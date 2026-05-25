@@ -50,7 +50,11 @@ class LLWindow;
 
 namespace LLImageGLMemory
 {
-    void alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count);
+    // width/height are the level-0 dimensions. If has_mips is true,
+    // the recorded size includes the full mip pyramid down to 1x1
+    // (driver-padded via dataFormatVRAMBytes per level). count covers
+    // array slices / cube faces, each of which gets its own pyramid.
+    void alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, bool has_mips = false);
     void free_tex_image(U32 texName);
     void free_tex_images(U32 count, const U32* texNames);
     void free_cur_tex_image();
@@ -65,10 +69,18 @@ public:
     // call once per frame
     static void updateClass();
 
-    // Get an estimate of how many bytes have been allocated in vram for textures.
-    // Does not include mipmaps.
-    // NOTE: multiplying this number by two gives a good estimate for total
-    // video memory usage based on testing in lagland against an NVIDIA GPU.
+    // Get an estimate of how many bytes have been allocated in vram for
+    // textures. Allocations recorded via alloc_tex_image with has_mips=true
+    // include the full mip pyramid (driver-padded via dataFormatVRAMBytes);
+    // allocations from external setManualImage callers that don't pass
+    // has_mips=true cover level 0 only.
+    //
+    // NOTE: viewer consumers (llviewertexture.cpp, lltextureview.cpp)
+    // historically scaled this by 2x via a /512 divisor instead of /1024
+    // when converting to MB. That fudge predates per-mip accounting and
+    // also compensates for driver-side overhead (descriptor structs, page
+    // alignment) plus the unaccounted external-setManualImage callers.
+    // Leave it alone until the budget code is reconciled holistically.
     static U64 getTextureBytesAllocated();
 
     // These 2 functions replace glGenTextures() and glDeleteTextures()
@@ -76,8 +88,21 @@ public:
     static void deleteTextures(S32 numTextures, const U32 *textures);
 
     // Size calculation
+    //
+    // dataFormatBits/Bytes report the *tight host-side* layout — i.e. the
+    // packed CPU buffer size for glTexImage2D/glTexSubImage2D uploads
+    // (matching the pixel format). Use these for source-pointer
+    // arithmetic and host-side accounting (getBytes/getMipBytes).
+    //
+    // dataFormatVRAMBits/Bytes report the *driver-side* allocation for
+    // VRAM accounting. They differ from the host values for formats that
+    // drivers pad (RGB8 -> RGBX, RGB16F -> RGBA16F, RGB32F -> RGBA32F,
+    // DEPTH_COMPONENT24 -> 32-bit). For other formats they delegate to
+    // dataFormatBits/Bytes.
     static S32 dataFormatBits(S32 dataformat);
     static S64 dataFormatBytes(S32 dataformat, S32 width, S32 height);
+    static S32 dataFormatVRAMBits(S32 dataformat);
+    static S64 dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height);
     static S32 dataFormatComponents(S32 dataformat);
 
     bool updateBindStats() const ;
@@ -134,7 +159,14 @@ public:
     void setComponents(S32 ncomponents) { mComponents = (S8)ncomponents ;}
     void setAllowCompression(bool allow) { mAllowCompression = allow; }
 
-    static void setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels, bool allow_compression = true);
+    // has_mips signals VRAM accounting that this allocation will own a
+    // full mip pyramid (either by additional setManualImage calls per
+    // level or via glGenerateMipmap). Only consulted on the miplevel==0
+    // call (the only one that records allocation bytes); ignored
+    // otherwise. Defaults to false so non-LLImageGL callers
+    // (llrendertarget, manip tools, drawpoolbump scratch uploads, etc.)
+    // keep their existing single-level accounting.
+    static void setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels, bool allow_compression = true, bool has_mips = false);
 
     // Apply the GL_TEXTURE_SWIZZLE_RGBA mask that re-expresses a deprecated
     // source format on the currently-bound texture as samplable RGBA.

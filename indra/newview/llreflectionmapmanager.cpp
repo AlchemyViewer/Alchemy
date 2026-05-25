@@ -83,7 +83,7 @@ void load_exr(const std::string& filename)
 
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_FLOAT, out);
 
-        LLImageGLMemory::alloc_tex_image(width, height, GL_RGB16F, 1);
+        LLImageGLMemory::alloc_tex_image(width, height, GL_RGB16F, 1, /*has_mips=*/true);
 
         free(out); // release memory of image data
 

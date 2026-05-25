@@ -197,6 +197,38 @@ namespace tut
         // 5x3 R8 = 15 bytes; rounds up to 16 (4-aligned).
         ensure_equals("5x3 R8 byte count rounds to 4-aligned 16",
                       (S32)LLImageGL::dataFormatBytes(GL_R8, 5, 3), 16);
+
+        // Host vs. VRAM split: dataFormatBits returns the tight host
+        // layout (used for CPU upload-buffer math); dataFormatVRAMBits
+        // returns the padded driver allocation (used for VRAM stats).
+        // For formats drivers don't pad, the two agree.
+        ensure_equals("RGB8 host -> 24 bits (tight)",
+                      LLImageGL::dataFormatBits(GL_RGB8), 24);
+        ensure_equals("RGB8 VRAM -> 32 bits (padded to RGBX)",
+                      LLImageGL::dataFormatVRAMBits(GL_RGB8), 32);
+        ensure_equals("RGB16F host -> 48 bits (tight)",
+                      LLImageGL::dataFormatBits(GL_RGB16F), 48);
+        ensure_equals("RGB16F VRAM -> 64 bits (padded to RGBA16F)",
+                      LLImageGL::dataFormatVRAMBits(GL_RGB16F), 64);
+        ensure_equals("RGB32F host -> 96 bits (tight)",
+                      LLImageGL::dataFormatBits(GL_RGB32F), 96);
+        ensure_equals("RGB32F VRAM -> 128 bits (padded to RGBA32F)",
+                      LLImageGL::dataFormatVRAMBits(GL_RGB32F), 128);
+        ensure_equals("DEPTH_COMPONENT24 host -> 24 bits (tight)",
+                      LLImageGL::dataFormatBits(GL_DEPTH_COMPONENT24), 24);
+        ensure_equals("DEPTH_COMPONENT24 VRAM -> 32 bits (padded)",
+                      LLImageGL::dataFormatVRAMBits(GL_DEPTH_COMPONENT24), 32);
+
+        // VRAM bytes path applies the same 4-byte alignment as the
+        // host bytes path and routes unpadded formats through the
+        // host table — so RGBA8 matches between the two.
+        ensure_equals("16x16 RGBA8 VRAM = 1024 bytes (matches host)",
+                      (S32)LLImageGL::dataFormatVRAMBytes(GL_RGBA8, 16, 16), 1024);
+        // 16x16 RGB8: host 16*16*3 = 768; VRAM 16*16*4 = 1024.
+        ensure_equals("16x16 RGB8 host = 768 bytes",
+                      (S32)LLImageGL::dataFormatBytes(GL_RGB8, 16, 16), 768);
+        ensure_equals("16x16 RGB8 VRAM = 1024 bytes (padded)",
+                      (S32)LLImageGL::dataFormatVRAMBytes(GL_RGB8, 16, 16), 1024);
     }
 
     // When no explicit format is set, createGLTexture derives one from

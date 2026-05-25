@@ -183,7 +183,7 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
         ++mip;
     }
 
-    alloc_tex_image(resolution, resolution, format, count * 6);
+    alloc_tex_image(resolution, resolution, format, count * 6, use_mips);
 
     mImage->setAddressMode(LLTexUnit::TAM_CLAMP);
 

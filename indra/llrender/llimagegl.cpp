@@ -75,12 +75,26 @@ static U64 sTextureBytes = 0;
 
 // track a texture alloc on the currently bound texture.
 // asserts that no currently tracked alloc exists
-void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count)
+void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, bool has_mips)
 {
     U32 texUnit = gGL.getCurrentTexUnitIndex();
     llassert(texUnit == 0); // allocations should always be done on tex unit 0
     U32 texName = gGL.getTexUnit(texUnit)->getCurrTexture();
-    U64 size = LLImageGL::dataFormatBytes(intformat, width, height);
+    U64 size = LLImageGL::dataFormatVRAMBytes(intformat, width, height);
+    if (has_mips)
+    {
+        // Sum the mip pyramid down to 1x1 the same way getMipBytes does,
+        // so non-power-of-two and non-square cases stay exact rather than
+        // relying on the 4/3 geometric-series approximation.
+        S32 w = (S32)width;
+        S32 h = (S32)height;
+        while (w > 1 && h > 1)
+        {
+            w >>= 1; if (w == 0) w = 1;
+            h >>= 1; if (h == 0) h = 1;
+            size += LLImageGL::dataFormatVRAMBytes(intformat, w, h);
+        }
+    }
     size *= count;
 
     llassert(size >= 0);
@@ -400,6 +414,45 @@ S64 LLImageGL::dataFormatBytes(S32 dataformat, S32 width, S32 height)
         break;
     }
     S64 bytes (((S64)width * (S64)height * (S64)dataFormatBits(dataformat)+7)>>3);
+    S64 aligned = (bytes+3)&~3;
+    return aligned;
+}
+
+//static
+S32 LLImageGL::dataFormatVRAMBits(S32 dataformat)
+{
+    // For formats where driver-side storage diverges from the tight
+    // host layout, return the padded width. Everything else delegates
+    // to dataFormatBits so adding a new format to the host table also
+    // covers VRAM accounting by default.
+    switch (dataformat)
+    {
+    case GL_RGB8:                   return 32;  // padded to RGBX
+    case GL_RGB16F:                 return 64;  // padded to RGBA16F
+    case GL_RGB32F:                 return 128; // padded to RGBA32F
+    case GL_DEPTH_COMPONENT24:      return 32;  // padded to 32-bit
+    default:                        return dataFormatBits(dataformat);
+    }
+}
+
+//static
+S64 LLImageGL::dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height)
+{
+    switch (dataformat)
+    {
+    case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
+    case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
+    case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+    case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
+        if (width < 4) width = 4;
+        if (height < 4) height = 4;
+        break;
+    default:
+        break;
+    }
+    S64 bytes (((S64)width * (S64)height * (S64)dataFormatVRAMBits(dataformat)+7)>>3);
     S64 aligned = (bytes+3)&~3;
     return aligned;
 }
@@ -807,7 +860,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
         S32 w = getWidth();
         S32 h = getHeight();
         LLImageGL::setManualImage(mTarget, 0, mFormatInternal, w, h,
-            mFormatPrimary, mFormatType, (GLvoid*)data_in, mAllowCompression);
+            mFormatPrimary, mFormatType, (GLvoid*)data_in, mAllowCompression, mUseMipMaps);
     }
     else if (mUseMipMaps)
     {
@@ -842,7 +895,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                         stop_glerror();
                     }
 
-                    LLImageGL::setManualImage(mTarget, gl_level, mFormatInternal, w, h, mFormatPrimary, mFormatType, (GLvoid*)data_in, mAllowCompression);
+                    LLImageGL::setManualImage(mTarget, gl_level, mFormatInternal, w, h, mFormatPrimary, mFormatType, (GLvoid*)data_in, mAllowCompression, mUseMipMaps);
                     if (gl_level == 0)
                     {
                         analyzeAlpha(data_in, w, h);
@@ -885,7 +938,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                     LLImageGL::setManualImage(mTarget, 0, mFormatInternal,
                                  w, h,
                                  mFormatPrimary, mFormatType,
-                                 data_in, mAllowCompression);
+                                 data_in, mAllowCompression, mUseMipMaps);
                     analyzeAlpha(data_in, w, h);
                     stop_glerror();
 
@@ -986,7 +1039,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                             stop_glerror();
                         }
 
-                        LLImageGL::setManualImage(mTarget, m, mFormatInternal, w, h, mFormatPrimary, mFormatType, cur_mip_data, mAllowCompression);
+                        LLImageGL::setManualImage(mTarget, m, mFormatInternal, w, h, mFormatPrimary, mFormatType, cur_mip_data, mAllowCompression, mUseMipMaps);
                         if (m == 0)
                         {
                             analyzeAlpha(data_in, w, h);
@@ -1354,7 +1407,7 @@ void LLImageGL::deleteTextures(S32 numTextures, const U32 *textures)
 }
 
 // static
-void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels, bool allow_compression)
+void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels, bool allow_compression, bool has_mips)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     // Gate on GL version. GL_TEXTURE_SWIZZLE_RGBA is in both core and
@@ -1536,12 +1589,12 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
         LL_PROFILE_ZONE_NUM(width);
         LL_PROFILE_ZONE_NUM(height);
 
-        // Memory accounting tracks level 0 only — see comment on
-        // LLImageGL::getTextureBytesAllocated (consumer multiplies by 2 to
-        // estimate the full mip pyramid). Updating on every miplevel
-        // call replaced the level-0 size with each successive sub-mip's
-        // tiny size, leaving e.g. a 256x256 RGBA texture tracked at the
-        // bytes of mip 8 instead of mip 0.
+        // Memory accounting runs on the miplevel==0 call only — that's
+        // when the texture's full footprint (level 0 + the optional mip
+        // pyramid, signalled by has_mips) is recorded. Updating on every
+        // miplevel call previously replaced the level-0 size with each
+        // successive sub-mip's tiny size, leaving e.g. a 256x256 RGBA
+        // texture tracked at the bytes of mip 8 instead of mip 0.
         const bool track_alloc = (miplevel == 0);
         if (track_alloc)
         {
@@ -1570,7 +1623,7 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
         }
         if (track_alloc)
         {
-            alloc_tex_image(width, height, intformat, 1);
+            alloc_tex_image(width, height, intformat, 1, has_mips);
         }
     }
     stop_glerror();
@@ -2717,7 +2770,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
             free_tex_image(mTexName);
             glTexImage2D(mTarget, 0, mFormatInternal, desired_width, desired_height, 0, mFormatPrimary, mFormatType, nullptr);
             glCopyTexSubImage2D(mTarget, 0, 0, 0, 0, 0, desired_width, desired_height);
-            alloc_tex_image(desired_width, desired_height, mFormatInternal, 1);
+            alloc_tex_image(desired_width, desired_height, mFormatInternal, 1, mHasMipMaps);
 
             mTexOptionsDirty = true;
 
@@ -2765,7 +2818,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         glTexImage2D(mTarget, 0, mFormatInternal, desired_width, desired_height, 0, mFormatPrimary, mFormatType, nullptr);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
-        alloc_tex_image(desired_width, desired_height, mFormatInternal, 1);
+        alloc_tex_image(desired_width, desired_height, mFormatInternal, 1, mHasMipMaps);
 
         if (mHasMipMaps)
         {
