@@ -893,6 +893,9 @@ with the same filename but different name
   <texture name="icon_auction.tga"/>
   <texture name="icon_place.tga"/>
   <texture name="icon_top_pick.tga" />
+  <texture name="Icon_Place" file_name="icon_place.tga" preload="false" />
+  <texture name="Icon_Auction" file_name="icon_auction.tga" preload="false" />
+  <texture name="Icon_Group" file_name="icon_group.tga" preload="false" />
 
   <texture name="icon_event.tga"/>
   <texture name="icon_event_adult.tga"/>
