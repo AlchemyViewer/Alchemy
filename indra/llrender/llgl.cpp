@@ -2443,6 +2443,10 @@ void LLGLState::initClass()
     //make sure multisample defaults to disabled
     sStateMap[GL_MULTISAMPLE] = GL_FALSE;
     glDisable(GL_MULTISAMPLE);
+
+    // Ensure SRGB framebuffer is disabled by default
+    sStateMap[GL_FRAMEBUFFER_SRGB] = GL_FALSE;
+    glDisable(GL_FRAMEBUFFER_SRGB);
 }
 
 //static

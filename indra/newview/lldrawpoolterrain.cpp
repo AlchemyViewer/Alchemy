@@ -219,6 +219,8 @@ void LLDrawPoolTerrain::renderFullShader()
     }
     else
     {
+        LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+
         // Use materials
         U32 paint_type = use_local_materials ? gLocalTerrainMaterials.getPaintType() : compp->getPaintType();
         paint_type = llclamp(paint_type, 0, TERRAIN_PAINT_TYPE_COUNT);

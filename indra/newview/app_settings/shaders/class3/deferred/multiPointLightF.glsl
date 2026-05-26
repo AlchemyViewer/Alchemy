@@ -126,7 +126,6 @@ void main()
     }
     else
     {
-        diffuse = srgb_to_linear(diffuse);
         spec.rgb = srgb_to_linear(spec.rgb);
 
         // As of OSX 10.6.7 ATI Apple's crash when using a variable size loop

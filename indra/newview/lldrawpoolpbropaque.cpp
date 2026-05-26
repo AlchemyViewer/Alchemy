@@ -54,6 +54,8 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
 {
     llassert(!LLPipeline::sRenderingHUDs);
 
+    LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+
     if (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR_ALPHA_MASK)
     {
         LL::GLTFSceneManager::instance().renderOpaque();

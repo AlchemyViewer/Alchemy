@@ -122,7 +122,6 @@ void main()
         {
             discard;
         }
-        diffuse = srgb_to_linear(diffuse);
         spec.rgb = srgb_to_linear(spec.rgb);
 
         float lit = nl * dist_atten;

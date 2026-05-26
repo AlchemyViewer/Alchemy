@@ -910,7 +910,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     bool ssao = RenderDeferredSSAO;
 
     //allocate deferred rendering color buffers
-    if (!mRT->deferredScreen.allocate(resX, resY, GL_RGBA, true)) return false;
+    if (!mRT->deferredScreen.allocate(resX, resY, GL_SRGB8_ALPHA8, true)) return false;
     if (!addDeferredAttachments(mRT->deferredScreen)) return false;
 
     GLuint screenFormat = hdr ? GL_RGBA16F : GL_RGBA;

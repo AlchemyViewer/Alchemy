@@ -205,12 +205,11 @@ void main()
     }
     else
     {
-        // legacy shaders are still writng sRGB to gbuffer
-        baseColor.rgb = srgb_to_linear(baseColor.rgb);
-
+        // legacy shaders are still writng sRGB to gbuffer, diffuse is sRGB buffer autodecoded
+        // to linear, but specular is not, so convert it here for use in lighting calcs
         spec.rgb = srgb_to_linear(spec.rgb);
 
-        float da          = clamp(dot(gb.normal, light_dir.xyz), 0.0, 1.0);
+        float da = clamp(dot(gb.normal, light_dir.xyz), 0.0, 1.0);
 
         vec3 irradiance = amblit;
         vec3 glossenv = vec3(0);

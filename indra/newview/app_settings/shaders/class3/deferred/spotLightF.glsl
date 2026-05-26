@@ -189,8 +189,6 @@ void main()
     else
     {
         float envIntensity = gb.envIntensity;
-
-        diffuse = srgb_to_linear(diffuse);
         spec.rgb = srgb_to_linear(spec.rgb);
 
         if (proj_tc.z > 0.0 &&
