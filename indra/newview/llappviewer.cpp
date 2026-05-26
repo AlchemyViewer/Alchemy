@@ -3045,9 +3045,11 @@ bool LLAppViewer::initConfiguration()
         gSavedSettings.setBOOL("RenderDebugGLSession", false);
     }
 
-    const LLControlVariable* skinfolder = gSavedSettings.getControl("SkinCurrent");
+    LLControlVariable* skinfolder = gSavedSettings.getControl("SkinCurrent");
     if (skinfolder && LLStringUtil::null != skinfolder->getValue().asString())
     {
+        skinfolder->setValue("default", false);
+
         // Examining "Language" may not suffice -- see LLUI::getLanguage()
         // logic. Unfortunately LLUI::getLanguage() doesn't yet do us much
         // good because we haven't yet called LLUI::initClass().

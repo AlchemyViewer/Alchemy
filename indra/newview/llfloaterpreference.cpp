@@ -688,6 +688,16 @@ skin_t manifestFromJson(const std::string& filename, const ESkinType type)
 void LLFloaterPreference::loadUserSkins()
 {
     mUserSkins.clear();
+#if 1
+    const std::string& fullpath = gDirUtilp->add(gDirUtilp->getSkinBaseDir(), "default");
+    if (LLFile::isdir(fullpath))
+    {
+        const std::string& manifestpath = gDirUtilp->add(fullpath, "manifest.json");
+        skin_t skin = manifestFromJson(manifestpath, SYSTEM_SKIN);
+
+        mUserSkins.emplace("default", skin);
+    }
+#else
     LLDirIterator sysiter(gDirUtilp->getSkinBaseDir(), "*");
     bool found = true;
     while (found)
@@ -725,6 +735,7 @@ void LLFloaterPreference::loadUserSkins()
             }
         }
     }
+#endif
     reloadSkinList();
 }
 
