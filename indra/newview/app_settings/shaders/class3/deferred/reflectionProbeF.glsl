@@ -290,7 +290,9 @@ bool intersect(const Ray &ray) const
         return true;
 } */
 
-// adapted -- assume that origin is inside sphere, return intersection of ray with edge of sphere
+// adapted -- assume that origin is inside sphere, return intersection of ray with edge of sphere.
+// guards `radius2 - d2` against negative values so callers that pass a position outside the sphere
+// (or use the 4096*4096 automatic-probe hack) get a clamped intersection instead of NaN.
 vec3 sphereIntersect(vec3 origin, vec3 dir, vec3 center, float radius2)
 {
         float t0, t1; // solutions for t if the ray intersects
@@ -300,7 +302,7 @@ vec3 sphereIntersect(vec3 origin, vec3 dir, vec3 center, float radius2)
 
         float d2 = dot(L,L) - tca * tca;
 
-        float thc = sqrt(radius2 - d2);
+        float thc = sqrt(max(radius2 - d2, 0.0));
         t0 = tca - thc;
         t1 = tca + thc;
 
