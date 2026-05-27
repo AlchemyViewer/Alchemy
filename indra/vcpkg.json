@@ -47,7 +47,6 @@
     "glm",
     "harfbuzz",
     "hunspell",
-    "icu",
     {
       "name": "libjpeg-turbo",
       "features": [

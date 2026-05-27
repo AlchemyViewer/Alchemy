@@ -26,7 +26,6 @@ set(cmake_SOURCE_FILES
         GStreamer10Plugin.cmake
         Havok.cmake
         Hunspell.cmake
-        ICU4C.cmake
         JPEG.cmake
         LibVLCPlugin.cmake
         Linking.cmake
