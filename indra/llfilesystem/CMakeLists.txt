@@ -26,20 +26,12 @@ target_sources(llfilesystem
 if (DARWIN)
   target_sources(llfilesystem
       PRIVATE
-      lldir_mac.cpp
-      lldir_utils_objc.mm
+      lldir_mac.mm
       PUBLIC
       FILE_SET HEADERS
       FILES
       lldir_mac.h
-      lldir_utils_objc.h
       )
-
-  set_source_files_properties(
-    lldir_utils_objc.mm
-    PROPERTIES
-    SKIP_PRECOMPILE_HEADERS TRUE
-  )
 endif (DARWIN)
 
 if (LINUX)

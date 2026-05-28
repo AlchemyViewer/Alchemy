@@ -36,9 +36,37 @@
 #include <unistd.h>
 #include <glob.h>
 #include <filesystem>
-#include "lldir_utils_objc.h"
+
+#import <Cocoa/Cocoa.h>
 
 // --------------------------------------------------------------------------------
+
+//findSystemDirectory scoped exclusively to this file.
+std::string findSystemDirectory(NSSearchPathDirectory searchPathDirectory,
+                                NSSearchPathDomainMask domainMask)
+{
+    std::string result;
+    @autoreleasepool {
+        NSString *path = nil;
+
+        // Search for the path
+        NSArray* paths = NSSearchPathForDirectoriesInDomains(searchPathDirectory,
+                                                             domainMask,
+                                                             YES);
+        if ([paths count])
+        {
+            path = [paths objectAtIndex:0];
+            //HACK:  Always attempt to create directory, ignore errors.
+            NSError *error = nil;
+
+            [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:&error];
+
+
+            result = std::string([path UTF8String]);
+        }
+    }
+    return result;
+}
 
 static bool CreateDirectory(const std::string &parent,
                             const std::string &child,
@@ -64,9 +92,13 @@ LLDir_Mac::LLDir_Mac()
 {
     mDirDelimiter = "/";
 
-    const std::string     secondLifeString = "AlchemyNext";
+    const std::string secondLifeString = "AlchemyNext";
 
-    std::string executablepathstr = getSystemExecutableFolder();
+    std::string executablepathstr;
+    @autoreleasepool {
+        NSString *bundlePath = [[NSBundle mainBundle] executablePath];
+        executablepathstr = std::string([bundlePath UTF8String]);
+    }
 
     //NOTE:  LLINFOS/LLERRS will not output to log here.  The streams are not initialized.
 
@@ -81,8 +113,10 @@ LLDir_Mac::LLDir_Mac()
         mExecutableDir = executablepath.parent_path().string();
 
         // mAppRODataDir
-        std::string resourcepath = getSystemResourceFolder();
-        mAppRODataDir = resourcepath;
+        @autoreleasepool {
+            NSString *bundlePath = [[NSBundle mainBundle] resourcePath];
+            mAppRODataDir = std::string([bundlePath UTF8String]);
+        }
 
         // *NOTE: When running in a dev tree, use the copy of
         // skins in indra/newview/ rather than in the application bundle.  This
@@ -108,7 +142,7 @@ LLDir_Mac::LLDir_Mac()
         }
 
         // mOSUserDir
-        std::string appdir = getSystemApplicationSupportFolder();
+        std::string appdir = findSystemDirectory(NSApplicationSupportDirectory, NSUserDomainMask);
         std::string rootdir;
 
         //Create root directory
@@ -126,7 +160,7 @@ LLDir_Mac::LLDir_Mac()
         }
 
         //mOSCacheDir
-        std::string cachedir =  getSystemCacheFolder();
+        std::string cachedir =  findSystemDirectory(NSCachesDirectory, NSUserDomainMask);
         if (!cachedir.empty())
         {
             mOSCacheDir = cachedir;
@@ -138,8 +172,7 @@ LLDir_Mac::LLDir_Mac()
         mOSUserAppDir = mOSUserDir;
 
         // mTempDir
-        //Aura 120920 std::filesystem::temp_directory_path() not yet implemented on mac. :(
-        std::string tmpdir = getSystemTempFolder();
+        std::string tmpdir = LLFile::tmpdir();
         if (!tmpdir.empty())
         {
             CreateDirectory(tmpdir, secondLifeString, &mTempDir);
