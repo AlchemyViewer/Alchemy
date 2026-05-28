@@ -5,50 +5,51 @@
 
 # Alchemy Viewer
 
-[Alchemy Viewer](https://www.alchemyviewer.org) is a third-party client for Second Life. Our focus is on creating a cohesive and modern experience, with carefully considered default behaviors and settings while maintaining a bleeding-edge approach to adopting new features and developments from the Second Life platform.
+[![License: LGPL 2.1](https://img.shields.io/badge/License-LGPL_2.1-blue.svg)](LICENSE)
+[![Latest Release](https://img.shields.io/github/v/release/AlchemyViewer/Alchemy)](https://github.com/AlchemyViewer/Alchemy/releases)
+[![Discord](https://img.shields.io/badge/Discord-Join-7289da?logo=discord&logoColor=white)][discord]
 
-## Download
+[Alchemy Viewer](https://www.alchemyviewer.org) is a third-party client for [Second Life](https://secondlife.com), forked from the official [Linden Lab viewer](https://github.com/secondlife/viewer). We focus on a cohesive, modern experience built on thoughtful defaults — while staying on the bleeding edge of new platform features.
 
-Most people use a pre-built release. Windows, macOS, and Linux builds are published as [releases on GitHub][releasesgh]. Release candidates and project viewers are typically announced on our [Discord server][discord].
+## 📥 Download
 
-## Building from source
+Most users install a [pre-built release][releasesgh] for Windows, macOS, or Linux. Release candidates and project viewers are announced on our [Discord server][discord].
 
-Alchemy uses CMake with vcpkg for dependency management.
+## 🔨 Building from source
 
-### Quick start
+Alchemy uses CMake with vcpkg for dependency management. Platform setup, presets, build options, tests, packaging, and troubleshooting all live in [**doc/BUILD.md**](doc/BUILD.md).
 
 ```
-git clone https://github.com/alchemyviewer/alchemy.git
+git clone https://github.com/AlchemyViewer/Alchemy.git alchemy
 cd alchemy
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-dotnet tool restore                                   # only if packaging
-cmake -S indra --preset <preset>                      # see below
+dotnet tool restore                                  # packaging only
+cmake -S indra --preset <preset>                     # see BUILD.md for presets
 cmake --build build-<OS>-<preset> --config Release
 ```
 
-### Platform setup
+## 🤝 Contribute
 
-Install the right compiler and system dependencies for your OS first:
+File bug reports, suggest enhancements, or open a pull request — see [CONTRIBUTING](CONTRIBUTING.md) for guidelines.
 
-- [Windows](doc/BUILD.WINDOWS.md)
-- [Linux](doc/BUILD.LINUX.md)
-- [macOS](doc/BUILD.MAC.md)
+## 🙏 Acknowledgements
 
-### Reference
+Alchemy stands on the work of:
 
-Presets, configuration types, build options, and how to run tests all live in [**doc/BUILD.md**](doc/BUILD.md).
+- [Linden Lab](https://www.lindenlab.com/) and the [Second Life Viewer](https://github.com/secondlife/viewer) contributors
+- The many open-source libraries that power the viewer (see [`indra/vcpkg.json`](indra/vcpkg.json))
 
-## Contribute
+## 🔗 Resources
 
-Help improve Alchemy Viewer! You can get involved by filing bugs, suggesting enhancements, submitting pull requests, and more. See [CONTRIBUTING](CONTRIBUTING.md) for details.
+- [Website](https://www.alchemyviewer.org)
+- [Downloads][releasesgh]
+- [Issue tracker](https://github.com/AlchemyViewer/Alchemy/issues)
+- [Discord][discord]
 
-## Resources
+## 📜 License
 
-* [Website](http://www.alchemyviewer.org)
-* [Downloads][releasesgh]
-* [Issue tracker](https://github.com/AlchemyViewer/Alchemy/issues)
-* [Discord][discord]
+Alchemy is licensed under the [GNU Lesser General Public License v2.1](LICENSE), inherited from the upstream Linden Lab viewer.
 
 [releasesgh]: https://github.com/AlchemyViewer/Alchemy/releases
 [discord]: https://discordapp.com/invite/KugCgs6
