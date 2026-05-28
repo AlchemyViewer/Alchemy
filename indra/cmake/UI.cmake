@@ -2,7 +2,7 @@
 include_guard()
 
 include(FreeType)
-include(GLIB)
+include(DBUS)
 
 add_library(ll::uilibraries INTERFACE IMPORTED)
 
@@ -28,8 +28,7 @@ if (LINUX)
   target_link_libraries(ll::uilibraries INTERFACE
           ll::fontconfig
           ll::freetype
-          ll::glib
-          ll::gio
+          ll::dbus
   )
 elseif(DARWIN)
   target_link_libraries(ll::uilibraries INTERFACE

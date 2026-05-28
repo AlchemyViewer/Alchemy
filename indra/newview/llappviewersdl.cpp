@@ -89,29 +89,12 @@ static void handleUrl(const char* url_utf8);
 #endif
 #endif
 
-#ifdef LL_GLIB
-#include <gio/gio.h>
+#if LL_LINUX && LL_DBUS
+#include <dbus/dbus.h>
 
-
-#define VIEWERAPI_SERVICE "com.secondlife.ViewerAppAPIService"
-#define VIEWERAPI_PATH "/com/secondlife/ViewerAppAPI"
+#define VIEWERAPI_SERVICE   "com.secondlife.ViewerAppAPIService"
+#define VIEWERAPI_PATH      "/com/secondlife/ViewerAppAPI"
 #define VIEWERAPI_INTERFACE "com.secondlife.ViewerAppAPI"
-
-static const char * DBUS_SERVER = "<node name=\"/com/secondlife/ViewerAppAPI\">\n"
-                                  "  <interface name=\"com.secondlife.ViewerAppAPI\">\n"
-                                  "    <annotation name=\"org.freedesktop.DBus.GLib.CSymbol\" value=\"viewer_app_api\"/>\n"
-                                  "    <method name=\"GoSLURL\">\n"
-                                  "      <annotation name=\"org.freedesktop.DBus.GLib.CSymbol\" value=\"dispatchSLURL\"/>\n"
-                                  "      <arg type=\"s\" name=\"slurl\" direction=\"in\" />\n"
-                                  "    </method>\n"
-                                  "  </interface>\n"
-                                  "</node>";
-
-typedef struct
-{
-    GObject parent;
-} ViewerAppAPI;
-
 #endif
 
 #if LL_DARWIN
@@ -126,6 +109,11 @@ namespace
     char **gArgV = NULL;
     LLAppViewerSDL* gViewerAppPtr = NULL;
     void (*gOldTerminateHandler)() = NULL;
+#if LL_LINUX && LL_DBUS
+    // Shared session-bus connection, owned for the lifetime of the process and
+    // pumped from SDL_AppIterate so incoming GoSLURL method calls get dispatched.
+    DBusConnection* gDBusConn = nullptr;
+#endif
 #if LL_DARWIN
     // Buffers a secondlife:// URL that arrived from the OS before the viewer
     // was ready to dispatch it. Drained at the end of LLAppViewerSDL::init().
@@ -630,16 +618,21 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     // Run the application main loop
     if (!gViewerAppPtr->frame())
     {
-#if LL_LINUX && LL_GLIB
-        // Pump until we've nothing left to do or passed 1/15th of a
-        // second pumping for this frame.
-        static LLTimer pump_timer;
-        pump_timer.reset();
-        pump_timer.setTimerExpirySec(1.0f / 15.0f);
-        do
+#if LL_LINUX && LL_DBUS
+        // Pump the session bus until we've nothing left to dispatch or have
+        // passed 1/15th of a second pumping for this frame.
+        if (gDBusConn)
         {
-            g_main_context_iteration(g_main_context_default(), false);
-        } while( g_main_context_pending(g_main_context_default()) && !pump_timer.hasExpired());
+            static LLTimer pump_timer;
+            pump_timer.reset();
+            pump_timer.setTimerExpirySec(1.0f / 15.0f);
+            dbus_connection_read_write(gDBusConn, 0); // non-blocking I/O
+            while (dbus_connection_dispatch(gDBusConn) == DBUS_DISPATCH_DATA_REMAINS
+                   && !pump_timer.hasExpired())
+            {
+            }
+            dbus_connection_flush(gDBusConn); // push any reply out this frame
+        }
 #endif
 
         // hack - doesn't belong here - but this is just for debugging
@@ -802,96 +795,98 @@ if(act.sa_sigaction != old_act.sa_sigaction) ++reset_count;
 }
 
 /////////////////////////////////////////
-#if LL_LINUX && LL_GLIB
+#if LL_LINUX && LL_DBUS
 
-typedef struct
-{
-        GObjectClass parent_class;
-} ViewerAppAPIClass;
-
-static void viewerappapi_init(ViewerAppAPI *server);
-static void viewerappapi_class_init(ViewerAppAPIClass *klass);
-
-G_DEFINE_TYPE(ViewerAppAPI, viewerappapi, G_TYPE_OBJECT);
-
-void viewerappapi_class_init(ViewerAppAPIClass *klass)
-{
-}
-
-static void dispatchSLURL(gchar const *slurl)
+static void dispatchSLURL(const char* slurl)
 {
     LL_INFOS() << "Was asked to go to slurl: " << slurl << LL_ENDL;
 
     std::string url = slurl;
-    LLMediaCtrl* web = NULL;
+    LLMediaCtrl* web = nullptr;
     const bool trusted_browser = false;
     LLURLDispatcher::dispatch(url, "", web, trusted_browser);
 }
 
-static void DoMethodeCall (GDBusConnection       *connection,
-                                const gchar           *sender,
-                                const gchar           *object_path,
-                                const gchar           *interface_name,
-                                const gchar           *method_name,
-                                GVariant              *parameters,
-                                GDBusMethodInvocation *invocation,
-                                gpointer               user_data)
+// Handles method calls delivered to VIEWERAPI_PATH. We only implement GoSLURL.
+static DBusHandlerResult onBusMessage(DBusConnection* connection, DBusMessage* message, void* user_data)
 {
-    LL_INFOS() << "DBUS message " << method_name << "  from: " << sender << " interface: " << interface_name << LL_ENDL;
-    const gchar *slurl;
+    if (!dbus_message_is_method_call(message, VIEWERAPI_INTERFACE, "GoSLURL"))
+    {
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    }
 
-    g_variant_get (parameters, "(&s)", &slurl);
-    dispatchSLURL(slurl);
-}
+    DBusError err;
+    dbus_error_init(&err);
 
-GDBusNodeInfo *gBusNodeInfo = nullptr;
-static const GDBusInterfaceVTable interface_vtable =
+    const char* slurl = nullptr;
+    if (dbus_message_get_args(message, &err, DBUS_TYPE_STRING, &slurl, DBUS_TYPE_INVALID))
+    {
+        dispatchSLURL(slurl);
+
+        // Reply so a blocking caller (sendURLToOtherInstance) unblocks promptly.
+        if (!dbus_message_get_no_reply(message))
         {
-                DoMethodeCall
-        };
-static void busAcquired(GDBusConnection *connection, const gchar *name, gpointer user_data)
-{
-    auto id = g_dbus_connection_register_object(connection,
-                                                VIEWERAPI_PATH,
-                                                gBusNodeInfo->interfaces[0],
-                                                &interface_vtable,
-                                                NULL,  /* user_data */
-                                                             NULL,  /* user_data_free_func */
-                                                             NULL); /* GError** */
-    g_assert (id > 0);
+            if (DBusMessage* reply = dbus_message_new_method_return(message))
+            {
+                dbus_connection_send(connection, reply, nullptr);
+                dbus_message_unref(reply);
+            }
+        }
+    }
+    else
+    {
+        LL_WARNS() << "DBUS GoSLURL bad arguments: " << err.message << LL_ENDL;
+    }
+
+    dbus_error_free(&err);
+    return DBUS_HANDLER_RESULT_HANDLED;
 }
 
-static void nameAcquired(GDBusConnection *connection, const gchar *name, gpointer user_data)
+// unregister_function, message_function, then four reserved padding slots.
+static const DBusObjectPathVTable sViewerApiVTable =
 {
-}
-
-static void nameLost(GDBusConnection *connection, const gchar *name, gpointer user_data)
-{
-
-}
-void viewerappapi_init(ViewerAppAPI *server)
-{
-    gBusNodeInfo = g_dbus_node_info_new_for_xml (DBUS_SERVER, NULL);
-    g_assert (gBusNodeInfo != NULL);
-
-    g_bus_own_name(G_BUS_TYPE_SESSION,
-                   VIEWERAPI_SERVICE,
-                   G_BUS_NAME_OWNER_FLAGS_NONE,
-                   busAcquired,
-                   nameAcquired,
-                   nameLost,
-                   NULL,
-                   NULL);
-
-}
-
-///
+    nullptr,
+    &onBusMessage,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr
+};
 
 //virtual
 bool LLAppViewerSDL::initSLURLHandler()
 {
-    //ViewerAppAPI *api_server = (ViewerAppAPI*)
-    g_object_new(viewerappapi_get_type(), NULL);
+    DBusError err;
+    dbus_error_init(&err);
+
+    gDBusConn = dbus_bus_get(DBUS_BUS_SESSION, &err);
+    if (!gDBusConn)
+    {
+        LL_WARNS() << "Cannot connect to session bus: " << err.message << LL_ENDL;
+        dbus_error_free(&err);
+        return false;
+    }
+
+    // We pump the connection ourselves from SDL_AppIterate, so don't let
+    // libdbus terminate the process if the bus disconnects.
+    dbus_connection_set_exit_on_disconnect(gDBusConn, false);
+
+    if (!dbus_connection_register_object_path(gDBusConn, VIEWERAPI_PATH, &sViewerApiVTable, nullptr))
+    {
+        LL_WARNS() << "Failed to register dbus object " << VIEWERAPI_PATH << LL_ENDL;
+        return false;
+    }
+
+    // Claim the well-known service name. DO_NOT_QUEUE so we never silently wait
+    // behind an existing owner; the marker-file guard upstream ensures we only
+    // reach here as the primary instance.
+    dbus_bus_request_name(gDBusConn, VIEWERAPI_SERVICE, DBUS_NAME_FLAG_DO_NOT_QUEUE, &err);
+    if (dbus_error_is_set(&err))
+    {
+        LL_WARNS() << "Failed to acquire dbus name " << VIEWERAPI_SERVICE << ": " << err.message << LL_ENDL;
+        dbus_error_free(&err);
+        return false;
+    }
 
     return true;
 }
@@ -899,46 +894,46 @@ bool LLAppViewerSDL::initSLURLHandler()
 //virtual
 bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
 {
-    auto *pBus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, nullptr);
+    DBusError err;
+    dbus_error_init(&err);
 
-    if( !pBus )
+    DBusConnection* connection = dbus_bus_get(DBUS_BUS_SESSION, &err);
+    if (!connection)
     {
-        LL_WARNS() << "Getting dbus failed." << LL_ENDL;
+        LL_WARNS() << "Cannot connect to session bus: " << err.message << LL_ENDL;
+        dbus_error_free(&err);
         return false;
     }
 
-    auto pProxy = g_dbus_proxy_new_sync(pBus, G_DBUS_PROXY_FLAGS_NONE, nullptr,
-                                        VIEWERAPI_SERVICE, VIEWERAPI_PATH,
-                                        VIEWERAPI_INTERFACE, nullptr, nullptr);
-
-    if( !pProxy )
+    DBusMessage* message = dbus_message_new_method_call(VIEWERAPI_SERVICE, VIEWERAPI_PATH,
+                                                        VIEWERAPI_INTERFACE, "GoSLURL");
+    if (!message)
     {
-        LL_WARNS() << "Cannot create new dbus proxy." << LL_ENDL;
-        g_object_unref( pBus );
+        LL_WARNS() << "Cannot create dbus method call." << LL_ENDL;
         return false;
     }
 
-    auto *pArgs = g_variant_new( "(s)", url.c_str() );
-    if( !pArgs )
+    const char* curl = url.c_str();
+    dbus_message_append_args(message, DBUS_TYPE_STRING, &curl, DBUS_TYPE_INVALID);
+
+    // Block for a reply. If no other instance owns the name this returns null
+    // with an error set (ServiceUnknown) -> we are the primary instance ->
+    // return false so startup continues normally.
+    DBusMessage* reply = dbus_connection_send_with_reply_and_block(connection, message, 2000, &err);
+    dbus_message_unref(message);
+
+    const bool handed_off = (reply != nullptr);
+    if (reply)
     {
-        LL_WARNS() << "Cannot create new variant." << LL_ENDL;
-        g_object_unref( pBus );
-        return false;
+        dbus_message_unref(reply);
+    }
+    else
+    {
+        LL_INFOS() << "No running instance to hand off SLURL to: " << err.message << LL_ENDL;
+        dbus_error_free(&err);
     }
 
-    auto pRes  = g_dbus_proxy_call_sync(pProxy,
-                                        "GoSLURL",
-                                        pArgs,
-                                        G_DBUS_CALL_FLAGS_NONE,
-                                        -1, nullptr, nullptr);
-
-
-
-    if( pRes )
-        g_variant_unref( pRes );
-    g_object_unref( pProxy );
-    g_object_unref( pBus );
-    return true;
+    return handed_off;
 }
 
 #elif LL_DARWIN
@@ -956,7 +951,7 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
     // Services / Apple Events automatically — no IPC needed from us.
     return false;
 }
-#else // LL_GLIB
+#else // LL_DBUS
 bool LLAppViewerSDL::initSLURLHandler()
 {
     return false; // not implemented without dbus
@@ -965,7 +960,7 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
 {
     return false; // not implemented without dbus
 }
-#endif // LL_GLIB
+#endif // LL_DBUS
 
 void LLAppViewerSDL::initCrashReporting(bool reportFreeze)
 {

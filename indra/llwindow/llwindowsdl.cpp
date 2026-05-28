@@ -41,10 +41,6 @@
 #include "llsdl.h"
 
 #if LL_LINUX
-#ifdef LL_GLIB
-#include <glib.h>
-#endif
-
 extern "C" {
 # include "fontconfig/fontconfig.h"
 }

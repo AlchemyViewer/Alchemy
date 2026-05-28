@@ -13,6 +13,7 @@ set(cmake_SOURCE_FILES
         Collada-Dom.cmake
         Copy3rdPartyLibs.cmake
         CURL.cmake
+        DBUS.cmake
         Discord.cmake
         EXPAT.cmake
         FAudio.cmake

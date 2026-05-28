@@ -27,6 +27,10 @@
         "openssl"
       ]
     },
+    {
+      "name": "dbus",
+      "platform": "linux"
+    },
     "dullahan-bin",
     "expat",
     "fmt",
