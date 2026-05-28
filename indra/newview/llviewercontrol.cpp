@@ -92,12 +92,8 @@
 #include "rlvcommon.h"
 // [/RLVa:KB]
 
-#if LL_DARWIN
-#if LL_SDL_WINDOW
+#if LL_DARWIN && LL_SDL_WINDOW
 #include "llwindowsdl.h"
-#else
-#include "llwindowmacosx.h"
-#endif
 #endif
 
 // Third party library includes
@@ -625,8 +621,6 @@ static bool handleAppleUseMultGLChanged(const LLSD& newvalue)
     {
 #if LL_SDL_WINDOW
         LLWindowSDL::setUseMultGL(newvalue.asBoolean());
-#else
-        LLWindowMacOSX::setUseMultGL(newvalue.asBoolean());
 #endif
     }
     return true;

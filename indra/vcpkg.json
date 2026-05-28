@@ -89,6 +89,38 @@
         "freetype"
       ]
     },
+    {
+      "name": "sdl3",
+      "features": [
+        {
+          "name": "alsa",
+          "platform": "linux"
+        },
+        {
+          "name": "dbus",
+          "platform": "linux"
+        },
+        {
+          "name": "ibus",
+          "platform": "linux"
+        },
+        {
+          "name": "wayland",
+          "platform": "linux"
+        },
+        {
+          "name": "x11",
+          "platform": "linux"
+        }
+      ]
+    },
+    {
+      "name": "sdl3-image",
+      "platform": "osx",
+      "features": [
+        "tiff"
+      ]
+    },
     "secondlife-certificates",
     "secondlife-emoji-shortcodes",
     "simdutf",
@@ -107,12 +139,6 @@
     "websocketpp",
     "xxhash",
     "zlib"
-  ],
-  "default-features": [
-    {
-      "name": "sdl3",
-      "platform": "linux"
-    }
   ],
   "features": {
     "bugsplat": {
@@ -173,43 +199,6 @@
       "description": "Build with support for OpenXR(experimental)",
       "dependencies": [
         "openxr-loader"
-      ]
-    },
-    "sdl3": {
-      "description": "Build with platform independent SDL window backend",
-      "dependencies": [
-        {
-          "name": "sdl3",
-          "features": [
-            {
-              "name": "alsa",
-              "platform": "linux"
-            },
-            {
-              "name": "dbus",
-              "platform": "linux"
-            },
-            {
-              "name": "ibus",
-              "platform": "linux"
-            },
-            {
-              "name": "wayland",
-              "platform": "linux"
-            },
-            {
-              "name": "x11",
-              "platform": "linux"
-            }
-          ]
-        },
-        {
-          "name": "sdl3-image",
-          "platform": "osx",
-          "features": [
-            "tiff"
-          ]
-        }
       ]
     },
     "sentry": {

@@ -27,10 +27,6 @@
 #ifndef LL_LLGLHEADERS_H
 #define LL_LLGLHEADERS_H
 
-#if LL_WINDOWS || LL_MESA_HEADLESS || LL_SDL_WINDOW || LL_LINUX
- //----------------------------------------------------------------------------
- // LL_WINDOWS || LL_MESA_HEADLESS || LL_SDL_WINDOW || LL_LINUX
-
 #define LL_GL_FUNC_POINTER 1
 
  // windows gl headers depend on things like APIENTRY, so include windows.
@@ -64,23 +60,6 @@
 #define EGL_EGL_PROTOTYPES 0
 #include <EGL/egl.h>
 #endif
-
-#elif LL_DARWIN
-//----------------------------------------------------------------------------
-// LL_DARWIN
-
-#include <OpenGL/gl3.h>
-#include <OpenGL/gl3ext.h>
-
-#ifndef GL_TEXTURE_MAX_ANISOTROPY
-#define GL_TEXTURE_MAX_ANISOTROPY GL_TEXTURE_MAX_ANISOTROPY_EXT
-#endif
-
-#ifndef GL_MAX_TEXTURE_MAX_ANISOTROPY
-#define GL_MAX_TEXTURE_MAX_ANISOTROPY GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT
-#endif
-
-#endif // LL_MESA_HEADLESS / LL_SDL_WINDOW // LL_LINUX / LL_WINDOWS / LL_DARWIN
 
 // GL_NVX_gpu_memory_info constants
 #ifndef GL_NVX_gpu_memory_info

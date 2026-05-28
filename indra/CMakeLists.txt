@@ -125,11 +125,6 @@ if (USE_KDU)
   list(APPEND VCPKG_MANIFEST_FEATURES "kdu")
 endif()
 
-# Setup SDL feature flag
-if (USE_SDL_WINDOW)
-  list(APPEND VCPKG_MANIFEST_FEATURES "sdl3")
-endif()
-
 # Setup Tracy feature flags
 if (USE_TRACY)
   list(APPEND VCPKG_MANIFEST_FEATURES "tracy")

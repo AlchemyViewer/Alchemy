@@ -40,9 +40,6 @@ public:
     void    resetMaskKeys() override;
     MASK    currentMask(bool for_mouse_event) override;
     void    scanKeyboard() override;
-#if LL_DARWIN && !LL_SDL_WINDOW
-    void    handleModifier(MASK mask) override;
-#endif
 };
 
 #endif

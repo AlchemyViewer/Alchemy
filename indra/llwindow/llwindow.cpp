@@ -29,12 +29,10 @@
 
 #if LL_MESA_HEADLESS
 #include "llwindowmesaheadless.h"
-#elif LL_SDL_WINDOW
-#include "llwindowsdl.h"
-#elif LL_WINDOWS
+#elif LL_WINDOWS && !LL_SDL_WINDOW
 #include "llwindowwin32.h"
-#elif LL_DARWIN
-#include "llwindowmacosx.h"
+#else
+#include "llwindowsdl.h"
 #endif
 
 #include "llerror.h"
@@ -78,15 +76,10 @@ S32 OSMessageBox(const std::string& text, const std::string& caption, U32 type)
     LL_WARNS() << "OSMessageBox: " << text << LL_ENDL;
 #if LL_MESA_HEADLESS // !!! *FIX: (?)
     return OSBTN_OK;
-#elif LL_SDL_WINDOW
-    result = OSMessageBoxSDL(text, caption, type);
-#elif LL_WINDOWS
+#elif LL_WINDOWS && !LL_SDL_WINDOW
     result = OSMessageBoxWin32(text, caption, type);
-#elif LL_DARWIN
-    result = OSMessageBoxMacOSX(text, caption, type);
 #else
-    LL_WARNS() << "OSMessageBox not implemented for this platform!" << LL_ENDL;
-    return OSBTN_OK;
+    result = OSMessageBoxSDL(text, caption, type);
 #endif
 
     if (was_visible)
@@ -259,14 +252,10 @@ std::vector<std::string> LLWindow::getDynamicFallbackFontList()
 {
 #if LL_MESA_HEADLESS
     return std::vector<std::string>();
-#elif LL_SDL_WINDOW
-    return LLWindowSDL::getDynamicFallbackFontList();
-#elif LL_WINDOWS
+#elif LL_WINDOWS && !LL_SDL_WINDOW
     return LLWindowWin32::getDynamicFallbackFontList();
-#elif LL_DARWIN
-    return LLWindowMacOSX::getDynamicFallbackFontList();
 #else
-    return std::vector<std::string>();
+    return LLWindowSDL::getDynamicFallbackFontList();
 #endif
 }
 
@@ -275,14 +264,10 @@ std::vector<std::string> LLWindow::getDisplaysResolutionList()
 {
 #if LL_MESA_HEADLESS
     return std::vector<std::string>();
-#elif LL_SDL_WINDOW
-    return LLWindowSDL::getDisplaysResolutionList();
-#elif LL_WINDOWS
+#elif LL_WINDOWS && !LL_SDL_WINDOW
     return LLWindowWin32::getDisplaysResolutionList();
-#elif LL_DARWIN
-    return LLWindowMacOSX::getDisplaysResolutionList();
 #else
-    return std::vector<std::string>();
+    return LLWindowSDL::getDisplaysResolutionList();
 #endif
 }
 
@@ -348,15 +333,10 @@ LLSplashScreen *LLSplashScreen::create()
 {
 #if LL_MESA_HEADLESS
     return nullptr;
-#elif LL_SDL_WINDOW
-    return new LLSplashScreenSDL;
-#elif LL_WINDOWS
+#elif LL_WINDOWS && !LL_SDL_WINDOW
     return new LLSplashScreenWin32;
-#elif LL_DARWIN
-    return new LLSplashScreenMacOSX;
 #else
-    LL_WARNS() << ("LLSplashScreen not implemented on this platform!") << LL_ENDL;
-    return nullptr;
+    return new LLSplashScreenSDL;
 #endif
 }
 
@@ -366,12 +346,12 @@ void LLSplashScreen::show()
 {
     if (!gSplashScreenp)
     {
-#if LL_SDL_WINDOW && !LL_MESA_HEADLESS
-        gSplashScreenp = new LLSplashScreenSDL;
-#elif LL_WINDOWS && !LL_MESA_HEADLESS
+#if LL_MESA_HEADLESS
+        gSplashScreenp = nullptr;
+#elif LL_WINDOWS && !LL_SDL_WINDOW
         gSplashScreenp = new LLSplashScreenWin32;
-#elif LL_DARWIN
-        gSplashScreenp = new LLSplashScreenMacOSX;
+#else
+        gSplashScreenp = new LLSplashScreenSDL;
 #endif
         if (gSplashScreenp)
         {
@@ -432,18 +412,14 @@ LLWindow* LLWindowManager::createWindow(
         new_window = new LLWindowMesaHeadless(callbacks,
             title, name, x, y, width, height, flags,
             fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth);
-#elif LL_SDL_WINDOW
-        new_window = new LLWindowSDL(callbacks,
-            title, name, x, y, width, height, flags,
-            fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples);
-#elif LL_WINDOWS
+#elif LL_WINDOWS && !LL_SDL_WINDOW
         new_window = new LLWindowWin32(callbacks,
             title, name, x, y, width, height, flags,
             fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples, max_cores, max_gl_version);
-#elif LL_DARWIN
-        new_window = new LLWindowMacOSX(callbacks,
-            title, name, x, y, width, height, flags,
-            fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples);
+#else
+        new_window = new LLWindowSDL(callbacks,
+                                     title, name, x, y, width, height, flags,
+                                     fullscreen, clearBg, enable_vsync, use_gl, ignore_pixel_depth, fsaa_samples);
 #endif
     }
     else

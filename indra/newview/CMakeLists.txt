@@ -1692,47 +1692,23 @@ if (DARWIN)
     Korean.lproj/language.txt
     )
 
-  if(USE_SDL_WINDOW)
-    LIST(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
-    LIST(APPEND viewer_HEADER_FILES llappviewersdl.h)
-    LIST(APPEND viewer_RESOURCE_FILES
-      Info-AlchemySDL.plist
-      )
-
-    set_source_files_properties(llappviewersdl.cpp PROPERTIES LANGUAGE OBJCXX)
-  else()
-    LIST(APPEND viewer_SOURCE_FILES llappdelegate-objc.mm)
-    LIST(APPEND viewer_SOURCE_FILES llappviewermacosx.cpp)
-    LIST(APPEND viewer_HEADER_FILES llappviewermacosx.h)
-    LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.mm)
-    LIST(APPEND viewer_SOURCE_FILES llappviewermacosx-objc.h)
-    LIST(APPEND viewer_SOURCE_FILES llfilepicker_mac.mm)
-    LIST(APPEND viewer_HEADER_FILES llfilepicker_mac.h)
-
-    set_source_files_properties(
-      llappviewermacosx-objc.mm
-      PROPERTIES
-      SKIP_PRECOMPILE_HEADERS TRUE
+  LIST(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
+  LIST(APPEND viewer_HEADER_FILES llappviewersdl.h)
+  LIST(APPEND viewer_RESOURCE_FILES
+    Info-AlchemySDL.plist
     )
 
-    set_source_files_properties(
-      llfilepicker_mac.mm
-      PROPERTIES
-      SKIP_PRECOMPILE_HEADERS TRUE
-    )
+  set_source_files_properties(llappviewersdl.cpp PROPERTIES LANGUAGE OBJCXX)
 
-    # This should be compiled with the viewer.
-    set_source_files_properties(
-      llappdelegate-objc.mm
-      PROPERTIES
-      SKIP_PRECOMPILE_HEADERS TRUE
-      )
+  # Preserved for possible build option to fall back to native macos filepicker
+  # LIST(APPEND viewer_SOURCE_FILES llfilepicker_mac.mm)
+  # LIST(APPEND viewer_HEADER_FILES llfilepicker_mac.h)
 
-    LIST(APPEND viewer_RESOURCE_FILES
-      Info-Alchemy.plist
-      Alchemy.xib
-      )
-  endif()
+  # set_source_files_properties(
+  #   llfilepicker_mac.mm
+  #   PROPERTIES
+  #   SKIP_PRECOMPILE_HEADERS TRUE
+  # )
 
   SOURCE_GROUP("Resources" FILES ${viewer_RESOURCE_FILES})
   list(APPEND viewer_SOURCE_FILES ${viewer_RESOURCE_FILES})
@@ -2075,15 +2051,8 @@ elseif(DARWIN)
   set(MACOSX_BUNDLE_BUNDLE_NAME "Alchemy")
   set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
   set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}")
-  set(MACOSX_BUNDLE_COPYRIGHT "Copyright © Linden Research, Inc. 2020")
-  set(MACOSX_BUNDLE_NSMAIN_NIB_FILE "Alchemy.nib")
+  set(MACOSX_BUNDLE_COPYRIGHT "Copyright © Alchemy Development Team 2012-2026")
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
-
-  if(USE_SDL_WINDOW)
-    set(VIEWER_INFO_PLIST "Info-AlchemySDL.plist")
-  else()
-    set(VIEWER_INFO_PLIST "Info-Alchemy.plist")
-  endif()
 
   # https://blog.kitware.com/upcoming-in-cmake-2-8-12-osx-rpath-support/
   set(CMAKE_MACOSX_RPATH 1)
@@ -2096,33 +2065,18 @@ elseif(DARWIN)
     # From Contents/MacOS/Alchemy, look in Contents/Frameworks
     BUILD_WITH_INSTALL_RPATH 1
     INSTALL_RPATH "@executable_path/../Frameworks"
-    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/${VIEWER_INFO_PLIST}"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-AlchemySDL.plist"
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
     )
 
-  # Support generating nib and dsym for non-xcode generators
-  if(XCODE)
-    if(NOT USE_SDL_WINDOW)
-      set_target_properties(
-          ${VIEWER_BINARY_NAME}
-          PROPERTIES
-          RESOURCE "Alchemy.xib"
-          )
-    endif()
-  else()
+  # Support generating dsym for non-xcode generators
+  if(NOT XCODE)
     if(USE_BUGSPLAT)
       set(VIEWER_DEBUG_BUNDLE "${SYMBOLS_STAGING_DIR}/dSYMs/${product}.dSYM")
       find_program(DSYMUTIL_PROGRAM dsymutil REQUIRED)
       add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
             COMMAND ${DSYMUTIL_PROGRAM} -o ${VIEWER_DEBUG_BUNDLE} $<TARGET_FILE:${VIEWER_BINARY_NAME}>
             COMMENT "Generating Alchemy.dSYM")
-    endif()
-
-    if(NOT USE_SDL_WINDOW)
-      find_program(IBTOOL_PROGRAM ibtool REQUIRED)
-      add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E env MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET} ${IBTOOL_PROGRAM} --compile $<TARGET_BUNDLE_DIR:${VIEWER_BINARY_NAME}>/Contents/Resources/Alchemy.nib ${CMAKE_CURRENT_SOURCE_DIR}/Alchemy.xib
-            COMMENT "Compiling Alchemy.nib")
     endif()
   endif()
 

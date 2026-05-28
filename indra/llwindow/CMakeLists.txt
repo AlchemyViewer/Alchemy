@@ -72,29 +72,6 @@ if(USE_SDL_WINDOW)
   )
 endif()
 
-if(DARWIN AND NOT USE_SDL_WINDOW)
-  target_sources(llwindow
-    PRIVATE
-      llkeyboardmacosx.cpp
-      llwindowmacosx.cpp
-      llwindowmacosx-objc.mm
-      llopenglview-objc.mm
-    PUBLIC
-      llkeyboardmacosx.h
-      llwindowmacosx.h
-      llwindowmacosx-objc.h
-      llopenglview-objc.h
-      llappdelegate-objc.h
-  )
-
-  set_source_files_properties(
-    llwindowmacosx-objc.mm
-    llopenglview-objc.mm
-    PROPERTIES
-    SKIP_PRECOMPILE_HEADERS TRUE
-  )
-endif()
-
 if(WINDOWS)
   target_sources(llwindow
     PRIVATE
@@ -116,7 +93,7 @@ if(BUILD_HEADLESS)
 
   target_sources(llwindowheadless
     PRIVATE
-      ${llwindow_BASE_SOURCE_FILES} 
+      ${llwindow_BASE_SOURCE_FILES}
       llwindowmesaheadless.cpp
     PUBLIC
       ${llwindow_BASE_HEADER_FILES}

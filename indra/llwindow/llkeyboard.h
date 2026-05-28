@@ -81,11 +81,6 @@ public:
     virtual bool    handleKeyUp(const NATIVE_KEY_TYPE key, MASK mask) = 0;
     virtual bool    handleKeyDown(const NATIVE_KEY_TYPE key, MASK mask) = 0;
 
-#if LL_DARWIN && !LL_SDL_WINDOW
-    // We only actually use this for macOS.
-    virtual void    handleModifier(MASK mask) = 0;
-#endif // LL_DARWIN
-
     // Asynchronously poll the control, alt, and shift keys and set the
     // appropriate internal key masks.
     virtual void    resetMaskKeys() = 0;
