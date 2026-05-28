@@ -163,8 +163,17 @@ bool LLDirPicker::getDirModeless(std::string* filename,
         return false;
     }
 
+    // Caller can seed the starting folder via *filename — matches what the
+    // Win32 IFileDialog and Cocoa NSOpenPanel paths do on the non-SDL
+    // backends.
+    std::string start_dir;
+    if (filename && !filename->empty())
+    {
+        start_dir = *filename;
+    }
+
     auto* ctx = new LLSDLFileDialogContext<std::string>(callback, userdata);
-    LLSDLFileDialog::show(SDL_FILEDIALOG_OPENFOLDER, ctx, /*allow_many=*/false);
+    LLSDLFileDialog::show(SDL_FILEDIALOG_OPENFOLDER, ctx, /*allow_many=*/false, start_dir);
 
     return true;
 }

@@ -553,14 +553,9 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
         return false;
     }
 
-    // Note: SDL_PROP_FILE_DIALOG_LOCATION_STRING is intentionally not used —
-    // SDL3 backends differ on whether they treat it as a directory hint vs a
-    // pre-filled filename, so default_filename stays unused for now.
-    (void)default_filename;
-
     auto* ctx = new LLSDLFileDialogContext<std::string>(
         callback, userdata, std::move(file_filters));
-    LLSDLFileDialog::show(SDL_FILEDIALOG_SAVEFILE, ctx, /*allow_many=*/false);
+    LLSDLFileDialog::show(SDL_FILEDIALOG_SAVEFILE, ctx, /*allow_many=*/false, default_filename);
 
     return true;
 }

@@ -124,12 +124,15 @@ namespace LLSDLFileDialog
     // NFILTERS_NUMBER (when the holder carries filters), WINDOW_POINTER
     // (always — uses the main viewer window so the dialog is parented
     // correctly even when a worker thread holds a GL context current),
-    // and MANY_BOOLEAN.
+    // MANY_BOOLEAN, and LOCATION_STRING when `location` is non-empty
+    // (the Win32 and Cocoa backends use this to seed the starting
+    // folder / suggested filename, matching the non-SDL pickers).
     //
     // Ownership of `ctx` transfers to SDL: it is read by SDL during
     // dialog display and freed by trampoline<ResultT> on completion.
     template <typename ResultT>
-    inline void show(SDL_FileDialogType type, LLSDLFileDialogContext<ResultT>* ctx, bool allow_many)
+    inline void show(SDL_FileDialogType type, LLSDLFileDialogContext<ResultT>* ctx, bool allow_many,
+                     const std::string& location = {})
     {
         SDL_PropertiesID props = SDL_CreateProperties();
         if (!ctx->mFilters.empty())
@@ -139,6 +142,10 @@ namespace LLSDLFileDialog
         }
         SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, LLWindowSDL::getMainSDLWindow());
         SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, allow_many);
+        if (!location.empty())
+        {
+            SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, location.c_str());
+        }
 
         SDL_ShowFileDialogWithProperties(type, &trampoline<ResultT>, ctx, props);
 
