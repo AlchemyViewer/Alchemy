@@ -1,0 +1,3 @@
+[submodule "indra/dullahan"]
+	path = indra/dullahan
+	url = https://github.com/AlchemyViewer/dullahan.git
