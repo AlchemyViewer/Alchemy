@@ -139,6 +139,8 @@ void LLPluginClassMedia::reset()
     mCanPaste = false;
     mCanDoDelete = false;
     mCanSelectAll = false;
+    mContextMenuX = 0;
+    mContextMenuY = 0;
     mMediaName.clear();
     mMediaDescription.clear();
     mBackgroundColor = LLColor4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -1239,6 +1241,14 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
             {
                 mCanSelectAll = message.getValueBoolean("select_all");
             }
+        }
+        else if(message_name == "context_menu")
+        {
+            // The plugin pushed up-to-date edit state just before this, so the
+            // host can now show its context menu with correct enable state.
+            mContextMenuX = message.getValueS32("x");
+            mContextMenuY = message.getValueS32("y");
+            mediaEvent(LLPluginClassMediaOwner::MEDIA_EVENT_CONTEXT_MENU);
         }
         else if(message_name == "name_text")
         {

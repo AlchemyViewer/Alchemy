@@ -91,6 +91,8 @@ public:
         virtual bool handleMouseDown( S32 x, S32 y, MASK mask );
         virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask);
         virtual bool handleRightMouseUp(S32 x, S32 y, MASK mask);
+        virtual bool handleMiddleMouseDown(S32 x, S32 y, MASK mask);
+        virtual bool handleMiddleMouseUp(S32 x, S32 y, MASK mask);
         virtual bool handleDoubleClick( S32 x, S32 y, MASK mask );
         virtual bool handleScrollWheel( S32 x, S32 y, S32 clicks );
         virtual bool handleScrollHWheel( S32 x, S32 y, S32 clicks );
@@ -173,6 +175,10 @@ public:
         void onOpenWebInspector();
         void onShowSource();
 
+        // show the page context menu (in response to MEDIA_EVENT_CONTEXT_MENU),
+        // at the given control-local coordinate
+        void showContextMenu(S32 x, S32 y);
+
         LLUUID getTextureID() {return mMediaTextureID;}
 
         // The Browser windows want keyup and keydown events. Overridden from LLFocusableElement to return true.
@@ -219,6 +225,11 @@ public:
 
         class LLWindowShade* mWindowShade;
         LLHandle<LLContextMenu> mContextMenuHandle;
+
+        // control-local position of the last right-click, used to place the
+        // context menu when CEF asks us to show it (MEDIA_EVENT_CONTEXT_MENU)
+        S32 mContextMenuLocalX = 0;
+        S32 mContextMenuLocalY = 0;
 };
 
 #endif // LL_LLMediaCtrl_H

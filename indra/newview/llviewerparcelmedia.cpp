@@ -606,6 +606,14 @@ void LLViewerParcelMedia::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent
         {
             LL_DEBUGS("Media") <<  "Media event:  MEDIA_EVENT_LINK_HOVERED, hover text is: " << self->getHoverText() << LL_ENDL;
         };
+
+
+        break;
+
+        case MEDIA_EVENT_CONTEXT_MENU:
+        {
+            LL_DEBUGS("Media") <<  "Media event:  MEDIA_EVENT_CONTEXT_MENU" << LL_ENDL;
+        }
         break;
     };
 }

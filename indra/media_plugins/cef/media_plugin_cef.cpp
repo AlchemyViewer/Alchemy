@@ -79,6 +79,7 @@ private:
     const std::vector<std::string> onFileDialog(dullahan::EFileDialogType dialog_type, const std::string dialog_title, const std::string default_file, const std::string dialog_accept_filter, bool& use_default);
     bool onJSDialogCallback(const std::string origin_url, const std::string message_text, const std::string default_prompt_text);
     bool onJSBeforeUnloadCallback();
+    void onRequestContextMenuCallback(int x, int y, unsigned int edit_flags);
 
     void postDebugMessage(const std::string& msg);
     void authResponse(LLPluginMessage &message);
@@ -514,6 +515,25 @@ void MediaPluginCEF::onCursorChangedCallback(dullahan::ECursorType type)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Fired by CEF when the page requests a context menu (right-click). This is the
+// point at which the edit-state is known to be current, so push it to the host
+// first (so canCut/canCopy/... are fresh), then send a context_menu message
+// telling the host to show its own menu at the given page coordinate. The host
+// defers showing its menu until this arrives precisely so the enable state is
+// correct - see LLMediaCtrl.
+void MediaPluginCEF::onRequestContextMenuCallback(int x, int y, unsigned int edit_flags)
+{
+    // make sure the cached can-undo/copy/paste/... state the menu reads is up
+    // to date before we ask the host to show the menu
+    checkEditState();
+
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "context_menu");
+    message.setValueS32("x", x);
+    message.setValueS32("y", y);
+    sendMessage(message);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //
 void MediaPluginCEF::authResponse(LLPluginMessage &message)
 {
@@ -633,6 +653,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 mCEFLib->setOnRequestExitCallback(std::bind(&MediaPluginCEF::onRequestExitCallback, this));
                 mCEFLib->setOnJSDialogCallback(std::bind(&MediaPluginCEF::onJSDialogCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
                 mCEFLib->setOnJSBeforeUnloadCallback(std::bind(&MediaPluginCEF::onJSBeforeUnloadCallback, this));
+                mCEFLib->setOnRequestContextMenuCallback(std::bind(&MediaPluginCEF::onRequestContextMenuCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
                 dullahan::dullahan_settings settings;
 #if LL_WINDOWS
@@ -827,25 +848,46 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 S32 x = message_in.getValueS32("x");
                 S32 y = message_in.getValueS32("y");
 
-                // only even send left mouse button events to the CEF library
-                // (partially prompted by crash in macOS CEF when sending right button events)
-                // we catch the right click in viewer and display our own context menu anyway
+                // map the viewer's button index to the dullahan button. The
+                // viewer uses 0 = left, 1 = right, 2 = middle (see
+                // LLViewerMediaImpl::mouseDown/Up callers). Unknown values fall
+                // back to left.
                 S32 button = message_in.getValueS32("button");
                 dullahan::EMouseButton btn = dullahan::MB_MOUSE_BUTTON_LEFT;
+                if (button == 1)
+                {
+                    btn = dullahan::MB_MOUSE_BUTTON_RIGHT;
+                }
+                else if (button == 2)
+                {
+                    btn = dullahan::MB_MOUSE_BUTTON_MIDDLE;
+                }
 
                 // keyboard modifiers held during the event (shift/ctrl/alt/meta)
-                uint32_t mods = parseDullahanMouseModifiers(message_in.getValue("modifiers"));
+                uint32_t mods = message_in.getValueU32("modifiers");
 
-                if (event == "down" && button == 0)
+                if (event == "down")
                 {
+                    // A right-click is forwarded to CEF so the renderer runs its
+                    // context-menu path - that's what fires the browser client's
+                    // OnBeforeContextMenu and refreshes the edit-state the menus
+                    // read - but it must not be treated as a page interaction:
+                    // only a left-click gives the page input focus. (Note: CEF
+                    // has no way to drive the context-menu callback without the
+                    // renderer also seeing the click, so the page's own
+                    // contextmenu/mousedown JS still runs; the native CEF menu is
+                    // suppressed in the browser client.)
                     mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_DOWN, x, y, mods);
-                    mCEFLib->setFocus();
+                    if (btn == dullahan::MB_MOUSE_BUTTON_LEFT)
+                    {
+                        mCEFLib->setFocus(true);
+                    }
 
                     std::stringstream str;
                     str << "Mouse down at = " << x << ", " << y;
                     postDebugMessage(str.str());
                 }
-                else if (event == "up" && button == 0)
+                else if (event == "up")
                 {
                     mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_UP, x, y, mods);
 
@@ -855,6 +897,8 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 }
                 else if (event == "double_click")
                 {
+                    // CEF only synthesizes the multi-click sequence (and the
+                    // text selection it drives) for the left button
                     mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_DOUBLE_CLICK, x, y, mods);
                 }
                 else
@@ -875,7 +919,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 delta_x *= -scaling_factor;
                 delta_y *= -scaling_factor;
 
-                uint32_t mods = parseDullahanMouseModifiers(message_in.getValue("modifiers"));
+                uint32_t mods = message_in.getValueU32("modifiers");
                 mCEFLib->mouseWheel(x, y, delta_x, delta_y, mods);
             }
             else if (message_name == "text_event")

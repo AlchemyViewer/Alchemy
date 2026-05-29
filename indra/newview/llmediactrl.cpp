@@ -329,9 +329,19 @@ bool LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
 {
     if (LLPanel::handleRightMouseDown(x, y, mask)) return true;
 
+    // remember where (in control-local coords) the menu should appear; CEF
+    // reports back a page coordinate but the menu is placed in our own space
+    mContextMenuLocalX = x;
+    mContextMenuLocalY = y;
+
     S32 media_x = x, media_y = y;
     convertInputCoords(media_x, media_y);
 
+    // Forward the right-click to the media (CEF) but do NOT show the context
+    // menu here. CEF responds with a context-menu request (MEDIA_EVENT_CONTEXT_MENU)
+    // after it has computed the current edit-state, and we show the menu then -
+    // otherwise the menu's Undo/Cut/Copy/... enable state would be read from a
+    // stale cross-process cache (it updates a frame or more after this click).
     if (mMediaSource)
         mMediaSource->mouseDown(media_x, media_y, mask, 1);
 
@@ -342,6 +352,15 @@ bool LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
         setFocus( true );
     }
 
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Show the page context menu. Called in response to MEDIA_EVENT_CONTEXT_MENU
+// (i.e. after CEF has reported fresh edit-state), at the control-relative
+// coordinate the right-click occurred.
+void LLMediaCtrl::showContextMenu(S32 x, S32 y)
+{
     auto menu = mContextMenuHandle.get();
     if (!menu)
     {
@@ -371,6 +390,44 @@ bool LLMediaCtrl::handleRightMouseDown( S32 x, S32 y, MASK mask )
 
         menu->show(x, y);
         LLMenuGL::showPopup(this, menu, x, y);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+bool LLMediaCtrl::handleMiddleMouseUp( S32 x, S32 y, MASK mask )
+{
+    if (LLPanel::handleMiddleMouseUp(x, y, mask)) return true;
+    convertInputCoords(x, y);
+
+    if (mMediaSource)
+    {
+        // button 2 == middle (see media_plugin_cef mouse_event handling)
+        mMediaSource->mouseUp(x, y, mask, 2);
+    }
+
+    gFocusMgr.setMouseCapture( NULL );
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+bool LLMediaCtrl::handleMiddleMouseDown( S32 x, S32 y, MASK mask )
+{
+    if (LLPanel::handleMiddleMouseDown(x, y, mask)) return true;
+    convertInputCoords(x, y);
+
+    if (mMediaSource)
+    {
+        mMediaSource->mouseDown(x, y, mask, 2);
+    }
+
+    gFocusMgr.setMouseCapture( this );
+
+    if (mTakeFocusOnClick)
+    {
+        setFocus( true );
     }
 
     return true;
@@ -1190,6 +1247,16 @@ void LLMediaCtrl::handleMediaEvent(LLPluginClassMedia* self, EMediaEvent event)
         case MEDIA_EVENT_DEBUG_MESSAGE:
         {
             LL_INFOS("media") << self->getDebugMessageText() << LL_ENDL;
+        };
+        break;
+
+        case MEDIA_EVENT_CONTEXT_MENU:
+        {
+            // CEF asked us to show a context menu and has just pushed fresh
+            // edit-state, so the menu's enable flags are now correct. Show it at
+            // the control-local position recorded on the triggering right-click.
+            LL_DEBUGS("Media") << "Media event:  MEDIA_EVENT_CONTEXT_MENU" << LL_ENDL;
+            showContextMenu(mContextMenuLocalX, mContextMenuLocalY);
         };
         break;
     };

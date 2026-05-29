@@ -225,6 +225,11 @@ public:
     void    selectAll();
     bool    canSelectAll() const { return mCanSelectAll; };
 
+    // page coordinate of the last context-menu (right-click) request,
+    // accompanying MEDIA_EVENT_CONTEXT_MENU
+    int     getContextMenuX() const { return mContextMenuX; };
+    int     getContextMenuY() const { return mContextMenuY; };
+
     void    showPageSource();
 
     // These can be called before init(), and they will be queued and sent before the media init message.
@@ -445,6 +450,9 @@ protected:
     bool            mCanPaste;
     bool            mCanDoDelete;
     bool            mCanSelectAll;
+
+    int             mContextMenuX;
+    int             mContextMenuY;
 
     std::string     mMediaName;
     std::string     mMediaDescription;
