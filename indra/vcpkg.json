@@ -19,6 +19,7 @@
     "boost-spirit",
     "boost-stacktrace",
     "boost-url",
+    "cef-bin",
     "collada-dom",
     {
       "name": "curl",
@@ -31,7 +32,6 @@
       "name": "dbus",
       "platform": "linux"
     },
-    "dullahan-bin",
     "expat",
     "fmt",
     {
