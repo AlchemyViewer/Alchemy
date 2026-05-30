@@ -2458,7 +2458,7 @@ bool LLFloaterIMContainer::isNearbyChatSpeakerSelected()
     if (!selectedItem)
     {
         LL_WARNS() << "Current selected item is null" << LL_ENDL;
-        return NULL;
+        return false;
     }
 
     conversations_widgets_map::const_iterator iter = mConversationsWidgets.begin();
