@@ -288,7 +288,7 @@ public:
     FSFloaterPoser* getPoserFloater(){ return mPoser; };
 protected:
     // Tools within this composite
-    FSManipRotateJoint* mManip     = nullptr; 
+    FSManipRotateJoint* mManip     = nullptr;
     LLToolSelectRect*   mSelectRect= nullptr;
     FSFloaterPoser*     mPoser     = nullptr;
 

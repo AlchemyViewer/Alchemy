@@ -937,8 +937,8 @@ FSToolCompPose::FSToolCompPose()
     // Create a joint manipulator
     mManip = new FSManipRotateJoint(this);
 
-    // Possibly create a selection rectangle tool if you want 
-    // to be able to box-select joints or objects 
+    // Possibly create a selection rectangle tool if you want
+    // to be able to box-select joints or objects
     // (same usage as LLToolCompRotate does)
     // mSelectRect = new LLToolSelectRect(this);
 
@@ -1021,7 +1021,7 @@ void FSToolCompPose::pickCallback(const LLPickInfo& pick_info)
 bool FSToolCompPose::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     mMouseDown = false;
-    // The base LLToolComposite sets mCur->handleMouseUp(...) 
+    // The base LLToolComposite sets mCur->handleMouseUp(...)
     // and does other management
     return LLToolComposite::handleMouseUp(x, y, mask);
 }
@@ -1167,7 +1167,7 @@ void FSToolCompPoseTranslate::pickCallback(const LLPickInfo& pick_info)
 bool FSToolCompPoseTranslate::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     mMouseDown = false;
-    // The base LLToolComposite sets mCur->handleMouseUp(...) 
+    // The base LLToolComposite sets mCur->handleMouseUp(...)
     // and does other management
     return LLToolComposite::handleMouseUp(x, y, mask);
 }
