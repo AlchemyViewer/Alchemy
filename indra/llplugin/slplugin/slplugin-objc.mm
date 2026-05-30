@@ -42,6 +42,37 @@ extern "C" {
     void  objc_autoreleasePoolPop(void *pool);
 }
 
+// CEF on macOS requires the running NSApplication to implement the
+// CrAppProtocol / CefAppProtocol selectors -isHandlingSendEvent and
+// -setHandlingSendEvent:. CEF's message pump (CefDoMessageLoopWork, driven by
+// the CEF media plugin) sends -isHandlingSendEvent to NSApp directly; if the
+// app object doesn't respond it crashes with:
+//
+//     -[NSApplication isHandlingSendEvent]: unrecognized selector
+//
+// SLPlugin's NSApp comes from NSApplicationLoad() - a vanilla NSApplication
+// that doesn't implement these - so add them via a category. The ObjC runtime
+// installs categories at image load, before the event loop runs, so the pump
+// can never hit an unrecognized selector. processEvents() brackets its
+// -sendEvent: call (below) to keep the reported state accurate.
+static BOOL sHandlingSendEvent = NO;
+
+@interface NSApplication (SLPluginCefAppProtocol)
+- (BOOL)isHandlingSendEvent;
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent;
+@end
+
+@implementation NSApplication (SLPluginCefAppProtocol)
+- (BOOL)isHandlingSendEvent
+{
+    return sHandlingSendEvent;
+}
+- (void)setHandlingSendEvent:(BOOL)handlingSendEvent
+{
+    sHandlingSendEvent = handlingSendEvent;
+}
+@end
+
 //Note: NSApp is a global defined by cocoa which is an id to the application.
 
 void LLCocoaPlugin::setupCocoa()
@@ -108,7 +139,12 @@ void LLCocoaPlugin::processEvents()
      // Some plugins (webkit at least) will want an event loop.  This qualifies.
     NSEvent * event;
     event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate distantPast] inMode:NSDefaultRunLoopMode dequeue:YES];
+    // Bracket the dispatch so CEF's -isHandlingSendEvent (see the category
+    // above) reports true while we're inside -sendEvent:, the way a hand-written
+    // CefAppProtocol app would.
+    [NSApp setHandlingSendEvent:YES];
     [NSApp sendEvent: event];
+    [NSApp setHandlingSendEvent:NO];
 }
 
 

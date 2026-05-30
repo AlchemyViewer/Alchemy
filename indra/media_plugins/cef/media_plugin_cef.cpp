@@ -84,7 +84,7 @@ private:
     void authResponse(LLPluginMessage &message);
 
     void keyEvent(dullahan::EKeyEvent key_event, LLSD native_key_data);
-    void unicodeInput(std::string event, LLSD native_key_data);
+    void unicodeInput(std::string text, LLSD native_key_data);
 
     void checkEditState();
     void setVolume();
@@ -98,7 +98,6 @@ private:
     std::string mProxyHost;
     int mProxyPort;
     bool mDisableGPU;
-    bool mDisableNetworkService;
     bool mUseMockKeyChain;
     bool mDisableWebSecurity;
     bool mFileAccessFromFileUrls;
@@ -140,7 +139,6 @@ MediaPluginBase(host_send_func, host_user_data)
     mProxyHost = "";
     mProxyPort = 0;
     mDisableGPU = false;
-    mDisableNetworkService = true;
     mUseMockKeyChain = true;
     mDisableWebSecurity = false;
     mFileAccessFromFileUrls = false;
@@ -666,8 +664,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 }
                 settings.disable_gpu = mDisableGPU;
 #if LL_DARWIN
-                settings.disable_network_service = mDisableNetworkService;
-                settings.use_mock_keychain = mUseMockKeyChain;
+               settings.use_mock_keychain = mUseMockKeyChain;
 #endif
                 // these were added to facilitate loading images directly into a local
                 // web page for the prototype 360 project in 2017 - something that is
@@ -680,8 +677,6 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 settings.disable_web_security = false;
                 settings.file_access_from_file_urls = false;
 
-                settings.flash_enabled = mPluginsEnabled;
-
                 // This setting applies to all plugins, not just Flash
                 // Regarding, SL-15559 PDF files do not load in CEF v91,
                 // it turns out that on Windows, PDF support is treated
@@ -692,16 +687,12 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 // explicitly disable Flash with a different setting (below)
                 settings.plugins_enabled = mPluginsEnabled;
 
-                // SL-14897 Disable Flash support in the embedded browser
-                settings.flash_enabled = false;
-
                 settings.flip_mouse_y = false;
                 settings.flip_pixels_y = true;
                 settings.frame_rate = 60;
                 settings.force_wave_audio = true;
                 settings.initial_height = 1024;
                 settings.initial_width = 1024;
-                settings.java_enabled = false;
                 settings.javascript_enabled = mJavascriptEnabled;
                 settings.media_stream_enabled = false; // MAINT-6060 - WebRTC media removed until we can add granularity/query UI
 
@@ -842,9 +833,12 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 S32 button = message_in.getValueS32("button");
                 dullahan::EMouseButton btn = dullahan::MB_MOUSE_BUTTON_LEFT;
 
+                // keyboard modifiers held during the event (shift/ctrl/alt/meta)
+                uint32_t mods = parseDullahanMouseModifiers(message_in.getValue("modifiers"));
+
                 if (event == "down" && button == 0)
                 {
-                    mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_DOWN, x, y);
+                    mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_DOWN, x, y, mods);
                     mCEFLib->setFocus();
 
                     std::stringstream str;
@@ -853,7 +847,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 }
                 else if (event == "up" && button == 0)
                 {
-                    mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_UP, x, y);
+                    mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_UP, x, y, mods);
 
                     std::stringstream str;
                     str << "Mouse up at = " << x << ", " << y;
@@ -861,11 +855,11 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 }
                 else if (event == "double_click")
                 {
-                    mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_DOUBLE_CLICK, x, y);
+                    mCEFLib->mouseButton(btn, dullahan::ME_MOUSE_DOUBLE_CLICK, x, y, mods);
                 }
                 else
                 {
-                    mCEFLib->mouseMove(x, y);
+                    mCEFLib->mouseMove(x, y, false, mods);
                 }
             }
             else if (message_name == "scroll_event")
@@ -881,13 +875,18 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 delta_x *= -scaling_factor;
                 delta_y *= -scaling_factor;
 
-                mCEFLib->mouseWheel(x, y, delta_x, delta_y);
+                uint32_t mods = parseDullahanMouseModifiers(message_in.getValue("modifiers"));
+                mCEFLib->mouseWheel(x, y, delta_x, delta_y, mods);
             }
             else if (message_name == "text_event")
             {
-                std::string event = message_in.getValue("event");
+                // NB: the committed text is sent under "text" (see
+                // LLPluginClassMedia::textInput); reading "event" here always
+                // yielded an empty string, so no characters were ever inserted
+                // via this path.
+                std::string text = message_in.getValue("text");
                 LLSD native_key_data = message_in.getValueLLSD("native_key_data");
-                unicodeInput(event, native_key_data);
+                unicodeInput(text, native_key_data);
             }
             else if (message_name == "key_event")
             {
@@ -1032,6 +1031,11 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
             {
                 mFileAccessFromFileUrls = message_in.getValueBoolean("enabled");
             }
+            else if (message_name == "focused")
+            {
+                bool focused = message_in.getValueBoolean("focused");
+                mCEFLib->setFocus(focused);
+            }
         }
         else if (message_class == LLPLUGIN_MESSAGE_CLASS_MEDIA_TIME)
         {
@@ -1052,91 +1056,61 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 //
 void MediaPluginCEF::keyEvent(dullahan::EKeyEvent key_event, LLSD native_key_data = LLSD::emptyMap())
 {
-#if LL_DARWIN
-    U32 event_modifiers = native_key_data["event_modifiers"].asInteger();
-    U32 event_keycode = native_key_data["event_keycode"].asInteger();
-    U32 event_chars = native_key_data["event_chars"].asInteger();
-    U32 event_umodchars = native_key_data["event_umodchars"].asInteger();
-    bool event_isrepeat = native_key_data["event_isrepeat"].asBoolean();
-
-    // adding new code below in unicodeInput means we don't send ascii chars
-    // here too or we get double key presses on a mac.
-    bool esc_key = (event_umodchars == 27);
-    bool tab_key_up = (event_umodchars == 9) && (key_event == dullahan::EKeyEvent::KE_KEY_UP);
-    if ((esc_key || ((unsigned char)event_chars < 0x10 || (unsigned char)event_chars >= 0x7f )) && !tab_key_up)
-    {
-        mCEFLib->nativeKeyboardEventOSX(key_event, event_modifiers,
-                                        event_keycode, event_chars,
-                                        event_umodchars, event_isrepeat);
-    }
-#elif LL_WINDOWS
-    U32 msg = ll_U32_from_sd(native_key_data["msg"]);
-    U32 wparam = ll_U32_from_sd(native_key_data["w_param"]);
-    U64 lparam = ll_U32_from_sd(native_key_data["l_param"]);
-
-    mCEFLib->nativeKeyboardEventWin(msg, wparam, lparam);
-#endif
-
-#if LL_LINUX
-
+#if LL_LINUX || LL_DARWIN
     uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());       // this is actually the SDL event.key.keysym.sym;
     uint32_t native_virtual_key_win = (uint32_t)(native_key_data["virtual_key_win"].asInteger());
+    // raw SDL modifier mask (SDL_Keymod); dullahan translates it to CEF flags
     uint32_t native_modifiers = (uint32_t)(native_key_data["modifiers"].asInteger());
+    // platform scancode (SDL_KeyboardEvent.raw); CEF needs it as
+    // native_key_code or the key event is dropped before reaching the page
+    uint32_t native_scan_code = (uint32_t)(native_key_data["sdl_scancode"].asInteger());
 
-    // only for non-printable keysyms, the actual text input is done in unicodeInput() below
-    if (native_virtual_key <= 0x1b || native_virtual_key >= 0x7f)
-    {
-        // set keypad flag, not sure if this even does anything
-        bool keypad = false;
-        if (native_virtual_key_win >= 0x60 && native_virtual_key_win <= 0x6f)
-        {
-            keypad = true;
-        }
+    // Send key-down/up (RAWKEYDOWN / KEYUP) for EVERY key, including printable
+    // ones. dullahan maps the SDL keysym to the correct Windows virtual-key
+    // code, so the page receives a DOM keydown with the right keyCode - which
+    // JS-driven fields (search boxes, SPAs) rely on. The actual character
+    // insertion happens separately in unicodeInput() (a CHAR event from the
+    // committed text). Previously printable keys were excluded here and the
+    // character path tried to synthesise the keydown itself with a bogus
+    // (always-zero) key code, so those fields misbehaved.
+    bool keypad = (native_virtual_key_win >= 0x60 && native_virtual_key_win <= 0x6f);
+    mCEFLib->nativeKeyboardEventSDL2(key_event, native_virtual_key, native_modifiers, keypad, native_scan_code);
+#elif LL_WINDOWS
+    U32 msg = ll_U32_from_sd(native_key_data["msg"]);
+    U32 wparam = ll_U32_from_sd(native_key_data["w_param"]);
+    U64 lparam = ll_U32_from_sd(native_key_data["l_param"]);
 
-        // yes, we send native_virtual_key_win twice because native_virtual_key breaks it
-        mCEFLib->nativeKeyboardEventSDL2(key_event, native_virtual_key, native_modifiers, keypad);
-    }
-
-#endif // LL_LINUX
+    mCEFLib->nativeKeyboardEventWin(msg, wparam, lparam);
+#endif
 };
 
-void MediaPluginCEF::unicodeInput(std::string event, LLSD native_key_data = LLSD::emptyMap())
+void MediaPluginCEF::unicodeInput(std::string text, LLSD native_key_data = LLSD::emptyMap())
 {
-#if LL_DARWIN
-    // i didn't think this code was needed for macOS but without it, the IME
-    // input in japanese (and likely others too) doesn't work correctly.
-    // see maint-7654
-    U32 event_modifiers = native_key_data["event_modifiers"].asInteger();
-    U32 event_keycode = native_key_data["event_keycode"].asInteger();
-    U32 event_chars = native_key_data["event_chars"].asInteger();
-    U32 event_umodchars = native_key_data["event_umodchars"].asInteger();
-    bool event_isrepeat = native_key_data["event_isrepeat"].asBoolean();
-
-    dullahan::EKeyEvent key_event = dullahan::KE_KEY_UP;
-    if (event == "down")
+#if LL_LINUX || LL_DARWIN
+    // 'text' is the committed UTF-8 string for this text event. Deliver it to
+    // the page as CHAR events - one per Unicode codepoint - which is what
+    // actually inserts characters into the focused DOM field. The matching
+    // keydown/keyup (with the correct virtual-key code) is sent separately by
+    // keyEvent(). dullahan strips control/shift from CHAR internally so a
+    // CHAR isn't mistaken for a shortcut.
+    //
+    // Previously this read native_key_data["sdl_sym"], which the SDL window
+    // backend never sets (getNativeKeyData only provides virtual_key /
+    // virtual_key_win / modifiers), so the synthesised key code was always 0
+    // and every page keydown carried keyCode 0. Sending the real text avoids
+    // depending on the keysym at all and fixes IME / dead-key / multi-byte
+    // input that a single keysym can't represent.
+    LLWString wtext = utf8str_to_wstring(text);
+    for (llwchar cp : wtext)
     {
-        key_event = dullahan::KE_KEY_DOWN;
+        mCEFLib->nativeKeyboardEventSDL2(dullahan::KE_KEY_CHAR, (uint32_t)cp, 0, false);
     }
-
-    mCEFLib->nativeKeyboardEventOSX(key_event, event_modifiers,
-                                    event_keycode, event_chars,
-                                    event_umodchars, event_isrepeat);
 #elif LL_WINDOWS
-    event = ""; // not needed here but prevents unused var warning as error
+    text = ""; // not needed here but prevents unused var warning as error
     U32 msg = ll_U32_from_sd(native_key_data["msg"]);
     U32 wparam = ll_U32_from_sd(native_key_data["w_param"]);
     U64 lparam = ll_U32_from_sd(native_key_data["l_param"]);
     mCEFLib->nativeKeyboardEventWin(msg, wparam, lparam);
-#endif
-
-#if LL_LINUX
-
-    uint32_t native_scan_code = (uint32_t)(native_key_data["sdl_sym"].asInteger());
-    uint32_t native_virtual_key = (uint32_t)(native_key_data["virtual_key"].asInteger());
-    uint32_t native_modifiers = (uint32_t)(native_key_data["modifiers"].asInteger());
-
-    mCEFLib->nativeKeyboardEvent(dullahan::KE_KEY_DOWN, native_scan_code, native_virtual_key, native_modifiers);
-
 #endif // LL_LINUX
 };
 

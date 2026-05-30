@@ -150,7 +150,7 @@
 #include "stringize.h"
 #include "llcoros.h"
 #include "llexception.h"
-#include "cef/dullahan_version.h"
+#include "../dullahan/src/dullahan_version.h"
 #include "vlc/libvlc_version.h"
 
 #if LL_SDL_WINDOW

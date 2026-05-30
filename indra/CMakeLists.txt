@@ -26,6 +26,9 @@ option(BUILD_APPEARANCE_UTIL "Build the appearance utility project" OFF)
 option(BUILD_TESTING "Build and run unit and integration tests: disable for build timing runs to reduce variation" OFF)
 option(BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
 
+# Dullahan build options
+option(BUILD_DULLAHAN_EXAMPLE "Build the Dullahan OpenGL example application" OFF)
+
 # Plugin Build Options
 option(BUILD_EXAMPLE_PLUGIN "Build support for SLPlugin example plugin" ON)
 option(BUILD_CEF_PLUGIN "Build support for SLPlugin CEF web plugin." ON)
@@ -170,6 +173,10 @@ if(USE_OPENAL)
   list(APPEND VCPKG_MANIFEST_FEATURES "openal")
 endif()
 
+if(BUILD_DULLAHAN_EXAMPLE)
+  list(APPEND VCPKG_MANIFEST_FEATURES "dullahan-example")
+endif()
+
 # Export compile_commands.json for ninja and makefile generators
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -238,6 +245,7 @@ endif ()
 include(APR)
 include(Boost)
 include(bugsplat)
+include(CEFPlugin)
 include(Collada-Dom)
 include(CURL)
 include(DBUS)
@@ -296,6 +304,7 @@ include(Copy3rdPartyLibs)
 # Add our cmake modules to cmake
 add_subdirectory(cmake)
 
+add_subdirectory(dullahan)
 add_subdirectory(llprecompiled)
 add_subdirectory(llaudio)
 add_subdirectory(llappearance)

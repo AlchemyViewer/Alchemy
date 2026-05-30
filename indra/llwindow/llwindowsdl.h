@@ -273,6 +273,10 @@ private:
     LLTimer mFlashTimer;
     U32 mKeyVirtualKey = 0;
     U32 mKeyModifiers = SDL_KMOD_NONE;
+    // Platform-dependent scancode (SDL_KeyboardEvent.raw) of the last key event.
+    // Forwarded through getNativeKeyData() to the CEF media plugin, which needs
+    // it as CefKeyEvent.native_key_code for key events to reach the page.
+    U32 mKeyRawScanCode = 0;
 
     // Per-frame mouse-motion accumulator. SDL_EVENT_MOUSE_MOTION delivers
     // event.motion.xrel/yrel (relative motion since the last event in

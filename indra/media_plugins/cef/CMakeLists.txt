@@ -56,9 +56,12 @@ add_library(media_plugin_cef
 
 target_link_libraries(media_plugin_cef
         media_plugin_base
+        dullahan
         ll::cef
         ll::glib_headers
 )
+
+add_dependencies(media_plugin_cef dullahan_host)
 
 if (WINDOWS)
   set_target_properties(media_plugin_cef
@@ -69,17 +72,17 @@ if (WINDOWS)
   target_link_options(media_plugin_cef PRIVATE /MANIFEST:NO /IGNORE:4099)
 
   # Copy plugin files to packaging directory
-  set(DULLAHAN_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/dullahan-bin")
+  set(CEF_BIN_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/cef-bin")
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${DULLAHAN_DIR}/bin" "${VIEWER_STAGING_DIR}/llplugin"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_BIN_DIR}/Release" "${VIEWER_STAGING_DIR}/llplugin"
   )
 
   set(CEF_RESOURCE_FILES
-    "${DULLAHAN_DIR}/resources/chrome_100_percent.pak"
-    "${DULLAHAN_DIR}/resources/chrome_200_percent.pak"
-    "${DULLAHAN_DIR}/resources/resources.pak"
-    "${DULLAHAN_DIR}/resources/icudtl.dat"
+    "${CEF_BIN_DIR}/Resources/chrome_100_percent.pak"
+    "${CEF_BIN_DIR}/Resources/chrome_200_percent.pak"
+    "${CEF_BIN_DIR}/Resources/resources.pak"
+    "${CEF_BIN_DIR}/Resources/icudtl.dat"
   )
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD
@@ -89,10 +92,19 @@ if (WINDOWS)
 
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/dullahan-bin/resources/locales" "${VIEWER_STAGING_DIR}/llplugin/locales"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_BIN_DIR}/Resources/locales" "${VIEWER_STAGING_DIR}/llplugin/locales"
+  )
+
+  add_custom_command(
+    TARGET media_plugin_cef POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:dullahan_host>" "${VIEWER_STAGING_DIR}/llplugin"
+    COMMAND_EXPAND_LISTS
   )
 
 elseif (DARWIN)
+    # macOS has extra helper bundles
+    add_dependencies(media_plugin_cef dullahan_host_alerts dullahan_host_gpu dullahan_host_plugin dullahan_host_renderer)
+
     find_library(CORESERVICES_LIBRARY CoreServices)
     find_library(AUDIOUNIT_LIBRARY AudioUnit)
 

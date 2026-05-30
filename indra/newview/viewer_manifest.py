@@ -939,7 +939,7 @@ class DarwinManifest(ViewerManifest):
                     with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'lib')):
                         self.path("Chromium Embedded Framework.framework")
 
-                    with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'dullahan-bin', 'helpers')):
+                    with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'dullahan', self.args['configuration'])):
                         self.path("DullahanHelper.app")
                         self.path("DullahanHelper (Alerts).app")
                         self.path("DullahanHelper (GPU).app")

@@ -158,6 +158,28 @@
         }
       ]
     },
+    "dullahan-example": {
+      "description": "Build with support for Dullahan OpenGL example application",
+      "dependencies": [
+        {
+          "name": "glad",
+          "platform": "windows | linux",
+          "features": [
+            "gl-api-21",
+            "loader"
+          ]
+        },
+        {
+          "name": "imgui",
+          "features": [
+            "opengl2-binding",
+            "opengl3-binding",
+            "sdl3-binding",
+            "sdlgpu3-binding"
+          ]
+        }
+      ]
+    },
     "faudio": {
       "description": "Build with support for the FAudio audio engine",
       "dependencies": [

@@ -2002,6 +2002,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         {
             mKeyVirtualKey = event.key.key;
             mKeyModifiers = event.key.mod;
+            mKeyRawScanCode = event.key.raw;
 
             // Collapse the alternate Return keysyms (USB-HID secondary Return
             // and numpad Enter) onto the canonical SDLK_RETURN so downstream
@@ -2040,6 +2041,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         {
             mKeyVirtualKey = event.key.key;
             mKeyModifiers = event.key.mod;
+            mKeyRawScanCode = event.key.raw;
 
             if (mKeyVirtualKey == SDLK_RETURN2 || mKeyVirtualKey == SDLK_KP_ENTER)
             {
@@ -3011,23 +3013,19 @@ LLSD LLWindowSDL::getNativeKeyData()
 {
     LLSD result = LLSD::emptyMap();
 
-    U32 modifiers = 0; // pretend-native modifiers... oh what a tangled web we weave!
-
-    // we go through so many levels of device abstraction that I can't really guess
-    // what a plugin under GDK under Qt under SL under SDL under X11 considers
-    // a 'native' modifier mask.  this has been sort of reverse-engineered... they *appear*
-    // to match GDK consts, but that may be co-incidence.
-    // SDL3 provides SDL_KMOD_{SHIFT,CTRL,ALT} as L|R aliases — use those
-    // instead of OR-ing L and R copies manually.
-    modifiers |= (mKeyModifiers & SDL_KMOD_SHIFT) ? 0x0001 : 0;
-    modifiers |= (mKeyModifiers & SDL_KMOD_CAPS)  ? 0x0002 : 0;
-    modifiers |= (mKeyModifiers & SDL_KMOD_CTRL)  ? 0x0004 : 0;
-    modifiers |= (mKeyModifiers & SDL_KMOD_ALT)   ? 0x0008 : 0;
-    // *todo: NUM? - not a GDK modifier; CEF/Qt don't seem to care.
+    // Pass the raw SDL modifier mask (SDL_Keymod) straight through. The media
+    // plugin's only consumer is dullahan/CEF, which translates SDL_Keymod into
+    // CEF's EVENTFLAG_* itself, so there's no need to approximate a GDK-style
+    // mask here (the historical convention this used to emulate).
+    U32 modifiers = (U32)mKeyModifiers;
 
     result["virtual_key"] = (S32)mKeyVirtualKey;
     result["virtual_key_win"] = (S32)LLKeyboardSDL::mapSDLtoWin( mKeyVirtualKey );
     result["modifiers"] = (S32)modifiers;
+    // Platform-dependent scancode (SDL_KeyboardEvent.raw): the Mac virtual
+    // keycode / X11-evdev keycode CEF needs as native_key_code so the page
+    // actually receives the key event (see media_plugin_cef keyEvent()).
+    result["sdl_scancode"] = (S32)mKeyRawScanCode;
     return result;
 }
 
