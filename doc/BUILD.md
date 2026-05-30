@@ -163,10 +163,10 @@ rustup default stable
 
 ## Clone and bootstrap
 
-Clone the repo and set up the Python venv and .NET tools:
+Alchemy vendors the [Dullahan](https://github.com/AlchemyViewer/dullahan) CEF wrapper — used by the in-world web media plugin — as a git submodule under `indra/dullahan`. It builds from source as part of the tree, so the submodule must be present before you configure. Clone with `--recurse-submodules`, then set up the Python venv and .NET tools:
 
 ```
-git clone https://github.com/AlchemyViewer/Alchemy.git alchemy
+git clone --recurse-submodules https://github.com/AlchemyViewer/Alchemy.git alchemy
 cd alchemy
 python3 -m venv .venv
 # Windows: .\.venv\Scripts\Activate.ps1
@@ -174,6 +174,14 @@ python3 -m venv .venv
 pip install -r requirements.txt
 dotnet tool restore        # packaging only
 ```
+
+Already cloned without `--recurse-submodules`? Fetch the submodules before configuring:
+
+```
+git submodule update --init --recursive
+```
+
+After pulling upstream changes, run the same command to keep the submodule in sync with the revision the tree expects.
 
 ## Configure
 
@@ -380,6 +388,21 @@ cmake -S indra --preset <preset> -DPACKAGE=OFF
 Velopack also requires `dotnet tool restore` to have been run so the `vpk` CLI is on PATH.
 
 ## Troubleshooting
+
+### Configure fails: `indra/dullahan` has no `CMakeLists.txt`
+
+The Dullahan CEF wrapper is a git submodule. If you cloned without `--recurse-submodules`, `indra/dullahan` is empty and CMake configure stops with an error like:
+
+```
+CMake Error at CMakeLists.txt (add_subdirectory):
+  The source directory .../indra/dullahan does not contain a CMakeLists.txt file.
+```
+
+Fetch the submodule, then re-run configure:
+
+```
+git submodule update --init --recursive
+```
 
 ### First `cmake -S indra --preset ...` takes forever
 

@@ -20,7 +20,7 @@ Most users install a [pre-built release][releasesgh] for Windows, macOS, or Linu
 Alchemy uses CMake with vcpkg for dependency management. Platform setup, presets, build options, tests, packaging, and troubleshooting all live in [**doc/BUILD.md**](doc/BUILD.md).
 
 ```
-git clone https://github.com/AlchemyViewer/Alchemy.git alchemy
+git clone --recurse-submodules https://github.com/AlchemyViewer/Alchemy.git alchemy
 cd alchemy
 python3 -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
