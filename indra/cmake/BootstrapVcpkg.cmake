@@ -7,6 +7,7 @@ include_guard(GLOBAL)
 
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     set(VCPKG_ROOT "${CMAKE_SOURCE_DIR}/../vcpkg")
+    set(ENV{VCPKG_ROOT} ${VCPKG_ROOT})
     if(WIN32)
         set(VCPKG_EXECUTABLE ${VCPKG_ROOT}/vcpkg.exe)
         set(VCPKG_BOOTSTRAP ${VCPKG_ROOT}/bootstrap-vcpkg.bat)
