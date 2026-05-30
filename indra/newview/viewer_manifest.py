@@ -542,7 +542,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
         self.path("featuretable.txt")
         self.path("cube.dae")
 
-        with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'secondlife-certificates')):
+        with self.prefix(src=os.path.join(self.args['source'], "..", "externals", "ca-certificates")):
             self.path("ca-bundle.crt")
 
         if not self.is_packaging_viewer():
@@ -860,7 +860,7 @@ class DarwinManifest(ViewerManifest):
                 self.path("featuretable_mac.txt")
                 self.path("cube.dae")
 
-                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'secondlife-certificates'),dst=""):
+                with self.prefix(src=os.path.join(self.args['source'], "..", "externals", "ca-certificates")):
                     self.path("ca-bundle.crt")
 
                 # Translations
@@ -1202,7 +1202,7 @@ class LinuxManifest(ViewerManifest):
         self.path("featuretable_linux.txt")
         self.path("cube.dae")
 
-        with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'secondlife-certificates'), dst="bin"):
+        with self.prefix(src=os.path.join(self.args['source'], "..", "externals", "ca-certificates"), dst="bin"):
             self.path("ca-bundle.crt")
 
         if not self.is_packaging_viewer():
