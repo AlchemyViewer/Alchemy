@@ -96,7 +96,7 @@ jobs:
             echo "bugsplat_db=" >> $GITHUB_OUTPUT
           else
             echo 'build_type=proprietary' >> $GITHUB_OUTPUT
-            echo "bugsplat_db=SecondLife_Viewer_2018" >> $GITHUB_OUTPUT
+            echo "bugsplat_db=" >> $GITHUB_OUTPUT
           fi
 
           # determine the viewer channel from the branch or tag name
@@ -383,9 +383,6 @@ jobs:
           elif $BUILD_VIEWER
           then
             cmake --build --preset $CMAKE_PRESET_NAME-$BUILD_CONFIG || fatal "failed building $BUILD_CONFIG viewer"
-
-            # *TODO: Make this a build extension. disabled for now
-            # package_llphysicsextensions_tpv || fatal "failed building llphysicsextensions packages"
           else
             echo "::notice::Skipping build due to both viewer and tests being disabled"
           fi
@@ -455,14 +452,14 @@ jobs:
           path: |
             ${{ steps.configure.outputs.build_directory }}/newview/viewer_version.txt
 
-      - name: Upload appearance utility package
-        uses: actions/upload-artifact@v7
-        if: runner.os == 'Linux' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
-        with:
-          name: "${{ steps.build.outputs.artifact }}-appearanceutility"
-          path: |
-            ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-bin
-            ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-headless-bin
+      # - name: Upload appearance utility package
+      #   uses: actions/upload-artifact@v7
+      #   if: runner.os == 'Linux' && matrix.configuration == 'release' && matrix.build_variant == 'Viewer'
+      #   with:
+      #     name: "${{ steps.build.outputs.artifact }}-appearanceutility"
+      #     path: |
+      #       ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-bin
+      #       ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-headless-bin
 
   # sign-and-package-windows:
   #   env:
@@ -602,60 +599,60 @@ jobs:
   #         node-version: "22"
   #         dumpSyms: false
 
-  release:
-    needs: [setup, build, sign-and-package-windows, sign-and-package-mac]
-    runs-on: ubuntu-latest
-    if: needs.setup.outputs.release_run
-    steps:
-      # - uses: actions/download-artifact@v8
-      #   with:
-      #     pattern: "*-installer"
+  # release:
+  #   needs: [setup, build, sign-and-package-windows, sign-and-package-mac]
+  #   runs-on: ubuntu-latest
+  #   if: needs.setup.outputs.release_run
+  #   steps:
+  #     # - uses: actions/download-artifact@v8
+  #     #   with:
+  #     #     pattern: "*-installer"
 
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: "*-metadata"
+  #     - uses: actions/download-artifact@v8
+  #       with:
+  #         pattern: "*-metadata"
 
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: "*-releases"
+  #     - uses: actions/download-artifact@v8
+  #       with:
+  #         pattern: "*-releases"
 
-      - uses: actions/download-artifact@v8
-        with:
-          name: "Linux-app"
+  #     - uses: actions/download-artifact@v8
+  #       with:
+  #         name: "Linux-app"
 
-      - name: Rename metadata
-        run: |
-          cp Windows-metadata/newview/viewer_version.txt Windows-viewer_version.txt
-          cp macOS-metadata/newview/viewer_version.txt macOS-viewer_version.txt
-          cp Linux-metadata/newview/viewer_version.txt Linux-viewer_version.txt
+  #     - name: Rename metadata
+  #       run: |
+  #         cp Windows-metadata/newview/viewer_version.txt Windows-viewer_version.txt
+  #         cp macOS-metadata/newview/viewer_version.txt macOS-viewer_version.txt
+  #         cp Linux-metadata/newview/viewer_version.txt Linux-viewer_version.txt
 
-      # forked from softprops/action-gh-release
-      - name: Create GitHub release
-        id: release
-        uses: AlchemyViewer/action-gh-release@v2
-        with:
-          # name the release page for the branch
-          name: "${{ needs.setup.outputs.viewer_branch }}"
-          # SL-20546: want the channel and version to be visible on the
-          # release page
-          body: |
-            Build ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            ${{ needs.setup.outputs.viewer_channel }}
-            ${{ needs.build.outputs.viewer_version }}
-            ${{ needs.setup.outputs.relnotes }}
-          prerelease: true
-          generate_release_notes: true
-          target_commitish: ${{ github.sha }}
-          append_body: true
-          fail_on_unmatched_files: true
-          files: |
-            macOS-installer/*.dmg
-            Windows-installer/*.exe
-            *.tar.xz
-            *-viewer_version.txt
-            Windows-releases/*
-            macOS-releases/*
+  #     # forked from softprops/action-gh-release
+  #     - name: Create GitHub release
+  #       id: release
+  #       uses: AlchemyViewer/action-gh-release@v2
+  #       with:
+  #         # name the release page for the branch
+  #         name: "${{ needs.setup.outputs.viewer_branch }}"
+  #         # SL-20546: want the channel and version to be visible on the
+  #         # release page
+  #         body: |
+  #           Build ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  #           ${{ needs.setup.outputs.viewer_channel }}
+  #           ${{ needs.build.outputs.viewer_version }}
+  #           ${{ needs.setup.outputs.relnotes }}
+  #         prerelease: true
+  #         generate_release_notes: true
+  #         target_commitish: ${{ github.sha }}
+  #         append_body: true
+  #         fail_on_unmatched_files: true
+  #         files: |
+  #           macOS-installer/*.dmg
+  #           Windows-installer/*.exe
+  #           *.tar.xz
+  #           *-viewer_version.txt
+  #           Windows-releases/*
+  #           macOS-releases/*
 
-      - name: post release URL
-        run: |
-          echo "::notice::Release ${{ steps.release.outputs.url }}"
+  #     - name: post release URL
+  #       run: |
+  #         echo "::notice::Release ${{ steps.release.outputs.url }}"
