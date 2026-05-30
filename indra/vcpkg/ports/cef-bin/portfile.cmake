@@ -30,7 +30,7 @@ elseif(VCPKG_TARGET_IS_LINUX)
     vcpkg_download_distfile(ARCHIVE
         URLS "https://cef-builds.spotifycdn.com/cef_binary_148.0.9%2Bg0d9d52a%2Bchromium-148.0.7778.180_linux64_minimal.tar.bz2"
         FILENAME "cef.${VERSION}.linux64.tar.bz2"
-        SHA512 f38218298e44e7fedfa55438101a0d6ff11f03a95c13664fb5747089cdf25ff08be9648d03ae3b899c7e8bc2e8db17035cfbaf762213c47e63ce6fcc59349d20
+        SHA512 197a1598f56b636db558d1f6dddfa3885f529571d354c0ff98dd27dbea56e73790f65ddece89e130bdc76611e374de8da5282e517980ffac98ef59037422e390
     )
 endif()
 
@@ -80,7 +80,16 @@ elseif(VCPKG_TARGET_IS_OSX)
     set(CEF_RELEASE_FRAMEWORK_DIR "${CURRENT_PACKAGES_DIR}/lib/Chromium Embedded Framework.framework")
     file(RENAME "${CEF_SOURCE_PATH}/Release/Chromium Embedded Framework.framework" "${CEF_RELEASE_FRAMEWORK_DIR}")
 elseif(VCPKG_TARGET_IS_LINUX)
-    file(INSTALL "${CEF_SOURCE_PATH}/Release" "${CEF_SOURCE_PATH}/Resources" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}")
+    file(INSTALL "${CEF_SOURCE_PATH}/Release/libcef.so" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
+    file(INSTALL
+        DIRECTORY "${CEF_SOURCE_PATH}/Release/"
+        DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/Release"
+        FILES_MATCHING
+        PATTERN "*.*"
+        PATTERN "chrome-sandbox"
+        PATTERN "libcef.so" EXCLUDE
+    )
+    file(INSTALL "${CEF_SOURCE_PATH}/Resources" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}")
 endif()
 
 file(INSTALL "${CEF_SOURCE_PATH}/LICENSE.txt" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}" RENAME copyright)
