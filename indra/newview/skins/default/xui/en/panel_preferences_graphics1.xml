@@ -15,6 +15,7 @@
     height="16"
     layout="topleft"
     left="5"
+    name="preset_label"
     top="5"
     width="100">
       Preset in use:
