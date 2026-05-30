@@ -1,6 +1,7 @@
 {
     "name": "cef-bin",
     "version": "148.0.7778.180",
+    "port-version": 1,
     "dependencies": [
         {
         "name": "vcpkg-cmake",
