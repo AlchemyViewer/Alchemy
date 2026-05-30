@@ -206,6 +206,7 @@ jobs:
       LOGFAIL: DEBUG
       master_message_template_checkout: ${{ github.workspace }}/.master-message-template
       # vcpkg Setup
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
       VCPKG_USERNAME: ${{ github.repository_owner }}
       VCPKG_FEED_URL: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
       VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,readwrite"
@@ -262,30 +263,40 @@ jobs:
       - name: Install Velopack CLI
         run: dotnet tool restore
 
+      - name: Bootstrap vcpkg Windows
+        if: runner.os == 'Windows'
+        run: |
+          ./vcpkg/bootstrap-vcpkg.bat
+
+      - name: Bootstrap vcpkg non-Windows
+        if: runner.os == 'macOS' || runner.os == 'Linux'
+        run: |
+          ./vcpkg/bootstrap-vcpkg.sh
+
       - name: Set up vcpkg nuget caching
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]
           then
-            $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
+            $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
               sources add \
               -Source "${{ env.VCPKG_FEED_URL }}" \
               -StorePasswordInClearText \
               -Name GitHubPackages \
               -UserName "${{ env.VCPKG_USERNAME }}" \
               -Password "${{ secrets.GITHUB_TOKEN }}"
-            $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
+            $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
               setapikey "${{ secrets.GITHUB_TOKEN }}" \
               -Source "${{ env.VCPKG_FEED_URL }}"
           else
-            mono $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
+            mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
               sources add \
               -Source "${{ env.VCPKG_FEED_URL }}" \
               -StorePasswordInClearText \
               -Name GitHubPackages \
               -UserName "${{ env.VCPKG_USERNAME }}" \
               -Password "${{ secrets.GITHUB_TOKEN }}"
-            mono $(${VCPKG_INSTALLATION_ROOT}/vcpkg fetch nuget | tail -n 1) \
+            mono $(${VCPKG_ROOT}/vcpkg fetch nuget | tail -n 1) \
               setapikey "${{ secrets.GITHUB_TOKEN }}" \
               -Source "${{ env.VCPKG_FEED_URL }}"
           fi
