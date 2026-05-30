@@ -32,6 +32,11 @@ if (DARWIN)
       FILES
       lldir_mac.h
       )
+  set_source_files_properties(
+    lldir_mac.mm
+    PROPERTIES
+    SKIP_PRECOMPILE_HEADERS TRUE
+  )
 endif (DARWIN)
 
 if (LINUX)
