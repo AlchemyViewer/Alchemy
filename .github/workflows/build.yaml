@@ -159,6 +159,8 @@ jobs:
             configuration: relwithdebinfo
           - runner: macos-26
             configuration: optdebug
+          - runner: macos-26
+            arch: x64
 
     runs-on: ${{ matrix.runner }}
     outputs:
