@@ -198,7 +198,8 @@
           "name": "mesa",
           "features": [
             "offscreen"
-          ]
+          ],
+          "platform": "windows"
         }
       ]
     },
