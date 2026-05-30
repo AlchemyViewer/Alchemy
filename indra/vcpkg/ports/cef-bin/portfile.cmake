@@ -23,7 +23,7 @@ elseif(VCPKG_TARGET_IS_OSX)
         vcpkg_download_distfile(ARCHIVE
             URLS "https://cef-builds.spotifycdn.com/cef_binary_148.0.9%2Bg0d9d52a%2Bchromium-148.0.7778.180_macosx64_minimal.tar.bz2"
             FILENAME "cef.${VERSION}.macosx64.tar.bz2"
-            SHA512 3bb9f7cb5ee62bde7ac68e377341b7de3df64f32d8de1c2dbafd92da33146f8a5845ebbbe803e7660d921206e987ab651482e716357806cb30c9061a4f8684b5
+            SHA512 4280392cdddc7524fcf38ddabef81386083a73c624d412deb88f6888534690327a0713b30abc65dab2379f5e5a53f06c445f665405716762bc34df867bc54001
         )
     endif()
 elseif(VCPKG_TARGET_IS_LINUX)
