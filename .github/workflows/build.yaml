@@ -143,7 +143,7 @@ jobs:
     strategy:
       matrix:
         runner: ["windows-2025", "macos-26", "ubuntu-24.04"]
-        configuration: release
+        configuration: [release]
         arch: [x64, arm64]
         build_variant: [Viewer, Tests]
         exclude:
