@@ -29,7 +29,6 @@
 #include "linden_common.h"
 #include "lltut.h"
 #include "llxorcipher.h"
-#include "llnullcipher.h"
 
 namespace tut
 {
@@ -106,26 +105,5 @@ namespace tut
         xorCipher1.decrypt((U8 *) str, str_len);
         // it should not be the same as original data!
         ensure_memory_matches("LLXORCipher: In Place decrypt failed", str, str_len, str1, str_len);
-    }
-
-    //LLNullCipher encrypt->decrypt
-    template<> template<>
-    void cipher_object_t::test<4>()
-    {
-        const char str[] = "SecondLife";
-        const S32 str_len = sizeof(str);
-        U8 encrypted[str_len];
-        U8 decrypted[str_len];
-        LLNullCipher nullCipher;
-        LLNullCipher nullCipher1;
-
-        U32 length = nullCipher.requiredEncryptionSpace(50);
-        ensure("LLNullCipher::requiredEncryptionSpace() function failed", (length == 50));
-
-        U32 len1 = nullCipher.encrypt((U8 *) str, str_len, encrypted, str_len);
-        ensure_memory_matches("LLNullCipher - Source transformed during encryption.", encrypted, len1, str, str_len);
-
-        U32 len2 = nullCipher1.decrypt(encrypted, str_len, decrypted, str_len);
-        ensure_memory_matches("LLNullCipher - Decryption failed", decrypted, len2, str, str_len);
     }
 }

@@ -35,7 +35,6 @@ target_sources(llmessage
     llmessagetemplateparser.cpp
     llmessagethrottle.cpp
     llnamevalue.cpp
-    llnullcipher.cpp
     llpacketack.cpp
     llpacketbuffer.cpp
     llpacketring.cpp
@@ -46,8 +45,6 @@ target_sources(llmessage
     llsdhttpserver.cpp
     llsdmessagebuilder.cpp
     llsdmessagereader.cpp
-    llservicebuilder.cpp
-    llservice.cpp
     llstoredmessage.cpp
     lltemplatemessagebuilder.cpp
     lltemplatemessagedispatcher.cpp
@@ -59,7 +56,6 @@ target_sources(llmessage
     lltransfertargetfile.cpp
     lltransfertargetvfile.cpp
     lltrustedmessageservice.cpp
-    lluseroperation.cpp
     llxfer.cpp
     llxfer_file.cpp
     llxfermanager.cpp
@@ -121,7 +117,6 @@ target_sources(llmessage
     llmessagethrottle.h
     llmsgvariabletype.h
     llnamevalue.h
-    llnullcipher.h
     llpacketack.h
     llpacketbuffer.h
     llpacketring.h
@@ -135,8 +130,6 @@ target_sources(llmessage
     llsdhttpserver.h
     llsdmessagebuilder.h
     llsdmessagereader.h
-    llservice.h
-    llservicebuilder.h
     llstoredmessage.h
     lltaskname.h
     llteleportflags.h
@@ -150,7 +143,6 @@ target_sources(llmessage
     lltransfertargetfile.h
     lltransfertargetvfile.h
     lltrustedmessageservice.h
-    lluseroperation.h
     llvehicleparams.h
     llxfer.h
     llxfermanager.h
@@ -213,7 +205,6 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llmessageconfig "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llmessagetemplateparser "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llpartdata "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llservicebuilder "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(lltemplatemessagebuilder "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llxfer_file "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llxorcipher "" "${test_libs}" "${test_project}")
