@@ -37,11 +37,7 @@
 // For Windows, use:
 //  #define USE_WIN32_SHARED_MEMORY 1
 
-// If we ever want to fall back to the apr implementation for a platform, use:
-//  #define USE_APR_SHARED_MEMORY 1
-
 #if LL_WINDOWS
-//  #define USE_APR_SHARED_MEMORY 1
     #define USE_WIN32_SHARED_MEMORY 1
 #elif LL_DARWIN
     #define USE_SHM_OPEN_SHARED_MEMORY 1
@@ -52,26 +48,21 @@
 
 // FIXME: This path thing is evil and unacceptable.
 #if LL_WINDOWS
-    #define APR_SHARED_MEMORY_PREFIX_STRING "C:\\LLPlugin_"
     // Apparnently using the "Global\\" prefix here only works from administrative accounts under Vista.
     // Other options I've seen referenced are "Local\\" and "Session\\".
     #define WIN32_SHARED_MEMORY_PREFIX_STRING "Local\\LL_"
 #else
     // mac and linux
-    #define APR_SHARED_MEMORY_PREFIX_STRING "/tmp/LLPlugin_"
     #define SHM_OPEN_SHARED_MEMORY_PREFIX_STRING "/LL"
 #endif
 
-#if USE_APR_SHARED_MEMORY
-    #include "llapr.h"
-    #include "apr_shm.h"
-#elif USE_SHM_OPEN_SHARED_MEMORY
+#if USE_SHM_OPEN_SHARED_MEMORY
     #include <sys/fcntl.h>
     #include <sys/mman.h>
     #include <errno.h>
 #elif USE_WIN32_SHARED_MEMORY
 #include <windows.h>
-#endif // USE_APR_SHARED_MEMORY
+#endif // USE_SHM_OPEN_SHARED_MEMORY
 
 
 int LLPluginSharedMemory::sSegmentNumber = 0;
@@ -101,9 +92,7 @@ public:
     LLPluginSharedMemoryPlatformImpl();
     ~LLPluginSharedMemoryPlatformImpl();
 
-#if USE_APR_SHARED_MEMORY
-    apr_shm_t* mAprSharedMemory;
-#elif USE_SHM_OPEN_SHARED_MEMORY
+#if USE_SHM_OPEN_SHARED_MEMORY
     int mSharedMemoryFD;
 #elif USE_WIN32_SHARED_MEMORY
     HANDLE mMapFile;
@@ -138,115 +127,7 @@ LLPluginSharedMemory::~LLPluginSharedMemory()
     delete mImpl;
 }
 
-#if USE_APR_SHARED_MEMORY
-// MARK: apr implementation
-
-LLPluginSharedMemoryPlatformImpl::LLPluginSharedMemoryPlatformImpl()
-{
-    mAprSharedMemory = NULL;
-}
-
-LLPluginSharedMemoryPlatformImpl::~LLPluginSharedMemoryPlatformImpl()
-{
-
-}
-
-bool LLPluginSharedMemory::map(void)
-{
-    mMappedAddress = apr_shm_baseaddr_get(mImpl->mAprSharedMemory);
-    if(mMappedAddress == NULL)
-    {
-        return false;
-    }
-
-    return true;
-}
-
-bool LLPluginSharedMemory::unmap(void)
-{
-    // This is a no-op under apr.
-    return true;
-}
-
-bool LLPluginSharedMemory::close(void)
-{
-    // This is a no-op under apr.
-    return true;
-}
-
-bool LLPluginSharedMemory::unlink(void)
-{
-    // This is a no-op under apr.
-    return true;
-}
-
-
-bool LLPluginSharedMemory::create(size_t size)
-{
-    mName = APR_SHARED_MEMORY_PREFIX_STRING;
-    mName += createName();
-    mSize = size;
-
-    apr_status_t status = apr_shm_create( &(mImpl->mAprSharedMemory), mSize, mName.c_str(), gAPRPoolp );
-
-    if(ll_apr_warn_status(status))
-    {
-        return false;
-    }
-
-    mNeedsDestroy = true;
-
-    return map();
-}
-
-bool LLPluginSharedMemory::destroy(void)
-{
-    if(mImpl->mAprSharedMemory)
-    {
-        apr_status_t status = apr_shm_destroy(mImpl->mAprSharedMemory);
-        if(ll_apr_warn_status(status))
-        {
-            // TODO: Is this a fatal error?  I think not...
-        }
-        mImpl->mAprSharedMemory = NULL;
-    }
-
-    return true;
-}
-
-bool LLPluginSharedMemory::attach(const std::string &name, size_t size)
-{
-    mName = name;
-    mSize = size;
-
-    apr_status_t status = apr_shm_attach( &(mImpl->mAprSharedMemory), mName.c_str(), gAPRPoolp );
-
-    if(ll_apr_warn_status(status))
-    {
-        return false;
-    }
-
-    return map();
-}
-
-
-bool LLPluginSharedMemory::detach(void)
-{
-    if(mImpl->mAprSharedMemory)
-    {
-        apr_status_t status = apr_shm_detach(mImpl->mAprSharedMemory);
-        if(ll_apr_warn_status(status))
-        {
-            // TODO: Is this a fatal error?  I think not...
-        }
-        mImpl->mAprSharedMemory = NULL;
-    }
-
-    return true;
-}
-
-
-#elif USE_SHM_OPEN_SHARED_MEMORY
+#if USE_SHM_OPEN_SHARED_MEMORY
 // MARK: shm_open/mmap implementation
 
 LLPluginSharedMemoryPlatformImpl::LLPluginSharedMemoryPlatformImpl()

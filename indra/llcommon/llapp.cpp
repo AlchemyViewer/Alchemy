@@ -53,8 +53,6 @@
 //
 // Signal handling
 #ifndef LL_WINDOWS
-#include "apr_signal.h"
-
 # include <signal.h>
 # include <unistd.h> // for fork()
 void setup_signals();
@@ -458,7 +456,17 @@ void clear_signals()
     sigaction(SIGQUIT, &act, NULL);
 }
 
-
+const char* signal_to_string(int sig) {
+    switch (sig) {
+        case SIGINT:  return "SIGINT";
+        case SIGILL:  return "SIGILL";
+        case SIGFPE:  return "SIGFPE";
+        case SIGSEGV: return "SIGSEGV";
+        case SIGTERM: return "SIGTERM";
+        case SIGABRT: return "SIGABRT";
+        default:      return "UNKNOWN_SIGNAL";
+    }
+}
 
 void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 {
@@ -473,7 +481,7 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
 
     if (LLApp::sLogInSignal)
     {
-        LL_INFOS() << "Signal handler - Got signal " << signum << " - " << apr_signal_description_get(signum) << LL_ENDL;
+        LL_INFOS() << "Signal handler - Got signal " << signum << " (" << signal_to_string(signum) << ")" << LL_ENDL;
     }
 
 
