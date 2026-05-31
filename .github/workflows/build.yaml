@@ -21,13 +21,6 @@ on:
         required: true
         type: string
         default: "hippo"
-      installer_type:
-        description: 'Windows and Mac installer type'
-        type: choice
-        options:
-          - velopack
-          - nsis
-        default: 'velopack'
   pull_request:
   push:
     branches: ["main", "release/*", "beta/*", "project/*"]
@@ -200,8 +193,6 @@ jobs:
       VIEWER_GRID: "agni"
       # Link Time Optimization
       USE_LTO: ${{ matrix.configuration == 'release' }}
-      # Velopack Installer
-      USE_VELOPACK: ${{ (contains(matrix.runner, 'windows') || contains(matrix.runner, 'macos')) && github.event.inputs.installer_type == 'velopack' }}
       # Setting this variable directs Linden's TUT test driver code to capture
       # test-program log output at the specified level, but to display it only if
       # the individual test fails.
@@ -360,7 +351,7 @@ jobs:
             -DBUILD_APPEARANCE_UTIL:BOOL="$BUILD_APPEARANCE_UTIL" \
             -DBUILD_TESTING:BOOL="$BUILD_TESTS" \
             -DPACKAGE:BOOL=ON \
-            -DUSE_VELOPACK:BOOL="$USE_VELOPACK" \
+            -DUSE_VELOPACK:BOOL=ON \
             -DHAVOK:BOOL="$HAVOK" \
             -DUSE_LTO:BOOL="$USE_LTO" \
             -DDISABLE_RELEASE_DEBUG_LOGGING=ON \

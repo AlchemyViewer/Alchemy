@@ -1,8 +1,8 @@
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO velopack/velopack
-    REF 0.0.1589-ga2c5a97
-    SHA512 32b2719364b80a532c0c0ec77c61535cb2d174444f1e643dfc0ef2626d56748249baa66d17e9a770ba63fd57809f17b1eb16f2a2b5303bb355609804408b0a81
+    REF ${VERSION}
+    SHA512 c12703a623555adc56c0e8f7ea70e789caa616d2d6f2c5a53eda7bf55794feee125b6a97817e17114ccf19ca1b43d377f70b5f417b7c9d2befa9f381c57f9d53
     HEAD_REF main
 )
 
@@ -42,19 +42,35 @@ if(VCPKG_TARGET_IS_WINDOWS)
     file(INSTALL "${SOURCE_PATH}/target/x86_64-pc-windows-msvc/release/velopack_libc.dll" DESTINATION "${CURRENT_PACKAGES_DIR}/bin")
     file(INSTALL "${SOURCE_PATH}/target/x86_64-pc-windows-msvc/release/velopack_libc.dll.lib" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
 elseif(VCPKG_TARGET_IS_OSX)
-    vcpkg_execute_required_process(
-        COMMAND ${RUSTUP_EXECUTABLE} target add aarch64-apple-darwin
-        WORKING_DIRECTORY "${SOURCE_PATH}"
-        LOGNAME rustup-${TARGET_TRIPLET}-dbg
-    )
+    if(VCPKG_OSX_ARCHITECTURES MATCHES "arm64")
+        vcpkg_execute_required_process(
+            COMMAND ${RUSTUP_EXECUTABLE} target add aarch64-apple-darwin
+            WORKING_DIRECTORY "${SOURCE_PATH}"
+            LOGNAME rustup-${TARGET_TRIPLET}-dbg
+        )
 
-    vcpkg_execute_build_process(
-        COMMAND ${CARGO_EXECUTABLE} build --target aarch64-apple-darwin --release -p velopack_libc
-        WORKING_DIRECTORY "${SOURCE_PATH}"
-        LOGNAME cargo-${TARGET_TRIPLET}-dbg
-    )
+        vcpkg_execute_build_process(
+            COMMAND ${CARGO_EXECUTABLE} build --target aarch64-apple-darwin --release -p velopack_libc
+            WORKING_DIRECTORY "${SOURCE_PATH}"
+            LOGNAME cargo-${TARGET_TRIPLET}-dbg
+        )
 
-    file(INSTALL "${SOURCE_PATH}/target/aarch64-apple-darwin/release/libvelopack_libc.a" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
+        file(INSTALL "${SOURCE_PATH}/target/aarch64-apple-darwin/release/libvelopack_libc.a" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
+    else()
+        vcpkg_execute_required_process(
+            COMMAND ${RUSTUP_EXECUTABLE} target add x86_64-apple-darwin
+            WORKING_DIRECTORY "${SOURCE_PATH}"
+            LOGNAME rustup-${TARGET_TRIPLET}-dbg
+        )
+
+        vcpkg_execute_build_process(
+            COMMAND ${CARGO_EXECUTABLE} build --target x86_64-apple-darwin --release -p velopack_libc
+            WORKING_DIRECTORY "${SOURCE_PATH}"
+            LOGNAME cargo-${TARGET_TRIPLET}-dbg
+        )
+
+        file(INSTALL "${SOURCE_PATH}/target/x86_64-apple-darwin/release/libvelopack_libc.a" DESTINATION "${CURRENT_PACKAGES_DIR}/lib")
+    endif()
 elseif(VCPKG_TARGET_IS_LINUX)
     vcpkg_execute_required_process(
         COMMAND ${RUSTUP_EXECUTABLE} target add x86_64-unknown-linux-gnu
