@@ -369,25 +369,25 @@
 
     <font name="0xProto" label="0xProto" monospace="true" ligatures="true" font_hinting="light">
         <style name="NORMAL">
-            <file font_weight="400">0xProto-Regular.woff2</file>
+            <file>0xProto-Regular.woff2</file>
         </style>
         <style name="BOLD" inherit="true">
-            <file flags="bold" font_weight="700">0xProto-Bold.woff2</file>
+            <file flags="bold">0xProto-Bold.woff2</file>
         </style>
         <style name="ITALIC" inherit="true">
-            <file font_weight="400">0xProto-Italic.woff2</file>
+            <file>0xProto-Italic.woff2</file>
         </style>
     </font>
 
     <font name="0xProtoNL" label="0xProto No Ligatures" monospace="true" ligatures="false" font_hinting="light">
         <style name="NORMAL">
-            <file font_weight="400">0xProto-Regular-NL.woff2</file>
+            <file>0xProto-Regular-NL.woff2</file>
         </style>
         <style name="BOLD" inherit="true">
-            <file flags="bold" font_weight="700">0xProto-Bold-NL.woff2</file>
+            <file flags="bold">0xProto-Bold-NL.woff2</file>
         </style>
         <style name="ITALIC" inherit="true">
-            <file font_weight="400">0xProto-Italic-NL.woff2</file>
+            <file>0xProto-Italic-NL.woff2</file>
         </style>
     </font>
 
