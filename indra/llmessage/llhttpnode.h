@@ -51,9 +51,6 @@ class LLChainIOFactory;
  * To implement a service, in most cases, subclass LLHTTPNode, implement
  * get() or post(), and create a global instance of LLHTTPRegistration<>.
  * This can all be done in a .cpp file, with no publically declared parts.
- *
- * To implement a server see lliohttpserver.h
- * @see LLHTTPWireServer
  */
 
 /**

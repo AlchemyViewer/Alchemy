@@ -24,7 +24,6 @@ target_sources(llmessage
     llhttpsdhandler.cpp
     llinstantmessage.cpp
     lliobuffer.cpp
-    lliohttpserver.cpp
     lliopipe.cpp
     lliosocket.cpp
     llioutil.cpp
@@ -109,7 +108,6 @@ target_sources(llmessage
     llinstantmessage.h
     llinvite.h
     lliobuffer.h
-    lliohttpserver.h
     lliopipe.h
     lliosocket.h
     llioutil.h
@@ -210,7 +208,6 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(lldatapacker "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llhost "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llhttpnode "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(lliohttpserver "tests/llpipeutil.cpp" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsdmessagebuilder "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsdmessagereader "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llmessageconfig "" "${test_libs}" "${test_project}")
