@@ -548,60 +548,10 @@ class Windows_x86_64_Manifest(ViewerManifest):
         if not self.is_packaging_viewer():
             self.package_file = "copied_deps"
 
-    def nsi_file_commands(self, install=True):
-        def INSTDIR(path):
-            # Note that '$INSTDIR' is purely textual here: we write
-            # exactly that into the .nsi file for NSIS to interpret.
-            # Pass the result through normpath() to handle the case in which
-            # path is the empty string. On Windows, that produces "$INSTDIR\".
-            # Unfortunately, if that's the last item on a line, NSIS takes
-            # that as line continuation and misinterprets the following line.
-            # Ensure we don't emit a trailing backslash.
-            return os.path.normpath(os.path.join('$INSTDIR', path))
-
-        result = []
-        dest_files = [pair[1] for pair in self.file_list if pair[0] and os.path.isfile(pair[1])]
-        # sort deepest hierarchy first
-        dest_files.sort(key=lambda f: (f.count(os.path.sep), f), reverse=True)
-        out_path = None
-        for pkg_file in dest_files:
-            pkg_file = os.path.normpath(pkg_file)
-            rel_file = self.relpath(pkg_file)
-            installed_dir = INSTDIR(os.path.dirname(rel_file))
-            if install and installed_dir != out_path:
-                out_path = installed_dir
-                # emit SetOutPath every time it changes
-                result.append('SetOutPath ' + out_path)
-            if install:
-                result.append('File ' + rel_file)
-            else:
-                result.append('Delete ' + INSTDIR(rel_file))
-
-        # at the end of a delete, just rmdir all the directories
-        if not install:
-            deleted_file_dirs = [os.path.dirname(self.relpath(f)) for f in dest_files]
-            # find all ancestors so that we don't skip any dirs that happened
-            # to have no non-dir children
-            deleted_dirs = set(itertools.chain.from_iterable(path_ancestors(d)
-                                                             for d in deleted_file_dirs))
-            # sort deepest hierarchy first
-            for d in sorted(deleted_dirs, key=lambda f: (f.count(os.path.sep), f), reverse=True):
-                result.append('RMDir ' + INSTDIR(d))
-
-        return '\n'.join(result)
-
     def package_finish(self):
-        # Check if we should use Velopack instead of NSIS
-        # Note: as of 2026.01's release, we will be building with Velopack's one click install.
-        # We maintain the legacy NSIS packaging mainly for TPVs at this point.
-        if self.args.get('velopack', 'OFF') == 'ON':
-            self.velopack_package_finish()
+        if self.args.get('velopack', 'OFF').upper() != 'ON' and self.args.get('velopack', 'OFF').upper() != 'TRUE' and self.args.get('velopack', 'OFF').upper() != '1':
             return
 
-        # NSIS packaging (legacy)
-        self.nsis_package_finish()
-
-    def velopack_package_finish(self):
         # packId determines install folder: %LocalAppData%\{packId}
         # Uses same naming as NSIS INSTNAME for channel separation
         pack_id = self.app_name_oneword()  # "SecondLife", "SecondLifeBeta", etc.
@@ -618,6 +568,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
 
         # Channel-specific icon for the Velopack installer.
         icon_path = os.path.join(self.get_src_prefix(), 'installers', 'windows', 'install_icon.ico')
+        splash_path = os.path.join(self.get_src_prefix(), 'installers', 'windows', 'install_splash.gif')
 
         # In CI, defer Velopack packaging to the sign step where Azure credentials
         # are available. Emit metadata as GitHub outputs so the sign step can run
@@ -633,12 +584,23 @@ class Windows_x86_64_Manifest(ViewerManifest):
             else:
                 print("WARNING: Icon not found at %s" % icon_path)
 
+            # Copy the splash into pack_dir so it's included in the Windows-app artifact
+            splash_filename = ''
+            if os.path.exists(splash_path):
+                splash_filename = os.path.basename(splash_path)
+                splash_dest = os.path.join(pack_dir, splash_filename)
+                shutil.copy2(splash_path, splash_dest)
+                print("Copied splash %s to %s" % (splash_path, splash_dest))
+            else:
+                print("WARNING: Splash not found at %s" % splash_path)
+
             # Emit metadata for the sign step
             self.set_github_output('velopack_pack_id', pack_id)
             self.set_github_output('velopack_pack_version', pack_version)
             self.set_github_output('velopack_pack_title', pack_title)
             self.set_github_output('velopack_main_exe', main_exe)
             self.set_github_output('velopack_icon', icon_filename)
+            self.set_github_output('velopack_splash', splash_filename)
             self.set_github_output('velopack_installer_base', installer_base)
             self.set_github_output('velopack_exclude', exclude_pattern)
             # Set package_file so llmanifest's touched.bat logic doesn't crash
@@ -659,7 +621,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
             # shortcuts in llvelopack.cpp on_after_install hook instead.
             '--shortcuts', '',
             '--outputDir', os.path.join(self.args['build'], 'Releases'),
-            '--splashImage', os.path.join(self.get_src_prefix(), 'installers', 'windows', 'install_splash.gif'),
+            '--splashImage', splash_path,
             '--splashProgressColor', '#00a5dc',
         ]
 
@@ -707,74 +669,6 @@ class Windows_x86_64_Manifest(ViewerManifest):
 
         # Output the Releases directory path for artifact upload (contains nupkg, RELEASES for updates)
         self.set_github_output('velopack_releases', releases_dir)
-
-    def nsis_package_finish(self):
-        """Package the viewer using NSIS installer (legacy)"""
-        # a standard map of strings for replacing in the templates
-        substitution_strings = {
-            'version' : '.'.join(self.args['version']),
-            'version_short' : '.'.join(self.args['version'][:-1]),
-            'version_dashes' : '-'.join(self.args['version']),
-            'version_registry' : '%s(64)' % '.'.join(self.args['version']),
-            'final_exe' : self.final_exe(),
-            'flags':'',
-            'app_name':self.app_name(),
-            'app_name_oneword':self.app_name_oneword()
-            }
-
-        installer_file = self.installer_base_name() + '_Setup.exe'
-        substitution_strings['installer_file'] = installer_file
-
-        version_vars = """
-        !define INSTEXE "%(final_exe)s"
-        !define VERSION "%(version_short)s"
-        !define VERSION_LONG "%(version)s"
-        !define VERSION_DASHES "%(version_dashes)s"
-        !define VERSION_REGISTRY "%(version_registry)s"
-        !define VIEWER_EXE "%(final_exe)s"
-        """ % substitution_strings
-
-        if self.channel_type() == 'release':
-            substitution_strings['caption'] = CHANNEL_VENDOR_BASE
-        else:
-            substitution_strings['caption'] = self.app_name() + ' ${VERSION}'
-
-        inst_vars_template = """
-            OutFile "%(installer_file)s"
-            !define INSTNAME   "%(app_name_oneword)s"
-            !define SHORTCUT   "%(app_name)s"
-            !define URLNAME   "secondlife"
-            Caption "%(caption)s"
-            """
-
-        engage_registry="SetRegView 64"
-        program_files="!define MULTIUSER_USE_PROGRAMFILES64"
-
-        # Dump the installers/windows directory into the raw app image tree
-        # because NSIS needs those files. But don't use path() because we
-        # don't want them installed with the viewer - they're only for use by
-        # the installer itself.
-        shutil.copytree(os.path.join(self.get_src_prefix(), 'installers', 'windows'),
-                        os.path.join(self.get_dst_prefix(), 'installers', 'windows'),
-                        dirs_exist_ok=True)
-
-        tempfile = "secondlife_setup_tmp.nsi"
-        # the following replaces strings in the nsi template
-        # it also does python-style % substitution
-        self.replace_in("installers/windows/installer_template.nsi", tempfile, {
-                "%%VERSION%%":version_vars,
-                # The template references "%%SOURCE%%\installers\windows\...".
-                # Now that we've copied that directory into the app image
-                # tree, we can just replace %%SOURCE%% with '.'.
-                "%%SOURCE%%":'.',
-                "%%INST_VARS%%":inst_vars_template % substitution_strings,
-                "%%INSTALL_FILES%%":self.nsi_file_commands(True),
-                "%%PROGRAMFILES%%":program_files,
-                "%%ENGAGEREGISTRY%%":engage_registry,
-                "%%DELETE_FILES%%":self.nsi_file_commands(False)})
-
-        self.package_file = installer_file
-
 
 class DarwinManifest(ViewerManifest):
     build_data_json_platform = 'mac'

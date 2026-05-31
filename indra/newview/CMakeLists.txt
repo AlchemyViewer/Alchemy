@@ -92,16 +92,6 @@ if (WINDOWS)
     )
   execute_process(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/installer/icons/uninstall_icon.ico"
-      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/uninstall_icon.ico"
-    )
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
-      "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_wizard_small.png"
-    )
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${BRANDING_SOURCE_DIR}/installer/splash/${ICON_PATH}/install_splash.gif"
       "${CMAKE_CURRENT_SOURCE_DIR}/installers/windows/install_splash.gif"
     )
