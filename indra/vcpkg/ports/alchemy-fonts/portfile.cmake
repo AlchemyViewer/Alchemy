@@ -9,6 +9,17 @@ vcpkg_from_github(
 )
 
 file(INSTALL
+    DIRECTORY "${SOURCE_PATH}/0xproto/"
+    DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
+    FILES_MATCHING
+    PATTERN "*.ttc"
+    PATTERN "*.ttf"
+    PATTERN "*.otf"
+    PATTERN "*.woff2"
+    PATTERN "*.txt"
+)
+
+file(INSTALL
     DIRECTORY "${SOURCE_PATH}/cascadia-code/"
     DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
     FILES_MATCHING
@@ -44,6 +55,17 @@ file(INSTALL
 
 file(INSTALL
     DIRECTORY "${SOURCE_PATH}/inter/"
+    DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
+    FILES_MATCHING
+    PATTERN "*.ttc"
+    PATTERN "*.ttf"
+    PATTERN "*.otf"
+    PATTERN "*.woff2"
+    PATTERN "*.txt"
+)
+
+file(INSTALL
+    DIRECTORY "${SOURCE_PATH}/lexica-ultralegible/"
     DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}/fonts"
     FILES_MATCHING
     PATTERN "*.ttc"
@@ -123,10 +145,12 @@ file(INSTALL
 
 vcpkg_install_copyright(
     FILE_LIST
+        ${SOURCE_PATH}/0xproto/0xProto-license.txt
         ${SOURCE_PATH}/cascadia-code/CascadiaCode-LICENSE.txt
         ${SOURCE_PATH}/dejavu-sans/DejaVu-License.txt
         ${SOURCE_PATH}/ibm-plex/IBMPlex-LICENSE.txt
         ${SOURCE_PATH}/inter/Inter-LICENSE.txt
+        ${SOURCE_PATH}/lexica-ultralegible/LexicaUltralegible-license.txt
         ${SOURCE_PATH}/noto-emoji/NotoEmoji-LICENSE.txt
         ${SOURCE_PATH}/opendyslexic/OpenDyslexic-LICENSE.txt
         ${SOURCE_PATH}/source-code/SourceCode.LICENSE.md
