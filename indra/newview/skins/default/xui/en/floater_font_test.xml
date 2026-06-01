@@ -337,6 +337,147 @@
      left="16">
         Helvetica size=Large style=BOLD|ITALIC
     </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="LexicaUltralegible"
+     height="16"
+     layout="topleft"
+     left="16">
+        LexicaUltralegible
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="LexicaUltralegible"
+     font.style="BOLD"
+     height="16"
+     layout="topleft"
+     left="16">
+        LexicaUltralegible style=BOLD
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="LexicaUltralegible"
+     font.style="ITALIC"
+     height="16"
+     layout="topleft"
+     left="16">
+        LexicaUltralegible style=ITALIC
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="LexicaUltralegible"
+     font.style="BOLD|ITALIC"
+     height="16"
+     layout="topleft"
+     left="16">
+        LexicaUltralegible style=BOLD|ITALIC
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="0xProto"
+     height="16"
+     layout="topleft"
+     left="16">
+        0xProto (monospace)
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="0xProto"
+     font.style="BOLD"
+     height="16"
+     layout="topleft"
+     left="16">
+        0xProto style=BOLD
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="0xProto"
+     font.style="ITALIC"
+     height="16"
+     layout="topleft"
+     left="16">
+        0xProto style=ITALIC
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="0xProto"
+     font.style="BOLD|ITALIC"
+     height="16"
+     layout="topleft"
+     left="16">
+        0xProto style=BOLD|ITALIC
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="0xProtoNL"
+     height="16"
+     layout="topleft"
+     left="16">
+        0xProto No Ligatures (monospace)
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="0xProtoNL"
+     font.style="BOLD"
+     height="16"
+     layout="topleft"
+     left="16">
+        0xProto No Ligatures style=BOLD
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="0xProtoNL"
+     font.style="ITALIC"
+     height="16"
+     layout="topleft"
+     left="16">
+        0xProto No Ligatures style=ITALIC
+    </text>
+    <text
+     type="string"
+     length="1"
+     bottom_delta="20"
+     follows="left|top|right"
+     font="0xProtoNL"
+     font.style="BOLD|ITALIC"
+     height="16"
+     layout="topleft"
+     left="16">
+        0xProto No Ligatures style=BOLD|ITALIC
+    </text>
 <!--
     <text
      type="string"

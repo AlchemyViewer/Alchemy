@@ -352,6 +352,45 @@
         </style>
     </font>
 
+    <font name="LexicaUltralegible" label="Lexica Ultralegible" font_hinting="light">
+        <style name="NORMAL">
+            <file>LexicaUltralegible-Regular.woff2</file>
+        </style>
+        <style name="BOLD" inherit="true">
+            <file>LexicaUltralegible-Bold.woff2</file>
+        </style>
+        <style name="ITALIC" inherit="true">
+            <file>LexicaUltralegible-Italic.woff2</file>
+        </style>
+        <style name="BOLD|ITALIC" inherit="true">
+            <file>LexicaUltralegible-BoldItalic.woff2</file>
+        </style>
+    </font>
+
+    <font name="0xProto" label="0xProto" monospace="true" ligatures="true" font_hinting="light">
+        <style name="NORMAL">
+            <file>0xProto-Regular.woff2</file>
+        </style>
+        <style name="BOLD" inherit="true">
+            <file flags="bold">0xProto-Bold.woff2</file>
+        </style>
+        <style name="ITALIC" inherit="true">
+            <file>0xProto-Italic.woff2</file>
+        </style>
+    </font>
+
+    <font name="0xProtoNL" label="0xProto No Ligatures" monospace="true" ligatures="false" font_hinting="light">
+        <style name="NORMAL">
+            <file>0xProto-Regular-NL.woff2</file>
+        </style>
+        <style name="BOLD" inherit="true">
+            <file flags="bold">0xProto-Bold-NL.woff2</file>
+        </style>
+        <style name="ITALIC" inherit="true">
+            <file>0xProto-Italic-NL.woff2</file>
+        </style>
+    </font>
+
     <font name="OpenDyslexic" label="Open Dyslexic" font_hinting="default">
         <size name="Huge"   size="14.0"/>
         <size name="Large"  size="9.6"/>
