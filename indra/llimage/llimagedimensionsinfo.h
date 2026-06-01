@@ -90,6 +90,7 @@ protected:
     bool getImageDimensionsPng();
     bool getImageDimensionsJpeg();
     bool getImageDimensionsWebP();
+    bool getImageDimensionsAVIF();
 
     S32 read_s32()
     {

@@ -243,6 +243,7 @@ endif ()
 
 # Declare All Dependency Includes
 include(APR)
+include(AVIF)
 include(Boost)
 include(bugsplat)
 include(CEFPlugin)

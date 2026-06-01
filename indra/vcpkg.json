@@ -52,6 +52,13 @@
     "harfbuzz",
     "hunspell",
     {
+      "name": "libavif",
+      "features": [
+        "aom",
+        "dav1d"
+      ]
+    },
+    {
       "name": "libjpeg-turbo",
       "features": [
         "jpeg8"

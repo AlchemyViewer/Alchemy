@@ -14,6 +14,7 @@ target_sources(llimage
     llimagepng.cpp
     llimagetga.cpp
     llimagewebp.cpp
+    llimageavif.cpp
     llimageworker.cpp
     llpngwrapper.cpp
     )
@@ -32,6 +33,7 @@ target_sources(llimage
     llimagepng.h
     llimagetga.h
     llimagewebp.h
+    llimageavif.h
     llimageworker.h
     llmapimagetype.h
     llpngwrapper.h
@@ -52,6 +54,7 @@ target_link_libraries(llimage
     llmath
     llcommon
     ll::libwebp
+    ll::libavif
     ll::libpng
     ll::libjpeg
     )

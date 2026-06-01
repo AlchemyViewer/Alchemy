@@ -92,7 +92,8 @@ class LLLocalBitmap
             ET_IMG_JPG,
             ET_IMG_J2C,
             ET_IMG_PNG,
-            ET_IMG_WEBP
+            ET_IMG_WEBP,
+            ET_IMG_AVIF
         };
 
     private: /* members */

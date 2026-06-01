@@ -38,6 +38,7 @@
 #include "llimagejpeg.h"
 #include "llimagepng.h"
 #include "llimagewebp.h"
+#include "llimageavif.h"
 
 /* misc headers */
 #include "fsyspath.h"
@@ -112,6 +113,10 @@ LLLocalBitmap::LLLocalBitmap(std::string filename)
     else if (temp_exten == "webp")
     {
         mExtension = ET_IMG_WEBP;
+    }
+    else if (temp_exten == "avif")
+    {
+        mExtension = ET_IMG_AVIF;
     }
     else
     {
@@ -383,6 +388,17 @@ bool LLLocalBitmap::decodeBitmap(LLPointer<LLImageRaw> rawimg)
         {
             LLPointer<LLImageWebP> webp_image = new LLImageWebP;
             if (webp_image->load(mFilename) && webp_image->decode(rawimg, 0.0f))
+            {
+                rawimg->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
+                decode_successful = true;
+            }
+            break;
+        }
+
+        case ET_IMG_AVIF:
+        {
+            LLPointer<LLImageAVIF> avif_image = new LLImageAVIF;
+            if (avif_image->load(mFilename) && avif_image->decode(rawimg, 0.0f))
             {
                 rawimg->biasedScaleToPowerOfTwo(LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT);
                 decode_successful = true;

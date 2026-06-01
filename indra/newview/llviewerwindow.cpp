@@ -1422,6 +1422,7 @@ static dragdrop_type_lookup_t s_DragDropTypesLookup[] = {
     std::make_tuple("png", LLAssetType::AT_TEXTURE, LLFilePicker::FFLOAD_IMAGE),
     std::make_tuple("tga", LLAssetType::AT_TEXTURE, LLFilePicker::FFLOAD_IMAGE),
     std::make_tuple("webp", LLAssetType::AT_TEXTURE, LLFilePicker::FFLOAD_IMAGE),
+    std::make_tuple("avif", LLAssetType::AT_TEXTURE, LLFilePicker::FFLOAD_IMAGE),
     std::make_tuple("bvh", LLAssetType::AT_ANIMATION, LLFilePicker::FFLOAD_ANIM),
     std::make_tuple("anim", LLAssetType::AT_ANIMATION, LLFilePicker::FFLOAD_ANIM),
     std::make_tuple("wav", LLAssetType::AT_SOUND_WAV, LLFilePicker::FFLOAD_WAV),
@@ -5102,6 +5103,8 @@ void LLViewerWindow::saveImageNumbered(LLImageFormatted *image, bool force_picke
             pick_type = LLFilePicker::FFSAVE_TGA;
         else if (extension == ".webp")
             pick_type = LLFilePicker::FFSAVE_WEBP;
+        else if (extension == ".avif")
+            pick_type = LLFilePicker::FFSAVE_AVIF;
         else
             pick_type = LLFilePicker::FFSAVE_ALL;
 
@@ -5276,6 +5279,12 @@ bool LLViewerWindow::saveSnapshot(const std::string& filepath, S32 image_width, 
             break;
         case LLSnapshotModel::SNAPSHOT_FORMAT_JPEG:
             image_codec = IMG_CODEC_JPEG;
+            break;
+        case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
+            image_codec = IMG_CODEC_WEBP;
+            break;
+        case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
+            image_codec = IMG_CODEC_AVIF;
             break;
         default:
             image_codec = IMG_CODEC_BMP;

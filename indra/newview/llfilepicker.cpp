@@ -53,7 +53,7 @@ LLFilePicker LLFilePicker::sInstance;
 
 #if LL_WINDOWS && !LL_SDL_WINDOW
 #define SOUND_FILTER L"Sounds (*.wav)\0*.wav\0"
-#define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png;*.webp\0"
+#define IMAGE_FILTER L"Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp; *.avif)\0*.tga;*.bmp;*.jpg;*.jpeg;*.png;*.webp;*.avif\0"
 #define ANIM_FILTER L"Animations (*.bvh; *.anim)\0*.bvh;*.anim\0"
 #define COLLADA_FILTER L"Scene (*.dae)\0*.dae\0"
 #define GLTF_FILTER L"glTF (*.gltf; *.glb)\0*.gltf;*.glb\0"
@@ -191,7 +191,7 @@ namespace
             filter_vec.push_back({ "Sounds (*.wav)", "wav" });
             break;
         case LLFilePicker::FFLOAD_IMAGE:
-            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)", "tga;bmp;jpg;jpeg;png;webp" });
+            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp; *.avif)", "tga;bmp;jpg;jpeg;png;webp;avif" });
             break;
         case LLFilePicker::FFLOAD_ANIM:
             filter_vec.push_back({ "Animations (*.bvh; *.anim)", "bvh;anim" });
@@ -222,7 +222,7 @@ namespace
         case LLFilePicker::FFLOAD_MATERIAL_TEXTURE:
             filter_vec.push_back({ "GLTF Import (*.gltf; *.glb; *.tga; *.bmp; *.jpg; *.jpeg; *.png)", "gltf;glb;tga;bmp;jpg;jpeg;png" });
             filter_vec.push_back({ "GLTF Files (*.gltf; *.glb)", "gltf;glb" });
-            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp)", "tga;bmp;jpg;jpeg;png;webp" });
+            filter_vec.push_back({ "Images (*.tga; *.bmp; *.jpg; *.jpeg; *.png; *.webp; *.avif)", "tga;bmp;jpg;jpeg;png;webp;avif" });
             break;
         case LLFilePicker::FFLOAD_HDRI:
             filter_vec.push_back({ "HDRI Files (*.exr)", "exr" });
@@ -468,6 +468,13 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
         }
         file_filters.push_back({ "WebP Images (*.webp)", "webp" });
         break;
+    case FFSAVE_AVIF:
+        if (default_filename.empty())
+        {
+            default_filename = "untitled.avif";
+        }
+        file_filters.push_back({ "AVIF Images (*.avif)", "avif" });
+        break;
     case FFSAVE_TGAPNG:
         if (default_filename.empty())
         {
@@ -477,6 +484,7 @@ bool LLFilePicker::getSaveFileModeless(ESaveFilter filter,
         file_filters.push_back({ "PNG Images (*.png)", "png" });
         file_filters.push_back({ "Targa Images (*.tga)", "tga" });
         file_filters.push_back({ "WebP Images (*.webp)", "webp" });
+        file_filters.push_back({ "AVIF Images (*.avif)", "avif" });
         break;
 
     case FFSAVE_JPEG:
@@ -877,6 +885,16 @@ bool LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
             L"WebP Images (*.webp)\0*.webp\0" \
             L"\0";
         break;
+    case FFSAVE_AVIF:
+        if (filename.empty())
+        {
+            wcsncpy(mFilesW, L"untitled.avif", FILENAME_BUFFER_SIZE);   /*Flawfinder: ignore*/
+        }
+        mOFN.lpstrDefExt = L"avif";
+        mOFN.lpstrFilter =
+            L"AVIF Images (*.avif)\0*.avif\0" \
+            L"\0";
+        break;
     case FFSAVE_TGAPNG:
         if (filename.empty())
         {
@@ -888,6 +906,7 @@ bool LLFilePicker::getSaveFile(ESaveFilter filter, const std::string& filename, 
             L"PNG Images (*.png)\0*.png\0" \
             L"Targa Images (*.tga)\0*.tga\0" \
             L"WebP Images (*.webp)\0*.webp\0" \
+            L"AVIF Images (*.avif)\0*.avif\0" \
             L"\0";
         break;
 
@@ -1075,6 +1094,7 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
             allowedv->push_back("tpic");
             allowedv->push_back("png");
             allowedv->push_back("webp");
+            allowedv->push_back("avif");
             break;
         case FFLOAD_WAV:
             allowedv->push_back("wav");
@@ -1188,7 +1208,7 @@ void set_nav_save_data(LLFilePicker::ESaveFilter filter, std::string &extension,
         case LLFilePicker::FFSAVE_TGAPNG:
             type = "PNG";
             creator = "prvw";
-            extension = "png,tga,webp";
+            extension = "png,tga,webp,avif";
             break;
         case LLFilePicker::FFSAVE_BMP:
             type = "BMPf";
@@ -1208,6 +1228,11 @@ void set_nav_save_data(LLFilePicker::ESaveFilter filter, std::string &extension,
         case LLFilePicker::FFSAVE_WEBP:
             extension = "webp";
             type = "WEBP";
+            creator = "prvw";
+            break;
+        case LLFilePicker::FFSAVE_AVIF:
+            extension = "avif";
+            type = "AVIF";
             creator = "prvw";
             break;
         case LLFilePicker::FFSAVE_AVI:

@@ -48,6 +48,7 @@
 #include "llimagejpeg.h"
 #include "llimagetga.h"
 #include "llimagewebp.h"
+#include "llimageavif.h"
 #include "llinventorymodel.h"   // gInventory
 #include "llpluginclassmedia.h"
 #include "llresourcedata.h"
@@ -380,7 +381,7 @@ void LLMediaFilePicker::notify(const std::vector<std::string>& filenames)
 
 #if LL_WINDOWS
 static std::string SOUND_EXTENSIONS = "wav";
-static std::string IMAGE_EXTENSIONS = "tga bmp jpg jpeg png webp";
+static std::string IMAGE_EXTENSIONS = "tga bmp jpg jpeg png webp avif";
 static std::string ANIM_EXTENSIONS =  "bvh anim";
 static std::string XML_EXTENSIONS = "xml";
 static std::string SLOBJECT_EXTENSIONS = "slobject";
@@ -1103,6 +1104,9 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
                 break;
             case LLSnapshotModel::SNAPSHOT_FORMAT_WEBP:
                 formatted = new LLImageWebP;
+                break;
+            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
+                formatted = new LLImageAVIF(gSavedSettings.getS32("SnapshotQuality"));
                 break;
             }
             formatted->enableOverSize() ;

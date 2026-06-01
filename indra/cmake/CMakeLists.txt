@@ -3,6 +3,7 @@
 set(cmake_SOURCE_FILES
         00-Common.cmake
         APR.cmake
+        AVIF.cmake
         Boost.cmake
         BootstrapVcpkg.cmake
         bugsplat.cmake
