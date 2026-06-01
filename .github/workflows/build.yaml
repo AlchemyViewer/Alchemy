@@ -152,8 +152,6 @@ jobs:
             configuration: relwithdebinfo
           - runner: macos-26
             configuration: optdebug
-          - runner: macos-26
-            arch: x64
 
     runs-on: ${{ matrix.runner }}
     outputs:
@@ -222,6 +220,14 @@ jobs:
           sudo locale-gen en_US.UTF-8
           sudo locale-gen en_GB.UTF-8
           sudo locale-gen fr_FR.UTF-8
+
+          df -h
+          sudo docker container prune -f
+          sudo docker image prune -a -f
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/.ghcup
+          df -h
 
       - name: macOS Homebrew Dependency Install
         if: runner.os == 'macOS'
