@@ -52,6 +52,15 @@ const S32 MAX_RAPID_CHANGES_PER_SEC = 10;
 // period of time over which to measure rapid changes
 const F32Seconds RAPID_CHANGE_WINDOW(1.f);
 
+// Stat bar vertical layout, in UI pixels. The label/value line at the top and
+// (for VERTICAL bars) the tick-label row along the bottom are each one monospace
+// line tall. Deriving the reserves from the live font line height keeps taller
+// faces (e.g. the current default) from clipping descenders or tick labels the
+// way the old fixed 14/15/20px constants did.
+const S32 STAT_BAR_TEXT_VPAD   = 2;  // breathing room beneath a text line
+const S32 STAT_BAR_TICK_LENGTH = 4;  // tick-mark length drawn past the bar
+const S32 STAT_BAR_MIN_BAR     = 5;  // smallest drawn bar thickness
+
 F32 calc_tick_value(F32 min, F32 max)
 {
     F32 range = max - min;
@@ -374,20 +383,29 @@ void LLStatBar::draw()
         break;
     }
 
+    // Reserve a full text line at the top for the label/value so descenders
+    // ('g', 'y', 'p', 'q') clear the bar below instead of spilling into it, and
+    // (for VERTICAL bars) a tick mark plus a text line at the bottom so the
+    // tick labels aren't cut off. Both reserves track the live font metrics;
+    // the old fixed 15/20px were tuned for a shorter monospace face.
+    LLFontGL* font = LLFontGL::getFontMonospace();
+    const S32 text_height       = font->getLineHeight() + STAT_BAR_TEXT_VPAD;
+    const S32 tick_label_height = STAT_BAR_TICK_LENGTH + text_height;
+
     LLRect bar_rect;
     if (mOrientation == HORIZONTAL)
     {
-        bar_rect.mTop    = llmax(5, getRect().getHeight() - 15);
+        bar_rect.mTop    = llmax(STAT_BAR_MIN_BAR, getRect().getHeight() - text_height);
         bar_rect.mLeft   = 0;
         bar_rect.mRight  = getRect().getWidth() - 40;
-        bar_rect.mBottom = llmin(bar_rect.mTop - 5, 0);
+        bar_rect.mBottom = llmin(bar_rect.mTop - STAT_BAR_MIN_BAR, 0);
     }
     else // VERTICAL
     {
-        bar_rect.mTop    = llmax(5, getRect().getHeight() - 15);
+        bar_rect.mTop    = llmax(STAT_BAR_MIN_BAR, getRect().getHeight() - text_height);
         bar_rect.mLeft   = 0;
         bar_rect.mRight  = getRect().getWidth();
-        bar_rect.mBottom = llmin(bar_rect.mTop - 5, 20);
+        bar_rect.mBottom = llmin(bar_rect.mTop - STAT_BAR_MIN_BAR, tick_label_height);
     }
 
     mCurMaxBar = LLSmoothInterpolation::lerp(mCurMaxBar, mTargetMaxBar, 0.05f);
@@ -584,47 +602,61 @@ LLRect LLStatBar::getRequiredRect()
 {
     LLRect rect;
 
+    // Heights are derived from the live monospace line height so rows stay tall
+    // enough for the current font (see the layout reserves used in draw()).
+    const S32 text_height = LLFontGL::getFontMonospace()->getLineHeight() + STAT_BAR_TEXT_VPAD;
+
     if (mDisplayBar)
     {
         if (mDisplayHistory)
         {
             rect.mTop = mMaxHeight;
         }
+        else if (mOrientation == VERTICAL)
+        {
+            // Partial expand: value/label line on top, a short bar, and a row of
+            // tick labels (a tick mark + a text line) along the bottom.
+            rect.mTop = text_height + STAT_BAR_MIN_BAR + (STAT_BAR_TICK_LENGTH + text_height);
+        }
         else
         {
-            rect.mTop = 40;
+            // Horizontal: value/label line plus the bar; tick labels sit to the
+            // right of the bar, so no bottom row is needed.
+            rect.mTop = llmax(40, text_height + STAT_BAR_MIN_BAR);
         }
     }
     else
     {
-        rect.mTop = 14;
+        // Collapsed: just the label/value line, tall enough for its descenders.
+        rect.mTop = text_height;
     }
     return rect;
 }
 
 void LLStatBar::drawLabelAndValue( F32 value, std::string &label, LLRect &bar_rect, S32 decimal_digits )
 {
-    LLFontGL::getFontMonospace()->render(mLabel.getWString(), 0, 0.F, (F32)getRect().getHeight(), LLColor4(1.f, 1.f, 1.f, 1.f),
-        LLFontGL::LEFT, LLFontGL::TOP);
+    LLFontGL* font = LLFontGL::getFontMonospace();
 
     static std::string na_string = LLTrans::getString("na");
     std::string value_str   = !llisnan(value)
                             ? llformat("%10.*f %s", decimal_digits, value, label.c_str())
                             : na_string;
 
-    // Draw the current value.
-    if (mOrientation == HORIZONTAL)
-    {
-        LLFontGL::getFontMonospace()->renderUTF8(value_str, 0, bar_rect.mRight, getRect().getHeight(),
-            LLColor4(1.f, 1.f, 1.f, 1.f),
-            LLFontGL::RIGHT, LLFontGL::TOP);
-    }
-    else
-    {
-        LLFontGL::getFontMonospace()->renderUTF8(value_str, 0, bar_rect.mRight, getRect().getHeight(),
-            LLColor4(1.f, 1.f, 1.f, 1.f),
-            LLFontGL::RIGHT, LLFontGL::TOP);
-    }
+    // The label is left-aligned from the left edge and the value is right-aligned
+    // at the bar's right edge, both on the same line. Reserve the value's width so
+    // a long label is ellipsized instead of overprinting the value.
+    static const S32 LABEL_VALUE_GAP = 4;
+    const S32 value_width = font->getWidth(value_str);
+    const S32 label_max_pixels = llmax(0, bar_rect.mRight - value_width - LABEL_VALUE_GAP);
+
+    font->render(mLabel.getWString(), 0, 0.f, (F32)getRect().getHeight(), LLColor4(1.f, 1.f, 1.f, 1.f),
+        LLFontGL::LEFT, LLFontGL::TOP, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+        S32_MAX, label_max_pixels, NULL, /*use_ellipses=*/true);
+
+    // Draw the current value (right-aligned at the bar's right edge for both orientations).
+    font->renderUTF8(value_str, 0, bar_rect.mRight, getRect().getHeight(),
+        LLColor4(1.f, 1.f, 1.f, 1.f),
+        LLFontGL::RIGHT, LLFontGL::TOP);
 }
 
 void LLStatBar::drawTicks( F32 min, F32 max, F32 value_scale, LLRect &bar_rect )
@@ -658,7 +690,7 @@ void LLStatBar::drawTicks( F32 min, F32 max, F32 value_scale, LLRect &bar_rect )
     {
         const S32 MIN_TICK_SPACING  = mOrientation == HORIZONTAL ? 20 : 30;
         const S32 MIN_LABEL_SPACING = mOrientation == HORIZONTAL ? 30 : 60;
-        const S32 TICK_LENGTH = 4;
+        const S32 TICK_LENGTH = STAT_BAR_TICK_LENGTH;
         const S32 TICK_WIDTH = 1;
 
         F32 start = mCurMinBar < 0.f
