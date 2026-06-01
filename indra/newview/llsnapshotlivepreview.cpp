@@ -952,6 +952,9 @@ void LLSnapshotLivePreview::estimateDataSize()
             case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
                 ratio = 8.0;    // Lossy AVIF compresses substantially better
                 break;
+            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
+                ratio = 3.0;    // Lossless AVIF, roughly PNG-class sizes
+                break;
         }
     }
     mDataSize = (S32)((F32)mPreviewImage->getDataSize() / ratio);
@@ -996,6 +999,9 @@ LLPointer<LLImageFormatted> LLSnapshotLivePreview::getFormattedImage()
                 break;
             case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
                 mFormattedImage = new LLImageAVIF(mSnapshotQuality);
+                break;
+            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
+                mFormattedImage = new LLImageAVIF(100); // quality 100 == lossless
                 break;
         }
         if (mFormattedImage->encode(mPreviewImage, 0))

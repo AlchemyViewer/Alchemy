@@ -44,7 +44,8 @@ public:
         SNAPSHOT_FORMAT_JPEG,
         SNAPSHOT_FORMAT_BMP,
         SNAPSHOT_FORMAT_WEBP,
-        SNAPSHOT_FORMAT_AVIF
+        SNAPSHOT_FORMAT_AVIF,
+        SNAPSHOT_FORMAT_AVIF_LOSSLESS
     } ESnapshotFormat;
 
     typedef enum

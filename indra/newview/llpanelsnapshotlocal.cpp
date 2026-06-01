@@ -125,6 +125,10 @@ LLSnapshotModel::ESnapshotFormat LLPanelSnapshotLocal::getImageFormat() const
     {
         fmt = LLSnapshotModel::SNAPSHOT_FORMAT_AVIF;
     }
+    else if (id == "AVIF_LOSSLESS")
+    {
+        fmt = LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS;
+    }
 
     return fmt;
 }

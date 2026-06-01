@@ -237,7 +237,13 @@ bool LLImageAVIF::encode(const LLImageRaw* raw_image, F32 encode_time)
         memcpy(tmp_buff.get() + (size_t)i * stride, row, stride);
     }
 
-    avifImage* image = avifImageCreate(width, height, 8, AVIF_PIXEL_FORMAT_YUV420);
+    // Quality 100 selects a mathematically lossless encode. True lossless requires
+    // the identity matrix (RGB stored without a lossy YUV conversion), which in turn
+    // requires 4:4:4 (no chroma subsampling). Lossy uses 4:2:0 with a BT.601 matrix.
+    const bool lossless = (mEncodeQuality >= AVIF_QUALITY_LOSSLESS);
+
+    avifImage* image = avifImageCreate(width, height, 8,
+        lossless ? AVIF_PIXEL_FORMAT_YUV444 : AVIF_PIXEL_FORMAT_YUV420);
     if (!image)
     {
         setLastError("LLImageAVIF::Failed to allocate image");
@@ -247,7 +253,7 @@ bool LLImageAVIF::encode(const LLImageRaw* raw_image, F32 encode_time)
     // Tag the bitstream as sRGB so decoders reproduce our 8-bit sRGB content.
     image->colorPrimaries = AVIF_COLOR_PRIMARIES_BT709;
     image->transferCharacteristics = AVIF_TRANSFER_CHARACTERISTICS_SRGB;
-    image->matrixCoefficients = AVIF_MATRIX_COEFFICIENTS_BT601;
+    image->matrixCoefficients = lossless ? AVIF_MATRIX_COEFFICIENTS_IDENTITY : AVIF_MATRIX_COEFFICIENTS_BT601;
 
     avifRGBImage rgb;
     avifRGBImageSetDefaults(&rgb, image);

@@ -178,6 +178,10 @@
          label="AVIF"
          name="AVIF"
          value="AVIF" />
+        <combo_box.item
+         label="AVIF (Lossless)"
+         name="AVIF_LOSSLESS"
+         value="AVIF_LOSSLESS" />
     </combo_box>
     <slider
      decimal_digits="0"

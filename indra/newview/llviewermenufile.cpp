@@ -1108,6 +1108,9 @@ class LLFileTakeSnapshotToDisk : public view_listener_t
             case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
                 formatted = new LLImageAVIF(gSavedSettings.getS32("SnapshotQuality"));
                 break;
+            case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
+                formatted = new LLImageAVIF(100); // quality 100 == lossless
+                break;
             }
             formatted->enableOverSize() ;
             formatted->encode(raw, 0);

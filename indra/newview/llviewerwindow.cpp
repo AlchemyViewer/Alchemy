@@ -5284,6 +5284,7 @@ bool LLViewerWindow::saveSnapshot(const std::string& filepath, S32 image_width, 
             image_codec = IMG_CODEC_WEBP;
             break;
         case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF:
+        case LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS:
             image_codec = IMG_CODEC_AVIF;
             break;
         default:
