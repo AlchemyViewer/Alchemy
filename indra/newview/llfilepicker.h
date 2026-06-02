@@ -100,6 +100,7 @@ public:
         FFSAVE_JPEG = 14,
         FFSAVE_SCRIPT = 15,
         FFSAVE_WEBP,
+        FFSAVE_AVIF,
         FFSAVE_CSV,
         FFSAVE_TGAPNG
 

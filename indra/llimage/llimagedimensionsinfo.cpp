@@ -31,6 +31,7 @@
 #include "llimagedimensionsinfo.h"
 
 #include <webp/decode.h>
+#include <avif/avif.h>
 
 // Value is true if one of Libjpeg's functions has encountered an error while working.
 static bool sJpegErrorEncountered = false;
@@ -70,6 +71,8 @@ bool LLImageDimensionsInfo::load(const std::string& src_filename,U32 codec)
         return getImageDimensionsPng();
     case IMG_CODEC_WEBP:
         return getImageDimensionsWebP();
+    case IMG_CODEC_AVIF:
+        return getImageDimensionsAVIF();
     default:
         return false;
 
@@ -193,6 +196,47 @@ bool LLImageDimensionsInfo::getImageDimensionsWebP()
         mHeight = features.height;
 
         return true;
+    }
+    return false;
+}
+
+bool LLImageDimensionsInfo::getImageDimensionsAVIF()
+{
+    auto image_size = LLFile::size(mSrcFilename);
+    if (image_size > 0)
+    {
+        auto image_buf = std::make_unique<U8[]>(image_size);
+
+        std::error_code ec;
+        mInfile.seek(0, LLFile::beg, ec);
+        mInfile.read(image_buf.get(), image_size, ec);
+        if (ec)
+        {
+            return false;
+        }
+
+        avifDecoder* decoder = avifDecoderCreate();
+        if (!decoder)
+        {
+            return false;
+        }
+
+        bool success = false;
+        // Parsing alone (no frame decode) is enough to read the dimensions.
+        if (avifDecoderSetIOMemory(decoder, image_buf.get(), image_size) == AVIF_RESULT_OK
+            && avifDecoderParse(decoder) == AVIF_RESULT_OK)
+        {
+            mWidth = decoder->image->width;
+            mHeight = decoder->image->height;
+            success = true;
+        }
+        else
+        {
+            LL_WARNS() << "Not an AVIF" << LL_ENDL;
+        }
+
+        avifDecoderDestroy(decoder);
+        return success;
     }
     return false;
 }

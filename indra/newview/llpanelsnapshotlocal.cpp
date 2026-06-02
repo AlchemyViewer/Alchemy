@@ -121,6 +121,14 @@ LLSnapshotModel::ESnapshotFormat LLPanelSnapshotLocal::getImageFormat() const
     {
         fmt = LLSnapshotModel::SNAPSHOT_FORMAT_WEBP;
     }
+    else if (id == "AVIF")
+    {
+        fmt = LLSnapshotModel::SNAPSHOT_FORMAT_AVIF;
+    }
+    else if (id == "AVIF_LOSSLESS")
+    {
+        fmt = LLSnapshotModel::SNAPSHOT_FORMAT_AVIF_LOSSLESS;
+    }
 
     return fmt;
 }
@@ -132,7 +140,7 @@ void LLPanelSnapshotLocal::updateControls(const LLSD& info)
         (LLSnapshotModel::ESnapshotFormat) gSavedSettings.getS32("SnapshotFormat");
     getChild<LLComboBox>("local_format_combo")->selectNthItem((S32) fmt);
 
-    const bool show_quality_ctrls = (fmt == LLSnapshotModel::SNAPSHOT_FORMAT_JPEG);
+    const bool show_quality_ctrls = (fmt == LLSnapshotModel::SNAPSHOT_FORMAT_JPEG || fmt == LLSnapshotModel::SNAPSHOT_FORMAT_AVIF);
     getChild<LLUICtrl>("image_quality_slider")->setVisible(show_quality_ctrls);
     getChild<LLUICtrl>("image_quality_level")->setVisible(show_quality_ctrls);
 

@@ -41,6 +41,7 @@
 #include "llimagetga.h"
 #include "llimagepng.h"
 #include "llimagewebp.h"
+#include "llimageavif.h"
 #include "llinventory.h"
 #include "llinventorymodel.h"
 #include "llnotificationsutil.h"
@@ -519,6 +520,10 @@ void LLPreviewTexture::onFileLoadedForSave(bool success,
         else if (extension == "webp")
         {
             image = new LLImageWebP;
+        }
+        else if (extension == "avif")
+        {
+            image = new LLImageAVIF;
         }
 
         if( image && !image->encode( src, 0 ) )
