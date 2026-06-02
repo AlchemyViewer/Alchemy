@@ -4327,6 +4327,9 @@ void LLViewerWindow::updateWorldViewRect(bool use_full_window)
     // start off using whole window to render world
     LLRect new_world_rect = mWindowRectRaw;
 
+#if 0 // Disable dynamic world view resizing for now since it causes some peformance issues on large displays when entering/leaving
+      // mouselook or hiding UI. We can re-enable this in the future when we have a better solution for the performance issues, such as
+      // rendering to a smaller offscreen buffer and then upscaling to the window size.
     if (!use_full_window && mWorldViewPlaceholder.get())
     {
         new_world_rect = mWorldViewPlaceholder.get()->calcScreenRect();
@@ -4339,6 +4342,7 @@ void LLViewerWindow::updateWorldViewRect(bool use_full_window)
         new_world_rect.mBottom = ll_round((F32)new_world_rect.mBottom * mDisplayScale.mV[VY]);
         new_world_rect.mTop = ll_round((F32)new_world_rect.mTop * mDisplayScale.mV[VY]);
     }
+#endif
 
     if (mWorldViewRectRaw != new_world_rect)
     {
