@@ -237,13 +237,19 @@ bool LLImageAVIF::encode(const LLImageRaw* raw_image, F32 encode_time)
         memcpy(tmp_buff.get() + (size_t)i * stride, row, stride);
     }
 
-    // Quality 100 selects a mathematically lossless encode. True lossless requires
-    // the identity matrix (RGB stored without a lossy YUV conversion), which in turn
-    // requires 4:4:4 (no chroma subsampling). Lossy uses 4:2:0 with a BT.601 matrix.
+    // 1/2 component images are grayscale (luma [+ alpha]); encode them as monochrome
+    // 4:0:0 so the single channel maps directly to luma. 3/4 component images are color.
+    // Quality 100 selects a mathematically lossless encode: for color that needs the
+    // identity matrix (RGB stored verbatim), which requires 4:4:4; lossy color uses
+    // 4:2:0. Monochrome stores luma directly, so a standard matrix is already exact and
+    // the identity matrix (which needs three planes) must not be used.
+    const bool grayscale = (components <= 2);
     const bool lossless = (mEncodeQuality >= AVIF_QUALITY_LOSSLESS);
 
-    avifImage* image = avifImageCreate(width, height, 8,
-        lossless ? AVIF_PIXEL_FORMAT_YUV444 : AVIF_PIXEL_FORMAT_YUV420);
+    const avifPixelFormat yuv_format = grayscale ? AVIF_PIXEL_FORMAT_YUV400
+        : (lossless ? AVIF_PIXEL_FORMAT_YUV444 : AVIF_PIXEL_FORMAT_YUV420);
+
+    avifImage* image = avifImageCreate(width, height, 8, yuv_format);
     if (!image)
     {
         setLastError("LLImageAVIF::Failed to allocate image");
@@ -253,11 +259,17 @@ bool LLImageAVIF::encode(const LLImageRaw* raw_image, F32 encode_time)
     // Tag the bitstream as sRGB so decoders reproduce our 8-bit sRGB content.
     image->colorPrimaries = AVIF_COLOR_PRIMARIES_BT709;
     image->transferCharacteristics = AVIF_TRANSFER_CHARACTERISTICS_SRGB;
-    image->matrixCoefficients = lossless ? AVIF_MATRIX_COEFFICIENTS_IDENTITY : AVIF_MATRIX_COEFFICIENTS_BT601;
+    image->matrixCoefficients = (lossless && !grayscale) ? AVIF_MATRIX_COEFFICIENTS_IDENTITY : AVIF_MATRIX_COEFFICIENTS_BT601;
 
     avifRGBImage rgb;
     avifRGBImageSetDefaults(&rgb, image);
-    rgb.format = (components == 4) ? AVIF_RGB_FORMAT_RGBA : AVIF_RGB_FORMAT_RGB;
+    switch (components)
+    {
+        case 1:  rgb.format = AVIF_RGB_FORMAT_GRAY;  break;
+        case 2:  rgb.format = AVIF_RGB_FORMAT_GRAYA; break;
+        case 4:  rgb.format = AVIF_RGB_FORMAT_RGBA;  break;
+        default: rgb.format = AVIF_RGB_FORMAT_RGB;   break; // 3 components
+    }
     rgb.depth = 8;
     rgb.pixels = tmp_buff.get();
     rgb.rowBytes = (uint32_t)stride;
