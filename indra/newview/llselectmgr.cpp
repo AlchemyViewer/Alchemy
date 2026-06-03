@@ -131,6 +131,23 @@ static bool selectionAllLocalPreview(LLObjectSelectionHandle selection)
     }
     return true;
 }
+
+// Populate a select node for a client-only preview the way the sim would via
+// processObjectProperties -- no such reply will ever arrive -- so the build
+// tools treat it as a valid, fully agent-owned, editable object.
+static void synthesizeLocalPreviewNode(LLSelectNode* nodep, LLViewerObject* objectp)
+{
+    if (!nodep || !isLocalPreviewObject(objectp))
+    {
+        return;
+    }
+    nodep->mValid = true;
+    nodep->mName = "(local mesh preview)";
+    nodep->mDescription.clear();
+    nodep->mPermissions->init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
+    const U32 full_perm = PERM_MODIFY | PERM_COPY | PERM_MOVE | PERM_TRANSFER;
+    nodep->mPermissions->initMasks(full_perm, full_perm, PERM_NONE, PERM_NONE, full_perm);
+}
 //
 // Consts
 //
@@ -1044,6 +1061,7 @@ void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, bool add_to
         if (!objectp->isSelected())
         {
             LLSelectNode *nodep = new LLSelectNode(objectp, true);
+            synthesizeLocalPreviewNode(nodep, objectp);
             if (add_to_end)
             {
                 mSelectedObjects->addNodeAtEnd(nodep);
@@ -1092,18 +1110,7 @@ void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, bool undoab
         nodep = new LLSelectNode(objectp, true);
         mSelectedObjects->addNode(nodep);
         llassert_always(nodep->getObject());
-
-        if (isLocalPreviewObject(objectp))
-        {
-            // Client-only preview: no sim ObjectProperties reply will ever
-            // arrive, so synthesize a valid, fully agent-owned node here so the
-            // build tools consider it editable.
-            nodep->mValid = true;
-            nodep->mName = "(local mesh preview)";
-            nodep->mPermissions->init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
-            const U32 full_perm = PERM_MODIFY | PERM_COPY | PERM_MOVE | PERM_TRANSFER;
-            nodep->mPermissions->initMasks(full_perm, full_perm, PERM_NONE, PERM_NONE, full_perm);
-        }
+        synthesizeLocalPreviewNode(nodep, objectp);
     }
     else
     {
