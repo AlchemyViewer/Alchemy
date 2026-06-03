@@ -978,8 +978,14 @@ void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj)
     }
 
     LLSelectMgr::getInstance()->deselectAll(); // dropping the in-world selection before reparenting
+
+    // Normal attach path: addChild() makes the root a child of the avatar in the
+    // object tree (so getAvatar()'s parent walk reaches the agent and routes the
+    // rigged faces into the avatar draw path), then attaches it -- parenting the
+    // drawable to the joint and applying the skin's joint-position overrides. The
+    // LLVOAvatarSelf::attachObject() override and the RLV watchdog detect the
+    // client-only flag and skip the inventory/COF/RLV bookkeeping a preview lacks.
     gAgentAvatarp->addChild(root);
-    gAgentAvatarp->attachObject(root);
 
     LL_INFOS("LocalMesh") << "Attached local mesh preview to avatar" << LL_ENDL;
 }
@@ -1022,9 +1028,9 @@ void LLLocalMeshMgr::detachRootIfAttached(LLViewerObject* root)
     {
         return;
     }
-    // Base-class detach: a clean client-side removal (avoids the inventory/sim
-    // traffic LLVOAvatarSelf::detachObject would attempt for a real attachment).
-    gAgentAvatarp->LLVOAvatar::detachObject(root);
+    // Normal detach path; LLVOAvatarSelf::detachObject() detects the client-only
+    // flag and skips the inventory/COF/RLV bookkeeping a real detach would do.
+    gAgentAvatarp->detachObject(root);
     gAgentAvatarp->removeChild(root); // also clears the object-tree parent
     root->setAttachmentState(0);
 }
