@@ -231,6 +231,57 @@ namespace
         return LLVector3(size[0], size[1], size[2]);
     }
 
+    // Loader-built models carry skin weights in mSkinWeights (a position-keyed
+    // map), NOT in face.mWeights -- the per-vertex array is only filled when a
+    // mesh is *downloaded* (LLVolume::unpackVolumeFaces). The upload path
+    // serializes weights by looking each vertex position up via
+    // getJointInfluences(); reproduce that here and pack the result exactly as a
+    // download would: each component is jointIndex + weight, the weight
+    // U16-quantized then clamped to [0.001, 0.999], up to 4 influences, with a
+    // (joint 0, ~1.0) fallback for any unweighted vertex. Must run BEFORE
+    // cacheOptimize() so its vertex remap carries the weights along. Without this
+    // the rigged draw path skins the mesh to garbage (holes, exploded verts,
+    // avatar deformation, vanishing parts).
+    void populateFaceWeights(LLVolumeFace& face, LLModel& mdl)
+    {
+        if (face.mNumVertices <= 0 || mdl.mSkinWeights.empty())
+        {
+            return;
+        }
+        face.allocateWeights(face.mNumVertices);
+        if (!face.mWeights)
+        {
+            return;
+        }
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            const LLVector3 pos(face.mPositions[v].getF32ptr());
+            const LLModel::weight_list& weights = mdl.getJointInfluences(pos);
+
+            F32 packed[4] = { 0.f, 0.f, 0.f, 0.f };
+            S32 cur = 0;
+            F32 wsum = 0.f;
+            for (LLModel::weight_list::const_iterator it = weights.begin();
+                 it != weights.end() && cur < 4; ++it)
+            {
+                if (it->mJointIdx < 0 || it->mJointIdx >= 255)
+                {
+                    continue; // matches LLModel::writeModel()'s joint-index guard
+                }
+                const U16 influence = (U16)(it->mWeight * 65535.f);
+                const F32 w = llclamp((F32)influence / 65535.f, 0.001f, 0.999f);
+                packed[cur] = (F32)it->mJointIdx + w;
+                wsum += w;
+                ++cur;
+            }
+            if (cur == 0 || wsum <= 0.f)
+            {
+                packed[0] = 0.999f; // joint 0 at full weight
+            }
+            face.mWeights[v].loadua(packed);
+        }
+    }
+
     // LLModelLoader::joint_lookup_func_t -- resolve a joint name against this
     // load's preview avatar. NOT the agent: the DAE loader writes the model's
     // joint-position overrides straight onto the returned joint, which would
@@ -474,6 +525,13 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 {
                     // Static: bake the instance transform into authored world space.
                     transformFace(face, mat);
+                }
+                else
+                {
+                    // Rigged: the loader leaves face.mWeights empty (weights live
+                    // in mSkinWeights). Fill them so the injected volume skins to
+                    // the avatar the same way a downloaded rigged mesh would.
+                    populateFaceWeights(face, *mdl);
                 }
                 num_vertices += face.mNumVertices;
                 num_triangles += face.mNumIndices / 3;
