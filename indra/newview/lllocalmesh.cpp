@@ -1058,7 +1058,7 @@ void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj)
 void LLLocalMeshMgr::detachPreviewFromAvatar(LLViewerObject* obj)
 {
     LLViewerObject* root = findRootForObject(obj);
-    if (!root)
+    if (!root || !root->isAttachment() || !isAgentAvatarValid())
     {
         return;
     }
@@ -1068,23 +1068,39 @@ void LLLocalMeshMgr::detachPreviewFromAvatar(LLViewerObject* obj)
         if (spawned.second.get() == root) { tracking_id = spawned.first; break; }
     }
 
-    detachRootIfAttached(root);
+    LLSelectMgr::getInstance()->deselectAll();
 
-    // Clear the (cosmetic) attachment state we set on the children too.
+    // Detach in place (NOT despawn/respawn) so the same prims -- and any edits the
+    // user made (textures, colours, transforms) -- survive being taken off.
+    //
+    // Clear the attachment state on the WHOLE linkset FIRST: the makeStatic() inside
+    // LLViewerJointAttachment::removeObject() is guarded on !isAttachment(), so with
+    // the state still set it's a no-op and the drawables stay ACTIVE on the avatar's
+    // spatial bridge -- once detached they then render adrift from their bounding
+    // boxes (mesh in one spot, bbox across the region). Clearing first lets
+    // removeObject() re-home the linkset (root + children) into the region partition.
     for (auto& spawned : mSpawnedObjects)
     {
-        if (spawned.first == tracking_id && spawned.second.notNull())
+        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
         {
             spawned.second->setAttachmentState(0);
         }
     }
 
-    if (isAgentAvatarValid())
+    // LLVOAvatar::removeChild() clears the object-tree parent AND detaches
+    // (removeObject -> makeStatic, now effective), so a single call does both.
+    gAgentAvatarp->removeChild(root);
+
+    // setupDrawable() parented the root drawable's xform to the attachment joint;
+    // restore it as a region root so its world position comes from getPositionAgent().
+    if (root->mDrawable.notNull())
     {
-        // Put it back in-world a few metres in front of the agent.
-        root->setPositionAgent(gAgent.getPositionAgent() + gAgent.getAtAxis() * 3.f);
-        root->markForUpdate();
+        root->mDrawable->mXform.setParent(NULL);
     }
+
+    // Put it back in-world a few metres in front of the agent.
+    root->setPositionAgent(gAgent.getPositionAgent() + gAgent.getAtAxis() * 3.f);
+    root->markForUpdate();
 }
 
 void LLLocalMeshMgr::detachRootIfAttached(LLViewerObject* root)

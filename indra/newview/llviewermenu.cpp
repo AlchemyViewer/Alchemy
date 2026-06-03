@@ -7938,6 +7938,15 @@ class LLAttachmentDetach : public view_listener_t
             return true;
         }
 
+        // Client-only local mesh previews have no inventory item or sim object, so
+        // the item-id based detach below is a no-op for them. Route to the local
+        // mesh manager, which detaches the whole preview linkset client-side.
+        if (object->isLocalOnly() && LLLocalMeshMgr::instanceExists())
+        {
+            LLLocalMeshMgr::getInstance()->detachPreviewFromAvatar(object);
+            return true;
+        }
+
         struct f: public LLSelectedObjectFunctor
         {
             f() : mAvatarsInSelection(false) {}
