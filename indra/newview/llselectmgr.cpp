@@ -101,8 +101,36 @@
 // [/RLVa:KB]
 #include "llglheaders.h"
 #include "llinventoryobserver.h"
+#include "lllocalmesh.h"
 
 LLViewerObject* getSelectedParentObject(LLViewerObject *object) ;
+
+// Local mesh preview objects are client-only (no sim object), so all selection
+// and edit network traffic must be suppressed for them.
+static bool isLocalPreviewObject(LLViewerObject* obj)
+{
+    return obj && LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocalPreview(obj);
+}
+
+// True only if the selection is non-empty and consists entirely of client-only
+// local mesh previews (so the whole server send can be skipped). A selection
+// containing any real object returns false and is sent normally.
+static bool selectionAllLocalPreview(LLObjectSelectionHandle selection)
+{
+    if (selection.isNull() || selection->getNumNodes() == 0)
+    {
+        return false;
+    }
+    for (LLObjectSelection::iterator iter = selection->begin(); iter != selection->end(); ++iter)
+    {
+        LLViewerObject* obj = (*iter)->getObject();
+        if (obj && !isLocalPreviewObject(obj))
+        {
+            return false;
+        }
+    }
+    return true;
+}
 //
 // Consts
 //
@@ -490,15 +518,18 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S3
     object->resetRot();
 
     // Always send to simulator, so you get a copy of the
-    // permissions structure back.
-    gMessageSystem->newMessageFast(_PREHASH_ObjectSelect);
-    gMessageSystem->nextBlockFast(_PREHASH_AgentData);
-    gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
-    gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-    gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
-    gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, object->getLocalID() );
-    LLViewerRegion* regionp = object->getRegion();
-    gMessageSystem->sendReliable( regionp->getHost());
+    // permissions structure back. (Skipped for client-only local previews.)
+    if (!isLocalPreviewObject(object))
+    {
+        gMessageSystem->newMessageFast(_PREHASH_ObjectSelect);
+        gMessageSystem->nextBlockFast(_PREHASH_AgentData);
+        gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+        gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
+        gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, object->getLocalID() );
+        LLViewerRegion* regionp = object->getRegion();
+        gMessageSystem->sendReliable( regionp->getHost());
+    }
 
     updatePointAt();
     updateSelectionCenter();
@@ -972,7 +1003,7 @@ void LLSelectMgr::deselectObjectOnly(LLViewerObject* object, bool send_to_sim)
     object->setAngularVelocity( 0,0,0 );
     object->setVelocity( 0,0,0 );
 
-    if (send_to_sim)
+    if (send_to_sim && !isLocalPreviewObject(object))
     {
         LLViewerRegion* region = object->getRegion();
         gMessageSystem->newMessageFast(_PREHASH_ObjectDeselect);
@@ -1061,6 +1092,18 @@ void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, bool undoab
         nodep = new LLSelectNode(objectp, true);
         mSelectedObjects->addNode(nodep);
         llassert_always(nodep->getObject());
+
+        if (isLocalPreviewObject(objectp))
+        {
+            // Client-only preview: no sim ObjectProperties reply will ever
+            // arrive, so synthesize a valid, fully agent-owned node here so the
+            // build tools consider it editable.
+            nodep->mValid = true;
+            nodep->mName = "(local mesh preview)";
+            nodep->mPermissions->init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
+            const U32 full_perm = PERM_MODIFY | PERM_COPY | PERM_MOVE | PERM_TRANSFER;
+            nodep->mPermissions->initMasks(full_perm, full_perm, PERM_NONE, PERM_NONE, full_perm);
+        }
     }
     else
     {
@@ -4744,6 +4787,9 @@ void LLSelectMgr::packDuplicateOnRayHead(void *user_data)
 void LLSelectMgr::sendMultipleUpdate(U32 type)
 {
     if (type == UPD_NONE) return;
+    // Client-only local previews are moved/rotated/scaled purely locally; never
+    // send their transforms to the sim.
+    if (selectionAllLocalPreview(mSelectedObjects)) return;
     // send individual updates when selecting textures or individual objects
     ESendType send_type = (!gSavedSettings.getBOOL("EditLinkedParts") && !getTEMode()) ? SEND_ONLY_ROOTS : SEND_ROOTS_FIRST;
     if (send_type == SEND_ONLY_ROOTS)
@@ -4951,13 +4997,16 @@ void LLSelectMgr::deselectAll()
         objectp->setVelocity( 0,0,0 );
     }
 
-    sendListToRegions(
-        "ObjectDeselect",
-        packAgentAndSessionID,
-        packObjectLocalID,
-        logNoOp,
-        NULL,
-        SEND_INDIVIDUALS);
+    if (!selectionAllLocalPreview(mSelectedObjects))
+    {
+        sendListToRegions(
+            "ObjectDeselect",
+            packAgentAndSessionID,
+            packObjectLocalID,
+            logNoOp,
+            NULL,
+            SEND_INDIVIDUALS);
+    }
 
     removeAll();
 
@@ -4982,13 +5031,16 @@ void LLSelectMgr::deselectAllForStandingUp()
         objectp->setVelocity( 0,0,0 );
     }
 
-    sendListToRegions(
-        "ObjectDeselect",
-        packAgentAndSessionID,
-        packObjectLocalID,
-        logNoOp,
-        NULL,
-        SEND_INDIVIDUALS);
+    if (!selectionAllLocalPreview(mSelectedObjects))
+    {
+        sendListToRegions(
+            "ObjectDeselect",
+            packAgentAndSessionID,
+            packObjectLocalID,
+            logNoOp,
+            NULL,
+            SEND_INDIVIDUALS);
+    }
 
     removeAll();
 
@@ -5354,6 +5406,8 @@ void LLSelectMgr::sendSelect()
     {
         return;
     }
+
+    if (selectionAllLocalPreview(mSelectedObjects)) return;
 
     sendListToRegions(
         "ObjectSelect",
@@ -5970,6 +6024,13 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 
 void LLSelectMgr::requestObjectPropertiesFamily(LLViewerObject* object)
 {
+    // Client-only local previews have no sim object; their properties are
+    // synthesized locally in addAsIndividual, so never query the sim.
+    if (isLocalPreviewObject(object))
+    {
+        return;
+    }
+
     LLMessageSystem* msg = gMessageSystem;
 
     msg->newMessageFast(_PREHASH_RequestObjectPropertiesFamily);

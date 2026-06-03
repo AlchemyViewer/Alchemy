@@ -134,6 +134,10 @@ public:
     LLLocalMesh* getUnit(const LLUUID& tracking_id) const;
     LLLocalMesh* getUnitByWorldID(const LLUUID& world_id) const;
 
+    // True if the object is one of our client-only in-world preview spawns.
+    // Used by LLSelectMgr to suppress all server traffic for these objects.
+    bool isLocalPreview(const LLViewerObject* obj) const;
+
     // Create a client-only LLVOVolume in-world referencing the unit's mesh.
     LLViewerObject* spawnInWorld(const LLUUID& tracking_id);
     // Convenience: load each file and spawn it in-world once it finishes loading.

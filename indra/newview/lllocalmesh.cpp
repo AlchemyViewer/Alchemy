@@ -44,6 +44,7 @@
 #include "llcallbacklist.h"  // doOnIdleOneTime
 #include "llinventoryicon.h"
 #include "llprimitive.h"     // LL_PCODE_VOLUME
+#include "object_flags.h"    // FLAGS_OBJECT_* for owner permissions
 #include "llscrolllistctrl.h"
 #include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
@@ -569,6 +570,22 @@ LLLocalMesh* LLLocalMeshMgr::getUnitByWorldID(const LLUUID& world_id) const
     return nullptr;
 }
 
+bool LLLocalMeshMgr::isLocalPreview(const LLViewerObject* obj) const
+{
+    if (!obj)
+    {
+        return false;
+    }
+    for (const auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.second.get() == obj)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
 {
     LLLocalMesh* unit = getUnit(tracking_id);
@@ -596,10 +613,12 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
         return nullptr;
     }
 
-    // Not selectable yet: until the LLSelectMgr server-I/O gating is in place,
-    // editing this client-only object would send updates for an object the sim
-    // doesn't know about. Selection/manipulation is enabled in a later step.
-    vol->mbCanSelect = false;
+    // Selectable and movable with the standard build tools. LLSelectMgr
+    // suppresses all server traffic for these client-only objects (gated on
+    // isLocalPreview), and we set full owner permission flags so the tools
+    // enable manipulation (permYouOwner/permModify/permMove read these flags).
+    vol->mbCanSelect = true;
+    vol->setFlagsWithoutUpdate(FLAGS_OBJECT_YOU_OWNER | FLAGS_OBJECT_MODIFY | FLAGS_OBJECT_MOVE | FLAGS_OBJECT_COPY | FLAGS_OBJECT_TRANSFER, true);
 
     // Build the drawable, then force a valid LOD. LLDrawable's constructor calls
     // setNoLOD(); with mLOD == NO_LOD, LLPrimitive::setVolume builds a
