@@ -183,11 +183,15 @@ public:
     // on client-only previews, which the sim delete path can't touch.
     void deletePreviewObject(LLViewerObject* obj);
 
-    // Attach/detach a rigged preview to the agent avatar (menu-driven, M4). Each
-    // acts on the preview linkset that owns `obj` (root or child). isRiggedPreview
-    // is true when `obj` is a local preview whose unit is rigged; isPreviewAttached
-    // reflects whether that linkset is currently worn.
-    void attachPreviewToAvatar(LLViewerObject* obj);
+    // Attach/detach a preview linkset to the agent avatar, driven by the normal
+    // "Attach"/"Detach" object menus (the viewer's sim attach/detach can't act on
+    // a client-only object). Each acts on the preview linkset that owns `obj` (root
+    // or child). attach_point is the avatar attachment-point id the user picked
+    // (the key into LLVOAvatar::mAttachmentPoints; render order is sorted by it);
+    // 0 means the default point (chest). isRiggedPreview is true when `obj` is a
+    // local preview whose unit is rigged; isPreviewAttached reflects whether that
+    // linkset is currently worn.
+    void attachPreviewToAvatar(LLViewerObject* obj, S32 attach_point = 0);
     void detachPreviewFromAvatar(LLViewerObject* obj);
     bool isRiggedPreview(const LLViewerObject* obj) const;
     bool isPreviewAttached(const LLViewerObject* obj) const;

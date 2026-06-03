@@ -6377,39 +6377,6 @@ bool enable_object_delete()
     return new_value;
 }
 
-// Local mesh preview: wear/take-off a rigged preview on the agent avatar (M4).
-// Only shown for a selected client-only rigged preview.
-bool enable_attach_local_mesh()
-{
-    if (!LLLocalMeshMgr::instanceExists())
-    {
-        return false;
-    }
-    LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
-    return obj && LLLocalMeshMgr::getInstance()->isRiggedPreview(obj);
-}
-
-void handle_attach_local_mesh()
-{
-    if (!LLLocalMeshMgr::instanceExists())
-    {
-        return;
-    }
-    LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
-    LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
-    if (obj && mgr->isRiggedPreview(obj))
-    {
-        if (mgr->isPreviewAttached(obj))
-        {
-            mgr->detachPreviewFromAvatar(obj);
-        }
-        else
-        {
-            mgr->attachPreviewToAvatar(obj);
-        }
-    }
-}
-
 class LLObjectsReturnPackage
 {
 public:
@@ -7652,6 +7619,19 @@ private:
         if (selectedObject)
         {
             S32 index = userdata.asInteger();
+
+            // Client-only local mesh previews have no inventory item or sim object,
+            // and there's nothing to walk to -- the normal sim attach path below
+            // would do nothing. Attach the preview linkset client-side to the
+            // attachment point the user picked from this menu (render order is sorted
+            // by attachment-point id, so the choice matters).
+            if (selectedObject->isLocalOnly() && LLLocalMeshMgr::instanceExists())
+            {
+                LLLocalMeshMgr::getInstance()->attachPreviewToAvatar(selectedObject, index);
+                setObjectSelection(NULL);
+                return true;
+            }
+
             LLViewerJointAttachment* attachment_point = NULL;
             if (index > 0)
                 attachment_point = get_if_there(gAgentAvatarp->mAttachmentPoints, index, (LLViewerJointAttachment*)NULL);
@@ -10742,7 +10722,6 @@ void initialize_menus()
     commit.add("Object.SetFavorite", boost::bind(&handle_object_set_favorite, _2));
     commit.add("Object.SitOrStand", boost::bind(&handle_object_sit_or_stand));
     commit.add("Object.Delete", boost::bind(&handle_object_delete));
-    commit.add("Object.AttachLocalMesh", boost::bind(&handle_attach_local_mesh));
     view_listener_t::addMenu(new LLObjectAttachToAvatar(true), "Object.AttachToAvatar");
     view_listener_t::addMenu(new LLObjectAttachToAvatar(false), "Object.AttachAddToAvatar");
     view_listener_t::addMenu(new LLObjectReturn(), "Object.Return");
@@ -10771,7 +10750,6 @@ void initialize_menus()
     enable.add("Object.EnableTouch", boost::bind(&enable_object_touch, _1));
     enable.add("Object.EnableFavorites", boost::bind(&enable_object_favorite, _2));
     enable.add("Object.EnableDelete", boost::bind(&enable_object_delete));
-    enable.add("Object.EnableAttachLocalMesh", boost::bind(&enable_attach_local_mesh));
     enable.add("Object.EnableWear", boost::bind(&object_is_wearable));
 
     enable.add("Object.EnableStandUp", boost::bind(&enable_object_stand_up));

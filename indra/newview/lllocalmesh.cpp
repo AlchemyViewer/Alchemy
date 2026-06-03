@@ -1007,7 +1007,7 @@ bool LLLocalMeshMgr::isPreviewAttached(const LLViewerObject* obj) const
     return root && root->isAttachment();
 }
 
-void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj)
+void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj, S32 attach_point)
 {
     if (!isAgentAvatarValid())
     {
@@ -1020,9 +1020,12 @@ void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj)
     }
 
     // Reproduce a server attach's end state for this client-only linkset:
-    //  * a non-zero attachment-point state on every prim so isAttachment()/
-    //    getAvatar() recognise them (the point is cosmetic for a rigged mesh --
-    //    the skin drives placement); state 0x10 == ATTACHMENT_ID_FROM_STATE 1 (chest),
+    //  * encode the chosen attachment-point id into the state every prim carries, so
+    //    getTargetAttachmentPoint() binds the linkset to that point and isAttachment()/
+    //    getAvatar() recognise them. The point matters: the avatar sorts rigged
+    //    render order by attachment-point id, so the user picks it from the normal
+    //    "Attach" menu. ATTACHMENT_ID_FROM_STATE is a symmetric nibble-swap, so
+    //    applying it to the id yields the state (id 1 == chest == state 0x10).
     //  * make the root a child of the avatar in the object tree so getAvatar()'s
     //    parent walk reaches the agent (root for itself, children via the root) --
     //    this is what routes the faces into the rigged draw path,
@@ -1035,7 +1038,8 @@ void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj)
     {
         if (spawned.second.get() == root) { tracking_id = spawned.first; break; }
     }
-    const U8 attach_state = 0x10; // chest
+    const S32 point = (attach_point > 0) ? attach_point : 1; // default to chest
+    const U8 attach_state = (U8)ATTACHMENT_ID_FROM_STATE(point);
     for (auto& spawned : mSpawnedObjects)
     {
         if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
