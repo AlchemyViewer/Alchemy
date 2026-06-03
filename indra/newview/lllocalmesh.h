@@ -183,6 +183,15 @@ public:
     // on client-only previews, which the sim delete path can't touch.
     void deletePreviewObject(LLViewerObject* obj);
 
+    // Attach/detach a rigged preview to the agent avatar (menu-driven, M4). Each
+    // acts on the preview linkset that owns `obj` (root or child). isRiggedPreview
+    // is true when `obj` is a local preview whose unit is rigged; isPreviewAttached
+    // reflects whether that linkset is currently worn.
+    void attachPreviewToAvatar(LLViewerObject* obj);
+    void detachPreviewFromAvatar(LLViewerObject* obj);
+    bool isRiggedPreview(const LLViewerObject* obj) const;
+    bool isPreviewAttached(const LLViewerObject* obj) const;
+
     // Create the client-only linkset in-world referencing the unit's parts. If a
     // linkset for this unit already exists (live reload), it is replaced in place
     // and the root's transform preserved.
@@ -220,6 +229,11 @@ private:
 
     // Find a decoded part by its world id (across all loaded units).
     const LLLocalMeshPart* findPart(const LLUUID& world_id) const;
+    // The spawned linkset root for the unit that owns `obj` (root or child), or null.
+    LLViewerObject* findRootForObject(const LLViewerObject* obj) const;
+    // Detach a spawned root from the agent avatar if it is currently worn (used by
+    // despawn/cleanup so an attached preview doesn't dangle on the avatar).
+    void detachRootIfAttached(LLViewerObject* root);
     // Point a freshly created object at a part's geometry/skin (sculpt id +
     // setVolume + default textures). Does not set the object's transform.
     void applyPartGeometry(LLVOVolume* vol, const LLLocalMeshPart& part);

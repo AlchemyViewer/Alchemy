@@ -440,6 +440,10 @@ public:
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
     U8 getAttachmentState() const                   { return mAttachmentState; }
 // [/RLVa:KB]
+    // Set the encoded attachment-point state. Normally written from the server's
+    // object update; exposed so a client-only object (local mesh preview) can be
+    // attached to the agent avatar without a round-trip.
+    void setAttachmentState(U8 state)               { mAttachmentState = state; }
 //  U8 getAttachmentState()                         { return mAttachmentState; }
 
     F32 getAppAngle() const                 { return mAppAngle; }

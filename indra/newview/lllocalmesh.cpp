@@ -48,6 +48,7 @@
 #include "llprimitive.h"     // LL_PCODE_VOLUME
 #include "object_flags.h"    // FLAGS_OBJECT_* for owner permissions
 #include "llscrolllistctrl.h"
+#include "llselectmgr.h"    // deselect before re-parenting onto the avatar
 #include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
@@ -653,6 +654,7 @@ void LLLocalMeshMgr::cleanup()
     {
         if (spawned.second.notNull() && !spawned.second->isDead())
         {
+            detachRootIfAttached(spawned.second.get()); // unwear before it dies
             spawned.second->markDead();
         }
     }
@@ -681,6 +683,7 @@ void LLLocalMeshMgr::despawnObjectsInRegion(LLViewerRegion* regionp)
         {
             if (obj && !obj->isDead())
             {
+                detachRootIfAttached(obj); // unwear before it dies
                 obj->markDead();
             }
             iter = mSpawnedObjects.erase(iter);
@@ -884,6 +887,146 @@ void LLLocalMeshMgr::deletePreviewObject(LLViewerObject* obj)
     {
         delUnit(tracking_id);
     }
+}
+
+LLViewerObject* LLLocalMeshMgr::findRootForObject(const LLViewerObject* obj) const
+{
+    if (!obj)
+    {
+        return nullptr;
+    }
+    LLUUID tracking_id;
+    for (const auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.second.get() == obj)
+        {
+            tracking_id = spawned.first;
+            break;
+        }
+    }
+    if (tracking_id.isNull())
+    {
+        return nullptr;
+    }
+    // The first entry pushed for a tracking id is the linkset root.
+    for (const auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
+        {
+            return spawned.second.get();
+        }
+    }
+    return nullptr;
+}
+
+bool LLLocalMeshMgr::isRiggedPreview(const LLViewerObject* obj) const
+{
+    if (!obj || !obj->isLocalOnly())
+    {
+        return false;
+    }
+    for (const auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.second.get() == obj)
+        {
+            LLLocalMesh* unit = getUnit(spawned.first);
+            return unit && unit->isRigged();
+        }
+    }
+    return false;
+}
+
+bool LLLocalMeshMgr::isPreviewAttached(const LLViewerObject* obj) const
+{
+    LLViewerObject* root = findRootForObject(obj);
+    return root && root->isAttachment();
+}
+
+void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj)
+{
+    if (!isAgentAvatarValid())
+    {
+        return;
+    }
+    LLViewerObject* root = findRootForObject(obj);
+    if (!root || root->isAttachment())
+    {
+        return; // not one of ours, or already worn
+    }
+
+    // Reproduce a server attach's end state for this client-only linkset:
+    //  * a non-zero attachment-point state on every prim so isAttachment()/
+    //    getAvatar() recognise them (the point is cosmetic for a rigged mesh --
+    //    the skin drives placement); state 0x10 == ATTACHMENT_ID_FROM_STATE 1 (chest),
+    //  * make the root a child of the avatar in the object tree so getAvatar()'s
+    //    parent walk reaches the agent (root for itself, children via the root) --
+    //    this is what routes the faces into the rigged draw path,
+    //  * attachObject() to parent the drawable to the joint and apply the skin's
+    //    joint-position overrides (recursively, including children).
+    LLUUID tracking_id;
+    for (const auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.second.get() == root) { tracking_id = spawned.first; break; }
+    }
+    const U8 attach_state = 0x10; // chest
+    for (auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
+        {
+            spawned.second->setAttachmentState(attach_state);
+        }
+    }
+
+    LLSelectMgr::getInstance()->deselectAll(); // dropping the in-world selection before reparenting
+    gAgentAvatarp->addChild(root);
+    gAgentAvatarp->attachObject(root);
+
+    LL_INFOS("LocalMesh") << "Attached local mesh preview to avatar" << LL_ENDL;
+}
+
+void LLLocalMeshMgr::detachPreviewFromAvatar(LLViewerObject* obj)
+{
+    LLViewerObject* root = findRootForObject(obj);
+    if (!root)
+    {
+        return;
+    }
+    LLUUID tracking_id;
+    for (const auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.second.get() == root) { tracking_id = spawned.first; break; }
+    }
+
+    detachRootIfAttached(root);
+
+    // Clear the (cosmetic) attachment state we set on the children too.
+    for (auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.first == tracking_id && spawned.second.notNull())
+        {
+            spawned.second->setAttachmentState(0);
+        }
+    }
+
+    if (isAgentAvatarValid())
+    {
+        // Put it back in-world a few metres in front of the agent.
+        root->setPositionAgent(gAgent.getPositionAgent() + gAgent.getAtAxis() * 3.f);
+        root->markForUpdate();
+    }
+}
+
+void LLLocalMeshMgr::detachRootIfAttached(LLViewerObject* root)
+{
+    if (!root || !root->isAttachment() || !isAgentAvatarValid())
+    {
+        return;
+    }
+    // Base-class detach: a clean client-side removal (avoids the inventory/sim
+    // traffic LLVOAvatarSelf::detachObject would attempt for a real attachment).
+    gAgentAvatarp->LLVOAvatar::detachObject(root);
+    gAgentAvatarp->removeChild(root); // also clears the object-tree parent
+    root->setAttachmentState(0);
 }
 
 LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
@@ -1109,6 +1252,7 @@ void LLLocalMeshMgr::despawnUnit(const LLUUID& tracking_id)
         {
             if (iter->second.notNull() && !iter->second->isDead())
             {
+                detachRootIfAttached(iter->second.get()); // unwear before it dies
                 iter->second->markDead(); // root markDead cascades to its linked children
             }
             iter = mSpawnedObjects.erase(iter);
