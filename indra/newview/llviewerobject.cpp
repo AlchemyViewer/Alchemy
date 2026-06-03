@@ -2814,6 +2814,8 @@ void LLViewerObject::saveScript(const LLViewerInventoryItem* item,
      * XXXPAM Investigate not making this copy.  Seems unecessary, but I'm unsure about the
      * interaction with doUpdateInventory() called below.
      */
+    if (isLocalOnly()) return; // client-only object: no task inventory on a sim
+
     LL_DEBUGS() << "LLViewerObject::saveScript() " << item->getUUID() << " " << item->getAssetUUID() << LL_ENDL;
 
     LLPointer<LLViewerInventoryItem> task_item =
@@ -2855,6 +2857,8 @@ void LLViewerObject::saveScript(const LLViewerInventoryItem* item,
 void LLViewerObject::moveInventory(const LLUUID& folder_id,
                                    const LLUUID& item_id)
 {
+    if (isLocalOnly()) return; // client-only object: no task inventory on a sim
+
     LL_DEBUGS() << "LLViewerObject::moveInventory " << item_id << LL_ENDL;
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_MoveTaskInventory);
@@ -2962,6 +2966,20 @@ void LLViewerObject::requestInventory()
 
 void LLViewerObject::fetchInventoryFromServer()
 {
+    if (isLocalOnly())
+    {
+        // Client-only object (e.g. local mesh preview): no task inventory exists
+        // on any sim, and mLocalID is client-side -- a request could even hit an
+        // unrelated region object. Present an empty, loaded inventory instead.
+        if (!mInventory)
+        {
+            mInventory = new LLInventoryObject::object_list_t();
+        }
+        mInventoryDirty = false;
+        doInventoryCallback(); // resets mInvRequestState to STOPPED
+        return;
+    }
+
     if (!isInventoryPending())
     {
         delete mInventory;
@@ -3564,6 +3582,8 @@ void LLViewerObject::doInventoryCallback()
 
 void LLViewerObject::removeInventory(const LLUUID& item_id)
 {
+    if (isLocalOnly()) return; // client-only object: no task inventory on a sim
+
     // close associated floater properties
     LLSD params;
     params["id"] = item_id;
@@ -3636,6 +3656,8 @@ void LLViewerObject::updateInventory(
     U8 key,
     bool is_new)
 {
+    if (isLocalOnly()) return; // client-only object: no task inventory on a sim
+
     // This slices the object into what we're concerned about on the
     // viewer. The simulator will take the permissions and transfer
     // ownership.
@@ -4972,6 +4994,7 @@ void LLViewerObject::setNumTEs(const U8 num_tes)
 
 void LLViewerObject::sendMaterialUpdate() const
 {
+    if (isLocalOnly()) return; // client-only object: no sim counterpart
     LLViewerRegion* regionp = getRegion();
     if(!regionp) return;
     gMessageSystem->newMessageFast(_PREHASH_ObjectMaterial);
@@ -4988,6 +5011,7 @@ void LLViewerObject::sendMaterialUpdate() const
 //formerly send_object_shape(LLViewerObject *object)
 void LLViewerObject::sendShapeUpdate()
 {
+    if (isLocalOnly()) return; // client-only object: no sim counterpart
     gMessageSystem->newMessageFast(_PREHASH_ObjectShape);
     gMessageSystem->nextBlockFast(_PREHASH_AgentData);
     gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
@@ -5004,6 +5028,7 @@ void LLViewerObject::sendShapeUpdate()
 
 void LLViewerObject::sendTEUpdate() const
 {
+    if (isLocalOnly()) return; // client-only object: no sim counterpart
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(_PREHASH_ObjectImage);
 
@@ -6502,7 +6527,8 @@ void LLViewerObject::parameterChanged(U16 param_type, bool local_origin)
 
 void LLViewerObject::parameterChanged(U16 param_type, LLNetworkData* data, bool in_use, bool local_origin)
 {
-    if (local_origin)
+    // Client-only objects have no sim counterpart -- never send param changes up.
+    if (local_origin && !isLocalOnly())
     {
         // *NOTE: Do not send the render material ID in this way as it will get
         // out-of-sync with other sent client data.
@@ -6901,6 +6927,7 @@ bool LLViewerObject::specialHoverCursor() const
 
 void LLViewerObject::updateFlags(bool physics_changed)
 {
+    if (isLocalOnly()) return; // client-only object: no sim counterpart
     LLViewerRegion* regionp = getRegion();
     if(!regionp) return;
     gMessageSystem->newMessageFast(_PREHASH_ObjectFlagUpdate);
@@ -7494,9 +7521,11 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
         }
     }
 
-    if (update_server)
+    if (update_server && !isLocalOnly())
     {
-        // update via ModifyMaterialParams cap (server will echo back changes)
+        // update via ModifyMaterialParams cap (server will echo back changes).
+        // Client-only objects have no sim counterpart, so the local render
+        // material above is the end of it.
         for (S32 te = start_idx; te < end_idx; ++te)
         {
             // This sends a cleared version of this object's current material
@@ -7654,6 +7683,7 @@ bool LLViewerObject::isObjectInPendingUpdate(const LLUUID& owner_id, LLViewerObj
 
 void LLViewerObject::requestObjectUpdate()
 {
+    if (isLocalOnly()) return; // client-only object: nothing to request from a sim
     if (LLViewerRegion* regionp = getRegion())
     {
         LLMessageSystem* msg = gMessageSystem;
