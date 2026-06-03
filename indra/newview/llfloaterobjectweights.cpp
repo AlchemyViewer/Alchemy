@@ -33,6 +33,7 @@
 #include "lltextbox.h"
 
 #include "llagent.h"
+#include "llappviewer.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 
@@ -125,14 +126,18 @@ void LLFloaterObjectWeights::onOpen(const LLSD& key)
 // virtual
 void LLFloaterObjectWeights::onWeightsUpdate(const SelectionCost& selection_cost)
 {
-    mSelectedDownloadWeight->setText(llformat("%.1f", selection_cost.mNetworkCost));
-    mSelectedPhysicsWeight->setText(llformat("%.1f", selection_cost.mPhysicsCost));
-    mSelectedServerWeight->setText(llformat("%.1f", selection_cost.mSimulationCost));
+    LLAppViewer::instance()->postToMainCoro(
+        [=]()
+        {
+            mSelectedDownloadWeight->setText(llformat("%.1f", selection_cost.mNetworkCost));
+            mSelectedPhysicsWeight->setText(llformat("%.1f", selection_cost.mPhysicsCost));
+            mSelectedServerWeight->setText(llformat("%.1f", selection_cost.mSimulationCost));
 
-    S32 render_cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectRenderCost();
-    mSelectedDisplayWeight->setText(llformat("%d", render_cost));
+            S32 render_cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectRenderCost();
+            mSelectedDisplayWeight->setText(llformat("%d", render_cost));
 
-    toggleWeightsLoadingIndicators(false);
+            toggleWeightsLoadingIndicators(false);
+        });
 }
 
 //virtual
