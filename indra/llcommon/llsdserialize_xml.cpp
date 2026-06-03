@@ -549,9 +549,17 @@ void LLSDXMLParser::Impl::parsePart(const char* buf, llssize len)
         && len > 0 )
     {
         XML_Status status = XML_Parse(mParser, buf, (int)len, 0);
-        if (status == XML_STATUS_ERROR)
+        // A short, complete document (e.g. "<llsd><map /></llsd>") may be
+        // wholly contained in this first chunk. Reaching </llsd> calls
+        // XML_StopParser(false), which makes XML_Parse return XML_STATUS_ERROR
+        // even though the parse succeeded -- mGracefullStop distinguishes that
+        // graceful stop from a real error, matching parse()/parseLines().
+        if (status == XML_STATUS_ERROR && !mGracefullStop)
         {
-            LL_INFOS() << "Unexpected XML parsing error at start" << LL_ENDL;
+            if (mEmitErrors)
+            {
+                LL_INFOS() << "Unexpected XML parsing error at start" << LL_ENDL;
+            }
         }
     }
 }

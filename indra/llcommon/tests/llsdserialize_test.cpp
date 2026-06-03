@@ -57,6 +57,7 @@ typedef U32 uint32_t;
 #include "../test/namedtempfile.h"
 #include "stringize.h"
 #include "StringVec.h"
+#include "wrapllerrs.h"
 #include <functional>
 
 typedef std::function<void(const LLSD& data, std::ostream& str)> FormatterFunction;
@@ -241,6 +242,33 @@ namespace tut
         mSD = string_to_vector("6|6|asdfhappybox|60e44ec5-305c-43c2-9a19-b4b89b1ae2a6|60e44ec5-305c-43c2-9a19-b4b89b1ae2a6|60e44ec5-305c-43c2-9a19-b4b89b1ae2a6|00000000-0000-0000-0000-000000000000|7fffffff|7fffffff|0|0|82000|450fe394-2904-c9ad-214c-a07eb7feec29|(No Description)|0|10|0");
         expected = "<llsd><binary encoding=\"base64\">Nnw2fGFzZGZoYXBweWJveHw2MGU0NGVjNS0zMDVjLTQzYzItOWExOS1iNGI4OWIxYWUyYTZ8NjBlNDRlYzUtMzA1Yy00M2MyLTlhMTktYjRiODliMWFlMmE2fDYwZTQ0ZWM1LTMwNWMtNDNjMi05YTE5LWI0Yjg5YjFhZTJhNnwwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDB8N2ZmZmZmZmZ8N2ZmZmZmZmZ8MHwwfDgyMDAwfDQ1MGZlMzk0LTI5MDQtYzlhZC0yMTRjLWEwN2ViN2ZlZWMyOXwoTm8gRGVzY3JpcHRpb24pfDB8MTB8MA==</binary></llsd>\n";
         xml_test("binary", expected);
+    }
+
+    template<> template<>
+    void sd_xml_object::test<7>()
+    {
+        // A complete, single-line legacy <llsd> document (no embedded '\n')
+        // is read entirely into the header buffer by LLSDSerialize::deserialize
+        // and handed to LLSDXMLParser::parsePart(). Reaching </llsd> within that
+        // first chunk calls XML_StopParser(false), which makes expat report
+        // XML_STATUS_ERROR even though the parse succeeded. parsePart() used to
+        // log a spurious "Unexpected XML parsing error" for that graceful stop.
+        // Empty containers are the common single-line form that triggered it.
+        auto deserialize_no_spurious_error =
+            [](const std::string& xml, const LLSD& expected)
+            {
+                CaptureLog capture(LLError::LEVEL_INFO);
+                std::istringstream input(xml);
+                LLSD parsed;
+                bool ok = LLSDSerialize::deserialize(parsed, input, xml.size());
+                ensure(STRINGIZE("deserialize " << xml << " succeeded"), ok);
+                ensure_equals(STRINGIZE("deserialize " << xml << " value"), parsed, expected);
+                ensure(STRINGIZE("no spurious parse error for " << xml),
+                       capture.messageWith("Unexpected XML parsing error", false).empty());
+            };
+
+        deserialize_no_spurious_error("<llsd><map /></llsd>\n", LLSD::emptyMap());
+        deserialize_no_spurious_error("<llsd><array /></llsd>\n", LLSD::emptyArray());
     }
 
     class TestLLSDSerializeData
