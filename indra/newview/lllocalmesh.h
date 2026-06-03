@@ -51,6 +51,7 @@
 
 class LLScrollListCtrl;
 class LLViewerObject;
+class LLViewerRegion;
 class LLVOAvatar;
 class LLVOVolume;
 class LLVolume;
@@ -206,6 +207,12 @@ public:
     // LLViewerObjectList::killAllObjects() so they are released while the object
     // list is still valid, ahead of singleton teardown. Idempotent.
     void cleanup();
+
+    // Release the preview objects (and preview avatar) hosted by a region that is
+    // being torn down. Wired into LLViewerObjectList::killObjects(region) so they
+    // don't dangle past their host region. The loaded units stay; a later spawn
+    // re-creates them in the current region.
+    void despawnObjectsInRegion(LLViewerRegion* regionp);
 
 private:
     LLUUID addUnitInternal(const std::string& filename);

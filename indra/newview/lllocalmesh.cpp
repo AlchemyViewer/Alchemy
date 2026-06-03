@@ -629,6 +629,39 @@ void LLLocalMeshMgr::cleanup()
     }
 }
 
+void LLLocalMeshMgr::despawnObjectsInRegion(LLViewerRegion* regionp)
+{
+    // The hosting region is being torn down (LLViewerObjectList::killObjects).
+    // Release our client-only objects in it so they don't dangle past their
+    // region; the loaded units stay, so a later spawn/reload re-creates them in
+    // whatever region is current then. markDead() is idempotent.
+    for (auto iter = mSpawnedObjects.begin(); iter != mSpawnedObjects.end(); )
+    {
+        LLViewerObject* obj = iter->second.get();
+        if (!obj || obj->isDead() || obj->getRegion() == regionp)
+        {
+            if (obj && !obj->isDead())
+            {
+                obj->markDead();
+            }
+            iter = mSpawnedObjects.erase(iter);
+        }
+        else
+        {
+            ++iter;
+        }
+    }
+
+    if (mPreviewAvatar.notNull() && (mPreviewAvatar->isDead() || mPreviewAvatar->getRegion() == regionp))
+    {
+        if (!mPreviewAvatar->isDead())
+        {
+            mPreviewAvatar->markDead();
+        }
+        mPreviewAvatar = nullptr; // recreated lazily in the current region on next load
+    }
+}
+
 LLVOAvatar* LLLocalMeshMgr::getPreviewAvatar()
 {
     if ((mPreviewAvatar.isNull() || mPreviewAvatar->isDead()) && gAgent.getRegion())

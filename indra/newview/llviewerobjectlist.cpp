@@ -1413,6 +1413,14 @@ bool LLViewerObjectList::killObject(LLViewerObject *objectp)
 void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
 {
     LL_PROFILE_ZONE_SCOPED;
+
+    // Release our client-only local mesh previews hosted by this region before it
+    // is torn down, so they don't dangle past it (the preview avatar too).
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr::getInstance()->despawnObjectsInRegion(regionp);
+    }
+
     LLViewerObject *objectp;
 
 
