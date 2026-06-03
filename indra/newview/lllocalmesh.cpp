@@ -571,6 +571,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             part.mVolume->copyFacesFrom(faces);
             // cacheOptimize generates tangents (loaded mesh assets require them
             // and raycast picking dereferences them) -- before setMeshAssetLoaded.
+            // Mirrors the download path (LLVolume::unpackVolumeFacesInternal).
             if (!part.mVolume->cacheOptimize(true))
             {
                 LL_WARNS("LocalMesh") << "cacheOptimize failed for '" << mShortName << "'" << LL_ENDL;
@@ -579,8 +580,14 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
 
             if (!mdl->mSkinInfo.mJointNames.empty())
             {
-                // Owned copy bound to this part's world id.
-                LLSD sd = mdl->mSkinInfo.asLLSD(true, mdl->mSkinInfo.mLockScaleIfJointPosition);
+                // Owned copy bound to this part's world id. include_joints=false
+                // strips the alt-inverse-bind matrices (joint-position overrides) +
+                // pelvis offset while keeping joint names, inverse bind, and bind
+                // shape -- everything skinning needs. This mirrors the mesh-upload
+                // preview's default (show_joint_overrides off): the overrides reshape
+                // the avatar skeleton on attach, and a mesh weighted for the default
+                // skeleton (the common case) scrunches when they're applied.
+                LLSD sd = mdl->mSkinInfo.asLLSD(false, false);
                 part.mSkinInfo = new LLMeshSkinInfo(part.mWorldID, sd);
                 num_joints = llmax(num_joints, (S32)mdl->mSkinInfo.mJointNames.size());
             }
