@@ -427,8 +427,28 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
     // mesh. Each LLModel becomes its own part (<= 8 faces) -- exactly the split
     // the upload path makes -- so a >8-face or multi-node file spawns as a
     // linkset instead of dropping geometry.
+    //
+    // A *rigged* unit keeps the loader's geometry and skin verbatim: the loader
+    // already normalized the mesh to a unit box and built a matching bind-shape
+    // matrix, so re-normalizing or baking the instance transform here would desync
+    // the skinning once the preview is attached to an avatar. Static units bake
+    // the instance transforms and normalize for in-world linkset placement.
+    bool unit_rigged = false;
+    for (auto iter = scene.begin(); iter != scene.end() && !unit_rigged; ++iter)
+    {
+        for (LLModelInstance& instance : iter->second)
+        {
+            LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
+            if (mdl && !mdl->mSkinInfo.mJointNames.empty())
+            {
+                unit_rigged = true;
+                break;
+            }
+        }
+    }
+
     std::vector<LLLocalMeshPart> parts;
-    std::vector<LLVector3> centers; // scene-space centre of each part (parallel to parts)
+    std::vector<LLVector3> centers; // static units only: scene-space centre per part
     S32 num_vertices = 0, num_triangles = 0, num_joints = 0;
 
     for (auto iter = scene.begin(); iter != scene.end(); ++iter)
@@ -444,14 +464,16 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 continue;
             }
 
-            // Collect this model's faces, baking the instance transform so the
-            // part lands in the model's authored world space.
             std::vector<LLVolumeFace> faces;
             faces.reserve(mdl->getNumVolumeFaces());
             for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
             {
                 LLVolumeFace face = mdl->getVolumeFace(fi); // deep copy
-                transformFace(face, mat);
+                if (!unit_rigged)
+                {
+                    // Static: bake the instance transform into authored world space.
+                    transformFace(face, mat);
+                }
                 num_vertices += face.mNumVertices;
                 num_triangles += face.mNumIndices / 3;
                 faces.push_back(face);
@@ -461,13 +483,28 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 continue;
             }
 
-            // Normalize to a unit box centred at origin; keep the size (prim
-            // scale) and scene-space centre (placement within the model).
-            LLVector3 center;
             LLLocalMeshPart part;
-            part.mScale = normalizeFaces(faces, &center);
             part.mWorldID.generate();
             part.mNumFaces = (S32)faces.size();
+
+            if (unit_rigged)
+            {
+                // Keep the loader's (already unit-box) geometry as-is; record the
+                // authored size for the in-world static view. Placement comes from
+                // the rig once attached, so no per-part offset.
+                LLVector3 nscale, ntrans;
+                mdl->getNormalizedScaleTranslation(nscale, ntrans);
+                part.mScale  = nscale;
+                part.mOffset = LLVector3::zero;
+            }
+            else
+            {
+                // Normalize to a unit box; keep size (prim scale) + scene-space
+                // centre (offset within the model, computed below).
+                LLVector3 center;
+                part.mScale = normalizeFaces(faces, &center);
+                centers.push_back(center);
+            }
 
             LLVolumeParams vparams;
             vparams.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
@@ -490,7 +527,6 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             }
 
             parts.push_back(part);
-            centers.push_back(center);
         }
     }
 
@@ -500,20 +536,23 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
         return false; // keep any previously loaded geometry intact
     }
 
-    // Combined bounding box across all parts -> the model centre. Each part's
-    // offset is relative to it, so the spawn can drop the whole model centred in
-    // front of the agent and the parts assemble in their authored positions.
-    LLVector3 cmin = centers[0] - parts[0].mScale * 0.5f;
-    LLVector3 cmax = centers[0] + parts[0].mScale * 0.5f;
-    for (size_t i = 0; i < parts.size(); ++i)
+    if (!unit_rigged)
     {
-        update_min_max(cmin, cmax, centers[i] - parts[i].mScale * 0.5f);
-        update_min_max(cmin, cmax, centers[i] + parts[i].mScale * 0.5f);
-    }
-    const LLVector3 model_center = (cmin + cmax) * 0.5f;
-    for (size_t i = 0; i < parts.size(); ++i)
-    {
-        parts[i].mOffset = centers[i] - model_center;
+        // Combined bounding box across all parts -> the model centre. Each part's
+        // offset is relative to it, so the spawn drops the whole model centred in
+        // front of the agent with the parts in their authored positions.
+        LLVector3 cmin = centers[0] - parts[0].mScale * 0.5f;
+        LLVector3 cmax = centers[0] + parts[0].mScale * 0.5f;
+        for (size_t i = 0; i < parts.size(); ++i)
+        {
+            update_min_max(cmin, cmax, centers[i] - parts[i].mScale * 0.5f);
+            update_min_max(cmin, cmax, centers[i] + parts[i].mScale * 0.5f);
+        }
+        const LLVector3 model_center = (cmin + cmax) * 0.5f;
+        for (size_t i = 0; i < parts.size(); ++i)
+        {
+            parts[i].mOffset = centers[i] - model_center;
+        }
     }
 
     // Commit.
