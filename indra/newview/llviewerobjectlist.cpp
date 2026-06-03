@@ -65,6 +65,7 @@
 #include "lltoolmgr.h"
 #include "lltoolpie.h"
 #include "llkeyboard.h"
+#include "lllocalmesh.h"
 #include "llmeshrepository.h"
 #include "u64.h"
 #include "llviewertexturelist.h"
@@ -1432,6 +1433,14 @@ void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
 void LLViewerObjectList::killAllObjects()
 {
     // Used only on global destruction.
+
+    // Destroy local-mesh preview objects (and their preview avatar) first, so
+    // these client-only objects are released while this list is still valid
+    // instead of dangling until the local-mesh singleton is torn down.
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr::getInstance()->cleanup();
+    }
 
     // Mass cleanup to not clear lists one item at a time
     mIndexAndLocalIDToUUID.clear();

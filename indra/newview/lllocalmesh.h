@@ -191,6 +191,11 @@ public:
     // does not deform the real agent avatar. Created lazily on first load.
     LLVOAvatar* getPreviewAvatar();
 
+    // Destroy all client-only preview objects and the preview avatar. Wired into
+    // LLViewerObjectList::killAllObjects() so they are released while the object
+    // list is still valid, ahead of singleton teardown. Idempotent.
+    void cleanup();
+
 private:
     LLUUID addUnitInternal(const std::string& filename);
     void   despawnForWorldID(const LLUUID& world_id);

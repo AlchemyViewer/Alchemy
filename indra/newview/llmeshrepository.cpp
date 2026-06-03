@@ -4249,6 +4249,14 @@ void LLMeshRepository::shutdown()
     llassert(mThread != NULL);
     llassert(mThread->mSignal != NULL);
 
+    // Tear down the local mesh registry we created in init(). Its preview objects
+    // and avatar were already released by LLViewerObjectList::killAllObjects();
+    // this frees the decoded units and the singleton itself.
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr::deleteSingleton();
+    }
+
     metrics_teleport_started_signal.disconnect();
 
     for (U32 i = 0; i < mUploads.size(); ++i)

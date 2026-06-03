@@ -594,15 +594,38 @@ LLLocalMeshMgr::LLLocalMeshMgr()
 
 LLLocalMeshMgr::~LLLocalMeshMgr()
 {
+    cleanup(); // release spawned objects + preview avatar (idempotent)
+
     for (LLLocalMesh* unit : mMeshList)
     {
         delete unit;
     }
     mMeshList.clear();
+}
+
+void LLLocalMeshMgr::cleanup()
+{
+    // Release every client-only object we rezzed and the preview avatar. Called
+    // from LLViewerObjectList::killAllObjects() so they die while the object list
+    // and regions are still valid, rather than later when this singleton is torn
+    // down. markDead() is idempotent, so the kill loop re-marking them is fine.
+    mTimer.stopTimer();
+
+    for (auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.second.notNull() && !spawned.second->isDead())
+        {
+            spawned.second->markDead();
+        }
+    }
+    mSpawnedObjects.clear();
 
     if (mPreviewAvatar.notNull())
     {
-        mPreviewAvatar->markDead();
+        if (!mPreviewAvatar->isDead())
+        {
+            mPreviewAvatar->markDead();
+        }
         mPreviewAvatar = nullptr;
     }
 }
