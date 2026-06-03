@@ -1026,8 +1026,10 @@ void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj)
     //  * make the root a child of the avatar in the object tree so getAvatar()'s
     //    parent walk reaches the agent (root for itself, children via the root) --
     //    this is what routes the faces into the rigged draw path,
-    //  * attachObject() to parent the drawable to the joint and apply the skin's
-    //    joint-position overrides (recursively, including children).
+    //  * attachObject() to parent the drawable to the joint (recursively, including
+    //    children). The preview skin carries no joint-position overrides (stripped
+    //    in ingestScene to match the upload default), so the agent skeleton is left
+    //    as-is and a default-weighted mesh renders correctly.
     LLUUID tracking_id;
     for (const auto& spawned : mSpawnedObjects)
     {
@@ -1047,9 +1049,9 @@ void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj)
     // Normal attach path: addChild() makes the root a child of the avatar in the
     // object tree (so getAvatar()'s parent walk reaches the agent and routes the
     // rigged faces into the avatar draw path), then attaches it -- parenting the
-    // drawable to the joint and applying the skin's joint-position overrides. The
-    // LLVOAvatarSelf::attachObject() override and the RLV watchdog detect the
-    // client-only flag and skip the inventory/COF/RLV bookkeeping a preview lacks.
+    // drawable to the joint. The LLVOAvatarSelf::attachObject() override and the RLV
+    // watchdog detect the client-only flag and skip the inventory/COF/RLV
+    // bookkeeping a preview lacks.
     gAgentAvatarp->addChild(root);
 
     LL_INFOS("LocalMesh") << "Attached local mesh preview to avatar" << LL_ENDL;
@@ -1105,15 +1107,21 @@ void LLLocalMeshMgr::detachPreviewFromAvatar(LLViewerObject* obj)
 
 void LLLocalMeshMgr::detachRootIfAttached(LLViewerObject* root)
 {
-    if (!root || !root->isAttachment() || !isAgentAvatarValid())
+    // Only the linkset root is the avatar's direct attachment; children hang off the
+    // root in the object tree, so skip anything that isn't worn on the avatar.
+    if (!root || !root->isAttachment() || !isAgentAvatarValid()
+        || root->getParent() != (LLViewerObject*)gAgentAvatarp)
     {
         return;
     }
-    // Normal detach path; LLVOAvatarSelf::detachObject() detects the client-only
-    // flag and skips the inventory/COF/RLV bookkeeping a real detach would do.
-    gAgentAvatarp->detachObject(root);
-    gAgentAvatarp->removeChild(root); // also clears the object-tree parent
+    // Clear the attachment state first so the makeStatic() inside removeObject()
+    // runs (it's guarded on !isAttachment()), then remove from the avatar in one
+    // call: LLVOAvatar::removeChild() clears the object-tree parent AND detaches via
+    // LLVOAvatarSelf::detachObject() (local-safe, no inventory/COF/RLV traffic).
+    // Used by the despawn/cleanup paths right before markDead(), so -- unlike
+    // detachPreviewFromAvatar() -- no in-world re-home is needed.
     root->setAttachmentState(0);
+    gAgentAvatarp->removeChild(root);
 }
 
 LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
