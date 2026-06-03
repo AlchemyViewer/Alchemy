@@ -514,6 +514,7 @@ set(viewer_SOURCE_FILES
     lllocalbitmaps.cpp
     lllocalgltfmaterials.cpp
     lllocalmesh.cpp
+    lllocalanim.cpp
     lllocationhistory.cpp
     lllocationinputctrl.cpp
     lllogchat.cpp
@@ -1278,6 +1279,7 @@ set(viewer_HEADER_FILES
     lllocalbitmaps.h
     lllocalgltfmaterials.h
     lllocalmesh.h
+    lllocalanim.h
     lllocationhistory.h
     lllocationinputctrl.h
     lllogchat.h

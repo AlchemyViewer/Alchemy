@@ -121,6 +121,8 @@
 #include "llviewerhelp.h"
 #include "llviewermenufile.h"   // init_menu_file()
 #include "lllocalmesh.h"
+#include "lllocalanim.h"
+#include "llcontrolavatar.h"    // LLControlAvatar (animesh control av for local anim playback)
 #include "llviewermessage.h"
 #include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
@@ -684,6 +686,60 @@ class LLAdvancedLoadLocalMesh : public view_listener_t
         return true;
     }
 };
+
+// Local animation (M5): play/stop a local .anim/.bvh on a local mesh that has been
+// made an animated object (animesh). The animation runs on the linkset's control
+// avatar, so these are only meaningful for a client-only animesh root.
+static LLControlAvatar* get_local_animesh_control_avatar()
+{
+    LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+    if (!obj || !obj->isLocalOnly())
+    {
+        return nullptr;
+    }
+    LLViewerObject* root = obj->getRootEdit();
+    return (root && root->isAnimatedObject()) ? root->getControlAvatar() : nullptr;
+}
+
+bool enable_play_local_anim()
+{
+    return get_local_animesh_control_avatar() != nullptr;
+}
+
+void handle_play_local_anim()
+{
+    LLControlAvatar* cav = get_local_animesh_control_avatar();
+    if (!cav)
+    {
+        return;
+    }
+    // Keep the control avatar alive across the async file picker; if the preview is
+    // taken down (or un-animeshed) before the picker returns, bail.
+    LLPointer<LLVOAvatar> cav_ptr = cav;
+    LLFilePickerReplyThread::startPicker(
+        [cav_ptr](const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter)
+        {
+            if (filenames.empty() || cav_ptr.isNull() || cav_ptr->isDead())
+            {
+                return;
+            }
+            const LLUUID anim_id = LLLocalAnimMgr::getInstance()->loadAnim(filenames.front());
+            if (anim_id.notNull())
+            {
+                LLLocalAnimMgr::getInstance()->playOnAvatar(cav_ptr.get(), anim_id);
+            }
+        },
+        LLFilePicker::FFLOAD_ANIM, false);
+}
+
+void handle_stop_local_anim()
+{
+    LLControlAvatar* cav = get_local_animesh_control_avatar();
+    if (cav && LLLocalAnimMgr::instanceExists())
+    {
+        LLLocalAnimMgr::getInstance()->stopOnAvatar(cav);
+    }
+}
 
 class LLAdvancedToggleConsole : public view_listener_t
 {
@@ -10722,6 +10778,8 @@ void initialize_menus()
     commit.add("Object.SetFavorite", boost::bind(&handle_object_set_favorite, _2));
     commit.add("Object.SitOrStand", boost::bind(&handle_object_sit_or_stand));
     commit.add("Object.Delete", boost::bind(&handle_object_delete));
+    commit.add("Object.PlayLocalAnim", boost::bind(&handle_play_local_anim));
+    commit.add("Object.StopLocalAnim", boost::bind(&handle_stop_local_anim));
     view_listener_t::addMenu(new LLObjectAttachToAvatar(true), "Object.AttachToAvatar");
     view_listener_t::addMenu(new LLObjectAttachToAvatar(false), "Object.AttachAddToAvatar");
     view_listener_t::addMenu(new LLObjectReturn(), "Object.Return");
@@ -10750,6 +10808,7 @@ void initialize_menus()
     enable.add("Object.EnableTouch", boost::bind(&enable_object_touch, _1));
     enable.add("Object.EnableFavorites", boost::bind(&enable_object_favorite, _2));
     enable.add("Object.EnableDelete", boost::bind(&enable_object_delete));
+    enable.add("Object.EnablePlayLocalAnim", boost::bind(&enable_play_local_anim));
     enable.add("Object.EnableWear", boost::bind(&object_is_wearable));
 
     enable.add("Object.EnableStandUp", boost::bind(&enable_object_stand_up));
