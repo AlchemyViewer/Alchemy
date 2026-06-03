@@ -120,6 +120,7 @@
 #include "llviewergenericmessage.h"
 #include "llviewerhelp.h"
 #include "llviewermenufile.h"   // init_menu_file()
+#include "lllocalmesh.h"
 #include "llviewermessage.h"
 #include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
@@ -662,6 +663,27 @@ void init_menus()
 // SHOW CONSOLES //
 ///////////////////
 
+
+//////////////////
+// LOCAL MESH   //
+//////////////////
+
+class LLAdvancedLoadLocalMesh : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        LLFilePickerReplyThread::startPicker(
+            [](const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter)
+            {
+                if (!filenames.empty())
+                {
+                    LLLocalMeshMgr::getInstance()->addAndSpawn(filenames);
+                }
+            },
+            LLFilePicker::FFLOAD_MODEL, true);
+        return true;
+    }
+};
 
 class LLAdvancedToggleConsole : public view_listener_t
 {
@@ -10411,6 +10433,7 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToggleHowTo(), "Help.ToggleHowTo");
 
     // Advanced menu
+    view_listener_t::addMenu(new LLAdvancedLoadLocalMesh(), "Advanced.LoadLocalMesh");
     view_listener_t::addMenu(new LLAdvancedToggleConsole(), "Advanced.ToggleConsole");
     view_listener_t::addMenu(new LLAdvancedCheckConsole(), "Advanced.CheckConsole");
     view_listener_t::addMenu(new LLAdvancedDumpInfoToConsole(), "Advanced.DumpInfoToConsole");
