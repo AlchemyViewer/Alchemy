@@ -148,6 +148,36 @@ static void synthesizeLocalPreviewNode(LLSelectNode* nodep, LLViewerObject* obje
     const U32 full_perm = PERM_MODIFY | PERM_COPY | PERM_MOVE | PERM_TRANSFER;
     nodep->mPermissions->initMasks(full_perm, full_perm, PERM_NONE, PERM_NONE, full_perm);
 }
+
+// Delete a selection made up entirely of client-only previews. The sim delete
+// path (DeRezObject/ObjectDelete) can't touch them, so despawn them locally.
+static void deleteLocalPreviewSelection()
+{
+    if (!LLLocalMeshMgr::instanceExists())
+    {
+        return;
+    }
+    LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
+    LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+
+    // Snapshot the objects first; deleting despawns them and clears the selection.
+    std::vector<LLPointer<LLViewerObject> > objects;
+    for (LLObjectSelection::iterator iter = selection->begin(); iter != selection->end(); ++iter)
+    {
+        if (LLViewerObject* obj = (*iter)->getObject())
+        {
+            objects.push_back(obj);
+        }
+    }
+
+    LLSelectMgr::getInstance()->deselectAll();
+
+    for (LLPointer<LLViewerObject>& obj : objects)
+    {
+        // The first part of a linkset drops the whole unit; later parts no-op.
+        mgr->deletePreviewObject(obj.get());
+    }
+}
 //
 // Consts
 //
@@ -4231,6 +4261,14 @@ void LLSelectMgr::selectDelete()
     }
 // [/RLVa:KB]
 
+    // Client-only local mesh previews have no sim counterpart; delete them
+    // locally instead of sending a DeRez the sim would ignore.
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        deleteLocalPreviewSelection();
+        return;
+    }
+
     S32 deleteable_count = 0;
 
     bool locked_but_deleteable_object = false;
@@ -4380,6 +4418,12 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
 
 void LLSelectMgr::selectForceDelete()
 {
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        deleteLocalPreviewSelection();
+        return;
+    }
+
     sendListToRegions(
         "ObjectDelete",
         packDeleteHeader,

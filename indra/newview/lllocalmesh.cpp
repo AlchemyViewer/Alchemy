@@ -804,6 +804,32 @@ bool LLLocalMeshMgr::isLocalPreview(const LLViewerObject* obj) const
     return false;
 }
 
+void LLLocalMeshMgr::deletePreviewObject(LLViewerObject* obj)
+{
+    if (!obj)
+    {
+        return;
+    }
+
+    // Map the object (linkset root or child) back to the unit that owns it, then
+    // drop the whole unit -- this despawns the entire linkset and stops live
+    // reload, so the deleted preview stays deleted.
+    LLUUID tracking_id;
+    for (const auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.second.get() == obj)
+        {
+            tracking_id = spawned.first;
+            break;
+        }
+    }
+
+    if (tracking_id.notNull())
+    {
+        delUnit(tracking_id);
+    }
+}
+
 LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
 {
     LLLocalMesh* unit = getUnit(tracking_id);

@@ -181,6 +181,11 @@ public:
     // Used by LLSelectMgr to suppress all server traffic for these objects.
     bool isLocalPreview(const LLViewerObject* obj) const;
 
+    // Delete the preview linkset that owns this object (and the loaded unit, so a
+    // later file save does not respawn it). Lets the standard Delete key/menu work
+    // on client-only previews, which the sim delete path can't touch.
+    void deletePreviewObject(LLViewerObject* obj);
+
     // Create the client-only linkset in-world referencing the unit's parts. If a
     // linkset for this unit already exists (live reload), it is replaced in place
     // and the root's transform preserved.
