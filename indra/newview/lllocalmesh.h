@@ -55,7 +55,23 @@ class LLVOAvatar;
 class LLVOVolume;
 class LLVolume;
 
-// A single local mesh file and its decoded, in-memory representation.
+// One uploadable sub-mesh of a local mesh file: a single LLModel's geometry,
+// normalized to a unit box (as the upload path does), plus where it sits within
+// the model. A file with more than 8 faces -- or multiple mesh nodes -- yields
+// several parts, exactly the multi-prim linkset an upload of the same file would
+// produce. A simple single-mesh file is just one part.
+struct LLLocalMeshPart
+{
+    LLUUID                    mWorldID;       // unique mesh id objects/repository reference
+    LLPointer<LLVolume>       mVolume;        // normalized geometry (<= 8 faces)
+    LLPointer<LLMeshSkinInfo> mSkinInfo;      // null if not rigged
+    LLVector3                 mScale;         // authored size -> prim scale
+    LLVector3                 mOffset;        // part centre relative to the whole-model centre
+    S32                       mNumFaces = 0;
+};
+
+// A single local mesh file and its decoded, in-memory representation (one or more
+// parts spawned together as a linkset).
 class LLLocalMesh
 {
 public:
@@ -65,22 +81,17 @@ public:
     std::string getFilename() const   { return mFilename; }
     std::string getShortName() const  { return mShortName; }
     LLUUID      getTrackingID() const { return mTrackingID; }
-    LLUUID      getWorldID() const     { return mWorldID; }
 
     bool getValid() const   { return mState == ST_LOADED; }
     bool isLoading() const  { return mState == ST_LOADING; }
     bool isFailed() const   { return mState == ST_FAILED; }
 
-    // Decoded geometry/skin -- consumed by the mesh repository injection.
-    LLVolume*             getVolume() const   { return mVolume; }
-    const LLMeshSkinInfo* getSkinInfo() const { return mSkinInfo; }
-    bool                  isRigged() const    { return mSkinInfo.notNull(); }
-
-    // Authored bounding-box size; the spawned static preview uses this as its
-    // prim scale. (1,1,1) when rigged (the rig, not the object scale, governs).
-    LLVector3             getScale() const    { return mScale; }
+    // Decoded parts -- consumed by the spawn path and repository injection.
+    const std::vector<LLLocalMeshPart>& getParts() const { return mParts; }
+    bool isRigged() const; // true if any part is rigged
 
     // Stats (for UI + logging).
+    S32 getNumParts() const     { return (S32)mParts.size(); }
     S32 getNumFaces() const     { return mNumFaces; }
     S32 getNumVertices() const  { return mNumVertices; }
     S32 getNumTriangles() const { return mNumTriangles; }
@@ -98,9 +109,10 @@ private:
 
     void startLoad();
 
-    // Assemble decoded geometry and commit it to this unit; returns false (and
-    // leaves any previously loaded geometry untouched) if the scene yielded
-    // nothing, so a failed live-reload keeps showing the last good mesh.
+    // Assemble decoded geometry into parts and commit them to this unit; returns
+    // false (leaving the previous parts untouched) if the scene yielded nothing,
+    // so a failed live-reload keeps showing the last good mesh. Each call mints
+    // fresh part world ids so a reload serves new geometry cleanly.
     bool ingestScene(LLModelLoader::scene& scene);
     void markFailed() { mState = ST_FAILED; }
 
@@ -108,28 +120,23 @@ private:
     // async re-parse. The geometry swap happens back in the load callback.
     bool pollForReload();       // true if a reload was started this poll
     void finishReload(bool ok); // clear in-flight state after the parse returns
-    void regenerateWorldID();   // mint a fresh world id (keeps skin id in sync)
     bool isReloading() const { return mReloading; }
 
     std::string mFilename;
     std::string mShortName;
     LLUUID      mTrackingID; // stable, identifies this unit in UI
-    LLUUID      mWorldID;    // stable mesh UUID objects reference (kept across reloads)
     EFormat     mFormat;
     EState      mState;
     bool        mSpawnWhenReady;
 
     std::filesystem::file_time_type mLastModified; // for live reload (M3)
 
-    LLPointer<LLVolume>       mVolume;   // assembled high-LOD geometry, served for all LODs
-    LLPointer<LLMeshSkinInfo> mSkinInfo; // null if not rigged
-    LLVector3                 mScale;    // authored size; prim scale for the static preview ((1,1,1) when rigged)
+    std::vector<LLLocalMeshPart> mParts; // one per LLModel; spawned together as a linkset
 
-    S32  mNumFaces;
+    S32  mNumFaces;     // totals across all parts
     S32  mNumVertices;
     S32  mNumTriangles;
     S32  mNumJoints;
-    bool mTruncated; // geometry exceeded MAX_MODEL_FACES and was clipped
 
     // Live-reload bookkeeping.
     bool                            mReloading;       // an async re-parse is in flight
@@ -161,19 +168,22 @@ public:
     void   delUnit(LLUUID tracking_id);
 
     LLUUID      getUnitID(const std::string& filename) const;
-    LLUUID      getTrackingID(const LLUUID& world_id) const;
-    LLUUID      getWorldID(const LLUUID& tracking_id) const;
-    bool        isLocal(const LLUUID& world_id) const;
     std::string getFilename(const LLUUID& tracking_id) const;
 
     LLLocalMesh* getUnit(const LLUUID& tracking_id) const;
-    LLLocalMesh* getUnitByWorldID(const LLUUID& world_id) const;
+
+    // Mesh repository injection: resolve a part's world id to its decoded data.
+    bool                  isLocal(const LLUUID& world_id) const;
+    LLVolume*             getVolumeForWorldID(const LLUUID& world_id) const;
+    const LLMeshSkinInfo* getSkinInfoForWorldID(const LLUUID& world_id) const;
 
     // True if the object is one of our client-only in-world preview spawns.
     // Used by LLSelectMgr to suppress all server traffic for these objects.
     bool isLocalPreview(const LLViewerObject* obj) const;
 
-    // Create a client-only LLVOVolume in-world referencing the unit's mesh.
+    // Create the client-only linkset in-world referencing the unit's parts. If a
+    // linkset for this unit already exists (live reload), it is replaced in place
+    // and the root's transform preserved.
     LLViewerObject* spawnInWorld(const LLUUID& tracking_id);
     // Convenience: load each file and spawn it in-world once it finishes loading.
     void addAndSpawn(const std::vector<std::string>& filenames);
@@ -198,20 +208,21 @@ public:
 
 private:
     LLUUID addUnitInternal(const std::string& filename);
-    void   despawnForWorldID(const LLUUID& world_id);
+    void   despawnUnit(const LLUUID& tracking_id);
 
-    // After a successful reload, re-point our spawned objects at the unit's new
-    // world id so the repository serves the freshly decoded geometry.
-    void repointSpawnedObjects(const LLUUID& old_world_id, LLLocalMesh* unit);
-    // Apply a unit's mesh geometry/skin to an existing spawned object (shared by
-    // the spawn and reload paths). Does not touch the object's transform.
-    void applyUnitGeometry(LLVOVolume* vol, const LLLocalMesh* unit);
+    // Find a decoded part by its world id (across all loaded units).
+    const LLLocalMeshPart* findPart(const LLUUID& world_id) const;
+    // Point a freshly created object at a part's geometry/skin (sculpt id +
+    // setVolume + default textures). Does not set the object's transform.
+    void applyPartGeometry(LLVOVolume* vol, const LLLocalMeshPart& part);
 
     typedef std::list<LLLocalMesh*>::iterator       local_list_iter;
     typedef std::list<LLLocalMesh*>::const_iterator local_list_citer;
     std::list<LLLocalMesh*> mMeshList;
 
-    // Client-only objects we've rezzed, paired with the world ID they show.
+    // Client-only objects we've rezzed, keyed by the tracking id of the unit they
+    // belong to. A unit's linkset shares one tracking id; the first entry pushed
+    // for a tracking id is the linkset root.
     std::vector<std::pair<LLUUID, LLPointer<LLViewerObject> > > mSpawnedObjects;
 
     LLLocalMeshTimer       mTimer;         // drives live-reload polling

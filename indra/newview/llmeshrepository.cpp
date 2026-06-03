@@ -4399,15 +4399,15 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
     // of issuing an asset fetch. The same geometry is served for every LOD.
     if (LLLocalMeshMgr::instanceExists())
     {
-        LLLocalMesh* unit = LLLocalMeshMgr::getInstance()->getUnitByWorldID(mesh_params.getSculptID());
-        if (unit && unit->getVolume())
+        LLVolume* local_volume = LLLocalMeshMgr::getInstance()->getVolumeForWorldID(mesh_params.getSculptID());
+        if (local_volume)
         {
             LLVolume* sys_volume = LLPrimitive::getVolumeManager()->refVolume(mesh_params, new_lod);
             if (sys_volume)
             {
                 if (!sys_volume->isMeshAssetLoaded())
                 {
-                    sys_volume->copyVolumeFaces(unit->getVolume());
+                    sys_volume->copyVolumeFaces(local_volume);
                     sys_volume->setMeshAssetLoaded(true);
                 }
                 LLPrimitive::getVolumeManager()->unrefVolume(sys_volume);
@@ -4918,10 +4918,10 @@ const LLMeshSkinInfo* LLMeshRepository::getSkinInfo(const LLUUID& mesh_id, LLVOV
     // Local mesh: serve the decoded skin (or null if static) and never fetch.
     if (LLLocalMeshMgr::instanceExists())
     {
-        LLLocalMesh* unit = LLLocalMeshMgr::getInstance()->getUnitByWorldID(mesh_id);
-        if (unit)
+        LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
+        if (mgr->isLocal(mesh_id))
         {
-            return unit->getSkinInfo();
+            return mgr->getSkinInfoForWorldID(mesh_id);
         }
     }
 
@@ -5065,10 +5065,10 @@ bool LLMeshRepository::hasSkinInfo(const LLUUID& mesh_id)
 
     if (LLLocalMeshMgr::instanceExists())
     {
-        LLLocalMesh* unit = LLLocalMeshMgr::getInstance()->getUnitByWorldID(mesh_id);
-        if (unit)
+        LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
+        if (mgr->isLocal(mesh_id))
         {
-            return unit->isRigged();
+            return mgr->getSkinInfoForWorldID(mesh_id) != nullptr;
         }
     }
 
