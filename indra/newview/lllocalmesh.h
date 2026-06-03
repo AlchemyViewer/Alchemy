@@ -37,6 +37,7 @@
 #define LL_LLLOCALMESH_H
 
 #include "llmodelloader.h"  // LLModelLoader, LLModelLoader::scene, JointMap, LLMeshSkinInfo
+#include "lleventtimer.h"   // LLEventTimer (live-reload polling)
 #include "llpointer.h"
 #include "llsingleton.h"
 #include "lluuid.h"
@@ -50,6 +51,7 @@
 
 class LLScrollListCtrl;
 class LLViewerObject;
+class LLVOVolume;
 class LLVolume;
 
 // A single local mesh file and its decoded, in-memory representation.
@@ -87,16 +89,26 @@ public:
     void setSpawnWhenReady(bool b) { mSpawnWhenReady = b; }
     bool wantsSpawn() const         { return mSpawnWhenReady; }
 
-    // Main-thread completion hooks driven by the load callback.
-    void onLoadComplete(LLModelLoader::scene& scene);
-    void markFailed() { mState = ST_FAILED; }
-
 private:
+    friend class LLLocalMeshMgr; // orchestrates loading/reload and spawning
+
     enum EFormat { FMT_NONE, FMT_DAE, FMT_GLTF };
     enum EState  { ST_LOADING, ST_LOADED, ST_FAILED };
 
     void startLoad();
-    void assembleFromScene(LLModelLoader::scene& scene);
+
+    // Assemble decoded geometry and commit it to this unit; returns false (and
+    // leaves any previously loaded geometry untouched) if the scene yielded
+    // nothing, so a failed live-reload keeps showing the last good mesh.
+    bool ingestScene(LLModelLoader::scene& scene);
+    void markFailed() { mState = ST_FAILED; }
+
+    // Live reload (M3): poll the source file's mtime and, on a change, kick an
+    // async re-parse. The geometry swap happens back in the load callback.
+    bool pollForReload();       // true if a reload was started this poll
+    void finishReload(bool ok); // clear in-flight state after the parse returns
+    void regenerateWorldID();   // mint a fresh world id (keeps skin id in sync)
+    bool isReloading() const { return mReloading; }
 
     std::string mFilename;
     std::string mShortName;
@@ -117,6 +129,22 @@ private:
     S32  mNumTriangles;
     S32  mNumJoints;
     bool mTruncated; // geometry exceeded MAX_MODEL_FACES and was clipped
+
+    // Live-reload bookkeeping.
+    bool                            mReloading;       // an async re-parse is in flight
+    std::filesystem::file_time_type mPendingModified; // mtime of the in-flight reload
+    std::filesystem::file_time_type mFailedModified;  // mtime that last failed to parse
+};
+
+// Periodic tick that lets loaded units watch their source files for changes.
+class LLLocalMeshTimer : public LLEventTimer
+{
+public:
+    LLLocalMeshTimer();
+    void startTimer();
+    void stopTimer();
+    bool isRunning();
+    bool tick() override;
 };
 
 // Owns all loaded local meshes and resolves between tracking IDs, world IDs and
@@ -151,9 +179,22 @@ public:
 
     void feedScrollList(LLScrollListCtrl* ctrl);
 
+    // Called by the load callback when an async (re)parse finishes (main thread).
+    void onLoadResult(const LLUUID& tracking_id, LLModelLoader::scene& scene, U32 load_state);
+
+    // Timer tick: poll every loaded unit's source file for changes.
+    void doUpdates();
+
 private:
     LLUUID addUnitInternal(const std::string& filename);
     void   despawnForWorldID(const LLUUID& world_id);
+
+    // After a successful reload, re-point our spawned objects at the unit's new
+    // world id so the repository serves the freshly decoded geometry.
+    void repointSpawnedObjects(const LLUUID& old_world_id, LLLocalMesh* unit);
+    // Apply a unit's mesh geometry/skin to an existing spawned object (shared by
+    // the spawn and reload paths). Does not touch the object's transform.
+    void applyUnitGeometry(LLVOVolume* vol, const LLLocalMesh* unit);
 
     typedef std::list<LLLocalMesh*>::iterator       local_list_iter;
     typedef std::list<LLLocalMesh*>::const_iterator local_list_citer;
@@ -161,6 +202,8 @@ private:
 
     // Client-only objects we've rezzed, paired with the world ID they show.
     std::vector<std::pair<LLUUID, LLPointer<LLViewerObject> > > mSpawnedObjects;
+
+    LLLocalMeshTimer mTimer; // drives live-reload polling
 };
 
 #endif // LL_LLLOCALMESH_H

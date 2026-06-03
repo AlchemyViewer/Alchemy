@@ -235,9 +235,20 @@ namespace
         }
     }
 
+    // Emit a one-line summary of a unit's decoded geometry.
+    void logUnit(const char* verb, const LLLocalMesh* unit)
+    {
+        LL_INFOS("LocalMesh") << verb << " local mesh '" << unit->getShortName() << "' [" << unit->getWorldID() << "]: "
+                              << unit->getNumFaces() << " faces, " << unit->getNumVertices() << " verts, "
+                              << unit->getNumTriangles() << " tris, size " << unit->getScale() << ", "
+                              << (unit->isRigged() ? llformat("rigged (%d joints)", unit->getNumJoints()) : std::string("static"))
+                              << LL_ENDL;
+    }
+
     // LLModelLoader::load_callback_t -- runs on the main thread once parsing is
-    // done. Hands the scene to the unit, optionally spawns it, and reaps the
-    // loader (deferred, since we are inside the loader's own callback).
+    // done. Hands the result to the manager (which assembles, spawns or swaps
+    // geometry) and reaps the loader's context (deferred, since we are inside the
+    // loader's own callback and it self-deletes after we return).
     void onModelLoaded(LLModelLoader::scene& scene, LLModelLoader::model_list& /*models*/, S32 /*lod*/, void* opaque)
     {
         LoadContext* ctx = static_cast<LoadContext*>(opaque);
@@ -246,34 +257,9 @@ namespace
             return;
         }
 
-        const LLUUID tracking_id = ctx->mTrackingID;
-        const U32 load_state = ctx->mLoadState;
-
-        LLLocalMeshMgr* mgr = LLLocalMeshMgr::instanceExists() ? LLLocalMeshMgr::getInstance() : nullptr;
-        LLLocalMesh* unit = mgr ? mgr->getUnit(tracking_id) : nullptr;
-        if (unit) // null if the unit was removed while loading
+        if (LLLocalMeshMgr* mgr = LLLocalMeshMgr::instanceExists() ? LLLocalMeshMgr::getInstance() : nullptr)
         {
-            if (load_state < LLModelLoader::ERROR_PARSING && !scene.empty())
-            {
-                unit->onLoadComplete(scene);
-            }
-            else
-            {
-                LL_WARNS("LocalMesh") << "Parse failed (state " << load_state << ") for " << unit->getFilename() << LL_ENDL;
-                unit->markFailed();
-            }
-
-            if (unit->getValid())
-            {
-                if (unit->wantsSpawn())
-                {
-                    mgr->spawnInWorld(tracking_id);
-                }
-            }
-            else
-            {
-                mgr->delUnit(tracking_id); // drop the failed unit
-            }
+            mgr->onLoadResult(ctx->mTrackingID, scene, ctx->mLoadState);
         }
 
         // The model loader deletes itself in LLModelLoader::loadModelCallback
@@ -302,6 +288,9 @@ LLLocalMesh::LLLocalMesh(std::string filename)
     , mNumJoints(0)
     , mScale(1.f, 1.f, 1.f)
     , mTruncated(false)
+    , mReloading(false)
+    , mPendingModified()
+    , mFailedModified()
 {
     mTrackingID.generate();
     mWorldID.generate();
@@ -351,6 +340,12 @@ LLLocalMesh::~LLLocalMesh()
 
 void LLLocalMesh::startLoad()
 {
+    // Record the mtime we are about to parse; the completion handler stamps it as
+    // the loaded version, so live-reload change detection compares against the
+    // exact bytes we read (not whatever the file becomes mid-parse).
+    std::error_code ec;
+    mPendingModified = std::filesystem::last_write_time(fsyspath(mFilename), ec);
+
     LoadContext* ctx = new LoadContext();
     ctx->mTrackingID = mTrackingID;
 
@@ -405,30 +400,17 @@ void LLLocalMesh::startLoad()
     ctx->mLoader->start(); // parse on the worker thread; onModelLoaded fires on the main thread, then the loader self-deletes
 }
 
-void LLLocalMesh::onLoadComplete(LLModelLoader::scene& scene)
+bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
 {
-    assembleFromScene(scene);
-
-    mState = (mVolume.notNull() && mNumFaces > 0) ? ST_LOADED : ST_FAILED;
-
-    if (mState == ST_LOADED)
-    {
-        mLastModified = std::filesystem::last_write_time(fsyspath(mFilename));
-        LL_INFOS("LocalMesh") << "Loaded local mesh '" << mShortName << "' [" << mWorldID << "]: "
-                              << mNumFaces << " faces, " << mNumVertices << " verts, " << mNumTriangles << " tris, "
-                              << "size " << mScale << ", "
-                              << (isRigged() ? llformat("rigged (%d joints)", mNumJoints) : std::string("static"))
-                              << (mTruncated ? " [TRUNCATED to MAX_MODEL_FACES]" : "")
-                              << LL_ENDL;
-    }
-}
-
-void LLLocalMesh::assembleFromScene(LLModelLoader::scene& scene)
-{
+    // Assemble into locals first; members are only overwritten once we know the
+    // parse produced geometry, so a failed reload preserves the last good mesh.
     std::vector<LLVolumeFace> faces;
     const LLMeshSkinInfo* skin_src = nullptr;
+    S32  num_vertices = 0;
+    S32  num_triangles = 0;
+    bool truncated = false;
 
-    for (LLModelLoader::scene::iterator iter = scene.begin(); iter != scene.end() && !mTruncated; ++iter)
+    for (LLModelLoader::scene::iterator iter = scene.begin(); iter != scene.end() && !truncated; ++iter)
     {
         LLMatrix4a mat;
         mat.loadu(iter->first);
@@ -452,19 +434,19 @@ void LLLocalMesh::assembleFromScene(LLModelLoader::scene& scene)
                 if ((S32)faces.size() >= MAX_MODEL_FACES)
                 {
                     // Faithful to the upload limit; warn and clip the remainder.
-                    mTruncated = true;
+                    truncated = true;
                     break;
                 }
 
                 LLVolumeFace face = mdl->getVolumeFace(fi); // deep copy
                 transformFace(face, mat);
 
-                mNumVertices += face.mNumVertices;
-                mNumTriangles += face.mNumIndices / 3;
+                num_vertices += face.mNumVertices;
+                num_triangles += face.mNumIndices / 3;
                 faces.push_back(face);
             }
 
-            if (mTruncated)
+            if (truncated)
             {
                 break;
             }
@@ -474,7 +456,7 @@ void LLLocalMesh::assembleFromScene(LLModelLoader::scene& scene)
     if (faces.empty())
     {
         LL_WARNS("LocalMesh") << "Local mesh produced no geometry: " << mFilename << LL_ENDL;
-        return;
+        return false; // keep any previously loaded geometry intact
     }
 
     // Static meshes: re-normalize the merged geometry into a unit box centred at
@@ -484,40 +466,106 @@ void LLLocalMesh::assembleFromScene(LLModelLoader::scene& scene)
     // so the object pivot, bounding box and build-tool size would all be wrong
     // without this. Rigged meshes stay in skin/bind space -- the skeleton, not
     // the object transform, drives their placement (handled at rigged-attach).
+    LLVector3 scale(1.f, 1.f, 1.f);
     if (!skin_src)
     {
-        mScale = normalizeFaces(faces);
+        scale = normalizeFaces(faces);
     }
 
     LLVolumeParams params;
     params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
-    mVolume = new LLVolume(params, 1.f);
-    mVolume->copyFacesFrom(faces);
+    LLPointer<LLVolume> volume = new LLVolume(params, 1.f);
+    volume->copyFacesFrom(faces);
 
     // Optimize the index buffer and generate tangents, matching what
     // unpackVolumeFaces() does for a real mesh asset. Loaded mesh assets are
     // required to carry tangents (see LLVolume::genTangents) and raycast
     // picking dereferences them, so this must run before setMeshAssetLoaded().
-    if (!mVolume->cacheOptimize(true))
+    if (!volume->cacheOptimize(true))
     {
         LL_WARNS("LocalMesh") << "cacheOptimize failed for '" << mShortName << "'" << LL_ENDL;
     }
-    mVolume->setMeshAssetLoaded(true);
+    volume->setMeshAssetLoaded(true);
 
+    LLPointer<LLMeshSkinInfo> skin;
+    S32 num_joints = 0;
     if (skin_src)
     {
         // Round-trip through LLSD to get a clean, owned copy bound to our UUID.
         LLSD sd = skin_src->asLLSD(true, skin_src->mLockScaleIfJointPosition);
-        mSkinInfo = new LLMeshSkinInfo(mWorldID, sd);
-        mNumJoints = (S32)skin_src->mJointNames.size();
+        skin = new LLMeshSkinInfo(mWorldID, sd);
+        num_joints = (S32)skin_src->mJointNames.size();
     }
 
-    mNumFaces = (S32)faces.size();
+    // Commit.
+    mVolume       = volume;
+    mSkinInfo     = skin; // null clears any prior rig
+    mScale        = scale;
+    mNumFaces     = (S32)faces.size();
+    mNumVertices  = num_vertices;
+    mNumTriangles = num_triangles;
+    mNumJoints    = num_joints;
+    mTruncated    = truncated;
+    mState        = ST_LOADED;
+    mLastModified = mPendingModified; // the exact version we just parsed
 
-    if (mTruncated)
+    if (truncated)
     {
         LL_WARNS("LocalMesh") << "Local mesh '" << mShortName << "' exceeds " << MAX_MODEL_FACES
                               << " faces; extra faces were dropped from the preview." << LL_ENDL;
+    }
+
+    return true;
+}
+
+bool LLLocalMesh::pollForReload()
+{
+    // Only watch units that are currently showing good geometry; skip while an
+    // initial load or a previous reload is still in flight.
+    if (mState != ST_LOADED || mReloading)
+    {
+        return false;
+    }
+    if (!gDirUtilp->fileExists(mFilename))
+    {
+        return false;
+    }
+
+    std::error_code ec;
+    const std::filesystem::file_time_type mtime = std::filesystem::last_write_time(fsyspath(mFilename), ec);
+    if (ec || mtime == mLastModified || mtime == mFailedModified)
+    {
+        return false; // unchanged, or a version we already know fails to parse
+    }
+
+    mReloading = true;
+    LL_INFOS("LocalMesh") << "Source changed, reloading '" << mShortName << "'" << LL_ENDL;
+    startLoad(); // captures mPendingModified
+    return true;
+}
+
+void LLLocalMesh::finishReload(bool ok)
+{
+    mReloading = false;
+    if (ok)
+    {
+        mFailedModified = std::filesystem::file_time_type(); // clear any prior failure
+    }
+    else
+    {
+        // Remember this version failed so we don't re-attempt it every tick; a
+        // further edit (a new mtime) will be retried.
+        mFailedModified = mPendingModified;
+        LL_WARNS("LocalMesh") << "Reload parse failed for '" << mShortName << "'; keeping previous geometry" << LL_ENDL;
+    }
+}
+
+void LLLocalMesh::regenerateWorldID()
+{
+    mWorldID.generate();
+    if (mSkinInfo.notNull())
+    {
+        mSkinInfo->mMeshID = mWorldID; // keep the skin's id in sync with the new world id
     }
 }
 
@@ -526,6 +574,7 @@ void LLLocalMesh::assembleFromScene(LLModelLoader::scene& scene)
 /*=======================================*/
 LLLocalMeshMgr::LLLocalMeshMgr()
 {
+    mTimer.stopTimer(); // started on demand once the first unit is added
 }
 
 LLLocalMeshMgr::~LLLocalMeshMgr()
@@ -569,6 +618,10 @@ LLUUID LLLocalMeshMgr::addUnitInternal(const std::string& filename)
     // Loading (async) or already loaded -- keep it; completion is handled in
     // the load callback.
     mMeshList.push_back(unit);
+    if (!mTimer.isRunning())
+    {
+        mTimer.startTimer(); // begin watching source files for live reload
+    }
     return unit->getTrackingID();
 }
 
@@ -587,6 +640,11 @@ void LLLocalMeshMgr::delUnit(LLUUID tracking_id)
         {
             ++iter;
         }
+    }
+
+    if (mMeshList.empty())
+    {
+        mTimer.stopTimer(); // nothing left to watch
     }
 }
 
@@ -734,12 +792,25 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
     vol->setLOD(LLVolumeLODGroup::NUM_LODS - 1);
 
     // Place a few meters in front of the agent. The geometry was normalized to a
-    // unit box centred on the origin, so the object's prim scale carries the
-    // authored size and the pivot sits at the geometry's centre.
+    // unit box centred on the origin, so the prim scale carries the authored size
+    // and the pivot sits at the geometry's centre. Scale/position are set here
+    // (spawn only); live reload preserves whatever transform the user has set.
     const LLVector3 pos = gAgent.getPositionAgent() + gAgent.getAtAxis() * 3.f;
     vol->setPositionAgent(pos);
     vol->setScale(unit->getScale(), false);
 
+    applyUnitGeometry(vol, unit);
+
+    mSpawnedObjects.emplace_back(unit->getWorldID(), obj);
+
+    LL_INFOS("LocalMesh") << "Spawned local mesh '" << unit->getShortName() << "' ("
+                          << (vol->getVolume() ? vol->getVolume()->getNumVolumeFaces() : 0)
+                          << " faces) at " << pos << LL_ENDL;
+    return obj;
+}
+
+void LLLocalMeshMgr::applyUnitGeometry(LLVOVolume* vol, const LLLocalMesh* unit)
+{
     // isSculpted()/isMesh() key off the PARAMS_SCULPT extra param (not the
     // volume params alone). Without it, LLVOVolume::setVolume skips the entire
     // mesh-load block and the object stays a plain prim. local_origin=false so
@@ -749,14 +820,15 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
     vol->setParameterEntry(LLNetworkData::PARAMS_SCULPT, sculpt_params, false);
 
     // Reference the local mesh by its world UUID; the repository injection
-    // resolves it to the decoded geometry.
+    // resolves it to the decoded geometry. On reload the world id has changed,
+    // so setVolume re-runs the mesh path and picks up the fresh geometry/skin.
     LLVolumeParams params;
     params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
     params.setSculptID(unit->getWorldID(), LL_SCULPT_TYPE_MESH);
     vol->setVolume(params, LLVolumeLODGroup::NUM_LODS - 1);
 
     // Give every face a visible default texture (file materials are not yet
-    // applied in this milestone).
+    // applied in this milestone). The face count can change across reloads.
     LLVolume* v = vol->getVolume();
     const S32 num_faces = v ? v->getNumVolumeFaces() : 0;
     if (num_faces > 0)
@@ -769,12 +841,88 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
     }
 
     vol->markForUpdate();
+}
 
-    mSpawnedObjects.emplace_back(unit->getWorldID(), obj);
+void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scene& scene, U32 load_state)
+{
+    LLLocalMesh* unit = getUnit(tracking_id);
+    if (!unit) // removed while loading
+    {
+        return;
+    }
 
-    LL_INFOS("LocalMesh") << "Spawned local mesh '" << unit->getShortName() << "' (" << num_faces
-                          << " faces) at " << pos << LL_ENDL;
-    return obj;
+    const bool reloading = unit->isReloading();
+    const bool parse_ok  = (load_state < LLModelLoader::ERROR_PARSING) && !scene.empty();
+    const bool assembled = parse_ok && unit->ingestScene(scene);
+
+    if (!parse_ok)
+    {
+        LL_WARNS("LocalMesh") << "Parse failed (state " << load_state << ") for " << unit->getFilename() << LL_ENDL;
+    }
+
+    if (reloading)
+    {
+        unit->finishReload(assembled);
+        if (assembled)
+        {
+            // Swap geometry under a fresh world id and re-point our spawns at it.
+            const LLUUID old_world = unit->getWorldID();
+            unit->regenerateWorldID();
+            logUnit("Reloaded", unit);
+            repointSpawnedObjects(old_world, unit);
+        }
+        return;
+    }
+
+    // Initial load.
+    if (assembled)
+    {
+        logUnit("Loaded", unit);
+        if (unit->wantsSpawn())
+        {
+            spawnInWorld(tracking_id);
+        }
+    }
+    else
+    {
+        unit->markFailed();
+        delUnit(tracking_id); // drop the failed unit
+    }
+}
+
+void LLLocalMeshMgr::repointSpawnedObjects(const LLUUID& old_world_id, LLLocalMesh* unit)
+{
+    const LLUUID new_world_id = unit->getWorldID();
+    for (auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.first != old_world_id)
+        {
+            continue;
+        }
+        LLViewerObject* obj = spawned.second.get();
+        if (obj && !obj->isDead())
+        {
+            if (LLVOVolume* vol = dynamic_cast<LLVOVolume*>(obj))
+            {
+                applyUnitGeometry(vol, unit); // keeps the object's transform
+            }
+        }
+        spawned.first = new_world_id; // track the new id for future reloads/despawn
+    }
+}
+
+void LLLocalMeshMgr::doUpdates()
+{
+    // Stop/restart around the sweep so a long poll can't re-enter via the timer.
+    mTimer.stopTimer();
+    for (LLLocalMesh* unit : mMeshList)
+    {
+        unit->pollForReload();
+    }
+    if (!mMeshList.empty())
+    {
+        mTimer.startTimer();
+    }
 }
 
 void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames)
@@ -842,4 +990,27 @@ void LLLocalMeshMgr::feedScrollList(LLScrollListCtrl* ctrl)
 
         ctrl->addElement(element);
     }
+}
+
+/*=======================================*/
+/*  LLLocalMeshTimer: live-reload poll   */
+/*=======================================*/
+static const F32 LOCAL_MESH_TIMER_HEARTBEAT = 3.0f; // seconds between file-change polls
+
+LLLocalMeshTimer::LLLocalMeshTimer()
+    : LLEventTimer(LOCAL_MESH_TIMER_HEARTBEAT)
+{
+}
+
+void LLLocalMeshTimer::startTimer() { mEventTimer.start(); }
+void LLLocalMeshTimer::stopTimer()  { mEventTimer.stop(); }
+bool LLLocalMeshTimer::isRunning()  { return mEventTimer.getStarted(); }
+
+bool LLLocalMeshTimer::tick()
+{
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr::getInstance()->doUpdates();
+    }
+    return false; // keep ticking
 }
