@@ -263,6 +263,7 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     mTENormalMaps(NULL),
     mTESpecularMaps(NULL),
     mbCanSelect(true),
+    mIsLocalOnly(false),
     mFlags(0),
     mPhysicsShapeType(0),
     mPhysicsGravity(0),

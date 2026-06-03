@@ -778,6 +778,13 @@ public:
     // can likely be factored out
     bool            mbCanSelect;
 
+    // Client-only object with no simulator counterpart (e.g. a local mesh
+    // preview). Build/select code reads this to skip all server traffic for the
+    // object and to delete it locally instead of asking the sim. O(1) -- avoids
+    // having to ask the owning manager whether an object is client-only.
+    bool            mIsLocalOnly;
+    bool            isLocalOnly() const { return mIsLocalOnly; }
+
 private:
     // Grabbed from UPDATE_FLAGS
     U32             mFlags;

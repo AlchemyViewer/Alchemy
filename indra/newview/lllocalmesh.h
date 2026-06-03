@@ -177,10 +177,6 @@ public:
     LLVolume*             getVolumeForWorldID(const LLUUID& world_id) const;
     const LLMeshSkinInfo* getSkinInfoForWorldID(const LLUUID& world_id) const;
 
-    // True if the object is one of our client-only in-world preview spawns.
-    // Used by LLSelectMgr to suppress all server traffic for these objects.
-    bool isLocalPreview(const LLViewerObject* obj) const;
-
     // Delete the preview linkset that owns this object (and the loaded unit, so a
     // later file save does not respawn it). Lets the standard Delete key/menu work
     // on client-only previews, which the sim delete path can't touch.

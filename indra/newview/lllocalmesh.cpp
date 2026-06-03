@@ -788,22 +788,6 @@ LLLocalMesh* LLLocalMeshMgr::getUnit(const LLUUID& tracking_id) const
     return nullptr;
 }
 
-bool LLLocalMeshMgr::isLocalPreview(const LLViewerObject* obj) const
-{
-    if (!obj)
-    {
-        return false;
-    }
-    for (const auto& spawned : mSpawnedObjects)
-    {
-        if (spawned.second.get() == obj)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 void LLLocalMeshMgr::deletePreviewObject(LLViewerObject* obj)
 {
     if (!obj)
@@ -887,10 +871,11 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
             continue;
         }
 
-        // Selectable and movable with the standard build tools; LLSelectMgr
-        // suppresses server traffic for these (gated on isLocalPreview). Full
-        // owner permission flags let the tools enable manipulation.
+        // Client-only object: mark it so the build/select code skips server
+        // traffic and deletes it locally. Selectable/movable with full owner
+        // permission flags so the tools enable manipulation.
         vol->mbCanSelect = true;
+        vol->mIsLocalOnly = true;
         vol->setFlagsWithoutUpdate(FLAGS_OBJECT_YOU_OWNER | FLAGS_OBJECT_MODIFY | FLAGS_OBJECT_MOVE | FLAGS_OBJECT_COPY | FLAGS_OBJECT_TRANSFER, true);
 
         // Build the drawable and force a valid LOD before setVolume (a NO_LOD

@@ -109,7 +109,8 @@ LLViewerObject* getSelectedParentObject(LLViewerObject *object) ;
 // and edit network traffic must be suppressed for them.
 static bool isLocalPreviewObject(LLViewerObject* obj)
 {
-    return obj && LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocalPreview(obj);
+    // Client-only local mesh preview: an O(1) object flag, no manager lookup.
+    return obj && obj->isLocalOnly();
 }
 
 // True only if the selection is non-empty and consists entirely of client-only
