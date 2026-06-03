@@ -41,6 +41,7 @@
 #include "fsyspath.h"
 #include "indra_constants.h" // IMG_DEFAULT
 #include "llagent.h"
+#include "llanimationstates.h" // ANIM_AGENT_STAND (preview avatar)
 #include "llcallbacklist.h"  // doOnIdleOneTime
 #include "llinventoryicon.h"
 #include "llprimitive.h"     // LL_PCODE_VOLUME
@@ -70,22 +71,24 @@ namespace
         JointTransformMap mJointTransformMap;
         JointNameSet      mJointsFromNode;
         U32               mLoadState = LLModelLoader::STARTING;
+        LLVOAvatar*       mAvatar = nullptr; // preview skeleton for joint lookup (never the agent)
     };
 
     // Build the joint alias map the loaders use to recognise rig joints,
-    // mirroring LLModelPreview::getJointAliases() but against the agent avatar.
-    void buildJointAliases(JointMap& joint_map)
+    // mirroring LLModelPreview::getJointAliases(). Resolved against the preview
+    // avatar (never the agent).
+    void buildJointAliases(JointMap& joint_map, LLVOAvatar* av)
     {
-        if (!isAgentAvatarValid())
+        if (!av)
         {
             return;
         }
 
-        joint_map = gAgentAvatarp->getJointAliases();
+        joint_map = av->getJointAliases();
 
         std::vector<std::string> cv_names, attach_names;
-        gAgentAvatarp->getSortedJointNames(1, cv_names);
-        gAgentAvatarp->getSortedJointNames(2, attach_names);
+        av->getSortedJointNames(1, cv_names);
+        av->getSortedJointNames(2, attach_names);
         for (const std::string& name : cv_names)
         {
             joint_map[name] = name;
@@ -219,11 +222,14 @@ namespace
         return LLVector3(size[0], size[1], size[2]);
     }
 
-    // LLModelLoader::joint_lookup_func_t -- resolve a joint name against the
-    // agent's skeleton. (opaque is the LoadContext, unused here.)
-    LLJoint* lookupJoint(const std::string& name, void* /*opaque*/)
+    // LLModelLoader::joint_lookup_func_t -- resolve a joint name against this
+    // load's preview avatar. NOT the agent: the DAE loader writes the model's
+    // joint-position overrides straight onto the returned joint, which would
+    // otherwise deform the user's own avatar.
+    LLJoint* lookupJoint(const std::string& name, void* opaque)
     {
-        return isAgentAvatarValid() ? gAgentAvatarp->getJoint(name) : nullptr;
+        LoadContext* ctx = static_cast<LoadContext*>(opaque);
+        return (ctx && ctx->mAvatar) ? ctx->mAvatar->getJoint(name) : nullptr;
     }
 
     // LLModelLoader::state_callback_t -- record the last state for diagnostics.
@@ -349,8 +355,14 @@ void LLLocalMesh::startLoad()
     LoadContext* ctx = new LoadContext();
     ctx->mTrackingID = mTrackingID;
 
+    // Resolve joints against a dedicated UI avatar -- never the agent. The DAE
+    // loader writes the model's joint-position overrides onto the looked-up
+    // joints, so gAgentAvatarp here would deform the user's avatar.
+    LLVOAvatar* preview_av = LLLocalMeshMgr::getInstance()->getPreviewAvatar();
+    ctx->mAvatar = preview_av;
+
     JointMap joint_alias_map;
-    buildJointAliases(joint_alias_map);
+    buildJointAliases(joint_alias_map, preview_av);
 
     LLModelLoader::load_callback_t     load_cb    = onModelLoaded;
     LLModelLoader::joint_lookup_func_t joint_cb   = lookupJoint;
@@ -378,7 +390,10 @@ void LLLocalMesh::startLoad()
     else // FMT_GLTF
     {
         std::vector<LLJointData> viewer_skeleton;
-        gAgentAvatarp->getJointMatricesAndHierarhy(viewer_skeleton);
+        if (preview_av)
+        {
+            preview_av->getJointMatricesAndHierarhy(viewer_skeleton);
+        }
         ctx->mLoader = new LLGLTFLoader(
             mFilename,
             LLModel::LOD_HIGH,
@@ -584,6 +599,37 @@ LLLocalMeshMgr::~LLLocalMeshMgr()
         delete unit;
     }
     mMeshList.clear();
+
+    if (mPreviewAvatar.notNull())
+    {
+        mPreviewAvatar->markDead();
+        mPreviewAvatar = nullptr;
+    }
+}
+
+LLVOAvatar* LLLocalMeshMgr::getPreviewAvatar()
+{
+    if ((mPreviewAvatar.isNull() || mPreviewAvatar->isDead()) && gAgent.getRegion())
+    {
+        // A dedicated, never-rendered UI avatar gives the model loaders a skeleton
+        // to resolve joints against -- and to absorb the model's joint-position
+        // overrides -- WITHOUT mutating the real agent avatar. Mirrors
+        // LLModelPreview::createPreviewAvatar().
+        LLVOAvatar* av = (LLVOAvatar*)gObjectList.createObjectViewer(LL_PCODE_LEGACY_AVATAR, gAgent.getRegion(), LLViewerObject::CO_FLAG_UI_AVATAR);
+        if (av)
+        {
+            av->createDrawable(&gPipeline);
+            av->mSpecialRenderMode = 1; // not part of the in-world render
+            av->startMotion(ANIM_AGENT_STAND);
+            av->hideSkirt();
+        }
+        else
+        {
+            LL_WARNS("LocalMesh") << "Failed to create preview avatar for joint resolution" << LL_ENDL;
+        }
+        mPreviewAvatar = av;
+    }
+    return mPreviewAvatar.get();
 }
 
 LLUUID LLLocalMeshMgr::addUnit(const std::string& filename)

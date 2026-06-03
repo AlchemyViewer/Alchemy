@@ -51,6 +51,7 @@
 
 class LLScrollListCtrl;
 class LLViewerObject;
+class LLVOAvatar;
 class LLVOVolume;
 class LLVolume;
 
@@ -185,6 +186,11 @@ public:
     // Timer tick: poll every loaded unit's source file for changes.
     void doUpdates();
 
+    // A dedicated, never-rendered UI avatar that the model loaders resolve joints
+    // against (and dump joint-position overrides onto) so loading a rigged mesh
+    // does not deform the real agent avatar. Created lazily on first load.
+    LLVOAvatar* getPreviewAvatar();
+
 private:
     LLUUID addUnitInternal(const std::string& filename);
     void   despawnForWorldID(const LLUUID& world_id);
@@ -203,7 +209,8 @@ private:
     // Client-only objects we've rezzed, paired with the world ID they show.
     std::vector<std::pair<LLUUID, LLPointer<LLViewerObject> > > mSpawnedObjects;
 
-    LLLocalMeshTimer mTimer; // drives live-reload polling
+    LLLocalMeshTimer       mTimer;         // drives live-reload polling
+    LLPointer<LLVOAvatar>  mPreviewAvatar; // skeleton for joint resolution (never the agent)
 };
 
 #endif // LL_LLLOCALMESH_H
