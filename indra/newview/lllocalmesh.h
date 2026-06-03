@@ -40,6 +40,7 @@
 #include "llpointer.h"
 #include "llsingleton.h"
 #include "lluuid.h"
+#include "v3math.h"
 
 #include <filesystem>
 #include <list>
@@ -71,6 +72,10 @@ public:
     LLVolume*             getVolume() const   { return mVolume; }
     const LLMeshSkinInfo* getSkinInfo() const { return mSkinInfo; }
     bool                  isRigged() const    { return mSkinInfo.notNull(); }
+
+    // Authored bounding-box size; the spawned static preview uses this as its
+    // prim scale. (1,1,1) when rigged (the rig, not the object scale, governs).
+    LLVector3             getScale() const    { return mScale; }
 
     // Stats (for UI + logging).
     S32 getNumFaces() const     { return mNumFaces; }
@@ -105,6 +110,7 @@ private:
 
     LLPointer<LLVolume>       mVolume;   // assembled high-LOD geometry, served for all LODs
     LLPointer<LLMeshSkinInfo> mSkinInfo; // null if not rigged
+    LLVector3                 mScale;    // authored size; prim scale for the static preview ((1,1,1) when rigged)
 
     S32  mNumFaces;
     S32  mNumVertices;

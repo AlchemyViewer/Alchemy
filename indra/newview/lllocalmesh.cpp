@@ -138,6 +138,87 @@ namespace
         }
     }
 
+    // Normalize a merged face set into a unit box centred at the origin and
+    // return its authored size, mirroring LLModel::normalizeVolumeFaces() (the
+    // upload path's convention). The returned size becomes the spawned object's
+    // prim scale, so the preview renders at native dimensions, is centred on its
+    // pivot, and reports correct extents to the build tools. Tangents are
+    // intentionally not touched here -- cacheOptimize() generates them
+    // afterwards on the already-normalized geometry.
+    LLVector3 normalizeFaces(std::vector<LLVolumeFace>& faces)
+    {
+        if (faces.empty())
+        {
+            return LLVector3(1.f, 1.f, 1.f);
+        }
+
+        LLVector4a min = faces[0].mExtents[0];
+        LLVector4a max = faces[0].mExtents[1];
+        for (size_t i = 1; i < faces.size(); ++i)
+        {
+            update_min_max(min, max, faces[i].mExtents[0]);
+            update_min_max(min, max, faces[i].mExtents[1]);
+        }
+
+        // Translation that centres the geometry at the origin.
+        LLVector4a trans;
+        trans.setAdd(min, max);
+        trans.mul(-0.5f);
+
+        // Size along each axis (guard zero-thickness axes against div-by-zero).
+        LLVector4a size;
+        size.setSub(max, min);
+        F32 sx = size[0], sy = size[1], sz = size[2], sw = size[3];
+        if (fabs(sx) < F_APPROXIMATELY_ZERO) sx = 1.f;
+        if (fabs(sy) < F_APPROXIMATELY_ZERO) sy = 1.f;
+        if (fabs(sz) < F_APPROXIMATELY_ZERO) sz = 1.f;
+        size.set(sx, sy, sz, sw);
+
+        LLVector4a scale;
+        scale.splat(1.f);
+        scale.div(size); // 1 / size
+        LLVector4a inv_scale(1.f);
+        inv_scale.div(scale); // == size
+
+        for (LLVolumeFace& face : faces)
+        {
+            // Shrink extents into the unit cube.
+            face.mExtents[0].add(trans);
+            face.mExtents[0].mul(scale);
+            face.mExtents[1].add(trans);
+            face.mExtents[1].mul(scale);
+
+            for (S32 j = 0; j < face.mNumVertices; ++j)
+            {
+                face.mPositions[j].add(trans);
+                face.mPositions[j].mul(scale);
+                if (face.mNormals && !face.mNormals[j].equals3(LLVector4a::getZero()))
+                {
+                    face.mNormals[j].mul(inv_scale);
+                    face.mNormals[j].normalize3();
+                }
+            }
+
+            // Texture-coordinate extents (rendering and tangent generation use these).
+            if (face.mTexCoords)
+            {
+                face.mTexCoordExtents[0] = face.mTexCoords[0];
+                face.mTexCoordExtents[1] = face.mTexCoords[0];
+                for (S32 j = 1; j < face.mNumVertices; ++j)
+                {
+                    update_min_max(face.mTexCoordExtents[0], face.mTexCoordExtents[1], face.mTexCoords[j]);
+                }
+            }
+            else
+            {
+                face.mTexCoordExtents[0].set(0.f, 0.f);
+                face.mTexCoordExtents[1].set(1.f, 1.f);
+            }
+        }
+
+        return LLVector3(size[0], size[1], size[2]);
+    }
+
     // LLModelLoader::joint_lookup_func_t -- resolve a joint name against the
     // agent's skeleton. (opaque is the LoadContext, unused here.)
     LLJoint* lookupJoint(const std::string& name, void* /*opaque*/)
@@ -219,6 +300,7 @@ LLLocalMesh::LLLocalMesh(std::string filename)
     , mNumVertices(0)
     , mNumTriangles(0)
     , mNumJoints(0)
+    , mScale(1.f, 1.f, 1.f)
     , mTruncated(false)
 {
     mTrackingID.generate();
@@ -334,6 +416,7 @@ void LLLocalMesh::onLoadComplete(LLModelLoader::scene& scene)
         mLastModified = std::filesystem::last_write_time(fsyspath(mFilename));
         LL_INFOS("LocalMesh") << "Loaded local mesh '" << mShortName << "' [" << mWorldID << "]: "
                               << mNumFaces << " faces, " << mNumVertices << " verts, " << mNumTriangles << " tris, "
+                              << "size " << mScale << ", "
                               << (isRigged() ? llformat("rigged (%d joints)", mNumJoints) : std::string("static"))
                               << (mTruncated ? " [TRUNCATED to MAX_MODEL_FACES]" : "")
                               << LL_ENDL;
@@ -392,6 +475,18 @@ void LLLocalMesh::assembleFromScene(LLModelLoader::scene& scene)
     {
         LL_WARNS("LocalMesh") << "Local mesh produced no geometry: " << mFilename << LL_ENDL;
         return;
+    }
+
+    // Static meshes: re-normalize the merged geometry into a unit box centred at
+    // the origin and keep the authored size for the prim scale. Both loaders
+    // normalize per-model, but baking the instance transforms above puts the
+    // merged result back into authored world space (often large and off-origin),
+    // so the object pivot, bounding box and build-tool size would all be wrong
+    // without this. Rigged meshes stay in skin/bind space -- the skeleton, not
+    // the object transform, drives their placement (handled at rigged-attach).
+    if (!skin_src)
+    {
+        mScale = normalizeFaces(faces);
     }
 
     LLVolumeParams params;
@@ -638,10 +733,12 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
     gPipeline.createObject(obj);
     vol->setLOD(LLVolumeLODGroup::NUM_LODS - 1);
 
-    // Place a few meters in front of the agent at native scale.
+    // Place a few meters in front of the agent. The geometry was normalized to a
+    // unit box centred on the origin, so the object's prim scale carries the
+    // authored size and the pivot sits at the geometry's centre.
     const LLVector3 pos = gAgent.getPositionAgent() + gAgent.getAtAxis() * 3.f;
     vol->setPositionAgent(pos);
-    vol->setScale(LLVector3(1.f, 1.f, 1.f), false);
+    vol->setScale(unit->getScale(), false);
 
     // isSculpted()/isMesh() key off the PARAMS_SCULPT extra param (not the
     // volume params alone). Without it, LLVOVolume::setVolume skips the entire
