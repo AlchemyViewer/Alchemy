@@ -2576,7 +2576,7 @@ LLVector3 LLVOVolume::getApproximateFaceNormal(U8 face_id)
 
 void LLVOVolume::requestMediaDataUpdate(bool isNew)
 {
-    if (sObjectMediaClient)
+    if (sObjectMediaClient && !isLocalOnly()) // client-only object: no sim media data
         sObjectMediaClient->fetchMedia(new LLMediaDataClientObjectImpl(this, isNew));
 }
 
@@ -2825,7 +2825,7 @@ void LLVOVolume::mediaNavigated(LLViewerMediaImpl *impl, LLPluginClassMedia* plu
         // "bounce back" to the current URL from the media entry
         mediaNavigateBounceBack(face_index);
     }
-    else if (sObjectMediaNavigateClient)
+    else if (sObjectMediaNavigateClient && !isLocalOnly()) // client-only object: no sim to notify
     {
 
         LL_DEBUGS("MediaOnAPrim") << "broadcasting navigate with URI " << new_location << LL_ENDL;
@@ -2915,7 +2915,7 @@ void LLVOVolume::mediaEvent(LLViewerMediaImpl *impl, LLPluginClassMedia* plugin,
 
 void LLVOVolume::sendMediaDataUpdate()
 {
-    if (sObjectMediaClient)
+    if (sObjectMediaClient && !isLocalOnly()) // client-only object: no sim media data
         sObjectMediaClient->updateMedia(new LLMediaDataClientObjectImpl(this, false));
 }
 
