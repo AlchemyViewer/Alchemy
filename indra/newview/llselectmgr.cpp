@@ -148,6 +148,18 @@ static void synthesizeLocalPreviewNode(LLSelectNode* nodep, LLViewerObject* obje
     nodep->mPermissions->init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
     const U32 full_perm = PERM_MODIFY | PERM_COPY | PERM_MOVE | PERM_TRANSFER;
     nodep->mPermissions->initMasks(full_perm, full_perm, PERM_NONE, PERM_NONE, full_perm);
+
+    // Snapshot the current face textures the way processObjectProperties would, so
+    // texture/material-picker revert (cancel) has a baseline to restore to.
+    uuid_vec_t texture_ids;
+    const U8 num_tes = objectp->getNumTEs();
+    texture_ids.reserve(num_tes);
+    for (U8 te = 0; te < num_tes; ++te)
+    {
+        const LLTextureEntry* tep = objectp->getTE(te);
+        texture_ids.push_back(tep ? tep->getID() : LLUUID::null);
+    }
+    nodep->saveTextures(texture_ids);
 }
 
 // Delete a selection made up entirely of client-only previews. The sim delete
@@ -5524,6 +5536,24 @@ void LLSelectMgr::saveSelectedShinyColors()
 
 void LLSelectMgr::saveSelectedObjectTextures()
 {
+    // Client-only previews never receive the ObjectProperties reply the normal
+    // path waits on, so invalidating + sendSelect() would leave them permanently
+    // invalid -- which breaks the selection when a texture/material picker commits.
+    // Re-affirm the synthesized node instead (re-snapshots textures, keeps mValid).
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        struct lf : public LLSelectedNodeFunctor
+        {
+            virtual bool apply(LLSelectNode* node)
+            {
+                synthesizeLocalPreviewNode(node, node->getObject());
+                return true;
+            }
+        } local_func;
+        getSelection()->applyToNodes(&local_func);
+        return;
+    }
+
     // invalidate current selection so we update saved textures
     struct f : public LLSelectedNodeFunctor
     {
