@@ -398,6 +398,15 @@ void LLLocalMesh::assembleFromScene(LLModelLoader::scene& scene)
     params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
     mVolume = new LLVolume(params, 1.f);
     mVolume->copyFacesFrom(faces);
+
+    // Optimize the index buffer and generate tangents, matching what
+    // unpackVolumeFaces() does for a real mesh asset. Loaded mesh assets are
+    // required to carry tangents (see LLVolume::genTangents) and raycast
+    // picking dereferences them, so this must run before setMeshAssetLoaded().
+    if (!mVolume->cacheOptimize(true))
+    {
+        LL_WARNS("LocalMesh") << "cacheOptimize failed for '" << mShortName << "'" << LL_ENDL;
+    }
     mVolume->setMeshAssetLoaded(true);
 
     if (skin_src)
