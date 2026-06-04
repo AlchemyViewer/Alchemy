@@ -78,6 +78,7 @@ endif ()
 
 # Spell checking backend
 cmake_dependent_option(USE_NSSPELLCHECKER "Use the native macOS NSSpellChecker instead of Hunspell" OFF "DARWIN" OFF)
+cmake_dependent_option(USE_WINSPELLCHECK "Use the native Windows Spell Checking API instead of Hunspell" OFF "WIN32" OFF)
 
 # Configure crash reporting
 option(RELEASE_CRASH_REPORTING "Enable use of crash reporting in release builds" OFF)
@@ -184,6 +185,10 @@ if(BUILD_DULLAHAN_EXAMPLE)
   list(APPEND VCPKG_MANIFEST_FEATURES "dullahan-example")
 endif()
 
+if (NOT USE_NSSPELLCHECKER AND NOT USE_WINSPELLCHECK)
+  list(APPEND VCPKG_MANIFEST_FEATURES "hunspell")
+endif()
+
 # Export compile_commands.json for ninja and makefile generators
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -270,9 +275,7 @@ include(GLIB)
 include(GLM)
 include(Harfbuzz)
 include(Havok)
-if (NOT USE_NSSPELLCHECKER)
-  include(Hunspell)   # only the default (Hunspell) spell-check engine needs it
-endif ()
+include(Hunspell)
 include(JPEG)
 include(LLKDU)
 include(LLPhysicsExtensions)
@@ -303,6 +306,7 @@ include(Vorbis)
 include(WebP)
 include(WebRTC)
 include(websocketpp)
+include(WinSpellCheck)
 include(xxHash)
 include(ZLIBNG)
 

@@ -88,9 +88,13 @@ if(WINDOWS)
     endif()
 elseif(DARWIN)
     set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
-    set(release_libs
-    "libhunspell-1.7.0.dylib"
-    )
+    if (NOT USE_NSSPELLCHECKER)
+        set(release_libs "")
+    else()
+        set(release_libs
+        "libhunspell-1.7.0.dylib"
+        )
+    endif()
 elseif(LINUX)
     set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
     set(release_libs "")

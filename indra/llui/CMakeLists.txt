@@ -234,12 +234,16 @@ target_sources(llui
     llxyvector.h
     )
 
-# Spell checking: the backend-agnostic LLSpellChecker core (always compiled) plus exactly one
-# platform engine selected by build option — native macOS NSSpellChecker or Hunspell (default).
+# Spell checking: the backend-agnostic LLSpellChecker core (llspellcheck.cpp) is always compiled;
+# exactly one platform engine is selected by build option — native macOS NSSpellChecker
+# (Objective-C++), native Windows Spell Checking API, or Hunspell (default).
 target_sources(llui PRIVATE llspellcheck.cpp)
 if (USE_NSSPELLCHECKER)
   target_sources(llui PRIVATE llspellcheckengine_mac.mm)
   set_source_files_properties(llspellcheckengine_mac.mm PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
+elseif (USE_WINSPELLCHECK)
+  target_sources(llui PRIVATE llspellcheckengine_win32.cpp)
+  set_source_files_properties(llspellcheckengine_win32.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 else ()
   target_sources(llui PRIVATE llspellcheckengine_hunspell.cpp)
 endif ()
@@ -273,6 +277,8 @@ target_link_libraries(llui
 
 if (USE_NSSPELLCHECKER)
     target_link_libraries(llui PUBLIC ll::nsspellchecker)
+elseif (USE_WINSPELLCHECK)
+    target_link_libraries(llui PUBLIC ll::winspellcheck)
 else ()
     target_link_libraries(llui PUBLIC ll::hunspell)
 endif ()
@@ -283,6 +289,8 @@ target_precompile_headers(llui REUSE_FROM llprecompiled)
 if(BUILD_TESTING)
   if (USE_NSSPELLCHECKER)
     set(spellcheck_lib ll::nsspellchecker)
+  elseif (USE_WINSPELLCHECK)
+    set(spellcheck_lib ll::winspellcheck)
   else ()
     set(spellcheck_lib ll::hunspell)
   endif ()

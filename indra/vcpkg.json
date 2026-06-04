@@ -50,7 +50,6 @@
     },
     "glm",
     "harfbuzz",
-    "hunspell",
     {
       "name": "libavif",
       "features": [
@@ -195,6 +194,12 @@
       "description": "Build with support for the FAudio audio engine",
       "dependencies": [
         "faudio"
+      ]
+    },
+    "hunspell": {
+      "description": "Build with support for Hunspell spell-check engine",
+      "dependencies": [
+        "hunspell"
       ]
     },
     "kdu": {
