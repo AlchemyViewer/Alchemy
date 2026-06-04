@@ -234,8 +234,15 @@ target_sources(llui
     llxyvector.h
     )
 
-# Spell checking: the backend-agnostic LLSpellChecker core plus the Hunspell engine.
-target_sources(llui PRIVATE llspellcheck.cpp llspellcheckengine_hunspell.cpp)
+# Spell checking: the backend-agnostic LLSpellChecker core (always compiled) plus exactly one
+# platform engine selected by build option — native macOS NSSpellChecker or Hunspell (default).
+target_sources(llui PRIVATE llspellcheck.cpp)
+if (USE_NSSPELLCHECKER)
+  target_sources(llui PRIVATE llspellcheckengine_mac.mm)
+  set_source_files_properties(llspellcheckengine_mac.mm PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
+else ()
+  target_sources(llui PRIVATE llspellcheckengine_hunspell.cpp)
+endif ()
 
 SET(llurlentry_TEST_DEPENDENCIES
     llurlmatch.cpp
@@ -262,14 +269,24 @@ target_link_libraries(llui
         llxml
         llmath
         llcommon
-        ll::hunspell
     )
+
+if (USE_NSSPELLCHECKER)
+    target_link_libraries(llui PUBLIC ll::nsspellchecker)
+else ()
+    target_link_libraries(llui PUBLIC ll::hunspell)
+endif ()
 
 target_precompile_headers(llui REUSE_FROM llprecompiled)
 
 # Add tests
 if(BUILD_TESTING)
-  set(test_libs llmessage llcorehttp llxml llrender llcommon ll::hunspell)
+  if (USE_NSSPELLCHECKER)
+    set(spellcheck_lib ll::nsspellchecker)
+  else ()
+    set(spellcheck_lib ll::hunspell)
+  endif ()
+  set(test_libs llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
 
   SET(llui_TEST_SOURCE_FILES
       llurlmatch.cpp
@@ -278,7 +295,7 @@ if(BUILD_TESTING)
   LL_ADD_PROJECT_UNIT_TESTS(llui "${llui_TEST_SOURCE_FILES}")
 
   # INTEGRATION TESTS
-  set(test_libs llui llmessage llcorehttp llxml llrender llcommon ll::hunspell)
+  set(test_libs llui llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
   set(test_project llui)
   LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llemojidictionary llemojidictionary.cpp "${test_libs}" "${test_project}")

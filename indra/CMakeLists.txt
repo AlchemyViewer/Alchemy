@@ -76,6 +76,9 @@ else ()
   option(USE_SDL_WINDOW "Build with SDL based window management and input (experimental on Windows)" OFF)
 endif ()
 
+# Spell checking backend
+cmake_dependent_option(USE_NSSPELLCHECKER "Use the native macOS NSSpellChecker instead of Hunspell" OFF "DARWIN" OFF)
+
 # Configure crash reporting
 option(RELEASE_CRASH_REPORTING "Enable use of crash reporting in release builds" OFF)
 option(NON_RELEASE_CRASH_REPORTING "Enable use of crash reporting in developer builds" OFF)
@@ -267,7 +270,9 @@ include(GLIB)
 include(GLM)
 include(Harfbuzz)
 include(Havok)
-include(Hunspell)
+if (NOT USE_NSSPELLCHECKER)
+  include(Hunspell)   # only the default (Hunspell) spell-check engine needs it
+endif ()
 include(JPEG)
 include(LLKDU)
 include(LLPhysicsExtensions)
@@ -275,6 +280,7 @@ include(Mesa)
 include(Meshoptimizer)
 include(Mikktspace)
 include(NDOF)
+include(NSSpellChecker)
 include(NVAPI)
 include(OpenAL)
 include(OpenGL)
