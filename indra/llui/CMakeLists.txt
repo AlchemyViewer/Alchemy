@@ -70,7 +70,6 @@ target_sources(llui
     llsearcheditor.cpp
     llslider.cpp
     llsliderctrl.cpp
-    llspellcheck.cpp
     llspinctrl.cpp
     llstatbar.cpp
     llstatgraph.cpp
@@ -190,6 +189,7 @@ target_sources(llui
     llsliderctrl.h
     llslider.h
     llspellcheck.h
+    llspellcheckengine.h
     llspellcheckmenuhandler.h
     llspinctrl.h
     llstatbar.h
@@ -233,6 +233,9 @@ target_sources(llui
     llxuiparser.h
     llxyvector.h
     )
+
+# Spell checking: the backend-agnostic LLSpellChecker core plus the Hunspell engine.
+target_sources(llui PRIVATE llspellcheck.cpp llspellcheckengine_hunspell.cpp)
 
 SET(llurlentry_TEST_DEPENDENCIES
     llurlmatch.cpp
