@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel
+  follows="all"
+  layout="topleft"
+  name="panel_local_asset"
+  top="0"
+  left="0"
+  height="400"
+  width="530">
+  <string name="rez_label">Rez in World</string>
+  <string name="derez_label">Derez</string>
+  <string name="col_name">Name</string>
+  <string name="col_status">Status</string>
+  <string name="target_self">My Avatar</string>
+  <string name="target_selected">Selected Object</string>
+  <scroll_list
+    name="l_name_list"
+    follows="all"
+    layout="topleft"
+    top="5"
+    left="5"
+    right="-130"
+    bottom="-5"
+    column_padding="0"
+    draw_heading="true"
+    multi_select="true"
+    search_column="1">
+    <column name="icon" label="" width="20"/>
+    <column name="unit_name" label="Name" dynamicwidth="true"/>
+  </scroll_list>
+  <button
+    name="add_btn"
+    label="Add..."
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="5"
+    right="-5"/>
+  <button
+    name="del_btn"
+    label="Delete"
+    enabled="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="33"
+    right="-5"/>
+  <button
+    name="spawn_btn"
+    label="Rez in World"
+    enabled="false"
+    visible="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="73"
+    right="-5"/>
+  <button
+    name="select_btn"
+    label="Select in World"
+    enabled="false"
+    visible="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="101"
+    right="-5"/>
+  <combo_box
+    name="attach_point_combo"
+    enabled="false"
+    visible="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="129"
+    right="-5"/>
+  <button
+    name="attach_btn"
+    label="Attach..."
+    enabled="false"
+    visible="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="157"
+    right="-5"/>
+  <check_box
+    name="include_joints_check"
+    label="Joint Positions"
+    tool_tip="Bake the mesh's joint-position overrides into its skin (for fitted bodies that need them). Off matches the upload preview default. Changing this reloads the mesh."
+    enabled="false"
+    visible="false"
+    follows="top|right"
+    layout="topleft"
+    height="20"
+    width="120"
+    top="189"
+    right="-5"/>
+  <combo_box
+    name="anim_target_combo"
+    enabled="false"
+    visible="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="73"
+    right="-5"/>
+  <button
+    name="play_btn"
+    label="Play"
+    enabled="false"
+    visible="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="101"
+    right="-5"/>
+  <button
+    name="stop_btn"
+    label="Stop"
+    enabled="false"
+    visible="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="129"
+    right="-5"/>
+</panel>

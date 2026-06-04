@@ -147,10 +147,14 @@ public:
     LLUUID       getWorldID(const LLUUID &tracking_id) const;
     bool         isLocal(const LLUUID& world_id) const;
     std::string  getFilename(const LLUUID &tracking_id) const;
+    std::vector<std::string> getFilenames() const; // every loaded path (persistence)
     boost::signals2::connection setOnChangedCallback(const LLUUID tracking_id, const LLLocalBitmap::LLLocalTextureCallback& cb);
     void associateGLTFMaterial(const LLUUID tracking_id, LLGLTFMaterial* mat);
 
     void         feedScrollList(LLScrollListCtrl* ctrl);
+    // Fired when the unit list changes (add/remove) so the Local Assets floater
+    // refreshes reactively. Distinct from the per-unit setOnChangedCallback above.
+    boost::signals2::connection setUnitsChangedCallback(const std::function<void()>& cb);
     void         doUpdates();
     void         setNeedsRebake();
     void         doRebake();
@@ -159,6 +163,7 @@ private:
     std::list<LLLocalBitmap*>    mBitmapList;
     LLLocalBitmapTimer           mTimer;
     bool                         mNeedsRebake;
+    boost::signals2::signal<void()> mUnitsChangedSignal; // add/remove
     typedef std::list<LLLocalBitmap*>::iterator local_list_iter;
     typedef std::list<LLLocalBitmap*>::const_iterator local_list_citer;
 };

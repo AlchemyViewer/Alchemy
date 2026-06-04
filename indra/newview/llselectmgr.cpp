@@ -187,8 +187,10 @@ static void deleteLocalPreviewSelection()
 
     for (LLPointer<LLViewerObject>& obj : objects)
     {
-        // The first part of a linkset drops the whole unit; later parts no-op.
-        mgr->deletePreviewObject(obj.get());
+        // Derez the linkset (the in-world Delete key takes a local preview out of the
+        // world but keeps the loaded file in the Local Assets list). The first part of
+        // a linkset derezzes it; later parts no-op. Use the floater's Delete to unload.
+        mgr->despawnPreviewObject(obj.get());
     }
 }
 //

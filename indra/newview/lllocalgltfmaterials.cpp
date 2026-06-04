@@ -327,6 +327,10 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::vector<std::string>& filenames)
         iter++;
     }
     mTimer.startTimer();
+    if (add_count > 0)
+    {
+        mUnitsChangedSignal();
+    }
     return add_count;
 }
 
@@ -341,6 +345,10 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename, LLUUID& outID)
     mTimer.stopTimer();
     S32 res = addUnitInternal(filename, outID);
     mTimer.startTimer();
+    if (res > 0)
+    {
+        mUnitsChangedSignal();
+    }
     return res;
 }
 
@@ -412,6 +420,27 @@ void LLLocalGLTFMaterialMgr::delUnit(LLUUID tracking_id)
             unit = NULL;
         }
     }
+    mUnitsChangedSignal();
+}
+
+boost::signals2::connection LLLocalGLTFMaterialMgr::setUnitsChangedCallback(const std::function<void()>& cb)
+{
+    return mUnitsChangedSignal.connect(cb);
+}
+
+std::vector<std::string> LLLocalGLTFMaterialMgr::getFilenames() const
+{
+    // One .gltf/.glb can hold several materials (several units); persist the file once.
+    std::vector<std::string> out;
+    for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
+    {
+        const std::string filename = unit->getFilename();
+        if (std::find(out.begin(), out.end(), filename) == out.end())
+        {
+            out.push_back(filename);
+        }
+    }
+    return out;
 }
 
 LLUUID LLLocalGLTFMaterialMgr::getUnitID(const std::string& filename, S32 index)

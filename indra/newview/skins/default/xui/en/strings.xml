@@ -2855,6 +2855,9 @@ If you continue to receive this message, please contact Second Life support for 
 	<!-- Environment settings -->
 	<string name="LocalSettings">Local Settings</string>
 	<string name="RegionSettings">Region Settings</string>
+	<!-- Local Assets floater: in-world status of a local mesh preview -->
+	<string name="LocalAssetRezzed">Rezzed</string>
+	<string name="LocalAssetAttached">Attached: [POINT]</string>
 
 	<string name="NoEnvironmentSettings">This Region does not support environmental settings.</string>
 	<string name="EnvironmentSun">Sun</string>

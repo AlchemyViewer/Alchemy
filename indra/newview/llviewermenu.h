@@ -37,6 +37,7 @@ class LLView;
 class LLParcelSelection;
 class LLObjectSelection;
 class LLSelectNode;
+class LLControlAvatar;
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
 void set_use_wireframe(bool useWireframe);
@@ -82,6 +83,11 @@ void handle_object_return();
 void handle_object_delete();
 void handle_object_edit();
 void handle_object_edit_gltf_material();
+
+// Resolve the control avatar of the currently-selected animesh (any animesh, local
+// preview or not), or null. Shared by the in-world right-click menu and the Local
+// Assets floater so a local anim can be previewed on any animesh.
+LLControlAvatar* get_selected_animesh_control_avatar();
 
 void handle_attachment_edit(const LLUUID& inv_item_id);
 void handle_attachment_touch(const LLUUID& inv_item_id);

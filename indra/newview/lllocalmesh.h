@@ -43,6 +43,7 @@
 #include "lluuid.h"
 #include "v3math.h"
 
+#include <boost/signals2/signal.hpp>
 #include <filesystem>
 #include <list>
 #include <string>
@@ -76,7 +77,7 @@ struct LLLocalMeshPart
 class LLLocalMesh
 {
 public:
-    LLLocalMesh(std::string filename);
+    LLLocalMesh(std::string filename, bool include_joints = false);
     ~LLLocalMesh();
 
     std::string getFilename() const   { return mFilename; }
@@ -120,6 +121,7 @@ private:
     // Live reload (M3): poll the source file's mtime and, on a change, kick an
     // async re-parse. The geometry swap happens back in the load callback.
     bool pollForReload();       // true if a reload was started this poll
+    bool forceReload();         // re-parse now (e.g. after a build-option change)
     void finishReload(bool ok); // clear in-flight state after the parse returns
     bool isReloading() const { return mReloading; }
 
@@ -129,6 +131,7 @@ private:
     EFormat     mFormat;
     EState      mState;
     bool        mSpawnWhenReady;
+    bool        mIncludeJointPositions = false; // bake joint-position overrides into the skin
 
     std::filesystem::file_time_type mLastModified; // for live reload (M3)
 
@@ -164,24 +167,36 @@ class LLLocalMeshMgr : public LLSingleton<LLLocalMeshMgr>
     ~LLLocalMeshMgr();
 
 public:
-    LLUUID addUnit(const std::string& filename);
+    LLUUID addUnit(const std::string& filename, bool include_joints = false);
     bool   addUnit(const std::vector<std::string>& filenames);
     void   delUnit(LLUUID tracking_id);
 
     LLUUID      getUnitID(const std::string& filename) const;
     std::string getFilename(const LLUUID& tracking_id) const;
+    // Every currently-loaded source file path (for cross-session persistence).
+    std::vector<std::string> getFilenames() const;
 
     LLLocalMesh* getUnit(const LLUUID& tracking_id) const;
+
+    // Per-unit toggle: include the mesh's joint-position overrides (alt-inverse-bind
+    // + pelvis offset) when building its skin, for fitted bodies that need them.
+    // Changing it re-parses the unit (and re-spawns it in place if it is in-world).
+    void setIncludeJointPositions(const LLUUID& tracking_id, bool include);
+    bool getIncludeJointPositions(const LLUUID& tracking_id) const;
 
     // Mesh repository injection: resolve a part's world id to its decoded data.
     bool                  isLocal(const LLUUID& world_id) const;
     LLVolume*             getVolumeForWorldID(const LLUUID& world_id) const;
     const LLMeshSkinInfo* getSkinInfoForWorldID(const LLUUID& world_id) const;
 
-    // Delete the preview linkset that owns this object (and the loaded unit, so a
-    // later file save does not respawn it). Lets the standard Delete key/menu work
-    // on client-only previews, which the sim delete path can't touch.
-    void deletePreviewObject(LLViewerObject* obj);
+    // Despawn the in-world preview but KEEP the loaded unit so it can be re-spawned
+    // (a later file save won't auto-respawn a despawned unit -- see onLoadResult).
+    // despawnPreviewObject derezzes the linkset that owns `obj`, letting the standard
+    // in-world Delete key/menu "derez" client-only previews (which the sim delete
+    // path can't touch) without dropping the file from the list. despawn() does the
+    // same by tracking id. To remove the file from the list entirely, use delUnit().
+    void despawnPreviewObject(LLViewerObject* obj);
+    void despawn(const LLUUID& tracking_id);
 
     // Attach/detach a preview linkset to the agent avatar, driven by the normal
     // "Attach"/"Detach" object menus (the viewer's sim attach/detach can't act on
@@ -203,7 +218,16 @@ public:
     // Convenience: load each file and spawn it in-world once it finishes loading.
     void addAndSpawn(const std::vector<std::string>& filenames);
 
+    // The spawned linkset root for a loaded unit, or null if it isn't in-world.
+    // Lets the UI act on an existing preview (e.g. attach it) without re-rezzing.
+    LLViewerObject* getSpawnedRoot(const LLUUID& tracking_id) const;
+
     void feedScrollList(LLScrollListCtrl* ctrl);
+
+    // Fired when the unit list or any unit's in-world (rezzed) state changes, so the
+    // Local Assets floater refreshes reactively no matter who made the change
+    // (in-world Delete/derez, login reload, the floater itself, ...).
+    boost::signals2::connection setUnitsChangedCallback(const std::function<void()>& cb);
 
     // Called by the load callback when an async (re)parse finishes (main thread).
     void onLoadResult(const LLUUID& tracking_id, LLModelLoader::scene& scene, U32 load_state);
@@ -228,8 +252,14 @@ public:
     void despawnObjectsInRegion(LLViewerRegion* regionp);
 
 private:
-    LLUUID addUnitInternal(const std::string& filename);
+    LLUUID addUnitInternal(const std::string& filename, bool include_joints = false);
     void   despawnUnit(const LLUUID& tracking_id);
+
+    // Reload an already-spawned linkset in place by pointing each existing prim at
+    // the freshly decoded geometry (new sculpt id) instead of despawning -- so
+    // attachment, selection and transform are preserved and there's no flicker.
+    // Returns false if the prim count changed (caller falls back to spawnInWorld).
+    bool hotSwapInWorld(const LLUUID& tracking_id);
 
     // Find a decoded part by its world id (across all loaded units).
     const LLLocalMeshPart* findPart(const LLUUID& world_id) const;
@@ -250,6 +280,8 @@ private:
     // belong to. A unit's linkset shares one tracking id; the first entry pushed
     // for a tracking id is the linkset root.
     std::vector<std::pair<LLUUID, LLPointer<LLViewerObject> > > mSpawnedObjects;
+
+    boost::signals2::signal<void()> mUnitsChangedSignal; // add/remove/spawn/despawn
 
     LLLocalMeshTimer       mTimer;         // drives live-reload polling
     LLPointer<LLVOAvatar>  mPreviewAvatar; // skeleton for joint resolution (never the agent)

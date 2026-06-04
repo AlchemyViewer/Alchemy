@@ -1089,6 +1089,10 @@ bool LLLocalBitmapMgr::addUnit(const std::vector<std::string>& filenames)
         iter++;
     }
     mTimer.startTimer();
+    if (add_successful)
+    {
+        mUnitsChangedSignal();
+    }
     return add_successful;
 }
 
@@ -1097,6 +1101,10 @@ LLUUID LLLocalBitmapMgr::addUnit(const std::string& filename)
     mTimer.stopTimer();
     LLUUID tracking_id = addUnitInternal(filename);
     mTimer.startTimer();
+    if (tracking_id.notNull())
+    {
+        mUnitsChangedSignal();
+    }
     return tracking_id;
 }
 
@@ -1206,6 +1214,23 @@ void LLLocalBitmapMgr::delUnit(LLUUID tracking_id)
             unit = NULL;
         }
     }
+    mUnitsChangedSignal();
+}
+
+boost::signals2::connection LLLocalBitmapMgr::setUnitsChangedCallback(const std::function<void()>& cb)
+{
+    return mUnitsChangedSignal.connect(cb);
+}
+
+std::vector<std::string> LLLocalBitmapMgr::getFilenames() const
+{
+    std::vector<std::string> out;
+    out.reserve(mBitmapList.size());
+    for (const LLLocalBitmap* unit : mBitmapList)
+    {
+        out.push_back(unit->getFilename());
+    }
+    return out;
 }
 
 LLUUID LLLocalBitmapMgr::getTrackingID(const LLUUID& world_id) const

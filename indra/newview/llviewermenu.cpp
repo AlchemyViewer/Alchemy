@@ -687,13 +687,14 @@ class LLAdvancedLoadLocalMesh : public view_listener_t
     }
 };
 
-// Local animation (M5): play/stop a local .anim/.bvh on a local mesh that has been
-// made an animated object (animesh). The animation runs on the linkset's control
-// avatar, so these are only meaningful for a client-only animesh root.
-static LLControlAvatar* get_local_animesh_control_avatar()
+// Local animation (M5): play/stop a local .anim/.bvh on the selected animated
+// object (animesh). The animation runs on the linkset's control avatar -- which
+// exists for any animesh, local preview or not -- so a local anim can be previewed
+// on any selected animesh, not only client-only previews.
+LLControlAvatar* get_selected_animesh_control_avatar()
 {
     LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
-    if (!obj || !obj->isLocalOnly())
+    if (!obj)
     {
         return nullptr;
     }
@@ -703,12 +704,12 @@ static LLControlAvatar* get_local_animesh_control_avatar()
 
 bool enable_play_local_anim()
 {
-    return get_local_animesh_control_avatar() != nullptr;
+    return get_selected_animesh_control_avatar() != nullptr;
 }
 
 void handle_play_local_anim()
 {
-    LLControlAvatar* cav = get_local_animesh_control_avatar();
+    LLControlAvatar* cav = get_selected_animesh_control_avatar();
     if (!cav)
     {
         return;
@@ -734,7 +735,7 @@ void handle_play_local_anim()
 
 void handle_stop_local_anim()
 {
-    LLControlAvatar* cav = get_local_animesh_control_avatar();
+    LLControlAvatar* cav = get_selected_animesh_control_avatar();
     if (cav && LLLocalAnimMgr::instanceExists())
     {
         LLLocalAnimMgr::getInstance()->stopOnAvatar(cav);

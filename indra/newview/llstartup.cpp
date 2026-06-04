@@ -70,6 +70,7 @@
 #include "llfocusmgr.h"
 #include "llfloatergridstatus.h"
 #include "llfloaterimsession.h"
+#include "lllocalassetpaths.h"
 #include "lllocationhistory.h"
 #include "llgltfmateriallist.h"
 #include "llimageworker.h"
@@ -1199,6 +1200,12 @@ bool idle_startup()
         LLAvatarIconIDCache::getInstance()->load();
 
         LLRenderMuteList::getInstance()->loadFromFile();
+
+        // List the artist's saved local-asset file paths (mesh/anim/texture/material)
+        // for the Local Assets floater. This only reads the paths -- the files are
+        // decoded lazily when first used -- so it's fine to do here, and it starts
+        // watching the managers to keep the saved set current.
+        LLLocalAssetPaths::getInstance()->loadAndWatch();
 
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-09-22 (Catznip-3.3)
         if (LLTextParser::instance().loadKeywords() && LLTextParser::instance().getHighlightCount() > 0)

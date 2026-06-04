@@ -27,20 +27,44 @@
 #include "lllocalanim.h"
 
 #include "llbvhloader.h"
+#include "llcharacter.h"        // LLCharacter::sInstances (resolve avatar by id)
 #include "lldatapacker.h"
 #include "lldir.h"
 #include "llfile.h"
+#include "llinventoryicon.h"
 #include "llkeyframemotion.h"
+#include "llscrolllistctrl.h"
 #include "llstring.h"
 #include "llvoavatar.h"
-#include "llvoavatarself.h" // gAgentAvatarp, isAgentAvatarValid (BVH joint aliases)
+#include "llvoavatarself.h"     // gAgentAvatarp, isAgentAvatarValid (BVH joint aliases)
+
+namespace
+{
+    constexpr F32 LOCAL_ANIM_TIMER_HEARTBEAT = 3.0f; // seconds between file-change polls
+
+    // Resolve an avatar id to a live avatar, including animesh control avatars
+    // (both are LLCharacters, registered in LLCharacter::sInstances).
+    LLVOAvatar* resolve_avatar(const LLUUID& av_id)
+    {
+        for (LLCharacter* character : LLCharacter::sInstances)
+        {
+            if (character && character->getID() == av_id)
+            {
+                return dynamic_cast<LLVOAvatar*>(character);
+            }
+        }
+        return nullptr;
+    }
+}
 
 LLLocalAnimMgr::LLLocalAnimMgr()
 {
+    mTimer.stopTimer(); // started on demand once the first unit is added
 }
 
 LLLocalAnimMgr::~LLLocalAnimMgr()
 {
+    mTimer.stopTimer();
     // Drop the keyframe data we cached globally for our local motions.
     for (const auto& entry : mAnims)
     {
@@ -49,7 +73,7 @@ LLLocalAnimMgr::~LLLocalAnimMgr()
     mAnims.clear();
 }
 
-LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
+bool LLLocalAnimMgr::decodeFile(const std::string& filename, std::vector<U8>& out_keyframe) const
 {
     std::error_code ec;
     LLFile infile;
@@ -57,21 +81,21 @@ LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
     if (!infile || ec)
     {
         LL_WARNS("LocalAnim") << "Can't open animation file: " << filename << LL_ENDL;
-        return LLUUID::null;
+        return false;
     }
 
     const S64 file_size = infile.size(ec);
     if (file_size <= 0 || ec)
     {
         LL_WARNS("LocalAnim") << "Empty or unreadable animation file: " << filename << LL_ENDL;
-        return LLUUID::null;
+        return false;
     }
 
     std::vector<U8> data((size_t)file_size);
     if ((S64)infile.read(data.data(), file_size, ec) != file_size || ec)
     {
         LL_WARNS("LocalAnim") << "Short read on animation file: " << filename << LL_ENDL;
-        return LLUUID::null;
+        return false;
     }
     infile.close();
 
@@ -80,10 +104,9 @@ LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
     std::string ext = gDirUtilp->getExtension(filename);
     LLStringUtil::toLower(ext);
 
-    std::vector<U8> keyframe;
     if (ext == "anim")
     {
-        keyframe = std::move(data);
+        out_keyframe = std::move(data);
     }
     else if (ext == "bvh")
     {
@@ -100,22 +123,32 @@ LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
         {
             LL_WARNS("LocalAnim") << "BVH parse failed (status " << load_status << ", line "
                                   << line_number << "): " << filename << LL_ENDL;
-            return LLUUID::null;
+            return false;
         }
         const U32 out_size = loader.getOutputSize();
-        keyframe.resize(out_size);
-        LLDataPackerBinaryBuffer dp(keyframe.data(), (S32)out_size);
+        out_keyframe.resize(out_size);
+        LLDataPackerBinaryBuffer dp(out_keyframe.data(), (S32)out_size);
         loader.serialize(dp); // BVH -> keyframe (.anim) bytes
     }
     else
     {
         LL_WARNS("LocalAnim") << "Unsupported animation file type '." << ext << "': " << filename << LL_ENDL;
-        return LLUUID::null;
+        return false;
     }
 
-    if (keyframe.empty())
+    if (out_keyframe.empty())
     {
         LL_WARNS("LocalAnim") << "No animation data decoded from " << filename << LL_ENDL;
+        return false;
+    }
+    return true;
+}
+
+LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
+{
+    std::vector<U8> keyframe;
+    if (!decodeFile(filename, keyframe))
+    {
         return LLUUID::null;
     }
 
@@ -126,13 +159,209 @@ LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
     anim.mFilename  = filename;
     anim.mShortName = gDirUtilp->getBaseFileName(filename, true /* strip extension */);
     anim.mData      = std::move(keyframe);
+    std::error_code ec;
+    anim.mLastModified = std::filesystem::last_write_time(filename, ec);
 
     const size_t bytes = anim.mData.size();
     mAnims[id] = std::move(anim);
 
+    if (!mTimer.isRunning())
+    {
+        mTimer.startTimer(); // begin watching source files for live reload
+    }
+
+    mUnitsChangedSignal();
     LL_INFOS("LocalAnim") << "Loaded local anim '" << mAnims[id].mShortName << "' ("
                           << bytes << " bytes) as " << id << LL_ENDL;
     return id;
+}
+
+LLUUID LLLocalAnimMgr::addUnit(const std::string& filename)
+{
+    return loadAnim(filename);
+}
+
+bool LLLocalAnimMgr::addUnit(const std::vector<std::string>& filenames)
+{
+    bool any = false;
+    for (const std::string& filename : filenames)
+    {
+        if (!filename.empty() && loadAnim(filename).notNull())
+        {
+            any = true;
+        }
+    }
+    return any;
+}
+
+void LLLocalAnimMgr::delUnit(LLUUID tracking_id)
+{
+    auto iter = mAnims.find(tracking_id);
+    if (iter == mAnims.end())
+    {
+        return;
+    }
+
+    // Stop it wherever it's playing, purge the cached motion, and drop the play map.
+    for (auto pit = mPlaying.begin(); pit != mPlaying.end(); )
+    {
+        if (pit->second == tracking_id)
+        {
+            if (LLVOAvatar* av = resolve_avatar(pit->first))
+            {
+                av->stopMotion(tracking_id, true);
+                av->removeMotion(tracking_id);
+            }
+            pit = mPlaying.erase(pit);
+        }
+        else
+        {
+            ++pit;
+        }
+    }
+
+    LLKeyframeDataCache::removeKeyframeData(tracking_id);
+    mAnims.erase(iter);
+
+    if (mAnims.empty())
+    {
+        mTimer.stopTimer(); // nothing left to watch
+    }
+    mUnitsChangedSignal();
+    LL_INFOS("LocalAnim") << "Removed local anim " << tracking_id << LL_ENDL;
+}
+
+boost::signals2::connection LLLocalAnimMgr::setUnitsChangedCallback(const std::function<void()>& cb)
+{
+    return mUnitsChangedSignal.connect(cb);
+}
+
+LLUUID LLLocalAnimMgr::getUnitID(const std::string& filename) const
+{
+    for (const auto& entry : mAnims)
+    {
+        if (entry.second.mFilename == filename)
+        {
+            return entry.first;
+        }
+    }
+    return LLUUID::null;
+}
+
+std::string LLLocalAnimMgr::getFilename(const LLUUID& tracking_id) const
+{
+    auto iter = mAnims.find(tracking_id);
+    return (iter != mAnims.end()) ? iter->second.mFilename : std::string();
+}
+
+std::vector<std::string> LLLocalAnimMgr::getFilenames() const
+{
+    std::vector<std::string> out;
+    out.reserve(mAnims.size());
+    for (const auto& entry : mAnims)
+    {
+        out.push_back(entry.second.mFilename);
+    }
+    return out;
+}
+
+void LLLocalAnimMgr::feedScrollList(LLScrollListCtrl* ctrl)
+{
+    if (!ctrl)
+    {
+        return;
+    }
+
+    const std::string icon_name = LLInventoryIcon::getIconName(LLAssetType::AT_ANIMATION, LLInventoryType::IT_ANIMATION);
+
+    for (const auto& entry : mAnims)
+    {
+        LLSD element;
+        element["columns"][0]["column"] = "icon";
+        element["columns"][0]["type"]   = "icon";
+        element["columns"][0]["value"]  = icon_name;
+
+        element["columns"][1]["column"] = "unit_name";
+        element["columns"][1]["type"]   = "text";
+        element["columns"][1]["value"]  = entry.second.mShortName;
+
+        LLSD data;
+        data["id"]   = entry.first;
+        data["type"] = (S32)LLAssetType::AT_ANIMATION;
+        element["value"] = data;
+
+        ctrl->addElement(element);
+    }
+}
+
+void LLLocalAnimMgr::reapplyToAvatar(const LLUUID& av_id, const LLUUID& anim_id)
+{
+    LLVOAvatar* av = resolve_avatar(av_id);
+    auto iter = mAnims.find(anim_id);
+    if (!av || iter == mAnims.end())
+    {
+        return;
+    }
+
+    // Purge the stale parsed motion instance so createMotion() yields a fresh one
+    // that deserializes the new bytes.
+    av->stopMotion(anim_id, true);
+    av->removeMotion(anim_id);
+
+    LLKeyframeMotion* motionp = dynamic_cast<LLKeyframeMotion*>(av->createMotion(anim_id));
+    if (!motionp)
+    {
+        return;
+    }
+    LLDataPackerBinaryBuffer dp(iter->second.mData.data(), (S32)iter->second.mData.size());
+    if (motionp->deserialize(dp, anim_id, false))
+    {
+        av->startMotion(anim_id);
+    }
+}
+
+void LLLocalAnimMgr::doUpdates()
+{
+    // Stop/restart around the sweep so a long poll can't re-enter via the timer.
+    mTimer.stopTimer();
+
+    for (auto& entry : mAnims)
+    {
+        const LLUUID& id   = entry.first;
+        LocalAnim&    anim = entry.second;
+
+        std::error_code ec;
+        const auto mtime = std::filesystem::last_write_time(anim.mFilename, ec);
+        if (ec || mtime == anim.mLastModified)
+        {
+            continue;
+        }
+        anim.mLastModified = mtime;
+
+        std::vector<U8> fresh;
+        if (!decodeFile(anim.mFilename, fresh))
+        {
+            continue; // keep last good data; retry on the next mtime change
+        }
+        anim.mData = std::move(fresh);
+
+        // Refresh the cached keyframe data so the next play uses the new bytes,
+        // and re-apply live to any avatar currently playing this id.
+        LLKeyframeDataCache::removeKeyframeData(id);
+        for (const auto& play : mPlaying)
+        {
+            if (play.second == id)
+            {
+                reapplyToAvatar(play.first, id);
+            }
+        }
+        LL_INFOS("LocalAnim") << "Live-reloaded local anim '" << anim.mShortName << "'" << LL_ENDL;
+    }
+
+    if (!mAnims.empty())
+    {
+        mTimer.startTimer();
+    }
 }
 
 bool LLLocalAnimMgr::playOnAvatar(LLVOAvatar* av, const LLUUID& anim_id)
@@ -202,4 +431,25 @@ std::string LLLocalAnimMgr::getShortName(const LLUUID& anim_id) const
 {
     auto iter = mAnims.find(anim_id);
     return (iter != mAnims.end()) ? iter->second.mShortName : std::string();
+}
+
+/*=======================================*/
+/*  LLLocalAnimTimer: live-reload poll   */
+/*=======================================*/
+LLLocalAnimMgr::LLLocalAnimTimer::LLLocalAnimTimer()
+    : LLEventTimer(LOCAL_ANIM_TIMER_HEARTBEAT)
+{
+}
+
+void LLLocalAnimMgr::LLLocalAnimTimer::startTimer() { mEventTimer.start(); }
+void LLLocalAnimMgr::LLLocalAnimTimer::stopTimer()  { mEventTimer.stop(); }
+bool LLLocalAnimMgr::LLLocalAnimTimer::isRunning()  { return mEventTimer.getStarted(); }
+
+bool LLLocalAnimMgr::LLLocalAnimTimer::tick()
+{
+    if (LLLocalAnimMgr::instanceExists())
+    {
+        LLLocalAnimMgr::getInstance()->doUpdates();
+    }
+    return false; // keep ticking
 }

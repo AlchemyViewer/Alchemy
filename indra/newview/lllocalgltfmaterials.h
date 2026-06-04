@@ -30,6 +30,7 @@
 #include "lleventtimer.h"
 #include "llpointer.h"
 #include "llgltfmateriallist.h"
+#include <boost/signals2/signal.hpp>
 #include <filesystem>
 
 class LLScrollListCtrl;
@@ -111,13 +112,18 @@ public:
     LLUUID       getWorldID(LLUUID tracking_id);
     bool         isLocal(LLUUID world_id);
     void         getFilenameAndIndex(LLUUID tracking_id, std::string &filename, S32 &index);
+    std::vector<std::string> getFilenames() const; // distinct loaded files (persistence)
 
     void         feedScrollList(LLScrollListCtrl* ctrl);
+    // Fired when the unit list changes (add/remove) so the Local Assets floater
+    // refreshes reactively.
+    boost::signals2::connection setUnitsChangedCallback(const std::function<void()>& cb);
     void         doUpdates();
 
 private:
     std::list<LLPointer<LLLocalGLTFMaterial> >    mMaterialList;
     LLLocalGLTFMaterialTimer           mTimer;
+    boost::signals2::signal<void()>    mUnitsChangedSignal; // add/remove
     typedef std::list<LLPointer<LLLocalGLTFMaterial> >::iterator local_list_iter;
 };
 

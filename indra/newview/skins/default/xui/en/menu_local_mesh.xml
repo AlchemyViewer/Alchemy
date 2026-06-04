@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu
+ layout="topleft"
+ name="menu_local_mesh">
+    <menu_item_call
+     label="Rez in World"
+     name="spawn">
+        <on_click function="LocalMesh.Spawn"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Derez"
+     name="derez">
+        <on_click function="LocalMesh.Derez"/>
+        <on_enable function="LocalMesh.IsSpawned"/>
+    </menu_item_call>
+    <menu_item_call
+     label="Select in World"
+     name="select">
+        <on_click function="LocalMesh.Select"/>
+        <on_enable function="LocalMesh.IsSpawned"/>
+    </menu_item_call>
+    <menu
+     label="Attach To"
+     name="attach_to"
+     tear_off="false">
+    </menu>
+    <menu_item_call
+     label="Detach"
+     name="detach">
+        <on_click function="LocalMesh.Detach"/>
+        <on_enable function="LocalMesh.IsAttached"/>
+    </menu_item_call>
+    <menu_item_separator/>
+    <menu_item_call
+     label="Delete"
+     name="delete">
+        <on_click function="LocalMesh.Delete"/>
+    </menu_item_call>
+</context_menu>

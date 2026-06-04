@@ -123,6 +123,7 @@
 #include "llfloaterlandholdings.h"
 #include "llfloaterlinkreplace.h"
 #include "llfloaterloadprefpreset.h"
+#include "llfloaterlocalassets.h"
 #include "llfloatermap.h"
 #include "llfloatermarketplace.h"
 #include "llfloatermarketplacelistings.h"
@@ -414,6 +415,7 @@ void LLViewerFloaterReg::registerFloaters()
         LLFloaterReg::add("event", "floater_event.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterEvent>);
     }
     LLFloaterReg::add("experiences", "floater_experiences.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperiences>);
+    LLFloaterReg::add("local_assets", "floater_local_assets.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLocalAssets>);
     LLFloaterReg::add("experience_profile", "floater_experienceprofile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperienceProfile>);
     LLFloaterReg::add("experience_search", "floater_experience_search.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterExperiencePicker>);
 

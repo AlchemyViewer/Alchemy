@@ -52,6 +52,8 @@
 #include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
+#include "lltrans.h"
+#include "llviewerjointattachment.h"
 #include "llvoavatarself.h"
 #include "llvovolume.h"
 #include "pipeline.h"
@@ -341,12 +343,13 @@ namespace
 /*=======================================*/
 /*  LLLocalMesh: unit class              */
 /*=======================================*/
-LLLocalMesh::LLLocalMesh(std::string filename)
+LLLocalMesh::LLLocalMesh(std::string filename, bool include_joints)
     : mFilename(filename)
     , mShortName(gDirUtilp->getBaseFileName(filename, true))
     , mFormat(FMT_NONE)
     , mState(ST_LOADING)
     , mSpawnWhenReady(false)
+    , mIncludeJointPositions(include_joints)
     , mLastModified()
     , mNumFaces(0)
     , mNumVertices(0)
@@ -580,14 +583,16 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
 
             if (!mdl->mSkinInfo.mJointNames.empty())
             {
-                // Owned copy bound to this part's world id. include_joints=false
-                // strips the alt-inverse-bind matrices (joint-position overrides) +
-                // pelvis offset while keeping joint names, inverse bind, and bind
-                // shape -- everything skinning needs. This mirrors the mesh-upload
-                // preview's default (show_joint_overrides off): the overrides reshape
-                // the avatar skeleton on attach, and a mesh weighted for the default
-                // skeleton (the common case) scrunches when they're applied.
-                LLSD sd = mdl->mSkinInfo.asLLSD(false, false);
+                // Owned copy bound to this part's world id. By default include_joints
+                // is false: it strips the alt-inverse-bind matrices (joint-position
+                // overrides) + pelvis offset while keeping joint names, inverse bind,
+                // and bind shape -- everything skinning needs. That mirrors the
+                // mesh-upload preview default (show_joint_overrides off): the overrides
+                // reshape the avatar skeleton on attach, and a mesh weighted for the
+                // default skeleton (the common case) scrunches when they're applied.
+                // Fitted bodies that DO need the overrides opt in via the mesh tab's
+                // "Joint Positions" toggle (mIncludeJointPositions).
+                LLSD sd = mdl->mSkinInfo.asLLSD(mIncludeJointPositions, false);
                 part.mSkinInfo = new LLMeshSkinInfo(part.mWorldID, sd);
                 num_joints = llmax(num_joints, (S32)mdl->mSkinInfo.mJointNames.size());
             }
@@ -686,6 +691,20 @@ void LLLocalMesh::finishReload(bool ok)
         mFailedModified = mPendingModified;
         LL_WARNS("LocalMesh") << "Reload parse failed for '" << mShortName << "'; keeping previous geometry" << LL_ENDL;
     }
+}
+
+bool LLLocalMesh::forceReload()
+{
+    // Re-parse the current file regardless of mtime so a changed build option (e.g.
+    // the joint-position toggle) takes effect. Reuses the reload path: onLoadResult()
+    // rebuilds the geometry and refreshes the in-world linkset if one exists.
+    if (mReloading || !gDirUtilp->fileExists(mFilename))
+    {
+        return false;
+    }
+    mReloading = true;
+    startLoad(); // captures mPendingModified
+    return true;
 }
 
 /*=======================================*/
@@ -794,9 +813,9 @@ LLVOAvatar* LLLocalMeshMgr::getPreviewAvatar()
     return mPreviewAvatar.get();
 }
 
-LLUUID LLLocalMeshMgr::addUnit(const std::string& filename)
+LLUUID LLLocalMeshMgr::addUnit(const std::string& filename, bool include_joints)
 {
-    return addUnitInternal(filename);
+    return addUnitInternal(filename, include_joints);
 }
 
 bool LLLocalMeshMgr::addUnit(const std::vector<std::string>& filenames)
@@ -812,9 +831,9 @@ bool LLLocalMeshMgr::addUnit(const std::vector<std::string>& filenames)
     return any;
 }
 
-LLUUID LLLocalMeshMgr::addUnitInternal(const std::string& filename)
+LLUUID LLLocalMeshMgr::addUnitInternal(const std::string& filename, bool include_joints)
 {
-    LLLocalMesh* unit = new LLLocalMesh(filename);
+    LLLocalMesh* unit = new LLLocalMesh(filename, include_joints);
     if (unit->isFailed())
     {
         // Immediate failure (bad extension / no avatar / missing file).
@@ -826,6 +845,7 @@ LLUUID LLLocalMeshMgr::addUnitInternal(const std::string& filename)
     // Loading (async) or already loaded -- keep it; completion is handled in
     // the load callback.
     mMeshList.push_back(unit);
+    mUnitsChangedSignal();
     if (!mTimer.isRunning())
     {
         mTimer.startTimer(); // begin watching source files for live reload
@@ -854,6 +874,7 @@ void LLLocalMeshMgr::delUnit(LLUUID tracking_id)
     {
         mTimer.stopTimer(); // nothing left to watch
     }
+    mUnitsChangedSignal();
 }
 
 LLUUID LLLocalMeshMgr::getUnitID(const std::string& filename) const
@@ -928,7 +949,18 @@ LLLocalMesh* LLLocalMeshMgr::getUnit(const LLUUID& tracking_id) const
     return nullptr;
 }
 
-void LLLocalMeshMgr::deletePreviewObject(LLViewerObject* obj)
+std::vector<std::string> LLLocalMeshMgr::getFilenames() const
+{
+    std::vector<std::string> out;
+    out.reserve(mMeshList.size());
+    for (const LLLocalMesh* unit : mMeshList)
+    {
+        out.push_back(unit->getFilename());
+    }
+    return out;
+}
+
+void LLLocalMeshMgr::despawnPreviewObject(LLViewerObject* obj)
 {
     if (!obj)
     {
@@ -936,8 +968,8 @@ void LLLocalMeshMgr::deletePreviewObject(LLViewerObject* obj)
     }
 
     // Map the object (linkset root or child) back to the unit that owns it, then
-    // drop the whole unit -- this despawns the entire linkset and stops live
-    // reload, so the deleted preview stays deleted.
+    // derez that unit's linkset. The loaded file stays in the list so it can be
+    // re-spawned, and onLoadResult won't auto-respawn it on a later file save.
     LLUUID tracking_id;
     for (const auto& spawned : mSpawnedObjects)
     {
@@ -948,10 +980,20 @@ void LLLocalMeshMgr::deletePreviewObject(LLViewerObject* obj)
         }
     }
 
+    despawn(tracking_id);
+}
+
+void LLLocalMeshMgr::despawn(const LLUUID& tracking_id)
+{
     if (tracking_id.notNull())
     {
-        delUnit(tracking_id);
+        despawnUnit(tracking_id); // removes the in-world linkset, keeps the unit loaded
     }
+}
+
+boost::signals2::connection LLLocalMeshMgr::setUnitsChangedCallback(const std::function<void()>& cb)
+{
+    return mUnitsChangedSignal.connect(cb);
 }
 
 LLViewerObject* LLLocalMeshMgr::findRootForObject(const LLViewerObject* obj) const
@@ -1150,6 +1192,8 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
     LLVector3    base;
     LLQuaternion root_rot;
     bool         had_prev = false;
+    bool         was_attached = false;
+    S32          attach_point = 0;
     for (const auto& spawned : mSpawnedObjects)
     {
         if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
@@ -1157,6 +1201,12 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
             base     = spawned.second->getPositionAgent();
             root_rot = spawned.second->getRotation();
             had_prev = true;
+            if (spawned.second->isAttachment())
+            {
+                // Preview was worn: re-wear the rebuilt linkset at the same point.
+                was_attached = true;
+                attach_point = ATTACHMENT_ID_FROM_STATE(spawned.second->getAttachmentState());
+            }
             break; // the first entry for a tracking id is the linkset root
         }
     }
@@ -1226,10 +1276,93 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
     {
         root->setRotation(root_rot); // restore the linkset orientation across reload
     }
+    if (root && was_attached)
+    {
+        attachPreviewToAvatar(root, attach_point); // restore the attachment across re-spawn
+    }
 
+    mUnitsChangedSignal(); // rezzed state changed
     LL_INFOS("LocalMesh") << "Spawned local mesh '" << unit->getShortName() << "' as "
                           << unit->getNumParts() << " prim(s), " << unit->getNumFaces() << " faces" << LL_ENDL;
     return root;
+}
+
+bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
+{
+    LLLocalMesh* unit = getUnit(tracking_id);
+    if (!unit || !unit->getValid())
+    {
+        return false;
+    }
+    const std::vector<LLLocalMeshPart>& parts = unit->getParts();
+
+    // The existing spawned prims for this unit, in spawn order (root first).
+    std::vector<LLViewerObject*> objs;
+    for (const auto& spawned : mSpawnedObjects)
+    {
+        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
+        {
+            objs.push_back(spawned.second.get());
+        }
+    }
+
+    // Only a structurally identical linkset can be swapped 1:1 in place; a changed
+    // prim count needs a real re-spawn (to add/remove prims).
+    if (objs.empty() || objs.size() != parts.size())
+    {
+        return false;
+    }
+
+    // Point each prim at the freshly decoded geometry by swapping its mesh (sculpt)
+    // id. The new id has an empty volume cache, so the repository copies the new
+    // faces and the prim rebuilds in place; LLVOVolume also drops its cached skin
+    // when the mesh id changes, so rigged skinning refreshes too. No despawn -> the
+    // attachment, selection and transform are all preserved.
+    for (size_t i = 0; i < parts.size(); ++i)
+    {
+        LLVOVolume* vol = dynamic_cast<LLVOVolume*>(objs[i]);
+        if (!vol)
+        {
+            return false;
+        }
+        vol->setScale(parts[i].mScale, false);
+        applyPartGeometry(vol, parts[i]);
+    }
+
+    LL_INFOS("LocalMesh") << "Hot-swapped local mesh '" << unit->getShortName() << "' ("
+                          << parts.size() << " prim(s)) in place" << LL_ENDL;
+    return true;
+}
+
+LLViewerObject* LLLocalMeshMgr::getSpawnedRoot(const LLUUID& tracking_id) const
+{
+    for (const auto& spawned : mSpawnedObjects)
+    {
+        // The first live entry pushed for a tracking id is the linkset root.
+        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
+        {
+            return spawned.second;
+        }
+    }
+    return nullptr;
+}
+
+void LLLocalMeshMgr::setIncludeJointPositions(const LLUUID& tracking_id, bool include)
+{
+    LLLocalMesh* unit = getUnit(tracking_id);
+    if (!unit || unit->mIncludeJointPositions == include)
+    {
+        return;
+    }
+    unit->mIncludeJointPositions = include;
+    unit->forceReload(); // rebuild the skin with/without the joint-position overrides
+    mUnitsChangedSignal(); // persisted property changed -> let LLLocalAssetPaths re-save
+}
+
+bool LLLocalMeshMgr::getIncludeJointPositions(const LLUUID& tracking_id) const
+{
+    const LLLocalMesh* unit = getUnit(tracking_id);
+    return unit && unit->mIncludeJointPositions;
 }
 
 void LLLocalMeshMgr::applyPartGeometry(LLVOVolume* vol, const LLLocalMeshPart& part)
@@ -1287,9 +1420,17 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
         if (assembled)
         {
             logUnit("Reloaded", unit);
-            // Replace the existing linkset with the new geometry; spawnInWorld
-            // preserves the root transform across the swap.
-            spawnInWorld(tracking_id);
+            // Refresh an in-world linkset: hot-swap the geometry in place (no despawn,
+            // so attachment/selection/transform survive). A changed prim count can't be
+            // swapped 1:1 -> fall back to a full re-spawn (which restores the attachment
+            // if the preview was worn). Not spawned -> just keep the rebuilt data.
+            if (getSpawnedRoot(tracking_id))
+            {
+                if (!hotSwapInWorld(tracking_id))
+                {
+                    spawnInWorld(tracking_id);
+                }
+            }
         }
         return;
     }
@@ -1361,6 +1502,7 @@ void LLLocalMeshMgr::despawnUnit(const LLUUID& tracking_id)
             ++iter;
         }
     }
+    mUnitsChangedSignal(); // rezzed state changed
 }
 
 void LLLocalMeshMgr::feedScrollList(LLScrollListCtrl* ctrl)
@@ -1374,6 +1516,8 @@ void LLLocalMeshMgr::feedScrollList(LLScrollListCtrl* ctrl)
 
     for (LLLocalMesh* unit : mMeshList)
     {
+        LLViewerObject* root = getSpawnedRoot(unit->getTrackingID());
+
         LLSD element;
         element["columns"][0]["column"] = "icon";
         element["columns"][0]["type"]   = "icon";
@@ -1382,6 +1526,40 @@ void LLLocalMeshMgr::feedScrollList(LLScrollListCtrl* ctrl)
         element["columns"][1]["column"] = "unit_name";
         element["columns"][1]["type"]   = "text";
         element["columns"][1]["value"]  = unit->getShortName();
+        if (root)
+        {
+            element["columns"][1]["font"]["style"] = "BOLD"; // in-world (rezzed or worn)
+        }
+
+        // Status column (the mesh tab adds it): in-world state + attachment point.
+        std::string status;
+        if (root)
+        {
+            if (root->isAttachment())
+            {
+                const S32 point_id = ATTACHMENT_ID_FROM_STATE(root->getAttachmentState());
+                std::string point_name = llformat("%d", point_id);
+                if (isAgentAvatarValid())
+                {
+                    LLVOAvatar::attachment_map_t::const_iterator iter =
+                        gAgentAvatarp->mAttachmentPoints.find(point_id);
+                    if (iter != gAgentAvatarp->mAttachmentPoints.end() && iter->second)
+                    {
+                        point_name = iter->second->getName();
+                    }
+                }
+                LLSD args;
+                args["POINT"] = point_name;
+                status = LLTrans::getString("LocalAssetAttached", args);
+            }
+            else
+            {
+                status = LLTrans::getString("LocalAssetRezzed");
+            }
+        }
+        element["columns"][2]["column"] = "status";
+        element["columns"][2]["type"]   = "text";
+        element["columns"][2]["value"]  = status;
 
         LLSD data;
         data["id"]   = unit->getTrackingID();

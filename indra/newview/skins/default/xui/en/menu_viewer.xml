@@ -60,6 +60,13 @@
           function="Floater.ToggleOrBringToFront"
           parameter="experiences"/>
       </menu_item_call>
+      <menu_item_call
+        label="Local Assets..."
+        name="LocalAssets">
+        <menu_item_call.on_click
+          function="Floater.ToggleOrBringToFront"
+          parameter="local_assets"/>
+      </menu_item_call>
       <menu_item_separator/>
       <menu_item_check
        label="Music Ticker..."
