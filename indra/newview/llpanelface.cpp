@@ -136,6 +136,22 @@ LLGLTFMaterial::TextureInfo LLPanelFace::getPBRTextureInfo()
     return LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT;
 }
 
+// Apply a GLTF material override to a face. Client-only local mesh previews get
+// no sim override echo, so apply the override directly (setTEGLTFMaterialOverride
+// re-renders); real objects queue a ModifyMaterialParams sim update as usual.
+static void apply_gltf_override(LLViewerObject* object, S32 te, const LLGLTFMaterial& new_override)
+{
+    if (object && object->isLocalOnly())
+    {
+        LLPointer<LLGLTFMaterial> ov = new LLGLTFMaterial(new_override);
+        object->setTEGLTFMaterialOverride((U8)te, ov);
+    }
+    else
+    {
+        LLGLTFMaterialList::queueModify(object, te, &new_override);
+    }
+}
+
 void LLPanelFace::updateSelectedGLTFMaterials(std::function<void(LLGLTFMaterial*)> func)
 {
     struct LLSelectedTEGLTFMaterialFunctor : public LLSelectedTEFunctor
@@ -151,7 +167,7 @@ void LLPanelFace::updateSelectedGLTFMaterials(std::function<void(LLGLTFMaterial*
                 new_override = *tep->getGLTFMaterialOverride();
             }
             mFunc(&new_override);
-            LLGLTFMaterialList::queueModify(object, face, &new_override);
+            apply_gltf_override(object, face, new_override);
 
             return true;
         }
@@ -181,7 +197,7 @@ void LLPanelFace::updateSelectedGLTFMaterialsWithScale(std::function<void(LLGLTF
             U32 t_axis = VY;
             LLPrimitive::getTESTAxes(face, &s_axis, &t_axis);
             mFunc(&new_override, object->getScale().mV[s_axis], object->getScale().mV[t_axis]);
-            LLGLTFMaterialList::queueModify(object, face, &new_override);
+            apply_gltf_override(object, face, new_override);
 
             return true;
         }
@@ -891,7 +907,7 @@ struct LLPanelFaceSetAlignedTEFunctor : public LLSelectedTEFunctor
 
                 if (any_changed)
                 {
-                    LLGLTFMaterialList::queueModify(object, te, &new_override);
+                    apply_gltf_override(object, te, new_override);
                 }
             }
             else
@@ -910,7 +926,7 @@ struct LLPanelFaceSetAlignedTEFunctor : public LLSelectedTEFunctor
                     transform.mScale.set(gltf_scale.mV[0], gltf_scale.mV[1]);
                     transform.mRotation = gltf_rot;
 
-                    LLGLTFMaterialList::queueModify(object, te, &new_override);
+                    apply_gltf_override(object, te, new_override);
                 }
             }
         }

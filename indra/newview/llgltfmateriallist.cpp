@@ -327,6 +327,13 @@ void LLGLTFMaterialList::applyQueuedOverrides(LLViewerObject* obj)
 
 void LLGLTFMaterialList::queueModify(const LLViewerObject* obj, S32 side, const LLGLTFMaterial* mat)
 {
+    if (obj && obj->isLocalOnly())
+    {
+        // Client-only local mesh preview: it has no sim counterpart, so never
+        // queue a ModifyMaterialParams round-trip. Local render state is applied
+        // directly by the caller (setRenderMaterialID / setGLTFMaterialOverride).
+        return;
+    }
     if (obj && obj->getRenderMaterialID(side).notNull())
     {
         if (mat == nullptr)
@@ -342,6 +349,10 @@ void LLGLTFMaterialList::queueModify(const LLViewerObject* obj, S32 side, const 
 
 void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const LLUUID& asset_id)
 {
+    if (obj && obj->isLocalOnly())
+    {
+        return; // client-only preview: no sim material sync (see queueModify)
+    }
     const LLGLTFMaterial* material_override = obj->getTE(side)->getGLTFMaterialOverride();
     if (material_override)
     {
@@ -357,6 +368,10 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
 
 void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const LLUUID& asset_id, const std::string &override_json)
 {
+    if (obj && obj->isLocalOnly())
+    {
+        return; // client-only preview: no sim material sync (see queueModify)
+    }
     if (asset_id.isNull() || override_json.empty())
     {
         // If there is no asset, there can't be an override
@@ -370,6 +385,10 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
 
 void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const LLUUID& asset_id, const LLGLTFMaterial* material_override)
 {
+    if (obj && obj->isLocalOnly())
+    {
+        return; // client-only preview: no sim material sync (see queueModify)
+    }
     if (asset_id.isNull() || material_override == nullptr)
     {
         // If there is no asset, there can't be an override
