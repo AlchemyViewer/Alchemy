@@ -77,6 +77,10 @@ public:
     // Rebuild the visible list (decoded units + dimmed undecoded saved paths).
     void refresh();
 
+    // Decode + add a file into this tab's backing manager (used by the floater's
+    // OS drag-and-drop routing). Public wrapper over the protected loadPath().
+    void loadFile(const std::string& path) { loadPath(path); }
+
 protected:
     // Backing-manager hooks, implemented per asset type.
     virtual void feedList() = 0;                                   // decoded units -> rows
@@ -94,6 +98,9 @@ protected:
     // by overrides; the base keeps them hidden.
     virtual void initExtraButtons() {}
     virtual void updateExtraButtons(bool /*has_selection*/) {}
+
+    // Placeholder shown over the list while it's empty (per asset type).
+    virtual std::string emptyHint() const { return LLStringUtil::null; }
 
     LLUUID              getSelectedID() const;   // null if the selection is undecoded
     std::vector<LLUUID> getSelectedIDs() const;  // decoded selections only
@@ -150,6 +157,8 @@ void LLPanelLocalAssetBase::refresh()
     appendUnloaded();  // saved-but-undecoded paths, dimmed
     selectByPath(prev);
     onSelectionChange();
+    // Hint over an empty list (LLScrollListCtrl shows the comment only when empty).
+    mList->setCommentText(mList->getItemCount() == 0 ? emptyHint() : LLStringUtil::null);
 }
 
 void LLPanelLocalAssetBase::appendUnloaded()
@@ -389,6 +398,7 @@ protected:
     }
     LLLocalAssetPaths::EType assetType() const override { return LLLocalAssetPaths::TYPE_MESH; }
     LLFilePicker::ELoadFilter getLoadFilter() const override { return LLFilePicker::FFLOAD_MODEL; }
+    std::string emptyHint() const override { return getString("empty_hint_mesh"); }
     boost::signals2::connection connectChanged(const std::function<void()>& cb) override
     {
         return LLLocalMeshMgr::getInstance()->setUnitsChangedCallback(cb);
@@ -769,6 +779,7 @@ protected:
     }
     LLLocalAssetPaths::EType assetType() const override { return LLLocalAssetPaths::TYPE_ANIM; }
     LLFilePicker::ELoadFilter getLoadFilter() const override { return LLFilePicker::FFLOAD_ANIM; }
+    std::string emptyHint() const override { return getString("empty_hint_anim"); }
     boost::signals2::connection connectChanged(const std::function<void()>& cb) override
     {
         return LLLocalAnimMgr::getInstance()->setUnitsChangedCallback(cb);
@@ -876,10 +887,121 @@ void LLPanelLocalAnim::onStop()
     }
 }
 
+// Apply a local GLTF material (world id) to the current in-world selection. Real
+// objects go through the normal server path. A client-only (isLocalOnly) preview
+// selection is handled locally: set the render material per selected face without a
+// server round-trip, then mark the render-material param in use so it survives the
+// drawable rebuild (client-only objects get no server echo to do that -- same fix as
+// applyPartGeometry in lllocalmesh.cpp). Selections never mix local + real.
+void apply_local_material_to_selection(const LLUUID& world_id)
+{
+    LLObjectSelectionHandle sel = LLSelectMgr::getInstance()->getSelection();
+    bool any_local = false;
+    for (LLObjectSelection::iterator it = sel->begin(); it != sel->end(); ++it)
+    {
+        LLViewerObject* obj = (*it)->getObject();
+        if (obj && obj->isLocalOnly())
+        {
+            any_local = true;
+            break;
+        }
+    }
+    if (!any_local)
+    {
+        LLSelectMgr::getInstance()->selectionSetGLTFMaterial(world_id);
+        return;
+    }
+
+    struct ApplyFunc final : public LLSelectedTEFunctor
+    {
+        LLUUID mId;
+        bool apply(LLViewerObject* obj, S32 te) override
+        {
+            obj->setRenderMaterialID(te, mId, /*update_server=*/false, /*local_origin=*/true);
+            return true;
+        }
+    } func;
+    func.mId = world_id;
+    sel->applyToTEs(&func);
+
+    for (LLObjectSelection::iterator it = sel->begin(); it != sel->end(); ++it)
+    {
+        LLViewerObject* obj = (*it)->getObject();
+        if (obj && obj->isLocalOnly())
+        {
+            obj->setHasRenderMaterialParams(true);
+        }
+    }
+}
+
 // ============================================================================
-//  Textures tab -- mirrors the texture-picker Local tab (Add/Delete only).
+//  Apply-to-face base -- shared by the Textures and Materials tabs. Reuses the
+//  hidden "spawn_btn" side slot as an "Apply to Face" button that applies the
+//  selected local asset to the current in-world face selection.
 // ============================================================================
-class LLPanelLocalTexture final : public LLPanelLocalAssetBase
+class LLPanelLocalApplyAsset : public LLPanelLocalAssetBase
+{
+protected:
+    virtual std::string applyLabel() = 0;                       // button label
+    virtual LLUUID      worldIdFor(const LLUUID& tracking_id) = 0; // unit -> world id
+    virtual void        applyWorldId(const LLUUID& world_id) = 0;  // apply to selection
+
+    void initExtraButtons() override
+    {
+        mApplyBtn = getChild<LLButton>("spawn_btn"); // per-tab instance; reuse the slot
+        mApplyBtn->setLabel(applyLabel());
+        mApplyBtn->setVisible(true);
+        mApplyBtn->setCommitCallback(boost::bind(&LLPanelLocalApplyAsset::onApply, this));
+    }
+    void updateExtraButtons(bool has_selection) override
+    {
+        if (mApplyBtn)
+        {
+            // Need both a chosen asset row and an in-world selection to apply to.
+            const bool has_target = LLSelectMgr::getInstance()->getSelection()->getNumNodes() > 0;
+            mApplyBtn->setEnabled(has_selection && has_target);
+        }
+    }
+    void draw() override
+    {
+        // In-world selection changes independently of the list, so keep this live.
+        updateExtraButtons(mList && mList->getFirstSelected() != nullptr);
+        LLPanel::draw();
+    }
+
+private:
+    void onApply()
+    {
+        LLUUID id = getSelectedID();
+        if (id.isNull())
+        {
+            // Undecoded row: decode it (bitmap/material loads are synchronous), then apply.
+            const std::string path = getSelectedPath();
+            if (path.empty())
+            {
+                return;
+            }
+            loadPath(path);
+            id = unitForPath(path);
+        }
+        if (id.isNull())
+        {
+            return;
+        }
+        const LLUUID world_id = worldIdFor(id);
+        if (world_id.notNull())
+        {
+            applyWorldId(world_id);
+        }
+    }
+
+    LLButton* mApplyBtn { nullptr };
+};
+
+// ============================================================================
+//  Textures tab -- list + "Apply to Face" (applies a local texture to selection).
+// ============================================================================
+class LLPanelLocalTexture final : public LLPanelLocalApplyAsset
 {
 protected:
     void feedList() override
@@ -908,16 +1030,30 @@ protected:
     }
     LLLocalAssetPaths::EType assetType() const override { return LLLocalAssetPaths::TYPE_TEXTURE; }
     LLFilePicker::ELoadFilter getLoadFilter() const override { return LLFilePicker::FFLOAD_IMAGE; }
+    std::string emptyHint() const override { return getString("empty_hint_tex"); }
     boost::signals2::connection connectChanged(const std::function<void()>& cb) override
     {
         return LLLocalBitmapMgr::getInstance()->setUnitsChangedCallback(cb);
+    }
+
+    std::string applyLabel() override { return getString("apply_texture_label"); }
+    LLUUID worldIdFor(const LLUUID& tracking_id) override
+    {
+        return LLLocalBitmapMgr::getInstance()->getWorldID(tracking_id);
+    }
+    void applyWorldId(const LLUUID& world_id) override
+    {
+        // setTEImage + sendTEUpdate; sendTEUpdate is isLocalOnly-guarded, so this is
+        // safe on both real objects and client-only previews.
+        LLSelectMgr::getInstance()->selectionSetImage(world_id);
     }
 };
 
 // ============================================================================
 //  GLTF Materials tab -- one row per material (a .gltf can hold several).
+//  List + "Apply to Face" (applies a local material to the in-world selection).
 // ============================================================================
-class LLPanelLocalMaterial final : public LLPanelLocalAssetBase
+class LLPanelLocalMaterial final : public LLPanelLocalApplyAsset
 {
 protected:
     void feedList() override
@@ -950,9 +1086,20 @@ protected:
     }
     LLLocalAssetPaths::EType assetType() const override { return LLLocalAssetPaths::TYPE_MATERIAL; }
     LLFilePicker::ELoadFilter getLoadFilter() const override { return LLFilePicker::FFLOAD_MATERIAL; }
+    std::string emptyHint() const override { return getString("empty_hint_mat"); }
     boost::signals2::connection connectChanged(const std::function<void()>& cb) override
     {
         return LLLocalGLTFMaterialMgr::getInstance()->setUnitsChangedCallback(cb);
+    }
+
+    std::string applyLabel() override { return getString("apply_material_label"); }
+    LLUUID worldIdFor(const LLUUID& tracking_id) override
+    {
+        return LLLocalGLTFMaterialMgr::getInstance()->getWorldID(tracking_id);
+    }
+    void applyWorldId(const LLUUID& world_id) override
+    {
+        apply_local_material_to_selection(world_id);
     }
 };
 
@@ -961,8 +1108,9 @@ LLPanelLocalAssetBase* add_asset_tab(LLTabContainer* tabs, LLPanelLocalAssetBase
                                      const std::string& name, const std::string& label,
                                      const std::string& xml, bool select)
 {
-    panel->setName(name);
     panel->buildFromFile(xml);
+    panel->setName(name); // AFTER build: the shared XML's name would otherwise clobber it,
+                          // leaving all tabs identically named (breaks getPanelByName routing)
     tabs->addTabPanel(LLTabContainer::TabPanelParams().panel(panel).label(label).select_tab(select));
     return panel;
 }
@@ -995,4 +1143,50 @@ bool LLFloaterLocalAssets::postBuild()
                   "panel_local_asset_list.xml", false);
 
     return true;
+}
+
+void LLFloaterLocalAssets::dropFiles(const std::vector<std::string>& paths)
+{
+    if (!mTabs)
+    {
+        return;
+    }
+    for (const std::string& path : paths)
+    {
+        std::string ext = gDirUtilp->getExtension(path);
+        LLStringUtil::toLower(ext);
+
+        std::string tab_name;
+        if (ext == "dae")
+        {
+            tab_name = "mesh_tab";
+        }
+        else if (ext == "gltf" || ext == "glb")
+        {
+            // A glTF can be a mesh or a material: honor the active tab if it's one of
+            // those, else default to Mesh.
+            LLPanel* cur = mTabs->getCurrentPanel();
+            tab_name = (cur && cur->getName() == "mat_tab") ? "mat_tab" : "mesh_tab";
+        }
+        else if (ext == "bvh" || ext == "anim")
+        {
+            tab_name = "anim_tab";
+        }
+        else if (ext == "bmp" || ext == "jpg" || ext == "jpeg" || ext == "png" ||
+                 ext == "tga" || ext == "webp" || ext == "avif" || ext == "j2c" || ext == "jp2")
+        {
+            tab_name = "tex_tab";
+        }
+        else
+        {
+            continue; // not something the Local Assets tabs handle
+        }
+
+        // The tab panels are LLPanelLocalAssetBase (anon-namespace, visible here).
+        if (LLPanelLocalAssetBase* panel = dynamic_cast<LLPanelLocalAssetBase*>(mTabs->getPanelByName(tab_name)))
+        {
+            mTabs->selectTabPanel(panel);
+            panel->loadFile(path); // decode + add (+ persist) via the manager
+        }
+    }
 }

@@ -242,6 +242,7 @@ bool LLLocalGLTFMaterial::loadMaterial()
                     material_name);
             }
 
+            mMaterialName = material_name; // for matching a mesh face's binding name
             if (!material_name.empty())
             {
                 mShortName = gDirUtilp->getBaseFileName(filename_lc, true) + " (" + material_name + ")";
@@ -352,7 +353,20 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename, LLUUID& outID)
     return res;
 }
 
-S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID& outID)
+S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename, bool mesh_owned)
+{
+    mTimer.stopTimer();
+    LLUUID outID;
+    S32 res = addUnitInternal(filename, outID, mesh_owned);
+    mTimer.startTimer();
+    if (res > 0)
+    {
+        mUnitsChangedSignal();
+    }
+    return res;
+}
+
+S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID& outID, bool mesh_owned)
 {
     tinygltf::Model model;
     LLTinyGLTFHelper::loadModel(filename, model);
@@ -374,6 +388,7 @@ S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID&
         // load material from file
         if (unit->updateSelf())
         {
+            unit->setMeshOwned(mesh_owned);
             mMaterialList.emplace_back(unit);
             if(loaded_materials == 0)
             {
@@ -434,6 +449,10 @@ std::vector<std::string> LLLocalGLTFMaterialMgr::getFilenames() const
     std::vector<std::string> out;
     for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
     {
+        if (unit->isMeshOwned())
+        {
+            continue; // a mesh's imported material, not part of the user's set
+        }
         const std::string filename = unit->getFilename();
         if (std::find(out.begin(), out.end(), filename) == out.end())
         {
@@ -504,6 +523,26 @@ void LLLocalGLTFMaterialMgr::getFilenameAndIndex(LLUUID tracking_id, std::string
     }
 }
 
+void LLLocalGLTFMaterialMgr::getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out)
+{
+    for (local_list_iter iter = mMaterialList.begin(); iter != mMaterialList.end(); iter++)
+    {
+        LLLocalGLTFMaterial* unit = *iter;
+        if (unit->getFilename() != filename)
+        {
+            continue;
+        }
+        // Match the model loader's face-binding convention: an unnamed glTF material
+        // binds as "mat<index>" (see LLGLTFLoader::generateMaterialName).
+        std::string name = unit->getMaterialName();
+        if (name.empty())
+        {
+            name = "mat" + std::to_string(unit->getIndexInFile());
+        }
+        out[name] = unit->getWorldID();
+    }
+}
+
 // probably shouldn't be here, but at the moment this mirrors lllocalbitmaps
 void LLLocalGLTFMaterialMgr::feedScrollList(LLScrollListCtrl* ctrl)
 {
@@ -518,6 +557,10 @@ void LLLocalGLTFMaterialMgr::feedScrollList(LLScrollListCtrl* ctrl)
             for (local_list_iter iter = mMaterialList.begin();
                 iter != mMaterialList.end(); iter++)
             {
+                if ((*iter)->isMeshOwned())
+                {
+                    continue; // hidden: imported by a local mesh for its faces
+                }
                 LLSD element;
 
                 element["columns"][0]["column"] = "icon";

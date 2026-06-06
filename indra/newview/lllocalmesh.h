@@ -42,10 +42,12 @@
 #include "llsingleton.h"
 #include "lluuid.h"
 #include "v3math.h"
+#include "v4color.h"
 
 #include <boost/signals2/signal.hpp>
 #include <filesystem>
 #include <list>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -62,6 +64,18 @@ class LLVolume;
 // the model. A file with more than 8 faces -- or multiple mesh nodes -- yields
 // several parts, exactly the multi-prim linkset an upload of the same file would
 // produce. A simple single-mesh file is just one part.
+// A single face's material as imported from the model file, resolved to ids the
+// viewer can render directly (no upload). For Blinn-Phong (.dae) the diffuse map is
+// a mesh-owned local-bitmap world id; for glTF the whole material is a local-gltf
+// world id applied as the face's render material.
+struct LLLocalMeshFaceMaterial
+{
+    LLUUID   mDiffuseID;                  // local-bitmap world id (Blinn-Phong), or null
+    LLColor4 mDiffuseColor = LLColor4::white;
+    bool     mFullbright   = false;
+    LLUUID   mRenderMaterialID;          // local-gltf world id (glTF) -> face render material, or null
+};
+
 struct LLLocalMeshPart
 {
     LLUUID                    mWorldID;       // unique mesh id objects/repository reference
@@ -70,6 +84,7 @@ struct LLLocalMeshPart
     LLVector3                 mScale;         // authored size -> prim scale
     LLVector3                 mOffset;        // part centre relative to the whole-model centre
     S32                       mNumFaces = 0;
+    std::vector<LLLocalMeshFaceMaterial> mFaceMaterials; // parallel to the volume's faces
 };
 
 // A single local mesh file and its decoded, in-memory representation (one or more
@@ -116,6 +131,12 @@ private:
     // so a failed live-reload keeps showing the last good mesh. Each call mints
     // fresh part world ids so a reload serves new geometry cleanly.
     bool ingestScene(LLModelLoader::scene& scene);
+    // Register a model-referenced image as a mesh-owned local bitmap (deduped by
+    // filename) and return its world id, remembering it for cleanup on delete.
+    LLUUID registerOwnedBitmap(const std::string& filename);
+    // Register this glTF file's materials (mesh-owned, deduped) and map each by its
+    // face-binding name to its world id, for applying them per face in ingestScene.
+    void importGLTFMaterials(std::map<std::string, LLUUID>& out_by_name);
     void markFailed() { mState = ST_FAILED; }
 
     // Live reload (M3): poll the source file's mtime and, on a change, kick an
@@ -136,6 +157,13 @@ private:
     std::filesystem::file_time_type mLastModified; // for live reload (M3)
 
     std::vector<LLLocalMeshPart> mParts; // one per LLModel; spawned together as a linkset
+
+    // Local-bitmap tracking ids imported for this unit's materials (mesh-owned);
+    // released from LLLocalBitmapMgr when this unit is deleted.
+    std::vector<LLUUID> mOwnedBitmaps;
+    // Local-gltf-material tracking ids imported for this unit (mesh-owned); released
+    // from LLLocalGLTFMaterialMgr when this unit is deleted.
+    std::vector<LLUUID> mOwnedMaterials;
 
     S32  mNumFaces;     // totals across all parts
     S32  mNumVertices;

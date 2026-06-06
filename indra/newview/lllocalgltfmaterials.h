@@ -32,6 +32,7 @@
 #include "llgltfmateriallist.h"
 #include <boost/signals2/signal.hpp>
 #include <filesystem>
+#include <map>
 
 class LLScrollListCtrl;
 class LLGLTFMaterial;
@@ -50,6 +51,11 @@ public: /* accessors */
     LLUUID      getTrackingID() const;
     LLUUID      getWorldID() const;
     S32         getIndexInFile() const;
+    std::string getMaterialName() const { return mMaterialName; } // glTF material name (face binding)
+    // Imported by a local mesh for its own faces: hidden from the Materials tab +
+    // cross-session persistence (it reappears when the mesh re-decodes).
+    bool        isMeshOwned() const { return mIsMeshOwned; }
+    void        setMeshOwned(bool b) { mIsMeshOwned = b; }
 
 public:
     bool updateSelf();
@@ -80,6 +86,8 @@ private: /* members */
     ELinkStatus mLinkStatus;
     S32         mUpdateRetries;
     S32         mMaterialIndex; // Single file can have more than one
+    std::string mMaterialName;  // glTF material name, for matching a mesh face's binding
+    bool        mIsMeshOwned = false; // imported by a local mesh (see isMeshOwned)
 };
 
 class LLLocalGLTFMaterialTimer : public LLEventTimer
@@ -103,8 +111,10 @@ public:
     S32          addUnit(const std::vector<std::string>& filenames);
     S32          addUnit(const std::string& filename); // file can hold multiple materials
     S32          addUnit(const std::string& filename, LLUUID& outID); // returns first material id as outID
+    // Add a file's materials as mesh-owned: hidden from the Materials tab + persistence.
+    S32          addUnit(const std::string& filename, bool mesh_owned);
 protected:
-    S32          addUnitInternal(const std::string& filename, LLUUID& outID); // file can hold multiple materials
+    S32          addUnitInternal(const std::string& filename, LLUUID& outID, bool mesh_owned = false); // file can hold multiple materials
 public:
     void         delUnit(LLUUID tracking_id);
     LLUUID       getUnitID(const std::string& filename, S32 index = 0);
@@ -112,6 +122,9 @@ public:
     LLUUID       getWorldID(LLUUID tracking_id);
     bool         isLocal(LLUUID world_id);
     void         getFilenameAndIndex(LLUUID tracking_id, std::string &filename, S32 &index);
+    // Map each of a file's materials by name (empty name -> "mat<index>", matching the
+    // model loader's face bindings) to its world id, for texturing a local mesh.
+    void         getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out);
     std::vector<std::string> getFilenames() const; // distinct loaded files (persistence)
 
     void         feedScrollList(LLScrollListCtrl* ctrl);

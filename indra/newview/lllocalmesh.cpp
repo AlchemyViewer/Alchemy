@@ -45,6 +45,8 @@
 #include "llanimationstates.h" // ANIM_AGENT_STAND (preview avatar)
 #include "llcallbacklist.h"  // doOnIdleOneTime
 #include "llinventoryicon.h"
+#include "lllocalbitmaps.h"  // import a mesh's diffuse maps as mesh-owned local bitmaps
+#include "lllocalgltfmaterials.h" // import a glTF mesh's materials as mesh-owned local materials
 #include "llprimitive.h"     // LL_PCODE_VOLUME
 #include "object_flags.h"    // FLAGS_OBJECT_* for owner permissions
 #include "llscrolllistctrl.h"
@@ -475,6 +477,46 @@ void LLLocalMesh::startLoad()
     ctx->mLoader->start(); // parse on the worker thread; onModelLoaded fires on the main thread, then the loader self-deletes
 }
 
+LLUUID LLLocalMesh::registerOwnedBitmap(const std::string& filename)
+{
+    LLLocalBitmapMgr* mgr = LLLocalBitmapMgr::getInstance();
+    // Reuse an existing unit for this file (another face of this mesh, a prior
+    // reload, or one the user already loaded) so we don't duplicate it.
+    LLUUID tracking_id = mgr->getUnitID(filename);
+    if (tracking_id.isNull())
+    {
+        tracking_id = mgr->addUnit(filename, /*mesh_owned=*/true);
+        if (tracking_id.notNull())
+        {
+            mOwnedBitmaps.push_back(tracking_id);
+        }
+    }
+    return mgr->getWorldID(tracking_id); // null if the image failed to load
+}
+
+void LLLocalMesh::importGLTFMaterials(std::map<std::string, LLUUID>& out_by_name)
+{
+    LLLocalGLTFMaterialMgr* mgr = LLLocalGLTFMaterialMgr::getInstance();
+    // Register the file's materials once (mesh-owned), unless they're already loaded
+    // (a prior reload, or the user loaded the same file in the Materials tab).
+    if (mgr->getUnitID(mFilename, 0).isNull())
+    {
+        if (mgr->addUnit(mFilename, /*mesh_owned=*/true) > 0)
+        {
+            for (S32 i = 0; ; ++i)
+            {
+                LLUUID tid = mgr->getUnitID(mFilename, i);
+                if (tid.isNull())
+                {
+                    break;
+                }
+                mOwnedMaterials.push_back(tid);
+            }
+        }
+    }
+    mgr->getWorldIDsByName(mFilename, out_by_name);
+}
+
 bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
 {
     // Build into locals first; members are only overwritten once we know the
@@ -505,6 +547,14 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
     std::vector<LLLocalMeshPart> parts;
     std::vector<LLVector3> centers; // static units only: scene-space centre per part
     S32 num_vertices = 0, num_triangles = 0, num_joints = 0;
+
+    // glTF: import the file's materials once (mesh-owned) and map them by binding
+    // name, so each face can be pointed at the matching local-gltf material below.
+    std::map<std::string, LLUUID> gltf_mat_by_name;
+    if (mFormat == FMT_GLTF)
+    {
+        importGLTFMaterials(gltf_mat_by_name);
+    }
 
     for (auto iter = scene.begin(); iter != scene.end(); ++iter)
     {
@@ -548,6 +598,45 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             LLLocalMeshPart part;
             part.mWorldID.generate();
             part.mNumFaces = (S32)faces.size();
+
+            // Capture each face's material (M7.2). faces[fi] lines up 1:1 with
+            // mdl->mMaterialList[fi] (cacheOptimize keeps face order), so a flat
+            // per-face vector is the minimal representation. For Blinn-Phong (.dae)
+            // register the diffuse image as a mesh-owned local bitmap and remember
+            // its world id + color; glTF is handled via the material manager (M7.4),
+            // so its faces fall through to the default texture here.
+            part.mFaceMaterials.resize(faces.size());
+            if (mFormat == FMT_DAE)
+            {
+                for (S32 fi = 0; fi < (S32)faces.size() && fi < (S32)mdl->mMaterialList.size(); ++fi)
+                {
+                    material_map::const_iterator mit = instance.mMaterial.find(mdl->mMaterialList[fi]);
+                    if (mit == instance.mMaterial.end())
+                    {
+                        continue;
+                    }
+                    const LLImportMaterial& im = mit->second;
+                    LLLocalMeshFaceMaterial& fm = part.mFaceMaterials[fi];
+                    fm.mDiffuseColor = im.mDiffuseColor;
+                    fm.mFullbright   = im.mFullbright;
+                    if (!im.mDiffuseMapFilename.empty())
+                    {
+                        fm.mDiffuseID = registerOwnedBitmap(im.mDiffuseMapFilename);
+                    }
+                }
+            }
+            else if (mFormat == FMT_GLTF && !gltf_mat_by_name.empty())
+            {
+                for (S32 fi = 0; fi < (S32)faces.size() && fi < (S32)mdl->mMaterialList.size(); ++fi)
+                {
+                    std::map<std::string, LLUUID>::const_iterator it =
+                        gltf_mat_by_name.find(mdl->mMaterialList[fi]);
+                    if (it != gltf_mat_by_name.end())
+                    {
+                        part.mFaceMaterials[fi].mRenderMaterialID = it->second;
+                    }
+                }
+            }
 
             if (unit_rigged)
             {
@@ -861,6 +950,15 @@ void LLLocalMeshMgr::delUnit(LLUUID tracking_id)
         if (unit->getTrackingID() == tracking_id)
         {
             despawnUnit(tracking_id);
+            // Release the mesh-owned local bitmaps + materials imported for this unit.
+            for (const LLUUID& bid : unit->mOwnedBitmaps)
+            {
+                LLLocalBitmapMgr::getInstance()->delUnit(bid);
+            }
+            for (const LLUUID& mid : unit->mOwnedMaterials)
+            {
+                LLLocalGLTFMaterialMgr::getInstance()->delUnit(mid);
+            }
             iter = mMeshList.erase(iter);
             delete unit;
         }
@@ -1381,17 +1479,44 @@ void LLLocalMeshMgr::applyPartGeometry(LLVOVolume* vol, const LLLocalMeshPart& p
     params.setSculptID(part.mWorldID, LL_SCULPT_TYPE_MESH);
     vol->setVolume(params, LLVolumeLODGroup::NUM_LODS - 1);
 
-    // Give every face a visible default texture (file materials are not yet
-    // applied in this milestone).
+    // Apply each face's imported material (M7.2): the diffuse map (a mesh-owned
+    // local bitmap), diffuse color and fullbright captured at ingest. Faces with no
+    // map fall back to the default texture. No sendTEUpdate() -- the object is
+    // client-only (isLocalOnly) and these setters only touch local render state.
     LLVolume* v = vol->getVolume();
     const S32 num_faces = v ? v->getNumVolumeFaces() : 0;
+    bool any_render_mat = false;
     if (num_faces > 0)
     {
         vol->setNumTEs((U8)num_faces);
         for (S32 i = 0; i < num_faces; ++i)
         {
-            vol->setTETexture((U8)i, IMG_DEFAULT);
+            const LLLocalMeshFaceMaterial* fm =
+                (i < (S32)part.mFaceMaterials.size()) ? &part.mFaceMaterials[i] : nullptr;
+            const LLUUID tex = (fm && fm->mDiffuseID.notNull()) ? fm->mDiffuseID : IMG_DEFAULT;
+            vol->setTETexture((U8)i, tex);
+            if (fm)
+            {
+                vol->setTEColor((U8)i, fm->mDiffuseColor);
+                vol->setTEFullbright((U8)i, fm->mFullbright ? 1 : 0);
+                if (fm->mRenderMaterialID.notNull())
+                {
+                    // glTF PBR material (owns its own textures); update_server=false
+                    // because the preview is client-only.
+                    vol->setRenderMaterialID((S32)i, fm->mRenderMaterialID, false, true);
+                    any_render_mat = true;
+                }
+            }
         }
+    }
+
+    if (any_render_mat)
+    {
+        // Mark the render-material extra param in use so the glTF materials survive
+        // the post-spawn drawable rebuild. A client-only object never gets the server
+        // echo that normally sets this, so the render materials would otherwise be
+        // dropped on the next frame. No sim traffic: the object is isLocalOnly.
+        vol->setHasRenderMaterialParams(true);
     }
 
     vol->markForUpdate();

@@ -1108,7 +1108,19 @@ LLUUID LLLocalBitmapMgr::addUnit(const std::string& filename)
     return tracking_id;
 }
 
-LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename)
+LLUUID LLLocalBitmapMgr::addUnit(const std::string& filename, bool mesh_owned)
+{
+    mTimer.stopTimer();
+    LLUUID tracking_id = addUnitInternal(filename, mesh_owned);
+    mTimer.startTimer();
+    if (tracking_id.notNull())
+    {
+        mUnitsChangedSignal();
+    }
+    return tracking_id;
+}
+
+LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename, bool mesh_owned)
 {
     if (!checkTextureDimensions(filename))
     {
@@ -1119,6 +1131,7 @@ LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename)
 
     if (unit->getValid())
     {
+        unit->setMeshOwned(mesh_owned);
         mBitmapList.push_back(unit);
         return unit->getTrackingID();
     }
@@ -1228,6 +1241,10 @@ std::vector<std::string> LLLocalBitmapMgr::getFilenames() const
     out.reserve(mBitmapList.size());
     for (const LLLocalBitmap* unit : mBitmapList)
     {
+        if (unit->isMeshOwned())
+        {
+            continue; // a mesh's imported texture, not part of the user's set
+        }
         out.push_back(unit->getFilename());
     }
     return out;
@@ -1331,6 +1348,10 @@ void LLLocalBitmapMgr::feedScrollList(LLScrollListCtrl* ctrl)
             for (local_list_iter iter = mBitmapList.begin();
                  iter != mBitmapList.end(); iter++)
             {
+                if ((*iter)->isMeshOwned())
+                {
+                    continue; // hidden: imported by a local mesh for its materials
+                }
                 LLSD element;
 
                 element["columns"][0]["column"] = "icon";

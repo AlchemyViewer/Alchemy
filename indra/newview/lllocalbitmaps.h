@@ -51,6 +51,10 @@ class LLLocalBitmap
         LLUUID      getTrackingID() const;
         LLUUID      getWorldID() const;
         bool        getValid() const;
+        // Imported by a local mesh for its own materials: hidden from the Textures
+        // tab + cross-session persistence (it reappears when the mesh re-decodes).
+        bool        isMeshOwned() const { return mIsMeshOwned; }
+        void        setMeshOwned(bool b) { mIsMeshOwned = b; }
 
     public: /* self update public section */
         enum EUpdateType
@@ -106,6 +110,7 @@ class LLLocalBitmap
         EExtension  mExtension;
         ELinkStatus mLinkStatus;
         S32         mUpdateRetries;
+        bool        mIsMeshOwned = false; // imported by a local mesh (see isMeshOwned)
         LLLocalTextureChangedSignal mChangedSignal;
 
         // Store a list of accosiated materials
@@ -136,9 +141,11 @@ class LLLocalBitmapMgr : public LLSingleton<LLLocalBitmapMgr>
 public:
     bool         addUnit(const std::vector<std::string>& filenames);
 protected:
-    LLUUID       addUnitInternal(const std::string& filename);
+    LLUUID       addUnitInternal(const std::string& filename, bool mesh_owned = false);
 public:
     LLUUID       addUnit(const std::string& filename);
+    // Add a unit imported by a local mesh: hidden from the Textures tab + persistence.
+    LLUUID       addUnit(const std::string& filename, bool mesh_owned);
     LLUUID       getUnitID(const std::string& filename);
     void         delUnit(LLUUID tracking_id);
     bool        checkTextureDimensions(std::string filename);

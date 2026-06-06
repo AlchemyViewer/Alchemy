@@ -9,10 +9,16 @@
   width="530">
   <string name="rez_label">Rez in World</string>
   <string name="derez_label">Derez</string>
+  <string name="apply_texture_label">Apply to Face</string>
+  <string name="apply_material_label">Apply to Face</string>
   <string name="col_name">Name</string>
   <string name="col_status">Status</string>
   <string name="target_self">My Avatar</string>
   <string name="target_selected">Selected Object</string>
+  <string name="empty_hint_mesh">No meshes yet. Click "Add..." to load a .dae, .gltf or .glb model.</string>
+  <string name="empty_hint_anim">No animations yet. Click "Add..." to load a .bvh or .anim file.</string>
+  <string name="empty_hint_tex">No textures yet. Click "Add..." to load an image file.</string>
+  <string name="empty_hint_mat">No materials yet. Click "Add..." to load a .gltf or .glb material.</string>
   <scroll_list
     name="l_name_list"
     follows="all"

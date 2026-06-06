@@ -27,6 +27,9 @@
 
 #include "llfloater.h"
 
+#include <string>
+#include <vector>
+
 class LLTabContainer;
 
 class LLFloaterLocalAssets final : public LLFloater
@@ -36,6 +39,10 @@ public:
     ~LLFloaterLocalAssets() override;
 
     bool postBuild() override;
+
+    // Load OS-dropped files into the matching tabs, by extension (routed here from
+    // LLViewerWindow::handleDragNDropFile when the drop lands on this floater).
+    void dropFiles(const std::vector<std::string>& paths);
 
 private:
     LLTabContainer* mTabs { nullptr };
