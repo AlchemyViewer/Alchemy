@@ -44,6 +44,17 @@
     top="5"
     right="-5"/>
   <button
+    name="upload_btn"
+    label="Upload..."
+    tool_tip="Upload the selected file to Second Life through the standard upload (with its L$ cost confirmation)."
+    enabled="false"
+    follows="bottom|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    bottom="-5"
+    right="-5"/>
+  <button
     name="unload_btn"
     label="Unload"
     tool_tip="Free this asset from memory but keep it in the list as a dimmed entry you can reload. For a mesh this also derezzes its in-world copies."

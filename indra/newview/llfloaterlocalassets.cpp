@@ -39,7 +39,10 @@
 #include "llscrolllistitem.h"
 #include "lltabcontainer.h"
 #include "lluictrlfactory.h"
-#include "llviewermenufile.h"   // LLFilePickerReplyThread
+#include "llviewermenufile.h"   // LLFilePickerReplyThread, upload_single_file
+#include "llfloaterreg.h"       // LLFloaterReg::showInstance (mesh Upload)
+#include "llfloatermodelpreview.h" // mesh Upload -> the Model upload floater
+#include "llmodel.h"            // LLModel::LOD_HIGH
 
 #include "llagentcamera.h"
 #include "llcontrolavatar.h"
@@ -94,6 +97,8 @@ protected:
     virtual LLFilePicker::ELoadFilter getLoadFilter() const = 0;
     // Subscribe to the backing manager's "units changed" signal for reactive refresh.
     virtual boost::signals2::connection connectChanged(const std::function<void()>& cb) = 0;
+    // Send the file at `path` through the viewer's standard upload flow for this type.
+    virtual void doUpload(const std::string& path) = 0;
 
     // Optional per-type extra buttons (Rez/Attach, Play/Stop, ...). Shown and wired
     // by overrides; the base keeps them hidden.
@@ -111,6 +116,7 @@ protected:
     LLButton*         mAddBtn { nullptr };
     LLButton*         mUnloadBtn { nullptr }; // free the asset, keep the saved path (dimmed row)
     LLButton*         mRemoveBtn { nullptr }; // forget the file entirely (row disappears)
+    LLButton*         mUploadBtn { nullptr }; // upload the selected file to Second Life
 
 private:
     void appendUnloaded();
@@ -118,6 +124,7 @@ private:
     void onAddBtn();
     void onUnloadBtn();
     void onRemoveBtn();
+    void onUploadBtn();
     void onDoubleClick();
     void onSelectionChange();
     static void onFilesPicked(const std::vector<std::string>& filenames,
@@ -132,6 +139,7 @@ bool LLPanelLocalAssetBase::postBuild()
     mAddBtn    = getChild<LLButton>("add_btn");
     mUnloadBtn = getChild<LLButton>("unload_btn");
     mRemoveBtn = getChild<LLButton>("remove_btn");
+    mUploadBtn = getChild<LLButton>("upload_btn");
 
     mList->setCommitOnSelectionChange(true);
     mList->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onSelectionChange, this));
@@ -139,6 +147,7 @@ bool LLPanelLocalAssetBase::postBuild()
     mAddBtn->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onAddBtn, this));
     mUnloadBtn->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onUnloadBtn, this));
     mRemoveBtn->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onRemoveBtn, this));
+    mUploadBtn->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onUploadBtn, this));
 
     // Reactive refresh: the backing manager signals us on any unit change (decode,
     // remove, and for mesh spawn/derez), whoever made it -- us, the texture picker,
@@ -285,6 +294,11 @@ void LLPanelLocalAssetBase::onSelectionChange()
     {
         mRemoveBtn->setEnabled(has_selection);
     }
+    if (mUploadBtn)
+    {
+        // Upload acts on the selected file (decoded or not), so a row is all it needs.
+        mUploadBtn->setEnabled(has_selection);
+    }
     updateExtraButtons(has_selection);
 }
 
@@ -321,6 +335,18 @@ void LLPanelLocalAssetBase::onUnloadBtn()
     for (const LLUUID& id : ids)
     {
         delUnit(id);
+    }
+}
+
+void LLPanelLocalAssetBase::onUploadBtn()
+{
+    // Upload the selected file through the standard per-type upload flow (with its
+    // L$ cost confirmation). Works on a decoded or saved-but-undecoded row -- it's
+    // the file on disk we upload, not the in-memory preview.
+    const std::string path = getSelectedPath();
+    if (!path.empty())
+    {
+        doUpload(path);
     }
 }
 
@@ -434,6 +460,15 @@ protected:
     boost::signals2::connection connectChanged(const std::function<void()>& cb) override
     {
         return LLLocalMeshMgr::getInstance()->setUnitsChangedCallback(cb);
+    }
+    void doUpload(const std::string& path) override
+    {
+        // Hand the file to the standard Model upload floater (LOD/physics/cost).
+        if (LLFloaterModelPreview* fmp =
+                dynamic_cast<LLFloaterModelPreview*>(LLFloaterReg::showInstance("upload_model")))
+        {
+            fmp->loadModel(LLModel::LOD_HIGH, path);
+        }
     }
 
     void initExtraButtons() override;
@@ -834,6 +869,11 @@ protected:
     {
         return LLLocalAnimMgr::getInstance()->setUnitsChangedCallback(cb);
     }
+    void doUpload(const std::string& path) override
+    {
+        // .anim / .bvh -> the standard animation upload floater.
+        upload_single_file(std::vector<std::string>(1, path), LLFilePicker::FFLOAD_ANIM, LLUUID::null);
+    }
 
     void initExtraButtons() override;
     void updateExtraButtons(bool has_selection) override;
@@ -1085,6 +1125,10 @@ protected:
     {
         return LLLocalBitmapMgr::getInstance()->setUnitsChangedCallback(cb);
     }
+    void doUpload(const std::string& path) override
+    {
+        upload_single_file(std::vector<std::string>(1, path), LLFilePicker::FFLOAD_IMAGE, LLUUID::null);
+    }
 
     std::string applyLabel() override { return getString("apply_texture_label"); }
     LLUUID worldIdFor(const LLUUID& tracking_id) override
@@ -1140,6 +1184,11 @@ protected:
     boost::signals2::connection connectChanged(const std::function<void()>& cb) override
     {
         return LLLocalGLTFMaterialMgr::getInstance()->setUnitsChangedCallback(cb);
+    }
+    void doUpload(const std::string& path) override
+    {
+        // FFLOAD_GLTF routes to LLMaterialEditor::loadMaterialFromFile (the upload path).
+        upload_single_file(std::vector<std::string>(1, path), LLFilePicker::FFLOAD_GLTF, LLUUID::null);
     }
 
     std::string applyLabel() override { return getString("apply_material_label"); }
