@@ -152,6 +152,7 @@ public:
 
     LLUUID       getTrackingID(const LLUUID& world_id) const;
     LLUUID       getWorldID(const LLUUID &tracking_id) const;
+    bool         isMeshOwned(const LLUUID& tracking_id) const; // imported by a local mesh
     bool         isLocal(const LLUUID& world_id) const;
     std::string  getFilename(const LLUUID &tracking_id) const;
     std::vector<std::string> getFilenames() const; // every loaded path (persistence)

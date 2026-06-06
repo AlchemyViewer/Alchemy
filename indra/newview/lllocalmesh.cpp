@@ -481,7 +481,35 @@ void LLLocalMesh::startLoad()
     ctx->mLoader->start(); // parse on the worker thread; onModelLoaded fires on the main thread, then the loader self-deletes
 }
 
-LLUUID LLLocalMesh::registerOwnedBitmap(const std::string& filename)
+namespace
+{
+    // Record a mesh-owned unit referenced by the current parse (deduped).
+    void track_owned(std::vector<LLUUID>& owned, const LLUUID& id)
+    {
+        if (id.notNull() && std::find(owned.begin(), owned.end(), id) == owned.end())
+        {
+            owned.push_back(id);
+        }
+    }
+
+    // Release (delUnit) every id in `had` that the current parse no longer keeps and
+    // that no sibling mesh still references (so a shared texture/material survives).
+    template <typename Mgr>
+    void release_dropped(Mgr* mgr, const std::vector<LLUUID>& had, const std::vector<LLUUID>& keep,
+                         const LLLocalMesh* exclude)
+    {
+        for (const LLUUID& id : had)
+        {
+            if (std::find(keep.begin(), keep.end(), id) == keep.end()
+                && !LLLocalMeshMgr::getInstance()->isImportOwnedByOther(id, exclude))
+            {
+                mgr->delUnit(id);
+            }
+        }
+    }
+}
+
+LLUUID LLLocalMesh::registerOwnedBitmap(const std::string& filename, std::vector<LLUUID>& owned)
 {
     LLLocalBitmapMgr* mgr = LLLocalBitmapMgr::getInstance();
     // Reuse an existing unit for this file (another face of this mesh, a prior
@@ -490,32 +518,37 @@ LLUUID LLLocalMesh::registerOwnedBitmap(const std::string& filename)
     if (tracking_id.isNull())
     {
         tracking_id = mgr->addUnit(filename, /*mesh_owned=*/true);
-        if (tracking_id.notNull())
-        {
-            mOwnedBitmaps.push_back(tracking_id);
-        }
+    }
+    // Keep mesh-owned units we reference this parse; a reused USER unit is left
+    // untracked (the user owns it, and we must not release it on reload/delete).
+    if (tracking_id.notNull() && mgr->isMeshOwned(tracking_id))
+    {
+        track_owned(owned, tracking_id);
     }
     return mgr->getWorldID(tracking_id); // null if the image failed to load
 }
 
-void LLLocalMesh::importGLTFMaterials(std::map<std::string, LLUUID>& out_by_name)
+void LLLocalMesh::importGLTFMaterials(std::map<std::string, LLUUID>& out_by_name, std::vector<LLUUID>& owned)
 {
     LLLocalGLTFMaterialMgr* mgr = LLLocalGLTFMaterialMgr::getInstance();
-    // Register the file's materials once (mesh-owned), unless they're already loaded
-    // (a prior reload, or the user loaded the same file in the Materials tab).
+    // Load the file's materials once (mesh-owned), unless already present (a prior
+    // reload, or the user loaded the same file in the Materials tab).
     if (mgr->getUnitID(mFilename, 0).isNull())
     {
-        if (mgr->addUnit(mFilename, /*mesh_owned=*/true) > 0)
+        mgr->addUnit(mFilename, /*mesh_owned=*/true);
+    }
+    // Keep the file's mesh-owned material units referenced this parse (a user-loaded
+    // copy of the same file is left untracked).
+    for (S32 i = 0; ; ++i)
+    {
+        LLUUID tid = mgr->getUnitID(mFilename, i);
+        if (tid.isNull())
         {
-            for (S32 i = 0; ; ++i)
-            {
-                LLUUID tid = mgr->getUnitID(mFilename, i);
-                if (tid.isNull())
-                {
-                    break;
-                }
-                mOwnedMaterials.push_back(tid);
-            }
+            break;
+        }
+        if (mgr->isMeshOwned(tid))
+        {
+            track_owned(owned, tid);
         }
     }
     mgr->getWorldIDsByName(mFilename, out_by_name);
@@ -554,10 +587,16 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
 
     // glTF: import the file's materials once (mesh-owned) and map them by binding
     // name, so each face can be pointed at the matching local-gltf material below.
+    // Mesh-owned imports referenced by THIS parse. On commit we release any the
+    // previous parse used but this one dropped (e.g. a material removed in an edit),
+    // so reloads don't accumulate stale local textures/materials.
+    std::vector<LLUUID> new_owned_bitmaps;
+    std::vector<LLUUID> new_owned_materials;
+
     std::map<std::string, LLUUID> gltf_mat_by_name;
     if (mFormat == FMT_GLTF)
     {
-        importGLTFMaterials(gltf_mat_by_name);
+        importGLTFMaterials(gltf_mat_by_name, new_owned_materials);
     }
 
     for (auto iter = scene.begin(); iter != scene.end(); ++iter)
@@ -625,7 +664,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                     fm.mFullbright   = im.mFullbright;
                     if (!im.mDiffuseMapFilename.empty())
                     {
-                        fm.mDiffuseID = registerOwnedBitmap(im.mDiffuseMapFilename);
+                        fm.mDiffuseID = registerOwnedBitmap(im.mDiffuseMapFilename, new_owned_bitmaps);
                     }
                 }
             }
@@ -696,6 +735,10 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
 
     if (parts.empty())
     {
+        // Failed parse: drop only the units this attempt newly created, keeping the
+        // old owned set and the last-good geometry.
+        release_dropped(LLLocalBitmapMgr::getInstance(), new_owned_bitmaps, mOwnedBitmaps, this);
+        release_dropped(LLLocalGLTFMaterialMgr::getInstance(), new_owned_materials, mOwnedMaterials, this);
         LL_WARNS("LocalMesh") << "Local mesh produced no geometry: " << mFilename << LL_ENDL;
         return false; // keep any previously loaded geometry intact
     }
@@ -719,7 +762,14 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
         }
     }
 
-    // Commit.
+    // Commit. First release mesh-owned imports the previous version used but this one
+    // no longer does (e.g. a material/texture removed in an edit), then adopt the new
+    // owned sets so they're freed with the mesh later.
+    release_dropped(LLLocalBitmapMgr::getInstance(), mOwnedBitmaps, new_owned_bitmaps, this);
+    release_dropped(LLLocalGLTFMaterialMgr::getInstance(), mOwnedMaterials, new_owned_materials, this);
+    mOwnedBitmaps   = std::move(new_owned_bitmaps);
+    mOwnedMaterials = std::move(new_owned_materials);
+
     mParts        = std::move(parts);
     mNumFaces     = 0;
     for (const LLLocalMeshPart& p : mParts) { mNumFaces += p.mNumFaces; }
@@ -1064,6 +1114,27 @@ LLLocalMesh* LLLocalMeshMgr::getUnit(const LLUUID& tracking_id) const
         }
     }
     return nullptr;
+}
+
+bool LLLocalMeshMgr::isImportOwnedByOther(const LLUUID& tracking_id, const LLLocalMesh* exclude) const
+{
+    if (tracking_id.isNull())
+    {
+        return false;
+    }
+    for (const LLLocalMesh* unit : mMeshList)
+    {
+        if (unit == exclude)
+        {
+            continue;
+        }
+        if (std::find(unit->mOwnedBitmaps.begin(), unit->mOwnedBitmaps.end(), tracking_id) != unit->mOwnedBitmaps.end()
+            || std::find(unit->mOwnedMaterials.begin(), unit->mOwnedMaterials.end(), tracking_id) != unit->mOwnedMaterials.end())
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::vector<std::string> LLLocalMeshMgr::getFilenames() const

@@ -1292,6 +1292,18 @@ LLUUID LLLocalBitmapMgr::getWorldID(const LLUUID &tracking_id) const
     return world_id;
 }
 
+bool LLLocalBitmapMgr::isMeshOwned(const LLUUID& tracking_id) const
+{
+    for (local_list_citer iter = mBitmapList.begin(); iter != mBitmapList.end(); iter++)
+    {
+        if ((*iter)->getTrackingID() == tracking_id)
+        {
+            return (*iter)->isMeshOwned();
+        }
+    }
+    return false;
+}
+
 bool LLLocalBitmapMgr::isLocal(const LLUUID &world_id) const
 {
     for (local_list_citer iter = mBitmapList.begin(); iter != mBitmapList.end(); iter++)

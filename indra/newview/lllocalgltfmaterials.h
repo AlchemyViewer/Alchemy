@@ -120,6 +120,7 @@ public:
     LLUUID       getUnitID(const std::string& filename, S32 index = 0);
 
     LLUUID       getWorldID(LLUUID tracking_id);
+    bool         isMeshOwned(const LLUUID& tracking_id) const; // imported by a local mesh
     bool         isLocal(LLUUID world_id);
     void         getFilenameAndIndex(LLUUID tracking_id, std::string &filename, S32 &index);
     // Map each of a file's materials by name (empty name -> "mat<index>", matching the

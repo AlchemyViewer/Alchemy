@@ -140,11 +140,13 @@ private:
     // fresh part world ids so a reload serves new geometry cleanly.
     bool ingestScene(LLModelLoader::scene& scene);
     // Register a model-referenced image as a mesh-owned local bitmap (deduped by
-    // filename) and return its world id, remembering it for cleanup on delete.
-    LLUUID registerOwnedBitmap(const std::string& filename);
+    // filename) and return its world id. Records every mesh-owned unit it references
+    // into `owned` (the set this parse keeps) so ingestScene can release the rest.
+    LLUUID registerOwnedBitmap(const std::string& filename, std::vector<LLUUID>& owned);
     // Register this glTF file's materials (mesh-owned, deduped) and map each by its
     // face-binding name to its world id, for applying them per face in ingestScene.
-    void importGLTFMaterials(std::map<std::string, LLUUID>& out_by_name);
+    // Records the file's mesh-owned material units into `owned` (kept this parse).
+    void importGLTFMaterials(std::map<std::string, LLUUID>& out_by_name, std::vector<LLUUID>& owned);
     void markFailed() { mState = ST_FAILED; }
 
     // Live reload (M3): poll the source file's mtime and, on a change, kick an
@@ -214,6 +216,11 @@ public:
     std::vector<std::string> getFilenames() const;
 
     LLLocalMesh* getUnit(const LLUUID& tracking_id) const;
+
+    // True if a mesh-owned import (tracking id) is still referenced by some loaded
+    // mesh other than `exclude` -- so a reload that drops it doesn't delUnit a unit a
+    // sibling mesh (sharing the same texture/material file) still needs.
+    bool isImportOwnedByOther(const LLUUID& tracking_id, const LLLocalMesh* exclude) const;
 
     // Per-unit toggle: include the mesh's joint-position overrides (alt-inverse-bind
     // + pelvis offset) when building its skin, for fitted bodies that need them.

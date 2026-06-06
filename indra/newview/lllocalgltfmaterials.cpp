@@ -520,6 +520,18 @@ bool LLLocalGLTFMaterialMgr::isLocal(const LLUUID world_id)
     return false;
 }
 
+bool LLLocalGLTFMaterialMgr::isMeshOwned(const LLUUID& tracking_id) const
+{
+    for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
+    {
+        if (unit->getTrackingID() == tracking_id)
+        {
+            return unit->isMeshOwned();
+        }
+    }
+    return false;
+}
+
 void LLLocalGLTFMaterialMgr::getFilenameAndIndex(LLUUID tracking_id, std::string &filename, S32 &index)
 {
     filename = "";
