@@ -641,6 +641,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             LLLocalMeshPart part;
             part.mWorldID.generate();
             part.mNumFaces = (S32)faces.size();
+            part.mName = !instance.mLabel.empty() ? instance.mLabel : mdl->getName();
 
             // Capture each face's material (M7.2). faces[fi] lines up 1:1 with
             // mdl->mMaterialList[fi] (cacheOptimize keeps face order), so a flat
@@ -1204,6 +1205,38 @@ LLUUID LLLocalMeshMgr::instanceForObject(const LLViewerObject* obj) const
         }
     }
     return LLUUID::null;
+}
+
+bool LLLocalMeshMgr::getPreviewDisplay(const LLViewerObject* obj, std::string& name_out, std::string& path_out) const
+{
+    auto it = mSpawnedCopies.find(instanceForObject(obj));
+    if (it == mSpawnedCopies.end())
+    {
+        return false;
+    }
+    LLLocalMesh* unit = getUnit(it->second.mTrackingID);
+    if (!unit)
+    {
+        return false;
+    }
+    path_out = unit->getFilename();
+    name_out = unit->getShortName();
+    // One prim per part (see spawnLinkset), so the prim's index in this copy maps
+    // 1:1 to its part -- prefer the part's own sub-mesh name when it has one.
+    const std::vector<LLPointer<LLViewerObject>>& prims = it->second.mPrims;
+    const std::vector<LLLocalMeshPart>& parts = unit->getParts();
+    for (size_t i = 0; i < prims.size(); ++i)
+    {
+        if (prims[i].get() == obj)
+        {
+            if (i < parts.size() && !parts[i].mName.empty())
+            {
+                name_out = parts[i].mName;
+            }
+            break;
+        }
+    }
+    return true;
 }
 
 LLViewerObject* LLLocalMeshMgr::getInstanceRoot(const LLUUID& instance_id) const

@@ -143,8 +143,20 @@ static void synthesizeLocalPreviewNode(LLSelectNode* nodep, LLViewerObject* obje
         return;
     }
     nodep->mValid = true;
+    // Show the actual sub-mesh name/source instead of a generic placeholder.
     nodep->mName = "(local mesh preview)";
     nodep->mDescription.clear();
+    {
+        std::string mesh_name, mesh_path;
+        if (LLLocalMeshMgr::getInstance()->getPreviewDisplay(objectp, mesh_name, mesh_path))
+        {
+            if (!mesh_name.empty())
+            {
+                nodep->mName = mesh_name;
+            }
+            nodep->mDescription = mesh_path;
+        }
+    }
     nodep->mPermissions->init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
     const U32 full_perm = PERM_MODIFY | PERM_COPY | PERM_MOVE | PERM_TRANSFER;
     nodep->mPermissions->initMasks(full_perm, full_perm, PERM_NONE, PERM_NONE, full_perm);
@@ -5911,6 +5923,15 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
                                     void *user_data,
                                     ESendType send_type)
 {
+    // Client-only local mesh previews never talk to the simulator. Short-circuit
+    // every object message marshalled through here (name/description/permissions/
+    // sale/group/owner/click-action/category/shape/flags/...). Local derez,
+    // duplicate and attach are handled by LLLocalMeshMgr before reaching this path.
+    if (selectionAllLocalPreview(selected_handle))
+    {
+        return;
+    }
+
     LLSelectNode* node;
     LLSelectNode* linkset_root = NULL;
     LLViewerRegion* last_region;

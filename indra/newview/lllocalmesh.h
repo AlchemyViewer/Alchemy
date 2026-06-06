@@ -80,6 +80,7 @@ struct LLLocalMeshFaceMaterial
 
 struct LLLocalMeshPart
 {
+    std::string               mName;          // sub-mesh (model/instance) name, for build-floater display
     LLUUID                    mWorldID;       // unique mesh id objects/repository reference
     LLPointer<LLVolume>       mVolume;        // normalized geometry (<= 8 faces)
     LLPointer<LLMeshSkinInfo> mSkinInfo;      // null if not rigged
@@ -270,6 +271,10 @@ public:
     // The root of (any) one rezzed copy of a unit, or null if it has none -- handy for
     // "is this unit in-world?" checks. Use getSpawnedInstances() to act per copy.
     LLViewerObject* getSpawnedRoot(const LLUUID& tracking_id) const;
+    // For the build floater: resolve the preview that owns `obj` (root or child
+    // prim) to a display name -- the selected sub-mesh's own name when it has one,
+    // else the file's short name -- plus the source file path. False if not a preview.
+    bool getPreviewDisplay(const LLViewerObject* obj, std::string& name_out, std::string& path_out) const;
     // Number of live rezzed copies of a unit.
     S32 getSpawnedCount(const LLUUID& tracking_id) const;
 
