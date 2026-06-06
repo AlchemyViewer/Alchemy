@@ -708,6 +708,18 @@ void LLPanelVolume::getState( )
     mBtnCopyLight->setEnabled(editable&& single_volume && volobjp);
     mBtnPasteLight->setEnabled(editable&& single_volume && volobjp && mClipboardParams.has("light"));
     mBtnPipetteLight->setEnabled(editable&& single_volume && volobjp);
+
+    // Client-only local mesh previews have no sim physics: disable the physics
+    // shape/material controls for them (their sends are already short-circuited).
+    if (objectp->isLocalOnly())
+    {
+        if (mComboPhysicsShapeType)  { mComboPhysicsShapeType->setEnabled(false); }
+        if (mSpinPhysicsGravity)     { mSpinPhysicsGravity->setEnabled(false); }
+        if (mSpinPhysicsFriction)    { mSpinPhysicsFriction->setEnabled(false); }
+        if (mSpinPhysicsDensity)     { mSpinPhysicsDensity->setEnabled(false); }
+        if (mSpinPhysicsRestitution) { mSpinPhysicsRestitution->setEnabled(false); }
+        if (mComboMaterial)          { mComboMaterial->setEnabled(false); }
+    }
 }
 
 // static

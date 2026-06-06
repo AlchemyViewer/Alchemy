@@ -1296,6 +1296,15 @@ void LLPanelObject::getState( )
 
     mObject = objectp;
     mRootObject = root_objectp;
+
+    // Client-only local mesh previews have no sim physics: disable the sim-only
+    // object flags for them (their sends are already short-circuited).
+    if (objectp->isLocalOnly())
+    {
+        if (mCheckPhysics)   { mCheckPhysics->setEnabled(false); }
+        if (mCheckTemporary) { mCheckTemporary->setEnabled(false); }
+        if (mCheckPhantom)   { mCheckPhantom->setEnabled(false); }
+    }
 }
 
 // static

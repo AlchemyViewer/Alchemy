@@ -1008,6 +1008,30 @@ void LLPanelPermissions::refresh()
 
     getChildView("label click action")->setEnabled(is_perm_modify && is_nonpermanent_enforced  && all_volume);
     getChildView("clickaction")->setEnabled(is_perm_modify && is_nonpermanent_enforced && all_volume);
+
+    // Client-only local mesh previews have no server-side identity: none of the
+    // sim-backed properties above apply, and edits would be silently dropped
+    // (sendListToRegions is short-circuited for them). Keep name/desc visible
+    // (read-only) but disable every editing/permission/sale/group/click control.
+    if (objectp->isLocalOnly())
+    {
+        static const std::string sim_only_ctrls[] = {
+            "Object Name", "Object Description",
+            "button set group", "button deed", "checkbox share with group",
+            "checkbox allow everyone move", "checkbox allow everyone copy",
+            "checkbox next owner can modify", "checkbox next owner can copy",
+            "checkbox next owner can transfer",
+            "checkbox for sale", "sale type", "Edit Cost",
+            "search_check", "clickaction",
+        };
+        for (const std::string& ctrl_name : sim_only_ctrls)
+        {
+            if (LLView* v = findChildView(ctrl_name, true))
+            {
+                v->setEnabled(false);
+            }
+        }
+    }
 }
 
 // Shorten name if it doesn't fit into max_pixels of two lines
