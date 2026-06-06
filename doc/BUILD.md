@@ -72,7 +72,7 @@ Install system packages for your distro:
 ```
 sudo pacman -Syu automake autoconf autoconf-archive base-devel cmake fontconfig git glib2-devel \
     gstreamer gst-plugins-base-libs ninja libglvnd libtool libvlc libx11 pkgconf python \
-    wayland dotnet-sdk rustup zip
+    wayland dotnet-sdk rustup zip nasm
 ```
 
 </details>
