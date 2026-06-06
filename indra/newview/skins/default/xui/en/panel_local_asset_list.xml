@@ -9,10 +9,10 @@
   width="530">
   <string name="rez_label">Rez in World</string>
   <string name="derez_label">Derez</string>
-  <string name="apply_texture_label">Apply to Face</string>
-  <string name="apply_material_label">Apply to Face</string>
+  <string name="apply_texture_label">Apply to Selected</string>
+  <string name="apply_material_label">Apply to Selected</string>
   <string name="rez_tooltip">Rez a new in-world copy of this mesh (a client-side preview; nothing is uploaded).</string>
-  <string name="apply_tooltip">Apply this to the selected in-world face(s).</string>
+  <string name="apply_tooltip">Apply this to the selected object (all faces), or only the face(s) picked with Select Face.</string>
   <string name="col_name">Name</string>
   <string name="col_status">Status</string>
   <string name="target_self">My Avatar</string>

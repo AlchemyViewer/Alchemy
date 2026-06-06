@@ -1044,6 +1044,43 @@ void apply_local_material_to_selection(const LLUUID& world_id)
     }
 }
 
+// "Apply to face" covers every face of the selected object, unless the user
+// picked specific faces with the Select Face tool (then only those). Mark all
+// faces on any selected object that has no individual face selection, so the
+// apply below (which honors the per-face select mask via applyToTEs) hits the
+// whole object instead of nothing. Objects with a Select-Face pick are left
+// untouched so the pick is respected.
+static void target_all_faces_unless_face_selected(LLObjectSelectionHandle sel)
+{
+    if (!sel)
+    {
+        return;
+    }
+    for (LLObjectSelection::iterator it = sel->begin(); it != sel->end(); ++it)
+    {
+        LLSelectNode* node = *it;
+        LLViewerObject* obj = node ? node->getObject() : nullptr;
+        if (!obj || obj->getNumTEs() <= 0)
+        {
+            continue;
+        }
+        bool face_picked = false;
+        for (S32 te = 0, n = obj->getNumTEs(); te < n; ++te)
+        {
+            if (node->isTESelected(te))
+            {
+                face_picked = true;
+                break;
+            }
+        }
+        if (!face_picked)
+        {
+            node->selectAllTEs(true);
+            obj->setAllTESelected(true);
+        }
+    }
+}
+
 // ============================================================================
 //  Apply-to-face base -- shared by the Textures and Materials tabs. Reuses the
 //  hidden "spawn_btn" side slot as an "Apply to Face" button that applies the
@@ -1102,6 +1139,8 @@ private:
         const LLUUID world_id = worldIdFor(id);
         if (world_id.notNull())
         {
+            // Whole object -> all faces; specific Select-Face pick -> just those.
+            target_all_faces_unless_face_selected(LLSelectMgr::getInstance()->getSelection());
             applyWorldId(world_id);
         }
     }
