@@ -2859,6 +2859,7 @@ If you continue to receive this message, please contact Second Life support for 
 	<string name="LocalAssetRezzed">Rezzed</string>
 	<string name="LocalAssetAttached">Attached: [POINT]</string>
 	<string name="LocalMeshInWorldCount">[COUNT] in world</string>
+	<string name="LocalAssetModelOwned">[NAME] (model)</string>
 
 	<string name="NoEnvironmentSettings">This Region does not support environmental settings.</string>
 	<string name="EnvironmentSun">Sun</string>

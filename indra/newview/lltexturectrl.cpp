@@ -1212,6 +1212,10 @@ void LLFloaterTexturePicker::onBtnRemove(void* userdata)
             if (list_item)
             {
                 LLSD data = list_item->getValue();
+                if (data["mesh_owned"].asBoolean())
+                {
+                    continue; // model-loaded: read-only, owned by its mesh
+                }
                 LLUUID tracking_id = data["id"];
                 S32 asset_type = data["type"].asInteger();
 

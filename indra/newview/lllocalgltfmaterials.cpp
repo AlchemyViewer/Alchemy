@@ -39,6 +39,7 @@
 #include "llnotificationsutil.h"
 #include "llscrolllistctrl.h"
 #include "lltextureentry.h"
+#include "lltrans.h"           // "(model)" tag for mesh-owned rows
 #include "lltinygltfhelper.h"
 #include "llviewertexture.h"
 
@@ -569,23 +570,30 @@ void LLLocalGLTFMaterialMgr::feedScrollList(LLScrollListCtrl* ctrl)
             for (local_list_iter iter = mMaterialList.begin();
                 iter != mMaterialList.end(); iter++)
             {
-                if ((*iter)->isMeshOwned())
-                {
-                    continue; // hidden: imported by a local mesh for its faces
-                }
+                // Model-loaded (mesh-owned) materials are shown too, tagged "(model)"
+                // and flagged so the UI treats them as read-only / transient.
+                const bool mesh_owned = (*iter)->isMeshOwned();
                 LLSD element;
 
                 element["columns"][0]["column"] = "icon";
                 element["columns"][0]["type"] = "icon";
                 element["columns"][0]["value"] = icon_name;
 
+                std::string unit_name = (*iter)->getShortName();
+                if (mesh_owned)
+                {
+                    LLSD name_args;
+                    name_args["NAME"] = unit_name;
+                    unit_name = LLTrans::getString("LocalAssetModelOwned", name_args);
+                }
                 element["columns"][1]["column"] = "unit_name";
                 element["columns"][1]["type"] = "text";
-                element["columns"][1]["value"] = (*iter)->getShortName();
+                element["columns"][1]["value"] = unit_name;
 
                 LLSD data;
                 data["id"] = (*iter)->getTrackingID();
                 data["type"] = (S32)LLAssetType::AT_MATERIAL;
+                data["mesh_owned"] = mesh_owned;
                 element["value"] = data;
 
                 ctrl->addElement(element);

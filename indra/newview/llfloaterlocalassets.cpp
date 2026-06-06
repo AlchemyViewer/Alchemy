@@ -121,6 +121,7 @@ protected:
 private:
     void appendUnloaded();
     void selectByPath(const std::string& path);
+    bool anySelectedMeshOwned() const; // a model-loaded (read-only) row is selected
     void onAddBtn();
     void onUnloadBtn();
     void onRemoveBtn();
@@ -280,19 +281,37 @@ std::vector<LLUUID> LLPanelLocalAssetBase::getSelectedIDs() const
     return ids;
 }
 
+bool LLPanelLocalAssetBase::anySelectedMeshOwned() const
+{
+    if (mList)
+    {
+        for (LLScrollListItem* item : mList->getAllSelected())
+        {
+            if (item && item->getValue()["mesh_owned"].asBoolean())
+            {
+                return true; // a model-loaded (read-only) row is in the selection
+            }
+        }
+    }
+    return false;
+}
+
 void LLPanelLocalAssetBase::onSelectionChange()
 {
     const bool has_selection = mList && !mList->getAllSelected().empty();
     // Unload only makes sense for a decoded row (an undecoded one is already
     // unloaded); Remove forgets the saved path, so it works on either.
     const bool has_decoded = !getSelectedIDs().empty();
+    // Model-loaded (mesh-owned) rows are read-only -- they belong to the mesh that
+    // imported them, so block Unload/Remove while one is selected.
+    const bool read_only = anySelectedMeshOwned();
     if (mUnloadBtn)
     {
-        mUnloadBtn->setEnabled(has_decoded);
+        mUnloadBtn->setEnabled(has_decoded && !read_only);
     }
     if (mRemoveBtn)
     {
-        mRemoveBtn->setEnabled(has_selection);
+        mRemoveBtn->setEnabled(has_selection && !read_only);
     }
     if (mUploadBtn)
     {
