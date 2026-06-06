@@ -617,6 +617,7 @@ void LLPanelLocalMesh::initExtraButtons()
     mJointsCheck->setVisible(true);
 
     mRezBtn->setCommitCallback(boost::bind(&LLPanelLocalMesh::onRez, this));
+    mRezBtn->setToolTip(getString("rez_tooltip")); // spawn_btn slot is repurposed per tab
     mSelectBtn->setCommitCallback(boost::bind(&LLPanelLocalMesh::onSelect, this));
     mAttachBtn->setCommitCallback(boost::bind(&LLPanelLocalMesh::onAttach, this));
     mJointsCheck->setCommitCallback(boost::bind(&LLPanelLocalMesh::onToggleJoints, this));
@@ -1059,6 +1060,7 @@ protected:
     {
         mApplyBtn = getChild<LLButton>("spawn_btn"); // per-tab instance; reuse the slot
         mApplyBtn->setLabel(applyLabel());
+        mApplyBtn->setToolTip(getString("apply_tooltip")); // spawn_btn slot is repurposed per tab
         mApplyBtn->setVisible(true);
         mApplyBtn->setCommitCallback(boost::bind(&LLPanelLocalApplyAsset::onApply, this));
     }
