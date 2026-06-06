@@ -90,7 +90,7 @@ sudo apt install \
     libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
-    pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 rustup
+    pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 rustup nasm
 ```
 
 </details>
@@ -108,7 +108,7 @@ sudo apt install \
     libthai-dev libtool libudev-dev libunwind-dev liburing-dev libvlc-dev libwayland-dev \
     libx11-dev libxcursor-dev libxext-dev libxfixes-dev libxft-dev libxi-dev libxinerama-dev \
     libxkbcommon-dev libxrandr-dev libxss-dev libxtst-dev linux-libc-dev ninja-build \
-    pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 rustup
+    pkgconf tar tex-common texinfo unzip zip dotnet-sdk-10.0 rustup nasm
 ```
 
 </details>
