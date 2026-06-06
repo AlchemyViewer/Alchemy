@@ -62,6 +62,8 @@
 #include "llviewerjointattachment.h"
 #include "llvoavatarself.h"
 #include "llvovolume.h"
+#include "lltextureentry.h"
+#include "llgltfmaterial.h"
 #include "pipeline.h"
 
 /*=======================================*/
@@ -1556,6 +1558,77 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
     }
 }
 
+namespace
+{
+// A face's user-visible render state, snapshotted so user edits survive a hot-swap:
+// applyPartGeometry re-applies the file's imported materials and resets every face,
+// which would otherwise wipe textures/materials/glow/etc. the user applied to the
+// in-world preview.
+struct PreservedFace
+{
+    LLTextureEntry te;            // diffuse id, color, glow, bump/shiny/fullbright, transforms, Blinn-Phong material, glTF override
+    LLUUID         render_mat_id; // glTF render material id (kept in the param block, not the TE)
+};
+
+std::vector<PreservedFace> capturePreservedFaces(LLVOVolume* vol)
+{
+    std::vector<PreservedFace> out;
+    const U8 n = vol->getNumTEs();
+    out.reserve(n);
+    for (U8 i = 0; i < n; ++i)
+    {
+        PreservedFace pf;
+        if (const LLTextureEntry* tep = vol->getTE(i))
+        {
+            pf.te = *tep;
+        }
+        pf.render_mat_id = vol->getRenderMaterialID(i);
+        out.push_back(pf);
+    }
+    return out;
+}
+
+void restorePreservedFaces(LLVOVolume* vol, const std::vector<PreservedFace>& saved)
+{
+    const U8 n = vol->getNumTEs();
+    bool any_render_mat = false;
+    for (U8 i = 0; i < n && i < (U8)saved.size(); ++i)
+    {
+        const LLTextureEntry& te = saved[i].te;
+        vol->setTETexture(i, te.getID());
+        vol->setTEColor(i, te.getColor());
+        vol->setTEGlow(i, te.getGlow());
+        vol->setTEBumpShinyFullbright(i, te.getBumpShinyFullbright());
+        F32 ss = 1.f, st = 1.f, os = 0.f, ot = 0.f;
+        te.getScale(&ss, &st);
+        te.getOffset(&os, &ot);
+        vol->setTEScale(i, ss, st);
+        vol->setTEOffset(i, os, ot);
+        vol->setTERotation(i, te.getRotation());
+        if (te.getMaterialParams().notNull())
+        {
+            vol->setTEMaterialParams(i, te.getMaterialParams()); // Blinn-Phong normal/specular
+        }
+        if (saved[i].render_mat_id.notNull())
+        {
+            // glTF PBR material (+ override); client-only, so update_server=false.
+            vol->setRenderMaterialID((S32)i, saved[i].render_mat_id, false, true);
+            if (const LLGLTFMaterial* ov = te.getGLTFMaterialOverride())
+            {
+                LLPointer<LLGLTFMaterial> ovp = new LLGLTFMaterial(*ov);
+                vol->setTEGLTFMaterialOverride(i, ovp);
+            }
+            any_render_mat = true;
+        }
+    }
+    if (any_render_mat)
+    {
+        vol->setHasRenderMaterialParams(true);
+    }
+    vol->markForUpdate();
+}
+} // namespace
+
 bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
 {
     LLLocalMesh* unit = getUnit(tracking_id);
@@ -1607,7 +1680,12 @@ bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
                 return false; // a dead/unexpected prim -> let the caller re-spawn
             }
             vol->setScale(parts[i].mScale, false);
+            // Preserve user-applied face params (diffuse/normal/specular/glow/color/
+            // render material/transforms) across the swap -- applyPartGeometry resets
+            // every face to the file's imported material.
+            std::vector<PreservedFace> preserved = capturePreservedFaces(vol);
             applyPartGeometry(vol, parts[i]);
+            restorePreservedFaces(vol, preserved);
         }
     }
 
