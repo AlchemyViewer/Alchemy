@@ -146,6 +146,13 @@ bool LLLocalAnimMgr::decodeFile(const std::string& filename, std::vector<U8>& ou
 
 LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
 {
+    // No double-add: a file that's already loaded just returns its existing unit.
+    // (Live-reload re-decodes in doUpdates(), not here, so this doesn't block it.)
+    if (LLUUID existing = getUnitID(filename); existing.notNull())
+    {
+        return existing;
+    }
+
     std::vector<U8> keyframe;
     if (!decodeFile(filename, keyframe))
     {

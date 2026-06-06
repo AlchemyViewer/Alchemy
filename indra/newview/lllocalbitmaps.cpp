@@ -1122,6 +1122,18 @@ LLUUID LLLocalBitmapMgr::addUnit(const std::string& filename, bool mesh_owned)
 
 LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename, bool mesh_owned)
 {
+    // No double-add: reuse an existing unit for this file. A user add (mesh_owned
+    // false) only matches a user unit, and a mesh import only matches a mesh-owned
+    // unit -- so the same file can be both a user texture and a (hidden) mesh-owned
+    // import without colliding, and re-adding a loaded file won't duplicate it.
+    for (LLLocalBitmap* unit : mBitmapList)
+    {
+        if (unit->getFilename() == filename && unit->isMeshOwned() == mesh_owned)
+        {
+            return unit->getTrackingID();
+        }
+    }
+
     if (!checkTextureDimensions(filename))
     {
         return LLUUID::null;

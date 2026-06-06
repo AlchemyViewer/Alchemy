@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel
+  follows="all"
+  layout="topleft"
+  name="panel_local_spawned"
+  top="0"
+  left="0"
+  height="400"
+  width="530">
+  <string name="empty_hint">No copies in world yet. Rez a mesh from the Mesh tab.</string>
+  <scroll_list
+    name="spawned_list"
+    follows="all"
+    layout="topleft"
+    top="5"
+    left="5"
+    right="-130"
+    bottom="-5"
+    column_padding="0"
+    draw_heading="true"
+    multi_select="true"
+    search_column="1">
+    <column name="icon" label="" width="20"/>
+    <column name="unit_name" label="Name" dynamicwidth="true"/>
+    <column name="status" label="Status" width="120"/>
+  </scroll_list>
+  <button
+    name="select_btn"
+    label="Select in World"
+    tool_tip="Select this copy and open the Build floater to edit it (does not move the camera)."
+    enabled="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="5"
+    right="-5"/>
+  <button
+    name="focus_btn"
+    label="Focus Camera"
+    tool_tip="Point the camera at this copy."
+    enabled="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="33"
+    right="-5"/>
+  <button
+    name="derez_btn"
+    label="Derez"
+    tool_tip="Remove the selected copy (or copies) from the world."
+    enabled="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="61"
+    right="-5"/>
+  <button
+    name="derez_all_btn"
+    label="Derez All"
+    tool_tip="Remove every rezzed copy from the world."
+    enabled="false"
+    follows="top|right"
+    layout="topleft"
+    height="23"
+    width="120"
+    top="89"
+    right="-5"/>
+</panel>

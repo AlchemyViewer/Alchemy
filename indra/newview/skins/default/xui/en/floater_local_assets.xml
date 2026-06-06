@@ -12,6 +12,7 @@
   single_instance="true"
   title="LOCAL ASSETS">
   <string name="tab_mesh">Mesh</string>
+  <string name="tab_rezzed">Rezzed</string>
   <string name="tab_anim">Animations</string>
   <string name="tab_textures">Textures</string>
   <string name="tab_materials">Materials</string>

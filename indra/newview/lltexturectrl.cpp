@@ -660,6 +660,15 @@ bool LLFloaterTexturePicker::postBuild()
     mLocalScrollCtrl->setCommitCallback(onLocalScrollCommit, this);
     refreshLocalList();
 
+    // React to local-unit changes from anywhere (this picker, another picker, the
+    // Local Assets floater, a mesh import, or a live-reload) so the Local tab never
+    // goes stale. refreshLocalList() reads the current pick type, so one handler per
+    // manager serves textures and materials alike.
+    mLocalBitmapsChangedConn = LLLocalBitmapMgr::getInstance()->setUnitsChangedCallback(
+        [this]() { refreshLocalList(); });
+    mLocalMaterialsChangedConn = LLLocalGLTFMaterialMgr::getInstance()->setUnitsChangedCallback(
+        [this]() { refreshLocalList(); });
+
     getChild<LLLineEditor>("uuid_editor")->setCommitCallback(boost::bind(&onApplyUUID, this));
     getChild<LLButton>("apply_uuid_btn")->setClickedCallback(boost::bind(&onApplyUUID, this));
 
@@ -1662,26 +1671,10 @@ void LLFloaterTexturePicker::onPickerCallback(const std::vector<std::string>& fi
         iter++;
     }
 
-    // Todo: this should referesh all pickers, not just a current one
-    if (!handle.isDead())
-    {
-        LLFloaterTexturePicker* self = (LLFloaterTexturePicker*)handle.get();
-        self->mLocalScrollCtrl->clearRows();
-
-        if (self->mInventoryPickType == PICK_TEXTURE_MATERIAL)
-        {
-            LLLocalBitmapMgr::getInstance()->feedScrollList(self->mLocalScrollCtrl);
-            LLLocalGLTFMaterialMgr::getInstance()->feedScrollList(self->mLocalScrollCtrl);
-        }
-        else if (self->mInventoryPickType == PICK_TEXTURE)
-        {
-            LLLocalBitmapMgr::getInstance()->feedScrollList(self->mLocalScrollCtrl);
-        }
-        else if (self->mInventoryPickType == PICK_MATERIAL)
-        {
-            LLLocalGLTFMaterialMgr::getInstance()->feedScrollList(self->mLocalScrollCtrl);
-        }
-    }
+    // No manual refresh needed: addUnit() fires the manager's units-changed signal,
+    // and every open picker (this one included) rebuilds its Local tab from the
+    // handler wired in postBuild() -- so all pickers stay in sync, not just this one.
+    (void)handle;
 }
 
 void LLFloaterTexturePicker::onTextureSelect(bool success, const LLTextureEntry& te )

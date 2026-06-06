@@ -49,9 +49,11 @@
 #include <list>
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+class LLQuaternion;
 class LLScrollListCtrl;
 class LLViewerObject;
 class LLViewerRegion;
@@ -118,6 +120,12 @@ public:
     void setSpawnWhenReady(bool b) { mSpawnWhenReady = b; }
     bool wantsSpawn() const         { return mSpawnWhenReady; }
 
+    // Deferred attach: wear the preview at this attachment point once loading
+    // completes (-1 = don't). Set by LLLocalMeshMgr::addAndAttach when the user
+    // hits Attach on a not-yet-decoded unit. Requires wantsSpawn().
+    void setAttachWhenReady(S32 attach_point) { mAttachWhenReady = attach_point; }
+    S32  wantsAttach() const                  { return mAttachWhenReady; }
+
 private:
     friend class LLLocalMeshMgr; // orchestrates loading/reload and spawning
 
@@ -152,6 +160,7 @@ private:
     EFormat     mFormat;
     EState      mState;
     bool        mSpawnWhenReady;
+    S32         mAttachWhenReady = -1; // attach point to wear at once loaded (-1 = none)
     bool        mIncludeJointPositions = false; // bake joint-position overrides into the skin
 
     std::filesystem::file_time_type mLastModified; // for live reload (M3)
@@ -217,14 +226,16 @@ public:
     LLVolume*             getVolumeForWorldID(const LLUUID& world_id) const;
     const LLMeshSkinInfo* getSkinInfoForWorldID(const LLUUID& world_id) const;
 
-    // Despawn the in-world preview but KEEP the loaded unit so it can be re-spawned
+    // Despawn in-world preview copies but KEEP the loaded unit so it can be re-spawned
     // (a later file save won't auto-respawn a despawned unit -- see onLoadResult).
-    // despawnPreviewObject derezzes the linkset that owns `obj`, letting the standard
-    // in-world Delete key/menu "derez" client-only previews (which the sim delete
-    // path can't touch) without dropping the file from the list. despawn() does the
-    // same by tracking id. To remove the file from the list entirely, use delUnit().
+    // despawnPreviewObject derezzes just the copy that owns `obj`, letting the standard
+    // in-world Delete key/menu "derez" a single client-only copy (which the sim delete
+    // path can't touch) without dropping the file from the list. despawn() derezzes
+    // ALL of a unit's copies ("Derez All"). To remove the file from the list entirely,
+    // use delUnit().
     void despawnPreviewObject(LLViewerObject* obj);
     void despawn(const LLUUID& tracking_id);
+    void despawnAll(); // derez every copy of every unit (Spawned tab "Derez All")
 
     // Attach/detach a preview linkset to the agent avatar, driven by the normal
     // "Attach"/"Detach" object menus (the viewer's sim attach/detach can't act on
@@ -239,16 +250,38 @@ public:
     bool isRiggedPreview(const LLViewerObject* obj) const;
     bool isPreviewAttached(const LLViewerObject* obj) const;
 
-    // Create the client-only linkset in-world referencing the unit's parts. If a
-    // linkset for this unit already exists (live reload), it is replaced in place
-    // and the root's transform preserved.
+    // Rez a NEW client-only copy ("instance") of the unit's parts in front of the
+    // agent. A unit can be rezzed any number of times; each copy is independent with
+    // its own instance id. Returns the new copy's linkset root.
     LLViewerObject* spawnInWorld(const LLUUID& tracking_id);
     // Convenience: load each file and spawn it in-world once it finishes loading.
     void addAndSpawn(const std::vector<std::string>& filenames);
+    // Load a file (if needed) and, once decoded, spawn it and wear it at the given
+    // attachment point -- so Attach works on a not-yet-decoded unit.
+    void addAndAttach(const std::string& filename, S32 attach_point);
 
-    // The spawned linkset root for a loaded unit, or null if it isn't in-world.
-    // Lets the UI act on an existing preview (e.g. attach it) without re-rezzing.
+    // The root of (any) one rezzed copy of a unit, or null if it has none -- handy for
+    // "is this unit in-world?" checks. Use getSpawnedInstances() to act per copy.
     LLViewerObject* getSpawnedRoot(const LLUUID& tracking_id) const;
+    // Number of live rezzed copies of a unit.
+    S32 getSpawnedCount(const LLUUID& tracking_id) const;
+
+    // A single rezzed copy of a unit; mRoot is its linkset root.
+    struct SpawnedInstance
+    {
+        LLUUID          mInstanceID;
+        LLUUID          mTrackingID;
+        LLViewerObject* mRoot;
+    };
+    // Every live rezzed copy across all units, in rez order (for the Spawned tab).
+    std::vector<SpawnedInstance> getSpawnedInstances() const;
+    // The linkset root of a specific rezzed copy, or null.
+    LLViewerObject* getInstanceRoot(const LLUUID& instance_id) const;
+    // Derez a single rezzed copy, leaving the loaded unit and the unit's other copies.
+    void despawnInstance(const LLUUID& instance_id);
+    // Localized in-world status of a copy's root ("Rezzed" / "Attached: <point>"),
+    // shared by the mesh list and the Spawned tab. Empty for a null root.
+    std::string statusText(LLViewerObject* root) const;
 
     void feedScrollList(LLScrollListCtrl* ctrl);
 
@@ -283,11 +316,21 @@ private:
     LLUUID addUnitInternal(const std::string& filename, bool include_joints = false);
     void   despawnUnit(const LLUUID& tracking_id);
 
-    // Reload an already-spawned linkset in place by pointing each existing prim at
+    // Reload every spawned copy of a unit in place by pointing each existing prim at
     // the freshly decoded geometry (new sculpt id) instead of despawning -- so
     // attachment, selection and transform are preserved and there's no flicker.
-    // Returns false if the prim count changed (caller falls back to spawnInWorld).
+    // Returns false if the prim count changed (caller falls back to a re-spawn).
     bool hotSwapInWorld(const LLUUID& tracking_id);
+    // Re-rez every existing copy of a unit at its current transform/attachment, used
+    // when a reload changes the prim count so hot-swap can't swap 1:1.
+    void respawnInstancesInPlace(const LLUUID& tracking_id);
+    // Build one copy's linkset for (tracking_id, instance_id) rooted at `base` with
+    // `root_rot`, optionally worn at attach_point. Returns the root.
+    LLViewerObject* spawnLinkset(const LLUUID& tracking_id, const LLUUID& instance_id,
+                                 const LLVector3& base, const LLQuaternion& root_rot,
+                                 bool attach, S32 attach_point);
+    // The instance id of the copy that owns `obj` (root or child), or null.
+    LLUUID instanceForObject(const LLViewerObject* obj) const;
 
     // Find a decoded part by its world id (across all loaded units).
     const LLLocalMeshPart* findPart(const LLUUID& world_id) const;
@@ -304,10 +347,18 @@ private:
     typedef std::list<LLLocalMesh*>::const_iterator local_list_citer;
     std::list<LLLocalMesh*> mMeshList;
 
-    // Client-only objects we've rezzed, keyed by the tracking id of the unit they
-    // belong to. A unit's linkset shares one tracking id; the first entry pushed
-    // for a tracking id is the linkset root.
-    std::vector<std::pair<LLUUID, LLPointer<LLViewerObject> > > mSpawnedObjects;
+    // A rezzed copy ("instance") of a unit: its whole linkset, with mPrims[0] the
+    // root. Keyed by instance id in mSpawnedCopies, so per-copy lookup/erase is O(1)
+    // and a copy's prims are grouped together -- per-unit/per-copy work then scales
+    // with the copy count, not the total prim count across every copy.
+    struct SpawnedCopy
+    {
+        LLUUID                                  mTrackingID; // the unit this copy came from
+        U32                                     mSeq = 0;    // rez order, for stable listing
+        std::vector<LLPointer<LLViewerObject> > mPrims;      // mPrims[0] is the linkset root
+    };
+    std::unordered_map<LLUUID, SpawnedCopy> mSpawnedCopies; // instance id -> copy
+    U32 mNextSpawnSeq = 0; // monotonic rez counter feeding SpawnedCopy::mSeq
 
     boost::signals2::signal<void()> mUnitsChangedSignal; // add/remove/spawn/despawn
 

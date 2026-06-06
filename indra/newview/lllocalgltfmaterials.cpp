@@ -368,6 +368,18 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename, bool mesh_owned
 
 S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID& outID, bool mesh_owned)
 {
+    // No double-add: if this file's materials are already loaded (same ownership
+    // class -- user vs mesh-owned), return the existing first material instead of
+    // loading the file's materials a second time.
+    for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
+    {
+        if (unit->getFilename() == filename && unit->isMeshOwned() == mesh_owned)
+        {
+            outID = getUnitID(filename, 0);
+            return 0; // nothing newly added
+        }
+    }
+
     tinygltf::Model model;
     LLTinyGLTFHelper::loadModel(filename, model);
 

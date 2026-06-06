@@ -78,7 +78,8 @@ public:
     void refresh();
 
     // Decode + add a file into this tab's backing manager (used by the floater's
-    // OS drag-and-drop routing). Public wrapper over the protected loadPath().
+    // OS drag-and-drop routing). Public wrapper over the protected loadPath(); the
+    // backing manager dedups, so a file that's already loaded is never added twice.
     void loadFile(const std::string& path) { loadPath(path); }
 
 protected:
@@ -108,13 +109,15 @@ protected:
 
     LLScrollListCtrl* mList { nullptr };
     LLButton*         mAddBtn { nullptr };
-    LLButton*         mDelBtn { nullptr };
+    LLButton*         mUnloadBtn { nullptr }; // free the asset, keep the saved path (dimmed row)
+    LLButton*         mRemoveBtn { nullptr }; // forget the file entirely (row disappears)
 
 private:
     void appendUnloaded();
     void selectByPath(const std::string& path);
     void onAddBtn();
-    void onDelBtn();
+    void onUnloadBtn();
+    void onRemoveBtn();
     void onDoubleClick();
     void onSelectionChange();
     static void onFilesPicked(const std::vector<std::string>& filenames,
@@ -125,15 +128,17 @@ private:
 
 bool LLPanelLocalAssetBase::postBuild()
 {
-    mList   = getChild<LLScrollListCtrl>("l_name_list");
-    mAddBtn = getChild<LLButton>("add_btn");
-    mDelBtn = getChild<LLButton>("del_btn");
+    mList      = getChild<LLScrollListCtrl>("l_name_list");
+    mAddBtn    = getChild<LLButton>("add_btn");
+    mUnloadBtn = getChild<LLButton>("unload_btn");
+    mRemoveBtn = getChild<LLButton>("remove_btn");
 
     mList->setCommitOnSelectionChange(true);
     mList->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onSelectionChange, this));
     mList->setDoubleClickCallback(boost::bind(&LLPanelLocalAssetBase::onDoubleClick, this));
     mAddBtn->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onAddBtn, this));
-    mDelBtn->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onDelBtn, this));
+    mUnloadBtn->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onUnloadBtn, this));
+    mRemoveBtn->setCommitCallback(boost::bind(&LLPanelLocalAssetBase::onRemoveBtn, this));
 
     // Reactive refresh: the backing manager signals us on any unit change (decode,
     // remove, and for mesh spawn/derez), whoever made it -- us, the texture picker,
@@ -269,9 +274,16 @@ std::vector<LLUUID> LLPanelLocalAssetBase::getSelectedIDs() const
 void LLPanelLocalAssetBase::onSelectionChange()
 {
     const bool has_selection = mList && !mList->getAllSelected().empty();
-    if (mDelBtn)
+    // Unload only makes sense for a decoded row (an undecoded one is already
+    // unloaded); Remove forgets the saved path, so it works on either.
+    const bool has_decoded = !getSelectedIDs().empty();
+    if (mUnloadBtn)
     {
-        mDelBtn->setEnabled(has_selection);
+        mUnloadBtn->setEnabled(has_decoded);
+    }
+    if (mRemoveBtn)
+    {
+        mRemoveBtn->setEnabled(has_selection);
     }
     updateExtraButtons(has_selection);
 }
@@ -294,7 +306,25 @@ void LLPanelLocalAssetBase::onAddBtn()
         getLoadFilter(), true);
 }
 
-void LLPanelLocalAssetBase::onDelBtn()
+void LLPanelLocalAssetBase::onUnloadBtn()
+{
+    if (!mList)
+    {
+        return;
+    }
+    // Free each selected decoded unit but keep its saved path, so the row stays in
+    // the list as a dimmed, reloadable entry. For a mesh this also derezzes its
+    // in-world copies. delUnit() fires the manager signal, which refreshes us; an
+    // undecoded selection has no unit to unload. Snapshot first -- delUnit() frees
+    // the LLScrollListItems we'd otherwise be iterating.
+    const std::vector<LLUUID> ids = getSelectedIDs();
+    for (const LLUUID& id : ids)
+    {
+        delUnit(id);
+    }
+}
+
+void LLPanelLocalAssetBase::onRemoveBtn()
 {
     if (!mList)
     {
@@ -345,7 +375,8 @@ void LLPanelLocalAssetBase::onFilesPicked(const std::vector<std::string>& filena
         if (!filename.empty())
         {
             // Decode now (the user just chose it); the manager signal both refreshes
-            // us and records the path in LLLocalAssetPaths for persistence.
+            // us and records the path in LLLocalAssetPaths for persistence. The
+            // manager dedups, so re-picking a loaded file won't add it twice.
             self->loadPath(filename);
         }
     }
@@ -363,7 +394,8 @@ public:
     void doSpawn(const LLUUID& tracking_id);
     void doAttach(const LLUUID& tracking_id, S32 attach_point);
     void doDetach(const LLUUID& tracking_id);
-    void doDelete(const LLUUID& tracking_id);
+    void doUnload(const LLUUID& tracking_id); // free + derez copies, keep the file in the list
+    void doRemove(const LLUUID& tracking_id); // forget the file entirely
     void menuAttach(const LLUUID& tracking_id, const LLSD& point) { doAttach(tracking_id, point.asInteger()); }
     void doSelect(const LLUUID& tracking_id);
     void doDerez(const LLUUID& tracking_id);
@@ -445,7 +477,8 @@ protected:
         reg.add("LocalMesh.Select", boost::bind(&LLPanelLocalMesh::doSelect,   mPanel, id));
         reg.add("LocalMesh.Attach", boost::bind(&LLPanelLocalMesh::menuAttach, mPanel, id, _2));
         reg.add("LocalMesh.Detach", boost::bind(&LLPanelLocalMesh::doDetach,   mPanel, id));
-        reg.add("LocalMesh.Delete", boost::bind(&LLPanelLocalMesh::doDelete,   mPanel, id));
+        reg.add("LocalMesh.Unload", boost::bind(&LLPanelLocalMesh::doUnload,   mPanel, id));
+        reg.add("LocalMesh.Remove", boost::bind(&LLPanelLocalMesh::doRemove,   mPanel, id));
         ereg.add("LocalMesh.IsAttached", boost::bind(&LLPanelLocalMesh::isUnitAttached, mPanel, id));
         ereg.add("LocalMesh.IsSpawned",  boost::bind(&LLPanelLocalMesh::isUnitSpawned,  mPanel, id));
 
@@ -503,7 +536,10 @@ void LLPanelLocalMesh::initExtraButtons()
         LLScrollListColumn::Params c;
         c.name = "unit_name";
         c.header.label = getString("col_name");
-        c.width.relative_width = 1.f;
+        // Fill the space LEFT OVER by the fixed icon/status columns. relative_width
+        // would instead claim that fraction of the WHOLE list width, pushing the
+        // fixed Status column off the right edge (invisible).
+        c.width.dynamic_width = true;
         mList->addColumn(c);
     }
     {
@@ -566,7 +602,9 @@ void LLPanelLocalMesh::updateExtraButtons(bool has_selection)
     populateAttachPoints();
     const LLUUID id = getSelectedID(); // null when an undecoded row is selected
     const bool loaded = id.notNull();
-    const bool can_attach = loaded && isAgentAvatarValid() &&
+    // Attach works on an undecoded row too -- it loads then attaches -- so enable on
+    // any selection, not just a decoded one.
+    const bool can_attach = has_selection && isAgentAvatarValid() &&
                             mAttachCombo && mAttachCombo->getItemCount() > 0;
     if (mAttachBtn)   { mAttachBtn->setEnabled(can_attach); }
     if (mAttachCombo) { mAttachCombo->setEnabled(can_attach); }
@@ -585,10 +623,10 @@ void LLPanelLocalMesh::refreshActionButtons()
     const bool spawned = id.notNull() && LLLocalMeshMgr::getInstance()->getSpawnedRoot(id) != nullptr;
     if (mRezBtn)
     {
-        // Rez works on a decoded unit or (auto-loading) an undecoded one; once it's
-        // in-world the same button becomes Derez.
+        // Rez always spawns a NEW copy -- it no longer toggles to Derez. Copies are
+        // managed per-instance (Spawned tab / in-world Delete) or via Derez All.
         mRezBtn->setEnabled(has_selection);
-        mRezBtn->setLabel(getString(spawned ? "derez_label" : "rez_label"));
+        mRezBtn->setLabel(getString("rez_label"));
     }
     if (mSelectBtn)
     {
@@ -606,15 +644,7 @@ void LLPanelLocalMesh::onRez()
     const LLUUID id = getSelectedID();
     if (id.notNull())
     {
-        // Decoded: Rez, or Derez if already in-world.
-        if (LLLocalMeshMgr::getInstance()->getSpawnedRoot(id))
-        {
-            doDerez(id);
-        }
-        else
-        {
-            doSpawn(id);
-        }
+        doSpawn(id); // always rez a new copy
         return;
     }
     // Undecoded: load it and rez once it finishes (addAndSpawn handles the async load).
@@ -627,7 +657,19 @@ void LLPanelLocalMesh::onRez()
 
 void LLPanelLocalMesh::onAttach()
 {
-    doAttach(getSelectedID(), getComboAttachPoint());
+    const LLUUID id = getSelectedID();
+    if (id.notNull())
+    {
+        doAttach(id, getComboAttachPoint());
+        return;
+    }
+    // Undecoded row: load it and attach once it finishes loading (mirrors how Rez
+    // handles an undecoded row via addAndSpawn).
+    const std::string path = getSelectedPath();
+    if (!path.empty())
+    {
+        LLLocalMeshMgr::getInstance()->addAndAttach(path, getComboAttachPoint());
+    }
 }
 
 void LLPanelLocalMesh::onSelect()
@@ -688,14 +730,11 @@ void LLPanelLocalMesh::doAttach(const LLUUID& tracking_id, S32 attach_point)
         return;
     }
     LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
-    LLViewerObject* root = mgr->getSpawnedRoot(tracking_id);
-    if (!root)
+    // Attach always wears a fresh copy (Rez and Attach both spawn a new instance now);
+    // wearing a specific already-rezzed copy is a per-instance op on the Spawned tab.
+    if (LLViewerObject* root = mgr->spawnInWorld(tracking_id))
     {
-        root = mgr->spawnInWorld(tracking_id); // not in-world yet: rez it, then wear it
-    }
-    if (root)
-    {
-        mgr->attachPreviewToAvatar(root, attach_point); // if it spawned, the signal refreshes us
+        mgr->attachPreviewToAvatar(root, attach_point); // the spawn signal refreshes us
     }
 }
 
@@ -708,7 +747,17 @@ void LLPanelLocalMesh::doDetach(const LLUUID& tracking_id)
     }
 }
 
-void LLPanelLocalMesh::doDelete(const LLUUID& tracking_id)
+void LLPanelLocalMesh::doUnload(const LLUUID& tracking_id)
+{
+    if (tracking_id.notNull())
+    {
+        // Free the unit (and derez its in-world copies) but keep the saved path, so
+        // the mesh stays in the list as a dimmed, reloadable entry.
+        delUnit(tracking_id); // units-changed signal -> refresh()
+    }
+}
+
+void LLPanelLocalMesh::doRemove(const LLUUID& tracking_id)
 {
     if (tracking_id.notNull())
     {
@@ -737,11 +786,12 @@ void LLPanelLocalMesh::doSelect(const LLUUID& tracking_id)
     {
         return;
     }
-    // Select the linkset in-world and point the camera at it.
+    // Select the linkset and open Build to edit it. Deliberately does NOT move the
+    // camera (artists found Select yanking the view jarring); framing a copy is the
+    // separate Focus Camera action on the Spawned tab.
     LLSelectMgr::getInstance()->deselectAll();
     LLSelectMgr::getInstance()->selectObjectAndFamily(root);
-    gAgentCamera.setFocusOnAvatar(false, false);
-    gAgentCamera.setFocusGlobal(root->getPositionGlobal(), root->getID());
+    handle_object_edit();
 }
 
 // ============================================================================
@@ -1103,6 +1153,187 @@ protected:
     }
 };
 
+// ============================================================================
+//  Spawned Objects tab -- one row per rezzed copy across all meshes, with per-copy
+//  Select / Derez and a Derez All. Not a file list (not an LLPanelLocalAssetBase):
+//  its rows are in-world copies, fed from LLLocalMeshMgr::getSpawnedInstances(), and
+//  the row value is the copy's instance id.
+// ============================================================================
+class LLPanelLocalSpawned final : public LLPanel
+{
+public:
+    bool postBuild() override;
+    void draw() override;
+
+private:
+    void   refresh();
+    void   onSelectionChange();
+    void   onSelect();
+    void   onFocus();
+    void   onDerez();
+    void   onDerezAll();
+    LLUUID firstSelectedInstance() const;
+
+    LLScrollListCtrl* mList { nullptr };
+    LLButton*         mSelectBtn { nullptr };
+    LLButton*         mFocusBtn { nullptr };
+    LLButton*         mDerezBtn { nullptr };
+    LLButton*         mDerezAllBtn { nullptr };
+    boost::signals2::scoped_connection mChangedConn;
+};
+
+bool LLPanelLocalSpawned::postBuild()
+{
+    mList        = getChild<LLScrollListCtrl>("spawned_list");
+    mSelectBtn   = getChild<LLButton>("select_btn");
+    mFocusBtn    = getChild<LLButton>("focus_btn");
+    mDerezBtn    = getChild<LLButton>("derez_btn");
+    mDerezAllBtn = getChild<LLButton>("derez_all_btn");
+
+    mList->setCommitOnSelectionChange(true);
+    mList->setCommitCallback(boost::bind(&LLPanelLocalSpawned::onSelectionChange, this));
+    mList->setDoubleClickCallback(boost::bind(&LLPanelLocalSpawned::onSelect, this));
+    mSelectBtn->setCommitCallback(boost::bind(&LLPanelLocalSpawned::onSelect, this));
+    mFocusBtn->setCommitCallback(boost::bind(&LLPanelLocalSpawned::onFocus, this));
+    mDerezBtn->setCommitCallback(boost::bind(&LLPanelLocalSpawned::onDerez, this));
+    mDerezAllBtn->setCommitCallback(boost::bind(&LLPanelLocalSpawned::onDerezAll, this));
+
+    // Reactive: the mesh manager signals on any spawn / despawn / attach change.
+    mChangedConn = LLLocalMeshMgr::getInstance()->setUnitsChangedCallback(
+        boost::bind(&LLPanelLocalSpawned::refresh, this));
+
+    refresh();
+    return true;
+}
+
+void LLPanelLocalSpawned::refresh()
+{
+    if (!mList)
+    {
+        return;
+    }
+    const LLUUID prev = firstSelectedInstance();
+    mList->clearRows();
+
+    LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
+    const std::string icon = LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT, LLInventoryType::IT_OBJECT);
+    for (const LLLocalMeshMgr::SpawnedInstance& inst : mgr->getSpawnedInstances())
+    {
+        LLLocalMesh* unit = mgr->getUnit(inst.mTrackingID);
+
+        LLSD element;
+        element["columns"][0]["column"] = "icon";
+        element["columns"][0]["type"]   = "icon";
+        element["columns"][0]["value"]  = icon;
+        element["columns"][1]["column"] = "unit_name";
+        element["columns"][1]["type"]   = "text";
+        element["columns"][1]["value"]  = unit ? unit->getShortName() : LLStringUtil::null;
+        element["columns"][2]["column"] = "status";
+        element["columns"][2]["type"]   = "text";
+        element["columns"][2]["value"]  = mgr->statusText(inst.mRoot);
+
+        element["value"] = inst.mInstanceID; // identify the row by its copy
+        mList->addElement(element);
+    }
+
+    if (prev.notNull())
+    {
+        mList->selectByValue(LLSD(prev));
+    }
+    onSelectionChange();
+    mList->setCommentText(mList->getItemCount() == 0 ? getString("empty_hint") : LLStringUtil::null);
+}
+
+void LLPanelLocalSpawned::onSelectionChange()
+{
+    const bool has_sel = mList && !mList->getAllSelected().empty();
+    const bool any     = mList && mList->getItemCount() > 0;
+    if (mSelectBtn)   { mSelectBtn->setEnabled(has_sel); }
+    if (mFocusBtn)    { mFocusBtn->setEnabled(has_sel); }
+    if (mDerezBtn)    { mDerezBtn->setEnabled(has_sel); }
+    if (mDerezAllBtn) { mDerezAllBtn->setEnabled(any); }
+}
+
+void LLPanelLocalSpawned::draw()
+{
+    // In-world derez (the Delete key) changes the set independently of this list,
+    // so keep the buttons' enabled state live.
+    onSelectionChange();
+    LLPanel::draw();
+}
+
+LLUUID LLPanelLocalSpawned::firstSelectedInstance() const
+{
+    if (mList)
+    {
+        if (LLScrollListItem* item = mList->getFirstSelected())
+        {
+            return item->getValue().asUUID();
+        }
+    }
+    return LLUUID::null;
+}
+
+void LLPanelLocalSpawned::onSelect()
+{
+    LLViewerObject* root = LLLocalMeshMgr::getInstance()->getInstanceRoot(firstSelectedInstance());
+    if (!root)
+    {
+        return;
+    }
+    // Select + open Build to edit. Deliberately does NOT move the camera; framing the
+    // copy is the separate Focus Camera action below (artists dislike Select yanking
+    // the view, especially when picking through copies).
+    LLSelectMgr::getInstance()->deselectAll();
+    LLSelectMgr::getInstance()->selectObjectAndFamily(root);
+    handle_object_edit();
+}
+
+void LLPanelLocalSpawned::onFocus()
+{
+    LLViewerObject* root = LLLocalMeshMgr::getInstance()->getInstanceRoot(firstSelectedInstance());
+    if (!root)
+    {
+        return;
+    }
+    // Frame the copy: select it and point the camera at it (the deliberate move).
+    LLSelectMgr::getInstance()->deselectAll();
+    LLSelectMgr::getInstance()->selectObjectAndFamily(root);
+    gAgentCamera.setFocusOnAvatar(false, false);
+    gAgentCamera.setFocusGlobal(root->getPositionGlobal(), root->getID());
+}
+
+void LLPanelLocalSpawned::onDerez()
+{
+    if (!mList)
+    {
+        return;
+    }
+    // Snapshot ids first: despawnInstance() fires the manager signal -> refresh()
+    // rebuilds the list and frees the LLScrollListItems we'd be iterating.
+    std::vector<LLUUID> ids;
+    for (LLScrollListItem* item : mList->getAllSelected())
+    {
+        if (item)
+        {
+            const LLUUID id = item->getValue().asUUID();
+            if (id.notNull())
+            {
+                ids.push_back(id);
+            }
+        }
+    }
+    for (const LLUUID& id : ids)
+    {
+        LLLocalMeshMgr::getInstance()->despawnInstance(id);
+    }
+}
+
+void LLPanelLocalSpawned::onDerezAll()
+{
+    LLLocalMeshMgr::getInstance()->despawnAll();
+}
+
 // Build a panel from XUI and add it as a tab.
 LLPanelLocalAssetBase* add_asset_tab(LLTabContainer* tabs, LLPanelLocalAssetBase* panel,
                                      const std::string& name, const std::string& label,
@@ -1132,6 +1363,17 @@ LLFloaterLocalAssets::~LLFloaterLocalAssets()
 bool LLFloaterLocalAssets::postBuild()
 {
     mTabs = getChild<LLTabContainer>("asset_tabs");
+
+    // Rezzed tab first (the in-world scene overview): one row per rezzed copy. Its
+    // own panel/XML, not a file list. setName() after buildFromFile so the XML's name
+    // doesn't clobber it. Mesh stays the default-selected tab (load assets first).
+    {
+        LLPanelLocalSpawned* spawned = new LLPanelLocalSpawned();
+        spawned->buildFromFile("panel_local_spawned.xml");
+        spawned->setName("spawned_tab");
+        mTabs->addTabPanel(LLTabContainer::TabPanelParams().panel(spawned)
+                           .label(getString("tab_rezzed")).select_tab(false));
+    }
 
     add_asset_tab(mTabs, new LLPanelLocalMesh(),     "mesh_tab", getString("tab_mesh"),
                   "panel_local_asset_list.xml", true);

@@ -26,6 +26,10 @@
 
 #include "lllocalmesh.h"
 
+#include <algorithm>     // std::sort (stable rez-order listing of spawned copies)
+#include <unordered_map> // mSpawnedCopies: instance id -> copy (O(1) per-copy lookup/erase)
+#include <unordered_set> // dedup avatars when rebuilding overrides across copies
+
 /* model loaders (shared with the mesh upload path) */
 #include "lldaeloader.h"
 #include "gltf/llgltfloader.h"
@@ -823,15 +827,18 @@ void LLLocalMeshMgr::cleanup()
     // down. markDead() is idempotent, so the kill loop re-marking them is fine.
     mTimer.stopTimer();
 
-    for (auto& spawned : mSpawnedObjects)
+    for (auto& entry : mSpawnedCopies)
     {
-        if (spawned.second.notNull() && !spawned.second->isDead())
+        for (LLPointer<LLViewerObject>& p : entry.second.mPrims)
         {
-            detachRootIfAttached(spawned.second.get()); // unwear before it dies
-            spawned.second->markDead();
+            if (p.notNull() && !p->isDead())
+            {
+                detachRootIfAttached(p.get()); // unwear before it dies (only the root is worn)
+                p->markDead();
+            }
         }
     }
-    mSpawnedObjects.clear();
+    mSpawnedCopies.clear();
 
     if (mPreviewAvatar.notNull())
     {
@@ -849,17 +856,22 @@ void LLLocalMeshMgr::despawnObjectsInRegion(LLViewerRegion* regionp)
     // Release our client-only objects in it so they don't dangle past their
     // region; the loaded units stay, so a later spawn/reload re-creates them in
     // whatever region is current then. markDead() is idempotent.
-    for (auto iter = mSpawnedObjects.begin(); iter != mSpawnedObjects.end(); )
+    for (auto iter = mSpawnedCopies.begin(); iter != mSpawnedCopies.end(); )
     {
-        LLViewerObject* obj = iter->second.get();
-        if (!obj || obj->isDead() || obj->getRegion() == regionp)
+        SpawnedCopy& copy = iter->second;
+        LLViewerObject* root = copy.mPrims.empty() ? nullptr : copy.mPrims.front().get();
+        // A copy is a single linkset in one region, so the root's region covers it all.
+        if (!root || root->isDead() || root->getRegion() == regionp)
         {
-            if (obj && !obj->isDead())
+            for (LLPointer<LLViewerObject>& p : copy.mPrims)
             {
-                detachRootIfAttached(obj); // unwear before it dies
-                obj->markDead();
+                if (p.notNull() && !p->isDead())
+                {
+                    detachRootIfAttached(p.get()); // unwear before it dies
+                    p->markDead();
+                }
             }
-            iter = mSpawnedObjects.erase(iter);
+            iter = mSpawnedCopies.erase(iter);
         }
         else
         {
@@ -922,6 +934,13 @@ bool LLLocalMeshMgr::addUnit(const std::vector<std::string>& filenames)
 
 LLUUID LLLocalMeshMgr::addUnitInternal(const std::string& filename, bool include_joints)
 {
+    // No double-add: a file that's already loaded just returns its existing unit
+    // (so it can be rezzed again rather than duplicated in the list).
+    if (LLUUID existing = getUnitID(filename); existing.notNull())
+    {
+        return existing;
+    }
+
     LLLocalMesh* unit = new LLLocalMesh(filename, include_joints);
     if (unit->isFailed())
     {
@@ -1065,20 +1084,11 @@ void LLLocalMeshMgr::despawnPreviewObject(LLViewerObject* obj)
         return;
     }
 
-    // Map the object (linkset root or child) back to the unit that owns it, then
-    // derez that unit's linkset. The loaded file stays in the list so it can be
+    // Map the object (linkset root or child) back to the single rezzed copy that owns
+    // it and derez just that copy -- so the in-world Delete key removes one copy, not
+    // every copy of the unit. The loaded file stays in the list so it can be
     // re-spawned, and onLoadResult won't auto-respawn it on a later file save.
-    LLUUID tracking_id;
-    for (const auto& spawned : mSpawnedObjects)
-    {
-        if (spawned.second.get() == obj)
-        {
-            tracking_id = spawned.first;
-            break;
-        }
-    }
-
-    despawn(tracking_id);
+    despawnInstance(instanceForObject(obj));
 }
 
 void LLLocalMeshMgr::despawn(const LLUUID& tracking_id)
@@ -1100,25 +1110,40 @@ LLViewerObject* LLLocalMeshMgr::findRootForObject(const LLViewerObject* obj) con
     {
         return nullptr;
     }
-    LLUUID tracking_id;
-    for (const auto& spawned : mSpawnedObjects)
+    // Resolve obj (root or child) to its rezzed copy, then return that copy's root.
+    return getInstanceRoot(instanceForObject(obj));
+}
+
+LLUUID LLLocalMeshMgr::instanceForObject(const LLViewerObject* obj) const
+{
+    if (obj)
     {
-        if (spawned.second.get() == obj)
+        // obj may be any prim of a copy (root or child); match it within each copy.
+        // Only called by the infrequent per-object paths (in-world Delete, attach/
+        // detach), so scanning the copies' prims is fine.
+        for (const auto& entry : mSpawnedCopies)
         {
-            tracking_id = spawned.first;
-            break;
+            for (const LLPointer<LLViewerObject>& p : entry.second.mPrims)
+            {
+                if (p.get() == obj)
+                {
+                    return entry.first;
+                }
+            }
         }
     }
-    if (tracking_id.isNull())
+    return LLUUID::null;
+}
+
+LLViewerObject* LLLocalMeshMgr::getInstanceRoot(const LLUUID& instance_id) const
+{
+    auto it = mSpawnedCopies.find(instance_id);
+    if (it != mSpawnedCopies.end() && !it->second.mPrims.empty())
     {
-        return nullptr;
-    }
-    // The first entry pushed for a tracking id is the linkset root.
-    for (const auto& spawned : mSpawnedObjects)
-    {
-        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
+        LLViewerObject* root = it->second.mPrims.front().get();
+        if (root && !root->isDead())
         {
-            return spawned.second.get();
+            return root;
         }
     }
     return nullptr;
@@ -1130,13 +1155,11 @@ bool LLLocalMeshMgr::isRiggedPreview(const LLViewerObject* obj) const
     {
         return false;
     }
-    for (const auto& spawned : mSpawnedObjects)
+    auto it = mSpawnedCopies.find(instanceForObject(obj));
+    if (it != mSpawnedCopies.end())
     {
-        if (spawned.second.get() == obj)
-        {
-            LLLocalMesh* unit = getUnit(spawned.first);
-            return unit && unit->isRigged();
-        }
+        LLLocalMesh* unit = getUnit(it->second.mTrackingID);
+        return unit && unit->isRigged();
     }
     return false;
 }
@@ -1173,18 +1196,17 @@ void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj, S32 attach_point
     //    children). The preview skin carries no joint-position overrides (stripped
     //    in ingestScene to match the upload default), so the agent skeleton is left
     //    as-is and a default-weighted mesh renders correctly.
-    LLUUID tracking_id;
-    for (const auto& spawned : mSpawnedObjects)
-    {
-        if (spawned.second.get() == root) { tracking_id = spawned.first; break; }
-    }
+    const LLUUID instance_id = instanceForObject(root);
     const S32 point = (attach_point > 0) ? attach_point : 1; // default to chest
     const U8 attach_state = (U8)ATTACHMENT_ID_FROM_STATE(point);
-    for (auto& spawned : mSpawnedObjects)
+    if (auto it = mSpawnedCopies.find(instance_id); it != mSpawnedCopies.end())
     {
-        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
+        for (LLPointer<LLViewerObject>& p : it->second.mPrims)
         {
-            spawned.second->setAttachmentState(attach_state);
+            if (p.notNull() && !p->isDead())
+            {
+                p->setAttachmentState(attach_state);
+            }
         }
     }
 
@@ -1198,6 +1220,7 @@ void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj, S32 attach_point
     // bookkeeping a preview lacks.
     gAgentAvatarp->addChild(root);
 
+    mUnitsChangedSignal(); // worn state changed -> refresh the list status
     LL_INFOS("LocalMesh") << "Attached local mesh preview to avatar" << LL_ENDL;
 }
 
@@ -1208,28 +1231,27 @@ void LLLocalMeshMgr::detachPreviewFromAvatar(LLViewerObject* obj)
     {
         return;
     }
-    LLUUID tracking_id;
-    for (const auto& spawned : mSpawnedObjects)
-    {
-        if (spawned.second.get() == root) { tracking_id = spawned.first; break; }
-    }
+    const LLUUID instance_id = instanceForObject(root);
 
     LLSelectMgr::getInstance()->deselectAll();
 
     // Detach in place (NOT despawn/respawn) so the same prims -- and any edits the
     // user made (textures, colours, transforms) -- survive being taken off.
     //
-    // Clear the attachment state on the WHOLE linkset FIRST: the makeStatic() inside
-    // LLViewerJointAttachment::removeObject() is guarded on !isAttachment(), so with
-    // the state still set it's a no-op and the drawables stay ACTIVE on the avatar's
-    // spatial bridge -- once detached they then render adrift from their bounding
-    // boxes (mesh in one spot, bbox across the region). Clearing first lets
+    // Clear the attachment state on this copy's WHOLE linkset FIRST: the makeStatic()
+    // inside LLViewerJointAttachment::removeObject() is guarded on !isAttachment(), so
+    // with the state still set it's a no-op and the drawables stay ACTIVE on the
+    // avatar's spatial bridge -- once detached they then render adrift from their
+    // bounding boxes (mesh in one spot, bbox across the region). Clearing first lets
     // removeObject() re-home the linkset (root + children) into the region partition.
-    for (auto& spawned : mSpawnedObjects)
+    if (auto it = mSpawnedCopies.find(instance_id); it != mSpawnedCopies.end())
     {
-        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
+        for (LLPointer<LLViewerObject>& p : it->second.mPrims)
         {
-            spawned.second->setAttachmentState(0);
+            if (p.notNull() && !p->isDead())
+            {
+                p->setAttachmentState(0);
+            }
         }
     }
 
@@ -1247,6 +1269,8 @@ void LLLocalMeshMgr::detachPreviewFromAvatar(LLViewerObject* obj)
     // Put it back in-world a few metres in front of the agent.
     root->setPositionAgent(gAgent.getPositionAgent() + gAgent.getAtAxis() * 3.f);
     root->markForUpdate();
+
+    mUnitsChangedSignal(); // worn state changed -> refresh the list status
 }
 
 void LLLocalMeshMgr::detachRootIfAttached(LLViewerObject* root)
@@ -1283,42 +1307,42 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
         return nullptr;
     }
 
+    // Always rez a NEW copy a few metres in front of the agent. `base` is the root
+    // prim's world position (root = the model centre + part 0's offset).
+    const std::vector<LLLocalMeshPart>& parts = unit->getParts();
+    const LLVector3 base = gAgent.getPositionAgent() + gAgent.getAtAxis() * 3.f + parts[0].mOffset;
+    LLUUID instance_id;
+    instance_id.generate();
+
+    LLViewerObject* root = spawnLinkset(tracking_id, instance_id, base, LLQuaternion(), false, 0);
+    if (root)
+    {
+        LL_INFOS("LocalMesh") << "Spawned local mesh '" << unit->getShortName() << "' as "
+                              << unit->getNumParts() << " prim(s), " << unit->getNumFaces() << " faces" << LL_ENDL;
+    }
+    return root;
+}
+
+LLViewerObject* LLLocalMeshMgr::spawnLinkset(const LLUUID& tracking_id, const LLUUID& instance_id,
+                                             const LLVector3& base, const LLQuaternion& root_rot,
+                                             bool attach, S32 attach_point)
+{
+    LLLocalMesh* unit = getUnit(tracking_id);
+    if (!unit || !unit->getValid() || unit->getParts().empty()
+        || !isAgentAvatarValid() || !gAgent.getRegion())
+    {
+        return nullptr;
+    }
     const std::vector<LLLocalMeshPart>& parts = unit->getParts();
 
-    // Live reload: if a linkset already exists for this unit, preserve its root
-    // transform and then replace it with the freshly decoded geometry.
-    LLVector3    base;
-    LLQuaternion root_rot;
-    bool         had_prev = false;
-    bool         was_attached = false;
-    S32          attach_point = 0;
-    for (const auto& spawned : mSpawnedObjects)
-    {
-        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
-        {
-            base     = spawned.second->getPositionAgent();
-            root_rot = spawned.second->getRotation();
-            had_prev = true;
-            if (spawned.second->isAttachment())
-            {
-                // Preview was worn: re-wear the rebuilt linkset at the same point.
-                was_attached = true;
-                attach_point = ATTACHMENT_ID_FROM_STATE(spawned.second->getAttachmentState());
-            }
-            break; // the first entry for a tracking id is the linkset root
-        }
-    }
-    despawnUnit(tracking_id);
-
-    // `base` is the root prim's world position. For a fresh spawn, place the
-    // model's centre a few metres in front of the agent (root = centre + offset0).
-    if (!had_prev)
-    {
-        base = gAgent.getPositionAgent() + gAgent.getAtAxis() * 3.f + parts[0].mOffset;
-    }
-
     // One prim per part, linked into a single linkset rooted at the first prim --
-    // the same structure an upload of this file would rez.
+    // the same structure an upload of this file would rez. The whole linkset is one
+    // copy, stored under instance_id, so it can be addressed independently of the
+    // unit's other copies.
+    SpawnedCopy copy;
+    copy.mTrackingID = tracking_id;
+    copy.mSeq        = mNextSpawnSeq++;
+
     LLViewerObject* root = nullptr;
     for (size_t i = 0; i < parts.size(); ++i)
     {
@@ -1328,7 +1352,7 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
         LLVOVolume* vol = dynamic_cast<LLVOVolume*>(obj);
         if (!vol)
         {
-            LL_WARNS("LocalMesh") << "spawnInWorld: failed to create volume object" << LL_ENDL;
+            LL_WARNS("LocalMesh") << "spawnLinkset: failed to create volume object" << LL_ENDL;
             if (obj) { obj->markDead(); }
             continue;
         }
@@ -1367,22 +1391,65 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
         // root's rotation is still identity here, making that a pure translation.
         vol->setPositionAgent(base + (part.mOffset - parts[0].mOffset));
 
-        mSpawnedObjects.emplace_back(tracking_id, obj);
+        copy.mPrims.push_back(obj);
     }
 
-    if (root && had_prev)
+    if (root)
     {
-        root->setRotation(root_rot); // restore the linkset orientation across reload
-    }
-    if (root && was_attached)
-    {
-        attachPreviewToAvatar(root, attach_point); // restore the attachment across re-spawn
+        // Store the copy before attaching -- attachPreviewToAvatar() looks it up by id.
+        mSpawnedCopies[instance_id] = std::move(copy);
+        root->setRotation(root_rot); // identity for a fresh rez; the saved orientation on reload
+        if (attach)
+        {
+            attachPreviewToAvatar(root, attach_point); // restore a worn copy across a re-spawn
+        }
     }
 
     mUnitsChangedSignal(); // rezzed state changed
-    LL_INFOS("LocalMesh") << "Spawned local mesh '" << unit->getShortName() << "' as "
-                          << unit->getNumParts() << " prim(s), " << unit->getNumFaces() << " faces" << LL_ENDL;
     return root;
+}
+
+void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
+{
+    // Capture each existing copy's identity, transform and attachment, then re-rez
+    // them in place. Used when a reload changes the prim count (hot-swap can't swap
+    // 1:1), so every copy refreshes without moving or losing its worn state.
+    struct Saved
+    {
+        LLUUID       mInstanceID;
+        LLVector3    mBase;
+        LLQuaternion mRot;
+        bool         mAttached = false;
+        S32          mPoint = 0;
+    };
+    std::vector<Saved> saved;
+    for (const auto& entry : mSpawnedCopies)
+    {
+        const SpawnedCopy& copy = entry.second;
+        if (copy.mTrackingID != tracking_id || copy.mPrims.empty())
+        {
+            continue;
+        }
+        LLViewerObject* r = copy.mPrims.front().get(); // mPrims[0] is the root
+        if (!r || r->isDead())
+        {
+            continue;
+        }
+        Saved s;
+        s.mInstanceID = entry.first;
+        s.mBase       = r->getPositionAgent();
+        s.mRot        = r->getRotation();
+        s.mAttached   = r->isAttachment();
+        s.mPoint      = s.mAttached ? ATTACHMENT_ID_FROM_STATE(r->getAttachmentState()) : 0;
+        saved.push_back(s);
+    }
+
+    despawnUnit(tracking_id); // drop all copies; re-rez them below at the same places
+
+    for (const Saved& s : saved)
+    {
+        spawnLinkset(tracking_id, s.mInstanceID, s.mBase, s.mRot, s.mAttached, s.mPoint);
+    }
 }
 
 bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
@@ -1394,19 +1461,23 @@ bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
     }
     const std::vector<LLLocalMeshPart>& parts = unit->getParts();
 
-    // The existing spawned prims for this unit, in spawn order (root first).
-    std::vector<LLViewerObject*> objs;
-    for (const auto& spawned : mSpawnedObjects)
+    // Only structurally identical copies can be swapped 1:1; a changed prim count
+    // needs a real re-spawn (to add/remove prims) -- caller falls back. The copies
+    // are already grouped (one entry per copy), so just check each copy's prim count.
+    S32 copies = 0;
+    for (const auto& entry : mSpawnedCopies)
     {
-        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
+        if (entry.second.mTrackingID != tracking_id)
         {
-            objs.push_back(spawned.second.get());
+            continue;
+        }
+        ++copies;
+        if (entry.second.mPrims.size() != parts.size())
+        {
+            return false;
         }
     }
-
-    // Only a structurally identical linkset can be swapped 1:1 in place; a changed
-    // prim count needs a real re-spawn (to add/remove prims).
-    if (objs.empty() || objs.size() != parts.size())
+    if (copies == 0)
     {
         return false;
     }
@@ -1414,35 +1485,153 @@ bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
     // Point each prim at the freshly decoded geometry by swapping its mesh (sculpt)
     // id. The new id has an empty volume cache, so the repository copies the new
     // faces and the prim rebuilds in place; LLVOVolume also drops its cached skin
-    // when the mesh id changes, so rigged skinning refreshes too. No despawn -> the
-    // attachment, selection and transform are all preserved.
-    for (size_t i = 0; i < parts.size(); ++i)
+    // when the mesh id changes, so rigged skinning refreshes too. No despawn -> each
+    // copy's attachment, selection and transform are all preserved.
+    for (auto& entry : mSpawnedCopies)
     {
-        LLVOVolume* vol = dynamic_cast<LLVOVolume*>(objs[i]);
-        if (!vol)
+        SpawnedCopy& copy = entry.second;
+        if (copy.mTrackingID != tracking_id)
         {
-            return false;
+            continue;
         }
-        vol->setScale(parts[i].mScale, false);
-        applyPartGeometry(vol, parts[i]);
+        for (size_t i = 0; i < parts.size(); ++i)
+        {
+            LLViewerObject* o = copy.mPrims[i].get();
+            LLVOVolume* vol = (o && !o->isDead()) ? dynamic_cast<LLVOVolume*>(o) : nullptr;
+            if (!vol)
+            {
+                return false; // a dead/unexpected prim -> let the caller re-spawn
+            }
+            vol->setScale(parts[i].mScale, false);
+            applyPartGeometry(vol, parts[i]);
+        }
     }
 
     LL_INFOS("LocalMesh") << "Hot-swapped local mesh '" << unit->getShortName() << "' ("
-                          << parts.size() << " prim(s)) in place" << LL_ENDL;
+                          << copies << " copy(ies), " << parts.size() << " prim(s) each) in place" << LL_ENDL;
     return true;
 }
 
 LLViewerObject* LLLocalMeshMgr::getSpawnedRoot(const LLUUID& tracking_id) const
 {
-    for (const auto& spawned : mSpawnedObjects)
+    // Any one live copy's root -- enough for "is this unit in-world?" checks.
+    for (const auto& entry : mSpawnedCopies)
     {
-        // The first live entry pushed for a tracking id is the linkset root.
-        if (spawned.first == tracking_id && spawned.second.notNull() && !spawned.second->isDead())
+        const SpawnedCopy& copy = entry.second;
+        if (copy.mTrackingID == tracking_id && !copy.mPrims.empty())
         {
-            return spawned.second;
+            LLViewerObject* root = copy.mPrims.front().get();
+            if (root && !root->isDead())
+            {
+                return root;
+            }
         }
     }
     return nullptr;
+}
+
+S32 LLLocalMeshMgr::getSpawnedCount(const LLUUID& tracking_id) const
+{
+    S32 count = 0;
+    for (const auto& entry : mSpawnedCopies)
+    {
+        const SpawnedCopy& copy = entry.second;
+        if (copy.mTrackingID == tracking_id && !copy.mPrims.empty()
+            && copy.mPrims.front().notNull() && !copy.mPrims.front()->isDead())
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
+std::vector<LLLocalMeshMgr::SpawnedInstance> LLLocalMeshMgr::getSpawnedInstances() const
+{
+    // Collect with the rez sequence so the list is stable in rez order, independent
+    // of the map's (unspecified) iteration order.
+    std::vector<std::pair<U32, SpawnedInstance> > ordered;
+    for (const auto& entry : mSpawnedCopies)
+    {
+        const SpawnedCopy& copy = entry.second;
+        if (copy.mPrims.empty() || copy.mPrims.front().isNull() || copy.mPrims.front()->isDead())
+        {
+            continue;
+        }
+        ordered.push_back({copy.mSeq, {entry.first, copy.mTrackingID, copy.mPrims.front().get()}});
+    }
+    std::sort(ordered.begin(), ordered.end(),
+              [](const std::pair<U32, SpawnedInstance>& a, const std::pair<U32, SpawnedInstance>& b)
+              { return a.first < b.first; });
+
+    std::vector<SpawnedInstance> out;
+    out.reserve(ordered.size());
+    for (const auto& pr : ordered)
+    {
+        out.push_back(pr.second);
+    }
+    return out;
+}
+
+void LLLocalMeshMgr::despawnInstance(const LLUUID& instance_id)
+{
+    auto it = mSpawnedCopies.find(instance_id);
+    if (it == mSpawnedCopies.end())
+    {
+        return;
+    }
+    for (LLPointer<LLViewerObject>& p : it->second.mPrims)
+    {
+        if (p.notNull() && !p->isDead())
+        {
+            detachRootIfAttached(p.get()); // unwear before it dies (only the root is worn)
+            p->markDead();                 // the root's markDead cascades to its children
+        }
+    }
+    mSpawnedCopies.erase(it);
+    mUnitsChangedSignal(); // rezzed state changed
+}
+
+void LLLocalMeshMgr::despawnAll()
+{
+    for (auto& entry : mSpawnedCopies)
+    {
+        for (LLPointer<LLViewerObject>& p : entry.second.mPrims)
+        {
+            if (p.notNull() && !p->isDead())
+            {
+                detachRootIfAttached(p.get()); // unwear before it dies
+                p->markDead();                 // the root's markDead cascades to its children
+            }
+        }
+    }
+    mSpawnedCopies.clear();
+    mUnitsChangedSignal(); // rezzed state changed
+}
+
+std::string LLLocalMeshMgr::statusText(LLViewerObject* root) const
+{
+    if (!root)
+    {
+        return std::string();
+    }
+    if (root->isAttachment())
+    {
+        const S32 point_id = ATTACHMENT_ID_FROM_STATE(root->getAttachmentState());
+        std::string point_name = llformat("%d", point_id);
+        if (isAgentAvatarValid())
+        {
+            LLVOAvatar::attachment_map_t::const_iterator iter =
+                gAgentAvatarp->mAttachmentPoints.find(point_id);
+            if (iter != gAgentAvatarp->mAttachmentPoints.end() && iter->second)
+            {
+                point_name = iter->second->getName();
+            }
+        }
+        LLSD args;
+        args["POINT"] = point_name;
+        return LLTrans::getString("LocalAssetAttached", args);
+    }
+    return LLTrans::getString("LocalAssetRezzed");
 }
 
 void LLLocalMeshMgr::setIncludeJointPositions(const LLUUID& tracking_id, bool include)
@@ -1553,7 +1742,31 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
             {
                 if (!hotSwapInWorld(tracking_id))
                 {
-                    spawnInWorld(tracking_id);
+                    respawnInstancesInPlace(tracking_id); // prim count changed -> re-rez each copy
+                }
+                // The skin may have changed (a live edit, or a Joint Positions
+                // toggle), so recompute joint-position overrides on every affected
+                // avatar. rebuildAttachmentOverrides() clears the old offsets
+                // (resetting the skeleton) then re-adds from the current skin -- so a
+                // toggle-off truly reverts the skeleton instead of leaving the
+                // previous mesh's pelvis/joint offsets stuck on it. Each worn/animesh
+                // copy may sit on a different avatar, so rebuild each one (deduped);
+                // getAvatar() resolves the agent (attached) or the control avatar
+                // (animesh); a plain rezzed rigged copy has none, so it's skipped.
+                std::unordered_set<LLVOAvatar*> avatars;
+                for (const SpawnedInstance& inst : getSpawnedInstances())
+                {
+                    if (inst.mTrackingID == tracking_id && inst.mRoot)
+                    {
+                        if (LLVOAvatar* av = inst.mRoot->getAvatar())
+                        {
+                            avatars.insert(av);
+                        }
+                    }
+                }
+                for (LLVOAvatar* av : avatars)
+                {
+                    av->rebuildAttachmentOverrides();
                 }
             }
         }
@@ -1566,7 +1779,13 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
         logUnit("Loaded", unit);
         if (unit->wantsSpawn())
         {
-            spawnInWorld(tracking_id);
+            LLViewerObject* root = spawnInWorld(tracking_id);
+            // Deferred attach: Attach was pressed on this unit while it was still
+            // undecoded (see addAndAttach) -- wear it now that it's in-world.
+            if (root && unit->wantsAttach() >= 0)
+            {
+                attachPreviewToAvatar(root, unit->wantsAttach());
+            }
         }
     }
     else
@@ -1609,18 +1828,50 @@ void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames)
     }
 }
 
+void LLLocalMeshMgr::addAndAttach(const std::string& filename, S32 attach_point)
+{
+    if (filename.empty())
+    {
+        return;
+    }
+    const LLUUID tracking_id = addUnit(filename); // dedups: existing unit if already loaded
+    LLLocalMesh* unit = tracking_id.notNull() ? getUnit(tracking_id) : nullptr;
+    if (!unit)
+    {
+        return;
+    }
+    if (unit->getValid())
+    {
+        // Already decoded -- spawn and wear it now.
+        if (LLViewerObject* root = spawnInWorld(tracking_id))
+        {
+            attachPreviewToAvatar(root, attach_point);
+        }
+    }
+    else
+    {
+        // Still loading (the common case for an undecoded row) -- onLoadResult will
+        // spawn and attach it once the parse finishes.
+        unit->setSpawnWhenReady(true);
+        unit->setAttachWhenReady(attach_point);
+    }
+}
+
 void LLLocalMeshMgr::despawnUnit(const LLUUID& tracking_id)
 {
-    for (auto iter = mSpawnedObjects.begin(); iter != mSpawnedObjects.end(); )
+    for (auto iter = mSpawnedCopies.begin(); iter != mSpawnedCopies.end(); )
     {
-        if (iter->first == tracking_id)
+        if (iter->second.mTrackingID == tracking_id)
         {
-            if (iter->second.notNull() && !iter->second->isDead())
+            for (LLPointer<LLViewerObject>& p : iter->second.mPrims)
             {
-                detachRootIfAttached(iter->second.get()); // unwear before it dies
-                iter->second->markDead(); // root markDead cascades to its linked children
+                if (p.notNull() && !p->isDead())
+                {
+                    detachRootIfAttached(p.get()); // unwear before it dies
+                    p->markDead();                 // the root's markDead cascades to its children
+                }
             }
-            iter = mSpawnedObjects.erase(iter);
+            iter = mSpawnedCopies.erase(iter);
         }
         else
         {
@@ -1641,6 +1892,7 @@ void LLLocalMeshMgr::feedScrollList(LLScrollListCtrl* ctrl)
 
     for (LLLocalMesh* unit : mMeshList)
     {
+        const S32 count = getSpawnedCount(unit->getTrackingID());
         LLViewerObject* root = getSpawnedRoot(unit->getTrackingID());
 
         LLSD element;
@@ -1656,31 +1908,18 @@ void LLLocalMeshMgr::feedScrollList(LLScrollListCtrl* ctrl)
             element["columns"][1]["font"]["style"] = "BOLD"; // in-world (rezzed or worn)
         }
 
-        // Status column (the mesh tab adds it): in-world state + attachment point.
+        // Status column (the mesh tab adds it): the in-world copy count, or -- when
+        // there's exactly one copy -- that copy's state + attachment point.
         std::string status;
-        if (root)
+        if (count > 1)
         {
-            if (root->isAttachment())
-            {
-                const S32 point_id = ATTACHMENT_ID_FROM_STATE(root->getAttachmentState());
-                std::string point_name = llformat("%d", point_id);
-                if (isAgentAvatarValid())
-                {
-                    LLVOAvatar::attachment_map_t::const_iterator iter =
-                        gAgentAvatarp->mAttachmentPoints.find(point_id);
-                    if (iter != gAgentAvatarp->mAttachmentPoints.end() && iter->second)
-                    {
-                        point_name = iter->second->getName();
-                    }
-                }
-                LLSD args;
-                args["POINT"] = point_name;
-                status = LLTrans::getString("LocalAssetAttached", args);
-            }
-            else
-            {
-                status = LLTrans::getString("LocalAssetRezzed");
-            }
+            LLSD args;
+            args["COUNT"] = count;
+            status = LLTrans::getString("LocalMeshInWorldCount", args);
+        }
+        else if (root)
+        {
+            status = statusText(root);
         }
         element["columns"][2]["column"] = "status";
         element["columns"][2]["type"]   = "text";
