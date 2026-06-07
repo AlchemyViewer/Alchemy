@@ -367,6 +367,37 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename, bool mesh_owned
     return res;
 }
 
+// Content signature of a glTF material: its factors plus, for each texture slot,
+// the SOURCE image (not the per-material texture index). Exporters routinely split
+// one atlas-textured material into one material per face (distinct names + distinct
+// texture objects that all point at the same image); those share a signature, so we
+// can import them as a single local material instead of N -- no Materials-tab
+// clutter, no repeated load/verify dialogs, and one shared texture that renders on
+// the first load (every face references it, so its load callback repaints them all).
+static std::string gltfMaterialSignature(const tinygltf::Model& model, S32 idx)
+{
+    const tinygltf::Material& m = model.materials[idx];
+    const tinygltf::PbrMetallicRoughness& pbr = m.pbrMetallicRoughness;
+    std::string s;
+    auto add_d = [&s](double d) { s += std::to_string(d); s += ','; };
+    auto add_vec = [&](const std::vector<double>& v) { for (double d : v) { add_d(d); } s += '|'; };
+    auto add_tex = [&](int ti, int tc)
+    {
+        const int src = (ti >= 0 && ti < (int)model.textures.size()) ? model.textures[ti].source : -1;
+        s += std::to_string(src); s += ':'; s += std::to_string(tc); s += '|';
+    };
+    add_vec(pbr.baseColorFactor);
+    add_d(pbr.metallicFactor); add_d(pbr.roughnessFactor); s += '|';
+    add_tex(pbr.baseColorTexture.index, pbr.baseColorTexture.texCoord);
+    add_tex(pbr.metallicRoughnessTexture.index, pbr.metallicRoughnessTexture.texCoord);
+    add_tex(m.normalTexture.index, m.normalTexture.texCoord); add_d(m.normalTexture.scale); s += '|';
+    add_tex(m.occlusionTexture.index, m.occlusionTexture.texCoord); add_d(m.occlusionTexture.strength); s += '|';
+    add_vec(m.emissiveFactor);
+    add_tex(m.emissiveTexture.index, m.emissiveTexture.texCoord);
+    s += m.alphaMode; s += '|'; add_d(m.alphaCutoff); s += (m.doubleSided ? '1' : '0');
+    return s;
+}
+
 S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID& outID, bool mesh_owned)
 {
     // No double-add: if this file's materials are already loaded (same ownership
@@ -391,11 +422,34 @@ S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID&
     }
 
     S32 loaded_materials = 0;
+    // Deduplicate content-identical materials within this file (see
+    // gltfMaterialSignature). The signature comes straight from the parsed model,
+    // so a duplicate is skipped BEFORE it is loaded -- no second decode, no second
+    // verify dialog. Every original face binding name is recorded as an alias on
+    // the canonical unit so a mesh face still resolves to it (getWorldIDsByName).
+    std::vector<std::pair<std::string, LLLocalGLTFMaterial*>> by_signature;
     for (size_t i = 0; i < materials_in_file; i++)
     {
-        // Todo: this is rather inefficient, files will be spammed with
-        // separate loads and date checks, find a way to improve this.
-        // May be doUpdates() should be checking individual files.
+        const std::string signature = gltfMaterialSignature(model, static_cast<S32>(i));
+
+        LLLocalGLTFMaterial* canonical = nullptr;
+        for (const auto& entry : by_signature)
+        {
+            if (entry.first == signature)
+            {
+                canonical = entry.second;
+                break;
+            }
+        }
+        if (canonical)
+        {
+            // Identical to an already-imported material: keep this face binding name
+            // (empty -> "mat<index>", matching the model loader) pointing at it.
+            const std::string& nm = model.materials[i].name;
+            canonical->addAliasName(nm.empty() ? ("mat" + std::to_string(i)) : nm);
+            continue;
+        }
+
         LLPointer<LLLocalGLTFMaterial> unit = new LLLocalGLTFMaterial(filename, static_cast<S32>(i));
 
         // load material from file
@@ -403,6 +457,7 @@ S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID&
         {
             unit->setMeshOwned(mesh_owned);
             mMaterialList.emplace_back(unit);
+            by_signature.emplace_back(signature, unit.get());
             if(loaded_materials == 0)
             {
                 outID = unit->getTrackingID();
@@ -491,6 +546,17 @@ LLUUID LLLocalGLTFMaterialMgr::getUnitID(const std::string& filename, S32 index)
     return LLUUID::null;
 }
 
+void LLLocalGLTFMaterialMgr::getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out)
+{
+    for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
+    {
+        if (unit->getFilename() == filename)
+        {
+            out.push_back(unit->getTrackingID());
+        }
+    }
+}
+
 LLUUID LLLocalGLTFMaterialMgr::getWorldID(LLUUID tracking_id)
 {
     LLUUID world_id = LLUUID::null;
@@ -565,6 +631,13 @@ void LLLocalGLTFMaterialMgr::getWorldIDsByName(const std::string& filename, std:
             name = "mat" + std::to_string(unit->getIndexInFile());
         }
         out[name] = unit->getWorldID();
+
+        // Plus any face bindings that deduplicated onto this unit at import, so every
+        // face of a one-material-per-face mesh resolves to this shared material.
+        for (const std::string& alias : unit->getAliasNames())
+        {
+            out[alias] = unit->getWorldID();
+        }
     }
 }
 

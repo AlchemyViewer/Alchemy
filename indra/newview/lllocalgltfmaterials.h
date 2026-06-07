@@ -52,6 +52,12 @@ public: /* accessors */
     LLUUID      getWorldID() const;
     S32         getIndexInFile() const;
     std::string getMaterialName() const { return mMaterialName; } // glTF material name (face binding)
+    // Other glTF material names (face bindings) that deduplicated onto this unit:
+    // a mesh import collapses content-identical materials to one, but every
+    // original face still binds by its own name, so we keep them for the name->id
+    // map (see LLLocalGLTFMaterialMgr::getWorldIDsByName).
+    const std::vector<std::string>& getAliasNames() const { return mAliasNames; }
+    void        addAliasName(const std::string& name) { mAliasNames.push_back(name); }
     // Imported by a local mesh for its own faces: hidden from the Materials tab +
     // cross-session persistence (it reappears when the mesh re-decodes).
     bool        isMeshOwned() const { return mIsMeshOwned; }
@@ -87,6 +93,7 @@ private: /* members */
     S32         mUpdateRetries;
     S32         mMaterialIndex; // Single file can have more than one
     std::string mMaterialName;  // glTF material name, for matching a mesh face's binding
+    std::vector<std::string> mAliasNames; // other face bindings deduplicated onto this unit
     bool        mIsMeshOwned = false; // imported by a local mesh (see isMeshOwned)
 };
 
@@ -118,6 +125,10 @@ protected:
 public:
     void         delUnit(LLUUID tracking_id);
     LLUUID       getUnitID(const std::string& filename, S32 index = 0);
+    // Tracking ids of every unit loaded from a file, in list order. Unlike walking
+    // getUnitID(file, 0..N), this is safe across the index gaps that import-time
+    // deduplication leaves in getIndexInFile().
+    void         getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out);
 
     LLUUID       getWorldID(LLUUID tracking_id);
     bool         isMeshOwned(const LLUUID& tracking_id) const; // imported by a local mesh

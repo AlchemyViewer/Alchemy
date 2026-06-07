@@ -535,21 +535,29 @@ LLUUID LLLocalMesh::registerOwnedBitmap(const std::string& filename, std::vector
 void LLLocalMesh::importGLTFMaterials(std::map<std::string, LLUUID>& out_by_name, std::vector<LLUUID>& owned)
 {
     LLLocalGLTFMaterialMgr* mgr = LLLocalGLTFMaterialMgr::getInstance();
-    // Load the file's materials once (mesh-owned), unless already present (a prior
-    // reload, or the user loaded the same file in the Materials tab).
-    if (mgr->getUnitID(mFilename, 0).isNull())
+
+    // Load the file's materials once as mesh-owned, unless a prior parse already did.
+    // (A user-loaded copy from the Materials tab is a separate, non-mesh-owned set
+    // and doesn't count.) Import-time dedup can leave gaps in per-file material
+    // indices, so enumerate units by tracking id rather than walking indices.
+    std::vector<LLUUID> tids;
+    mgr->getTrackingIDs(mFilename, tids);
+    bool has_mesh_owned = false;
+    for (const LLUUID& tid : tids)
+    {
+        if (mgr->isMeshOwned(tid)) { has_mesh_owned = true; break; }
+    }
+    if (!has_mesh_owned)
     {
         mgr->addUnit(mFilename, /*mesh_owned=*/true);
+        tids.clear();
+        mgr->getTrackingIDs(mFilename, tids);
     }
-    // Keep the file's mesh-owned material units referenced this parse (a user-loaded
-    // copy of the same file is left untracked).
-    for (S32 i = 0; ; ++i)
+
+    // Keep this parse's mesh-owned units referenced (a user-loaded copy is left
+    // untracked -- the user owns it; we must not release it on reload/delete).
+    for (const LLUUID& tid : tids)
     {
-        LLUUID tid = mgr->getUnitID(mFilename, i);
-        if (tid.isNull())
-        {
-            break;
-        }
         if (mgr->isMeshOwned(tid))
         {
             track_owned(owned, tid);
@@ -1878,12 +1886,45 @@ void LLLocalMeshMgr::applyPartGeometry(LLVOVolume* vol, const LLLocalMeshPart& p
     // local bitmap), diffuse color and fullbright captured at ingest. Faces with no
     // map fall back to the default texture. No sendTEUpdate() -- the object is
     // client-only (isLocalOnly) and these setters only touch local render state.
-    LLVolume* v = vol->getVolume();
-    const S32 num_faces = v ? v->getNumVolumeFaces() : 0;
+    //
+    // Use the PART's decoded face count, not vol->getVolume()'s. At initial spawn
+    // the viewer object's mesh volume can still report a placeholder face count --
+    // the repository injection that resolves the sculpt id to our geometry hasn't
+    // realized on this object yet -- so getNumVolumeFaces() reads too few faces and
+    // only the first face(s) get textures/materials; the rest stay default until a
+    // reload/hot-swap (where the volume is already realized) re-runs this. That is
+    // why a fresh import "only materials one face/link until the source is
+    // refreshed". part.mNumFaces is the geometry we injected (== part.mVolume's face
+    // count), available synchronously, so setNumTEs() and the per-face apply below
+    // always cover every face -- and the object then carries the full TE count for
+    // later edits (e.g. Apply-to-Selected, which is bounded by getNumTEs()).
+    const S32 num_faces = part.mNumFaces;
     bool any_render_mat = false;
+    for (S32 i = 0; i < num_faces && i < (S32)part.mFaceMaterials.size(); ++i)
+    {
+        if (part.mFaceMaterials[i].mRenderMaterialID.notNull())
+        {
+            any_render_mat = true;
+            break;
+        }
+    }
     if (num_faces > 0)
     {
         vol->setNumTEs((U8)num_faces);
+
+        // Mark the render-material extra param IN USE *before* applying per-face
+        // materials. setRenderMaterialID() only persists an id into the param block
+        // when getRenderMaterialParams() returns it, and that returns null until the
+        // param is in use. Applied per-face beforehand, each call created a throwaway
+        // block and only the last face's id survived -- so the rebuild's
+        // updateTEMaterialTextures() then cleared every other face's material (a
+        // freshly imported glTF mesh showed its material on only one face). A
+        // client-only object never gets the server echo that would normally set this.
+        if (any_render_mat)
+        {
+            vol->setHasRenderMaterialParams(true);
+        }
+
         for (S32 i = 0; i < num_faces; ++i)
         {
             const LLLocalMeshFaceMaterial* fm =
@@ -1899,19 +1940,9 @@ void LLLocalMeshMgr::applyPartGeometry(LLVOVolume* vol, const LLLocalMeshPart& p
                     // glTF PBR material (owns its own textures); update_server=false
                     // because the preview is client-only.
                     vol->setRenderMaterialID((S32)i, fm->mRenderMaterialID, false, true);
-                    any_render_mat = true;
                 }
             }
         }
-    }
-
-    if (any_render_mat)
-    {
-        // Mark the render-material extra param in use so the glTF materials survive
-        // the post-spawn drawable rebuild. A client-only object never gets the server
-        // echo that normally sets this, so the render materials would otherwise be
-        // dropped on the next frame. No sim traffic: the object is isLocalOnly.
-        vol->setHasRenderMaterialParams(true);
     }
 
     vol->markForUpdate();
