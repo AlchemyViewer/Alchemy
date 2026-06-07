@@ -84,10 +84,21 @@ bool LLLocalAnimMgr::decodeFile(const std::string& filename, std::vector<U8>& ou
         return false;
     }
 
-    const S64 file_size = infile.size(ec);
-    if (file_size <= 0 || ec)
+    // Reject unsupported types and absurd sizes BEFORE buffering the whole file,
+    // so a wrong or huge pick can't allocate unbounded memory / stall the viewer.
+    std::string ext = gDirUtilp->getExtension(filename);
+    LLStringUtil::toLower(ext);
+    if (ext != "anim" && ext != "bvh")
     {
-        LL_WARNS("LocalAnim") << "Empty or unreadable animation file: " << filename << LL_ENDL;
+        LL_WARNS("LocalAnim") << "Unsupported animation file type '." << ext << "': " << filename << LL_ENDL;
+        return false;
+    }
+
+    constexpr S64 MAX_LOCAL_ANIM_BYTES = 64ll * 1024 * 1024;
+    const S64 file_size = infile.size(ec);
+    if (file_size <= 0 || file_size > MAX_LOCAL_ANIM_BYTES || ec)
+    {
+        LL_WARNS("LocalAnim") << "Empty, oversized, or unreadable animation file: " << filename << LL_ENDL;
         return false;
     }
 
@@ -101,9 +112,6 @@ bool LLLocalAnimMgr::decodeFile(const std::string& filename, std::vector<U8>& ou
 
     // Decode to LLKeyframeMotion serialized form. A .anim file already IS that form;
     // a .bvh is parsed and serialized the same way the upload path does.
-    std::string ext = gDirUtilp->getExtension(filename);
-    LLStringUtil::toLower(ext);
-
     if (ext == "anim")
     {
         out_keyframe = std::move(data);

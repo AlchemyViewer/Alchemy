@@ -3634,6 +3634,13 @@ void LLViewerObject::updateMaterialInventory(LLViewerInventoryItem* item, U8 key
     {
         return;
     }
+    if (isLocalOnly())
+    {
+        // Client-only object: no server-side task inventory, so don't queue the
+        // asset as pending -- updateInventory() would early-out and never clear
+        // it, wedging later isAssetInInventory() short-circuits for that asset.
+        return;
+    }
     if (LLAssetType::AT_TEXTURE != item->getType()
         && LLAssetType::AT_MATERIAL != item->getType())
     {

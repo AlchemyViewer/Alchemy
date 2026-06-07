@@ -126,9 +126,16 @@ void LLFloaterObjectWeights::onOpen(const LLSD& key)
 // virtual
 void LLFloaterObjectWeights::onWeightsUpdate(const SelectionCost& selection_cost)
 {
+    // The response can land on a later tick, after the floater has been closed.
+    // Capture a handle and bail if the floater is gone before touching widgets.
+    LLHandle<LLView> handle = getHandle();
     LLAppViewer::instance()->postToMainCoro(
-        [=]()
+        [this, handle, selection_cost]()
         {
+            if (handle.isDead())
+            {
+                return;
+            }
             mSelectedDownloadWeight->setText(llformat("%.1f", selection_cost.mNetworkCost));
             mSelectedPhysicsWeight->setText(llformat("%.1f", selection_cost.mPhysicsCost));
             mSelectedServerWeight->setText(llformat("%.1f", selection_cost.mSimulationCost));

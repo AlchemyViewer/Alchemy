@@ -190,6 +190,12 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 
     getChildView("button permissions")->setEnabled(!objectp->isPermanentEnforced());
     mPanelInventoryObject->setEnabled(!objectp->isPermanentEnforced());
+    if (mFilterEditor)
+    {
+        // Restore the filter the local-only branch above disables, so it isn't
+        // left stuck disabled after selecting a normal object next.
+        mFilterEditor->setEnabled(true);
+    }
 }
 
 void LLPanelContents::onFilterEdit()

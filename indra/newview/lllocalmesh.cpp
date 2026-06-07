@@ -1061,14 +1061,43 @@ void LLLocalMeshMgr::delUnit(LLUUID tracking_id)
         if (unit->getTrackingID() == tracking_id)
         {
             despawnUnit(tracking_id);
-            // Release the mesh-owned local bitmaps + materials imported for this unit.
+            // Release the mesh-owned local bitmaps + materials imported for this
+            // unit -- but only the ones no OTHER loaded mesh still references.
+            // Imports are deduplicated by file, so two meshes using the same
+            // texture/material share a tracking id; releasing it unconditionally
+            // would strip it from the other mesh too.
+            auto shared_with_other = [&](const LLUUID& import_id) -> bool
+            {
+                for (const LLLocalMesh* other : mMeshList)
+                {
+                    if (other == unit)
+                    {
+                        continue;
+                    }
+                    for (const LLUUID& bid : other->mOwnedBitmaps)
+                    {
+                        if (bid == import_id) return true;
+                    }
+                    for (const LLUUID& mid : other->mOwnedMaterials)
+                    {
+                        if (mid == import_id) return true;
+                    }
+                }
+                return false;
+            };
             for (const LLUUID& bid : unit->mOwnedBitmaps)
             {
-                LLLocalBitmapMgr::getInstance()->delUnit(bid);
+                if (!shared_with_other(bid))
+                {
+                    LLLocalBitmapMgr::getInstance()->delUnit(bid);
+                }
             }
             for (const LLUUID& mid : unit->mOwnedMaterials)
             {
-                LLLocalGLTFMaterialMgr::getInstance()->delUnit(mid);
+                if (!shared_with_other(mid))
+                {
+                    LLLocalGLTFMaterialMgr::getInstance()->delUnit(mid);
+                }
             }
             iter = mMeshList.erase(iter);
             delete unit;

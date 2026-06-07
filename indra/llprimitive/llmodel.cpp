@@ -1317,12 +1317,12 @@ LLModel::JointWeightCache::CellKey LLModel::JointWeightCache::cellKey(const LLVe
 const LLModel::weight_list& LLModel::JointWeightCache::influences(const LLVector3& pos) const
 {
     // Match radius == cell size == the weld epsilon, so a key within epsilon of
-    // pos is in pos's cell or an immediate neighbour: scan the 3x3x3 block and
-    // take the closest. (Mirrors getJointInfluences()'s "first within epsilon"
-    // linear scan; duplicate keys within 1e-5 are the same vertex.)
+    // pos is in pos's cell or an immediate neighbour. Scan the 3x3x3 block,
+    // counting in-epsilon candidates and tracking the closest.
     const CellKey base = cellKey(pos);
     const weight_list* best = nullptr;
     F32 best_dist = WELD_EPSILON;
+    S32 in_epsilon = 0;
     for (S32 dx = -1; dx <= 1; ++dx)
     {
         for (S32 dy = -1; dy <= 1; ++dy)
@@ -1337,18 +1337,24 @@ const LLModel::weight_list& LLModel::JointWeightCache::influences(const LLVector
                 for (const weight_map::value_type* e : it->second)
                 {
                     const F32 d = (e->first - pos).length();
-                    if (d < best_dist)
+                    if (d < WELD_EPSILON)
                     {
-                        best_dist = d;
-                        best = &e->second;
+                        ++in_epsilon;
+                        if (d < best_dist)
+                        {
+                            best_dist = d;
+                            best = &e->second;
+                        }
                     }
                 }
             }
         }
     }
-    // Miss: defer to the full search (exact find + closest-point fallback), so
-    // behaviour is identical to calling getJointInfluences() per vertex.
-    return best ? *best : mModel.getJointInfluences(pos);
+    // Defer to the full search unless we found exactly one in-epsilon match.
+    // getJointInfluences() returns the FIRST weld-epsilon match in map order, so
+    // on a miss (closest-point fallback) or an ambiguous tie (multiple keys
+    // within epsilon) we mirror it exactly instead of guessing the closest.
+    return (best && in_epsilon == 1) ? *best : mModel.getJointInfluences(pos);
 }
 
 void LLModel::setConvexHullDecomposition(

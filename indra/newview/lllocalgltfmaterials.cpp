@@ -407,7 +407,9 @@ S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID&
     {
         if (unit->getFilename() == filename && unit->isMeshOwned() == mesh_owned)
         {
-            outID = getUnitID(filename, 0);
+            // Return THIS unit's id; getUnitID(filename, 0) ignores ownership and
+            // could hand back a different (user vs mesh-owned) unit for the file.
+            outID = unit->getTrackingID();
             return 0; // nothing newly added
         }
     }
