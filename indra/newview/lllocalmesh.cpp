@@ -251,8 +251,10 @@ namespace
     // (joint 0, ~1.0) fallback for any unweighted vertex. Must run BEFORE
     // cacheOptimize() so its vertex remap carries the weights along. Without this
     // the rigged draw path skins the mesh to garbage (holes, exploded verts,
-    // avatar deformation, vanishing parts).
-    void populateFaceWeights(LLVolumeFace& face, LLModel& mdl)
+    // avatar deformation, vanishing parts). The per-vertex lookup goes through an
+    // LLModel::JointWeightCache (O(1)) instead of getJointInfluences() (O(V)),
+    // turning this pass from O(V^2) to O(V) -- see the cache's header doc.
+    void populateFaceWeights(LLVolumeFace& face, LLModel& mdl, const LLModel::JointWeightCache& locator)
     {
         if (face.mNumVertices <= 0 || mdl.mSkinWeights.empty())
         {
@@ -266,7 +268,7 @@ namespace
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const LLVector3 pos(face.mPositions[v].getF32ptr());
-            const LLModel::weight_list& weights = mdl.getJointInfluences(pos);
+            const LLModel::weight_list& weights = locator.influences(pos);
 
             F32 packed[4] = { 0.f, 0.f, 0.f, 0.f };
             S32 cur = 0;
@@ -616,6 +618,9 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
 
             std::vector<LLVolumeFace> faces;
             faces.reserve(mdl->getNumVolumeFaces());
+            // Built once per model (empty/cheap for static meshes): O(1) per-vertex
+            // weight lookup so the rigged weight pass below is O(V), not O(V^2).
+            const LLModel::JointWeightCache weight_locator(*mdl);
             for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
             {
                 LLVolumeFace face = mdl->getVolumeFace(fi); // deep copy
@@ -629,7 +634,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                     // Rigged: the loader leaves face.mWeights empty (weights live
                     // in mSkinWeights). Fill them so the injected volume skins to
                     // the avatar the same way a downloaded rigged mesh would.
-                    populateFaceWeights(face, *mdl);
+                    populateFaceWeights(face, *mdl, weight_locator);
                 }
                 num_vertices += face.mNumVertices;
                 num_triangles += face.mNumIndices / 3;
