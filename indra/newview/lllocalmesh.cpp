@@ -703,6 +703,25 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 centers.push_back(center);
             }
 
+            // Keep each face's mNormalizedScale consistent with the geometry that
+            // actually reaches cacheOptimize() below. cacheOptimize reconstructs the
+            // mesh in its un-normalized ("original") frame to generate tangents with
+            // correct UV proportions -- scaling positions/normals by mNormalizedScale
+            // and back. The static path re-normalizes here (a SECOND normalization
+            // after the loader's), so a rotated or non-uniformly scaled instance
+            // transform makes the re-normalized size differ from the loader's stored
+            // scale. Leaving mNormalizedScale stale runs the normals through
+            // normalize(normalize(n / S_stale) * S_stale), which is NOT identity for a
+            // non-uniform model (e.g. a tall, narrow body) -- so a rezzed preview
+            // renders with visibly skewed normals (and tangents). part.mScale is the
+            // size that un-normalizes this part's unit-box geometry, so it is the
+            // correct value for both paths (rigged already matches; this makes the
+            // invariant explicit).
+            for (LLVolumeFace& nf : faces)
+            {
+                nf.mNormalizedScale = part.mScale;
+            }
+
             LLVolumeParams vparams;
             vparams.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
             part.mVolume = new LLVolume(vparams, 1.f);
