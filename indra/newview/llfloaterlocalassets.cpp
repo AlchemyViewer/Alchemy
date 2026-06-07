@@ -78,7 +78,7 @@ public:
     bool postBuild() override;
 
     // Rebuild the visible list (decoded units + dimmed undecoded saved paths).
-    void refresh();
+    void refresh() override;
 
     // Decode + add a file into this tab's backing manager (used by the floater's
     // OS drag-and-drop routing). Public wrapper over the protected loadPath(); the
@@ -1275,7 +1275,7 @@ public:
     void draw() override;
 
 private:
-    void   refresh();
+    void   refresh() override;
     void   onSelectionChange();
     void   onSelect();
     void   onFocus();
