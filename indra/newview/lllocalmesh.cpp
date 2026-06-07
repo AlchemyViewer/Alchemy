@@ -974,7 +974,7 @@ void LLLocalMeshMgr::despawnObjectsInRegion(LLViewerRegion* regionp)
     }
 }
 
-LLVOAvatar* LLLocalMeshMgr::getPreviewAvatar()
+LLVOAvatar* LLLocalMeshMgr::getPreviewAvatar(bool run_stand_anim)
 {
     if ((mPreviewAvatar.isNull() || mPreviewAvatar->isDead()) && gAgent.getRegion())
     {
@@ -987,7 +987,14 @@ LLVOAvatar* LLLocalMeshMgr::getPreviewAvatar()
         {
             av->createDrawable(&gPipeline);
             av->mSpecialRenderMode = 1; // not part of the in-world render
-            av->startMotion(ANIM_AGENT_STAND);
+            // Leave the skeleton at its REST pose by default. The FBX loader rebuilds missing
+            // inverse binds as inverse(joint world matrix), so the joints must sit at the
+            // canonical bind pose; the stand animation would pose the arms and skew those
+            // binds. Only run it if this avatar is actually being rendered.
+            if (run_stand_anim)
+            {
+                av->startMotion(ANIM_AGENT_STAND);
+            }
             av->hideSkirt();
         }
         else

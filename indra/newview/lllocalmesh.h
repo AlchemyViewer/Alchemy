@@ -311,7 +311,10 @@ public:
     // A dedicated, never-rendered UI avatar that the model loaders resolve joints
     // against (and dump joint-position overrides onto) so loading a rigged mesh
     // does not deform the real agent avatar. Created lazily on first load.
-    LLVOAvatar* getPreviewAvatar();
+    // Left at its default REST pose by default: the FBX loader rebuilds missing inverse
+    // binds as inverse(joint world matrix), so the skeleton must sit at the canonical bind
+    // pose. Pass run_stand_anim=true only if a caller actually renders this avatar.
+    LLVOAvatar* getPreviewAvatar(bool run_stand_anim = false);
 
     // Destroy all client-only preview objects and the preview avatar. Wired into
     // LLViewerObjectList::killAllObjects() so they are released while the object
