@@ -107,9 +107,12 @@ private:
     boost::signals2::signal<void()> mUnitsChangedSignal; // add/remove
 
     // Decode a .anim/.bvh file into keyframe bytes (the LLKeyframeMotion form).
-    bool decodeFile(const std::string& filename, std::vector<U8>& out_keyframe) const;
+    // out_alias_deferred (optional): set true when a .bvh is decoded before the agent
+    // avatar exists, so its joint aliases were unavailable and a re-decode is owed.
+    bool decodeFile(const std::string& filename, std::vector<U8>& out_keyframe, bool* out_alias_deferred = nullptr) const;
     // Re-deserialize fresh bytes onto an avatar already playing this id (live reload).
-    void reapplyToAvatar(const LLUUID& av_id, const LLUUID& anim_id);
+    // Returns true only when the replacement motion is live on the avatar.
+    bool reapplyToAvatar(const LLUUID& av_id, const LLUUID& anim_id);
 
     // Live-reload polling (mirrors LLLocalMeshTimer).
     class LLLocalAnimTimer : public LLEventTimer

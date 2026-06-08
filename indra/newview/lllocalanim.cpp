@@ -73,7 +73,7 @@ LLLocalAnimMgr::~LLLocalAnimMgr()
     mAnims.clear();
 }
 
-bool LLLocalAnimMgr::decodeFile(const std::string& filename, std::vector<U8>& out_keyframe) const
+bool LLLocalAnimMgr::decodeFile(const std::string& filename, std::vector<U8>& out_keyframe, bool* out_alias_deferred) const
 {
     std::error_code ec;
     LLFile infile;
@@ -148,6 +148,13 @@ bool LLLocalAnimMgr::decodeFile(const std::string& filename, std::vector<U8>& ou
         {
             joint_alias_map = gAgentAvatarp->getJointAliases();
         }
+        else if (out_alias_deferred)
+        {
+            // No agent avatar yet (e.g. login-time path restore): decode without joint
+            // aliases now, but signal that a re-decode is owed once the avatar exists,
+            // so alias-dependent joints aren't permanently mismapped.
+            *out_alias_deferred = true;
+        }
         LLBVHLoader loader((const char*)data.data(), load_status, line_number, joint_alias_map);
         if (!loader.isInitialized())
         {
@@ -184,7 +191,8 @@ LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
     }
 
     std::vector<U8> keyframe;
-    if (!decodeFile(filename, keyframe))
+    bool alias_deferred = false;
+    if (!decodeFile(filename, keyframe, &alias_deferred))
     {
         return LLUUID::null;
     }
@@ -196,8 +204,14 @@ LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
     anim.mFilename  = filename;
     anim.mShortName = gDirUtilp->getBaseFileName(filename, true /* strip extension */);
     anim.mData      = std::move(keyframe);
-    std::error_code ec;
-    anim.mLastModified = std::filesystem::last_write_time(filename, ec);
+    // Leave mLastModified at its epoch default when the decode was deferred (a .bvh
+    // decoded before the avatar's joint aliases existed): doUpdates() then re-decodes
+    // it once the avatar is ready. Otherwise record the file's current mtime.
+    if (!alias_deferred)
+    {
+        std::error_code ec;
+        anim.mLastModified = std::filesystem::last_write_time(filename, ec);
+    }
 
     const size_t bytes = anim.mData.size();
     mAnims[id] = std::move(anim);
@@ -331,30 +345,33 @@ void LLLocalAnimMgr::feedScrollList(LLScrollListCtrl* ctrl)
     }
 }
 
-void LLLocalAnimMgr::reapplyToAvatar(const LLUUID& av_id, const LLUUID& anim_id)
+bool LLLocalAnimMgr::reapplyToAvatar(const LLUUID& av_id, const LLUUID& anim_id)
 {
     LLVOAvatar* av = resolve_avatar(av_id);
     auto iter = mAnims.find(anim_id);
     if (!av || iter == mAnims.end())
     {
-        return;
+        return false;
     }
 
     // Purge the stale parsed motion instance so createMotion() yields a fresh one
-    // that deserializes the new bytes.
+    // that deserializes the new bytes. The id is keyed per-avatar, so the old motion
+    // must go before a new one can take its place.
     av->stopMotion(anim_id, true);
     av->removeMotion(anim_id);
 
     LLKeyframeMotion* motionp = dynamic_cast<LLKeyframeMotion*>(av->createMotion(anim_id));
     if (!motionp)
     {
-        return;
+        return false;
     }
     LLDataPackerBinaryBuffer dp(iter->second.mData.data(), (S32)iter->second.mData.size());
     if (motionp->deserialize(dp, anim_id, false))
     {
         av->startMotion(anim_id);
+        return true;
     }
+    return false;
 }
 
 void LLLocalAnimMgr::doUpdates()
@@ -374,24 +391,35 @@ void LLLocalAnimMgr::doUpdates()
             continue;
         }
         std::vector<U8> fresh;
-        if (!decodeFile(anim.mFilename, fresh))
+        bool alias_deferred = false;
+        if (!decodeFile(anim.mFilename, fresh, &alias_deferred))
         {
             continue; // keep last good data; don't consume mtime so a mid-save retries
         }
-        anim.mLastModified = mtime;
         anim.mData = std::move(fresh);
 
         // Refresh the cached keyframe data so the next play uses the new bytes,
         // and re-apply live to any avatar currently playing this id.
         LLKeyframeDataCache::removeKeyframeData(id);
+        bool reapply_ok = true;
         for (const auto& play : mPlaying)
         {
             if (play.second == id)
             {
-                reapplyToAvatar(play.first, id);
+                reapply_ok = reapplyToAvatar(play.first, id) && reapply_ok;
             }
         }
-        LL_INFOS("LocalAnim") << "Live-reloaded local anim '" << anim.mShortName << "'" << LL_ENDL;
+
+        // Consume the mtime only once the swap is fully live AND the decode used joint
+        // aliases. Otherwise leave it so the next heartbeat retries: a transient reapply
+        // failure (the live preview tears down before the replacement is built, so it
+        // would otherwise stay blank), or a .bvh decoded before the avatar's aliases
+        // existed (re-decodes correctly once the avatar is ready).
+        if (reapply_ok && !alias_deferred)
+        {
+            anim.mLastModified = mtime;
+            LL_INFOS("LocalAnim") << "Live-reloaded local anim '" << anim.mShortName << "'" << LL_ENDL;
+        }
     }
 
     if (!mAnims.empty())
