@@ -660,6 +660,15 @@ bool LLFloaterTexturePicker::postBuild()
     mLocalScrollCtrl->setCommitCallback(onLocalScrollCommit, this);
     refreshLocalList();
 
+    // React to local-unit changes from anywhere (this picker, another picker, the
+    // Local Assets floater, a mesh import, or a live-reload) so the Local tab never
+    // goes stale. refreshLocalList() reads the current pick type, so one handler per
+    // manager serves textures and materials alike.
+    mLocalBitmapsChangedConn = LLLocalBitmapMgr::getInstance()->setUnitsChangedCallback(
+        [this]() { onLocalAssetsChanged(); });
+    mLocalMaterialsChangedConn = LLLocalGLTFMaterialMgr::getInstance()->setUnitsChangedCallback(
+        [this]() { onLocalAssetsChanged(); });
+
     getChild<LLLineEditor>("uuid_editor")->setCommitCallback(boost::bind(&onApplyUUID, this));
     getChild<LLButton>("apply_uuid_btn")->setClickedCallback(boost::bind(&onApplyUUID, this));
 
@@ -1203,6 +1212,10 @@ void LLFloaterTexturePicker::onBtnRemove(void* userdata)
             if (list_item)
             {
                 LLSD data = list_item->getValue();
+                if (data["mesh_owned"].asBoolean())
+                {
+                    continue; // model-loaded: read-only, owned by its mesh
+                }
                 LLUUID tracking_id = data["id"];
                 S32 asset_type = data["type"].asInteger();
 
@@ -1542,6 +1555,51 @@ void LLFloaterTexturePicker::refreshLocalList()
     }
 }
 
+void LLFloaterTexturePicker::onLocalAssetsChanged()
+{
+    // A refresh can be triggered by another picker / the Local Assets floater adding
+    // or removing local assets. Capture this picker's Local-tab selection first
+    // (refreshLocalList() rebuilds and clears the list) so we can either keep it
+    // highlighted or, if its unit was removed, drop the now-dangling selection.
+    LLSD sel_value;
+    bool have_sel = false;
+    bool still_valid = false;
+    if (mModeSelector && mModeSelector->getValue().asInteger() == PICKER_LOCAL && mLocalScrollCtrl)
+    {
+        if (LLScrollListItem* sel = mLocalScrollCtrl->getFirstSelected())
+        {
+            const LLSD data = sel->getValue();
+            if (data.has("id") && data.has("type"))
+            {
+                sel_value = data;
+                have_sel = true;
+                const LLUUID tracking_id = data["id"].asUUID();
+                const LLUUID world_id = (data["type"].asInteger() == LLAssetType::AT_MATERIAL)
+                    ? LLLocalGLTFMaterialMgr::getInstance()->getWorldID(tracking_id)
+                    : LLLocalBitmapMgr::getInstance()->getWorldID(tracking_id);
+                still_valid = world_id.notNull();
+            }
+        }
+    }
+
+    refreshLocalList();
+
+    if (have_sel)
+    {
+        if (still_valid)
+        {
+            // Keep the user's selection highlighted across the rebuild.
+            mLocalScrollCtrl->setSelectedByValue(sel_value, true);
+        }
+        else
+        {
+            // The selected local asset was removed elsewhere; drop the dangling
+            // selection so a later commit can't apply a deleted texture/material.
+            mImageAssetID.setNull();
+        }
+    }
+}
+
 void LLFloaterTexturePicker::refreshInventoryFilter()
 {
     U32 filter_types = 0x0;
@@ -1662,26 +1720,10 @@ void LLFloaterTexturePicker::onPickerCallback(const std::vector<std::string>& fi
         iter++;
     }
 
-    // Todo: this should referesh all pickers, not just a current one
-    if (!handle.isDead())
-    {
-        LLFloaterTexturePicker* self = (LLFloaterTexturePicker*)handle.get();
-        self->mLocalScrollCtrl->clearRows();
-
-        if (self->mInventoryPickType == PICK_TEXTURE_MATERIAL)
-        {
-            LLLocalBitmapMgr::getInstance()->feedScrollList(self->mLocalScrollCtrl);
-            LLLocalGLTFMaterialMgr::getInstance()->feedScrollList(self->mLocalScrollCtrl);
-        }
-        else if (self->mInventoryPickType == PICK_TEXTURE)
-        {
-            LLLocalBitmapMgr::getInstance()->feedScrollList(self->mLocalScrollCtrl);
-        }
-        else if (self->mInventoryPickType == PICK_MATERIAL)
-        {
-            LLLocalGLTFMaterialMgr::getInstance()->feedScrollList(self->mLocalScrollCtrl);
-        }
-    }
+    // No manual refresh needed: addUnit() fires the manager's units-changed signal,
+    // and every open picker (this one included) rebuilds its Local tab from the
+    // handler wired in postBuild() -- so all pickers stay in sync, not just this one.
+    (void)handle;
 }
 
 void LLFloaterTexturePicker::onTextureSelect(bool success, const LLTextureEntry& te )

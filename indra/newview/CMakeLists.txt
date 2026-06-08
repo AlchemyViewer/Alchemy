@@ -380,6 +380,7 @@ set(viewer_SOURCE_FILES
     llfloaterlandholdings.cpp
     llfloaterlinkreplace.cpp
     llfloaterloadprefpreset.cpp
+    llfloaterlocalassets.cpp
     llfloatermarketplacelistings.cpp
     llfloatermap.cpp
     llfloatermediasettings.cpp
@@ -513,6 +514,9 @@ set(viewer_SOURCE_FILES
     lllistview.cpp
     lllocalbitmaps.cpp
     lllocalgltfmaterials.cpp
+    lllocalmesh.cpp
+    lllocalanim.cpp
+    lllocalassetpaths.cpp
     lllocationhistory.cpp
     lllocationinputctrl.cpp
     lllogchat.cpp
@@ -1144,6 +1148,7 @@ set(viewer_HEADER_FILES
     llfloaterlandholdings.h
     llfloaterlinkreplace.h
     llfloaterloadprefpreset.h
+    llfloaterlocalassets.h
     llfloatermap.h
     llfloatermarketplace.h
     llfloatermarketplacelistings.h
@@ -1276,6 +1281,9 @@ set(viewer_HEADER_FILES
     lllistview.h
     lllocalbitmaps.h
     lllocalgltfmaterials.h
+    lllocalmesh.h
+    lllocalanim.h
+    lllocalassetpaths.h
     lllocationhistory.h
     lllocationinputctrl.h
     lllogchat.h

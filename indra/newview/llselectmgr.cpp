@@ -101,8 +101,120 @@
 // [/RLVa:KB]
 #include "llglheaders.h"
 #include "llinventoryobserver.h"
+#include "lllocalmesh.h"
 
 LLViewerObject* getSelectedParentObject(LLViewerObject *object) ;
+
+// Local mesh preview objects are client-only (no sim object), so all selection
+// and edit network traffic must be suppressed for them.
+static bool isLocalPreviewObject(LLViewerObject* obj)
+{
+    // Client-only local mesh preview: an O(1) object flag, no manager lookup.
+    return obj && obj->isLocalOnly();
+}
+
+// True only if the selection is non-empty and consists entirely of client-only
+// local mesh previews (so the whole server send can be skipped). A selection
+// containing any real object returns false and is sent normally.
+static bool selectionAllLocalPreview(LLObjectSelectionHandle selection)
+{
+    if (selection.isNull() || selection->getNumNodes() == 0)
+    {
+        return false;
+    }
+    for (LLObjectSelection::iterator iter = selection->begin(); iter != selection->end(); ++iter)
+    {
+        LLViewerObject* obj = (*iter)->getObject();
+        if (obj && !isLocalPreviewObject(obj))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Populate a select node for a client-only preview the way the sim would via
+// processObjectProperties -- no such reply will ever arrive -- so the build
+// tools treat it as a valid, fully agent-owned, editable object.
+static void synthesizeLocalPreviewNode(LLSelectNode* nodep, LLViewerObject* objectp)
+{
+    if (!nodep || !isLocalPreviewObject(objectp))
+    {
+        return;
+    }
+    nodep->mValid = true;
+    // Show the actual sub-mesh name/source instead of a generic placeholder.
+    nodep->mName = "(local mesh preview)";
+    nodep->mDescription.clear();
+    {
+        std::string mesh_name, mesh_path;
+        if (LLLocalMeshMgr::getInstance()->getPreviewDisplay(objectp, mesh_name, mesh_path))
+        {
+            if (!mesh_name.empty())
+            {
+                nodep->mName = mesh_name;
+            }
+            nodep->mDescription = mesh_path;
+        }
+    }
+    nodep->mPermissions->init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
+    const U32 full_perm = PERM_MODIFY | PERM_COPY | PERM_MOVE | PERM_TRANSFER;
+    nodep->mPermissions->initMasks(full_perm, full_perm, PERM_NONE, PERM_NONE, full_perm);
+
+    // Snapshot the current face textures the way processObjectProperties would, so
+    // texture/material-picker revert (cancel) has a baseline to restore to.
+    uuid_vec_t texture_ids;
+    uuid_vec_t material_ids;
+    gltf_materials_vec_t override_materials;
+    const U8 num_tes = objectp->getNumTEs();
+    texture_ids.reserve(num_tes);
+    material_ids.reserve(num_tes);
+    override_materials.reserve(num_tes);
+    for (U8 te = 0; te < num_tes; ++te)
+    {
+        const LLTextureEntry* tep = objectp->getTE(te);
+        texture_ids.push_back(tep ? tep->getID() : LLUUID::null);
+        material_ids.push_back(objectp->getRenderMaterialID(te));
+        const LLGLTFMaterial* over = tep ? tep->getGLTFMaterialOverride() : nullptr;
+        override_materials.emplace_back(over ? new LLGLTFMaterial(*over) : nullptr);
+    }
+    nodep->saveTextures(texture_ids);
+    // Snapshot GLTF render-material ids + overrides too, so selectionRevertGLTFMaterials()
+    // can restore them when a material picker is cancelled on a local preview.
+    nodep->saveGLTFMaterials(material_ids, override_materials);
+}
+
+// Delete a selection made up entirely of client-only previews. The sim delete
+// path (DeRezObject/ObjectDelete) can't touch them, so despawn them locally.
+static void deleteLocalPreviewSelection()
+{
+    if (!LLLocalMeshMgr::instanceExists())
+    {
+        return;
+    }
+    LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
+    LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+
+    // Snapshot the objects first; deleting despawns them and clears the selection.
+    std::vector<LLPointer<LLViewerObject> > objects;
+    for (LLObjectSelection::iterator iter = selection->begin(); iter != selection->end(); ++iter)
+    {
+        if (LLViewerObject* obj = (*iter)->getObject())
+        {
+            objects.push_back(obj);
+        }
+    }
+
+    LLSelectMgr::getInstance()->deselectAll();
+
+    for (LLPointer<LLViewerObject>& obj : objects)
+    {
+        // Derez the linkset (the in-world Delete key takes a local preview out of the
+        // world but keeps the loaded file in the Local Assets list). The first part of
+        // a linkset derezzes it; later parts no-op. Use the floater's Delete to unload.
+        mgr->despawnPreviewObject(obj.get());
+    }
+}
 //
 // Consts
 //
@@ -490,15 +602,18 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S3
     object->resetRot();
 
     // Always send to simulator, so you get a copy of the
-    // permissions structure back.
-    gMessageSystem->newMessageFast(_PREHASH_ObjectSelect);
-    gMessageSystem->nextBlockFast(_PREHASH_AgentData);
-    gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
-    gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-    gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
-    gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, object->getLocalID() );
-    LLViewerRegion* regionp = object->getRegion();
-    gMessageSystem->sendReliable( regionp->getHost());
+    // permissions structure back. (Skipped for client-only local previews.)
+    if (!isLocalPreviewObject(object))
+    {
+        gMessageSystem->newMessageFast(_PREHASH_ObjectSelect);
+        gMessageSystem->nextBlockFast(_PREHASH_AgentData);
+        gMessageSystem->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+        gMessageSystem->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+        gMessageSystem->nextBlockFast(_PREHASH_ObjectData);
+        gMessageSystem->addU32Fast(_PREHASH_ObjectLocalID, object->getLocalID() );
+        LLViewerRegion* regionp = object->getRegion();
+        gMessageSystem->sendReliable( regionp->getHost());
+    }
 
     updatePointAt();
     updateSelectionCenter();
@@ -914,7 +1029,9 @@ void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, bool send_to_s
     object->addThisAndAllChildren(objects);
     remove(objects);
 
-    if (!send_to_sim) return;
+    // Local previews carry fake local ids and can't be mixed with real objects in a
+    // selection, so never tell the sim we deselected one.
+    if (!send_to_sim || isLocalPreviewObject(object)) return;
 
     //-----------------------------------------------------------
     // Inform simulator of deselection
@@ -972,7 +1089,7 @@ void LLSelectMgr::deselectObjectOnly(LLViewerObject* object, bool send_to_sim)
     object->setAngularVelocity( 0,0,0 );
     object->setVelocity( 0,0,0 );
 
-    if (send_to_sim)
+    if (send_to_sim && !isLocalPreviewObject(object))
     {
         LLViewerRegion* region = object->getRegion();
         gMessageSystem->newMessageFast(_PREHASH_ObjectDeselect);
@@ -1013,6 +1130,7 @@ void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, bool add_to
         if (!objectp->isSelected())
         {
             LLSelectNode *nodep = new LLSelectNode(objectp, true);
+            synthesizeLocalPreviewNode(nodep, objectp);
             if (add_to_end)
             {
                 mSelectedObjects->addNodeAtEnd(nodep);
@@ -1061,6 +1179,7 @@ void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, bool undoab
         nodep = new LLSelectNode(objectp, true);
         mSelectedObjects->addNode(nodep);
         llassert_always(nodep->getObject());
+        synthesizeLocalPreviewNode(nodep, objectp);
     }
     else
     {
@@ -1149,6 +1268,9 @@ LLObjectSelectionHandle LLSelectMgr::setHoverObject(LLViewerObject *objectp, S32
                 continue;
             }
             LLSelectNode* nodep = new LLSelectNode(cur_objectp, false);
+            // Local previews never get an ObjectProperties reply; populate the node
+            // locally so a preview reached via hover/box-select is still valid/editable.
+            synthesizeLocalPreviewNode(nodep, cur_objectp);
             nodep->selectTE(face, true);
             mHoverObjects->addNodeAtEnd(nodep);
         }
@@ -1310,6 +1432,7 @@ LLObjectSelectionHandle LLSelectMgr::selectHighlightedObjects()
         }
 
         LLSelectNode* new_nodep = new LLSelectNode(*nodep);
+        synthesizeLocalPreviewNode(new_nodep, objectp);
         mSelectedObjects->addNode(new_nodep);
 
         // flag this object as selected
@@ -4181,6 +4304,14 @@ void LLSelectMgr::selectDelete()
     }
 // [/RLVa:KB]
 
+    // Client-only local mesh previews have no sim counterpart; delete them
+    // locally instead of sending a DeRez the sim would ignore.
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        deleteLocalPreviewSelection();
+        return;
+    }
+
     S32 deleteable_count = 0;
 
     bool locked_but_deleteable_object = false;
@@ -4330,6 +4461,12 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
 
 void LLSelectMgr::selectForceDelete()
 {
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        deleteLocalPreviewSelection();
+        return;
+    }
+
     sendListToRegions(
         "ObjectDelete",
         packDeleteHeader,
@@ -4744,6 +4881,9 @@ void LLSelectMgr::packDuplicateOnRayHead(void *user_data)
 void LLSelectMgr::sendMultipleUpdate(U32 type)
 {
     if (type == UPD_NONE) return;
+    // Client-only local previews are moved/rotated/scaled purely locally; never
+    // send their transforms to the sim.
+    if (selectionAllLocalPreview(mSelectedObjects)) return;
     // send individual updates when selecting textures or individual objects
     ESendType send_type = (!gSavedSettings.getBOOL("EditLinkedParts") && !getTEMode()) ? SEND_ONLY_ROOTS : SEND_ROOTS_FIRST;
     if (send_type == SEND_ONLY_ROOTS)
@@ -4951,13 +5091,16 @@ void LLSelectMgr::deselectAll()
         objectp->setVelocity( 0,0,0 );
     }
 
-    sendListToRegions(
-        "ObjectDeselect",
-        packAgentAndSessionID,
-        packObjectLocalID,
-        logNoOp,
-        NULL,
-        SEND_INDIVIDUALS);
+    if (!selectionAllLocalPreview(mSelectedObjects))
+    {
+        sendListToRegions(
+            "ObjectDeselect",
+            packAgentAndSessionID,
+            packObjectLocalID,
+            logNoOp,
+            NULL,
+            SEND_INDIVIDUALS);
+    }
 
     removeAll();
 
@@ -4982,13 +5125,16 @@ void LLSelectMgr::deselectAllForStandingUp()
         objectp->setVelocity( 0,0,0 );
     }
 
-    sendListToRegions(
-        "ObjectDeselect",
-        packAgentAndSessionID,
-        packObjectLocalID,
-        logNoOp,
-        NULL,
-        SEND_INDIVIDUALS);
+    if (!selectionAllLocalPreview(mSelectedObjects))
+    {
+        sendListToRegions(
+            "ObjectDeselect",
+            packAgentAndSessionID,
+            packObjectLocalID,
+            logNoOp,
+            NULL,
+            SEND_INDIVIDUALS);
+    }
 
     removeAll();
 
@@ -5355,6 +5501,8 @@ void LLSelectMgr::sendSelect()
         return;
     }
 
+    if (selectionAllLocalPreview(mSelectedObjects)) return;
+
     sendListToRegions(
         "ObjectSelect",
         packAgentAndSessionID,
@@ -5418,6 +5566,24 @@ void LLSelectMgr::saveSelectedShinyColors()
 
 void LLSelectMgr::saveSelectedObjectTextures()
 {
+    // Client-only previews never receive the ObjectProperties reply the normal
+    // path waits on, so invalidating + sendSelect() would leave them permanently
+    // invalid -- which breaks the selection when a texture/material picker commits.
+    // Re-affirm the synthesized node instead (re-snapshots textures, keeps mValid).
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        struct lf : public LLSelectedNodeFunctor
+        {
+            virtual bool apply(LLSelectNode* node)
+            {
+                synthesizeLocalPreviewNode(node, node->getObject());
+                return true;
+            }
+        } local_func;
+        getSelection()->applyToNodes(&local_func);
+        return;
+    }
+
     // invalidate current selection so we update saved textures
     struct f : public LLSelectedNodeFunctor
     {
@@ -5773,6 +5939,15 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
                                     void *user_data,
                                     ESendType send_type)
 {
+    // Client-only local mesh previews never talk to the simulator. Short-circuit
+    // every object message marshalled through here (name/description/permissions/
+    // sale/group/owner/click-action/category/shape/flags/...). Local derez,
+    // duplicate and attach are handled by LLLocalMeshMgr before reaching this path.
+    if (selectionAllLocalPreview(selected_handle))
+    {
+        return;
+    }
+
     LLSelectNode* node;
     LLSelectNode* linkset_root = NULL;
     LLViewerRegion* last_region;
@@ -5970,6 +6145,13 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
 
 void LLSelectMgr::requestObjectPropertiesFamily(LLViewerObject* object)
 {
+    // Client-only local previews have no sim object; their properties are
+    // synthesized locally in addAsIndividual, so never query the sim.
+    if (isLocalPreviewObject(object))
+    {
+        return;
+    }
+
     LLMessageSystem* msg = gMessageSystem;
 
     msg->newMessageFast(_PREHASH_RequestObjectPropertiesFamily);
@@ -7884,6 +8066,19 @@ bool LLSelectMgr::canSelectObject(LLViewerObject* object, bool ignore_select_own
 
     ESelectType selection_type = getSelectTypeForObject(object);
     if (mSelectedObjects->getObjectCount() > 0 && mSelectedObjects->mSelectType != selection_type) return false;
+
+    // Don't allow mixing client-only local mesh previews with real (sim) objects
+    // in a single selection -- a mixed selection escapes the all-local gating and
+    // would send the previews' (fake) local IDs to the sim. The selection is kept
+    // homogeneous by this check, so the first selected object is representative.
+    if (mSelectedObjects->getObjectCount() > 0)
+    {
+        LLViewerObject* selected = mSelectedObjects->getFirstObject();
+        if (selected && selected->isLocalOnly() != object->isLocalOnly())
+        {
+            return false;
+        }
+    }
 
     return true;
 }

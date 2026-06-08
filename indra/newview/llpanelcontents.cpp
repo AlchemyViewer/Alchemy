@@ -132,6 +132,23 @@ void LLPanelContents::getState(LLViewerObject *objectp )
         return;
     }
 
+    if (objectp->isLocalOnly())
+    {
+        // Client-only local mesh preview: it has no server-side task inventory,
+        // so scripts/contents/permissions don't apply.
+        getChildView("button new script")->setEnabled(false);
+        getChildView("button permissions")->setEnabled(false);
+        if (mFilterEditor)
+        {
+            mFilterEditor->setEnabled(false);
+        }
+        if (mPanelInventoryObject)
+        {
+            mPanelInventoryObject->setEnabled(false);
+        }
+        return;
+    }
+
     LLUUID group_id;            // used for SL-23488
     LLSelectMgr::getInstance()->selectGetGroup(group_id);  // sets group_id as a side effect SL-23488
 
@@ -173,6 +190,12 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 
     getChildView("button permissions")->setEnabled(!objectp->isPermanentEnforced());
     mPanelInventoryObject->setEnabled(!objectp->isPermanentEnforced());
+    if (mFilterEditor)
+    {
+        // Restore the filter the local-only branch above disables, so it isn't
+        // left stuck disabled after selecting a normal object next.
+        mFilterEditor->setEnabled(true);
+    }
 }
 
 void LLPanelContents::onFilterEdit()

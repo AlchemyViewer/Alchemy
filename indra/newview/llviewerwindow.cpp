@@ -129,6 +129,7 @@
 #include "llkeyboard.h"
 #include "lllineeditor.h"
 #include "lllocalbitmaps.h"
+#include "llfloaterlocalassets.h"
 #include "lllocalgltfmaterials.h"
 #include "llmenugl.h"
 #include "llmenuoptionpathfindingrebakenavmesh.h"
@@ -1487,6 +1488,34 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropFile(LLWindow 
         case LLWindowCallbacks::DNDA_TRACK:
         case LLWindowCallbacks::DNDA_DROPPED:
             {
+                // Route a file drop landing on the Local Assets floater into its tabs,
+                // ahead of the world/upload paths (works in or out of build mode). `pos`
+                // is in raw GL device pixels but UI rects are in scaled UI coords, so
+                // convert before the hit-test (mirrors the mouse path, see ~line 1032).
+                if (!mDragItems.empty())
+                {
+                    LLFloater* la = LLFloaterReg::findInstance("local_assets");
+                    const S32 ui_x = ll_round((F32)pos.mX / mDisplayScale.mV[VX]);
+                    const S32 ui_y = ll_round((F32)pos.mY / mDisplayScale.mV[VY]);
+                    if (la && la->isInVisibleChain() && la->calcScreenRect().pointInRect(ui_x, ui_y))
+                    {
+                        result = LLWindowCallbacks::DND_COPY;
+                        if (fDrop)
+                        {
+                            std::vector<std::string> files;
+                            for (const drag_item_t& dragItem : mDragItems)
+                            {
+                                files.push_back(dragItem.second);
+                            }
+                            if (LLFloaterLocalAssets* laf = dynamic_cast<LLFloaterLocalAssets*>(la))
+                            {
+                                laf->dropFiles(files);
+                            }
+                        }
+                        break; // handled by the floater
+                    }
+                }
+
                 if (!LLToolMgr::getInstance()->inBuildMode())
                 {
                     if (!mDragItems.empty())

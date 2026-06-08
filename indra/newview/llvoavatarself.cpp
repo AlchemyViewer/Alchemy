@@ -1264,25 +1264,33 @@ const LLViewerJointAttachment *LLVOAvatarSelf::attachObject(LLViewerObject *view
     // Should just be the last object added
     if (attachment->isObjectAttached(viewer_object))
     {
-        const LLUUID& attachment_id = viewer_object->getAttachmentItemID();
-        LLAppearanceMgr::instance().registerAttachment(attachment_id);
         updateLODRiggedAttachments();
 
-// [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Modified: RLVa-1.2.1a
-        // NOTE: RLVa event handlers should be invoked *after* LLVOAvatar::attachObject() calls LLViewerJointAttachment::addObject()
-        if (mAttachmentSignal)
+        // Client-only objects (e.g. local mesh previews) have no inventory item
+        // and never participate in COF or RLV state. Do the rigged-render refresh
+        // above for them, but skip the inventory sync and RLV/appearance
+        // bookkeeping a real attachment would trigger.
+        if (!viewer_object->isLocalOnly())
         {
-            (*mAttachmentSignal)(viewer_object, attachment, ACTION_ATTACH);
-        }
-        if (rlv_handler_t::isEnabled())
-        {
-            RlvAttachmentLockWatchdog::instance().onAttach(viewer_object, attachment);
-            gRlvHandler.onAttach(viewer_object, attachment);
+            const LLUUID& attachment_id = viewer_object->getAttachmentItemID();
+            LLAppearanceMgr::instance().registerAttachment(attachment_id);
 
-            if ( (attachment->getIsHUDAttachment()) && (!gRlvAttachmentLocks.hasLockedHUD()) )
-                gRlvAttachmentLocks.updateLockedHUD();
-        }
+// [RLVa:KB] - Checked: 2010-08-22 (RLVa-1.2.1a) | Modified: RLVa-1.2.1a
+            // NOTE: RLVa event handlers should be invoked *after* LLVOAvatar::attachObject() calls LLViewerJointAttachment::addObject()
+            if (mAttachmentSignal)
+            {
+                (*mAttachmentSignal)(viewer_object, attachment, ACTION_ATTACH);
+            }
+            if (rlv_handler_t::isEnabled())
+            {
+                RlvAttachmentLockWatchdog::instance().onAttach(viewer_object, attachment);
+                gRlvHandler.onAttach(viewer_object, attachment);
+
+                if ( (attachment->getIsHUDAttachment()) && (!gRlvAttachmentLocks.hasLockedHUD()) )
+                    gRlvAttachmentLocks.updateLockedHUD();
+            }
 // [/RLVa:KB]
+        }
     }
 
     return attachment;
@@ -1292,10 +1300,13 @@ const LLViewerJointAttachment *LLVOAvatarSelf::attachObject(LLViewerObject *view
 bool LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
 {
     const LLUUID attachment_id = viewer_object->getAttachmentItemID();
+    // Client-only objects (e.g. local mesh previews) have no inventory item and
+    // never participate in COF or RLV state -- skip that bookkeeping below.
+    const bool is_local = viewer_object->isLocalOnly();
 
 // [RLVa:KB] - Checked: 2010-03-05 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
     // NOTE: RLVa event handlers should be invoked *before* LLVOAvatar::detachObject() calls LLViewerJointAttachment::removeObject()
-    if (rlv_handler_t::isEnabled())
+    if (rlv_handler_t::isEnabled() && !is_local)
     {
         for (attachment_map_t::const_iterator itAttachPt = mAttachmentPoints.begin(); itAttachPt != mAttachmentPoints.end(); ++itAttachPt)
         {
@@ -1336,7 +1347,11 @@ bool LLVOAvatarSelf::detachObject(LLViewerObject *viewer_object)
         // Make sure the inventory is in sync with the avatar.
 
         // Update COF contents, don't trigger appearance update.
-        if (!isAgentAvatarValid())
+        if (is_local)
+        {
+            // No inventory item to unregister for a client-only preview.
+        }
+        else if (!isAgentAvatarValid())
         {
             LL_INFOS() << "removeItemLinks skipped, avatar is under destruction" << LL_ENDL;
         }

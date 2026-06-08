@@ -550,6 +550,12 @@ void RlvAttachmentLockWatchdog::detach(S32 idxAttachPt, const uuid_vec_t& idsAtt
 // Checked: 2010-09-23 (RLVa-1.2.1d) | Modified: RLVa-1.2.1d
 void RlvAttachmentLockWatchdog::onAttach(const LLViewerObject* pAttachObj, const LLViewerJointAttachment* pAttachPt)
 {
+    // Client-only objects (e.g. local mesh previews) have no inventory item and
+    // never participate in attachment locks. Their null attachment-item id would
+    // trip the RLV_ASSERT below, which is fatal (LL_ERRS) in debug-info builds.
+    if (!pAttachObj || pAttachObj->isLocalOnly())
+        return;
+
     S32 idxAttachPt = RlvAttachPtLookup::getAttachPointIndex(pAttachObj);
     const LLUUID& idAttachItem = (pAttachObj) ? pAttachObj->getAttachmentItemID() : LLUUID::null;
     RLV_ASSERT( (!isAgentAvatarValid()) || ((idxAttachPt) && (idAttachItem.notNull())) );
@@ -657,6 +663,10 @@ void RlvAttachmentLockWatchdog::onAttach(const LLViewerObject* pAttachObj, const
 // Checked: 2010-07-28 (RLVa-1.2.0i) | Modified: RLVa-1.2.0i
 void RlvAttachmentLockWatchdog::onDetach(const LLViewerObject* pAttachObj, const LLViewerJointAttachment* pAttachPt)
 {
+    // See onAttach(): client-only objects never participate in attachment locks.
+    if (!pAttachObj || pAttachObj->isLocalOnly())
+        return;
+
     S32 idxAttachPt = RlvAttachPtLookup::getAttachPointIndex(pAttachPt);
     const LLUUID& idAttachItem = (pAttachObj) ? pAttachObj->getAttachmentItemID() : LLUUID::null;
     RLV_ASSERT( (!isAgentAvatarValid()) || ((idxAttachPt) && (idAttachItem.notNull())) );

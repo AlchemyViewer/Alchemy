@@ -120,6 +120,9 @@
 #include "llviewergenericmessage.h"
 #include "llviewerhelp.h"
 #include "llviewermenufile.h"   // init_menu_file()
+#include "lllocalmesh.h"
+#include "lllocalanim.h"
+#include "llcontrolavatar.h"    // LLControlAvatar (animesh control av for local anim playback)
 #include "llviewermessage.h"
 #include "llviewernetwork.h"
 #include "llviewerobjectlist.h"
@@ -662,6 +665,82 @@ void init_menus()
 // SHOW CONSOLES //
 ///////////////////
 
+
+//////////////////
+// LOCAL MESH   //
+//////////////////
+
+class LLAdvancedLoadLocalMesh : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        LLFilePickerReplyThread::startPicker(
+            [](const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter)
+            {
+                if (!filenames.empty())
+                {
+                    LLLocalMeshMgr::getInstance()->addAndSpawn(filenames);
+                }
+            },
+            LLFilePicker::FFLOAD_MODEL, true);
+        return true;
+    }
+};
+
+// Local animation (M5): play/stop a local .anim/.bvh on the selected animated
+// object (animesh). The animation runs on the linkset's control avatar -- which
+// exists for any animesh, local preview or not -- so a local anim can be previewed
+// on any selected animesh, not only client-only previews.
+LLControlAvatar* get_selected_animesh_control_avatar()
+{
+    LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
+    if (!obj)
+    {
+        return nullptr;
+    }
+    LLViewerObject* root = obj->getRootEdit();
+    return (root && root->isAnimatedObject()) ? root->getControlAvatar() : nullptr;
+}
+
+bool enable_play_local_anim()
+{
+    return get_selected_animesh_control_avatar() != nullptr;
+}
+
+void handle_play_local_anim()
+{
+    LLControlAvatar* cav = get_selected_animesh_control_avatar();
+    if (!cav)
+    {
+        return;
+    }
+    // Keep the control avatar alive across the async file picker; if the preview is
+    // taken down (or un-animeshed) before the picker returns, bail.
+    LLPointer<LLVOAvatar> cav_ptr = cav;
+    LLFilePickerReplyThread::startPicker(
+        [cav_ptr](const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter)
+        {
+            if (filenames.empty() || cav_ptr.isNull() || cav_ptr->isDead())
+            {
+                return;
+            }
+            const LLUUID anim_id = LLLocalAnimMgr::getInstance()->loadAnim(filenames.front());
+            if (anim_id.notNull())
+            {
+                LLLocalAnimMgr::getInstance()->playOnAvatar(cav_ptr.get(), anim_id);
+            }
+        },
+        LLFilePicker::FFLOAD_ANIM, false);
+}
+
+void handle_stop_local_anim()
+{
+    LLControlAvatar* cav = get_selected_animesh_control_avatar();
+    if (cav && LLLocalAnimMgr::instanceExists())
+    {
+        LLLocalAnimMgr::getInstance()->stopOnAvatar(cav);
+    }
+}
 
 class LLAdvancedToggleConsole : public view_listener_t
 {
@@ -7597,6 +7676,7 @@ private:
         if (selectedObject)
         {
             S32 index = userdata.asInteger();
+
             LLViewerJointAttachment* attachment_point = NULL;
             if (index > 0)
                 attachment_point = get_if_there(gAgentAvatarp->mAttachmentPoints, index, (LLViewerJointAttachment*)NULL);
@@ -7612,6 +7692,19 @@ private:
                 return true;
             }
 // [/RLVa:KB]
+
+            // Client-only local mesh previews have no inventory item or sim object,
+            // and there's nothing to walk to -- the normal sim attach path below
+            // would do nothing. Attach the preview linkset client-side to the
+            // attachment point the user picked from this menu (render order is sorted
+            // by attachment-point id, so the choice matters). Kept AFTER the RLVa gate
+            // above so attach restrictions apply to previews too.
+            if (selectedObject->isLocalOnly() && LLLocalMeshMgr::instanceExists())
+            {
+                LLLocalMeshMgr::getInstance()->attachPreviewToAvatar(selectedObject, index, mReplace);
+                setObjectSelection(NULL);
+                return true;
+            }
 
             confirmReplaceAttachment(0, attachment_point);
         }
@@ -7880,6 +7973,25 @@ class LLAttachmentDetach : public view_listener_t
         if (!object)
         {
             LL_WARNS() << "handle_detach() - no object to detach" << LL_ENDL;
+            return true;
+        }
+
+        // Respect RLVa remove-locks for local previews too: if @detach-locked and the
+        // selection sits on a locked attachment point, don't detach.
+        if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.hasLockedAttachmentPoint(RLV_LOCK_REMOVE)) )
+        {
+            LLObjectSelectionHandle hSelect = LLSelectMgr::getInstance()->getSelection();
+            RlvSelectHasLockedAttach f;
+            if ( (hSelect->isAttachment()) && (hSelect->getFirstRootNode(&f, false) != NULL) )
+                return true;
+        }
+
+        // Client-only local mesh previews have no inventory item or sim object, so
+        // the item-id based detach below is a no-op for them. Route to the local
+        // mesh manager, which detaches the whole preview linkset client-side.
+        if (object->isLocalOnly() && LLLocalMeshMgr::instanceExists())
+        {
+            LLLocalMeshMgr::getInstance()->detachPreviewFromAvatar(object);
             return true;
         }
 
@@ -10411,6 +10523,7 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToggleHowTo(), "Help.ToggleHowTo");
 
     // Advanced menu
+    view_listener_t::addMenu(new LLAdvancedLoadLocalMesh(), "Advanced.LoadLocalMesh");
     view_listener_t::addMenu(new LLAdvancedToggleConsole(), "Advanced.ToggleConsole");
     view_listener_t::addMenu(new LLAdvancedCheckConsole(), "Advanced.CheckConsole");
     view_listener_t::addMenu(new LLAdvancedDumpInfoToConsole(), "Advanced.DumpInfoToConsole");
@@ -10677,6 +10790,8 @@ void initialize_menus()
     commit.add("Object.SetFavorite", boost::bind(&handle_object_set_favorite, _2));
     commit.add("Object.SitOrStand", boost::bind(&handle_object_sit_or_stand));
     commit.add("Object.Delete", boost::bind(&handle_object_delete));
+    commit.add("Object.PlayLocalAnim", boost::bind(&handle_play_local_anim));
+    commit.add("Object.StopLocalAnim", boost::bind(&handle_stop_local_anim));
     view_listener_t::addMenu(new LLObjectAttachToAvatar(true), "Object.AttachToAvatar");
     view_listener_t::addMenu(new LLObjectAttachToAvatar(false), "Object.AttachAddToAvatar");
     view_listener_t::addMenu(new LLObjectReturn(), "Object.Return");
@@ -10705,6 +10820,7 @@ void initialize_menus()
     enable.add("Object.EnableTouch", boost::bind(&enable_object_touch, _1));
     enable.add("Object.EnableFavorites", boost::bind(&enable_object_favorite, _2));
     enable.add("Object.EnableDelete", boost::bind(&enable_object_delete));
+    enable.add("Object.EnablePlayLocalAnim", boost::bind(&enable_play_local_anim));
     enable.add("Object.EnableWear", boost::bind(&object_is_wearable));
 
     enable.add("Object.EnableStandUp", boost::bind(&enable_object_stand_up));

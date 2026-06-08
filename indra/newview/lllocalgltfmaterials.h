@@ -30,7 +30,9 @@
 #include "lleventtimer.h"
 #include "llpointer.h"
 #include "llgltfmateriallist.h"
+#include <boost/signals2/signal.hpp>
 #include <filesystem>
+#include <map>
 
 class LLScrollListCtrl;
 class LLGLTFMaterial;
@@ -49,6 +51,17 @@ public: /* accessors */
     LLUUID      getTrackingID() const;
     LLUUID      getWorldID() const;
     S32         getIndexInFile() const;
+    std::string getMaterialName() const { return mMaterialName; } // glTF material name (face binding)
+    // Other glTF material names (face bindings) that deduplicated onto this unit:
+    // a mesh import collapses content-identical materials to one, but every
+    // original face still binds by its own name, so we keep them for the name->id
+    // map (see LLLocalGLTFMaterialMgr::getWorldIDsByName).
+    const std::vector<std::string>& getAliasNames() const { return mAliasNames; }
+    void        addAliasName(const std::string& name) { mAliasNames.push_back(name); }
+    // Imported by a local mesh for its own faces: hidden from the Materials tab +
+    // cross-session persistence (it reappears when the mesh re-decodes).
+    bool        isMeshOwned() const { return mIsMeshOwned; }
+    void        setMeshOwned(bool b) { mIsMeshOwned = b; }
 
 public:
     bool updateSelf();
@@ -79,6 +92,9 @@ private: /* members */
     ELinkStatus mLinkStatus;
     S32         mUpdateRetries;
     S32         mMaterialIndex; // Single file can have more than one
+    std::string mMaterialName;  // glTF material name, for matching a mesh face's binding
+    std::vector<std::string> mAliasNames; // other face bindings deduplicated onto this unit
+    bool        mIsMeshOwned = false; // imported by a local mesh (see isMeshOwned)
 };
 
 class LLLocalGLTFMaterialTimer : public LLEventTimer
@@ -102,22 +118,37 @@ public:
     S32          addUnit(const std::vector<std::string>& filenames);
     S32          addUnit(const std::string& filename); // file can hold multiple materials
     S32          addUnit(const std::string& filename, LLUUID& outID); // returns first material id as outID
+    // Add a file's materials as mesh-owned: hidden from the Materials tab + persistence.
+    S32          addUnit(const std::string& filename, bool mesh_owned);
 protected:
-    S32          addUnitInternal(const std::string& filename, LLUUID& outID); // file can hold multiple materials
+    S32          addUnitInternal(const std::string& filename, LLUUID& outID, bool mesh_owned = false); // file can hold multiple materials
 public:
     void         delUnit(LLUUID tracking_id);
     LLUUID       getUnitID(const std::string& filename, S32 index = 0);
+    // Tracking ids of every unit loaded from a file, in list order. Unlike walking
+    // getUnitID(file, 0..N), this is safe across the index gaps that import-time
+    // deduplication leaves in getIndexInFile().
+    void         getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out);
 
     LLUUID       getWorldID(LLUUID tracking_id);
+    bool         isMeshOwned(const LLUUID& tracking_id) const; // imported by a local mesh
     bool         isLocal(LLUUID world_id);
     void         getFilenameAndIndex(LLUUID tracking_id, std::string &filename, S32 &index);
+    // Map each of a file's materials by name (empty name -> "mat<index>", matching the
+    // model loader's face bindings) to its world id, for texturing a local mesh.
+    void         getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out);
+    std::vector<std::string> getFilenames() const; // distinct loaded files (persistence)
 
     void         feedScrollList(LLScrollListCtrl* ctrl);
+    // Fired when the unit list changes (add/remove) so the Local Assets floater
+    // refreshes reactively.
+    boost::signals2::connection setUnitsChangedCallback(const std::function<void()>& cb);
     void         doUpdates();
 
 private:
     std::list<LLPointer<LLLocalGLTFMaterial> >    mMaterialList;
     LLLocalGLTFMaterialTimer           mTimer;
+    boost::signals2::signal<void()>    mUnitsChangedSignal; // add/remove
     typedef std::list<LLPointer<LLLocalGLTFMaterial> >::iterator local_list_iter;
 };
 

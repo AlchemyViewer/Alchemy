@@ -1089,6 +1089,10 @@ bool LLLocalBitmapMgr::addUnit(const std::vector<std::string>& filenames)
         iter++;
     }
     mTimer.startTimer();
+    if (add_successful)
+    {
+        mUnitsChangedSignal();
+    }
     return add_successful;
 }
 
@@ -1097,11 +1101,39 @@ LLUUID LLLocalBitmapMgr::addUnit(const std::string& filename)
     mTimer.stopTimer();
     LLUUID tracking_id = addUnitInternal(filename);
     mTimer.startTimer();
+    if (tracking_id.notNull())
+    {
+        mUnitsChangedSignal();
+    }
     return tracking_id;
 }
 
-LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename)
+LLUUID LLLocalBitmapMgr::addUnit(const std::string& filename, bool mesh_owned)
 {
+    mTimer.stopTimer();
+    LLUUID tracking_id = addUnitInternal(filename, mesh_owned);
+    mTimer.startTimer();
+    if (tracking_id.notNull())
+    {
+        mUnitsChangedSignal();
+    }
+    return tracking_id;
+}
+
+LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename, bool mesh_owned)
+{
+    // No double-add: reuse an existing unit for this file. A user add (mesh_owned
+    // false) only matches a user unit, and a mesh import only matches a mesh-owned
+    // unit -- so the same file can be both a user texture and a (hidden) mesh-owned
+    // import without colliding, and re-adding a loaded file won't duplicate it.
+    for (LLLocalBitmap* unit : mBitmapList)
+    {
+        if (unit->getFilename() == filename && unit->isMeshOwned() == mesh_owned)
+        {
+            return unit->getTrackingID();
+        }
+    }
+
     if (!checkTextureDimensions(filename))
     {
         return LLUUID::null;
@@ -1111,6 +1143,7 @@ LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename)
 
     if (unit->getValid())
     {
+        unit->setMeshOwned(mesh_owned);
         mBitmapList.push_back(unit);
         return unit->getTrackingID();
     }
@@ -1206,6 +1239,27 @@ void LLLocalBitmapMgr::delUnit(LLUUID tracking_id)
             unit = NULL;
         }
     }
+    mUnitsChangedSignal();
+}
+
+boost::signals2::connection LLLocalBitmapMgr::setUnitsChangedCallback(const std::function<void()>& cb)
+{
+    return mUnitsChangedSignal.connect(cb);
+}
+
+std::vector<std::string> LLLocalBitmapMgr::getFilenames() const
+{
+    std::vector<std::string> out;
+    out.reserve(mBitmapList.size());
+    for (const LLLocalBitmap* unit : mBitmapList)
+    {
+        if (unit->isMeshOwned())
+        {
+            continue; // a mesh's imported texture, not part of the user's set
+        }
+        out.push_back(unit->getFilename());
+    }
+    return out;
 }
 
 LLUUID LLLocalBitmapMgr::getTrackingID(const LLUUID& world_id) const
@@ -1236,6 +1290,18 @@ LLUUID LLLocalBitmapMgr::getWorldID(const LLUUID &tracking_id) const
     }
 
     return world_id;
+}
+
+bool LLLocalBitmapMgr::isMeshOwned(const LLUUID& tracking_id) const
+{
+    for (local_list_citer iter = mBitmapList.begin(); iter != mBitmapList.end(); iter++)
+    {
+        if ((*iter)->getTrackingID() == tracking_id)
+        {
+            return (*iter)->isMeshOwned();
+        }
+    }
+    return false;
 }
 
 bool LLLocalBitmapMgr::isLocal(const LLUUID &world_id) const
@@ -1306,19 +1372,30 @@ void LLLocalBitmapMgr::feedScrollList(LLScrollListCtrl* ctrl)
             for (local_list_iter iter = mBitmapList.begin();
                  iter != mBitmapList.end(); iter++)
             {
+                // Model-loaded (mesh-owned) textures are shown too, tagged "(model)"
+                // and flagged so the UI treats them as read-only / transient.
+                const bool mesh_owned = (*iter)->isMeshOwned();
                 LLSD element;
 
                 element["columns"][0]["column"] = "icon";
                 element["columns"][0]["type"] = "icon";
                 element["columns"][0]["value"] = icon_name;
 
+                std::string unit_name = (*iter)->getShortName();
+                if (mesh_owned)
+                {
+                    LLSD name_args;
+                    name_args["NAME"] = unit_name;
+                    unit_name = LLTrans::getString("LocalAssetModelOwned", name_args);
+                }
                 element["columns"][1]["column"] = "unit_name";
                 element["columns"][1]["type"] = "text";
-                element["columns"][1]["value"] = (*iter)->getShortName();
+                element["columns"][1]["value"] = unit_name;
 
                 LLSD data;
                 data["id"] = (*iter)->getTrackingID();
                 data["type"] = (S32)LLAssetType::AT_TEXTURE;
+                data["mesh_owned"] = mesh_owned;
                 element["value"] = data;
 
                 ctrl->addElement(element);

@@ -65,6 +65,7 @@
 #include "lltoolmgr.h"
 #include "lltoolpie.h"
 #include "llkeyboard.h"
+#include "lllocalmesh.h"
 #include "llmeshrepository.h"
 #include "u64.h"
 #include "llviewertexturelist.h"
@@ -1412,6 +1413,14 @@ bool LLViewerObjectList::killObject(LLViewerObject *objectp)
 void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
 {
     LL_PROFILE_ZONE_SCOPED;
+
+    // Release our client-only local mesh previews hosted by this region before it
+    // is torn down, so they don't dangle past it (the preview avatar too).
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr::getInstance()->despawnObjectsInRegion(regionp);
+    }
+
     LLViewerObject *objectp;
 
 
@@ -1432,6 +1441,14 @@ void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
 void LLViewerObjectList::killAllObjects()
 {
     // Used only on global destruction.
+
+    // Destroy local-mesh preview objects (and their preview avatar) first, so
+    // these client-only objects are released while this list is still valid
+    // instead of dangling until the local-mesh singleton is torn down.
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr::getInstance()->cleanup();
+    }
 
     // Mass cleanup to not clear lists one item at a time
     mIndexAndLocalIDToUUID.clear();
@@ -1594,6 +1611,15 @@ void LLViewerObjectList::updateActive(LLViewerObject *objectp)
 
 void LLViewerObjectList::updateObjectCost(LLViewerObject* object)
 {
+    // Client-only (local preview) objects have no sim counterpart, so their fake
+    // UUIDs can't be costed by the GetObjectCost capability: a request would never
+    // resolve and would re-fire every time the cost is read. Skip them -- their
+    // cached cost stays at the 0 default, which is the correct land impact for
+    // something that isn't actually rezzed on the region.
+    if (!object || object->isLocalOnly())
+    {
+        return;
+    }
     if (!object->isRoot())
     { //always fetch cost for the parent when fetching cost for children
         mStaleObjectCost.insert(((LLViewerObject*)object->getParent())->getID());
@@ -1621,6 +1647,13 @@ void LLViewerObjectList::onObjectCostFetchFailure(const LLUUID& object_id)
 
 void LLViewerObjectList::updatePhysicsFlags(const LLViewerObject* object)
 {
+    // Client-only (local preview) objects have no sim counterpart, so the
+    // GetObjectPhysicsData cap can't resolve their fake UUIDs -- skip them, mirroring
+    // updateObjectCost() above.
+    if (!object || object->isLocalOnly())
+    {
+        return;
+    }
     mStalePhysicsFlags.insert(object->getID());
 }
 

@@ -184,8 +184,11 @@ bool LLViewerJointAttachment::addObject(LLViewerObject* object)
 
     // Two instances of the same inventory item attached --
     // Request detach, and kill the object in the meantime.
+    // (Skip for client-only objects: a local mesh preview has no inventory item,
+    // so its id is null and the dedup would markDead an unrelated null-id local
+    // attachment and send it an ObjectDetach the sim can't act on.)
 // [SL:KB] - Patch: Appearance-PhantomAttach | Checked: Catznip-5.0
-    if (LLViewerObject* pAttachObj = getAttachedObject(object->getAttachmentItemID()))
+    if (LLViewerObject* pAttachObj = (!object->isLocalOnly()) ? getAttachedObject(object->getAttachmentItemID()) : nullptr)
     {
         LL_INFOS() << "(same object re-attached)" << LL_ENDL;
         pAttachObj->markDead();

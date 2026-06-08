@@ -39,6 +39,7 @@
 #include "llnotificationsutil.h"
 #include "llscrolllistctrl.h"
 #include "lltextureentry.h"
+#include "lltrans.h"           // "(model)" tag for mesh-owned rows
 #include "lltinygltfhelper.h"
 #include "llviewertexture.h"
 
@@ -242,6 +243,7 @@ bool LLLocalGLTFMaterial::loadMaterial()
                     material_name);
             }
 
+            mMaterialName = material_name; // for matching a mesh face's binding name
             if (!material_name.empty())
             {
                 mShortName = gDirUtilp->getBaseFileName(filename_lc, true) + " (" + material_name + ")";
@@ -327,6 +329,10 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::vector<std::string>& filenames)
         iter++;
     }
     mTimer.startTimer();
+    if (add_count > 0)
+    {
+        mUnitsChangedSignal();
+    }
     return add_count;
 }
 
@@ -341,11 +347,73 @@ S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename, LLUUID& outID)
     mTimer.stopTimer();
     S32 res = addUnitInternal(filename, outID);
     mTimer.startTimer();
+    if (res > 0)
+    {
+        mUnitsChangedSignal();
+    }
     return res;
 }
 
-S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID& outID)
+S32 LLLocalGLTFMaterialMgr::addUnit(const std::string& filename, bool mesh_owned)
 {
+    mTimer.stopTimer();
+    LLUUID outID;
+    S32 res = addUnitInternal(filename, outID, mesh_owned);
+    mTimer.startTimer();
+    if (res > 0)
+    {
+        mUnitsChangedSignal();
+    }
+    return res;
+}
+
+// Content signature of a glTF material: its factors plus, for each texture slot,
+// the SOURCE image (not the per-material texture index). Exporters routinely split
+// one atlas-textured material into one material per face (distinct names + distinct
+// texture objects that all point at the same image); those share a signature, so we
+// can import them as a single local material instead of N -- no Materials-tab
+// clutter, no repeated load/verify dialogs, and one shared texture that renders on
+// the first load (every face references it, so its load callback repaints them all).
+static std::string gltfMaterialSignature(const tinygltf::Model& model, S32 idx)
+{
+    const tinygltf::Material& m = model.materials[idx];
+    const tinygltf::PbrMetallicRoughness& pbr = m.pbrMetallicRoughness;
+    std::string s;
+    auto add_d = [&s](double d) { s += std::to_string(d); s += ','; };
+    auto add_vec = [&](const std::vector<double>& v) { for (double d : v) { add_d(d); } s += '|'; };
+    auto add_tex = [&](int ti, int tc)
+    {
+        const int src = (ti >= 0 && ti < (int)model.textures.size()) ? model.textures[ti].source : -1;
+        s += std::to_string(src); s += ':'; s += std::to_string(tc); s += '|';
+    };
+    add_vec(pbr.baseColorFactor);
+    add_d(pbr.metallicFactor); add_d(pbr.roughnessFactor); s += '|';
+    add_tex(pbr.baseColorTexture.index, pbr.baseColorTexture.texCoord);
+    add_tex(pbr.metallicRoughnessTexture.index, pbr.metallicRoughnessTexture.texCoord);
+    add_tex(m.normalTexture.index, m.normalTexture.texCoord); add_d(m.normalTexture.scale); s += '|';
+    add_tex(m.occlusionTexture.index, m.occlusionTexture.texCoord); add_d(m.occlusionTexture.strength); s += '|';
+    add_vec(m.emissiveFactor);
+    add_tex(m.emissiveTexture.index, m.emissiveTexture.texCoord);
+    s += m.alphaMode; s += '|'; add_d(m.alphaCutoff); s += (m.doubleSided ? '1' : '0');
+    return s;
+}
+
+S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID& outID, bool mesh_owned)
+{
+    // No double-add: if this file's materials are already loaded (same ownership
+    // class -- user vs mesh-owned), return the existing first material instead of
+    // loading the file's materials a second time.
+    for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
+    {
+        if (unit->getFilename() == filename && unit->isMeshOwned() == mesh_owned)
+        {
+            // Return THIS unit's id; getUnitID(filename, 0) ignores ownership and
+            // could hand back a different (user vs mesh-owned) unit for the file.
+            outID = unit->getTrackingID();
+            return 0; // nothing newly added
+        }
+    }
+
     tinygltf::Model model;
     LLTinyGLTFHelper::loadModel(filename, model);
 
@@ -356,17 +424,42 @@ S32 LLLocalGLTFMaterialMgr::addUnitInternal(const std::string& filename, LLUUID&
     }
 
     S32 loaded_materials = 0;
+    // Deduplicate content-identical materials within this file (see
+    // gltfMaterialSignature). The signature comes straight from the parsed model,
+    // so a duplicate is skipped BEFORE it is loaded -- no second decode, no second
+    // verify dialog. Every original face binding name is recorded as an alias on
+    // the canonical unit so a mesh face still resolves to it (getWorldIDsByName).
+    std::vector<std::pair<std::string, LLLocalGLTFMaterial*>> by_signature;
     for (size_t i = 0; i < materials_in_file; i++)
     {
-        // Todo: this is rather inefficient, files will be spammed with
-        // separate loads and date checks, find a way to improve this.
-        // May be doUpdates() should be checking individual files.
+        const std::string signature = gltfMaterialSignature(model, static_cast<S32>(i));
+
+        LLLocalGLTFMaterial* canonical = nullptr;
+        for (const auto& entry : by_signature)
+        {
+            if (entry.first == signature)
+            {
+                canonical = entry.second;
+                break;
+            }
+        }
+        if (canonical)
+        {
+            // Identical to an already-imported material: keep this face binding name
+            // (empty -> "mat<index>", matching the model loader) pointing at it.
+            const std::string& nm = model.materials[i].name;
+            canonical->addAliasName(nm.empty() ? ("mat" + std::to_string(i)) : nm);
+            continue;
+        }
+
         LLPointer<LLLocalGLTFMaterial> unit = new LLLocalGLTFMaterial(filename, static_cast<S32>(i));
 
         // load material from file
         if (unit->updateSelf())
         {
+            unit->setMeshOwned(mesh_owned);
             mMaterialList.emplace_back(unit);
+            by_signature.emplace_back(signature, unit.get());
             if(loaded_materials == 0)
             {
                 outID = unit->getTrackingID();
@@ -412,6 +505,31 @@ void LLLocalGLTFMaterialMgr::delUnit(LLUUID tracking_id)
             unit = NULL;
         }
     }
+    mUnitsChangedSignal();
+}
+
+boost::signals2::connection LLLocalGLTFMaterialMgr::setUnitsChangedCallback(const std::function<void()>& cb)
+{
+    return mUnitsChangedSignal.connect(cb);
+}
+
+std::vector<std::string> LLLocalGLTFMaterialMgr::getFilenames() const
+{
+    // One .gltf/.glb can hold several materials (several units); persist the file once.
+    std::vector<std::string> out;
+    for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
+    {
+        if (unit->isMeshOwned())
+        {
+            continue; // a mesh's imported material, not part of the user's set
+        }
+        const std::string filename = unit->getFilename();
+        if (std::find(out.begin(), out.end(), filename) == out.end())
+        {
+            out.push_back(filename);
+        }
+    }
+    return out;
 }
 
 LLUUID LLLocalGLTFMaterialMgr::getUnitID(const std::string& filename, S32 index)
@@ -428,6 +546,17 @@ LLUUID LLLocalGLTFMaterialMgr::getUnitID(const std::string& filename, S32 index)
         }
     }
     return LLUUID::null;
+}
+
+void LLLocalGLTFMaterialMgr::getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out)
+{
+    for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
+    {
+        if (unit->getFilename() == filename)
+        {
+            out.push_back(unit->getTrackingID());
+        }
+    }
 }
 
 LLUUID LLLocalGLTFMaterialMgr::getWorldID(LLUUID tracking_id)
@@ -459,6 +588,18 @@ bool LLLocalGLTFMaterialMgr::isLocal(const LLUUID world_id)
     return false;
 }
 
+bool LLLocalGLTFMaterialMgr::isMeshOwned(const LLUUID& tracking_id) const
+{
+    for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
+    {
+        if (unit->getTrackingID() == tracking_id)
+        {
+            return unit->isMeshOwned();
+        }
+    }
+    return false;
+}
+
 void LLLocalGLTFMaterialMgr::getFilenameAndIndex(LLUUID tracking_id, std::string &filename, S32 &index)
 {
     filename = "";
@@ -471,6 +612,33 @@ void LLLocalGLTFMaterialMgr::getFilenameAndIndex(LLUUID tracking_id, std::string
         {
             filename = unit->getFilename();
             index = unit->getIndexInFile();
+        }
+    }
+}
+
+void LLLocalGLTFMaterialMgr::getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out)
+{
+    for (local_list_iter iter = mMaterialList.begin(); iter != mMaterialList.end(); iter++)
+    {
+        LLLocalGLTFMaterial* unit = *iter;
+        if (unit->getFilename() != filename)
+        {
+            continue;
+        }
+        // Match the model loader's face-binding convention: an unnamed glTF material
+        // binds as "mat<index>" (see LLGLTFLoader::generateMaterialName).
+        std::string name = unit->getMaterialName();
+        if (name.empty())
+        {
+            name = "mat" + std::to_string(unit->getIndexInFile());
+        }
+        out[name] = unit->getWorldID();
+
+        // Plus any face bindings that deduplicated onto this unit at import, so every
+        // face of a one-material-per-face mesh resolves to this shared material.
+        for (const std::string& alias : unit->getAliasNames())
+        {
+            out[alias] = unit->getWorldID();
         }
     }
 }
@@ -489,19 +657,30 @@ void LLLocalGLTFMaterialMgr::feedScrollList(LLScrollListCtrl* ctrl)
             for (local_list_iter iter = mMaterialList.begin();
                 iter != mMaterialList.end(); iter++)
             {
+                // Model-loaded (mesh-owned) materials are shown too, tagged "(model)"
+                // and flagged so the UI treats them as read-only / transient.
+                const bool mesh_owned = (*iter)->isMeshOwned();
                 LLSD element;
 
                 element["columns"][0]["column"] = "icon";
                 element["columns"][0]["type"] = "icon";
                 element["columns"][0]["value"] = icon_name;
 
+                std::string unit_name = (*iter)->getShortName();
+                if (mesh_owned)
+                {
+                    LLSD name_args;
+                    name_args["NAME"] = unit_name;
+                    unit_name = LLTrans::getString("LocalAssetModelOwned", name_args);
+                }
                 element["columns"][1]["column"] = "unit_name";
                 element["columns"][1]["type"] = "text";
-                element["columns"][1]["value"] = (*iter)->getShortName();
+                element["columns"][1]["value"] = unit_name;
 
                 LLSD data;
                 data["id"] = (*iter)->getTrackingID();
                 data["type"] = (S32)LLAssetType::AT_MATERIAL;
+                data["mesh_owned"] = mesh_owned;
                 element["value"] = data;
 
                 ctrl->addElement(element);

@@ -43,6 +43,8 @@
 #include "llviewertexture.h"
 #include "llwindow.h"
 
+#include <boost/signals2/connection.hpp>
+
 class LLComboBox;
 class LLFloaterTexturePicker;
 class LLInventoryItem;
@@ -403,6 +405,7 @@ public:
 protected:
     void changeMode();
     void refreshLocalList();
+    void onLocalAssetsChanged(); // refresh local list, then drop a now-deleted local selection
     void refreshInventoryFilter();
     void setImageIDFromItem(const LLInventoryItem* itemp, bool set_selection = true);
     LLViewerInventoryItem* findInvItem(const LLUUID& asset_id, bool copyable_only, bool ignore_library = false) const;
@@ -469,6 +472,12 @@ private:
 
     bool mBakeTextureEnabled;
     bool mLocalTextureEnabled;
+
+    // Keep the Local tab live as local units change anywhere -- the Local Assets
+    // floater, a mesh import, live-reload, or another picker -- not just after this
+    // picker's own add/remove. Scoped so they drop when the floater is destroyed.
+    boost::signals2::scoped_connection mLocalBitmapsChangedConn;
+    boost::signals2::scoped_connection mLocalMaterialsChangedConn;
 
     static S32 sLastPickerMode;
 };

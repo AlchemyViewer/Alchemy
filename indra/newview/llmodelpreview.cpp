@@ -2895,6 +2895,12 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
             mat_normal.loadu(glm::value_ptr(m));
         }
 
+        // O(1) per-vertex weight lookup for the skin-weight buffer fill below;
+        // without it the per-vertex getJointInfluences() scan is O(V^2) and stalls
+        // the preview on dense rigged meshes. Built once per model (empty/cheap
+        // when unskinned).
+        LLModel::JointWeightCache weight_cache(*mdl);
+
         S32 num_faces = mdl->getNumVolumeFaces();
         for (S32 i = 0; i < num_faces; ++i)
         {
@@ -2994,7 +3000,7 @@ void LLModelPreview::genBuffers(S32 lod, bool include_skin_weights)
                     //find closest weight to vf.mVertices[i].mPosition
                     LLVector3 pos(vf.mPositions[i].getF32ptr());
 
-                    const LLModel::weight_list& weight_list = mdl->getJointInfluences(pos);
+                    const LLModel::weight_list& weight_list = weight_cache.influences(pos);
                     llassert(weight_list.size()>0 && weight_list.size() <= 4); // LLModel::loadModel() should guarantee this
 
                     LLVector4 w(0, 0, 0, 0);

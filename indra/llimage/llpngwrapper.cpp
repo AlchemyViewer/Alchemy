@@ -237,7 +237,7 @@ void LLPngWrapper::normalizeImage()
     //      1. Expand any palettes
     //      2. Convert grayscales to RGB
     //      3. Create alpha layer from transparency
-    //      4. Ensure 8-bpp for all images
+    //      4. Ensure 8-bpp for all images (16-bit accurately scaled, not truncated)
     //      5. Set (or guess) gamma
 
     if (mColorType == PNG_COLOR_TYPE_PALETTE)
@@ -263,7 +263,13 @@ void LLPngWrapper::normalizeImage()
     }
     else if (mBitDepth == 16)
     {
+#ifdef PNG_READ_SCALE_16_TO_8_SUPPORTED
+        // Accurate linear 16->8 reduction (round(v/257)) rather than
+        // png_set_strip_16's biased low-byte truncation (v>>8).
+        png_set_scale_16(mReadPngPtr);
+#else
         png_set_strip_16(mReadPngPtr);
+#endif
     }
 
     const F64 SCREEN_GAMMA = 2.2;

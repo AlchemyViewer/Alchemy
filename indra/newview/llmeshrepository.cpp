@@ -46,6 +46,7 @@
 #include "llsdserialize.h"
 #include "llthread.h"
 #include "llfilesystem.h"
+#include "lllocalmesh.h"
 #include "llviewercontrol.h"
 #include "llviewerinventory.h"
 #include "llviewermenufile.h"
@@ -4214,6 +4215,11 @@ void LLMeshRepository::init()
 {
     mMeshMutex = new LLMutex();
 
+    // Create the local mesh registry up front so the isLocal()/getUnit*()
+    // short-circuits below have an instance to consult. The hot-path checks
+    // stay guarded by instanceExists() for shutdown safety.
+    LLLocalMeshMgr::getInstance();
+
     // initSystem is static; call it directly. getInstance() returns null here (s_isInitialized is false)
     // and dispatching a static method through a null pointer is UB.
     LLConvexDecomposition::initSystem();
@@ -4242,6 +4248,14 @@ void LLMeshRepository::shutdown()
     LL_INFOS(LOG_MESH) << "Shutting down mesh repository." << LL_ENDL;
     llassert(mThread != NULL);
     llassert(mThread->mSignal != NULL);
+
+    // Tear down the local mesh registry we created in init(). Its preview objects
+    // and avatar were already released by LLViewerObjectList::killAllObjects();
+    // this frees the decoded units and the singleton itself.
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr::deleteSingleton();
+    }
 
     metrics_teleport_started_signal.disconnect();
 
@@ -4378,6 +4392,37 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 
     if (new_lod < 0 || new_lod >= LLVolumeLODGroup::NUM_LODS)
     {
+        return new_lod;
+    }
+
+    // Local mesh: serve the decoded geometry directly from the registry instead
+    // of issuing an asset fetch. The same geometry is served for every LOD.
+    // Local mesh: decide locality by registry membership, not by whether a decoded
+    // volume happens to exist right now. A local-only world id must never fall through
+    // to the simulator-backed fetch below -- not even during the brief window of a
+    // hot-reload when its volume is momentarily unavailable (it has no server asset).
+    if (LLLocalMeshMgr::instanceExists() &&
+        LLLocalMeshMgr::getInstance()->isLocal(mesh_params.getSculptID()))
+    {
+        LLVolume* local_volume = LLLocalMeshMgr::getInstance()->getVolumeForWorldID(mesh_params.getSculptID());
+        if (local_volume)
+        {
+            LLVolume* sys_volume = LLPrimitive::getVolumeManager()->refVolume(mesh_params, new_lod);
+            if (sys_volume)
+            {
+                // Always recopy: a live reload rebuilds the local volume in place while
+                // the cached system volume keeps the same world id, so an
+                // isMeshAssetLoaded() gate here would pin the stale geometry.
+                sys_volume->copyVolumeFaces(local_volume);
+                sys_volume->setMeshAssetLoaded(true);
+                LLPrimitive::getVolumeManager()->unrefVolume(sys_volume);
+            }
+            if (vobj)
+            {
+                vobj->notifyMeshLoaded();
+            }
+        }
+        // Served above, or still decoding mid-reload -- either way, don't remote-fetch.
         return new_lod;
     }
 
@@ -4864,12 +4909,28 @@ void LLMeshRepository::notifyMeshUnavailable(const LLVolumeParams& mesh_params, 
 
 S32 LLMeshRepository::getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod)
 {
+    // Local mesh has no header/LOD list; the same geometry is valid for every LOD.
+    if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_params.getSculptID()))
+    {
+        return llclamp(lod, 0, LLVolumeLODGroup::NUM_LODS - 1);
+    }
     return mThread->getActualMeshLOD(mesh_params, lod);
 }
 
 const LLMeshSkinInfo* LLMeshRepository::getSkinInfo(const LLUUID& mesh_id, LLVOVolume* requesting_obj)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
+    // Local mesh: serve the decoded skin (or null if static) and never fetch.
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
+        if (mgr->isLocal(mesh_id))
+        {
+            return mgr->getSkinInfoForWorldID(mesh_id);
+        }
+    }
+
     if (mesh_id.notNull())
     {
         skin_map::iterator iter = mSkinMap.find(mesh_id);
@@ -5008,6 +5069,15 @@ bool LLMeshRepository::hasSkinInfo(const LLUUID& mesh_id)
         return false;
     }
 
+    if (LLLocalMeshMgr::instanceExists())
+    {
+        LLLocalMeshMgr* mgr = LLLocalMeshMgr::getInstance();
+        if (mgr->isLocal(mesh_id))
+        {
+            return mgr->getSkinInfoForWorldID(mesh_id) != nullptr;
+        }
+    }
+
     if (mThread->hasSkinInfoInHeader(mesh_id))
     {
         return true;
@@ -5027,6 +5097,11 @@ bool LLMeshRepository::hasHeader(const LLUUID& mesh_id) const
     if (mesh_id.isNull())
     {
         return false;
+    }
+
+    if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_id))
+    {
+        return true;
     }
 
     return mThread->hasHeader(mesh_id);

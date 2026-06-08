@@ -1287,6 +1287,14 @@ function="World.EnvPreset"
      name="BuildTools"
      tear_off="true"
      visible="true">
+       <menu_item_call
+        label="Local Assets..."
+        name="LocalAssets">
+         <menu_item_call.on_click
+          function="Floater.ToggleOrBringToFront"
+          parameter="local_assets"/>
+       </menu_item_call>
+       <menu_item_separator/>
        <menu_item_check
          label="Build"
          name="Show Build Tools"
@@ -3042,6 +3050,12 @@ function="World.EnvPreset"
      name="Develop"
      tear_off="true"
      visible="false">
+        <menu_item_call
+         label="Load Local Mesh..."
+         name="LoadLocalMesh">
+            <menu_item_call.on_click
+             function="Advanced.LoadLocalMesh" />
+        </menu_item_call>
         <menu
          create_jump_keys="true"
          label="Consoles"

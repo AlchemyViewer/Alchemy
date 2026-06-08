@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+  can_close="true"
+  can_resize="true"
+  height="440"
+  width="540"
+  min_height="320"
+  min_width="460"
+  layout="topleft"
+  name="floater_local_assets"
+  save_rect="true"
+  single_instance="true"
+  title="LOCAL ASSETS">
+  <string name="tab_mesh">Mesh</string>
+  <string name="tab_rezzed">Rezzed</string>
+  <string name="tab_anim">Animations</string>
+  <string name="tab_textures">Textures</string>
+  <string name="tab_materials">Materials</string>
+  <tab_container
+    top="5"
+    left="5"
+    right="-5"
+    height="430"
+    layout="topleft"
+    follows="all"
+    tab_position="top"
+    name="asset_tabs"/>
+</floater>

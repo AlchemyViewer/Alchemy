@@ -33,6 +33,7 @@
 #include "lltextbox.h"
 
 #include "llagent.h"
+#include "llappviewer.h"
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 
@@ -125,14 +126,25 @@ void LLFloaterObjectWeights::onOpen(const LLSD& key)
 // virtual
 void LLFloaterObjectWeights::onWeightsUpdate(const SelectionCost& selection_cost)
 {
-    mSelectedDownloadWeight->setText(llformat("%.1f", selection_cost.mNetworkCost));
-    mSelectedPhysicsWeight->setText(llformat("%.1f", selection_cost.mPhysicsCost));
-    mSelectedServerWeight->setText(llformat("%.1f", selection_cost.mSimulationCost));
+    // The response can land on a later tick, after the floater has been closed.
+    // Capture a handle and bail if the floater is gone before touching widgets.
+    LLHandle<LLView> handle = getHandle();
+    LLAppViewer::instance()->postToMainCoro(
+        [this, handle, selection_cost]()
+        {
+            if (handle.isDead())
+            {
+                return;
+            }
+            mSelectedDownloadWeight->setText(llformat("%.1f", selection_cost.mNetworkCost));
+            mSelectedPhysicsWeight->setText(llformat("%.1f", selection_cost.mPhysicsCost));
+            mSelectedServerWeight->setText(llformat("%.1f", selection_cost.mSimulationCost));
 
-    S32 render_cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectRenderCost();
-    mSelectedDisplayWeight->setText(llformat("%d", render_cost));
+            S32 render_cost = LLSelectMgr::getInstance()->getSelection()->getSelectedObjectRenderCost();
+            mSelectedDisplayWeight->setText(llformat("%d", render_cost));
 
-    toggleWeightsLoadingIndicators(false);
+            toggleWeightsLoadingIndicators(false);
+        });
 }
 
 //virtual
@@ -273,20 +285,46 @@ void LLFloaterObjectWeights::refresh()
         LLViewerRegion* region = gAgent.getRegion();
         if (region && region->capabilitiesReceived())
         {
+            S32 server_costable_roots = 0;
             for (LLObjectSelection::valid_root_iterator iter = sel_mgr->getSelection()->valid_root_begin();
                     iter != sel_mgr->getSelection()->valid_root_end(); ++iter)
             {
-                LLAccountingCostManager::getInstance()->addObject((*iter)->getObject()->getID());
+                // Client-only previews have no sim counterpart, so the
+                // ResourceCostSelected cap can't cost their fake UUIDs -- a request
+                // would never resolve and the weight indicators would spin forever.
+                LLViewerObject* root = (*iter)->getObject();
+                if (root && !root->isLocalOnly())
+                {
+                    LLAccountingCostManager::getInstance()->addObject(root->getID());
+                    ++server_costable_roots;
+                }
             }
 
             std::string url = region->getCapability("ResourceCostSelected");
-            if (!url.empty())
+            if (server_costable_roots > 0)
             {
-                // Update the transaction id before the new fetch request
-                generateTransactionID();
+                if (!url.empty())
+                {
+                    // Update the transaction id before the new fetch request
+                    generateTransactionID();
 
-                LLAccountingCostManager::getInstance()->fetchCosts(Roots, url, getObserverHandle());
-                toggleWeightsLoadingIndicators(true);
+                    LLAccountingCostManager::getInstance()->fetchCosts(Roots, url, getObserverHandle());
+                    toggleWeightsLoadingIndicators(true);
+                }
+            }
+            else
+            {
+                // Entirely client-only (local preview) selection. The sim-side weights
+                // (download/physics/server) can't be fetched, so zero them instead of
+                // spinning the loading indicators forever -- but the display/render
+                // weight is computed client-side, so keep it accurate.
+                toggleWeightsLoadingIndicators(false);
+                const std::string zero = llformat("%.1f", 0.f);
+                mSelectedDownloadWeight->setText(zero);
+                mSelectedPhysicsWeight->setText(zero);
+                mSelectedServerWeight->setText(zero);
+                const S32 render_cost = sel_mgr->getSelection()->getSelectedObjectRenderCost();
+                mSelectedDisplayWeight->setText(llformat("%d", render_cost));
             }
         }
         else

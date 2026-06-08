@@ -886,6 +886,12 @@ LLSD LLModel::writeModel(
 
             LLVector3 pos_range = max_pos - min_pos;
 
+            // O(1) per-vertex weight lookup for the skinning block below; without
+            // it the per-vertex getJointInfluences() scan makes this loop O(V^2)
+            // and freezes the uploader on dense rigged meshes. Built once per
+            // model (empty/cheap when unskinned).
+            JointWeightCache weight_cache(*model[idx]);
+
             for (S32 i = 0; i < model[idx]->getNumVolumeFaces(); ++i)
             { //for each face
                 const LLVolumeFace& face = model[idx]->getVolumeFace(i);
@@ -1044,10 +1050,10 @@ LLSD LLModel::writeModel(
                         {
                             LLVector3 pos(face.mPositions[j].getF32ptr());
 
-                            weight_list& weights = model[idx]->getJointInfluences(pos);
+                            const weight_list& weights = weight_cache.influences(pos);
 
                             S32 count = 0;
-                            for (weight_list::iterator iter = weights.begin(); iter != weights.end(); ++iter)
+                            for (weight_list::const_iterator iter = weights.begin(); iter != weights.end(); ++iter)
                             {
                                 // Note joint index cannot exceed 255.
                                 if (iter->mJointIdx < 255 && iter->mJointIdx >= 0)
@@ -1289,6 +1295,66 @@ LLModel::weight_list& LLModel::getJointInfluences(const LLVector3& pos)
 
         return best->second;
     }
+}
+
+LLModel::JointWeightCache::JointWeightCache(LLModel& model)
+    : mModel(model)
+{
+    mCells.reserve(model.mSkinWeights.size());
+    for (const weight_map::value_type& entry : model.mSkinWeights)
+    {
+        mCells[cellKey(entry.first)].push_back(&entry);
+    }
+}
+
+LLModel::JointWeightCache::CellKey LLModel::JointWeightCache::cellKey(const LLVector3& p)
+{
+    return { llfloor(p.mV[VX] / WELD_EPSILON),
+             llfloor(p.mV[VY] / WELD_EPSILON),
+             llfloor(p.mV[VZ] / WELD_EPSILON) };
+}
+
+const LLModel::weight_list& LLModel::JointWeightCache::influences(const LLVector3& pos) const
+{
+    // Match radius == cell size == the weld epsilon, so a key within epsilon of
+    // pos is in pos's cell or an immediate neighbour. Scan the 3x3x3 block,
+    // counting in-epsilon candidates and tracking the closest.
+    const CellKey base = cellKey(pos);
+    const weight_list* best = nullptr;
+    F32 best_dist = WELD_EPSILON;
+    S32 in_epsilon = 0;
+    for (S32 dx = -1; dx <= 1; ++dx)
+    {
+        for (S32 dy = -1; dy <= 1; ++dy)
+        {
+            for (S32 dz = -1; dz <= 1; ++dz)
+            {
+                auto it = mCells.find({ base.x + dx, base.y + dy, base.z + dz });
+                if (it == mCells.end())
+                {
+                    continue;
+                }
+                for (const weight_map::value_type* e : it->second)
+                {
+                    const F32 d = (e->first - pos).length();
+                    if (d < WELD_EPSILON)
+                    {
+                        ++in_epsilon;
+                        if (d < best_dist)
+                        {
+                            best_dist = d;
+                            best = &e->second;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Defer to the full search unless we found exactly one in-epsilon match.
+    // getJointInfluences() returns the FIRST weld-epsilon match in map order, so
+    // on a miss (closest-point fallback) or an ambiguous tie (multiple keys
+    // within epsilon) we mirror it exactly instead of guessing the closest.
+    return (best && in_epsilon == 1) ? *best : mModel.getJointInfluences(pos);
 }
 
 void LLModel::setConvexHullDecomposition(

@@ -51,6 +51,10 @@ class LLLocalBitmap
         LLUUID      getTrackingID() const;
         LLUUID      getWorldID() const;
         bool        getValid() const;
+        // Imported by a local mesh for its own materials: hidden from the Textures
+        // tab + cross-session persistence (it reappears when the mesh re-decodes).
+        bool        isMeshOwned() const { return mIsMeshOwned; }
+        void        setMeshOwned(bool b) { mIsMeshOwned = b; }
 
     public: /* self update public section */
         enum EUpdateType
@@ -106,6 +110,7 @@ class LLLocalBitmap
         EExtension  mExtension;
         ELinkStatus mLinkStatus;
         S32         mUpdateRetries;
+        bool        mIsMeshOwned = false; // imported by a local mesh (see isMeshOwned)
         LLLocalTextureChangedSignal mChangedSignal;
 
         // Store a list of accosiated materials
@@ -136,21 +141,28 @@ class LLLocalBitmapMgr : public LLSingleton<LLLocalBitmapMgr>
 public:
     bool         addUnit(const std::vector<std::string>& filenames);
 protected:
-    LLUUID       addUnitInternal(const std::string& filename);
+    LLUUID       addUnitInternal(const std::string& filename, bool mesh_owned = false);
 public:
     LLUUID       addUnit(const std::string& filename);
+    // Add a unit imported by a local mesh: hidden from the Textures tab + persistence.
+    LLUUID       addUnit(const std::string& filename, bool mesh_owned);
     LLUUID       getUnitID(const std::string& filename);
     void         delUnit(LLUUID tracking_id);
     bool        checkTextureDimensions(std::string filename);
 
     LLUUID       getTrackingID(const LLUUID& world_id) const;
     LLUUID       getWorldID(const LLUUID &tracking_id) const;
+    bool         isMeshOwned(const LLUUID& tracking_id) const; // imported by a local mesh
     bool         isLocal(const LLUUID& world_id) const;
     std::string  getFilename(const LLUUID &tracking_id) const;
+    std::vector<std::string> getFilenames() const; // every loaded path (persistence)
     boost::signals2::connection setOnChangedCallback(const LLUUID tracking_id, const LLLocalBitmap::LLLocalTextureCallback& cb);
     void associateGLTFMaterial(const LLUUID tracking_id, LLGLTFMaterial* mat);
 
     void         feedScrollList(LLScrollListCtrl* ctrl);
+    // Fired when the unit list changes (add/remove) so the Local Assets floater
+    // refreshes reactively. Distinct from the per-unit setOnChangedCallback above.
+    boost::signals2::connection setUnitsChangedCallback(const std::function<void()>& cb);
     void         doUpdates();
     void         setNeedsRebake();
     void         doRebake();
@@ -159,6 +171,7 @@ private:
     std::list<LLLocalBitmap*>    mBitmapList;
     LLLocalBitmapTimer           mTimer;
     bool                         mNeedsRebake;
+    boost::signals2::signal<void()> mUnitsChangedSignal; // add/remove
     typedef std::list<LLLocalBitmap*>::iterator local_list_iter;
     typedef std::list<LLLocalBitmap*>::const_iterator local_list_citer;
 };

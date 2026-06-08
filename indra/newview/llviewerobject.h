@@ -440,6 +440,10 @@ public:
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
     U8 getAttachmentState() const                   { return mAttachmentState; }
 // [/RLVa:KB]
+    // Set the encoded attachment-point state. Normally written from the server's
+    // object update; exposed so a client-only object (local mesh preview) can be
+    // attached to the agent avatar without a round-trip.
+    void setAttachmentState(U8 state)               { mAttachmentState = state; }
 //  U8 getAttachmentState()                         { return mAttachmentState; }
 
     F32 getAppAngle() const                 { return mAppAngle; }
@@ -777,6 +781,13 @@ public:
     // true if user can select this object by clicking under any circumstances (even if pick_unselectable is true)
     // can likely be factored out
     bool            mbCanSelect;
+
+    // Client-only object with no simulator counterpart (e.g. a local mesh
+    // preview). Build/select code reads this to skip all server traffic for the
+    // object and to delete it locally instead of asking the sim. O(1) -- avoids
+    // having to ask the owning manager whether an object is client-only.
+    bool            mIsLocalOnly;
+    bool            isLocalOnly() const { return mIsLocalOnly; }
 
 private:
     // Grabbed from UPDATE_FLAGS
