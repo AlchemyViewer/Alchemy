@@ -1611,6 +1611,15 @@ void LLViewerObjectList::updateActive(LLViewerObject *objectp)
 
 void LLViewerObjectList::updateObjectCost(LLViewerObject* object)
 {
+    // Client-only (local preview) objects have no sim counterpart, so their fake
+    // UUIDs can't be costed by the GetObjectCost capability: a request would never
+    // resolve and would re-fire every time the cost is read. Skip them -- their
+    // cached cost stays at the 0 default, which is the correct land impact for
+    // something that isn't actually rezzed on the region.
+    if (!object || object->isLocalOnly())
+    {
+        return;
+    }
     if (!object->isRoot())
     { //always fetch cost for the parent when fetching cost for children
         mStaleObjectCost.insert(((LLViewerObject*)object->getParent())->getID());

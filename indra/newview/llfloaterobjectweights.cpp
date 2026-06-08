@@ -285,20 +285,43 @@ void LLFloaterObjectWeights::refresh()
         LLViewerRegion* region = gAgent.getRegion();
         if (region && region->capabilitiesReceived())
         {
+            S32 server_costable_roots = 0;
             for (LLObjectSelection::valid_root_iterator iter = sel_mgr->getSelection()->valid_root_begin();
                     iter != sel_mgr->getSelection()->valid_root_end(); ++iter)
             {
-                LLAccountingCostManager::getInstance()->addObject((*iter)->getObject()->getID());
+                // Client-only previews have no sim counterpart, so the
+                // ResourceCostSelected cap can't cost their fake UUIDs -- a request
+                // would never resolve and the weight indicators would spin forever.
+                LLViewerObject* root = (*iter)->getObject();
+                if (root && !root->isLocalOnly())
+                {
+                    LLAccountingCostManager::getInstance()->addObject(root->getID());
+                    ++server_costable_roots;
+                }
             }
 
             std::string url = region->getCapability("ResourceCostSelected");
-            if (!url.empty())
+            if (server_costable_roots > 0)
             {
-                // Update the transaction id before the new fetch request
-                generateTransactionID();
+                if (!url.empty())
+                {
+                    // Update the transaction id before the new fetch request
+                    generateTransactionID();
 
-                LLAccountingCostManager::getInstance()->fetchCosts(Roots, url, getObserverHandle());
-                toggleWeightsLoadingIndicators(true);
+                    LLAccountingCostManager::getInstance()->fetchCosts(Roots, url, getObserverHandle());
+                    toggleWeightsLoadingIndicators(true);
+                }
+            }
+            else
+            {
+                // Entirely client-only (local preview) selection: nothing the sim can
+                // cost. Show zero weights instead of a perpetual loading indicator.
+                toggleWeightsLoadingIndicators(false);
+                const std::string zero = llformat("%.1f", 0.f);
+                mSelectedDownloadWeight->setText(zero);
+                mSelectedPhysicsWeight->setText(zero);
+                mSelectedServerWeight->setText(zero);
+                mSelectedDisplayWeight->setText(zero);
             }
         }
         else
