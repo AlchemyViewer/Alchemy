@@ -164,14 +164,24 @@ static void synthesizeLocalPreviewNode(LLSelectNode* nodep, LLViewerObject* obje
     // Snapshot the current face textures the way processObjectProperties would, so
     // texture/material-picker revert (cancel) has a baseline to restore to.
     uuid_vec_t texture_ids;
+    uuid_vec_t material_ids;
+    gltf_materials_vec_t override_materials;
     const U8 num_tes = objectp->getNumTEs();
     texture_ids.reserve(num_tes);
+    material_ids.reserve(num_tes);
+    override_materials.reserve(num_tes);
     for (U8 te = 0; te < num_tes; ++te)
     {
         const LLTextureEntry* tep = objectp->getTE(te);
         texture_ids.push_back(tep ? tep->getID() : LLUUID::null);
+        material_ids.push_back(objectp->getRenderMaterialID(te));
+        const LLGLTFMaterial* over = tep ? tep->getGLTFMaterialOverride() : nullptr;
+        override_materials.emplace_back(over ? new LLGLTFMaterial(*over) : nullptr);
     }
     nodep->saveTextures(texture_ids);
+    // Snapshot GLTF render-material ids + overrides too, so selectionRevertGLTFMaterials()
+    // can restore them when a material picker is cancelled on a local preview.
+    nodep->saveGLTFMaterials(material_ids, override_materials);
 }
 
 // Delete a selection made up entirely of client-only previews. The sim delete
@@ -1019,7 +1029,9 @@ void LLSelectMgr::deselectObjectAndFamily(LLViewerObject* object, bool send_to_s
     object->addThisAndAllChildren(objects);
     remove(objects);
 
-    if (!send_to_sim) return;
+    // Local previews carry fake local ids and can't be mixed with real objects in a
+    // selection, so never tell the sim we deselected one.
+    if (!send_to_sim || isLocalPreviewObject(object)) return;
 
     //-----------------------------------------------------------
     // Inform simulator of deselection
@@ -1256,6 +1268,9 @@ LLObjectSelectionHandle LLSelectMgr::setHoverObject(LLViewerObject *objectp, S32
                 continue;
             }
             LLSelectNode* nodep = new LLSelectNode(cur_objectp, false);
+            // Local previews never get an ObjectProperties reply; populate the node
+            // locally so a preview reached via hover/box-select is still valid/editable.
+            synthesizeLocalPreviewNode(nodep, cur_objectp);
             nodep->selectTE(face, true);
             mHoverObjects->addNodeAtEnd(nodep);
         }
@@ -1417,6 +1432,7 @@ LLObjectSelectionHandle LLSelectMgr::selectHighlightedObjects()
         }
 
         LLSelectNode* new_nodep = new LLSelectNode(*nodep);
+        synthesizeLocalPreviewNode(new_nodep, objectp);
         mSelectedObjects->addNode(new_nodep);
 
         // flag this object as selected

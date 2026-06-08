@@ -405,6 +405,7 @@ public:
 protected:
     void changeMode();
     void refreshLocalList();
+    void onLocalAssetsChanged(); // refresh local list, then drop a now-deleted local selection
     void refreshInventoryFilter();
     void setImageIDFromItem(const LLInventoryItem* itemp, bool set_selection = true);
     LLViewerInventoryItem* findInvItem(const LLUUID& asset_id, bool copyable_only, bool ignore_library = false) const;

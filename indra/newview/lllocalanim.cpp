@@ -114,6 +114,28 @@ bool LLLocalAnimMgr::decodeFile(const std::string& filename, std::vector<U8>& ou
     // a .bvh is parsed and serialized the same way the upload path does.
     if (ext == "anim")
     {
+        // Validate that the bytes actually deserialize before accepting them, so a
+        // truncated/corrupt save isn't committed -- and, via doUpdates()'s "keep last
+        // good on failure", doesn't blank a live preview on hot reload. Use a throwaway
+        // motion id on the agent avatar so playback and the global keyframe cache are
+        // untouched. (No avatar yet -> can't validate here; the size/ext guards apply.)
+        if (isAgentAvatarValid())
+        {
+            LLUUID probe_id;
+            probe_id.generate();
+            if (LLKeyframeMotion* probe = dynamic_cast<LLKeyframeMotion*>(gAgentAvatarp->createMotion(probe_id)))
+            {
+                LLDataPackerBinaryBuffer probe_dp(data.data(), (S32)data.size());
+                const bool ok = probe->deserialize(probe_dp, probe_id, false);
+                gAgentAvatarp->removeMotion(probe_id);
+                LLKeyframeDataCache::removeKeyframeData(probe_id);
+                if (!ok)
+                {
+                    LL_WARNS("LocalAnim") << "Corrupt .anim (failed to deserialize): " << filename << LL_ENDL;
+                    return false;
+                }
+            }
+        }
         out_keyframe = std::move(data);
     }
     else if (ext == "bvh")

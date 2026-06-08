@@ -4397,7 +4397,12 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
 
     // Local mesh: serve the decoded geometry directly from the registry instead
     // of issuing an asset fetch. The same geometry is served for every LOD.
-    if (LLLocalMeshMgr::instanceExists())
+    // Local mesh: decide locality by registry membership, not by whether a decoded
+    // volume happens to exist right now. A local-only world id must never fall through
+    // to the simulator-backed fetch below -- not even during the brief window of a
+    // hot-reload when its volume is momentarily unavailable (it has no server asset).
+    if (LLLocalMeshMgr::instanceExists() &&
+        LLLocalMeshMgr::getInstance()->isLocal(mesh_params.getSculptID()))
     {
         LLVolume* local_volume = LLLocalMeshMgr::getInstance()->getVolumeForWorldID(mesh_params.getSculptID());
         if (local_volume)
@@ -4405,19 +4410,20 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
             LLVolume* sys_volume = LLPrimitive::getVolumeManager()->refVolume(mesh_params, new_lod);
             if (sys_volume)
             {
-                if (!sys_volume->isMeshAssetLoaded())
-                {
-                    sys_volume->copyVolumeFaces(local_volume);
-                    sys_volume->setMeshAssetLoaded(true);
-                }
+                // Always recopy: a live reload rebuilds the local volume in place while
+                // the cached system volume keeps the same world id, so an
+                // isMeshAssetLoaded() gate here would pin the stale geometry.
+                sys_volume->copyVolumeFaces(local_volume);
+                sys_volume->setMeshAssetLoaded(true);
                 LLPrimitive::getVolumeManager()->unrefVolume(sys_volume);
             }
             if (vobj)
             {
                 vobj->notifyMeshLoaded();
             }
-            return new_lod;
         }
+        // Served above, or still decoding mid-reload -- either way, don't remote-fetch.
+        return new_lod;
     }
 
     {

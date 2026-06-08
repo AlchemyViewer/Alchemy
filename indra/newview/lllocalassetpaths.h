@@ -64,6 +64,7 @@ public:
 
 private:
     void        onUnitsChanged();   // remember any newly-loaded files
+    void        reloadForAccount(); // (re-)read the current account's saved paths + prune
     static const char* key(EType type);
     std::vector<std::string> currentFiles(EType type) const;
     std::string getFilePath() const;

@@ -7677,18 +7677,6 @@ private:
         {
             S32 index = userdata.asInteger();
 
-            // Client-only local mesh previews have no inventory item or sim object,
-            // and there's nothing to walk to -- the normal sim attach path below
-            // would do nothing. Attach the preview linkset client-side to the
-            // attachment point the user picked from this menu (render order is sorted
-            // by attachment-point id, so the choice matters).
-            if (selectedObject->isLocalOnly() && LLLocalMeshMgr::instanceExists())
-            {
-                LLLocalMeshMgr::getInstance()->attachPreviewToAvatar(selectedObject, index);
-                setObjectSelection(NULL);
-                return true;
-            }
-
             LLViewerJointAttachment* attachment_point = NULL;
             if (index > 0)
                 attachment_point = get_if_there(gAgentAvatarp->mAttachmentPoints, index, (LLViewerJointAttachment*)NULL);
@@ -7704,6 +7692,19 @@ private:
                 return true;
             }
 // [/RLVa:KB]
+
+            // Client-only local mesh previews have no inventory item or sim object,
+            // and there's nothing to walk to -- the normal sim attach path below
+            // would do nothing. Attach the preview linkset client-side to the
+            // attachment point the user picked from this menu (render order is sorted
+            // by attachment-point id, so the choice matters). Kept AFTER the RLVa gate
+            // above so attach restrictions apply to previews too.
+            if (selectedObject->isLocalOnly() && LLLocalMeshMgr::instanceExists())
+            {
+                LLLocalMeshMgr::getInstance()->attachPreviewToAvatar(selectedObject, index);
+                setObjectSelection(NULL);
+                return true;
+            }
 
             confirmReplaceAttachment(0, attachment_point);
         }
@@ -7973,6 +7974,16 @@ class LLAttachmentDetach : public view_listener_t
         {
             LL_WARNS() << "handle_detach() - no object to detach" << LL_ENDL;
             return true;
+        }
+
+        // Respect RLVa remove-locks for local previews too: if @detach-locked and the
+        // selection sits on a locked attachment point, don't detach.
+        if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.hasLockedAttachmentPoint(RLV_LOCK_REMOVE)) )
+        {
+            LLObjectSelectionHandle hSelect = LLSelectMgr::getInstance()->getSelection();
+            RlvSelectHasLockedAttach f;
+            if ( (hSelect->isAttachment()) && (hSelect->getFirstRootNode(&f, false) != NULL) )
+                return true;
         }
 
         // Client-only local mesh previews have no inventory item or sim object, so

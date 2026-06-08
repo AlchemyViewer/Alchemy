@@ -183,11 +183,33 @@ void LLLocalAssetPaths::onUnitsChanged()
 
 void LLLocalAssetPaths::loadAndWatch()
 {
+    // Re-read the CURRENT account's saved paths on every call. Login cleanup is
+    // re-entered on relog / account switch, so this refreshes mPaths for the new
+    // account's local_assets.xml instead of leaving the previous account's set in
+    // memory (which onUnitsChanged() would then write into the new account's file).
+    reloadForAccount();
+
     if (mWatching)
     {
-        return; // once per session
+        return; // register the manager watchers only once per session
     }
     mWatching = true;
+
+    // Watch for files that become loaded from here on, so the saved set stays current.
+    mConnections.emplace_back(LLLocalMeshMgr::getInstance()->setUnitsChangedCallback(
+        boost::bind(&LLLocalAssetPaths::onUnitsChanged, this)));
+    mConnections.emplace_back(LLLocalAnimMgr::getInstance()->setUnitsChangedCallback(
+        boost::bind(&LLLocalAssetPaths::onUnitsChanged, this)));
+    mConnections.emplace_back(LLLocalBitmapMgr::getInstance()->setUnitsChangedCallback(
+        boost::bind(&LLLocalAssetPaths::onUnitsChanged, this)));
+    mConnections.emplace_back(LLLocalGLTFMaterialMgr::getInstance()->setUnitsChangedCallback(
+        boost::bind(&LLLocalAssetPaths::onUnitsChanged, this)));
+}
+
+void LLLocalAssetPaths::reloadForAccount()
+{
+    // Discard any in-memory set from a previous account before reading.
+    mPaths = LLSD();
 
     // Read the saved paths (no decoding).
     const std::string path = getFilePath();
@@ -240,14 +262,4 @@ void LLLocalAssetPaths::loadAndWatch()
     {
         writeToDisk();
     }
-
-    // Watch for files that become loaded from here on, so the saved set stays current.
-    mConnections.emplace_back(LLLocalMeshMgr::getInstance()->setUnitsChangedCallback(
-        boost::bind(&LLLocalAssetPaths::onUnitsChanged, this)));
-    mConnections.emplace_back(LLLocalAnimMgr::getInstance()->setUnitsChangedCallback(
-        boost::bind(&LLLocalAssetPaths::onUnitsChanged, this)));
-    mConnections.emplace_back(LLLocalBitmapMgr::getInstance()->setUnitsChangedCallback(
-        boost::bind(&LLLocalAssetPaths::onUnitsChanged, this)));
-    mConnections.emplace_back(LLLocalGLTFMaterialMgr::getInstance()->setUnitsChangedCallback(
-        boost::bind(&LLLocalAssetPaths::onUnitsChanged, this)));
 }

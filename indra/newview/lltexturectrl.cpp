@@ -665,9 +665,9 @@ bool LLFloaterTexturePicker::postBuild()
     // goes stale. refreshLocalList() reads the current pick type, so one handler per
     // manager serves textures and materials alike.
     mLocalBitmapsChangedConn = LLLocalBitmapMgr::getInstance()->setUnitsChangedCallback(
-        [this]() { refreshLocalList(); });
+        [this]() { onLocalAssetsChanged(); });
     mLocalMaterialsChangedConn = LLLocalGLTFMaterialMgr::getInstance()->setUnitsChangedCallback(
-        [this]() { refreshLocalList(); });
+        [this]() { onLocalAssetsChanged(); });
 
     getChild<LLLineEditor>("uuid_editor")->setCommitCallback(boost::bind(&onApplyUUID, this));
     getChild<LLButton>("apply_uuid_btn")->setClickedCallback(boost::bind(&onApplyUUID, this));
@@ -1552,6 +1552,35 @@ void LLFloaterTexturePicker::refreshLocalList()
     else if (mInventoryPickType == PICK_MATERIAL)
     {
         LLLocalGLTFMaterialMgr::getInstance()->feedScrollList(mLocalScrollCtrl);
+    }
+}
+
+void LLFloaterTexturePicker::onLocalAssetsChanged()
+{
+    // The refresh may be triggered by another picker / the Local Assets floater
+    // removing the very local asset this picker has selected. If we're on the Local
+    // tab and the selected row's unit no longer resolves, its world id is dangling --
+    // drop it so a later commit can't apply a deleted local texture/material. Check
+    // before refreshLocalList() rebuilds (and clears) the list.
+    bool drop_selection = false;
+    if (mModeSelector && mModeSelector->getValue().asInteger() == 1 /* Local */ && mLocalScrollCtrl)
+    {
+        if (LLScrollListItem* sel = mLocalScrollCtrl->getFirstSelected())
+        {
+            const LLSD data = sel->getValue();
+            const LLUUID tracking_id = data["id"].asUUID();
+            const LLUUID world_id = (data["type"].asInteger() == LLAssetType::AT_MATERIAL)
+                ? LLLocalGLTFMaterialMgr::getInstance()->getWorldID(tracking_id)
+                : LLLocalBitmapMgr::getInstance()->getWorldID(tracking_id);
+            drop_selection = world_id.isNull();
+        }
+    }
+
+    refreshLocalList();
+
+    if (drop_selection)
+    {
+        mImageAssetID.setNull();
     }
 }
 

@@ -92,6 +92,14 @@ protected:
     virtual void loadPath(const std::string& path) = 0;          // decode a file (lazy / add)
     virtual LLUUID unitForPath(const std::string& path) const = 0; // decoded? -> tracking id
     virtual std::string pathForUnit(const LLUUID& tracking_id) const = 0; // tracking id -> path
+    // All decoded unit ids backing a saved path. Default: the single unit unitForPath()
+    // resolves. The GLTF Materials panel overrides this -- one .gltf file can decode to
+    // several material units, and removing its row must unload all of them.
+    virtual void unitsForPath(const std::string& path, std::vector<LLUUID>& out) const
+    {
+        const LLUUID id = unitForPath(path);
+        if (id.notNull()) { out.push_back(id); }
+    }
     virtual std::string iconName() const = 0;                    // row icon for this type
     virtual LLLocalAssetPaths::EType assetType() const = 0;
     virtual LLFilePicker::ELoadFilter getLoadFilter() const = 0;
@@ -396,9 +404,20 @@ void LLPanelLocalAssetBase::onRemoveBtn()
         {
             LLLocalAssetPaths::getInstance()->removePath(assetType(), entry.first); // forget the path
         }
-        if (entry.second.notNull())
+        // Unload every decoded unit backing this row. For a multi-material glTF file
+        // that's all of the file's material units, not just the selected row.
+        std::vector<LLUUID> ids;
+        if (!entry.first.empty())
         {
-            delUnit(entry.second); // unload the decoded unit (fires the manager signal)
+            unitsForPath(entry.first, ids);
+        }
+        if (ids.empty() && entry.second.notNull())
+        {
+            ids.push_back(entry.second);
+        }
+        for (const LLUUID& id : ids)
+        {
+            delUnit(id); // unload the decoded unit (fires the manager signal)
         }
     }
     refresh(); // removePath() alone (undecoded rows) doesn't fire a manager signal
@@ -1233,6 +1252,11 @@ protected:
         S32 index = 0;
         LLLocalGLTFMaterialMgr::getInstance()->getFilenameAndIndex(tracking_id, filename, index);
         return filename;
+    }
+    void unitsForPath(const std::string& path, std::vector<LLUUID>& out) const override
+    {
+        // One .gltf/.glb can decode to several material units; remove them all.
+        LLLocalGLTFMaterialMgr::getInstance()->getTrackingIDs(path, out);
     }
     std::string iconName() const override
     {
