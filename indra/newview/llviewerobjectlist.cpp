@@ -1647,6 +1647,13 @@ void LLViewerObjectList::onObjectCostFetchFailure(const LLUUID& object_id)
 
 void LLViewerObjectList::updatePhysicsFlags(const LLViewerObject* object)
 {
+    // Client-only (local preview) objects have no sim counterpart, so the
+    // GetObjectPhysicsData cap can't resolve their fake UUIDs -- skip them, mirroring
+    // updateObjectCost() above.
+    if (!object || object->isLocalOnly())
+    {
+        return;
+    }
     mStalePhysicsFlags.insert(object->getID());
 }
 

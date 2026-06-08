@@ -314,14 +314,17 @@ void LLFloaterObjectWeights::refresh()
             }
             else
             {
-                // Entirely client-only (local preview) selection: nothing the sim can
-                // cost. Show zero weights instead of a perpetual loading indicator.
+                // Entirely client-only (local preview) selection. The sim-side weights
+                // (download/physics/server) can't be fetched, so zero them instead of
+                // spinning the loading indicators forever -- but the display/render
+                // weight is computed client-side, so keep it accurate.
                 toggleWeightsLoadingIndicators(false);
                 const std::string zero = llformat("%.1f", 0.f);
                 mSelectedDownloadWeight->setText(zero);
                 mSelectedPhysicsWeight->setText(zero);
                 mSelectedServerWeight->setText(zero);
-                mSelectedDisplayWeight->setText(zero);
+                const S32 render_cost = sel_mgr->getSelection()->getSelectedObjectRenderCost();
+                mSelectedDisplayWeight->setText(llformat("%d", render_cost));
             }
         }
         else
