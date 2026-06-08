@@ -10504,6 +10504,13 @@ Disabling future updates for this file.
   </notification>
 
   <notification
+   icon="notifytip.tga"
+   name="LocalMeshNoUVs"
+   type="notifytip">
+[FNAME] has no UV coordinates, so textures and materials can't be previewed on it (it renders untextured/white). Re-export the mesh with a UV map.
+  </notification>
+
+  <notification
    icon="alertmodal.tga"
    name="LocalBitmapsUpdateFailedFinal"
    persist="true"

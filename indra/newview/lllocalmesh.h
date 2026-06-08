@@ -110,6 +110,7 @@ public:
     // Decoded parts -- consumed by the spawn path and repository injection.
     const std::vector<LLLocalMeshPart>& getParts() const { return mParts; }
     bool isRigged() const; // true if any part is rigged
+    bool hasUVs() const { return mHasUVs; } // false if the source mesh shipped without texcoords
 
     // Stats (for UI + logging).
     S32 getNumParts() const     { return (S32)mParts.size(); }
@@ -182,6 +183,7 @@ private:
     S32  mNumVertices;
     S32  mNumTriangles;
     S32  mNumJoints;
+    bool mHasUVs = true; // false if the source mesh had no UV coordinates (untexturable)
 
     // Live-reload bookkeeping.
     bool                            mReloading;       // an async re-parse is in flight

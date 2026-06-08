@@ -53,6 +53,7 @@
 #include "lllocalgltfmaterials.h" // import a glTF mesh's materials as mesh-owned local materials
 #include "llprimitive.h"     // LL_PCODE_VOLUME
 #include "object_flags.h"    // FLAGS_OBJECT_* for owner permissions
+#include "llnotificationsutil.h" // warn when a loaded mesh has no UVs
 #include "llscrolllistctrl.h"
 #include "llselectmgr.h"    // deselect before re-parenting onto the avatar
 #include "llviewercontrol.h"
@@ -489,6 +490,11 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
 
     std::vector<LLLocalMeshPart> parts;
     S32 num_vertices = 0, num_triangles = 0, num_joints = 0;
+    // A mesh authored without UVs can't be textured: the loaders zero-fill the
+    // missing texcoords, so every vertex lands at (0,0) and diffuse/material maps
+    // (and the face-select overlay) sample a single texel -> the surface renders
+    // white. Detect it so the user gets told instead of a silent white mesh.
+    bool unit_has_uvs = false;
 
     // glTF: import the file's materials once (mesh-owned) and map them by binding
     // name, so each face can be pointed at the matching local-gltf material below.
@@ -535,6 +541,17 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 }
                 num_vertices += face.mNumVertices;
                 num_triangles += face.mNumIndices / 3;
+                if (!unit_has_uvs && face.mTexCoords)
+                {
+                    for (S32 v = 0; v < face.mNumVertices; ++v)
+                    {
+                        if (face.mTexCoords[v].mV[0] != 0.f || face.mTexCoords[v].mV[1] != 0.f)
+                        {
+                            unit_has_uvs = true;
+                            break;
+                        }
+                    }
+                }
                 faces.push_back(face);
             }
             if (faces.empty())
@@ -671,6 +688,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
     mNumVertices  = num_vertices;
     mNumTriangles = num_triangles;
     mNumJoints    = num_joints;
+    mHasUVs       = unit_has_uvs;
     mState        = ST_LOADED;
     mLastModified = mPendingModified; // the exact version we just parsed
 
@@ -1956,6 +1974,16 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
     if (assembled)
     {
         logUnit("Loaded", unit);
+        // A mesh with no UVs can't be textured -- warn once here (not on reload, to
+        // avoid spam) so a white/untextured preview isn't a silent mystery.
+        if (!unit->hasUVs())
+        {
+            LL_WARNS("LocalMesh") << "Mesh has no UV coordinates: " << unit->getFilename()
+                                  << " -- textures/materials cannot be previewed." << LL_ENDL;
+            LLSD args;
+            args["FNAME"] = unit->getFilename();
+            LLNotificationsUtil::add("LocalMeshNoUVs", args);
+        }
         if (unit->wantsSpawn())
         {
             LLViewerObject* root = spawnInWorld(tracking_id);
