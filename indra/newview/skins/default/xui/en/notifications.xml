@@ -9498,9 +9498,10 @@ With the following Residents:
 &lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
   <tag>confirm</tag>
 	<usetemplate
-     name="okcancelbuttons"
+     name="okcancelignore"
      notext="Cancel"
-     yestext="OK"/>
+     yestext="OK"
+     ignoretext="Warn me before I share items"/>
   </notification>
   
   <notification
