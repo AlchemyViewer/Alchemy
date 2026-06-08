@@ -356,27 +356,6 @@ static bool make_gltf_variant(LLGLSLShader& shader, LLGLSLShader& variant, bool 
     }
 }
 
-static bool make_gltf_variants(LLGLSLShader& shader, bool use_sun_shadow)
-{
-    shader.mFeatures.mGLTF = true;
-    shader.mGLTFVariants.resize(LLGLSLShader::NUM_GLTF_VARIANTS);
-
-    for (U32 i = 0; i < LLGLSLShader::NUM_GLTF_VARIANTS; ++i)
-    {
-        bool alpha_blend = i & LLGLSLShader::GLTFVariant::ALPHA_BLEND;
-        bool rigged = i & LLGLSLShader::GLTFVariant::RIGGED;
-        bool unlit = i & LLGLSLShader::GLTFVariant::UNLIT;
-        bool multi_uv = i & LLGLSLShader::GLTFVariant::MULTI_UV;
-
-        if (!make_gltf_variant(shader, shader.mGLTFVariants[i], alpha_blend, rigged, unlit, multi_uv, use_sun_shadow))
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 #ifdef SHOW_ASSERT
 // return true if there are no redundant shaders in the given vector
 // also checks for redundant variants
