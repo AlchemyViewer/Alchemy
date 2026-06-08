@@ -7701,7 +7701,7 @@ private:
             // above so attach restrictions apply to previews too.
             if (selectedObject->isLocalOnly() && LLLocalMeshMgr::instanceExists())
             {
-                LLLocalMeshMgr::getInstance()->attachPreviewToAvatar(selectedObject, index);
+                LLLocalMeshMgr::getInstance()->attachPreviewToAvatar(selectedObject, index, mReplace);
                 setObjectSelection(NULL);
                 return true;
             }

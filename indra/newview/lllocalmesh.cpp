@@ -1344,7 +1344,7 @@ bool LLLocalMeshMgr::isPreviewAttached(const LLViewerObject* obj) const
     return root && root->isAttachment();
 }
 
-void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj, S32 attach_point)
+void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj, S32 attach_point, bool replace)
 {
     if (!isAgentAvatarValid())
     {
@@ -1372,6 +1372,33 @@ void LLLocalMeshMgr::attachPreviewToAvatar(LLViewerObject* obj, S32 attach_point
     //    as-is and a default-weighted mesh renders correctly.
     const LLUUID instance_id = instanceForObject(root);
     const S32 point = (attach_point > 0) ? attach_point : 1; // default to chest
+
+    // Replace (vs Add): take off any OTHER local preview already worn on this point
+    // first. Stays client-only and per-point -- it never touches the user's real
+    // attachments (those are server-side and not ours to remove). The displaced
+    // preview drops back in-world rather than being destroyed.
+    if (replace)
+    {
+        std::vector<LLViewerObject*> displaced;
+        for (const auto& entry : mSpawnedCopies)
+        {
+            if (entry.first == instance_id || entry.second.mPrims.empty())
+            {
+                continue;
+            }
+            LLViewerObject* other = entry.second.mPrims[0]; // linkset root
+            if (other && !other->isDead() && other->isAttachment()
+                && (S32)ATTACHMENT_ID_FROM_STATE(other->getAttachmentState()) == point)
+            {
+                displaced.push_back(other);
+            }
+        }
+        for (LLViewerObject* other : displaced)
+        {
+            detachPreviewFromAvatar(other);
+        }
+    }
+
     const U8 attach_state = (U8)ATTACHMENT_ID_FROM_STATE(point);
     if (auto it = mSpawnedCopies.find(instance_id); it != mSpawnedCopies.end())
     {

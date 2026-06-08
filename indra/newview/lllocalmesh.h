@@ -253,7 +253,7 @@ public:
     // 0 means the default point (chest). isRiggedPreview is true when `obj` is a
     // local preview whose unit is rigged; isPreviewAttached reflects whether that
     // linkset is currently worn.
-    void attachPreviewToAvatar(LLViewerObject* obj, S32 attach_point = 0);
+    void attachPreviewToAvatar(LLViewerObject* obj, S32 attach_point = 0, bool replace = false);
     void detachPreviewFromAvatar(LLViewerObject* obj);
     bool isRiggedPreview(const LLViewerObject* obj) const;
     bool isPreviewAttached(const LLViewerObject* obj) const;
