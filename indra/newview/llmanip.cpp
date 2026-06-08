@@ -359,11 +359,6 @@ LLVector3 LLManip::getPivotPoint()
     LLViewerObject* object = mObjectSelection->getFirstRootObject(true);
     if (object && (mObjectSelection->getObjectCount() == 1 || editRootAxis) && mObjectSelection->getSelectType() != SELECT_TYPE_HUD)
     {
-        LLSelectNode* select_node = mObjectSelection->getFirstNode();
-        if (select_node->mSelectedGLTFNode != -1)
-        {
-            return object->getGLTFNodePositionAgent(select_node->mSelectedGLTFNode);
-        }
         return mObjectSelection->getFirstObject()->getPivotPositionAgent();
     }
     return LLSelectMgr::getInstance()->getBBoxOfSelection().getCenterAgent();

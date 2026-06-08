@@ -2785,7 +2785,7 @@ void LLAgentCamera::setFocusGlobal(const LLPickInfo& pick)
 {
     LLViewerObject* objectp = gObjectList.findObject(pick.mObjectID);
 
-    if (objectp && pick.mGLTFNodeIndex == -1)
+    if (objectp)
     {
         // focus on object plus designated offset
         // which may or may not be same as pick.mPosGlobal

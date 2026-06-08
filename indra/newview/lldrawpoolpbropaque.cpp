@@ -30,7 +30,6 @@
 #include "lldrawpoolpbropaque.h"
 #include "llviewershadermgr.h"
 #include "pipeline.h"
-#include "gltfscenemanager.h"
 
 LLDrawPoolGLTFPBR::LLDrawPoolGLTFPBR(U32 type) :
     LLRenderPass(type)
@@ -56,15 +55,8 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
 
     LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
 
-    if (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR_ALPHA_MASK)
-    {
-        LL::GLTFSceneManager::instance().renderOpaque();
-    }
-
     gDeferredPBROpaqueProgram.bind();
     pushGLTFBatches(mRenderType);
-
-    LL::GLTFSceneManager::instance().render(true, true);
 
     gDeferredPBROpaqueProgram.bind(true);
     pushRiggedGLTFBatches(mRenderType + 1);

@@ -251,8 +251,6 @@ LLVector2        gDebugRaycastTexCoord;
 LLVector4a       gDebugRaycastNormal;
 LLVector4a       gDebugRaycastTangent;
 S32             gDebugRaycastFaceHit;
-S32             gDebugRaycastGLTFNodeHit;
-S32             gDebugRaycastGLTFPrimitiveHit;
 LLVector4a       gDebugRaycastStart;
 LLVector4a       gDebugRaycastEnd;
 
@@ -3701,11 +3699,9 @@ void LLViewerWindow::updateUI()
 
     if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_RAYCAST))
     {
-        gDebugRaycastFaceHit = gDebugRaycastGLTFNodeHit = gDebugRaycastGLTFPrimitiveHit = -1;
+        gDebugRaycastFaceHit = -1;
         gDebugRaycastObject = cursorIntersect(-1, -1, 512.f, NULL, -1, false, false, true, false,
                                               &gDebugRaycastFaceHit,
-                                              &gDebugRaycastGLTFNodeHit,
-                                              &gDebugRaycastGLTFPrimitiveHit,
                                               &gDebugRaycastIntersection,
                                               &gDebugRaycastTexCoord,
                                               &gDebugRaycastNormal,
@@ -4731,8 +4727,6 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
                                                 bool pick_unselectable,
                                                 bool pick_reflection_probe,
                                                 S32* face_hit,
-                                                S32* gltf_node_hit,
-                                                S32* gltf_primitive_hit,
                                                 LLVector4a *intersection,
                                                 LLVector2 *uv,
                                                 LLVector4a *normal,
@@ -4833,7 +4827,7 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
         if (!found) // if not found in HUD, look in world:
         {
             found = gPipeline.lineSegmentIntersectInWorld(mw_start, mw_end, pick_transparent, pick_rigged, pick_unselectable, pick_reflection_probe,
-                                                          face_hit, gltf_node_hit, gltf_primitive_hit, intersection, uv, normal, tangent);
+                                                          face_hit, intersection, uv, normal, tangent);
             if (found && !pick_transparent)
             {
                 gDebugRaycastIntersection = *intersection;
@@ -6656,7 +6650,7 @@ void LLPickInfo::fetchResults()
     }
 
     LLViewerObject* hit_object = gViewerWindow->cursorIntersect(mMousePt.mX, mMousePt.mY, 512.f,
-                                    nullptr, -1, mPickTransparent, mPickRigged, mPickUnselectable, mPickReflectionProbe, &face_hit, &mGLTFNodeIndex, &mGLTFPrimitiveIndex,
+                                    nullptr, -1, mPickTransparent, mPickRigged, mPickUnselectable, mPickReflectionProbe, &face_hit,
                                 &intersection, &uv, &normal, &tangent, &start, &end);
 
     mPickPt = mMousePt;
@@ -6819,8 +6813,6 @@ void LLPickInfo::getSurfaceInfo()
         if (gViewerWindow->cursorIntersect(ll_round((F32)mMousePt.mX), ll_round((F32)mMousePt.mY), 1024.f,
                                            objectp, -1, mPickTransparent, mPickRigged, mPickUnselectable, mPickReflectionProbe,
                                            &mObjectFace,
-                                           &mGLTFNodeIndex,
-                                           &mGLTFPrimitiveIndex,
                                            &intersection,
                                            &mSTCoords,
                                            &normal,

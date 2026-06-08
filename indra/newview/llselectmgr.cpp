@@ -56,7 +56,6 @@
 #include "llattachmentsmgr.h"
 #include "llviewerwindow.h"
 #include "lldrawable.h"
-#include "llfloatergltfasseteditor.h"
 #include "llfloaterinspect.h"
 #include "llfloaterreporter.h"
 #include "llfloaterreg.h"
@@ -455,7 +454,7 @@ void LLSelectMgr::overrideAvatarUpdates()
 //-----------------------------------------------------------------------------
 // Select just the object, not any other group members.
 //-----------------------------------------------------------------------------
-LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S32 face, S32 gltf_node, S32 gltf_primitive)
+LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S32 face)
 {
     llassert( object );
 
@@ -466,11 +465,6 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S3
     if (object->isSelected() ) {
         // make sure point at position is updated
         updatePointAt();
-        LLSelectNode* nodep = mSelectedObjects->findNode(object);
-        if (nodep)
-        {
-            nodep->selectGLTFNode(gltf_node, gltf_primitive, true);
-        }
         gEditMenuHandler = this;
         return NULL;
     }
@@ -485,7 +479,7 @@ LLObjectSelectionHandle LLSelectMgr::selectObjectOnly(LLViewerObject* object, S3
 
     // Place it in the list and tag it.
     // This will refresh dialogs.
-    addAsIndividual(object, face, true, gltf_node, gltf_primitive);
+    addAsIndividual(object, face, true);
 
     // Stop the object from moving (this anticipates changes on the
     // simulator in LLTask::userSelect)
@@ -1056,7 +1050,7 @@ void LLSelectMgr::addAsFamily(std::vector<LLViewerObject*>& objects, bool add_to
 //-----------------------------------------------------------------------------
 // addAsIndividual() - a single object, face, etc
 //-----------------------------------------------------------------------------
-void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, bool undoable, S32 gltf_node, S32 gltf_primitive)
+void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, bool undoable)
 {
     // check to see if object is already in list
     LLSelectNode *nodep = mSelectedObjects->findNode(objectp);
@@ -1101,13 +1095,6 @@ void LLSelectMgr::addAsIndividual(LLViewerObject *objectp, S32 face, bool undoab
     {
         LL_ERRS() << "LLSelectMgr::add face " << face << " out-of-range" << LL_ENDL;
         return;
-    }
-
-    // Handle glTF node selection
-    if (gltf_node >= 0)
-    {
-        nodep->selectGLTFNode(gltf_node, gltf_primitive, true);
-
     }
 
     saveSelectedObjectTransform(SELECT_ACTION_TYPE_PICK);
@@ -5470,14 +5457,6 @@ void LLSelectMgr::saveSelectedObjectTransform(EActionType action_type)
                 return true; // skip
             }
 
-            if (selectNode->mSelectedGLTFNode != -1)
-            {
-                // save GLTF node state
-                object->getGLTFNodeTransformAgent(selectNode->mSelectedGLTFNode, &selectNode->mSavedPositionLocal, &selectNode->mSavedRotation, &selectNode->mSavedScale);
-                selectNode->mSavedPositionGlobal = gAgent.getPosGlobalFromAgent(selectNode->mSavedPositionLocal);
-                selectNode->mLastMoveLocal.setZero();
-            }
-            else
             {
                 selectNode->mSavedPositionLocal = object->getPosition();
                 if (object->isAttachment())
@@ -6990,17 +6969,6 @@ void LLSelectNode::selectTE(S32 te_index, bool selected)
     mLastTESelected = te_index;
 }
 
-void LLSelectNode::selectGLTFNode(S32 node_index, S32 primitive_index, bool selected)
-{
-    if (node_index < 0)
-    {
-        return;
-    }
-
-    mSelectedGLTFNode = node_index;
-    mSelectedGLTFPrimitive = primitive_index;
-}
-
 bool LLSelectNode::isTESelected(S32 te_index) const
 {
     if (te_index < 0 || te_index >= mObject->getNumTEs())
@@ -7499,12 +7467,6 @@ void dialog_refresh_all()
     if (panel_task_info)
     {
         panel_task_info->dirty();
-    }
-
-    LLFloaterGLTFAssetEditor * gltf_editor = LLFloaterReg::findTypedInstance<LLFloaterGLTFAssetEditor>("gltf_asset_editor");
-    if (gltf_editor)
-    {
-        gltf_editor->dirty();
     }
 }
 

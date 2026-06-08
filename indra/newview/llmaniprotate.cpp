@@ -555,7 +555,6 @@ void LLManipRotate::drag( S32 x, S32 y )
 
     bool damped = mSmoothRotate;
     mSmoothRotate = false;
-    bool gltf_mode = false;
 
     for (LLObjectSelection::iterator iter = mObjectSelection->begin();
          iter != mObjectSelection->end(); iter++)
@@ -569,16 +568,6 @@ void LLManipRotate::drag( S32 x, S32 y )
             ((root_object == NULL) || !root_object->isPermanentEnforced()) &&
             (object->isRootEdit() || selectNode->mIndividualSelection))
         {
-
-            if (selectNode->mSelectedGLTFNode != -1)
-            {
-                LLQuaternion new_rot = selectNode->mSavedRotation * mRotation;
-
-                object->setGLTFNodeRotationAgent(selectNode->mSelectedGLTFNode, new_rot);
-
-                gltf_mode = true;
-            }
-            else if (!gltf_mode)
             {
                 if (!object->isRootEdit())
                 {
@@ -646,7 +635,6 @@ void LLManipRotate::drag( S32 x, S32 y )
     }
 
     // update positions
-    if (!gltf_mode)
     {
         for (LLObjectSelection::iterator iter = mObjectSelection->begin();
             iter != mObjectSelection->end(); iter++)
@@ -665,11 +653,6 @@ void LLManipRotate::drag( S32 x, S32 y )
                 LLVector3 old_position;
                 LLVector3 new_position;
 
-                if (selectNode->mSelectedGLTFNode != -1)
-                {
-
-                }
-                else
                 {
                     if (object->isAttachment() && object->mDrawable.notNull())
                     {

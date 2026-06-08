@@ -197,7 +197,6 @@ set(viewer_SOURCE_FILES
     fsposeranimator.cpp
     fsposestate.cpp
     fsposingmotion.cpp
-    gltfscenemanager.cpp
     gltf/asset.cpp
     gltf/accessor.cpp
     gltf/primitive.cpp
@@ -356,7 +355,6 @@ set(viewer_SOURCE_FILES
     llfloaterfonttest.cpp
     llfloaterforgetuser.cpp
     llfloatergesture.cpp
-    llfloatergltfasseteditor.cpp
     llfloatergodtools.cpp
     llfloatergotoline.cpp
     llfloatergridstatus.cpp
@@ -957,7 +955,6 @@ set(viewer_HEADER_FILES
     fsposeranimator.h
     fsposestate.h
     fsposingmotion.h
-    gltfscenemanager.h
     groupchatlistener.h
     gltf/asset.h
     gltf/accessor.h
@@ -1119,7 +1116,6 @@ set(viewer_HEADER_FILES
     llfloaterfonttest.h
     llfloaterforgetuser.h
     llfloatergesture.h
-    llfloatergltfasseteditor.h
     llfloatergodtools.h
     llfloatergotoline.h
     llfloatergridstatus.h

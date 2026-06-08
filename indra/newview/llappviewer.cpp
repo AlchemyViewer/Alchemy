@@ -252,7 +252,6 @@
 #include "llavatariconctrl.h"
 #include "llgroupiconctrl.h"
 #include "llviewerassetstats.h"
-#include "gltfscenemanager.h"
 
 #include "workqueue.h"
 using namespace LL;
@@ -1343,7 +1342,6 @@ bool LLAppViewer::init()
     LLViewerStatsRecorder::createInstance();
     LLSelectMgr::createInstance();
     LLViewerCamera::createInstance();
-    LL::GLTFSceneManager::createInstance();
     LLMaterialMgr::createInstance();
     LLHUDManager::createInstance();
     LLWorldMap::createInstance();
@@ -2293,7 +2291,6 @@ bool LLAppViewer::cleanup()
     LLWorldMap::deleteSingleton();
     LLAvatarNameCache::deleteSingleton();
     LLMaterialMgr::deleteSingleton();
-    LL::GLTFSceneManager::deleteSingleton();
     LLSelectMgr::deleteSingleton();
     LLToolMgr::deleteSingleton();
     LLToolPie::deleteSingleton();
@@ -5453,7 +5450,6 @@ void LLAppViewer::idle()
         if (!(logoutRequestSent() && hasSavedFinalSnapshot()))
         {
             gObjectList.update(gAgent);
-            LL::GLTFSceneManager::instance().update();
         }
     }
 

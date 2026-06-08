@@ -121,7 +121,6 @@
 #include "llscenemonitor.h"
 #include "llprogressview.h"
 #include "llcleanup.h"
-#include "gltfscenemanager.h"
 #include "lutcube.h"
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "llvisualeffect.h"
@@ -5071,8 +5070,6 @@ void LLPipeline::renderDebug()
         }
     }
 
-    LL::GLTFSceneManager::instance().renderDebug();
-
     if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_OCCLUSION))
     { //render visible selected group occlusion geometry
         gDebugProgram.bind();
@@ -6818,8 +6815,6 @@ LLViewerObject* LLPipeline::lineSegmentIntersectInWorld(const LLVector4a& start,
                                                         bool pick_unselectable,
                                                         bool pick_reflection_probe,
                                                         S32* face_hit,
-                                                        S32* gltf_node_hit,
-                                                        S32* gltf_primitive_hit,
                                                         LLVector4a* intersection,         // return the intersection point
                                                         LLVector2* tex_coord,            // return the texture coordinates of the intersection point
                                                         LLVector4a* normal,               // return the surface normal at the intersection point
@@ -6961,25 +6956,6 @@ LLViewerObject* LLPipeline::lineSegmentIntersectInWorld(const LLVector4a& start,
         }
     }
 
-    S32 node_hit = -1;
-    S32 primitive_hit = -1;
-    LLDrawable* hit = LL::GLTFSceneManager::instance().lineSegmentIntersect(start, local_end, pick_transparent, pick_rigged, pick_unselectable, pick_reflection_probe, &node_hit, &primitive_hit, &position, tex_coord, normal, tangent);
-    if (hit)
-    {
-        drawable = hit;
-        local_end = position;
-    }
-
-    if (gltf_node_hit)
-    {
-        *gltf_node_hit = node_hit;
-    }
-
-    if (gltf_primitive_hit)
-    {
-        *gltf_primitive_hit = primitive_hit;
-    }
-
     if (intersection)
     {
         *intersection = position;
@@ -7095,15 +7071,6 @@ void LLPipeline::renderGLTFObjects(U32 type, bool texture, bool rigged)
 
     gGL.loadMatrix(gGLModelView);
     gGLLastMatrix = NULL;
-
-    if (!rigged)
-    {
-        LL::GLTFSceneManager::instance().renderOpaque();
-    }
-    else
-    {
-        LL::GLTFSceneManager::instance().render(true, true);
-    }
 }
 
 // Currently only used for shadows -Cosmic,2023-04-19

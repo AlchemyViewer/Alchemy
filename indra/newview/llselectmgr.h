@@ -175,7 +175,6 @@ public:
 
     void selectAllTEs(bool b);
     void selectTE(S32 te_index, bool selected);
-    void selectGLTFNode(S32 node_index, S32 primitive_index, bool selected);
     bool isTESelected(S32 te_index) const;
     bool hasSelectedTE() const { return TE_SELECT_MASK_ALL & mTESelectMask; }
     S32 getLastSelectedTE() const;
@@ -247,8 +246,6 @@ public:
     std::vector<LLVector3>  mSilhouetteVertices;    // array of vertices to render silhouette of object
     std::vector<LLVector3>  mSilhouetteNormals; // array of normals to render silhouette of object
     bool                    mSilhouetteExists;  // need to generate silhouette?
-    S32             mSelectedGLTFNode = -1;
-    S32             mSelectedGLTFPrimitive = -1;
 
 protected:
     mutable LLPointer<LLViewerObject>   mObject;
@@ -543,7 +540,7 @@ public:
     LLObjectSelectionHandle selectObjectAndFamily(LLViewerObject* object, bool add_to_end = false, bool ignore_select_owned = false);
 
     // For when you want just a child object.
-    LLObjectSelectionHandle selectObjectOnly(LLViewerObject* object, S32 face = SELECT_ALL_TES, S32 gltf_node = -1, S32 gltf_primitive = -1);
+    LLObjectSelectionHandle selectObjectOnly(LLViewerObject* object, S32 face = SELECT_ALL_TES);
 
     // Same as above, but takes a list of objects.  Used by rectangle select.
     LLObjectSelectionHandle selectObjectAndFamily(const std::vector<LLViewerObject*>& object_list, bool send_to_sim = true);
@@ -845,7 +842,7 @@ public:
     void remove(std::vector<LLViewerObject*>& objects);
     void remove(LLViewerObject* object, S32 te = SELECT_ALL_TES, bool undoable = true);
     void removeAll();
-    void addAsIndividual(LLViewerObject* object, S32 te = SELECT_ALL_TES, bool undoable = true, S32 gltf_node = -1, S32 gltf_primitive = -1);
+    void addAsIndividual(LLViewerObject* object, S32 te = SELECT_ALL_TES, bool undoable = true);
     void promoteSelectionToRoot();
     void demoteSelectionToIndividuals();
 

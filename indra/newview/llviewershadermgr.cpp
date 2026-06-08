@@ -254,9 +254,6 @@ LLGLSLShader            gDeferredPBRAlphaProgram;
 LLGLSLShader            gDeferredSkinnedPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
 
-LLGLSLShader            gGLTFPBRMetallicRoughnessProgram;
-
-
 //helper for making a rigged variant of a given shader
 static bool make_rigged_variant(LLGLSLShader& shader, LLGLSLShader& riggedShader)
 {
@@ -465,11 +462,6 @@ void LLViewerShaderMgr::finalizeShaderList()
     mShaderList.push_back(&gDeferredDiffuseProgram);
     mShaderList.push_back(&gDeferredBumpProgram);
     mShaderList.push_back(&gDeferredPBROpaqueProgram);
-
-    if (gSavedSettings.getBOOL("GLTFEnabled"))
-    {
-        mShaderList.push_back(&gGLTFPBRMetallicRoughnessProgram);
-    }
 
     mShaderList.push_back(&gDeferredAvatarProgram);
     mShaderList.push_back(&gDeferredTerrainProgram);
@@ -1250,7 +1242,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gHUDPBROpaqueProgram.unload();
         gPBRGlowProgram.unload();
         gDeferredPBROpaqueProgram.unload();
-        gGLTFPBRMetallicRoughnessProgram.unload();
         gDeferredSkinnedPBROpaqueProgram.unload();
         gDeferredPBRAlphaProgram.unload();
         gDeferredSkinnedPBRAlphaProgram.unload();
@@ -1455,34 +1446,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             success = gDeferredPBROpaqueProgram.createShader();
         }
         llassert(success);
-    }
-
-    if (gSavedSettings.getBOOL("GLTFEnabled"))
-    {
-        if (success)
-        {
-            gGLTFPBRMetallicRoughnessProgram.mName = "GLTF PBR Metallic Roughness Shader";
-            gGLTFPBRMetallicRoughnessProgram.mFeatures.hasSrgb = true;
-
-            gGLTFPBRMetallicRoughnessProgram.mShaderFiles.clear();
-            gGLTFPBRMetallicRoughnessProgram.mShaderFiles.push_back(make_pair("gltf/pbrmetallicroughnessV.glsl", GL_VERTEX_SHADER));
-            gGLTFPBRMetallicRoughnessProgram.mShaderFiles.push_back(make_pair("gltf/pbrmetallicroughnessF.glsl", GL_FRAGMENT_SHADER));
-            gGLTFPBRMetallicRoughnessProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            gGLTFPBRMetallicRoughnessProgram.clearPermutations();
-
-            add_common_permutations(&gGLTFPBRMetallicRoughnessProgram);
-
-            success = make_gltf_variants(gGLTFPBRMetallicRoughnessProgram, use_sun_shadow);
-
-            //llassert(success);
-            if (!success)
-            {
-                LL_WARNS() << "Failed to create GLTF PBR Metallic Roughness Shader, disabling!" << LL_ENDL;
-                gSavedSettings.setBOOL("RenderCanUseGLTFPBROpaqueShaders", false);
-                // continue as if this shader never happened
-                success = true;
-            }
-        }
     }
 
     if (success)

@@ -88,7 +88,6 @@
 #include "llsculptidsize.h"
 #include "llavatarappearancedefines.h"
 #include "llgltfmateriallist.h"
-#include "gltfscenemanager.h"
 #include "lltoolmgr.h"
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvactions.h"
@@ -1201,11 +1200,6 @@ bool LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
             }
         }
 
-        if ((volume_params.getSculptType() & LL_SCULPT_TYPE_MASK) == LL_SCULPT_TYPE_GLTF)
-        { // notify GLTFSceneManager about new GLTF object
-            LL::GLTFSceneManager::instance().addGLTFObject(this, volume_params.getSculptID());
-        }
-
         return true;
     }
     else if (NO_LOD == lod)
@@ -1485,12 +1479,6 @@ bool LLVOVolume::calcLOD()
 {
     if (mDrawable.isNull())
     {
-        return false;
-    }
-
-    if (mGLTFAsset != nullptr)
-    {
-        // do not calculate LOD for GLTF objects
         return false;
     }
 
@@ -5727,7 +5715,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 
             LLVOVolume* vobj = drawablep->getVOVolume();
 
-            if (!vobj || vobj->isDead() || vobj->mGLTFAsset)
+            if (!vobj || vobj->isDead())
             {
                 continue;
             }

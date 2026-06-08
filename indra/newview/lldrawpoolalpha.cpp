@@ -49,7 +49,6 @@
 #include "llspatialpartition.h"
 #include "llglcommonfunc.h"
 #include "llvoavatar.h"
-#include "gltfscenemanager.h"
 
 #include "llenvironment.h"
 
@@ -252,14 +251,6 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
     mAlphaSFactor = LLRender::BF_ZERO;                         // } glow suppression
     mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;       // }
     gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
-
-    if (rigged && mType == LLDrawPool::POOL_ALPHA_POST_WATER)
-    { // draw GLTF scene to depth buffer before rigged alpha
-        LL::GLTFSceneManager::instance().render(false, false);
-        LL::GLTFSceneManager::instance().render(false, true);
-        LL::GLTFSceneManager::instance().render(false, false, true);
-        LL::GLTFSceneManager::instance().render(false, true, true);
-    }
 
     // If the face is more than 90% transparent, then don't update the Depth buffer for Dof
     // We don't want the nearly invisible objects to cause of DoF effects

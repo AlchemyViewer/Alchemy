@@ -36,7 +36,6 @@
 #include "llspatialpartition.h"
 #include "llviewershadermgr.h"
 #include "llrender.h"
-#include "gltfscenemanager.h"
 
 static LLTrace::BlockTimerStatHandle FTM_RENDER_SIMPLE_DEFERRED("Deferred Simple");
 static LLTrace::BlockTimerStatHandle FTM_RENDER_GRASS_DEFERRED("Deferred Grass");
@@ -184,10 +183,6 @@ void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
 void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_FULLBRIGHT);
-
-    // render unrigged unlit GLTF
-    LL::GLTFSceneManager::instance().render(true, false, true);
-    LL::GLTFSceneManager::instance().render(true, true, true);
 
     LLGLSLShader* shader = nullptr;
     if (LLPipeline::sRenderingHUDs)

@@ -664,14 +664,6 @@ bool LLManipTranslate::handleHover(S32 x, S32 y, MASK mask)
         LLSelectNode* selectNode = *iter;
         LLViewerObject* object = selectNode->getObject();
 
-        if (selectNode->mSelectedGLTFNode != -1)
-        {
-            // manipulating a GLTF node
-            clamped_relative_move_f -= selectNode->mLastMoveLocal;
-            object->moveGLTFNode(selectNode->mSelectedGLTFNode, clamped_relative_move_f);
-            selectNode->mLastMoveLocal += clamped_relative_move_f;
-        }
-        else
         {
             // Only apply motion to root objects and objects selected
             // as "individual".

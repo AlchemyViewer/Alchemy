@@ -146,8 +146,6 @@
 #include <boost/json.hpp>
 #include "llcleanup.h"
 #include "llviewershadermgr.h"
-#include "gltfscenemanager.h"
-#include "gltf/asset.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -3581,42 +3579,6 @@ bool enable_os_exception()
 #else
     return false;
 #endif
-}
-
-
-bool enable_gltf()
-{
-    static LLCachedControl<bool> enablegltf(gSavedSettings, "GLTFEnabled", false);
-    static LLCachedControl<bool> can_use(gSavedSettings, "RenderCanUseGLTFPBROpaqueShaders", true);
-
-    return enablegltf && can_use;
-}
-
-bool enable_gltf_save_as()
-{
-    if (enable_gltf())
-    {
-        LLViewerObject* obj = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject();
-        if (obj)
-        {
-            if (obj->mGLTFAsset && obj->mGLTFAsset->isLocalPreview())
-            {
-                return true;
-            }
-
-            LLPermissions* permissions = LLSelectMgr::getInstance()->findObjectPermissions(obj);
-            if (permissions)
-            {
-                return permissions->allowExportBy(gAgent.getID());
-            }
-        }
-    }
-    return false;
-}
-
-bool enable_gltf_upload()
-{
-    return enable_gltf_save_as();
 }
 
 bool enable_terrain_local_paintmap()
@@ -8715,52 +8677,6 @@ class LLAdvancedClickHDRIPreview: public view_listener_t
     }
 };
 
-
-class LLAdvancedClickGLTFOpen: public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        static LLCachedControl<bool> can_use_shaders(gSavedSettings, "RenderCanUseGLTFPBROpaqueShaders", true);
-        if (can_use_shaders)
-        {
-            LL::GLTFSceneManager::instance().load();
-        }
-        else
-        {
-            LLNotificationsUtil::add("NoSupportGLTFShader");
-        }
-
-        return true;
-    }
-};
-
-class LLAdvancedClickGLTFSaveAs : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        LL::GLTFSceneManager::instance().saveAs();
-        return true;
-    }
-};
-
-class LLAdvancedClickGLTFUpload: public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        LL::GLTFSceneManager::instance().uploadSelection();
-        return true;
-    }
-};
-
-class LLAdvancedClickGLTFEdit : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        LLFloaterReg::showInstance("gltf_asset_editor");
-        return true;
-    }
-};
-
 class LLAdvancedClickResizeWindow : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -10535,10 +10451,6 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedClickRenderProfile(), "Advanced.ClickRenderProfile");
     view_listener_t::addMenu(new LLAdvancedClickRenderBenchmark(), "Advanced.ClickRenderBenchmark");
     view_listener_t::addMenu(new LLAdvancedClickHDRIPreview(), "Advanced.ClickHDRIPreview");
-    view_listener_t::addMenu(new LLAdvancedClickGLTFOpen(), "Advanced.ClickGLTFOpen");
-    view_listener_t::addMenu(new LLAdvancedClickGLTFSaveAs(), "Advanced.ClickGLTFSaveAs");
-    view_listener_t::addMenu(new LLAdvancedClickGLTFUpload(), "Advanced.ClickGLTFUpload");
-    view_listener_t::addMenu(new LLAdvancedClickGLTFEdit(), "Advanced.ClickGLTFEdit");
     view_listener_t::addMenu(new LLAdvancedClickResizeWindow(), "Advanced.ClickResizeWindow");
     view_listener_t::addMenu(new LLAdvancedPurgeShaderCache(), "Advanced.ClearShaderCache");
 
@@ -10863,9 +10775,6 @@ void initialize_menus()
     commit.add("Pathfinding.Characters.Select", boost::bind(&LLFloaterPathfindingCharacters::openCharactersWithSelectedObjects));
     enable.add("EnableSelectInPathfindingCharacters", boost::bind(&enable_object_select_in_pathfinding_characters));
     enable.add("Advanced.EnableErrorOSException", boost::bind(&enable_os_exception));
-    enable.add("EnableGLTF", boost::bind(&enable_gltf));
-    enable.add("EnableGLTFSaveAs", boost::bind(&enable_gltf_save_as));
-    enable.add("EnableGLTFUpload", boost::bind(&enable_gltf_upload));
     enable.add("EnableTerrainLocalPaintMap", boost::bind(&enable_terrain_local_paintmap));
 
     view_listener_t::addMenu(new LLFloaterVisible(), "FloaterVisible");

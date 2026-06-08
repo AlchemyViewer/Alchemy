@@ -4943,30 +4943,6 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		編集中の非ＨＤＲの空の設定は自動的にＨＤＲの設定に変換されます。ＨＤＲとトーンマッピングを削除する場合は、反射プローブ環境の値を０にしてください。
 		<usetemplate ignoretext="ＨＤＲの空の調整時の警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
-	<notification name="GLTFOpenSelection">
-		プレビューしているＧＬＴＦアセットへのハンドルとして機能するオブジェクトを選択する必要があります。
-		<usetemplate name="okbutton" yestext="ＯＫ"/>
-	</notification>
-	<notification name="GLTFLoadFailed">
-		ＧＬＴＦファイルの読み込みに失敗しました。詳細についてはログを参照してください。
-		<usetemplate name="okbutton" yestext="ＯＫ"/>
-	</notification>
-	<notification name="GLTFSaveFailed">
-		ＧＬＴＦファイルの保存に失敗しました。詳細についてはログを参照してください。
-		<usetemplate name="okbutton" yestext="ＯＫ"/>
-	</notification>
-	<notification name="GLTFSaveSelection">
-		ＧＬＴＦアセットが関連付けられているオブジェクトを選択する必要があります。
-		<usetemplate name="okbutton" yestext="ＯＫ"/>
-	</notification>
-	<notification name="GLTFUploadSelection">
-		ローカル専用のＧＬＴＦアセットが関連付けられているオブジェクトを選択する必要があります。
-		<usetemplate name="okbutton" yestext="ＯＫ"/>
-	</notification>
-	<notification name="GLTFUploadInProgress">
-		現在アップロードしています。しばらくしてからもう一度お試しください。
-		<usetemplate name="okbutton" yestext="ＯＫ"/>
-	</notification>
 	<notification name="NoSupportGLTFShader">
 		ＧＬＴＦシーンは、お使いのグラフィックハードウェアではまだサポートされていません。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
