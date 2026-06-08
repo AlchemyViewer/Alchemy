@@ -373,13 +373,12 @@ void LLLocalAnimMgr::doUpdates()
         {
             continue;
         }
-        anim.mLastModified = mtime;
-
         std::vector<U8> fresh;
         if (!decodeFile(anim.mFilename, fresh))
         {
-            continue; // keep last good data; retry on the next mtime change
+            continue; // keep last good data; don't consume mtime so a mid-save retries
         }
+        anim.mLastModified = mtime;
         anim.mData = std::move(fresh);
 
         // Refresh the cached keyframe data so the next play uses the new bytes,

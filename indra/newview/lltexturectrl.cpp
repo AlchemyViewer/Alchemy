@@ -1557,30 +1557,46 @@ void LLFloaterTexturePicker::refreshLocalList()
 
 void LLFloaterTexturePicker::onLocalAssetsChanged()
 {
-    // The refresh may be triggered by another picker / the Local Assets floater
-    // removing the very local asset this picker has selected. If we're on the Local
-    // tab and the selected row's unit no longer resolves, its world id is dangling --
-    // drop it so a later commit can't apply a deleted local texture/material. Check
-    // before refreshLocalList() rebuilds (and clears) the list.
-    bool drop_selection = false;
-    if (mModeSelector && mModeSelector->getValue().asInteger() == 1 /* Local */ && mLocalScrollCtrl)
+    // A refresh can be triggered by another picker / the Local Assets floater adding
+    // or removing local assets. Capture this picker's Local-tab selection first
+    // (refreshLocalList() rebuilds and clears the list) so we can either keep it
+    // highlighted or, if its unit was removed, drop the now-dangling selection.
+    LLSD sel_value;
+    bool have_sel = false;
+    bool still_valid = false;
+    if (mModeSelector && mModeSelector->getValue().asInteger() == PICKER_LOCAL && mLocalScrollCtrl)
     {
         if (LLScrollListItem* sel = mLocalScrollCtrl->getFirstSelected())
         {
             const LLSD data = sel->getValue();
-            const LLUUID tracking_id = data["id"].asUUID();
-            const LLUUID world_id = (data["type"].asInteger() == LLAssetType::AT_MATERIAL)
-                ? LLLocalGLTFMaterialMgr::getInstance()->getWorldID(tracking_id)
-                : LLLocalBitmapMgr::getInstance()->getWorldID(tracking_id);
-            drop_selection = world_id.isNull();
+            if (data.has("id") && data.has("type"))
+            {
+                sel_value = data;
+                have_sel = true;
+                const LLUUID tracking_id = data["id"].asUUID();
+                const LLUUID world_id = (data["type"].asInteger() == LLAssetType::AT_MATERIAL)
+                    ? LLLocalGLTFMaterialMgr::getInstance()->getWorldID(tracking_id)
+                    : LLLocalBitmapMgr::getInstance()->getWorldID(tracking_id);
+                still_valid = world_id.notNull();
+            }
         }
     }
 
     refreshLocalList();
 
-    if (drop_selection)
+    if (have_sel)
     {
-        mImageAssetID.setNull();
+        if (still_valid)
+        {
+            // Keep the user's selection highlighted across the rebuild.
+            mLocalScrollCtrl->setSelectedByValue(sel_value, true);
+        }
+        else
+        {
+            // The selected local asset was removed elsewhere; drop the dangling
+            // selection so a later commit can't apply a deleted texture/material.
+            mImageAssetID.setNull();
+        }
     }
 }
 
