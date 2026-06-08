@@ -46,6 +46,7 @@
 
 #include "llagentcamera.h"
 #include "llcontrolavatar.h"
+#include "llgltfmateriallist.h" // LLGLTFMaterialList::flushUpdates (apply local material)
 #include "lllistcontextmenu.h"
 #include "lllocalanim.h"
 #include "lllocalassetpaths.h"
@@ -56,6 +57,7 @@
 #include "llviewerjointattachment.h"
 #include "llviewermenu.h"       // get_selected_animesh_control_avatar
 #include "llviewerobject.h"
+#include "llviewertexture.h"    // LLViewerTextureManager::getFetchedTexture (apply local texture)
 #include "llvoavatarself.h"     // gAgentAvatarp, isAgentAvatarValid, mAttachmentPoints
 
 #include <boost/signals2.hpp>
@@ -1016,87 +1018,116 @@ void LLPanelLocalAnim::onStop()
     }
 }
 
-// Apply a local GLTF material (world id) to the current in-world selection. Real
-// objects go through the normal server path. A client-only (isLocalOnly) preview
-// selection is handled locally: set the render material per selected face without a
-// server round-trip, then mark the render-material param in use so it survives the
-// drawable rebuild (client-only objects get no server echo to do that -- same fix as
-// applyPartGeometry in lllocalmesh.cpp). Selections never mix local + real.
-void apply_local_material_to_selection(const LLUUID& world_id)
+// Collect the faces to apply a local asset to on one selected object. Honors an
+// explicit Select-Face pick (a strict, non-empty subset of the object's faces); any
+// other state -- a whole-object selection, or nothing picked -- means every face.
+//
+// Iterates getNumTEs() (the texture-entry count), NOT getNumFaces() (the drawable's
+// *built* face count). For a freshly spawned or hot-swapped local mesh the volume
+// realizes a frame or more after the TEs are set, so getNumFaces() can still read a
+// placeholder count -- and applyToTEs()/selectionSetImage(), which clamp to
+// llmin(getNumTEs, getNumFaces), then cover only the first face(s). That clamp is
+// exactly why Apply had to be clicked twice: the first click hit one face, the apply
+// forced the volume to realize, and only then did a second click reach the rest.
+static void collect_apply_tes(const LLSelectNode* node, const LLViewerObject* obj, std::vector<S32>& out)
 {
-    LLObjectSelectionHandle sel = LLSelectMgr::getInstance()->getSelection();
-    bool any_local = false;
-    for (LLObjectSelection::iterator it = sel->begin(); it != sel->end(); ++it)
+    out.clear();
+    const S32 num = (S32)obj->getNumTEs();
+    if (num <= 0)
     {
-        LLViewerObject* obj = (*it)->getObject();
-        if (obj && obj->isLocalOnly())
-        {
-            any_local = true;
-            break;
-        }
-    }
-    if (!any_local)
-    {
-        LLSelectMgr::getInstance()->selectionSetGLTFMaterial(world_id);
         return;
     }
-
-    struct ApplyFunc final : public LLSelectedTEFunctor
+    S32 picked = 0;
+    for (S32 te = 0; te < num; ++te)
     {
-        LLUUID mId;
-        bool apply(LLViewerObject* obj, S32 te) override
+        if (node->isTESelected(te))
         {
-            obj->setRenderMaterialID(te, mId, /*update_server=*/false, /*local_origin=*/true);
-            return true;
+            ++picked;
         }
-    } func;
-    func.mId = world_id;
-    sel->applyToTEs(&func);
-
-    for (LLObjectSelection::iterator it = sel->begin(); it != sel->end(); ++it)
+    }
+    const bool subset = (picked > 0 && picked < num); // genuine per-face pick
+    for (S32 te = 0; te < num; ++te)
     {
-        LLViewerObject* obj = (*it)->getObject();
-        if (obj && obj->isLocalOnly())
+        if (!subset || node->isTESelected(te))
         {
-            obj->setHasRenderMaterialParams(true);
+            out.push_back(te);
         }
     }
 }
 
-// "Apply to face" covers every face of the selected object, unless the user
-// picked specific faces with the Select Face tool (then only those). Mark all
-// faces on any selected object that has no individual face selection, so the
-// apply below (which honors the per-face select mask via applyToTEs) hits the
-// whole object instead of nothing. Objects with a Select-Face pick are left
-// untouched so the pick is respected.
-static void target_all_faces_unless_face_selected(LLObjectSelectionHandle sel)
+// Apply a local texture (world id) to the current in-world selection -- every face
+// unless specific faces are picked. Mirrors LLToolDragAndDrop::dropTextureAllFaces
+// (a plain setTEImage over getNumTEs()), so it isn't subject to the getNumFaces
+// clamp described on collect_apply_tes(). sendTEUpdate() is isLocalOnly-guarded, so
+// this is safe on both real objects and client-only previews.
+void apply_local_texture_to_selection(const LLUUID& world_id)
 {
-    if (!sel)
-    {
-        return;
-    }
+    LLViewerTexture* image = LLViewerTextureManager::getFetchedTexture(
+        world_id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+    LLObjectSelectionHandle sel = LLSelectMgr::getInstance()->getSelection();
+    std::vector<S32> tes;
     for (LLObjectSelection::iterator it = sel->begin(); it != sel->end(); ++it)
     {
         LLSelectNode* node = *it;
         LLViewerObject* obj = node ? node->getObject() : nullptr;
-        if (!obj || obj->getNumTEs() <= 0)
+        if (!obj || !obj->permModify())
         {
             continue;
         }
-        bool face_picked = false;
-        for (S32 te = 0, n = obj->getNumTEs(); te < n; ++te)
+        collect_apply_tes(node, obj, tes);
+        for (S32 te : tes)
         {
-            if (node->isTESelected(te))
-            {
-                face_picked = true;
-                break;
-            }
+            obj->setTEImage(te, image);
         }
-        if (!face_picked)
+        obj->sendTEUpdate(); // isLocalOnly-guarded; a no-op for client-only previews
+    }
+}
+
+// Apply a local GLTF material (world id) to the current in-world selection -- every
+// face unless specific faces are picked. Real objects update the server (queued,
+// flushed once at the end); client-only (isLocalOnly) previews update local render
+// state only and then mark the render-material param in use so it survives the
+// drawable rebuild (no server echo does that for them -- same fix as
+// applyPartGeometry in lllocalmesh.cpp). Iterates getNumTEs() to dodge the
+// getNumFaces clamp (see collect_apply_tes).
+void apply_local_material_to_selection(const LLUUID& world_id)
+{
+    LLObjectSelectionHandle sel = LLSelectMgr::getInstance()->getSelection();
+    std::vector<S32> tes;
+    bool any_server = false;
+    for (LLObjectSelection::iterator it = sel->begin(); it != sel->end(); ++it)
+    {
+        LLSelectNode* node = *it;
+        LLViewerObject* obj = node ? node->getObject() : nullptr;
+        if (!obj || !obj->permModify())
         {
-            node->selectAllTEs(true);
-            obj->setAllTESelected(true);
+            continue;
         }
+        const bool local = obj->isLocalOnly();
+        collect_apply_tes(node, obj, tes);
+        // For a client-only preview, mark the render-material param IN USE *before*
+        // setting per-face ids. setRenderMaterialID() creates a throwaway param block
+        // with in_use=false whenever the block isn't already in use (llviewerobject
+        // createNewParameterEntry), so without this each face's call would replace the
+        // block and only the LAST face would keep its material -- every other face
+        // renders untextured. Real objects get a per-face block from the server echo
+        // instead. (Same ordering as applyPartGeometry in lllocalmesh.cpp.)
+        if (local)
+        {
+            obj->setHasRenderMaterialParams(true);
+        }
+        else
+        {
+            any_server = true;
+        }
+        for (S32 te : tes)
+        {
+            obj->setRenderMaterialID(te, world_id, /*update_server=*/!local, /*local_origin=*/true);
+        }
+    }
+    if (any_server)
+    {
+        LLGLTFMaterialList::flushUpdates();
     }
 }
 
@@ -1159,7 +1190,6 @@ private:
         if (world_id.notNull())
         {
             // Whole object -> all faces; specific Select-Face pick -> just those.
-            target_all_faces_unless_face_selected(LLSelectMgr::getInstance()->getSelection());
             applyWorldId(world_id);
         }
     }
@@ -1216,9 +1246,7 @@ protected:
     }
     void applyWorldId(const LLUUID& world_id) override
     {
-        // setTEImage + sendTEUpdate; sendTEUpdate is isLocalOnly-guarded, so this is
-        // safe on both real objects and client-only previews.
-        LLSelectMgr::getInstance()->selectionSetImage(world_id);
+        apply_local_texture_to_selection(world_id);
     }
 };
 
