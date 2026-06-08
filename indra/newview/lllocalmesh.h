@@ -84,8 +84,9 @@ struct LLLocalMeshPart
     LLUUID                    mWorldID;       // unique mesh id objects/repository reference
     LLPointer<LLVolume>       mVolume;        // normalized geometry (<= 8 faces)
     LLPointer<LLMeshSkinInfo> mSkinInfo;      // null if not rigged
-    LLVector3                 mScale;         // authored size -> prim scale
-    LLVector3                 mOffset;        // part centre relative to the whole-model centre
+    LLVector3                 mScale;         // object scale (decomposed instance scale; rigged: authored size)
+    LLQuaternion              mRotation;      // object rotation (decomposed instance rotation; rigged: identity)
+    LLVector3                 mOffset;        // scene-space position of the part (static); zero for rigged
     S32                       mNumFaces = 0;
     std::vector<LLLocalMeshFaceMaterial> mFaceMaterials; // parallel to the volume's faces
 };

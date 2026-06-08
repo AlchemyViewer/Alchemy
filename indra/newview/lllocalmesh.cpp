@@ -111,134 +111,28 @@ namespace
         }
     }
 
-    // Transform a volume face's positions/normals in place and recompute extents.
-    // Normals use the 3x3 rotation only (renormalized); adequate for preview and
-    // exact for rigid/uniformly-scaled instances.
-    void transformFace(LLVolumeFace& face, const LLMatrix4a& mat)
+    // Decompose an instance/scene transform into TRS for the preview object, mirroring
+    // LLMeshUploadThread::decomposeMeshMatrix(): scale = transformed basis lengths,
+    // rotation = orthogonalized basis (so shear is dropped, exactly as an upload would),
+    // position = transformed origin. Applying this as the object's transform -- instead
+    // of baking it into the geometry -- keeps the geometry model-local, so cacheOptimize()
+    // generates normals/tangents in the same frame the upload/download path does.
+    void decomposeInstanceMatrix(const LLMatrix4& t, LLVector3& pos, LLQuaternion& rot, LLVector3& scale)
     {
-        if (face.mNumVertices <= 0 || !face.mPositions)
+        const bool reflected = (t.determinant() < 0.f);
+        pos = LLVector3(0.f, 0.f, 0.f) * t;
+        LLVector3 x = LLVector3(1.f, 0.f, 0.f) * t - pos;
+        LLVector3 y = LLVector3(0.f, 1.f, 0.f) * t - pos;
+        LLVector3 z = LLVector3(0.f, 0.f, 1.f) * t - pos;
+        scale.set(x.normalize(), y.normalize(), z.normalize());
+        if (reflected)
         {
-            return;
+            x *= -1.f; // keep a right-handed basis for the quaternion; scale stays positive
         }
-
-        LLVector4a min, max;
-        for (S32 i = 0; i < face.mNumVertices; ++i)
-        {
-            LLVector4a p;
-            mat.affineTransform(face.mPositions[i], p);
-            face.mPositions[i] = p;
-
-            if (face.mNormals)
-            {
-                LLVector4a n;
-                mat.rotate(face.mNormals[i], n);
-                n.normalize3fast();
-                face.mNormals[i] = n;
-            }
-
-            if (i == 0)
-            {
-                min = max = p;
-            }
-            else
-            {
-                update_min_max(min, max, p);
-            }
-        }
-
-        if (face.mExtents)
-        {
-            face.mExtents[0] = min;
-            face.mExtents[1] = max;
-        }
-    }
-
-    // Normalize a face set into a unit box centred at the origin and return its
-    // authored size, mirroring LLModel::normalizeVolumeFaces() (the upload path's
-    // convention). The returned size becomes the prim scale, so the preview
-    // renders at native dimensions, is centred on its pivot, and reports correct
-    // extents to the build tools. center_out (if given) receives the pre-normalize
-    // centre, used to place the part within the model. Tangents are intentionally
-    // not touched here -- cacheOptimize() generates them on the normalized geometry.
-    LLVector3 normalizeFaces(std::vector<LLVolumeFace>& faces, LLVector3* center_out = nullptr)
-    {
-        if (faces.empty())
-        {
-            if (center_out) center_out->setZero();
-            return LLVector3(1.f, 1.f, 1.f);
-        }
-
-        LLVector4a min = faces[0].mExtents[0];
-        LLVector4a max = faces[0].mExtents[1];
-        for (size_t i = 1; i < faces.size(); ++i)
-        {
-            update_min_max(min, max, faces[i].mExtents[0]);
-            update_min_max(min, max, faces[i].mExtents[1]);
-        }
-
-        // Translation that centres the geometry at the origin.
-        LLVector4a trans;
-        trans.setAdd(min, max);
-        trans.mul(-0.5f);
-
-        if (center_out)
-        {
-            // Pre-normalize centre (in the faces' current/scene space).
-            center_out->set(-trans[0], -trans[1], -trans[2]);
-        }
-
-        // Size along each axis (guard zero-thickness axes against div-by-zero).
-        LLVector4a size;
-        size.setSub(max, min);
-        F32 sx = size[0], sy = size[1], sz = size[2], sw = size[3];
-        if (fabs(sx) < F_APPROXIMATELY_ZERO) sx = 1.f;
-        if (fabs(sy) < F_APPROXIMATELY_ZERO) sy = 1.f;
-        if (fabs(sz) < F_APPROXIMATELY_ZERO) sz = 1.f;
-        size.set(sx, sy, sz, sw);
-
-        LLVector4a scale;
-        scale.splat(1.f);
-        scale.div(size); // 1 / size
-        LLVector4a inv_scale(1.f);
-        inv_scale.div(scale); // == size
-
-        for (LLVolumeFace& face : faces)
-        {
-            // Shrink extents into the unit cube.
-            face.mExtents[0].add(trans);
-            face.mExtents[0].mul(scale);
-            face.mExtents[1].add(trans);
-            face.mExtents[1].mul(scale);
-
-            for (S32 j = 0; j < face.mNumVertices; ++j)
-            {
-                face.mPositions[j].add(trans);
-                face.mPositions[j].mul(scale);
-                if (face.mNormals && !face.mNormals[j].equals3(LLVector4a::getZero()))
-                {
-                    face.mNormals[j].mul(inv_scale);
-                    face.mNormals[j].normalize3();
-                }
-            }
-
-            // Texture-coordinate extents (rendering and tangent generation use these).
-            if (face.mTexCoords)
-            {
-                face.mTexCoordExtents[0] = face.mTexCoords[0];
-                face.mTexCoordExtents[1] = face.mTexCoords[0];
-                for (S32 j = 1; j < face.mNumVertices; ++j)
-                {
-                    update_min_max(face.mTexCoordExtents[0], face.mTexCoordExtents[1], face.mTexCoords[j]);
-                }
-            }
-            else
-            {
-                face.mTexCoordExtents[0].set(0.f, 0.f);
-                face.mTexCoordExtents[1].set(1.f, 1.f);
-            }
-        }
-
-        return LLVector3(size[0], size[1], size[2]);
+        LLMatrix3 rm;
+        rm.setRows(x, y, z);
+        rot = rm.quaternion();
+        rot.normalize();
     }
 
     // Loader-built models carry skin weights in mSkinWeights (a position-keyed
@@ -594,7 +488,6 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
     }
 
     std::vector<LLLocalMeshPart> parts;
-    std::vector<LLVector3> centers; // static units only: scene-space centre per part
     S32 num_vertices = 0, num_triangles = 0, num_joints = 0;
 
     // glTF: import the file's materials once (mesh-owned) and map them by binding
@@ -613,9 +506,6 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
 
     for (auto iter = scene.begin(); iter != scene.end(); ++iter)
     {
-        LLMatrix4a mat;
-        mat.loadu(iter->first);
-
         for (LLModelInstance& instance : iter->second)
         {
             LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
@@ -632,12 +522,11 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
             {
                 LLVolumeFace face = mdl->getVolumeFace(fi); // deep copy
-                if (!unit_rigged)
-                {
-                    // Static: bake the instance transform into authored world space.
-                    transformFace(face, mat);
-                }
-                else
+                // Keep the loader's model-local geometry for both rigged and static
+                // units; the instance transform is applied as the object transform
+                // below (mirroring the upload), so geometry/normals/tangents stay in
+                // the authored frame.
+                if (unit_rigged)
                 {
                     // Rigged: the loader leaves face.mWeights empty (weights live
                     // in mSkinWeights). Fill them so the injected volume skins to
@@ -697,42 +586,32 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 }
             }
 
+            // Both rigged and static units keep the loader's model-local geometry and
+            // its mNormalizedScale (authored size); cacheOptimize() below uses it to
+            // reconstruct the authored frame for tangent generation exactly as the
+            // download path does, so normals AND tangents match a real upload.
+            LLVector3 nscale, ntrans;
+            mdl->getNormalizedScaleTranslation(nscale, ntrans);
             if (unit_rigged)
             {
-                // Keep the loader's (already unit-box) geometry as-is; record the
-                // authored size for the in-world static view. Placement comes from
-                // the rig once attached, so no per-part offset.
-                LLVector3 nscale, ntrans;
-                mdl->getNormalizedScaleTranslation(nscale, ntrans);
-                part.mScale  = nscale;
-                part.mOffset = LLVector3::zero;
+                // Placement comes from the rig once attached: no object transform.
+                part.mScale    = nscale;
+                part.mRotation = LLQuaternion();
+                part.mOffset   = LLVector3::zero;
             }
             else
             {
-                // Normalize to a unit box; keep size (prim scale) + scene-space
-                // centre (offset within the model, computed below).
-                LLVector3 center;
-                part.mScale = normalizeFaces(faces, &center);
-                centers.push_back(center);
-            }
-
-            // Keep each face's mNormalizedScale consistent with the geometry that
-            // actually reaches cacheOptimize() below. cacheOptimize reconstructs the
-            // mesh in its un-normalized ("original") frame to generate tangents with
-            // correct UV proportions -- scaling positions/normals by mNormalizedScale
-            // and back. The static path re-normalizes here (a SECOND normalization
-            // after the loader's), so a rotated or non-uniformly scaled instance
-            // transform makes the re-normalized size differ from the loader's stored
-            // scale. Leaving mNormalizedScale stale runs the normals through
-            // normalize(normalize(n / S_stale) * S_stale), which is NOT identity for a
-            // non-uniform model (e.g. a tall, narrow body) -- so a rezzed preview
-            // renders with visibly skewed normals (and tangents). part.mScale is the
-            // size that un-normalizes this part's unit-box geometry, so it is the
-            // correct value for both paths (rigged already matches; this makes the
-            // invariant explicit).
-            for (LLVolumeFace& nf : faces)
-            {
-                nf.mNormalizedScale = part.mScale;
+                // Static: decompose the instance transform into the preview object's
+                // scale / rotation / position (drops shear, like the uploader's
+                // decomposeMeshMatrix). Geometry stays model-local, so the object
+                // transform reproduces the instance placement while tangents/normals
+                // generate in the authored frame -- identical to the uploaded copy.
+                LLVector3 pos, scl;
+                LLQuaternion rot;
+                decomposeInstanceMatrix(instance.mTransform, pos, rot, scl);
+                part.mScale    = scl;
+                part.mRotation = rot;
+                part.mOffset   = pos; // scene-space; spawn uses per-part differences
             }
 
             LLVolumeParams vparams;
@@ -776,25 +655,6 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
         release_dropped(LLLocalGLTFMaterialMgr::getInstance(), new_owned_materials, mOwnedMaterials, this);
         LL_WARNS("LocalMesh") << "Local mesh produced no geometry: " << mFilename << LL_ENDL;
         return false; // keep any previously loaded geometry intact
-    }
-
-    if (!unit_rigged)
-    {
-        // Combined bounding box across all parts -> the model centre. Each part's
-        // offset is relative to it, so the spawn drops the whole model centred in
-        // front of the agent with the parts in their authored positions.
-        LLVector3 cmin = centers[0] - parts[0].mScale * 0.5f;
-        LLVector3 cmax = centers[0] + parts[0].mScale * 0.5f;
-        for (size_t i = 0; i < parts.size(); ++i)
-        {
-            update_min_max(cmin, cmax, centers[i] - parts[i].mScale * 0.5f);
-            update_min_max(cmin, cmax, centers[i] + parts[i].mScale * 0.5f);
-        }
-        const LLVector3 model_center = (cmin + cmax) * 0.5f;
-        for (size_t i = 0; i < parts.size(); ++i)
-        {
-            parts[i].mOffset = centers[i] - model_center;
-        }
     }
 
     // Commit. First release mesh-owned imports the previous version used but this one
@@ -1587,10 +1447,23 @@ LLViewerObject* LLLocalMeshMgr::spawnLinkset(const LLUUID& tracking_id, const LL
         vol->setScale(part.mScale, false);
         applyPartGeometry(vol, part);
 
-        // Place each prim at the model centre + its offset. Children are already
-        // parented, so setPositionAgent converts to a parent-relative offset; the
-        // root's rotation is still identity here, making that a pure translation.
-        vol->setPositionAgent(base + (part.mOffset - parts[0].mOffset));
+        if (obj == root)
+        {
+            // Root: the part's intrinsic rotation composed with the rez orientation.
+            // Set it BEFORE positioning children so their world->parent-local
+            // conversion below accounts for it. (Rigged parts are identity rotation,
+            // so this reduces to the old root_rot.)
+            root->setRotation(part.mRotation * root_rot);
+            root->setPositionAgent(base);
+        }
+        else
+        {
+            // Child: world position is the intrinsic offset from the root part,
+            // rotated by the rez orientation; rotation is the part's intrinsic
+            // rotation relative to the root part (parent-local).
+            vol->setPositionAgent(base + (part.mOffset - parts[0].mOffset) * root_rot);
+            vol->setRotation(part.mRotation * ~parts[0].mRotation);
+        }
 
         copy.mPrims.push_back(obj);
     }
@@ -1599,7 +1472,6 @@ LLViewerObject* LLLocalMeshMgr::spawnLinkset(const LLUUID& tracking_id, const LL
     {
         // Store the copy before attaching -- attachPreviewToAvatar() looks it up by id.
         mSpawnedCopies[instance_id] = std::move(copy);
-        root->setRotation(root_rot); // identity for a fresh rez; the saved orientation on reload
         if (attach)
         {
             attachPreviewToAvatar(root, attach_point); // restore a worn copy across a re-spawn
@@ -1623,6 +1495,13 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
         bool         mAttached = false;
         S32          mPoint = 0;
     };
+    // spawnLinkset() composes the root part's intrinsic rotation (parts[0].mRotation)
+    // with the root_rot argument, so save root_rot as the USER delta
+    // (~intrinsic * world), not the full world rotation -- otherwise the re-rez would
+    // apply the intrinsic rotation twice. Read it from the (already reparsed) unit.
+    const LLLocalMesh* unit = getUnit(tracking_id);
+    const LLQuaternion intrinsic0 = (unit && !unit->getParts().empty())
+        ? unit->getParts().front().mRotation : LLQuaternion();
     std::vector<Saved> saved;
     for (const auto& entry : mSpawnedCopies)
     {
@@ -1639,7 +1518,7 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
         Saved s;
         s.mInstanceID = entry.first;
         s.mBase       = r->getPositionAgent();
-        s.mRot        = r->getRotation();
+        s.mRot        = ~intrinsic0 * r->getRotation(); // user delta, not full world rotation
         s.mAttached   = r->isAttachment();
         s.mPoint      = s.mAttached ? ATTACHMENT_ID_FROM_STATE(r->getAttachmentState()) : 0;
         saved.push_back(s);
