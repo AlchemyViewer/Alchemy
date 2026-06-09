@@ -180,7 +180,8 @@ public:
     virtual void setControlName(const std::string& control, LLView *context = NULL);
     void removeControlVariable();
 
-    LLControlVariable* getControlVariable() { return mControlVariable; }
+    LLControlVariable* getControlVariable() { return mControlVariables ? mControlVariables->mControlVariable : nullptr; }
+    LLControlVariable* getEnabledControlVariable() { return mControlVariables ? mControlVariables->mEnabledControlVariable : nullptr; }
 
     void setEnabledControlVariable(LLControlVariable* control);
     void setDisabledControlVariable(LLControlVariable* control);
@@ -305,17 +306,6 @@ protected:
 
     LLViewModelPtr  mViewModel;
 
-    LLControlVariable* mControlVariable;
-    boost::signals2::connection mControlConnection;
-    LLControlVariable* mEnabledControlVariable;
-    boost::signals2::connection mEnabledControlConnection;
-    LLControlVariable* mDisabledControlVariable;
-    boost::signals2::connection mDisabledControlConnection;
-    LLControlVariable* mMakeVisibleControlVariable;
-    boost::signals2::connection mMakeVisibleControlConnection;
-    LLControlVariable* mMakeInvisibleControlVariable;
-    boost::signals2::connection mMakeInvisibleControlConnection;
-
     std::string mFunctionName;
 
     static F32 sActiveControlTransparency;
@@ -331,6 +321,27 @@ private:
     bool            mTentative;
 
     ETypeTransparency mTransparencyType;
+
+    // Binding a control to a setting variable is uncommon, so keep the
+    // pointers and their scoped (auto-disconnecting) signal connections in a
+    // block allocated only on first use. This both avoids ~120 bytes of
+    // mostly-unused members on every control and ensures the connections are
+    // disconnected when the control is destroyed (scoped_connection RAII).
+    struct ControlVariables
+    {
+        LLControlVariable* mControlVariable{ nullptr };
+        LLControlVariable* mEnabledControlVariable{ nullptr };
+        LLControlVariable* mDisabledControlVariable{ nullptr };
+        LLControlVariable* mMakeVisibleControlVariable{ nullptr };
+        LLControlVariable* mMakeInvisibleControlVariable{ nullptr };
+        boost::signals2::scoped_connection mControlConnection;
+        boost::signals2::scoped_connection mEnabledControlConnection;
+        boost::signals2::scoped_connection mDisabledControlConnection;
+        boost::signals2::scoped_connection mMakeVisibleControlConnection;
+        boost::signals2::scoped_connection mMakeInvisibleControlConnection;
+    };
+    ControlVariables*   mControlVariables{ nullptr };
+    ControlVariables&   getControlVars(); // lazily allocates mControlVariables
 };
 
 // Build time optimization, generate once in .cpp file

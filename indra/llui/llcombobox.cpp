@@ -173,9 +173,9 @@ void LLComboBox::initFromParams(const LLComboBox::Params& p)
 // virtual
 bool LLComboBox::postBuild()
 {
-    if (mControlVariable)
+    if (getControlVariable())
     {
-        setValue(mControlVariable->getValue()); // selects the appropriate item
+        setValue(getControlVariable()->getValue()); // selects the appropriate item
     }
     return true;
 }
@@ -278,9 +278,9 @@ LLScrollListItem* LLComboBox::add(const std::string& name, EAddPosition pos, boo
     item->setEnabled(enabled);
     if (!mAllowTextEntry && mLabel.empty())
     {
-        if (mControlVariable)
+        if (getControlVariable())
         {
-            setValue(mControlVariable->getValue()); // selects the appropriate item
+            setValue(getControlVariable()->getValue()); // selects the appropriate item
         }
         else
         {
@@ -297,9 +297,9 @@ LLScrollListItem* LLComboBox::add(const std::string& name, const LLUUID& id, EAd
     item->setEnabled(enabled);
     if (!mAllowTextEntry && mLabel.empty())
     {
-        if (mControlVariable)
+        if (getControlVariable())
         {
-            setValue(mControlVariable->getValue()); // selects the appropriate item
+            setValue(getControlVariable()->getValue()); // selects the appropriate item
         }
         else
         {
@@ -317,9 +317,9 @@ LLScrollListItem* LLComboBox::add(const std::string& name, void* userdata, EAddP
     item->setUserdata( userdata );
     if (!mAllowTextEntry && mLabel.empty())
     {
-        if (mControlVariable)
+        if (getControlVariable())
         {
-            setValue(mControlVariable->getValue()); // selects the appropriate item
+            setValue(getControlVariable()->getValue()); // selects the appropriate item
         }
         else
         {
@@ -336,9 +336,9 @@ LLScrollListItem* LLComboBox::add(const std::string& name, LLSD value, EAddPosit
     item->setEnabled(enabled);
     if (!mAllowTextEntry && mLabel.empty())
     {
-        if (mControlVariable)
+        if (getControlVariable())
         {
-            setValue(mControlVariable->getValue()); // selects the appropriate item
+            setValue(getControlVariable()->getValue()); // selects the appropriate item
         }
         else
         {

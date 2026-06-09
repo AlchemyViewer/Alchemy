@@ -838,12 +838,12 @@ void LLMenuItemCallGL::updateEnabled( void )
     if (mEnableSignal.num_slots() > 0)
     {
         bool enabled = mEnableSignal(this, LLSD());
-        if (mEnabledControlVariable)
+        if (getEnabledControlVariable())
         {
             if (!enabled)
             {
                 // callback overrides control variable; this will call setEnabled()
-                mEnabledControlVariable->set(false);
+                getEnabledControlVariable()->set(false);
             }
         }
         else
@@ -947,7 +947,7 @@ void LLMenuItemCheckGL::buildDrawLabel( void )
 {
     // Note: mCheckSignal() returns true if no callbacks are set
     bool checked = mCheckSignal(this, LLSD());
-    if (mControlVariable)
+    if (getControlVariable())
     {
         if (!checked)
             setControlValue(false); // callback overrides control variable; this will call setValue()

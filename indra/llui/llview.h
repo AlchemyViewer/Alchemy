@@ -605,7 +605,7 @@ private:
     bool        mEnabled;       // Enabled means "accepts input that has an effect on the state of the application."
                                 // A disabled view, for example, may still have a scrollbar that responds to mouse events.
     bool        mMouseOpaque;   // Opaque views handle all mouse events that are over their rect.
-    LLUIString  mToolTipMsg;    // isNull() is true if none.
+    LLUIString* mToolTipMsg { nullptr }; // allocated lazily; null when no tooltip is set
 
     U8          mSoundFlags;
     bool        mFromXUI;
@@ -624,6 +624,9 @@ private:
     mutable LLView* mDefaultWidgets;
 
     LLView& getDefaultWidgetContainer() const;
+
+    // tooltip holder is allocated on demand; most widgets never set one
+    LLUIString& getOrCreateToolTipMsg();
 
     // This allows special mouse-event targeting logic for testing.
     typedef std::function<bool(const LLView*, S32 x, S32 y)> DrilldownFunc;

@@ -104,11 +104,6 @@ LLUICtrl::LLUICtrl(const LLUICtrl::Params& p, const LLViewModelPtr& viewmodel)
     mTabStop(false),
     mTentative(false),
     mViewModel(viewmodel),
-    mControlVariable(NULL),
-    mEnabledControlVariable(NULL),
-    mDisabledControlVariable(NULL),
-    mMakeVisibleControlVariable(NULL),
-    mMakeInvisibleControlVariable(NULL),
     mCommitSignal(NULL),
     mValidateSignal(NULL),
     mMouseEnterSignal(NULL),
@@ -258,6 +253,9 @@ LLUICtrl::~LLUICtrl()
     delete mRightMouseDownSignal;
     delete mRightMouseUpSignal;
     delete mDoubleClickSignal;
+
+    // scoped_connection members disconnect from any bound control variables here
+    delete mControlVariables;
 }
 
 void default_commit_handler(LLUICtrl* ctrl, const LLSD& param)
@@ -500,11 +498,20 @@ bool LLUICtrl::postBuild()
     return LLView::postBuild();
 }
 
+LLUICtrl::ControlVariables& LLUICtrl::getControlVars()
+{
+    if (!mControlVariables)
+    {
+        mControlVariables = new ControlVariables();
+    }
+    return *mControlVariables;
+}
+
 bool LLUICtrl::setControlValue(const LLSD& value)
 {
-    if (mControlVariable)
+    if (LLControlVariable* control = getControlVariable())
     {
-        mControlVariable->set(value);
+        control->set(value);
         return true;
     }
     return false;
@@ -512,28 +519,29 @@ bool LLUICtrl::setControlValue(const LLSD& value)
 
 void LLUICtrl::setControlVariable(LLControlVariable* control)
 {
-    if (mControlVariable)
+    if (mControlVariables && mControlVariables->mControlVariable)
     {
         //RN: this will happen in practice, should we try to avoid it?
         //LL_WARNS() << "setControlName called twice on same control!" << LL_ENDL;
-        mControlConnection.disconnect(); // disconnect current signal
-        mControlVariable = NULL;
+        mControlVariables->mControlConnection.disconnect(); // disconnect current signal
+        mControlVariables->mControlVariable = NULL;
     }
 
     if (control)
     {
-        mControlVariable = control;
-        mControlConnection = mControlVariable->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("value")));
-        setValue(mControlVariable->getValue());
+        ControlVariables& vars = getControlVars();
+        vars.mControlVariable = control;
+        vars.mControlConnection = control->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("value")));
+        setValue(control->getValue());
     }
 }
 
 void LLUICtrl::removeControlVariable()
 {
-    if (mControlVariable)
+    if (mControlVariables && mControlVariables->mControlVariable)
     {
-        mControlConnection.disconnect();
-        mControlVariable = NULL;
+        mControlVariables->mControlConnection.disconnect();
+        mControlVariables->mControlVariable = NULL;
     }
 }
 
@@ -560,61 +568,65 @@ void LLUICtrl::setControlName(const std::string& control_name, LLView *context)
 
 void LLUICtrl::setEnabledControlVariable(LLControlVariable* control)
 {
-    if (mEnabledControlVariable)
+    if (mControlVariables && mControlVariables->mEnabledControlVariable)
     {
-        mEnabledControlConnection.disconnect(); // disconnect current signal
-        mEnabledControlVariable = NULL;
+        mControlVariables->mEnabledControlConnection.disconnect(); // disconnect current signal
+        mControlVariables->mEnabledControlVariable = NULL;
     }
     if (control)
     {
-        mEnabledControlVariable = control;
-        mEnabledControlConnection = mEnabledControlVariable->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("enabled")));
-        setEnabled(mEnabledControlVariable->getValue().asBoolean());
+        ControlVariables& vars = getControlVars();
+        vars.mEnabledControlVariable = control;
+        vars.mEnabledControlConnection = control->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("enabled")));
+        setEnabled(control->getValue().asBoolean());
     }
 }
 
 void LLUICtrl::setDisabledControlVariable(LLControlVariable* control)
 {
-    if (mDisabledControlVariable)
+    if (mControlVariables && mControlVariables->mDisabledControlVariable)
     {
-        mDisabledControlConnection.disconnect(); // disconnect current signal
-        mDisabledControlVariable = NULL;
+        mControlVariables->mDisabledControlConnection.disconnect(); // disconnect current signal
+        mControlVariables->mDisabledControlVariable = NULL;
     }
     if (control)
     {
-        mDisabledControlVariable = control;
-        mDisabledControlConnection = mDisabledControlVariable->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("disabled")));
-        setEnabled(!(mDisabledControlVariable->getValue().asBoolean()));
+        ControlVariables& vars = getControlVars();
+        vars.mDisabledControlVariable = control;
+        vars.mDisabledControlConnection = control->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("disabled")));
+        setEnabled(!(control->getValue().asBoolean()));
     }
 }
 
 void LLUICtrl::setMakeVisibleControlVariable(LLControlVariable* control)
 {
-    if (mMakeVisibleControlVariable)
+    if (mControlVariables && mControlVariables->mMakeVisibleControlVariable)
     {
-        mMakeVisibleControlConnection.disconnect(); // disconnect current signal
-        mMakeVisibleControlVariable = NULL;
+        mControlVariables->mMakeVisibleControlConnection.disconnect(); // disconnect current signal
+        mControlVariables->mMakeVisibleControlVariable = NULL;
     }
     if (control)
     {
-        mMakeVisibleControlVariable = control;
-        mMakeVisibleControlConnection = mMakeVisibleControlVariable->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("visible")));
-        setVisible(mMakeVisibleControlVariable->getValue().asBoolean());
+        ControlVariables& vars = getControlVars();
+        vars.mMakeVisibleControlVariable = control;
+        vars.mMakeVisibleControlConnection = control->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("visible")));
+        setVisible(control->getValue().asBoolean());
     }
 }
 
 void LLUICtrl::setMakeInvisibleControlVariable(LLControlVariable* control)
 {
-    if (mMakeInvisibleControlVariable)
+    if (mControlVariables && mControlVariables->mMakeInvisibleControlVariable)
     {
-        mMakeInvisibleControlConnection.disconnect(); // disconnect current signal
-        mMakeInvisibleControlVariable = NULL;
+        mControlVariables->mMakeInvisibleControlConnection.disconnect(); // disconnect current signal
+        mControlVariables->mMakeInvisibleControlVariable = NULL;
     }
     if (control)
     {
-        mMakeInvisibleControlVariable = control;
-        mMakeInvisibleControlConnection = mMakeInvisibleControlVariable->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("invisible")));
-        setVisible(!(mMakeInvisibleControlVariable->getValue().asBoolean()));
+        ControlVariables& vars = getControlVars();
+        vars.mMakeInvisibleControlVariable = control;
+        vars.mMakeInvisibleControlConnection = control->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("invisible")));
+        setVisible(!(control->getValue().asBoolean()));
     }
 }
 

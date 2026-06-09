@@ -156,12 +156,17 @@ LLView::LLView(const LLView::Params& p)
     mUseBoundingRect(p.use_bounding_rect),
     mDefaultTabGroup(p.default_tab_group),
     mLastTabGroup(0),
-    mToolTipMsg((LLStringExplicit)p.tool_tip()),
     mDefaultWidgets(NULL)
 {
     // create rect first, as this will supply initial follows flags
     setShape(p.rect);
     parseFollowsFlags(p);
+
+    // allocate the tooltip holder only when a tooltip is actually provided
+    if (!p.tool_tip().empty())
+    {
+        mToolTipMsg = new LLUIString((LLStringExplicit)p.tool_tip());
+    }
 }
 
 LLView::~LLView()
@@ -194,6 +199,8 @@ LLView::~LLView()
         delete mDefaultWidgets;
         mDefaultWidgets = NULL;
     }
+
+    delete mToolTipMsg;
 }
 
 // virtual
@@ -208,20 +215,36 @@ bool LLView::isPanel() const
     return false;
 }
 
+LLUIString& LLView::getOrCreateToolTipMsg()
+{
+    if (!mToolTipMsg)
+    {
+        mToolTipMsg = new LLUIString();
+    }
+    return *mToolTipMsg;
+}
+
 void LLView::setToolTip(const LLStringExplicit& msg)
 {
-    mToolTipMsg = msg;
+    if (mToolTipMsg)
+    {
+        *mToolTipMsg = msg;
+    }
+    else if (!msg.empty())
+    {
+        mToolTipMsg = new LLUIString(msg);
+    }
 }
 
 bool LLView::setToolTipArg(const LLStringExplicit& key, const LLStringExplicit& text)
 {
-    mToolTipMsg.setArg(key, text);
+    getOrCreateToolTipMsg().setArg(key, text);
     return true;
 }
 
 void LLView::setToolTipArgs( const LLStringUtil::format_map_t& args )
 {
-    mToolTipMsg.setArgList(args);
+    getOrCreateToolTipMsg().setArgList(args);
 }
 
 // virtual
@@ -931,7 +954,7 @@ const std::string LLView::getToolTip() const
         }
     }
 
-    return mToolTipMsg.getString();
+    return mToolTipMsg ? mToolTipMsg->getString() : LLStringUtil::null;
 }
 
 bool LLView::handleToolTip(S32 x, S32 y, MASK mask)
