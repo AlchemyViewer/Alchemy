@@ -167,6 +167,51 @@ LLFolderViewItem::Params::Params()
     max_folder_item_overlap("max_folder_item_overlap", 0)
 { }
 
+//static
+const LLFolderViewItemStyle* LLFolderViewItem::internStyle(const Params& p)
+{
+    // These come from widget params and never change per item, so we share one
+    // immutable instance across every item built from the same params. There are
+    // only a few distinct param sets (inventory items/folders, conversation view,
+    // etc.), so a linear scan is cheap even when building 100k+ items.
+    // Main-thread only (UI construction); no synchronization needed.
+    static std::vector<std::unique_ptr<LLFolderViewItemStyle>> sStyles;
+
+    LLFolderViewItemStyle candidate;
+    candidate.fontColor = p.font_color;
+    candidate.fontHighlightColor = p.font_highlight_color;
+    candidate.itemHeight = p.item_height;
+    candidate.localIndentation = p.folder_indentation;
+    candidate.iconPad = p.icon_pad;
+    candidate.iconWidth = p.icon_width;
+    candidate.textPad = p.text_pad;
+    candidate.textPadTop = p.text_pad_top;
+    candidate.arrowSize = p.arrow_size;
+    candidate.arrowPadTop = p.arrow_pad_top;
+    candidate.maxFolderItemOverlap = p.max_folder_item_overlap;
+
+    for (const std::unique_ptr<LLFolderViewItemStyle>& style : sStyles)
+    {
+        if (style->itemHeight == candidate.itemHeight
+            && style->localIndentation == candidate.localIndentation
+            && style->iconPad == candidate.iconPad
+            && style->iconWidth == candidate.iconWidth
+            && style->textPad == candidate.textPad
+            && style->textPadTop == candidate.textPadTop
+            && style->arrowSize == candidate.arrowSize
+            && style->arrowPadTop == candidate.arrowPadTop
+            && style->maxFolderItemOverlap == candidate.maxFolderItemOverlap
+            && LLInitParam::ParamCompare<LLUIColor, false>::equals(style->fontColor, candidate.fontColor)
+            && LLInitParam::ParamCompare<LLUIColor, false>::equals(style->fontHighlightColor, candidate.fontHighlightColor))
+        {
+            return style.get();
+        }
+    }
+
+    sStyles.push_back(std::make_unique<LLFolderViewItemStyle>(candidate));
+    return sStyles.back().get();
+}
+
 // Default constructor
 LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
 :   LLView(p),
@@ -185,9 +230,8 @@ LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
     mLabelStyle( LLFontGL::NORMAL ),
     pLabelFont(nullptr),
     mHasVisibleChildren(false),
-    mLocalIndentation(p.folder_indentation),
+    mStyle(internStyle(p)),
     mIndentation(0),
-    mItemHeight(p.item_height),
     mControlLabelRotation(0.f),
     mDragAndDropTarget(false),
     mLabel(utf8str_to_wstring(p.name)),
@@ -196,18 +240,7 @@ LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
     mIsMouseOverTitle(false),
     mMarketplaceItem(p.marketplace_item),
     mAllowDrop(p.allow_drop),
-    mFontColor(p.font_color),
-    mFontHighlightColor(p.font_highlight_color),
-    mLeftPad(p.left_pad),
-    mIconPad(p.icon_pad),
-    mIconWidth(p.icon_width),
-    mTextPad(p.text_pad),
-    mTextPadRight(p.text_pad_right),
-    mTextPadTop(p.text_pad_top),
-    mArrowSize(p.arrow_size),
-    mArrowPadTop(p.arrow_pad_top),
     mSingleFolderMode(p.single_folder_mode),
-    mMaxFolderItemOverlap(p.max_folder_item_overlap),
     mDoubleClickOverride(p.double_click_override)
 {
     if (!sColorSetInitialized)
@@ -361,7 +394,10 @@ void LLFolderViewItem::refresh()
     LLFolderViewModelItem& vmi = *getViewModelItem();
 
     mLabel = utf8str_to_wstring(vmi.getDisplayName());
-    mLabelFontBuffer.reset();
+    if (mLabelFontBuffer)
+    {
+        mLabelFontBuffer->reset();
+    }
     mIsFavorite = vmi.isFavorite() && !vmi.isItemInTrash();
     setToolTip(vmi.getName());
     // icons are slightly expensive to get, can be optimized
@@ -377,7 +413,12 @@ void LLFolderViewItem::refresh()
         mLabelStyle = vmi.getLabelStyle();
         pLabelFont = nullptr; // refresh can be called from a coro, don't use getLabelFontForStyle, coro trips font list tread safety
         mLabelSuffix = utf8str_to_wstring(vmi.getLabelSuffix());
-        mSuffixFontBuffer.reset();
+        // Only invalidate cached geometry if the buffer exists; if it doesn't,
+        // draw() will lazily create it. Don't allocate here just to reset it.
+        if (mSuffixFontBuffer)
+        {
+            mSuffixFontBuffer->reset();
+        }
     }
 
     // Dirty the filter flag of the model from the view (CHUI-849)
@@ -445,7 +486,7 @@ void LLFolderViewItem::addToFolder(LLFolderViewFolder* folder)
 
     // Compute indentation since parent folder changed
     mIndentation = (getParentFolder())
-        ? getParentFolder()->getIndentation() + mLocalIndentation
+        ? getParentFolder()->getIndentation() + mStyle->localIndentation
         : 0;
 }
 
@@ -456,7 +497,7 @@ S32 LLFolderViewItem::arrange( S32* width, S32* height )
 {
     // Only indent deeper items in hierarchy
     mIndentation = (getParentFolder())
-        ? getParentFolder()->getIndentation() + mLocalIndentation
+        ? getParentFolder()->getIndentation() + mStyle->localIndentation
         : 0;
     if (mLabelWidthDirty)
     {
@@ -466,7 +507,9 @@ S32 LLFolderViewItem::arrange( S32* width, S32* height )
             // it is purely visual, so it is fine to do at our laisure
             refreshSuffix();
         }
-        mLabelWidth = getLabelXPos() + getLabelFontForStyle(mLabelStyle)->getWidth(mLabel.c_str()) + getLabelFontForStyle(LLFontGL::NORMAL)->getWidth(mLabelSuffix.c_str()) + mLabelPaddingRight;
+        // getLabelFont() is the cached font for mLabelStyle; sSuffixFont is the cached NORMAL-style
+        // font. Both avoid the per-call sFonts map lookup that getLabelFontForStyle() does.
+        mLabelWidth = getLabelXPos() + getLabelFont()->getWidth(mLabel.c_str()) + sSuffixFont->getWidth(mLabelSuffix.c_str()) + mLabelPaddingRight;
         mLabelWidthDirty = false;
         if (mIsFavorite)
         {
@@ -489,22 +532,22 @@ S32 LLFolderViewItem::arrange( S32* width, S32* height )
 
 S32 LLFolderViewItem::getItemHeight() const
 {
-    return mItemHeight;
+    return mStyle->itemHeight;
 }
 
 S32 LLFolderViewItem::getLabelXPos()
 {
-    return getIndentation() + mArrowSize + mTextPad + mIconWidth + mIconPad;
+    return getIndentation() + mStyle->arrowSize + mStyle->textPad + mStyle->iconWidth + mStyle->iconPad;
 }
 
 S32 LLFolderViewItem::getIconPad()
 {
-    return mIconPad;
+    return mStyle->iconPad;
 }
 
 S32 LLFolderViewItem::getTextPad()
 {
-    return mTextPad;
+    return mStyle->textPad;
 }
 
 // *TODO: This can be optimized a lot by simply recording that it is
@@ -675,7 +718,7 @@ bool LLFolderViewItem::handleMouseDown( S32 x, S32 y, MASK mask )
 
 bool LLFolderViewItem::handleHover( S32 x, S32 y, MASK mask )
 {
-    mIsMouseOverTitle = (y > (getRect().getHeight() - mItemHeight));
+    mIsMouseOverTitle = (y > (getRect().getHeight() - mStyle->itemHeight));
 
     if( hasMouseCapture() && isMovable() )
     {
@@ -815,8 +858,8 @@ void LLFolderViewItem::drawOpenFolderArrow()
     if (hasVisibleChildren() || !isFolderComplete())
     {
         gl_draw_scaled_rotated_image(
-            mIndentation, getRect().getHeight() - mArrowSize - mArrowPadTop - sTopPad,
-            mArrowSize, mArrowSize, mControlLabelRotation, sFolderArrowImg->getImage(), sFgColor);
+            mIndentation, getRect().getHeight() - mStyle->arrowSize - mStyle->arrowPadTop - sTopPad,
+            mStyle->arrowSize, mStyle->arrowSize, mControlLabelRotation, sFolderArrowImg->getImage(), sFgColor);
     }
 }
 
@@ -851,7 +894,7 @@ void LLFolderViewItem::drawFavoriteIcon()
         }
         gl_draw_scaled_image(
             x_offset - FAVORITE_IMAGE_SIZE - FAVORITE_IMAGE_PAD,
-            getRect().getHeight() - mItemHeight + FAVORITE_IMAGE_PAD,
+            getRect().getHeight() - mStyle->itemHeight + FAVORITE_IMAGE_PAD,
             FAVORITE_IMAGE_SIZE,
             FAVORITE_IMAGE_SIZE,
             favorite_image->getImage(),
@@ -887,8 +930,8 @@ void LLFolderViewItem::drawHighlight(bool showContent, bool hasKeyboardFocus,
     const LLUIColor& focusOutlineColor, const LLUIColor& mouseOverColor)
 {
     const S32 focus_top = getRect().getHeight();
-    const S32 focus_bottom = getRect().getHeight() - mItemHeight;
-    const bool folder_open = (getRect().getHeight() > mItemHeight + 4);
+    const S32 focus_bottom = getRect().getHeight() - mStyle->itemHeight;
+    const bool folder_open = (getRect().getHeight() > mStyle->itemHeight + 4);
     const S32 FOCUS_LEFT = 1;
 
     // Determine which background color to use for highlighting
@@ -992,12 +1035,30 @@ void LLFolderViewItem::drawHighlight(bool showContent, bool hasKeyboardFocus,
     }
 }
 
+void LLFolderViewItem::setVisible(bool visible)
+{
+    if (!visible)
+    {
+        // Off-screen items don't need cached text geometry; release it (and the
+        // buffer objects themselves). Rebuilt lazily by drawLabel()/draw() if the
+        // item is shown again. Resetting an already-null buffer is a no-op, so the
+        // repeated setVisible(false) calls during folder open/close animation are cheap.
+        mLabelFontBuffer.reset();
+        mSuffixFontBuffer.reset();
+    }
+    LLView::setVisible(visible);
+}
+
 void LLFolderViewItem::drawLabel(const LLFontGL * font, const F32 x, const F32 y, const LLColor4& color, F32 &right_x)
 {
     //--------------------------------------------------------------------------------//
     // Draw the actual label text
     //
-    mLabelFontBuffer.render(font, mLabel, 0, x, y, color,
+    if (!mLabelFontBuffer)
+    {
+        mLabelFontBuffer = std::make_unique<LLFontVertexBuffer>();
+    }
+    mLabelFontBuffer->render(font, mLabel, 0, x, y, color,
         LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
         S32_MAX, getRect().getWidth() - (S32) x - mLabelPaddingRight, &right_x, /*use_ellipses*/true);
 }
@@ -1023,7 +1084,7 @@ void LLFolderViewItem::draw()
     //--------------------------------------------------------------------------------//
     // Draw open icon
     //
-    const S32 icon_x = mIndentation + mArrowSize + mTextPad;
+    const S32 icon_x = mIndentation + mStyle->arrowSize + mStyle->textPad;
     const S32 rect_height = getRect().getHeight();
     if (!mIconOpen.isNull() && (llabs(mControlLabelRotation) > 80)) // For open folders
     {
@@ -1036,7 +1097,10 @@ void LLFolderViewItem::draw()
 
     if (mIconOverlay && getRoot()->showItemLinkOverlays())
     {
-        mIconOverlay->draw(icon_x, rect_height - mIcon->getHeight() - sTopPad + 1);
+        // mIcon may be null (see the 'else if (mIcon)' above); fall back to the
+        // overlay's own height rather than dereferencing a null icon.
+        S32 overlay_icon_height = mIcon ? mIcon->getHeight() : mIconOverlay->getHeight();
+        mIconOverlay->draw(icon_x, rect_height - overlay_icon_height - sTopPad + 1);
     }
 
     //--------------------------------------------------------------------------------//
@@ -1049,7 +1113,7 @@ void LLFolderViewItem::draw()
 
     S32 filter_string_length = mViewModelItem->hasFilterStringMatch() ? (S32)mViewModelItem->getFilterStringSize() : 0;
     F32 right_x  = 0;
-    F32 y = (F32)rect_height - line_height - (F32)mTextPadTop - (F32)sTopPad;
+    F32 y = (F32)rect_height - line_height - (F32)mStyle->textPadTop - (F32)sTopPad;
     F32 text_left = (F32)getLabelXPos();
     LLWString combined_string = mLabel + mLabelSuffix;
 
@@ -1092,7 +1156,7 @@ void LLFolderViewItem::draw()
     LLColor4 color;
     if (mIsSelected && filled)
     {
-        color = mFontHighlightColor;
+        color = mStyle->fontHighlightColor;
     }
     else if (mIsFavorite && highlight_color)
     {
@@ -1100,7 +1164,7 @@ void LLFolderViewItem::draw()
     }
     else
     {
-        color = mFontColor;
+        color = mStyle->fontColor;
     }
 
     if (isFadeItem())
@@ -1115,7 +1179,11 @@ void LLFolderViewItem::draw()
     //
     if (!mLabelSuffix.empty())
     {
-        mSuffixFontBuffer.render(sSuffixFont, mLabelSuffix, 0, right_x, y, isFadeItem() ? color : sSuffixColor.get(),
+        if (!mSuffixFontBuffer)
+        {
+            mSuffixFontBuffer = std::make_unique<LLFontVertexBuffer>();
+        }
+        mSuffixFontBuffer->render(sSuffixFont, mLabelSuffix, 0, right_x, y, isFadeItem() ? color : sSuffixColor.get(),
             LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
             S32_MAX, S32_MAX, &right_x);
     }
@@ -1128,7 +1196,7 @@ void LLFolderViewItem::draw()
         if(mLabelSuffix.empty() || (font == sSuffixFont))
         {
             F32 match_string_left = text_left + font->getWidthF32(combined_string.c_str(), 0, filter_offset + filter_string_length) - font->getWidthF32(combined_string.c_str(), filter_offset, filter_string_length);
-            F32 yy = (F32)rect_height - line_height - (F32)mTextPadTop - (F32)sTopPad;
+            F32 yy = (F32)rect_height - line_height - (F32)mStyle->textPadTop - (F32)sTopPad;
             font->render(combined_string, filter_offset, match_string_left, yy,
                 sFilterTextColor, LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
                 filter_string_length, S32_MAX, &right_x);
@@ -1139,7 +1207,7 @@ void LLFolderViewItem::draw()
             if(label_filter_length > 0)
             {
                 F32 match_string_left = text_left + font->getWidthF32(mLabel.c_str(), 0, filter_offset + label_filter_length) - font->getWidthF32(mLabel.c_str(), filter_offset, label_filter_length);
-                F32 yy = (F32)rect_height - line_height - (F32)mTextPadTop - (F32)sTopPad;
+                F32 yy = (F32)rect_height - line_height - (F32)mStyle->textPadTop - (F32)sTopPad;
                 font->render(mLabel, filter_offset, match_string_left, yy,
                     sFilterTextColor, LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
                     label_filter_length, S32_MAX, &right_x);
@@ -1150,7 +1218,7 @@ void LLFolderViewItem::draw()
             {
                 S32 suffix_offset = llmax(0, filter_offset - (S32)mLabel.size());
                 F32 match_string_left = text_left + font->getWidthF32(mLabel.c_str(), 0, static_cast<S32>(mLabel.size())) + sSuffixFont->getWidthF32(mLabelSuffix.c_str(), 0, suffix_offset + suffix_filter_length) - sSuffixFont->getWidthF32(mLabelSuffix.c_str(), suffix_offset, suffix_filter_length);
-                F32 yy = (F32)rect_height - sSuffixFont->getLineHeight() - (F32)mTextPadTop - (F32)sTopPad;
+                F32 yy = (F32)rect_height - sSuffixFont->getLineHeight() - (F32)mStyle->textPadTop - (F32)sTopPad;
                 sSuffixFont->render(mLabelSuffix, suffix_offset, match_string_left, yy, sFilterTextColor,
                     LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
                     suffix_filter_length, S32_MAX, &right_x);
@@ -1236,7 +1304,7 @@ void LLFolderViewFolder::addToFolder(LLFolderViewFolder* folder)
 
     // Compute indentation since parent folder changed
     mIndentation = (getParentFolder())
-        ? getParentFolder()->getIndentation() + mLocalIndentation
+        ? getParentFolder()->getIndentation() + mStyle->localIndentation
         : 0;
 
     if(isOpen() && folder->isOpen())
@@ -1386,7 +1454,7 @@ S32 LLFolderViewFolder::arrange( S32* width, S32* height )
             folders_t::iterator fit = iter++;
             // number of pixels that bottom of folder label is from top of parent folder
             if (getRect().getHeight() - (*fit)->getRect().mTop + (*fit)->getItemHeight()
-                > ll_round(mCurHeight) + mMaxFolderItemOverlap)
+                > ll_round(mCurHeight) + mStyle->maxFolderItemOverlap)
             {
                 // hide if beyond current folder height
                 (*fit)->setVisible(false);
@@ -1399,7 +1467,7 @@ S32 LLFolderViewFolder::arrange( S32* width, S32* height )
             items_t::iterator iit = iter++;
             // number of pixels that bottom of item label is from top of parent folder
             if (getRect().getHeight() - (*iit)->getRect().mBottom
-                > ll_round(mCurHeight) + mMaxFolderItemOverlap)
+                > ll_round(mCurHeight) + mStyle->maxFolderItemOverlap)
             {
                 (*iit)->setVisible(false);
             }
@@ -1982,7 +2050,16 @@ void LLFolderViewFolder::onIdleUpdateFavorites(void* data)
                 }
                 else
                 {
-                    // Nothing changed
+                    // Nothing changed. On a later iteration 'self' was already
+                    // flagged FAVORITE_CLEANUP before we advanced, but if we bail
+                    // on the very first iteration (parent == self) it never was,
+                    // so clear it here. Otherwise this idle callback stays
+                    // registered and re-scans every frame, never getting removed.
+                    if (parent == self)
+                    {
+                        self->mFavoritesDirtyFlags = 0;
+                        gIdleCallbacks.deleteFunction(&LLFolderViewFolder::onIdleUpdateFavorites, self);
+                    }
                     break;
                 }
             }
@@ -2317,7 +2394,7 @@ bool LLFolderViewFolder::handleRightMouseDown( S32 x, S32 y, MASK mask )
 
 bool LLFolderViewFolder::handleHover(S32 x, S32 y, MASK mask)
 {
-    mIsMouseOverTitle = (y > (getRect().getHeight() - mItemHeight));
+    mIsMouseOverTitle = (y > (getRect().getHeight() - mStyle->itemHeight));
 
     bool handled = LLView::handleHover(x, y, mask);
 
@@ -2339,7 +2416,7 @@ bool LLFolderViewFolder::handleMouseDown( S32 x, S32 y, MASK mask )
     }
     if( !handled )
     {
-        if((mIndentation < x && x < mIndentation + (isCollapsed() ? 0 : mArrowSize) + mTextPad)
+        if((mIndentation < x && x < mIndentation + (isCollapsed() ? 0 : mStyle->arrowSize) + mStyle->textPad)
            && !mSingleFolderMode)
         {
             toggleOpen();
@@ -2398,7 +2475,7 @@ bool LLFolderViewFolder::handleDoubleClick( S32 x, S32 y, MASK mask )
                 return true;
             }
         }
-        if(mIndentation < x && x < mIndentation + (isCollapsed() ? 0 : mArrowSize) + mTextPad)
+        if(mIndentation < x && x < mIndentation + (isCollapsed() ? 0 : mStyle->arrowSize) + mStyle->textPad)
         {
             // don't select when user double-clicks plus sign
             // so as not to contradict single-click behavior
