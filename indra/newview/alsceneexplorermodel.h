@@ -1,0 +1,296 @@
+/**
+ * @file alsceneexplorermodel.h
+ * @brief Folder-view model for the Scene Explorer tree (region -> linkset -> prim, avatars)
+ *
+ * Copyright (c) 2026, Rye Mutt <rye@alchemyviewer.org>
+ *
+ * The source code in this file is provided to you under the terms of the
+ * GNU Lesser General Public License, version 2.1, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ * PARTICULAR PURPOSE. Terms of the LGPL can be found in doc/LGPL-licence.txt
+ * in this distribution, or online at http://www.gnu.org/licenses/lgpl-2.1.txt
+ *
+ */
+#ifndef AL_SCENEEXPLORERMODEL_H
+#define AL_SCENEEXPLORERMODEL_H
+
+#include "../llui/llfolderviewitem.h"
+#include "../llui/llfolderviewmodel.h"
+
+#include "alobjectproperties.h"
+#include "lltimer.h"
+#include "lluuid.h"
+
+class ALFloaterSceneExplorer;
+class ALSceneExplorerItem;
+
+// ============================================================================
+// Sort comparator
+// ============================================================================
+class ALSceneExplorerSort
+{
+public:
+    enum ESortMode : U32
+    {
+        SORT_DISTANCE = 0,
+        SORT_NAME,
+        SORT_LAND_IMPACT,
+        SORT_TRIANGLES,
+        SORT_TYPE
+    };
+
+    ALSceneExplorerSort(ESortMode mode = SORT_DISTANCE) : mMode(mode) {}
+
+    void setMode(ESortMode mode) { mMode = mode; }
+    ESortMode getMode() const { return mMode; }
+
+    bool operator()(const ALSceneExplorerItem* a, const ALSceneExplorerItem* b) const;
+
+private:
+    ESortMode mMode;
+};
+
+// ============================================================================
+// Filter
+// ============================================================================
+class ALSceneExplorerFilter final : public LLFolderViewFilter
+{
+public:
+    enum EOwnerMode : U32
+    {
+        OWNER_ANY = 0,
+        OWNER_MINE,
+        OWNER_GROUP,
+        OWNER_OTHERS
+    };
+
+    ALSceneExplorerFilter();
+    ~ALSceneExplorerFilter() override = default;
+
+    // Predicate setters (called by the floater); each bumps the generation.
+    void setFilterSubString(const std::string& string);
+    void setOwnerMode(EOwnerMode mode);
+    void setGeomMask(U32 mask);     // bits: 1 << ALObjectProperties::EGeom
+    void setFlagMask(U32 mask);     // bits: ALObjectProperties::EFlag (require all)
+    void setRadius(F32 radius, bool limit);
+    bool isLimitRadiusActive() const { return mLimitRadius; }
+
+    // LLFolderViewFilter
+    bool check(const LLFolderViewModelItem* item) override;
+    bool checkFolder(const LLFolderViewModelItem* folder) const override { return true; }
+
+    void setEmptyLookupMessage(const std::string& message) override { mEmptyLookupMessage = message; }
+    std::string getEmptyLookupMessage(bool is_empty_folder = false) const override { return mEmptyLookupMessage; }
+
+    bool showAllResults() const override { return false; }
+
+    std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const override { return std::string::npos; }
+    std::string::size_type getFilterStringSize() const override { return mFilterSubString.size(); }
+
+    bool isActive() const override;
+    bool isModified() const override { return mModified; }
+    void clearModified() override { mModified = false; }
+    const std::string& getName() const override { return mName; }
+    const std::string& getFilterText() override { return mFilterSubString; }
+    void setModified(EFilterModified behavior = FILTER_RESTART) override;
+
+    // Time-slice filtering the way LLInventoryFilter does: each pass gets a few
+    // ms, then bails and resumes next idle, so filtering a 60k-node tree stays
+    // responsive instead of stalling on one frame. Must be a real-time LLTimer:
+    // an LLFrameTimer's clock only advances once per frame, so it could never
+    // expire inside a single pass and the budget would be a no-op.
+    void resetTime(S32 timeout) override
+    {
+        mFilterTime.reset();
+        mFilterTime.setTimerExpirySec((F32)timeout / 1000.f);
+    }
+    bool isTimedOut() override { return mFilterTime.hasExpired(); }
+
+    bool isDefault() const override { return !isActive(); }
+    bool isNotDefault() const override { return isActive(); }
+    void markDefault() override {}
+    void resetDefault() override {}
+
+    S32 getCurrentGeneration() const override { return mGeneration; }
+    S32 getFirstSuccessGeneration() const override { return mGeneration; }
+    S32 getFirstRequiredGeneration() const override { return mGeneration; }
+
+private:
+    bool matches(const ALSceneExplorerItem* item) const;
+
+    std::string mName;
+    std::string mEmptyLookupMessage;
+    std::string mFilterSubString;   // lowercased
+    EOwnerMode  mOwnerMode  = OWNER_ANY;
+    U32         mGeomMask   = 0;
+    U32         mFlagMask   = 0;
+    F32         mRadius     = 64.f;
+    bool        mLimitRadius = false;
+    bool        mModified   = false;
+    S32         mGeneration = 1;
+    LLTimer     mFilterTime;        // per-pass time budget for filter()
+};
+
+// ============================================================================
+// View model
+// ============================================================================
+class ALSceneExplorerViewModel final
+:   public LLFolderViewModel<ALSceneExplorerSort, ALSceneExplorerItem, ALSceneExplorerItem, ALSceneExplorerFilter>
+{
+public:
+    typedef LLFolderViewModel<ALSceneExplorerSort, ALSceneExplorerItem, ALSceneExplorerItem, ALSceneExplorerFilter> base_t;
+
+    ALSceneExplorerViewModel() : base_t(new ALSceneExplorerSort(), new ALSceneExplorerFilter()) {}
+
+    bool startDrag(std::vector<LLFolderViewModelItem*>& items) override { return false; }
+};
+
+// ============================================================================
+// Model item
+// ============================================================================
+class ALSceneExplorerItem final : public LLFolderViewModelItemCommon
+{
+public:
+    enum EItemType : U8
+    {
+        TYPE_REGION = 0,
+        TYPE_CATEGORY_OBJECTS,
+        TYPE_CATEGORY_AVATARS,
+        TYPE_CATEGORY_DERENDERED,
+        TYPE_LINKSET,
+        TYPE_PRIM,
+        TYPE_AVATAR,
+        TYPE_ATTACHMENT_POINT,  // per-avatar attachment-point grouping folder
+        TYPE_ATTACHMENT         // attachment linkset root
+    };
+
+    ALSceneExplorerItem(EItemType type, const LLUUID& id, const std::string& name,
+                        LLFolderViewModelInterface& root_view_model, ALFloaterSceneExplorer* floater);
+
+    // Accessors used by filter / sort / floater
+    EItemType getItemType() const { return mItemType; }
+    bool isContainer() const
+    {
+        return mItemType == TYPE_REGION || isCategory() || mItemType == TYPE_ATTACHMENT_POINT;
+    }
+    bool isCategory() const
+    {
+        return mItemType == TYPE_CATEGORY_OBJECTS
+            || mItemType == TYPE_CATEGORY_AVATARS
+            || mItemType == TYPE_CATEGORY_DERENDERED;
+    }
+    // Folder-ness is fully derived from the item type: structural containers
+    // plus every root scene object (so single- and multi-prim objects sort
+    // together in one widget list). Only child prims are leaf widgets.
+    bool isFolderType() const
+    {
+        return isContainer()
+            || mItemType == TYPE_LINKSET
+            || mItemType == TYPE_AVATAR
+            || mItemType == TYPE_ATTACHMENT;
+    }
+    const LLUUID& getUUID() const { return mUUID; }
+    const ALObjectProperties::Record& getRecord() const { return mRecord; }
+    ALObjectProperties::Record& getRecordRef() { return mRecord; }
+    const std::string& getSearchableText() const { return mSearchable; }
+
+    void setName(const std::string& name);
+    void updateRecord(const ALObjectProperties::Record& rec);
+    // Same, but also adopts @display_name (when non-empty) in the one
+    // rebuildSearchable()/dirtyFilter() pass instead of dirtying twice.
+    void updateRecord(const ALObjectProperties::Record& rec, const std::string& display_name);
+
+    // Index within the parent linkset/avatar child list (1-based; 0 = unset/root).
+    // Used to keep child prims in native link order regardless of the active sort.
+    void setLinkOrder(S32 order) { mLinkOrder = order; }
+    S32  getLinkOrder() const { return mLinkOrder; }
+
+    // Bounded re-request bookkeeping for the floater's property fetch.
+    S32  getPropsRetries() const { return mPropsRetries; }
+    void notePropsRetry() { ++mPropsRetries; }
+
+    // Run the configured activate action (focus/edit/inspect) on this object.
+    // Invoked from the view's double-click paths only — openItem() also fires
+    // when a folder is expanded, which must never trigger activation.
+    void activate();
+
+    // LLFolderViewModelItem (non-Common)
+    const std::string& getName() const override { return mName; }
+    const std::string& getDisplayName() const override { return mName; }
+    const std::string& getSearchableName() const override { return mSearchable; }
+    std::string getSearchableDescription() const override { return mRecord.mDescription; }
+    std::string getSearchableCreatorName() const override { return LLStringUtil::null; }
+    std::string getSearchableUUIDString() const override { return mUUID.asString(); }
+
+    LLPointer<LLUIImage> getIcon() const override;
+    LLFontGL::StyleFlags getLabelStyle() const override;
+    std::string getLabelSuffix() const override;
+
+    void openItem(void) override;
+    void closeItem(void) override {}
+    void selectItem(void) override {}
+    void navigateToFolder(bool new_window = false, bool change_mode = false) override {}
+
+    bool isFavorite() const override { return false; }
+    bool isItemRenameable() const override { return false; }
+    bool renameItem(const std::string& new_name) override { return false; }
+    bool isItemMovable(void) const override { return false; }
+    void move(LLFolderViewModelItem* parent_listener) override {}
+    bool isItemRemovable(bool check_worn = true) const override { return false; }
+    bool isItemInTrash(void) const override { return false; }
+    bool removeItem() override { return false; }
+    void removeBatch(std::vector<LLFolderViewModelItem*>& batch) override {}
+    bool isItemCopyable(bool can_copy_as_link = true) const override { return true; }
+    bool copyToClipboard() const override { return false; }
+    bool cutToClipboard() override { return false; }
+    bool isClipboardPasteable() const override { return false; }
+    void pasteFromClipboard() override {}
+    void pasteLinkFromClipboard() override {}
+    bool isAgentInventory() const override { return false; }
+    bool isAgentInventoryRoot() const override { return false; }
+    void buildContextMenu(LLMenuGL& menu, U32 flags) override {}
+
+    bool hasChildren() const override { return getChildrenCount() > 0; }
+
+    bool dragOrDrop(MASK mask, bool drop, EDragAndDropType cargo_type,
+                    void* cargo_data, std::string& tooltip_msg) override { return false; }
+
+    // Real filtering (mirrors LLFolderViewModelItemInventory::filter).
+    bool filter(LLFolderViewFilter& filter) override;
+
+private:
+    void rebuildSearchable();
+
+    EItemType                   mItemType;
+    LLUUID                      mUUID;
+    std::string                 mName;
+    std::string                 mSearchable;    // lowercased name+desc+uuid
+    S32                         mLinkOrder = 0;
+    S32                         mPropsRetries = 0;
+    ALObjectProperties::Record  mRecord;
+    ALFloaterSceneExplorer*     mFloater;
+};
+
+// ============================================================================
+// Folder widget
+//
+// Scene objects (linksets, single prims, avatars, attachment roots) are all
+// represented as folders so they sort together in one list regardless of prim
+// count (LLFolderViewFolder lays out sub-folders above leaf items, which would
+// otherwise force multi-prim linksets above single prims). Childless folders
+// simply draw no disclosure arrow. This subclass restores leaf-style activation:
+// a double-click acts on the object (focus/edit/inspect) instead of toggling,
+// while the disclosure arrow still expands multi-prim linksets. Structural
+// containers (region/category/attachment-point) keep the default toggle.
+// ============================================================================
+class ALSceneExplorerFolder final : public LLFolderViewFolder
+{
+public:
+    typedef LLFolderViewFolder::Params Params; // LLFolderViewFolder has no Params of its own
+    ALSceneExplorerFolder(const Params& p) : LLFolderViewFolder(p) {}
+    ~ALSceneExplorerFolder() override = default;
+
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+};
+
+#endif // AL_SCENEEXPLORERMODEL_H

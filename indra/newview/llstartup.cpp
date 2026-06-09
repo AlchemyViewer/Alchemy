@@ -151,6 +151,7 @@
 #include "llproductinforequest.h"
 #include "llqueryflags.h"
 #include "llsecapi.h"
+#include "alobjectproperties.h"
 #include "llselectmgr.h"
 #include "llsky.h"
 #include "llstatview.h"
@@ -3019,8 +3020,10 @@ void register_viewer_callbacks(LLMessageSystem* msg)
 
     msg->setHandlerFuncFast(_PREHASH_ImprovedInstantMessage,    process_improved_im);
     msg->setHandlerFuncFast(_PREHASH_ScriptQuestion,            process_script_question);
-    msg->setHandlerFuncFast(_PREHASH_ObjectProperties,          LLSelectMgr::processObjectProperties);
-    msg->setHandlerFuncFast(_PREHASH_ObjectPropertiesFamily,    LLSelectMgr::processObjectPropertiesFamily);
+    // ALObjectPropertiesCache caches object properties for the Scene Explorer
+    // (and other non-selection consumers), then forwards to LLSelectMgr.
+    msg->setHandlerFuncFast(_PREHASH_ObjectProperties,          ALObjectPropertiesCache::processObjectProperties);
+    msg->setHandlerFuncFast(_PREHASH_ObjectPropertiesFamily,    ALObjectPropertiesCache::processObjectPropertiesFamily);
     msg->setHandlerFuncFast(_PREHASH_ForceObjectSelect,         LLSelectMgr::processForceObjectSelect);
 
     msg->setHandlerFuncFast(_PREHASH_MoneyBalanceReply,         process_money_balance_reply);

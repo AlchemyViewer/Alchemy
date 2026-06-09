@@ -2,6 +2,83 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="llsd.xsd">
     <map>
+        <key>ALSceneExplorerActivateAction</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: double-click / Enter action (0=focus, 1=edit, 2=inspect, 3=select).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSceneExplorerFlagFilter</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: feature-flag filter mask (ALObjectProperties::EFlag bits; all set bits required).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSceneExplorerLimitRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: only show objects within ALSceneExplorerRadius meters of the agent.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSceneExplorerOwnerFilter</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: owner filter (0=any, 1=mine, 2=group, 3=others).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSceneExplorerRadius</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: radius in meters for the limit-radius filter.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>64.0</real>
+        </map>
+        <key>ALSceneExplorerShowAvatars</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: include avatars and their attachments in the tree.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALSceneExplorerSortOrder</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: tree sort order (0=distance, 1=name, 2=land impact, 3=triangles, 4=type).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>NumpadControl</key>
         <map>
             <key>Comment</key>

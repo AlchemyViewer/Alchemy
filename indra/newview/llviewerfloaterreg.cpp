@@ -115,6 +115,7 @@
 #include "llfloaterimagepreview.h"
 #include "llfloaterimsession.h"
 #include "llfloaterinspect.h"
+#include "alfloatersceneexplorer.h"
 #include "llfloaterinventorysettings.h"
 #include "llfloaterinventorythumbnailshelper.h"
 #include "llfloaterjoystick.h"
@@ -437,6 +438,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("incoming_call", "floater_incoming_call.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLIncomingCallDialog>);
     LLFloaterReg::add("inventory", "floater_my_inventory.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSidePanelContainer>);
     LLFloaterReg::add("inspect", "floater_inspect.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterInspect>);
+    LLFloaterReg::add("scene_explorer", "floater_scene_explorer.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterSceneExplorer>);
     LLFloaterReg::add("inventory_thumbnails_helper", "floater_inventory_thumbnails_helper.xml", (LLFloaterBuildFunc) &LLFloaterReg::build<LLFloaterInventoryThumbnailsHelper>);
     LLFloaterReg::add("item_properties", "floater_item_properties.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterItemProperties>);
     LLFloaterReg::add("task_properties", "floater_task_properties.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterItemProperties>);

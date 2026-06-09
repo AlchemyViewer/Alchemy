@@ -1128,67 +1128,94 @@ void LLViewerObjectList::fetchObjectCostsCoro(std::string url)
         return;
     }
 
-    LLSD idList(LLSD::emptyArray());
-
-    for (uuid_set_t::iterator it = diff.begin(); it != diff.end(); ++it)
-    {
-        idList.append(*it);
-    }
-
     mPendingObjectCost.insert(diff.begin(), diff.end());
 
-    LLSD postData = LLSD::emptyMap();
+    // The GetObjectCost capability rejects requests that ask for too many
+    // objects at once ("Maximum number of resource cost requests allowed is
+    // 500"), so split large requests into chunks issued sequentially. Stay
+    // comfortably under the limit since it is enforced at the boundary.
+    constexpr size_t MAX_OBJECTS_PER_COST_REQUEST = 256;
 
-    postData["object_ids"] = idList;
-
-    LLSD result = httpAdapter->postAndSuspend(httpRequest, url, postData);
-
-    LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
-    LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
-
-    if (!status || result.has("error"))
+    for (uuid_set_t::iterator chunk_begin = diff.begin(); chunk_begin != diff.end(); )
     {
-        if (result.has("error"))
+        LLSD idList(LLSD::emptyArray());
+        uuid_set_t::iterator it = chunk_begin;
+        for (size_t count = 0; count < MAX_OBJECTS_PER_COST_REQUEST && it != diff.end(); ++count, ++it)
         {
-            LL_WARNS() << "Application level error when fetching object "
-                << "cost.  Message: " << result["error"]["message"].asString()
-                << ", identifier: " << result["error"]["identifier"].asString()
-                << LL_ENDL;
-
-            // TODO*: Adaptively adjust request size if the
-            // service says we've requested too many and retry
+            idList.append(*it);
         }
-        reportObjectCostFailure(idList);
+        chunk_begin = it;
 
-        return;
-    }
+        LLSD postData = LLSD::emptyMap();
+        postData["object_ids"] = idList;
 
-    // Success, grab the resource cost and linked set costs
-    // for an object if one was returned
-    for (LLSD::array_iterator it = idList.beginArray(); it != idList.endArray(); ++it)
-    {
-        LLUUID objectId = it->asUUID();
-
-        // Object could have been added to the mStaleObjectCost after request started
-        mStaleObjectCost.erase(objectId);
-        mPendingObjectCost.erase(objectId);
-
-        // Check to see if the request contains data for the object
-        if (result.has(it->asString()))
+        LLSD result;
+        try
         {
-            LLSD objectData = result[it->asString()];
-
-            F32 linkCost = (F32)objectData["linked_set_resource_cost"].asReal();
-            F32 objectCost = (F32)objectData["resource_cost"].asReal();
-            F32 physicsCost = (F32)objectData["physics_cost"].asReal();
-            F32 linkPhysicsCost = (F32)objectData["linked_set_physics_cost"].asReal();
-
-            gObjectList.updateObjectCost(objectId, objectCost, linkCost, physicsCost, linkPhysicsCost);
+            result = httpAdapter->postAndSuspend(httpRequest, url, postData);
         }
-        else
+        catch (...)
         {
-            // TODO*: Give user feedback about the missing data?
-            gObjectList.onObjectCostFetchFailure(objectId);
+            // Coroutine teardown mid-sequence (e.g. LLCoros::Stop at disconnect).
+            // Retire this run's unresolved ids so they aren't stranded in
+            // mPendingObjectCost, which would exclude them from every future
+            // fetch via the set_difference above.
+            for (LLSD::array_const_iterator cit = idList.beginArray(); cit != idList.endArray(); ++cit)
+            {
+                mPendingObjectCost.erase(cit->asUUID());
+            }
+            for (uuid_set_t::iterator rest = chunk_begin; rest != diff.end(); ++rest)
+            {
+                mPendingObjectCost.erase(*rest);
+            }
+            throw;
+        }
+
+        LLSD httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
+        LLCore::HttpStatus status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
+
+        if (!status || result.has("error"))
+        {
+            if (result.has("error"))
+            {
+                LL_WARNS() << "Application level error when fetching object "
+                    << "cost.  Message: " << result["error"]["message"].asString()
+                    << ", identifier: " << result["error"]["identifier"].asString()
+                    << LL_ENDL;
+            }
+            reportObjectCostFailure(idList);
+
+            // A failed chunk shouldn't abort the remaining ones.
+            continue;
+        }
+
+        // Success, grab the resource cost and linked set costs
+        // for an object if one was returned
+        for (LLSD::array_iterator result_it = idList.beginArray(); result_it != idList.endArray(); ++result_it)
+        {
+            LLUUID objectId = result_it->asUUID();
+
+            // Object could have been added to the mStaleObjectCost after request started
+            mStaleObjectCost.erase(objectId);
+            mPendingObjectCost.erase(objectId);
+
+            // Check to see if the request contains data for the object
+            if (result.has(result_it->asString()))
+            {
+                LLSD objectData = result[result_it->asString()];
+
+                F32 linkCost = (F32)objectData["linked_set_resource_cost"].asReal();
+                F32 objectCost = (F32)objectData["resource_cost"].asReal();
+                F32 physicsCost = (F32)objectData["physics_cost"].asReal();
+                F32 linkPhysicsCost = (F32)objectData["linked_set_physics_cost"].asReal();
+
+                gObjectList.updateObjectCost(objectId, objectCost, linkCost, physicsCost, linkPhysicsCost);
+            }
+            else
+            {
+                // TODO*: Give user feedback about the missing data?
+                gObjectList.onObjectCostFetchFailure(objectId);
+            }
         }
     }
 
