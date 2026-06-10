@@ -1591,8 +1591,22 @@ void LLFloaterTexturePicker::onLocalAssetsChanged()
     {
         if (still_valid)
         {
-            // Keep the user's selection highlighted across the rebuild.
-            mLocalScrollCtrl->setSelectedByValue(sel_value, true);
+            // Keep the user's selection highlighted across the rebuild. The rows
+            // carry map-valued LLSD, which setSelectedByValue() compares via
+            // asString() -- a map stringifies to "", so it would just highlight
+            // the first row. Match the unit id + type manually instead.
+            const LLUUID sel_id = sel_value["id"].asUUID();
+            const S32 sel_type = sel_value["type"].asInteger();
+            std::vector<LLScrollListItem*> items = mLocalScrollCtrl->getAllData();
+            for (size_t i = 0; i < items.size(); ++i)
+            {
+                const LLSD v = items[i]->getValue();
+                if (v.has("id") && v["id"].asUUID() == sel_id && v["type"].asInteger() == sel_type)
+                {
+                    mLocalScrollCtrl->selectNthItem((S32)i);
+                    break;
+                }
+            }
         }
         else
         {
