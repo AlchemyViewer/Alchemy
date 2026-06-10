@@ -69,6 +69,16 @@ bool ALSceneExplorerSort::operator()(const ALSceneExplorerItem* a, const ALScene
         if (ra.mGeom != rb.mGeom)
             return ra.mGeom < rb.mGeom;
         break;
+    case SORT_REGION_ORIGIN:
+    {
+        // Agent-independent ordering for builders: distance from the region's
+        // <0,0,0>, computed from the live region position.
+        const F32 da = ra.mPosRegion.magVecSquared();
+        const F32 db = rb.mPosRegion.magVecSquared();
+        if (da != db)
+            return da < db;
+        break;
+    }
     case SORT_DISTANCE:
     default:
         if (ra.mDistance != rb.mDistance)
@@ -104,6 +114,16 @@ void ALSceneExplorerFilter::setOwnerMode(EOwnerMode mode)
     {
         mOwnerMode = mode;
         setModified(FILTER_RESTART);
+    }
+}
+
+void ALSceneExplorerFilter::setOwnerId(const LLUUID& id)
+{
+    if (id != mOwnerId)
+    {
+        mOwnerId = id;
+        if (mOwnerMode == OWNER_SPECIFIC)
+            setModified(FILTER_RESTART);
     }
 }
 
@@ -175,15 +195,26 @@ bool ALSceneExplorerFilter::matches(const ALSceneExplorerItem* item) const
     if (mFlagMask != 0 && (rec.mFlags & mFlagMask) != mFlagMask)
         return false;
 
-    // Owner predicate only applies once we actually know the owner.
-    if (mOwnerMode != OWNER_ANY && rec.mPropsValid)
+    if (mOwnerMode != OWNER_ANY)
     {
-        switch (mOwnerMode)
+        // Avatars are their own "owner" so owner filters behave sensibly for
+        // them; object rows apply the predicate only once props have arrived.
+        const bool is_avatar = (item->getItemType() == ALSceneExplorerItem::TYPE_AVATAR);
+        const LLUUID& owner = is_avatar ? item->getUUID() : rec.mOwnerId;
+        const bool group_owned = !is_avatar && rec.mGroupOwned;
+        if (is_avatar || rec.mPropsValid)
         {
-        case OWNER_MINE:   if (rec.mOwnerId != gAgentID) return false; break;
-        case OWNER_GROUP:  if (!rec.mGroupOwned) return false; break;
-        case OWNER_OTHERS: if (rec.mOwnerId == gAgentID || rec.mGroupOwned) return false; break;
-        default: break;
+            switch (mOwnerMode)
+            {
+            case OWNER_MINE:   if (owner != gAgentID) return false; break;
+            case OWNER_GROUP:  if (!group_owned) return false; break;
+            case OWNER_OTHERS: if (owner == gAgentID || group_owned) return false; break;
+            case OWNER_SPECIFIC:
+                if (owner != mOwnerId && !(group_owned && rec.mGroupId == mOwnerId))
+                    return false;
+                break;
+            default: break;
+            }
         }
     }
 
@@ -334,6 +365,14 @@ void ALSceneExplorerItem::activate()
     if (mFloater)
     {
         mFloater->activateItem(mUUID);
+    }
+}
+
+void ALSceneExplorerItem::buildContextMenu(LLMenuGL& menu, U32 flags)
+{
+    if (mFloater)
+    {
+        mFloater->buildRowContextMenu(menu, flags);
     }
 }
 

@@ -32,11 +32,12 @@ class ALSceneExplorerSort
 public:
     enum ESortMode : U32
     {
-        SORT_DISTANCE = 0,
+        SORT_DISTANCE = 0,      // from the agent (reorders as the agent moves)
         SORT_NAME,
         SORT_LAND_IMPACT,
         SORT_TRIANGLES,
-        SORT_TYPE
+        SORT_TYPE,
+        SORT_REGION_ORIGIN      // from the region's <0,0,0> (agent-independent)
     };
 
     ALSceneExplorerSort(ESortMode mode = SORT_DISTANCE) : mMode(mode) {}
@@ -61,7 +62,8 @@ public:
         OWNER_ANY = 0,
         OWNER_MINE,
         OWNER_GROUP,
-        OWNER_OTHERS
+        OWNER_OTHERS,
+        OWNER_SPECIFIC      // a single owner/group id ("Filter by this owner")
     };
 
     ALSceneExplorerFilter();
@@ -70,6 +72,7 @@ public:
     // Predicate setters (called by the floater); each bumps the generation.
     void setFilterSubString(const std::string& string);
     void setOwnerMode(EOwnerMode mode);
+    void setOwnerId(const LLUUID& id);  // target for OWNER_SPECIFIC
     void setGeomMask(U32 mask);     // bits: 1 << ALObjectProperties::EGeom
     void setFlagMask(U32 mask);     // bits: ALObjectProperties::EFlag (require all)
     void setRadius(F32 radius, bool limit);
@@ -122,6 +125,7 @@ private:
     std::string mEmptyLookupMessage;
     std::string mFilterSubString;   // lowercased
     EOwnerMode  mOwnerMode  = OWNER_ANY;
+    LLUUID      mOwnerId;           // OWNER_SPECIFIC target
     U32         mGeomMask   = 0;
     U32         mFlagMask   = 0;
     F32         mRadius     = 64.f;
@@ -261,7 +265,10 @@ public:
     void pasteLinkFromClipboard() override {}
     bool isAgentInventory() const override { return false; }
     bool isAgentInventoryRoot() const override { return false; }
-    void buildContextMenu(LLMenuGL& menu, U32 flags) override {}
+    // Forwards to the floater, which shows/hides the shared superset menu per
+    // row type (and stages the row as the live selection for reused viewer
+    // handlers). Also reused by the floater's gear button.
+    void buildContextMenu(LLMenuGL& menu, U32 flags) override;
 
     bool hasChildren() const override { return getChildrenCount() > 0; }
 

@@ -109,6 +109,54 @@ VRAM: [VRAM_USAGE] KB
          width="55"
          sort_column="vramcount_sort"/>
         <scroll_list.columns
+         label="LI"
+         name="land_impact"
+         width="40"
+         tool_tip="Land impact: linkset total on root rows, own contribution on child rows"
+         sort_column="land_impact_sort"/>
+        <scroll_list.columns
+         label="ARC"
+         name="rendercost"
+         width="55"
+         tool_tip="Render cost of this prim"
+         sort_column="rendercost_sort"/>
+        <scroll_list.columns
+         label="Physics"
+         name="physicscost"
+         width="52"
+         sort_column="physicscost_sort"/>
+        <scroll_list.columns
+         label="Stream"
+         name="streamingcost"
+         width="52"
+         sort_column="streamingcost_sort"/>
+        <scroll_list.columns
+         label="Prims"
+         name="primcount"
+         width="45"
+         sort_column="primcount_sort"/>
+        <scroll_list.columns
+         label="Distance"
+         name="distance"
+         width="55"
+         sort_column="distance_sort"/>
+        <scroll_list.columns
+         label="Scripts"
+         name="scripts"
+         width="50" />
+        <scroll_list.columns
+         label="Light/Glow"
+         name="lightglow"
+         width="62" />
+        <scroll_list.columns
+         label="Media"
+         name="media"
+         width="45" />
+        <scroll_list.columns
+         label="Alpha/PBR"
+         name="alphapbr"
+         width="62" />
+        <scroll_list.columns
          label="Creation Date"
          name="creation_date"
          dynamic_width="true"
@@ -136,6 +184,30 @@ VRAM: [VRAM_USAGE] KB
         <scroll_list.columns
          label=""
          name="creation_date_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="land_impact_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="rendercost_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="physicscost_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="streamingcost_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="primcount_sort"
+         width="-1" />
+        <scroll_list.columns
+         label=""
+         name="distance_sort"
          width="-1" />
          <scroll_list.commit_callback
          function="Inspect.SelectObject" />

@@ -30,6 +30,7 @@ class LLAvatarName;
 class LLFolderView;
 class LLFolderViewItem;
 class LLLayoutPanel;
+class LLMenuGL;
 class LLPanel;
 class LLViewerObject;
 
@@ -41,9 +42,17 @@ public:
     void onOpen(const LLSD& key) override;
     void onClose(bool app_quitting) override;
     void draw() override;
+    bool handleKeyHere(KEY key, MASK mask) override;
 
     // Invoked from ALSceneExplorerItem::openItem (double-click / Enter).
     void activateItem(const LLUUID& id);
+
+    // Shows/hides the shared superset menu's entries for the selected row's
+    // type and stages live object rows as the in-world selection so reused
+    // viewer handlers (touch/buy/return/...) and their enable predicates act
+    // on them. Driven by the folder view's right-click popup (via
+    // ALSceneExplorerItem::buildContextMenu) and by the gear button.
+    void buildRowContextMenu(LLMenuGL& menu, U32 flags);
 
 private:
     ALFloaterSceneExplorer(const LLSD& key);
@@ -80,7 +89,12 @@ private:
 
     // --- filters / sort ---------------------------------------------------
     void onFilterChanged();
-    void onSortChanged();
+    void setSortMode(const LLSD& param);
+    bool checkSortMode(const LLSD& param) const;
+    void toggleShow(const LLSD& param);
+    bool checkShow(const LLSD& param) const;
+    void doResetFilters();
+    void doFilterByOwner();
     void updateCategoryCounts();
     void updateActionButtons();
 
@@ -96,11 +110,18 @@ private:
     LLViewerObject* getSelectedObject() const;
     void selectInWorld(const uuid_vec_t& ids);
     void openBuildTools();
+    void onGearMouseDown();
     void doFocus();
     void doEdit();
     void doInspect();
     void doTeleport();
-    void doCopyID();
+    void doSit();
+    void doCopy(const LLSD& param);
+    void doCopyResults();
+    void doShowOnMap();
+    void doBeacon();
+    void doBlockOwner();
+    void doAvatarAction(const LLSD& param);
     void doDerender(const LLSD& param);
     void doRestore();
 
@@ -148,6 +169,8 @@ private:
     LLUUID     mLastButtonStateID;  // selection the action buttons were last gated for
     LLUUID     mLastDetailID;       // selection the detail pane was last built for
     LLUUID     mLastFacesID;        // selection the faces list was last built for
+    LLUUID     mBeaconTrackedID;    // row the location tracker beacon was set for
+    LLUUID     mFilterOwnerId;      // "Filter by this owner" target (session-only)
     LLVector3d mLastFilterAgentPos; // last agent position the radius filter ran at
     bool       mShowAvatars   = true;
     bool       mShowDerendered = false;

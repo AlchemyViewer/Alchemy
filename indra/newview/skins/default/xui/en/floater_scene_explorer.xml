@@ -22,7 +22,19 @@
      text_pad_left="10"
      left="8"
      top="22"
-     width="454" />
+     width="419" />
+    <menu_button
+     follows="top|right"
+     height="22"
+     image_overlay="Conv_toolbar_sort"
+     layout="topleft"
+     menu_filename="menu_scene_explorer_view.xml"
+     menu_position="bottomleft"
+     name="view_btn"
+     tool_tip="View / sort options"
+     left_pad="4"
+     top_delta="0"
+     width="31" />
     <combo_box
      follows="left|top"
      height="22"
@@ -36,21 +48,7 @@
         <combo_box.item label="Owned by me" name="mine" value="1" />
         <combo_box.item label="Group owned" name="group" value="2" />
         <combo_box.item label="Owned by others" name="others" value="3" />
-    </combo_box>
-    <combo_box
-     follows="left|top"
-     height="22"
-     layout="topleft"
-     name="sort_combo"
-     tool_tip="Sort order"
-     left_pad="8"
-     top_delta="0"
-     width="130">
-        <combo_box.item label="Sort: Distance" name="distance" value="0" />
-        <combo_box.item label="Sort: Name" name="name" value="1" />
-        <combo_box.item label="Sort: Land impact" name="li" value="2" />
-        <combo_box.item label="Sort: Triangles" name="tris" value="3" />
-        <combo_box.item label="Sort: Type" name="type" value="4" />
+        <combo_box.item label="Selected owner" name="specific" value="4" />
     </combo_box>
     <check_box
      follows="left|top"
@@ -58,9 +56,9 @@
      label="Scripted"
      layout="topleft"
      name="flag_scripted"
-     left="8"
-     top_pad="6"
-     width="80" />
+     left_pad="8"
+     top_delta="2"
+     width="76" />
     <check_box
      follows="left|top"
      height="18"
@@ -69,7 +67,7 @@
      name="flag_light"
      left_pad="4"
      top_delta="0"
-     width="60" />
+     width="58" />
     <check_box
      follows="left|top"
      height="18"
@@ -82,34 +80,14 @@
     <check_box
      follows="left|top"
      height="18"
-     label="Avatars"
-     layout="topleft"
-     name="show_avatars_check"
-     initial_value="true"
-     left_pad="4"
-     top_delta="0"
-     width="80" />
-    <check_box
-     follows="left|top"
-     height="18"
-     label="Derendered"
-     layout="topleft"
-     name="show_derendered_check"
-     tool_tip="List this region's derendered objects (and derendered avatars) in their own category"
-     left_pad="4"
-     top_delta="0"
-     width="96" />
-    <check_box
-     follows="left|top"
-     height="18"
      label="Within"
      layout="topleft"
      name="limit_radius_check"
      left="8"
-     top_pad="6"
+     top_pad="8"
      width="70" />
     <slider
-     follows="left|top"
+     follows="left|top|right"
      height="18"
      decimal_digits="0"
      increment="1"
@@ -121,7 +99,7 @@
      tool_tip="Radius (m)"
      left_pad="2"
      top_delta="0"
-     width="300" />
+     width="374" />
     <layout_stack
      follows="all"
      layout="topleft"
@@ -130,7 +108,7 @@
      left="8"
      top_pad="6"
      width="454"
-     height="476">
+     height="500">
         <layout_panel
          auto_resize="true"
          height="226"
@@ -598,24 +576,27 @@
           </layout_stack>
         </layout_panel>
     </layout_stack>
-    <button
+    <menu_button
      follows="bottom|left"
      height="23"
-     label="Refresh"
+     image_overlay="OptionsMenu_Off"
      layout="topleft"
-     name="refresh_btn"
+     menu_filename="menu_scene_explorer.xml"
+     menu_position="topleft"
+     name="gear_btn"
+     tool_tip="Actions for the selected row"
      left="8"
      bottom="-8"
-     width="64" />
+     width="31" />
     <button
      follows="bottom|left"
      height="23"
      label="Focus"
      layout="topleft"
      name="focus_btn"
-     left_pad="2"
+     left_pad="4"
      bottom_delta="0"
-     width="56" />
+     width="58" />
     <button
      follows="bottom|left"
      height="23"
@@ -624,7 +605,7 @@
      name="edit_btn"
      left_pad="2"
      bottom_delta="0"
-     width="50" />
+     width="58" />
     <button
      follows="bottom|left"
      height="23"
@@ -637,19 +618,20 @@
     <button
      follows="bottom|left"
      height="23"
+     label="Beacon"
+     layout="topleft"
+     name="beacon_btn"
+     tool_tip="Set a tracking beacon on this row's position; use again to clear"
+     left_pad="2"
+     bottom_delta="0"
+     width="62" />
+    <button
+     follows="bottom|left"
+     height="23"
      label="TP"
      layout="topleft"
      name="teleport_btn"
      left_pad="2"
      bottom_delta="0"
-     width="42" />
-    <button
-     follows="bottom|left"
-     height="23"
-     label="Copy ID"
-     layout="topleft"
-     name="copy_id_btn"
-     left_pad="2"
-     bottom_delta="0"
-     width="64" />
+     width="44" />
 </floater>

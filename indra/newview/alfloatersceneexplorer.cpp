@@ -29,9 +29,12 @@
 #include "llfolderview.h"
 #include "llfolderviewitem.h"
 #include "lllayoutstack.h"
+#include "llmenubutton.h"
+#include "llmenugl.h"
 #include "llscrollcontainer.h"
 #include "llscrolllistctrl.h"
 #include "lltextbox.h"
+#include "lltoggleablemenu.h"
 #include "lltrans.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
@@ -45,16 +48,20 @@
 #include "lltexturectrl.h"
 #include "llviewerinventory.h"
 
+#include "alavataractions.h"
 #include "alderenderlist.h"
 #include "alobjectproperties.h"
 #include "llagent.h"
+#include "llavataractions.h"
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llselectmgr.h"
+#include "llslurl.h"
 #include "lltoolcomp.h"
 #include "lltoolmgr.h"
+#include "lltracker.h"
 #include "llviewercontrol.h"
 #include "llviewerjointattachment.h"
 #include "llviewermenu.h"
@@ -285,12 +292,113 @@ namespace
             return std::string("(object)");
         }
     }
+
+    // ------------------------------------------------------------------
+    // Context / gear menu helpers
+    // ------------------------------------------------------------------
+
+    // Evaluate a globally registered enable predicate (the same ones the pie
+    // and main menus use) against the current selection, so the explorer's
+    // permission gating can never diverge from the rest of the viewer.
+    bool registryEnabled(const std::string& name)
+    {
+        const LLUICtrl::enable_callback_t* cb = LLUICtrl::EnableCallbackRegistry::getValue(name);
+        return cb && (*cb)(nullptr, LLSD());
+    }
+
+    // Restore the all-visible/enabled baseline LLFolderView::updateMenuOptions
+    // establishes before buildContextMenu, so the gear button path starts from
+    // the same state as the right-click popup.
+    void resetMenuEntries(LLMenuGL& menu)
+    {
+        for (LLView* menu_item : *menu.getChildList())
+        {
+            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(menu_item))
+            {
+                if (branch->getBranch())
+                    resetMenuEntries(*branch->getBranch());
+            }
+            menu_item->setVisible(false);
+            menu_item->pushVisible(true);
+            menu_item->setEnabled(true);
+        }
+    }
+
+    // Show only the listed entries (the llinventorybridge hide_context_entries
+    // pattern, local so the explorer doesn't drag the inventory bridge in):
+    // recurses into submenus, drops leading/doubled separators, disables the
+    // entries named in @disabled.
+    void hideMenuEntries(LLMenuGL& menu,
+                         const std::vector<std::string>& show,
+                         const std::vector<std::string>& disabled)
+    {
+        bool prev_was_separator = true;
+        for (LLView* menu_item : *menu.getChildList())
+        {
+            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(menu_item))
+            {
+                if (branch->getBranch())
+                    hideMenuEntries(*branch->getBranch(), show, disabled);
+            }
+
+            const std::string& name = menu_item->getName();
+            bool found = std::find(show.begin(), show.end(), name) != show.end();
+            if (found)
+            {
+                const bool is_separator = dynamic_cast<LLMenuItemSeparatorGL*>(menu_item) != nullptr;
+                found = !(is_separator && prev_was_separator);
+                prev_was_separator = is_separator;
+            }
+
+            if (!found)
+            {
+                // Multi-selection passes call this repeatedly; don't re-hide
+                // an entry an earlier selected item explicitly showed.
+                if (!menu_item->getLastVisible())
+                    menu_item->setVisible(false);
+                menu_item->setEnabled(false);
+            }
+            else
+            {
+                menu_item->setVisible(true);
+                menu_item->pushVisible(true);
+                menu_item->setEnabled(
+                    std::find(disabled.begin(), disabled.end(), name) == disabled.end());
+            }
+        }
+    }
 }
 
 // ============================================================================
 ALFloaterSceneExplorer::ALFloaterSceneExplorer(const LLSD& key)
 :   LLFloater(key)
 {
+    // Registered in the constructor (not postBuild) so the gear / view menu
+    // buttons in the floater XML can resolve these while their menus build.
+    // The same names serve the folder view's right-click popup. Entries the
+    // superset menu reuses from the global registries (Object.Touch,
+    // Object.Return, PayObject, Tools.TakeCopy, ...) resolve through the
+    // default registrar and aren't repeated here.
+    mCommitCallbackRegistrar.add("SceneExplorer.Focus",        boost::bind(&ALFloaterSceneExplorer::doFocus, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Edit",         boost::bind(&ALFloaterSceneExplorer::doEdit, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Inspect",      boost::bind(&ALFloaterSceneExplorer::doInspect, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Teleport",     boost::bind(&ALFloaterSceneExplorer::doTeleport, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Sit",          boost::bind(&ALFloaterSceneExplorer::doSit, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Copy",         boost::bind(&ALFloaterSceneExplorer::doCopy, this, _2));
+    mCommitCallbackRegistrar.add("SceneExplorer.CopyResults",  boost::bind(&ALFloaterSceneExplorer::doCopyResults, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.ShowOnMap",    boost::bind(&ALFloaterSceneExplorer::doShowOnMap, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Beacon",       boost::bind(&ALFloaterSceneExplorer::doBeacon, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.BlockOwner",   boost::bind(&ALFloaterSceneExplorer::doBlockOwner, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.AvatarAction", boost::bind(&ALFloaterSceneExplorer::doAvatarAction, this, _2));
+    mCommitCallbackRegistrar.add("SceneExplorer.FilterByOwner",boost::bind(&ALFloaterSceneExplorer::doFilterByOwner, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Derender",     boost::bind(&ALFloaterSceneExplorer::doDerender, this, _2));
+    mCommitCallbackRegistrar.add("SceneExplorer.Restore",      boost::bind(&ALFloaterSceneExplorer::doRestore, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Refresh",      boost::bind(&ALFloaterSceneExplorer::reconcile, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.SetSort",      boost::bind(&ALFloaterSceneExplorer::setSortMode, this, _2));
+    mCommitCallbackRegistrar.add("SceneExplorer.ToggleShow",   boost::bind(&ALFloaterSceneExplorer::toggleShow, this, _2));
+    mCommitCallbackRegistrar.add("SceneExplorer.ResetFilters", boost::bind(&ALFloaterSceneExplorer::doResetFilters, this));
+    mEnableCallbackRegistrar.add("SceneExplorer.CheckSort",    boost::bind(&ALFloaterSceneExplorer::checkSortMode, this, _2));
+    mEnableCallbackRegistrar.add("SceneExplorer.CheckShow",    boost::bind(&ALFloaterSceneExplorer::checkShow, this, _2));
 }
 
 ALFloaterSceneExplorer::~ALFloaterSceneExplorer()
@@ -314,19 +422,22 @@ bool ALFloaterSceneExplorer::postBuild()
     mShowAvatars = gSavedSettings.getBOOL("ALSceneExplorerShowAvatars");
     mShowDerendered = gSavedSettings.getBOOL("ALSceneExplorerShowDerendered");
 
-    // Push persisted filter/sort state into the controls before wiring the
-    // commit callbacks, so the UI, the saved settings, and the filter object
-    // all agree from the first frame.
-    getChild<LLUICtrl>("show_avatars_check")->setValue(mShowAvatars);
-    getChild<LLUICtrl>("show_derendered_check")->setValue(mShowDerendered);
+    // Push persisted filter state into the controls before wiring the commit
+    // callbacks, so the UI, the saved settings, and the filter object all
+    // agree from the first frame. (Sort mode and the avatar/derendered
+    // toggles live in the view menu now and read their members directly.)
     const U32 flag_mask = gSavedSettings.getU32("ALSceneExplorerFlagFilter");
     getChild<LLUICtrl>("flag_scripted")->setValue((flag_mask & ALObjectProperties::FLAG_SCRIPTED) != 0);
     getChild<LLUICtrl>("flag_light")->setValue((flag_mask & ALObjectProperties::FLAG_LIGHT) != 0);
     getChild<LLUICtrl>("flag_particles")->setValue((flag_mask & ALObjectProperties::FLAG_PARTICLES) != 0);
     getChild<LLUICtrl>("limit_radius_check")->setValue(gSavedSettings.getBOOL("ALSceneExplorerLimitRadius"));
     getChild<LLUICtrl>("radius_slider")->setValue(gSavedSettings.getF32("ALSceneExplorerRadius"));
-    getChild<LLComboBox>("owner_combo")->setCurrentByIndex((S32)gSavedSettings.getU32("ALSceneExplorerOwnerFilter"));
-    getChild<LLComboBox>("sort_combo")->setCurrentByIndex((S32)gSavedSettings.getU32("ALSceneExplorerSortOrder"));
+    // The "Selected owner" mode is session-only (its target id isn't
+    // persisted), so never restore into it.
+    S32 owner_idx = (S32)gSavedSettings.getU32("ALSceneExplorerOwnerFilter");
+    if (owner_idx >= (S32)ALSceneExplorerFilter::OWNER_SPECIFIC)
+        owner_idx = 0;
+    getChild<LLComboBox>("owner_combo")->setCurrentByIndex(owner_idx);
 
     getChild<LLFilterEditor>("filter_input")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
     getChild<LLUICtrl>("owner_combo")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
@@ -335,16 +446,16 @@ bool ALFloaterSceneExplorer::postBuild()
     getChild<LLUICtrl>("flag_scripted")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
     getChild<LLUICtrl>("flag_light")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
     getChild<LLUICtrl>("flag_particles")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
-    getChild<LLUICtrl>("show_avatars_check")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
-    getChild<LLUICtrl>("show_derendered_check")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
-    getChild<LLUICtrl>("sort_combo")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onSortChanged, this));
 
-    getChild<LLButton>("refresh_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::reconcile, this));
     getChild<LLButton>("focus_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::doFocus, this));
     getChild<LLButton>("edit_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::doEdit, this));
     getChild<LLButton>("inspect_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::doInspect, this));
+    getChild<LLButton>("beacon_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::doBeacon, this));
     getChild<LLButton>("teleport_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::doTeleport, this));
-    getChild<LLButton>("copy_id_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::doCopyID, this));
+    // The gear menu is the same superset menu the tree's right-click shows;
+    // refresh its per-row state just before it opens (mouse-down fires ahead
+    // of LLMenuButton::toggleMenu).
+    getChild<LLMenuButton>("gear_btn")->setMouseDownCallback(boost::bind(&ALFloaterSceneExplorer::onGearMouseDown, this));
 
     // Detail pane, received-items style: one layout panel hosts the expander
     // bar + content, and collapses down to just the bar (min_dim) — the bar
@@ -366,15 +477,6 @@ bool ALFloaterSceneExplorer::postBuild()
         getChild<LLUICtrl>(check_name)->setCommitCallback(
             boost::bind(&ALFloaterSceneExplorer::refreshDetail, this));
     }
-
-    // Context-menu commands (menu_scene_explorer.xml, shown by the folder view).
-    mCommitCallbackRegistrar.add("SceneExplorer.Focus",    boost::bind(&ALFloaterSceneExplorer::doFocus, this));
-    mCommitCallbackRegistrar.add("SceneExplorer.Edit",     boost::bind(&ALFloaterSceneExplorer::doEdit, this));
-    mCommitCallbackRegistrar.add("SceneExplorer.Inspect",  boost::bind(&ALFloaterSceneExplorer::doInspect, this));
-    mCommitCallbackRegistrar.add("SceneExplorer.Teleport", boost::bind(&ALFloaterSceneExplorer::doTeleport, this));
-    mCommitCallbackRegistrar.add("SceneExplorer.CopyID",   boost::bind(&ALFloaterSceneExplorer::doCopyID, this));
-    mCommitCallbackRegistrar.add("SceneExplorer.Derender", boost::bind(&ALFloaterSceneExplorer::doDerender, this, _2));
-    mCommitCallbackRegistrar.add("SceneExplorer.Restore",  boost::bind(&ALFloaterSceneExplorer::doRestore, this));
 
     mPropsConn = ALObjectPropertiesCache::instance().setChangeCallback(
         boost::bind(&ALFloaterSceneExplorer::onPropsCacheChanged, this, _1));
@@ -405,10 +507,19 @@ void ALFloaterSceneExplorer::onOpen(const LLSD& key)
 {
     mReconcileTimer.reset();
     reconcile();
+    // Inventory muscle memory: typing starts filtering right away.
+    getChild<LLFilterEditor>("filter_input")->setFocus(true);
 }
 
 void ALFloaterSceneExplorer::onClose(bool app_quitting)
 {
+    // Drop a tracker beacon the explorer set; never clobber one the user set
+    // through the map or a landmark.
+    if (mBeaconTrackedID.notNull())
+    {
+        LLTracker::stopTracking(false);
+        mBeaconTrackedID.setNull();
+    }
 }
 
 void ALFloaterSceneExplorer::draw()
@@ -416,6 +527,16 @@ void ALFloaterSceneExplorer::draw()
     // All discovery / fetch / filter / layout now happens in idleUpdate() (driven
     // by gIdleCallbacks); draw() just renders the current tree state.
     LLFloater::draw();
+}
+
+bool ALFloaterSceneExplorer::handleKeyHere(KEY key, MASK mask)
+{
+    if (key == 'F' && mask == MASK_CONTROL)
+    {
+        getChild<LLFilterEditor>("filter_input")->setFocus(true);
+        return true;
+    }
+    return LLFloater::handleKeyHere(key, mask);
 }
 
 // static
@@ -1174,14 +1295,18 @@ void ALFloaterSceneExplorer::reconcile()
         }
     }
 
-    // Re-sort everything periodically only for the distance key, whose order
-    // shifts as the agent moves. Static keys (name/land-impact/triangles/type)
-    // re-sort per-parent when nodes are added or change, so a full periodic
-    // re-sort would just be wasted work on a large tree. requestSortAll() only
-    // bumps the target sort version — sorting actually runs inside arrange(),
-    // which nothing else re-arms on a quiet tree — so force a re-arrange too,
-    // or the refreshed distances never reorder anything.
-    if (mViewModel.getSorter().getMode() == ALSceneExplorerSort::SORT_DISTANCE)
+    // Re-sort everything periodically only for the position-driven keys:
+    // agent distance shifts as the agent moves, region-origin distance as
+    // objects move (positions were refreshed above either way). Static keys
+    // (name/land-impact/triangles/type) re-sort per-parent when nodes are
+    // added or change, so a full periodic re-sort would just be wasted work
+    // on a large tree. requestSortAll() only bumps the target sort version —
+    // sorting actually runs inside arrange(), which nothing else re-arms on a
+    // quiet tree — so force a re-arrange too, or the refreshed positions
+    // never reorder anything.
+    const ALSceneExplorerSort::ESortMode sort_mode = mViewModel.getSorter().getMode();
+    if (sort_mode == ALSceneExplorerSort::SORT_DISTANCE
+        || sort_mode == ALSceneExplorerSort::SORT_REGION_ORIGIN)
     {
         mViewModel.requestSortAll();
         mTree->arrangeAll();
@@ -1354,7 +1479,12 @@ void ALFloaterSceneExplorer::onFilterChanged()
     ALSceneExplorerFilter& f = mViewModel.getFilter();
     f.setFilterSubString(getChild<LLFilterEditor>("filter_input")->getText());
 
-    const S32 owner_idx = llmax(0, getChild<LLComboBox>("owner_combo")->getCurrentIndex());
+    // "Selected owner" is only meaningful with a target id (set by the
+    // context menu's Filter by This Owner); picked manually it means Any.
+    S32 owner_idx = llmax(0, getChild<LLComboBox>("owner_combo")->getCurrentIndex());
+    if (owner_idx == (S32)ALSceneExplorerFilter::OWNER_SPECIFIC && mFilterOwnerId.isNull())
+        owner_idx = (S32)ALSceneExplorerFilter::OWNER_ANY;
+    f.setOwnerId(mFilterOwnerId);
     f.setOwnerMode((ALSceneExplorerFilter::EOwnerMode)owner_idx);
 
     U32 flags = 0;
@@ -1372,24 +1502,47 @@ void ALFloaterSceneExplorer::onFilterChanged()
     gSavedSettings.setU32("ALSceneExplorerFlagFilter", flags);
     gSavedSettings.setBOOL("ALSceneExplorerLimitRadius", limit);
     gSavedSettings.setF32("ALSceneExplorerRadius", radius);
-
-    const bool show_av = getChild<LLUICtrl>("show_avatars_check")->getValue().asBoolean();
-    if (show_av != mShowAvatars)
-    {
-        mShowAvatars = show_av;
-        gSavedSettings.setBOOL("ALSceneExplorerShowAvatars", show_av);
-        reconcile();
-    }
-
-    const bool show_derendered = getChild<LLUICtrl>("show_derendered_check")->getValue().asBoolean();
-    if (show_derendered != mShowDerendered)
-    {
-        mShowDerendered = show_derendered;
-        gSavedSettings.setBOOL("ALSceneExplorerShowDerendered", show_derendered);
-        syncDerendered();
-    }
     // The filter setters above bumped the filter generation, so the next idle
     // pass (mTree->update()) re-filters and re-arranges.
+}
+
+void ALFloaterSceneExplorer::doResetFilters()
+{
+    getChild<LLFilterEditor>("filter_input")->setText(LLStringUtil::null);
+    getChild<LLComboBox>("owner_combo")->setCurrentByIndex(0);
+    getChild<LLUICtrl>("flag_scripted")->setValue(false);
+    getChild<LLUICtrl>("flag_light")->setValue(false);
+    getChild<LLUICtrl>("flag_particles")->setValue(false);
+    getChild<LLUICtrl>("limit_radius_check")->setValue(false);
+    mFilterOwnerId.setNull();
+    onFilterChanged();
+}
+
+void ALFloaterSceneExplorer::doFilterByOwner()
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+    if (!item || item->isContainer())
+        return;
+
+    // An avatar row is its own owner; object rows use their fetched owner
+    // (the deeding group for group-owned objects).
+    LLUUID owner;
+    if (item->getItemType() == ALSceneExplorerItem::TYPE_AVATAR)
+    {
+        owner = item->getUUID();
+    }
+    else
+    {
+        const ALObjectProperties::Record& rec = item->getRecord();
+        if (rec.mPropsValid)
+            owner = rec.mGroupOwned ? rec.mGroupId : rec.mOwnerId;
+    }
+    if (owner.isNull())
+        return;
+
+    mFilterOwnerId = owner;
+    getChild<LLComboBox>("owner_combo")->setCurrentByIndex((S32)ALSceneExplorerFilter::OWNER_SPECIFIC);
+    onFilterChanged();
 }
 
 void ALFloaterSceneExplorer::updateCategoryCounts()
@@ -1425,12 +1578,17 @@ void ALFloaterSceneExplorer::updateActionButtons()
 
     getChild<LLButton>("focus_btn")->setEnabled(obj != nullptr);
     getChild<LLButton>("edit_btn")->setEnabled(
-        obj && (!RlvActions::isRlvEnabled() || RlvActions::canEdit(obj)));
+        obj && !obj->isAvatar()
+        && (!RlvActions::isRlvEnabled() || RlvActions::canEdit(obj)));
     getChild<LLButton>("inspect_btn")->setEnabled(obj != nullptr);
-    // Teleport works for live objects and for derendered objects via their
+    // Beacon needs a position: live rows have one, derendered objects keep
+    // their stored one, derendered avatars don't.
+    getChild<LLButton>("beacon_btn")->setEnabled(
+        is_row && !item->getRecord().mPosGlobal.isExactlyZero());
+    // Teleport works for live rows and for derendered objects via their
     // stored position.
     getChild<LLButton>("teleport_btn")->setEnabled(obj != nullptr || derendered_obj);
-    getChild<LLButton>("copy_id_btn")->setEnabled(is_row);
+    // Everything else lives in the gear / context menus.
 }
 
 // ============================================================================
@@ -1810,14 +1968,61 @@ void ALFloaterSceneExplorer::fillObjectDetail(ALSceneExplorerItem* item)
     }
 }
 
-void ALFloaterSceneExplorer::onSortChanged()
+namespace
 {
-    const U32 mode = (U32)llmax(0, getChild<LLComboBox>("sort_combo")->getCurrentIndex());
-    mViewModel.getSorter().setMode((ALSceneExplorerSort::ESortMode)mode);
-    gSavedSettings.setU32("ALSceneExplorerSortOrder", mode);
+    ALSceneExplorerSort::ESortMode sortModeFromParam(const LLSD& param)
+    {
+        const std::string key = param.asString();
+        if (key == "name")          return ALSceneExplorerSort::SORT_NAME;
+        if (key == "land_impact")   return ALSceneExplorerSort::SORT_LAND_IMPACT;
+        if (key == "triangles")     return ALSceneExplorerSort::SORT_TRIANGLES;
+        if (key == "type")          return ALSceneExplorerSort::SORT_TYPE;
+        if (key == "region_origin") return ALSceneExplorerSort::SORT_REGION_ORIGIN;
+        return ALSceneExplorerSort::SORT_DISTANCE;
+    }
+}
+
+void ALFloaterSceneExplorer::setSortMode(const LLSD& param)
+{
+    const ALSceneExplorerSort::ESortMode mode = sortModeFromParam(param);
+    mViewModel.getSorter().setMode(mode);
+    gSavedSettings.setU32("ALSceneExplorerSortOrder", (U32)mode);
     mViewModel.requestSortAll();
     if (mTree)
         mTree->arrangeAll();
+}
+
+bool ALFloaterSceneExplorer::checkSortMode(const LLSD& param) const
+{
+    return mViewModel.getSorter().getMode() == sortModeFromParam(param);
+}
+
+void ALFloaterSceneExplorer::toggleShow(const LLSD& param)
+{
+    const std::string key = param.asString();
+    if (key == "avatars")
+    {
+        mShowAvatars = !mShowAvatars;
+        gSavedSettings.setBOOL("ALSceneExplorerShowAvatars", mShowAvatars);
+        reconcile(); // prunes / restores the avatar rows immediately
+    }
+    else if (key == "derendered")
+    {
+        mShowDerendered = !mShowDerendered;
+        gSavedSettings.setBOOL("ALSceneExplorerShowDerendered", mShowDerendered);
+        syncDerendered();
+        updateCategoryCounts();
+    }
+}
+
+bool ALFloaterSceneExplorer::checkShow(const LLSD& param) const
+{
+    const std::string key = param.asString();
+    if (key == "avatars")
+        return mShowAvatars;
+    if (key == "derendered")
+        return mShowDerendered;
+    return false;
 }
 
 // ============================================================================
@@ -2000,13 +2205,340 @@ void ALFloaterSceneExplorer::doTeleport()
     }
 }
 
-void ALFloaterSceneExplorer::doCopyID()
+void ALFloaterSceneExplorer::doSit()
+{
+    LLViewerObject* obj = getSelectedObject();
+    if (!obj || obj->isAvatar())
+        return;
+    // The shared sit handler carries the RLVa / already-sitting handling.
+    handle_object_sit(obj->getID());
+}
+
+void ALFloaterSceneExplorer::doCopy(const LLSD& param)
 {
     ALSceneExplorerItem* item = getSelectedItem();
     if (!item || item->isContainer())
         return;
-    const LLWString wid = utf8str_to_wstring(item->getUUID().asString());
-    LLClipboard::instance().copyToClipboard(wid, 0, (S32)wid.size());
+
+    const ALObjectProperties::Record& rec = item->getRecord();
+    const std::string what = param.asString();
+    std::string out;
+    if (what == "name")
+    {
+        out = item->getName(); // avatar rows are already RLVa-anonymized
+    }
+    else if (what == "uuid")
+    {
+        out = item->getUUID().asString();
+    }
+    else if (what == "pos")
+    {
+        out = llformat("<%.1f, %.1f, %.1f>",
+                       rec.mPosRegion.mV[VX], rec.mPosRegion.mV[VY], rec.mPosRegion.mV[VZ]);
+    }
+    else if (what == "slurl")
+    {
+        // The menu disables this under RLVa @showloc; double-check anyway.
+        if (RlvActions::isRlvEnabled() && !RlvActions::canShowLocation())
+            return;
+        LLViewerRegion* region = gAgent.getRegion();
+        if (!region || rec.mPosGlobal.isExactlyZero())
+            return;
+        out = LLSLURL(region->getName(), rec.mPosGlobal).getSLURLString();
+    }
+    if (out.empty())
+        return;
+
+    const LLWString wout = utf8str_to_wstring(out);
+    LLClipboard::instance().copyToClipboard(wout, 0, (S32)wout.size());
+}
+
+void ALFloaterSceneExplorer::doCopyResults()
+{
+    // Export the rows that pass the current filter (linkset granularity) as
+    // CSV for offline auditing. Owners resolve to a name only when the name
+    // cache already has it; otherwise the UUID still identifies them.
+    std::string out = "Name,Owner,Land Impact,Triangles,Distance (m),UUID\n";
+    auto csv_escape = [](std::string s)
+    {
+        LLStringUtil::replaceString(s, "\"", "\"\"");
+        return "\"" + s + "\"";
+    };
+
+    S32 rows = 0;
+    auto append_category = [&](ALSceneExplorerItem* category)
+    {
+        if (!category)
+            return;
+        for (auto it = category->getChildrenBegin(); it != category->getChildrenEnd(); ++it)
+        {
+            ALSceneExplorerItem* child = static_cast<ALSceneExplorerItem*>(it->get());
+            if (!child->passedFilter())
+                continue;
+            const ALObjectProperties::Record& rec = child->getRecord();
+
+            std::string owner;
+            if (child->getItemType() == ALSceneExplorerItem::TYPE_AVATAR)
+            {
+                owner = child->getName();
+            }
+            else if (rec.mPropsValid)
+            {
+                owner = rec.mGroupOwned ? rec.mGroupId.asString()
+                                        : avatarDisplayName(rec.mOwnerId);
+                if (owner.empty())
+                    owner = rec.mOwnerId.asString();
+            }
+
+            out += csv_escape(child->getName()) + "," + csv_escape(owner) + ","
+                + (rec.mLandImpact > 0.f ? llformat("%.0f", rec.mLandImpact) : std::string())
+                + "," + (rec.mNumTriangles > 0 ? llformat("%u", rec.mNumTriangles) : std::string())
+                + "," + llformat("%.1f", rec.mDistance)
+                + "," + child->getUUID().asString() + "\n";
+            ++rows;
+        }
+    };
+    append_category(mObjectsCategory);
+    append_category(mAvatarsCategory);
+    append_category(mDerenderedCategory);
+    if (!rows)
+        return;
+
+    const LLWString wout = utf8str_to_wstring(out);
+    LLClipboard::instance().copyToClipboard(wout, 0, (S32)wout.size());
+}
+
+void ALFloaterSceneExplorer::doShowOnMap()
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+    if (!item || item->isContainer())
+        return;
+    if (RlvActions::isRlvEnabled() && !RlvActions::canShowLocation())
+        return;
+
+    if (item->getItemType() == ALSceneExplorerItem::TYPE_AVATAR)
+    {
+        LLAvatarActions::showOnMap(item->getUUID());
+        return;
+    }
+    const LLVector3d& pos = item->getRecord().mPosGlobal;
+    if (pos.isExactlyZero())
+        return;
+    LLTracker::trackLocation(pos, item->getName(), LLStringUtil::null, LLTracker::LOCATION_ITEM);
+    mBeaconTrackedID = item->getUUID();
+    LLFloaterReg::showInstance("world_map", "center");
+}
+
+void ALFloaterSceneExplorer::doBeacon()
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+    if (!item || item->isContainer())
+        return;
+
+    // Toggle: a second use on the same row clears its beacon.
+    if (mBeaconTrackedID == item->getUUID())
+    {
+        LLTracker::stopTracking(false);
+        mBeaconTrackedID.setNull();
+        return;
+    }
+    const LLVector3d& pos = item->getRecord().mPosGlobal;
+    if (pos.isExactlyZero())
+        return;
+    LLTracker::trackLocation(pos, item->getName(), LLStringUtil::null, LLTracker::LOCATION_ITEM);
+    mBeaconTrackedID = item->getUUID();
+}
+
+void ALFloaterSceneExplorer::doBlockOwner()
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+    if (!item || item->isContainer())
+        return;
+    const ALObjectProperties::Record& rec = item->getRecord();
+    if (!rec.mPropsValid || rec.mGroupOwned
+        || rec.mOwnerId.isNull() || rec.mOwnerId == gAgentID)
+    {
+        return;
+    }
+    LLAvatarActions::toggleBlock(rec.mOwnerId);
+}
+
+void ALFloaterSceneExplorer::doAvatarAction(const LLSD& param)
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+    if (!item)
+        return;
+    const LLUUID id = item->getUUID();
+    if (id.isNull())
+        return;
+
+    // All of these carry their own permission / RLVa gating and confirmation
+    // dialogs; the menu only decides visibility.
+    const std::string action = param.asString();
+    if      (action == "profile")        LLAvatarActions::showProfile(id);
+    else if (action == "im")             LLAvatarActions::startIM(id);
+    else if (action == "offer_tp")       LLAvatarActions::offerTeleport(id);
+    else if (action == "request_tp")     LLAvatarActions::teleportRequest(id);
+    else if (action == "zoom")           ALAvatarActions::zoomIn(id);
+    else if (action == "teleport_to")    ALAvatarActions::teleportTo(id);
+    else if (action == "freeze")         ALAvatarActions::parcelFreeze(id);
+    else if (action == "eject")          ALAvatarActions::parcelEject(id);
+    else if (action == "estate_tp_home") ALAvatarActions::estateTeleportHome(id);
+    else if (action == "estate_kick")    ALAvatarActions::estateKick(id);
+    else if (action == "estate_ban")     ALAvatarActions::estateBan(id);
+    else if (action == "block")          LLAvatarActions::toggleBlock(id);
+    else if (action == "report")         ALAvatarActions::reportAbuse(id);
+}
+
+// ============================================================================
+// Context / gear menu
+// ============================================================================
+void ALFloaterSceneExplorer::onGearMouseDown()
+{
+    // Mouse-down fires before LLMenuButton::toggleMenu shows the menu, so
+    // this is the per-open hook to mirror the right-click popup's state.
+    LLToggleableMenu* menu = getChild<LLMenuButton>("gear_btn")->getMenu();
+    if (!menu)
+        return;
+    resetMenuEntries(*menu);
+    buildRowContextMenu(*menu, 0);
+}
+
+void ALFloaterSceneExplorer::buildRowContextMenu(LLMenuGL& menu, U32 flags)
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+
+    std::vector<std::string> show;
+    std::vector<std::string> disabled;
+
+    // Structural rows (and no selection at all): tree-level utilities only.
+    if (!item || item->isContainer())
+    {
+        show = { "refresh", "copy_results" };
+        hideMenuEntries(menu, show, disabled);
+        return;
+    }
+
+    const LLUUID id = item->getUUID();
+    const ALObjectProperties::Record& rec = item->getRecord();
+    const bool rlv = RlvActions::isRlvEnabled();
+    const bool can_show_location = !rlv || RlvActions::canShowLocation();
+
+    if (item->isDerenderedType())
+    {
+        show = { "restore_derendered", "sep_derender", "sep_copy", "copy_menu", "copy_name", "copy_uuid" };
+        if (item->getItemType() == ALSceneExplorerItem::TYPE_DERENDERED_OBJECT)
+        {
+            show.insert(show.end(), { "teleport", "show_map", "beacon", "copy_pos", "copy_slurl" });
+            if (!can_show_location)
+                disabled.insert(disabled.end(), { "show_map", "copy_slurl" });
+        }
+        hideMenuEntries(menu, show, disabled);
+        return;
+    }
+
+    if (item->getItemType() == ALSceneExplorerItem::TYPE_AVATAR)
+    {
+        const bool is_self = (id == gAgentID);
+        show = { "focus", "av_zoom", "av_teleport", "show_map", "beacon",
+                 "sep_copy", "copy_menu", "copy_name", "copy_uuid", "copy_pos", "copy_slurl",
+                 "filter_by_owner" };
+        if (!ALAvatarActions::canZoomIn(id))
+            disabled.push_back("av_zoom");
+        if (!ALAvatarActions::canTeleportTo(id))
+            disabled.push_back("av_teleport");
+        if (!can_show_location)
+            disabled.insert(disabled.end(), { "show_map", "copy_slurl" });
+
+        if (is_self)
+        {
+            // Social / moderation actions make no sense on yourself.
+            show.insert(show.begin(), { "av_profile", "sep_avatar_actions" });
+        }
+        else
+        {
+            show.insert(show.begin(), { "av_profile", "av_im", "av_offer_tp", "av_request_tp",
+                                        "sep_avatar_actions" });
+            if (!LLAvatarActions::canOfferTeleport(id))
+                disabled.push_back("av_offer_tp");
+
+            // Admin entries are hidden outright without the matching power.
+            if (ALAvatarActions::canFreezeEject(id))
+                show.insert(show.end(), { "sep_admin", "freeze", "eject" });
+            if (ALAvatarActions::canManageAvatarsEstate(id))
+                show.insert(show.end(), { "sep_admin", "estate_home", "estate_kick", "estate_ban" });
+
+            show.insert(show.end(), { "sep_moderation", "av_block", "av_report" });
+            if (!LLAvatarActions::canBlock(id))
+                disabled.push_back("av_block");
+        }
+        hideMenuEntries(menu, show, disabled);
+        return;
+    }
+
+    // Live object rows (world linkset / child prim / attachment root).
+    LLViewerObject* obj = gObjectList.findObject(id);
+    if (!obj || obj->isDead())
+    {
+        // Row went stale between reconciles; offer the inert copies only.
+        show = { "copy_menu", "copy_name", "copy_uuid", "copy_pos" };
+        hideMenuEntries(menu, show, disabled);
+        return;
+    }
+
+    // Stage the row as the live selection so the reused viewer handlers
+    // (Object.Touch / Object.Return / PayObject / ...) and their registered
+    // enable predicates act on it — the same model as the in-world
+    // right-click, which also selects what it targets.
+    mLastSelectedID = id;
+    uuid_vec_t ids;
+    ids.push_back(id);
+    selectInWorld(ids);
+
+    const bool is_attachment = obj->isAttachment();
+
+    show = { "touch", "open", "buy", "pay", "take_copy", "sep_object_actions",
+             "focus", "edit", "inspect", "teleport", "show_map", "beacon",
+             "sep_copy", "copy_menu", "copy_name", "copy_uuid", "copy_pos", "copy_slurl",
+             "filter_by_owner" };
+    if (!is_attachment)
+    {
+        show.insert(show.begin() + 1, "sit");
+        if (registryEnabled("Object.EnableReturn"))
+            show.insert(show.end(), { "sep_admin", "return" });
+        show.insert(show.end(), { "sep_derender", "derender_temp", "derender_perm" });
+    }
+    show.insert(show.end(), { "sep_moderation", "block_object", "block_owner", "report" });
+
+    if (!(obj->flagHandleTouch() && (!rlv || RlvActions::canTouch(obj))))
+        disabled.push_back("touch");
+    if (rlv && !RlvActions::canSit(obj))
+        disabled.push_back("sit");
+    if (!registryEnabled("Object.EnableOpen"))
+        disabled.push_back("open");
+    if (!registryEnabled("Object.EnableBuy"))
+        disabled.push_back("buy");
+    if (!registryEnabled("EnablePayObject"))
+        disabled.push_back("pay");
+    if (!registryEnabled("Tools.EnableTakeCopy"))
+        disabled.push_back("take_copy");
+    if (rlv && !RlvActions::canEdit(obj))
+        disabled.push_back("edit");
+    if (!registryEnabled("Object.EnableMute"))
+        disabled.push_back("block_object");
+    if (!(rec.mPropsValid && !rec.mGroupOwned
+          && rec.mOwnerId.notNull() && rec.mOwnerId != gAgentID))
+        disabled.push_back("block_owner");
+    if (!registryEnabled("Object.EnableReportAbuse"))
+        disabled.push_back("report");
+    if (!(rec.mPropsValid && (rec.mOwnerId.notNull() || rec.mGroupId.notNull())))
+        disabled.push_back("filter_by_owner");
+    if (!ALDerenderList::canAdd(obj))
+        disabled.insert(disabled.end(), { "derender_temp", "derender_perm" });
+    if (!can_show_location)
+        disabled.insert(disabled.end(), { "show_map", "copy_slurl" });
+
+    hideMenuEntries(menu, show, disabled);
 }
 
 void ALFloaterSceneExplorer::doDerender(const LLSD& param)

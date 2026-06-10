@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!-- Scene Explorer view/sort menu (the filter bar's hamburger button). -->
+<toggleable_menu
+ layout="topleft"
+ name="menu_scene_explorer_view">
+    <menu_item_check
+     label="Sort by Distance"
+     name="sort_distance">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckSort"
+         parameter="distance" />
+        <menu_item_check.on_click
+         function="SceneExplorer.SetSort"
+         parameter="distance" />
+    </menu_item_check>
+    <menu_item_check
+     label="Sort by Distance from Region Origin"
+     name="sort_region_origin"
+     tool_tip="Order by distance from the region's &lt;0,0,0&gt; corner - stable as you move around">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckSort"
+         parameter="region_origin" />
+        <menu_item_check.on_click
+         function="SceneExplorer.SetSort"
+         parameter="region_origin" />
+    </menu_item_check>
+    <menu_item_check
+     label="Sort by Name"
+     name="sort_name">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckSort"
+         parameter="name" />
+        <menu_item_check.on_click
+         function="SceneExplorer.SetSort"
+         parameter="name" />
+    </menu_item_check>
+    <menu_item_check
+     label="Sort by Land Impact"
+     name="sort_land_impact">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckSort"
+         parameter="land_impact" />
+        <menu_item_check.on_click
+         function="SceneExplorer.SetSort"
+         parameter="land_impact" />
+    </menu_item_check>
+    <menu_item_check
+     label="Sort by Triangles"
+     name="sort_triangles">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckSort"
+         parameter="triangles" />
+        <menu_item_check.on_click
+         function="SceneExplorer.SetSort"
+         parameter="triangles" />
+    </menu_item_check>
+    <menu_item_check
+     label="Sort by Type"
+     name="sort_type">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckSort"
+         parameter="type" />
+        <menu_item_check.on_click
+         function="SceneExplorer.SetSort"
+         parameter="type" />
+    </menu_item_check>
+    <menu_item_separator />
+    <menu_item_check
+     label="Show Avatars"
+     name="show_avatars">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckShow"
+         parameter="avatars" />
+        <menu_item_check.on_click
+         function="SceneExplorer.ToggleShow"
+         parameter="avatars" />
+    </menu_item_check>
+    <menu_item_check
+     label="Show Derendered"
+     name="show_derendered">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckShow"
+         parameter="derendered" />
+        <menu_item_check.on_click
+         function="SceneExplorer.ToggleShow"
+         parameter="derendered" />
+    </menu_item_check>
+    <menu_item_separator />
+    <menu_item_call
+     label="Reset Filters"
+     name="reset_filters">
+        <menu_item_call.on_click
+         function="SceneExplorer.ResetFilters" />
+    </menu_item_call>
+    <menu_item_call
+     label="Refresh"
+     name="refresh">
+        <menu_item_call.on_click
+         function="SceneExplorer.Refresh" />
+    </menu_item_call>
+    <menu_item_call
+     label="Copy Results to Clipboard"
+     name="copy_results"
+     tool_tip="Copy the filtered list as CSV (name, owner, LI, triangles, distance, UUID)">
+        <menu_item_call.on_click
+         function="SceneExplorer.CopyResults" />
+    </menu_item_call>
+</toggleable_menu>

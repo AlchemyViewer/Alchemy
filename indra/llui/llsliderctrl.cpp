@@ -302,7 +302,16 @@ void LLSliderCtrl::updateSliderRect()
     }
     if (mTextBox)
     {
-        right -= mTextBox->getRect().getWidth() + sliderctrl_spacing;
+        // Keep the value text pinned to the right edge, the same way the
+        // editable variant above is; without this a resized slider leaves
+        // the text floating at its construction-time offset mid-track.
+        LLRect text_rect = mTextBox->getRect();
+        const S32 text_width = text_rect.getWidth();
+        text_rect.mRight = right;
+        text_rect.mLeft = right - text_width;
+        mTextBox->setRect(text_rect);
+
+        right -= text_width + sliderctrl_spacing;
     }
     if (mLabelBox)
     {

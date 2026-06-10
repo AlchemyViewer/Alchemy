@@ -64,6 +64,7 @@
 #include "llcontrolavatar.h"
 #include "lldrawable.h"
 #include "llface.h"
+#include "llfloaterinspect.h"
 #include "llfloatertools.h"
 #include "llfollowcam.h"
 #include "llhudtext.h"
@@ -3959,14 +3960,29 @@ void LLViewerObject::setObjectCostStale()
     getRootEdit()->mCostStale = true;
 }
 
+// The async GetObjectCost replies land here; the Inspect floater's opt-in
+// cost columns (and the build floater) read them off the selection, so both
+// need a refresh poke when a cost arrives for a selected object.
+static void dirty_cost_floaters()
+{
+    if (gFloaterTools)
+    {
+        gFloaterTools->dirty();
+    }
+    if (LLFloaterInspect* inspect = LLFloaterReg::findTypedInstance<LLFloaterInspect>("inspect"))
+    {
+        inspect->dirty();
+    }
+}
+
 void LLViewerObject::setObjectCost(F32 cost)
 {
     mObjectCost = cost;
     mCostStale = false;
 
-    if (isSelected() && gFloaterTools)
+    if (isSelected())
     {
-        gFloaterTools->dirty();
+        dirty_cost_floaters();
     }
 }
 
@@ -3984,9 +4000,9 @@ void LLViewerObject::setLinksetCost(F32 cost)
         iter++;
     }
 
-    if (needs_refresh && gFloaterTools)
+    if (needs_refresh)
     {
-        gFloaterTools->dirty();
+        dirty_cost_floaters();
     }
 }
 
@@ -3995,9 +4011,9 @@ void LLViewerObject::setPhysicsCost(F32 cost)
     mPhysicsCost = cost;
     mCostStale = false;
 
-    if (isSelected() && gFloaterTools)
+    if (isSelected())
     {
-        gFloaterTools->dirty();
+        dirty_cost_floaters();
     }
 }
 
@@ -4006,9 +4022,9 @@ void LLViewerObject::setLinksetPhysicsCost(F32 cost)
     mLinksetPhysicsCost = cost;
     mCostStale = false;
 
-    if (isSelected() && gFloaterTools)
+    if (isSelected())
     {
-        gFloaterTools->dirty();
+        dirty_cost_floaters();
     }
 }
 

@@ -2602,7 +2602,7 @@
             <key>Type</key>
             <string>U32</string>
             <key>Value</key>
-            <integer>1023</integer>
+            <integer>4095</integer>
         </map>
         <key>ClickingAvatarKeepsCamera</key>
         <map>
