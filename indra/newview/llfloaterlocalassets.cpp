@@ -1230,7 +1230,9 @@ protected:
     }
     LLUUID unitForPath(const std::string& path) const override
     {
-        return LLLocalBitmapMgr::getInstance()->getUnitID(path);
+        // User units only: a mesh-owned import of the same file is a distinct,
+        // read-only unit this tab must neither claim as loaded nor delete.
+        return LLLocalBitmapMgr::getInstance()->getUnitID(path, /*mesh_owned=*/false);
     }
     std::string pathForUnit(const LLUUID& tracking_id) const override
     {
@@ -1284,8 +1286,9 @@ protected:
     }
     LLUUID unitForPath(const std::string& path) const override
     {
-        // A file holds >= 1 material; treat it as loaded if its first material is.
-        return LLLocalGLTFMaterialMgr::getInstance()->getUnitID(path, 0);
+        // A file holds >= 1 material; treat it as loaded if its first USER material
+        // is (a mesh-owned import of the same file is a distinct, read-only set).
+        return LLLocalGLTFMaterialMgr::getInstance()->getUnitID(path, 0, /*mesh_owned=*/false);
     }
     std::string pathForUnit(const LLUUID& tracking_id) const override
     {
@@ -1296,8 +1299,10 @@ protected:
     }
     void unitsForPath(const std::string& path, std::vector<LLUUID>& out) const override
     {
-        // One .gltf/.glb can decode to several material units; remove them all.
-        LLLocalGLTFMaterialMgr::getInstance()->getTrackingIDs(path, out);
+        // One .gltf/.glb can decode to several material units; act on all of the
+        // USER's. Mesh-owned imports of the same file belong to a loaded mesh and
+        // must not be deleted from this tab.
+        LLLocalGLTFMaterialMgr::getInstance()->getTrackingIDs(path, out, /*mesh_owned=*/false);
     }
     std::string iconName() const override
     {

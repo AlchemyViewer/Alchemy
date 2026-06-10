@@ -124,11 +124,15 @@ protected:
     S32          addUnitInternal(const std::string& filename, LLUUID& outID, bool mesh_owned = false); // file can hold multiple materials
 public:
     void         delUnit(LLUUID tracking_id);
-    LLUUID       getUnitID(const std::string& filename, S32 index = 0);
-    // Tracking ids of every unit loaded from a file, in list order. Unlike walking
-    // getUnitID(file, 0..N), this is safe across the index gaps that import-time
-    // deduplication leaves in getIndexInFile().
-    void         getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out);
+    // The lookups below resolve within ONE ownership class: a user-loaded set and a
+    // mesh-owned import of the same file are distinct units (see addUnitInternal),
+    // and an ownership-blind match could hand the Materials tab a mesh's hidden
+    // imports to delete (or bind a mesh's faces to the user's deletable copies).
+    LLUUID       getUnitID(const std::string& filename, S32 index, bool mesh_owned);
+    // Tracking ids of every unit of the class loaded from a file, in list order.
+    // Unlike walking getUnitID(file, 0..N), this is safe across the index gaps
+    // that import-time deduplication leaves in getIndexInFile().
+    void         getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out, bool mesh_owned);
 
     LLUUID       getWorldID(LLUUID tracking_id);
     bool         isMeshOwned(const LLUUID& tracking_id) const; // imported by a local mesh
@@ -136,7 +140,7 @@ public:
     void         getFilenameAndIndex(LLUUID tracking_id, std::string &filename, S32 &index);
     // Map each of a file's materials by name (empty name -> "mat<index>", matching the
     // model loader's face bindings) to its world id, for texturing a local mesh.
-    void         getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out);
+    void         getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out, bool mesh_owned);
     std::vector<std::string> getFilenames() const; // distinct loaded files (persistence)
 
     void         feedScrollList(LLScrollListCtrl* ctrl);

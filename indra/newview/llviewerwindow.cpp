@@ -1584,7 +1584,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropFile(LLWindow 
 
                                 if (LLAssetType::AT_TEXTURE == mDragItems.front().first->getType())
                                 {
-                                    LLUUID idLocalBitmap = LLLocalBitmapMgr::instance().getUnitID(strFilename);
+                                    LLUUID idLocalBitmap = LLLocalBitmapMgr::instance().getUnitID(strFilename, false);
                                     if (idLocalBitmap.isNull())
                                     {
                                         idLocalBitmap = LLLocalBitmapMgr::instance().addUnit(strFilename);
@@ -1598,7 +1598,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropFile(LLWindow 
                                 }
                                 else if (LLAssetType::AT_MATERIAL == mDragItems.front().first->getType())
                                 {
-                                    LLUUID isLocalMat = LLLocalGLTFMaterialMgr::instance().getUnitID(strFilename, 0);
+                                    LLUUID isLocalMat = LLLocalGLTFMaterialMgr::instance().getUnitID(strFilename, 0, false);
                                     if (isLocalMat.isNull())
                                     {
                                         LLLocalGLTFMaterialMgr::instance().addUnit(strFilename, isLocalMat);

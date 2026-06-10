@@ -243,10 +243,16 @@ bool LLLocalGLTFMaterial::loadMaterial()
                     material_name);
             }
 
-            mMaterialName = material_name; // for matching a mesh face's binding name
-            if (!material_name.empty())
+            if (decode_successful)
             {
-                mShortName = gDirUtilp->getBaseFileName(filename_lc, true) + " (" + material_name + ")";
+                // Only commit the binding name on success: a failed re-decode (e.g.
+                // the file locked mid-save, retried later) must not blank the name a
+                // mesh re-bind (getWorldIDsByName) matches faces against.
+                mMaterialName = material_name; // for matching a mesh face's binding name
+                if (!material_name.empty())
+                {
+                    mShortName = gDirUtilp->getBaseFileName(filename_lc, true) + " (" + material_name + ")";
+                }
             }
 
             break;
@@ -532,14 +538,15 @@ std::vector<std::string> LLLocalGLTFMaterialMgr::getFilenames() const
     return out;
 }
 
-LLUUID LLLocalGLTFMaterialMgr::getUnitID(const std::string& filename, S32 index)
+LLUUID LLLocalGLTFMaterialMgr::getUnitID(const std::string& filename, S32 index, bool mesh_owned)
 {
     if (!mMaterialList.empty())
     {
         for (local_list_iter itBitmap = mMaterialList.begin(); mMaterialList.end() != itBitmap; ++itBitmap)
         {
             LLLocalGLTFMaterial* unit = *itBitmap;
-            if (filename == unit->getFilename() && index == unit->getIndexInFile())
+            if (filename == unit->getFilename() && index == unit->getIndexInFile()
+                && unit->isMeshOwned() == mesh_owned)
             {
                 return unit->getTrackingID();
             }
@@ -548,11 +555,11 @@ LLUUID LLLocalGLTFMaterialMgr::getUnitID(const std::string& filename, S32 index)
     return LLUUID::null;
 }
 
-void LLLocalGLTFMaterialMgr::getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out)
+void LLLocalGLTFMaterialMgr::getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out, bool mesh_owned)
 {
     for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
     {
-        if (unit->getFilename() == filename)
+        if (unit->getFilename() == filename && unit->isMeshOwned() == mesh_owned)
         {
             out.push_back(unit->getTrackingID());
         }
@@ -616,12 +623,12 @@ void LLLocalGLTFMaterialMgr::getFilenameAndIndex(LLUUID tracking_id, std::string
     }
 }
 
-void LLLocalGLTFMaterialMgr::getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out)
+void LLLocalGLTFMaterialMgr::getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out, bool mesh_owned)
 {
     for (local_list_iter iter = mMaterialList.begin(); iter != mMaterialList.end(); iter++)
     {
         LLLocalGLTFMaterial* unit = *iter;
-        if (unit->getFilename() != filename)
+        if (unit->getFilename() != filename || unit->isMeshOwned() != mesh_owned)
         {
             continue;
         }

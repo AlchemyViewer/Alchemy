@@ -415,9 +415,14 @@ namespace
 LLUUID LLLocalMesh::registerOwnedBitmap(const std::string& filename, std::vector<LLUUID>& owned)
 {
     LLLocalBitmapMgr* mgr = LLLocalBitmapMgr::getInstance();
-    // Reuse an existing unit for this file (another face of this mesh, a prior
-    // reload, or one the user already loaded) so we don't duplicate it.
-    LLUUID tracking_id = mgr->getUnitID(filename);
+    // Reuse an existing unit for this file -- a prior import (another face of this
+    // mesh or an earlier reload) first, else a copy the user already loaded -- so
+    // we don't duplicate it.
+    LLUUID tracking_id = mgr->getUnitID(filename, /*mesh_owned=*/true);
+    if (tracking_id.isNull())
+    {
+        tracking_id = mgr->getUnitID(filename, /*mesh_owned=*/false);
+    }
     if (tracking_id.isNull())
     {
         tracking_id = mgr->addUnit(filename, /*mesh_owned=*/true);
@@ -440,29 +445,26 @@ void LLLocalMesh::importGLTFMaterials(std::map<std::string, LLUUID>& out_by_name
     // and doesn't count.) Import-time dedup can leave gaps in per-file material
     // indices, so enumerate units by tracking id rather than walking indices.
     std::vector<LLUUID> tids;
-    mgr->getTrackingIDs(mFilename, tids);
-    bool has_mesh_owned = false;
-    for (const LLUUID& tid : tids)
-    {
-        if (mgr->isMeshOwned(tid)) { has_mesh_owned = true; break; }
-    }
-    if (!has_mesh_owned)
+    mgr->getTrackingIDs(mFilename, tids, /*mesh_owned=*/true);
+    if (tids.empty())
     {
         mgr->addUnit(mFilename, /*mesh_owned=*/true);
-        tids.clear();
-        mgr->getTrackingIDs(mFilename, tids);
+        mgr->getTrackingIDs(mFilename, tids, /*mesh_owned=*/true);
     }
 
     // Keep this parse's mesh-owned units referenced (a user-loaded copy is left
     // untracked -- the user owns it; we must not release it on reload/delete).
     for (const LLUUID& tid : tids)
     {
-        if (mgr->isMeshOwned(tid))
-        {
-            track_owned(owned, tid);
-        }
+        track_owned(owned, tid);
     }
-    mgr->getWorldIDsByName(mFilename, out_by_name);
+    // Bind faces to the mesh's own imports; the user's deletable copies are only a
+    // fallback for the corner where the mesh-owned import failed to load.
+    mgr->getWorldIDsByName(mFilename, out_by_name, /*mesh_owned=*/true);
+    if (out_by_name.empty())
+    {
+        mgr->getWorldIDsByName(mFilename, out_by_name, /*mesh_owned=*/false);
+    }
 }
 
 bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)

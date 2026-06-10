@@ -146,7 +146,11 @@ public:
     LLUUID       addUnit(const std::string& filename);
     // Add a unit imported by a local mesh: hidden from the Textures tab + persistence.
     LLUUID       addUnit(const std::string& filename, bool mesh_owned);
-    LLUUID       getUnitID(const std::string& filename);
+    // Resolve a file to its unit of ONE ownership class. A user texture and a
+    // mesh-owned import of the same file are distinct units (see addUnitInternal);
+    // an ownership-blind first-match could hand the Textures tab a mesh's hidden
+    // import to delete (or vice versa), so callers must say which side they want.
+    LLUUID       getUnitID(const std::string& filename, bool mesh_owned);
     void         delUnit(LLUUID tracking_id);
     bool        checkTextureDimensions(std::string filename);
 
