@@ -266,10 +266,12 @@ public:
     // its own instance id. Returns the new copy's linkset root.
     LLViewerObject* spawnInWorld(const LLUUID& tracking_id);
     // Convenience: load each file and spawn it in-world once it finishes loading.
-    void addAndSpawn(const std::vector<std::string>& filenames);
+    // include_joints applies to any file that needs a fresh decode (pass the
+    // persisted joint-position flag for saved rows, like loadPath does).
+    void addAndSpawn(const std::vector<std::string>& filenames, bool include_joints = false);
     // Load a file (if needed) and, once decoded, spawn it and wear it at the given
     // attachment point -- so Attach works on a not-yet-decoded unit.
-    void addAndAttach(const std::string& filename, S32 attach_point);
+    void addAndAttach(const std::string& filename, S32 attach_point, bool include_joints = false);
 
     // The root of (any) one rezzed copy of a unit, or null if it has none -- handy for
     // "is this unit in-world?" checks. Use getSpawnedInstances() to act per copy.

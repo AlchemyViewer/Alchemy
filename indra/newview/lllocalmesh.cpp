@@ -937,57 +937,61 @@ LLUUID LLLocalMeshMgr::addUnitInternal(const std::string& filename, bool include
 
 void LLLocalMeshMgr::delUnit(LLUUID tracking_id)
 {
-    for (local_list_iter iter = mMeshList.begin(); iter != mMeshList.end(); )
+    // Pull the unit out of the list BEFORE any teardown that fires signals
+    // (despawnUnit fires mUnitsChangedSignal; releasing owned imports fires the
+    // bitmap/material managers' signals). Listeners run synchronously and must
+    // never see the dying unit still listed -- the add-only
+    // LLLocalAssetPaths::onUnitsChanged, for one, would re-record its path from
+    // getFilenames() and undo a Remove.
+    LLLocalMesh* unit = nullptr;
+    for (local_list_iter iter = mMeshList.begin(); iter != mMeshList.end(); ++iter)
     {
-        LLLocalMesh* unit = *iter;
-        if (unit->getTrackingID() == tracking_id)
+        if ((*iter)->getTrackingID() == tracking_id)
         {
-            despawnUnit(tracking_id);
-            // Release the mesh-owned local bitmaps + materials imported for this
-            // unit -- but only the ones no OTHER loaded mesh still references.
-            // Imports are deduplicated by file, so two meshes using the same
-            // texture/material share a tracking id; releasing it unconditionally
-            // would strip it from the other mesh too.
-            auto shared_with_other = [&](const LLUUID& import_id) -> bool
+            unit = *iter;
+            mMeshList.erase(iter);
+            break;
+        }
+    }
+    if (unit)
+    {
+        despawnUnit(tracking_id);
+        // Release the mesh-owned local bitmaps + materials imported for this
+        // unit -- but only the ones no OTHER loaded mesh still references.
+        // Imports are deduplicated by file, so two meshes using the same
+        // texture/material share a tracking id; releasing it unconditionally
+        // would strip it from the other mesh too. (The dying unit is already
+        // delisted, so mMeshList holds only the others.)
+        auto shared_with_other = [&](const LLUUID& import_id) -> bool
+        {
+            for (const LLLocalMesh* other : mMeshList)
             {
-                for (const LLLocalMesh* other : mMeshList)
+                for (const LLUUID& bid : other->mOwnedBitmaps)
                 {
-                    if (other == unit)
-                    {
-                        continue;
-                    }
-                    for (const LLUUID& bid : other->mOwnedBitmaps)
-                    {
-                        if (bid == import_id) return true;
-                    }
-                    for (const LLUUID& mid : other->mOwnedMaterials)
-                    {
-                        if (mid == import_id) return true;
-                    }
+                    if (bid == import_id) return true;
                 }
-                return false;
-            };
-            for (const LLUUID& bid : unit->mOwnedBitmaps)
-            {
-                if (!shared_with_other(bid))
+                for (const LLUUID& mid : other->mOwnedMaterials)
                 {
-                    LLLocalBitmapMgr::getInstance()->delUnit(bid);
+                    if (mid == import_id) return true;
                 }
             }
-            for (const LLUUID& mid : unit->mOwnedMaterials)
-            {
-                if (!shared_with_other(mid))
-                {
-                    LLLocalGLTFMaterialMgr::getInstance()->delUnit(mid);
-                }
-            }
-            iter = mMeshList.erase(iter);
-            delete unit;
-        }
-        else
+            return false;
+        };
+        for (const LLUUID& bid : unit->mOwnedBitmaps)
         {
-            ++iter;
+            if (!shared_with_other(bid))
+            {
+                LLLocalBitmapMgr::getInstance()->delUnit(bid);
+            }
         }
+        for (const LLUUID& mid : unit->mOwnedMaterials)
+        {
+            if (!shared_with_other(mid))
+            {
+                LLLocalGLTFMaterialMgr::getInstance()->delUnit(mid);
+            }
+        }
+        delete unit;
     }
 
     if (mMeshList.empty())
@@ -2020,7 +2024,7 @@ void LLLocalMeshMgr::doUpdates()
     }
 }
 
-void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames)
+void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames, bool include_joints)
 {
     for (const std::string& filename : filenames)
     {
@@ -2028,7 +2032,7 @@ void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames)
         {
             continue;
         }
-        const LLUUID tracking_id = addUnit(filename);
+        const LLUUID tracking_id = addUnit(filename, include_joints);
         if (tracking_id.notNull())
         {
             if (LLLocalMesh* unit = getUnit(tracking_id))
@@ -2039,13 +2043,13 @@ void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames)
     }
 }
 
-void LLLocalMeshMgr::addAndAttach(const std::string& filename, S32 attach_point)
+void LLLocalMeshMgr::addAndAttach(const std::string& filename, S32 attach_point, bool include_joints)
 {
     if (filename.empty())
     {
         return;
     }
-    const LLUUID tracking_id = addUnit(filename); // dedups: existing unit if already loaded
+    const LLUUID tracking_id = addUnit(filename, include_joints); // dedups: existing unit if already loaded
     LLLocalMesh* unit = tracking_id.notNull() ? getUnit(tracking_id) : nullptr;
     if (!unit)
     {
