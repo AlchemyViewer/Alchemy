@@ -1591,47 +1591,80 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
     }
 }
 
-namespace
+// Hot-swap diff-restore state: each spawned prim's live face state, captured
+// BEFORE the reload's ingestScene commits (ingest releases dropped imports,
+// whose teardown already swaps live faces to IMG_DEFAULT -- a capture taken
+// after that would record the reset as if the user had applied it), plus the
+// OLD parts' imported materials to diff user edits against.
+struct LLLocalMeshPreSwapSnapshot
 {
-// A face's user-visible render state, snapshotted so user edits survive a hot-swap:
-// applyPartGeometry re-applies the file's imported materials and resets every face,
-// which would otherwise wipe textures/materials/glow/etc. the user applied to the
-// in-world preview.
-struct PreservedFace
-{
-    LLTextureEntry te;            // diffuse id, color, glow, bump/shiny/fullbright, transforms, Blinn-Phong material, glTF override
-    LLUUID         render_mat_id; // glTF render material id (kept in the param block, not the TE)
+    struct Face
+    {
+        LLTextureEntry mTE;          // diffuse id, color, glow, bump/shiny/fullbright, transforms, Blinn-Phong material, glTF override
+        LLUUID         mRenderMatID; // glTF render material id (kept in the param block, not the TE)
+    };
+    typedef std::vector<Face> PrimFaces;
+
+    std::map<LLUUID, std::vector<PrimFaces>>          mCaptured;    // per copy (instance id), per prim
+    std::vector<std::vector<LLLocalMeshFaceMaterial>> mOldImported; // per part: the old file's materials
 };
 
-std::vector<PreservedFace> capturePreservedFaces(LLVOVolume* vol)
+namespace
 {
-    std::vector<PreservedFace> out;
-    const U8 n = vol->getNumTEs();
-    out.reserve(n);
-    for (U8 i = 0; i < n; ++i)
-    {
-        PreservedFace pf;
-        if (const LLTextureEntry* tep = vol->getTE(i))
-        {
-            pf.te = *tep;
-        }
-        pf.render_mat_id = vol->getRenderMaterialID(i);
-        out.push_back(pf);
-    }
-    return out;
-}
-
-void restorePreservedFaces(LLVOVolume* vol, const std::vector<PreservedFace>& saved)
+// Re-apply the user's in-world face edits on top of the freshly applied file
+// materials. applyPartGeometry() has just written the NEW file's imported state
+// (texture/color/fullbright/render material); for those fields a captured value
+// is restored only when it differs from what the OLD file had imported -- i.e.
+// only when the user actually changed it. Restoring them wholesale overwrote
+// every file-level material edit with pre-reload state, so material changes in
+// the source file never showed on spawned copies. Fields no import can author
+// (glow, texture transforms, bump/shiny, Blinn-Phong maps, glTF overrides) are
+// user state, restored as-is.
+void restorePreservedFaces(LLVOVolume* vol,
+                           const LLLocalMeshPreSwapSnapshot::PrimFaces& saved,
+                           const std::vector<LLLocalMeshFaceMaterial>* old_imported)
 {
+    LLLocalBitmapMgr* bitmap_mgr = LLLocalBitmapMgr::getInstance();
     const U8 n = vol->getNumTEs();
     bool any_render_mat = false;
     for (U8 i = 0; i < n && i < (U8)saved.size(); ++i)
     {
-        const LLTextureEntry& te = saved[i].te;
-        vol->setTETexture(i, te.getID());
-        vol->setTEColor(i, te.getColor());
+        const LLTextureEntry& te = saved[i].mTE;
+
+        // What the OLD file had applied to this face, with applyPartGeometry()'s
+        // fallbacks -- captured values equal to these are imports, not user edits.
+        const LLLocalMeshFaceMaterial* old_fm =
+            (old_imported && i < (U8)old_imported->size()) ? &(*old_imported)[i] : nullptr;
+        const LLUUID   old_tex        = (old_fm && old_fm->mDiffuseID.notNull()) ? old_fm->mDiffuseID : IMG_DEFAULT;
+        const LLColor4 old_color      = old_fm ? old_fm->mDiffuseColor : LLColor4::white;
+        const bool     old_fullbright = old_fm && old_fm->mFullbright;
+        const LLUUID   old_render_mat = old_fm ? old_fm->mRenderMaterialID : LLUUID();
+
+        // Local-bitmap world ids rotate on the texture's own live reload; compare
+        // tracking ids too so that churn doesn't read as a user edit.
+        bool tex_is_user_edit = te.getID() != old_tex;
+        if (tex_is_user_edit)
+        {
+            const LLUUID cap_track = bitmap_mgr->getTrackingID(te.getID());
+            tex_is_user_edit = cap_track.isNull() || cap_track != bitmap_mgr->getTrackingID(old_tex);
+        }
+        if (tex_is_user_edit)
+        {
+            vol->setTETexture(i, te.getID());
+        }
+        if (te.getColor() != old_color)
+        {
+            vol->setTEColor(i, te.getColor());
+        }
+        if (((bool)te.getFullbright()) != old_fullbright)
+        {
+            vol->setTEFullbright(i, te.getFullbright());
+        }
+
+        // User-only state: no import path authors these.
         vol->setTEGlow(i, te.getGlow());
-        vol->setTEBumpShinyFullbright(i, te.getBumpShinyFullbright());
+        vol->setTEBumpmap(i, te.getBumpmap());
+        vol->setTEShiny(i, te.getShiny());
         F32 ss = 1.f, st = 1.f, os = 0.f, ot = 0.f;
         te.getScale(&ss, &st);
         te.getOffset(&os, &ot);
@@ -1642,16 +1675,19 @@ void restorePreservedFaces(LLVOVolume* vol, const std::vector<PreservedFace>& sa
         {
             vol->setTEMaterialParams(i, te.getMaterialParams()); // Blinn-Phong normal/specular
         }
-        if (saved[i].render_mat_id.notNull())
+
+        if (saved[i].mRenderMatID.notNull() && saved[i].mRenderMatID != old_render_mat)
         {
-            // glTF PBR material (+ override); client-only, so update_server=false.
-            vol->setRenderMaterialID((S32)i, saved[i].render_mat_id, false, true);
-            if (const LLGLTFMaterial* ov = te.getGLTFMaterialOverride())
-            {
-                LLPointer<LLGLTFMaterial> ovp = new LLGLTFMaterial(*ov);
-                vol->setTEGLTFMaterialOverride(i, ovp);
-            }
+            // The user applied this material over the import; keep it showing.
+            // Client-only, so update_server=false.
+            vol->setRenderMaterialID((S32)i, saved[i].mRenderMatID, false, true);
             any_render_mat = true;
+        }
+        if (const LLGLTFMaterial* ov = te.getGLTFMaterialOverride())
+        {
+            // Overrides are user edits (imports never author them).
+            LLPointer<LLGLTFMaterial> ovp = new LLGLTFMaterial(*ov);
+            vol->setTEGLTFMaterialOverride(i, ovp);
         }
     }
     if (any_render_mat)
@@ -1662,7 +1698,48 @@ void restorePreservedFaces(LLVOVolume* vol, const std::vector<PreservedFace>& sa
 }
 } // namespace
 
-bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
+void LLLocalMeshMgr::capturePreSwap(const LLUUID& tracking_id, const LLLocalMesh& unit,
+                                    LLLocalMeshPreSwapSnapshot& out) const
+{
+    for (const LLLocalMeshPart& part : unit.getParts())
+    {
+        out.mOldImported.push_back(part.mFaceMaterials);
+    }
+    for (const auto& entry : mSpawnedCopies)
+    {
+        const SpawnedCopy& copy = entry.second;
+        if (copy.mTrackingID != tracking_id)
+        {
+            continue;
+        }
+        std::vector<LLLocalMeshPreSwapSnapshot::PrimFaces> prims;
+        prims.reserve(copy.mPrims.size());
+        for (const LLPointer<LLViewerObject>& p : copy.mPrims)
+        {
+            LLLocalMeshPreSwapSnapshot::PrimFaces faces;
+            LLVOVolume* vol = (p.notNull() && !p->isDead()) ? dynamic_cast<LLVOVolume*>(p.get()) : nullptr;
+            if (vol)
+            {
+                const U8 n = vol->getNumTEs();
+                faces.reserve(n);
+                for (U8 i = 0; i < n; ++i)
+                {
+                    LLLocalMeshPreSwapSnapshot::Face f;
+                    if (const LLTextureEntry* tep = vol->getTE(i))
+                    {
+                        f.mTE = *tep;
+                    }
+                    f.mRenderMatID = vol->getRenderMaterialID(i);
+                    faces.push_back(f);
+                }
+            }
+            prims.push_back(std::move(faces));
+        }
+        out.mCaptured.emplace(entry.first, std::move(prims));
+    }
+}
+
+bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id, const LLLocalMeshPreSwapSnapshot& pre_swap)
 {
     LLLocalMesh* unit = getUnit(tracking_id);
     if (!unit || !unit->getValid())
@@ -1713,12 +1790,17 @@ bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
                 return false; // a dead/unexpected prim -> let the caller re-spawn
             }
             vol->setScale(parts[i].mScale, false);
-            // Preserve user-applied face params (diffuse/normal/specular/glow/color/
-            // render material/transforms) across the swap -- applyPartGeometry resets
-            // every face to the file's imported material.
-            std::vector<PreservedFace> preserved = capturePreservedFaces(vol);
+            // Apply the new file's geometry + materials, then diff-restore the
+            // user's face edits over them (see restorePreservedFaces). The live
+            // state was captured pre-ingest in onLoadResult.
             applyPartGeometry(vol, parts[i]);
-            restorePreservedFaces(vol, preserved);
+            auto cap_it = pre_swap.mCaptured.find(entry.first);
+            if (cap_it != pre_swap.mCaptured.end() && i < cap_it->second.size())
+            {
+                const std::vector<LLLocalMeshFaceMaterial>* old_imported =
+                    (i < pre_swap.mOldImported.size()) ? &pre_swap.mOldImported[i] : nullptr;
+                restorePreservedFaces(vol, cap_it->second[i], old_imported);
+            }
         }
     }
 
@@ -1959,6 +2041,17 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
 
     const bool reloading = unit->isReloading();
     const bool parse_ok  = (load_state < LLModelLoader::ERROR_PARSING) && !scene.empty();
+
+    // Snapshot the spawned copies' live face state and the old parts' imported
+    // materials BEFORE ingestScene commits: the hot-swap diff-restore needs both
+    // to tell user edits from file changes, and ingest's release of dropped
+    // imports already resets live faces as the dying units tear down.
+    LLLocalMeshPreSwapSnapshot pre_swap;
+    if (reloading && parse_ok)
+    {
+        capturePreSwap(tracking_id, *unit, pre_swap);
+    }
+
     const bool assembled = parse_ok && unit->ingestScene(scene);
 
     if (!parse_ok)
@@ -1978,7 +2071,7 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
             // if the preview was worn). Not spawned -> just keep the rebuilt data.
             if (getSpawnedRoot(tracking_id))
             {
-                if (!hotSwapInWorld(tracking_id))
+                if (!hotSwapInWorld(tracking_id, pre_swap))
                 {
                     respawnInstancesInPlace(tracking_id); // prim count changed -> re-rez each copy
                 }

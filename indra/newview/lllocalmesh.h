@@ -60,6 +60,7 @@ class LLViewerRegion;
 class LLVOAvatar;
 class LLVOVolume;
 class LLVolume;
+struct LLLocalMeshPreSwapSnapshot; // hot-swap diff-restore state (lllocalmesh.cpp)
 
 // One uploadable sub-mesh of a local mesh file: a single LLModel's geometry,
 // normalized to a unit box (as the upload path does), plus where it sits within
@@ -344,8 +345,16 @@ private:
     // Reload every spawned copy of a unit in place by pointing each existing prim at
     // the freshly decoded geometry (new sculpt id) instead of despawning -- so
     // attachment, selection and transform are preserved and there's no flicker.
+    // pre_swap carries the state captured before ingestScene committed; the
+    // diff-restore re-applies only the user's face edits over the new file state.
     // Returns false if the prim count changed (caller falls back to a re-spawn).
-    bool hotSwapInWorld(const LLUUID& tracking_id);
+    bool hotSwapInWorld(const LLUUID& tracking_id, const LLLocalMeshPreSwapSnapshot& pre_swap);
+    // Snapshot, BEFORE a reload's ingestScene commits, everything the hot-swap
+    // diff-restore needs: each spawned prim's live face state and the old parts'
+    // imported materials (ingest releases dropped imports, whose teardown already
+    // resets live faces -- a later capture would mistake that for user state).
+    void capturePreSwap(const LLUUID& tracking_id, const LLLocalMesh& unit,
+                        LLLocalMeshPreSwapSnapshot& out) const;
     // Re-rez every existing copy of a unit at its current transform/attachment, used
     // when a reload changes the prim count so hot-swap can't swap 1:1.
     void respawnInstancesInPlace(const LLUUID& tracking_id);
