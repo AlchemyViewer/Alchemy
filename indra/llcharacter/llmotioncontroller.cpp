@@ -336,6 +336,27 @@ void LLMotionController::removeMotionInstance(LLMotion* motionp)
 }
 
 //-----------------------------------------------------------------------------
+// purgeMotionInstances()
+//-----------------------------------------------------------------------------
+void LLMotionController::purgeMotionInstances(const LLUUID& id)
+{
+    removeMotion(id);
+    for (motion_set_t::iterator iter = mDeprecatedMotions.begin();
+         iter != mDeprecatedMotions.end(); )
+    {
+        motion_set_t::iterator cur_iter = iter++;
+        LLMotion* motionp = *cur_iter;
+        if (motionp->getID() == id)
+        {
+            // The same complete excision deactivateMotionInstance() applies to
+            // deprecated motions; removeMotionInstance() deactivates if needed.
+            removeMotionInstance(motionp); // does not touch mDeprecatedMotions
+            mDeprecatedMotions.erase(cur_iter);
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
 // createMotion()
 //-----------------------------------------------------------------------------
 LLMotion* LLMotionController::createMotion( const LLUUID &id )

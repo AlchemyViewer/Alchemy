@@ -133,6 +133,11 @@ public:
 
     void removeMotion( const LLUUID& id );
 
+    // removes ALL instances of a motion -- the canonical one AND any deprecated
+    // duplicates still easing out -- for when the motion's backing keyframe
+    // data is about to be destroyed (see LLMotionController::purgeMotionInstances)
+    void purgeMotionInstances( const LLUUID& id );
+
     // returns an instance of a registered motion, creating one if necessary
     LLMotion* createMotion( const LLUUID &id );
 
