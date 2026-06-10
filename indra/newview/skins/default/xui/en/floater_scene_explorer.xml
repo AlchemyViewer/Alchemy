@@ -634,4 +634,14 @@
      left_pad="2"
      bottom_delta="0"
      width="44" />
+    <text
+     follows="bottom|left|right"
+     halign="right"
+     height="14"
+     layout="topleft"
+     name="status_text"
+     use_ellipses="true"
+     left_pad="6"
+     bottom_delta="-4"
+     right="-8" />
 </floater>

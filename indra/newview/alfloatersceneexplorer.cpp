@@ -31,11 +31,13 @@
 #include "lllayoutstack.h"
 #include "llmenubutton.h"
 #include "llmenugl.h"
+#include "llnotificationsutil.h"
 #include "llscrollcontainer.h"
 #include "llscrolllistctrl.h"
 #include "lltextbox.h"
 #include "lltoggleablemenu.h"
 #include "lltrans.h"
+#include "llui.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
@@ -421,6 +423,10 @@ bool ALFloaterSceneExplorer::postBuild()
 
     mShowAvatars = gSavedSettings.getBOOL("ALSceneExplorerShowAvatars");
     mShowDerendered = gSavedSettings.getBOOL("ALSceneExplorerShowDerendered");
+    // The 360 interest-list mode itself is applied in onOpen / released in
+    // onClose, so the simulator only streams the full region while the
+    // explorer is actually up.
+    mFullRegion = gSavedSettings.getBOOL("ALSceneExplorerFullRegion");
 
     // Push persisted filter state into the controls before wiring the commit
     // callbacks, so the UI, the saved settings, and the filter object all
@@ -506,6 +512,8 @@ bool ALFloaterSceneExplorer::postBuild()
 void ALFloaterSceneExplorer::onOpen(const LLSD& key)
 {
     mReconcileTimer.reset();
+    if (mFullRegion)
+        applyFullRegionMode(true);
     reconcile();
     // Inventory muscle memory: typing starts filtering right away.
     getChild<LLFilterEditor>("filter_input")->setFocus(true);
@@ -520,6 +528,11 @@ void ALFloaterSceneExplorer::onClose(bool app_quitting)
         LLTracker::stopTracking(false);
         mBeaconTrackedID.setNull();
     }
+    // Release the full-region stream while the explorer is closed (the
+    // preference itself persists; reopening re-applies it). At quit the
+    // simulator cleans up the interest list with the circuit.
+    if (!app_quitting && mFullRegion)
+        applyFullRegionMode(false);
 }
 
 void ALFloaterSceneExplorer::draw()
@@ -582,6 +595,17 @@ void ALFloaterSceneExplorer::idleUpdate()
     // The folder view's own idle routine: runs (time-sliced) filtering, finalises
     // it, then arranges/lays out the tree in one consistent pass.
     mTree->update();
+
+    // On the reconcile cadence, after the arrange so widget rects are fresh:
+    // refresh on-screen suffixes, demand costs for visible rows, and bump
+    // their pending props requests to the front of the queue.
+    if (mScanVisible)
+    {
+        mScanVisible = false;
+        scanVisibleRows();
+    }
+    updateStatusText();
+
     syncSelectionToWorld();
     updateActionButtons();
 
@@ -783,7 +807,10 @@ ALSceneExplorerItem* ALFloaterSceneExplorer::getOrCreateNode(LLViewerObject* obj
 
     ALSceneExplorerItem* item = new ALSceneExplorerItem(type, id, placeholderName(type, id), mViewModel, this);
     item->setLinkOrder(link_order);
-    ALObjectProperties::Record rec = ALObjectProperties::fromObject(obj);
+    // Costs stay demand-driven (visible rows / LI sort / detail pane): a bulk
+    // build triggering a GetObjectCost for every object would ask the server
+    // to cost the whole region the moment it streams in under 360 mode.
+    ALObjectProperties::Record rec = ALObjectProperties::fromObject(obj, /*fetch_costs=*/false);
     if (LLVOAvatar* av = obj->asAvatar())
     {
         // Avatar rows repurpose these fields: complexity + worn attachments.
@@ -1207,7 +1234,12 @@ void ALFloaterSceneExplorer::reconcile()
         // write deliberately doesn't dirty per-item filter state.
         ALSceneExplorerItem* node = it->second;
         ALObjectProperties::Record& rec = node->getRecordRef();
-        rec.mPosRegion  = obj->getPositionRegion();
+        const LLVector3 new_pos = obj->getPositionRegion();
+        // Track whether anything actually moved this pass: the position-keyed
+        // sorts re-arm only then, instead of unconditionally every 1.5s.
+        if ((new_pos - rec.mPosRegion).magVecSquared() > 0.25f) // > 0.5 m
+            mObjectsMoved = true;
+        rec.mPosRegion  = new_pos;
         rec.mPosGlobal  = obj->getPositionGlobal();
         rec.mDistance   = (F32)(rec.mPosGlobal - gAgent.getPositionGlobal()).magVec();
         rec.mObjectCost = obj->peekObjectCost();
@@ -1279,6 +1311,16 @@ void ALFloaterSceneExplorer::reconcile()
     syncDerendered();
     updateCategoryCounts();
     mDetailDirty = true; // live metrics (distance/costs) were refreshed above
+    mScanVisible = true; // visible-row pass runs after the next arrange
+
+    // Self-healing 360 mode: the capture floater restores the agent mode on
+    // its close without knowing about us, so while our toggle is on, re-claim
+    // it. changeInterestListMode() no-ops when the mode is already 360, and
+    // crossings re-apply it through LLAgent::capabilityReceivedCallback.
+    if (mFullRegion && gAgent.getInterestListMode() != IL_MODE_360)
+    {
+        gAgent.changeInterestListMode(IL_MODE_360);
+    }
 
     // The per-pass distance refresh above doesn't dirty per-item filter state,
     // so when the radius predicate is active, re-arm the whole filter once the
@@ -1295,21 +1337,41 @@ void ALFloaterSceneExplorer::reconcile()
         }
     }
 
-    // Re-sort everything periodically only for the position-driven keys:
-    // agent distance shifts as the agent moves, region-origin distance as
-    // objects move (positions were refreshed above either way). Static keys
+    // Re-sort only for the position-driven keys, and only when positions
+    // actually changed: agent distance when the agent has moved, either key
+    // when an object moved this pass (std::list::sort over tens of thousands
+    // of roots every 1.5s is real cost on a 360-streamed region). Static keys
     // (name/land-impact/triangles/type) re-sort per-parent when nodes are
-    // added or change, so a full periodic re-sort would just be wasted work
-    // on a large tree. requestSortAll() only bumps the target sort version —
+    // added or change. requestSortAll() only bumps the target sort version —
     // sorting actually runs inside arrange(), which nothing else re-arms on a
     // quiet tree — so force a re-arrange too, or the refreshed positions
-    // never reorder anything.
+    // never reorder anything. While the cursor is over the tree or a context
+    // menu is up, the re-sort is deferred (not dropped — the trigger state
+    // stays armed) so rows never jump under the mouse mid-click.
     const ALSceneExplorerSort::ESortMode sort_mode = mViewModel.getSorter().getMode();
     if (sort_mode == ALSceneExplorerSort::SORT_DISTANCE
         || sort_mode == ALSceneExplorerSort::SORT_REGION_ORIGIN)
     {
-        mViewModel.requestSortAll();
-        mTree->arrangeAll();
+        const LLVector3d agent_pos = gAgent.getPositionGlobal();
+        const bool agent_moved = (sort_mode == ALSceneExplorerSort::SORT_DISTANCE)
+            && (agent_pos - mLastSortAgentPos).magVec() > 1.0;
+
+        if (agent_moved || mObjectsMoved)
+        {
+            S32 mouse_x = 0, mouse_y = 0;
+            LLUI::getInstance()->getMousePositionScreen(&mouse_x, &mouse_y);
+            const bool pointer_over_tree =
+                mTreePanel && mTreePanel->calcScreenRect().pointInRect(mouse_x, mouse_y);
+            const bool menu_open =
+                LLMenuGL::sMenuContainer && LLMenuGL::sMenuContainer->hasVisibleMenu();
+            if (!pointer_over_tree && !menu_open)
+            {
+                mLastSortAgentPos = agent_pos;
+                mObjectsMoved = false;
+                mViewModel.requestSortAll();
+                mTree->arrangeAll();
+            }
+        }
     }
 }
 
@@ -1336,32 +1398,53 @@ void ALFloaterSceneExplorer::queueProps(const LLUUID& id)
 void ALFloaterSceneExplorer::drainPropsQueue()
 {
     LLViewerRegion* region = gAgent.getRegion();
-    if (!region || mFetchQueue.empty())
+    if (!region || (mFetchQueue.empty() && mPriorityFetch.empty()))
         return;
 
     ALObjectPropertiesCache& cache = ALObjectPropertiesCache::instance();
     std::vector<U32> local_ids;
     local_ids.reserve(MAX_OBJECTS_PER_PACKET);
-    while (!mFetchQueue.empty() && local_ids.size() < (size_t)MAX_OBJECTS_PER_PACKET)
+
+    auto take = [&](const LLUUID& id)
     {
-        const LLUUID id = mFetchQueue.front();
-        mFetchQueue.pop_front();
         mQueuedProps.erase(id);
+
+        // Already in flight, or the reply landed since this id was queued
+        // (the priority lane leaves its ids in the main queue too).
+        const ALObjectPropertiesCache::ServerProps* p = cache.get(id);
+        if (cache.isPending(id) || (p && p->mHasFullData))
+            return;
 
         LLViewerObject* obj = gObjectList.findObject(id);
         // Local ids are a per-region namespace, so never address an object
         // that died or crossed into a neighbour region.
         if (!obj || obj->isDead() || obj->getRegion() != region)
-            continue;
+            return;
         // Never disturb the user's live selection: a raw ObjectDeselect for an
         // actively edited object desyncs the simulator's selection state (the
         // sim halts physical objects and streams updates only while selected).
         // retryUnresolved() re-queues it once it is no longer selected.
         if (obj->isSelected())
-            continue;
+            return;
 
         local_ids.push_back(obj->getLocalID());
         cache.markPending(id);
+    };
+
+    // On-screen rows first — a 360-streamed region can hold a multi-minute
+    // backlog, and what the user is looking at shouldn't wait behind it.
+    while (!mPriorityFetch.empty() && local_ids.size() < (size_t)MAX_OBJECTS_PER_PACKET)
+    {
+        const LLUUID id = mPriorityFetch.front();
+        mPriorityFetch.pop_front();
+        mPriorityQueued.erase(id);
+        take(id);
+    }
+    while (!mFetchQueue.empty() && local_ids.size() < (size_t)MAX_OBJECTS_PER_PACKET)
+    {
+        const LLUUID id = mFetchQueue.front();
+        mFetchQueue.pop_front();
+        take(id);
     }
     if (local_ids.empty())
         return;
@@ -1849,7 +1932,9 @@ void ALFloaterSceneExplorer::fillObjectDetail(ALSceneExplorerItem* item)
         set_value("detail_build", geom.empty() ? std::string("-") : geom, geom.empty());
 
     // Costs: grey metric labels with aligned, heat-colored values; a missing
-    // metric shows a muted dash so cells never shift.
+    // metric shows a muted dash so cells never shift. Showing the detail pane
+    // is explicit demand for this object's costs.
+    requestCostsFor(item);
     const bool show_costs = !derendered;
     show("label_costs", show_costs);
     show("label_li", show_costs);
@@ -1987,6 +2072,18 @@ void ALFloaterSceneExplorer::setSortMode(const LLSD& param)
     const ALSceneExplorerSort::ESortMode mode = sortModeFromParam(param);
     mViewModel.getSorter().setMode(mode);
     gSavedSettings.setU32("ALSceneExplorerSortOrder", (U32)mode);
+
+    // Choosing the land-impact key is explicit demand for every row's cost
+    // (the order is meaningless while they read 0). The requests run through
+    // the existing GetObjectCost pipeline, chunked and deduplicated there.
+    if (mode == ALSceneExplorerSort::SORT_LAND_IMPACT)
+    {
+        for (const auto& entry : mItems)
+        {
+            requestCostsFor(entry.second);
+        }
+    }
+
     mViewModel.requestSortAll();
     if (mTree)
         mTree->arrangeAll();
@@ -2013,6 +2110,18 @@ void ALFloaterSceneExplorer::toggleShow(const LLSD& param)
         syncDerendered();
         updateCategoryCounts();
     }
+    else if (key == "full_region")
+    {
+        mFullRegion = !mFullRegion;
+        gSavedSettings.setBOOL("ALSceneExplorerFullRegion", mFullRegion);
+        if (mFullRegion)
+        {
+            // The load is the feature, but the user should know they are
+            // asking the simulator for it ("don't show again" supported).
+            LLNotificationsUtil::add("SceneExplorerFullRegion");
+        }
+        applyFullRegionMode(mFullRegion);
+    }
 }
 
 bool ALFloaterSceneExplorer::checkShow(const LLSD& param) const
@@ -2022,7 +2131,129 @@ bool ALFloaterSceneExplorer::checkShow(const LLSD& param) const
         return mShowAvatars;
     if (key == "derendered")
         return mShowDerendered;
+    if (key == "full_region")
+        return mFullRegion;
     return false;
+}
+
+// ============================================================================
+// Full-region (360) coverage + scalability
+// ============================================================================
+void ALFloaterSceneExplorer::applyFullRegionMode(bool active)
+{
+    if (active)
+    {
+        // Remember what to restore; LLAgent re-applies the agent-level mode
+        // to new regions after crossings, and reconcile() re-claims it if the
+        // 360 capture floater restores the mode out from under us.
+        mPrevILMode = gAgent.getInterestListMode();
+        if (gAgent.getInterestListMode() != IL_MODE_360)
+        {
+            gAgent.changeInterestListMode(IL_MODE_360);
+        }
+        return;
+    }
+
+    // Releasing: never clobber another driver of the mode. If the 360 capture
+    // floater is up it owns 360 for as long as it lives; if someone already
+    // switched the mode away, there is nothing of ours to restore.
+    if (gAgent.getInterestListMode() != IL_MODE_360)
+        return;
+    if (LLFloaterReg::findInstance("360capture"))
+        return;
+    // A saved mode of 360 means something else had it on when we enabled —
+    // restoring "360" would strand the stream on, so fall back to default.
+    const std::string restore_mode =
+        (!mPrevILMode.empty() && mPrevILMode != IL_MODE_360) ? mPrevILMode : IL_MODE_DEFAULT;
+    gAgent.changeInterestListMode(restore_mode);
+}
+
+void ALFloaterSceneExplorer::requestCostsFor(ALSceneExplorerItem* item)
+{
+    // One-shot demand trigger: a failed fetch leaves the cost stale forever,
+    // so without the guard every read would re-request it (the Stage-0 loop).
+    if (!item || item->wasCostRequested()
+        || item->isContainer() || item->isDerenderedType()
+        || item->getItemType() == ALSceneExplorerItem::TYPE_AVATAR)
+    {
+        return;
+    }
+    LLViewerObject* obj = gObjectList.findObject(item->getUUID());
+    if (!obj || obj->isDead())
+        return;
+    if (obj->peekLinksetCost() > 0.f)
+        return; // already costed (the reconcile peek keeps the record fresh)
+    item->noteCostRequested();
+    obj->getObjectCost();
+    obj->getLinksetCost();
+}
+
+void ALFloaterSceneExplorer::scanVisibleRows()
+{
+    if (!mTree || !mTreePanel || mItems.empty())
+        return;
+
+    const LLRect viewport = mTreePanel->calcScreenRect();
+    ALObjectPropertiesCache& cache = ALObjectPropertiesCache::instance();
+    for (const auto& entry : mItems)
+    {
+        ALSceneExplorerItem* item = entry.second;
+        if (item->isContainer())
+            continue;
+        auto wit = mWidgets.find(entry.first);
+        if (wit == mWidgets.end())
+            continue;
+        LLFolderViewItem* widget = wit->second;
+        if (!widget->getVisible() || !widget->isInVisibleChain())
+            continue;
+        if (!viewport.overlaps(widget->calcScreenRect()))
+            continue;
+
+        // Keep on-screen label suffixes (distance, complexity, LI) current —
+        // they are captured at widget refresh and would otherwise go stale as
+        // the agent moves.
+        widget->refresh();
+
+        if (item->isDerenderedType())
+            continue;
+
+        // Viewport-bounded cost demand: what the user is looking at gets its
+        // LI without costing the whole region.
+        requestCostsFor(item);
+
+        // Bump this row's queued props request ahead of the off-screen
+        // backlog (no-op unless it is still waiting in the main queue).
+        const ALObjectPropertiesCache::ServerProps* p = cache.get(entry.first);
+        if (mQueuedProps.count(entry.first) && !(p && p->mHasFullData)
+            && mPriorityQueued.insert(entry.first).second)
+        {
+            mPriorityFetch.push_back(entry.first);
+        }
+    }
+}
+
+void ALFloaterSceneExplorer::updateStatusText()
+{
+    // Transient pipeline feedback; quiet when there is nothing in flight.
+    std::string status;
+    if (const size_t building = mBuildQueue.size())
+    {
+        status = llformat("Loading %d objects...", (S32)building);
+    }
+    else if (const size_t fetching = mFetchQueue.size() + mPriorityFetch.size())
+    {
+        status = llformat("Fetching details: %d...", (S32)fetching);
+    }
+    else if (mItems.size() > 30000)
+    {
+        status = llformat("%d rows - large region", (S32)mItems.size());
+    }
+
+    if (status != mLastStatus)
+    {
+        mLastStatus = status;
+        getChild<LLTextBox>("status_text")->setText(status);
+    }
 }
 
 // ============================================================================

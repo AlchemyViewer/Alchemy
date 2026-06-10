@@ -442,6 +442,7 @@ public:
     // re-requesting failed/uncosted objects forever.
     F32 peekObjectCost() const  { return mObjectCost; }
     F32 peekLinksetCost() const { return mLinksetCost; }
+    F32 peekPhysicsCost() const { return mPhysicsCost; }
 
     void sendShapeUpdate();
 

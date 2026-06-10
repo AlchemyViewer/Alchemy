@@ -87,6 +87,12 @@ private:
     void applyServerProps(ALSceneExplorerItem* item);
     void onAvatarNameLoaded(const LLUUID& id, const LLAvatarName& av_name);
 
+    // --- full-region (360) coverage + scalability ---------------------------
+    void applyFullRegionMode(bool active);
+    void scanVisibleRows();
+    void updateStatusText();
+    void requestCostsFor(ALSceneExplorerItem* item);
+
     // --- filters / sort ---------------------------------------------------
     void onFilterChanged();
     void setSortMode(const LLSD& param);
@@ -149,8 +155,12 @@ private:
     // Property-fetch pipeline: mFetchQueue holds ids waiting to be sent
     // (mQueuedProps mirrors its membership for dedup); once sent, an id is
     // tracked as in-flight by ALObjectPropertiesCache until its reply lands.
+    // On-screen rows jump the line through mPriorityFetch (mPriorityQueued
+    // mirrors it), drained ahead of the main queue.
     std::deque<LLUUID>            mFetchQueue;
     boost::unordered_set<LLUUID>  mQueuedProps;
+    std::deque<LLUUID>            mPriorityFetch;
+    boost::unordered_set<LLUUID>  mPriorityQueued;
 
     // New objects discovered by reconcile() awaiting time-sliced widget creation
     // in drainBuildQueue(), so a 60k-object region populates without a stall.
@@ -172,8 +182,14 @@ private:
     LLUUID     mBeaconTrackedID;    // row the location tracker beacon was set for
     LLUUID     mFilterOwnerId;      // "Filter by this owner" target (session-only)
     LLVector3d mLastFilterAgentPos; // last agent position the radius filter ran at
+    LLVector3d mLastSortAgentPos;   // last agent position the distance sort ran at
+    std::string mPrevILMode;        // interest-list mode before 360 was applied
+    std::string mLastStatus;        // last status-line text (avoid re-set churn)
     bool       mShowAvatars   = true;
     bool       mShowDerendered = false;
+    bool       mFullRegion    = false;
+    bool       mObjectsMoved  = false; // any object moved since the last re-sort
+    bool       mScanVisible   = false; // run scanVisibleRows after the next arrange
     bool       mDetailsExpanded = false;
     bool       mDetailDirty   = false;
     bool       mSyncingSelection = false;

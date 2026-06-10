@@ -222,6 +222,12 @@ public:
     S32  getPropsRetries() const { return mPropsRetries; }
     void notePropsRetry() { ++mPropsRetries; }
 
+    // One-shot guard for demand-driven cost fetches (visible row / LI sort /
+    // detail pane): a failed fetch leaves the object's cost stale forever, so
+    // each node asks at most once per session unless explicitly refreshed.
+    bool wasCostRequested() const { return mCostRequested; }
+    void noteCostRequested() { mCostRequested = true; }
+
     // Run the configured activate action (focus/edit/inspect) on this object.
     // Invoked from the view's double-click paths only — openItem() also fires
     // when a folder is expanded, which must never trigger activation.
@@ -287,6 +293,7 @@ private:
     std::string                 mSearchable;    // lowercased name+desc+uuid
     S32                         mLinkOrder = 0;
     S32                         mPropsRetries = 0;
+    bool                        mCostRequested = false;
     ALObjectProperties::Record  mRecord;
     ALFloaterSceneExplorer*     mFloater;
 };

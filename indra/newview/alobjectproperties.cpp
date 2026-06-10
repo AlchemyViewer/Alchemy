@@ -29,7 +29,7 @@
 namespace ALObjectProperties
 {
 
-void fillFromObject(Record& rec, LLViewerObject* obj)
+void fillFromObject(Record& rec, LLViewerObject* obj, bool fetch_costs)
 {
     if (!obj)
         return;
@@ -119,20 +119,30 @@ void fillFromObject(Record& rec, LLViewerObject* obj)
 
     rec.mFlags = flags;
 
-    // Cost (cached values; trigger async refresh as a side effect).
-    rec.mObjectCost    = obj->getObjectCost();
-    rec.mLandImpact    = obj->getLinksetCost();
-    rec.mPhysicsCost   = obj->getPhysicsCost();
+    // Cost: cached values either way; the triggering getters additionally
+    // queue an async refresh when the cached value is stale.
+    if (fetch_costs)
+    {
+        rec.mObjectCost  = obj->getObjectCost();
+        rec.mLandImpact  = obj->getLinksetCost();
+        rec.mPhysicsCost = obj->getPhysicsCost();
+    }
+    else
+    {
+        rec.mObjectCost  = obj->peekObjectCost();
+        rec.mLandImpact  = obj->peekLinksetCost();
+        rec.mPhysicsCost = obj->peekPhysicsCost();
+    }
     rec.mStreamingCost = obj->getStreamingCost();
 }
 
-Record fromObject(LLViewerObject* obj)
+Record fromObject(LLViewerObject* obj, bool fetch_costs)
 {
     Record rec;
     if (obj)
     {
         rec.mId = obj->getID();
-        fillFromObject(rec, obj);
+        fillFromObject(rec, obj, fetch_costs);
     }
     return rec;
 }

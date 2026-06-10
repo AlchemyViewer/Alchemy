@@ -116,11 +116,14 @@ namespace ALObjectProperties
 
     // Fill the local (non-server) fields of @rec from a live object. The
     // identity and server fields are left untouched so a cached record keeps
-    // its async data across refreshes.
-    void fillFromObject(Record& rec, LLViewerObject* obj);
+    // its async data across refreshes. With @fetch_costs the cost reads go
+    // through the triggering getters (queueing an async GetObjectCost refresh
+    // when stale) — pass false anywhere costs must stay demand-driven, e.g.
+    // bulk node builds; the cached values are still peeked either way.
+    void fillFromObject(Record& rec, LLViewerObject* obj, bool fetch_costs = true);
 
     // Convenience: build a fresh record (identity + local fields) for @obj.
-    Record fromObject(LLViewerObject* obj);
+    Record fromObject(LLViewerObject* obj, bool fetch_costs = true);
 
     // A compact human-readable flag list for a row suffix / tooltip, e.g.
     // "scripted, light, glow". Empty when no notable flags set.
