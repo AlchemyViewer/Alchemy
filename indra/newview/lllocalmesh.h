@@ -73,10 +73,11 @@ struct LLLocalMeshPreSwapSnapshot; // hot-swap diff-restore state (lllocalmesh.c
 // world id applied as the face's render material.
 struct LLLocalMeshFaceMaterial
 {
-    LLUUID   mDiffuseID;                  // local-bitmap world id (Blinn-Phong), or null
-    LLColor4 mDiffuseColor = LLColor4::white;
-    bool     mFullbright   = false;
-    LLUUID   mRenderMaterialID;          // local-gltf world id (glTF) -> face render material, or null
+    LLUUID      mDiffuseID;                // local-bitmap world id (Blinn-Phong), or null
+    LLColor4    mDiffuseColor = LLColor4::white;
+    bool        mFullbright   = false;
+    LLUUID      mRenderMaterialID;         // local-gltf world id (glTF) -> face render material, or null
+    std::string mMaterialName;             // glTF binding name, to re-resolve after a material-file regroup
 };
 
 struct LLLocalMeshPart
@@ -337,6 +338,13 @@ public:
     // don't dangle past their host region. The loaded units stay; a later spawn
     // re-creates them in the current region.
     void despawnObjectsInRegion(LLViewerRegion* regionp);
+
+    // A local material file's name -> world id mapping changed (live-edit regroup
+    // in LLLocalGLTFMaterialMgr): re-resolve this mesh file's stored face
+    // materials by their binding names and re-point spawned faces at the new ids.
+    // Faces the user re-materialed in-world are left alone -- only faces still
+    // showing the previously imported id move (the hot-swap diff-restore rule).
+    void rebindFaceMaterials(const std::string& filename);
 
 private:
     LLUUID addUnitInternal(const std::string& filename, bool include_joints = false);

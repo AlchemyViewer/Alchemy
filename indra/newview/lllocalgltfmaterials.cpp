@@ -35,6 +35,7 @@
 #include "llgltfmateriallist.h"
 #include "llimage.h"
 #include "llinventoryicon.h"
+#include "lllocalmesh.h"       // rebindFaceMaterials after a live-edit regroup
 #include "llmaterialmgr.h"
 #include "llnotificationsutil.h"
 #include "llscrolllistctrl.h"
@@ -702,11 +703,142 @@ void LLLocalGLTFMaterialMgr::doUpdates()
     // preventing theoretical overlap in cases with huge number of loaded images.
     mTimer.stopTimer();
 
+    // Per-unit content refresh; collect which (file, ownership class) groups
+    // actually re-decoded so the structural pass below runs once per group.
+    std::vector<std::pair<std::string, bool>> changed;
     for (local_list_iter iter = mMaterialList.begin(); iter != mMaterialList.end(); iter++)
     {
-        (*iter)->updateSelf();
+        if ((*iter)->updateSelf())
+        {
+            std::pair<std::string, bool> key((*iter)->getFilename(), (*iter)->isMeshOwned());
+            if (std::find(changed.begin(), changed.end(), key) == changed.end())
+            {
+                changed.push_back(key);
+            }
+        }
+    }
+
+    // A live edit can change a file's material STRUCTURE, not just content:
+    // re-derive its units/aliases, and when that moved the name -> id mapping,
+    // re-point any local mesh bound to the file (faces bind by name only at
+    // ingest, so a diverged formerly-deduplicated material would otherwise keep
+    // rendering the stale canonical unit forever).
+    bool structure_changed = false;
+    for (const auto& entry : changed)
+    {
+        if (regroupFileMaterials(entry.first, entry.second))
+        {
+            structure_changed = true;
+            LLLocalMeshMgr::getInstance()->rebindFaceMaterials(entry.first);
+        }
+    }
+    if (structure_changed)
+    {
+        mUnitsChangedSignal(); // regroup can add units -> refresh the lists
     }
 
     mTimer.startTimer();
+}
+
+bool LLLocalGLTFMaterialMgr::regroupFileMaterials(const std::string& filename, bool mesh_owned)
+{
+    std::map<std::string, LLUUID> before;
+    getWorldIDsByName(filename, before, mesh_owned);
+
+    tinygltf::Model model;
+    if (!LLTinyGLTFHelper::loadModel(filename, model))
+    {
+        return false; // unreadable mid-save; the per-unit retry path covers it
+    }
+    const S32 count = (S32)model.materials.size();
+    if (count <= 0)
+    {
+        return false;
+    }
+
+    // This file's units of this ownership class, by material index.
+    std::map<S32, LLLocalGLTFMaterial*> by_index;
+    for (const LLPointer<LLLocalGLTFMaterial>& unit : mMaterialList)
+    {
+        if (unit->getFilename() == filename && unit->isMeshOwned() == mesh_owned)
+        {
+            by_index[unit->getIndexInFile()] = unit.get();
+        }
+    }
+    if (by_index.empty())
+    {
+        return false;
+    }
+
+    // Units whose material index no longer exists: a successful parse is truth
+    // (a mesh reload replaces geometry wholesale, same idea), so drop them.
+    // Collect first -- delUnit mutates mMaterialList and fires the signal.
+    std::vector<LLUUID> dead;
+    for (auto it = by_index.begin(); it != by_index.end();)
+    {
+        if (it->first >= count)
+        {
+            dead.push_back(it->second->getTrackingID());
+            it = by_index.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // Signature per index, and signature -> canonical unit over the unit-backed
+    // indices (lowest index wins, matching import order).
+    std::vector<std::string> sigs;
+    sigs.reserve(count);
+    for (S32 i = 0; i < count; ++i)
+    {
+        sigs.push_back(gltfMaterialSignature(model, i));
+    }
+    std::map<std::string, LLLocalGLTFMaterial*> canonical;
+    for (const auto& entry : by_index)
+    {
+        canonical.emplace(sigs[entry.first], entry.second);
+    }
+
+    // Rebuild every alias from scratch. An index with no unit either still
+    // matches an existing unit's content (alias it there) or has diverged /
+    // been newly added (give it its own unit now).
+    for (const auto& entry : by_index)
+    {
+        entry.second->clearAliasNames();
+    }
+    for (S32 i = 0; i < count; ++i)
+    {
+        if (by_index.count(i))
+        {
+            continue; // has its own unit
+        }
+        const std::string& nm = model.materials[i].name;
+        const std::string name = nm.empty() ? ("mat" + std::to_string(i)) : nm;
+        std::map<std::string, LLLocalGLTFMaterial*>::iterator canon_it = canonical.find(sigs[i]);
+        if (canon_it != canonical.end())
+        {
+            canon_it->second->addAliasName(name);
+            continue;
+        }
+        LLPointer<LLLocalGLTFMaterial> unit = new LLLocalGLTFMaterial(filename, i);
+        if (unit->updateSelf())
+        {
+            unit->setMeshOwned(mesh_owned);
+            mMaterialList.emplace_back(unit);
+            by_index[i] = unit.get();
+            canonical.emplace(sigs[i], unit.get());
+        }
+    }
+
+    for (const LLUUID& id : dead)
+    {
+        delUnit(id);
+    }
+
+    std::map<std::string, LLUUID> after;
+    getWorldIDsByName(filename, after, mesh_owned);
+    return before != after;
 }
 

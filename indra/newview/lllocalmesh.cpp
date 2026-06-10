@@ -596,15 +596,21 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                     }
                 }
             }
-            else if (mFormat == FMT_GLTF && !gltf_mat_by_name.empty())
+            else if (mFormat == FMT_GLTF)
             {
                 for (S32 fi = 0; fi < (S32)faces.size() && fi < (S32)mdl->mMaterialList.size(); ++fi)
                 {
+                    LLLocalMeshFaceMaterial& fm = part.mFaceMaterials[fi];
+                    // Keep the binding name even when it doesn't resolve right now:
+                    // a live edit of the material file regroups its units (see
+                    // LLLocalGLTFMaterialMgr), and rebindFaceMaterials() re-resolves
+                    // faces by this name.
+                    fm.mMaterialName = mdl->mMaterialList[fi];
                     std::map<std::string, LLUUID>::const_iterator it =
-                        gltf_mat_by_name.find(mdl->mMaterialList[fi]);
+                        gltf_mat_by_name.find(fm.mMaterialName);
                     if (it != gltf_mat_by_name.end())
                     {
-                        part.mFaceMaterials[fi].mRenderMaterialID = it->second;
+                        fm.mRenderMaterialID = it->second;
                     }
                 }
             }
@@ -859,6 +865,72 @@ void LLLocalMeshMgr::despawnObjectsInRegion(LLViewerRegion* regionp)
             mPreviewAvatar->markDead();
         }
         mPreviewAvatar = nullptr; // recreated lazily in the current region on next load
+    }
+}
+
+void LLLocalMeshMgr::rebindFaceMaterials(const std::string& filename)
+{
+    const LLUUID tracking_id = getUnitID(filename);
+    LLLocalMesh* unit = tracking_id.notNull() ? getUnit(tracking_id) : nullptr;
+    if (!unit || !unit->getValid())
+    {
+        return; // no loaded mesh binds to this file
+    }
+
+    // The new name -> world id mapping, with the same mesh-owned-first/user-
+    // fallback preference the ingest-time bind uses.
+    LLLocalGLTFMaterialMgr* mgr = LLLocalGLTFMaterialMgr::getInstance();
+    std::map<std::string, LLUUID> by_name;
+    mgr->getWorldIDsByName(filename, by_name, /*mesh_owned=*/true);
+    if (by_name.empty())
+    {
+        mgr->getWorldIDsByName(filename, by_name, /*mesh_owned=*/false);
+    }
+
+    for (size_t p = 0; p < unit->mParts.size(); ++p)
+    {
+        LLLocalMeshPart& part = unit->mParts[p];
+        for (size_t f = 0; f < part.mFaceMaterials.size(); ++f)
+        {
+            LLLocalMeshFaceMaterial& fm = part.mFaceMaterials[f];
+            if (fm.mMaterialName.empty())
+            {
+                continue; // not a glTF-bound face
+            }
+            std::map<std::string, LLUUID>::const_iterator it = by_name.find(fm.mMaterialName);
+            const LLUUID new_id = (it != by_name.end()) ? it->second : LLUUID();
+            if (new_id == fm.mRenderMaterialID)
+            {
+                continue;
+            }
+            const LLUUID old_id = fm.mRenderMaterialID;
+            fm.mRenderMaterialID = new_id; // future hot-swaps diff against the new import
+
+            for (auto& entry : mSpawnedCopies)
+            {
+                const SpawnedCopy& copy = entry.second;
+                if (copy.mTrackingID != tracking_id || p >= copy.mPrims.size())
+                {
+                    continue;
+                }
+                LLViewerObject* o = copy.mPrims[p].get();
+                LLVOVolume* vol = (o && !o->isDead()) ? dynamic_cast<LLVOVolume*>(o) : nullptr;
+                if (!vol || f >= (size_t)vol->getNumTEs())
+                {
+                    continue;
+                }
+                if (vol->getRenderMaterialID((U8)f) != old_id)
+                {
+                    continue; // the user re-materialed this face in-world; leave it
+                }
+                if (new_id.notNull())
+                {
+                    vol->setHasRenderMaterialParams(true); // client-only: no server echo sets it
+                }
+                vol->setRenderMaterialID((S32)f, new_id, false, true);
+                vol->markForUpdate();
+            }
+        }
     }
 }
 
