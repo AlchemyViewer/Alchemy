@@ -1200,33 +1200,36 @@ void LLFloaterTexturePicker::onBtnAdd(void* userdata)
 void LLFloaterTexturePicker::onBtnRemove(void* userdata)
 {
     LLFloaterTexturePicker* self = (LLFloaterTexturePicker*) userdata;
-    std::vector<LLScrollListItem*> selected_items = self->mLocalScrollCtrl->getAllSelected();
 
-    if (!selected_items.empty())
+    // Snapshot the selected units' values BEFORE mutating the managers: delUnit()
+    // fires the units-changed signal synchronously, which re-enters this picker
+    // via onLocalAssetsChanged() -> refreshLocalList() -> clearRows() and frees
+    // every LLScrollListItem a pointer snapshot would still be iterating.
+    std::vector<std::pair<LLUUID, S32>> to_remove;
+    for (LLScrollListItem* list_item : self->mLocalScrollCtrl->getAllSelected())
     {
-
-        for(std::vector<LLScrollListItem*>::iterator iter = selected_items.begin();
-            iter != selected_items.end(); iter++)
+        if (list_item)
         {
-            LLScrollListItem* list_item = *iter;
-            if (list_item)
+            const LLSD data = list_item->getValue();
+            if (data["mesh_owned"].asBoolean())
             {
-                LLSD data = list_item->getValue();
-                if (data["mesh_owned"].asBoolean())
-                {
-                    continue; // model-loaded: read-only, owned by its mesh
-                }
-                LLUUID tracking_id = data["id"];
-                S32 asset_type = data["type"].asInteger();
+                continue; // model-loaded: read-only, owned by its mesh
+            }
+            to_remove.emplace_back(data["id"].asUUID(), data["type"].asInteger());
+        }
+    }
 
-                if (LLAssetType::AT_MATERIAL == asset_type)
-                {
-                    LLLocalGLTFMaterialMgr::getInstance()->delUnit(tracking_id);
-                }
-                else
-                {
-                    LLLocalBitmapMgr::getInstance()->delUnit(tracking_id);
-                }
+    if (!to_remove.empty())
+    {
+        for (const auto& [tracking_id, asset_type] : to_remove)
+        {
+            if (LLAssetType::AT_MATERIAL == asset_type)
+            {
+                LLLocalGLTFMaterialMgr::getInstance()->delUnit(tracking_id);
+            }
+            else
+            {
+                LLLocalBitmapMgr::getInstance()->delUnit(tracking_id);
             }
         }
 
