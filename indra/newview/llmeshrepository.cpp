@@ -4968,6 +4968,14 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
 
+    // Local mesh previews have no server-side decomposition; don't queue a repo
+    // request that can never resolve (the id would sit in mLoadingPhysicsShapes
+    // forever, retrying).
+    if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_id))
+    {
+        return;
+    }
+
     if (mesh_id.notNull())
     {
         LLModel::Decomposition* decomp = NULL;
@@ -4997,6 +5005,14 @@ LLModel::Decomposition* LLMeshRepository::getDecomposition(const LLUUID& mesh_id
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
 
     LLModel::Decomposition* ret = NULL;
+
+    // Local mesh previews have no server-side decomposition; don't queue a repo
+    // request that can never resolve (the id would sit in mLoadingDecompositions
+    // forever, retrying).
+    if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_id))
+    {
+        return ret;
+    }
 
     if (mesh_id.notNull())
     {
@@ -5042,6 +5058,13 @@ void LLMeshRepository::buildHull(const LLVolumeParams& params, S32 detail)
 bool LLMeshRepository::hasPhysicsShape(const LLUUID& mesh_id)
 {
     if (mesh_id.isNull())
+    {
+        return false;
+    }
+
+    // Local mesh previews have no server physics shape (and must not trigger the
+    // decomposition fetch below).
+    if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_id))
     {
         return false;
     }
