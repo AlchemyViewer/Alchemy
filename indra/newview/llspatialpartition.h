@@ -102,7 +102,14 @@ public:
     const LLMatrix4* mModelMatrix = nullptr;
 
     LLPointer<LLVOAvatar> mAvatar = nullptr;
-    LLMeshSkinInfo* mSkinInfo = nullptr;
+    // Owning, like mAvatar above: the mesh repo culls skins whose only
+    // remaining reference is its own map (and a local-mesh reload drops the
+    // unit/volume references mid-frame), so the draw call must hold its skin
+    // alive itself for the per-frame matrix-palette upload. LLFace::mSkinInfo
+    // stays a raw mirror (like its mAvatar): faces and their group's draw
+    // infos are (re)built together, so a face's skin is always pinned by its
+    // volume or by the co-generated draw-info references here.
+    LLPointer<LLMeshSkinInfo> mSkinInfo;
 
     // Material pointer here is likely for debugging only and are immaterial (zing!)
     LLPointer<LLMaterial> mMaterial;
