@@ -4704,6 +4704,39 @@ void LLSelectMgr::selectDuplicate(const LLVector3& offset, bool select_copy)
             return;
         }
     }
+
+    // Client-only local previews: duplicate locally. The ObjectDuplicate send
+    // below is swallowed for an all-local selection (sendListToRegions gate),
+    // which would otherwise make Ctrl+D / shift-drag-copy a silent no-op.
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        // Snapshot the source roots first: spawning fires the manager's
+        // units-changed signal, whose listeners must not invalidate this walk.
+        std::vector<LLPointer<LLViewerObject>> src_roots;
+        for (LLObjectSelection::root_iterator it = getSelection()->root_begin();
+             it != getSelection()->root_end(); ++it)
+        {
+            src_roots.emplace_back((*it)->getObject());
+        }
+        std::vector<LLViewerObject*> new_roots;
+        for (const LLPointer<LLViewerObject>& src : src_roots)
+        {
+            if (LLViewerObject* new_root = LLLocalMeshMgr::getInstance()->duplicatePreview(src.get(), offset))
+            {
+                new_roots.push_back(new_root);
+            }
+        }
+        if (select_copy && !new_roots.empty())
+        {
+            deselectAll();
+            for (LLViewerObject* new_root : new_roots)
+            {
+                selectObjectAndFamily(new_root);
+            }
+        }
+        return;
+    }
+
     LLDuplicateData data;
 
     data.offset = offset;
@@ -5942,7 +5975,9 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
     // Client-only local mesh previews never talk to the simulator. Short-circuit
     // every object message marshalled through here (name/description/permissions/
     // sale/group/owner/click-action/category/shape/flags/...). Local derez,
-    // duplicate and attach are handled by LLLocalMeshMgr before reaching this path.
+    // duplicate and attach are intercepted upstream (selectDelete, selectDuplicate
+    // and the attach menu route to LLLocalMeshMgr); anything else marshalled here
+    // for an all-local selection is intentionally dropped.
     if (selectionAllLocalPreview(selected_handle))
     {
         return;

@@ -1416,6 +1416,33 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
     return root;
 }
 
+LLViewerObject* LLLocalMeshMgr::duplicatePreview(LLViewerObject* obj, const LLVector3& offset)
+{
+    LLViewerObject* root = findRootForObject(obj);
+    if (!root || root->isDead() || root->isAttachment())
+    {
+        return nullptr; // worn copies don't duplicate, matching the sim path
+    }
+    auto it = mSpawnedCopies.find(instanceForObject(root));
+    if (it == mSpawnedCopies.end())
+    {
+        return nullptr;
+    }
+    const LLUUID tracking_id = it->second.mTrackingID;
+    const LLLocalMesh* unit = getUnit(tracking_id);
+    if (!unit || !unit->getValid() || unit->getParts().empty())
+    {
+        return nullptr;
+    }
+    // Same transform capture as respawnInstancesInPlace(): spawnLinkset() composes
+    // the root part's intrinsic rotation itself, so pass the USER delta, not the
+    // full world rotation.
+    const LLQuaternion user_delta = ~unit->getParts().front().mRotation * root->getRotation();
+    LLUUID instance_id;
+    instance_id.generate();
+    return spawnLinkset(tracking_id, instance_id, root->getPositionAgent() + offset, user_delta, false, 0);
+}
+
 LLViewerObject* LLLocalMeshMgr::spawnLinkset(const LLUUID& tracking_id, const LLUUID& instance_id,
                                              const LLVector3& base, const LLQuaternion& root_rot,
                                              bool attach, S32 attach_point)

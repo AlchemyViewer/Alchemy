@@ -265,6 +265,11 @@ public:
     // agent. A unit can be rezzed any number of times; each copy is independent with
     // its own instance id. Returns the new copy's linkset root.
     LLViewerObject* spawnInWorld(const LLUUID& tracking_id);
+    // Rez a NEW copy of the preview that owns `obj`, at the source copy's transform
+    // plus `offset` -- the local-object route for the build tools' Duplicate
+    // (Ctrl+D / shift-drag-copy). Worn copies don't duplicate, matching the sim
+    // path. Returns the new copy's linkset root, or null.
+    LLViewerObject* duplicatePreview(LLViewerObject* obj, const LLVector3& offset);
     // Convenience: load each file and spawn it in-world once it finishes loading.
     // include_joints applies to any file that needs a fresh decode (pass the
     // persisted joint-position flag for saved rows, like loadPath does).
