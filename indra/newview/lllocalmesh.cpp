@@ -76,15 +76,19 @@ namespace
     // owns the by-reference joint maps the loader holds for the duration of the
     // parse, so they outlive the (possibly deleted) LLLocalMesh. The load
     // callback frees it. The unit is looked up by tracking ID, so a unit
-    // deleted mid-load can't be dereferenced.
+    // deleted mid-load can't be dereferenced. The preview avatar is held by
+    // LLPointer: the loader thread resolves (and the DAE loader writes to)
+    // joints on it mid-parse, while a teleport/logout can markDead() and drop
+    // the manager's reference at any time -- the ref keeps the avatar's memory
+    // (and its joints) valid until the context is freed on the main thread.
     struct LoadContext
     {
-        LLUUID            mTrackingID;
-        LLModelLoader*    mLoader = nullptr;
-        JointTransformMap mJointTransformMap;
-        JointNameSet      mJointsFromNode;
-        U32               mLoadState = LLModelLoader::STARTING;
-        LLVOAvatar*       mAvatar = nullptr; // preview skeleton for joint lookup (never the agent)
+        LLUUID                mTrackingID;
+        LLModelLoader*        mLoader = nullptr;
+        JointTransformMap     mJointTransformMap;
+        JointNameSet          mJointsFromNode;
+        U32                   mLoadState = LLModelLoader::STARTING;
+        LLPointer<LLVOAvatar> mAvatar; // preview skeleton for joint lookup (never the agent)
     };
 
     // Build the joint alias map the loaders use to recognise rig joints,
