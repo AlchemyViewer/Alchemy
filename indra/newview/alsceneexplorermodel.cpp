@@ -355,22 +355,18 @@ bool ALSceneExplorerFolder::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
     ALSceneExplorerItem* item = static_cast<ALSceneExplorerItem*>(getViewModelItem());
 
-    // Structural containers (region / category / attachment point) keep the
-    // standard expand-on-double-click behaviour.
-    if (!item || item->isContainer())
-        return LLFolderViewFolder::handleDoubleClick(x, y, mask);
-
-    // A real scene object: let an open folder's children claim the click first,
-    // otherwise act on the object (focus/edit/inspect per the activate-action
-    // setting) the way a leaf prim does, so single- and multi-prim objects
-    // behave identically. The disclosure arrow still expands children. Note:
-    // activate() rather than openItem() — the latter also fires on folder
-    // expansion and is therefore a no-op for folder-typed scene objects.
-    if (isOpen() && childrenHandleDoubleClick(x, y, mask) != nullptr)
+    // Childless scene objects (single-prim roots) have nothing to expand, so
+    // double-click activates them the way a leaf prim does. Everything else —
+    // containers, multi-prim linksets, avatars — keeps the standard
+    // expand/collapse double-click; activation for those lives in the action
+    // buttons and context menu. (activate() rather than openItem(): the model
+    // openItem() also fires on folder expansion and must stay inert here.)
+    if (item && !item->isContainer() && item->getChildrenCount() == 0)
+    {
+        if (getRoot())
+            getRoot()->setSelection(this, false);
+        item->activate();
         return true;
-
-    if (getRoot())
-        getRoot()->setSelection(this, false);
-    item->activate();
-    return true;
+    }
+    return LLFolderViewFolder::handleDoubleClick(x, y, mask);
 }

@@ -156,6 +156,10 @@ bool ALFloaterSceneExplorer::postBuild()
     mTreePanel = getChild<LLPanel>("scene_tree");
     buildTree();
 
+    // Shown by the folder view's status text when a filter matches nothing
+    // (without it, a zero-hit filter renders a blank pane).
+    mViewModel.getFilter().setEmptyLookupMessage(getString("no_matches"));
+
     mShowAvatars = gSavedSettings.getBOOL("ALSceneExplorerShowAvatars");
 
     // Push persisted filter/sort state into the controls before wiring the
@@ -259,7 +263,11 @@ void ALFloaterSceneExplorer::idleUpdate()
         mRetryTimer.reset();
         retryUnresolved();
     }
-    if (mFetchTimer.getElapsedTimeF32() > 0.5f)
+    // Adaptive drain cadence: snappy while the backlog is small (a normal
+    // region's queue clears in seconds), halved when it is huge so the densest
+    // regions don't see peak probe load for minutes on end.
+    const F32 drain_interval = (mFetchQueue.size() > 2048) ? 1.f : 0.5f;
+    if (mFetchTimer.getElapsedTimeF32() > drain_interval)
     {
         mFetchTimer.reset();
         drainPropsQueue();
@@ -617,9 +625,10 @@ void ALFloaterSceneExplorer::reconcile()
         return;
 
     // Region crossing: tear the tree down wholesale and rebuild for the new
-    // region (the property cache already dropped itself via the agent's
-    // region-changed callback). Cheaper and cleaner than discovering each
-    // stale node's absence one-by-one, and keeps the root label current.
+    // region — cheaper and cleaner than discovering each stale node's absence
+    // one-by-one, and keeps the root label current. The props cache
+    // deliberately persists (UUID-keyed; see ALObjectPropertiesCache), so
+    // objects fetched on a previous visit skip re-probing entirely.
     const U64 region_handle = region->getHandle();
     if (region_handle != mLastRegionHandle)
     {
@@ -687,20 +696,23 @@ void ALFloaterSceneExplorer::reconcile()
 
         // Cheap per-pass refresh. Distance changes as things move (drives the
         // distance sort + "Nm" suffix); land-impact / object cost arrive
-        // asynchronously after a node is built, so we keep pulling those cached
-        // accounting values until they populate. Flags, geometry and the ARC
-        // render cost (a profiled per-face hotspot) were captured at build time
-        // and rarely change, so we skip the full fillFromObject() here to keep
-        // the 1.5s reconcile O(N)-cheap even on a 60k-object region. The radius
-        // filter is re-armed below when the agent has moved, since this write
-        // deliberately doesn't dirty per-item filter state.
+        // asynchronously after the node-build fetch, so keep PEEKING the cached
+        // values until they populate — peek, never getObjectCost(): the getter
+        // re-queues a GetObjectCost request whenever the cost is stale, and a
+        // failed fetch stays stale, so a triggering read here would re-request
+        // failed/uncosted objects every pass forever. Flags, geometry and the
+        // ARC render cost (a profiled per-face hotspot) were captured at build
+        // time and rarely change, so the full fillFromObject() is skipped to
+        // keep the 1.5s reconcile O(N)-cheap even on a 60k-object region. The
+        // radius filter is re-armed below when the agent has moved, since this
+        // write deliberately doesn't dirty per-item filter state.
         ALSceneExplorerItem* node = it->second;
         ALObjectProperties::Record& rec = node->getRecordRef();
         rec.mPosRegion  = obj->getPositionRegion();
         rec.mPosGlobal  = obj->getPositionGlobal();
         rec.mDistance   = (F32)(rec.mPosGlobal - gAgent.getPositionGlobal()).magVec();
-        rec.mObjectCost = obj->getObjectCost();
-        rec.mLandImpact = obj->getLinksetCost();
+        rec.mObjectCost = obj->peekObjectCost();
+        rec.mLandImpact = obj->peekLinksetCost();
     }
 
     // Collect ids, not pointers: removing a linkset root frees its descendant
@@ -758,9 +770,15 @@ void ALFloaterSceneExplorer::reconcile()
     // Re-sort everything periodically only for the distance key, whose order
     // shifts as the agent moves. Static keys (name/land-impact/triangles/type)
     // re-sort per-parent when nodes are added or change, so a full periodic
-    // re-sort would just be wasted work on a large tree.
+    // re-sort would just be wasted work on a large tree. requestSortAll() only
+    // bumps the target sort version — sorting actually runs inside arrange(),
+    // which nothing else re-arms on a quiet tree — so force a re-arrange too,
+    // or the refreshed distances never reorder anything.
     if (mViewModel.getSorter().getMode() == ALSceneExplorerSort::SORT_DISTANCE)
+    {
         mViewModel.requestSortAll();
+        mTree->arrangeAll();
+    }
 }
 
 // ============================================================================
@@ -992,14 +1010,37 @@ void ALFloaterSceneExplorer::selectInWorld(const uuid_vec_t& ids)
     LLSelectMgr* sm = LLSelectMgr::getInstance();
     mSyncingSelection = true;
     sm->deselectAll();
-    if (!objs.empty())
-        sm->selectObjectAndFamily(objs);
+
+    // Mirror LLToolSelect's EditLinkedParts split exactly: with "Edit linked"
+    // on, select the individual prim; otherwise always the whole linkset.
+    // Selecting a lone child while the build tools are in whole-object mode
+    // (or vice versa) desyncs the manipulators from what the user expects.
+    static LLCachedControl<bool> edit_linked(gSavedSettings, "EditLinkedParts", false);
+    for (LLViewerObject* obj : objs)
+    {
+        if (edit_linked && !obj->isAvatar())
+        {
+            sm->selectObjectOnly(obj, SELECT_ALL_TES);
+        }
+        else
+        {
+            sm->selectObjectAndFamily(obj, /*add_to_end=*/true);
+        }
+    }
     mSyncingSelection = false;
 }
 
 void ALFloaterSceneExplorer::syncSelectionToWorld()
 {
     if (mSyncingSelection)
+        return;
+    // Drive the in-world selection only while an editing surface is up. Plain
+    // browsing must never grab the user's selection — pushing one has side
+    // effects (avatar look-at/point-at targeting, edit-mode behaviour) that
+    // read as the camera/avatar reacting to every tree click. mLastSelectedID
+    // deliberately isn't advanced while gated, so opening Build/Inspect adopts
+    // the currently selected row once.
+    if (!LLFloaterReg::instanceVisible("build") && !LLFloaterReg::instanceVisible("inspect"))
         return;
     LLViewerObject* obj = getSelectedObject();
     const LLUUID id = obj ? obj->getID() : LLUUID::null;
@@ -1032,7 +1073,16 @@ void ALFloaterSceneExplorer::activateItem(const LLUUID& id)
     case 2: LLFloaterReg::showInstance("inspect");  break;
     case 3:                                         break; // select only
     case 0:
-    default: handle_zoom_to_object(id);             break;
+    default:
+        // Focus zooms the camera only while browsing freely. With Build or
+        // Inspect up the user is editing — double-click means "retarget the
+        // selection", and yanking the camera mid-edit is jarring (the explicit
+        // Focus button / context entry still zooms regardless).
+        if (!LLFloaterReg::instanceVisible("build") && !LLFloaterReg::instanceVisible("inspect"))
+        {
+            handle_zoom_to_object(id);
+        }
+        break;
     }
 }
 

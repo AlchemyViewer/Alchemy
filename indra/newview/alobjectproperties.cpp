@@ -190,21 +190,37 @@ const std::string& iconName(const Record& rec)
 // ============================================================================
 ALObjectPropertiesCache::ALObjectPropertiesCache()
 {
-    // Object names/owners can change and local ids are reused across visits, so
-    // drop everything when the agent changes region and let consumers re-fetch.
-    mRegionChangedConn = gAgent.addRegionChangedCallback(boost::bind(&ALObjectPropertiesCache::clear, this));
 }
 
 ALObjectPropertiesCache::~ALObjectPropertiesCache()
 {
-    if (mRegionChangedConn.connected())
-        mRegionChangedConn.disconnect();
 }
 
 const ALObjectPropertiesCache::ServerProps* ALObjectPropertiesCache::get(const LLUUID& id) const
 {
     auto it = mCache.find(id);
     return (it != mCache.end()) ? &it->second : nullptr;
+}
+
+ALObjectPropertiesCache::ServerProps& ALObjectPropertiesCache::lookupOrCreate(const LLUUID& id)
+{
+    auto found = mCache.find(id);
+    if (found != mCache.end())
+        return found->second;
+
+    ServerProps& p = mCache[id];
+    mCacheOrder.push_back(id);
+    trimCache(); // evicts from the front, never the entry just added
+    return p;
+}
+
+void ALObjectPropertiesCache::trimCache()
+{
+    while (mCache.size() > MAX_CACHE_ENTRIES && !mCacheOrder.empty())
+    {
+        mCache.erase(mCacheOrder.front());
+        mCacheOrder.pop_front();
+    }
 }
 
 // static
@@ -215,7 +231,7 @@ void ALObjectPropertiesCache::processObjectPropertiesFamily(LLMessageSystem* msg
     if (id.notNull())
     {
         ALObjectPropertiesCache& self = instance();
-        ServerProps& p = self.mCache[id];
+        ServerProps& p = self.lookupOrCreate(id);
         msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_OwnerID, p.mOwnerId);
         msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_GroupID, p.mGroupId);
         msg->getStringFast(_PREHASH_ObjectData, _PREHASH_Name, p.mName);
@@ -242,7 +258,7 @@ void ALObjectPropertiesCache::processObjectProperties(LLMessageSystem* msg, void
         if (id.isNull())
             continue;
 
-        ServerProps& p = self.mCache[id];
+        ServerProps& p = self.lookupOrCreate(id);
         msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_CreatorID, p.mCreatorId, i);
         msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_OwnerID, p.mOwnerId, i);
         msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_GroupID, p.mGroupId, i);

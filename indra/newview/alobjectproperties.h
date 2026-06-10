@@ -14,6 +14,8 @@
 #ifndef AL_OBJECTPROPERTIES_H
 #define AL_OBJECTPROPERTIES_H
 
+#include <deque>
+
 #include <boost/signals2.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
@@ -138,6 +140,12 @@ namespace ALObjectProperties
 // existing selection behaviour is preserved. Consumers (Scene Explorer, detail
 // pane, ...) read from here and subscribe for change notifications instead of
 // having to be in a selection.
+//
+// The cache deliberately PERSISTS across region crossings: entries are keyed
+// by globally-unique object UUID, so crossing a border doesn't stale them —
+// and wiping would make every border hop re-probe the whole region. Growth is
+// bounded by oldest-first eviction instead (insertion order roughly equals
+// region visit order, so stale regions age out first).
 // ============================================================================
 class ALObjectPropertiesCache : public LLSingleton<ALObjectPropertiesCache>
 {
@@ -185,19 +193,27 @@ public:
         return instanceExists() && instance().isPending(id);
     }
 
-    // Drop all cached entries. Bound to the agent region-change signal so we
-    // never serve stale name/owner data after crossing into a new region.
+    // Drop everything (explicit refresh only — see the class comment for why
+    // region crossings must NOT clear).
     void clear()
     {
         mCache.clear();
+        mCacheOrder.clear();
         mPendingRequests.clear();
     }
 
 private:
+    // Bounded growth: once past the cap, evict oldest insertions first. The
+    // cap comfortably exceeds a maximal (~60k object) region so a single
+    // region never churns against it.
+    static constexpr size_t MAX_CACHE_ENTRIES = 100000;
+    ServerProps& lookupOrCreate(const LLUUID& id);
+    void trimCache();
+
     boost::unordered_map<LLUUID, ServerProps> mCache;
+    std::deque<LLUUID> mCacheOrder;     // insertion order, for eviction
     boost::unordered_set<LLUUID> mPendingRequests;
     change_signal_t mChangeSignal;
-    boost::signals2::connection mRegionChangedConn;
 };
 
 #endif // AL_OBJECTPROPERTIES_H

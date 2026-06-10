@@ -12,6 +12,7 @@
  single_instance="true"
  title="Scene Explorer"
  width="420">
+    <floater.string name="no_matches">No matching objects</floater.string>
     <filter_editor
      follows="left|top|right"
      height="22"
@@ -37,7 +38,7 @@
         <combo_box.item label="Owned by others" name="others" value="3" />
     </combo_box>
     <combo_box
-     follows="top|right"
+     follows="left|top"
      height="22"
      layout="topleft"
      name="sort_combo"
@@ -79,7 +80,7 @@
      top_delta="0"
      width="80" />
     <check_box
-     follows="top|right"
+     follows="left|top"
      height="18"
      label="Avatars"
      layout="topleft"
