@@ -599,16 +599,22 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
             mSpinRotation = mSpinRotation * rotation_around_vertical;
             mSpinRotation = mSpinRotation * rotation_around_left;
 
-            // TODO: Throttle these
-            LLMessageSystem *msg = gMessageSystem;
-            msg->newMessageFast(_PREHASH_ObjectSpinUpdate);
-            msg->nextBlockFast(_PREHASH_AgentData);
-            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
-            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-            msg->nextBlockFast(_PREHASH_ObjectData);
-            msg->addUUIDFast(_PREHASH_ObjectID, objectp->getID() );
-            msg->addQuatFast(_PREHASH_Rotation, mSpinRotation );
-            msg->sendMessage( objectp->getRegion()->getHost() );
+            // Client-only local previews have no sim object to spin. The toggle
+            // above re-sets mSpinGrabbing from the mask every hover, so
+            // startSpin()'s early-out alone doesn't keep us out of this block.
+            if (!objectp->isLocalOnly())
+            {
+                // TODO: Throttle these
+                LLMessageSystem *msg = gMessageSystem;
+                msg->newMessageFast(_PREHASH_ObjectSpinUpdate);
+                msg->nextBlockFast(_PREHASH_AgentData);
+                msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+                msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+                msg->nextBlockFast(_PREHASH_ObjectData);
+                msg->addUUIDFast(_PREHASH_ObjectID, objectp->getID() );
+                msg->addQuatFast(_PREHASH_Rotation, mSpinRotation );
+                msg->sendMessage( objectp->getRegion()->getHost() );
+            }
         }
         else
         {

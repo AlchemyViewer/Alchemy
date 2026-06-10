@@ -203,7 +203,12 @@ void LLModelLoader::run()
     }
     else
     {
-        // No main-loop queue (unit tests / headless): single-threaded, safe.
+        // No main-loop queue registered. The viewer always has one (a global,
+        // gMainloopWork), so this branch can only run in a binary with no main
+        // loop concurrently using LLCallbackList -- where the idle list is the
+        // only delivery left. loadModelCallback() cannot be invoked inline
+        // here: it blocks until this thread is stopped and then deletes the
+        // loader, which would deadlock run().
         doOnIdleOneTime(boost::bind(&LLModelLoader::loadModelCallback, this));
     }
 }

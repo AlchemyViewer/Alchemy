@@ -112,7 +112,12 @@ void LLLocalAssetPaths::writeToDisk() const
         LLFile::remove(tmp_path);
         return;
     }
-    LLFile::rename(tmp_path, path);
+    if (LLFile::rename(tmp_path, path) != 0)
+    {
+        // rename already warned; don't leave the temp file behind, and keep the
+        // old (still intact) file as the persisted state
+        LLFile::remove(tmp_path);
+    }
 }
 
 void LLLocalAssetPaths::removePath(EType type, const std::string& path)

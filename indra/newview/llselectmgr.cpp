@@ -4734,6 +4734,19 @@ void LLSelectMgr::selectDuplicate(const LLVector3& offset, bool select_copy)
                 selectObjectAndFamily(new_root);
             }
         }
+        else if (!select_copy)
+        {
+            // Mirror the sim path's bookkeeping below so repeatDuplicate()
+            // recognizes these as duplicated and chains the copy/move sequence.
+            for (LLObjectSelection::root_iterator it = getSelection()->root_begin();
+                 it != getSelection()->root_end(); ++it)
+            {
+                LLSelectNode* node = *it;
+                node->mDuplicated = true;
+                node->mDuplicatePos = node->getObject()->getPositionGlobal();
+                node->mDuplicateRot = node->getObject()->getRotation();
+            }
+        }
         return;
     }
 
@@ -4792,12 +4805,32 @@ void LLSelectMgr::repeatDuplicate()
     }
 
     // duplicate objects in place
-    LLDuplicateData data;
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        // Client-only local previews: copy each in place locally -- the gated
+        // ObjectDuplicate send below is swallowed for an all-local selection
+        // (see selectDuplicate). The shared move-by-delta loop below then
+        // advances the selection exactly like the sim path.
+        std::vector<LLPointer<LLViewerObject>> src_roots;
+        for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+             iter != getSelection()->root_end(); ++iter)
+        {
+            src_roots.emplace_back((*iter)->getObject());
+        }
+        for (const LLPointer<LLViewerObject>& src : src_roots)
+        {
+            LLLocalMeshMgr::getInstance()->duplicatePreview(src.get(), LLVector3::zero);
+        }
+    }
+    else
+    {
+        LLDuplicateData data;
 
-    data.offset = LLVector3::zero;
-    data.flags = 0x0;
+        data.offset = LLVector3::zero;
+        data.flags = 0x0;
 
-    sendListToRegions("ObjectDuplicate", packDuplicateHeader, packDuplicate, logNoOp, &data, SEND_ONLY_ROOTS);
+        sendListToRegions("ObjectDuplicate", packDuplicateHeader, packDuplicate, logNoOp, &data, SEND_ONLY_ROOTS);
+    }
 
     // move current selection based on delta from duplication position and update duplication position
     for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
