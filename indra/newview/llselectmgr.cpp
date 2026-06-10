@@ -8039,6 +8039,21 @@ bool LLSelectMgr::canSelectObject(LLViewerObject* object, bool ignore_select_own
         return false;
     }
 
+    // Don't allow mixing client-only local mesh previews with real (sim) objects
+    // in a single selection -- a mixed selection escapes the all-local gating and
+    // would send the previews' (fake) local IDs to the sim. Checked ahead of
+    // mForceSelection so temp/right-click (forced) selects can't sneak a mix in;
+    // the selection stays homogeneous, so the first selected object is
+    // representative.
+    if (mSelectedObjects->getObjectCount() > 0)
+    {
+        LLViewerObject* selected = mSelectedObjects->getFirstObject();
+        if (selected && selected->isLocalOnly() != object->isLocalOnly())
+        {
+            return false;
+        }
+    }
+
     if (mForceSelection)
     {
         return true;
@@ -8066,19 +8081,6 @@ bool LLSelectMgr::canSelectObject(LLViewerObject* object, bool ignore_select_own
 
     ESelectType selection_type = getSelectTypeForObject(object);
     if (mSelectedObjects->getObjectCount() > 0 && mSelectedObjects->mSelectType != selection_type) return false;
-
-    // Don't allow mixing client-only local mesh previews with real (sim) objects
-    // in a single selection -- a mixed selection escapes the all-local gating and
-    // would send the previews' (fake) local IDs to the sim. The selection is kept
-    // homogeneous by this check, so the first selected object is representative.
-    if (mSelectedObjects->getObjectCount() > 0)
-    {
-        LLViewerObject* selected = mSelectedObjects->getFirstObject();
-        if (selected && selected->isLocalOnly() != object->isLocalOnly())
-        {
-            return false;
-        }
-    }
 
     return true;
 }
@@ -9035,6 +9037,13 @@ void LLSelectMgr::sendSelectionMove()
 {
     LLSelectNode *node = mSelectedObjects->getFirstRootNode();
     if (node == NULL)
+    {
+        return;
+    }
+
+    // Client-only local previews are moved purely locally (this is the
+    // joystick/spacenav build-move path); there is no sim object to update.
+    if (selectionAllLocalPreview(mSelectedObjects))
     {
         return;
     }
