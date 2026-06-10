@@ -31,12 +31,35 @@
 #include "lluiimage.h"
 #include "llfontvertexbuffer.h"
 
+#include <memory>
+
 class LLFolderView;
 class LLFolderViewModelItem;
 class LLFolderViewFolder;
 class LLFolderViewFunctor;
 class LLFolderViewFilter;
 class LLFolderViewModelInterface;
+
+// Per-item layout and colors that come from Params and never vary per item.
+// They are identical for every item built from the same widget params, so rather
+// than copying ~100 bytes into each of (potentially) hundreds of thousands of
+// items, the values are interned (see LLFolderViewItem::internStyle) and shared
+// by const pointer. Anything an item mutates per-instance (e.g. indentation,
+// label padding) stays a direct member.
+struct LLFolderViewItemStyle
+{
+    LLUIColor   fontColor;
+    LLUIColor   fontHighlightColor;
+    S32         itemHeight{ 0 };
+    S32         localIndentation{ 0 };
+    S32         iconPad{ 0 };
+    S32         iconWidth{ 0 };
+    S32         textPad{ 0 };
+    S32         textPadTop{ 0 };
+    S32         arrowSize{ 0 };
+    S32         arrowPadTop{ 0 };
+    S32         maxFolderItemOverlap{ 0 };
+};
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLFolderViewItem
@@ -108,21 +131,11 @@ protected:
     LLUIImagePtr                mIcon,
                                 mIconOpen,
                                 mIconOverlay;
-    S32                         mLocalIndentation;
+    // Shared, interned const layout + colors (see LLFolderViewItemStyle).
+    const LLFolderViewItemStyle* mStyle;
     S32                         mIndentation;
-    S32                         mItemHeight;
     S32                         mDragStartX,
                                 mDragStartY;
-
-    S32                         mLeftPad,
-                                mIconPad,
-                                mIconWidth,
-                                mTextPad,
-                                mTextPadRight,
-                                mTextPadTop,
-                                mArrowSize,
-                                mArrowPadTop,
-                                mMaxFolderItemOverlap;
 
     F32                         mControlLabelRotation;
     LLFolderView*               mRoot;
@@ -139,8 +152,6 @@ protected:
 
     S32                         mCutGeneration;
 
-    LLUIColor                   mFontColor;
-    LLUIColor                   mFontHighlightColor;
     static bool                 sColorSetInitialized;
 
     // For now assuming all colors are the same in derived classes.
@@ -308,6 +319,9 @@ public:
 
     //virtual LLView* findChildView(const std::string& name, bool recurse) const { return LLView::findChildView(name, recurse); }
 
+    // Releases cached text geometry when hidden so off-screen items hold no font buffers.
+    virtual void setVisible(bool visible);
+
     //  virtual void handleDropped();
     virtual void draw();
     void drawOpenFolderArrow();
@@ -329,8 +343,16 @@ private:
     static LLUIImagePtr sFavoriteContentImg;
     static LLFontGL* sSuffixFont;
 
-    LLFontVertexBuffer mLabelFontBuffer;
-    LLFontVertexBuffer mSuffixFontBuffer;
+    // Returns a shared, immutable style for the given params, deduplicated across
+    // all items (there are only a handful of distinct param sets). Main-thread only.
+    static const LLFolderViewItemStyle* internStyle(const Params& p);
+
+    // Cached text geometry. Lazily (re)built during draw() and released when the
+    // item goes off-screen (see setVisible), so only on-screen items hold vertex
+    // buffers and their MSVC per-std::list sentinel allocations. Null until first
+    // drawn, after being hidden, or (for the suffix) when there is no suffix.
+    std::unique_ptr<LLFontVertexBuffer> mLabelFontBuffer;
+    std::unique_ptr<LLFontVertexBuffer> mSuffixFontBuffer;
     LLFontGL* pLabelFont{nullptr};
 };
 

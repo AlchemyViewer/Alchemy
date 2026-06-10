@@ -207,7 +207,7 @@ LLFolderView::LLFolderView(const Params& p)
     mAutoOpenCandidate = NULL;
     mAutoOpenTimer.stop();
     mKeyboardSelection = false;
-    mIndentation =  getParentFolder() ? getParentFolder()->getIndentation() + mLocalIndentation : 0;
+    mIndentation =  getParentFolder() ? getParentFolder()->getIndentation() + mStyle->localIndentation : 0;
 
     //clear label
     // go ahead and render root folder as usual
@@ -230,11 +230,11 @@ LLFolderView::LLFolderView(const Params& p)
     // Textbox
     LLTextBox::Params text_p;
     LLFontGL* font = getLabelFontForStyle(mLabelStyle);
-    //mIconPad, mTextPad are set in folder_view_item.xml
-    LLRect new_r = LLRect(rect.mLeft + mIconPad,
-                  rect.mTop - mTextPad,
+    //icon_pad, text_pad are set in folder_view_item.xml (shared via mStyle)
+    LLRect new_r = LLRect(rect.mLeft + mStyle->iconPad,
+                  rect.mTop - mStyle->textPad,
                   rect.mRight,
-                  rect.mTop - mTextPad - font->getLineHeight());
+                  rect.mTop - mStyle->textPad - font->getLineHeight());
     text_p.rect(new_r);
     text_p.name(std::string(p.name));
     text_p.font(font);

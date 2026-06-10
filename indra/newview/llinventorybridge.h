@@ -201,7 +201,6 @@ protected:
     const LLUUID mUUID; // item id
     LLInventoryType::EType mInvType;
     bool                        mIsLink;
-    LLTimer                     mTimeSinceRequestStart;
     mutable std::string         mDisplayName;
     mutable std::string         mSearchableName;
 

@@ -418,7 +418,7 @@ S32 LLConversationViewSession::arrange(S32* width, S32* height)
     //LLFolderViewFolder::arrange computes value for getIndentation() function below
     S32 arranged = LLFolderViewFolder::arrange(width, height);
 
-    S32 h_pad = mHasArrow ? getIndentation() + mArrowSize : getIndentation();
+    S32 h_pad = mHasArrow ? getIndentation() + mStyle->arrowSize : getIndentation();
 
     LLRect rect(mCollapsedMode ? getLocalRect().mLeft : h_pad,
                 getLocalRect().mTop,
@@ -454,7 +454,7 @@ void LLConversationViewSession::toggleCollapsedMode(bool is_collapsed)
     // except for the icon which we display in minimized mode
     getChild<LLView>("conversation_item_stack")->setVisible(!mCollapsedMode);
 
-    S32 h_pad = mHasArrow ? getIndentation() + mArrowSize : getIndentation();
+    S32 h_pad = mHasArrow ? getIndentation() + mStyle->arrowSize : getIndentation();
 
     mItemPanel->translate(mCollapsedMode ? -h_pad : h_pad, 0);
 }
@@ -692,7 +692,7 @@ void LLConversationViewParticipant::draw()
     const LLFontGL* font = getLabelFontForStyle(mLabelStyle);
     F32 right_x  = 0;
 
-    F32 y = (F32)getRect().getHeight() - font->getLineHeight() - (F32)mTextPad;
+    F32 y = (F32)getRect().getHeight() - font->getLineHeight() - (F32)mStyle->textPad;
     F32 text_left = (F32)getLabelXPos();
 
     LLUIColor* color;
@@ -837,7 +837,7 @@ void LLConversationViewParticipant::onMouseLeave(S32 x, S32 y, MASK mask)
 
 S32 LLConversationViewParticipant::getLabelXPos()
 {
-    return getIndentation() + mAvatarIcon->getRect().getWidth() + mIconPad;
+    return getIndentation() + mAvatarIcon->getRect().getWidth() + mStyle->iconPad;
 }
 
 // static
