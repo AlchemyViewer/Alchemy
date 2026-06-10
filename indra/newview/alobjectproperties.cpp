@@ -175,12 +175,19 @@ std::string flagsToString(U32 flags)
 const std::string& iconName(const Record& rec)
 {
     static const std::string s_object("Inv_Object");
+    static const std::string s_multi("Inv_Object_Multi");
+    static const std::string s_mesh("Inv_Mesh");
     static const std::string s_avatar("Generic_Person");
-    switch (rec.mGeom)
-    {
-    case GEOM_AVATAR: return s_avatar;
-    default:          return s_object;
-    }
+
+    if (rec.mGeom == GEOM_AVATAR)
+        return s_avatar;
+    // Multi-prim linksets read as "multi" regardless of geometry; single prims
+    // split mesh vs everything else.
+    if (rec.mPrimCount > 1)
+        return s_multi;
+    if (rec.mGeom == GEOM_MESH)
+        return s_mesh;
+    return s_object;
 }
 
 } // namespace ALObjectProperties
@@ -265,6 +272,11 @@ void ALObjectPropertiesCache::processObjectProperties(LLMessageSystem* msg, void
         U64 creation_date = 0;
         msg->getU64Fast(_PREHASH_ObjectData, _PREHASH_CreationDate, creation_date, i);
         p.mCreationDate = (time_t)(creation_date / 1000000);
+        msg->getU32Fast(_PREHASH_ObjectData, _PREHASH_BaseMask, p.mBaseMask, i);
+        msg->getU32Fast(_PREHASH_ObjectData, _PREHASH_OwnerMask, p.mOwnerMask, i);
+        msg->getU32Fast(_PREHASH_ObjectData, _PREHASH_GroupMask, p.mGroupMask, i);
+        msg->getU32Fast(_PREHASH_ObjectData, _PREHASH_EveryoneMask, p.mEveryoneMask, i);
+        msg->getU32Fast(_PREHASH_ObjectData, _PREHASH_NextOwnerMask, p.mNextOwnerMask, i);
         msg->getStringFast(_PREHASH_ObjectData, _PREHASH_Name, p.mName, i);
         msg->getStringFast(_PREHASH_ObjectData, _PREHASH_Description, p.mDescription, i);
         p.mGroupOwned = p.mOwnerId.isNull() && p.mGroupId.notNull();

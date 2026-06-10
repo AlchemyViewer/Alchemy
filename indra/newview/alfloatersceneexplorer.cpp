@@ -22,16 +22,28 @@
 #include "lltimer.h"
 
 #include "llbutton.h"
+#include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
 #include "llfiltereditor.h"
 #include "llfolderview.h"
 #include "llfolderviewitem.h"
+#include "lllayoutstack.h"
 #include "llscrollcontainer.h"
+#include "llscrolllistctrl.h"
 #include "lltextbox.h"
 #include "lltrans.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
+
+#include "lldate.h"
+#include "llinventoryfunctions.h"
+#include "llinventorymodel.h"
+#include "llmaterial.h"
+#include "llpermissionsflags.h"
+#include "lltextureentry.h"
+#include "lltexturectrl.h"
+#include "llviewerinventory.h"
 
 #include "alderenderlist.h"
 #include "alobjectproperties.h"
@@ -49,6 +61,8 @@
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
 #include "llvoavatar.h"
+#include "rlvactions.h"
+#include "rlvcommon.h"
 
 namespace
 {
@@ -119,15 +133,150 @@ namespace
         return 0;
     }
 
+    // RLVa-aware avatar row label: anonymize when @shownames restricts this
+    // agent (self is never restricted).
+    std::string displayNameFor(const LLUUID& id, const LLAvatarName& av_name)
+    {
+        if (RlvActions::isRlvEnabled() && id != gAgentID
+            && !RlvActions::canShowName(RlvActions::SNC_DEFAULT, id))
+        {
+            return RlvStrings::getAnonym(av_name);
+        }
+        return av_name.getCompleteName();
+    }
+
+    // Empty when the name cache hasn't resolved this avatar yet.
+    std::string avatarDisplayName(const LLUUID& id)
+    {
+        LLAvatarName av_name;
+        if (!LLAvatarNameCache::get(id, &av_name))
+            return std::string();
+        return displayNameFor(id, av_name);
+    }
+
+    // Agent / group app-SLURLs: the URL machinery renders these as resolved,
+    // clickable names (profile/group inspect on click) and applies RLVa
+    // @shownames anonymization for us.
+    std::string agentSlurl(const LLUUID& id)
+    {
+        return "secondlife:///app/agent/" + id.asString() + "/inspect";
+    }
+    std::string groupSlurl(const LLUUID& id)
+    {
+        return "secondlife:///app/group/" + id.asString() + "/inspect";
+    }
+
+    // Compact modify/copy/transfer triad, e.g. "MC-".
+    std::string permTriad(U32 mask)
+    {
+        std::string s;
+        s += (mask & PERM_MODIFY)   ? 'M' : '-';
+        s += (mask & PERM_COPY)     ? 'C' : '-';
+        s += (mask & PERM_TRANSFER) ? 'T' : '-';
+        return s;
+    }
+
+    // Mirrors the build floater's copy-texture / Copy-Asset-UUID gating
+    // (llpanelface.cpp): a texture/material asset id may be shown when the
+    // agent could legitimately obtain it — real god powers (no admin-menu
+    // fakery), a library/default asset, or a full-perm item referencing the
+    // asset in their inventory. The inventory search is expensive, so results
+    // are memoized per session (positives are stable; a stale negative just
+    // means reopening the floater after acquiring a full-perm copy).
+    bool canRevealAssetId(const LLUUID& asset_id)
+    {
+        if (asset_id.isNull())
+            return false;
+        if (gAgent.isGodlikeWithoutAdminMenuFakery())
+            return true;
+
+        static boost::unordered_map<LLUUID, bool> s_reveal_cache;
+        auto cached = s_reveal_cache.find(asset_id);
+        if (cached != s_reveal_cache.end())
+            return cached->second;
+
+        bool reveal = get_is_predefined_texture(asset_id);
+        if (!reveal)
+        {
+            LLViewerInventoryCategory::cat_array_t cats;
+            LLViewerInventoryItem::item_array_t items;
+            LLAssetIDMatches asset_id_matches(asset_id);
+            gInventory.collectDescendentsIf(gInventory.getRootFolderID(), cats, items,
+                                            LLInventoryModel::EXCLUDE_TRASH, asset_id_matches);
+            for (const auto& item : items)
+            {
+                if (item && item->getIsFullPerm())
+                {
+                    reveal = true;
+                    break;
+                }
+            }
+            if (!reveal)
+            {
+                // Library assets are free for everyone.
+                cats.clear();
+                items.clear();
+                gInventory.collectDescendentsIf(gInventory.getLibraryRootFolderID(), cats, items,
+                                                LLInventoryModel::EXCLUDE_TRASH, asset_id_matches);
+                reveal = !items.empty();
+            }
+        }
+        s_reveal_cache[asset_id] = reveal;
+        return reveal;
+    }
+
+    // Asset id for display, or a friendly note when the user lacks the
+    // permissions to see it.
+    std::string assetIdForDisplay(const LLUUID& asset_id)
+    {
+        return canRevealAssetId(asset_id) ? asset_id.asString()
+                                          : std::string("(needs a full-perm copy to view)");
+    }
+
+    // Rough heat indicator for cost numbers: normal / caution / red.
+    // (LabelTextColor, not TextFgColor — the latter is for editor backgrounds
+    // and reads near-black on dark skins.)
+    const LLColor4& heatColor(F32 value, F32 caution, F32 alert)
+    {
+        static const LLUIColor normal = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+        static const LLUIColor warn   = LLUIColorTable::instance().getColor("AlertCautionTextColor", LLColor4::yellow);
+        static const LLUIColor danger = LLUIColorTable::instance().getColor("Red", LLColor4::red);
+        if (value >= alert)
+            return danger.get();
+        if (value >= caution)
+            return warn.get();
+        return normal.get();
+    }
+
+    // De-emphasis that is still readable on dark skins (LabelDisabledColor is
+    // grey-on-grey there).
+    const LLColor4& mutedColor()
+    {
+        static const LLUIColor muted = LLUIColorTable::instance().getColor("LtGray", LLColor4::grey);
+        return muted.get();
+    }
+
+    const LLColor4& labelColor()
+    {
+        static const LLUIColor label = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+        return label.get();
+    }
+
+    const LLColor4& cautionColor()
+    {
+        static const LLUIColor caution = LLUIColorTable::instance().getColor("AlertCautionTextColor", LLColor4::yellow);
+        return caution.get();
+    }
+
     std::string placeholderName(ALSceneExplorerItem::EItemType type, const LLUUID& id)
     {
         switch (type)
         {
         case ALSceneExplorerItem::TYPE_AVATAR:
         {
-            LLAvatarName av_name;
-            if (LLAvatarNameCache::get(id, &av_name))
-                return av_name.getCompleteName();
+            std::string name = avatarDisplayName(id);
+            if (!name.empty())
+                return name;
             return std::string("(loading avatar)");
         }
         case ALSceneExplorerItem::TYPE_ATTACHMENT:
@@ -149,6 +298,8 @@ ALFloaterSceneExplorer::~ALFloaterSceneExplorer()
     gIdleCallbacks.deleteFunction(onIdle, this);
     if (mPropsConn.connected())
         mPropsConn.disconnect();
+    if (mDerenderConn.connected())
+        mDerenderConn.disconnect();
 }
 
 bool ALFloaterSceneExplorer::postBuild()
@@ -161,11 +312,13 @@ bool ALFloaterSceneExplorer::postBuild()
     mViewModel.getFilter().setEmptyLookupMessage(getString("no_matches"));
 
     mShowAvatars = gSavedSettings.getBOOL("ALSceneExplorerShowAvatars");
+    mShowDerendered = gSavedSettings.getBOOL("ALSceneExplorerShowDerendered");
 
     // Push persisted filter/sort state into the controls before wiring the
     // commit callbacks, so the UI, the saved settings, and the filter object
     // all agree from the first frame.
     getChild<LLUICtrl>("show_avatars_check")->setValue(mShowAvatars);
+    getChild<LLUICtrl>("show_derendered_check")->setValue(mShowDerendered);
     const U32 flag_mask = gSavedSettings.getU32("ALSceneExplorerFlagFilter");
     getChild<LLUICtrl>("flag_scripted")->setValue((flag_mask & ALObjectProperties::FLAG_SCRIPTED) != 0);
     getChild<LLUICtrl>("flag_light")->setValue((flag_mask & ALObjectProperties::FLAG_LIGHT) != 0);
@@ -183,6 +336,7 @@ bool ALFloaterSceneExplorer::postBuild()
     getChild<LLUICtrl>("flag_light")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
     getChild<LLUICtrl>("flag_particles")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
     getChild<LLUICtrl>("show_avatars_check")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
+    getChild<LLUICtrl>("show_derendered_check")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
     getChild<LLUICtrl>("sort_combo")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onSortChanged, this));
 
     getChild<LLButton>("refresh_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::reconcile, this));
@@ -192,20 +346,51 @@ bool ALFloaterSceneExplorer::postBuild()
     getChild<LLButton>("teleport_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::doTeleport, this));
     getChild<LLButton>("copy_id_btn")->setClickedCallback(boost::bind(&ALFloaterSceneExplorer::doCopyID, this));
 
+    // Detail pane, received-items style: one layout panel hosts the expander
+    // bar + content, and collapses down to just the bar (min_dim) — the bar
+    // stays visible and the panel-spacing gap above it is the drag area.
+    mDetailHost = getChild<LLLayoutPanel>("detail_host_layout");
+    mDetailsExpanded = gSavedSettings.getBOOL("ALSceneExplorerShowDetails");
+    getChild<LLButton>("details_btn")->setToggleState(mDetailsExpanded);
+    getChild<LLButton>("details_btn")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onToggleDetails, this));
+    getChild<LLLayoutStack>("main_stack")->collapsePanel(mDetailHost, !mDetailsExpanded);
+
+    // The perms / flag checkboxes are display-only: any click is reverted by
+    // refilling from the model (keeps them full-brightness, unlike disabling).
+    static const char* const READONLY_CHECKS[] = {
+        "check_modify", "check_copy", "check_transfer",
+        "check_scripted", "check_light", "check_physics", "check_phantom", "check_temp"
+    };
+    for (const char* check_name : READONLY_CHECKS)
+    {
+        getChild<LLUICtrl>(check_name)->setCommitCallback(
+            boost::bind(&ALFloaterSceneExplorer::refreshDetail, this));
+    }
+
     // Context-menu commands (menu_scene_explorer.xml, shown by the folder view).
     mCommitCallbackRegistrar.add("SceneExplorer.Focus",    boost::bind(&ALFloaterSceneExplorer::doFocus, this));
     mCommitCallbackRegistrar.add("SceneExplorer.Edit",     boost::bind(&ALFloaterSceneExplorer::doEdit, this));
     mCommitCallbackRegistrar.add("SceneExplorer.Inspect",  boost::bind(&ALFloaterSceneExplorer::doInspect, this));
     mCommitCallbackRegistrar.add("SceneExplorer.Teleport", boost::bind(&ALFloaterSceneExplorer::doTeleport, this));
     mCommitCallbackRegistrar.add("SceneExplorer.CopyID",   boost::bind(&ALFloaterSceneExplorer::doCopyID, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Derender", boost::bind(&ALFloaterSceneExplorer::doDerender, this, _2));
+    mCommitCallbackRegistrar.add("SceneExplorer.Restore",  boost::bind(&ALFloaterSceneExplorer::doRestore, this));
 
     mPropsConn = ALObjectPropertiesCache::instance().setChangeCallback(
         boost::bind(&ALFloaterSceneExplorer::onPropsCacheChanged, this, _1));
+    // Track derender changes from anywhere (explorer, build menu, Blocked
+    // floater) so rows move between the live tree and the Derendered category.
+    mDerenderConn = ALDerenderList::setChangeCallback(
+        boost::bind(&ALFloaterSceneExplorer::onDerenderListChanged, this));
 
     // Restore persisted sort order, and seed the filter object from the
     // controls restored above.
     mViewModel.getSorter().setMode((ALSceneExplorerSort::ESortMode)gSavedSettings.getU32("ALSceneExplorerSortOrder"));
     onFilterChanged();
+
+    // Sentinel so the first idle pass (no selection) disables the action
+    // buttons rather than leaving them at their XML-default enabled state.
+    mLastButtonStateID.generate();
 
     // Drive discovery / fetch / filtering / layout from the viewer idle loop, the
     // way LLInventoryPanel does, rather than from draw(). This keeps tree mutation
@@ -277,6 +462,22 @@ void ALFloaterSceneExplorer::idleUpdate()
     // it, then arranges/lays out the tree in one consistent pass.
     mTree->update();
     syncSelectionToWorld();
+    updateActionButtons();
+
+    // Detail pane follows the selection; also rebuilt when props arrive or a
+    // reconcile pass refreshes live metrics (mDetailDirty). Skipped while the
+    // host is collapsed to just the expander bar.
+    if (mDetailHost && mDetailsExpanded)
+    {
+        ALSceneExplorerItem* detail_item = getSelectedItem();
+        const LLUUID detail_id = detail_item ? detail_item->getUUID() : LLUUID::null;
+        if (detail_id != mLastDetailID || mDetailDirty)
+        {
+            mLastDetailID = detail_id;
+            mDetailDirty = false;
+            refreshDetail();
+        }
+    }
 }
 
 void ALFloaterSceneExplorer::drainBuildQueue(F64 max_time)
@@ -383,7 +584,7 @@ LLFolderViewItem* ALFloaterSceneExplorer::createWidget(ALSceneExplorerItem* item
     }
     else
     {
-        widget = LLUICtrlFactory::create<LLFolderViewItem>(params);
+        widget = LLUICtrlFactory::create<ALSceneExplorerListItem>(params);
     }
 
     if (parent_widget)
@@ -462,6 +663,12 @@ ALSceneExplorerItem* ALFloaterSceneExplorer::getOrCreateNode(LLViewerObject* obj
     ALSceneExplorerItem* item = new ALSceneExplorerItem(type, id, placeholderName(type, id), mViewModel, this);
     item->setLinkOrder(link_order);
     ALObjectProperties::Record rec = ALObjectProperties::fromObject(obj);
+    if (LLVOAvatar* av = obj->asAvatar())
+    {
+        // Avatar rows repurpose these fields: complexity + worn attachments.
+        rec.mRenderCost = (F32)av->getVisualComplexity();
+        rec.mPrimCount  = av->getAttachmentCount();
+    }
     item->updateRecord(rec);
 
     parent_item->addChild(item);
@@ -618,6 +825,166 @@ void ALFloaterSceneExplorer::clearTree()
     mQueued.clear();
 }
 
+// ============================================================================
+// Derendered category
+// ============================================================================
+void ALFloaterSceneExplorer::ensureDerenderedCategory()
+{
+    if (mDerenderedCategory)
+        return;
+    mDerenderedCategory = new ALSceneExplorerItem(ALSceneExplorerItem::TYPE_CATEGORY_DERENDERED,
+                                                  LLUUID::generateNewID(), "Derendered", mViewModel, this);
+    mRootItem->addChild(mDerenderedCategory);
+    mDerenderedWidget = createWidget(mDerenderedCategory, true, mTree);
+    mDerenderedWidget->refresh();
+}
+
+void ALFloaterSceneExplorer::destroyDerenderedCategory()
+{
+    if (!mDerenderedCategory)
+        return;
+
+    // Remove the entry rows first (they live in mItems/mWidgets), then the
+    // category node + widget themselves (member-held, not in the maps).
+    std::vector<LLUUID> ids;
+    for (auto it = mDerenderedCategory->getChildrenBegin(); it != mDerenderedCategory->getChildrenEnd(); ++it)
+    {
+        ids.push_back(static_cast<ALSceneExplorerItem*>(it->get())->getUUID());
+    }
+    for (const LLUUID& id : ids)
+    {
+        auto it = mItems.find(id);
+        if (it != mItems.end())
+            removeNode(it->second);
+    }
+
+    LLFolderViewModelItem* base_item = mDerenderedCategory;
+    if (LLFolderViewModelItem* parent = const_cast<LLFolderViewModelItem*>(base_item->getParent()))
+        parent->removeChild(mDerenderedCategory);
+    if (mDerenderedWidget)
+        mDerenderedWidget->destroyView();
+    mDerenderedCategory = nullptr;
+    mDerenderedWidget = nullptr;
+}
+
+void ALFloaterSceneExplorer::onDerenderListChanged()
+{
+    syncDerendered();
+    updateCategoryCounts();
+}
+
+void ALFloaterSceneExplorer::syncDerendered()
+{
+    if (!mTree || !mRootItem)
+        return;
+
+    LLViewerRegion* region = gAgent.getRegion();
+    const U64 region_handle = region ? region->getHandle() : 0;
+
+    // Desired set: derendered objects scoped to the current region (their
+    // local-id bookkeeping is region-specific); derendered avatars are
+    // region-less and always listed.
+    std::vector<const ALDerenderEntry*> wanted;
+    if (mShowDerendered)
+    {
+        for (const auto& entry : ALDerenderList::instance().getEntries())
+        {
+            if (!entry || !entry->isValid())
+                continue;
+            if (entry->getType() == ALDerenderEntry::TYPE_OBJECT)
+            {
+                if (static_cast<const ALDerenderObject*>(entry.get())->idRegion != region_handle)
+                    continue;
+            }
+            else if (entry->getType() != ALDerenderEntry::TYPE_AVATAR)
+            {
+                continue;
+            }
+            wanted.push_back(entry.get());
+        }
+    }
+
+    if (wanted.empty())
+    {
+        destroyDerenderedCategory();
+        return;
+    }
+    ensureDerenderedCategory();
+
+    boost::unordered_set<LLUUID> present;
+    for (const ALDerenderEntry* entry : wanted)
+    {
+        const LLUUID& id = entry->getID();
+        const bool is_avatar_entry = (entry->getType() == ALDerenderEntry::TYPE_AVATAR);
+
+        // Same anonymization rule as live avatar rows.
+        std::string name = entry->getName();
+        if (is_avatar_entry && RlvActions::isRlvEnabled() && id != gAgentID
+            && !RlvActions::canShowName(RlvActions::SNC_DEFAULT, id))
+        {
+            name = RlvStrings::getAnonym(name);
+        }
+
+        auto it = mItems.find(id);
+        ALSceneExplorerItem* node = (it != mItems.end()) ? it->second : nullptr;
+        if (node && !node->isDerenderedType())
+        {
+            // A live node still holds this id (the kill is in flight); the next
+            // sync pass picks the entry up once reconcile has swept it.
+            continue;
+        }
+        present.insert(id);
+
+        if (!node)
+        {
+            node = new ALSceneExplorerItem(
+                is_avatar_entry ? ALSceneExplorerItem::TYPE_DERENDERED_AVATAR
+                                : ALSceneExplorerItem::TYPE_DERENDERED_OBJECT,
+                id, name, mViewModel, this);
+            if (is_avatar_entry)
+                node->getRecordRef().mGeom = ALObjectProperties::GEOM_AVATAR;
+            mDerenderedCategory->addChild(node);
+            LLFolderViewItem* widget = createWidget(node, false, mDerenderedWidget);
+            mItems[id] = node;
+            mWidgets[id] = widget;
+            widget->refresh();
+        }
+        else if (node->getName() != name && !name.empty())
+        {
+            node->setName(name); // covers RLVa @shownames flips
+            if (auto wit = mWidgets.find(id); wit != mWidgets.end())
+                wit->second->refresh();
+        }
+
+        // Stored position drives the distance suffix / distance sort.
+        if (!is_avatar_entry && region)
+        {
+            const ALDerenderObject* obj_entry = static_cast<const ALDerenderObject*>(entry);
+            ALObjectProperties::Record& rec = node->getRecordRef();
+            rec.mPosRegion = obj_entry->posRegion;
+            rec.mPosGlobal = region->getPosGlobalFromRegion(obj_entry->posRegion);
+            rec.mDistance  = (F32)(rec.mPosGlobal - gAgent.getPositionGlobal()).magVec();
+        }
+    }
+
+    // Prune rows whose entries were restored/removed (or filtered out).
+    std::vector<LLUUID> stale;
+    for (auto it = mDerenderedCategory->getChildrenBegin(); it != mDerenderedCategory->getChildrenEnd(); ++it)
+    {
+        const LLUUID& id = static_cast<ALSceneExplorerItem*>(it->get())->getUUID();
+        if (!present.count(id))
+            stale.push_back(id);
+    }
+    for (const LLUUID& id : stale)
+    {
+        auto it = mItems.find(id);
+        if (it != mItems.end())
+            removeNode(it->second);
+    }
+    if (mDerenderedCategory->getChildrenCount() == 0)
+        destroyDerenderedCategory();
+}
+
 void ALFloaterSceneExplorer::reconcile()
 {
     LLViewerRegion* region = gAgent.getRegion();
@@ -674,6 +1041,17 @@ void ALFloaterSceneExplorer::reconcile()
         const bool is_attachment = obj->isAttachment();
         if ((is_avatar || is_attachment) && !mShowAvatars)
             continue;
+        // RLVa: when nearby-agent presence is restricted, other avatars (and
+        // their attachments) must not be listed at all; self always stays.
+        // Re-evaluated every pass, so imposing/lifting the restriction prunes
+        // or restores the rows within a reconcile tick.
+        if ((is_avatar || is_attachment) && RlvActions::isRlvEnabled()
+            && !RlvActions::canShowNearbyAgents())
+        {
+            const LLVOAvatar* wearer = is_avatar ? avatarp : obj->getAvatarAncestor();
+            if (wearer && !wearer->isSelf())
+                continue;
+        }
         // Unselectable objects (water/sky/ground, no-select prims) can neither be
         // fetched from the server nor edited, so leave them out entirely.
         if (!is_avatar && !obj->mbCanSelect)
@@ -713,6 +1091,25 @@ void ALFloaterSceneExplorer::reconcile()
         rec.mDistance   = (F32)(rec.mPosGlobal - gAgent.getPositionGlobal()).magVec();
         rec.mObjectCost = obj->peekObjectCost();
         rec.mLandImpact = obj->peekLinksetCost();
+
+        // Avatar row labels depend on RLVa name restrictions, which can change
+        // at any time — re-derive per pass (a handful of avatars, one cache
+        // lookup + string compare each) so @shownames anonymizes existing rows
+        // promptly and lifting it restores them. Complexity / attachment count
+        // shift as avatars change outfits, so refresh those here too.
+        if (is_avatar)
+        {
+            rec.mRenderCost = (F32)avatarp->getVisualComplexity();
+            rec.mPrimCount  = avatarp->getAttachmentCount();
+
+            const std::string name = avatarDisplayName(id);
+            if (!name.empty() && name != node->getName())
+            {
+                node->setName(name);
+                if (auto wit = mWidgets.find(id); wit != mWidgets.end())
+                    wit->second->refresh();
+            }
+        }
     }
 
     // Collect ids, not pointers: removing a linkset root frees its descendant
@@ -721,10 +1118,14 @@ void ALFloaterSceneExplorer::reconcile()
     std::vector<LLUUID> to_remove;
     for (const auto& entry : mItems)
     {
-        // Attachment-point folders are synthetic (no backing object); they are
-        // pruned below once empty rather than matched against the present set.
-        if (entry.second->getItemType() == ALSceneExplorerItem::TYPE_ATTACHMENT_POINT)
+        // Synthetic nodes have no backing object in the present set:
+        // attachment-point folders are pruned below once empty, and derendered
+        // rows are managed entirely by syncDerendered().
+        if (entry.second->getItemType() == ALSceneExplorerItem::TYPE_ATTACHMENT_POINT
+            || entry.second->isDerenderedType())
+        {
             continue;
+        }
         if (!present.count(entry.first))
             to_remove.push_back(entry.first);
     }
@@ -751,6 +1152,12 @@ void ALFloaterSceneExplorer::reconcile()
         if (it != mItems.end())
             removeNode(it->second);
     }
+
+    // Reflect derender-list state (also re-checked here so region changes and
+    // toggle flips stay correct even without a change signal).
+    syncDerendered();
+    updateCategoryCounts();
+    mDetailDirty = true; // live metrics (distance/costs) were refreshed above
 
     // The per-pass distance refresh above doesn't dirty per-item filter state,
     // so when the radius predicate is active, re-arm the whole filter once the
@@ -856,10 +1263,11 @@ void ALFloaterSceneExplorer::retryUnresolved()
     {
         ALSceneExplorerItem* item = entry.second;
         const ALSceneExplorerItem::EItemType type = item->getItemType();
-        // Avatars resolve via the name cache and attachment-point folders are
-        // synthetic — neither has server object properties to fetch.
+        // Avatars resolve via the name cache; attachment-point folders and
+        // derendered rows are synthetic — none has server props to fetch.
         if (type == ALSceneExplorerItem::TYPE_AVATAR
             || type == ALSceneExplorerItem::TYPE_ATTACHMENT_POINT
+            || item->isDerenderedType()
             || item->isContainer())
         {
             continue;
@@ -882,7 +1290,9 @@ void ALFloaterSceneExplorer::retryUnresolved()
 
 void ALFloaterSceneExplorer::applyServerProps(ALSceneExplorerItem* item)
 {
-    if (!item)
+    // Derendered rows keep their stored entry name; cached props (from before
+    // the derender) must not overwrite it.
+    if (!item || item->isDerenderedType())
         return;
     const ALObjectPropertiesCache::ServerProps* p =
         ALObjectPropertiesCache::instance().get(item->getUUID());
@@ -912,7 +1322,7 @@ void ALFloaterSceneExplorer::onAvatarNameLoaded(const LLUUID& id, const LLAvatar
     auto it = mItems.find(id);
     if (it == mItems.end())
         return;
-    it->second->setName(av_name.getCompleteName());
+    it->second->setName(displayNameFor(id, av_name)); // RLVa-aware
     auto wit = mWidgets.find(id);
     if (wit != mWidgets.end())
         wit->second->refresh();
@@ -931,6 +1341,9 @@ void ALFloaterSceneExplorer::onPropsCacheChanged(const LLUUID& id)
     auto wit = mWidgets.find(id);
     if (wit != mWidgets.end())
         wit->second->refresh();
+
+    if (id == mLastDetailID)
+        mDetailDirty = true;
 }
 
 // ============================================================================
@@ -967,8 +1380,434 @@ void ALFloaterSceneExplorer::onFilterChanged()
         gSavedSettings.setBOOL("ALSceneExplorerShowAvatars", show_av);
         reconcile();
     }
+
+    const bool show_derendered = getChild<LLUICtrl>("show_derendered_check")->getValue().asBoolean();
+    if (show_derendered != mShowDerendered)
+    {
+        mShowDerendered = show_derendered;
+        gSavedSettings.setBOOL("ALSceneExplorerShowDerendered", show_derendered);
+        syncDerendered();
+    }
     // The filter setters above bumped the filter generation, so the next idle
     // pass (mTree->update()) re-filters and re-arranges.
+}
+
+void ALFloaterSceneExplorer::updateCategoryCounts()
+{
+    auto update = [](ALSceneExplorerItem* category, LLFolderViewItem* widget, const char* base)
+    {
+        if (!category)
+            return;
+        const std::string name = llformat("%s (%d)", base, (S32)category->getChildrenCount());
+        if (name != category->getName())
+        {
+            category->setName(name);
+            if (widget)
+                widget->refresh();
+        }
+    };
+    update(mObjectsCategory,    mObjectsWidget,    "Objects");
+    update(mAvatarsCategory,    mAvatarsWidget,    "Avatars");
+    update(mDerenderedCategory, mDerenderedWidget, "Derendered");
+}
+
+void ALFloaterSceneExplorer::updateActionButtons()
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+    const LLUUID id = item ? item->getUUID() : LLUUID::null;
+    if (id == mLastButtonStateID)
+        return;
+    mLastButtonStateID = id;
+
+    const bool is_row = item && !item->isContainer();
+    LLViewerObject* obj = is_row ? gObjectList.findObject(id) : nullptr;
+    const bool derendered_obj = item && item->getItemType() == ALSceneExplorerItem::TYPE_DERENDERED_OBJECT;
+
+    getChild<LLButton>("focus_btn")->setEnabled(obj != nullptr);
+    getChild<LLButton>("edit_btn")->setEnabled(
+        obj && (!RlvActions::isRlvEnabled() || RlvActions::canEdit(obj)));
+    getChild<LLButton>("inspect_btn")->setEnabled(obj != nullptr);
+    // Teleport works for live objects and for derendered objects via their
+    // stored position.
+    getChild<LLButton>("teleport_btn")->setEnabled(obj != nullptr || derendered_obj);
+    getChild<LLButton>("copy_id_btn")->setEnabled(is_row);
+}
+
+// ============================================================================
+// Detail pane
+// ============================================================================
+void ALFloaterSceneExplorer::onToggleDetails()
+{
+    mDetailsExpanded = getChild<LLButton>("details_btn")->getToggleState();
+    gSavedSettings.setBOOL("ALSceneExplorerShowDetails", mDetailsExpanded);
+    if (mDetailHost)
+        getChild<LLLayoutStack>("main_stack")->collapsePanel(mDetailHost, !mDetailsExpanded);
+    mDetailDirty = true;
+}
+
+void ALFloaterSceneExplorer::refreshDetail()
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+    const bool avatar_row = item
+        && (item->getItemType() == ALSceneExplorerItem::TYPE_AVATAR
+            || item->getItemType() == ALSceneExplorerItem::TYPE_DERENDERED_AVATAR);
+
+    // Type-specific panels: swap which one shows for a cleaner display.
+    getChild<LLPanel>("detail_panel_avatar")->setVisible(avatar_row);
+    getChild<LLPanel>("detail_panel_object")->setVisible(!avatar_row);
+
+    if (avatar_row)
+        fillAvatarDetail(item);
+    else
+        fillObjectDetail(item);
+}
+
+void ALFloaterSceneExplorer::fillAvatarDetail(ALSceneExplorerItem* item)
+{
+    getChild<LLView>("detail_faces_layout")->setVisible(false);
+    getChild<LLScrollListCtrl>("detail_faces")->deleteAllItems();
+    mLastFacesID.setNull();
+
+    const ALObjectProperties::Record& rec = item->getRecord();
+    getChild<LLTextBox>("avatar_name")->setText(agentSlurl(item->getUUID()));
+    getChild<LLTextBox>("avatar_distance")->setText(llformat("%.1f m", rec.mDistance));
+
+    LLTextBox* complexity = getChild<LLTextBox>("avatar_complexity");
+    if (rec.mRenderCost > 0.f)
+    {
+        complexity->setText(llformat("%.0f", rec.mRenderCost));
+        complexity->setColor(heatColor(rec.mRenderCost, 100000.f, 250000.f));
+    }
+    else
+    {
+        complexity->setText(std::string("-"));
+        complexity->setColor(mutedColor());
+    }
+    getChild<LLTextBox>("avatar_attachments")->setText(
+        rec.mPrimCount > 0 ? llformat("%d worn", rec.mPrimCount) : std::string("-"));
+
+    LLTextBox* note = getChild<LLTextBox>("avatar_note");
+    if (item->isDerenderedType())
+    {
+        note->setText(std::string("Derendered - right-click the row to Restore."));
+        note->setColor(cautionColor());
+    }
+    else
+    {
+        note->setText(std::string("Click the name to open their profile."));
+        note->setColor(mutedColor());
+    }
+}
+
+void ALFloaterSceneExplorer::fillObjectDetail(ALSceneExplorerItem* item)
+{
+    auto show = [this](const char* name, bool visible)
+    {
+        getChild<LLView>(name)->setVisible(visible);
+    };
+    auto set_text = [this](const char* name, const std::string& value)
+    {
+        getChild<LLTextBox>(name)->setText(value);
+    };
+    auto show_row = [&](const char* label, const char* value, bool visible)
+    {
+        show(label, visible);
+        show(value, visible);
+    };
+
+    LLScrollListCtrl* faces = getChild<LLScrollListCtrl>("detail_faces");
+
+    const bool is_row = item && !item->isContainer();
+    const bool derendered = is_row && item->isDerenderedType();
+    LLViewerObject* obj = is_row ? gObjectList.findObject(item->getUUID()) : nullptr;
+    if (obj && obj->isDead())
+        obj = nullptr;
+
+    LLTextBox* name_box = getChild<LLTextBox>("detail_name");
+    LLTextBox* desc_box = getChild<LLTextBox>("detail_desc");
+
+    if (!is_row)
+    {
+        name_box->setText(std::string("Select an object or avatar to see its details."));
+        desc_box->setVisible(false);
+        show_row("label_owner", "detail_owner", false);
+        show_row("label_creator", "detail_creator", false);
+        show("label_perms", false);
+        show("check_modify", false);
+        show("check_copy", false);
+        show("check_transfer", false);
+        show("detail_perms_next", false);
+        show_row("label_pos", "detail_where", false);
+        show_row("label_size", "detail_size", false);
+        show_row("label_geom", "detail_build", false);
+        show("label_costs", false);
+        show("label_li", false);
+        show("detail_li", false);
+        show("label_render", false);
+        show("detail_render", false);
+        show("label_phys", false);
+        show("detail_phys", false);
+        show("label_stream", false);
+        show("detail_stream", false);
+        show("label_flags", false);
+        show("check_scripted", false);
+        show("check_light", false);
+        show("check_physics", false);
+        show("check_phantom", false);
+        show("check_temp", false);
+        show("detail_flags_extra", false);
+        getChild<LLView>("detail_faces_layout")->setVisible(false);
+        faces->deleteAllItems();
+        mLastFacesID.setNull();
+        return;
+    }
+
+    const ALObjectProperties::Record& rec = item->getRecord();
+    const LLUUID& id = item->getUUID();
+
+    name_box->setText(item->getName());
+
+    // Description doubles as the derendered notice.
+    if (derendered)
+    {
+        desc_box->setVisible(true);
+        desc_box->setText(std::string("Derendered - right-click the row to Restore."));
+        desc_box->setColor(cautionColor());
+    }
+    else
+    {
+        desc_box->setVisible(!rec.mDescription.empty());
+        desc_box->setText(rec.mDescription);
+        desc_box->setColor(labelColor());
+    }
+
+    // Value + colour in one step so loading placeholders read muted and real
+    // values reset to full brightness.
+    auto set_value = [this](const char* name, const std::string& value, bool muted)
+    {
+        LLTextBox* box = getChild<LLTextBox>(name);
+        box->setText(value);
+        box->setColor(muted ? mutedColor() : labelColor());
+    };
+
+    // Who. Rows stay visible while data is in flight (muted "loading...")
+    // so the form doesn't reflow as replies arrive. Hidden only for
+    // derendered entries, whose props are stale.
+    const ALObjectPropertiesCache::ServerProps* props =
+        derendered ? nullptr : ALObjectPropertiesCache::instance().get(id);
+    const bool props_full = props && props->mHasFullData;
+
+    show_row("label_owner", "detail_owner", !derendered);
+    if (!derendered)
+    {
+        if (props)
+            set_value("detail_owner", props->mGroupOwned ? groupSlurl(props->mGroupId)
+                                                         : agentSlurl(props->mOwnerId), false);
+        else
+            set_value("detail_owner", std::string("loading..."), true);
+    }
+
+    show_row("label_creator", "detail_creator", !derendered);
+    if (!derendered)
+    {
+        if (!props_full)
+        {
+            set_value("detail_creator", std::string("loading..."), true);
+        }
+        else if (props->mCreatorId.isNull())
+        {
+            set_value("detail_creator", std::string("-"), true);
+        }
+        else
+        {
+            std::string creator = agentSlurl(props->mCreatorId);
+            if (props->mCreationDate)
+                creator += "  on " + LLDate((F64)props->mCreationDate).asString().substr(0, 10);
+            set_value("detail_creator", creator, false);
+        }
+    }
+
+    show("label_perms", !derendered);
+    show("check_modify", !derendered);
+    show("check_copy", !derendered);
+    show("check_transfer", !derendered);
+    show("detail_perms_next", !derendered);
+    if (!derendered)
+    {
+        getChild<LLCheckBoxCtrl>("check_modify")->setValue(props_full && (props->mOwnerMask & PERM_MODIFY) != 0);
+        getChild<LLCheckBoxCtrl>("check_copy")->setValue(props_full && (props->mOwnerMask & PERM_COPY) != 0);
+        getChild<LLCheckBoxCtrl>("check_transfer")->setValue(props_full && (props->mOwnerMask & PERM_TRANSFER) != 0);
+        set_text("detail_perms_next", props_full ? "next owner " + permTriad(props->mNextOwnerMask)
+                                                 : std::string("loading..."));
+    }
+
+    // Where
+    show_row("label_pos", "detail_where", true);
+    if (derendered)
+    {
+        set_text("detail_where", rec.mPosRegion.isExactlyZero()
+            ? std::string("unknown")
+            : llformat("<%.0f, %.0f, %.0f>  (%.0f m away)",
+                       rec.mPosRegion.mV[VX], rec.mPosRegion.mV[VY], rec.mPosRegion.mV[VZ],
+                       rec.mDistance));
+    }
+    else if (obj)
+    {
+        const LLVector3 pos = obj->getPositionRegion();
+        set_text("detail_where", llformat("<%.1f, %.1f, %.1f>  (%.1f m away)",
+                                          pos.mV[VX], pos.mV[VY], pos.mV[VZ], rec.mDistance));
+    }
+    else
+    {
+        set_text("detail_where", llformat("%.1f m away", rec.mDistance));
+    }
+
+    show_row("label_size", "detail_size", !derendered);
+    if (!derendered)
+    {
+        if (obj)
+        {
+            const LLVector3 scale = obj->getScale();
+            F32 roll, pitch, yaw;
+            obj->getRotationRegion().getEulerAngles(&roll, &pitch, &yaw);
+            set_value("detail_size", llformat("%.2f x %.2f x %.2f m   rot <%.0f, %.0f, %.0f>",
+                                              scale.mV[VX], scale.mV[VY], scale.mV[VZ],
+                                              roll * RAD_TO_DEG, pitch * RAD_TO_DEG, yaw * RAD_TO_DEG),
+                      false);
+        }
+        else
+        {
+            set_value("detail_size", std::string("loading..."), true);
+        }
+    }
+
+    std::string geom;
+    if (rec.mPrimCount > 1)
+        geom += llformat("%d prims   ", rec.mPrimCount);
+    if (rec.mNumTriangles > 0)
+        geom += llformat("%u tris   %u verts   %d faces", rec.mNumTriangles, rec.mNumVertices, rec.mNumFaces);
+    show_row("label_geom", "detail_build", !derendered);
+    if (!derendered)
+        set_value("detail_build", geom.empty() ? std::string("-") : geom, geom.empty());
+
+    // Costs: grey metric labels with aligned, heat-colored values; a missing
+    // metric shows a muted dash so cells never shift.
+    const bool show_costs = !derendered;
+    show("label_costs", show_costs);
+    show("label_li", show_costs);
+    show("detail_li", show_costs);
+    show("label_render", show_costs);
+    show("detail_render", show_costs);
+    show("label_phys", show_costs);
+    show("detail_phys", show_costs);
+    show("label_stream", show_costs);
+    show("detail_stream", show_costs);
+    if (show_costs)
+    {
+        auto set_cost = [this](const char* name, const std::string& value, const LLColor4& color)
+        {
+            LLTextBox* box = getChild<LLTextBox>(name);
+            box->setText(value);
+            box->setColor(color);
+        };
+        set_cost("detail_li",
+                 rec.mLandImpact > 0.f ? llformat("%.0f", rec.mLandImpact) : std::string("-"),
+                 rec.mLandImpact > 0.f ? heatColor(rec.mLandImpact, 50.f, 200.f) : mutedColor());
+        set_cost("detail_render",
+                 rec.mRenderCost > 0.f ? llformat("%.0f", rec.mRenderCost) : std::string("-"),
+                 rec.mRenderCost > 0.f ? heatColor(rec.mRenderCost, 30000.f, 100000.f) : mutedColor());
+        set_cost("detail_phys",
+                 rec.mPhysicsCost > 0.f ? llformat("%.1f", rec.mPhysicsCost) : std::string("-"),
+                 rec.mPhysicsCost > 0.f ? labelColor() : mutedColor());
+        set_cost("detail_stream",
+                 rec.mStreamingCost > 0.f ? llformat("%.1f", rec.mStreamingCost) : std::string("-"),
+                 rec.mStreamingCost > 0.f ? labelColor() : mutedColor());
+    }
+
+    // Flags: the common ones as read-only checkboxes, the rest as muted text.
+    const bool show_flags = !derendered;
+    show("label_flags", show_flags);
+    show("check_scripted", show_flags);
+    show("check_light", show_flags);
+    show("check_physics", show_flags);
+    show("check_phantom", show_flags);
+    show("check_temp", show_flags);
+    if (show_flags)
+    {
+        getChild<LLCheckBoxCtrl>("check_scripted")->setValue(rec.hasFlag(ALObjectProperties::FLAG_SCRIPTED));
+        getChild<LLCheckBoxCtrl>("check_light")->setValue(rec.hasFlag(ALObjectProperties::FLAG_LIGHT));
+        getChild<LLCheckBoxCtrl>("check_physics")->setValue(rec.hasFlag(ALObjectProperties::FLAG_PHYSICS));
+        getChild<LLCheckBoxCtrl>("check_phantom")->setValue(rec.hasFlag(ALObjectProperties::FLAG_PHANTOM));
+        getChild<LLCheckBoxCtrl>("check_temp")->setValue(rec.hasFlag(ALObjectProperties::FLAG_TEMPORARY));
+    }
+    // Suppress everything already conveyed elsewhere in the pane: the five
+    // checkboxes above, and the per-face columns (glow / fullbright / alpha /
+    // PBR) in the materials list below.
+    constexpr U32 SHOWN_ELSEWHERE = ALObjectProperties::FLAG_SCRIPTED | ALObjectProperties::FLAG_LIGHT
+        | ALObjectProperties::FLAG_PHYSICS | ALObjectProperties::FLAG_PHANTOM
+        | ALObjectProperties::FLAG_TEMPORARY
+        | ALObjectProperties::FLAG_GLOW | ALObjectProperties::FLAG_FULLBRIGHT
+        | ALObjectProperties::FLAG_ALPHA | ALObjectProperties::FLAG_PBR_MATERIAL
+        | ALObjectProperties::FLAG_AVATAR;
+    const std::string extra_flags = ALObjectProperties::flagsToString(rec.mFlags & ~SHOWN_ELSEWHERE);
+    show("detail_flags_extra", show_flags && !extra_flags.empty());
+    if (!extra_flags.empty())
+        set_text("detail_flags_extra", "Also: " + extra_flags);
+
+    // Per-face material/texture list (live objects only); asset ids are
+    // perm-gated like the build floater's copy checks. Only rebuilt when the
+    // selection changes — the periodic detail refresh must not reset the
+    // user's scroll position mid-read.
+    getChild<LLView>("detail_faces_layout")->setVisible(obj != nullptr);
+    if (!obj)
+    {
+        faces->deleteAllItems();
+        mLastFacesID.setNull();
+    }
+    else if (id != mLastFacesID)
+    {
+        mLastFacesID = id;
+        faces->deleteAllItems();
+        const U8 num_tes = obj->getNumTEs();
+        for (U8 i = 0; i < num_tes; ++i)
+        {
+            const LLTextureEntry* te = obj->getTE(i);
+            if (!te)
+                continue;
+
+            std::string material;
+            const LLUUID& mat_id = obj->getRenderMaterialID(i);
+            if (mat_id.notNull())
+            {
+                material = "PBR " + assetIdForDisplay(mat_id);
+            }
+            else
+            {
+                material = "tex " + assetIdForDisplay(te->getID());
+                if (const LLMaterialPtr mat = te->getMaterialParams())
+                {
+                    if (mat->getNormalID().notNull())
+                        material += " +norm";
+                    if (mat->getSpecularID().notNull())
+                        material += " +spec";
+                }
+            }
+
+            const F32 alpha = te->getColor().mV[VALPHA];
+            LLSD row;
+            row["columns"][0]["column"] = "face";
+            row["columns"][0]["value"]  = (S32)i;
+            row["columns"][1]["column"] = "material";
+            row["columns"][1]["value"]  = material;
+            row["columns"][2]["column"] = "alpha";
+            row["columns"][2]["value"]  = (alpha < 0.999f) ? llformat("%.2f", alpha) : std::string();
+            row["columns"][3]["column"] = "glow";
+            row["columns"][3]["value"]  = (te->getGlow() > 0.f) ? llformat("%.2f", te->getGlow()) : std::string();
+            row["columns"][4]["column"] = "bright";
+            row["columns"][4]["value"]  = te->getFullbright() ? std::string("Y") : std::string();
+            faces->addElement(row);
+        }
+    }
 }
 
 void ALFloaterSceneExplorer::onSortChanged()
@@ -984,17 +1823,18 @@ void ALFloaterSceneExplorer::onSortChanged()
 // ============================================================================
 // Actions
 // ============================================================================
-LLViewerObject* ALFloaterSceneExplorer::getSelectedObject() const
+ALSceneExplorerItem* ALFloaterSceneExplorer::getSelectedItem() const
 {
     if (!mTree)
         return nullptr;
     LLFolderViewItem* sel = mTree->getCurSelectedItem();
-    if (!sel)
-        return nullptr;
-    ALSceneExplorerItem* item = static_cast<ALSceneExplorerItem*>(sel->getViewModelItem());
-    if (!item)
-        return nullptr;
-    return gObjectList.findObject(item->getUUID());
+    return sel ? static_cast<ALSceneExplorerItem*>(sel->getViewModelItem()) : nullptr;
+}
+
+LLViewerObject* ALFloaterSceneExplorer::getSelectedObject() const
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+    return item ? gObjectList.findObject(item->getUUID()) : nullptr;
 }
 
 void ALFloaterSceneExplorer::selectInWorld(const uuid_vec_t& ids)
@@ -1015,9 +1855,14 @@ void ALFloaterSceneExplorer::selectInWorld(const uuid_vec_t& ids)
     // on, select the individual prim; otherwise always the whole linkset.
     // Selecting a lone child while the build tools are in whole-object mode
     // (or vice versa) desyncs the manipulators from what the user expects.
+    // Also mirror its RLVa gate: while the build tools are up, objects the
+    // user may not edit are refused, exactly as clicking them in-world is.
     static LLCachedControl<bool> edit_linked(gSavedSettings, "EditLinkedParts", false);
+    const bool rlv_gate_edit = RlvActions::isRlvEnabled() && LLFloaterReg::instanceVisible("build");
     for (LLViewerObject* obj : objs)
     {
+        if (rlv_gate_edit && !obj->isAvatar() && !RlvActions::canEdit(obj))
+            continue;
         if (edit_linked && !obj->isAvatar())
         {
             sm->selectObjectOnly(obj, SELECT_ALL_TES);
@@ -1069,7 +1914,13 @@ void ALFloaterSceneExplorer::activateItem(const LLUUID& id)
 
     switch (gSavedSettings.getU32("ALSceneExplorerActivateAction"))
     {
-    case 1: openBuildTools();                       break;
+    case 1:
+        // Same RLVa edit gate as the in-world edit paths.
+        if (!RlvActions::isRlvEnabled() || RlvActions::canEdit(obj))
+        {
+            openBuildTools();
+        }
+        break;
     case 2: LLFloaterReg::showInstance("inspect");  break;
     case 3:                                         break; // select only
     case 0:
@@ -1109,6 +1960,10 @@ void ALFloaterSceneExplorer::doEdit()
     LLViewerObject* obj = getSelectedObject();
     if (!obj)
         return;
+    // The menu's edit path enforces RLVa @edit; entering build mode from the
+    // explorer must not bypass it.
+    if (RlvActions::isRlvEnabled() && !RlvActions::canEdit(obj))
+        return;
     uuid_vec_t ids;
     ids.push_back(obj->getID());
     selectInWorld(ids);
@@ -1128,29 +1983,72 @@ void ALFloaterSceneExplorer::doInspect()
 
 void ALFloaterSceneExplorer::doTeleport()
 {
-    LLViewerObject* obj = getSelectedObject();
-    if (!obj)
+    ALSceneExplorerItem* item = getSelectedItem();
+    if (!item)
         return;
-    gAgent.teleportViaLocation(obj->getPositionGlobal());
+    if (LLViewerObject* obj = gObjectList.findObject(item->getUUID()))
+    {
+        gAgent.teleportViaLocation(obj->getPositionGlobal());
+        return;
+    }
+    // Derendered objects keep their stored position.
+    if (item->getItemType() == ALSceneExplorerItem::TYPE_DERENDERED_OBJECT)
+    {
+        const LLVector3d& pos = item->getRecord().mPosGlobal;
+        if (!pos.isExactlyZero())
+            gAgent.teleportViaLocation(pos);
+    }
 }
 
 void ALFloaterSceneExplorer::doCopyID()
 {
+    ALSceneExplorerItem* item = getSelectedItem();
+    if (!item || item->isContainer())
+        return;
+    const LLWString wid = utf8str_to_wstring(item->getUUID().asString());
+    LLClipboard::instance().copyToClipboard(wid, 0, (S32)wid.size());
+}
+
+void ALFloaterSceneExplorer::doDerender(const LLSD& param)
+{
     LLViewerObject* obj = getSelectedObject();
-    LLUUID id;
-    if (obj)
+    // Object rows only here; avatar derendering arrives with the per-type
+    // menus (Stage 4).
+    if (!obj || obj->isAvatar() || obj->isAttachment())
+        return;
+    if (!ALDerenderList::canAdd(obj))
+        return;
+
+    // ALDerenderList::addSelection() consumes the live selection; always feed
+    // it the whole family regardless of the EditLinkedParts split so the
+    // entry's root/child local-id bookkeeping is complete.
+    LLSelectMgr* sm = LLSelectMgr::getInstance();
+    mSyncingSelection = true;
+    sm->deselectAll();
+    sm->selectObjectAndFamily(obj);
+    mSyncingSelection = false;
+
+    if (ALDerenderList::canAddSelection())
     {
-        id = obj->getID();
+        ALDerenderList::instance().addSelection(param.asString() == "permanent");
     }
-    else if (mTree && mTree->getCurSelectedItem())
-    {
-        if (ALSceneExplorerItem* item = static_cast<ALSceneExplorerItem*>(mTree->getCurSelectedItem()->getViewModelItem()))
-            id = item->getUUID();
-    }
-    if (id.notNull())
-    {
-        const std::string id_str = id.asString();
-        const LLWString wid = utf8str_to_wstring(id_str);
-        LLClipboard::instance().copyToClipboard(wid, 0, (S32)wid.size());
-    }
+    sm->deselectAll(); // whatever the kill left behind
+    // The change signal already ran syncDerendered(); the live node falls out
+    // on the next reconcile sweep.
+}
+
+void ALFloaterSceneExplorer::doRestore()
+{
+    ALSceneExplorerItem* item = getSelectedItem();
+    if (!item || !item->isDerenderedType())
+        return;
+    uuid_vec_t ids;
+    ids.push_back(item->getUUID());
+    ALDerenderList::instance().removeObjects(
+        item->getItemType() == ALSceneExplorerItem::TYPE_DERENDERED_AVATAR
+            ? ALDerenderEntry::TYPE_AVATAR
+            : ALDerenderEntry::TYPE_OBJECT,
+        ids);
+    // removeObjects() requests the objects back from the sim (cache-miss
+    // refetch) and fires the change signal, which prunes this row.
 }

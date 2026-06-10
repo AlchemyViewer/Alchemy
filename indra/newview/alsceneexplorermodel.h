@@ -161,7 +161,9 @@ public:
         TYPE_PRIM,
         TYPE_AVATAR,
         TYPE_ATTACHMENT_POINT,  // per-avatar attachment-point grouping folder
-        TYPE_ATTACHMENT         // attachment linkset root
+        TYPE_ATTACHMENT,        // attachment linkset root
+        TYPE_DERENDERED_OBJECT, // ALDerenderList entry; synthetic, no live object
+        TYPE_DERENDERED_AVATAR
     };
 
     ALSceneExplorerItem(EItemType type, const LLUUID& id, const std::string& name,
@@ -178,6 +180,13 @@ public:
         return mItemType == TYPE_CATEGORY_OBJECTS
             || mItemType == TYPE_CATEGORY_AVATARS
             || mItemType == TYPE_CATEGORY_DERENDERED;
+    }
+    // Synthetic rows backed by an ALDerenderList entry instead of a live
+    // object: excluded from the present-set sweep, the props fetch/retry, and
+    // live-object actions (Restore / Copy-ID only).
+    bool isDerenderedType() const
+    {
+        return mItemType == TYPE_DERENDERED_OBJECT || mItemType == TYPE_DERENDERED_AVATAR;
     }
     // Folder-ness is fully derived from the item type: structural containers
     // plus every root scene object (so single- and multi-prim objects sort
@@ -225,6 +234,10 @@ public:
     LLPointer<LLUIImage> getIcon() const override;
     LLFontGL::StyleFlags getLabelStyle() const override;
     std::string getLabelSuffix() const override;
+
+    // Multi-line hover tooltip built from the record (always current — the
+    // widgets query it on demand instead of caching it).
+    std::string getTooltip() const;
 
     void openItem(void) override;
     void closeItem(void) override {}
@@ -291,6 +304,18 @@ public:
     ~ALSceneExplorerFolder() override = default;
 
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    bool handleToolTip(S32 x, S32 y, MASK mask) override;
+};
+
+// Leaf widget: identical to the stock item except for the rich model tooltip.
+class ALSceneExplorerListItem final : public LLFolderViewItem
+{
+public:
+    typedef LLFolderViewItem::Params Params;
+    ALSceneExplorerListItem(const Params& p) : LLFolderViewItem(p) {}
+    ~ALSceneExplorerListItem() override = default;
+
+    bool handleToolTip(S32 x, S32 y, MASK mask) override;
 };
 
 #endif // AL_SCENEEXPLORERMODEL_H

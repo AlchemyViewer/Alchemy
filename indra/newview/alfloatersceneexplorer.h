@@ -29,6 +29,7 @@
 class LLAvatarName;
 class LLFolderView;
 class LLFolderViewItem;
+class LLLayoutPanel;
 class LLPanel;
 class LLViewerObject;
 
@@ -63,6 +64,12 @@ private:
     void removeNode(ALSceneExplorerItem* item);
     void clearTree();
 
+    // --- derendered category (synthetic rows from ALDerenderList) ----------
+    void syncDerendered();
+    void ensureDerenderedCategory();
+    void destroyDerenderedCategory();
+    void onDerenderListChanged();
+
     // --- async property fetch --------------------------------------------
     void queueProps(const LLUUID& id);
     void drainPropsQueue();
@@ -74,9 +81,18 @@ private:
     // --- filters / sort ---------------------------------------------------
     void onFilterChanged();
     void onSortChanged();
+    void updateCategoryCounts();
+    void updateActionButtons();
+
+    // --- detail pane --------------------------------------------------------
+    void onToggleDetails();
+    void refreshDetail();
+    void fillObjectDetail(ALSceneExplorerItem* item);
+    void fillAvatarDetail(ALSceneExplorerItem* item);
 
     // --- actions ----------------------------------------------------------
     void syncSelectionToWorld();
+    ALSceneExplorerItem* getSelectedItem() const;
     LLViewerObject* getSelectedObject() const;
     void selectInWorld(const uuid_vec_t& ids);
     void openBuildTools();
@@ -85,17 +101,26 @@ private:
     void doInspect();
     void doTeleport();
     void doCopyID();
+    void doDerender(const LLSD& param);
+    void doRestore();
 
     // --- members ----------------------------------------------------------
     ALSceneExplorerViewModel mViewModel;
     LLFolderView*  mTree        = nullptr;
     LLPanel*       mTreePanel   = nullptr;
+    // Received-items-style host: holds the expander bar + detail content and
+    // collapses down to the bar via LLLayoutStack::collapsePanel().
+    LLLayoutPanel* mDetailHost  = nullptr;
 
     ALSceneExplorerItem* mRootItem        = nullptr;
     ALSceneExplorerItem* mObjectsCategory = nullptr;
     ALSceneExplorerItem* mAvatarsCategory = nullptr;
     LLFolderViewItem*    mObjectsWidget   = nullptr;
     LLFolderViewItem*    mAvatarsWidget   = nullptr;
+    // Created lazily while derendered entries exist and the toggle is on, so
+    // an empty category never clutters the tree.
+    ALSceneExplorerItem* mDerenderedCategory = nullptr;
+    LLFolderViewItem*    mDerenderedWidget   = nullptr;
 
     boost::unordered_map<LLUUID, ALSceneExplorerItem*> mItems;
     boost::unordered_map<LLUUID, LLFolderViewItem*>    mWidgets;
@@ -112,6 +137,7 @@ private:
     boost::unordered_set<LLUUID>  mQueued;
 
     boost::signals2::connection mPropsConn;
+    boost::signals2::connection mDerenderConn;
 
     LLFrameTimer mReconcileTimer;
     LLFrameTimer mFetchTimer;
@@ -119,8 +145,14 @@ private:
 
     U64        mLastRegionHandle = 0;
     LLUUID     mLastSelectedID;
+    LLUUID     mLastButtonStateID;  // selection the action buttons were last gated for
+    LLUUID     mLastDetailID;       // selection the detail pane was last built for
+    LLUUID     mLastFacesID;        // selection the faces list was last built for
     LLVector3d mLastFilterAgentPos; // last agent position the radius filter ran at
     bool       mShowAvatars   = true;
+    bool       mShowDerendered = false;
+    bool       mDetailsExpanded = false;
+    bool       mDetailDirty   = false;
     bool       mSyncingSelection = false;
 };
 

@@ -18,6 +18,7 @@
 
 #include "alfloatersceneexplorer.h"
 #include "llagent.h"
+#include "lltooltip.h"
 #include "llui.h"
 
 // ============================================================================
@@ -258,8 +259,27 @@ std::string ALSceneExplorerItem::getLabelSuffix() const
     if (isContainer())
         return LLStringUtil::null;
 
+    // Derendered entries have no live metrics; objects keep their stored
+    // position (distance), region-less avatar entries show nothing.
+    if (mItemType == TYPE_DERENDERED_AVATAR)
+        return LLStringUtil::null;
+    if (mItemType == TYPE_DERENDERED_OBJECT)
+        return llformat("%.0fm", mRecord.mDistance);
+
+    // Avatar rows show render complexity + worn attachment count (stored in
+    // mRenderCost / mPrimCount by the reconcile pass) instead of object costs.
+    if (mItemType == TYPE_AVATAR)
+    {
+        std::string suffix = llformat("%.0fm", mRecord.mDistance);
+        if (mRecord.mRenderCost > 0.f)
+            suffix += llformat("  cmplx %.0fk", mRecord.mRenderCost / 1000.f);
+        if (mRecord.mPrimCount > 0)
+            suffix += llformat("  %d att", mRecord.mPrimCount);
+        return suffix;
+    }
+
     std::string suffix = llformat("%.0fm", mRecord.mDistance);
-    if ((mItemType == TYPE_LINKSET || mItemType == TYPE_AVATAR) && mRecord.mLandImpact > 0.f)
+    if (mItemType == TYPE_LINKSET && mRecord.mLandImpact > 0.f)
     {
         suffix += llformat("  LI %.0f", mRecord.mLandImpact);
     }
@@ -268,6 +288,45 @@ std::string ALSceneExplorerItem::getLabelSuffix() const
         suffix += llformat("  %u tris", mRecord.mNumTriangles);
     }
     return suffix;
+}
+
+std::string ALSceneExplorerItem::getTooltip() const
+{
+    if (isContainer())
+        return mName;
+
+    std::string tip = mName;
+    if (!mRecord.mDescription.empty())
+        tip += "\n" + mRecord.mDescription;
+    tip += llformat("\nDistance: %.0f m", mRecord.mDistance);
+
+    if (mItemType == TYPE_AVATAR)
+    {
+        if (mRecord.mRenderCost > 0.f)
+            tip += llformat("\nComplexity: %.0f", mRecord.mRenderCost);
+        if (mRecord.mPrimCount > 0)
+            tip += llformat("\nAttachments: %d", mRecord.mPrimCount);
+        return tip;
+    }
+    if (isDerenderedType())
+    {
+        tip += "\n(derendered)";
+        return tip;
+    }
+
+    if (mRecord.mPrimCount > 1)
+        tip += llformat("\nPrims: %d", mRecord.mPrimCount);
+    if (mRecord.mLandImpact > 0.f)
+        tip += llformat("\nLand impact: %.0f", mRecord.mLandImpact);
+    if (mRecord.mRenderCost > 0.f)
+        tip += llformat("\nRender cost: %.0f", mRecord.mRenderCost);
+    if (mRecord.mNumTriangles > 0)
+        tip += llformat("\nTriangles: %u  (%u verts, %d faces)",
+                        mRecord.mNumTriangles, mRecord.mNumVertices, mRecord.mNumFaces);
+    const std::string flags = ALObjectProperties::flagsToString(mRecord.mFlags);
+    if (!flags.empty())
+        tip += "\nFlags: " + flags;
+    return tip;
 }
 
 void ALSceneExplorerItem::activate()
@@ -369,4 +428,38 @@ bool ALSceneExplorerFolder::handleDoubleClick(S32 x, S32 y, MASK mask)
         return true;
     }
     return LLFolderViewFolder::handleDoubleClick(x, y, mask);
+}
+
+namespace
+{
+    // Shared rich-tooltip display for both widget flavours: query the model on
+    // demand so the contents are always current.
+    bool showSceneTooltip(LLFolderViewItem* widget)
+    {
+        ALSceneExplorerItem* item = static_cast<ALSceneExplorerItem*>(widget->getViewModelItem());
+        if (!item || item->isContainer())
+            return false;
+        LLToolTip::Params params;
+        params.message = item->getTooltip();
+        params.sticky_rect = widget->calcScreenRect();
+        LLToolTipMgr::instance().show(params);
+        return true;
+    }
+}
+
+bool ALSceneExplorerFolder::handleToolTip(S32 x, S32 y, MASK mask)
+{
+    // An open folder's children own their own tooltips.
+    if (isOpen() && LLView::childrenHandleToolTip(x, y, mask) != nullptr)
+        return true;
+    if (showSceneTooltip(this))
+        return true;
+    return LLFolderViewFolder::handleToolTip(x, y, mask);
+}
+
+bool ALSceneExplorerListItem::handleToolTip(S32 x, S32 y, MASK mask)
+{
+    if (showSceneTooltip(this))
+        return true;
+    return LLFolderViewItem::handleToolTip(x, y, mask);
 }

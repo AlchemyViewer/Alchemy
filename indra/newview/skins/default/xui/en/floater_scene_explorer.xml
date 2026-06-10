@@ -2,16 +2,16 @@
 <floater
  legacy_header_height="18"
  can_resize="true"
- height="520"
+ height="640"
  layout="topleft"
  min_height="360"
- min_width="390"
+ min_width="430"
  name="scene_explorer"
  help_topic="scene_explorer"
  save_rect="true"
  single_instance="true"
  title="Scene Explorer"
- width="420">
+ width="470">
     <floater.string name="no_matches">No matching objects</floater.string>
     <filter_editor
      follows="left|top|right"
@@ -22,7 +22,7 @@
      text_pad_left="10"
      left="8"
      top="22"
-     width="404" />
+     width="454" />
     <combo_box
      follows="left|top"
      height="22"
@@ -92,6 +92,16 @@
     <check_box
      follows="left|top"
      height="18"
+     label="Derendered"
+     layout="topleft"
+     name="show_derendered_check"
+     tool_tip="List this region's derendered objects (and derendered avatars) in their own category"
+     left_pad="4"
+     top_delta="0"
+     width="96" />
+    <check_box
+     follows="left|top"
+     height="18"
      label="Within"
      layout="topleft"
      name="limit_radius_check"
@@ -112,16 +122,482 @@
      left_pad="2"
      top_delta="0"
      width="300" />
-    <panel
-     bevel_style="in"
-     border="true"
+    <layout_stack
      follows="all"
      layout="topleft"
-     name="scene_tree"
+     name="main_stack"
+     orientation="vertical"
      left="8"
      top_pad="6"
-     width="404"
-     height="356" />
+     width="454"
+     height="476">
+        <layout_panel
+         auto_resize="true"
+         height="226"
+         min_dim="120"
+         name="tree_layout"
+         user_resize="true">
+            <panel
+             bevel_style="in"
+             border="true"
+             follows="all"
+             layout="topleft"
+             name="scene_tree"
+             left="0"
+             top="0"
+             width="454"
+             height="226" />
+        </layout_panel>
+        <layout_panel
+         auto_resize="false"
+         height="330"
+         min_dim="28"
+         expanded_min_dim="200"
+         name="detail_host_layout"
+         user_resize="true">
+            <button
+             follows="left|top|right"
+             halign="left"
+             height="28"
+             image_selected="MarketplaceBtn_Selected"
+             image_unselected="MarketplaceBtn_Off"
+             is_toggle="true"
+             label="Details"
+             layout="topleft"
+             name="details_btn"
+             pad_left="35"
+             tab_stop="false"
+             tool_tip="Show details for the selected row"
+             left="0"
+             top="0"
+             width="454" />
+          <layout_stack
+           animate="false"
+           follows="all"
+           layout="topleft"
+           name="detail_stack"
+           orientation="vertical"
+           left="0"
+           top="28"
+           width="454"
+           height="302">
+            <layout_panel
+             auto_resize="false"
+             height="188"
+             min_dim="60"
+             name="detail_rows_layout"
+             user_resize="true">
+             <scroll_container
+              follows="all"
+              layout="topleft"
+              name="detail_scroll"
+              reserve_scroll_corner="false"
+              left="0"
+              top="0"
+              width="454"
+              height="188">
+              <panel
+               follows="left|top"
+               layout="topleft"
+               name="detail_content"
+               left="0"
+               top="0"
+               width="437"
+               height="212">
+              <panel
+               follows="left|top"
+               layout="topleft"
+               name="detail_panel_object"
+               left="0"
+               top="0"
+               width="437"
+               height="212">
+                <text
+                 follows="left|top"
+                 font="SansSerif"
+                 font.style="BOLD"
+                 height="16"
+                 layout="topleft"
+                 name="detail_name"
+                 use_ellipses="true"
+                 left="2"
+                 top="4"
+                 width="433" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="detail_desc"
+                 use_ellipses="true"
+                 left="2"
+                 top_pad="2"
+                 width="433" />
+                <text
+                 follows="left|top"
+                 height="16"
+                 layout="topleft"
+                 name="label_owner"
+                 left="2"
+                 top_pad="6"
+                 width="58">Owner</text>
+                <text
+                 follows="left|top"
+                 height="16"
+                 layout="topleft"
+                 name="detail_owner"
+                 parse_urls="true"
+                 use_ellipses="true"
+                 left="64"
+                 top_delta="0"
+                 width="371" />
+                <text
+                 follows="left|top"
+                 height="16"
+                 layout="topleft"
+                 name="label_creator"
+                 left="2"
+                 top_pad="3"
+                 width="58">Creator</text>
+                <text
+                 follows="left|top"
+                 height="16"
+                 layout="topleft"
+                 name="detail_creator"
+                 parse_urls="true"
+                 use_ellipses="true"
+                 left="64"
+                 top_delta="0"
+                 width="371" />
+                <text
+                 follows="left|top"
+                 height="16"
+                 layout="topleft"
+                 name="label_perms"
+                 left="2"
+                 top_pad="4"
+                 width="58">Perms</text>
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Modify"
+                 layout="topleft"
+                 name="check_modify"
+                 left="64"
+                 top_delta="0"
+                 width="66" />
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Copy"
+                 layout="topleft"
+                 name="check_copy"
+                 left_pad="4"
+                 top_delta="0"
+                 width="56" />
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Transfer"
+                 layout="topleft"
+                 name="check_transfer"
+                 left_pad="4"
+                 top_delta="0"
+                 width="72" />
+                <text
+                 follows="left|top"
+                 height="16"
+                 layout="topleft"
+                 name="detail_perms_next"
+                 left_pad="8"
+                 top_delta="0"
+                 width="160" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_pos"
+                 left="2"
+                 top_pad="6"
+                 width="58">Position</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="detail_where"
+                 left="64"
+                 top_delta="0"
+                 width="371" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_size"
+                 left="2"
+                 top_pad="3"
+                 width="58">Size</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="detail_size"
+                 left="64"
+                 top_delta="0"
+                 width="371" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_geom"
+                 left="2"
+                 top_pad="3"
+                 width="58">Geometry</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="detail_build"
+                 left="64"
+                 top_delta="0"
+                 width="371" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_costs"
+                 left="2"
+                 top_pad="6"
+                 width="58">Costs</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_li"
+                 left="64"
+                 top_delta="0"
+                 width="16">LI</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="detail_li"
+                 left_pad="4"
+                 top_delta="0"
+                 width="44" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_render"
+                 left_pad="10"
+                 top_delta="0"
+                 width="42">Render</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="detail_render"
+                 left_pad="4"
+                 top_delta="0"
+                 width="56" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_phys"
+                 left_pad="10"
+                 top_delta="0"
+                 width="32">Phys</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="detail_phys"
+                 left_pad="4"
+                 top_delta="0"
+                 width="44" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_stream"
+                 left_pad="10"
+                 top_delta="0"
+                 width="42">Stream</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="detail_stream"
+                 left_pad="4"
+                 top_delta="0"
+                 width="54" />
+                <text
+                 follows="left|top"
+                 height="16"
+                 layout="topleft"
+                 name="label_flags"
+                 left="2"
+                 top_pad="4"
+                 width="58">Flags</text>
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Scripted"
+                 layout="topleft"
+                 name="check_scripted"
+                 left="64"
+                 top_delta="0"
+                 width="70" />
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Light"
+                 layout="topleft"
+                 name="check_light"
+                 left_pad="2"
+                 top_delta="0"
+                 width="54" />
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Physics"
+                 layout="topleft"
+                 name="check_physics"
+                 left_pad="2"
+                 top_delta="0"
+                 width="68" />
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Phantom"
+                 layout="topleft"
+                 name="check_phantom"
+                 left_pad="2"
+                 top_delta="0"
+                 width="74" />
+                <check_box
+                 follows="left|top"
+                 height="16"
+                 label="Temp"
+                 layout="topleft"
+                 name="check_temp"
+                 left_pad="2"
+                 top_delta="0"
+                 width="56" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="detail_flags_extra"
+                 use_ellipses="true"
+                 left="64"
+                 top_pad="3"
+                 width="371" />
+              </panel>
+              <panel
+               follows="left|top"
+               layout="topleft"
+               name="detail_panel_avatar"
+               visible="false"
+               left="0"
+               top="0"
+               width="437"
+               height="212">
+                <text
+                 follows="left|top"
+                 font="SansSerif"
+                 height="18"
+                 layout="topleft"
+                 name="avatar_name"
+                 parse_urls="true"
+                 use_ellipses="true"
+                 left="2"
+                 top="4"
+                 width="433" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_av_distance"
+                 left="2"
+                 top_pad="8"
+                 width="80">Distance</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="avatar_distance"
+                 left="86"
+                 top_delta="0"
+                 width="349" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_av_complexity"
+                 left="2"
+                 top_pad="5"
+                 width="80">Complexity</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="avatar_complexity"
+                 left="86"
+                 top_delta="0"
+                 width="349" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="label_av_attachments"
+                 left="2"
+                 top_pad="5"
+                 width="80">Attachments</text>
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="avatar_attachments"
+                 left="86"
+                 top_delta="0"
+                 width="349" />
+                <text
+                 follows="left|top"
+                 height="14"
+                 layout="topleft"
+                 name="avatar_note"
+                 left="2"
+                 top_pad="10"
+                 width="433" />
+              </panel>
+              </panel>
+             </scroll_container>
+            </layout_panel>
+            <layout_panel
+             auto_resize="true"
+             height="110"
+             min_dim="40"
+             name="detail_faces_layout">
+                <scroll_list
+                 draw_heading="true"
+                 follows="all"
+                 layout="topleft"
+                 name="detail_faces"
+                 left="0"
+                 top="0"
+                 width="454"
+                 height="110">
+                    <scroll_list.columns label="#" name="face" width="24" />
+                    <scroll_list.columns dynamic_width="true" label="Material / Texture" name="material" />
+                    <scroll_list.columns label="Alpha" name="alpha" width="44" />
+                    <scroll_list.columns label="Glow" name="glow" width="44" />
+                    <scroll_list.columns label="FB" name="bright" width="30" />
+                </scroll_list>
+            </layout_panel>
+          </layout_stack>
+        </layout_panel>
+    </layout_stack>
     <button
      follows="bottom|left"
      height="23"

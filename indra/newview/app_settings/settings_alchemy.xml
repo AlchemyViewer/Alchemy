@@ -68,6 +68,28 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALSceneExplorerShowDerendered</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: list derendered objects/avatars in their own category.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSceneExplorerShowDetails</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: show the detail pane for the selected row.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALSceneExplorerSortOrder</key>
         <map>
             <key>Comment</key>

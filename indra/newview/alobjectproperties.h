@@ -161,7 +161,13 @@ public:
         LLUUID      mCreatorId;
         bool        mGroupOwned   = false;
         time_t      mCreationDate = 0;
-        bool        mHasFullData  = false; // creator/date came from full ObjectProperties
+        // Permission masks (full ObjectProperties only).
+        U32         mBaseMask      = 0;
+        U32         mOwnerMask     = 0;
+        U32         mGroupMask     = 0;
+        U32         mEveryoneMask  = 0;
+        U32         mNextOwnerMask = 0;
+        bool        mHasFullData  = false; // creator/date/perms came from full ObjectProperties
     };
 
     // Message handlers (registered in llstartup.cpp). Each caches the relevant
