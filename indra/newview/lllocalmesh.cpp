@@ -760,7 +760,11 @@ bool LLLocalMesh::forceReload()
     // Re-parse the current file regardless of mtime so a changed build option (e.g.
     // the joint-position toggle) takes effect. Reuses the reload path: onLoadResult()
     // rebuilds the geometry and refreshes the in-world linkset if one exists.
-    if (mReloading || !gDirUtilp->fileExists(mFilename))
+    // Skip while the initial parse is still in flight: ingestScene() reads the
+    // current build options when that parse lands, so the change is picked up
+    // anyway -- and a second concurrent loader would cross result states with
+    // the first (a late failure would even delUnit a unit that loaded fine).
+    if (mReloading || mState == ST_LOADING || !gDirUtilp->fileExists(mFilename))
     {
         return false;
     }
