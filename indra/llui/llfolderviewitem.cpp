@@ -447,6 +447,13 @@ void LLFolderViewItem::refreshSuffix()
         mLabelStyle = vmi->getLabelStyle();
         pLabelFont = nullptr;
         mLabelSuffix = utf8str_to_wstring(vmi->getLabelSuffix());
+        // LLFontVertexBuffer::render doesn't compare the string, so cached
+        // geometry must be invalidated here or it would replay the old suffix.
+        // (A style change is covered by render's font-pointer compare.)
+        if (mSuffixFontBuffer)
+        {
+            mSuffixFontBuffer->reset();
+        }
     }
 
     mLabelWidthDirty = true;
