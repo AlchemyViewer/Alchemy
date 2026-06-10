@@ -76,15 +76,19 @@ namespace
     // owns the by-reference joint maps the loader holds for the duration of the
     // parse, so they outlive the (possibly deleted) LLLocalMesh. The load
     // callback frees it. The unit is looked up by tracking ID, so a unit
-    // deleted mid-load can't be dereferenced.
+    // deleted mid-load can't be dereferenced. The preview avatar is held by
+    // LLPointer: the loader thread resolves (and the DAE loader writes to)
+    // joints on it mid-parse, while a teleport/logout can markDead() and drop
+    // the manager's reference at any time -- the ref keeps the avatar's memory
+    // (and its joints) valid until the context is freed on the main thread.
     struct LoadContext
     {
-        LLUUID            mTrackingID;
-        LLModelLoader*    mLoader = nullptr;
-        JointTransformMap mJointTransformMap;
-        JointNameSet      mJointsFromNode;
-        U32               mLoadState = LLModelLoader::STARTING;
-        LLVOAvatar*       mAvatar = nullptr; // preview skeleton for joint lookup (never the agent)
+        LLUUID                mTrackingID;
+        LLModelLoader*        mLoader = nullptr;
+        JointTransformMap     mJointTransformMap;
+        JointNameSet          mJointsFromNode;
+        U32                   mLoadState = LLModelLoader::STARTING;
+        LLPointer<LLVOAvatar> mAvatar; // preview skeleton for joint lookup (never the agent)
     };
 
     // Build the joint alias map the loaders use to recognise rig joints,
@@ -411,9 +415,14 @@ namespace
 LLUUID LLLocalMesh::registerOwnedBitmap(const std::string& filename, std::vector<LLUUID>& owned)
 {
     LLLocalBitmapMgr* mgr = LLLocalBitmapMgr::getInstance();
-    // Reuse an existing unit for this file (another face of this mesh, a prior
-    // reload, or one the user already loaded) so we don't duplicate it.
-    LLUUID tracking_id = mgr->getUnitID(filename);
+    // Reuse an existing unit for this file -- a prior import (another face of this
+    // mesh or an earlier reload) first, else a copy the user already loaded -- so
+    // we don't duplicate it.
+    LLUUID tracking_id = mgr->getUnitID(filename, /*mesh_owned=*/true);
+    if (tracking_id.isNull())
+    {
+        tracking_id = mgr->getUnitID(filename, /*mesh_owned=*/false);
+    }
     if (tracking_id.isNull())
     {
         tracking_id = mgr->addUnit(filename, /*mesh_owned=*/true);
@@ -436,29 +445,26 @@ void LLLocalMesh::importGLTFMaterials(std::map<std::string, LLUUID>& out_by_name
     // and doesn't count.) Import-time dedup can leave gaps in per-file material
     // indices, so enumerate units by tracking id rather than walking indices.
     std::vector<LLUUID> tids;
-    mgr->getTrackingIDs(mFilename, tids);
-    bool has_mesh_owned = false;
-    for (const LLUUID& tid : tids)
-    {
-        if (mgr->isMeshOwned(tid)) { has_mesh_owned = true; break; }
-    }
-    if (!has_mesh_owned)
+    mgr->getTrackingIDs(mFilename, tids, /*mesh_owned=*/true);
+    if (tids.empty())
     {
         mgr->addUnit(mFilename, /*mesh_owned=*/true);
-        tids.clear();
-        mgr->getTrackingIDs(mFilename, tids);
+        mgr->getTrackingIDs(mFilename, tids, /*mesh_owned=*/true);
     }
 
     // Keep this parse's mesh-owned units referenced (a user-loaded copy is left
     // untracked -- the user owns it; we must not release it on reload/delete).
     for (const LLUUID& tid : tids)
     {
-        if (mgr->isMeshOwned(tid))
-        {
-            track_owned(owned, tid);
-        }
+        track_owned(owned, tid);
     }
-    mgr->getWorldIDsByName(mFilename, out_by_name);
+    // Bind faces to the mesh's own imports; the user's deletable copies are only a
+    // fallback for the corner where the mesh-owned import failed to load.
+    mgr->getWorldIDsByName(mFilename, out_by_name, /*mesh_owned=*/true);
+    if (out_by_name.empty())
+    {
+        mgr->getWorldIDsByName(mFilename, out_by_name, /*mesh_owned=*/false);
+    }
 }
 
 bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
@@ -590,15 +596,21 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                     }
                 }
             }
-            else if (mFormat == FMT_GLTF && !gltf_mat_by_name.empty())
+            else if (mFormat == FMT_GLTF)
             {
                 for (S32 fi = 0; fi < (S32)faces.size() && fi < (S32)mdl->mMaterialList.size(); ++fi)
                 {
+                    LLLocalMeshFaceMaterial& fm = part.mFaceMaterials[fi];
+                    // Keep the binding name even when it doesn't resolve right now:
+                    // a live edit of the material file regroups its units (see
+                    // LLLocalGLTFMaterialMgr), and rebindFaceMaterials() re-resolves
+                    // faces by this name.
+                    fm.mMaterialName = mdl->mMaterialList[fi];
                     std::map<std::string, LLUUID>::const_iterator it =
-                        gltf_mat_by_name.find(mdl->mMaterialList[fi]);
+                        gltf_mat_by_name.find(fm.mMaterialName);
                     if (it != gltf_mat_by_name.end())
                     {
-                        part.mFaceMaterials[fi].mRenderMaterialID = it->second;
+                        fm.mRenderMaterialID = it->second;
                     }
                 }
             }
@@ -754,7 +766,11 @@ bool LLLocalMesh::forceReload()
     // Re-parse the current file regardless of mtime so a changed build option (e.g.
     // the joint-position toggle) takes effect. Reuses the reload path: onLoadResult()
     // rebuilds the geometry and refreshes the in-world linkset if one exists.
-    if (mReloading || !gDirUtilp->fileExists(mFilename))
+    // Skip while the initial parse is still in flight: ingestScene() reads the
+    // current build options when that parse lands, so the change is picked up
+    // anyway -- and a second concurrent loader would cross result states with
+    // the first (a late failure would even delUnit a unit that loaded fine).
+    if (mReloading || mState == ST_LOADING || !gDirUtilp->fileExists(mFilename))
     {
         return false;
     }
@@ -852,6 +868,72 @@ void LLLocalMeshMgr::despawnObjectsInRegion(LLViewerRegion* regionp)
     }
 }
 
+void LLLocalMeshMgr::rebindFaceMaterials(const std::string& filename)
+{
+    const LLUUID tracking_id = getUnitID(filename);
+    LLLocalMesh* unit = tracking_id.notNull() ? getUnit(tracking_id) : nullptr;
+    if (!unit || !unit->getValid())
+    {
+        return; // no loaded mesh binds to this file
+    }
+
+    // The new name -> world id mapping, with the same mesh-owned-first/user-
+    // fallback preference the ingest-time bind uses.
+    LLLocalGLTFMaterialMgr* mgr = LLLocalGLTFMaterialMgr::getInstance();
+    std::map<std::string, LLUUID> by_name;
+    mgr->getWorldIDsByName(filename, by_name, /*mesh_owned=*/true);
+    if (by_name.empty())
+    {
+        mgr->getWorldIDsByName(filename, by_name, /*mesh_owned=*/false);
+    }
+
+    for (size_t p = 0; p < unit->mParts.size(); ++p)
+    {
+        LLLocalMeshPart& part = unit->mParts[p];
+        for (size_t f = 0; f < part.mFaceMaterials.size(); ++f)
+        {
+            LLLocalMeshFaceMaterial& fm = part.mFaceMaterials[f];
+            if (fm.mMaterialName.empty())
+            {
+                continue; // not a glTF-bound face
+            }
+            std::map<std::string, LLUUID>::const_iterator it = by_name.find(fm.mMaterialName);
+            const LLUUID new_id = (it != by_name.end()) ? it->second : LLUUID();
+            if (new_id == fm.mRenderMaterialID)
+            {
+                continue;
+            }
+            const LLUUID old_id = fm.mRenderMaterialID;
+            fm.mRenderMaterialID = new_id; // future hot-swaps diff against the new import
+
+            for (auto& entry : mSpawnedCopies)
+            {
+                const SpawnedCopy& copy = entry.second;
+                if (copy.mTrackingID != tracking_id || p >= copy.mPrims.size())
+                {
+                    continue;
+                }
+                LLViewerObject* o = copy.mPrims[p].get();
+                LLVOVolume* vol = (o && !o->isDead()) ? dynamic_cast<LLVOVolume*>(o) : nullptr;
+                if (!vol || f >= (size_t)vol->getNumTEs())
+                {
+                    continue;
+                }
+                if (vol->getRenderMaterialID((U8)f) != old_id)
+                {
+                    continue; // the user re-materialed this face in-world; leave it
+                }
+                if (new_id.notNull())
+                {
+                    vol->setHasRenderMaterialParams(true); // client-only: no server echo sets it
+                }
+                vol->setRenderMaterialID((S32)f, new_id, false, true);
+                vol->markForUpdate();
+            }
+        }
+    }
+}
+
 LLVOAvatar* LLLocalMeshMgr::getPreviewAvatar(bool run_stand_anim)
 {
     if ((mPreviewAvatar.isNull() || mPreviewAvatar->isDead()) && gAgent.getRegion())
@@ -933,57 +1015,61 @@ LLUUID LLLocalMeshMgr::addUnitInternal(const std::string& filename, bool include
 
 void LLLocalMeshMgr::delUnit(LLUUID tracking_id)
 {
-    for (local_list_iter iter = mMeshList.begin(); iter != mMeshList.end(); )
+    // Pull the unit out of the list BEFORE any teardown that fires signals
+    // (despawnUnit fires mUnitsChangedSignal; releasing owned imports fires the
+    // bitmap/material managers' signals). Listeners run synchronously and must
+    // never see the dying unit still listed -- the add-only
+    // LLLocalAssetPaths::onUnitsChanged, for one, would re-record its path from
+    // getFilenames() and undo a Remove.
+    LLLocalMesh* unit = nullptr;
+    for (local_list_iter iter = mMeshList.begin(); iter != mMeshList.end(); ++iter)
     {
-        LLLocalMesh* unit = *iter;
-        if (unit->getTrackingID() == tracking_id)
+        if ((*iter)->getTrackingID() == tracking_id)
         {
-            despawnUnit(tracking_id);
-            // Release the mesh-owned local bitmaps + materials imported for this
-            // unit -- but only the ones no OTHER loaded mesh still references.
-            // Imports are deduplicated by file, so two meshes using the same
-            // texture/material share a tracking id; releasing it unconditionally
-            // would strip it from the other mesh too.
-            auto shared_with_other = [&](const LLUUID& import_id) -> bool
+            unit = *iter;
+            mMeshList.erase(iter);
+            break;
+        }
+    }
+    if (unit)
+    {
+        despawnUnit(tracking_id);
+        // Release the mesh-owned local bitmaps + materials imported for this
+        // unit -- but only the ones no OTHER loaded mesh still references.
+        // Imports are deduplicated by file, so two meshes using the same
+        // texture/material share a tracking id; releasing it unconditionally
+        // would strip it from the other mesh too. (The dying unit is already
+        // delisted, so mMeshList holds only the others.)
+        auto shared_with_other = [&](const LLUUID& import_id) -> bool
+        {
+            for (const LLLocalMesh* other : mMeshList)
             {
-                for (const LLLocalMesh* other : mMeshList)
+                for (const LLUUID& bid : other->mOwnedBitmaps)
                 {
-                    if (other == unit)
-                    {
-                        continue;
-                    }
-                    for (const LLUUID& bid : other->mOwnedBitmaps)
-                    {
-                        if (bid == import_id) return true;
-                    }
-                    for (const LLUUID& mid : other->mOwnedMaterials)
-                    {
-                        if (mid == import_id) return true;
-                    }
+                    if (bid == import_id) return true;
                 }
-                return false;
-            };
-            for (const LLUUID& bid : unit->mOwnedBitmaps)
-            {
-                if (!shared_with_other(bid))
+                for (const LLUUID& mid : other->mOwnedMaterials)
                 {
-                    LLLocalBitmapMgr::getInstance()->delUnit(bid);
+                    if (mid == import_id) return true;
                 }
             }
-            for (const LLUUID& mid : unit->mOwnedMaterials)
-            {
-                if (!shared_with_other(mid))
-                {
-                    LLLocalGLTFMaterialMgr::getInstance()->delUnit(mid);
-                }
-            }
-            iter = mMeshList.erase(iter);
-            delete unit;
-        }
-        else
+            return false;
+        };
+        for (const LLUUID& bid : unit->mOwnedBitmaps)
         {
-            ++iter;
+            if (!shared_with_other(bid))
+            {
+                LLLocalBitmapMgr::getInstance()->delUnit(bid);
+            }
         }
+        for (const LLUUID& mid : unit->mOwnedMaterials)
+        {
+            if (!shared_with_other(mid))
+            {
+                LLLocalGLTFMaterialMgr::getInstance()->delUnit(mid);
+            }
+        }
+        delete unit;
     }
 
     if (mMeshList.empty())
@@ -1402,6 +1488,33 @@ LLViewerObject* LLLocalMeshMgr::spawnInWorld(const LLUUID& tracking_id)
     return root;
 }
 
+LLViewerObject* LLLocalMeshMgr::duplicatePreview(LLViewerObject* obj, const LLVector3& offset)
+{
+    LLViewerObject* root = findRootForObject(obj);
+    if (!root || root->isDead() || root->isAttachment())
+    {
+        return nullptr; // worn copies don't duplicate, matching the sim path
+    }
+    auto it = mSpawnedCopies.find(instanceForObject(root));
+    if (it == mSpawnedCopies.end())
+    {
+        return nullptr;
+    }
+    const LLUUID tracking_id = it->second.mTrackingID;
+    const LLLocalMesh* unit = getUnit(tracking_id);
+    if (!unit || !unit->getValid() || unit->getParts().empty())
+    {
+        return nullptr;
+    }
+    // Same transform capture as respawnInstancesInPlace(): spawnLinkset() composes
+    // the root part's intrinsic rotation itself, so pass the USER delta, not the
+    // full world rotation.
+    const LLQuaternion user_delta = ~unit->getParts().front().mRotation * root->getRotation();
+    LLUUID instance_id;
+    instance_id.generate();
+    return spawnLinkset(tracking_id, instance_id, root->getPositionAgent() + offset, user_delta, false, 0);
+}
+
 LLViewerObject* LLLocalMeshMgr::spawnLinkset(const LLUUID& tracking_id, const LLUUID& instance_id,
                                              const LLVector3& base, const LLQuaternion& root_rot,
                                              bool attach, S32 attach_point)
@@ -1550,47 +1663,80 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
     }
 }
 
-namespace
+// Hot-swap diff-restore state: each spawned prim's live face state, captured
+// BEFORE the reload's ingestScene commits (ingest releases dropped imports,
+// whose teardown already swaps live faces to IMG_DEFAULT -- a capture taken
+// after that would record the reset as if the user had applied it), plus the
+// OLD parts' imported materials to diff user edits against.
+struct LLLocalMeshPreSwapSnapshot
 {
-// A face's user-visible render state, snapshotted so user edits survive a hot-swap:
-// applyPartGeometry re-applies the file's imported materials and resets every face,
-// which would otherwise wipe textures/materials/glow/etc. the user applied to the
-// in-world preview.
-struct PreservedFace
-{
-    LLTextureEntry te;            // diffuse id, color, glow, bump/shiny/fullbright, transforms, Blinn-Phong material, glTF override
-    LLUUID         render_mat_id; // glTF render material id (kept in the param block, not the TE)
+    struct Face
+    {
+        LLTextureEntry mTE;          // diffuse id, color, glow, bump/shiny/fullbright, transforms, Blinn-Phong material, glTF override
+        LLUUID         mRenderMatID; // glTF render material id (kept in the param block, not the TE)
+    };
+    typedef std::vector<Face> PrimFaces;
+
+    std::map<LLUUID, std::vector<PrimFaces>>          mCaptured;    // per copy (instance id), per prim
+    std::vector<std::vector<LLLocalMeshFaceMaterial>> mOldImported; // per part: the old file's materials
 };
 
-std::vector<PreservedFace> capturePreservedFaces(LLVOVolume* vol)
+namespace
 {
-    std::vector<PreservedFace> out;
-    const U8 n = vol->getNumTEs();
-    out.reserve(n);
-    for (U8 i = 0; i < n; ++i)
-    {
-        PreservedFace pf;
-        if (const LLTextureEntry* tep = vol->getTE(i))
-        {
-            pf.te = *tep;
-        }
-        pf.render_mat_id = vol->getRenderMaterialID(i);
-        out.push_back(pf);
-    }
-    return out;
-}
-
-void restorePreservedFaces(LLVOVolume* vol, const std::vector<PreservedFace>& saved)
+// Re-apply the user's in-world face edits on top of the freshly applied file
+// materials. applyPartGeometry() has just written the NEW file's imported state
+// (texture/color/fullbright/render material); for those fields a captured value
+// is restored only when it differs from what the OLD file had imported -- i.e.
+// only when the user actually changed it. Restoring them wholesale overwrote
+// every file-level material edit with pre-reload state, so material changes in
+// the source file never showed on spawned copies. Fields no import can author
+// (glow, texture transforms, bump/shiny, Blinn-Phong maps, glTF overrides) are
+// user state, restored as-is.
+void restorePreservedFaces(LLVOVolume* vol,
+                           const LLLocalMeshPreSwapSnapshot::PrimFaces& saved,
+                           const std::vector<LLLocalMeshFaceMaterial>* old_imported)
 {
+    LLLocalBitmapMgr* bitmap_mgr = LLLocalBitmapMgr::getInstance();
     const U8 n = vol->getNumTEs();
     bool any_render_mat = false;
     for (U8 i = 0; i < n && i < (U8)saved.size(); ++i)
     {
-        const LLTextureEntry& te = saved[i].te;
-        vol->setTETexture(i, te.getID());
-        vol->setTEColor(i, te.getColor());
+        const LLTextureEntry& te = saved[i].mTE;
+
+        // What the OLD file had applied to this face, with applyPartGeometry()'s
+        // fallbacks -- captured values equal to these are imports, not user edits.
+        const LLLocalMeshFaceMaterial* old_fm =
+            (old_imported && i < (U8)old_imported->size()) ? &(*old_imported)[i] : nullptr;
+        const LLUUID   old_tex        = (old_fm && old_fm->mDiffuseID.notNull()) ? old_fm->mDiffuseID : IMG_DEFAULT;
+        const LLColor4 old_color      = old_fm ? old_fm->mDiffuseColor : LLColor4::white;
+        const bool     old_fullbright = old_fm && old_fm->mFullbright;
+        const LLUUID   old_render_mat = old_fm ? old_fm->mRenderMaterialID : LLUUID();
+
+        // Local-bitmap world ids rotate on the texture's own live reload; compare
+        // tracking ids too so that churn doesn't read as a user edit.
+        bool tex_is_user_edit = te.getID() != old_tex;
+        if (tex_is_user_edit)
+        {
+            const LLUUID cap_track = bitmap_mgr->getTrackingID(te.getID());
+            tex_is_user_edit = cap_track.isNull() || cap_track != bitmap_mgr->getTrackingID(old_tex);
+        }
+        if (tex_is_user_edit)
+        {
+            vol->setTETexture(i, te.getID());
+        }
+        if (te.getColor() != old_color)
+        {
+            vol->setTEColor(i, te.getColor());
+        }
+        if (((bool)te.getFullbright()) != old_fullbright)
+        {
+            vol->setTEFullbright(i, te.getFullbright());
+        }
+
+        // User-only state: no import path authors these.
         vol->setTEGlow(i, te.getGlow());
-        vol->setTEBumpShinyFullbright(i, te.getBumpShinyFullbright());
+        vol->setTEBumpmap(i, te.getBumpmap());
+        vol->setTEShiny(i, te.getShiny());
         F32 ss = 1.f, st = 1.f, os = 0.f, ot = 0.f;
         te.getScale(&ss, &st);
         te.getOffset(&os, &ot);
@@ -1601,16 +1747,19 @@ void restorePreservedFaces(LLVOVolume* vol, const std::vector<PreservedFace>& sa
         {
             vol->setTEMaterialParams(i, te.getMaterialParams()); // Blinn-Phong normal/specular
         }
-        if (saved[i].render_mat_id.notNull())
+
+        if (saved[i].mRenderMatID.notNull() && saved[i].mRenderMatID != old_render_mat)
         {
-            // glTF PBR material (+ override); client-only, so update_server=false.
-            vol->setRenderMaterialID((S32)i, saved[i].render_mat_id, false, true);
-            if (const LLGLTFMaterial* ov = te.getGLTFMaterialOverride())
-            {
-                LLPointer<LLGLTFMaterial> ovp = new LLGLTFMaterial(*ov);
-                vol->setTEGLTFMaterialOverride(i, ovp);
-            }
+            // The user applied this material over the import; keep it showing.
+            // Client-only, so update_server=false.
+            vol->setRenderMaterialID((S32)i, saved[i].mRenderMatID, false, true);
             any_render_mat = true;
+        }
+        if (const LLGLTFMaterial* ov = te.getGLTFMaterialOverride())
+        {
+            // Overrides are user edits (imports never author them).
+            LLPointer<LLGLTFMaterial> ovp = new LLGLTFMaterial(*ov);
+            vol->setTEGLTFMaterialOverride(i, ovp);
         }
     }
     if (any_render_mat)
@@ -1621,7 +1770,48 @@ void restorePreservedFaces(LLVOVolume* vol, const std::vector<PreservedFace>& sa
 }
 } // namespace
 
-bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
+void LLLocalMeshMgr::capturePreSwap(const LLUUID& tracking_id, const LLLocalMesh& unit,
+                                    LLLocalMeshPreSwapSnapshot& out) const
+{
+    for (const LLLocalMeshPart& part : unit.getParts())
+    {
+        out.mOldImported.push_back(part.mFaceMaterials);
+    }
+    for (const auto& entry : mSpawnedCopies)
+    {
+        const SpawnedCopy& copy = entry.second;
+        if (copy.mTrackingID != tracking_id)
+        {
+            continue;
+        }
+        std::vector<LLLocalMeshPreSwapSnapshot::PrimFaces> prims;
+        prims.reserve(copy.mPrims.size());
+        for (const LLPointer<LLViewerObject>& p : copy.mPrims)
+        {
+            LLLocalMeshPreSwapSnapshot::PrimFaces faces;
+            LLVOVolume* vol = (p.notNull() && !p->isDead()) ? dynamic_cast<LLVOVolume*>(p.get()) : nullptr;
+            if (vol)
+            {
+                const U8 n = vol->getNumTEs();
+                faces.reserve(n);
+                for (U8 i = 0; i < n; ++i)
+                {
+                    LLLocalMeshPreSwapSnapshot::Face f;
+                    if (const LLTextureEntry* tep = vol->getTE(i))
+                    {
+                        f.mTE = *tep;
+                    }
+                    f.mRenderMatID = vol->getRenderMaterialID(i);
+                    faces.push_back(f);
+                }
+            }
+            prims.push_back(std::move(faces));
+        }
+        out.mCaptured.emplace(entry.first, std::move(prims));
+    }
+}
+
+bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id, const LLLocalMeshPreSwapSnapshot& pre_swap)
 {
     LLLocalMesh* unit = getUnit(tracking_id);
     if (!unit || !unit->getValid())
@@ -1672,12 +1862,17 @@ bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id)
                 return false; // a dead/unexpected prim -> let the caller re-spawn
             }
             vol->setScale(parts[i].mScale, false);
-            // Preserve user-applied face params (diffuse/normal/specular/glow/color/
-            // render material/transforms) across the swap -- applyPartGeometry resets
-            // every face to the file's imported material.
-            std::vector<PreservedFace> preserved = capturePreservedFaces(vol);
+            // Apply the new file's geometry + materials, then diff-restore the
+            // user's face edits over them (see restorePreservedFaces). The live
+            // state was captured pre-ingest in onLoadResult.
             applyPartGeometry(vol, parts[i]);
-            restorePreservedFaces(vol, preserved);
+            auto cap_it = pre_swap.mCaptured.find(entry.first);
+            if (cap_it != pre_swap.mCaptured.end() && i < cap_it->second.size())
+            {
+                const std::vector<LLLocalMeshFaceMaterial>* old_imported =
+                    (i < pre_swap.mOldImported.size()) ? &pre_swap.mOldImported[i] : nullptr;
+                restorePreservedFaces(vol, cap_it->second[i], old_imported);
+            }
         }
     }
 
@@ -1918,6 +2113,17 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
 
     const bool reloading = unit->isReloading();
     const bool parse_ok  = (load_state < LLModelLoader::ERROR_PARSING) && !scene.empty();
+
+    // Snapshot the spawned copies' live face state and the old parts' imported
+    // materials BEFORE ingestScene commits: the hot-swap diff-restore needs both
+    // to tell user edits from file changes, and ingest's release of dropped
+    // imports already resets live faces as the dying units tear down.
+    LLLocalMeshPreSwapSnapshot pre_swap;
+    if (reloading && parse_ok)
+    {
+        capturePreSwap(tracking_id, *unit, pre_swap);
+    }
+
     const bool assembled = parse_ok && unit->ingestScene(scene);
 
     if (!parse_ok)
@@ -1937,7 +2143,7 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
             // if the preview was worn). Not spawned -> just keep the rebuilt data.
             if (getSpawnedRoot(tracking_id))
             {
-                if (!hotSwapInWorld(tracking_id))
+                if (!hotSwapInWorld(tracking_id, pre_swap))
                 {
                     respawnInstancesInPlace(tracking_id); // prim count changed -> re-rez each copy
                 }
@@ -2016,7 +2222,7 @@ void LLLocalMeshMgr::doUpdates()
     }
 }
 
-void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames)
+void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames, bool include_joints)
 {
     for (const std::string& filename : filenames)
     {
@@ -2024,7 +2230,7 @@ void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames)
         {
             continue;
         }
-        const LLUUID tracking_id = addUnit(filename);
+        const LLUUID tracking_id = addUnit(filename, include_joints);
         if (tracking_id.notNull())
         {
             if (LLLocalMesh* unit = getUnit(tracking_id))
@@ -2035,13 +2241,13 @@ void LLLocalMeshMgr::addAndSpawn(const std::vector<std::string>& filenames)
     }
 }
 
-void LLLocalMeshMgr::addAndAttach(const std::string& filename, S32 attach_point)
+void LLLocalMeshMgr::addAndAttach(const std::string& filename, S32 attach_point, bool include_joints)
 {
     if (filename.empty())
     {
         return;
     }
-    const LLUUID tracking_id = addUnit(filename); // dedups: existing unit if already loaded
+    const LLUUID tracking_id = addUnit(filename, include_joints); // dedups: existing unit if already loaded
     LLLocalMesh* unit = tracking_id.notNull() ? getUnit(tracking_id) : nullptr;
     if (!unit)
     {

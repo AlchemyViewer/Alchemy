@@ -32,6 +32,7 @@
 #include "llsdserialize.h"
 #include "lljoint.h"
 #include "llcallbacklist.h"
+#include "workqueue.h"
 
 #include "llmatrix4a.h"
 #include <boost/bind.hpp>
@@ -192,9 +193,24 @@ void LLModelLoader::run()
         setLoadState(ERROR_PARSING);
     }
 
-    // todo: we are inside of a thread, push this into main thread worker,
-    // not into doOnIdleOneTime that laks tread safety
-    doOnIdleOneTime(boost::bind(&LLModelLoader::loadModelCallback,this));
+    // Hand completion back to the main thread. run() executes on the loader's
+    // worker thread, and the LLCallbackList behind doOnIdleOneTime() is not
+    // thread-safe -- post through the main loop's WorkQueue instead.
+    LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
+    if (main_queue)
+    {
+        main_queue->post(boost::bind(&LLModelLoader::loadModelCallback, this));
+    }
+    else
+    {
+        // No main-loop queue registered. The viewer always has one (a global,
+        // gMainloopWork), so this branch can only run in a binary with no main
+        // loop concurrently using LLCallbackList -- where the idle list is the
+        // only delivery left. loadModelCallback() cannot be invoked inline
+        // here: it blocks until this thread is stopped and then deletes the
+        // loader, which would deadlock run().
+        doOnIdleOneTime(boost::bind(&LLModelLoader::loadModelCallback, this));
+    }
 }
 
 // static

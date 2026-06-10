@@ -94,15 +94,29 @@ void LLLocalAssetPaths::writeToDisk() const
     {
         return;
     }
-    llofstream out(path.c_str());
-    if (out.is_open())
+    // Write to a temp file and rename it over the old one (std::filesystem::rename
+    // replaces in one step) so a crash mid-write can't leave a truncated file --
+    // reloadForAccount() would silently normalize that to an empty working set.
+    const std::string tmp_path = path + ".tmp";
+    llofstream out(tmp_path.c_str());
+    if (!out.is_open())
     {
-        LLSDSerialize::toXML(mPaths, out);
-        out.close();
+        LL_WARNS("LocalAssets") << "Can't write local asset list: " << tmp_path << LL_ENDL;
+        return;
     }
-    else
+    LLSDSerialize::toXML(mPaths, out);
+    out.close();
+    if (out.fail())
     {
-        LL_WARNS("LocalAssets") << "Can't write local asset list: " << path << LL_ENDL;
+        LL_WARNS("LocalAssets") << "Failed writing local asset list: " << tmp_path << LL_ENDL;
+        LLFile::remove(tmp_path);
+        return;
+    }
+    if (LLFile::rename(tmp_path, path) != 0)
+    {
+        // rename already warned; don't leave the temp file behind, and keep the
+        // old (still intact) file as the persisted state
+        LLFile::remove(tmp_path);
     }
 }
 

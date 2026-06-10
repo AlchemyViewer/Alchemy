@@ -1163,12 +1163,12 @@ LLUUID LLLocalBitmapMgr::addUnitInternal(const std::string& filename, bool mesh_
     return LLUUID::null;
 }
 
-LLUUID LLLocalBitmapMgr::getUnitID(const std::string& filename)
+LLUUID LLLocalBitmapMgr::getUnitID(const std::string& filename, bool mesh_owned)
 {
     for (local_list_iter itBitmap = mBitmapList.begin(); mBitmapList.end() != itBitmap; ++itBitmap)
     {
         LLLocalBitmap* unit = *itBitmap;
-        if (filename == unit->getFilename())
+        if (filename == unit->getFilename() && unit->isMeshOwned() == mesh_owned)
         {
             return unit->getTrackingID();
         }

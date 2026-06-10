@@ -26,6 +26,7 @@
 
 #include "lllocalanim.h"
 
+#include "fsyspath.h"           // UTF-8-safe std::filesystem paths on Windows
 #include "llbvhloader.h"
 #include "llcharacter.h"        // LLCharacter::sInstances (resolve avatar by id)
 #include "lldatapacker.h"
@@ -210,7 +211,7 @@ LLUUID LLLocalAnimMgr::loadAnim(const std::string& filename)
     if (!alias_deferred)
     {
         std::error_code ec;
-        anim.mLastModified = std::filesystem::last_write_time(filename, ec);
+        anim.mLastModified = std::filesystem::last_write_time(fsyspath(filename), ec);
     }
 
     const size_t bytes = anim.mData.size();
@@ -253,21 +254,27 @@ void LLLocalAnimMgr::delUnit(LLUUID tracking_id)
         return;
     }
 
-    // Stop it wherever it's playing, purge the cached motion, and drop the play map.
+    // Drop the play-map entries, then stop and delete the motion EVERYWHERE
+    // before freeing its cached keyframe data. The sweep covers instances
+    // mPlaying no longer tracks -- replaced/stopped ones still easing out and
+    // deprecated duplicates -- which would otherwise keep dereferencing the
+    // freed JointMotionList every frame.
     for (auto pit = mPlaying.begin(); pit != mPlaying.end(); )
     {
         if (pit->second == tracking_id)
         {
-            if (LLVOAvatar* av = resolve_avatar(pit->first))
-            {
-                av->stopMotion(tracking_id, true);
-                av->removeMotion(tracking_id);
-            }
             pit = mPlaying.erase(pit);
         }
         else
         {
             ++pit;
+        }
+    }
+    for (LLCharacter* character : LLCharacter::sInstances)
+    {
+        if (character)
+        {
+            character->purgeMotionInstances(tracking_id);
         }
     }
 
@@ -354,24 +361,27 @@ bool LLLocalAnimMgr::reapplyToAvatar(const LLUUID& av_id, const LLUUID& anim_id)
         return false;
     }
 
-    // Purge the stale parsed motion instance so createMotion() yields a fresh one
-    // that deserializes the new bytes. The id is keyed per-avatar, so the old motion
-    // must go before a new one can take its place.
-    av->stopMotion(anim_id, true);
-    av->removeMotion(anim_id);
-
+    // The caller (doUpdates) already purged the stale motion instances and the
+    // cached keyframe data, so createMotion() yields a fresh motion. The first
+    // avatar's deserialize() rebuilds and globally re-caches the new data;
+    // later avatars must NOT deserialize again -- every deserialize builds
+    // another JointMotionList and addKeyframeData() overwrites the cache slot
+    // without freeing it, leaking one list per extra avatar per reload.
     LLKeyframeMotion* motionp = dynamic_cast<LLKeyframeMotion*>(av->createMotion(anim_id));
     if (!motionp)
     {
         return false;
     }
-    LLDataPackerBinaryBuffer dp(iter->second.mData.data(), (S32)iter->second.mData.size());
-    if (motionp->deserialize(dp, anim_id, false))
+    if (!LLKeyframeDataCache::getKeyframeData(anim_id))
     {
-        av->startMotion(anim_id);
-        return true;
+        LLDataPackerBinaryBuffer dp(iter->second.mData.data(), (S32)iter->second.mData.size());
+        if (!motionp->deserialize(dp, anim_id, false))
+        {
+            return false;
+        }
     }
-    return false;
+    av->startMotion(anim_id);
+    return true;
 }
 
 void LLLocalAnimMgr::doUpdates()
@@ -385,7 +395,7 @@ void LLLocalAnimMgr::doUpdates()
         LocalAnim&    anim = entry.second;
 
         std::error_code ec;
-        const auto mtime = std::filesystem::last_write_time(anim.mFilename, ec);
+        const auto mtime = std::filesystem::last_write_time(fsyspath(anim.mFilename), ec);
         if (ec || mtime == anim.mLastModified)
         {
             continue;
@@ -398,16 +408,44 @@ void LLLocalAnimMgr::doUpdates()
         }
         anim.mData = std::move(fresh);
 
-        // Refresh the cached keyframe data so the next play uses the new bytes,
-        // and re-apply live to any avatar currently playing this id.
-        LLKeyframeDataCache::removeKeyframeData(id);
-        bool reapply_ok = true;
-        for (const auto& play : mPlaying)
+        // Collect the avatars to re-apply to, pruning entries whose avatar is
+        // gone -- counting a dead avatar as a reapply failure would leave the
+        // mtime unconsumed and re-parse + restart the anim on every live avatar
+        // every heartbeat, forever.
+        std::vector<LLUUID> replaying;
+        for (auto pit = mPlaying.begin(); pit != mPlaying.end(); )
         {
-            if (play.second == id)
+            if (pit->second == id)
             {
-                reapply_ok = reapplyToAvatar(play.first, id) && reapply_ok;
+                if (!resolve_avatar(pit->first))
+                {
+                    pit = mPlaying.erase(pit);
+                    continue;
+                }
+                replaying.push_back(pit->first);
             }
+            ++pit;
+        }
+
+        // Stop and delete every live instance BEFORE freeing the cached keyframe
+        // data: stopping dereferences the JointMotionList (setStopTime, constraint
+        // teardown), and instances mPlaying no longer tracks (replaced/stopped
+        // ones still easing out, deprecated duplicates) would keep reading the
+        // freed data every frame.
+        for (LLCharacter* character : LLCharacter::sInstances)
+        {
+            if (character)
+            {
+                character->purgeMotionInstances(id);
+            }
+        }
+        LLKeyframeDataCache::removeKeyframeData(id);
+
+        // Re-apply live to any avatar currently playing this id.
+        bool reapply_ok = true;
+        for (const LLUUID& av_id : replaying)
+        {
+            reapply_ok = reapplyToAvatar(av_id, id) && reapply_ok;
         }
 
         // Consume the mtime only once the swap is fully live AND the decode used joint

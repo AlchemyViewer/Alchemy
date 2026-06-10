@@ -4604,10 +4604,10 @@ void LLMeshRepository::notifyLoadedMeshes()
     {
         //// Clean up dead skin info
         //U64Bytes skinbytes(0);
+        std::vector<LLUUID> culled_ids;
         for (auto iter = mSkinMap.begin(), ender = mSkinMap.end(); iter != ender;)
         {
             auto copy_iter = iter++;
-            LLUUID id = copy_iter->first;
 
             //skinbytes += U64Bytes(sizeof(LLMeshSkinInfo));
             //skinbytes += U64Bytes(copy_iter->second->mJointNames.size() * sizeof(std::string));
@@ -4615,16 +4615,28 @@ void LLMeshRepository::notifyLoadedMeshes()
             //skinbytes += U64Bytes(copy_iter->second->mJointNames.size() * sizeof(LLMatrix4a));
             //skinbytes += U64Bytes(copy_iter->second->mJointNames.size() * sizeof(LLMatrix4));
 
+            // The repo thread's mirror is erased only for skins actually evicted
+            // here: erasing it for every iterated skin emptied the mirror within
+            // one tick of arrival -- defeating its per-joint bounding-box use for
+            // any volume loading later than that -- and posted one work item per
+            // cached skin every tick.
             if (copy_iter->second->getNumRefs() == 1)
             {
+                culled_ids.push_back(copy_iter->first);
                 mSkinMap.erase(copy_iter);
             }
+        }
 
+        if (!culled_ids.empty())
+        {
             // erase from background thread
-            mThread->mWorkQueue.post([=, this]()
+            mThread->mWorkQueue.post([ids = std::move(culled_ids), this]()
                 {
                     LLMutexLock skin_lock(mThread->mSkinMapMutex);
-                    mThread->mSkinMap.erase(id);
+                    for (const LLUUID& id : ids)
+                    {
+                        mThread->mSkinMap.erase(id);
+                    }
                 });
         }
         //LL_INFOS() << "Skin info cache elements:" << mSkinMap.size() << " Memory: " << U64Kilobytes(skinbytes) << LL_ENDL;
@@ -4968,6 +4980,14 @@ void LLMeshRepository::fetchPhysicsShape(const LLUUID& mesh_id)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
 
+    // Local mesh previews have no server-side decomposition; don't queue a repo
+    // request that can never resolve (the id would sit in mLoadingPhysicsShapes
+    // forever, retrying).
+    if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_id))
+    {
+        return;
+    }
+
     if (mesh_id.notNull())
     {
         LLModel::Decomposition* decomp = NULL;
@@ -4997,6 +5017,14 @@ LLModel::Decomposition* LLMeshRepository::getDecomposition(const LLUUID& mesh_id
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK; //LL_RECORD_BLOCK_TIME(FTM_MESH_FETCH);
 
     LLModel::Decomposition* ret = NULL;
+
+    // Local mesh previews have no server-side decomposition; don't queue a repo
+    // request that can never resolve (the id would sit in mLoadingDecompositions
+    // forever, retrying).
+    if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_id))
+    {
+        return ret;
+    }
 
     if (mesh_id.notNull())
     {
@@ -5042,6 +5070,13 @@ void LLMeshRepository::buildHull(const LLVolumeParams& params, S32 detail)
 bool LLMeshRepository::hasPhysicsShape(const LLUUID& mesh_id)
 {
     if (mesh_id.isNull())
+    {
+        return false;
+    }
+
+    // Local mesh previews have no server physics shape (and must not trigger the
+    // decomposition fetch below).
+    if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_id))
     {
         return false;
     }

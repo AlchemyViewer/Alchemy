@@ -60,6 +60,7 @@ class LLViewerRegion;
 class LLVOAvatar;
 class LLVOVolume;
 class LLVolume;
+struct LLLocalMeshPreSwapSnapshot; // hot-swap diff-restore state (lllocalmesh.cpp)
 
 // One uploadable sub-mesh of a local mesh file: a single LLModel's geometry,
 // normalized to a unit box (as the upload path does), plus where it sits within
@@ -72,10 +73,11 @@ class LLVolume;
 // world id applied as the face's render material.
 struct LLLocalMeshFaceMaterial
 {
-    LLUUID   mDiffuseID;                  // local-bitmap world id (Blinn-Phong), or null
-    LLColor4 mDiffuseColor = LLColor4::white;
-    bool     mFullbright   = false;
-    LLUUID   mRenderMaterialID;          // local-gltf world id (glTF) -> face render material, or null
+    LLUUID      mDiffuseID;                // local-bitmap world id (Blinn-Phong), or null
+    LLColor4    mDiffuseColor = LLColor4::white;
+    bool        mFullbright   = false;
+    LLUUID      mRenderMaterialID;         // local-gltf world id (glTF) -> face render material, or null
+    std::string mMaterialName;             // glTF binding name, to re-resolve after a material-file regroup
 };
 
 struct LLLocalMeshPart
@@ -265,11 +267,18 @@ public:
     // agent. A unit can be rezzed any number of times; each copy is independent with
     // its own instance id. Returns the new copy's linkset root.
     LLViewerObject* spawnInWorld(const LLUUID& tracking_id);
+    // Rez a NEW copy of the preview that owns `obj`, at the source copy's transform
+    // plus `offset` -- the local-object route for the build tools' Duplicate
+    // (Ctrl+D / shift-drag-copy). Worn copies don't duplicate, matching the sim
+    // path. Returns the new copy's linkset root, or null.
+    LLViewerObject* duplicatePreview(LLViewerObject* obj, const LLVector3& offset);
     // Convenience: load each file and spawn it in-world once it finishes loading.
-    void addAndSpawn(const std::vector<std::string>& filenames);
+    // include_joints applies to any file that needs a fresh decode (pass the
+    // persisted joint-position flag for saved rows, like loadPath does).
+    void addAndSpawn(const std::vector<std::string>& filenames, bool include_joints = false);
     // Load a file (if needed) and, once decoded, spawn it and wear it at the given
     // attachment point -- so Attach works on a not-yet-decoded unit.
-    void addAndAttach(const std::string& filename, S32 attach_point);
+    void addAndAttach(const std::string& filename, S32 attach_point, bool include_joints = false);
 
     // The root of (any) one rezzed copy of a unit, or null if it has none -- handy for
     // "is this unit in-world?" checks. Use getSpawnedInstances() to act per copy.
@@ -330,6 +339,13 @@ public:
     // re-creates them in the current region.
     void despawnObjectsInRegion(LLViewerRegion* regionp);
 
+    // A local material file's name -> world id mapping changed (live-edit regroup
+    // in LLLocalGLTFMaterialMgr): re-resolve this mesh file's stored face
+    // materials by their binding names and re-point spawned faces at the new ids.
+    // Faces the user re-materialed in-world are left alone -- only faces still
+    // showing the previously imported id move (the hot-swap diff-restore rule).
+    void rebindFaceMaterials(const std::string& filename);
+
 private:
     LLUUID addUnitInternal(const std::string& filename, bool include_joints = false);
     void   despawnUnit(const LLUUID& tracking_id);
@@ -337,8 +353,16 @@ private:
     // Reload every spawned copy of a unit in place by pointing each existing prim at
     // the freshly decoded geometry (new sculpt id) instead of despawning -- so
     // attachment, selection and transform are preserved and there's no flicker.
+    // pre_swap carries the state captured before ingestScene committed; the
+    // diff-restore re-applies only the user's face edits over the new file state.
     // Returns false if the prim count changed (caller falls back to a re-spawn).
-    bool hotSwapInWorld(const LLUUID& tracking_id);
+    bool hotSwapInWorld(const LLUUID& tracking_id, const LLLocalMeshPreSwapSnapshot& pre_swap);
+    // Snapshot, BEFORE a reload's ingestScene commits, everything the hot-swap
+    // diff-restore needs: each spawned prim's live face state and the old parts'
+    // imported materials (ingest releases dropped imports, whose teardown already
+    // resets live faces -- a later capture would mistake that for user state).
+    void capturePreSwap(const LLUUID& tracking_id, const LLLocalMesh& unit,
+                        LLLocalMeshPreSwapSnapshot& out) const;
     // Re-rez every existing copy of a unit at its current transform/attachment, used
     // when a reload changes the prim count so hot-swap can't swap 1:1.
     void respawnInstancesInPlace(const LLUUID& tracking_id);

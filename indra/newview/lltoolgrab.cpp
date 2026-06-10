@@ -339,8 +339,9 @@ bool LLToolGrabBase::handleObjectHit(const LLPickInfo& info)
 void LLToolGrabBase::startSpin()
 {
     LLViewerObject* objectp = mGrabPick.getObject();
-    if (!objectp)
+    if (!objectp || objectp->isLocalOnly())
     {
+        // Client-only local previews have no sim object to spin.
         return;
     }
     mSpinGrabbing = true;
@@ -365,7 +366,7 @@ void LLToolGrabBase::stopSpin()
     mSpinGrabbing = false;
 
     LLViewerObject* objectp = mGrabPick.getObject();
-    if (!objectp)
+    if (!objectp || objectp->isLocalOnly())
     {
         return;
     }
@@ -598,16 +599,22 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
             mSpinRotation = mSpinRotation * rotation_around_vertical;
             mSpinRotation = mSpinRotation * rotation_around_left;
 
-            // TODO: Throttle these
-            LLMessageSystem *msg = gMessageSystem;
-            msg->newMessageFast(_PREHASH_ObjectSpinUpdate);
-            msg->nextBlockFast(_PREHASH_AgentData);
-            msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
-            msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
-            msg->nextBlockFast(_PREHASH_ObjectData);
-            msg->addUUIDFast(_PREHASH_ObjectID, objectp->getID() );
-            msg->addQuatFast(_PREHASH_Rotation, mSpinRotation );
-            msg->sendMessage( objectp->getRegion()->getHost() );
+            // Client-only local previews have no sim object to spin. The toggle
+            // above re-sets mSpinGrabbing from the mask every hover, so
+            // startSpin()'s early-out alone doesn't keep us out of this block.
+            if (!objectp->isLocalOnly())
+            {
+                // TODO: Throttle these
+                LLMessageSystem *msg = gMessageSystem;
+                msg->newMessageFast(_PREHASH_ObjectSpinUpdate);
+                msg->nextBlockFast(_PREHASH_AgentData);
+                msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID() );
+                msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+                msg->nextBlockFast(_PREHASH_ObjectData);
+                msg->addUUIDFast(_PREHASH_ObjectID, objectp->getID() );
+                msg->addQuatFast(_PREHASH_Rotation, mSpinRotation );
+                msg->sendMessage( objectp->getRegion()->getHost() );
+            }
         }
         else
         {
@@ -715,8 +722,10 @@ void LLToolGrabBase::handleHoverActive(S32 x, S32 y, MASK mask)
                 }
             }
 
-            // Don't move above top of screen or below bottom
-            if ((grab_center_gl.mY < gViewerWindow->getWorldViewHeightScaled() - 6)
+            // Don't move above top of screen or below bottom; client-only local
+            // previews have no sim object to update.
+            if (!objectp->isLocalOnly()
+                && (grab_center_gl.mY < gViewerWindow->getWorldViewHeightScaled() - 6)
                 && (grab_center_gl.mY > 24))
             {
                 // Transmit update to simulator
@@ -889,7 +898,7 @@ void LLToolGrabBase::handleHoverNonPhysical(S32 x, S32 y, MASK mask)
         changed_since_last_update = true;
     }
 
-    if (changed_since_last_update)
+    if (changed_since_last_update && !objectp->isLocalOnly())
     {
         LLMessageSystem *msg = gMessageSystem;
         msg->newMessageFast(_PREHASH_ObjectGrabUpdate);
@@ -1173,7 +1182,8 @@ LLVector3d LLToolGrabBase::getGrabPointGlobal()
 
 void send_ObjectGrab_message(LLViewerObject* object, const LLPickInfo & pick, const LLVector3 &grab_offset)
 {
-    if (!object) return;
+    // Client-only local previews have no sim object; localid 0 means nothing there.
+    if (!object || object->isLocalOnly()) return;
 
     LLMessageSystem *msg = gMessageSystem;
 
@@ -1210,7 +1220,7 @@ void send_ObjectGrab_message(LLViewerObject* object, const LLPickInfo & pick, co
 
 void send_ObjectDeGrab_message(LLViewerObject* object, const LLPickInfo & pick)
 {
-    if (!object) return;
+    if (!object || object->isLocalOnly()) return;
 
     LLMessageSystem *msg = gMessageSystem;
 

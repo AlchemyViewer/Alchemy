@@ -110,6 +110,14 @@ void LLCharacter::removeMotion( const LLUUID& id )
 }
 
 //-----------------------------------------------------------------------------
+// purgeMotionInstances()
+//-----------------------------------------------------------------------------
+void LLCharacter::purgeMotionInstances( const LLUUID& id )
+{
+    mMotionController.purgeMotionInstances(id);
+}
+
+//-----------------------------------------------------------------------------
 // findMotion()
 //-----------------------------------------------------------------------------
 LLMotion* LLCharacter::findMotion( const LLUUID &id )

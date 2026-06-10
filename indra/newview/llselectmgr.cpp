@@ -4704,6 +4704,52 @@ void LLSelectMgr::selectDuplicate(const LLVector3& offset, bool select_copy)
             return;
         }
     }
+
+    // Client-only local previews: duplicate locally. The ObjectDuplicate send
+    // below is swallowed for an all-local selection (sendListToRegions gate),
+    // which would otherwise make Ctrl+D / shift-drag-copy a silent no-op.
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        // Snapshot the source roots first: spawning fires the manager's
+        // units-changed signal, whose listeners must not invalidate this walk.
+        std::vector<LLPointer<LLViewerObject>> src_roots;
+        for (LLObjectSelection::root_iterator it = getSelection()->root_begin();
+             it != getSelection()->root_end(); ++it)
+        {
+            src_roots.emplace_back((*it)->getObject());
+        }
+        std::vector<LLViewerObject*> new_roots;
+        for (const LLPointer<LLViewerObject>& src : src_roots)
+        {
+            if (LLViewerObject* new_root = LLLocalMeshMgr::getInstance()->duplicatePreview(src.get(), offset))
+            {
+                new_roots.push_back(new_root);
+            }
+        }
+        if (select_copy && !new_roots.empty())
+        {
+            deselectAll();
+            for (LLViewerObject* new_root : new_roots)
+            {
+                selectObjectAndFamily(new_root);
+            }
+        }
+        else if (!select_copy)
+        {
+            // Mirror the sim path's bookkeeping below so repeatDuplicate()
+            // recognizes these as duplicated and chains the copy/move sequence.
+            for (LLObjectSelection::root_iterator it = getSelection()->root_begin();
+                 it != getSelection()->root_end(); ++it)
+            {
+                LLSelectNode* node = *it;
+                node->mDuplicated = true;
+                node->mDuplicatePos = node->getObject()->getPositionGlobal();
+                node->mDuplicateRot = node->getObject()->getRotation();
+            }
+        }
+        return;
+    }
+
     LLDuplicateData data;
 
     data.offset = offset;
@@ -4759,12 +4805,32 @@ void LLSelectMgr::repeatDuplicate()
     }
 
     // duplicate objects in place
-    LLDuplicateData data;
+    if (selectionAllLocalPreview(mSelectedObjects))
+    {
+        // Client-only local previews: copy each in place locally -- the gated
+        // ObjectDuplicate send below is swallowed for an all-local selection
+        // (see selectDuplicate). The shared move-by-delta loop below then
+        // advances the selection exactly like the sim path.
+        std::vector<LLPointer<LLViewerObject>> src_roots;
+        for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
+             iter != getSelection()->root_end(); ++iter)
+        {
+            src_roots.emplace_back((*iter)->getObject());
+        }
+        for (const LLPointer<LLViewerObject>& src : src_roots)
+        {
+            LLLocalMeshMgr::getInstance()->duplicatePreview(src.get(), LLVector3::zero);
+        }
+    }
+    else
+    {
+        LLDuplicateData data;
 
-    data.offset = LLVector3::zero;
-    data.flags = 0x0;
+        data.offset = LLVector3::zero;
+        data.flags = 0x0;
 
-    sendListToRegions("ObjectDuplicate", packDuplicateHeader, packDuplicate, logNoOp, &data, SEND_ONLY_ROOTS);
+        sendListToRegions("ObjectDuplicate", packDuplicateHeader, packDuplicate, logNoOp, &data, SEND_ONLY_ROOTS);
+    }
 
     // move current selection based on delta from duplication position and update duplication position
     for (LLObjectSelection::root_iterator iter = getSelection()->root_begin();
@@ -5942,7 +6008,9 @@ void LLSelectMgr::sendListToRegions(LLObjectSelectionHandle selected_handle,
     // Client-only local mesh previews never talk to the simulator. Short-circuit
     // every object message marshalled through here (name/description/permissions/
     // sale/group/owner/click-action/category/shape/flags/...). Local derez,
-    // duplicate and attach are handled by LLLocalMeshMgr before reaching this path.
+    // duplicate and attach are intercepted upstream (selectDelete, selectDuplicate
+    // and the attach menu route to LLLocalMeshMgr); anything else marshalled here
+    // for an all-local selection is intentionally dropped.
     if (selectionAllLocalPreview(selected_handle))
     {
         return;
@@ -8039,6 +8107,21 @@ bool LLSelectMgr::canSelectObject(LLViewerObject* object, bool ignore_select_own
         return false;
     }
 
+    // Don't allow mixing client-only local mesh previews with real (sim) objects
+    // in a single selection -- a mixed selection escapes the all-local gating and
+    // would send the previews' (fake) local IDs to the sim. Checked ahead of
+    // mForceSelection so temp/right-click (forced) selects can't sneak a mix in;
+    // the selection stays homogeneous, so the first selected object is
+    // representative.
+    if (mSelectedObjects->getObjectCount() > 0)
+    {
+        LLViewerObject* selected = mSelectedObjects->getFirstObject();
+        if (selected && selected->isLocalOnly() != object->isLocalOnly())
+        {
+            return false;
+        }
+    }
+
     if (mForceSelection)
     {
         return true;
@@ -8066,19 +8149,6 @@ bool LLSelectMgr::canSelectObject(LLViewerObject* object, bool ignore_select_own
 
     ESelectType selection_type = getSelectTypeForObject(object);
     if (mSelectedObjects->getObjectCount() > 0 && mSelectedObjects->mSelectType != selection_type) return false;
-
-    // Don't allow mixing client-only local mesh previews with real (sim) objects
-    // in a single selection -- a mixed selection escapes the all-local gating and
-    // would send the previews' (fake) local IDs to the sim. The selection is kept
-    // homogeneous by this check, so the first selected object is representative.
-    if (mSelectedObjects->getObjectCount() > 0)
-    {
-        LLViewerObject* selected = mSelectedObjects->getFirstObject();
-        if (selected && selected->isLocalOnly() != object->isLocalOnly())
-        {
-            return false;
-        }
-    }
 
     return true;
 }
@@ -9035,6 +9105,13 @@ void LLSelectMgr::sendSelectionMove()
 {
     LLSelectNode *node = mSelectedObjects->getFirstRootNode();
     if (node == NULL)
+    {
+        return;
+    }
+
+    // Client-only local previews are moved purely locally (this is the
+    // joystick/spacenav build-move path); there is no sim object to update.
+    if (selectionAllLocalPreview(mSelectedObjects))
     {
         return;
     }

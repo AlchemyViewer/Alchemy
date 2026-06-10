@@ -122,6 +122,15 @@ public:
     // returns true if successful
     bool stopMotionLocally( const LLUUID &id, bool stop_immediate );
 
+    // immediately deactivates and deletes EVERY instance of a motion id --
+    // the canonical instance and any deprecated duplicates still easing out.
+    // For use when the motion's backing data is about to be destroyed (e.g. a
+    // locally previewed animation whose globally cached keyframe data is purged
+    // on live reload/removal): removeMotion() only reaches the canonical
+    // instance, and a deprecated instance left easing out keeps dereferencing
+    // the freed data every frame.
+    void purgeMotionInstances( const LLUUID& id );
+
     // Move motions from loading to loaded
     void updateLoadingMotions();
 

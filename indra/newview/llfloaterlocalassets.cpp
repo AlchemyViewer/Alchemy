@@ -402,16 +402,16 @@ void LLPanelLocalAssetBase::onRemoveBtn()
 
     for (const auto& entry : selected)
     {
-        if (!entry.first.empty())
-        {
-            LLLocalAssetPaths::getInstance()->removePath(assetType(), entry.first); // forget the path
-        }
-        // Unload every decoded unit backing this row. For a multi-material glTF file
-        // that's all of the file's material units, not just the selected row.
+        // Unload every decoded unit backing this row FIRST and forget the path
+        // only once they are all gone. delUnit() fires the manager signals
+        // synchronously, and the add-only LLLocalAssetPaths::onUnitsChanged()
+        // re-records any path a still-loaded unit reports -- removePath() up
+        // front would be undone by the very first delUnit (mesh teardown, or a
+        // multi-material glTF file's surviving sibling units).
         std::vector<LLUUID> ids;
         if (!entry.first.empty())
         {
-            unitsForPath(entry.first, ids);
+            unitsForPath(entry.first, ids); // all of the file's units, not just the row
         }
         if (ids.empty() && entry.second.notNull())
         {
@@ -420,6 +420,10 @@ void LLPanelLocalAssetBase::onRemoveBtn()
         for (const LLUUID& id : ids)
         {
             delUnit(id); // unload the decoded unit (fires the manager signal)
+        }
+        if (!entry.first.empty())
+        {
+            LLLocalAssetPaths::getInstance()->removePath(assetType(), entry.first); // forget the path
         }
     }
     refresh(); // removePath() alone (undecoded rows) doesn't fire a manager signal
@@ -723,11 +727,15 @@ void LLPanelLocalMesh::onRez()
         doSpawn(id); // always rez a new copy
         return;
     }
-    // Undecoded: load it and rez once it finishes (addAndSpawn handles the async load).
+    // Undecoded: load it and rez once it finishes (addAndSpawn handles the async
+    // load). Decode with the joint-position flag the artist saved for this file,
+    // like loadPath -- defaulting it would also make onUnitsChanged erase the
+    // saved flag.
     const std::string path = getSelectedPath();
     if (!path.empty())
     {
-        LLLocalMeshMgr::getInstance()->addAndSpawn(std::vector<std::string>(1, path));
+        LLLocalMeshMgr::getInstance()->addAndSpawn(std::vector<std::string>(1, path),
+                                                   LLLocalAssetPaths::getInstance()->getMeshJoints(path));
     }
 }
 
@@ -740,11 +748,12 @@ void LLPanelLocalMesh::onAttach()
         return;
     }
     // Undecoded row: load it and attach once it finishes loading (mirrors how Rez
-    // handles an undecoded row via addAndSpawn).
+    // handles an undecoded row via addAndSpawn), honoring the saved joint flag.
     const std::string path = getSelectedPath();
     if (!path.empty())
     {
-        LLLocalMeshMgr::getInstance()->addAndAttach(path, getComboAttachPoint());
+        LLLocalMeshMgr::getInstance()->addAndAttach(path, getComboAttachPoint(),
+                                                    LLLocalAssetPaths::getInstance()->getMeshJoints(path));
     }
 }
 
@@ -837,9 +846,13 @@ void LLPanelLocalMesh::doRemove(const LLUUID& tracking_id)
 {
     if (tracking_id.notNull())
     {
-        LLLocalAssetPaths::getInstance()->removePath(LLLocalAssetPaths::TYPE_MESH,
-                                                     pathForUnit(tracking_id));
+        // Resolve the path before the unit dies, but forget it only AFTER
+        // delUnit: the units-changed listeners fire during teardown and the
+        // add-only LLLocalAssetPaths::onUnitsChanged would re-record a path
+        // removed up front (see onRemoveBtn).
+        const std::string path = pathForUnit(tracking_id);
         delUnit(tracking_id); // units-changed signal -> refresh()
+        LLLocalAssetPaths::getInstance()->removePath(LLLocalAssetPaths::TYPE_MESH, path);
     }
 }
 
@@ -1217,7 +1230,9 @@ protected:
     }
     LLUUID unitForPath(const std::string& path) const override
     {
-        return LLLocalBitmapMgr::getInstance()->getUnitID(path);
+        // User units only: a mesh-owned import of the same file is a distinct,
+        // read-only unit this tab must neither claim as loaded nor delete.
+        return LLLocalBitmapMgr::getInstance()->getUnitID(path, /*mesh_owned=*/false);
     }
     std::string pathForUnit(const LLUUID& tracking_id) const override
     {
@@ -1271,8 +1286,9 @@ protected:
     }
     LLUUID unitForPath(const std::string& path) const override
     {
-        // A file holds >= 1 material; treat it as loaded if its first material is.
-        return LLLocalGLTFMaterialMgr::getInstance()->getUnitID(path, 0);
+        // A file holds >= 1 material; treat it as loaded if its first USER material
+        // is (a mesh-owned import of the same file is a distinct, read-only set).
+        return LLLocalGLTFMaterialMgr::getInstance()->getUnitID(path, 0, /*mesh_owned=*/false);
     }
     std::string pathForUnit(const LLUUID& tracking_id) const override
     {
@@ -1283,8 +1299,10 @@ protected:
     }
     void unitsForPath(const std::string& path, std::vector<LLUUID>& out) const override
     {
-        // One .gltf/.glb can decode to several material units; remove them all.
-        LLLocalGLTFMaterialMgr::getInstance()->getTrackingIDs(path, out);
+        // One .gltf/.glb can decode to several material units; act on all of the
+        // USER's. Mesh-owned imports of the same file belong to a loaded mesh and
+        // must not be deleted from this tab.
+        LLLocalGLTFMaterialMgr::getInstance()->getTrackingIDs(path, out, /*mesh_owned=*/false);
     }
     std::string iconName() const override
     {

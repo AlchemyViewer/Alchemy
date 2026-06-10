@@ -58,6 +58,7 @@ public: /* accessors */
     // map (see LLLocalGLTFMaterialMgr::getWorldIDsByName).
     const std::vector<std::string>& getAliasNames() const { return mAliasNames; }
     void        addAliasName(const std::string& name) { mAliasNames.push_back(name); }
+    void        clearAliasNames() { mAliasNames.clear(); } // rebuilt by a live-edit regroup
     // Imported by a local mesh for its own faces: hidden from the Materials tab +
     // cross-session persistence (it reappears when the mesh re-decodes).
     bool        isMeshOwned() const { return mIsMeshOwned; }
@@ -122,13 +123,25 @@ public:
     S32          addUnit(const std::string& filename, bool mesh_owned);
 protected:
     S32          addUnitInternal(const std::string& filename, LLUUID& outID, bool mesh_owned = false); // file can hold multiple materials
+    // Re-derive a file's unit/alias structure after a live edit: import-time dedup
+    // collapses content-identical materials onto one unit (the other binding names
+    // become aliases), and an edit can split such a group, merge one, or add/remove
+    // materials outright. Surviving units keep their tracking/world ids; diverged or
+    // new indices get fresh units; removed indices drop theirs; every alias is
+    // rebuilt. Returns true when the file's name -> world id mapping changed (the
+    // caller re-binds local-mesh faces off that).
+    bool         regroupFileMaterials(const std::string& filename, bool mesh_owned);
 public:
     void         delUnit(LLUUID tracking_id);
-    LLUUID       getUnitID(const std::string& filename, S32 index = 0);
-    // Tracking ids of every unit loaded from a file, in list order. Unlike walking
-    // getUnitID(file, 0..N), this is safe across the index gaps that import-time
-    // deduplication leaves in getIndexInFile().
-    void         getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out);
+    // The lookups below resolve within ONE ownership class: a user-loaded set and a
+    // mesh-owned import of the same file are distinct units (see addUnitInternal),
+    // and an ownership-blind match could hand the Materials tab a mesh's hidden
+    // imports to delete (or bind a mesh's faces to the user's deletable copies).
+    LLUUID       getUnitID(const std::string& filename, S32 index, bool mesh_owned);
+    // Tracking ids of every unit of the class loaded from a file, in list order.
+    // Unlike walking getUnitID(file, 0..N), this is safe across the index gaps
+    // that import-time deduplication leaves in getIndexInFile().
+    void         getTrackingIDs(const std::string& filename, std::vector<LLUUID>& out, bool mesh_owned);
 
     LLUUID       getWorldID(LLUUID tracking_id);
     bool         isMeshOwned(const LLUUID& tracking_id) const; // imported by a local mesh
@@ -136,7 +149,7 @@ public:
     void         getFilenameAndIndex(LLUUID tracking_id, std::string &filename, S32 &index);
     // Map each of a file's materials by name (empty name -> "mat<index>", matching the
     // model loader's face bindings) to its world id, for texturing a local mesh.
-    void         getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out);
+    void         getWorldIDsByName(const std::string& filename, std::map<std::string, LLUUID>& out, bool mesh_owned);
     std::vector<std::string> getFilenames() const; // distinct loaded files (persistence)
 
     void         feedScrollList(LLScrollListCtrl* ctrl);
