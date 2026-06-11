@@ -169,31 +169,91 @@ public:
     S32                                 mTotalSize;
 };
 
+// One decoded or built message's block data. Each block name owns an ordered
+// list of its repeat instances; groups are kept in first-seen order, which is
+// the template's block order for both decode and build.
+//
+// This replaces an older std::map keyed by (canonical name pointer + repeat
+// index) pointer arithmetic. String-table names are contiguous 64-byte rows,
+// so name + i for i past ~64 walked into the adjacent name's storage; two
+// block names within range plus enough repeats aliased keys, overwriting (and
+// leaking) blocks and corrupting data. ImprovedTerseObjectUpdate-class
+// messages reach ~180 repeats after zerocode expansion, so this was reachable
+// from inbound traffic. Grouping by name sidesteps the synthesized key
+// entirely and drops the per-block map node.
 class LLMsgData
 {
 public:
-    LLMsgData(const char *name) : mTotalSize(-1)
+    struct BlockGroup
     {
-        mName = (char *)name;
+        char*                       mName;   // canonical (string-table) block name
+        std::vector<LLMsgBlkData*>  mBlocks; // repeat instances in order; owned
+    };
+    typedef std::vector<BlockGroup> msg_blk_data_map_t;
+
+    LLMsgData(const char *name) : mName((char *)name), mTotalSize(-1)
+    {
+        mMemberBlocks.reserve(8);
     }
     ~LLMsgData()
     {
-        for_each(mMemberBlocks.begin(), mMemberBlocks.end(), DeletePairedPointer());
-        mMemberBlocks.clear();
+        for (BlockGroup& group : mMemberBlocks)
+        {
+            for (LLMsgBlkData* blockp : group.mBlocks)
+            {
+                delete blockp;
+            }
+        }
     }
 
+    // Append blockp as the next repeat of its (canonical) block name.
     void addBlock(LLMsgBlkData *blockp)
     {
-        mMemberBlocks[blockp->mName] = blockp;
+        getOrAddGroup(blockp->mName).mBlocks.push_back(blockp);
     }
 
-    void addDataFast(char *blockname, char *varname, const void *data, S32 size, EMsgVariableType type, S32 data_size = -1);
+    bool empty() const { return mMemberBlocks.empty(); }
 
-public:
-    typedef std::map<char*, LLMsgBlkData*> msg_blk_data_map_t;
-    msg_blk_data_map_t                  mMemberBlocks;
+    // Repeat #blocknum of name, or nullptr if name or that index is absent.
+    LLMsgBlkData* getBlock(const char* name, S32 blocknum = 0) const
+    {
+        const BlockGroup* group = findGroup(name);
+        if (!group || blocknum < 0 || blocknum >= (S32)group->mBlocks.size())
+        {
+            return nullptr;
+        }
+        return group->mBlocks[blocknum];
+    }
+
+    msg_blk_data_map_t                  mMemberBlocks; // groups in template order
     char                                *mName;
     S32                                 mTotalSize;
+
+private:
+    BlockGroup& getOrAddGroup(char* name)
+    {
+        for (BlockGroup& group : mMemberBlocks)
+        {
+            if (group.mName == name)
+            {
+                return group;
+            }
+        }
+        mMemberBlocks.push_back(BlockGroup{name, {}});
+        return mMemberBlocks.back();
+    }
+
+    const BlockGroup* findGroup(const char* name) const
+    {
+        for (const BlockGroup& group : mMemberBlocks)
+        {
+            if (group.mName == name)
+            {
+                return &group;
+            }
+        }
+        return nullptr;
+    }
 };
 
 // LLMessage* classes store the template of messages

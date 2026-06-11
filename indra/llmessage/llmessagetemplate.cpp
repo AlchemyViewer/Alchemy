@@ -59,22 +59,6 @@ void LLMsgVarData::addData(const void *data, S32 size, EMsgVariableType type, S3
     }
 }
 
-void LLMsgData::addDataFast(char *blockname, char *varname, const void *data, S32 size, EMsgVariableType type, S32 data_size)
-{
-    // remember that if the blocknumber is > 0 then the number is appended to the name
-    char *namep = (char *)blockname;
-    LLMsgBlkData* block_data = mMemberBlocks[namep];
-    if (block_data->mBlockNumber)
-    {
-        namep += block_data->mBlockNumber;
-        block_data->addData(varname, data, size, type, data_size);
-    }
-    else
-    {
-        block_data->addData(varname, data, size, type, data_size);
-    }
-}
-
 // LLMessageVariable functions and friends
 
 std::ostream& operator<<(std::ostream& s, LLMessageVariable &msg)

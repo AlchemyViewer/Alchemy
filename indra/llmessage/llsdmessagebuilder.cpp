@@ -239,41 +239,16 @@ U32 LLSDMessageBuilder::buildMessage(U8*, U32, U8)
 
 void LLSDMessageBuilder::copyFromMessageData(const LLMsgData& data)
 {
-    // copy the blocks
-    // counting variables used to encode multiple block info
-    S32 block_count = 0;
-    char* block_name = NULL;
-
-    // loop through msg blocks to loop through variables, totalling up size
-    // data and filling the new (send) message
-    LLMsgData::msg_blk_data_map_t::const_iterator iter =
-        data.mMemberBlocks.begin();
-    LLMsgData::msg_blk_data_map_t::const_iterator end =
-        data.mMemberBlocks.end();
-    for(; iter != end; ++iter)
+    // walk each block group in template order, then each repeat in order,
+    // starting a fresh block per repeat and converting its variables to LLSD
+    for (const LLMsgData::BlockGroup& group : data.mMemberBlocks)
     {
-        const LLMsgBlkData* mbci = iter->second;
-        if(!mbci) continue;
-
-        // do we need to encode a block code?
-        if (block_count == 0)
+        for (const LLMsgBlkData* mbci : group.mBlocks)
         {
-            block_count = mbci->mBlockNumber;
-            block_name = (char*)mbci->mName;
-        }
+            nextBlock(group.mName);
 
-        // counting down mutliple blocks
-        block_count--;
-
-        nextBlock(block_name);
-
-        // now loop through the variables
-        LLMsgBlkData::msg_var_data_map_t::const_iterator dit = mbci->mMemberVarData.begin();
-        LLMsgBlkData::msg_var_data_map_t::const_iterator dend = mbci->mMemberVarData.end();
-
-        for(; dit != dend; ++dit)
-        {
-            const LLMsgVarData& mvci = *dit;
+            for (const LLMsgVarData& mvci : mbci->mMemberVarData)
+            {
             const char* varname = mvci.getName();
 
             switch(mvci.getType())
@@ -391,6 +366,7 @@ void LLSDMessageBuilder::copyFromMessageData(const LLMsgData& data)
             default:
                 LL_WARNS() << "Unknown type in conversion of message to LLSD" << LL_ENDL;
                 break;
+            }
             }
         }
     }

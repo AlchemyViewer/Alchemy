@@ -1022,5 +1022,49 @@ namespace tut
                       strlen(outBuffer), (size_t)254);
         delete reader;
     }
+
+    template<> template<>
+    void LLTemplateMessageBuilderTestObject::test<48>()
+        // A variable block repeated far past 64 times, alongside a second
+        // block, all round-trip intact. The old data model keyed each repeat
+        // by (block-name pointer + repeat index), walking the string table;
+        // past ~64 repeats those keys ran into an adjacent block name and
+        // aliased, corrupting and leaking blocks. Grouping repeats by name
+        // removes the synthesized key. ImprovedTerseObjectUpdate-class
+        // messages reach this repeat count after zerocode expansion.
+    {
+        LLMessageTemplate messageTemplate = defaultTemplate();
+        messageTemplate.addBlock(defaultBlock(MVT_U32, 4, MBT_VARIABLE)); // Test0
+        messageTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test1),
+                                             MVT_U32, 4, MBT_SINGLE));     // Test1
+
+        const S32 NUM_BLOCKS = 200;
+        LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate); // nextBlock(Test0)
+        builder->addU32(_PREHASH_Test0, 0);
+        for (S32 i = 1; i < NUM_BLOCKS; ++i)
+        {
+            builder->nextBlock(_PREHASH_Test0);
+            builder->addU32(_PREHASH_Test0, (U32)i);
+        }
+        // createBlock always names the block's variable Test0, regardless of
+        // the block name, so the Test1 block's variable is Test0 too
+        builder->nextBlock(_PREHASH_Test1);
+        builder->addU32(_PREHASH_Test0, 0xdeadbeef);
+
+        LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
+
+        ensure_equals("variable block count",
+                      reader->getNumberOfBlocks(_PREHASH_Test0), NUM_BLOCKS);
+        for (S32 i = 0; i < NUM_BLOCKS; ++i)
+        {
+            U32 value = 0xffffffff;
+            reader->getU32(_PREHASH_Test0, _PREHASH_Test0, value, i);
+            ensure_equals("variable block repeat intact", value, (U32)i);
+        }
+        U32 single = 0;
+        reader->getU32(_PREHASH_Test1, _PREHASH_Test0, single);
+        ensure_equals("adjacent single block intact", single, (U32)0xdeadbeef);
+        delete reader;
+    }
 }
 

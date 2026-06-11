@@ -138,8 +138,9 @@ void LLTemplateMessageBuilder::nextBlock(const char* blockname)
         return;
     }
 
-    // ok, have we already set this block?
-    LLMsgBlkData* block_data = mCurrentSMessageData->mMemberBlocks[bnamep];
+    // ok, have we already set this block? newMessage pre-added a placeholder
+    // for every template block, so getBlock(name, 0) is the group header.
+    LLMsgBlkData* block_data = mCurrentSMessageData->getBlock(bnamep, 0);
     if (block_data->mBlockNumber == 0)
     {
         // nope! set this as the current block
@@ -171,22 +172,18 @@ void LLTemplateMessageBuilder::nextBlock(const char* blockname)
 
 
         // if the block is type MBT_MULTIPLE then we need a known number,
-        // make sure that we're not exceeding it
+        // make sure that we're not exceeding it (the header tracks the count)
         if (  (template_data->mType == MBT_MULTIPLE)
-            &&(mCurrentSDataBlock->mBlockNumber == template_data->mNumber))
+            &&(block_data->mBlockNumber == template_data->mNumber))
         {
             LL_ERRS() << "LLTemplateMessageBuilder::nextBlock called "
-                << mCurrentSDataBlock->mBlockNumber << " times for " << bnamep
+                << block_data->mBlockNumber << " times for " << bnamep
                 << " exceeding " << template_data->mNumber
                 << " specified in type MBT_MULTIPLE." << LL_ENDL;
             return;
         }
 
-        // ok, we can make a new one
-        // modify the name to avoid name collision by adding number to end
-        S32  count = block_data->mBlockNumber;
-
-        // incrememt base name's count
+        // ok, we can make a new one; bump the count tracked on the header
         block_data->mBlockNumber++;
 
         if (block_data->mBlockNumber > MAX_BLOCKS)
@@ -195,16 +192,10 @@ void LLTemplateMessageBuilder::nextBlock(const char* blockname)
                    << "(limited to " << MAX_BLOCKS << ")" << LL_ENDL;
         }
 
-        // create new name
-        // Nota Bene: if things are working correctly,
-        // mCurrentMessageData->mMemberBlocks[blockname]->mBlockNumber ==
-        // mCurrentDataBlock->mBlockNumber + 1
-
-        char *nbnamep = bnamep + count;
-
-        mCurrentSDataBlock = new LLMsgBlkData(bnamep, count);
-        mCurrentSDataBlock->mName = nbnamep;
-        mCurrentSMessageData->mMemberBlocks[nbnamep] = mCurrentSDataBlock;
+        // append the new repeat under the canonical name; addBlock groups it
+        // and getBlock(name, i) recovers it by index
+        mCurrentSDataBlock = new LLMsgBlkData(bnamep, block_data->mBlockNumber - 1);
+        mCurrentSMessageData->addBlock(mCurrentSDataBlock);
 
         // add placeholders for each of the variables
         for (LLMessageBlock::message_variable_map_t::const_iterator
@@ -549,7 +540,8 @@ bool LLTemplateMessageBuilder::isMessageFull(const char* blockname) const
         max = MAX_BLOCKS;
         break;
     }
-    if(mCurrentSMessageData->mMemberBlocks[bnamep]->mBlockNumber >= max)
+    const LLMsgBlkData* header = mCurrentSMessageData->getBlock(bnamep, 0);
+    if(header && header->mBlockNumber >= max)
     {
         return true;
     }
@@ -559,17 +551,15 @@ bool LLTemplateMessageBuilder::isMessageFull(const char* blockname) const
 static S32 buildBlock(U8* buffer, S32 buffer_size, const LLMessageBlock* template_data, LLMsgData* message_data)
 {
     S32 result = 0;
-    LLMsgData::msg_blk_data_map_t::const_iterator block_iter = message_data->mMemberBlocks.find(template_data->mName);
-    const LLMsgBlkData* mbci = block_iter->second;
-
-    // ok, if this is the first block of a repeating pack, set
-    // block_count and, if it's type MBT_VARIABLE encode a byte
-    // for how many there are
-    S32 block_count = mbci->mBlockNumber;
+    // header (repeat 0) carries the repeat count; repeats are recovered by
+    // index via getBlock(name, i)
+    const LLMsgBlkData* header = message_data->getBlock(template_data->mName, 0);
+    const LLMsgBlkData* mbci = header;
+    S32 block_count = header ? header->mBlockNumber : 0;
     if (template_data->mType == MBT_VARIABLE)
     {
         // remember that mBlockNumber is a S32
-        U8 temp_block_number = (U8)mbci->mBlockNumber;
+        U8 temp_block_number = (U8)block_count;
         if ((S32)(result + sizeof(U8)) < MAX_BUFFER_SIZE)
         {
             memcpy(&buffer[result], &temp_block_number, sizeof(U8));
@@ -596,8 +586,10 @@ static S32 buildBlock(U8* buffer, S32 buffer_size, const LLMessageBlock* templat
         }
     }
 
-    while(block_count > 0)
+    for (S32 block_index = 0; block_index < block_count; ++block_index)
     {
+        mbci = message_data->getBlock(template_data->mName, block_index);
+
         // now loop through the variables
         for (LLMsgBlkData::msg_var_data_map_t::const_iterator iter = mbci->mMemberVarData.begin();
              iter != mbci->mMemberVarData.end(); iter++)
@@ -668,16 +660,6 @@ static S32 buildBlock(U8* buffer, S32 buffer_size, const LLMessageBlock* templat
             }
         }
 
-        --block_count;
-
-        if (block_iter != message_data->mMemberBlocks.end())
-        {
-            ++block_iter;
-            if (block_iter != message_data->mMemberBlocks.end())
-            {
-                mbci = block_iter->second;
-            }
-        }
     }
 
     return result;
@@ -767,42 +749,18 @@ U32 LLTemplateMessageBuilder::buildMessage(
 
 void LLTemplateMessageBuilder::copyFromMessageData(const LLMsgData& data)
 {
-    // copy the blocks
-    // counting variables used to encode multiple block info
-    S32 block_count = 0;
-    char *block_name = NULL;
-
-    // loop through msg blocks to loop through variables, totalling up size
-    // data and filling the new (send) message
-    LLMsgData::msg_blk_data_map_t::const_iterator iter =
-        data.mMemberBlocks.begin();
-    LLMsgData::msg_blk_data_map_t::const_iterator end =
-        data.mMemberBlocks.end();
-    for(; iter != end; ++iter)
+    // walk each block group in template order, then each repeat in order,
+    // starting a fresh block per repeat and copying its variables
+    for (const LLMsgData::BlockGroup& group : data.mMemberBlocks)
     {
-        const LLMsgBlkData* mbci = iter->second;
-        if(!mbci) continue;
-
-        // do we need to encode a block code?
-        if (block_count == 0)
+        for (const LLMsgBlkData* mbci : group.mBlocks)
         {
-            block_count = mbci->mBlockNumber;
-            block_name = (char *)mbci->mName;
-        }
+            nextBlock(group.mName);
 
-        // counting down mutliple blocks
-        block_count--;
-
-        nextBlock(block_name);
-
-        // now loop through the variables
-        LLMsgBlkData::msg_var_data_map_t::const_iterator dit = mbci->mMemberVarData.begin();
-        LLMsgBlkData::msg_var_data_map_t::const_iterator dend = mbci->mMemberVarData.end();
-
-        for(; dit != dend; ++dit)
-        {
-            const LLMsgVarData& mvci = *dit;
-            addData(mvci.getName(), mvci.getData(), mvci.getType(), mvci.getSize());
+            for (const LLMsgVarData& mvci : mbci->mMemberVarData)
+            {
+                addData(mvci.getName(), mvci.getData(), mvci.getType(), mvci.getSize());
+            }
         }
     }
 }
