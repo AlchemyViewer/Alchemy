@@ -92,14 +92,15 @@ void LLTemplateMessageReader::getData(const char *blockname, const char *varname
     LLMsgBlkData *msg_block_data = iter->second;
     LLMsgBlkData::msg_var_data_map_t &var_data_map = msg_block_data->mMemberVarData;
 
-    if (var_data_map.find(vnamep) == var_data_map.end())
+    LLMsgBlkData::msg_var_data_map_t::iterator vit = var_data_map.find(vnamep);
+    if (vit == var_data_map.end())
     {
         LL_ERRS() << "Variable "<< vnamep << " not in message "
             << mCurrentRMessageData->mName<< " block " << bnamep << LL_ENDL;
         return;
     }
 
-    LLMsgVarData& vardata = msg_block_data->mMemberVarData[vnamep];
+    LLMsgVarData& vardata = *vit;
 
     if (size && size != vardata.getSize())
     {
@@ -194,14 +195,16 @@ S32 LLTemplateMessageReader::getSize(const char *blockname, const char *varname)
     char *vnamep = (char *)varname;
 
     LLMsgBlkData* msg_data = iter->second;
-    LLMsgVarData& vardata = msg_data->mMemberVarData[vnamep];
+    LLMsgBlkData::msg_var_data_map_t::iterator vit = msg_data->mMemberVarData.find(vnamep);
 
-    if (!vardata.getName())
+    if (vit == msg_data->mMemberVarData.end())
     {   // don't crash
         LL_INFOS() << "Variable " << varname << " not in message "
             << mCurrentRMessageData->mName << " block " << bnamep << LL_ENDL;
         return LL_VARIABLE_NOT_IN_BLOCK;
     }
+
+    LLMsgVarData& vardata = *vit;
 
     if (mCurrentRMessageTemplate->mMemberBlocks[bnamep]->mType != MBT_SINGLE)
     {   // This is a serious error - crash
@@ -241,14 +244,16 @@ S32 LLTemplateMessageReader::getSize(const char *blockname, S32 blocknum, const 
     }
 
     LLMsgBlkData* msg_data = iter->second;
-    LLMsgVarData& vardata = msg_data->mMemberVarData[vnamep];
+    LLMsgBlkData::msg_var_data_map_t::iterator vit = msg_data->mMemberVarData.find(vnamep);
 
-    if (!vardata.getName())
+    if (vit == msg_data->mMemberVarData.end())
     {   // don't crash
         LL_INFOS() << "Variable " << vnamep << " not in message "
             <<  mCurrentRMessageData->mName << " block " << bnamep << LL_ENDL;
         return LL_VARIABLE_NOT_IN_BLOCK;
     }
+
+    LLMsgVarData& vardata = *vit;
 
     return vardata.getSize();
 }
@@ -617,7 +622,8 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender,
 
                 // ok, build out the variables
                 // add variable block
-                cur_data_block->addVariable(mvci.getName(), mvci.getType());
+                LLMsgVarData& vardata =
+                    cur_data_block->addVariable(mvci.getName(), mvci.getType());
 
                 // what type of variable?
                 if (mvci.getType() == MVT_VARIABLE)
@@ -658,7 +664,18 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender,
                     }
                     decode_pos += data_size;
 
-                    cur_data_block->addData(mvci.getName(), &buffer[decode_pos], tsize, mvci.getType());
+                    // Bound the wire-claimed length by the bytes actually
+                    // remaining in the packet, so a malformed length field
+                    // can't drive an out-of-bounds read.
+                    if (tsize > (U32)llmax(mReceiveSize - decode_pos, 0))
+                    {
+                        if (!custom)
+                        logRanOffEndOfPacket(sender, decode_pos, (S32)tsize);
+
+                        tsize = 0;
+                    }
+
+                    vardata.addData(&buffer[decode_pos], tsize, mvci.getType());
                     decode_pos += tsize;
                 }
                 else
@@ -673,15 +690,13 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender,
                         // default to 0s.
                         U32 size = mvci.getSize();
                         std::vector<U8> data(size, 0);
-                        cur_data_block->addData(mvci.getName(), &(data[0]),
-                                                size, mvci.getType());
+                        vardata.addData(&(data[0]), size, mvci.getType());
                     }
                     else
                     {
-                        cur_data_block->addData(mvci.getName(),
-                                                &buffer[decode_pos],
-                                                mvci.getSize(),
-                                                mvci.getType());
+                        vardata.addData(&buffer[decode_pos],
+                                        mvci.getSize(),
+                                        mvci.getType());
                     }
                     decode_pos += mvci.getSize();
                 }

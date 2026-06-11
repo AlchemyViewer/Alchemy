@@ -46,8 +46,14 @@ void LLMsgVarData::addData(const void *data, S32 size, EMsgVariableType type, S3
     if(size)
     {
         delete[] mData; // Delete it if it already exists
-        mData = new U8[size];
-        htolememcpy(mData, data, mType, size);
+        mData = nullptr;
+        U8* dest = mInlineData;
+        if (size > INLINE_DATA_SIZE)
+        {
+            mData = new U8[size];
+            dest = mData;
+        }
+        htolememcpy(dest, data, mType, size);
     }
 }
 

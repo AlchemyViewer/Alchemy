@@ -41,8 +41,8 @@
 
 namespace
 {
-    // The message variable storage is a raw `U8[]` buffer (allocated as
-    // `new U8[size]` in LLMsgVarData), so reading it as the variable's
+    // The message variable storage is a raw `U8[]` buffer (inline or
+    // heap-allocated in LLMsgVarData), so reading it as the variable's
     // logical type via `*(T*)mvci.getData()` is strict-aliasing UB. memcpy
     // through a trivially-copyable local stays inside the rules and lowers
     // to the same load on every supported toolchain.

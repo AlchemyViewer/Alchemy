@@ -55,18 +55,82 @@ public:
 
     char *getName() const   { return mName; }
     S32 getSize() const     { return mSize; }
-    void *getData()         { return (void*)mData; }
-    const void *getData() const { return (const void*)mData; }
+    void *getData()         { return mData ? (void*)mData : (mSize > 0 ? (void*)mInlineData : nullptr); }
+    const void *getData() const { return mData ? (const void*)mData : (mSize > 0 ? (const void*)mInlineData : nullptr); }
     S32 getDataSize() const { return mDataSize; }
     EMsgVariableType getType() const    { return mType; }
 
 protected:
+    // Payloads up to this size are stored in mInlineData instead of a heap
+    // block, sized to fit the largest fixed wire type (LLVector3d, 24 bytes)
+    // so only long Variable fields allocate.
+    static constexpr S32 INLINE_DATA_SIZE = 24;
+
     char                *mName;
     S32                 mSize;
     S32                 mDataSize;
 
-    U8                  *mData;
+    U8                  *mData;     // heap storage, only used when mSize > INLINE_DATA_SIZE
     EMsgVariableType    mType;
+    U8                  mInlineData[INLINE_DATA_SIZE];
+};
+
+// Insertion-ordered flat map from prehashed name pointer to variable data.
+// One instance exists per block per decoded/built message, with at most a
+// few dozen entries, so a linear pointer-compare scan wins over a node-based
+// map and avoids its per-entry allocations on the packet decode path.
+class LLMsgVarDataMap
+{
+public:
+    typedef std::vector<LLMsgVarData>::iterator iterator;
+    typedef std::vector<LLMsgVarData>::const_iterator const_iterator;
+
+    LLMsgVarDataMap()               { mEntries.reserve(8); }
+
+    iterator begin()                { return mEntries.begin(); }
+    const_iterator begin() const    { return mEntries.begin(); }
+    iterator end()                  { return mEntries.end(); }
+    const_iterator end() const      { return mEntries.end(); }
+    bool empty() const              { return mEntries.empty(); }
+    size_t size() const             { return mEntries.size(); }
+
+    // Returns the entry for name, inserting an empty one keyed to name if
+    // absent (std::map::operator[] semantics — repeated misses yield the
+    // same entry, never duplicates). An inserted entry has size -1 until
+    // someone calls addData on it.
+    LLMsgVarData& operator[](const char* name)
+    {
+        for (LLMsgVarData& entry : mEntries)
+        {
+            if (entry.getName() == name)
+            {
+                return entry;
+            }
+        }
+        return mEntries.emplace_back(name, MVT_U8);
+    }
+
+    iterator find(const char* name)
+    {
+        iterator it = mEntries.begin();
+        const iterator it_end = mEntries.end();
+        for (; it != it_end; ++it)
+        {
+            if (it->getName() == name)
+            {
+                break;
+            }
+        }
+        return it;
+    }
+
+    const_iterator find(const char* name) const
+    {
+        return const_cast<LLMsgVarDataMap*>(this)->find(name);
+    }
+
+private:
+    std::vector<LLMsgVarData> mEntries;
 };
 
 class LLMsgBlkData
@@ -85,10 +149,11 @@ public:
         }
     }
 
-    void addVariable(const char *name, EMsgVariableType type)
+    LLMsgVarData& addVariable(const char *name, EMsgVariableType type)
     {
-        LLMsgVarData tmp(name,type);
-        mMemberVarData[name] = tmp;
+        LLMsgVarData& entry = mMemberVarData[name];
+        entry = LLMsgVarData(name, type);
+        return entry;
     }
 
     void addData(char *name, const void *data, S32 size, EMsgVariableType type, S32 data_size = -1)
@@ -98,7 +163,7 @@ public:
     }
 
     S32                                 mBlockNumber;
-    typedef LLIndexedVector<LLMsgVarData, const char *, 8> msg_var_data_map_t;
+    typedef LLMsgVarDataMap msg_var_data_map_t;
     msg_var_data_map_t                  mMemberVarData;
     char                                *mName;
     S32                                 mTotalSize;
