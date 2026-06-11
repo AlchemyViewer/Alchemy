@@ -986,9 +986,10 @@ namespace tut
 
     // Sheet re-entry through the rasterizer: rasterize onto sheet 0,
     // release sheet 0 directly, rasterize a new codepoint — the new
-    // glyph allocates sheet 1 (slot 0 holds a nullptr placeholder)
-    // and getCacheGeneration advances. Pins index stability through
-    // the rasterizer layer (Phase 11 pins it at the cache layer).
+    // glyph rebuilds into the recycled slot (slot growth stays bounded
+    // across eviction cycles) and getCacheGeneration advances so
+    // captured vertex buffers rebuild. Pins slot recycling through the
+    // rasterizer layer (the cache-layer tests pin it at nextOpenPos).
     template<> template<>
     void llfontfreetype_render_object::test<6>()
     {
@@ -1012,14 +1013,14 @@ namespace tut
         ensure("sheet 0 reports released",
                cache->isSheetReleased(EFontGlyphType::Grayscale, 0));
 
-        // New glyph forces a fresh sheet because slot 0 is no longer
-        // re-allocatable (only trailing released slots get reused; slot
-        // 0 here is mid-list once sheet 1 exists). Picking a glyph not
+        // New glyph rebuilds into the recycled slot. Picking a glyph not
         // already cached avoids hitting the cmap-cache branch.
         LLFontGlyphInfo* g2 = ft->getGlyphInfo(L'B', EFontGlyphType::Grayscale);
         ensure("second glyph allocated post-release", g2 != nullptr);
-        ensure("getNumBitmaps grew (new sheet allocated)",
-               cache->getNumBitmaps(EFontGlyphType::Grayscale) >= 2u);
+        ensure_equals("released slot recycled (no sheet-vector growth)",
+                      cache->getNumBitmaps(EFontGlyphType::Grayscale), 1u);
+        ensure("recycled slot is live again",
+               !cache->isSheetReleased(EFontGlyphType::Grayscale, 0));
         ensure("cache generation advanced after release+alloc",
                cache->getCacheGeneration() > gen_before);
     }

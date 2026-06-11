@@ -178,12 +178,9 @@ bool LLFontGL::loadFace(const std::string& filename, F32 point_size, const F32 v
 
 S32 LLFontGL::getNumFaces(const std::string& filename)
 {
-    if (mFontFreetype == reinterpret_cast<LLFontFreetype*>(NULL))
-    {
-        mFontFreetype = new LLFontFreetype;
-    }
-
-    return mFontFreetype->getNumFaces(filename);
+    // Pure file probe — no instance state involved, so don't allocate a
+    // throwaway LLFontFreetype just to count collection faces.
+    return LLFontFreetype::getNumFaces(filename);
 }
 
 S32 LLFontGL::getCacheGeneration() const

@@ -33,6 +33,7 @@
 #include "llfontfreetype.h"   // for LLFontGlyphInfo, LLFontManager, ll::fonts::LoadedFont
 #include "llfontgl.h"         // for sUseDarkEmojiPalette
 #include "llfontregistry.h"   // for EFontHinting full definition
+#include "llframetimer.h"     // collectGarbage throttle clock
 #include "llimage.h"          // LLImageRaw, LLImageDataLock
 #include "llmath.h"           // ll_round, llclamp
 
@@ -275,6 +276,70 @@ void LLFontFace::resetBitmapCache()
     mGlyphInfoMap.clear();
     if (mFontBitmapCachep)
         mFontBitmapCachep->reset();
+}
+
+void LLFontFace::collectGarbage() const
+{
+    if (!mFTFace || !mFontBitmapCachep)
+        return;
+
+    // Sweep cadence: cheap enough to run at the top of every frame, with
+    // GC_INTERVAL_SEC bounding actual work. Idle threshold sized for "real
+    // user idle" — roughly the time after which a chat scrollback or panel of
+    // unique-codepoint text has stopped being displayed. Long enough not to
+    // churn during normal interaction; short enough that an hour-long session
+    // doesn't accumulate every transient code page ever shown.
+    constexpr F64 GC_INTERVAL_SEC      = 5.0;
+    constexpr F64 IDLE_THRESHOLD_SEC   = 60.0 * 15.0;
+
+    const F64 now = LLFrameTimer::getTotalSeconds();
+    if (now < mNextGcTime)
+        return;
+    mNextGcTime = now + GC_INTERVAL_SEC;
+
+    auto glyph_uses_sheet = [](const LLFontGlyphInfo* gi, EFontGlyphType type, U32 num) -> bool
+    {
+        for (U8 p = 0; p < gi->mPhaseCount; ++p)
+        {
+            const auto& entry = gi->mPhaseSlots[p].mBitmapEntry;
+            if (entry.first == type && entry.second >= 0 && static_cast<U32>(entry.second) == num)
+                return true;
+        }
+        return false;
+    };
+
+    // Shaped runs in LLFontShaping's cache hold only metric/glyph_id data — no
+    // atlas references — so they survive eviction; getGlyphInfoByIndex on the
+    // next frame re-rasterizes whichever glyphs were dropped here. Cache
+    // generation bumps inside releaseSheet so LLFontVertexBuffer rebuilds.
+    for (U32 t = 0; t < static_cast<U32>(EFontGlyphType::Count); ++t)
+    {
+        const EFontGlyphType type = static_cast<EFontGlyphType>(t);
+        const U32 sheet_count = mFontBitmapCachep->getNumBitmaps(type);
+        for (U32 num = 0; num < sheet_count; ++num)
+        {
+            if (mFontBitmapCachep->isSheetReleased(type, num))
+                continue;
+            const F64 last_used = mFontBitmapCachep->getSheetLastUsedTime(type, num);
+            // last_used == 0 means the sheet was allocated but not yet drawn
+            // from — skip it for one cycle so a brand-new sheet gets at least
+            // a frame to be touched before it's a candidate.
+            if (last_used <= 0.0)
+                continue;
+            if ((now - last_used) <= IDLE_THRESHOLD_SEC)
+                continue;
+
+            // Delete the glyph entries that reference this sheet, then
+            // release the sheet itself. There is no head-side cache to
+            // invalidate: getGlyphInfoByIndex routes every lookup through
+            // findGlyphInfo here, so every freetype sharing this face
+            // observes the deletion on its next render and re-rasterizes.
+            auto matches = [&](const LLFontGlyphInfo* gi) { return glyph_uses_sheet(gi, type, num); };
+            erase_glyph_entries(matches);
+
+            mFontBitmapCachep->releaseSheet(type, num);
+        }
+    }
 }
 
 void LLFontFace::destroyGlyphInfo(LLFontGlyphInfo* gi)

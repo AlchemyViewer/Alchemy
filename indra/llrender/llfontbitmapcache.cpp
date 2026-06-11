@@ -102,12 +102,13 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
 
     const U32 bitmap_idx = static_cast<U32>(bitmap_type);
 
-    // The last sheet is the active allocation target. If it was released by
-    // the eviction sweep, force a fresh sheet — its in-flight pen offsets are
+    // mCurrentSheet is the active allocation target. If the eviction sweep
+    // released it, force a fresh sheet — the in-flight pen offsets are
     // pointing into a freed image.
-    const bool last_sheet_released = !mImageRawVec[bitmap_idx].empty()
-                                  && mImageRawVec[bitmap_idx].back().isNull();
-    bool need_new_sheet = mImageRawVec[bitmap_idx].empty() || last_sheet_released;
+    const S32 active_sheet = mCurrentSheet[bitmap_idx];
+    const bool active_sheet_released = (active_sheet >= 0)
+                                    && mImageRawVec[bitmap_idx][active_sheet].isNull();
+    bool need_new_sheet = (active_sheet < 0) || active_sheet_released;
 
     if (!need_new_sheet && (mCurrentOffsetX[bitmap_idx] + width + 4) > mBitmapWidth)
     {
@@ -167,11 +168,35 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
         mBitmapWidth = image_width;
         mBitmapHeight = image_height;
 
-        S32 num_components = getNumComponents(bitmap_type);
-        mImageRawVec[bitmap_idx].emplace_back(new LLImageRaw(mBitmapWidth, mBitmapHeight, num_components));
-        bitmap_num = static_cast<U32>(mImageRawVec[bitmap_idx].size()) - 1;
+        // Prefer recycling a released slot over growing the sheet vectors.
+        // The nullptr placeholder only existed for index stability, and the
+        // purge-before-release contract (every glyph entry referencing a
+        // sheet is erased before releaseSheet, which also bumps the
+        // generation so captured vertex buffers rebuild) guarantees nothing
+        // references the released index anymore. Without recycling, a long
+        // session that cycles glyph working sets through eviction grows the
+        // slot vectors monotonically.
+        S32 slot = -1;
+        for (size_t i = 0, n = mImageRawVec[bitmap_idx].size(); i < n; ++i)
+        {
+            if (mImageRawVec[bitmap_idx][i].isNull())
+            {
+                slot = static_cast<S32>(i);
+                break;
+            }
+        }
+        if (slot < 0)
+        {
+            mImageRawVec[bitmap_idx].emplace_back();
+            mImageGLVec[bitmap_idx].emplace_back();
+            mLastUsedTime[bitmap_idx].push_back(0.0);
+            slot = static_cast<S32>(mImageRawVec[bitmap_idx].size()) - 1;
+        }
 
-        LLImageRaw* image_raw = mImageRawVec[bitmap_idx][bitmap_num];
+        S32 num_components = getNumComponents(bitmap_type);
+        mImageRawVec[bitmap_idx][slot] = new LLImageRaw(mBitmapWidth, mBitmapHeight, num_components);
+
+        LLImageRaw* image_raw = mImageRawVec[bitmap_idx][slot];
         if (EFontGlyphType::Grayscale == bitmap_type)
         {
             image_raw->clear(255, 0);
@@ -186,11 +211,12 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
         }
 
         // Make corresponding GL image.
-        mImageGLVec[bitmap_idx].emplace_back(new LLImageGL(image_raw, false, false));
-        LLImageGL* image_gl = mImageGLVec[bitmap_idx][bitmap_num];
+        mImageGLVec[bitmap_idx][slot] = new LLImageGL(image_raw, false, false);
+        LLImageGL* image_gl = mImageGLVec[bitmap_idx][slot];
 
-        // Track per-sheet last-used time alongside the image vectors.
-        mLastUsedTime[bitmap_idx].push_back(0.0);
+        // Fresh sheet hasn't been read or written yet.
+        mLastUsedTime[bitmap_idx][slot] = 0.0;
+        mCurrentSheet[bitmap_idx] = slot;
 
         // Start at beginning of the new image. 4px border guarantees that
         // the shadow shader's worst-case sample reach (2px screen dilation +
@@ -207,7 +233,7 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
 
     pos_x = mCurrentOffsetX[bitmap_idx];
     pos_y = mCurrentOffsetY[bitmap_idx];
-    bitmap_num = getNumBitmaps(bitmap_type) - 1;
+    bitmap_num = static_cast<U32>(mCurrentSheet[bitmap_idx]);
 
     mCurrentOffsetX[bitmap_idx] += width + 4;
     // Track tallest glyph placed in the current row so the next Y advance
@@ -303,6 +329,7 @@ void LLFontBitmapCache::reset()
         mCurrentOffsetX[idx] = 4;
         mCurrentOffsetY[idx] = 4;
         mCurrentRowMaxHeight[idx] = 0;
+        mCurrentSheet[idx] = -1;
     }
 
     mBitmapWidth = 0;

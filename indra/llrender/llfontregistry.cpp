@@ -1597,6 +1597,21 @@ bool LLFontRegistry::nameToSize(const std::string& size_name, F32& size)
 }
 
 
+void LLFontRegistry::storeFont(const LLFontDescriptor& desc, LLFontGL* fontp)
+{
+    auto it = mFontMap.find(desc);
+    if (it != mFontMap.end())
+    {
+        if (it->second != fontp)
+        {
+            delete it->second;
+            it->second = fontp;
+        }
+        return;
+    }
+    mFontMap[desc] = fontp;
+}
+
 LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
 {
     // Name should hold a font name recognized as a setting; the value
@@ -1642,7 +1657,7 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
         LLFontGL *font = new LLFontGL;
         font->mFontDescriptor = desc;
         font->mFontFreetype = it->second->mFontFreetype;
-        mFontMap[desc] = font;
+        storeFont(desc, font);
 
         return font;
     }
@@ -1729,8 +1744,11 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
         {
             const std::string font_path = *font_search_path_it + font_file_it->FileName;
 
-            fontp = new LLFontGL;
-            S32 num_faces = font_file_it->mLoadCollection ? fontp->getNumFaces(font_path) : 1;
+            // Static probe — counting collection faces needs no LLFontGL.
+            // The lazy `new LLFontGL` inside the face loop below allocates
+            // only when a face actually loads, so cache-hit-only files and
+            // missing search paths allocate nothing.
+            S32 num_faces = font_file_it->mLoadCollection ? LLFontFreetype::getNumFaces(font_path) : 1;
             for (S32 i = 0; i < num_faces; i++)
             {
                 // Fallback dedup: if the same (filename, face_index, sized
@@ -1808,10 +1826,13 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
         {
             LL_INFOS_ONCE("LLFontRegistry") << "Couldn't load font " << font_file_it->FileName <<  LL_ENDL;
         }
-        // fontp is non-NULL here when every face of this file hit
-        // mFallbackInstanceCache (the inner loop's `continue` skips the
-        // delete branches), or when all search paths failed. Either way
-        // ownership wasn't transferred to result/cache, so free it.
+        // fontp is non-NULL here only when an allocated wrapper wasn't
+        // consumed — its loadFace succeeded for a cache-inserted fallback
+        // but a later face of the same file hit mFallbackInstanceCache and
+        // `continue`d past the delete branches. Ownership wasn't
+        // transferred to result, so free it. (All-cache-hit files and
+        // missing search paths never allocate now — the wrapper is created
+        // lazily inside the face loop.)
         delete fontp;
         fontp = NULL;
     }
@@ -1819,7 +1840,22 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     if (result)
     {
         result->mFontDescriptor = desc;
-        mFontMap[desc] = result;
+        storeFont(desc, result);
+        // Also publish the result under its canonical (template-name +
+        // normalized-size) key when that differs from the requested desc
+        // and isn't taken. The matching-font-exists shortcut at the top
+        // probes exactly this key, so the next differently-spelled
+        // descriptor that normalizes to the same font shares this
+        // freetype through a thin wrapper instead of re-walking every
+        // font file. The alias is a full map citizen: owned by its slot,
+        // deleted in clear(), rebuilt by reload() like any head.
+        if (mFontMap.find(nearest_exact_desc) == mFontMap.end())
+        {
+            LLFontGL* canonical = new LLFontGL;
+            canonical->mFontDescriptor = nearest_exact_desc;
+            canonical->mFontFreetype = result->mFontFreetype;
+            mFontMap[nearest_exact_desc] = canonical;
+        }
     }
     else
     {
@@ -1943,10 +1979,11 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
     {
         LL_WARNS() << "Font reload: parseFontInfo failed; restoring previous fallback cache" << LL_ENDL;
         mFallbackInstanceCache = std::move(pinned_old_fallbacks);
-        // Re-insert the snapshot heads so widgets continue rendering
-        // against their previous freetype state.
+        // Re-seat the snapshot heads so widgets continue rendering
+        // against their previous freetype state. storeFont guards against
+        // anything the partial parse left in a colliding slot.
         for (const auto& [desc, head] : heads)
-            mFontMap[desc] = head;
+            storeFont(desc, head);
         return false;
     }
 
@@ -1962,17 +1999,19 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
     for (auto& [desc, head] : heads)
     {
         // createFont allocates a fresh LLFontGL with newly-loaded
-        // mFontFreetype and inserts it into mFontMap[desc]. We then steal
-        // its mFontFreetype LLPointer onto the existing head and replace
-        // the map entry with the original pointer so widget caches stay
-        // valid.
+        // mFontFreetype and stores it at mFontMap[desc]. We steal its
+        // mFontFreetype LLPointer onto the existing head, then re-seat the
+        // original pointer so widget caches stay valid — storeFont deletes
+        // the `fresh` wrapper sitting in the slot. The snapshot can hold
+        // canonical aliases too; when their turn comes, createFont's
+        // matching-font-exists shortcut shares the already-rebuilt
+        // freetype instead of re-walking font files.
         LLFontGL* fresh = createFont(desc);
         if (fresh)
         {
             head->mFontFreetype = fresh->mFontFreetype;
             head->mFontDescriptor = desc;
-            mFontMap[desc] = head;
-            delete fresh;
+            storeFont(desc, head);
             head->generateASCIIglyphs();
         }
         else
@@ -1981,9 +2020,10 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
                        << desc.getName() << " size " << desc.getSize()
                        << " style " << (S32)desc.getStyle()
                        << "; keeping previous freetype" << LL_ENDL;
-            // Re-insert old head so widgets still render its previous
-            // (now-orphaned) glyphs rather than nothing at all.
-            mFontMap[desc] = head;
+            // Re-seat the old head so widgets still render its previous
+            // (now-orphaned) glyphs rather than nothing at all. storeFont
+            // guards against an interim alias occupying the slot.
+            storeFont(desc, head);
         }
     }
 
