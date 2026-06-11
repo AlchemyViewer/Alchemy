@@ -279,7 +279,10 @@ S32 LLPacketRing::bufferInboundPacket(S32 socket)
             }
             else
             {
-                packet_size = 0;
+                // Runt SOCKS wrapper (no payload past the header): discard
+                // it, but keep the raw size so drainSocket() keeps draining
+                // instead of misreading one bad datagram as an empty socket.
+                // The drain accounting counts it as received-but-dropped.
             }
         }
     }
