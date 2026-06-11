@@ -313,6 +313,7 @@ void LLTemplateMessageBuilder::addData(const char *varname, const void *data, EM
     if (var_data->getType() == MVT_VARIABLE)
     {
         // Variable 1 can only store 255 bytes, make sure our data is smaller
+        bool truncated = false;
         if ((var_data->getSize() == 1) &&
             (size > 255))
         {
@@ -320,12 +321,19 @@ void LLTemplateMessageBuilder::addData(const char *varname, const void *data, EM
                    << "attempted to stuff more than 255 bytes in "
                    << "(" << size << ").  Clamping size and truncating data." << LL_ENDL;
             size = 255;
-            char *truncate = (char *)data;
-            truncate[254] = 0; // array size is 255 but the last element index is 254
+            truncated = true;
         }
 
         // no correct size for MVT_VARIABLE, instead we need to tell how many bytes the size will be encoded as
         mCurrentSDataBlock->addData(vnamep, data, size, type, var_data->getSize());
+        if (truncated)
+        {
+            // NUL-terminate the *stored* copy so a truncated string field is
+            // still a valid C string. The caller's buffer is const and must
+            // not be written through (it may be std::string::c_str() or a
+            // literal); last element index of the 255 stored bytes is 254.
+            static_cast<U8*>(mCurrentSDataBlock->mMemberVarData[vnamep].getData())[254] = 0;
+        }
         mCurrentSendTotal += size;
     }
     else
