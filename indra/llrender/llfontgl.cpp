@@ -449,35 +449,30 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // bind the atlas of whichever face produced each glyph. Track the current
     // (face, atlas) pair as we walk glyphs and flip on transitions. The
     // initial (face, cache, inv_width, inv_height) captures are deferred to
-    // the first glyph; the head's primary cache is used as a fallback for
-    // shadow-uniform setup below.
+    // the first glyph.
     const LLFontFace*        current_face = nullptr;
     const LLFontBitmapCache* font_bitmap_cache = mFontFreetype->getBitmapCache();
     F32 inv_width  = font_bitmap_cache ? 1.f / font_bitmap_cache->getBitmapWidth()  : 0.f;
     F32 inv_height = font_bitmap_cache ? 1.f / font_bitmap_cache->getBitmapHeight() : 0.f;
 
-    // Shader-shadow uniforms are pushed once before pass A starts and reset
-    // to passthrough (shadowMode = 0) before pass B's foreground emission.
-    // Captured into mShadowBufferList only by virtue of the shadow geometry
-    // they're set for; LLFontVertexBuffer::renderBuffers re-pushes the same
-    // values on cache replay since LLVertexBufferData doesn't capture
-    // uniforms. Skipped when sEnableShaderShadow is off (legacy multi-quad
-    // emission still drives shadow geometry — shader stays at shadowMode=0).
+    // shadowMode is pushed once before pass A starts and reset to
+    // passthrough (0) before pass B's foreground emission. It is the only
+    // shadow uniform by design: per-pass constant, so the captured-buffer
+    // replay (LLFontVertexBuffer::renderBuffers re-pushes it; LLVertexBufferData
+    // doesn't capture uniforms) stays correct. Everything that varies per
+    // batch in a mixed-atlas string — texel size of the bound atlas, alpha
+    // channel layout — derives from the bound texture inside uiF.glsl
+    // (textureSize + the RG-swizzle/.a sampling), so glyphs from
+    // differently-sized head and fallback atlases all shadow correctly.
+    // Skipped when sEnableShaderShadow is off (legacy multi-quad emission
+    // still drives shadow geometry — shader stays at shadowMode=0).
     const bool push_shader_shadow_uniforms =
         sEnableShaderShadow && (shadow != NO_SHADOW) && LLGLSLShader::sCurBoundShaderPtr;
     static const LLStaticHashedString sShadowMode("shadowMode");
-    static const LLStaticHashedString sAtlasTexelSize("atlasTexelSize");
-    static const LLStaticHashedString sGrayscaleAtlas("grayscaleAtlas");
     if (push_shader_shadow_uniforms)
     {
         const int mode = (shadow == DROP_SHADOW) ? 1 : 2; // SOFT
         LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, mode);
-        LLGLSLShader::sCurBoundShaderPtr->uniform2f(sAtlasTexelSize, inv_width, inv_height);
-        // Per-batch atlas type would be needed for correct mixed-atlas shadow
-        // sampling; for now treat all shadowed strings as grayscale text.
-        // Mixed text+emoji shadows may sample the wrong channel — acceptable
-        // limitation while sEnableShaderShadow is opt-in.
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sGrayscaleAtlas, 1);
     }
 
     bool draw_ellipses = false;

@@ -127,13 +127,13 @@ private:
 
     // Snapshot of LLFontGL::sEnableShaderShadow at genBuffers time. Required
     // because LLVertexBufferData doesn't capture shader uniforms; renderBuffers
-    // must re-push shadowMode / atlasTexelSize before replaying mShadowBufferList
-    // and reset shadowMode = 0 before mForegroundBufferList. If the static flag
-    // flips between gen and replay, the captured stream still replays with the
-    // shader state it was built for.
+    // must re-push shadowMode before replaying mShadowBufferList and reset
+    // shadowMode = 0 before mForegroundBufferList. If the static flag flips
+    // between gen and replay, the captured stream still replays with the
+    // shader state it was built for. shadowMode is the only shadow uniform —
+    // atlas texel size / channel layout derive from the bound texture in
+    // uiF.glsl, which the captured streams DO rebind per batch.
     bool mLastUsedShaderShadow = false;
-    F32  mLastAtlasTexelW = 0.f;
-    F32  mLastAtlasTexelH = 0.f;
     S32 mChars = 0;
     const LLFontGL *mLastFont = nullptr;
     S32 mLastOffset = 0;
