@@ -252,6 +252,12 @@ void LLSDMessageBuilder::copyFromMessageData(const LLMsgData& data)
 
             for (const LLMsgVarData& mvci : mbci->mMemberVarData)
             {
+            // a placeholder variable that was never filled has no payload at
+            // all (null data pointer); there is nothing to convert
+            if (mvci.getSize() < 0)
+            {
+                continue;
+            }
             const char* varname = mvci.getName();
 
             switch(mvci.getType())

@@ -852,5 +852,30 @@ namespace tut
             output["testBlock"][0]["testBinData"].asBinary().size(), (size_t)0);
     }
 
+    template<> template<>
+    void LLSDMessageBuilderTestObject::test<48>()
+        // a placeholder variable in an opened block that was never filled
+        // (size -1) has no payload at all; the legacy-to-llsd copy must skip
+        // it rather than read through its null data pointer
+    {
+        LLMessageTemplate messageTemplate = defaultTemplate();
+        LLMessageBlock* block = new LLMessageBlock(_PREHASH_Test0, MBT_VARIABLE);
+        block->addVariable(const_cast<char*>(_PREHASH_Test0), MVT_U8, 1);
+        block->addVariable(const_cast<char*>(_PREHASH_Test1), MVT_U8, 1);
+        messageTemplate.addBlock(block);
+
+        LLTemplateMessageBuilder* builder = defaultTemplateBuilder(messageTemplate);
+        builder->addU8(_PREHASH_Test0, 7); // Test1 left as a placeholder
+
+        LLSDMessageBuilder sd_builder;
+        sd_builder.copyFromMessageData(*builder->getCurrentMessage());
+        LLSD output = sd_builder.getMessage();
+
+        ensure_equals("Ensure filled variable copied",
+            output["Test0"][0]["Test0"].asInteger(), 7);
+        ensure("Ensure unfilled placeholder variable not copied",
+            !output["Test0"][0].has("Test1"));
+    }
+
 }
 

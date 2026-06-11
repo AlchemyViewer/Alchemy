@@ -769,6 +769,12 @@ void LLTemplateMessageBuilder::copyFromMessageData(const LLMsgData& data)
 
             for (const LLMsgVarData& mvci : mbci->mMemberVarData)
             {
+                // a placeholder variable that was never filled has no payload
+                // at all (null data pointer); there is nothing to copy
+                if (mvci.getSize() < 0)
+                {
+                    continue;
+                }
                 addData(mvci.getName(), mvci.getData(), mvci.getType(), mvci.getSize());
             }
         }
