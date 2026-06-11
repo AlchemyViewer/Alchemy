@@ -117,8 +117,11 @@ void LLSDMessageBuilder::addBinaryData(
     S32 size)
 {
     std::vector<U8> v;
-    v.resize(size);
-    memcpy(&(v[0]), reinterpret_cast<const U8*>(data), size);
+    if (size > 0)
+    {
+        v.resize(size);
+        memcpy(v.data(), reinterpret_cast<const U8*>(data), size);
+    }
     (*mCurrentBlock)[varname] = v;
 }
 
@@ -259,14 +262,17 @@ void LLSDMessageBuilder::copyFromMessageData(const LLMsgData& data)
 
             case MVT_VARIABLE:
                 {
-                    const char end = ((const char*)mvci.getData())[mvci.getSize()-1]; // Ensure null terminated
+                    // an empty field stores no payload at all (getData() may
+                    // be null), so don't probe for a terminating NUL
+                    const S32 size = mvci.getSize();
+                    const char end = size > 0 ? ((const char*)mvci.getData())[size-1] : 1;
                     if (mvci.getDataSize() == 1 && end == 0)
                     {
                         addString(varname, (const char*)mvci.getData());
                     }
                     else
                     {
-                        addBinaryData(varname, mvci.getData(), mvci.getSize());
+                        addBinaryData(varname, mvci.getData(), size);
                     }
                     break;
                 }

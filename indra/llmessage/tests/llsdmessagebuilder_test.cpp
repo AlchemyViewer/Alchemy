@@ -833,5 +833,24 @@ namespace tut
         ensure_equals(output["Test0"][0]["Test0"].asString(), std::string("testing"));
     }
 
+    template<> template<>
+    void LLSDMessageBuilderTestObject::test<47>()
+        // an empty MVT_VARIABLE field stores no payload (getData() is null),
+        // so the legacy-to-llsd copy must not probe it for a terminating NUL
+        // and must yield an empty value instead of reading out of bounds
+    {
+        addValue(messageBlockData, (char*)"testBinData", nullptr, MVT_VARIABLE, 0, 1);
+        messageData->addBlock(messageBlockData);
+        LLSDMessageBuilder builder = defaultBuilder();
+
+        builder.copyFromMessageData(*messageData);
+        LLSD output = builder.getMessage();
+
+        ensure("Ensure empty variable copied from legacy to llsd is present",
+            output["testBlock"][0]["testBinData"].isDefined());
+        ensure_equals("Ensure empty variable copied from legacy to llsd is empty",
+            output["testBlock"][0]["testBinData"].asBinary().size(), (size_t)0);
+    }
+
 }
 

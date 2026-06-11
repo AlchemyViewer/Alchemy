@@ -565,7 +565,6 @@ static S32 buildBlock(U8* buffer, S32 buffer_size, const LLMessageBlock* templat
     // header (repeat 0) carries the repeat count; repeats are recovered by
     // index via getBlock(name, i)
     const LLMsgBlkData* header = message_data->getBlock(template_data->mName, 0);
-    const LLMsgBlkData* mbci = header;
     S32 block_count = header ? header->mBlockNumber : 0;
     if (template_data->mType == MBT_VARIABLE)
     {
@@ -590,7 +589,7 @@ static S32 buildBlock(U8* buffer, S32 buffer_size, const LLMessageBlock* templat
         if (block_count != template_data->mNumber)
         {
             // nope!  need to fill it in all the way!
-            LL_ERRS() << "Block " << mbci->mName
+            LL_ERRS() << "Block " << template_data->mName
                 << " is type MBT_MULTIPLE but only has data for "
                 << block_count << " out of its "
                 << template_data->mNumber << " blocks" << LL_ENDL;
@@ -599,7 +598,7 @@ static S32 buildBlock(U8* buffer, S32 buffer_size, const LLMessageBlock* templat
 
     for (S32 block_index = 0; block_index < block_count; ++block_index)
     {
-        mbci = message_data->getBlock(template_data->mName, block_index);
+        const LLMsgBlkData* mbci = message_data->getBlock(template_data->mName, block_index);
 
         // now loop through the variables
         for (LLMsgBlkData::msg_var_data_map_t::const_iterator iter = mbci->mMemberVarData.begin();
