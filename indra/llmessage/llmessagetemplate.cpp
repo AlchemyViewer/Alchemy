@@ -53,7 +53,9 @@ void LLMsgVarData::addData(const void *data, S32 size, EMsgVariableType type, S3
             mData = new U8[size];
             dest = mData;
         }
-        htolememcpy(dest, data, mType, size);
+        // swizzle by the caller-declared layout of the incoming data; mType
+        // may still be the default if this entry skipped addVariable()
+        htolememcpy(dest, data, type, size);
     }
 }
 

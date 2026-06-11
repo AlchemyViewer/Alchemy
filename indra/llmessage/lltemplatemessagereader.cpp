@@ -678,6 +678,10 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender,
                         if (!custom)
                         logRanOffEndOfPacket(sender, decode_pos, (S32)tsize);
 
+                        // consume the rest of the packet so later fields
+                        // zero-fill (like the other ran-off-end paths)
+                        // instead of parsing the malformed field's payload
+                        decode_pos = mReceiveSize;
                         tsize = 0;
                     }
 
