@@ -118,7 +118,7 @@ namespace tut
 
     };
 
-    typedef test_group<LLTemplateMessageBuilderTestData>    LLTemplateMessageBuilderTestGroup;
+    typedef test_group<LLTemplateMessageBuilderTestData, 60>    LLTemplateMessageBuilderTestGroup;
     typedef LLTemplateMessageBuilderTestGroup::object       LLTemplateMessageBuilderTestObject;
     LLTemplateMessageBuilderTestGroup templateMessageBuilderTestGroup("LLTemplateMessageBuilder");
 
@@ -1128,6 +1128,54 @@ namespace tut
             }
             reader.clearMessage();
         }
+    }
+
+    template<> template<>
+    void LLTemplateMessageBuilderTestObject::test<50>()
+        // Reuse one builder across messages to exercise the pooled LLMsgData
+        // on the send side: the second build must not inherit blocks or values
+        // from the first.
+    {
+        LLMessageTemplate messageTemplate = defaultTemplate();
+        messageTemplate.addBlock(defaultBlock(MVT_U32, 4, MBT_VARIABLE)); // Test0
+        nameMap[_PREHASH_TestMessage] = &messageTemplate;
+        numberMap[1] = &messageTemplate;
+
+        LLTemplateMessageBuilder* builder = new LLTemplateMessageBuilder(nameMap);
+
+        const U32 cap = 1024;
+        for (S32 pass = 0; pass < 4; ++pass)
+        {
+            S32 count = (pass % 2 == 0) ? 5 : 2;
+            U32 base  = (pass % 2 == 0) ? 100u : 900u;
+
+            builder->newMessage(_PREHASH_TestMessage);
+            builder->nextBlock(_PREHASH_Test0);
+            builder->addU32(_PREHASH_Test0, base);
+            for (S32 i = 1; i < count; ++i)
+            {
+                builder->nextBlock(_PREHASH_Test0);
+                builder->addU32(_PREHASH_Test0, base + (U32)i);
+            }
+
+            U8 buf[cap];
+            memset(buf, 0, LL_PACKET_ID_SIZE);
+            U32 sz = builder->buildMessage(buf, cap, 0);
+
+            LLTemplateMessageReader reader(numberMap);
+            reader.validateMessage(buf, sz, LLHost());
+            reader.readMessage(buf, LLHost());
+            ensure_equals("builder reuse block count",
+                          reader.getNumberOfBlocks(_PREHASH_Test0), count);
+            for (S32 i = 0; i < count; ++i)
+            {
+                U32 v = 0xffffffff;
+                reader.getU32(_PREHASH_Test0, _PREHASH_Test0, v, i);
+                ensure_equals("builder reuse value", v, base + (U32)i);
+            }
+            builder->clearMessage();
+        }
+        delete builder;
     }
 }
 

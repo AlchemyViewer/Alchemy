@@ -64,14 +64,21 @@ void LLTemplateMessageBuilder::newMessage(const char *name)
 
     mCurrentSendTotal = 0;
 
-    delete mCurrentSMessageData;
-    mCurrentSMessageData = NULL;
-
     char* namep = (char*)name;
     if (mMessageTemplates.count(namep) > 0)
     {
         mCurrentSMessageTemplate = mMessageTemplates.find(name)->second;
-        mCurrentSMessageData = new LLMsgData(namep);
+        // reuse the working data set across messages; reset recycles blocks
+        // into its pool and keeps capacity, so steady-state sends (e.g.
+        // AgentUpdate every frame) allocate nothing.
+        if (!mCurrentSMessageData)
+        {
+            mCurrentSMessageData = new LLMsgData(namep);
+        }
+        else
+        {
+            mCurrentSMessageData->reset(namep);
+        }
         mCurrentSMessageName = namep;
         mCurrentSDataBlock = NULL;
         mCurrentSBlockName = NULL;
@@ -90,8 +97,7 @@ void LLTemplateMessageBuilder::newMessage(const char *name)
             ++iter)
         {
             LLMessageBlock* ci = *iter;
-            LLMsgBlkData* tblockp = new LLMsgBlkData(ci->mName, 0);
-            mCurrentSMessageData->addBlock(tblockp);
+            mCurrentSMessageData->allocBlock(ci->mName, 0);
         }
     }
     else
@@ -110,8 +116,13 @@ void LLTemplateMessageBuilder::clearMessage()
 
     mCurrentSMessageTemplate = NULL;
 
-    delete mCurrentSMessageData;
-    mCurrentSMessageData = NULL;
+    // keep mCurrentSMessageData (and its block pool) alive for reuse; reset
+    // recycles its blocks so nothing stale remains. Use is gated by
+    // mCurrentSMessageTemplate (now null) until the next newMessage().
+    if (mCurrentSMessageData)
+    {
+        mCurrentSMessageData->reset();
+    }
 
     mCurrentSMessageName = NULL;
     mCurrentSDataBlock = NULL;
@@ -192,10 +203,10 @@ void LLTemplateMessageBuilder::nextBlock(const char* blockname)
                    << "(limited to " << MAX_BLOCKS << ")" << LL_ENDL;
         }
 
-        // append the new repeat under the canonical name; addBlock groups it
-        // and getBlock(name, i) recovers it by index
-        mCurrentSDataBlock = new LLMsgBlkData(bnamep, block_data->mBlockNumber - 1);
-        mCurrentSMessageData->addBlock(mCurrentSDataBlock);
+        // append the new repeat under the canonical name; allocBlock pulls
+        // from the message's pool, groups it, and getBlock(name, i) recovers
+        // it by index
+        mCurrentSDataBlock = mCurrentSMessageData->allocBlock(bnamep, block_data->mBlockNumber - 1);
 
         // add placeholders for each of the variables
         for (LLMessageBlock::message_variable_map_t::const_iterator
