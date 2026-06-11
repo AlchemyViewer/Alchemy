@@ -93,7 +93,10 @@ public:
     bool loadFace(const std::string& filename, F32 point_size, const F32 vert_dpi, const F32 horz_dpi, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags, const LLFontVarAxes& var_axes = {});
 
     S32 getNumFaces(const std::string& filename);
-    S32 getCacheGeneration() const;
+    // U64: the stamp is a SUM of per-face S32 generations; a 64-bit unsigned
+    // accumulator keeps the strictly-increases contract without any overflow
+    // horizon a real session could reach (an S32 sum could wrap UB-style).
+    U64 getCacheGeneration() const;
     const LLFontFreetype* getFontFreetype() const { return mFontFreetype.get(); }
 
     S32 render(const LLWString &text, S32 begin_offset,

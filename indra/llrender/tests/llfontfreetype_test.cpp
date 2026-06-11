@@ -1009,6 +1009,22 @@ namespace tut
                       cache->getNumBitmaps(EFontGlyphType::Grayscale), 1u);
 
         const S32 gen_before = cache->getCacheGeneration();
+        // Honor the purge-before-release contract the production sweep
+        // maintains (LLFontFace::collectGarbage): delete the face-owned
+        // glyph entries referencing sheet 0 before releasing it. Without
+        // this, 'A''s stale entry would survive pointing into the slot the
+        // next allocation recycles — exactly the state recycling forbids.
+        ft->getFontFace()->erase_glyph_entries(
+            [](const LLFontGlyphInfo* gi)
+            {
+                for (U8 p = 0; p < gi->mPhaseCount; ++p)
+                {
+                    const auto& e = gi->mPhaseSlots[p].mBitmapEntry;
+                    if (e.first == EFontGlyphType::Grayscale && e.second == 0)
+                        return true;
+                }
+                return false;
+            });
         cache->releaseSheet(EFontGlyphType::Grayscale, 0);
         ensure("sheet 0 reports released",
                cache->isSheetReleased(EFontGlyphType::Grayscale, 0));

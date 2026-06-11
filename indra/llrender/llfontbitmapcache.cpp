@@ -78,6 +78,13 @@ LLImageRaw *LLFontBitmapCache::getImageRaw(EFontGlyphType bitmap_type, U32 bitma
     if (bitmap_type >= EFontGlyphType::Count || bitmap_num >= mImageRawVec[bitmap_idx].size())
         return nullptr;
 
+    // Released slots must NOT be touched: releaseSheet zeroes the slot's
+    // last-used time and the eviction sweep / recycling logic rely on it
+    // staying zero. A diagnostic or defensive probe of a released sheet
+    // returning null shouldn't make the slot look recently used.
+    if (mImageRawVec[bitmap_idx][bitmap_num].isNull())
+        return nullptr;
+
     touchSheet(bitmap_type, bitmap_num);
     return mImageRawVec[bitmap_idx][bitmap_num];
 }
@@ -86,6 +93,10 @@ LLImageGL *LLFontBitmapCache::getImageGL(EFontGlyphType bitmap_type, U32 bitmap_
 {
     const U32 bitmap_idx = static_cast<U32>(bitmap_type);
     if (bitmap_type >= EFontGlyphType::Count || bitmap_num >= mImageGLVec[bitmap_idx].size())
+        return nullptr;
+
+    // Same released-slot guard as getImageRaw — null reads don't touch.
+    if (mImageGLVec[bitmap_idx][bitmap_num].isNull())
         return nullptr;
 
     touchSheet(bitmap_type, bitmap_num);

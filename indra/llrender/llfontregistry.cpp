@@ -1961,6 +1961,23 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
     auto pinned_old_fallbacks = std::move(mFallbackInstanceCache);
     mFallbackInstanceCache.clear();
 
+    // Snapshot the full parse-time state alongside the heads. parseFontInfo
+    // can fail partway (malformed fonts.xml / override file) AFTER the wipes
+    // below have run; restoring only the heads would leave nameToSize,
+    // getAvailableFamilies, and uncached getFont calls running against an
+    // emptied registry until the next successful reload. mFontMap values are
+    // owned raw pointers, but the copy is safe: a failed parse only ever
+    // adds nullptr template placeholders (mergeFontEntry), so restoring the
+    // snapshot over the partial map can't double-own or leak a live
+    // LLFontGL, and on success the snapshot copies die without deleting.
+    auto saved_font_map       = mFontMap;
+    auto saved_font_sizes     = mFontSizes;
+    auto saved_family_sizes   = mFamilySizes;
+    auto saved_family_uses    = mFamilyUses;
+    auto saved_inherit_flags  = mInheritFlags;
+    auto saved_family_meta    = mFamilyMeta;
+    auto saved_last_overrides = mLastFontOverrides;
+
     // Wipe parse-time state.
     mFontSizes.clear();
     mFamilySizes.clear();
@@ -1977,13 +1994,20 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
 
     if (!parseFontInfo("fonts.xml", font_overrides))
     {
-        LL_WARNS() << "Font reload: parseFontInfo failed; restoring previous fallback cache" << LL_ENDL;
+        LL_WARNS() << "Font reload: parseFontInfo failed; restoring previous registry state" << LL_ENDL;
         mFallbackInstanceCache = std::move(pinned_old_fallbacks);
-        // Re-seat the snapshot heads so widgets continue rendering
-        // against their previous freetype state. storeFont guards against
-        // anything the partial parse left in a colliding slot.
-        for (const auto& [desc, head] : heads)
-            storeFont(desc, head);
+        // Restore the registry wholesale — templates + heads, size tables,
+        // family metadata, and the applied-overrides snapshot — so every
+        // lookup path behaves exactly as before the attempt. The partial
+        // parse's nullptr placeholders in mFontMap are discarded by the
+        // assignment (nothing non-null to free; see the snapshot note).
+        mFontMap           = std::move(saved_font_map);
+        mFontSizes         = std::move(saved_font_sizes);
+        mFamilySizes       = std::move(saved_family_sizes);
+        mFamilyUses        = std::move(saved_family_uses);
+        mInheritFlags      = std::move(saved_inherit_flags);
+        mFamilyMeta        = std::move(saved_family_meta);
+        mLastFontOverrides = saved_last_overrides;
         return false;
     }
 

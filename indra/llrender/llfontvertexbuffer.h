@@ -158,7 +158,8 @@ private:
 
     // Adding new characters to bitmap cache can alter value from getBitmapWidth();
     // which alters whole string. So rerender when new characters were added to cache.
-    S32 mLastFontCacheGen = 0;
+    // U64 to match LLFontGL::getCacheGeneration's summed stamp.
+    U64 mLastFontCacheGen = 0;
 
     static bool sEnableBufferCollection;
 
@@ -206,8 +207,8 @@ private:
         F32 mLastHorizDPI = 0.f;
         S32 mLastResGeneration = 0;
 
-        // Cache generation tracking
-        S32 mLastFontCacheGen = 0;
+        // Cache generation tracking. U64 to match LLFontGL::getCacheGeneration.
+        U64 mLastFontCacheGen = 0;
 
         static bool sEnableBufferCollection;
 };

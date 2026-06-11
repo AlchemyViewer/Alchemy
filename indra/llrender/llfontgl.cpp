@@ -183,7 +183,7 @@ S32 LLFontGL::getNumFaces(const std::string& filename)
     return LLFontFreetype::getNumFaces(filename);
 }
 
-S32 LLFontGL::getCacheGeneration() const
+U64 LLFontGL::getCacheGeneration() const
 {
     // Every render() call may sample from this font's head atlas AND from
     // each fallback face's atlas (e.g. emoji glyphs in an otherwise
@@ -209,15 +209,19 @@ S32 LLFontGL::getCacheGeneration() const
     const LLFontFreetype* ft = mFontFreetype.get();
     if (!ft)
         return 0;
-    S32 gen = 0;
+    // U64 accumulator: components are non-negative S32s drawn from the
+    // monotonic global counter, so the unsigned 64-bit sum can't overflow
+    // within any reachable session and the comparison contract in the
+    // vertex/width buffer caches stays exact.
+    U64 gen = 0;
     if (const LLFontBitmapCache* cache = ft->getFontBitmapCache())
-        gen += cache->getCacheGeneration();
+        gen += (U64)cache->getCacheGeneration();
     for (const auto& fb : ft->getFallbackFonts())
     {
         if (fb.first)
         {
             if (const LLFontBitmapCache* cache = fb.first->getFontBitmapCache())
-                gen += cache->getCacheGeneration();
+                gen += (U64)cache->getCacheGeneration();
         }
     }
     return gen;
