@@ -194,7 +194,8 @@ S32 LLPacketRing::receiveOrDropPacket(S32 socket, char *datap, bool drop)
 
 S32 LLPacketRing::receiveOrDropBufferedPacket(char *datap, bool drop)
 {
-    //llassert(mNumBufferedPackets > 0);
+    // receivePacket() only routes here when packets are buffered.
+    llassert(mNumBufferedPackets > 0);
 
     S32 packet_size = 0;
 
@@ -209,7 +210,9 @@ S32 LLPacketRing::receiveOrDropBufferedPacket(char *datap, bool drop)
     mNumBufferedBytes -= packet_size;
     if (mNumBufferedPackets == 0)
     {
-        //llassert(mNumBufferedBytes == 0);
+        // Byte accounting nets to zero once the ring drains. Held now that
+        // bufferInboundPacket no longer clobbers a live slot on empty receives.
+        llassert(mNumBufferedBytes == 0);
     }
 
     if (!drop)
@@ -220,7 +223,10 @@ S32 LLPacketRing::receiveOrDropBufferedPacket(char *datap, bool drop)
         }
         else
         {
-            //llassert(false); assertion disabled due to 0 size packets from server????
+            // Unreachable: bufferInboundPacket only commits a slot for a real
+            // (size > 0) packet, so a buffered packet never reads back as 0.
+            // Assert in debug; fall through returning 0 in release.
+            llassert(false);
         }
     }
     else
@@ -279,11 +285,20 @@ S32 LLPacketRing::bufferInboundPacket(S32 socket)
     }
     else
     {
-        packet->init(socket);
-        packet_size = packet->getSize();
+        // Receive into a scratch buffer first rather than straight into the
+        // ring slot. When the ring is full, mPacketRing[mHeadIndex] is the
+        // oldest *unread* packet; a would-block or zero-length datagram makes
+        // receive_packet() return <= 0, and receiving directly into the slot
+        // would clobber that unread packet and desync the byte/packet
+        // accounting. Only commit the slot once we know we have a real
+        // packet. (The SOCKS branch above already works this way.)
+        char buffer[NET_BUFFER_SIZE];   /* Flawfinder: ignore */
+        packet_size = receive_packet(socket, buffer);
         if (packet_size > 0)
         {
             mActualBytesIn += packet_size;
+
+            packet->init(buffer, packet_size, ::get_sender());
 
             mHeadIndex = (mHeadIndex + 1) % (S16)(mPacketRing.size());
             if (mNumBufferedPackets < MAX_BUFFER_RING_SIZE)
