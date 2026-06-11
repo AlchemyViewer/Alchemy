@@ -50,7 +50,6 @@
 
 #include "lldir.h"
 #include "llerror.h"
-#include "llframetimer.h"
 #include "llimage.h"
 #include "llimagepng.h"
 //#include "llimagej2c.h"
@@ -556,24 +555,42 @@ F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LL
     if (getFTFace() == nullptr)
         return 0.0;
 
-    U32 left_glyph = left_glyph_info ? left_glyph_info->mGlyphIndex : 0;
-    U32 right_glyph = right_glyph_info ? right_glyph_info->mGlyphIndex : 0;
+    // Kerning is defined within one face: the legacy 'kern' table maps
+    // pairs of THAT face's glyph indices. Probe the table of the face that
+    // owns both glyphs — historically this always probed the head's table,
+    // which fed it foreign indices whenever the glyphs came from a fallback
+    // (benign for GPOS-era fonts, which ship no legacy kern table, but
+    // wrong in principle and garbage-prone on old fonts — and it silently
+    // dropped real kerning for pairs that DO share a fallback face, e.g.
+    // two CJK glyphs). A mixed-face pair has no defined kerning at all.
+    if (!left_glyph_info || !right_glyph_info)
+        return 0.f;
+    const LLFontFace* source_face = left_glyph_info->mSourceFace;
+    if (!source_face || source_face != right_glyph_info->mSourceFace)
+        return 0.f;
+    LLFT_Face kern_face = source_face->face();
+    if (!kern_face)
+        return 0.f;
+
+    U32 left_glyph = left_glyph_info->mGlyphIndex;
+    U32 right_glyph = right_glyph_info->mGlyphIndex;
 
     FT_Vector  delta;
 
     // UNFITTED gives subpixel-precise kerning when callers maintain a
     // fractional pen accumulator (mUseSubpixelPen — autohinted/unhinted
     // faces). DEFAULT grid-fits to integer pixels, which is what callers
-    // want when they round per glyph (native-hinted faces).
+    // want when they round per glyph (native-hinted faces). The pen policy
+    // is the head's: it owns the layout loop the result feeds.
     const FT_UInt kern_mode = mUseSubpixelPen ? FT_KERNING_UNFITTED : FT_KERNING_DEFAULT;
-    llverify(!FT_Get_Kerning(getFTFace(), left_glyph, right_glyph, kern_mode, &delta));
+    llverify(!FT_Get_Kerning(kern_face, left_glyph, right_glyph, kern_mode, &delta));
 
     // Apply the FreeType auto-hinter's subpixel side-bearing correction between
     // adjacent glyphs. The lsb/rsb deltas are populated only when the autohinter
     // ran; for native-hinted (DEFAULT) and unhinted (NO_HINTING) loads they're
     // always zero and the correction is meaningless.
     F32 delta_correction = 0.0f;
-    if (mHinting == EFontHinting::FORCE_AUTOHINT && left_glyph_info && right_glyph_info)
+    if (mHinting == EFontHinting::FORCE_AUTOHINT)
     {
         // delta_diff is in 26.6 fixed point: the autohinter's net shift in
         // inter-glyph spacing (positive = hinter pushed glyphs apart).
@@ -811,7 +828,9 @@ LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fo
     if (!gi)
         return nullptr;
 
-    fontp->mFace->insertGlyphInfo(glyph_index, gi);
+    // insertGlyphInfo keeps an already-published entry over the incoming
+    // one (deleting the duplicate), so continue with its return value.
+    gi = fontp->mFace->insertGlyphInfo(glyph_index, gi);
 
     // Optimization: when the rendered pixel format differs from what the
     // caller requested (e.g. Color requested but the file is monochrome),
@@ -835,14 +854,15 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_
         return nullptr;
     llassert(!mIsFallback);
 
-    const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type)
-        ? glyph_type : EFontGlyphType::Grayscale;
+    // glyph_type passes through unresolved: getGlyphInfoByIndex treats
+    // Unspecified as match-any at lookup and only pins a concrete type
+    // when it has to rasterize.
 
     // Hot path: codepoint exists on this head's face. One cmap lookup
     // (cached) + one (face, glyph_index) hash lookup.
     U32 glyph_index = getCharGlyphIndex(wch);
     if (glyph_index != 0)
-        return getGlyphInfoByIndex(this, glyph_index, resolve_type);
+        return getGlyphInfoByIndex(this, glyph_index, glyph_type);
 
     // Cold path: walk fallbacks in codepoint-priority order, which
     // differs from the shape-path priority in selectShapingFace:
@@ -865,25 +885,25 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_
                 [&](const char_functor_t& f) { return f && f(wch); });
             hit.first)
         {
-            return getGlyphInfoByIndex(hit.first, hit.second, resolve_type);
+            return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
         }
     }
     if (auto hit = find_fallback_hit(mFallbackFonts, wch,
             [](const char_functor_t& f) { return !f; });
         hit.first)
     {
-        return getGlyphInfoByIndex(hit.first, hit.second, resolve_type);
+        return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
     }
     if (auto hit = find_fallback_hit(mFallbackFonts, wch,
             [](const char_functor_t& f) { return (bool)f; });
         hit.first)
     {
-        return getGlyphInfoByIndex(hit.first, hit.second, resolve_type);
+        return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
     }
 
     // No face in our chain has this codepoint. Use the head face's
     // notdef (glyph_index=0) — pre-warmed during loadFace.
-    return getGlyphInfoByIndex(this, 0, resolve_type);
+    return getGlyphInfoByIndex(this, 0, glyph_type);
 }
 
 LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType glyph_type) const
@@ -900,12 +920,38 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp
     // is observed consistently by every freetype that ever rendered the
     // glyph: the face's findGlyphInfo returns null after eviction, so we
     // fall through to addShapedGlyphFromFont and re-rasterize.
-    const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale;
+    //
+    // Unspecified probes the cache as match-any (findGlyphInfo returns the
+    // first entry of either type) and only resolves to Grayscale when the
+    // glyph has to be rasterized. Measurement paths pass Unspecified — they
+    // need metrics, not a particular atlas — and resolving before the probe
+    // forced a duplicate Grayscale rasterization (a full COLRv1 paint walk
+    // plus a Grayscale atlas slot) for every color glyph that had already
+    // been rendered through the Color atlas.
+    //
+    // A face with neither a color table (CBDT/sbix/COLR) nor OT-SVG can
+    // never produce a Color bitmap — FT_LOAD_COLOR on it rasterizes the
+    // same grayscale outline. Degrade the request up front so Color
+    // lookups on plain text faces (use_color=true is the UI default for
+    // every glyph, not just emoji) hit the existing Grayscale entry
+    // instead of missing and rasterizing a duplicate gray bitmap into
+    // fresh atlas slots published under a Color-typed entry. Reload paths
+    // that pre-warm ASCII as Grayscale made that the common case: the
+    // whole ASCII set stored twice per font, x8 phase slots on subpixel
+    // faces.
+    if (glyph_type == EFontGlyphType::Color
+        && fontp && fontp->mFace
+        && !fontp->mFace->hasColor()
+        && !fontp->mFace->hasSvg())
+    {
+        glyph_type = EFontGlyphType::Grayscale;
+    }
     if (fontp && fontp->mFace)
     {
-        if (LLFontGlyphInfo* gi = fontp->mFace->findGlyphInfo(glyph_index, resolve_type))
+        if (LLFontGlyphInfo* gi = fontp->mFace->findGlyphInfo(glyph_index, glyph_type))
             return gi;
     }
+    const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale;
     return addShapedGlyphFromFont(fontp, glyph_index, resolve_type);
 }
 
@@ -1173,70 +1219,11 @@ const LLFontBitmapCache* LLFontFreetype::getFontBitmapCache() const
 
 void LLFontFreetype::collectGarbage() const
 {
-    if (!getFTFace())
-        return;
-
-    // Sweep cadence: cheap enough to run at the top of every render call, with
-    // GC_INTERVAL_SEC bounding actual work. Idle threshold sized for "real
-    // user idle" — roughly the time after which a chat scrollback or panel of
-    // unique-codepoint text has stopped being displayed. Long enough not to
-    // churn during normal interaction; short enough that an hour-long session
-    // doesn't accumulate every transient code page ever shown.
-    constexpr F64 GC_INTERVAL_SEC      = 5.0;
-    constexpr F64 IDLE_THRESHOLD_SEC   = 60.0 * 15.0;
-
-    const F64 now = LLFrameTimer::getTotalSeconds();
-    if (now < mNextGcTime)
-        return;
-    mNextGcTime = now + GC_INTERVAL_SEC;
-
-    auto glyph_uses_sheet = [](const LLFontGlyphInfo* gi, EFontGlyphType type, U32 num) -> bool
-    {
-        for (U8 p = 0; p < gi->mPhaseCount; ++p)
-        {
-            const auto& entry = gi->mPhaseSlots[p].mBitmapEntry;
-            if (entry.first == type && entry.second >= 0 && static_cast<U32>(entry.second) == num)
-                return true;
-        }
-        return false;
-    };
-
-    // Shaped runs in LLFontShaping's cache hold only metric/glyph_id data — no
-    // atlas references — so they survive eviction; getGlyphInfoByIndex on the
-    // next frame re-rasterizes whichever glyphs were dropped here. Cache
-    // generation bumps inside releaseSheet so LLFontVertexBuffer rebuilds.
-    for (U32 t = 0; t < static_cast<U32>(EFontGlyphType::Count); ++t)
-    {
-        const EFontGlyphType type = static_cast<EFontGlyphType>(t);
-        const U32 sheet_count = getBitmapCache()->getNumBitmaps(type);
-        for (U32 num = 0; num < sheet_count; ++num)
-        {
-            if (getBitmapCache()->isSheetReleased(type, num))
-                continue;
-            const F64 last_used = getBitmapCache()->getSheetLastUsedTime(type, num);
-            // last_used == 0 means the sheet was allocated but not yet drawn
-            // from — skip it for one cycle so a brand-new sheet gets at least
-            // a frame to be touched before it's a candidate.
-            if (last_used <= 0.0)
-                continue;
-            if ((now - last_used) <= IDLE_THRESHOLD_SEC)
-                continue;
-
-            // Delete the face-owned glyph entries that reference this sheet,
-            // then release the sheet itself. There is no head-side cache to
-            // invalidate: getGlyphInfoByIndex routes every lookup through the
-            // face's findGlyphInfo, so siblings sharing this face (other
-            // heads, or heads using this face as a fallback) automatically
-            // observe the deletion on their next render and re-rasterize.
-            auto matches = [&](const LLFontGlyphInfo* gi) { return glyph_uses_sheet(gi, type, num); };
-            if (mFace)
-            {
-                mFace->erase_glyph_entries(matches);
-            }
-
-            getBitmapCache()->releaseSheet(type, num);
-        }
-    }
+    // The sweep (and its throttle) lives on the shared face wrapper — the
+    // atlas and glyph map are face state, and siblings wrapping the same
+    // face should cost one sweep per interval, not one per head.
+    if (mFace)
+        mFace->collectGarbage();
 }
 
 U8 LLFontFreetype::getStyle() const

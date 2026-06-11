@@ -102,6 +102,12 @@ namespace
     {
         std::vector<std::pair<size_t, size_t>>           ranges;
         std::vector<const std::vector<LLShapedGlyph>*>   glyphs;
+        // Shape-cache mutation count at build time. The glyph pointers are
+        // valid only while this matches LLFontShaping::cacheMutationCount();
+        // holders llassert equality after their last dereference so a
+        // use-after-invalidation trips a debug assert instead of reading
+        // freed glyph runs.
+        size_t mutation_snapshot = 0;
     };
 
     // Build the shape layout for `slice` against `root_face`. One
@@ -114,6 +120,11 @@ namespace
                                    LLWStringView         slice)
     {
         ShapeLayout out;
+        // Snapshot up front so the empty-layout early return below carries
+        // the live mutation count too — a default 0 would trip the holders'
+        // validity assert on every empty-label measurement (LLButton::resize
+        // with "" at startup) once anything had ever shaped.
+        out.mutation_snapshot = LLFontShaping::cacheMutationCount();
         if (!root_face || slice.empty())
             return out;
 
@@ -126,6 +137,13 @@ namespace
                                                      out.ranges[s].first,
                                                      out.ranges[s].second);
         }
+        // Re-snapshot AFTER all shapeLine calls — each call may itself
+        // mutate (miss-insert), which is fine: only mutations after this
+        // point invalidate the pointers collected above. (With a single
+        // range there's nothing to invalidate mid-build; with several,
+        // entries just shaped sit at the LRU front, out of eviction's
+        // reach.)
+        out.mutation_snapshot = LLFontShaping::cacheMutationCount();
         return out;
     }
 }
@@ -160,28 +178,53 @@ bool LLFontGL::loadFace(const std::string& filename, F32 point_size, const F32 v
 
 S32 LLFontGL::getNumFaces(const std::string& filename)
 {
-    if (mFontFreetype == reinterpret_cast<LLFontFreetype*>(NULL))
-    {
-        mFontFreetype = new LLFontFreetype;
-    }
-
-    return mFontFreetype->getNumFaces(filename);
+    // Pure file probe — no instance state involved, so don't allocate a
+    // throwaway LLFontFreetype just to count collection faces.
+    return LLFontFreetype::getNumFaces(filename);
 }
 
-S32 LLFontGL::getCacheGeneration() const
+U64 LLFontGL::getCacheGeneration() const
 {
     // Every render() call may sample from this font's head atlas AND from
     // each fallback face's atlas (e.g. emoji glyphs in an otherwise
-    // grayscale string). Each LLFontBitmapCache has its own per-instance
-    // generation that only ticks on mutations to that cache; the head
-    // atlas's local counter is blind to a fallback rasterizing a new
-    // glyph mid-frame, so vertex/width buffers comparing against it
-    // would miss the invalidation and keep the stale UVs that point at
-    // uninitialized atlas slots. The global counter ticks on any atlas
-    // mutation across every face — slight over-invalidation, but the
-    // only correct answer when the cache key has to cover all sampled
-    // atlases without enumerating them.
-    return LLFontBitmapCache::getGlobalGeneration();
+    // grayscale string) — and from nothing else: glyphs route through
+    // getGlyphInfo* whose mSourceFace is always the head face or a chain
+    // member. Summing the per-instance generation of exactly those caches
+    // gives a per-font invalidation stamp: it ticks for any mutation that
+    // can stale this font's captured UVs and stays put for unrelated
+    // fonts' glyph churn.
+    //
+    // Monotonic: each component only ever takes fresh values from the
+    // shared LLFontBitmapCache::sNextGeneration counter, so every mutation
+    // (including a face wrapper swap on reload, whose new cache starts at
+    // a value above everything previously issued) strictly increases the
+    // sum — no A+1/B-1 aliasing. addFallbackFont growing the chain adds a
+    // component, which also only increases it.
+    //
+    // This used to return the global counter, which invalidated EVERY
+    // cached text buffer viewer-wide whenever any font rasterized a glyph;
+    // during glyph churn (first CJK chat fill, post-eviction warm-up) each
+    // regen rasterized more glyphs and re-invalidated everything again for
+    // several frames.
+    const LLFontFreetype* ft = mFontFreetype.get();
+    if (!ft)
+        return 0;
+    // U64 accumulator: components are non-negative S32s drawn from the
+    // monotonic global counter, so the unsigned 64-bit sum can't overflow
+    // within any reachable session and the comparison contract in the
+    // vertex/width buffer caches stays exact.
+    U64 gen = 0;
+    if (const LLFontBitmapCache* cache = ft->getFontBitmapCache())
+        gen += (U64)cache->getCacheGeneration();
+    for (const auto& fb : ft->getFallbackFonts())
+    {
+        if (fb.first)
+        {
+            if (const LLFontBitmapCache* cache = fb.first->getFontBitmapCache())
+                gen += (U64)cache->getCacheGeneration();
+        }
+    }
+    return gen;
 }
 
 S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRect& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
@@ -410,35 +453,30 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // bind the atlas of whichever face produced each glyph. Track the current
     // (face, atlas) pair as we walk glyphs and flip on transitions. The
     // initial (face, cache, inv_width, inv_height) captures are deferred to
-    // the first glyph; the head's primary cache is used as a fallback for
-    // shadow-uniform setup below.
+    // the first glyph.
     const LLFontFace*        current_face = nullptr;
     const LLFontBitmapCache* font_bitmap_cache = mFontFreetype->getBitmapCache();
     F32 inv_width  = font_bitmap_cache ? 1.f / font_bitmap_cache->getBitmapWidth()  : 0.f;
     F32 inv_height = font_bitmap_cache ? 1.f / font_bitmap_cache->getBitmapHeight() : 0.f;
 
-    // Shader-shadow uniforms are pushed once before pass A starts and reset
-    // to passthrough (shadowMode = 0) before pass B's foreground emission.
-    // Captured into mShadowBufferList only by virtue of the shadow geometry
-    // they're set for; LLFontVertexBuffer::renderBuffers re-pushes the same
-    // values on cache replay since LLVertexBufferData doesn't capture
-    // uniforms. Skipped when sEnableShaderShadow is off (legacy multi-quad
-    // emission still drives shadow geometry — shader stays at shadowMode=0).
+    // shadowMode is pushed once before pass A starts and reset to
+    // passthrough (0) before pass B's foreground emission. It is the only
+    // shadow uniform by design: per-pass constant, so the captured-buffer
+    // replay (LLFontVertexBuffer::renderBuffers re-pushes it; LLVertexBufferData
+    // doesn't capture uniforms) stays correct. Everything that varies per
+    // batch in a mixed-atlas string — texel size of the bound atlas, alpha
+    // channel layout — derives from the bound texture inside uiF.glsl
+    // (textureSize + the RG-swizzle/.a sampling), so glyphs from
+    // differently-sized head and fallback atlases all shadow correctly.
+    // Skipped when sEnableShaderShadow is off (legacy multi-quad emission
+    // still drives shadow geometry — shader stays at shadowMode=0).
     const bool push_shader_shadow_uniforms =
         sEnableShaderShadow && (shadow != NO_SHADOW) && LLGLSLShader::sCurBoundShaderPtr;
     static const LLStaticHashedString sShadowMode("shadowMode");
-    static const LLStaticHashedString sAtlasTexelSize("atlasTexelSize");
-    static const LLStaticHashedString sGrayscaleAtlas("grayscaleAtlas");
     if (push_shader_shadow_uniforms)
     {
         const int mode = (shadow == DROP_SHADOW) ? 1 : 2; // SOFT
         LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, mode);
-        LLGLSLShader::sCurBoundShaderPtr->uniform2f(sAtlasTexelSize, inv_width, inv_height);
-        // Per-batch atlas type would be needed for correct mixed-atlas shadow
-        // sampling; for now treat all shadowed strings as grayscale text.
-        // Mixed text+emoji shadows may sample the wrong channel — acceptable
-        // limitation while sEnableShaderShadow is opt-in.
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sGrayscaleAtlas, 1);
     }
 
     bool draw_ellipses = false;
@@ -506,6 +544,35 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
     std::pair<EFontGlyphType, S32> bitmap_entry = std::make_pair(EFontGlyphType::Grayscale, -1);
     S32 glyph_count = 0;
+
+    // Atlas texture the pending batch's UVs were built against. Every batch
+    // submit re-asserts this binding: rasterizing a cache-missed glyph between
+    // accumulation and flush rebinds unit 0 to the upload target and leaves it
+    // bound (LLImageGL::setSubImage uploads with skip_unbind, and nextOpenPos
+    // binds brand-new sheets to create their GL textures), so the texture
+    // bound at flush time is NOT necessarily the one the pending quads were
+    // built for. Submitting under the stomped binding samples another atlas
+    // page — glyphs from unrelated text — which is exactly the legacy
+    // "CJK/emoji on first render" corruption the old per-codepoint
+    // `last_char != wch` flush band-aided around (the per-char flush kept the
+    // pending batch to ~1 glyph, making the misdraw practically invisible).
+    // bind() is a cached no-op when the binding didn't move, so the re-assert
+    // costs nothing on the common path.
+    LLImageGL* batch_image = nullptr;
+    auto flush_batch = [&]()
+    {
+        if (glyph_count > 0)
+        {
+            if (batch_image)
+            {
+                gGL.getTexUnit(0)->bind(batch_image);
+            }
+            gGL.begin(LLRender::TRIANGLES);
+            gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
+            gGL.end();
+            glyph_count = 0;
+        }
+    };
 
     // Itemize + shape the slice via the shared helper. Strict-monospace
     // gets emoji-cluster ranges so ASCII keeps the codepoint path's exact
@@ -596,13 +663,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     std::pair<EFontGlyphType, S32> next_bitmap_entry = slot.mBitmapEntry;
                     if (glyph_face != current_face || next_bitmap_entry != bitmap_entry)
                     {
-                        if (glyph_count > 0)
-                        {
-                            gGL.begin(LLRender::TRIANGLES);
-                            gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
-                            gGL.end();
-                            glyph_count = 0;
-                        }
+                        // Drain the queued glyphs under their own texture
+                        // before switching the batch to the new one.
+                        flush_batch();
                         bitmap_entry = next_bitmap_entry;
                         if (glyph_face != current_face)
                         {
@@ -614,11 +677,17 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                                 inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
                             }
                         }
-                        if (font_bitmap_cache)
+                        // Null when the slot's sheet has been released
+                        // (shouldn't happen mid-render — eviction runs at the
+                        // frame boundary and purges glyph entries first). The
+                        // emission guard below skips the quad rather than
+                        // sampling whatever texture happens to be bound.
+                        batch_image = font_bitmap_cache
+                            ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
+                            : nullptr;
+                        if (batch_image)
                         {
-                            LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
-                            if (font_image)
-                                gGL.getTexUnit(0)->bind(font_image);
+                            gGL.getTexUnit(0)->bind(batch_image);
                         }
                     }
 
@@ -632,46 +701,46 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                         break;
                     }
 
-                    LLRectf uv_rect(slot.mXBitmapOffset * inv_width,
-                                    (slot.mYBitmapOffset + slot.mHeight + PAD_UVY) * inv_height,
-                                    (slot.mXBitmapOffset + slot.mWidth) * inv_width,
-                                    (slot.mYBitmapOffset - PAD_UVY) * inv_height);
-                    LLRectf screen_rect(glyph_x,
-                                        glyph_y,
-                                        glyph_x + (F32)slot.mWidth,
-                                        glyph_y - (F32)slot.mHeight);
-
-                    if (glyph_count >= GLYPH_BATCH_SIZE)
+                    if (batch_image)
                     {
-                        gGL.begin(LLRender::TRIANGLES);
-                        gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
-                        gGL.end();
-                        glyph_count = 0;
-                    }
+                        LLRectf uv_rect(slot.mXBitmapOffset * inv_width,
+                                        (slot.mYBitmapOffset + slot.mHeight + PAD_UVY) * inv_height,
+                                        (slot.mXBitmapOffset + slot.mWidth) * inv_width,
+                                        (slot.mYBitmapOffset - PAD_UVY) * inv_height);
+                        LLRectf screen_rect(glyph_x,
+                                            glyph_y,
+                                            glyph_x + (F32)slot.mWidth,
+                                            glyph_y - (F32)slot.mHeight);
 
-                    // Grayscale glyphs tint with text_color (the bitmap is a
-                    // luminance / coverage mask). Color glyphs tint with
-                    // emoji_color (white, preserving CPAL palette colors baked
-                    // into the bitmap).
-                    const LLColor4U& col = bitmap_entry.first == EFontGlyphType::Grayscale
-                                         ? text_color : emoji_color;
-                    if (needs_two_pass)
-                    {
-                        // BOLD suppresses shadow per the legacy drawGlyph contract
-                        // (see FIXME at drawGlyphForeground): the bold doubled quad
-                        // and the shadow taps are mutually exclusive. drawGlyphShadow
-                        // doesn't see `style`, so gate the call here.
-                        if (!(style_to_add & BOLD))
+                        if (glyph_count >= GLYPH_BATCH_SIZE)
                         {
-                            drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                                            precomputed_shadow_color, shadow, slant_offset);
+                            flush_batch();
                         }
-                        deferred.push_back({screen_rect, uv_rect, bitmap_entry, current_face, col});
-                    }
-                    else
-                    {
-                        drawGlyphForeground(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                                            col, style_to_add, slant_offset);
+
+                        // Grayscale glyphs tint with text_color (the bitmap is a
+                        // luminance / coverage mask). Color glyphs tint with
+                        // emoji_color (white, preserving CPAL palette colors baked
+                        // into the bitmap).
+                        const LLColor4U& col = bitmap_entry.first == EFontGlyphType::Grayscale
+                                             ? text_color : emoji_color;
+                        if (needs_two_pass)
+                        {
+                            // BOLD suppresses shadow per the legacy drawGlyph contract
+                            // (see FIXME at drawGlyphForeground): the bold doubled quad
+                            // and the shadow taps are mutually exclusive. drawGlyphShadow
+                            // doesn't see `style`, so gate the call here.
+                            if (!(style_to_add & BOLD))
+                            {
+                                drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                                                precomputed_shadow_color, shadow, slant_offset);
+                            }
+                            deferred.push_back({screen_rect, uv_rect, bitmap_entry, current_face, col});
+                        }
+                        else
+                        {
+                            drawGlyphForeground(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                                                col, style_to_add, slant_offset);
+                        }
                     }
 
                     cur_x += sg.x_advance;
@@ -742,27 +811,19 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         const auto& cp_slot = fgi->mPhaseSlots[cp_phase];
 
         // Per-glyph bitmap texture. Flush + rebind only when the atlas
-        // slot actually changes; the legacy `last_char != wch` clause
-        // forced a per-codepoint flush as a band-aid for an undiagnosed
-        // CJK/emoji-on-first-render issue. Moving atlas eviction off the
-        // render path (sweepGlyphCaches between frames) eliminated the
-        // underlying race, and Latin text now batches up to GLYPH_BATCH_SIZE
-        // glyphs per draw the way it should.
+        // slot actually changes; flush_batch re-asserts the batch's own
+        // texture, so glyph rasterization between flushes (which leaves the
+        // upload target bound) can't misdirect the queued quads. The legacy
+        // `last_char != wch` clause forced a per-codepoint flush as a
+        // band-aid over exactly that misdirection; Latin text now batches
+        // up to GLYPH_BATCH_SIZE glyphs per draw the way it should.
         const LLFontFace* cp_glyph_face = fgi->mSourceFace;
         std::pair<EFontGlyphType, S32> next_bitmap_entry = cp_slot.mBitmapEntry;
         if (cp_glyph_face != current_face || next_bitmap_entry != bitmap_entry)
         {
             // Actually draw the queued glyphs before switching their texture;
             // otherwise the queued glyphs will be taken from wrong textures.
-            if (glyph_count > 0)
-            {
-                gGL.begin(LLRender::TRIANGLES);
-                {
-                    gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
-                }
-                gGL.end();
-                glyph_count = 0;
-            }
+            flush_batch();
 
             bitmap_entry = next_bitmap_entry;
             if (cp_glyph_face != current_face)
@@ -775,16 +836,17 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
                 }
             }
-            if (font_bitmap_cache)
+            // Defensive: getImageGL returns null when a sheet has been
+            // released (collectGarbage) or when the slot index is out
+            // of range. The emission guard below skips the glyph in that
+            // case — emitting quads without a known binding would sample
+            // whatever texture is currently bound.
+            batch_image = font_bitmap_cache
+                ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
+                : nullptr;
+            if (batch_image)
             {
-                LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
-                // Defensive: getImageGL returns null when a sheet has been
-                // released (collectGarbage) or when the slot index is out
-                // of range. Skip the bind in that case; the glyph won't
-                // render this frame but we don't crash inside LLTexUnit::bind
-                // dereferencing a null texture pointer.
-                if (font_image)
-                    gGL.getTexUnit(0)->bind(font_image);
+                gGL.getTexUnit(0)->bind(batch_image);
             }
         }
 
@@ -794,52 +856,49 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             break;
         }
 
-        // Draw the text at the appropriate location
-        //Specify vertices and texture coordinates
-        LLRectf uv_rect((cp_slot.mXBitmapOffset) * inv_width,
-                (cp_slot.mYBitmapOffset + cp_slot.mHeight + PAD_UVY) * inv_height,
-                (cp_slot.mXBitmapOffset + cp_slot.mWidth) * inv_width,
-                (cp_slot.mYBitmapOffset - PAD_UVY) * inv_height);
-        // Integer dest derived from quantized pen + per-phase bearing.
-        const F32 cp_glyph_x = (F32)(cp_dest_int_x + cp_slot.mXBearing);
-        const F32 cp_glyph_y = (F32)ll_round(cur_render_y) + (F32)cp_slot.mYBearing;
-        LLRectf screen_rect(cp_glyph_x,
-                    cp_glyph_y,
-                    cp_glyph_x + (F32)cp_slot.mWidth,
-                    cp_glyph_y - (F32)cp_slot.mHeight);
-
-        if (glyph_count >= GLYPH_BATCH_SIZE)
+        if (batch_image)
         {
-            gGL.begin(LLRender::TRIANGLES);
+            // Draw the text at the appropriate location
+            //Specify vertices and texture coordinates
+            LLRectf uv_rect((cp_slot.mXBitmapOffset) * inv_width,
+                    (cp_slot.mYBitmapOffset + cp_slot.mHeight + PAD_UVY) * inv_height,
+                    (cp_slot.mXBitmapOffset + cp_slot.mWidth) * inv_width,
+                    (cp_slot.mYBitmapOffset - PAD_UVY) * inv_height);
+            // Integer dest derived from quantized pen + per-phase bearing.
+            const F32 cp_glyph_x = (F32)(cp_dest_int_x + cp_slot.mXBearing);
+            const F32 cp_glyph_y = (F32)ll_round(cur_render_y) + (F32)cp_slot.mYBearing;
+            LLRectf screen_rect(cp_glyph_x,
+                        cp_glyph_y,
+                        cp_glyph_x + (F32)cp_slot.mWidth,
+                        cp_glyph_y - (F32)cp_slot.mHeight);
+
+            if (glyph_count >= GLYPH_BATCH_SIZE)
             {
-                gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
+                flush_batch();
             }
-            gGL.end();
 
-            glyph_count = 0;
-        }
-
-        // Grayscale tints with text_color; Color tints with emoji_color
-        // (white, preserving CPAL palette colors baked into the bitmap).
-        const LLColor4U& col = bitmap_entry.first == EFontGlyphType::Grayscale
-                             ? text_color : emoji_color;
-        if (needs_two_pass)
-        {
-            // BOLD suppresses shadow per the legacy drawGlyph contract
-            // (see FIXME at drawGlyphForeground): the bold doubled quad
-            // and the shadow taps are mutually exclusive. drawGlyphShadow
-            // doesn't see `style`, so gate the call here.
-            if (!(style_to_add & BOLD))
+            // Grayscale tints with text_color; Color tints with emoji_color
+            // (white, preserving CPAL palette colors baked into the bitmap).
+            const LLColor4U& col = bitmap_entry.first == EFontGlyphType::Grayscale
+                                 ? text_color : emoji_color;
+            if (needs_two_pass)
             {
-                drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                                precomputed_shadow_color, shadow, slant_offset);
+                // BOLD suppresses shadow per the legacy drawGlyph contract
+                // (see FIXME at drawGlyphForeground): the bold doubled quad
+                // and the shadow taps are mutually exclusive. drawGlyphShadow
+                // doesn't see `style`, so gate the call here.
+                if (!(style_to_add & BOLD))
+                {
+                    drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                                    precomputed_shadow_color, shadow, slant_offset);
+                }
+                deferred.push_back({screen_rect, uv_rect, bitmap_entry, current_face, col});
             }
-            deferred.push_back({screen_rect, uv_rect, bitmap_entry, current_face, col});
-        }
-        else
-        {
-            drawGlyphForeground(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                                col, style_to_add, slant_offset);
+            else
+            {
+                drawGlyphForeground(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
+                                    col, style_to_add, slant_offset);
+            }
         }
 
         chars_drawn++;
@@ -870,15 +929,14 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         cur_render_y = cur_y;
     }
 
+    // The layout's glyph pointers reach into the shape LRU; nothing inside
+    // the loop may shape (glyph rasterization doesn't), or they dangle.
+    llassert(layout.mutation_snapshot == LLFontShaping::cacheMutationCount());
+
     // End-of-pass flush. In single-pass mode this drains the foreground batch
     // and we're done. In two-pass mode this drains the shadow batch; pass B
     // below then walks the deferred metadata to emit foreground geometry.
-    gGL.begin(LLRender::TRIANGLES);
-    {
-        gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
-    }
-    gGL.end();
-    glyph_count = 0;
+    flush_batch();
 
     if (needs_two_pass)
     {
@@ -901,39 +959,41 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         // Pass B: emit foreground geometry from deferred metadata. Reset the
         // atlas-binding tracker; the first deferred glyph forces a (possibly
         // redundant, GL-driver-cheap) rebind to begin the foreground stream.
+        // Only glyphs whose batch_image resolved in pass A made it into
+        // `deferred`, so the getImageGL lookups below can only go null if a
+        // sheet vanished mid-render — which the frame-boundary eviction
+        // discipline rules out — but keep the same guard shape regardless.
         bitmap_entry = std::make_pair(EFontGlyphType::Grayscale, -1);
         current_face = nullptr;
+        batch_image = nullptr;
         for (const DeferredGlyph& dg : deferred)
         {
             if (dg.face != current_face || dg.bitmap_entry != bitmap_entry)
             {
-                if (glyph_count > 0)
-                {
-                    gGL.begin(LLRender::TRIANGLES);
-                    gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
-                    gGL.end();
-                    glyph_count = 0;
-                }
+                flush_batch();
                 bitmap_entry = dg.bitmap_entry;
                 if (dg.face != current_face)
                 {
                     current_face = dg.face;
                     font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
                 }
-                if (font_bitmap_cache)
+                batch_image = font_bitmap_cache
+                    ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
+                    : nullptr;
+                if (batch_image)
                 {
-                    LLImageGL* font_image = font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second);
-                    if (font_image)
-                        gGL.getTexUnit(0)->bind(font_image);
+                    gGL.getTexUnit(0)->bind(batch_image);
                 }
+            }
+
+            if (!batch_image)
+            {
+                continue;
             }
 
             if (glyph_count >= GLYPH_BATCH_SIZE)
             {
-                gGL.begin(LLRender::TRIANGLES);
-                gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
-                gGL.end();
-                glyph_count = 0;
+                flush_batch();
             }
 
             drawGlyphForeground(glyph_count, vertices, uvs, colors,
@@ -941,10 +1001,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                                 dg.color, style_to_add, slant_offset);
         }
 
-        gGL.begin(LLRender::TRIANGLES);
-        gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
-        gGL.end();
-        glyph_count = 0;
+        flush_batch();
     }
 
     if (right_x)
@@ -1188,6 +1245,9 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
             cur_x = (F32)ll_round(cur_x);
     }
 
+    // Layout pointers must have stayed valid for the whole measurement walk.
+    llassert(layout.mutation_snapshot == LLFontShaping::cacheMutationCount());
+
     if (!no_padding)
     {
         // add in extra pixels for last character's width past its xadvance
@@ -1255,6 +1315,9 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
         }
     }
     const bool use_shaped = !shape_glyphs->empty();
+    // shape_glyphs points into the shape LRU until the loop's last use.
+    const size_t shape_gen = LLFontShaping::cacheMutationCount();
+    (void)shape_gen;
 
     S32 i;
     for (i=0; (i < max_chars); i++)
@@ -1369,6 +1432,10 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
             cur_x = (F32)ll_round(cur_x);
     }
 
+    // No shape* call may fire while shape_glyphs is held (see the comment
+    // at the shapeLine call above).
+    llassert(shape_gen == LLFontShaping::cacheMutationCount());
+
     if( clip )
     {
         switch (end_on_word_boundary)
@@ -1420,6 +1487,8 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
         // (begin=0), which equals 0..start here.
         LLWStringView slice(wchars, (size_t)(start + 1));
         const auto& shape_glyphs = LLFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)(start + 1));
+        const size_t shape_gen = LLFontShaping::cacheMutationCount();
+        (void)shape_gen;
         if (!shape_glyphs.empty())
         {
             per_cp_advance.assign(start + 1, 0.f);
@@ -1439,6 +1508,9 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
                 }
             }
         }
+        // The fill above is shape_glyphs' last dereference — it must not
+        // have been invalidated by a shape-cache mutation mid-hold.
+        llassert(shape_gen == LLFontShaping::cacheMutationCount());
     }
     const bool use_shaped = !per_cp_advance.empty();
 
@@ -1647,6 +1719,11 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
         if (!subpixel_pen)
             cur_x = (F32)ll_round(cur_x);
     }
+
+    // Hit-test walk holds the layout's glyph pointers; early returns inside
+    // the loop skip this check, which is fine — the assert is a tripwire
+    // for shape-cache mutation mid-hold, not exhaustive coverage.
+    llassert(layout.mutation_snapshot == LLFontShaping::cacheMutationCount());
 
     return llmin(max_chars, pos - begin_offset);
 }

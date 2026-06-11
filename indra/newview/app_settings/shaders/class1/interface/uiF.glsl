@@ -27,12 +27,14 @@ out vec4 frag_color;
 
 uniform sampler2D diffuseMap;
 
-// Shadow shader path. Default values (shadowMode == 0, others ignored) make
-// every non-text UI surface and every NO_SHADOW text glyph hit the early-return
+// Shadow shader path. The default value (shadowMode == 0) makes every
+// non-text UI surface and every NO_SHADOW text glyph hit the early-return
 // branch below — bytewise equivalent to the pre-change shader. Only text
-// rendering with active shadow geometry sets shadowMode > 0 and pushes
-// atlasTexelSize before its draw range.
-uniform vec2 atlasTexelSize;       // 1.0 / vec2(atlas_w, atlas_h)
+// rendering with active shadow geometry sets shadowMode > 0 before its
+// draw range. shadowMode is deliberately the ONLY shadow uniform: per-pass
+// constant, so captured vertex buffers (which replay texture binds but not
+// uniforms) stay correct. Everything that varies per batch — atlas texel
+// size, alpha channel layout — derives from the bound texture itself.
 uniform int  shadowMode;           // 0 = passthrough, 1 = drop, 2 = soft
 
 in vec2 vary_texcoord0;
@@ -74,6 +76,15 @@ void main()
     // background gives total_alpha = 1 − Π(1 − α_i). Using max() instead
     // collapses to uniform vertex_color.a wherever any sample hits, which
     // produces a blocky outline-shaped shadow with no gradient.
+    //
+    // Atlas texel size comes from the bound texture, not a uniform: one
+    // shadowed string can batch glyphs from differently-sized atlases (the
+    // head face's sheets vs a fallback emoji face's), and a per-string
+    // uniform sized off the head atlas put the fallback glyphs' taps at the
+    // wrong distance. textureSize always reflects the atlas this draw
+    // actually samples — including on captured-buffer replay, which rebinds
+    // textures per batch.
+    vec2 atlasTexelSize = 1.0 / vec2(textureSize(diffuseMap, 0));
     float vc_a = vertex_color.a;
     float p;
     if (shadowMode == 1)

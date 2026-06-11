@@ -154,7 +154,10 @@ public:
     // to render directly (Unicode backup, primarily)
     bool loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags, const LLFontVarAxes& var_axes = {});
 
-    S32 getNumFaces(const std::string& filename);
+    // Count the faces in a font file (TTC/OTC collections). Pure probe —
+    // opens a temporary FT face from a locally-read buffer and closes it;
+    // touches no instance state, so callers don't need a live freetype.
+    static S32 getNumFaces(const std::string& filename);
 
     typedef std::function<bool(llwchar)> char_functor_t;
     void addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font, const char_functor_t& functor = nullptr);
@@ -281,10 +284,11 @@ public:
     // Run a maintenance pass that releases bitmap atlas sheets which haven't
     // been read or written within the idle threshold, recovering their CPU
     // and GPU memory and dropping any LLFontGlyphInfo entries that pointed
-    // into them. Self-throttled — repeat calls inside the GC interval are
-    // cheap no-ops, so it's fine for every render() invocation to call this
-    // unconditionally. NOT safe to call mid-render while a glyph pointer is
-    // held: call only at frame boundaries / before any glyph lookups.
+    // into them. Forwards to LLFontFace::collectGarbage — the sweep and its
+    // throttle live on the shared face wrapper, so N heads sharing one face
+    // cost one sweep per interval, not N. NOT safe to call mid-render while
+    // a glyph pointer is held: call only at frame boundaries / before any
+    // glyph lookups.
     void collectGarbage() const;
 
     // Return the FT glyph index for `wch` on this face, caching the result so
@@ -394,10 +398,9 @@ private:
 
     mutable S32 mRenderGlyphCount;
 
-    // Earliest wall-clock time (seconds) at which collectGarbage() should
-    // do real work. Throttle gate so the per-render call from LLFontGL::render
-    // is essentially free between sweeps.
-    mutable F64 mNextGcTime = 0.0;
+    // (collectGarbage's throttle clock moved to LLFontFace::mNextGcTime —
+    // per-head throttles made siblings sharing a face re-sweep the same
+    // atlas once per head per interval.)
 };
 
 #endif // LL_FONTFREETYPE_H

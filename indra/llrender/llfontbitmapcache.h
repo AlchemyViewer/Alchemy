@@ -82,22 +82,24 @@ public:
     S32 getCacheGeneration() const { return mGeneration; }
 
     // Snapshot of the global atlas-mutation counter. Every nextOpenPos /
-    // releaseSheet / reset / injectPage / new LLFontBitmapCache anywhere
-    // bumps this. Vertex/width-buffer caches that sample from a font's
-    // head face AND its fallback faces (each owning its own atlas with a
-    // separate per-instance mGeneration) need a counter that ticks on
-    // mutations to ANY of them — comparing only the head's mGeneration
-    // misses fallback rasterization (e.g. emoji glyphs added during a
-    // genBuffers walk), leaving the captured UVs pointing at uninitialized
-    // atlas slots until something else triggers a rebuild.
+    // releaseSheet / reset / new LLFontBitmapCache anywhere bumps this; it
+    // is the uniqueness source every per-instance mGeneration draws from,
+    // which is what makes summing per-instance generations a monotonic
+    // per-font invalidation stamp (see LLFontGL::getCacheGeneration —
+    // production no longer compares against the global value directly,
+    // since that invalidated every cached text buffer viewer-wide on any
+    // font's glyph churn). Kept public for tests and diagnostics.
     static S32 getGlobalGeneration() { return sNextGeneration; }
 
     // Drop the underlying images for a sheet, freeing the GPU and CPU memory.
-    // The slot index remains valid (kept as a nullptr placeholder) so existing
-    // sheet-index references stay numerically stable; callers must purge any
-    // glyph cache entries that referenced this sheet *before* releasing it,
-    // otherwise the next render will try to draw from a null texture. Bumps
-    // the cache generation so vertex buffers invalidate.
+    // The slot index stays valid as a nullptr placeholder so surviving
+    // sheet-index references remain numerically stable; callers must purge
+    // any glyph cache entries that referenced this sheet *before* releasing
+    // it, otherwise the next render will try to draw from a null texture.
+    // Released slots are recycled by the next nextOpenPos that needs a new
+    // sheet (the purge contract guarantees nothing references the index by
+    // then), so the slot vectors don't grow monotonically across eviction
+    // cycles. Bumps the cache generation so vertex buffers invalidate.
     void releaseSheet(EFontGlyphType bitmap_type, U32 bitmap_num);
 
     // Wall-clock seconds (LLFrameTimer::getTotalSeconds) when this sheet was
@@ -137,6 +139,11 @@ private:
     // glyph heights (text + tall color emoji bitmaps) don't have later
     // rows overwriting earlier rows.
     S32 mCurrentRowMaxHeight[static_cast<U32>(EFontGlyphType::Count)] = { 0, 0 };
+    // Slot index the pen offsets above point into, per atlas type; -1
+    // until the first sheet is created. Explicit because the active sheet
+    // is no longer necessarily the last slot: nextOpenPos recycles
+    // released slots, so the allocation target can sit mid-vector.
+    S32 mCurrentSheet[static_cast<U32>(EFontGlyphType::Count)] = { -1, -1 };
     S32 mMaxCharWidth = 0;
     S32 mMaxCharHeight = 0;
     // Globally-unique generation. Each new LLFontBitmapCache instance and

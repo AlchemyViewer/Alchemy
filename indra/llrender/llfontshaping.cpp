@@ -143,6 +143,12 @@ namespace
     ShapeLru   sShapeLru;
     ShapeIndex sShapeIndex;
 
+    // Bumped by every mutation that can invalidate a reference returned by
+    // shapeLine (miss-insert + its evictions, clears). LRU splices on cache
+    // hit don't count — they never touch the index or a glyph vector. See
+    // cacheMutationCount() in the header for the holder-side contract.
+    size_t sShapeCacheMutations = 0;
+
     // Shape a single sub-run through its owning face and append the
     // resulting glyphs to `out_glyphs`. Clusters are written in wstr
     // coordinates relative to `sub_begin_in_slice` — i.e. local to the
@@ -751,6 +757,10 @@ const std::vector<LLShapedGlyph>& LLFontShaping::shapeLine(
     key.codepoints.assign(slice.data(), slice.size());
     key.root_face = root_face;
 
+    // One bump covers the insert and any evictions below — either way,
+    // previously returned references may now dangle.
+    ++sShapeCacheMutations;
+
     auto [ins, inserted] = sShapeIndex.try_emplace(std::move(key));
     // Just-missed lookup means inserted is true; no duplicate to merge.
     sShapeLru.push_front(&ins->first);
@@ -791,6 +801,8 @@ void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
 
 void LLFontShaping::clearCache()
 {
+    if (!sShapeIndex.empty())
+        ++sShapeCacheMutations;
     sShapeIndex.clear();
     sShapeLru.clear();
 }
@@ -798,6 +810,11 @@ void LLFontShaping::clearCache()
 size_t LLFontShaping::cacheSize()
 {
     return sShapeIndex.size();
+}
+
+size_t LLFontShaping::cacheMutationCount()
+{
+    return sShapeCacheMutations;
 }
 
 void LLFontShaping::clearCacheForFace(const LLFontFreetype* face)
@@ -808,16 +825,39 @@ void LLFontShaping::clearCacheForFace(const LLFontFreetype* face)
     // Walk the index — its iterator gives us O(1) erase from the LRU via
     // the back-reference stored in each entry. Walking the LRU instead
     // would force a per-key index lookup on every match.
+    bool erased_any = false;
     for (auto it = sShapeIndex.begin(); it != sShapeIndex.end(); )
     {
-        if (it->first.root_face == face)
+        bool references_face = (it->first.root_face == face);
+        if (!references_face)
+        {
+            // Entries rooted at OTHER heads can still hold this face inside
+            // their glyph runs: every fallback-sourced glyph stores a raw
+            // pointer to the fallback that owns its glyph_id. Sweep those
+            // too so a dying face can't leave sibling-rooted entries whose
+            // sg.face dangles — see the header note on clearCacheForFace.
+            // O(glyphs) per surviving entry, but this only runs on face
+            // teardown / reload, never on the shape or render hot path.
+            for (const LLShapedGlyph& sg : it->second.glyphs)
+            {
+                if (sg.face == face)
+                {
+                    references_face = true;
+                    break;
+                }
+            }
+        }
+        if (references_face)
         {
             sShapeLru.erase(it->second.lru_pos);
             it = sShapeIndex.erase(it);
+            erased_any = true;
         }
         else
         {
             ++it;
         }
     }
+    if (erased_any)
+        ++sShapeCacheMutations;
 }

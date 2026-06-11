@@ -358,10 +358,13 @@ namespace tut
                       c.getNumBitmaps(EFontGlyphType::Grayscale), 1u);
     }
 
-    // After releasing the trailing sheet, the next nextOpenPos must
-    // allocate a fresh sheet rather than try to write into the freed
-    // image — pins llfontbitmapcache.cpp:105-107 (last_sheet_released
-    // check).
+    // After releasing the active sheet, the next nextOpenPos must build a
+    // fresh image rather than write into the freed one — and it recycles
+    // the released slot instead of growing the sheet vector. The purge-
+    // before-release contract guarantees nothing references the released
+    // index, so reuse is safe and bounds slot growth across eviction
+    // cycles. Pins the active_sheet_released check + slot recycling in
+    // nextOpenPos.
     template<> template<>
     void llfontbitmapcache_gl_object::test<10>()
     {
@@ -371,85 +374,83 @@ namespace tut
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, sheet);
         c.releaseSheet(EFontGlyphType::Grayscale, sheet);
 
-        S32 px2 = 0, py2 = 0; U32 sheet2 = 0;
-        ensure("nextOpenPos succeeds after trailing sheet release",
+        S32 px2 = 0, py2 = 0; U32 sheet2 = 99;
+        ensure("nextOpenPos succeeds after active sheet release",
                c.nextOpenPos(8, 8, px2, py2, EFontGlyphType::Grayscale, sheet2));
-        ensure_equals("new sheet is index 1 (slot 0 kept as nullptr)",
-                      (S32)sheet2, 1);
+        ensure_equals("released slot 0 is recycled for the new sheet",
+                      (S32)sheet2, 0);
         ensure_equals("new sheet starts at posX=4", px2, 4);
         ensure_equals("new sheet starts at posY=4", py2, 4);
-        ensure("released sheet 0 is still released",
-               c.isSheetReleased(EFontGlyphType::Grayscale, 0));
+        ensure("recycled slot 0 is live again",
+               !c.isSheetReleased(EFontGlyphType::Grayscale, 0));
+        ensure_equals("slot vector did not grow",
+                      c.getNumBitmaps(EFontGlyphType::Grayscale), 1u);
     }
 
     // Multi-cycle release+re-alloc: alloc, release, alloc, release, alloc
-    // produces three sheet slots. Only the most recent is live; slots 0
-    // and 1 are released-nullptr placeholders that stay reserved (no slot
-    // index re-use). Pins index stability under repeat cycles —
-    // llfontbitmapcache.cpp:105-107.
+    // keeps recycling slot 0 — the slot vector never grows across eviction
+    // cycles, and the generation counter still advances every cycle so
+    // captured vertex buffers rebuild. Pins bounded slot growth under
+    // repeat cycles.
     template<> template<>
     void llfontbitmapcache_gl_object::test<12>()
     {
         LLFontBitmapCache c;
         c.init(2, 2);
         S32 px = 0, py = 0;
-        U32 s0 = 0, s1 = 0, s2 = 0;
+        U32 s0 = 0, s1 = 99, s2 = 99;
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s0);
         ensure_equals("first alloc lands on sheet 0", (S32)s0, 0);
+        const S32 gen0 = c.getCacheGeneration();
         c.releaseSheet(EFontGlyphType::Grayscale, s0);
 
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s1);
-        ensure_equals("second alloc lands on sheet 1", (S32)s1, 1);
+        ensure_equals("second alloc recycles slot 0", (S32)s1, 0);
+        const S32 gen1 = c.getCacheGeneration();
+        ensure("generation advanced across release+recycle", gen1 > gen0);
         c.releaseSheet(EFontGlyphType::Grayscale, s1);
 
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s2);
-        ensure_equals("third alloc lands on sheet 2", (S32)s2, 2);
+        ensure_equals("third alloc recycles slot 0 again", (S32)s2, 0);
+        ensure("generation advanced again", c.getCacheGeneration() > gen1);
 
-        ensure_equals("getNumBitmaps == 3 (released slots stay reserved)",
-                      c.getNumBitmaps(EFontGlyphType::Grayscale), 3u);
-        ensure("sheet 0 still released",
-               c.isSheetReleased(EFontGlyphType::Grayscale, 0));
-        ensure("sheet 1 still released",
-               c.isSheetReleased(EFontGlyphType::Grayscale, 1));
-        ensure("sheet 2 live (not released)",
-               !c.isSheetReleased(EFontGlyphType::Grayscale, 2));
+        ensure_equals("getNumBitmaps == 1 (slots recycled, not reserved)",
+                      c.getNumBitmaps(EFontGlyphType::Grayscale), 1u);
+        ensure("slot 0 live after the final alloc",
+               !c.isSheetReleased(EFontGlyphType::Grayscale, 0));
     }
 
-    // Mid-list released sheet stays dead: once a non-trailing sheet is
-    // released, the allocator never re-uses its index. Subsequent allocs
-    // continue using the trailing live sheet (if it has room) until that
-    // sheet is itself released or fills. Pins the "back-only re-allocation"
-    // invariant — llfontbitmapcache.cpp:105-107 only inspects back().
+    // A live active sheet with room keeps absorbing allocations — a
+    // release+recycle cycle doesn't perturb the pen, and no spurious
+    // sheets are created while the active sheet has space. Pins the
+    // active-sheet tracking (mCurrentSheet) staying put across allocs.
     template<> template<>
     void llfontbitmapcache_gl_object::test<13>()
     {
         LLFontBitmapCache c;
         c.init(2, 2);
         S32 px = 0, py = 0;
-        U32 s0 = 0, s1 = 0;
+        U32 s0 = 0, s1 = 99;
 
-        // Alloc sheet 0, release (trailing), alloc → sheet 1 (live).
+        // Alloc sheet 0, release it, alloc → recycled slot 0 (live).
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s0);
         c.releaseSheet(EFontGlyphType::Grayscale, s0);
         c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, s1);
-        ensure_equals("after release+alloc, on sheet 1", (S32)s1, 1);
+        ensure_equals("after release+alloc, recycled onto slot 0", (S32)s1, 0);
 
-        // Sheet 0 is now mid-list released; sheet 1 is trailing live.
-        // Further allocs must keep landing on sheet 1 (it has plenty of
-        // room — 1024² atlas, only one 8x8 glyph placed).
+        // Further allocs must keep landing on the recycled sheet (it has
+        // plenty of room — only one 8x8 glyph placed since the rebuild).
         for (int i = 0; i < 4; ++i)
         {
             U32 si = 99;
             c.nextOpenPos(8, 8, px, py, EFontGlyphType::Grayscale, si);
-            ensure_equals("subsequent alloc stays on sheet 1 (mid-list 0 untouched)",
-                          (S32)si, 1);
+            ensure_equals("subsequent alloc stays on the recycled sheet",
+                          (S32)si, 0);
         }
-        ensure_equals("still 2 sheet slots (no extra allocation)",
-                      c.getNumBitmaps(EFontGlyphType::Grayscale), 2u);
-        ensure("sheet 0 stays released",
-               c.isSheetReleased(EFontGlyphType::Grayscale, 0));
-        ensure("sheet 1 stays live",
-               !c.isSheetReleased(EFontGlyphType::Grayscale, 1));
+        ensure_equals("still 1 sheet slot (no extra allocation)",
+                      c.getNumBitmaps(EFontGlyphType::Grayscale), 1u);
+        ensure("recycled sheet stays live",
+               !c.isSheetReleased(EFontGlyphType::Grayscale, 0));
     }
 
     // Cross-instance global generation: two LLFontBitmapCache instances

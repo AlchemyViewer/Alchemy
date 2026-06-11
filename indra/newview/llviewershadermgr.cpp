@@ -3332,17 +3332,15 @@ bool LLViewerShaderMgr::loadShadersInterface()
         success = gUIProgram.createShader();
         if (success)
         {
-            // Initialize the shadow-path uniforms to passthrough so non-text UI
+            // Initialize the shadow-path uniform to passthrough so non-text UI
             // and NO_SHADOW text take the early-return branch in uiF.glsl. GLSL
-            // already zero-initializes uniforms, but pushing explicit defaults
+            // already zero-initializes uniforms, but pushing an explicit default
             // documents the contract and protects against driver quirks.
+            // shadowMode is the shader's only shadow uniform — atlas texel size
+            // and channel layout derive from the bound texture in uiF.glsl.
             static LLStaticHashedString sShadowMode("shadowMode");
-            static LLStaticHashedString sGrayscaleAtlas("grayscaleAtlas");
-            static LLStaticHashedString sAtlasTexelSize("atlasTexelSize");
             gUIProgram.bind();
             gUIProgram.uniform1i(sShadowMode, 0);
-            gUIProgram.uniform1i(sGrayscaleAtlas, 1);
-            gUIProgram.uniform2f(sAtlasTexelSize, 0.f, 0.f);
             gUIProgram.unbind();
         }
     }

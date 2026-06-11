@@ -311,6 +311,13 @@ public:
 private:
     LLFontRegistry(const LLFontRegistry& other); // no-copy
     LLFontGL *createFont(const LLFontDescriptor& desc);
+    // Assign mFontMap[desc] = fontp, deleting any different LLFontGL the
+    // slot already owns. Map values are owned raw pointers, so plain
+    // assignment on an occupied slot leaks; occupied slots happen when
+    // reload() drives createFont directly over a map that already holds
+    // interim wrappers (canonical aliases, fresh heads from earlier
+    // iterations). Null-safe on both the incumbent and `fontp`.
+    void storeFont(const LLFontDescriptor& desc, LLFontGL* fontp);
     // Resolve cross-family <use> references, then per-family inherit="true"
     // style variants, in that order. Idempotent — consumes mFamilyUses and
     // mInheritFlags so re-running over a partially-resolved registry is safe.

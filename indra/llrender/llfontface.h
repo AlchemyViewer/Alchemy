@@ -220,12 +220,32 @@ public:
     // either path lives in one atlas slot. LLFontGlyphInfo entries are
     // owned here and deleted in ~LLFontFace.
     LLFontGlyphInfo* findGlyphInfo(U32 glyph_index, EFontGlyphType type) const;
-    void             insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const;
+    // Publish `gi` (ownership transfers to the cache) and return the
+    // published entry. If a (glyph_index, type) entry already exists, the
+    // EXISTING one is kept and returned and `gi` is deleted — published
+    // pointers may be held up the stack (render loop, kerning prefetch),
+    // so replacing in place would free memory in active use. Callers must
+    // continue with the return value, never with `gi`. A duplicate publish
+    // means an upstream dedup probe was skipped (addShapedGlyphFromFont
+    // checks findGlyphInfo first) and asserts in debug; the duplicate's
+    // atlas slots are orphaned, not reclaimed.
+    LLFontGlyphInfo* insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const;
 
     // Iterate and conditionally erase entries. Used by collectGarbage to
     // purge entries that referenced an evicted atlas sheet.
     template<typename Pred>
     void erase_glyph_entries(Pred should_erase) const;
+
+    // Release atlas sheets that haven't been read or written within the
+    // idle threshold, dropping the glyph entries that pointed into them
+    // first. Self-throttled — repeat calls inside the GC interval are
+    // cheap no-ops. Lives on the face because the atlas and glyph map do:
+    // N LLFontFreetype heads sharing this face cost one sweep per
+    // interval, not N (the throttle used to sit per-head, so siblings
+    // re-swept the same shared atlas). NOT safe to call mid-render while
+    // a glyph pointer is held: call only at frame boundaries / before any
+    // glyph lookups (LLFontGL::sweepGlyphCaches does).
+    void collectGarbage() const;
 
     // Drop all rasterized glyphs and reset the atlas. Used by the registry
     // when DPI changes and the wrapper survives but its atlas state needs
@@ -286,6 +306,12 @@ private:
 
     LLFontBitmapCache* mFontBitmapCachep = nullptr;
     mutable glyph_info_map_t mGlyphInfoMap;
+
+    // Earliest wall-clock time (seconds) at which collectGarbage() should
+    // do real work. Throttle gate so the per-frame sweep is essentially
+    // free between intervals. Per-face (not per-head) so siblings sharing
+    // this face share one cadence.
+    mutable F64 mNextGcTime = 0.0;
 
     bool mUseSubpixelPen = false;
     bool mHasColor       = false;
