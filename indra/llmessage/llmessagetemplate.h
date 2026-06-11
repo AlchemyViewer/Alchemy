@@ -93,6 +93,7 @@ public:
     const_iterator end() const      { return mEntries.end(); }
     bool empty() const              { return mEntries.empty(); }
     size_t size() const             { return mEntries.size(); }
+    void clear()                    { mEntries.clear(); } // keeps capacity for reuse
 
     // Returns the entry for name, inserting an empty one keyed to name if
     // absent (std::map::operator[] semantics — repeated misses yield the
@@ -147,6 +148,22 @@ public:
         {
             iter.deleteData();
         }
+    }
+
+    // Reset identity and drop variable data for pooled reuse, keeping the
+    // variable-map's capacity. Frees any heap payloads first: clearing the
+    // vector destroys the LLMsgVarData entries with their trivial destructor,
+    // which does not own mData.
+    void reinit(char *name, S32 blocknum)
+    {
+        for (LLMsgVarData& var : mMemberVarData)
+        {
+            var.deleteData();
+        }
+        mMemberVarData.clear();
+        mName = name;
+        mBlockNumber = blocknum;
+        mTotalSize = -1;
     }
 
     LLMsgVarData& addVariable(const char *name, EMsgVariableType type)
@@ -204,6 +221,47 @@ public:
                 delete blockp;
             }
         }
+        for (LLMsgBlkData* blockp : mBlockPool)
+        {
+            delete blockp;
+        }
+    }
+
+    // Reset for reuse on the next message: recycle every block into the free
+    // pool and clear the groups, keeping all the vector capacity. Variable
+    // data on the recycled blocks is freed lazily by allocBlock() on reuse
+    // (or by the destructor), so a decode after warmup allocates nothing.
+    void reset(const char *name = nullptr)
+    {
+        for (BlockGroup& group : mMemberBlocks)
+        {
+            for (LLMsgBlkData* blockp : group.mBlocks)
+            {
+                mBlockPool.push_back(blockp);
+            }
+        }
+        mMemberBlocks.clear(); // keeps capacity
+        mName = (char *)name;
+        mTotalSize = -1;
+    }
+
+    // Obtain a block for name+blocknum (from the pool, or freshly allocated)
+    // and append it as the next repeat of its group; returns it.
+    LLMsgBlkData* allocBlock(char *name, S32 blocknum)
+    {
+        LLMsgBlkData* blockp;
+        if (!mBlockPool.empty())
+        {
+            blockp = mBlockPool.back();
+            mBlockPool.pop_back();
+            blockp->reinit(name, blocknum);
+        }
+        else
+        {
+            blockp = new LLMsgBlkData(name, blocknum);
+        }
+        getOrAddGroup(name).mBlocks.push_back(blockp);
+        return blockp;
     }
 
     // Append blockp as the next repeat of its (canonical) block name.
@@ -230,6 +288,8 @@ public:
     S32                                 mTotalSize;
 
 private:
+    std::vector<LLMsgBlkData*>          mBlockPool; // recycled blocks ready for reuse
+
     BlockGroup& getOrAddGroup(char* name)
     {
         for (BlockGroup& group : mMemberBlocks)

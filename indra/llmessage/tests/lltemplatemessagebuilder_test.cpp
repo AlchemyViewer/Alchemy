@@ -1066,5 +1066,68 @@ namespace tut
         ensure_equals("adjacent single block intact", single, (U32)0xdeadbeef);
         delete reader;
     }
+
+    template<> template<>
+    void LLTemplateMessageBuilderTestObject::test<49>()
+        // Decode several messages through one reader to exercise the pooled
+        // LLMsgData reuse path: blocks recycle between decodes and no stale
+        // block or value leaks across messages of differing repeat counts.
+    {
+        LLMessageTemplate messageTemplate = defaultTemplate();
+        messageTemplate.addBlock(defaultBlock(MVT_U32, 4, MBT_VARIABLE)); // Test0
+        numberMap[1] = &messageTemplate;
+
+        const U32 cap = 1024;
+        U8 bufA[cap];
+        U8 bufB[cap];
+
+        // bufA: 5 repeats valued 100..104; bufB: 2 repeats valued 900..901
+        U32 szA, szB;
+        {
+            LLTemplateMessageBuilder* b = defaultBuilder(messageTemplate); // nextBlock(Test0)
+            b->addU32(_PREHASH_Test0, 100);
+            for (S32 i = 1; i < 5; ++i)
+            {
+                b->nextBlock(_PREHASH_Test0);
+                b->addU32(_PREHASH_Test0, 100 + (U32)i);
+            }
+            memset(bufA, 0, LL_PACKET_ID_SIZE);
+            szA = b->buildMessage(bufA, cap, 0);
+            delete b;
+        }
+        {
+            LLTemplateMessageBuilder* b = defaultBuilder(messageTemplate);
+            b->addU32(_PREHASH_Test0, 900);
+            b->nextBlock(_PREHASH_Test0);
+            b->addU32(_PREHASH_Test0, 901);
+            memset(bufB, 0, LL_PACKET_ID_SIZE);
+            szB = b->buildMessage(bufB, cap, 0);
+            delete b;
+        }
+
+        // alternate the two through one reader; reuse must not corrupt either
+        LLTemplateMessageReader reader(numberMap);
+        for (S32 pass = 0; pass < 4; ++pass)
+        {
+            bool useA  = (pass % 2) == 0;
+            U8*  buf   = useA ? bufA : bufB;
+            U32  sz    = useA ? szA  : szB;
+            S32  count = useA ? 5    : 2;
+            U32  base  = useA ? 100u : 900u;
+
+            reader.validateMessage(buf, sz, LLHost());
+            reader.readMessage(buf, LLHost());
+
+            ensure_equals("reuse block count",
+                          reader.getNumberOfBlocks(_PREHASH_Test0), count);
+            for (S32 i = 0; i < count; ++i)
+            {
+                U32 v = 0xffffffff;
+                reader.getU32(_PREHASH_Test0, _PREHASH_Test0, v, i);
+                ensure_equals("reuse repeat value", v, base + (U32)i);
+            }
+            reader.clearMessage();
+        }
+    }
 }
 

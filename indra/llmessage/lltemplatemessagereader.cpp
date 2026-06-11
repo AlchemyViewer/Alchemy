@@ -58,8 +58,13 @@ void LLTemplateMessageReader::clearMessage()
 {
     mReceiveSize = -1;
     mCurrentRMessageTemplate = nullptr;
-    delete mCurrentRMessageData;
-    mCurrentRMessageData = nullptr;
+    // Keep mCurrentRMessageData (and its block pool) alive for reuse; just
+    // recycle its blocks so nothing stale remains. mReceiveSize == -1 makes
+    // every getter bail until the next decode repopulates it.
+    if (mCurrentRMessageData)
+    {
+        mCurrentRMessageData->reset();
+    }
 }
 
 S32 LLTemplateMessageReader::getData(const char *blockname, const char *varname, void *datap, S32 size, S32 blocknum, S32 max_size)
@@ -529,16 +534,23 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender,
 
     llassert( mReceiveSize >= 0 );
     llassert( mCurrentRMessageTemplate);
-    llassert( !mCurrentRMessageData );
-    delete mCurrentRMessageData; // just to make sure
 
     // The offset tells us how may bytes to skip after the end of the
     // message name.
     U8 offset = buffer[PHL_OFFSET];
     S32 decode_pos = LL_PACKET_ID_SIZE + (S32)(mCurrentRMessageTemplate->mFrequency) + offset;
 
-    // create base working data set
-    mCurrentRMessageData = new LLMsgData(mCurrentRMessageTemplate->mName);
+    // Reuse the working data set across packets: it's reset (blocks recycled
+    // into its pool) rather than freed, so a steady-state decode does no heap
+    // allocation.
+    if (!mCurrentRMessageData)
+    {
+        mCurrentRMessageData = new LLMsgData(mCurrentRMessageTemplate->mName);
+    }
+    else
+    {
+        mCurrentRMessageData->reset(mCurrentRMessageTemplate->mName);
+    }
 
     // loop through the template building the data structure as we go
     LLMessageTemplate::message_block_map_t::const_iterator iter;
@@ -593,14 +605,12 @@ bool LLTemplateMessageReader::decodeData(const U8* buffer, const LLHost& sender,
         // now loop through the block
         for (i = 0; i < repeat_number; i++)
         {
-            // Every repeat keeps the canonical block name; addBlock groups
+            // Every repeat keeps the canonical block name; allocBlock groups
             // them by name and preserves order, so getBlock(name, i) recovers
             // repeat i. mBlockNumber carries the total repeat count (read by
-            // getNumberOfBlocks from repeat 0).
-            cur_data_block = new LLMsgBlkData(mbci->mName, repeat_number);
-
-            // add the block to the message
-            mCurrentRMessageData->addBlock(cur_data_block);
+            // getNumberOfBlocks from repeat 0). Blocks come from the message's
+            // pool, so repeated decodes reuse them.
+            cur_data_block = mCurrentRMessageData->allocBlock(mbci->mName, repeat_number);
 
             // now read the variables
             for (LLMessageBlock::message_variable_map_t::const_iterator iter =
