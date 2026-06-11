@@ -111,8 +111,9 @@ public:
 
 private:
 
-    void getData(const char *blockname, const char *varname, void *datap,
-                 S32 size = 0, S32 blocknum = 0, S32 max_size = S32_MAX);
+    // returns the number of bytes copied into datap
+    S32 getData(const char *blockname, const char *varname, void *datap,
+                S32 size = 0, S32 blocknum = 0, S32 max_size = S32_MAX);
 
     bool decodeTemplate(const U8* buffer, S32 buffer_size,  // inputs
                         LLMessageTemplate** msg_template, bool custom = false); // outputs

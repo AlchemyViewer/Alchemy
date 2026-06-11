@@ -967,5 +967,60 @@ namespace tut
         ensure_equals("Ensure unchanged buffer ", strlen(outBuffer), 0);
         delete reader;
     }
+
+    template<> template<>
+    void LLTemplateMessageBuilderTestObject::test<46>()
+        // variable-length field whose on-wire size claims more bytes than
+        // the message contains -> read clamps to 0 length instead of
+        // running off the end of the buffer
+    {
+        // build a message with one 1-byte-length variable field
+        LLMessageTemplate messageTemplate = defaultTemplate();
+        messageTemplate.addBlock(defaultBlock(MVT_VARIABLE, 1, MBT_SINGLE));
+        LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate);
+        builder->addString(_PREHASH_Test0, "hello");
+        const U32 bufferSize = 1024;
+        U8 buffer[bufferSize];
+        memset(buffer, 0xaa, bufferSize);
+        memset(buffer, 0, LL_PACKET_ID_SIZE);
+        U32 builtSize = builder->buildMessage(buffer, bufferSize, 0);
+        delete builder;
+
+        // corrupt the length byte (located after the 6-byte header and
+        // 1-byte high-frequency message number) so the field claims to
+        // extend far past the end of the message
+        buffer[LL_PACKET_ID_SIZE + 1] = 255;
+
+        numberMap[1] = &messageTemplate;
+        LLTemplateMessageReader* reader =
+            new LLTemplateMessageReader(numberMap);
+        reader->validateMessage(buffer, builtSize, LLHost());
+        reader->readMessage(buffer, LLHost());
+        ensure_equals("Ensure malformed length clamped to empty",
+                      reader->getSize(_PREHASH_Test0, _PREHASH_Test0), 0);
+        delete reader;
+    }
+
+    template<> template<>
+    void LLTemplateMessageBuilderTestObject::test<47>()
+        // stuffing an oversized string into a Variable-1 field truncates the
+        // stored copy without writing into the caller's buffer
+    {
+        LLMessageTemplate messageTemplate = defaultTemplate();
+        messageTemplate.addBlock(defaultBlock(MVT_VARIABLE, 1, MBT_SINGLE));
+        LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate);
+        std::string in(300, 'x');
+        builder->addString(_PREHASH_Test0, in);
+        ensure_equals("Ensure caller buffer untouched", in[254], 'x');
+        ensure_equals("Ensure caller size untouched", in.size(), (size_t)300);
+
+        // round-trip: stored copy is clamped to 255 bytes and NUL-terminated
+        LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
+        char outBuffer[1024];
+        reader->getString(_PREHASH_Test0, _PREHASH_Test0, 1024, outBuffer);
+        ensure_equals("Ensure stored string truncated and terminated",
+                      strlen(outBuffer), (size_t)254);
+        delete reader;
+    }
 }
 

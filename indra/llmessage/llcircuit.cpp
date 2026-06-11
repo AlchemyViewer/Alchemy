@@ -729,7 +729,10 @@ void LLCircuitData::checkPacketInID(TPACKETID id, bool receive_resent)
             U64Microseconds time = LLMessageSystem::getMessageTimeUsecs();
             TPACKETID index = mPacketsInID;
             S32 gap_count = 0;
-            if ((index < id) && ((id - index) < 16))
+            // Modular forward distance, so a small gap that spans the 24-bit
+            // packet-id wrap fills in normally; a genuinely old id yields a
+            // huge forward distance and still takes the out-of-order path.
+            if (LLModularMath::subtract<width>(id, index) < 16)
             {
                 while (index != id)
                 {
