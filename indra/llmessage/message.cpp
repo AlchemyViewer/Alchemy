@@ -534,7 +534,7 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
         // If you want to dump all received packets into Alchemy.log, uncomment this
         //dumpPacketToLog();
 
-        if(mTrueReceiveSize && receive_size > (S32) LL_MINIMUM_VALID_PACKET_SIZE && !faked_message)
+        if(mTrueReceiveSize && receive_size >= (S32) LL_MINIMUM_VALID_PACKET_SIZE && !faked_message)
         {
 #define LOCALHOST_ADDR 16777343
             LLMessageLog::log(mLastSender, LLHost(LOCALHOST_ADDR, mPort), buffer, mTrueReceiveSize);
@@ -1248,8 +1248,9 @@ S32 LLMessageSystem::sendMessage(const LLHost &host)
         mReliablePacketsOut++;
     }
 
-    // tack packet acks onto the end of this message
-    S32 space_left = (MTUBYTES - buffer_length) / sizeof(TPACKETID); // space left for packet ids
+    // tack packet acks onto the end of this message; signed math so an
+    // over-MTU payload yields a negative count instead of wrapping huge
+    S32 space_left = (MTUBYTES - (S32)buffer_length) / (S32)sizeof(TPACKETID); // space left for packet ids
     S32 ack_count = (S32)cdp->mAcks.size();
     bool is_ack_appended = false;
     std::vector<TPACKETID> acks;
@@ -1369,8 +1370,8 @@ void LLMessageSystem::logMsgFromInvalidCircuit( const LLHost& host, bool recv_re
     }
     else
     {
-        // TODO: babbage: work out if we need these
-        // mMessageCountList[mNumMessageCounts].mMessageNum = mCurrentRMessageTemplate->mMessageNumber;
+        const LLMessageTemplate* mt = mTemplateMessageReader->getTemplate();
+        mMessageCountList[mNumMessageCounts].mMessageNum = mt ? mt->mMessageNumber : 0;
         mMessageCountList[mNumMessageCounts].mMessageBytes = mMessageReader->getMessageSize();
         mMessageCountList[mNumMessageCounts].mInvalid = true;
         mNumMessageCounts++;
@@ -1420,9 +1421,8 @@ void LLMessageSystem::logTrustedMsgFromUntrustedCircuit( const LLHost& host )
     }
     else
     {
-        // TODO: babbage: work out if we need these
-        //mMessageCountList[mNumMessageCounts].mMessageNum
-        //  = mCurrentRMessageTemplate->mMessageNumber;
+        const LLMessageTemplate* mt = mTemplateMessageReader->getTemplate();
+        mMessageCountList[mNumMessageCounts].mMessageNum = mt ? mt->mMessageNumber : 0;
         mMessageCountList[mNumMessageCounts].mMessageBytes
             = mMessageReader->getMessageSize();
         mMessageCountList[mNumMessageCounts].mInvalid = true;
@@ -1438,8 +1438,8 @@ void LLMessageSystem::logValidMsg(LLCircuitData *cdp, const LLHost& host, bool r
     }
     else
     {
-        // TODO: babbage: work out if we need these
-        //mMessageCountList[mNumMessageCounts].mMessageNum = mCurrentRMessageTemplate->mMessageNumber;
+        const LLMessageTemplate* mt = mTemplateMessageReader->getTemplate();
+        mMessageCountList[mNumMessageCounts].mMessageNum = mt ? mt->mMessageNumber : 0;
         mMessageCountList[mNumMessageCounts].mMessageBytes = mMessageReader->getMessageSize();
         mMessageCountList[mNumMessageCounts].mInvalid = false;
         mNumMessageCounts++;
@@ -1727,7 +1727,6 @@ void LLMessageSystem::setMaxMessageCounts(const S32 num)
 
 std::ostream& operator<<(std::ostream& s, LLMessageSystem &msg)
 {
-    U32 i;
     if (msg.mbError)
     {
         s << "Message system not correctly initialized";
@@ -1737,26 +1736,29 @@ std::ostream& operator<<(std::ostream& s, LLMessageSystem &msg)
         s << "Message system open on port " << msg.mPort << " and socket " << msg.mSocket << "\n";
 //      s << "Message template file " << msg.mName << " loaded\n";
 
-        s << "\nHigh frequency messages:\n";
-
-        for (i = 1; msg.mMessageNumbers[i] && (i < 255); i++)
+        // use find() rather than operator[] so dumping doesn't pollute the
+        // number map with null entries for every probed id
+        auto dump_band = [&s, &msg](U32 first, U32 last)
         {
-            s << *(msg.mMessageNumbers[i]);
-        }
+            for (U32 i = first; i < last; i++)
+            {
+                auto iter = msg.mMessageNumbers.find(i);
+                if (iter == msg.mMessageNumbers.end() || !iter->second)
+                {
+                    break;
+                }
+                s << *(iter->second);
+            }
+        };
+
+        s << "\nHigh frequency messages:\n";
+        dump_band(1, 255);
 
         s << "\nMedium frequency messages:\n";
-
-        for (i = (255 << 8) + 1; msg.mMessageNumbers[i] && (i < (255 << 8) + 255); i++)
-        {
-            s << *msg.mMessageNumbers[i];
-        }
+        dump_band((255 << 8) + 1, (255 << 8) + 255);
 
         s << "\nLow frequency messages:\n";
-
-        for (i = (0xFFFF0000) + 1; msg.mMessageNumbers[i] && (i < 0xFFFFFFFF); i++)
-        {
-            s << *msg.mMessageNumbers[i];
-        }
+        dump_band(0xFFFF0000 + 1, 0xFFFFFFFF);
     }
     return s;
 }
@@ -2929,7 +2931,10 @@ S32 LLMessageSystem::zeroCodeExpand(U8** data, S32* data_size)
                 {
                     LL_WARNS("Messaging") << "attempt to write past reasonable encoded buffer size 3" << LL_ENDL;
                     callExceptionFunc(MX_WROTE_PAST_BUFFER_SIZE);
+                    // discard the malformed packet instead of continuing to
+                    // decode into a scrambled buffer (mirrors cases 1 and 2)
                     outptr = mEncodedRecvBuffer;
+                    break;
                 }
                 memset(outptr,0,(*inptr) - 1);
                 outptr += ((*inptr) - 1);

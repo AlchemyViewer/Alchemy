@@ -1136,7 +1136,7 @@ static inline void *htolememcpy(void *vs, const void *vct, EMsgVariableType type
             LL_ERRS() << "Size argument passed to htolememcpy doesn't match swizzle type size" << LL_ENDL;
         }
 #ifdef LL_BIG_ENDIAN
-        length = n % 2;
+        length = (S32)(n / 2);
         for (i = 1; i < length; i++)
         {
             htolememcpy(s + i*2, ct + i*2, MVT_S16, 2);
