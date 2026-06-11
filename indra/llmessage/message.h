@@ -540,12 +540,9 @@ public:
     bool isSendFull(const char* blockname = NULL);
     bool isSendFullFast(const char* blockname = NULL);
 
-    bool removeLastBlock();
-
     //void  buildMessage();
 
     S32     zeroCodeExpand(U8 **data, S32 *data_size);
-    S32     zeroCodeAdjustCurrentSendTotal();
 
     // Uses ping-based retry
     S32 sendReliable(const LLHost &host);

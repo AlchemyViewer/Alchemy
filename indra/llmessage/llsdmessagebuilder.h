@@ -48,7 +48,6 @@ public:
     virtual void newMessage(const char* name);
 
     virtual void nextBlock(const char* blockname);
-    virtual bool removeLastBlock(); // TODO: babbage: remove this horror...
 
     /** All add* methods expect pointers to canonical varname strings. */
     virtual void addBinaryData(
@@ -84,9 +83,6 @@ public:
         /**< Null implementation which returns 0. */
 
     virtual void clearMessage();
-
-    // TODO: babbage: remove this horror.
-    virtual void setBuilt(bool b);
 
     virtual S32 getMessageSize();
     virtual const char* getMessageName() const;

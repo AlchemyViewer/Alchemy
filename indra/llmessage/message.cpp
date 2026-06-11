@@ -988,14 +988,6 @@ bool LLMessageSystem::isSendFullFast(const char* blockname)
     return mMessageBuilder->isMessageFull(blockname);
 }
 
-
-// blow away the last block of a message, return false if that leaves no blocks or there wasn't a block to remove
-// TODO: Babbage: Remove this horror.
-bool LLMessageSystem::removeLastBlock()
-{
-    return mMessageBuilder->removeLastBlock();
-}
-
 S32 LLMessageSystem::sendReliable(const LLHost &host)
 {
     return sendReliable(host, LL_DEFAULT_RELIABLE_RETRIES, true, LL_PING_BASED_TIMEOUT_DUMMY, NULL, NULL);
@@ -2781,85 +2773,6 @@ U32 LLMessageSystem::getListenPort( void ) const
 {
     return mPort;
 }
-
-// TODO: babbage: remove this horror!
-S32 LLMessageSystem::zeroCodeAdjustCurrentSendTotal()
-{
-    if(mMessageBuilder == mLLSDMessageBuilder)
-    {
-        // babbage: don't compress LLSD messages, so delta is 0
-        return 0;
-    }
-
-    if (! mMessageBuilder->isBuilt())
-    {
-        mSendSize = mMessageBuilder->buildMessage(
-            mSendBuffer,
-            MAX_BUFFER_SIZE,
-            0);
-    }
-    // TODO: babbage: remove this horror
-    mMessageBuilder->setBuilt(false);
-
-    S32 count = mSendSize;
-
-    S32 net_gain = 0;
-    U8 num_zeroes = 0;
-
-    U8 *inptr = (U8 *)mSendBuffer;
-
-// skip the packet id field
-
-    for (U32 ii = 0; ii < LL_PACKET_ID_SIZE; ++ii)
-    {
-        count--;
-        inptr++;
-    }
-
-// don't actually build, just test
-
-// sequential zero bytes are encoded as 0 [U8 count]
-// with 0 0 [count] representing wrap (>256 zeroes)
-
-    while (count--)
-    {
-        if (!(*inptr))   // in a zero count
-        {
-            if (num_zeroes)
-            {
-                if (++num_zeroes > 254)
-                {
-                    num_zeroes = 0;
-                }
-                net_gain--;   // subseqent zeroes save one
-            }
-            else
-            {
-                net_gain++;  // starting a zero count adds one
-                num_zeroes = 1;
-            }
-            inptr++;
-        }
-        else
-        {
-            if (num_zeroes)
-            {
-                num_zeroes = 0;
-            }
-            inptr++;
-        }
-    }
-    if (net_gain < 0)
-    {
-        return net_gain;
-    }
-    else
-    {
-        return 0;
-    }
-}
-
-
 
 S32 LLMessageSystem::zeroCodeExpand(U8** data, S32* data_size)
 {
