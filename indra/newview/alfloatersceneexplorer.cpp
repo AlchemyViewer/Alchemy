@@ -52,11 +52,13 @@
 
 #include "alavataractions.h"
 #include "alderenderlist.h"
+#include "alfloatersceneexplorerfilters.h"
 #include "alobjectproperties.h"
 #include "llagent.h"
 #include "llavataractions.h"
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
+#include "llcachename.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llselectmgr.h"
@@ -395,10 +397,12 @@ ALFloaterSceneExplorer::ALFloaterSceneExplorer(const LLSD& key)
     mCommitCallbackRegistrar.add("SceneExplorer.FilterByOwner",boost::bind(&ALFloaterSceneExplorer::doFilterByOwner, this));
     mCommitCallbackRegistrar.add("SceneExplorer.Derender",     boost::bind(&ALFloaterSceneExplorer::doDerender, this, _2));
     mCommitCallbackRegistrar.add("SceneExplorer.Restore",      boost::bind(&ALFloaterSceneExplorer::doRestore, this));
-    mCommitCallbackRegistrar.add("SceneExplorer.Refresh",      boost::bind(&ALFloaterSceneExplorer::reconcile, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.Refresh",      boost::bind(&ALFloaterSceneExplorer::doRefresh, this));
     mCommitCallbackRegistrar.add("SceneExplorer.SetSort",      boost::bind(&ALFloaterSceneExplorer::setSortMode, this, _2));
     mCommitCallbackRegistrar.add("SceneExplorer.ToggleShow",   boost::bind(&ALFloaterSceneExplorer::toggleShow, this, _2));
     mCommitCallbackRegistrar.add("SceneExplorer.ResetFilters", boost::bind(&ALFloaterSceneExplorer::doResetFilters, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.SelectAllResults", boost::bind(&ALFloaterSceneExplorer::doSelectAllResults, this));
+    mCommitCallbackRegistrar.add("SceneExplorer.ShowFilters",  boost::bind(&ALFloaterSceneExplorer::doShowFilters, this));
     mEnableCallbackRegistrar.add("SceneExplorer.CheckSort",    boost::bind(&ALFloaterSceneExplorer::checkSortMode, this, _2));
     mEnableCallbackRegistrar.add("SceneExplorer.CheckShow",    boost::bind(&ALFloaterSceneExplorer::checkShow, this, _2));
 }
@@ -410,6 +414,8 @@ ALFloaterSceneExplorer::~ALFloaterSceneExplorer()
         mPropsConn.disconnect();
     if (mDerenderConn.connected())
         mDerenderConn.disconnect();
+    if (mWorldSelConn.connected())
+        mWorldSelConn.disconnect();
 }
 
 bool ALFloaterSceneExplorer::postBuild()
@@ -427,6 +433,7 @@ bool ALFloaterSceneExplorer::postBuild()
     // onClose, so the simulator only streams the full region while the
     // explorer is actually up.
     mFullRegion = gSavedSettings.getBOOL("ALSceneExplorerFullRegion");
+    mSelectionSync = gSavedSettings.getBOOL("ALSceneExplorerSelectionSync");
 
     // Push persisted filter state into the controls before wiring the commit
     // callbacks, so the UI, the saved settings, and the filter object all
@@ -436,7 +443,8 @@ bool ALFloaterSceneExplorer::postBuild()
     getChild<LLUICtrl>("flag_scripted")->setValue((flag_mask & ALObjectProperties::FLAG_SCRIPTED) != 0);
     getChild<LLUICtrl>("flag_light")->setValue((flag_mask & ALObjectProperties::FLAG_LIGHT) != 0);
     getChild<LLUICtrl>("flag_particles")->setValue((flag_mask & ALObjectProperties::FLAG_PARTICLES) != 0);
-    getChild<LLUICtrl>("limit_radius_check")->setValue(gSavedSettings.getBOOL("ALSceneExplorerLimitRadius"));
+    getChild<LLUICtrl>("limit_radius_check")->setValue(
+        gSavedSettings.getU32("ALSceneExplorerScope") == (U32)ALSceneExplorerFilter::SCOPE_RADIUS);
     getChild<LLUICtrl>("radius_slider")->setValue(gSavedSettings.getF32("ALSceneExplorerRadius"));
     // The "Selected owner" mode is session-only (its target id isn't
     // persisted), so never restore into it.
@@ -444,8 +452,11 @@ bool ALFloaterSceneExplorer::postBuild()
     if (owner_idx >= (S32)ALSceneExplorerFilter::OWNER_SPECIFIC)
         owner_idx = 0;
     getChild<LLComboBox>("owner_combo")->setCurrentByIndex(owner_idx);
+    getChild<LLComboBox>("search_type_combo")->setCurrentByIndex(
+        (S32)gSavedSettings.getU32("ALSceneExplorerSearchType"));
 
     getChild<LLFilterEditor>("filter_input")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
+    getChild<LLUICtrl>("search_type_combo")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
     getChild<LLUICtrl>("owner_combo")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
     getChild<LLUICtrl>("limit_radius_check")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
     getChild<LLUICtrl>("radius_slider")->setCommitCallback(boost::bind(&ALFloaterSceneExplorer::onFilterChanged, this));
@@ -490,6 +501,10 @@ bool ALFloaterSceneExplorer::postBuild()
     // floater) so rows move between the live tree and the Derendered category.
     mDerenderConn = ALDerenderList::setChangeCallback(
         boost::bind(&ALFloaterSceneExplorer::onDerenderListChanged, this));
+    // In-world selection -> tree highlight. The signal can fire many times a
+    // frame during edits, so the handler only flags; idleUpdate processes.
+    mWorldSelConn = LLSelectMgr::getInstance()->mUpdateSignal.connect(
+        boost::bind(&ALFloaterSceneExplorer::onWorldSelectionChanged, this));
 
     // Restore persisted sort order, and seed the filter object from the
     // controls restored above.
@@ -549,6 +564,19 @@ bool ALFloaterSceneExplorer::handleKeyHere(KEY key, MASK mask)
         getChild<LLFilterEditor>("filter_input")->setFocus(true);
         return true;
     }
+    // Enter activates the selected row the way double-click does. The folder
+    // view itself leaves RETURN unhandled (it only consumes it mid-rename),
+    // and routing it through openItem() would be wrong — folder expansion
+    // calls openItem() too, which is why it stays inert for folder types.
+    if (key == KEY_RETURN && mask == MASK_NONE && mTree && mTree->hasFocus())
+    {
+        ALSceneExplorerItem* item = getSelectedItem();
+        if (item && !item->isContainer() && !item->isDerenderedType())
+        {
+            item->activate();
+            return true;
+        }
+    }
     return LLFloater::handleKeyHere(key, mask);
 }
 
@@ -576,6 +604,11 @@ void ALFloaterSceneExplorer::idleUpdate()
     // (up to ~60k objects) streams in instead of stalling the frame.
     if (!mBuildQueue.empty())
         drainBuildQueue(0.006);
+
+    // Explicit-Refresh local re-fills, same time-sliced treatment (the full
+    // fillFromObject walks every face).
+    if (!mRefillQueue.empty())
+        drainRefillQueue(0.003);
 
     if (mRetryTimer.getElapsedTimeF32() > 8.f)
     {
@@ -607,6 +640,11 @@ void ALFloaterSceneExplorer::idleUpdate()
     updateStatusText();
 
     syncSelectionToWorld();
+    if (mWorldSelectionDirty)
+    {
+        mWorldSelectionDirty = false;
+        syncSelectionFromWorld();
+    }
     updateActionButtons();
 
     // Detail pane follows the selection; also rebuilt when props arrive or a
@@ -647,6 +685,37 @@ void ALFloaterSceneExplorer::drainBuildQueue(F64 max_time)
             getOrCreateNode(obj); // creates the widget (and any missing ancestors)
     }
     while (!mBuildQueue.empty() && LLTimer::getTotalSeconds() < end_time);
+}
+
+void ALFloaterSceneExplorer::drainRefillQueue(F64 max_time)
+{
+    if (mRefillQueue.empty())
+        return;
+
+    const F64 end_time = LLTimer::getTotalSeconds() + max_time;
+    do
+    {
+        const LLUUID id = mRefillQueue.front();
+        mRefillQueue.pop_front();
+
+        auto it = mItems.find(id);
+        if (it == mItems.end())
+            continue;
+        ALSceneExplorerItem* item = it->second;
+        LLViewerObject* obj = gObjectList.findObject(id);
+        if (!obj || obj->isDead())
+            continue;
+
+        // Re-fill the locally-derived fields — per-face flags (glow,
+        // fullbright, alpha, PBR), light/media, geometry, prim and triangle
+        // counts — which are captured at node build and go stale as objects
+        // are edited. Costs are peeked (never trigger) and the async server
+        // fields are left untouched by fillFromObject().
+        ALObjectProperties::Record rec = item->getRecord();
+        ALObjectProperties::fillFromObject(rec, obj, /*fetch_costs=*/false);
+        item->updateRecord(rec); // dirties this row's filter state
+    }
+    while (!mRefillQueue.empty() && LLTimer::getTotalSeconds() < end_time);
 }
 
 // ============================================================================
@@ -971,6 +1040,7 @@ void ALFloaterSceneExplorer::clearTree()
     mQueuedProps.clear();
     mBuildQueue.clear();
     mQueued.clear();
+    mRefillQueue.clear();
 }
 
 // ============================================================================
@@ -1310,6 +1380,8 @@ void ALFloaterSceneExplorer::reconcile()
     // toggle flips stay correct even without a change signal).
     syncDerendered();
     updateCategoryCounts();
+    // React to RLVa @shownames flips: scrub or re-resolve owner names.
+    auditOwnerNames();
     mDetailDirty = true; // live metrics (distance/costs) were refreshed above
     mScanVisible = true; // visible-row pass runs after the next arrange
 
@@ -1323,11 +1395,12 @@ void ALFloaterSceneExplorer::reconcile()
     }
 
     // The per-pass distance refresh above doesn't dirty per-item filter state,
-    // so when the radius predicate is active, re-arm the whole filter once the
-    // agent has actually moved — otherwise "Within N m" would keep showing the
-    // object set from wherever the filter last ran.
+    // so while a spatial scope (radius or parcel) is active, re-arm the whole
+    // filter once the agent has actually moved — otherwise the scope would
+    // keep showing the object set from wherever the filter last ran. (A
+    // parcel change requires movement, so this re-arm covers parcel scope.)
     ALSceneExplorerFilter& filter = mViewModel.getFilter();
-    if (filter.isLimitRadiusActive())
+    if (filter.isScopeActive())
     {
         const LLVector3d agent_pos = gAgent.getPositionGlobal();
         if ((agent_pos - mLastFilterAgentPos).magVec() > 1.0)
@@ -1409,10 +1482,10 @@ void ALFloaterSceneExplorer::drainPropsQueue()
     {
         mQueuedProps.erase(id);
 
-        // Already in flight, or the reply landed since this id was queued
-        // (the priority lane leaves its ids in the main queue too).
-        const ALObjectPropertiesCache::ServerProps* p = cache.get(id);
-        if (cache.isPending(id) || (p && p->mHasFullData))
+        // Already in flight (covers the priority lane leaving its ids in the
+        // main queue too). Deliberately NOT gated on cached full data: an
+        // explicit Refresh re-queues resolved ids to pick up renames.
+        if (cache.isPending(id))
             return;
 
         LLViewerObject* obj = gObjectList.findObject(id);
@@ -1515,6 +1588,12 @@ void ALFloaterSceneExplorer::applyServerProps(ALSceneExplorerItem* item)
     rec.mCreatorId    = p->mCreatorId;
     rec.mGroupOwned   = p->mGroupOwned;
     rec.mCreationDate = p->mCreationDate;
+    rec.mSaleType     = p->mSaleType;
+    rec.mSalePrice    = p->mSalePrice;
+    if (p->mSaleType != 0) // LLSaleInfo::FS_NOT
+        rec.mFlags |= ALObjectProperties::FLAG_FOR_SALE;
+    else
+        rec.mFlags &= ~ALObjectProperties::FLAG_FOR_SALE;
     rec.mPropsValid   = true;
 
     // Adopt the server name in the same pass (avatars keep their display name
@@ -1523,6 +1602,142 @@ void ALFloaterSceneExplorer::applyServerProps(ALSceneExplorerItem* item)
         (!p->mName.empty() && item->getItemType() != ALSceneExplorerItem::TYPE_AVATAR)
             ? p->mName : LLStringUtil::null;
     item->updateRecord(rec, display_name);
+
+    // Fold the owner's display name into the searchable text (resolved once
+    // per unique owner; batched into the rows when the lookup lands).
+    noteOwnerFor(item);
+}
+
+void ALFloaterSceneExplorer::noteOwnerFor(ALSceneExplorerItem* item)
+{
+    const ALObjectProperties::Record& rec = item->getRecord();
+    if (!rec.mPropsValid)
+        return;
+    const LLUUID& owner = rec.mGroupOwned ? rec.mGroupId : rec.mOwnerId;
+    if (owner.isNull())
+        return;
+
+    auto found = mOwnerNames.find(owner);
+    if (found != mOwnerNames.end())
+    {
+        if (!found->second.mName.empty())
+            item->setOwnerName(found->second.mName);
+        return;
+    }
+    resolveOwnerName(owner, rec.mGroupOwned);
+}
+
+void ALFloaterSceneExplorer::resolveOwnerName(const LLUUID& owner_id, bool group_owned)
+{
+    if (!mOwnerNamesPending.insert(owner_id).second)
+        return; // lookup already in flight
+
+    // RLVa @shownames: a hidden agent name must not become searchable text
+    // (an anonym would be useless to search anyway). Recorded as empty;
+    // auditOwnerNames() re-resolves it if the restriction lifts.
+    if (!group_owned && RlvActions::isRlvEnabled() && owner_id != gAgentID
+        && !RlvActions::canShowName(RlvActions::SNC_DEFAULT, owner_id))
+    {
+        mOwnerNamesPending.erase(owner_id);
+        mOwnerNames[owner_id] = ResolvedOwner();
+        return;
+    }
+
+    LLHandle<ALFloaterSceneExplorer> handle = getDerivedHandle<ALFloaterSceneExplorer>();
+    if (group_owned)
+    {
+        gCacheName->getGroup(owner_id,
+            [handle](const LLUUID& id, const std::string& name, bool is_group)
+            {
+                if (ALFloaterSceneExplorer* self = handle.get())
+                    self->onOwnerNameResolved(id, name, true);
+            });
+    }
+    else
+    {
+        LLAvatarNameCache::get(owner_id,
+            [handle](const LLUUID& id, const LLAvatarName& av_name)
+            {
+                if (ALFloaterSceneExplorer* self = handle.get())
+                    self->onOwnerNameResolved(id, av_name.getCompleteName(), false);
+            });
+    }
+}
+
+void ALFloaterSceneExplorer::onOwnerNameResolved(const LLUUID& owner_id, const std::string& name, bool is_group)
+{
+    mOwnerNamesPending.erase(owner_id);
+
+    // The @shownames restriction may have been imposed while the lookup was
+    // in flight; record hidden rather than leaking the name.
+    std::string stored = name;
+    if (!is_group && RlvActions::isRlvEnabled() && owner_id != gAgentID
+        && !RlvActions::canShowName(RlvActions::SNC_DEFAULT, owner_id))
+    {
+        stored.clear();
+    }
+    ResolvedOwner& entry = mOwnerNames[owner_id];
+    entry.mName = stored;
+    entry.mIsGroup = is_group;
+    if (stored.empty())
+        return;
+
+    // One batched pass folds the name into every row this owner has (search
+    // text + suffix); each setOwnerName dirties that row's filter state, and
+    // the visible-row scan refreshes on-screen suffixes within a tick.
+    for (const auto& item_entry : mItems)
+    {
+        ALSceneExplorerItem* item = item_entry.second;
+        const ALObjectProperties::Record& rec = item->getRecord();
+        if (rec.mPropsValid
+            && (rec.mGroupOwned ? rec.mGroupId : rec.mOwnerId) == owner_id)
+        {
+            item->setOwnerName(stored);
+        }
+    }
+    mScanVisible = true;
+
+    // The owner-filter combo may have been waiting on this very name.
+    if (owner_id == mFilterOwnerId)
+        updateOwnerFilterLabel();
+}
+
+void ALFloaterSceneExplorer::auditOwnerNames()
+{
+    // RLVa @shownames can flip at any time. Imposing it must SCRUB resolved
+    // owner names back out of the rows (suffix and searchable text both);
+    // lifting it re-resolves owners recorded as hidden. Group names are never
+    // restricted. Runs per reconcile pass — the unique-owner map is small and
+    // canShowName is a lookup.
+    for (auto& owner_entry : mOwnerNames)
+    {
+        if (owner_entry.second.mIsGroup)
+            continue;
+        const LLUUID& id = owner_entry.first;
+        const bool can_show = !RlvActions::isRlvEnabled() || id == gAgentID
+            || RlvActions::canShowName(RlvActions::SNC_DEFAULT, id);
+
+        if (!can_show && !owner_entry.second.mName.empty())
+        {
+            owner_entry.second.mName.clear();
+            for (const auto& item_entry : mItems)
+            {
+                ALSceneExplorerItem* item = item_entry.second;
+                const ALObjectProperties::Record& rec = item->getRecord();
+                if (rec.mPropsValid && !rec.mGroupOwned && rec.mOwnerId == id)
+                    item->setOwnerName(LLStringUtil::null);
+            }
+            mScanVisible = true;
+            if (id == mFilterOwnerId)
+                updateOwnerFilterLabel();
+        }
+        else if (can_show && owner_entry.second.mName.empty()
+                 && !mOwnerNamesPending.count(id))
+        {
+            // Hidden when first seen (or imposed mid-flight): resolve now.
+            resolveOwnerName(id, false);
+        }
+    }
 }
 
 void ALFloaterSceneExplorer::onAvatarNameLoaded(const LLUUID& id, const LLAvatarName& av_name)
@@ -1557,10 +1772,22 @@ void ALFloaterSceneExplorer::onPropsCacheChanged(const LLUUID& id)
 // ============================================================================
 // Filters / sort
 // ============================================================================
+namespace
+{
+    // The flag bits the quick-bar checkboxes own; everything else in the
+    // mask belongs to the companion filters floater.
+    constexpr U32 QUICK_FLAG_BITS = ALObjectProperties::FLAG_SCRIPTED
+        | ALObjectProperties::FLAG_LIGHT | ALObjectProperties::FLAG_PARTICLES;
+}
+
 void ALFloaterSceneExplorer::onFilterChanged()
 {
     ALSceneExplorerFilter& f = mViewModel.getFilter();
     f.setFilterSubString(getChild<LLFilterEditor>("filter_input")->getText());
+
+    const S32 search_idx = llmax(0, getChild<LLComboBox>("search_type_combo")->getCurrentIndex());
+    f.setSearchType((ALSceneExplorerFilter::ESearchType)search_idx);
+    gSavedSettings.setU32("ALSceneExplorerSearchType", (U32)search_idx);
 
     // "Selected owner" is only meaningful with a target id (set by the
     // context menu's Filter by This Owner); picked manually it means Any.
@@ -1570,35 +1797,103 @@ void ALFloaterSceneExplorer::onFilterChanged()
     f.setOwnerId(mFilterOwnerId);
     f.setOwnerMode((ALSceneExplorerFilter::EOwnerMode)owner_idx);
 
-    U32 flags = 0;
+    // The quick boxes own their three bits of the persisted mask; the rest
+    // belongs to the companion filters floater and must survive a bar commit.
+    U32 flags = gSavedSettings.getU32("ALSceneExplorerFlagFilter") & ~QUICK_FLAG_BITS;
     if (getChild<LLUICtrl>("flag_scripted")->getValue().asBoolean())  flags |= ALObjectProperties::FLAG_SCRIPTED;
     if (getChild<LLUICtrl>("flag_light")->getValue().asBoolean())     flags |= ALObjectProperties::FLAG_LIGHT;
     if (getChild<LLUICtrl>("flag_particles")->getValue().asBoolean()) flags |= ALObjectProperties::FLAG_PARTICLES;
     f.setFlagMask(flags);
+    f.setGeomMask(gSavedSettings.getU32("ALSceneExplorerTypeFilter"));
 
-    const bool limit = getChild<LLUICtrl>("limit_radius_check")->getValue().asBoolean();
+    // The bar's Within checkbox toggles the radius scope; the parcel scope is
+    // only reachable from the companion floater and survives until the user
+    // explicitly switches away.
+    U32 scope = gSavedSettings.getU32("ALSceneExplorerScope");
+    const bool within = getChild<LLUICtrl>("limit_radius_check")->getValue().asBoolean();
+    if (within)
+        scope = (U32)ALSceneExplorerFilter::SCOPE_RADIUS;
+    else if (scope == (U32)ALSceneExplorerFilter::SCOPE_RADIUS)
+        scope = (U32)ALSceneExplorerFilter::SCOPE_REGION;
     const F32 radius = (F32)getChild<LLUICtrl>("radius_slider")->getValue().asReal();
-    f.setRadius(radius, limit);
+    f.setScope((ALSceneExplorerFilter::EScope)scope, radius);
+
+    f.setMinLandImpact(gSavedSettings.getF32("ALSceneExplorerMinLandImpact"));
+    f.setMinTriangles(gSavedSettings.getU32("ALSceneExplorerMinTriangles"));
 
     // Persist the filter set (the text predicate is deliberately session-only).
     gSavedSettings.setU32("ALSceneExplorerOwnerFilter", (U32)owner_idx);
     gSavedSettings.setU32("ALSceneExplorerFlagFilter", flags);
-    gSavedSettings.setBOOL("ALSceneExplorerLimitRadius", limit);
+    gSavedSettings.setU32("ALSceneExplorerScope", scope);
     gSavedSettings.setF32("ALSceneExplorerRadius", radius);
+
+    updateOwnerFilterLabel();
     // The filter setters above bumped the filter generation, so the next idle
     // pass (mTree->update()) re-filters and re-arranges.
+}
+
+void ALFloaterSceneExplorer::refreshFilters()
+{
+    // Settings -> quick-bar controls, then the normal commit path (which
+    // re-derives the same settings — stable). The companion floater calls
+    // this after writing settings so both surfaces stay in agreement.
+    const U32 flags = gSavedSettings.getU32("ALSceneExplorerFlagFilter");
+    getChild<LLUICtrl>("flag_scripted")->setValue((flags & ALObjectProperties::FLAG_SCRIPTED) != 0);
+    getChild<LLUICtrl>("flag_light")->setValue((flags & ALObjectProperties::FLAG_LIGHT) != 0);
+    getChild<LLUICtrl>("flag_particles")->setValue((flags & ALObjectProperties::FLAG_PARTICLES) != 0);
+    getChild<LLUICtrl>("limit_radius_check")->setValue(
+        gSavedSettings.getU32("ALSceneExplorerScope") == (U32)ALSceneExplorerFilter::SCOPE_RADIUS);
+    getChild<LLUICtrl>("radius_slider")->setValue(gSavedSettings.getF32("ALSceneExplorerRadius"));
+    onFilterChanged();
 }
 
 void ALFloaterSceneExplorer::doResetFilters()
 {
     getChild<LLFilterEditor>("filter_input")->setText(LLStringUtil::null);
     getChild<LLComboBox>("owner_combo")->setCurrentByIndex(0);
-    getChild<LLUICtrl>("flag_scripted")->setValue(false);
-    getChild<LLUICtrl>("flag_light")->setValue(false);
-    getChild<LLUICtrl>("flag_particles")->setValue(false);
-    getChild<LLUICtrl>("limit_radius_check")->setValue(false);
     mFilterOwnerId.setNull();
-    onFilterChanged();
+    gSavedSettings.setU32("ALSceneExplorerFlagFilter", 0);
+    gSavedSettings.setU32("ALSceneExplorerTypeFilter", 0);
+    gSavedSettings.setU32("ALSceneExplorerScope", 0);
+    gSavedSettings.setF32("ALSceneExplorerMinLandImpact", 0.f);
+    gSavedSettings.setU32("ALSceneExplorerMinTriangles", 0);
+    refreshFilters();
+
+    // Push the cleared state into the companion floater if it is open.
+    if (LLFloater* filters = LLFloaterReg::findInstance("scene_explorer_filters"))
+    {
+        static_cast<ALFloaterSceneExplorerFilters*>(filters)->refreshFromSettings();
+    }
+}
+
+void ALFloaterSceneExplorer::doShowFilters()
+{
+    LLFloater* filters = LLFloaterReg::showInstance("scene_explorer_filters");
+    if (filters)
+    {
+        // Parent it like inventory's filter finder: follows and closes with
+        // the explorer.
+        addDependentFloater(filters);
+    }
+}
+
+void ALFloaterSceneExplorer::updateOwnerFilterLabel()
+{
+    // Show WHO the "Selected owner" filter targets on the combo button. The
+    // list entry itself stays generic; the button text carries the name.
+    LLComboBox* combo = getChild<LLComboBox>("owner_combo");
+    if (combo->getCurrentIndex() != (S32)ALSceneExplorerFilter::OWNER_SPECIFIC
+        || mFilterOwnerId.isNull())
+    {
+        return;
+    }
+    std::string name;
+    auto found = mOwnerNames.find(mFilterOwnerId);
+    if (found != mOwnerNames.end() && !found->second.mName.empty())
+        name = found->second.mName;
+    else if (mItems.count(mFilterOwnerId))
+        name = mItems[mFilterOwnerId]->getName(); // avatar row labels are RLVa-anonymized
+    combo->setLabel(name.empty() ? std::string("Owner: (loading)") : "Owner: " + name);
 }
 
 void ALFloaterSceneExplorer::doFilterByOwner()
@@ -1610,6 +1905,7 @@ void ALFloaterSceneExplorer::doFilterByOwner()
     // An avatar row is its own owner; object rows use their fetched owner
     // (the deeding group for group-owned objects).
     LLUUID owner;
+    bool group_owned = false;
     if (item->getItemType() == ALSceneExplorerItem::TYPE_AVATAR)
     {
         owner = item->getUUID();
@@ -1618,12 +1914,18 @@ void ALFloaterSceneExplorer::doFilterByOwner()
     {
         const ALObjectProperties::Record& rec = item->getRecord();
         if (rec.mPropsValid)
+        {
             owner = rec.mGroupOwned ? rec.mGroupId : rec.mOwnerId;
+            group_owned = rec.mGroupOwned;
+        }
     }
     if (owner.isNull())
         return;
 
     mFilterOwnerId = owner;
+    // Make sure the combo can label itself with the owner's name.
+    if (!mOwnerNames.count(owner))
+        resolveOwnerName(owner, group_owned);
     getChild<LLComboBox>("owner_combo")->setCurrentByIndex((S32)ALSceneExplorerFilter::OWNER_SPECIFIC);
     onFilterChanged();
 }
@@ -2122,6 +2424,24 @@ void ALFloaterSceneExplorer::toggleShow(const LLSD& param)
         }
         applyFullRegionMode(mFullRegion);
     }
+    else if (key == "selection_sync")
+    {
+        mSelectionSync = !mSelectionSync;
+        gSavedSettings.setBOOL("ALSceneExplorerSelectionSync", mSelectionSync);
+    }
+    else if (key == "owners")
+    {
+        gSavedSettings.setBOOL("ALSceneExplorerOwnerSuffix",
+                               !gSavedSettings.getBOOL("ALSceneExplorerOwnerSuffix"));
+        // Refresh what's on screen now; scrolled-in rows pick the change up
+        // from the periodic visible-row scan.
+        forEachVisibleRow([](ALSceneExplorerItem*, LLFolderViewItem* widget)
+        {
+            widget->refresh();
+        });
+        if (mTree)
+            mTree->arrangeAll();
+    }
 }
 
 bool ALFloaterSceneExplorer::checkShow(const LLSD& param) const
@@ -2133,6 +2453,10 @@ bool ALFloaterSceneExplorer::checkShow(const LLSD& param) const
         return mShowDerendered;
     if (key == "full_region")
         return mFullRegion;
+    if (key == "selection_sync")
+        return mSelectionSync;
+    if (key == "owners")
+        return gSavedSettings.getBOOL("ALSceneExplorerOwnerSuffix");
     return false;
 }
 
@@ -2188,13 +2512,13 @@ void ALFloaterSceneExplorer::requestCostsFor(ALSceneExplorerItem* item)
     obj->getLinksetCost();
 }
 
-void ALFloaterSceneExplorer::scanVisibleRows()
+void ALFloaterSceneExplorer::forEachVisibleRow(
+    const std::function<void(ALSceneExplorerItem*, LLFolderViewItem*)>& fn)
 {
     if (!mTree || !mTreePanel || mItems.empty())
         return;
 
     const LLRect viewport = mTreePanel->calcScreenRect();
-    ALObjectPropertiesCache& cache = ALObjectPropertiesCache::instance();
     for (const auto& entry : mItems)
     {
         ALSceneExplorerItem* item = entry.second;
@@ -2208,14 +2532,22 @@ void ALFloaterSceneExplorer::scanVisibleRows()
             continue;
         if (!viewport.overlaps(widget->calcScreenRect()))
             continue;
+        fn(item, widget);
+    }
+}
 
+void ALFloaterSceneExplorer::scanVisibleRows()
+{
+    ALObjectPropertiesCache& cache = ALObjectPropertiesCache::instance();
+    forEachVisibleRow([this, &cache](ALSceneExplorerItem* item, LLFolderViewItem* widget)
+    {
         // Keep on-screen label suffixes (distance, complexity, LI) current —
         // they are captured at widget refresh and would otherwise go stale as
         // the agent moves.
         widget->refresh();
 
         if (item->isDerenderedType())
-            continue;
+            return;
 
         // Viewport-bounded cost demand: what the user is looking at gets its
         // LI without costing the whole region.
@@ -2223,13 +2555,14 @@ void ALFloaterSceneExplorer::scanVisibleRows()
 
         // Bump this row's queued props request ahead of the off-screen
         // backlog (no-op unless it is still waiting in the main queue).
-        const ALObjectPropertiesCache::ServerProps* p = cache.get(entry.first);
-        if (mQueuedProps.count(entry.first) && !(p && p->mHasFullData)
-            && mPriorityQueued.insert(entry.first).second)
+        const LLUUID& id = item->getUUID();
+        const ALObjectPropertiesCache::ServerProps* p = cache.get(id);
+        if (mQueuedProps.count(id) && !(p && p->mHasFullData)
+            && mPriorityQueued.insert(id).second)
         {
-            mPriorityFetch.push_back(entry.first);
+            mPriorityFetch.push_back(id);
         }
-    }
+    });
 }
 
 void ALFloaterSceneExplorer::updateStatusText()
@@ -2239,6 +2572,10 @@ void ALFloaterSceneExplorer::updateStatusText()
     if (const size_t building = mBuildQueue.size())
     {
         status = llformat("Loading %d objects...", (S32)building);
+    }
+    else if (const size_t refilling = mRefillQueue.size())
+    {
+        status = llformat("Refreshing %d objects...", (S32)refilling);
     }
     else if (const size_t fetching = mFetchQueue.size() + mPriorityFetch.size())
     {
@@ -2265,6 +2602,22 @@ ALSceneExplorerItem* ALFloaterSceneExplorer::getSelectedItem() const
         return nullptr;
     LLFolderViewItem* sel = mTree->getCurSelectedItem();
     return sel ? static_cast<ALSceneExplorerItem*>(sel->getViewModelItem()) : nullptr;
+}
+
+// Every selected scene row (containers excluded), in tree selection order.
+std::vector<ALSceneExplorerItem*> ALFloaterSceneExplorer::getSelectedSceneItems() const
+{
+    std::vector<ALSceneExplorerItem*> items;
+    if (!mTree)
+        return items;
+    for (LLFolderViewItem* widget : mTree->getSelectedItems())
+    {
+        ALSceneExplorerItem* item =
+            widget ? static_cast<ALSceneExplorerItem*>(widget->getViewModelItem()) : nullptr;
+        if (item && !item->isContainer())
+            items.push_back(item);
+    }
+    return items;
 }
 
 LLViewerObject* ALFloaterSceneExplorer::getSelectedObject() const
@@ -2313,27 +2666,187 @@ void ALFloaterSceneExplorer::selectInWorld(const uuid_vec_t& ids)
 
 void ALFloaterSceneExplorer::syncSelectionToWorld()
 {
-    if (mSyncingSelection)
+    if (mSyncingSelection || !mSelectionSync)
         return;
     // Drive the in-world selection only while an editing surface is up. Plain
     // browsing must never grab the user's selection — pushing one has side
     // effects (avatar look-at/point-at targeting, edit-mode behaviour) that
-    // read as the camera/avatar reacting to every tree click. mLastSelectedID
-    // deliberately isn't advanced while gated, so opening Build/Inspect adopts
-    // the currently selected row once.
+    // read as the camera/avatar reacting to every tree click. The sync state
+    // deliberately doesn't advance while gated, so opening Build/Inspect
+    // adopts the currently selected rows once.
     if (!LLFloaterReg::instanceVisible("build") && !LLFloaterReg::instanceVisible("inspect"))
         return;
-    LLViewerObject* obj = getSelectedObject();
-    const LLUUID id = obj ? obj->getID() : LLUUID::null;
-    if (id == mLastSelectedID)
-        return;
-    mLastSelectedID = id;
-    if (obj)
+
+    uuid_vec_t ids;
+    for (ALSceneExplorerItem* item : getSelectedSceneItems())
     {
-        uuid_vec_t ids;
-        ids.push_back(id);
-        selectInWorld(ids);
+        if (item->isDerenderedType())
+            continue;
+        if (gObjectList.findObject(item->getUUID()))
+            ids.push_back(item->getUUID());
     }
+    std::sort(ids.begin(), ids.end());
+    if (ids == mLastPushedSelection)
+        return;
+    mLastPushedSelection = ids;
+    if (!ids.empty())
+        selectInWorld(ids);
+}
+
+void ALFloaterSceneExplorer::onWorldSelectionChanged()
+{
+    // Fires for every selection update (including per-frame property updates
+    // while editing) — just flag; idleUpdate processes once per pass.
+    mWorldSelectionDirty = true;
+}
+
+void ALFloaterSceneExplorer::syncSelectionFromWorld()
+{
+    // The sync toggle silences the passive mirroring in both directions;
+    // explicit actions (Edit / Inspect / menu staging) still select.
+    if (mSyncingSelection || !mSelectionSync || !mTree)
+        return;
+    // Mirror only while an editing surface is up, matching the tree->world
+    // direction. While plain browsing, transient world selections (pie menus,
+    // the gear menu's own staging — which selects the whole family and would
+    // bounce the tree from a child row to its root) must not yank the tree's
+    // selection or scroll position.
+    if (!LLFloaterReg::instanceVisible("build") && !LLFloaterReg::instanceVisible("inspect"))
+        return;
+
+    // Mirror the in-world selection onto the tree at the granularity it was
+    // made: selection roots (an individually selected child prim is its own
+    // root node). Only ids the tree actually holds participate.
+    uuid_vec_t ids;
+    LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+    for (LLObjectSelection::valid_root_iterator it = selection->valid_root_begin();
+         it != selection->valid_root_end(); ++it)
+    {
+        LLViewerObject* obj = (*it)->getObject();
+        if (obj && mWidgets.count(obj->getID()))
+            ids.push_back(obj->getID());
+    }
+    // Never clear the tree's selection because the world's emptied (closing
+    // the build floater deselects, but the user's place in the tree remains).
+    if (ids.empty())
+        return;
+    std::sort(ids.begin(), ids.end());
+    if (ids == mLastPushedSelection)
+        return; // our own push echoing back through mUpdateSignal
+    mLastPushedSelection = ids;
+
+    mSyncingSelection = true;
+    mTree->clearSelection();
+    bool first = true;
+    for (const LLUUID& id : ids)
+    {
+        auto wit = mWidgets.find(id);
+        if (wit == mWidgets.end())
+            continue;
+        if (first)
+        {
+            // Open ancestors and scroll so the row is actually seen; don't
+            // steal keyboard focus from the world the user is clicking in.
+            mTree->setSelection(wit->second, /*openitem=*/true, /*take_keyboard_focus=*/false);
+            first = false;
+        }
+        else
+        {
+            mTree->changeSelection(wit->second, true);
+        }
+    }
+    mTree->scrollToShowSelection();
+    mSyncingSelection = false;
+}
+
+void ALFloaterSceneExplorer::doSelectAllResults()
+{
+    if (!mTree)
+        return;
+    // Select every root-level row that passes the current filter (linkset
+    // granularity — child prims follow their roots through selectInWorld),
+    // feeding the batch menu actions (Take Copy / Return / Derender).
+    mSyncingSelection = true;
+    mTree->clearSelection();
+    bool first = true;
+    auto select_category = [&](ALSceneExplorerItem* category)
+    {
+        if (!category)
+            return;
+        for (auto it = category->getChildrenBegin(); it != category->getChildrenEnd(); ++it)
+        {
+            ALSceneExplorerItem* child = static_cast<ALSceneExplorerItem*>(it->get());
+            if (!child->passedFilter())
+                continue;
+            auto wit = mWidgets.find(child->getUUID());
+            if (wit == mWidgets.end())
+                continue;
+            if (first)
+            {
+                mTree->setSelection(wit->second, false, true);
+                first = false;
+            }
+            else
+            {
+                mTree->changeSelection(wit->second, true);
+            }
+        }
+    };
+    select_category(mObjectsCategory);
+    select_category(mAvatarsCategory);
+    mSyncingSelection = false;
+    // The next idle pass pushes the new multi-selection to the world if an
+    // editing surface is up (and the gear menu pushes it at open regardless).
+}
+
+void ALFloaterSceneExplorer::doRefresh()
+{
+    ALObjectPropertiesCache& cache = ALObjectPropertiesCache::instance();
+    mRefillQueue.clear();
+    for (const auto& entry : mItems)
+    {
+        ALSceneExplorerItem* item = entry.second;
+        const ALSceneExplorerItem::EItemType type = item->getItemType();
+        if (type == ALSceneExplorerItem::TYPE_AVATAR
+            || type == ALSceneExplorerItem::TYPE_ATTACHMENT_POINT
+            || item->isDerenderedType()
+            || item->isContainer())
+        {
+            continue;
+        }
+        // Re-arm the bounded retry and the one-shot cost demand, and
+        // re-request anything that never resolved (assume the reply is lost).
+        item->resetFetchState();
+        const ALObjectPropertiesCache::ServerProps* p = cache.get(entry.first);
+        if (!(p && p->mHasFullData))
+        {
+            cache.clearPending(entry.first);
+            queueProps(entry.first);
+        }
+        // Local fields (per-face flags, geometry, prim counts) go stale after
+        // node build; re-fill them time-sliced so filters see current state.
+        mRefillQueue.push_back(entry.first);
+    }
+
+    // Rows on screen get a forced re-request even when data is cached, so a
+    // rename or permission change made while standing here shows up — without
+    // re-probing the whole (possibly 360-streamed) region.
+    forEachVisibleRow([this, &cache](ALSceneExplorerItem* item, LLFolderViewItem*)
+    {
+        if (item->isDerenderedType()
+            || item->getItemType() == ALSceneExplorerItem::TYPE_AVATAR
+            || item->getItemType() == ALSceneExplorerItem::TYPE_ATTACHMENT_POINT)
+        {
+            return;
+        }
+        const LLUUID& id = item->getUUID();
+        if (cache.isPending(id) || mQueuedProps.count(id))
+            return;
+        if (mPriorityQueued.insert(id).second)
+            mPriorityFetch.push_back(id);
+    });
+
+    reconcile();
 }
 
 void ALFloaterSceneExplorer::activateItem(const LLUUID& id)
@@ -2343,9 +2856,9 @@ void ALFloaterSceneExplorer::activateItem(const LLUUID& id)
     LLViewerObject* obj = gObjectList.findObject(id);
     if (!obj)
         return;
-    mLastSelectedID = id; // keep the per-frame selection sync from re-selecting
     uuid_vec_t ids;
     ids.push_back(id);
+    mLastPushedSelection = ids; // keep the per-frame selection sync from re-selecting
     selectInWorld(ids);
 
     switch (gSavedSettings.getU32("ALSceneExplorerActivateAction"))
@@ -2515,10 +3028,17 @@ void ALFloaterSceneExplorer::doCopyResults()
             }
             else if (rec.mPropsValid)
             {
-                owner = rec.mGroupOwned ? rec.mGroupId.asString()
-                                        : avatarDisplayName(rec.mOwnerId);
+                // The resolved-owner map covers groups and avatars alike;
+                // RLVa-hidden avatar owners fall through to the anonymized
+                // display name, anything still unresolved to the bare id.
+                const LLUUID& owner_id = rec.mGroupOwned ? rec.mGroupId : rec.mOwnerId;
+                auto found = mOwnerNames.find(owner_id);
+                if (found != mOwnerNames.end() && !found->second.mName.empty())
+                    owner = found->second.mName;
+                else if (!rec.mGroupOwned)
+                    owner = avatarDisplayName(rec.mOwnerId);
                 if (owner.empty())
-                    owner = rec.mOwnerId.asString();
+                    owner = owner_id.asString();
             }
 
             out += csv_escape(child->getName()) + "," + csv_escape(owner) + ","
@@ -2650,6 +3170,51 @@ void ALFloaterSceneExplorer::buildRowContextMenu(LLMenuGL& menu, U32 flags)
         return;
     }
 
+    // Multi-selection: only the naturally batching entries. Everything is
+    // staged into the world selection so the reused handlers (Take Copy,
+    // Return) and their enable predicates act on the full set; Derender and
+    // Restore batch through their own handlers. Single-target entries
+    // (Touch / Pay / Profile / ...) don't appear at all.
+    const std::vector<ALSceneExplorerItem*> selected = getSelectedSceneItems();
+    if (selected.size() > 1)
+    {
+        bool all_derendered = true;
+        uuid_vec_t ids;
+        for (ALSceneExplorerItem* sel_item : selected)
+        {
+            all_derendered &= sel_item->isDerenderedType();
+            if (!sel_item->isDerenderedType()
+                && sel_item->getItemType() != ALSceneExplorerItem::TYPE_AVATAR
+                && gObjectList.findObject(sel_item->getUUID()))
+            {
+                ids.push_back(sel_item->getUUID());
+            }
+        }
+
+        if (all_derendered)
+        {
+            show = { "restore_derendered" };
+            hideMenuEntries(menu, show, disabled);
+            return;
+        }
+
+        if (!ids.empty())
+        {
+            uuid_vec_t sorted = ids;
+            std::sort(sorted.begin(), sorted.end());
+            mLastPushedSelection = sorted;
+            selectInWorld(ids);
+
+            show = { "take_copy", "sep_derender", "derender_temp", "derender_perm" };
+            if (!registryEnabled("Tools.EnableTakeCopy"))
+                disabled.push_back("take_copy");
+            if (registryEnabled("Object.EnableReturn"))
+                show.insert(show.begin() + 1, { "sep_admin", "return" });
+        }
+        hideMenuEntries(menu, show, disabled);
+        return;
+    }
+
     const LLUUID id = item->getUUID();
     const ALObjectProperties::Record& rec = item->getRecord();
     const bool rlv = RlvActions::isRlvEnabled();
@@ -2721,9 +3286,9 @@ void ALFloaterSceneExplorer::buildRowContextMenu(LLMenuGL& menu, U32 flags)
     // (Object.Touch / Object.Return / PayObject / ...) and their registered
     // enable predicates act on it — the same model as the in-world
     // right-click, which also selects what it targets.
-    mLastSelectedID = id;
     uuid_vec_t ids;
     ids.push_back(id);
+    mLastPushedSelection = ids;
     selectInWorld(ids);
 
     const bool is_attachment = obj->isAttachment();
@@ -2774,21 +3339,32 @@ void ALFloaterSceneExplorer::buildRowContextMenu(LLMenuGL& menu, U32 flags)
 
 void ALFloaterSceneExplorer::doDerender(const LLSD& param)
 {
-    LLViewerObject* obj = getSelectedObject();
-    // Object rows only here; avatar derendering arrives with the per-type
-    // menus (Stage 4).
-    if (!obj || obj->isAvatar() || obj->isAttachment())
-        return;
-    if (!ALDerenderList::canAdd(obj))
+    // Every selected derenderable object row (multi-select batches).
+    std::vector<LLViewerObject*> objs;
+    for (ALSceneExplorerItem* item : getSelectedSceneItems())
+    {
+        if (item->isDerenderedType())
+            continue;
+        LLViewerObject* obj = gObjectList.findObject(item->getUUID());
+        if (!obj || obj->isAvatar() || obj->isAttachment())
+            continue;
+        if (!ALDerenderList::canAdd(obj))
+            continue;
+        objs.push_back(obj);
+    }
+    if (objs.empty())
         return;
 
     // ALDerenderList::addSelection() consumes the live selection; always feed
-    // it the whole family regardless of the EditLinkedParts split so the
+    // it the whole families regardless of the EditLinkedParts split so each
     // entry's root/child local-id bookkeeping is complete.
     LLSelectMgr* sm = LLSelectMgr::getInstance();
     mSyncingSelection = true;
     sm->deselectAll();
-    sm->selectObjectAndFamily(obj);
+    for (LLViewerObject* obj : objs)
+    {
+        sm->selectObjectAndFamily(obj, /*add_to_end=*/true);
+    }
     mSyncingSelection = false;
 
     if (ALDerenderList::canAddSelection())
@@ -2796,22 +3372,27 @@ void ALFloaterSceneExplorer::doDerender(const LLSD& param)
         ALDerenderList::instance().addSelection(param.asString() == "permanent");
     }
     sm->deselectAll(); // whatever the kill left behind
-    // The change signal already ran syncDerendered(); the live node falls out
+    // The change signal already ran syncDerendered(); the live nodes fall out
     // on the next reconcile sweep.
 }
 
 void ALFloaterSceneExplorer::doRestore()
 {
-    ALSceneExplorerItem* item = getSelectedItem();
-    if (!item || !item->isDerenderedType())
-        return;
-    uuid_vec_t ids;
-    ids.push_back(item->getUUID());
-    ALDerenderList::instance().removeObjects(
-        item->getItemType() == ALSceneExplorerItem::TYPE_DERENDERED_AVATAR
-            ? ALDerenderEntry::TYPE_AVATAR
-            : ALDerenderEntry::TYPE_OBJECT,
-        ids);
+    // Every selected derendered row (multi-select batches), split by entry
+    // type for ALDerenderList's two namespaces.
+    uuid_vec_t object_ids;
+    uuid_vec_t avatar_ids;
+    for (ALSceneExplorerItem* item : getSelectedSceneItems())
+    {
+        if (item->getItemType() == ALSceneExplorerItem::TYPE_DERENDERED_OBJECT)
+            object_ids.push_back(item->getUUID());
+        else if (item->getItemType() == ALSceneExplorerItem::TYPE_DERENDERED_AVATAR)
+            avatar_ids.push_back(item->getUUID());
+    }
+    if (!object_ids.empty())
+        ALDerenderList::instance().removeObjects(ALDerenderEntry::TYPE_OBJECT, object_ids);
+    if (!avatar_ids.empty())
+        ALDerenderList::instance().removeObjects(ALDerenderEntry::TYPE_AVATAR, avatar_ids);
     // removeObjects() requests the objects back from the sim (cache-miss
-    // refetch) and fires the change signal, which prunes this row.
+    // refetch) and fires the change signal, which prunes the rows.
 }

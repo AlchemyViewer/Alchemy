@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!-- Scene Explorer visibility menu (the eye button in the filter bar):
+     what the tree displays, mirroring inventory's search-visibility menu. -->
+<toggleable_menu
+ layout="topleft"
+ name="menu_scene_explorer_visibility">
+    <menu_item_check
+     label="Show Avatars"
+     name="show_avatars"
+     tool_tip="List avatars (and their attachments) in their own category">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckShow"
+         parameter="avatars" />
+        <menu_item_check.on_click
+         function="SceneExplorer.ToggleShow"
+         parameter="avatars" />
+    </menu_item_check>
+    <menu_item_check
+     label="Show Derendered"
+     name="show_derendered"
+     tool_tip="List this region's derendered objects (and derendered avatars) in their own category">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckShow"
+         parameter="derendered" />
+        <menu_item_check.on_click
+         function="SceneExplorer.ToggleShow"
+         parameter="derendered" />
+    </menu_item_check>
+    <menu_item_check
+     label="Show Owners"
+     name="show_owners"
+     tool_tip="Append the owner's name to each row once it has resolved">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckShow"
+         parameter="owners" />
+        <menu_item_check.on_click
+         function="SceneExplorer.ToggleShow"
+         parameter="owners" />
+    </menu_item_check>
+    <menu_item_separator />
+    <menu_item_check
+     label="Full Region Coverage (360)"
+     name="full_region"
+     tool_tip="Ask the simulator to stream every object in the region while the explorer is open, instead of only what the camera can see">
+        <menu_item_check.on_check
+         function="SceneExplorer.CheckShow"
+         parameter="full_region" />
+        <menu_item_check.on_click
+         function="SceneExplorer.ToggleShow"
+         parameter="full_region" />
+    </menu_item_check>
+</toggleable_menu>

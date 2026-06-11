@@ -35,16 +35,82 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
-        <key>ALSceneExplorerLimitRadius</key>
+        <key>ALSceneExplorerSearchType</key>
         <map>
             <key>Comment</key>
-            <string>Scene Explorer: only show objects within ALSceneExplorerRadius meters of the agent.</string>
+            <string>Scene Explorer: which field the filter text searches (0 name, 1 description, 2 owner, 3 UUID, 4 all).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSceneExplorerSelectionSync</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: mirror selection between the tree and the world (tree rows select in-world while Build/Inspect is open; in-world selection highlights its row).</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>Boolean</string>
             <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALSceneExplorerScope</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: spatial scope of the filter (0 whole region, 1 agent's parcel, 2 within ALSceneExplorerRadius meters).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>ALSceneExplorerTypeFilter</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: geometry-type filter mask (bits: 1 prim, 2 mesh, 4 sculpt; 0 = any).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSceneExplorerMinLandImpact</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: show only linksets with at least this much land impact (0 = off).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0</real>
+        </map>
+        <key>ALSceneExplorerMinTriangles</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: show only objects with at least this many triangles (0 = off).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALSceneExplorerOwnerSuffix</key>
+        <map>
+            <key>Comment</key>
+            <string>Scene Explorer: append the owner's display name to each row once resolved.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
         </map>
         <key>ALSceneExplorerOwnerFilter</key>
         <map>

@@ -18,6 +18,7 @@
 #include "../llui/llfolderviewmodel.h"
 
 #include "alobjectproperties.h"
+#include "alsceneexplorerpredicate.h"
 #include "lltimer.h"
 #include "lluuid.h"
 
@@ -66,17 +67,44 @@ public:
         OWNER_SPECIFIC      // a single owner/group id ("Filter by this owner")
     };
 
+    // Which field the text predicate searches (the inventory search-type
+    // combo pattern). Order matches the search_type combo in the XUI.
+    enum ESearchType : U32
+    {
+        SEARCH_NAME = 0,
+        SEARCH_DESCRIPTION,
+        SEARCH_OWNER,       // resolved owner/group display name
+        SEARCH_UUID,
+        SEARCH_ALL
+    };
+
+    // Spatial scope. Order matches the scope radio in the filters floater.
+    enum EScope : U32
+    {
+        SCOPE_REGION = 0,
+        SCOPE_PARCEL,       // the parcel the agent is standing on
+        SCOPE_RADIUS        // within N m of the agent
+    };
+
     ALSceneExplorerFilter();
     ~ALSceneExplorerFilter() override = default;
 
     // Predicate setters (called by the floater); each bumps the generation.
     void setFilterSubString(const std::string& string);
+    void setSearchType(ESearchType type);
     void setOwnerMode(EOwnerMode mode);
     void setOwnerId(const LLUUID& id);  // target for OWNER_SPECIFIC
     void setGeomMask(U32 mask);     // bits: 1 << ALObjectProperties::EGeom
     void setFlagMask(U32 mask);     // bits: ALObjectProperties::EFlag (require all)
-    void setRadius(F32 radius, bool limit);
-    bool isLimitRadiusActive() const { return mLimitRadius; }
+    void setScope(EScope scope, F32 radius);
+    void setMinLandImpact(F32 min_li);
+    void setMinTriangles(U32 min_tris);
+    // Scope predicates depend on the agent's position/parcel, which the
+    // filter can't observe — the floater re-arms on agent movement.
+    bool isScopeActive() const
+    {
+        return mConstraints.mScope != (U32)ALSceneExplorerPredicate::SCOPE_REGION;
+    }
 
     // LLFolderViewFilter
     bool check(const LLFolderViewModelItem* item) override;
@@ -87,14 +115,22 @@ public:
 
     bool showAllResults() const override { return false; }
 
-    std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const override { return std::string::npos; }
-    std::string::size_type getFilterStringSize() const override { return mFilterSubString.size(); }
+    // Offset of the text match within the item's display name (npos when the
+    // match landed in another field), so the folder view draws the standard
+    // inventory match highlight.
+    std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const override;
+    std::string::size_type getFilterStringSize() const override { return mConstraints.mFilterSubString.size(); }
 
     bool isActive() const override;
     bool isModified() const override { return mModified; }
-    void clearModified() override { mModified = false; }
+    void clearModified() override
+    {
+        mModified = false;
+        // The pending refilter is done; the next change starts a new batch.
+        mFilterModified = FILTER_NONE;
+    }
     const std::string& getName() const override { return mName; }
-    const std::string& getFilterText() override { return mFilterSubString; }
+    const std::string& getFilterText() override { return mConstraints.mFilterSubString; }
     void setModified(EFilterModified behavior = FILTER_RESTART) override;
 
     // Time-slice filtering the way LLInventoryFilter does: each pass gets a few
@@ -114,24 +150,32 @@ public:
     void markDefault() override {}
     void resetDefault() override {}
 
-    S32 getCurrentGeneration() const override { return mGeneration; }
-    S32 getFirstSuccessGeneration() const override { return mGeneration; }
-    S32 getFirstRequiredGeneration() const override { return mGeneration; }
+    // Multi-generation scheme (the LLInventoryFilter model): current bumps on
+    // every change; items that PASSED at >= first-success still pass (so they
+    // stay visible while a less-restrictive change refilters); items that
+    // FAILED at >= first-required still fail (so a more-restrictive change
+    // can re-stamp them without re-evaluating the predicate).
+    S32 getCurrentGeneration() const override { return mCurrentGeneration; }
+    S32 getFirstSuccessGeneration() const override { return mFirstSuccessGeneration; }
+    S32 getFirstRequiredGeneration() const override { return mFirstRequiredGeneration; }
 
 private:
-    bool matches(const ALSceneExplorerItem* item) const;
+    // Map a classified constraint change onto the generation bookkeeping
+    // (CHANGE_NONE is a no-op).
+    void applyChange(ALSceneExplorerPredicate::EFilterChange change);
 
     std::string mName;
     std::string mEmptyLookupMessage;
-    std::string mFilterSubString;   // lowercased
-    EOwnerMode  mOwnerMode  = OWNER_ANY;
-    LLUUID      mOwnerId;           // OWNER_SPECIFIC target
-    U32         mGeomMask   = 0;
-    U32         mFlagMask   = 0;
-    F32         mRadius     = 64.f;
-    bool        mLimitRadius = false;
-    bool        mModified   = false;
-    S32         mGeneration = 1;
+    // The predicate state itself lives in the pure, unit-tested constraint
+    // set; this class is the LLFolderViewFilter adapter around it. The
+    // setters above keep writing through, and check() supplies the impure
+    // facts (agent id, parcel containment) per item.
+    ALSceneExplorerPredicate::Constraints mConstraints;
+    bool            mModified   = false;
+    EFilterModified mFilterModified = FILTER_NONE; // merged kind of the pending batch
+    S32         mCurrentGeneration       = 1;
+    S32         mFirstSuccessGeneration  = 1;
+    S32         mFirstRequiredGeneration = 1;
     LLTimer     mFilterTime;        // per-pass time budget for filter()
 };
 
@@ -205,7 +249,13 @@ public:
     const LLUUID& getUUID() const { return mUUID; }
     const ALObjectProperties::Record& getRecord() const { return mRecord; }
     ALObjectProperties::Record& getRecordRef() { return mRecord; }
-    const std::string& getSearchableText() const { return mSearchable; }
+
+    // Pre-lowercased per-field search text for the filter (kept separate so
+    // the search-type combo can target one field without allocation churn).
+    const std::string& searchName() const  { return mSearchName; }
+    const std::string& searchDesc() const  { return mSearchDesc; }
+    const std::string& searchUUID() const  { return mSearchUUID; }
+    const std::string& searchOwner() const { return mOwnerSearch; }
 
     void setName(const std::string& name);
     void updateRecord(const ALObjectProperties::Record& rec);
@@ -228,6 +278,16 @@ public:
     bool wasCostRequested() const { return mCostRequested; }
     void noteCostRequested() { mCostRequested = true; }
 
+    // Explicit Refresh: re-arm the bounded retry and cost demand so the
+    // fetch pipeline may ask the server again.
+    void resetFetchState() { mPropsRetries = 0; mCostRequested = false; }
+
+    // Resolved owner (or owning group) display name: folded into the
+    // searchable text and shown in the row suffix. Resolved and RLVa-gated
+    // by the floater.
+    void setOwnerName(const std::string& name);
+    const std::string& getOwnerName() const { return mOwnerDisplay; }
+
     // Run the configured activate action (focus/edit/inspect) on this object.
     // Invoked from the view's double-click paths only — openItem() also fires
     // when a folder is expanded, which must never trigger activation.
@@ -236,7 +296,7 @@ public:
     // LLFolderViewModelItem (non-Common)
     const std::string& getName() const override { return mName; }
     const std::string& getDisplayName() const override { return mName; }
-    const std::string& getSearchableName() const override { return mSearchable; }
+    const std::string& getSearchableName() const override { return mSearchName; }
     std::string getSearchableDescription() const override { return mRecord.mDescription; }
     std::string getSearchableCreatorName() const override { return LLStringUtil::null; }
     std::string getSearchableUUIDString() const override { return mUUID.asString(); }
@@ -283,6 +343,13 @@ public:
 
     // Real filtering (mirrors LLFolderViewModelItemInventory::filter).
     bool filter(LLFolderViewFilter& filter) override;
+    // Requests a re-arrange when this item's filtered state changes — the
+    // framework has no other filter->arrange link, so without this a filter
+    // toggle only becomes visible when something else happens to arrange
+    // (mirrors LLFolderViewModelItemInventory::setPassedFilter).
+    void setPassedFilter(bool passed, S32 filter_generation,
+                         std::string::size_type string_offset = std::string::npos,
+                         std::string::size_type string_size = 0) override;
 
 private:
     void rebuildSearchable();
@@ -290,10 +357,15 @@ private:
     EItemType                   mItemType;
     LLUUID                      mUUID;
     std::string                 mName;
-    std::string                 mSearchable;    // lowercased name+desc+uuid
+    std::string                 mSearchName;    // lowercased name
+    std::string                 mSearchDesc;    // lowercased description
+    std::string                 mSearchUUID;    // uuid string (already lowercase hex)
+    std::string                 mOwnerSearch;   // lowercased owner display name
+    std::string                 mOwnerDisplay;  // owner display name (row suffix)
     S32                         mLinkOrder = 0;
     S32                         mPropsRetries = 0;
     bool                        mCostRequested = false;
+    bool                        mPrevPassedAllFilters = false;
     ALObjectProperties::Record  mRecord;
     ALFloaterSceneExplorer*     mFloater;
 };

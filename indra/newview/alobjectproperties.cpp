@@ -82,6 +82,7 @@ void fillFromObject(Record& rec, LLViewerObject* obj, bool fetch_costs)
     if (obj->isParticleSource())    flags |= FLAG_PARTICLES;
     if (obj->isAttachment())        flags |= FLAG_ATTACHMENT;
     if (obj->isAnimatedObject())    flags |= FLAG_ANIMATED;
+    if (obj->flagTakesMoney())      flags |= FLAG_PAYABLE;
     if (obj->hasRenderMaterialParams()) flags |= FLAG_PBR_MATERIAL;
 
     // Volume-only features.
@@ -117,6 +118,9 @@ void fillFromObject(Record& rec, LLViewerObject* obj, bool fetch_costs)
             flags |= FLAG_ALPHA;
     }
 
+    // FLAG_FOR_SALE comes from the async server props (sale info), so carry
+    // the previous merge over local rebuilds.
+    flags |= (rec.mFlags & FLAG_FOR_SALE);
     rec.mFlags = flags;
 
     // Cost: cached values either way; the triggering getters additionally
@@ -167,6 +171,8 @@ std::string flagsToString(U32 flags)
         { FLAG_ATTACHMENT,       "attachment" },
         { FLAG_PBR_MATERIAL,     "PBR"        },
         { FLAG_ALPHA,            "alpha"      },
+        { FLAG_PAYABLE,          "payable"    },
+        { FLAG_FOR_SALE,         "for sale"   },
     };
 
     std::string out;
@@ -251,6 +257,8 @@ void ALObjectPropertiesCache::processObjectPropertiesFamily(LLMessageSystem* msg
         ServerProps& p = self.lookupOrCreate(id);
         msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_OwnerID, p.mOwnerId);
         msg->getUUIDFast(_PREHASH_ObjectData, _PREHASH_GroupID, p.mGroupId);
+        msg->getU8Fast(_PREHASH_ObjectData, _PREHASH_SaleType, p.mSaleType);
+        msg->getS32Fast(_PREHASH_ObjectData, _PREHASH_SalePrice, p.mSalePrice);
         msg->getStringFast(_PREHASH_ObjectData, _PREHASH_Name, p.mName);
         msg->getStringFast(_PREHASH_ObjectData, _PREHASH_Description, p.mDescription);
         p.mGroupOwned = p.mOwnerId.isNull() && p.mGroupId.notNull();
@@ -287,6 +295,8 @@ void ALObjectPropertiesCache::processObjectProperties(LLMessageSystem* msg, void
         msg->getU32Fast(_PREHASH_ObjectData, _PREHASH_GroupMask, p.mGroupMask, i);
         msg->getU32Fast(_PREHASH_ObjectData, _PREHASH_EveryoneMask, p.mEveryoneMask, i);
         msg->getU32Fast(_PREHASH_ObjectData, _PREHASH_NextOwnerMask, p.mNextOwnerMask, i);
+        msg->getU8Fast(_PREHASH_ObjectData, _PREHASH_SaleType, p.mSaleType, i);
+        msg->getS32Fast(_PREHASH_ObjectData, _PREHASH_SalePrice, p.mSalePrice, i);
         msg->getStringFast(_PREHASH_ObjectData, _PREHASH_Name, p.mName, i);
         msg->getStringFast(_PREHASH_ObjectData, _PREHASH_Description, p.mDescription, i);
         p.mGroupOwned = p.mOwnerId.isNull() && p.mGroupId.notNull();

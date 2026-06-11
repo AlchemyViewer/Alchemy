@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater
+ legacy_header_height="18"
+ can_resize="false"
+ height="500"
+ layout="topleft"
+ name="scene_explorer_filters"
+ help_topic="scene_explorer_filters"
+ save_rect="true"
+ single_instance="true"
+ title="Scene Explorer Filters"
+ width="340">
+    <text
+     follows="left|top"
+     height="14"
+     layout="topleft"
+     name="match_note"
+     left="10"
+     top="24"
+     width="320">Show only objects matching all checked filters:</text>
+    <text
+     follows="left|top"
+     font.style="BOLD"
+     height="14"
+     layout="topleft"
+     name="label_type"
+     left="10"
+     top_pad="8"
+     width="320">Type</text>
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Prim"
+     layout="topleft"
+     name="check_type_prim"
+     tool_tip="Show only regular prims"
+     left="18"
+     top_pad="4"
+     width="90" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Mesh"
+     layout="topleft"
+     name="check_type_mesh"
+     tool_tip="Show only mesh objects"
+     left_pad="14"
+     top_delta="0"
+     width="90" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Sculpt"
+     layout="topleft"
+     name="check_type_sculpt"
+     tool_tip="Show only sculpted prims"
+     left_pad="14"
+     top_delta="0"
+     width="90" />
+    <text
+     follows="left|top"
+     font.style="BOLD"
+     height="14"
+     layout="topleft"
+     name="label_features"
+     left="10"
+     top_pad="10"
+     width="320">Features</text>
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Scripted"
+     layout="topleft"
+     name="check_scripted"
+     tool_tip="Only objects containing scripts"
+     left="18"
+     top_pad="4"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Physics"
+     layout="topleft"
+     name="check_physics"
+     tool_tip="Only physical objects"
+     left="178"
+     top_delta="0"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Phantom"
+     layout="topleft"
+     name="check_phantom"
+     tool_tip="Only phantom objects (no collision)"
+     left="18"
+     top_pad="3"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Temporary"
+     layout="topleft"
+     name="check_temporary"
+     tool_tip="Only temporary-on-rez objects"
+     left="178"
+     top_delta="0"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Flexible"
+     layout="topleft"
+     name="check_flexible"
+     tool_tip="Only flexible prims"
+     left="18"
+     top_pad="3"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Light"
+     layout="topleft"
+     name="check_light"
+     tool_tip="Only light-emitting objects"
+     left="178"
+     top_delta="0"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Spotlight"
+     layout="topleft"
+     name="check_spotlight"
+     tool_tip="Only lights with a spotlight cone"
+     left="18"
+     top_pad="3"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Projector"
+     layout="topleft"
+     name="check_projector"
+     tool_tip="Only lights with a projection texture"
+     left="178"
+     top_delta="0"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Glow"
+     layout="topleft"
+     name="check_glow"
+     tool_tip="Only objects with glow on any face"
+     left="18"
+     top_pad="3"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Fullbright"
+     layout="topleft"
+     name="check_fullbright"
+     tool_tip="Only objects with a fullbright face"
+     left="178"
+     top_delta="0"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Media"
+     layout="topleft"
+     name="check_media"
+     tool_tip="Only objects with media on a face"
+     left="18"
+     top_pad="3"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Particles"
+     layout="topleft"
+     name="check_particles"
+     tool_tip="Only particle sources"
+     left="178"
+     top_delta="0"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Reflection probe"
+     layout="topleft"
+     name="check_probe"
+     tool_tip="Only reflection probe volumes"
+     left="18"
+     top_pad="3"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Animated mesh"
+     layout="topleft"
+     name="check_animated"
+     tool_tip="Only animated (animesh) objects"
+     left="178"
+     top_delta="0"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="PBR materials"
+     layout="topleft"
+     name="check_pbr"
+     tool_tip="Only objects with a PBR material on any face"
+     left="18"
+     top_pad="3"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Transparency"
+     layout="topleft"
+     name="check_alpha"
+     tool_tip="Only objects with a transparent face"
+     left="178"
+     top_delta="0"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Attachment"
+     layout="topleft"
+     name="check_attachment"
+     tool_tip="Only worn attachments"
+     left="18"
+     top_pad="3"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="For sale"
+     layout="topleft"
+     name="check_for_sale"
+     tool_tip="Only objects set for sale"
+     left="178"
+     top_delta="0"
+     width="150" />
+    <check_box
+     follows="left|top"
+     height="16"
+     label="Pays scripts (payable)"
+     layout="topleft"
+     name="check_payable"
+     tool_tip="Only objects that accept payments"
+     left="18"
+     top_pad="3"
+     width="150" />
+    <text
+     follows="left|top"
+     font.style="BOLD"
+     height="14"
+     layout="topleft"
+     name="label_scope"
+     left="10"
+     top_pad="10"
+     width="320">Scope</text>
+    <radio_group
+     follows="left|top"
+     height="54"
+     layout="topleft"
+     name="scope_radio"
+     tool_tip="Spatial scope of the results"
+     left="18"
+     top_pad="4"
+     width="140">
+        <radio_item
+         height="16"
+         label="Whole region"
+         layout="topleft"
+         name="scope_region"
+         tool_tip="Everything in the region"
+         top="0"
+         width="140" />
+        <radio_item
+         height="16"
+         label="This parcel"
+         layout="topleft"
+         name="scope_parcel"
+         tool_tip="Only objects on the parcel you are standing on"
+         top_pad="3"
+         width="140" />
+        <radio_item
+         height="16"
+         label="Within radius"
+         layout="topleft"
+         name="scope_radius"
+         tool_tip="Only objects within the radius of you"
+         top_pad="3"
+         width="140" />
+    </radio_group>
+    <slider
+     follows="left|top"
+     height="18"
+     decimal_digits="0"
+     increment="1"
+     initial_value="64"
+     layout="topleft"
+     max_val="512"
+     min_val="8"
+     name="radius_slider"
+     tool_tip="Radius in meters around you"
+     left="166"
+     top_delta="38"
+     width="160" />
+    <text
+     follows="left|top"
+     font.style="BOLD"
+     height="14"
+     layout="topleft"
+     name="label_heaviness"
+     left="10"
+     top_pad="10"
+     width="320">Heaviness</text>
+    <spinner
+     follows="left|top"
+     decimal_digits="0"
+     height="20"
+     increment="1"
+     label="Min land impact"
+     label_width="96"
+     layout="topleft"
+     max_val="100000"
+     min_val="0"
+     name="min_li_spinner"
+     tool_tip="Show only linksets with at least this much land impact (0 = off)"
+     left="18"
+     top_pad="6"
+     width="160" />
+    <spinner
+     follows="left|top"
+     decimal_digits="0"
+     height="20"
+     increment="1000"
+     label="Min triangles"
+     label_width="96"
+     layout="topleft"
+     max_val="10000000"
+     min_val="0"
+     name="min_tris_spinner"
+     tool_tip="Show only objects with at least this many triangles (0 = off)"
+     left="18"
+     top_pad="4"
+     width="180" />
+    <button
+     follows="left|bottom"
+     height="23"
+     label="Reset All Filters"
+     layout="topleft"
+     name="reset_btn"
+     tool_tip="Clear every filter, including the explorer's quick bar"
+     left="10"
+     bottom="-10"
+     width="120" />
+</floater>

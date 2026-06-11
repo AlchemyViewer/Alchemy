@@ -171,7 +171,9 @@ set(viewer_SOURCE_FILES
     alfloaterprogressview.cpp
     alfloaterregiontracker.cpp
     alfloatersceneexplorer.cpp
+    alfloatersceneexplorerfilters.cpp
     alfloatertransactionlog.cpp
+    alsceneexplorerpredicate.cpp
     alfloaterwebprofile.cpp
     allegacynotificationwellwindow.cpp
     alobjectproperties.cpp
@@ -936,7 +938,9 @@ set(viewer_HEADER_FILES
     alfloaterprogressview.h
     alfloaterregiontracker.h
     alfloatersceneexplorer.h
+    alfloatersceneexplorerfilters.h
     alfloatertransactionlog.h
+    alsceneexplorerpredicate.h
     alfloaterwebprofile.h
     allegacynotificationwellwindow.h
     alobjectproperties.h
@@ -2357,6 +2361,7 @@ if (BUILD_TESTING)
   # This creates a separate test project per file listed.
 
   SET(viewer_TEST_SOURCE_FILES
+    alsceneexplorerpredicate.cpp
     llagentaccess.cpp
     lldateutil.cpp
 #    llmediadataclient.cpp

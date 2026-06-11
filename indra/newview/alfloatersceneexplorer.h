@@ -15,6 +15,7 @@
 #define AL_FLOATERSCENEEXPLORER_H
 
 #include <deque>
+#include <functional>
 
 #include <boost/signals2.hpp>
 #include <boost/unordered_map.hpp>
@@ -54,6 +55,11 @@ public:
     // ALSceneExplorerItem::buildContextMenu) and by the gear button.
     void buildRowContextMenu(LLMenuGL& menu, U32 flags);
 
+    // Re-read the persisted filter settings into the quick-bar controls and
+    // the filter object. The companion filters floater calls this after
+    // writing settings, keeping both surfaces views of the same state.
+    void refreshFilters();
+
 private:
     ALFloaterSceneExplorer(const LLSD& key);
     ~ALFloaterSceneExplorer() override;
@@ -62,6 +68,7 @@ private:
     static void onIdle(void* user_data);
     void idleUpdate();
     void drainBuildQueue(F64 max_time);
+    void drainRefillQueue(F64 max_time);
 
     // --- tree construction ------------------------------------------------
     void buildTree();
@@ -89,9 +96,16 @@ private:
 
     // --- full-region (360) coverage + scalability ---------------------------
     void applyFullRegionMode(bool active);
+    void forEachVisibleRow(const std::function<void(ALSceneExplorerItem*, LLFolderViewItem*)>& fn);
     void scanVisibleRows();
     void updateStatusText();
     void requestCostsFor(ALSceneExplorerItem* item);
+
+    // --- owner name resolution (search + suffix) ----------------------------
+    void noteOwnerFor(ALSceneExplorerItem* item);
+    void resolveOwnerName(const LLUUID& owner_id, bool group_owned);
+    void onOwnerNameResolved(const LLUUID& owner_id, const std::string& name, bool is_group);
+    void auditOwnerNames();
 
     // --- filters / sort ---------------------------------------------------
     void onFilterChanged();
@@ -101,6 +115,8 @@ private:
     bool checkShow(const LLSD& param) const;
     void doResetFilters();
     void doFilterByOwner();
+    void doShowFilters();
+    void updateOwnerFilterLabel();
     void updateCategoryCounts();
     void updateActionButtons();
 
@@ -112,7 +128,12 @@ private:
 
     // --- actions ----------------------------------------------------------
     void syncSelectionToWorld();
+    void onWorldSelectionChanged();
+    void syncSelectionFromWorld();
+    void doSelectAllResults();
+    void doRefresh();
     ALSceneExplorerItem* getSelectedItem() const;
+    std::vector<ALSceneExplorerItem*> getSelectedSceneItems() const;
     LLViewerObject* getSelectedObject() const;
     void selectInWorld(const uuid_vec_t& ids);
     void openBuildTools();
@@ -167,15 +188,35 @@ private:
     std::deque<LLUUID>            mBuildQueue;
     boost::unordered_set<LLUUID>  mQueued;
 
+    // Explicit Refresh: rows awaiting a time-sliced local Record re-fill
+    // (per-face flags, geometry, prim counts go stale after node build).
+    std::deque<LLUUID>            mRefillQueue;
+
     boost::signals2::connection mPropsConn;
     boost::signals2::connection mDerenderConn;
+    boost::signals2::connection mWorldSelConn;
+
+    // Owner display names for the searchable text and row suffixes, resolved
+    // once per unique owner/group id. An empty name records "unresolved or
+    // RLVa-hidden"; auditOwnerNames() re-resolves/scrubs entries when the
+    // @shownames restriction flips mid-session (groups are never hidden).
+    struct ResolvedOwner
+    {
+        std::string mName;
+        bool        mIsGroup = false;
+    };
+    boost::unordered_map<LLUUID, ResolvedOwner> mOwnerNames;
+    boost::unordered_set<LLUUID>                mOwnerNamesPending;
 
     LLFrameTimer mReconcileTimer;
     LLFrameTimer mFetchTimer;
     LLFrameTimer mRetryTimer;
 
     U64        mLastRegionHandle = 0;
-    LLUUID     mLastSelectedID;
+    // Last id set synced between the tree and the world selection, kept
+    // sorted — used for change detection in both directions, which is also
+    // what breaks the world<->tree feedback loop.
+    uuid_vec_t mLastPushedSelection;
     LLUUID     mLastButtonStateID;  // selection the action buttons were last gated for
     LLUUID     mLastDetailID;       // selection the detail pane was last built for
     LLUUID     mLastFacesID;        // selection the faces list was last built for
@@ -188,8 +229,10 @@ private:
     bool       mShowAvatars   = true;
     bool       mShowDerendered = false;
     bool       mFullRegion    = false;
+    bool       mSelectionSync = true;  // passive tree<->world selection mirroring
     bool       mObjectsMoved  = false; // any object moved since the last re-sort
     bool       mScanVisible   = false; // run scanVisibleRows after the next arrange
+    bool       mWorldSelectionDirty = false; // LLSelectMgr signalled a change
     bool       mDetailsExpanded = false;
     bool       mDetailDirty   = false;
     bool       mSyncingSelection = false;

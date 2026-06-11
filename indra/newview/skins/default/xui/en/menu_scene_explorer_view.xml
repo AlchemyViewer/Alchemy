@@ -66,38 +66,31 @@
     </menu_item_check>
     <menu_item_separator />
     <menu_item_check
-     label="Show Avatars"
-     name="show_avatars">
+     label="Sync Selection with World"
+     name="selection_sync"
+     tool_tip="Mirror selection between the tree and the world: tree rows select in-world while Build or Inspect is open, and in-world selection highlights its row">
         <menu_item_check.on_check
          function="SceneExplorer.CheckShow"
-         parameter="avatars" />
+         parameter="selection_sync" />
         <menu_item_check.on_click
          function="SceneExplorer.ToggleShow"
-         parameter="avatars" />
-    </menu_item_check>
-    <menu_item_check
-     label="Show Derendered"
-     name="show_derendered">
-        <menu_item_check.on_check
-         function="SceneExplorer.CheckShow"
-         parameter="derendered" />
-        <menu_item_check.on_click
-         function="SceneExplorer.ToggleShow"
-         parameter="derendered" />
+         parameter="selection_sync" />
     </menu_item_check>
     <menu_item_separator />
-    <menu_item_check
-     label="Full Region Coverage (360)"
-     name="full_region"
-     tool_tip="Ask the simulator to stream every object in the region while the explorer is open, instead of only what the camera can see">
-        <menu_item_check.on_check
-         function="SceneExplorer.CheckShow"
-         parameter="full_region" />
-        <menu_item_check.on_click
-         function="SceneExplorer.ToggleShow"
-         parameter="full_region" />
-    </menu_item_check>
-    <menu_item_separator />
+    <menu_item_call
+     label="Filters..."
+     name="show_filters"
+     tool_tip="Open the full filter set: type, features, commerce, scope and heaviness">
+        <menu_item_call.on_click
+         function="SceneExplorer.ShowFilters" />
+    </menu_item_call>
+    <menu_item_call
+     label="Select All Results"
+     name="select_all_results"
+     tool_tip="Select every row matching the current filter, for batch actions like Return or Derender">
+        <menu_item_call.on_click
+         function="SceneExplorer.SelectAllResults" />
+    </menu_item_call>
     <menu_item_call
      label="Reset Filters"
      name="reset_filters">

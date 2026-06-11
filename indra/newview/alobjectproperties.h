@@ -70,7 +70,9 @@ namespace ALObjectProperties
         FLAG_ATTACHMENT       = 1 << 14,
         FLAG_PBR_MATERIAL     = 1 << 15,  // has a GLTF render material on any face
         FLAG_ALPHA            = 1 << 16,  // any face is alpha-blended / transparent
-        FLAG_AVATAR           = 1 << 17
+        FLAG_AVATAR           = 1 << 17,
+        FLAG_PAYABLE          = 1 << 18,  // pays a script on payment (takes money)
+        FLAG_FOR_SALE         = 1 << 19   // server sale info (set when props arrive)
     };
 
     struct Record
@@ -110,6 +112,8 @@ namespace ALObjectProperties
         LLUUID      mCreatorId;
         bool        mGroupOwned     = false;
         time_t      mCreationDate   = 0;
+        U8          mSaleType       = 0;   // LLSaleInfo::EForSale; 0 = not for sale
+        S32         mSalePrice      = 0;
 
         bool hasFlag(EFlag f) const { return (mFlags & f) != 0; }
     };
@@ -164,6 +168,9 @@ public:
         LLUUID      mCreatorId;
         bool        mGroupOwned   = false;
         time_t      mCreationDate = 0;
+        // Sale info (both reply flavours carry it).
+        U8          mSaleType     = 0;   // LLSaleInfo::EForSale; 0 = not for sale
+        S32         mSalePrice    = 0;
         // Permission masks (full ObjectProperties only).
         U32         mBaseMask      = 0;
         U32         mOwnerMask     = 0;

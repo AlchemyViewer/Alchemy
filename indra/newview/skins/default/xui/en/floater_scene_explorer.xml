@@ -13,16 +13,44 @@
  title="Scene Explorer"
  width="470">
     <floater.string name="no_matches">No matching objects</floater.string>
+    <combo_box
+     follows="left|top"
+     height="22"
+     layout="topleft"
+     name="search_type_combo"
+     tool_tip="Search by"
+     left="8"
+     top="22"
+     width="92">
+        <combo_box.item label="Name" name="name" value="0" />
+        <combo_box.item label="Description" name="description" value="1" />
+        <combo_box.item label="Owner" name="owner" value="2" />
+        <combo_box.item label="UUID" name="uuid" value="3" />
+        <combo_box.item label="All" name="all" value="4" />
+    </combo_box>
+    <menu_button
+     follows="left|top"
+     height="22"
+     image_overlay="Inv_Toolbar_SearchVisibility"
+     layout="topleft"
+     menu_filename="menu_scene_explorer_visibility.xml"
+     menu_position="bottomleft"
+     name="visibility_btn"
+     tool_tip="Choose what the tree displays"
+     left_pad="4"
+     top_delta="0"
+     width="31" />
     <filter_editor
      follows="left|top|right"
      height="22"
      layout="topleft"
-     label="Filter by name, description or UUID"
+     label="Enter search text"
      name="filter_input"
      text_pad_left="10"
-     left="8"
-     top="22"
-     width="419" />
+     tool_tip="Filter the tree by the field chosen in the Search-by selector"
+     left_pad="4"
+     top_delta="0"
+     width="288" />
     <menu_button
      follows="top|right"
      height="22"
@@ -56,6 +84,7 @@
      label="Scripted"
      layout="topleft"
      name="flag_scripted"
+     tool_tip="Only objects containing scripts (the Filters window holds the full set)"
      left_pad="8"
      top_delta="2"
      width="76" />
@@ -65,6 +94,7 @@
      label="Light"
      layout="topleft"
      name="flag_light"
+     tool_tip="Only light-emitting objects"
      left_pad="4"
      top_delta="0"
      width="58" />
@@ -74,6 +104,7 @@
      label="Particles"
      layout="topleft"
      name="flag_particles"
+     tool_tip="Only particle sources"
      left_pad="4"
      top_delta="0"
      width="80" />
@@ -83,6 +114,7 @@
      label="Within"
      layout="topleft"
      name="limit_radius_check"
+     tool_tip="Only objects within the radius of you (the Filters window adds a parcel scope)"
      left="8"
      top_pad="8"
      width="70" />
@@ -96,7 +128,7 @@
      max_val="512"
      min_val="8"
      name="radius_slider"
-     tool_tip="Radius (m)"
+     tool_tip="Radius in meters around you"
      left_pad="2"
      top_delta="0"
      width="374" />
@@ -260,6 +292,7 @@
                  label="Modify"
                  layout="topleft"
                  name="check_modify"
+                 tool_tip="Whether the owner may modify this object (display only)"
                  left="64"
                  top_delta="0"
                  width="66" />
@@ -269,6 +302,7 @@
                  label="Copy"
                  layout="topleft"
                  name="check_copy"
+                 tool_tip="Whether the owner may copy this object (display only)"
                  left_pad="4"
                  top_delta="0"
                  width="56" />
@@ -278,6 +312,7 @@
                  label="Transfer"
                  layout="topleft"
                  name="check_transfer"
+                 tool_tip="Whether the owner may transfer this object (display only)"
                  left_pad="4"
                  top_delta="0"
                  width="72" />
@@ -423,6 +458,7 @@
                  label="Scripted"
                  layout="topleft"
                  name="check_scripted"
+                 tool_tip="Contains scripts (display only)"
                  left="64"
                  top_delta="0"
                  width="70" />
@@ -432,6 +468,7 @@
                  label="Light"
                  layout="topleft"
                  name="check_light"
+                 tool_tip="Emits light (display only)"
                  left_pad="2"
                  top_delta="0"
                  width="54" />
@@ -441,6 +478,7 @@
                  label="Physics"
                  layout="topleft"
                  name="check_physics"
+                 tool_tip="Physical object (display only)"
                  left_pad="2"
                  top_delta="0"
                  width="68" />
@@ -450,6 +488,7 @@
                  label="Phantom"
                  layout="topleft"
                  name="check_phantom"
+                 tool_tip="No collision (display only)"
                  left_pad="2"
                  top_delta="0"
                  width="74" />
@@ -459,6 +498,7 @@
                  label="Temp"
                  layout="topleft"
                  name="check_temp"
+                 tool_tip="Temporary on rez - auto-deletes (display only)"
                  left_pad="2"
                  top_delta="0"
                  width="56" />
@@ -562,6 +602,7 @@
                  follows="all"
                  layout="topleft"
                  name="detail_faces"
+                 tool_tip="Per-face materials and textures of the selected object (asset IDs show only for full-permission assets)"
                  left="0"
                  top="0"
                  width="454"
@@ -594,6 +635,7 @@
      label="Focus"
      layout="topleft"
      name="focus_btn"
+     tool_tip="Zoom the camera to the selected row"
      left_pad="4"
      bottom_delta="0"
      width="58" />
@@ -603,6 +645,7 @@
      label="Edit"
      layout="topleft"
      name="edit_btn"
+     tool_tip="Open the selected object in the build tools"
      left_pad="2"
      bottom_delta="0"
      width="58" />
@@ -612,6 +655,7 @@
      label="Inspect"
      layout="topleft"
      name="inspect_btn"
+     tool_tip="Open the selected object in the Inspect window"
      left_pad="2"
      bottom_delta="0"
      width="62" />
@@ -631,6 +675,7 @@
      label="TP"
      layout="topleft"
      name="teleport_btn"
+     tool_tip="Teleport to the selected row's position"
      left_pad="2"
      bottom_delta="0"
      width="44" />

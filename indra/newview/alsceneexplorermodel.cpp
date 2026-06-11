@@ -20,6 +20,8 @@
 #include "llagent.h"
 #include "lltooltip.h"
 #include "llui.h"
+#include "llviewercontrol.h"
+#include "llviewerparcelmgr.h"
 
 // ============================================================================
 // ALSceneExplorerSort
@@ -92,82 +94,234 @@ bool ALSceneExplorerSort::operator()(const ALSceneExplorerItem* a, const ALScene
 // ============================================================================
 // ALSceneExplorerFilter
 // ============================================================================
+
+// The UI-facing enums must mirror the pure predicate's numeric twins; the
+// floater persists and casts the raw values.
+static_assert((U32)ALSceneExplorerFilter::SEARCH_NAME == (U32)ALSceneExplorerPredicate::SEARCH_NAME);
+static_assert((U32)ALSceneExplorerFilter::SEARCH_DESCRIPTION == (U32)ALSceneExplorerPredicate::SEARCH_DESCRIPTION);
+static_assert((U32)ALSceneExplorerFilter::SEARCH_OWNER == (U32)ALSceneExplorerPredicate::SEARCH_OWNER);
+static_assert((U32)ALSceneExplorerFilter::SEARCH_UUID == (U32)ALSceneExplorerPredicate::SEARCH_UUID);
+static_assert((U32)ALSceneExplorerFilter::SEARCH_ALL == (U32)ALSceneExplorerPredicate::SEARCH_ALL);
+static_assert((U32)ALSceneExplorerFilter::OWNER_ANY == (U32)ALSceneExplorerPredicate::OWNER_ANY);
+static_assert((U32)ALSceneExplorerFilter::OWNER_MINE == (U32)ALSceneExplorerPredicate::OWNER_MINE);
+static_assert((U32)ALSceneExplorerFilter::OWNER_GROUP == (U32)ALSceneExplorerPredicate::OWNER_GROUP);
+static_assert((U32)ALSceneExplorerFilter::OWNER_OTHERS == (U32)ALSceneExplorerPredicate::OWNER_OTHERS);
+static_assert((U32)ALSceneExplorerFilter::OWNER_SPECIFIC == (U32)ALSceneExplorerPredicate::OWNER_SPECIFIC);
+static_assert((U32)ALSceneExplorerFilter::SCOPE_REGION == (U32)ALSceneExplorerPredicate::SCOPE_REGION);
+static_assert((U32)ALSceneExplorerFilter::SCOPE_PARCEL == (U32)ALSceneExplorerPredicate::SCOPE_PARCEL);
+static_assert((U32)ALSceneExplorerFilter::SCOPE_RADIUS == (U32)ALSceneExplorerPredicate::SCOPE_RADIUS);
+
 ALSceneExplorerFilter::ALSceneExplorerFilter()
 :   mName("scene_explorer")
 {
+}
+
+void ALSceneExplorerFilter::applyChange(ALSceneExplorerPredicate::EFilterChange change)
+{
+    switch (change)
+    {
+    case ALSceneExplorerPredicate::CHANGE_NONE:
+        return;
+    case ALSceneExplorerPredicate::CHANGE_MORE_RESTRICTIVE:
+        setModified(FILTER_MORE_RESTRICTIVE);
+        return;
+    case ALSceneExplorerPredicate::CHANGE_LESS_RESTRICTIVE:
+        setModified(FILTER_LESS_RESTRICTIVE);
+        return;
+    case ALSceneExplorerPredicate::CHANGE_RESTART:
+    default:
+        setModified(FILTER_RESTART);
+        return;
+    }
 }
 
 void ALSceneExplorerFilter::setFilterSubString(const std::string& string)
 {
     std::string lower(string);
     LLStringUtil::toLower(lower);
-    if (lower != mFilterSubString)
+    if (lower != mConstraints.mFilterSubString)
     {
-        mFilterSubString = lower;
-        setModified(FILTER_RESTART);
+        const ALSceneExplorerPredicate::EFilterChange change =
+            ALSceneExplorerPredicate::classifySubstringChange(mConstraints.mFilterSubString, lower);
+        mConstraints.mFilterSubString = lower;
+        applyChange(change);
+    }
+}
+
+void ALSceneExplorerFilter::setSearchType(ESearchType type)
+{
+    if ((U32)type != mConstraints.mSearchType)
+    {
+        mConstraints.mSearchType = (U32)type;
+        // A different field is an unrelated predicate; only matters while a
+        // text predicate is set.
+        if (!mConstraints.mFilterSubString.empty())
+            setModified(FILTER_RESTART);
     }
 }
 
 void ALSceneExplorerFilter::setOwnerMode(EOwnerMode mode)
 {
-    if (mode != mOwnerMode)
+    if ((U32)mode != mConstraints.mOwnerMode)
     {
-        mOwnerMode = mode;
-        setModified(FILTER_RESTART);
+        // ANY passes everything, so entering a mode only narrows and leaving
+        // one only widens; switching between two real modes is unrelated.
+        const bool was_any = (mConstraints.mOwnerMode == (U32)OWNER_ANY);
+        mConstraints.mOwnerMode = (U32)mode;
+        if (was_any)
+            setModified(FILTER_MORE_RESTRICTIVE);
+        else if (mode == OWNER_ANY)
+            setModified(FILTER_LESS_RESTRICTIVE);
+        else
+            setModified(FILTER_RESTART);
     }
 }
 
 void ALSceneExplorerFilter::setOwnerId(const LLUUID& id)
 {
-    if (id != mOwnerId)
+    if (id != mConstraints.mOwnerId)
     {
-        mOwnerId = id;
-        if (mOwnerMode == OWNER_SPECIFIC)
+        mConstraints.mOwnerId = id;
+        // A different target invalidates passes and fails alike.
+        if (mConstraints.mOwnerMode == (U32)OWNER_SPECIFIC)
             setModified(FILTER_RESTART);
     }
 }
 
 void ALSceneExplorerFilter::setGeomMask(U32 mask)
 {
-    if (mask != mGeomMask)
+    if (mask != mConstraints.mGeomMask)
     {
-        mGeomMask = mask;
-        setModified(FILTER_RESTART);
+        const ALSceneExplorerPredicate::EFilterChange change =
+            ALSceneExplorerPredicate::classifyAllowedMaskChange(mConstraints.mGeomMask, mask);
+        mConstraints.mGeomMask = mask;
+        applyChange(change);
     }
 }
 
 void ALSceneExplorerFilter::setFlagMask(U32 mask)
 {
-    if (mask != mFlagMask)
+    if (mask != mConstraints.mFlagMask)
     {
-        mFlagMask = mask;
-        setModified(FILTER_RESTART);
+        const ALSceneExplorerPredicate::EFilterChange change =
+            ALSceneExplorerPredicate::classifyRequireAllMaskChange(mConstraints.mFlagMask, mask);
+        mConstraints.mFlagMask = mask;
+        applyChange(change);
     }
 }
 
-void ALSceneExplorerFilter::setRadius(F32 radius, bool limit)
+void ALSceneExplorerFilter::setScope(EScope scope, F32 radius)
 {
-    if (radius != mRadius || limit != mLimitRadius)
+    const EScope old_scope = (EScope)mConstraints.mScope;
+    const F32 old_radius = mConstraints.mRadius;
+    mConstraints.mScope = (U32)scope;
+    mConstraints.mRadius = radius; // kept current even while the scope is off
+
+    if (scope == old_scope)
     {
-        mRadius = radius;
-        mLimitRadius = limit;
+        // Same scope: only a radius change while the radius scope is active
+        // affects results, and it is monotonic.
+        if (scope == SCOPE_RADIUS && radius != old_radius)
+        {
+            setModified(radius < old_radius ? FILTER_MORE_RESTRICTIVE
+                                            : FILTER_LESS_RESTRICTIVE);
+        }
+        return;
+    }
+    // REGION passes everything spatial, so entering a spatial scope narrows
+    // and leaving one widens; switching between parcel and radius is
+    // unrelated.
+    if (old_scope == SCOPE_REGION)
+        setModified(FILTER_MORE_RESTRICTIVE);
+    else if (scope == SCOPE_REGION)
+        setModified(FILTER_LESS_RESTRICTIVE);
+    else
         setModified(FILTER_RESTART);
+}
+
+void ALSceneExplorerFilter::setMinLandImpact(F32 min_li)
+{
+    if (min_li != mConstraints.mMinLandImpact)
+    {
+        const ALSceneExplorerPredicate::EFilterChange change =
+            ALSceneExplorerPredicate::classifyMinThresholdChange(mConstraints.mMinLandImpact, min_li);
+        mConstraints.mMinLandImpact = min_li;
+        applyChange(change);
+    }
+}
+
+void ALSceneExplorerFilter::setMinTriangles(U32 min_tris)
+{
+    if (min_tris != mConstraints.mMinTriangles)
+    {
+        const ALSceneExplorerPredicate::EFilterChange change =
+            ALSceneExplorerPredicate::classifyMinThresholdChange(
+                (F32)mConstraints.mMinTriangles, (F32)min_tris);
+        mConstraints.mMinTriangles = min_tris;
+        applyChange(change);
     }
 }
 
 bool ALSceneExplorerFilter::isActive() const
 {
-    return !mFilterSubString.empty()
-        || mOwnerMode != OWNER_ANY
-        || mGeomMask != 0
-        || mFlagMask != 0
-        || mLimitRadius;
+    return !mConstraints.mFilterSubString.empty()
+        || mConstraints.mOwnerMode != (U32)OWNER_ANY
+        || mConstraints.mGeomMask != 0
+        || mConstraints.mFlagMask != 0
+        || mConstraints.mScope != (U32)SCOPE_REGION
+        || mConstraints.mMinLandImpact > 0.f
+        || mConstraints.mMinTriangles > 0;
 }
 
 void ALSceneExplorerFilter::setModified(EFilterModified behavior)
 {
     mModified = true;
-    ++mGeneration;
+    ++mCurrentGeneration;
+
+    // Merge with whatever kind of change is already pending this refilter:
+    // two different kinds in one batch degrade to a restart (inventory's
+    // rule). clearModified() resets the batch once the refilter completes.
+    if (mFilterModified == FILTER_NONE)
+        mFilterModified = behavior;
+    else if (mFilterModified != behavior)
+        mFilterModified = FILTER_RESTART;
+
+    switch (mFilterModified)
+    {
+    case FILTER_MORE_RESTRICTIVE:
+        // Old passes need revalidating; old fails certainly still fail, so
+        // first-required stays put and they can be re-stamped cheaply.
+        mFirstSuccessGeneration = mCurrentGeneration;
+        break;
+    case FILTER_LESS_RESTRICTIVE:
+        // Old fails need revalidating; old passes certainly still pass, so
+        // first-success stays put and the visible set never blanks out.
+        mFirstRequiredGeneration = mCurrentGeneration;
+        break;
+    case FILTER_RESTART:
+    default:
+        mFirstRequiredGeneration = mCurrentGeneration;
+        mFirstSuccessGeneration = mCurrentGeneration;
+        break;
+    }
+}
+
+std::string::size_type ALSceneExplorerFilter::getStringMatchOffset(LLFolderViewModelItem* item) const
+{
+    if (mConstraints.mFilterSubString.empty())
+        return std::string::npos;
+    // Only a name match can be highlighted: the widget draws the highlight at
+    // this offset within its displayed label, and the name is the only
+    // searched field the label shows (description/UUID/owner matches return
+    // npos). The lowercased search copy is byte-length-identical to the
+    // display name, so the offset maps straight onto the label — matching
+    // LLInventoryFilter's behaviour, including its non-ASCII imprecision.
+    if (mConstraints.mSearchType != (U32)SEARCH_NAME
+        && mConstraints.mSearchType != (U32)SEARCH_ALL)
+    {
+        return std::string::npos;
+    }
+    return static_cast<ALSceneExplorerItem*>(item)->searchName().find(mConstraints.mFilterSubString);
 }
 
 bool ALSceneExplorerFilter::check(const LLFolderViewModelItem* item)
@@ -179,52 +333,23 @@ bool ALSceneExplorerFilter::check(const LLFolderViewModelItem* item)
     if (!sit || sit->isContainer())
         return false; // containers are only shown through matching descendants
 
-    return matches(sit);
-}
+    // Gather the per-item facts (including the impure ones the pure predicate
+    // can't derive) and delegate to the unit-tested core.
+    const ALObjectProperties::Record& rec = sit->getRecord();
+    ALSceneExplorerPredicate::ItemFacts facts;
+    facts.mRecord      = &rec;
+    facts.mSearchName  = &sit->searchName();
+    facts.mSearchDesc  = &sit->searchDesc();
+    facts.mSearchUUID  = &sit->searchUUID();
+    facts.mSearchOwner = &sit->searchOwner();
+    facts.mItemId      = sit->getUUID();
+    facts.mIsAvatar    = (sit->getItemType() == ALSceneExplorerItem::TYPE_AVATAR);
+    facts.mIsChildPrim = (sit->getItemType() == ALSceneExplorerItem::TYPE_PRIM);
+    facts.mInAgentParcel = mConstraints.mScope != (U32)SCOPE_PARCEL
+        || LLViewerParcelMgr::getInstance()->inAgentParcel(rec.mPosGlobal);
+    mConstraints.mAgentId = gAgentID;
 
-bool ALSceneExplorerFilter::matches(const ALSceneExplorerItem* item) const
-{
-    const ALObjectProperties::Record& rec = item->getRecord();
-
-    if (mLimitRadius && rec.mDistance > mRadius)
-        return false;
-
-    if (mGeomMask != 0 && !(mGeomMask & (1u << rec.mGeom)))
-        return false;
-
-    if (mFlagMask != 0 && (rec.mFlags & mFlagMask) != mFlagMask)
-        return false;
-
-    if (mOwnerMode != OWNER_ANY)
-    {
-        // Avatars are their own "owner" so owner filters behave sensibly for
-        // them; object rows apply the predicate only once props have arrived.
-        const bool is_avatar = (item->getItemType() == ALSceneExplorerItem::TYPE_AVATAR);
-        const LLUUID& owner = is_avatar ? item->getUUID() : rec.mOwnerId;
-        const bool group_owned = !is_avatar && rec.mGroupOwned;
-        if (is_avatar || rec.mPropsValid)
-        {
-            switch (mOwnerMode)
-            {
-            case OWNER_MINE:   if (owner != gAgentID) return false; break;
-            case OWNER_GROUP:  if (!group_owned) return false; break;
-            case OWNER_OTHERS: if (owner == gAgentID || group_owned) return false; break;
-            case OWNER_SPECIFIC:
-                if (owner != mOwnerId && !(group_owned && rec.mGroupId == mOwnerId))
-                    return false;
-                break;
-            default: break;
-            }
-        }
-    }
-
-    if (!mFilterSubString.empty()
-        && item->getSearchableText().find(mFilterSubString) == std::string::npos)
-    {
-        return false;
-    }
-
-    return true;
+    return ALSceneExplorerPredicate::matches(facts, mConstraints);
 }
 
 // ============================================================================
@@ -236,6 +361,7 @@ ALSceneExplorerItem::ALSceneExplorerItem(EItemType type, const LLUUID& id, const
     mItemType(type),
     mUUID(id),
     mName(name),
+    mSearchUUID(id.asString()), // never changes; asString() is lowercase hex
     mFloater(floater)
 {
     mRecord.mId = id;
@@ -269,10 +395,25 @@ void ALSceneExplorerItem::updateRecord(const ALObjectProperties::Record& rec, co
     dirtyFilter();
 }
 
+void ALSceneExplorerItem::setOwnerName(const std::string& name)
+{
+    if (name == mOwnerDisplay)
+        return;
+    mOwnerDisplay = name;
+    mOwnerSearch = name;
+    LLStringUtil::toLower(mOwnerSearch);
+    rebuildSearchable();
+    dirtyFilter();
+}
+
 void ALSceneExplorerItem::rebuildSearchable()
 {
-    mSearchable = mName + " " + mRecord.mDescription + " " + mUUID.asString();
-    LLStringUtil::toLower(mSearchable);
+    mSearchName = mName;
+    LLStringUtil::toLower(mSearchName);
+    mSearchDesc = mRecord.mDescription;
+    LLStringUtil::toLower(mSearchDesc);
+    // mSearchUUID is fixed at construction; mOwnerSearch is set by the
+    // floater's owner-name resolution.
 }
 
 LLPointer<LLUIImage> ALSceneExplorerItem::getIcon() const
@@ -317,6 +458,12 @@ std::string ALSceneExplorerItem::getLabelSuffix() const
     if (mRecord.mNumTriangles > 0)
     {
         suffix += llformat("  %u tris", mRecord.mNumTriangles);
+    }
+    // Owner display name once resolved (toggleable from the eye menu).
+    static LLCachedControl<bool> show_owner(gSavedSettings, "ALSceneExplorerOwnerSuffix", true);
+    if (show_owner && !mOwnerDisplay.empty())
+    {
+        suffix += "  (" + mOwnerDisplay + ")";
     }
     return suffix;
 }
@@ -390,6 +537,45 @@ void ALSceneExplorerItem::openItem(void)
     }
 }
 
+void ALSceneExplorerItem::setPassedFilter(bool passed, S32 filter_generation,
+                                          std::string::size_type string_offset,
+                                          std::string::size_type string_size)
+{
+    // Mirrors LLFolderViewModelItemInventory::setPassedFilter: ask the parent
+    // folder to re-arrange when this item's filtered state (or its validity
+    // after a generation bump) changed. arrange() is the only thing that
+    // applies pass/fail state to widget visibility, and nothing else re-arms
+    // it on filter changes — without this, toggling a filter only takes
+    // visual effect when some unrelated event happens to arrange the tree.
+    const bool generation_skip = mMarkedDirtyGeneration >= 0
+        && mPrevPassedAllFilters
+        && mMarkedDirtyGeneration < mRootViewModel.getFilter().getFirstSuccessGeneration();
+    const S32 last_generation = mLastFilterGeneration;
+    LLFolderViewModelItemCommon::setPassedFilter(passed, filter_generation, string_offset, string_size);
+    const bool before = mPrevPassedAllFilters;
+    mPrevPassedAllFilters = passedFilter(filter_generation);
+
+    if (before != mPrevPassedAllFilters   // change of state
+        || generation_skip                // was marked dirty while passing
+        // (Re)stamped as passing after first-success moved past this item's
+        // last stamp: its visibility-by-generation had been invalidated (a
+        // more-restrictive change or restart), so it must arrange back in
+        // even though it passed before too. Deliberately keyed on
+        // first-SUCCESS, not inventory's first-required: required doesn't
+        // move on more-restrictive changes, which would leave rows hidden by
+        // a mid-refilter arrange with nothing to bring them back.
+        || (mPrevPassedAllFilters
+            && last_generation < mRootViewModel.getFilter().getFirstSuccessGeneration()))
+    {
+        LLFolderViewFolder* parent_folder =
+            mFolderViewItem ? mFolderViewItem->getParentFolder() : nullptr;
+        if (parent_folder)
+        {
+            parent_folder->requestArrange();
+        }
+    }
+}
+
 bool ALSceneExplorerItem::filter(LLFolderViewFilter& filter)
 {
     const S32 filter_generation = filter.getCurrentGeneration();
@@ -439,7 +625,10 @@ bool ALSceneExplorerItem::filter(LLFolderViewFilter& filter)
     if (continue_filtering)
     {
         const bool passed = filter.check(this);
-        setPassedFilter(passed, filter_generation);
+        // The match offset/size make the folder view draw the standard
+        // inventory-style highlight over the matched substring.
+        setPassedFilter(passed, filter_generation,
+                        filter.getStringMatchOffset(this), filter.getFilterStringSize());
         continue_filtering = !filter.isTimedOut();
     }
 
