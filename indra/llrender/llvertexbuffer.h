@@ -73,8 +73,8 @@ public:
         , mMode(mode)
         , mCount(count)
         , mTexName(tex_name)
-        , mProjection(model_view)
-        , mModelView(projection)
+        , mProjection(projection)
+        , mModelView(model_view)
         , mTexture0(texture0)
     {}
     void drawWithMatrix();

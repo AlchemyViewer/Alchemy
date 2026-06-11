@@ -176,6 +176,14 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
         {
             image_raw->clear(255, 0);
         }
+        else
+        {
+            // LLImageRaw doesn't zero its allocation. The BGRA sheet's
+            // borders and inter-glyph gutters are sampled by the shadow
+            // shader's dilated taps (and by any future linear filtering),
+            // so they must be transparent black, not heap garbage.
+            image_raw->clear(0, 0, 0, 0);
+        }
 
         // Make corresponding GL image.
         mImageGLVec[bitmap_idx].emplace_back(new LLImageGL(image_raw, false, false));

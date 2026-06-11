@@ -768,4 +768,90 @@ namespace tut
         ensure_equals("DROP_SHADOW returns 2",      n_drop, 2);
         ensure_equals("DROP_SHADOW_SOFT returns 2", n_soft, 2);
     }
+
+    // Mid-render glyph rasterization must not misdirect the pending
+    // batch's texture. Rasterizing a cache-missed glyph uploads into its
+    // atlas via LLImageGL::setSubImage, which binds the upload target on
+    // unit 0 and leaves it bound; if the quads queued before it then
+    // flush under that binding, their UVs sample a different atlas page
+    // and the run renders fragments of other glyphs ("text shows other
+    // text"). The legacy per-codepoint `last_char != wch` flush kept the
+    // queue to ~1 glyph and hid this; with real batching every flush must
+    // re-assert the batch's own texture (flush_batch in LLFontGL::render).
+    //
+    // Captured display lists record the texture bound at flush time
+    // (LLVertexBufferData::mTexName), which makes the misdirection
+    // directly observable: render a Latin prefix plus a never-yet-
+    // rasterized emoji and require the prefix batch to carry the
+    // grayscale atlas texture its UVs were built against.
+    template<> template<>
+    void llfontgl_render_object::test<6>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+        const LLFontFreetype* head = font->getFontFreetype();
+        ensure("head freetype resolves", head != nullptr);
+
+        // U+1F995 SAUROPOD — obscure enough that no other test in this
+        // binary rasterizes it. The mid-render upload only fires on a
+        // cache miss, so the emoji must be cold going in.
+        const llwchar emoji_cp = 0x1F995;
+        U32 emoji_idx = 0;
+        const LLFontFreetype* emoji_face = head->selectShapingFace(emoji_cp, emoji_idx);
+        if (!emoji_face || emoji_face == head || emoji_idx == 0)
+            skip("no emoji fallback covers U+1F995 in this harness");
+        ensure("emoji fallback has a face wrapper",
+               emoji_face->getFontFace() != nullptr);
+        if (emoji_face->getFontFace()->findGlyphInfo(emoji_idx, EFontGlyphType::Color))
+            skip("U+1F995 already rasterized; mid-render upload won't fire");
+
+        LLWString s = utf8str_to_wstring("stomp \xF0\x9F\xA6\x95 check");
+
+        std::list<LLVertexBufferData> capture;
+        gGL.beginList(&capture);
+        const S32 n = font->render(s, 0, 50.f, 100.f, LLColor4::white,
+                                   LLFontGL::LEFT, LLFontGL::BASELINE,
+                                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                   (S32)s.size());
+        gGL.endList();
+        ensure_equals("render consumed the whole string", n, (S32)s.size());
+
+        // Expected textures, resolved through the glyph entries the render
+        // itself produced. use_color defaulted true, so the render looked
+        // glyphs up as Color; querying the same way returns the same
+        // entries (and therefore the same atlas pages) it drew from.
+        const LLFontGlyphInfo* latin_gi = head->getGlyphInfo((llwchar)'s', EFontGlyphType::Color);
+        ensure("latin glyph cached", latin_gi && latin_gi->mSourceFace);
+        const auto& latin_entry = latin_gi->mPhaseSlots[0].mBitmapEntry;
+        LLImageGL* latin_img = latin_gi->mSourceFace->getBitmapCache()->getImageGL(
+            latin_entry.first, (U32)latin_entry.second);
+        ensure("latin atlas page live", latin_img != nullptr);
+        const U32 latin_tex = latin_img->getTexName();
+
+        const LLFontGlyphInfo* emoji_gi = head->getGlyphInfo(emoji_cp, EFontGlyphType::Color);
+        ensure("emoji glyph cached", emoji_gi && emoji_gi->mSourceFace);
+        const auto& emoji_entry = emoji_gi->mPhaseSlots[0].mBitmapEntry;
+        LLImageGL* emoji_img = emoji_gi->mSourceFace->getBitmapCache()->getImageGL(
+            emoji_entry.first, (U32)emoji_entry.second);
+        ensure("emoji atlas page live", emoji_img != nullptr);
+        const U32 emoji_tex = emoji_img->getTexName();
+
+        ensure("string spans two distinct atlas textures", latin_tex != emoji_tex);
+        ensure("capture produced batches", !capture.empty());
+
+        // The first captured batch is the Latin prefix, flushed when the
+        // glyph stream switches to the emoji's atlas — exactly the batch
+        // the mid-render upload used to misdirect.
+        ensure_equals("prefix batch carries its own atlas texture",
+                      capture.front().mTexName, latin_tex);
+        // And every batch in the capture must reference one of the two
+        // atlas pages this string actually draws from.
+        for (const LLVertexBufferData& entry : capture)
+        {
+            ensure("batch texture is one of the string's atlas pages",
+                   entry.mTexName == latin_tex || entry.mTexName == emoji_tex);
+        }
+    }
 }

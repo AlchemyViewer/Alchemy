@@ -835,14 +835,15 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_
         return nullptr;
     llassert(!mIsFallback);
 
-    const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type)
-        ? glyph_type : EFontGlyphType::Grayscale;
+    // glyph_type passes through unresolved: getGlyphInfoByIndex treats
+    // Unspecified as match-any at lookup and only pins a concrete type
+    // when it has to rasterize.
 
     // Hot path: codepoint exists on this head's face. One cmap lookup
     // (cached) + one (face, glyph_index) hash lookup.
     U32 glyph_index = getCharGlyphIndex(wch);
     if (glyph_index != 0)
-        return getGlyphInfoByIndex(this, glyph_index, resolve_type);
+        return getGlyphInfoByIndex(this, glyph_index, glyph_type);
 
     // Cold path: walk fallbacks in codepoint-priority order, which
     // differs from the shape-path priority in selectShapingFace:
@@ -865,25 +866,25 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_
                 [&](const char_functor_t& f) { return f && f(wch); });
             hit.first)
         {
-            return getGlyphInfoByIndex(hit.first, hit.second, resolve_type);
+            return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
         }
     }
     if (auto hit = find_fallback_hit(mFallbackFonts, wch,
             [](const char_functor_t& f) { return !f; });
         hit.first)
     {
-        return getGlyphInfoByIndex(hit.first, hit.second, resolve_type);
+        return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
     }
     if (auto hit = find_fallback_hit(mFallbackFonts, wch,
             [](const char_functor_t& f) { return (bool)f; });
         hit.first)
     {
-        return getGlyphInfoByIndex(hit.first, hit.second, resolve_type);
+        return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
     }
 
     // No face in our chain has this codepoint. Use the head face's
     // notdef (glyph_index=0) — pre-warmed during loadFace.
-    return getGlyphInfoByIndex(this, 0, resolve_type);
+    return getGlyphInfoByIndex(this, 0, glyph_type);
 }
 
 LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType glyph_type) const
@@ -900,12 +901,20 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp
     // is observed consistently by every freetype that ever rendered the
     // glyph: the face's findGlyphInfo returns null after eviction, so we
     // fall through to addShapedGlyphFromFont and re-rasterize.
-    const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale;
+    //
+    // Unspecified probes the cache as match-any (findGlyphInfo returns the
+    // first entry of either type) and only resolves to Grayscale when the
+    // glyph has to be rasterized. Measurement paths pass Unspecified — they
+    // need metrics, not a particular atlas — and resolving before the probe
+    // forced a duplicate Grayscale rasterization (a full COLRv1 paint walk
+    // plus a Grayscale atlas slot) for every color glyph that had already
+    // been rendered through the Color atlas.
     if (fontp && fontp->mFace)
     {
-        if (LLFontGlyphInfo* gi = fontp->mFace->findGlyphInfo(glyph_index, resolve_type))
+        if (LLFontGlyphInfo* gi = fontp->mFace->findGlyphInfo(glyph_index, glyph_type))
             return gi;
     }
+    const EFontGlyphType resolve_type = (EFontGlyphType::Unspecified != glyph_type) ? glyph_type : EFontGlyphType::Grayscale;
     return addShapedGlyphFromFont(fontp, glyph_index, resolve_type);
 }
 
