@@ -93,10 +93,17 @@ namespace LLFontShaping
     // Single-threaded; the shape path is main-thread only.
     void clearCache();
 
-    // Drop only the entries owned by `face`. Called from ~LLFontFreetype
-    // and from loadFace() reload, so a face teardown doesn't blow away
-    // unrelated entries cached for siblings. No-op when `face` is null
-    // or has no entries. Single-threaded.
+    // Drop every entry that references `face` — keyed on it (root_face) OR
+    // holding glyphs sourced from it (LLShapedGlyph::face stores a raw
+    // pointer to whichever fallback owns each glyph_id, and those entries
+    // are keyed by the HEAD that shaped them, not the fallback). Called
+    // from ~LLFontFreetype and from loadFace() reload, so a face teardown
+    // can't leave sibling-rooted entries whose glyph runs dangle into the
+    // destroyed face. Today's lifecycle makes the glyph-run sweep
+    // defensive — fallbacks outlive their heads via LLPointer chains and
+    // registry reloads clear globally — but enforcing it here keeps a
+    // future runtime fallback-removal path correct by construction.
+    // No-op when `face` is null or unreferenced. Single-threaded.
     void clearCacheForFace(const LLFontFreetype* face);
 
     // Number of entries currently held in the LRU. Cheap (boost::
@@ -104,6 +111,15 @@ namespace LLFontShaping
     // the cache contract — production callers shouldn't be branching
     // on this. Use clearCache to get to a known-empty state.
     size_t cacheSize();
+
+    // Monotonic count of cache mutations that can invalidate references
+    // returned by shapeLine: miss-inserts (including their evictions),
+    // clearCache, and clearCacheForFace when they erased anything. Cache
+    // HITS don't bump it — an LRU splice moves list nodes without touching
+    // the index or any glyph vector. Holders snapshot this after shaping
+    // and llassert equality after their last dereference, turning a
+    // use-after-invalidation into a debug assert instead of silent garbage.
+    size_t cacheMutationCount();
 }
 
 #endif // LL_LLFONTSHAPING_H

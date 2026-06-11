@@ -220,7 +220,16 @@ public:
     // either path lives in one atlas slot. LLFontGlyphInfo entries are
     // owned here and deleted in ~LLFontFace.
     LLFontGlyphInfo* findGlyphInfo(U32 glyph_index, EFontGlyphType type) const;
-    void             insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const;
+    // Publish `gi` (ownership transfers to the cache) and return the
+    // published entry. If a (glyph_index, type) entry already exists, the
+    // EXISTING one is kept and returned and `gi` is deleted — published
+    // pointers may be held up the stack (render loop, kerning prefetch),
+    // so replacing in place would free memory in active use. Callers must
+    // continue with the return value, never with `gi`. A duplicate publish
+    // means an upstream dedup probe was skipped (addShapedGlyphFromFont
+    // checks findGlyphInfo first) and asserts in debug; the duplicate's
+    // atlas slots are orphaned, not reclaimed.
+    LLFontGlyphInfo* insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const;
 
     // Iterate and conditionally erase entries. Used by collectGarbage to
     // purge entries that referenced an evicted atlas sheet.

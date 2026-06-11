@@ -82,14 +82,13 @@ public:
     S32 getCacheGeneration() const { return mGeneration; }
 
     // Snapshot of the global atlas-mutation counter. Every nextOpenPos /
-    // releaseSheet / reset / injectPage / new LLFontBitmapCache anywhere
-    // bumps this. Vertex/width-buffer caches that sample from a font's
-    // head face AND its fallback faces (each owning its own atlas with a
-    // separate per-instance mGeneration) need a counter that ticks on
-    // mutations to ANY of them — comparing only the head's mGeneration
-    // misses fallback rasterization (e.g. emoji glyphs added during a
-    // genBuffers walk), leaving the captured UVs pointing at uninitialized
-    // atlas slots until something else triggers a rebuild.
+    // releaseSheet / reset / new LLFontBitmapCache anywhere bumps this; it
+    // is the uniqueness source every per-instance mGeneration draws from,
+    // which is what makes summing per-instance generations a monotonic
+    // per-font invalidation stamp (see LLFontGL::getCacheGeneration —
+    // production no longer compares against the global value directly,
+    // since that invalidated every cached text buffer viewer-wide on any
+    // font's glyph churn). Kept public for tests and diagnostics.
     static S32 getGlobalGeneration() { return sNextGeneration; }
 
     // Drop the underlying images for a sheet, freeing the GPU and CPU memory.

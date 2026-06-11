@@ -811,7 +811,9 @@ LLFontGlyphInfo* LLFontFreetype::addShapedGlyphFromFont(const LLFontFreetype* fo
     if (!gi)
         return nullptr;
 
-    fontp->mFace->insertGlyphInfo(glyph_index, gi);
+    // insertGlyphInfo keeps an already-published entry over the incoming
+    // one (deleting the duplicate), so continue with its return value.
+    gi = fontp->mFace->insertGlyphInfo(glyph_index, gi);
 
     // Optimization: when the rendered pixel format differs from what the
     // caller requested (e.g. Color requested but the file is monochrome),
@@ -909,6 +911,24 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfoByIndex(const LLFontFreetype* fontp
     // forced a duplicate Grayscale rasterization (a full COLRv1 paint walk
     // plus a Grayscale atlas slot) for every color glyph that had already
     // been rendered through the Color atlas.
+    //
+    // A face with neither a color table (CBDT/sbix/COLR) nor OT-SVG can
+    // never produce a Color bitmap — FT_LOAD_COLOR on it rasterizes the
+    // same grayscale outline. Degrade the request up front so Color
+    // lookups on plain text faces (use_color=true is the UI default for
+    // every glyph, not just emoji) hit the existing Grayscale entry
+    // instead of missing and rasterizing a duplicate gray bitmap into
+    // fresh atlas slots published under a Color-typed entry. Reload paths
+    // that pre-warm ASCII as Grayscale made that the common case: the
+    // whole ASCII set stored twice per font, x8 phase slots on subpixel
+    // faces.
+    if (glyph_type == EFontGlyphType::Color
+        && fontp && fontp->mFace
+        && !fontp->mFace->hasColor()
+        && !fontp->mFace->hasSvg())
+    {
+        glyph_type = EFontGlyphType::Grayscale;
+    }
     if (fontp && fontp->mFace)
     {
         if (LLFontGlyphInfo* gi = fontp->mFace->findGlyphInfo(glyph_index, glyph_type))

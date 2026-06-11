@@ -102,6 +102,12 @@ namespace
     {
         std::vector<std::pair<size_t, size_t>>           ranges;
         std::vector<const std::vector<LLShapedGlyph>*>   glyphs;
+        // Shape-cache mutation count at build time. The glyph pointers are
+        // valid only while this matches LLFontShaping::cacheMutationCount();
+        // holders llassert equality after their last dereference so a
+        // use-after-invalidation trips a debug assert instead of reading
+        // freed glyph runs.
+        size_t mutation_snapshot = 0;
     };
 
     // Build the shape layout for `slice` against `root_face`. One
@@ -114,6 +120,11 @@ namespace
                                    LLWStringView         slice)
     {
         ShapeLayout out;
+        // Snapshot up front so the empty-layout early return below carries
+        // the live mutation count too — a default 0 would trip the holders'
+        // validity assert on every empty-label measurement (LLButton::resize
+        // with "" at startup) once anything had ever shaped.
+        out.mutation_snapshot = LLFontShaping::cacheMutationCount();
         if (!root_face || slice.empty())
             return out;
 
@@ -126,6 +137,13 @@ namespace
                                                      out.ranges[s].first,
                                                      out.ranges[s].second);
         }
+        // Re-snapshot AFTER all shapeLine calls — each call may itself
+        // mutate (miss-insert), which is fine: only mutations after this
+        // point invalidate the pointers collected above. (With a single
+        // range there's nothing to invalidate mid-build; with several,
+        // entries just shaped sit at the LRU front, out of eviction's
+        // reach.)
+        out.mutation_snapshot = LLFontShaping::cacheMutationCount();
         return out;
     }
 }
@@ -172,16 +190,40 @@ S32 LLFontGL::getCacheGeneration() const
 {
     // Every render() call may sample from this font's head atlas AND from
     // each fallback face's atlas (e.g. emoji glyphs in an otherwise
-    // grayscale string). Each LLFontBitmapCache has its own per-instance
-    // generation that only ticks on mutations to that cache; the head
-    // atlas's local counter is blind to a fallback rasterizing a new
-    // glyph mid-frame, so vertex/width buffers comparing against it
-    // would miss the invalidation and keep the stale UVs that point at
-    // uninitialized atlas slots. The global counter ticks on any atlas
-    // mutation across every face — slight over-invalidation, but the
-    // only correct answer when the cache key has to cover all sampled
-    // atlases without enumerating them.
-    return LLFontBitmapCache::getGlobalGeneration();
+    // grayscale string) — and from nothing else: glyphs route through
+    // getGlyphInfo* whose mSourceFace is always the head face or a chain
+    // member. Summing the per-instance generation of exactly those caches
+    // gives a per-font invalidation stamp: it ticks for any mutation that
+    // can stale this font's captured UVs and stays put for unrelated
+    // fonts' glyph churn.
+    //
+    // Monotonic: each component only ever takes fresh values from the
+    // shared LLFontBitmapCache::sNextGeneration counter, so every mutation
+    // (including a face wrapper swap on reload, whose new cache starts at
+    // a value above everything previously issued) strictly increases the
+    // sum — no A+1/B-1 aliasing. addFallbackFont growing the chain adds a
+    // component, which also only increases it.
+    //
+    // This used to return the global counter, which invalidated EVERY
+    // cached text buffer viewer-wide whenever any font rasterized a glyph;
+    // during glyph churn (first CJK chat fill, post-eviction warm-up) each
+    // regen rasterized more glyphs and re-invalidated everything again for
+    // several frames.
+    const LLFontFreetype* ft = mFontFreetype.get();
+    if (!ft)
+        return 0;
+    S32 gen = 0;
+    if (const LLFontBitmapCache* cache = ft->getFontBitmapCache())
+        gen += cache->getCacheGeneration();
+    for (const auto& fb : ft->getFallbackFonts())
+    {
+        if (fb.first)
+        {
+            if (const LLFontBitmapCache* cache = fb.first->getFontBitmapCache())
+                gen += cache->getCacheGeneration();
+        }
+    }
+    return gen;
 }
 
 S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRect& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
@@ -891,6 +933,10 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         cur_render_y = cur_y;
     }
 
+    // The layout's glyph pointers reach into the shape LRU; nothing inside
+    // the loop may shape (glyph rasterization doesn't), or they dangle.
+    llassert(layout.mutation_snapshot == LLFontShaping::cacheMutationCount());
+
     // End-of-pass flush. In single-pass mode this drains the foreground batch
     // and we're done. In two-pass mode this drains the shadow batch; pass B
     // below then walks the deferred metadata to emit foreground geometry.
@@ -1203,6 +1249,9 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
             cur_x = (F32)ll_round(cur_x);
     }
 
+    // Layout pointers must have stayed valid for the whole measurement walk.
+    llassert(layout.mutation_snapshot == LLFontShaping::cacheMutationCount());
+
     if (!no_padding)
     {
         // add in extra pixels for last character's width past its xadvance
@@ -1270,6 +1319,9 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
         }
     }
     const bool use_shaped = !shape_glyphs->empty();
+    // shape_glyphs points into the shape LRU until the loop's last use.
+    const size_t shape_gen = LLFontShaping::cacheMutationCount();
+    (void)shape_gen;
 
     S32 i;
     for (i=0; (i < max_chars); i++)
@@ -1384,6 +1436,10 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
             cur_x = (F32)ll_round(cur_x);
     }
 
+    // No shape* call may fire while shape_glyphs is held (see the comment
+    // at the shapeLine call above).
+    llassert(shape_gen == LLFontShaping::cacheMutationCount());
+
     if( clip )
     {
         switch (end_on_word_boundary)
@@ -1435,6 +1491,8 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
         // (begin=0), which equals 0..start here.
         LLWStringView slice(wchars, (size_t)(start + 1));
         const auto& shape_glyphs = LLFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)(start + 1));
+        const size_t shape_gen = LLFontShaping::cacheMutationCount();
+        (void)shape_gen;
         if (!shape_glyphs.empty())
         {
             per_cp_advance.assign(start + 1, 0.f);
@@ -1454,6 +1512,9 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
                 }
             }
         }
+        // The fill above is shape_glyphs' last dereference — it must not
+        // have been invalidated by a shape-cache mutation mid-hold.
+        llassert(shape_gen == LLFontShaping::cacheMutationCount());
     }
     const bool use_shaped = !per_cp_advance.empty();
 
@@ -1662,6 +1723,11 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
         if (!subpixel_pen)
             cur_x = (F32)ll_round(cur_x);
     }
+
+    // Hit-test walk holds the layout's glyph pointers; early returns inside
+    // the loop skip this check, which is fine — the assert is a tripwire
+    // for shape-cache mutation mid-hold, not exhaustive coverage.
+    llassert(layout.mutation_snapshot == LLFontShaping::cacheMutationCount());
 
     return llmin(max_chars, pos - begin_offset);
 }

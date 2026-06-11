@@ -247,7 +247,7 @@ LLFontGlyphInfo* LLFontFace::findGlyphInfo(U32 glyph_index, EFontGlyphType type)
     return (iter != range.second) ? iter->second : nullptr;
 }
 
-void LLFontFace::insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const
+LLFontGlyphInfo* LLFontFace::insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const
 {
     llassert(gi->mGlyphType < EFontGlyphType::Count);
     auto range = mGlyphInfoMap.equal_range(glyph_index);
@@ -255,13 +255,17 @@ void LLFontFace::insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const
         [gi](const glyph_info_map_t::value_type& e) { return e.second->mGlyphType == gi->mGlyphType; });
     if (iter != range.second)
     {
-        delete iter->second;
-        iter->second = gi;
+        // Keep the already-published entry — pointers to it may be live up
+        // the stack, and swapping it out would free memory in active use.
+        // Reaching here means an upstream dedup probe was skipped; the
+        // duplicate's atlas slots stay orphaned (we have no slot-level
+        // reclaim), which is a leak of atlas space but not of memory safety.
+        llassert(false);
+        delete gi;
+        return iter->second;
     }
-    else
-    {
-        mGlyphInfoMap.insert(std::make_pair(glyph_index, gi));
-    }
+    mGlyphInfoMap.insert(std::make_pair(glyph_index, gi));
+    return gi;
 }
 
 void LLFontFace::resetBitmapCache()
