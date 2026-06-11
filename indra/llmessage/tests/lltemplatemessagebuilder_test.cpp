@@ -118,7 +118,7 @@ namespace tut
 
     };
 
-    typedef test_group<LLTemplateMessageBuilderTestData>    LLTemplateMessageBuilderTestGroup;
+    typedef test_group<LLTemplateMessageBuilderTestData, 60>    LLTemplateMessageBuilderTestGroup;
     typedef LLTemplateMessageBuilderTestGroup::object       LLTemplateMessageBuilderTestObject;
     LLTemplateMessageBuilderTestGroup templateMessageBuilderTestGroup("LLTemplateMessageBuilder");
 
@@ -1021,6 +1021,161 @@ namespace tut
         ensure_equals("Ensure stored string truncated and terminated",
                       strlen(outBuffer), (size_t)254);
         delete reader;
+    }
+
+    template<> template<>
+    void LLTemplateMessageBuilderTestObject::test<48>()
+        // A variable block repeated far past 64 times, alongside a second
+        // block, all round-trip intact. The old data model keyed each repeat
+        // by (block-name pointer + repeat index), walking the string table;
+        // past ~64 repeats those keys ran into an adjacent block name and
+        // aliased, corrupting and leaking blocks. Grouping repeats by name
+        // removes the synthesized key. ImprovedTerseObjectUpdate-class
+        // messages reach this repeat count after zerocode expansion.
+    {
+        LLMessageTemplate messageTemplate = defaultTemplate();
+        messageTemplate.addBlock(defaultBlock(MVT_U32, 4, MBT_VARIABLE)); // Test0
+        messageTemplate.addBlock(createBlock(const_cast<char*>(_PREHASH_Test1),
+                                             MVT_U32, 4, MBT_SINGLE));     // Test1
+
+        const S32 NUM_BLOCKS = 200;
+        LLTemplateMessageBuilder* builder = defaultBuilder(messageTemplate); // nextBlock(Test0)
+        builder->addU32(_PREHASH_Test0, 0);
+        for (S32 i = 1; i < NUM_BLOCKS; ++i)
+        {
+            builder->nextBlock(_PREHASH_Test0);
+            builder->addU32(_PREHASH_Test0, (U32)i);
+        }
+        // createBlock always names the block's variable Test0, regardless of
+        // the block name, so the Test1 block's variable is Test0 too
+        builder->nextBlock(_PREHASH_Test1);
+        builder->addU32(_PREHASH_Test0, 0xdeadbeef);
+
+        LLTemplateMessageReader* reader = setReader(messageTemplate, builder);
+
+        ensure_equals("variable block count",
+                      reader->getNumberOfBlocks(_PREHASH_Test0), NUM_BLOCKS);
+        for (S32 i = 0; i < NUM_BLOCKS; ++i)
+        {
+            U32 value = 0xffffffff;
+            reader->getU32(_PREHASH_Test0, _PREHASH_Test0, value, i);
+            ensure_equals("variable block repeat intact", value, (U32)i);
+        }
+        U32 single = 0;
+        reader->getU32(_PREHASH_Test1, _PREHASH_Test0, single);
+        ensure_equals("adjacent single block intact", single, (U32)0xdeadbeef);
+        delete reader;
+    }
+
+    template<> template<>
+    void LLTemplateMessageBuilderTestObject::test<49>()
+        // Decode several messages through one reader to exercise the pooled
+        // LLMsgData reuse path: blocks recycle between decodes and no stale
+        // block or value leaks across messages of differing repeat counts.
+    {
+        LLMessageTemplate messageTemplate = defaultTemplate();
+        messageTemplate.addBlock(defaultBlock(MVT_U32, 4, MBT_VARIABLE)); // Test0
+        numberMap[1] = &messageTemplate;
+
+        const U32 cap = 1024;
+        U8 bufA[cap];
+        U8 bufB[cap];
+
+        // bufA: 5 repeats valued 100..104; bufB: 2 repeats valued 900..901
+        U32 szA, szB;
+        {
+            LLTemplateMessageBuilder* b = defaultBuilder(messageTemplate); // nextBlock(Test0)
+            b->addU32(_PREHASH_Test0, 100);
+            for (S32 i = 1; i < 5; ++i)
+            {
+                b->nextBlock(_PREHASH_Test0);
+                b->addU32(_PREHASH_Test0, 100 + (U32)i);
+            }
+            memset(bufA, 0, LL_PACKET_ID_SIZE);
+            szA = b->buildMessage(bufA, cap, 0);
+            delete b;
+        }
+        {
+            LLTemplateMessageBuilder* b = defaultBuilder(messageTemplate);
+            b->addU32(_PREHASH_Test0, 900);
+            b->nextBlock(_PREHASH_Test0);
+            b->addU32(_PREHASH_Test0, 901);
+            memset(bufB, 0, LL_PACKET_ID_SIZE);
+            szB = b->buildMessage(bufB, cap, 0);
+            delete b;
+        }
+
+        // alternate the two through one reader; reuse must not corrupt either
+        LLTemplateMessageReader reader(numberMap);
+        for (S32 pass = 0; pass < 4; ++pass)
+        {
+            bool useA  = (pass % 2) == 0;
+            U8*  buf   = useA ? bufA : bufB;
+            U32  sz    = useA ? szA  : szB;
+            S32  count = useA ? 5    : 2;
+            U32  base  = useA ? 100u : 900u;
+
+            reader.validateMessage(buf, sz, LLHost());
+            reader.readMessage(buf, LLHost());
+
+            ensure_equals("reuse block count",
+                          reader.getNumberOfBlocks(_PREHASH_Test0), count);
+            for (S32 i = 0; i < count; ++i)
+            {
+                U32 v = 0xffffffff;
+                reader.getU32(_PREHASH_Test0, _PREHASH_Test0, v, i);
+                ensure_equals("reuse repeat value", v, base + (U32)i);
+            }
+            reader.clearMessage();
+        }
+    }
+
+    template<> template<>
+    void LLTemplateMessageBuilderTestObject::test<50>()
+        // Reuse one builder across messages to exercise the pooled LLMsgData
+        // on the send side: the second build must not inherit blocks or values
+        // from the first.
+    {
+        LLMessageTemplate messageTemplate = defaultTemplate();
+        messageTemplate.addBlock(defaultBlock(MVT_U32, 4, MBT_VARIABLE)); // Test0
+        nameMap[_PREHASH_TestMessage] = &messageTemplate;
+        numberMap[1] = &messageTemplate;
+
+        LLTemplateMessageBuilder* builder = new LLTemplateMessageBuilder(nameMap);
+
+        const U32 cap = 1024;
+        for (S32 pass = 0; pass < 4; ++pass)
+        {
+            S32 count = (pass % 2 == 0) ? 5 : 2;
+            U32 base  = (pass % 2 == 0) ? 100u : 900u;
+
+            builder->newMessage(_PREHASH_TestMessage);
+            builder->nextBlock(_PREHASH_Test0);
+            builder->addU32(_PREHASH_Test0, base);
+            for (S32 i = 1; i < count; ++i)
+            {
+                builder->nextBlock(_PREHASH_Test0);
+                builder->addU32(_PREHASH_Test0, base + (U32)i);
+            }
+
+            U8 buf[cap];
+            memset(buf, 0, LL_PACKET_ID_SIZE);
+            U32 sz = builder->buildMessage(buf, cap, 0);
+
+            LLTemplateMessageReader reader(numberMap);
+            reader.validateMessage(buf, sz, LLHost());
+            reader.readMessage(buf, LLHost());
+            ensure_equals("builder reuse block count",
+                          reader.getNumberOfBlocks(_PREHASH_Test0), count);
+            for (S32 i = 0; i < count; ++i)
+            {
+                U32 v = 0xffffffff;
+                reader.getU32(_PREHASH_Test0, _PREHASH_Test0, v, i);
+                ensure_equals("builder reuse value", v, base + (U32)i);
+            }
+            builder->clearMessage();
+        }
+        delete builder;
     }
 }
 

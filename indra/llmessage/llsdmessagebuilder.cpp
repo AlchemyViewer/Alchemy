@@ -117,8 +117,11 @@ void LLSDMessageBuilder::addBinaryData(
     S32 size)
 {
     std::vector<U8> v;
-    v.resize(size);
-    memcpy(&(v[0]), reinterpret_cast<const U8*>(data), size);
+    if (size > 0)
+    {
+        v.resize(size);
+        memcpy(v.data(), reinterpret_cast<const U8*>(data), size);
+    }
     (*mCurrentBlock)[varname] = v;
 }
 
@@ -239,41 +242,22 @@ U32 LLSDMessageBuilder::buildMessage(U8*, U32, U8)
 
 void LLSDMessageBuilder::copyFromMessageData(const LLMsgData& data)
 {
-    // copy the blocks
-    // counting variables used to encode multiple block info
-    S32 block_count = 0;
-    char* block_name = NULL;
-
-    // loop through msg blocks to loop through variables, totalling up size
-    // data and filling the new (send) message
-    LLMsgData::msg_blk_data_map_t::const_iterator iter =
-        data.mMemberBlocks.begin();
-    LLMsgData::msg_blk_data_map_t::const_iterator end =
-        data.mMemberBlocks.end();
-    for(; iter != end; ++iter)
+    // walk each block group in template order, then each repeat in order,
+    // starting a fresh block per repeat and converting its variables to LLSD
+    for (const LLMsgData::BlockGroup& group : data.mMemberBlocks)
     {
-        const LLMsgBlkData* mbci = iter->second;
-        if(!mbci) continue;
-
-        // do we need to encode a block code?
-        if (block_count == 0)
+        for (const LLMsgBlkData* mbci : group.mBlocks)
         {
-            block_count = mbci->mBlockNumber;
-            block_name = (char*)mbci->mName;
-        }
+            nextBlock(group.mName);
 
-        // counting down mutliple blocks
-        block_count--;
-
-        nextBlock(block_name);
-
-        // now loop through the variables
-        LLMsgBlkData::msg_var_data_map_t::const_iterator dit = mbci->mMemberVarData.begin();
-        LLMsgBlkData::msg_var_data_map_t::const_iterator dend = mbci->mMemberVarData.end();
-
-        for(; dit != dend; ++dit)
-        {
-            const LLMsgVarData& mvci = *dit;
+            for (const LLMsgVarData& mvci : mbci->mMemberVarData)
+            {
+            // a placeholder variable that was never filled has no payload at
+            // all (null data pointer); there is nothing to convert
+            if (mvci.getSize() < 0)
+            {
+                continue;
+            }
             const char* varname = mvci.getName();
 
             switch(mvci.getType())
@@ -284,14 +268,17 @@ void LLSDMessageBuilder::copyFromMessageData(const LLMsgData& data)
 
             case MVT_VARIABLE:
                 {
-                    const char end = ((const char*)mvci.getData())[mvci.getSize()-1]; // Ensure null terminated
+                    // an empty field stores no payload at all (getData() may
+                    // be null), so don't probe for a terminating NUL
+                    const S32 size = mvci.getSize();
+                    const char end = size > 0 ? ((const char*)mvci.getData())[size-1] : 1;
                     if (mvci.getDataSize() == 1 && end == 0)
                     {
                         addString(varname, (const char*)mvci.getData());
                     }
                     else
                     {
-                        addBinaryData(varname, mvci.getData(), mvci.getSize());
+                        addBinaryData(varname, mvci.getData(), size);
                     }
                     break;
                 }
@@ -391,6 +378,7 @@ void LLSDMessageBuilder::copyFromMessageData(const LLMsgData& data)
             default:
                 LL_WARNS() << "Unknown type in conversion of message to LLSD" << LL_ENDL;
                 break;
+            }
             }
         }
     }
