@@ -62,19 +62,19 @@ void LLTemplateMessageReader::clearMessage()
     mCurrentRMessageData = nullptr;
 }
 
-void LLTemplateMessageReader::getData(const char *blockname, const char *varname, void *datap, S32 size, S32 blocknum, S32 max_size)
+S32 LLTemplateMessageReader::getData(const char *blockname, const char *varname, void *datap, S32 size, S32 blocknum, S32 max_size)
 {
     // is there a message ready to go?
     if (mReceiveSize == -1)
     {
         LL_ERRS() << "No message waiting for decode 2!" << LL_ENDL;
-        return;
+        return 0;
     }
 
     if (!mCurrentRMessageData)
     {
         LL_ERRS() << "Invalid mCurrentMessageData in getData!" << LL_ENDL;
-        return;
+        return 0;
     }
 
     char *bnamep = (char *)blockname + blocknum; // this works because it's just a hash.  The bnamep is never derefference
@@ -86,7 +86,7 @@ void LLTemplateMessageReader::getData(const char *blockname, const char *varname
     {
         LL_ERRS() << "Block " << blockname << " #" << blocknum
             << " not in message " << mCurrentRMessageData->mName << LL_ENDL;
-        return;
+        return 0;
     }
 
     LLMsgBlkData *msg_block_data = iter->second;
@@ -97,7 +97,7 @@ void LLTemplateMessageReader::getData(const char *blockname, const char *varname
     {
         LL_ERRS() << "Variable "<< vnamep << " not in message "
             << mCurrentRMessageData->mName<< " block " << bnamep << LL_ENDL;
-        return;
+        return 0;
     }
 
     LLMsgVarData& vardata = *vit;
@@ -109,7 +109,7 @@ void LLTemplateMessageReader::getData(const char *blockname, const char *varname
             << " is size " << vardata.getSize()
             << " but copying into buffer of size " << size
             << LL_ENDL;
-        return;
+        return 0;
     }
 
 
@@ -126,6 +126,7 @@ void LLTemplateMessageReader::getData(const char *blockname, const char *varname
         {
             memcpy(datap, vardata.getData(), vardata_size);
         }
+        return llmax(vardata_size, 0); // -1 means the variable was never filled
     }
     else
     {
@@ -136,6 +137,7 @@ void LLTemplateMessageReader::getData(const char *blockname, const char *varname
             << LL_ENDL;
 
         memcpy(datap, vardata.getData(), max_size);
+        return max_size;
     }
 }
 
@@ -419,15 +421,19 @@ inline void LLTemplateMessageReader::getIPPort(const char *block, const char *va
 inline void LLTemplateMessageReader::getString(const char *block, const char *var, S32 buffer_size, char *s, S32 blocknum )
 {
     s[0] = '\0';
-    getData(block, var, s, 0, blocknum, buffer_size);
-    s[buffer_size - 1] = '\0';
+    S32 data_size = getData(block, var, s, 0, blocknum, buffer_size);
+    // terminate at the copied length so an unterminated wire string can't
+    // expose whatever follows it in the caller's buffer
+    s[llclamp(data_size, 0, buffer_size - 1)] = '\0';
 }
 
 inline void LLTemplateMessageReader::getString(const char *block, const char *var, std::string& outstr, S32 blocknum )
 {
-    char s[MTUBYTES + 1]= {0}; // every element is initialized with 0
-    getData(block, var, s, 0, blocknum, MTUBYTES);
-    s[MTUBYTES] = '\0';
+    // wire strings normally carry their own NUL; terminating at the copied
+    // length covers the ones that don't, without zero-filling 1.5KB per call
+    char s[MTUBYTES + 1];
+    S32 data_size = getData(block, var, s, 0, blocknum, MTUBYTES);
+    s[llclamp(data_size, 0, MTUBYTES)] = '\0';
     outstr = s;
 }
 

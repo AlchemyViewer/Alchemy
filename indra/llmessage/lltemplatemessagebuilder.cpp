@@ -566,18 +566,12 @@ static S32 zero_code(U8 **data, U32 *data_size)
 
     if (net_gain < 0)
     {
-        // TODO: babbage: reinstate stat collecting...
-        //mCompressedPacketsOut++;
-        //mUncompressedBytesOut += *data_size;
-
+        // Compression stats are accounted by LLMessageSystem::sendMessage(),
+        // which detects this buffer swap.
         *data = encodedSendBuffer;
         *data_size += net_gain;
         encodedSendBuffer[0] |= LL_ZERO_CODE_FLAG;          // set the head bit to indicate zero coding
-
-        //mCompressedBytesOut += *data_size;
-
     }
-    //mTotalBytesOut += *data_size;
 
     return(net_gain);
 }

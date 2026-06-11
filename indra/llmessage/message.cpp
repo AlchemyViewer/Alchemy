@@ -1221,6 +1221,13 @@ S32 LLMessageSystem::sendMessage(const LLHost &host)
     U8 * buf_ptr = (U8 *)mSendBuffer;
     U32 buffer_length = mSendSize;
     mMessageBuilder->compressMessage(buf_ptr, buffer_length);
+    if (buf_ptr != (U8 *)mSendBuffer)
+    {
+        // compressMessage() only swaps buffers when zerocoding won
+        mCompressedPacketsOut++;
+        mUncompressedBytesOut += mSendSize;
+        mCompressedBytesOut += buffer_length;
+    }
 
     if (buffer_length > 1500)
     {
