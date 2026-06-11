@@ -536,6 +536,20 @@ public:
      */
     static std::string escapeString(const std::string& in);
 
+    /**
+     * @brief Call this method to format an LLSD to a stream.
+     *
+     * Sets the stream precision so Real values round-trip exactly
+     * (unless a realFormat override is installed).
+     * @param data The data to write.
+     * @param ostr The destination stream for the data.
+     * @return Returns The number of LLSD objects formatted out
+     */
+    S32 format(const LLSD& data, std::ostream& ostr, EFormatterOptions options) const override;
+
+    // also pull down base-class format() method that isn't overridden
+    using LLSDFormatter::format;
+
 protected:
     /**
      * @brief Implementation to format the data. This is called recursively.

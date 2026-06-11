@@ -33,7 +33,6 @@
 #include <simdutf.h>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
-#include <boost/regex.hpp>
 
 extern "C"
 {
@@ -82,10 +81,7 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 
     if (options & LLSDFormatter::OPTIONS_PRETTY)
     {
-        for (U32 i = 0; i < level; i++)
-        {
-            pre += "    ";
-        }
+        pre.assign(4 * (size_t)level, ' ');
         post = "\n";
     }
 
@@ -213,34 +209,42 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 // static
 std::string LLSDXMLFormatter::escapeString(const std::string& in)
 {
-    std::ostringstream out;
-    std::string::const_iterator it = in.begin();
-    std::string::const_iterator end = in.end();
-    for(; it != end; ++it)
+    // Append unescaped runs in bulk; only the five XML special characters
+    // need an entity.
+    std::string out;
+    out.reserve(in.size());
+    const char* start = in.data();
+    const char* end = start + in.size();
+    const char* run = start;
+    for(const char* p = start; p < end; ++p)
     {
-        switch((*it))
+        const char* entity;
+        switch(*p)
         {
         case '<':
-            out << "&lt;";
+            entity = "&lt;";
             break;
         case '>':
-            out << "&gt;";
+            entity = "&gt;";
             break;
         case '&':
-            out << "&amp;";
+            entity = "&amp;";
             break;
         case '\'':
-            out << "&apos;";
+            entity = "&apos;";
             break;
         case '"':
-            out << "&quot;";
+            entity = "&quot;";
             break;
         default:
-            out << (*it);
-            break;
+            continue;
         }
+        out.append(run, p - run);
+        out.append(entity);
+        run = p + 1;
     }
-    return out.str();
+    out.append(run, end - run);
+    return out;
 }
 
 
@@ -300,6 +304,7 @@ private:
     S32 mParseCount;
 
     bool mInLLSDElement;            // true if we're on LLSD
+    bool mSawLLSDElement;           // true if we ever entered an <llsd> element
     bool mGracefullStop;            // true if we found the </llsd
 
     typedef std::deque<LLSD*> LLSDRefStack;
@@ -343,12 +348,20 @@ void clear_eol(std::istream& input)
 
 static unsigned get_till_eol(std::istream& input, char *buf, unsigned bufsize)
 {
+    // Read via the streambuf: istream::get() pays a sentry per character,
+    // and at EOF it used to store a bogus (char)EOF byte in the buffer.
     unsigned count = 0;
-    while (count < bufsize && input.good())
+    std::streambuf* sb = input.rdbuf();
+    while (count < bufsize)
     {
-        char c = input.get();
-        buf[count++] = c;
-        if (is_eol(c))
+        int c = sb->sbumpc();
+        if (c == std::istream::traits_type::eof())
+        {
+            input.setstate(std::ios::eofbit | std::ios::failbit);
+            break;
+        }
+        buf[count++] = (char)c;
+        if (is_eol((char)c))
             break;
     }
     return count;
@@ -415,6 +428,14 @@ S32 LLSDXMLParser::Impl::parse(std::istream& input, LLSD& data)
     }
 
     clear_eol(input);
+    if (!mSawLLSDElement)
+    {
+        // well-formed XML that never contained an <llsd> element. The old
+        // code reported this by accident: reading EOF used to deposit a
+        // bogus (char)EOF byte in the parse buffer, forcing an expat error.
+        data = LLSD();
+        return LLSDParser::PARSE_FAILURE;
+    }
     data = mResult;
     return mParseCount;
 }
@@ -495,6 +516,11 @@ S32 LLSDXMLParser::Impl::parseLines(std::istream& input, LLSD& data)
     }
 
     clear_eol(input);
+    if (!mSawLLSDElement)
+    {
+        // well-formed XML that never contained an <llsd> element
+        return LLSDParser::PARSE_FAILURE;
+    }
     data = mResult;
     return mParseCount;
 }
@@ -506,6 +532,7 @@ void LLSDXMLParser::Impl::reset()
     mParseCount = 0;
 
     mInLLSDElement = false;
+    mSawLLSDElement = false;
     mDepth = 0;
 
     mGracefullStop = false;
@@ -614,6 +641,7 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
         case ELEMENT_LLSD:
             if (mInLLSDElement) { return startSkipping(); }
             mInLLSDElement = true;
+            mSawLLSDElement = true;
             return;
 
         case ELEMENT_KEY:
@@ -794,22 +822,19 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
 
         case ELEMENT_BINARY:
         {
-            // Regex is expensive, but only fix for whitespace in base64,
-            // created by python and other non-linden systems - DEV-39358
-            // Fortunately we have very little binary passing now,
-            // so performance impact shold be negligible. + poppy 2009-09-04
-            static const boost::regex r("\\s");
-            std::string stripped = boost::regex_replace(mCurrentContent, r, "");
-            if(stripped.size() > 0)
+            // simdutf's forgiving-base64 decoder skips ASCII whitespace
+            // natively (DEV-39358: python and other non-linden systems emit
+            // line-wrapped base64), and binary_length_from_base64 computes
+            // the exact decoded size even with whitespace present.
+            // binary_length_from_base64 returns 0 for empty or
+            // whitespace-only content, so <binary /> yields an empty
+            // LLSD::Binary rather than leaving the value undefined.
+            std::vector<U8> data(simdutf::binary_length_from_base64(mCurrentContent.data(), mCurrentContent.size()));
+            // convert to binary and check for errors
+            simdutf::result r = simdutf::base64_to_binary(mCurrentContent.data(), mCurrentContent.size(), (char*)data.data());
+            if(r.error == simdutf::error_code::SUCCESS)
             {
-                // allocate enough memory for the maximal binary length
-                std::vector<U8> data(simdutf::binary_length_from_base64(stripped.data(), stripped.size()));
-                // convert to binary and check for errors
-                simdutf::result r = simdutf::base64_to_binary(stripped.data(), stripped.size(), (char*)data.data());
-                if(r.error == simdutf::error_code::SUCCESS)
-                {
-                    value = std::move(data);
-                }
+                value = std::move(data);
             }
             break;
         }
@@ -832,7 +857,11 @@ void LLSDXMLParser::Impl::characterDataHandler(const XML_Char* data, int length)
     XML_Timer timer( &charDataTime );
     #endif  // XML_PARSER_PERFORMANCE_TESTS
 
-    mCurrentContent.append(data, length);
+    // content inside skipped elements is discarded anyway; don't buffer it
+    if (!mSkipping)
+    {
+        mCurrentContent.append(data, length);
+    }
 }
 
 
