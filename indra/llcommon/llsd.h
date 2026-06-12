@@ -444,7 +444,7 @@ public:
             TypeLLSDNumTypes = (TypeLLSDTypeEnd - TypeLLSDTypeBegin)
         };
 
-        Type type() const;
+        Type type() const   { return mType; }
 
         bool isUndefined() const    { return type() == TypeUndefined; }
         bool isDefined() const      { return type() != TypeUndefined; }
@@ -484,7 +484,21 @@ public:
 public:
         class Impl;
 private:
-        Impl* impl;
+        // Boolean, Integer, Real and Date values are stored inline; the
+        // remaining defined types hold a reference-counted heap impl.
+        union Data
+        {
+            Impl*   impl;
+            Boolean b;
+            Integer i;
+            Real    r;      // TypeReal and TypeDate (seconds since epoch)
+        };
+        Data mData;
+        Type mType;
+
+        static bool isHeapType(Type type) { return type >= TypeString && type != TypeDate; }
+        bool isHeap() const { return isHeapType(mType); }
+        void releaseValue();    ///< drop any heap reference; mData/mType left stale
         friend class LLSD::Impl;
     //@}
 

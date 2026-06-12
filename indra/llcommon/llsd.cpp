@@ -92,72 +92,52 @@ S32 sLLSDNetObjects = 0;
 #endif
 
 class LLSD::Impl
-    /**< This class is the abstract base class of the implementation of LLSD
-         It provides the reference counting implementation, and the default
-         implementation of most methods for most data types.  It also serves
-         as a working implementation of the Undefined type.
-
+    /**< This class is the abstract base class of the heap-backed value
+         implementations (String, UUID, URI, Binary, Map, Array). It provides
+         the reference counting implementation and default conversions.
+         Boolean, Integer, Real and Date values are stored inline in LLSD
+         itself and never reach this hierarchy.
     */
 {
 protected:
-    Impl(LLSD::Type type);
-
-    enum StaticAllocationMarker { STATIC_USAGE_COUNT = 0xFFFFFFFF };
-    Impl(StaticAllocationMarker);
-        ///< This constructor is used for static objects and causes the
-        //   suppresses adjusting the debugging counters when they are
-        //   finally initialized.
+    Impl();
 
     virtual ~Impl();
 
-    bool shared() const                         { return (mUseCount > 1) && (mUseCount != STATIC_USAGE_COUNT); }
+    bool shared() const                         { return mUseCount > 1; }
 
     U32 mUseCount;
-    const LLSD::Type mType;
 
 public:
+    static void retain(Impl* impl);
+        ///< safely increment the reference count
+
     static void destruct(Impl*& var);
         ///< safely decrement or destroy var
 
     static void reset(Impl*& var, Impl* impl);
         ///< safely set var to refer to the new impl (possibly shared)
 
-    static void move(Impl*& var, Impl*& impl);
-        ///< safely move impl from one object to another
+    static ImplMap& mutableMap(LLSD& sd);
+    static ImplArray& mutableArray(LLSD& sd);
+        ///< ensure sd is a modifiable, unshared map or array
 
-    static       Impl& safe(      Impl*);
-    static const Impl& safe(const Impl*);
-        ///< since a NULL Impl* is used for undefined, this ensures there is
-        //   always an object you call virtual member functions on
-
-    virtual ImplMap& makeMap(Impl*& var);
-    virtual ImplArray& makeArray(Impl*& var);
-        ///< sure var is a modifiable, non-shared map or array
-
-    // The type tag is stored per-instance so type checks (pervasive in
-    // serialization and dispatch paths) avoid a virtual call.
-    LLSD::Type type() const                     { return mType; }
-
-    static  void assignUndefined(LLSD::Impl*& var);
-    static  void assign(LLSD::Impl*& var, const LLSD::Impl* other);
-
-    virtual void assign(Impl*& var, LLSD::Boolean);
-    virtual void assign(Impl*& var, LLSD::Integer);
-    virtual void assign(Impl*& var, LLSD::Real);
-    virtual void assign(Impl*& var, const char*);
-    virtual void assign(Impl*& var, const LLSD::String&);
-    virtual void assign(Impl*& var, const LLSD::UUID&);
-    virtual void assign(Impl*& var, const LLSD::Date&);
-    virtual void assign(Impl*& var, const LLSD::URI&);
-    virtual void assign(Impl*& var, const LLSD::Binary&);
-    virtual void assign(Impl*& var, LLSD::String&&);
-    virtual void assign(Impl*& var, LLSD::UUID&&);
-    virtual void assign(Impl*& var, LLSD::Date&&);
-    virtual void assign(Impl*& var, LLSD::URI&&);
-    virtual void assign(Impl*& var, LLSD::Binary&&);
-        ///< If the receiver is the right type and unshared, these are simple
-        //   data assignments, othewise the default implementation handless
-        //   constructing the proper Impl subclass
+    template <class ImplT, class V>
+    static void assignValue(LLSD& sd, LLSD::Type type, V&& value)
+        ///< assign a heap-backed value, reusing an unshared impl in place
+    {
+        if (sd.mType == type && !sd.mData.impl->shared())
+        {
+            static_cast<ImplT*>(sd.mData.impl)->set(std::forward<V>(value));
+        }
+        else
+        {
+            sd.releaseValue();
+            sd.mData.impl = nullptr;
+            reset(sd.mData.impl, new ImplT(std::forward<V>(value)));
+            sd.mType = type;
+        }
+    }
 
     virtual Boolean asBoolean() const           { return false; }
     virtual Integer asInteger() const           { return 0; }
@@ -172,33 +152,8 @@ public:
 
     virtual void asXMLRPCValue(std::ostream& os) const { os << "<nil/>"; }
 
-    virtual bool has(std::string_view) const      { return false; }
-    virtual LLSD get(std::string_view) const      { return LLSD(); }
-    virtual LLSD getKeys() const                { return LLSD::emptyArray(); }
-    virtual void erase(const String&)           { }
-    virtual const LLSD& ref(std::string_view) const{ return undef(); }
-
-    virtual size_t size() const                 { return 0; }
-    virtual LLSD get(size_t) const              { return LLSD(); }
-    virtual void erase(size_t)                  { }
-    virtual const LLSD& ref(size_t) const       { return undef(); }
-
-    virtual LLSD::map_const_iterator beginMap() const { return endMap(); }
-    virtual LLSD::map_const_iterator endMap() const { static const LLSD::llsd_map_t empty; return empty.end(); }
-    virtual LLSD::array_const_iterator beginArray() const { return endArray(); }
-    virtual LLSD::array_const_iterator endArray() const { static const std::vector<LLSD> empty; return empty.end(); }
-
-    virtual void dumpStats() const;
-    virtual void calcStats(S32 type_counts[], S32 share_counts[]) const;
-    // Container subclasses contain LLSD objects, rather than directly
-    // containing Impl objects. This helper forwards through LLSD.
-    void calcStats(const LLSD& llsd, S32 type_counts[], S32 share_counts[]) const
-    {
-        safe(llsd.impl).calcStats(type_counts, share_counts);
-    }
-
-    static const Impl& getImpl(const LLSD& llsd)    { return safe(llsd.impl); }
-    static Impl& getImpl(LLSD& llsd)                { return safe(llsd.impl); }
+    static void calcStats(const LLSD& sd, S32 type_counts[], S32 share_counts[]);
+    static void dumpStats(const LLSD& sd);
 
     static const LLSD& undef();
 
@@ -212,11 +167,10 @@ namespace LLSDUnnamedNamespace
 namespace
 #endif
 {
-    template<LLSD::Type T, class Data, class DataRef = Data, class DataMove = Data>
+    template<class Data, class DataRef = Data, class DataMove = Data>
     class ImplBase : public LLSD::Impl
-        ///< This class handles most of the work for a subclass of Impl
-        //   for a given simple data type.  Subclasses of this provide the
-        //   conversion functions and a constructor.
+        ///< This class handles the work for a subclass of Impl for a given
+        //   heap-backed data type. Subclasses provide conversion functions.
     {
     protected:
         Data mValue;
@@ -224,115 +178,16 @@ namespace
         typedef ImplBase Base;
 
     public:
-        ImplBase(DataRef value) : LLSD::Impl(T), mValue(value) { }
-        ImplBase(DataMove value) : LLSD::Impl(T), mValue(std::move(value)) { }
+        ImplBase(DataRef value) : mValue(value) { }
+        ImplBase(DataMove value) : mValue(std::move(value)) { }
 
-        using LLSD::Impl::assign; // Unhiding base class virtuals...
-        virtual void assign(LLSD::Impl*& var, DataRef value) {
-            if (shared())
-            {
-                Impl::assign(var, value);
-            }
-            else
-            {
-                mValue = value;
-            }
-        }
-        virtual void assign(LLSD::Impl*& var, DataMove value) {
-            if (shared())
-            {
-                Impl::assign(var, std::move(value));
-            }
-            else
-            {
-                mValue = std::move(value);
-            }
-        }
+        void set(DataRef value)  { mValue = value; }
+        void set(DataMove value) { mValue = std::move(value); }
     };
-
-
-    class ImplBoolean final
-        : public ImplBase<LLSD::TypeBoolean, LLSD::Boolean, LLSD::Boolean, LLSD::Boolean&&>
-    {
-    public:
-        ImplBoolean(LLSD::Boolean v) : Base(v) { }
-
-        virtual LLSD::Boolean   asBoolean() const   { return mValue; }
-        virtual LLSD::Integer   asInteger() const   { return mValue ? 1 : 0; }
-        virtual LLSD::Real      asReal() const      { return mValue ? 1 : 0; }
-        virtual LLSD::String    asString() const;
-
-        virtual void asXMLRPCValue(std::ostream& os) const { os << (mValue ? "<boolean>1</boolean>" : "<boolean>0</boolean>"); }
-    };
-
-    LLSD::String ImplBoolean::asString() const
-        // *NOTE: The reason that false is not converted to "false" is
-        // because that would break roundtripping,
-        // e.g. LLSD(false).asString().asBoolean().  There are many
-        // reasons for wanting LLSD("false").asBoolean() == true, such
-        // as "everything else seems to work that way".
-        { return mValue ? "true" : ""; }
-
-
-    class ImplInteger final
-        : public ImplBase<LLSD::TypeInteger, LLSD::Integer, LLSD::Integer, LLSD::Integer&&>
-    {
-    public:
-        ImplInteger(LLSD::Integer v) : Base(v) { }
-
-        virtual LLSD::Boolean   asBoolean() const   { return mValue != 0; }
-        virtual LLSD::Integer   asInteger() const   { return mValue; }
-        virtual LLSD::Real      asReal() const      { return mValue; }
-        virtual LLSD::String    asString() const;
-
-        virtual void asXMLRPCValue(std::ostream& os) const { os << "<int>" << mValue << "</int>"; }
-    };
-
-    LLSD::String ImplInteger::asString() const
-    {
-        char buf[16];
-        char* end = std::to_chars(buf, buf + sizeof(buf), mValue).ptr;
-        return LLSD::String(buf, end);
-    }
-
-
-    class ImplReal final
-        : public ImplBase<LLSD::TypeReal, LLSD::Real, LLSD::Real, LLSD::Real&&>
-    {
-    public:
-        ImplReal(LLSD::Real v) : Base(v) { }
-
-        virtual LLSD::Boolean   asBoolean() const;
-        virtual LLSD::Integer   asInteger() const;
-        virtual LLSD::Real      asReal() const      { return mValue; }
-        virtual LLSD::String    asString() const;
-
-        virtual void asXMLRPCValue(std::ostream& os) const
-        {
-            // shortest representation that round-trips to the same double;
-            // fmt rather than std::to_chars because Apple gates the
-            // floating-point overloads behind macOS 13.3
-            char buf[32];
-            auto result = fmt::format_to_n(buf, sizeof(buf), "{}", mValue);
-            os << "<double>";
-            os.write(buf, result.out - buf);
-            os << "</double>";
-        }
-    };
-
-    LLSD::Boolean ImplReal::asBoolean() const
-        { return !std::isnan(mValue)  &&  mValue != 0.0; }
-
-    LLSD::Integer ImplReal::asInteger() const
-        { return !std::isnan(mValue) ? (LLSD::Integer)mValue : 0; }
-
-    LLSD::String ImplReal::asString() const
-        // {:g} matches the printf %g formatting this historically used
-        { return fmt::format("{:g}", mValue); }
 
 
     class ImplString final
-        : public ImplBase<LLSD::TypeString, LLSD::String, const LLSD::String&, LLSD::String&&>
+        : public ImplBase<LLSD::String, const LLSD::String&, LLSD::String&&>
     {
     public:
         ImplString(const LLSD::String& v) : Base(v) { }
@@ -345,23 +200,14 @@ namespace
         virtual LLSD::UUID      asUUID() const  { return LLUUID(mValue); }
         virtual LLSD::Date      asDate() const  { return LLDate(mValue); }
         virtual LLSD::URI       asURI() const   { return LLURI(mValue); }
-        virtual size_t          size() const    { return mValue.size(); }
         virtual const LLSD::String& asStringRef() const { return mValue; }
 
         virtual void asXMLRPCValue(std::ostream& os) const { os << "<string>" << LLStringFn::xml_encode(mValue) << "</string>"; }
 
-        using LLSD::Impl::assign; // Unhiding base class virtuals...
-        virtual void assign(LLSD::Impl*& var, const char* value)
-        {
-            if (shared())
-            {
-                Impl::assign(var, value);
-            }
-            else
-            {
-                mValue = value;
-            }
-        }
+        size_t size() const { return mValue.size(); }
+
+        using Base::set;
+        void set(const char* value) { mValue = value; }
     };
 
     LLSD::Integer ImplString::asInteger() const
@@ -381,7 +227,7 @@ namespace
 
 
     class ImplUUID final
-        : public ImplBase<LLSD::TypeUUID, LLSD::UUID, const LLSD::UUID&, LLSD::UUID&&>
+        : public ImplBase<LLSD::UUID, const LLSD::UUID&, LLSD::UUID&&>
     {
     public:
         ImplUUID(const LLSD::UUID& v) : Base(v) { }
@@ -394,35 +240,8 @@ namespace
     };
 
 
-    class ImplDate final
-        : public ImplBase<LLSD::TypeDate, LLSD::Date, const LLSD::Date&, LLSD::Date&&>
-    {
-    public:
-        ImplDate(const LLSD::Date& v)
-            : ImplBase(v)
-            { }
-
-        ImplDate(LLSD::Date&& v)
-            : ImplBase(std::move(v))
-        { }
-
-        virtual LLSD::Integer asInteger() const
-        {
-            return (LLSD::Integer)(mValue.secondsSinceEpoch());
-        }
-        virtual LLSD::Real asReal() const
-        {
-            return mValue.secondsSinceEpoch();
-        }
-        virtual LLSD::String    asString() const{ return mValue.asString(); }
-        virtual LLSD::Date      asDate() const  { return mValue; }
-
-        virtual void asXMLRPCValue(std::ostream& os) const { os << "<dateTime.iso8601>" << mValue.toHTTPDateString("%FT%T") << "</dateTime.iso8601>"; }
-    };
-
-
     class ImplURI final
-        : public ImplBase<LLSD::TypeURI, LLSD::URI, const LLSD::URI&, LLSD::URI&&>
+        : public ImplBase<LLSD::URI, const LLSD::URI&, LLSD::URI&&>
     {
     public:
         ImplURI(const LLSD::URI& v) : Base(v) { }
@@ -436,7 +255,7 @@ namespace
 
 
     class ImplBinary final
-        : public ImplBase<LLSD::TypeBinary, LLSD::Binary, const LLSD::Binary&, LLSD::Binary&&>
+        : public ImplBase<LLSD::Binary, const LLSD::Binary&, LLSD::Binary&&>
     {
     public:
         ImplBinary(const LLSD::Binary& v) : Base(v) { }
@@ -456,12 +275,12 @@ namespace
         DataMap mData;
 
     protected:
-        ImplMap(const DataMap& data) : Impl(LLSD::TypeMap), mData(data) { }
+        ImplMap(const DataMap& data) : mData(data) { }
 
     public:
-        ImplMap() : Impl(LLSD::TypeMap) { }
+        ImplMap() { }
 
-        virtual ImplMap& makeMap(LLSD::Impl*&);
+        ImplMap* clone() const { return new ImplMap(mData); }
 
         virtual LLSD::Boolean asBoolean() const { return !mData.empty(); }
 
@@ -477,47 +296,25 @@ namespace
             os << "</struct>";
         }
 
-        virtual bool has(std::string_view) const;
-
-        using LLSD::Impl::get; // Unhiding get(size_t)
-        using LLSD::Impl::erase; // Unhiding erase(size_t)
-        using LLSD::Impl::ref; // Unhiding ref(size_t)
-        virtual LLSD get(std::string_view) const;
-        virtual LLSD getKeys() const;
+        bool has(std::string_view) const;
+        LLSD get(std::string_view) const;
+        LLSD getKeys() const;
         void insert(std::string&& k, const LLSD& v);
         void insert(std::string&& k, LLSD&& v);
         void insert(std::string_view k, const LLSD& v);
         void insert(std::string_view k, LLSD&& v);
-        virtual void erase(const LLSD::String&);
-                      LLSD& ref(std::string&&);
-                      LLSD& ref(std::string_view);
-        virtual const LLSD& ref(std::string_view) const;
+        void erase(const LLSD::String&);
+        LLSD& ref(std::string&&);
+        LLSD& ref(std::string_view);
+        const LLSD& ref(std::string_view) const;
 
-        virtual size_t size() const { return mData.size(); }
+        size_t size() const { return mData.size(); }
 
         LLSD::map_iterator beginMap() { return mData.begin(); }
         LLSD::map_iterator endMap() { return mData.end(); }
-        virtual LLSD::map_const_iterator beginMap() const { return mData.begin(); }
-        virtual LLSD::map_const_iterator endMap() const { return mData.end(); }
-
-        virtual void dumpStats() const;
-        virtual void calcStats(S32 type_counts[], S32 share_counts[]) const;
+        LLSD::map_const_iterator beginMap() const { return mData.begin(); }
+        LLSD::map_const_iterator endMap() const { return mData.end(); }
     };
-
-    ImplMap& ImplMap::makeMap(LLSD::Impl*& var)
-    {
-        LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        if (shared())
-        {
-            ImplMap* i = new ImplMap(mData);
-            Impl::assign(var, i);
-            return *i;
-        }
-        else
-        {
-            return *this;
-        }
-    }
 
     bool ImplMap::has(const std::string_view k) const
     {
@@ -639,33 +436,6 @@ namespace
         return i->second;
     }
 
-    void ImplMap::dumpStats() const
-    {
-        std::cout << "Map size: " << mData.size() << std::endl;
-
-        std::cout << "LLSD Net Objects: " << llsd::sLLSDNetObjects << std::endl;
-        std::cout << "LLSD allocations: " << llsd::sLLSDAllocationCount << std::endl;
-
-        std::cout << "LLSD::Impl Net Objects: " << sOutstandingCount << std::endl;
-        std::cout << "LLSD::Impl allocations: " << sAllocationCount << std::endl;
-
-        Impl::dumpStats();
-    }
-
-    void ImplMap::calcStats(S32 type_counts[], S32 share_counts[]) const
-    {
-        LLSD::map_const_iterator iter = beginMap();
-        while (iter != endMap())
-        {
-            //std::cout << "  " << (*iter).first << ": " << (*iter).second << std::endl;
-            Impl::calcStats((*iter).second, type_counts, share_counts);
-            ++iter;
-        }
-
-        // Add in the values for this map
-        Impl::calcStats(type_counts, share_counts);
-    }
-
 
     class ImplArray final : public LLSD::Impl
     {
@@ -675,12 +445,12 @@ namespace
         DataVector mData;
 
     protected:
-        ImplArray(const DataVector& data) : Impl(LLSD::TypeArray), mData(data) { }
+        ImplArray(const DataVector& data) : mData(data) { }
 
     public:
-        ImplArray() : Impl(LLSD::TypeArray) { }
+        ImplArray() = default;
 
-        virtual ImplArray& makeArray(Impl*&);
+        ImplArray* clone() const { return new ImplArray(mData); }
 
         virtual LLSD::Boolean asBoolean() const { return !mData.empty(); }
 
@@ -694,47 +464,26 @@ namespace
             os << "</data></array>";
         }
 
-        using LLSD::Impl::get; // Unhiding get(LLSD::String)
-        using LLSD::Impl::erase; // Unhiding erase(LLSD::String)
-        using LLSD::Impl::ref; // Unhiding ref(LLSD::String)
-        virtual size_t size() const;
-        virtual LLSD get(size_t) const;
-                void set(size_t, const LLSD&);
-                void set(size_t, LLSD&&);
-                void insert(size_t, const LLSD&);
-                void insert(size_t, LLSD&&);
-                LLSD& append(const LLSD&);
-                LLSD& append(LLSD&&);
-        virtual void erase(size_t);
-                      LLSD& ref(size_t);
-        virtual const LLSD& ref(size_t) const;
+        size_t size() const { return mData.size(); }
+        LLSD get(size_t) const;
+        void set(size_t, const LLSD&);
+        void set(size_t, LLSD&&);
+        void insert(size_t, const LLSD&);
+        void insert(size_t, LLSD&&);
+        LLSD& append(const LLSD&);
+        LLSD& append(LLSD&&);
+        void erase(size_t);
+        LLSD& ref(size_t);
+        const LLSD& ref(size_t) const;
         void reserve(size_t size) { mData.reserve(size); }
 
         LLSD::array_iterator beginArray() { return mData.begin(); }
         LLSD::array_iterator endArray() { return mData.end(); }
         LLSD::reverse_array_iterator rbeginArray() { return mData.rbegin(); }
         LLSD::reverse_array_iterator rendArray() { return mData.rend(); }
-        virtual LLSD::array_const_iterator beginArray() const { return mData.begin(); }
-        virtual LLSD::array_const_iterator endArray() const { return mData.end(); }
-
-        virtual void calcStats(S32 type_counts[], S32 share_counts[]) const;
+        LLSD::array_const_iterator beginArray() const { return mData.begin(); }
+        LLSD::array_const_iterator endArray() const { return mData.end(); }
     };
-
-    ImplArray& ImplArray::makeArray(Impl*& var)
-    {
-        if (shared())
-        {
-            ImplArray* i = new ImplArray(mData);
-            Impl::assign(var, i);
-            return *i;
-        }
-        else
-        {
-            return *this;
-        }
-    }
-
-    size_t ImplArray::size() const      { return mData.size(); }
 
     LLSD ImplArray::get(size_t i) const
     {
@@ -851,33 +600,13 @@ namespace
 
         return mData[index];
     }
-
-    void ImplArray::calcStats(S32 type_counts[], S32 share_counts[]) const
-    {
-        LLSD::array_const_iterator iter = beginArray();
-        while (iter != endArray())
-        {   // Add values for all items held in the array
-            Impl::calcStats((*iter), type_counts, share_counts);
-            ++iter;
-        }
-
-        // Add in the values for this array
-        Impl::calcStats(type_counts, share_counts);
-    }
 }
 
-LLSD::Impl::Impl(LLSD::Type type)
+LLSD::Impl::Impl()
     : mUseCount(0)
-    , mType(type)
 {
     ++sAllocationCount;
     ++sOutstandingCount;
-}
-
-LLSD::Impl::Impl(StaticAllocationMarker)
-    : mUseCount(0)
-    , mType(LLSD::TypeUndefined)
-{
 }
 
 LLSD::Impl::~Impl()
@@ -885,9 +614,17 @@ LLSD::Impl::~Impl()
     --sOutstandingCount;
 }
 
+void LLSD::Impl::retain(Impl* impl)
+{
+    if (impl)
+    {
+        ++impl->mUseCount;
+    }
+}
+
 void LLSD::Impl::destruct(Impl*& var)
 {
-    if (var && var->mUseCount != STATIC_USAGE_COUNT && --var->mUseCount == 0)
+    if (var && --var->mUseCount == 0)
     {
         delete var;
     }
@@ -895,134 +632,59 @@ void LLSD::Impl::destruct(Impl*& var)
 
 void LLSD::Impl::reset(Impl*& var, Impl* impl)
 {
-    if (impl && impl->mUseCount != STATIC_USAGE_COUNT)
+    if (impl)
     {
         ++impl->mUseCount;
     }
-    if (var  &&  var->mUseCount != STATIC_USAGE_COUNT && --var->mUseCount == 0)
+    if (var && --var->mUseCount == 0)
     {
         delete var;
     }
     var = impl;
 }
 
-void LLSD::Impl::move(Impl*& var, Impl*& impl)
-{
-    if (var && var->mUseCount != STATIC_USAGE_COUNT && --var->mUseCount == 0)
-    {
-        delete var; // destroy var if usage falls to 0 and not static
-    }
-    var = impl; // Steal impl to var without incrementing use since this is a move
-    impl = nullptr; // null out old-impl pointer
-}
-
-LLSD::Impl& LLSD::Impl::safe(Impl* impl)
-{
-    static Impl theUndefined(STATIC_USAGE_COUNT);
-    return impl ? *impl : theUndefined;
-}
-
-const LLSD::Impl& LLSD::Impl::safe(const Impl* impl)
-{
-    return safe(const_cast<Impl*>(impl));
-}
-
-ImplMap& LLSD::Impl::makeMap(Impl*& var)
+ImplMap& LLSD::Impl::mutableMap(LLSD& sd)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
+    if (sd.mType == LLSD::TypeMap)
+    {
+        ImplMap* m = static_cast<ImplMap*>(sd.mData.impl);
+        if (m->shared())
+        {
+            ImplMap* copy = m->clone();
+            reset(sd.mData.impl, copy);
+            return *copy;
+        }
+        return *m;
+    }
+    sd.releaseValue();
+    sd.mData.impl = nullptr;
     ImplMap* im = new ImplMap;
-    reset(var, im);
+    reset(sd.mData.impl, im);
+    sd.mType = LLSD::TypeMap;
     return *im;
 }
 
-ImplArray& LLSD::Impl::makeArray(Impl*& var)
+ImplArray& LLSD::Impl::mutableArray(LLSD& sd)
 {
+    if (sd.mType == LLSD::TypeArray)
+    {
+        ImplArray* a = static_cast<ImplArray*>(sd.mData.impl);
+        if (a->shared())
+        {
+            ImplArray* copy = a->clone();
+            reset(sd.mData.impl, copy);
+            return *copy;
+        }
+        return *a;
+    }
+    sd.releaseValue();
+    sd.mData.impl = nullptr;
     ImplArray* ia = new ImplArray;
-    reset(var, ia);
+    reset(sd.mData.impl, ia);
+    sd.mType = LLSD::TypeArray;
     return *ia;
 }
-
-
-void LLSD::Impl::assign(Impl*& var, const Impl* other)
-{
-    reset(var, const_cast<Impl*>(other));
-}
-
-void LLSD::Impl::assignUndefined(Impl*& var)
-{
-    reset(var, 0);
-}
-
-void LLSD::Impl::assign(Impl*& var, LLSD::Boolean v)
-{
-    reset(var, new ImplBoolean(v));
-}
-
-void LLSD::Impl::assign(Impl*& var, LLSD::Integer v)
-{
-    reset(var, new ImplInteger(v));
-}
-
-void LLSD::Impl::assign(Impl*& var, LLSD::Real v)
-{
-    reset(var, new ImplReal(v));
-}
-
-void LLSD::Impl::assign(Impl*& var, const char* v)
-{
-    reset(var, new ImplString(v));
-}
-
-void LLSD::Impl::assign(Impl*& var, const LLSD::String& v)
-{
-    reset(var, new ImplString(v));
-}
-
-void LLSD::Impl::assign(Impl*& var, const LLSD::UUID& v)
-{
-    reset(var, new ImplUUID(v));
-}
-
-void LLSD::Impl::assign(Impl*& var, const LLSD::Date& v)
-{
-    reset(var, new ImplDate(v));
-}
-
-void LLSD::Impl::assign(Impl*& var, const LLSD::URI& v)
-{
-    reset(var, new ImplURI(v));
-}
-
-void LLSD::Impl::assign(Impl*& var, const LLSD::Binary& v)
-{
-    reset(var, new ImplBinary(v));
-}
-
-void LLSD::Impl::assign(Impl*& var, LLSD::String&& v)
-{
-    reset(var, new ImplString(std::move(v)));
-}
-
-void LLSD::Impl::assign(Impl*& var, LLSD::UUID&& v)
-{
-    reset(var, new ImplUUID(std::move(v)));
-}
-
-void LLSD::Impl::assign(Impl*& var, LLSD::Date&& v)
-{
-    reset(var, new ImplDate(std::move(v)));
-}
-
-void LLSD::Impl::assign(Impl*& var, LLSD::URI&& v)
-{
-    reset(var, new ImplURI(std::move(v)));
-}
-
-void LLSD::Impl::assign(Impl*& var, LLSD::Binary&& v)
-{
-    reset(var, new ImplBinary(std::move(v)));
-}
-
 
 const LLSD& LLSD::Impl::undef()
 {
@@ -1030,16 +692,54 @@ const LLSD& LLSD::Impl::undef()
     return immutableUndefined;
 }
 
-void LLSD::Impl::dumpStats() const
+void LLSD::Impl::calcStats(const LLSD& sd, S32 type_counts[], S32 share_counts[])
 {
+    S32 tp = S32(sd.type());
+    if (0 <= tp && tp < LLSD::TypeLLSDNumTypes)
+    {
+        type_counts[tp]++;
+        if (sd.isHeap() && sd.mData.impl->shared())
+        {
+            share_counts[tp]++;
+        }
+    }
+
+    if (sd.isMap())
+    {
+        for (LLSD::map_const_iterator it = sd.beginMap(), end = sd.endMap(); it != end; ++it)
+        {
+            calcStats(it->second, type_counts, share_counts);
+        }
+    }
+    else if (sd.isArray())
+    {
+        for (LLSD::array_const_iterator it = sd.beginArray(), end = sd.endArray(); it != end; ++it)
+        {
+            calcStats(*it, type_counts, share_counts);
+        }
+    }
+}
+
+void LLSD::Impl::dumpStats(const LLSD& sd)
+{
+    if (sd.isMap())
+    {
+        std::cout << "Map size: " << sd.size() << std::endl;
+    }
+
+    std::cout << "LLSD Net Objects: " << llsd::sLLSDNetObjects << std::endl;
+    std::cout << "LLSD allocations: " << llsd::sLLSDAllocationCount << std::endl;
+
+    std::cout << "LLSD::Impl Net Objects: " << sOutstandingCount << std::endl;
+    std::cout << "LLSD::Impl allocations: " << sAllocationCount << std::endl;
+
     S32 type_counts[LLSD::TypeLLSDNumTypes + 1];
     memset(&type_counts, 0, sizeof(type_counts));
 
     S32 share_counts[LLSD::TypeLLSDNumTypes + 1];
     memset(&share_counts, 0, sizeof(share_counts));
 
-    // Add info from all the values this object has
-    calcStats(type_counts, share_counts);
+    calcStats(sd, type_counts, share_counts);
 
     S32 type_index = LLSD::TypeLLSDTypeBegin;
     while (type_index != LLSD::TypeLLSDTypeEnd)
@@ -1052,103 +752,277 @@ void LLSD::Impl::dumpStats() const
     }
 }
 
-
-void LLSD::Impl::calcStats(S32 type_counts[], S32 share_counts[]) const
-{
-    S32 tp = S32(type());
-    if (0 <= tp && tp < LLSD::TypeLLSDNumTypes)
-    {
-        type_counts[tp]++;
-        if (shared())
-        {
-            share_counts[tp]++;
-        }
-    }
-}
-
-
 U32 LLSD::Impl::sAllocationCount = 0;
 U32 LLSD::Impl::sOutstandingCount = 0;
 
 
-
-#ifdef NAME_UNNAMED_NAMESPACE
-namespace LLSDUnnamedNamespace
-#else
-namespace
-#endif
+void LLSD::releaseValue()
 {
-    inline LLSD::Impl& safe(LLSD::Impl* impl)
-        { return LLSD::Impl::safe(impl); }
-
-    inline ImplMap& makeMap(LLSD::Impl*& var)
-        { return safe(var).makeMap(var); }
-
-    inline ImplArray& makeArray(LLSD::Impl*& var)
-        { return safe(var).makeArray(var); }
+    if (isHeap())
+    {
+        Impl::destruct(mData.impl);
+    }
 }
 
+LLSD::LLSD() : mType(TypeUndefined)     { mData.impl = nullptr; ALLOC_LLSD_OBJECT; }
+LLSD::~LLSD()                           { FREE_LLSD_OBJECT; releaseValue(); }
 
-LLSD::LLSD() : impl(0)                  { ALLOC_LLSD_OBJECT; }
-LLSD::~LLSD()                           { FREE_LLSD_OBJECT; Impl::destruct(impl); }
+LLSD::LLSD(const LLSD& other) : mType(TypeUndefined)
+{
+    mData.impl = nullptr;
+    ALLOC_LLSD_OBJECT;
+    assign(other);
+}
 
-LLSD::LLSD(const LLSD& other) : impl(0) { ALLOC_LLSD_OBJECT;  assign(other); }
-void LLSD::assign(const LLSD& other)    { Impl::assign(impl, other.impl); }
+void LLSD::assign(const LLSD& other)
+{
+    // copy other's value before releasing ours so self-assignment is safe
+    const Type t = other.mType;
+    Data d = other.mData;
+    if (isHeapType(t))
+    {
+        Impl::retain(d.impl);
+    }
+    releaseValue();
+    mData = d;
+    mType = t;
+}
 
-LLSD::LLSD(LLSD&& other) noexcept : impl(nullptr) { ALLOC_LLSD_OBJECT;  Impl::move(impl, other.impl); }
-void  LLSD::assign(LLSD&& other) { Impl::move(impl, other.impl); }
-LLSD& LLSD::operator=(LLSD&& other) noexcept { Impl::move(impl, other.impl); return *this; }
+LLSD::LLSD(LLSD&& other) noexcept
+    : mData(other.mData)
+    , mType(other.mType)
+{
+    ALLOC_LLSD_OBJECT;
+    other.mData.impl = nullptr;
+    other.mType = TypeUndefined;
+}
 
-void LLSD::clear()                      { Impl::assignUndefined(impl); }
+void LLSD::assign(LLSD&& other)
+{
+    if (this != &other)
+    {
+        releaseValue();
+        mData = other.mData;
+        mType = other.mType;
+        other.mData.impl = nullptr;
+        other.mType = TypeUndefined;
+    }
+}
 
-LLSD::Type LLSD::type() const           { return safe(impl).type(); }
+LLSD& LLSD::operator=(LLSD&& other) noexcept
+{
+    assign(std::move(other));
+    return *this;
+}
+
+void LLSD::clear()
+{
+    releaseValue();
+    mData.impl = nullptr;
+    mType = TypeUndefined;
+}
 
 // Scalar Constructors
-LLSD::LLSD(Boolean v) : impl(0)         { ALLOC_LLSD_OBJECT;    assign(v); }
-LLSD::LLSD(Integer v) : impl(0)         { ALLOC_LLSD_OBJECT;    assign(v); }
-LLSD::LLSD(Real v) : impl(0)            { ALLOC_LLSD_OBJECT;    assign(v); }
-LLSD::LLSD(const UUID& v) : impl(0)     { ALLOC_LLSD_OBJECT;    assign(v); }
-LLSD::LLSD(const String& v) : impl(0)   { ALLOC_LLSD_OBJECT;    assign(v); }
-LLSD::LLSD(const Date& v) : impl(0)     { ALLOC_LLSD_OBJECT;    assign(v); }
-LLSD::LLSD(const URI& v) : impl(0)      { ALLOC_LLSD_OBJECT;    assign(v); }
-LLSD::LLSD(const Binary& v) : impl(0)   { ALLOC_LLSD_OBJECT;    assign(v); }
-LLSD::LLSD(UUID&& v) : impl(0)          { ALLOC_LLSD_OBJECT;    assign(std::move(v)); }
-LLSD::LLSD(String&& v) : impl(0)        { ALLOC_LLSD_OBJECT;    assign(std::move(v)); }
-LLSD::LLSD(Date&& v) : impl(0)          { ALLOC_LLSD_OBJECT;    assign(std::move(v)); }
-LLSD::LLSD(URI&& v) : impl(0)           { ALLOC_LLSD_OBJECT;    assign(std::move(v)); }
-LLSD::LLSD(Binary&& v) : impl(0)        { ALLOC_LLSD_OBJECT;    assign(std::move(v)); }
+LLSD::LLSD(Boolean v) : mType(TypeBoolean)  { mData.b = v; ALLOC_LLSD_OBJECT; }
+LLSD::LLSD(Integer v) : mType(TypeInteger)  { mData.i = v; ALLOC_LLSD_OBJECT; }
+LLSD::LLSD(Real v) : mType(TypeReal)        { mData.r = v; ALLOC_LLSD_OBJECT; }
+LLSD::LLSD(const Date& v) : mType(TypeDate) { mData.r = v.secondsSinceEpoch(); ALLOC_LLSD_OBJECT; }
+LLSD::LLSD(Date&& v) : mType(TypeDate)      { mData.r = v.secondsSinceEpoch(); ALLOC_LLSD_OBJECT; }
+LLSD::LLSD(const String& v) : mType(TypeUndefined)  { mData.impl = nullptr; ALLOC_LLSD_OBJECT; assign(v); }
+LLSD::LLSD(const UUID& v) : mType(TypeUndefined)    { mData.impl = nullptr; ALLOC_LLSD_OBJECT; assign(v); }
+LLSD::LLSD(const URI& v) : mType(TypeUndefined)     { mData.impl = nullptr; ALLOC_LLSD_OBJECT; assign(v); }
+LLSD::LLSD(const Binary& v) : mType(TypeUndefined)  { mData.impl = nullptr; ALLOC_LLSD_OBJECT; assign(v); }
+LLSD::LLSD(String&& v) : mType(TypeUndefined)       { mData.impl = nullptr; ALLOC_LLSD_OBJECT; assign(std::move(v)); }
+LLSD::LLSD(UUID&& v) : mType(TypeUndefined)         { mData.impl = nullptr; ALLOC_LLSD_OBJECT; assign(std::move(v)); }
+LLSD::LLSD(URI&& v) : mType(TypeUndefined)          { mData.impl = nullptr; ALLOC_LLSD_OBJECT; assign(std::move(v)); }
+LLSD::LLSD(Binary&& v) : mType(TypeUndefined)       { mData.impl = nullptr; ALLOC_LLSD_OBJECT; assign(std::move(v)); }
 
 // Scalar Assignment
-void LLSD::assign(Boolean v)            { safe(impl).assign(impl, v); }
-void LLSD::assign(Integer v)            { safe(impl).assign(impl, v); }
-void LLSD::assign(Real v)               { safe(impl).assign(impl, v); }
-void LLSD::assign(const String& v)      { safe(impl).assign(impl, v); }
-void LLSD::assign(const UUID& v)        { safe(impl).assign(impl, v); }
-void LLSD::assign(const Date& v)        { safe(impl).assign(impl, v); }
-void LLSD::assign(const URI& v)         { safe(impl).assign(impl, v); }
-void LLSD::assign(const Binary& v)      { safe(impl).assign(impl, v); }
-void LLSD::assign(String&& v)           { safe(impl).assign(impl, std::move(v)); }
-void LLSD::assign(UUID&& v)             { safe(impl).assign(impl, std::move(v)); }
-void LLSD::assign(Date&& v)             { safe(impl).assign(impl, std::move(v)); }
-void LLSD::assign(URI&& v)              { safe(impl).assign(impl, std::move(v)); }
-void LLSD::assign(Binary&& v)           { safe(impl).assign(impl, std::move(v)); }
+void LLSD::assign(Boolean v)
+{
+    releaseValue();
+    mType = TypeBoolean;
+    mData.b = v;
+}
+
+void LLSD::assign(Integer v)
+{
+    releaseValue();
+    mType = TypeInteger;
+    mData.i = v;
+}
+
+void LLSD::assign(Real v)
+{
+    releaseValue();
+    mType = TypeReal;
+    mData.r = v;
+}
+
+void LLSD::assign(const Date& v)
+{
+    releaseValue();
+    mType = TypeDate;
+    mData.r = v.secondsSinceEpoch();
+}
+
+void LLSD::assign(Date&& v)
+{
+    releaseValue();
+    mType = TypeDate;
+    mData.r = v.secondsSinceEpoch();
+}
+
+void LLSD::assign(const String& v)  { Impl::assignValue<ImplString>(*this, TypeString, v); }
+void LLSD::assign(String&& v)       { Impl::assignValue<ImplString>(*this, TypeString, std::move(v)); }
+void LLSD::assign(const UUID& v)    { Impl::assignValue<ImplUUID>(*this, TypeUUID, v); }
+void LLSD::assign(UUID&& v)         { Impl::assignValue<ImplUUID>(*this, TypeUUID, std::move(v)); }
+void LLSD::assign(const URI& v)     { Impl::assignValue<ImplURI>(*this, TypeURI, v); }
+void LLSD::assign(URI&& v)          { Impl::assignValue<ImplURI>(*this, TypeURI, std::move(v)); }
+void LLSD::assign(const Binary& v)  { Impl::assignValue<ImplBinary>(*this, TypeBinary, v); }
+void LLSD::assign(Binary&& v)       { Impl::assignValue<ImplBinary>(*this, TypeBinary, std::move(v)); }
 
 // Scalar Accessors
-LLSD::Boolean   LLSD::asBoolean() const { return safe(impl).asBoolean(); }
-LLSD::Integer   LLSD::asInteger() const { return safe(impl).asInteger(); }
-LLSD::Real      LLSD::asReal() const    { return safe(impl).asReal(); }
-LLSD::String    LLSD::asString() const  { return safe(impl).asString(); }
-LLSD::UUID      LLSD::asUUID() const    { return safe(impl).asUUID(); }
-LLSD::Date      LLSD::asDate() const    { return safe(impl).asDate(); }
-LLSD::URI       LLSD::asURI() const     { return safe(impl).asURI(); }
-const LLSD::Binary& LLSD::asBinary() const  { return safe(impl).asBinary(); }
+LLSD::Boolean LLSD::asBoolean() const
+{
+    switch (mType)
+    {
+    case TypeBoolean:   return mData.b;
+    case TypeInteger:   return mData.i != 0;
+    case TypeReal:      return !std::isnan(mData.r) && mData.r != 0.0;
+    case TypeDate:
+    case TypeUndefined: return false;
+    default:            return mData.impl->asBoolean();
+    }
+}
 
-const LLSD::String& LLSD::asStringRef() const { return safe(impl).asStringRef(); }
+LLSD::Integer LLSD::asInteger() const
+{
+    switch (mType)
+    {
+    case TypeBoolean:   return mData.b ? 1 : 0;
+    case TypeInteger:   return mData.i;
+    case TypeReal:      return !std::isnan(mData.r) ? (Integer)mData.r : 0;
+    case TypeDate:      return (Integer)mData.r;
+    case TypeUndefined: return 0;
+    default:            return mData.impl->asInteger();
+    }
+}
+
+LLSD::Real LLSD::asReal() const
+{
+    switch (mType)
+    {
+    case TypeBoolean:   return mData.b ? 1.0 : 0.0;
+    case TypeInteger:   return mData.i;
+    case TypeReal:
+    case TypeDate:      return mData.r;
+    case TypeUndefined: return 0.0;
+    default:            return mData.impl->asReal();
+    }
+}
+
+LLSD::String LLSD::asString() const
+{
+    switch (mType)
+    {
+    case TypeBoolean:
+        // *NOTE: The reason that false is not converted to "false" is
+        // because that would break roundtripping,
+        // e.g. LLSD(false).asString().asBoolean().  There are many
+        // reasons for wanting LLSD("false").asBoolean() == true, such
+        // as "everything else seems to work that way".
+        return mData.b ? "true" : "";
+    case TypeInteger:
+    {
+        char buf[16];
+        char* end = std::to_chars(buf, buf + sizeof(buf), mData.i).ptr;
+        return String(buf, end);
+    }
+    case TypeReal:
+        // {:g} matches the printf %g formatting this historically used
+        return fmt::format("{:g}", mData.r);
+    case TypeDate:
+        return Date(mData.r).asString();
+    case TypeUndefined:
+        return String();
+    default:
+        return mData.impl->asString();
+    }
+}
+
+LLSD::UUID LLSD::asUUID() const
+{
+    return isHeap() ? mData.impl->asUUID() : LLUUID();
+}
+
+LLSD::Date LLSD::asDate() const
+{
+    if (mType == TypeDate)
+    {
+        return Date(mData.r);
+    }
+    return isHeap() ? mData.impl->asDate() : LLDate();
+}
+
+LLSD::URI LLSD::asURI() const
+{
+    return isHeap() ? mData.impl->asURI() : LLURI();
+}
+
+const LLSD::Binary& LLSD::asBinary() const
+{
+    if (isHeap())
+    {
+        return mData.impl->asBinary();
+    }
+    static const Binary empty;
+    return empty;
+}
+
+const LLSD::String& LLSD::asStringRef() const
+{
+    if (isHeap())
+    {
+        return mData.impl->asStringRef();
+    }
+    static const String empty;
+    return empty;
+}
 
 void LLSD::asXMLRPCValue(std::ostream& os) const
 {
     os << "<value>";
-    safe(impl).asXMLRPCValue(os);
+    switch (mType)
+    {
+    case TypeUndefined:
+        os << "<nil/>";
+        break;
+    case TypeBoolean:
+        os << (mData.b ? "<boolean>1</boolean>" : "<boolean>0</boolean>");
+        break;
+    case TypeInteger:
+        os << "<int>" << mData.i << "</int>";
+        break;
+    case TypeReal:
+    {
+        // shortest representation that round-trips to the same double;
+        // fmt rather than std::to_chars because Apple gates the
+        // floating-point overloads behind macOS 13.3
+        char buf[32];
+        auto result = fmt::format_to_n(buf, sizeof(buf), "{}", mData.r);
+        os << "<double>";
+        os.write(buf, result.out - buf);
+        os << "</double>";
+        break;
+    }
+    case TypeDate:
+        os << "<dateTime.iso8601>" << Date(mData.r).toHTTPDateString("%FT%T") << "</dateTime.iso8601>";
+        break;
+    default:
+        mData.impl->asXMLRPCValue(os);
+        break;
+    }
     os << "</value>";
 }
 
@@ -1160,125 +1034,167 @@ LLSD::String LLSD::asXMLRPCValue() const
 }
 
 // const char * helpers
-LLSD::LLSD(const char* v) : impl(0)     { ALLOC_LLSD_OBJECT;    assign(v); }
-void LLSD::assign(const char* v)
+LLSD::LLSD(const char* v) : mType(TypeUndefined)
 {
-    if(v) safe(impl).assign(impl, v);
-    else assign(std::string());
-}
-
-// std::string_view helpers
-LLSD::LLSD(std::string_view v) : impl(0)
-{
+    mData.impl = nullptr;
     ALLOC_LLSD_OBJECT;
     assign(v);
 }
+
+void LLSD::assign(const char* v)
+{
+    if (v)
+    {
+        Impl::assignValue<ImplString>(*this, TypeString, v);
+    }
+    else
+    {
+        assign(String());
+    }
+}
+
+// std::string_view helpers
+LLSD::LLSD(std::string_view v) : mType(TypeUndefined)
+{
+    mData.impl = nullptr;
+    ALLOC_LLSD_OBJECT;
+    assign(v);
+}
+
 void LLSD::assign(std::string_view v)
 {
-    safe(impl).assign(impl, std::string(v));
+    Impl::assignValue<ImplString>(*this, TypeString, String(v));
 }
 
 
 LLSD LLSD::emptyMap()
 {
     LLSD v;
-    makeMap(v.impl);
+    Impl::mutableMap(v);
     return v;
 }
 
-bool LLSD::has(const std::string_view k) const  { return safe(impl).has(k); }
-LLSD LLSD::get(const std::string_view k) const  { return safe(impl).get(k); }
-LLSD LLSD::getKeys() const              { return safe(impl).getKeys(); }
-void LLSD::insert(std::string&& k, const LLSD& v)    { makeMap(impl).insert(std::move(k), v); }
-void LLSD::insert(std::string&& k, LLSD&& v)         { makeMap(impl).insert(std::move(k), std::move(v)); }
-void LLSD::insert(std::string_view k, const LLSD& v) { makeMap(impl).insert(k, v); }
-void LLSD::insert(std::string_view k, LLSD&& v)      { makeMap(impl).insert(k, std::move(v)); }
+bool LLSD::has(const std::string_view k) const
+{
+    return mType == TypeMap && static_cast<const ImplMap*>(mData.impl)->has(k);
+}
+
+LLSD LLSD::get(const std::string_view k) const
+{
+    return (mType == TypeMap) ? static_cast<const ImplMap*>(mData.impl)->get(k) : LLSD();
+}
+
+LLSD LLSD::getKeys() const
+{
+    return (mType == TypeMap) ? static_cast<const ImplMap*>(mData.impl)->getKeys() : emptyArray();
+}
+
+void LLSD::insert(std::string&& k, const LLSD& v)    { Impl::mutableMap(*this).insert(std::move(k), v); }
+void LLSD::insert(std::string&& k, LLSD&& v)         { Impl::mutableMap(*this).insert(std::move(k), std::move(v)); }
+void LLSD::insert(std::string_view k, const LLSD& v) { Impl::mutableMap(*this).insert(k, v); }
+void LLSD::insert(std::string_view k, LLSD&& v)      { Impl::mutableMap(*this).insert(k, std::move(v)); }
 
 LLSD& LLSD::with(std::string&& k, const LLSD& v)
-                                        {
-                                            makeMap(impl).insert(std::move(k), v);
-                                            return *this;
-                                        }
+{
+    Impl::mutableMap(*this).insert(std::move(k), v);
+    return *this;
+}
 LLSD& LLSD::with(std::string&& k, LLSD&& v)
-                                        {
-                                            makeMap(impl).insert(std::move(k), std::move(v));
-                                            return *this;
-                                        }
+{
+    Impl::mutableMap(*this).insert(std::move(k), std::move(v));
+    return *this;
+}
 LLSD& LLSD::with(std::string_view k, const LLSD& v)
-                                        {
-                                            makeMap(impl).insert(k, v);
-                                            return *this;
-                                        }
+{
+    Impl::mutableMap(*this).insert(k, v);
+    return *this;
+}
 LLSD& LLSD::with(std::string_view k, LLSD&& v)
-                                        {
-                                            makeMap(impl).insert(k, std::move(v));
-                                            return *this;
-                                        }
-void LLSD::erase(const String& k)       { makeMap(impl).erase(k); }
+{
+    Impl::mutableMap(*this).insert(k, std::move(v));
+    return *this;
+}
+
+void LLSD::erase(const String& k)       { Impl::mutableMap(*this).erase(k); }
 
 LLSD& LLSD::operator[](const std::string_view k)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-    return makeMap(impl).ref(k);
+    return Impl::mutableMap(*this).ref(k);
 }
 
 LLSD& LLSD::operator[](std::string&& k)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-    return makeMap(impl).ref(std::move(k));
+    return Impl::mutableMap(*this).ref(std::move(k));
 }
 
 const LLSD& LLSD::operator[](const std::string_view k) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-    return safe(impl).ref(k);
+    return (mType == TypeMap) ? static_cast<const ImplMap*>(mData.impl)->ref(k) : Impl::undef();
 }
 
 LLSD LLSD::emptyArray()
 {
     LLSD v;
-    makeArray(v.impl);
+    Impl::mutableArray(v);
     return v;
 }
 
 LLSD LLSD::emptyReservedArray(size_t size)
 {
     LLSD v;
-    makeArray(v.impl).reserve(size);
+    Impl::mutableArray(v).reserve(size);
     return v;
 }
 
-size_t LLSD::size() const               { return safe(impl).size(); }
+size_t LLSD::size() const
+{
+    switch (mType)
+    {
+    case TypeMap:    return static_cast<const ImplMap*>(mData.impl)->size();
+    case TypeArray:  return static_cast<const ImplArray*>(mData.impl)->size();
+    case TypeString: return static_cast<const ImplString*>(mData.impl)->size();
+    default:         return 0;
+    }
+}
 
-LLSD LLSD::get(Integer i) const         { return safe(impl).get(i); }
-void LLSD::set(Integer i, const LLSD& v){ makeArray(impl).set(i, v); }
-void LLSD::set(Integer i, LLSD&& v)     { makeArray(impl).set(i, std::move(v)); }
-void LLSD::insert(Integer i, const LLSD& v) { makeArray(impl).insert(i, v); }
-void LLSD::insert(Integer i, LLSD&& v) { makeArray(impl).insert(i, std::move(v)); }
+LLSD LLSD::get(Integer i) const
+{
+    return (mType == TypeArray) ? static_cast<const ImplArray*>(mData.impl)->get(i) : LLSD();
+}
+
+void LLSD::set(Integer i, const LLSD& v){ Impl::mutableArray(*this).set(i, v); }
+void LLSD::set(Integer i, LLSD&& v)     { Impl::mutableArray(*this).set(i, std::move(v)); }
+void LLSD::insert(Integer i, const LLSD& v) { Impl::mutableArray(*this).insert(i, v); }
+void LLSD::insert(Integer i, LLSD&& v)  { Impl::mutableArray(*this).insert(i, std::move(v)); }
 
 LLSD& LLSD::with(Integer i, const LLSD& v)
-                                        {
-                                            makeArray(impl).insert(i, v);
-                                            return *this;
-                                        }
+{
+    Impl::mutableArray(*this).insert(i, v);
+    return *this;
+}
 LLSD& LLSD::with(Integer i, LLSD&& v)
-                                        {
-                                            makeArray(impl).insert(i, std::move(v));
-                                            return *this;
-                                        }
-LLSD& LLSD::append(const LLSD& v)       { return makeArray(impl).append(v); }
-LLSD& LLSD::append(LLSD&& v)            { return makeArray(impl).append(std::move(v)); }
-void LLSD::erase(Integer i)             { makeArray(impl).erase(i); }
+{
+    Impl::mutableArray(*this).insert(i, std::move(v));
+    return *this;
+}
+
+LLSD& LLSD::append(const LLSD& v)       { return Impl::mutableArray(*this).append(v); }
+LLSD& LLSD::append(LLSD&& v)            { return Impl::mutableArray(*this).append(std::move(v)); }
+void LLSD::erase(Integer i)             { Impl::mutableArray(*this).erase(i); }
 
 LLSD& LLSD::operator[](size_t i)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-    return makeArray(impl).ref(i);
+    return Impl::mutableArray(*this).ref(i);
 }
+
 const LLSD& LLSD::operator[](size_t i) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-    return safe(impl).ref(i);
+    return (mType == TypeArray) ? static_cast<const ImplArray*>(mData.impl)->ref(i) : Impl::undef();
 }
 
 static const char *llsd_dump(const LLSD &llsd, bool useXMLFormat)
@@ -1319,18 +1235,65 @@ const char *LLSD::dump(const LLSD &llsd)
     return llsd_dump(llsd, false);
 }
 
-LLSD::map_iterator          LLSD::beginMap()        { return makeMap(impl).beginMap(); }
-LLSD::map_iterator          LLSD::endMap()          { return makeMap(impl).endMap(); }
-LLSD::map_const_iterator    LLSD::beginMap() const  { return safe(impl).beginMap(); }
-LLSD::map_const_iterator    LLSD::endMap() const    { return safe(impl).endMap(); }
+LLSD::map_iterator LLSD::beginMap()
+{
+    return Impl::mutableMap(*this).beginMap();
+}
 
-LLSD::array_iterator        LLSD::beginArray()      { return makeArray(impl).beginArray(); }
-LLSD::array_iterator        LLSD::endArray()        { return makeArray(impl).endArray(); }
-LLSD::array_const_iterator  LLSD::beginArray() const{ return safe(impl).beginArray(); }
-LLSD::array_const_iterator  LLSD::endArray() const  { return safe(impl).endArray(); }
+LLSD::map_iterator LLSD::endMap()
+{
+    return Impl::mutableMap(*this).endMap();
+}
 
-LLSD::reverse_array_iterator    LLSD::rbeginArray()     { return makeArray(impl).rbeginArray(); }
-LLSD::reverse_array_iterator    LLSD::rendArray()       { return makeArray(impl).rendArray(); }
+LLSD::map_const_iterator LLSD::beginMap() const
+{
+    return (mType == TypeMap) ? static_cast<const ImplMap*>(mData.impl)->beginMap() : endMap();
+}
+
+LLSD::map_const_iterator LLSD::endMap() const
+{
+    if (mType == TypeMap)
+    {
+        return static_cast<const ImplMap*>(mData.impl)->endMap();
+    }
+    static const llsd_map_t empty;
+    return empty.end();
+}
+
+LLSD::array_iterator LLSD::beginArray()
+{
+    return Impl::mutableArray(*this).beginArray();
+}
+
+LLSD::array_iterator LLSD::endArray()
+{
+    return Impl::mutableArray(*this).endArray();
+}
+
+LLSD::array_const_iterator LLSD::beginArray() const
+{
+    return (mType == TypeArray) ? static_cast<const ImplArray*>(mData.impl)->beginArray() : endArray();
+}
+
+LLSD::array_const_iterator LLSD::endArray() const
+{
+    if (mType == TypeArray)
+    {
+        return static_cast<const ImplArray*>(mData.impl)->endArray();
+    }
+    static const std::vector<LLSD> empty;
+    return empty.end();
+}
+
+LLSD::reverse_array_iterator LLSD::rbeginArray()
+{
+    return Impl::mutableArray(*this).rbeginArray();
+}
+
+LLSD::reverse_array_iterator LLSD::rendArray()
+{
+    return Impl::mutableArray(*this).rendArray();
+}
 
 namespace llsd
 {
@@ -1358,7 +1321,7 @@ U32 allocationCount()                               { return LLSD::Impl::sAlloca
 U32 outstandingCount()                              { return LLSD::Impl::sOutstandingCount; }
 
 // Diagnostic dump of contents in an LLSD object
-void dumpStats(const LLSD& llsd)                    { LLSD::Impl::getImpl(llsd).dumpStats(); }
+void dumpStats(const LLSD& llsd)                    { LLSD::Impl::dumpStats(llsd); }
 
 } // namespace llsd
 

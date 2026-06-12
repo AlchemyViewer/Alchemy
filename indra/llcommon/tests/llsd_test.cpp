@@ -746,34 +746,36 @@ namespace tut
         }
 
         {
-            SDAllocationCheck check("assign integer value", 1);
+            // scalar values are stored inline and never allocate
+            SDAllocationCheck check("assign integer value", 0);
             LLSD v = 45;
             v = 33;
             v = 0;
         }
 
         {
-            SDAllocationCheck check("copy construct integer", 1);
+            SDAllocationCheck check("copy construct integer", 0);
             LLSD v = 45;
             LLSD w = v;
         }
 
         {
-            SDAllocationCheck check("assign integer", 1);
+            SDAllocationCheck check("assign integer", 0);
             LLSD v = 45;
             LLSD w;
             w = v;
         }
 
         {
-            SDAllocationCheck check("avoids extra clone", 2);
+            SDAllocationCheck check("avoids extra clone", 1);
             LLSD v = 45;
             LLSD w = v;
             w = "nice day";
         }
 
         {
-            SDAllocationCheck check("shared values test for threaded work", 9);
+            // map + array + two strings; integers, reals and undefs are inline
+            SDAllocationCheck check("shared values test for threaded work", 4);
 
             //U32 start_llsd_count = LLSD::outstandingCount();
 
@@ -781,7 +783,7 @@ namespace tut
 
             m["one"] = 1;
             m["two"] = 2;
-            m["one_copy"] = m["one"];           // 3 (m, "one" and "two")
+            m["one_copy"] = m["one"];           // 1 (m; the integers are inline)
 
             m["undef_one"] = LLSD();
             m["undef_two"] = LLSD();
@@ -791,16 +793,16 @@ namespace tut
                 LLSD first_array = LLSD::emptyArray();
                 first_array.append(1.0f);
                 first_array.append(2.0f);
-                first_array.append(3.0f);           // 7
+                first_array.append(3.0f);           // 2 (the reals are inline)
 
                 m["array"] = first_array;
                 m["array_clone"] = first_array;
-                m["array_copy"] = m["array"];       // 7
+                m["array_copy"] = m["array"];       // 2 (shared, no clones)
             }
 
             m["string_one"] = "string one value";
             m["string_two"] = "string two value";
-            m["string_one_copy"] = m["string_one"];     // 9
+            m["string_one_copy"] = m["string_one"];     // 4
 
             //U32 llsd_object_count = LLSD::outstandingCount();
             //std::cout << "Using " << (llsd_object_count - start_llsd_count) << " LLSD objects" << std::endl;
