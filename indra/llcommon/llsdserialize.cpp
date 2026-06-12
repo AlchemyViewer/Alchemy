@@ -32,8 +32,12 @@
 #include "llstreamtools.h" // for fullread
 
 #include <bit>
+#include <charconv>
 #include <iostream>
 #include <limits>
+
+#include <fast_float/fast_float.h>
+#include <fmt/format.h>
 #include <simdutf.h>
 
 #include <boost/iostreams/device/array.hpp>
@@ -455,6 +459,92 @@ void LLSDParser::account(llssize bytes) const
 }
 
 
+namespace
+{
+    void scan_digits(std::istream& istr, char*& out, const char* const out_end)
+    {
+        int c;
+        while (out < out_end && (c = istr.peek()) >= '0' && c <= '9')
+        {
+            *out++ = (char)istr.get();
+        }
+    }
+
+    // True when a scan stopped because the buffer filled while the stream
+    // still holds characters of the same numeric lexeme; accepting the
+    // buffered prefix would let one oversized token parse as several values.
+    bool numeric_token_truncated(std::istream& istr, size_t len, size_t cap)
+    {
+        if (len < cap)
+        {
+            return false;
+        }
+        int c = istr.peek();
+        return isalnum(c) || c == '.' || c == '+' || c == '-';
+    }
+
+    // Scan an integer token ([ws][+-]digits) from istr into buf, leaving the
+    // terminating character in the stream. Returns the token length.
+    size_t scan_integer_token(std::istream& istr, char* buf, size_t cap)
+    {
+        char* p = buf;
+        const char* const end = buf + cap;
+        istr >> std::ws;
+        int c = istr.peek();
+        if ((c == '+' || c == '-') && p < end)
+        {
+            *p++ = (char)istr.get();
+        }
+        scan_digits(istr, p, end);
+        return p - buf;
+    }
+
+    // Scan a real token ([ws][+-](inf|nan|digits[.digits][eE[+-]digits]))
+    // from istr into buf, leaving the terminating character in the stream.
+    // The caller validates the token by parsing it; the buffer is sized so
+    // any printf-formatted double fits.
+    size_t scan_real_token(std::istream& istr, char* buf, size_t cap)
+    {
+        char* p = buf;
+        const char* const end = buf + cap;
+        istr >> std::ws;
+        int c = istr.peek();
+        if ((c == '+' || c == '-') && p < end)
+        {
+            *p++ = (char)istr.get();
+            c = istr.peek();
+        }
+        if (isalpha(c)) // inf, infinity, nan
+        {
+            while (p < end && isalpha(istr.peek()))
+            {
+                *p++ = (char)istr.get();
+            }
+        }
+        else
+        {
+            scan_digits(istr, p, end);
+            if (istr.peek() == '.' && p < end)
+            {
+                *p++ = (char)istr.get();
+                scan_digits(istr, p, end);
+            }
+            c = istr.peek();
+            if ((c == 'e' || c == 'E') && p < end)
+            {
+                *p++ = (char)istr.get();
+                c = istr.peek();
+                if ((c == '+' || c == '-') && p < end)
+                {
+                    *p++ = (char)istr.get();
+                }
+                scan_digits(istr, p, end);
+            }
+        }
+        return p - buf;
+    }
+}
+
 /**
  * LLSDNotationParser
  */
@@ -606,10 +696,18 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     case 'i':
     {
         c = get(istr);
+        char buf[64];
+        size_t len = scan_integer_token(istr, buf, sizeof(buf));
+        const char* start = buf;
+        if (len && *start == '+')
+        {
+            ++start; // from_chars does not accept an explicit plus
+        }
         S32 integer = 0;
-        istr >> integer;
+        auto [ptr, ec] = std::from_chars(start, buf + len, integer);
         data = integer;
-        if(istr.fail())
+        if (numeric_token_truncated(istr, len, sizeof(buf)) ||
+            ec != std::errc() || ptr != buf + len)
         {
             LL_INFOS() << "STREAM FAILURE reading integer." << LL_ENDL;
             parse_count = PARSE_FAILURE;
@@ -620,10 +718,18 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     case 'r':
     {
         c = get(istr);
+        char buf[512];
+        size_t len = scan_real_token(istr, buf, sizeof(buf));
+        const char* start = buf;
+        if (len && *start == '+')
+        {
+            ++start; // from_chars does not accept an explicit plus
+        }
         F64 real = 0.0;
-        istr >> real;
+        auto [ptr, ec] = fast_float::from_chars(start, buf + len, real);
         data = real;
-        if(istr.fail())
+        if (numeric_token_truncated(istr, len, sizeof(buf)) ||
+            ec != std::errc() || ptr != buf + len)
         {
             LL_INFOS() << "STREAM FAILURE reading real." << LL_ENDL;
             parse_count = PARSE_FAILURE;
@@ -1391,19 +1497,6 @@ std::string LLSDNotationFormatter::escapeString(const std::string& in)
     return ostr.str();
 }
 
-// virtual
-S32 LLSDNotationFormatter::format(const LLSD& data, std::ostream& ostr,
-                                  EFormatterOptions options) const
-{
-    // The default stream precision (6 significant digits) silently corrupts
-    // Real values on the round trip. max_digits10 guarantees an exact
-    // round trip; an installed realFormat still takes precedence.
-    std::streamsize old_precision = ostr.precision(std::numeric_limits<F64>::max_digits10);
-    S32 rv = format_impl(data, ostr, options, 0);
-    ostr.precision(old_precision);
-    return rv;
-}
-
 S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
                                        EFormatterOptions options, U32 level) const
 {
@@ -1484,16 +1577,23 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
         break;
 
     case LLSD::TypeReal:
+    {
         ostr << "r";
         if(mRealFormat.empty())
         {
-            ostr << data.asReal();
+            // shortest representation that round-trips to the same double;
+            // fmt rather than std::to_chars because Apple gates the
+            // floating-point overloads behind macOS 13.3
+            char buf[32];
+            auto result = fmt::format_to_n(buf, sizeof(buf), "{}", data.asReal());
+            ostr.write(buf, result.out - buf);
         }
         else
         {
             formatReal(data.asReal(), ostr);
         }
         break;
+    }
 
     case LLSD::TypeUUID:
         ostr << "u" << data.asUUID();

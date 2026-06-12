@@ -856,4 +856,37 @@ namespace tut
                       LLStringUtil::getTokens("want x^^2", " ", "", "", "^"), StringVec{ "want", "x^2" });
         ensure_equals("escape at end", LLStringUtil::getTokens("it's^ up there^", " ", "", "'", "^"), StringVec{ "it's up", "there^" });
     }
+
+    template<> template<>
+    void string_index_object_t::test<43>()
+    {
+        set_test_name("xml_encode/xml_decode");
+
+        ensure_equals("encode passthrough",
+                      LLStringFn::xml_encode("plain text"), "plain text");
+        ensure_equals("encode element specials",
+                      LLStringFn::xml_encode("a<b>c&d\"e'f"),
+                      "a&lt;b&gt;c&amp;d\"e'f");
+        ensure_equals("encode attribute specials",
+                      LLStringFn::xml_encode("a<b>c&d\"e'f", true),
+                      "a&lt;b&gt;c&amp;d&quot;e&apos;f");
+        ensure_equals("encode empty", LLStringFn::xml_encode(""), "");
+
+        ensure_equals("decode element specials",
+                      LLStringFn::xml_decode("a&lt;b&gt;c&amp;d&quot;e&apos;f"),
+                      "a<b>c&d&quot;e&apos;f");
+        ensure_equals("decode attribute specials",
+                      LLStringFn::xml_decode("a&lt;b&gt;c&amp;d&quot;e&apos;f", true),
+                      "a<b>c&d\"e'f");
+        ensure_equals("decode unknown entity untouched",
+                      LLStringFn::xml_decode("a&foo;b&"), "a&foo;b&");
+
+        // each literal decodes exactly once: &amp;lt; is the text "&lt;",
+        // not a doubly-encoded "<"
+        ensure_equals("decode does not cascade",
+                      LLStringFn::xml_decode("a&amp;lt;b"), "a&lt;b");
+        ensure_equals("round trip nested entity text",
+                      LLStringFn::xml_decode(LLStringFn::xml_encode("a&lt;b")),
+                      "a&lt;b");
+    }
 }

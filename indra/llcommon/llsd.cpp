@@ -32,14 +32,14 @@
 
 #include "llbase64.h"
 #include "llerror.h"
-#include "llformat.h"
 #include "llsdserialize.h"
 #include "stringize.h"
 
+#include <charconv>
 #include <limits>
 
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
+#include <fast_float/fast_float.h>
+#include <fmt/format.h>
 
 // Defend against a caller forcibly passing a negative number into an unsigned
 // size_t index param
@@ -78,8 +78,18 @@ S32 sLLSDNetObjects = 0;
 
 } // namespace llsd
 
+// These counters feed llsd::dumpStats() only, but cost two writes to shared
+// globals on every LLSD construction/destruction (including moves and
+// temporaries), so they are compiled out unless explicitly enabled here.
+#define LLSD_TRACK_OBJECT_COUNTS 0
+
+#if LLSD_TRACK_OBJECT_COUNTS
 #define ALLOC_LLSD_OBJECT           { llsd::sLLSDNetObjects++;  llsd::sLLSDAllocationCount++;   }
 #define FREE_LLSD_OBJECT            { llsd::sLLSDNetObjects--;                                  }
+#else
+#define ALLOC_LLSD_OBJECT
+#define FREE_LLSD_OBJECT
+#endif
 
 class LLSD::Impl
     /**< This class is the abstract base class of the implementation of LLSD
@@ -90,7 +100,7 @@ class LLSD::Impl
     */
 {
 protected:
-    Impl();
+    Impl(LLSD::Type type);
 
     enum StaticAllocationMarker { STATIC_USAGE_COUNT = 0xFFFFFFFF };
     Impl(StaticAllocationMarker);
@@ -103,6 +113,7 @@ protected:
     bool shared() const                         { return (mUseCount > 1) && (mUseCount != STATIC_USAGE_COUNT); }
 
     U32 mUseCount;
+    const LLSD::Type mType;
 
 public:
     static void destruct(Impl*& var);
@@ -123,7 +134,9 @@ public:
     virtual ImplArray& makeArray(Impl*& var);
         ///< sure var is a modifiable, non-shared map or array
 
-    virtual LLSD::Type type() const             { return LLSD::TypeUndefined; }
+    // The type tag is stored per-instance so type checks (pervasive in
+    // serialization and dispatch paths) avoid a virtual call.
+    LLSD::Type type() const                     { return mType; }
 
     static  void assignUndefined(LLSD::Impl*& var);
     static  void assign(LLSD::Impl*& var, const LLSD::Impl* other);
@@ -157,7 +170,7 @@ public:
 
     virtual const String& asStringRef() const { static const std::string empty; return empty; }
 
-    virtual String asXMLRPCValue() const { return "<nil/>"; }
+    virtual void asXMLRPCValue(std::ostream& os) const { os << "<nil/>"; }
 
     virtual bool has(std::string_view) const      { return false; }
     virtual LLSD get(std::string_view) const      { return LLSD(); }
@@ -211,10 +224,8 @@ namespace
         typedef ImplBase Base;
 
     public:
-        ImplBase(DataRef value) : mValue(value) { }
-        ImplBase(DataMove value) : mValue(std::move(value)) { }
-
-        virtual LLSD::Type type() const { return T; }
+        ImplBase(DataRef value) : LLSD::Impl(T), mValue(value) { }
+        ImplBase(DataMove value) : LLSD::Impl(T), mValue(std::move(value)) { }
 
         using LLSD::Impl::assign; // Unhiding base class virtuals...
         virtual void assign(LLSD::Impl*& var, DataRef value) {
@@ -251,7 +262,7 @@ namespace
         virtual LLSD::Real      asReal() const      { return mValue ? 1 : 0; }
         virtual LLSD::String    asString() const;
 
-        virtual LLSD::String asXMLRPCValue() const { return mValue ? "<boolean>1</boolean>" : "<boolean>0</boolean>"; }
+        virtual void asXMLRPCValue(std::ostream& os) const { os << (mValue ? "<boolean>1</boolean>" : "<boolean>0</boolean>"); }
     };
 
     LLSD::String ImplBoolean::asString() const
@@ -274,11 +285,15 @@ namespace
         virtual LLSD::Real      asReal() const      { return mValue; }
         virtual LLSD::String    asString() const;
 
-        virtual LLSD::String asXMLRPCValue() const { return "<int>" + std::to_string(mValue) + "</int>"; }
+        virtual void asXMLRPCValue(std::ostream& os) const { os << "<int>" << mValue << "</int>"; }
     };
 
     LLSD::String ImplInteger::asString() const
-        { return llformat("%d", mValue); }
+    {
+        char buf[16];
+        char* end = std::to_chars(buf, buf + sizeof(buf), mValue).ptr;
+        return LLSD::String(buf, end);
+    }
 
 
     class ImplReal final
@@ -292,7 +307,17 @@ namespace
         virtual LLSD::Real      asReal() const      { return mValue; }
         virtual LLSD::String    asString() const;
 
-        virtual LLSD::String asXMLRPCValue() const { return "<double>" + std::to_string(mValue) + "</double>"; }
+        virtual void asXMLRPCValue(std::ostream& os) const
+        {
+            // shortest representation that round-trips to the same double;
+            // fmt rather than std::to_chars because Apple gates the
+            // floating-point overloads behind macOS 13.3
+            char buf[32];
+            auto result = fmt::format_to_n(buf, sizeof(buf), "{}", mValue);
+            os << "<double>";
+            os.write(buf, result.out - buf);
+            os << "</double>";
+        }
     };
 
     LLSD::Boolean ImplReal::asBoolean() const
@@ -302,7 +327,8 @@ namespace
         { return !std::isnan(mValue) ? (LLSD::Integer)mValue : 0; }
 
     LLSD::String ImplReal::asString() const
-        { return llformat("%lg", mValue); }
+        // {:g} matches the printf %g formatting this historically used
+        { return fmt::format("{:g}", mValue); }
 
 
     class ImplString final
@@ -322,7 +348,7 @@ namespace
         virtual size_t          size() const    { return mValue.size(); }
         virtual const LLSD::String& asStringRef() const { return mValue; }
 
-        virtual LLSD::String asXMLRPCValue() const { return "<string>" + LLStringFn::xml_encode(mValue) + "</string>"; }
+        virtual void asXMLRPCValue(std::ostream& os) const { os << "<string>" << LLStringFn::xml_encode(mValue) << "</string>"; }
 
         using LLSD::Impl::assign; // Unhiding base class virtuals...
         virtual void assign(LLSD::Impl*& var, const char* value)
@@ -364,7 +390,7 @@ namespace
         virtual LLSD::String    asString() const{ return mValue.asString(); }
         virtual LLSD::UUID      asUUID() const  { return mValue; }
 
-        virtual LLSD::String asXMLRPCValue() const { return "<string>" + mValue.asString() + "</string>"; }
+        virtual void asXMLRPCValue(std::ostream& os) const { os << "<string>" << mValue << "</string>"; }
     };
 
 
@@ -391,7 +417,7 @@ namespace
         virtual LLSD::String    asString() const{ return mValue.asString(); }
         virtual LLSD::Date      asDate() const  { return mValue; }
 
-        virtual LLSD::String asXMLRPCValue() const { return "<dateTime.iso8601>" + mValue.toHTTPDateString("%FT%T") + "</dateTime.iso8601>"; }
+        virtual void asXMLRPCValue(std::ostream& os) const { os << "<dateTime.iso8601>" << mValue.toHTTPDateString("%FT%T") << "</dateTime.iso8601>"; }
     };
 
 
@@ -405,7 +431,7 @@ namespace
         virtual LLSD::String    asString() const{ return mValue.asString(); }
         virtual LLSD::URI       asURI() const   { return mValue; }
 
-        virtual LLSD::String asXMLRPCValue() const { return "<string>" + LLStringFn::xml_encode(mValue.asString()) + "</string>"; }
+        virtual void asXMLRPCValue(std::ostream& os) const { os << "<string>" << LLStringFn::xml_encode(mValue.asString()) << "</string>"; }
     };
 
 
@@ -418,7 +444,7 @@ namespace
 
         virtual const LLSD::Binary& asBinary() const{ return mValue; }
 
-        virtual LLSD::String asXMLRPCValue() const { return "<base64>" + LLBase64::encode(mValue.data(), mValue.size()) + "</base64>"; }
+        virtual void asXMLRPCValue(std::ostream& os) const { os << "<base64>" << LLBase64::encode(mValue.data(), mValue.size()) << "</base64>"; }
     };
 
 
@@ -430,28 +456,25 @@ namespace
         DataMap mData;
 
     protected:
-        ImplMap(const DataMap& data) : mData(data) { }
+        ImplMap(const DataMap& data) : Impl(LLSD::TypeMap), mData(data) { }
 
     public:
-        ImplMap() { }
+        ImplMap() : Impl(LLSD::TypeMap) { }
 
         virtual ImplMap& makeMap(LLSD::Impl*&);
 
-        virtual LLSD::Type type() const { return LLSD::TypeMap; }
-
         virtual LLSD::Boolean asBoolean() const { return !mData.empty(); }
 
-        virtual LLSD::String asXMLRPCValue() const
+        virtual void asXMLRPCValue(std::ostream& os) const
         {
-            std::ostringstream os;
             os << "<struct>";
             for (const auto& it : mData)
             {
-                os << "<member><name>" << LLStringFn::xml_encode(it.first) << "</name>"
-                    << it.second.asXMLRPCValue() << "</member>";
+                os << "<member><name>" << LLStringFn::xml_encode(it.first) << "</name>";
+                it.second.asXMLRPCValue(os);
+                os << "</member>";
             }
             os << "</struct>";
-            return std::move(os).str();
         }
 
         virtual bool has(std::string_view) const;
@@ -467,7 +490,6 @@ namespace
         void insert(std::string_view k, LLSD&& v);
         virtual void erase(const LLSD::String&);
                       LLSD& ref(std::string&&);
-        virtual const LLSD& ref(std::string&&) const;
                       LLSD& ref(std::string_view);
         virtual const LLSD& ref(std::string_view) const;
 
@@ -514,38 +536,64 @@ namespace
     LLSD ImplMap::getKeys() const
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        LLSD keys = LLSD::emptyArray();
-        DataMap::const_iterator iter = mData.begin();
-        while (iter != mData.end())
+        LLSD keys = LLSD::emptyReservedArray(mData.size());
+        for (const auto& entry : mData)
         {
-            keys.append((*iter).first);
-            iter++;
+            keys.append(entry.first);
         }
         return keys;
     }
 
+    // The inserts probe with lower_bound before constructing the node so a
+    // duplicate key doesn't pay for a node + key string that map::emplace
+    // would immediately discard. Like emplace, they do not overwrite.
+
     void ImplMap::insert(std::string&& k, const LLSD& v)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        mData.emplace(std::move(k), v);
+        DataMap::iterator i = mData.lower_bound(k);
+        if (i == mData.end() || mData.key_comp()(k, i->first))
+        {
+            mData.emplace_hint(i, std::piecewise_construct,
+                               std::forward_as_tuple(std::move(k)),
+                               std::forward_as_tuple(v));
+        }
     }
 
     void ImplMap::insert(std::string&& k, LLSD&& v)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        mData.emplace(std::move(k), std::move(v));
+        DataMap::iterator i = mData.lower_bound(k);
+        if (i == mData.end() || mData.key_comp()(k, i->first))
+        {
+            mData.emplace_hint(i, std::piecewise_construct,
+                               std::forward_as_tuple(std::move(k)),
+                               std::forward_as_tuple(std::move(v)));
+        }
     }
 
     void ImplMap::insert(std::string_view k, const LLSD& v)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        mData.emplace(k, v);
+        DataMap::iterator i = mData.lower_bound(k);
+        if (i == mData.end() || mData.key_comp()(k, i->first))
+        {
+            mData.emplace_hint(i, std::piecewise_construct,
+                               std::forward_as_tuple(k),
+                               std::forward_as_tuple(v));
+        }
     }
 
     void ImplMap::insert(std::string_view k, LLSD&& v)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        mData.emplace(k, std::move(v));
+        DataMap::iterator i = mData.lower_bound(k);
+        if (i == mData.end() || mData.key_comp()(k, i->first))
+        {
+            mData.emplace_hint(i, std::piecewise_construct,
+                               std::forward_as_tuple(k),
+                               std::forward_as_tuple(std::move(v)));
+        }
     }
 
     void ImplMap::erase(const LLSD::String& k)
@@ -559,18 +607,9 @@ namespace
         DataMap::iterator i = mData.lower_bound(k);
         if (i == mData.end() || mData.key_comp()(k, i->first))
         {
-            return mData.emplace_hint(i, std::make_pair(std::move(k), LLSD()))->second;
-        }
-
-        return i->second;
-    }
-
-    const LLSD& ImplMap::ref(std::string&& k) const
-    {
-        DataMap::const_iterator i = mData.lower_bound(k);
-        if (i == mData.end() || mData.key_comp()(k, i->first))
-        {
-            return undef();
+            return mData.emplace_hint(i, std::piecewise_construct,
+                                      std::forward_as_tuple(std::move(k)),
+                                      std::forward_as_tuple())->second;
         }
 
         return i->second;
@@ -581,7 +620,9 @@ namespace
         DataMap::iterator i = mData.lower_bound(k);
         if (i == mData.end() || mData.key_comp()(k, i->first))
         {
-            return mData.emplace_hint(i, std::make_pair(k, LLSD()))->second;
+            return mData.emplace_hint(i, std::piecewise_construct,
+                                      std::forward_as_tuple(k),
+                                      std::forward_as_tuple())->second;
         }
 
         return i->second;
@@ -626,7 +667,7 @@ namespace
     }
 
 
-    class ImplArray : public LLSD::Impl
+    class ImplArray final : public LLSD::Impl
     {
     private:
         typedef std::vector<LLSD> DataVector;
@@ -634,27 +675,23 @@ namespace
         DataVector mData;
 
     protected:
-        ImplArray(const DataVector& data) : mData(data) { }
+        ImplArray(const DataVector& data) : Impl(LLSD::TypeArray), mData(data) { }
 
     public:
-        ImplArray() = default;
+        ImplArray() : Impl(LLSD::TypeArray) { }
 
         virtual ImplArray& makeArray(Impl*&);
 
-        virtual LLSD::Type type() const { return LLSD::TypeArray; }
-
         virtual LLSD::Boolean asBoolean() const { return !mData.empty(); }
 
-        virtual LLSD::String asXMLRPCValue() const
+        virtual void asXMLRPCValue(std::ostream& os) const
         {
-            std::ostringstream os;
             os << "<array><data>";
             for (const auto& it : mData)
             {
-                os << it.asXMLRPCValue();
+                it.asXMLRPCValue(os);
             }
             os << "</data></array>";
-            return std::move(os).str();
         }
 
         using LLSD::Impl::get; // Unhiding get(LLSD::String)
@@ -663,6 +700,7 @@ namespace
         virtual size_t size() const;
         virtual LLSD get(size_t) const;
                 void set(size_t, const LLSD&);
+                void set(size_t, LLSD&&);
                 void insert(size_t, const LLSD&);
                 void insert(size_t, LLSD&&);
                 LLSD& append(const LLSD&);
@@ -719,6 +757,19 @@ namespace
         mData[index] = v;
     }
 
+    void ImplArray::set(size_t i, LLSD&& v)
+    {
+        NEGATIVE_EXIT(i);
+        DataVector::size_type index = i;
+
+        if (index >= mData.size())
+        {
+            mData.resize(index + 1);
+        }
+
+        mData[index] = std::move(v);
+    }
+
     void ImplArray::insert(size_t i, const LLSD& v)
     {
         NEGATIVE_EXIT(i);
@@ -726,10 +777,15 @@ namespace
 
         if (index >= mData.size())  // tbd - sanity check limit for index ?
         {
-            mData.resize(index + 1);
+            // beyond the end: pad with undefined so v lands at index, rather
+            // than double-shifting and leaving a trailing undefined element
+            mData.resize(index);
+            mData.push_back(v);
         }
-
-        mData.insert(mData.begin() + index, v);
+        else
+        {
+            mData.insert(mData.begin() + index, v);
+        }
     }
 
     void ImplArray::insert(size_t i, LLSD&& v)
@@ -739,10 +795,13 @@ namespace
 
         if (index >= mData.size()) // tbd - sanity check limit for index ?
         {
-            mData.resize(index + 1);
+            mData.resize(index);
+            mData.push_back(std::move(v));
         }
-
-        mData.insert(mData.begin() + index, std::move(v));
+        else
+        {
+            mData.insert(mData.begin() + index, std::move(v));
+        }
     }
 
     LLSD& ImplArray::append(const LLSD& v)
@@ -807,8 +866,9 @@ namespace
     }
 }
 
-LLSD::Impl::Impl()
+LLSD::Impl::Impl(LLSD::Type type)
     : mUseCount(0)
+    , mType(type)
 {
     ++sAllocationCount;
     ++sOutstandingCount;
@@ -816,6 +876,7 @@ LLSD::Impl::Impl()
 
 LLSD::Impl::Impl(StaticAllocationMarker)
     : mUseCount(0)
+    , mType(LLSD::TypeUndefined)
 {
 }
 
@@ -863,8 +924,7 @@ LLSD::Impl& LLSD::Impl::safe(Impl* impl)
 
 const LLSD::Impl& LLSD::Impl::safe(const Impl* impl)
 {
-    static Impl theUndefined(STATIC_USAGE_COUNT);
-    return impl ? *impl : theUndefined;
+    return safe(const_cast<Impl*>(impl));
 }
 
 ImplMap& LLSD::Impl::makeMap(Impl*& var)
@@ -1085,7 +1145,19 @@ const LLSD::Binary& LLSD::asBinary() const  { return safe(impl).asBinary(); }
 
 const LLSD::String& LLSD::asStringRef() const { return safe(impl).asStringRef(); }
 
-LLSD::String LLSD::asXMLRPCValue() const { return "<value>" + safe(impl).asXMLRPCValue() + "</value>"; }
+void LLSD::asXMLRPCValue(std::ostream& os) const
+{
+    os << "<value>";
+    safe(impl).asXMLRPCValue(os);
+    os << "</value>";
+}
+
+LLSD::String LLSD::asXMLRPCValue() const
+{
+    std::ostringstream os;
+    asXMLRPCValue(os);
+    return std::move(os).str();
+}
 
 // const char * helpers
 LLSD::LLSD(const char* v) : impl(0)     { ALLOC_LLSD_OBJECT;    assign(v); }
@@ -1265,18 +1337,21 @@ namespace llsd
 
 LLSD::Real string_to_real(std::string_view in_string)
 {
+    // Match the historical istream semantics: skip leading whitespace and an
+    // optional '+', then the entire remainder must parse or the result is 0.0.
+    const char* first = in_string.data();
+    const char* const last = first + in_string.size();
+    while (first != last && (*first == ' ' || (*first >= '\t' && *first <= '\r')))
+    {
+        ++first;
+    }
+    if (first != last && *first == '+')
+    {
+        ++first;
+    }
     LLSD::Real v = 0.0;
-    boost::iostreams::stream<boost::iostreams::array_source> i_stream(in_string.data(), in_string.size());
-    i_stream >> v;
-
-    // we would probably like to ignore all trailing whitespace as
-    // well, but for now, simply eat the next character, and make
-    // sure we reached the end of the string.
-    // *NOTE: gcc 2.95 does not generate an eof() event on the
-    // stream operation above, so we manually get here to force it
-    // across platforms.
-    int c = i_stream.get();
-    return ((EOF == c) ? v : 0.0);
+    auto [ptr, ec] = fast_float::from_chars(first, last, v);
+    return (ptr == last && ec == std::errc()) ? v : 0.0;
 }
 
 U32 allocationCount()                               { return LLSD::Impl::sAllocationCount; }

@@ -281,6 +281,8 @@ target_link_libraries(
         ll::simdutf
         ll::fmt
         Threads::Threads
+        PRIVATE
+        ll::fastfloat
     )
 
 target_include_directories(llcommon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -171,6 +171,14 @@ namespace tut
         // tests with real values.
         std::string expected;
 
+        // default format: shortest representation that round-trips exactly
+        mSD = 0.1;
+        expected = "<llsd><real>0.1</real></llsd>\n";
+        xml_test("real default shortest", expected);
+        mSD = 1.0;
+        expected = "<llsd><real>1</real></llsd>\n";
+        xml_test("real default integral", expected);
+
         mFormatter->realFormat("%.2f");
         mSD = 1.0;
         expected = "<llsd><real>1.00</real></llsd>\n";
@@ -1171,8 +1179,15 @@ namespace tut
     {
         LLSD val = 123;
         ensureParse("valid integer", "i123", val, 1);
+        ensureParse("explicit plus integer", "i+123", val, 1);
+        val = -123;
+        ensureParse("negative integer", "i-123", val, 1);
         val.clear();
         ensureParse("invalid integer", "421", val, LLSDParser::PARSE_FAILURE);
+        ensureParse("empty integer", "i,", val, LLSDParser::PARSE_FAILURE);
+        // an oversized token must fail whole, not parse as a buffered prefix
+        ensureParse("oversized integer token",
+                    "i" + std::string(100, '1'), val, LLSDParser::PARSE_FAILURE);
     }
 
     template<> template<>
@@ -1180,8 +1195,22 @@ namespace tut
     {
         LLSD val = 456.7;
         ensureParse("valid real", "r456.7", val, 1);
+        ensureParse("explicit plus real", "r+456.7", val, 1);
+        val = -456.7;
+        ensureParse("negative real", "r-456.7", val, 1);
+        val = 1500.0;
+        ensureParse("scientific real", "r1.5e3", val, 1);
+        ensureParse("scientific real explicit plus exponent", "r1.5E+3", val, 1);
+        val = std::numeric_limits<F64>::infinity();
+        ensureParse("infinity real", "rinf", val, 1);
+        val = -std::numeric_limits<F64>::infinity();
+        ensureParse("negative infinity real", "r-inf", val, 1);
         val.clear();
         ensureParse("invalid real", "456.7", val, LLSDParser::PARSE_FAILURE);
+        ensureParse("empty real", "r,", val, LLSDParser::PARSE_FAILURE);
+        // an oversized token must fail whole, not parse as a buffered prefix
+        ensureParse("oversized real token",
+                    "r0." + std::string(600, '3'), val, LLSDParser::PARSE_FAILURE);
     }
 
     template<> template<>

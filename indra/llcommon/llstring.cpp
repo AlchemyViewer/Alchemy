@@ -1432,72 +1432,69 @@ namespace LLStringFn
         return output;
     }
 
-    using literals_t = std::map<char, std::string>;
-    static const literals_t xml_elem_literals =
-    {
-        { '<', "&lt;" },
-        { '>', "&gt;" },
-        { '&', "&amp;" }
-    };
-    static const literals_t xml_attr_literals =
-    {
-        { '"', "&quot;" },
-        { '\'', "&apos;" }
-    };
-
-    static void literals_encode(std::string& text, const literals_t& literals)
-    {
-        for (const std::pair<char, std::string> it : literals)
-        {
-            std::string::size_type pos = 0;
-            while ((pos = text.find(it.first, pos)) != std::string::npos)
-            {
-                text.replace(pos, 1, it.second);
-                pos += it.second.size();
-            }
-        }
-    }
-
-    static void literals_decode(std::string& text, const literals_t& literals)
-    {
-        for (const std::pair<char, std::string> it : literals)
-        {
-            std::string::size_type pos = 0;
-            while ((pos = text.find(it.second, pos)) != std::string::npos)
-            {
-                text[pos++] = it.first;
-                text.erase(pos, it.second.size() - 1);
-            }
-        }
-    }
-
     /**
      * @brief Replace all characters that are not allowed in XML 1.0
      * with corresponding literals: [ < > & ] => [ &lt; &gt; &amp; ]
+     * (plus [ " ' ] => [ &quot; &apos; ] when encoding for an attribute)
      */
     std::string xml_encode(const std::string& input, bool for_attribute)
     {
-        std::string result(input);
-        literals_encode(result, xml_elem_literals);
-        if (for_attribute)
+        std::string result;
+        result.reserve(input.size());
+        const char* const end = input.data() + input.size();
+        const char* run = input.data();
+        for (const char* p = run; p < end; ++p)
         {
-            literals_encode(result, xml_attr_literals);
+            const char* entity;
+            switch (*p)
+            {
+            case '<': entity = "&lt;"; break;
+            case '>': entity = "&gt;"; break;
+            case '&': entity = "&amp;"; break;
+            case '"': if (!for_attribute) continue; entity = "&quot;"; break;
+            case '\'': if (!for_attribute) continue; entity = "&apos;"; break;
+            default: continue;
+            }
+            result.append(run, p);
+            result.append(entity);
+            run = p + 1;
         }
+        result.append(run, end);
         return result;
     }
 
     /**
      * @brief Replace some of XML literals that are defined in XML 1.0
      * with corresponding characters: [ &lt; &gt; &amp; ] => [ < > & ]
+     * (plus [ &quot; &apos; ] => [ " ' ] when decoding an attribute)
+     *
+     * Each literal is decoded once, left to right, so text like &amp;lt;
+     * correctly becomes &lt; rather than cascading down to <.
      */
     std::string xml_decode(const std::string& input, bool for_attribute)
     {
-        std::string result(input);
-        literals_decode(result, xml_elem_literals);
-        if (for_attribute)
+        std::string result;
+        result.reserve(input.size());
+        const std::string_view text(input);
+        std::string_view::size_type run = 0; // start of the undecoded run
+        for (std::string_view::size_type pos = 0;
+             (pos = text.find('&', pos)) != std::string_view::npos; )
         {
-            literals_decode(result, xml_attr_literals);
+            const std::string_view rest = text.substr(pos);
+            char decoded;
+            std::string_view::size_type len;
+            if (rest.starts_with("&lt;"))       { decoded = '<';  len = 4; }
+            else if (rest.starts_with("&gt;"))  { decoded = '>';  len = 4; }
+            else if (rest.starts_with("&amp;")) { decoded = '&';  len = 5; }
+            else if (for_attribute && rest.starts_with("&quot;")) { decoded = '"';  len = 6; }
+            else if (for_attribute && rest.starts_with("&apos;")) { decoded = '\''; len = 6; }
+            else { ++pos; continue; }
+            result.append(text, run, pos - run);
+            result.push_back(decoded);
+            pos += len;
+            run = pos;
         }
+        result.append(text, run, text.size() - run);
         return result;
     }
 

@@ -287,8 +287,9 @@ public:
         // asStringRef on any non-string type will return a ref to an empty string.
         const String& asStringRef() const;
 
-        // Return "<value><((type))>((scalar value or recursive calls))</((type))></value>"
+        // Write/return "<value><((type))>((scalar value or recursive calls))</((type))></value>"
         // See http://xmlrpc.com/spec.md
+        void   asXMLRPCValue(std::ostream& os) const;
         String asXMLRPCValue() const;
 
         operator Boolean() const    { return asBoolean(); }

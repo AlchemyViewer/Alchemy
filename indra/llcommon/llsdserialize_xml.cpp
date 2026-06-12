@@ -30,6 +30,7 @@
 #include <iostream>
 #include <deque>
 
+#include <fmt/format.h>
 #include <simdutf.h>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
@@ -57,8 +58,6 @@ LLSDXMLFormatter::~LLSDXMLFormatter()
 S32 LLSDXMLFormatter::format(const LLSD& data, std::ostream& ostr,
                              EFormatterOptions options) const
 {
-    std::streamsize old_precision = ostr.precision(25);
-
     std::string post;
     if (options & LLSDFormatter::OPTIONS_PRETTY)
     {
@@ -68,7 +67,6 @@ S32 LLSDXMLFormatter::format(const LLSD& data, std::ostream& ostr,
     S32 rv = format_impl(data, ostr, options, 1);
     ostr << "</llsd>\n";
 
-    ostr.precision(old_precision);
     return rv;
 }
 
@@ -148,10 +146,16 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
         break;
 
     case LLSD::TypeReal:
+    {
         ostr << pre << "<real>";
         if(mRealFormat.empty())
         {
-            ostr << data.asReal();
+            // shortest representation that round-trips to the same double;
+            // fmt rather than std::to_chars because Apple gates the
+            // floating-point overloads behind macOS 13.3
+            char buf[32];
+            auto result = fmt::format_to_n(buf, sizeof(buf), "{}", data.asReal());
+            ostr.write(buf, result.out - buf);
         }
         else
         {
@@ -159,6 +163,7 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
         }
         ostr << "</real>" << post;
         break;
+    }
 
     case LLSD::TypeUUID:
         if(data.asUUID().isNull()) ostr << pre << "<uuid />" << post;
