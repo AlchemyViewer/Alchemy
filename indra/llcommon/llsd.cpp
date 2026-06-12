@@ -32,14 +32,20 @@
 
 #include "llbase64.h"
 #include "llerror.h"
-#include "llformat.h"
 #include "llsdserialize.h"
 #include "stringize.h"
 
+#include <charconv>
 #include <limits>
 
+#include <fmt/format.h>
+
+#if !(defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L)
+// string_to_real falls back to istream parsing where floating-point
+// std::from_chars is unavailable (e.g. older libc++)
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
+#endif
 
 // Defend against a caller forcibly passing a negative number into an unsigned
 // size_t index param
@@ -78,8 +84,18 @@ S32 sLLSDNetObjects = 0;
 
 } // namespace llsd
 
+// These counters feed llsd::dumpStats() only, but cost two writes to shared
+// globals on every LLSD construction/destruction (including moves and
+// temporaries), so they are compiled out unless explicitly enabled here.
+#define LLSD_TRACK_OBJECT_COUNTS 0
+
+#if LLSD_TRACK_OBJECT_COUNTS
 #define ALLOC_LLSD_OBJECT           { llsd::sLLSDNetObjects++;  llsd::sLLSDAllocationCount++;   }
 #define FREE_LLSD_OBJECT            { llsd::sLLSDNetObjects--;                                  }
+#else
+#define ALLOC_LLSD_OBJECT
+#define FREE_LLSD_OBJECT
+#endif
 
 class LLSD::Impl
     /**< This class is the abstract base class of the implementation of LLSD
@@ -90,7 +106,7 @@ class LLSD::Impl
     */
 {
 protected:
-    Impl();
+    Impl(LLSD::Type type);
 
     enum StaticAllocationMarker { STATIC_USAGE_COUNT = 0xFFFFFFFF };
     Impl(StaticAllocationMarker);
@@ -103,6 +119,7 @@ protected:
     bool shared() const                         { return (mUseCount > 1) && (mUseCount != STATIC_USAGE_COUNT); }
 
     U32 mUseCount;
+    const LLSD::Type mType;
 
 public:
     static void destruct(Impl*& var);
@@ -123,7 +140,9 @@ public:
     virtual ImplArray& makeArray(Impl*& var);
         ///< sure var is a modifiable, non-shared map or array
 
-    virtual LLSD::Type type() const             { return LLSD::TypeUndefined; }
+    // The type tag is stored per-instance so type checks (pervasive in
+    // serialization and dispatch paths) avoid a virtual call.
+    LLSD::Type type() const                     { return mType; }
 
     static  void assignUndefined(LLSD::Impl*& var);
     static  void assign(LLSD::Impl*& var, const LLSD::Impl* other);
@@ -211,10 +230,8 @@ namespace
         typedef ImplBase Base;
 
     public:
-        ImplBase(DataRef value) : mValue(value) { }
-        ImplBase(DataMove value) : mValue(std::move(value)) { }
-
-        virtual LLSD::Type type() const { return T; }
+        ImplBase(DataRef value) : LLSD::Impl(T), mValue(value) { }
+        ImplBase(DataMove value) : LLSD::Impl(T), mValue(std::move(value)) { }
 
         using LLSD::Impl::assign; // Unhiding base class virtuals...
         virtual void assign(LLSD::Impl*& var, DataRef value) {
@@ -278,7 +295,11 @@ namespace
     };
 
     LLSD::String ImplInteger::asString() const
-        { return llformat("%d", mValue); }
+    {
+        char buf[16];
+        char* end = std::to_chars(buf, buf + sizeof(buf), mValue).ptr;
+        return LLSD::String(buf, end);
+    }
 
 
     class ImplReal final
@@ -302,7 +323,8 @@ namespace
         { return !std::isnan(mValue) ? (LLSD::Integer)mValue : 0; }
 
     LLSD::String ImplReal::asString() const
-        { return llformat("%lg", mValue); }
+        // {:g} matches the printf %g formatting this historically used
+        { return fmt::format("{:g}", mValue); }
 
 
     class ImplString final
@@ -430,14 +452,12 @@ namespace
         DataMap mData;
 
     protected:
-        ImplMap(const DataMap& data) : mData(data) { }
+        ImplMap(const DataMap& data) : Impl(LLSD::TypeMap), mData(data) { }
 
     public:
-        ImplMap() { }
+        ImplMap() : Impl(LLSD::TypeMap) { }
 
         virtual ImplMap& makeMap(LLSD::Impl*&);
-
-        virtual LLSD::Type type() const { return LLSD::TypeMap; }
 
         virtual LLSD::Boolean asBoolean() const { return !mData.empty(); }
 
@@ -514,38 +534,64 @@ namespace
     LLSD ImplMap::getKeys() const
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        LLSD keys = LLSD::emptyArray();
-        DataMap::const_iterator iter = mData.begin();
-        while (iter != mData.end())
+        LLSD keys = LLSD::emptyReservedArray(mData.size());
+        for (const auto& entry : mData)
         {
-            keys.append((*iter).first);
-            iter++;
+            keys.append(entry.first);
         }
         return keys;
     }
 
+    // The inserts probe with lower_bound before constructing the node so a
+    // duplicate key doesn't pay for a node + key string that map::emplace
+    // would immediately discard. Like emplace, they do not overwrite.
+
     void ImplMap::insert(std::string&& k, const LLSD& v)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        mData.emplace(std::move(k), v);
+        DataMap::iterator i = mData.lower_bound(k);
+        if (i == mData.end() || mData.key_comp()(k, i->first))
+        {
+            mData.emplace_hint(i, std::piecewise_construct,
+                               std::forward_as_tuple(std::move(k)),
+                               std::forward_as_tuple(v));
+        }
     }
 
     void ImplMap::insert(std::string&& k, LLSD&& v)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        mData.emplace(std::move(k), std::move(v));
+        DataMap::iterator i = mData.lower_bound(k);
+        if (i == mData.end() || mData.key_comp()(k, i->first))
+        {
+            mData.emplace_hint(i, std::piecewise_construct,
+                               std::forward_as_tuple(std::move(k)),
+                               std::forward_as_tuple(std::move(v)));
+        }
     }
 
     void ImplMap::insert(std::string_view k, const LLSD& v)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        mData.emplace(k, v);
+        DataMap::iterator i = mData.lower_bound(k);
+        if (i == mData.end() || mData.key_comp()(k, i->first))
+        {
+            mData.emplace_hint(i, std::piecewise_construct,
+                               std::forward_as_tuple(k),
+                               std::forward_as_tuple(v));
+        }
     }
 
     void ImplMap::insert(std::string_view k, LLSD&& v)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-        mData.emplace(k, std::move(v));
+        DataMap::iterator i = mData.lower_bound(k);
+        if (i == mData.end() || mData.key_comp()(k, i->first))
+        {
+            mData.emplace_hint(i, std::piecewise_construct,
+                               std::forward_as_tuple(k),
+                               std::forward_as_tuple(std::move(v)));
+        }
     }
 
     void ImplMap::erase(const LLSD::String& k)
@@ -559,7 +605,9 @@ namespace
         DataMap::iterator i = mData.lower_bound(k);
         if (i == mData.end() || mData.key_comp()(k, i->first))
         {
-            return mData.emplace_hint(i, std::make_pair(std::move(k), LLSD()))->second;
+            return mData.emplace_hint(i, std::piecewise_construct,
+                                      std::forward_as_tuple(std::move(k)),
+                                      std::forward_as_tuple())->second;
         }
 
         return i->second;
@@ -581,7 +629,9 @@ namespace
         DataMap::iterator i = mData.lower_bound(k);
         if (i == mData.end() || mData.key_comp()(k, i->first))
         {
-            return mData.emplace_hint(i, std::make_pair(k, LLSD()))->second;
+            return mData.emplace_hint(i, std::piecewise_construct,
+                                      std::forward_as_tuple(k),
+                                      std::forward_as_tuple())->second;
         }
 
         return i->second;
@@ -626,7 +676,7 @@ namespace
     }
 
 
-    class ImplArray : public LLSD::Impl
+    class ImplArray final : public LLSD::Impl
     {
     private:
         typedef std::vector<LLSD> DataVector;
@@ -634,14 +684,12 @@ namespace
         DataVector mData;
 
     protected:
-        ImplArray(const DataVector& data) : mData(data) { }
+        ImplArray(const DataVector& data) : Impl(LLSD::TypeArray), mData(data) { }
 
     public:
-        ImplArray() = default;
+        ImplArray() : Impl(LLSD::TypeArray) { }
 
         virtual ImplArray& makeArray(Impl*&);
-
-        virtual LLSD::Type type() const { return LLSD::TypeArray; }
 
         virtual LLSD::Boolean asBoolean() const { return !mData.empty(); }
 
@@ -663,6 +711,7 @@ namespace
         virtual size_t size() const;
         virtual LLSD get(size_t) const;
                 void set(size_t, const LLSD&);
+                void set(size_t, LLSD&&);
                 void insert(size_t, const LLSD&);
                 void insert(size_t, LLSD&&);
                 LLSD& append(const LLSD&);
@@ -717,6 +766,19 @@ namespace
         }
 
         mData[index] = v;
+    }
+
+    void ImplArray::set(size_t i, LLSD&& v)
+    {
+        NEGATIVE_EXIT(i);
+        DataVector::size_type index = i;
+
+        if (index >= mData.size())
+        {
+            mData.resize(index + 1);
+        }
+
+        mData[index] = std::move(v);
     }
 
     void ImplArray::insert(size_t i, const LLSD& v)
@@ -807,8 +869,9 @@ namespace
     }
 }
 
-LLSD::Impl::Impl()
+LLSD::Impl::Impl(LLSD::Type type)
     : mUseCount(0)
+    , mType(type)
 {
     ++sAllocationCount;
     ++sOutstandingCount;
@@ -816,6 +879,7 @@ LLSD::Impl::Impl()
 
 LLSD::Impl::Impl(StaticAllocationMarker)
     : mUseCount(0)
+    , mType(LLSD::TypeUndefined)
 {
 }
 
@@ -863,8 +927,7 @@ LLSD::Impl& LLSD::Impl::safe(Impl* impl)
 
 const LLSD::Impl& LLSD::Impl::safe(const Impl* impl)
 {
-    static Impl theUndefined(STATIC_USAGE_COUNT);
-    return impl ? *impl : theUndefined;
+    return safe(const_cast<Impl*>(impl));
 }
 
 ImplMap& LLSD::Impl::makeMap(Impl*& var)
@@ -1265,6 +1328,23 @@ namespace llsd
 
 LLSD::Real string_to_real(std::string_view in_string)
 {
+#if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
+    // Match the historical istream semantics: skip leading whitespace and an
+    // optional '+', then the entire remainder must parse or the result is 0.0.
+    const char* first = in_string.data();
+    const char* const last = first + in_string.size();
+    while (first != last && (*first == ' ' || (*first >= '\t' && *first <= '\r')))
+    {
+        ++first;
+    }
+    if (first != last && *first == '+')
+    {
+        ++first;
+    }
+    LLSD::Real v = 0.0;
+    auto [ptr, ec] = std::from_chars(first, last, v);
+    return (ptr == last && ec == std::errc()) ? v : 0.0;
+#else
     LLSD::Real v = 0.0;
     boost::iostreams::stream<boost::iostreams::array_source> i_stream(in_string.data(), in_string.size());
     i_stream >> v;
@@ -1277,6 +1357,7 @@ LLSD::Real string_to_real(std::string_view in_string)
     // across platforms.
     int c = i_stream.get();
     return ((EOF == c) ? v : 0.0);
+#endif
 }
 
 U32 allocationCount()                               { return LLSD::Impl::sAllocationCount; }
