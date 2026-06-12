@@ -35,6 +35,8 @@
 #include <charconv>
 #include <iostream>
 #include <limits>
+
+#include <fast_float/fast_float.h>
 #include <simdutf.h>
 
 #include <boost/iostreams/device/array.hpp>
@@ -456,6 +458,79 @@ void LLSDParser::account(llssize bytes) const
 }
 
 
+namespace
+{
+    void scan_digits(std::istream& istr, char*& out, const char* const out_end)
+    {
+        int c;
+        while (out < out_end && (c = istr.peek()) >= '0' && c <= '9')
+        {
+            *out++ = (char)istr.get();
+        }
+    }
+
+    // Scan an integer token ([ws][+-]digits) from istr into buf, leaving the
+    // terminating character in the stream. Returns the token length.
+    size_t scan_integer_token(std::istream& istr, char* buf, size_t cap)
+    {
+        char* p = buf;
+        const char* const end = buf + cap;
+        istr >> std::ws;
+        int c = istr.peek();
+        if ((c == '+' || c == '-') && p < end)
+        {
+            *p++ = (char)istr.get();
+        }
+        scan_digits(istr, p, end);
+        return p - buf;
+    }
+
+    // Scan a real token ([ws][+-](inf|nan|digits[.digits][eE[+-]digits]))
+    // from istr into buf, leaving the terminating character in the stream.
+    // The caller validates the token by parsing it; the buffer is sized so
+    // any printf-formatted double fits.
+    size_t scan_real_token(std::istream& istr, char* buf, size_t cap)
+    {
+        char* p = buf;
+        const char* const end = buf + cap;
+        istr >> std::ws;
+        int c = istr.peek();
+        if ((c == '+' || c == '-') && p < end)
+        {
+            *p++ = (char)istr.get();
+            c = istr.peek();
+        }
+        if (isalpha(c)) // inf, infinity, nan
+        {
+            while (p < end && isalpha(istr.peek()))
+            {
+                *p++ = (char)istr.get();
+            }
+        }
+        else
+        {
+            scan_digits(istr, p, end);
+            if (istr.peek() == '.' && p < end)
+            {
+                *p++ = (char)istr.get();
+                scan_digits(istr, p, end);
+            }
+            c = istr.peek();
+            if ((c == 'e' || c == 'E') && p < end)
+            {
+                *p++ = (char)istr.get();
+                c = istr.peek();
+                if ((c == '+' || c == '-') && p < end)
+                {
+                    *p++ = (char)istr.get();
+                }
+                scan_digits(istr, p, end);
+            }
+        }
+        return p - buf;
+    }
+}
+
 /**
  * LLSDNotationParser
  */
@@ -607,10 +682,17 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     case 'i':
     {
         c = get(istr);
+        char buf[64];
+        size_t len = scan_integer_token(istr, buf, sizeof(buf));
+        const char* start = buf;
+        if (len && *start == '+')
+        {
+            ++start; // from_chars does not accept an explicit plus
+        }
         S32 integer = 0;
-        istr >> integer;
+        auto [ptr, ec] = std::from_chars(start, buf + len, integer);
         data = integer;
-        if(istr.fail())
+        if (ec != std::errc() || ptr != buf + len)
         {
             LL_INFOS() << "STREAM FAILURE reading integer." << LL_ENDL;
             parse_count = PARSE_FAILURE;
@@ -621,10 +703,17 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
     case 'r':
     {
         c = get(istr);
+        char buf[512];
+        size_t len = scan_real_token(istr, buf, sizeof(buf));
+        const char* start = buf;
+        if (len && *start == '+')
+        {
+            ++start; // from_chars does not accept an explicit plus
+        }
         F64 real = 0.0;
-        istr >> real;
+        auto [ptr, ec] = fast_float::from_chars(start, buf + len, real);
         data = real;
-        if(istr.fail())
+        if (ec != std::errc() || ptr != buf + len)
         {
             LL_INFOS() << "STREAM FAILURE reading real." << LL_ENDL;
             parse_count = PARSE_FAILURE;
