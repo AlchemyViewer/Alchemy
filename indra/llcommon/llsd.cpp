@@ -309,11 +309,13 @@ namespace
 
         virtual void asXMLRPCValue(std::ostream& os) const
         {
-            // shortest representation that round-trips to the same double
+            // shortest representation that round-trips to the same double;
+            // fmt rather than std::to_chars because Apple gates the
+            // floating-point overloads behind macOS 13.3
             char buf[32];
-            char* end = std::to_chars(buf, buf + sizeof(buf), mValue).ptr;
+            auto result = fmt::format_to_n(buf, sizeof(buf), "{}", mValue);
             os << "<double>";
-            os.write(buf, end - buf);
+            os.write(buf, result.out - buf);
             os << "</double>";
         }
     };

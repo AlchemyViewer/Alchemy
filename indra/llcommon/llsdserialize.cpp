@@ -37,6 +37,7 @@
 #include <limits>
 
 #include <fast_float/fast_float.h>
+#include <fmt/format.h>
 #include <simdutf.h>
 
 #include <boost/iostreams/device/array.hpp>
@@ -1565,10 +1566,12 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
         ostr << "r";
         if(mRealFormat.empty())
         {
-            // shortest representation that round-trips to the same double
+            // shortest representation that round-trips to the same double;
+            // fmt rather than std::to_chars because Apple gates the
+            // floating-point overloads behind macOS 13.3
             char buf[32];
-            char* end = std::to_chars(buf, buf + sizeof(buf), data.asReal()).ptr;
-            ostr.write(buf, end - buf);
+            auto result = fmt::format_to_n(buf, sizeof(buf), "{}", data.asReal());
+            ostr.write(buf, result.out - buf);
         }
         else
         {
