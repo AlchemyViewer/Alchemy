@@ -33,6 +33,7 @@
       "platform": "linux"
     },
     "expat",
+    "fast-float",
     "fmt",
     {
       "name": "fontconfig",

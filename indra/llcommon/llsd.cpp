@@ -38,14 +38,8 @@
 #include <charconv>
 #include <limits>
 
+#include <fast_float/fast_float.h>
 #include <fmt/format.h>
-
-#if !(defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L)
-// string_to_real falls back to istream parsing where floating-point
-// std::from_chars is unavailable (e.g. older libc++)
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-#endif
 
 // Defend against a caller forcibly passing a negative number into an unsigned
 // size_t index param
@@ -1341,7 +1335,6 @@ namespace llsd
 
 LLSD::Real string_to_real(std::string_view in_string)
 {
-#if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
     // Match the historical istream semantics: skip leading whitespace and an
     // optional '+', then the entire remainder must parse or the result is 0.0.
     const char* first = in_string.data();
@@ -1355,22 +1348,8 @@ LLSD::Real string_to_real(std::string_view in_string)
         ++first;
     }
     LLSD::Real v = 0.0;
-    auto [ptr, ec] = std::from_chars(first, last, v);
+    auto [ptr, ec] = fast_float::from_chars(first, last, v);
     return (ptr == last && ec == std::errc()) ? v : 0.0;
-#else
-    LLSD::Real v = 0.0;
-    boost::iostreams::stream<boost::iostreams::array_source> i_stream(in_string.data(), in_string.size());
-    i_stream >> v;
-
-    // we would probably like to ignore all trailing whitespace as
-    // well, but for now, simply eat the next character, and make
-    // sure we reached the end of the string.
-    // *NOTE: gcc 2.95 does not generate an eof() event on the
-    // stream operation above, so we manually get here to force it
-    // across platforms.
-    int c = i_stream.get();
-    return ((EOF == c) ? v : 0.0);
-#endif
 }
 
 U32 allocationCount()                               { return LLSD::Impl::sAllocationCount; }
