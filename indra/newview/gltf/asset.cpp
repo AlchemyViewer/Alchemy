@@ -898,6 +898,12 @@ void Asset::serialize(JsonWriter& dst) const
     write(mVersion, "version", dst);
     write(mMinVersion, "minVersion", dst, std::string());
     write(sGenerator, "generator", dst);
+    write(mCopyright, "copyright", dst, std::string());
+    if (!mExtras.empty())
+    {
+        dst.key("extras");
+        dst.rawValue(mExtras);
+    }
     dst.endObject();
 
     write(mScene, "scene", dst, INVALID_INDEX);
@@ -949,7 +955,17 @@ bool Asset::save(const std::string& filename)
     writer.endObject();
     std::string buffer = writer.str();
     llofstream file(filename, std::ios::binary);
+    if (!file.is_open())
+    {
+        LL_WARNS("GLTF") << "Failed to open file for writing: " << filename << LL_ENDL;
+        return false;
+    }
     file.write(buffer.c_str(), buffer.size());
+    if (!file.good())
+    {
+        LL_WARNS("GLTF") << "Failed to write file: " << filename << LL_ENDL;
+        return false;
+    }
 
     return true;
 }

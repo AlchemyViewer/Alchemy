@@ -103,7 +103,10 @@ static void rewrite_asset_urls(const simdjson::dom::element& src, simdjson::buil
     {
         dst.start_object();
         bool first = true;
-        for (const auto& member : src.get_object().value_unsafe())
+        // copy the handle out first: iterating the simdjson_result temporary
+        // dangles, as range-for does not extend the inner temporary's lifetime
+        simdjson::dom::object object = src.get_object().value_unsafe();
+        for (const auto& member : object)
         {
             if (!first)
             {
@@ -136,7 +139,9 @@ static void rewrite_asset_urls(const simdjson::dom::element& src, simdjson::buil
     {
         dst.start_array();
         bool first = true;
-        for (const simdjson::dom::element& elem : src.get_array().value_unsafe())
+        // see above: don't iterate the simdjson_result temporary
+        simdjson::dom::array array = src.get_array().value_unsafe();
+        for (const simdjson::dom::element& elem : array)
         {
             if (!first)
             {

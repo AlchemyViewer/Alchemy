@@ -104,6 +104,14 @@ namespace LL
                 mNeedComma = true;
             }
 
+            // append pre-serialized JSON verbatim (e.g. a preserved extras subtree)
+            void rawValue(std::string_view json)
+            {
+                comma();
+                mBuilder.append_raw(json);
+                mNeedComma = true;
+            }
+
             std::string str() const
             {
                 std::string_view view;

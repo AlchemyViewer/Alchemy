@@ -443,8 +443,8 @@ void LLGoogleTranslationHandler::parseErrorResponse(
 {
     std::string_view message;
     int64_t code;
-    if (root.at_pointer("/data/message").get_string().get(message) != simdjson::SUCCESS ||
-        root.at_pointer("/data/code").get_int64().get(code) != simdjson::SUCCESS)
+    if (root.at_pointer("/error/message").get_string().get(message) != simdjson::SUCCESS ||
+        root.at_pointer("/error/code").get_int64().get(code) != simdjson::SUCCESS)
     {
         return;
     }

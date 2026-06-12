@@ -253,6 +253,9 @@ namespace tut
             "'single quotes'",
             "{\"a\": 1,}",
             "\"unterminated",
+            // valid syntax but exceeds uint64: rejected with BIGINT_ERROR
+            // under the default parser configuration
+            "18446744073709551616",
         };
         for (const char* json : bad)
         {

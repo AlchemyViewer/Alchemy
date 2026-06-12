@@ -34,6 +34,7 @@
 #include "llerror.h"
 
 #include <cmath>
+#include <cstdlib>
 
 //=========================================================================
 LLSD LlsdFromJson(const simdjson::dom::element& val)
@@ -57,12 +58,21 @@ LLSD LlsdFromJson(const simdjson::dom::element& val)
     case simdjson::dom::element_type::BIGINT:
     {
         // integer too large for int64/uint64: degrade to Real, matching how
-        // such literals previously parsed as doubles
+        // such literals previously parsed as doubles. Only reachable if the
+        // parser enables bigint storage; the default configuration fails the
+        // parse with BIGINT_ERROR instead.
         double bigval;
-        if (val.get_double().get(bigval) == simdjson::SUCCESS)
+        if (val.get_double().get(bigval) != simdjson::SUCCESS)
         {
-            result = LLSD(bigval);
+            std::string_view digits;
+            if (val.get_bigint().get(digits) != simdjson::SUCCESS)
+            {
+                break;
+            }
+            // saturates to +/-HUGE_VAL rather than failing
+            bigval = strtod(std::string(digits).c_str(), nullptr);
         }
+        result = LLSD(bigval);
         break;
     }
     case simdjson::dom::element_type::STRING:
@@ -89,12 +99,17 @@ LLSD LlsdFromJson(const simdjson::dom::element& val)
         break;
     }
     case simdjson::dom::element_type::OBJECT:
+    {
         result = LLSD::emptyMap();
-        for (const simdjson::dom::key_value_pair& member : val.get_object().value_unsafe())
+        // copy the handle out first: iterating the simdjson_result temporary
+        // dangles, as range-for does not extend the inner temporary's lifetime
+        simdjson::dom::object object = val.get_object().value_unsafe();
+        for (const simdjson::dom::key_value_pair& member : object)
         {
             result[member.key] = LlsdFromJson(member.value);
         }
         break;
+    }
     }
     return result;
 }

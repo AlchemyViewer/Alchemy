@@ -594,16 +594,24 @@ namespace LL
         // to/from extension
 
         // for internal use only, use copy_extensions instead
-        template<typename T>
-        inline bool _copy_extension(const simdjson::dom::object& extensions, std::string_view member, T* dst)
+        inline bool _copy_extension(const simdjson::dom::object& extensions)
         {
+            return false;
+        }
+
+        template<typename T, class... Rest>
+        inline bool _copy_extension(const simdjson::dom::object& extensions, std::string_view member, T* dst, Rest... rest)
+        {
+            bool copied = false;
             Value v;
             if (extensions[member].get(v) == simdjson::SUCCESS)
             {
-                return copy(v, *dst);
+                copied = copy(v, *dst);
             }
 
-            return false;
+            // copy each extension; do not short circuit on success
+            bool rest_copied = _copy_extension(extensions, rest...);
+            return copied || rest_copied;
         }
 
         // Copy all extensions from src.extensions to provided destinations
@@ -622,17 +630,7 @@ namespace LL
                 simdjson::dom::object ext_obj;
                 if (obj["extensions"].get_object().get(ext_obj) == simdjson::SUCCESS)
                 {
-                    bool success = false;
-                    // copy each extension, return true if any of them succeed, do not short circuit on success
-                    U32 count = sizeof...(args);
-                    for (U32 i = 0; i < count; i += 2)
-                    {
-                        if (_copy_extension(ext_obj, args...))
-                        {
-                            success = true;
-                        }
-                    }
-                    return success;
+                    return _copy_extension(ext_obj, args...);
                 }
             }
 
@@ -1088,7 +1086,7 @@ namespace LL
                 dst = gltf_alpha_mode_to_enum(std::string(sv));
                 return true;
             }
-            return true;
+            return false;
         }
 
         template<>

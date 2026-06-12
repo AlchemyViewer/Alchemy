@@ -31,7 +31,7 @@ mutable document tree.
 
 Each class should provide two functions (Primitive shown for example):
 
-```
+```cpp
 // Append "this" in json form to the provided writer
 // Do not serialize default values
 void serialize(JsonWriter& obj) const;
@@ -42,7 +42,7 @@ const Primitive& operator=(const Value& src);
 
 "serialize" implementations should use "write":
 
-```
+```cpp
 void Primitive::serialize(JsonWriter& dst) const
 {
     write(mMaterial, "material", dst, -1);
@@ -54,7 +54,7 @@ void Primitive::serialize(JsonWriter& dst) const
 
 And operator= implementations should use "copy":
 
-```
+```cpp
 const Primitive& Primitive::operator=(const Value& src)
 {
     if (src.is_object())
@@ -84,7 +84,7 @@ As implementers encounter new data types, you'll see compiler errors
 pointing at templates in buffer_util.h.  See vec3 as a known good
 example of how to add support for a new type (there are bad examples, so beware):
 
-```
+```cpp
 // vec3
 template<>
 inline bool copy(const Value& src, vec3& dst)
