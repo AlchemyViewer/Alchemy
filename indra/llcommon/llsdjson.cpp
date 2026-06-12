@@ -33,99 +33,191 @@
 #include "llsdutil.h"
 #include "llerror.h"
 
+#include <cmath>
+#include <cstdlib>
+
 //=========================================================================
-LLSD LlsdFromJson(const boost::json::value& val)
+LLSD LlsdFromJson(const simdjson::dom::element& val)
 {
     LLSD result;
 
-    switch (val.kind())
+    switch (val.type())
     {
     default:
-    case boost::json::kind::null:
+    case simdjson::dom::element_type::NULL_VALUE:
         break;
-    case boost::json::kind::int64:
-    case boost::json::kind::uint64:
-        result = LLSD(val.to_number<int64_t>());
+    case simdjson::dom::element_type::INT64:
+        result = LLSD(val.get_int64().value_unsafe());
         break;
-    case boost::json::kind::double_:
-        result = LLSD(val.to_number<double>());
+    case simdjson::dom::element_type::UINT64:
+        result = LLSD(val.get_uint64().value_unsafe());
         break;
-    case boost::json::kind::string:
-        result = LLSD(boost::json::value_to<std::string>(val));
+    case simdjson::dom::element_type::DOUBLE:
+        result = LLSD(val.get_double().value_unsafe());
         break;
-    case boost::json::kind::bool_:
-        result = LLSD(val.as_bool());
+    case simdjson::dom::element_type::BIGINT:
+    {
+        // integer too large for int64/uint64: degrade to Real, matching how
+        // such literals previously parsed as doubles. Only reachable if the
+        // parser enables bigint storage; the default configuration fails the
+        // parse with BIGINT_ERROR instead.
+        double bigval;
+        if (val.get_double().get(bigval) != simdjson::SUCCESS)
+        {
+            std::string_view digits;
+            if (val.get_bigint().get(digits) != simdjson::SUCCESS)
+            {
+                break;
+            }
+            // saturates to +/-HUGE_VAL rather than failing
+            bigval = strtod(std::string(digits).c_str(), nullptr);
+        }
+        result = LLSD(bigval);
         break;
-    case boost::json::kind::array:
+    }
+    case simdjson::dom::element_type::STRING:
+        result = LLSD(std::string(val.get_string().value_unsafe()));
+        break;
+    case simdjson::dom::element_type::BOOL:
+        result = LLSD(val.get_bool().value_unsafe());
+        break;
+    case simdjson::dom::element_type::ARRAY:
     {
         result = LLSD::emptyArray();
-        const boost::json::array& array = val.as_array();
+        simdjson::dom::array array = val.get_array().value_unsafe();
         size_t size = array.size();
         // allocate elements 0 .. (size() - 1) to avoid incremental allocation
-        if (!array.empty())
+        if (size > 0)
         {
             result[size - 1] = LLSD();
         }
-        for (size_t i = 0; i < size; i++)
+        size_t i = 0;
+        for (const simdjson::dom::element& element : array)
         {
-            result[i] = (LlsdFromJson(array[i]));
+            result[i++] = LlsdFromJson(element);
         }
         break;
     }
-    case boost::json::kind::object:
+    case simdjson::dom::element_type::OBJECT:
+    {
         result = LLSD::emptyMap();
-        for (const auto& element : val.as_object())
+        // copy the handle out first: iterating the simdjson_result temporary
+        // dangles, as range-for does not extend the inner temporary's lifetime
+        simdjson::dom::object object = val.get_object().value_unsafe();
+        for (const simdjson::dom::key_value_pair& member : object)
         {
-            result[std::string_view(element.key())] = LlsdFromJson(element.value());
+            result[member.key] = LlsdFromJson(member.value);
         }
         break;
+    }
     }
     return result;
 }
 
 //=========================================================================
-boost::json::value LlsdToJson(const LLSD &val)
+// parser reuse avoids reallocating its internal buffers on every call; the
+// converted LLSD owns all its data, so nothing references the parser once
+// the conversion returns
+static simdjson::dom::parser& json_parser()
 {
-    boost::json::value result;
+    thread_local simdjson::dom::parser parser;
+    return parser;
+}
 
+static bool llsd_from_parsed(simdjson::simdjson_result<simdjson::dom::element> parsed,
+                             LLSD& out, std::string* errmsg)
+{
+    simdjson::dom::element root;
+    simdjson::error_code err = parsed.get(root);
+    if (err != simdjson::SUCCESS)
+    {
+        if (errmsg)
+        {
+            *errmsg = simdjson::error_message(err);
+        }
+        out = LLSD();
+        return false;
+    }
+    out = LlsdFromJson(root);
+    return true;
+}
+
+bool LlsdFromJsonString(std::string_view json, LLSD& out, std::string* errmsg)
+{
+    return llsd_from_parsed(json_parser().parse(json.data(), json.size()), out, errmsg);
+}
+
+bool LlsdFromJsonString(const simdjson::padded_string& json, LLSD& out, std::string* errmsg)
+{
+    return llsd_from_parsed(json_parser().parse(json), out, errmsg);
+}
+
+//=========================================================================
+static void llsd_to_json(simdjson::builder::string_builder& dst, const LLSD& val)
+{
     switch (val.type())
     {
     case LLSD::TypeUndefined:
-        result = nullptr;
+        dst.append_null();
         break;
     case LLSD::TypeBoolean:
-        result = val.asBoolean();
+        dst.append(val.asBoolean());
         break;
     case LLSD::TypeInteger:
-        result = val.asInteger();
+        dst.append(val.asInteger());
         break;
     case LLSD::TypeReal:
-        result = val.asReal();
+    {
+        F64 real = val.asReal();
+        if (std::isfinite(real))
+        {
+            dst.append(real);
+        }
+        else
+        {
+            // JSON has no representation for NaN or infinities
+            dst.append_null();
+        }
         break;
+    }
     case LLSD::TypeURI:
     case LLSD::TypeDate:
     case LLSD::TypeUUID:
     case LLSD::TypeString:
-        result = val.asString();
+        dst.escape_and_append_with_quotes(val.asString());
         break;
     case LLSD::TypeMap:
     {
-        boost::json::object& obj = result.emplace_object();
-        obj.reserve(val.size());
+        dst.start_object();
+        bool first = true;
         for (const auto& llsd_dat : llsd::inMap(val))
         {
-            obj[llsd_dat.first] = LlsdToJson(llsd_dat.second);
+            if (!first)
+            {
+                dst.append_comma();
+            }
+            first = false;
+            dst.escape_and_append_with_quotes(llsd_dat.first);
+            dst.append_colon();
+            llsd_to_json(dst, llsd_dat.second);
         }
+        dst.end_object();
         break;
     }
     case LLSD::TypeArray:
     {
-        boost::json::array& json_array = result.emplace_array();
-        json_array.reserve(val.size());
+        dst.start_array();
+        bool first = true;
         for (const auto& llsd_dat : llsd::inArray(val))
         {
-            json_array.push_back(LlsdToJson(llsd_dat));
+            if (!first)
+            {
+                dst.append_comma();
+            }
+            first = false;
+            llsd_to_json(dst, llsd_dat);
         }
+        dst.end_array();
         break;
     }
     case LLSD::TypeBinary:
@@ -134,6 +226,18 @@ boost::json::value LlsdToJson(const LLSD &val)
                               << val.type() << ")." << LL_ENDL;
         break;
     }
+}
 
-    return result;
+std::string LlsdToJson(const LLSD& val)
+{
+    simdjson::builder::string_builder builder;
+    llsd_to_json(builder, val);
+
+    std::string_view view;
+    if (builder.view().get(view) != simdjson::SUCCESS)
+    {
+        LL_WARNS("LlsdToJson") << "Allocation failure serializing LLSD to JSON" << LL_ENDL;
+        return std::string();
+    }
+    return std::string(view);
 }

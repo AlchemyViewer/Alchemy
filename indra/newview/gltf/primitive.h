@@ -28,14 +28,13 @@
 
 #include "llvertexbuffer.h"
 #include "llvolumeoctree.h"
-#include "boost/json.hpp"
+#include "common.h"
 
 // LL GLTF Implementation
 namespace LL
 {
     namespace GLTF
     {
-        using Value = boost::json::value;
         class Asset;
 
         class Primitive
@@ -104,7 +103,7 @@ namespace LL
                 LLVector4a* tangent = NULL             // return the surface tangent at the intersection point
             );
 
-            void serialize(boost::json::object& obj) const;
+            void serialize(JsonWriter& obj) const;
             const Primitive& operator=(const Value& src);
 
             bool prep(Asset& asset);

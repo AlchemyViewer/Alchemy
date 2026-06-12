@@ -1,5 +1,5 @@
 /**
- * @file llsdjson.cpp
+ * @file llsdjson.h
  * @brief LLSD flexible data system
  *
  * $LicenseInfo:firstyear=2015&license=viewerlgpl$
@@ -27,17 +27,16 @@
 #ifndef LL_LLSDJSON_H
 #define LL_LLSDJSON_H
 
-#include <map>
 #include <string>
-#include <vector>
+#include <string_view>
 
 #include "stdtypes.h"
 
 #include "llsd.h"
-#include <boost/json.hpp>
+#include <simdjson.h>
 
-/// Convert a parsed JSON structure into LLSD maintaining member names and
-/// array indexes.
+/// Convert a parsed JSON document element into LLSD maintaining member names
+/// and array indexes.
 /// JSON/JavaScript types are converted as follows:
 ///
 /// JSON Type     | LLSD Type
@@ -53,10 +52,33 @@
 ///
 /// For maps and arrays child entries will be converted and added to the structure.
 /// Order is preserved for an array but not for objects.
-LLSD LlsdFromJson(const boost::json::value &val);
+LLSD LlsdFromJson(const simdjson::dom::element& val);
 
-/// Convert an LLSD object into Parsed JSON object maintaining member names and
-/// array indexs.
+/// Parse a JSON document from text and convert it into LLSD as above.
+/// Returns false (leaving out undefined) on a parse failure; if errmsg is
+/// non-null it receives a description of the failure.
+bool LlsdFromJsonString(std::string_view json, LLSD& out, std::string* errmsg = nullptr);
+
+/// As above, but parses the buffer in place with no internal copy. Callers
+/// that materialize a document from raw bytes should read directly into a
+/// simdjson::padded_string and use this overload.
+bool LlsdFromJsonString(const simdjson::padded_string& json, LLSD& out, std::string* errmsg = nullptr);
+
+/// disambiguate std::string and C strings against the string_view and
+/// padded_string overloads (padded_string converts implicitly from
+/// std::string)
+inline bool LlsdFromJsonString(const std::string& json, LLSD& out, std::string* errmsg = nullptr)
+{
+    return LlsdFromJsonString(std::string_view(json), out, errmsg);
+}
+
+inline bool LlsdFromJsonString(const char* json, LLSD& out, std::string* errmsg = nullptr)
+{
+    return LlsdFromJsonString(std::string_view(json), out, errmsg);
+}
+
+/// Serialize an LLSD object into compact JSON text maintaining member names
+/// and array indexes.
 ///
 /// Types are converted as follows:
 /// LLSD Type     |  JSON Type
@@ -64,7 +86,7 @@ LLSD LlsdFromJson(const boost::json::value &val);
 /// TypeUndefined | null
 /// TypeBoolean   | boolean
 /// TypeInteger   | integer
-/// TypeReal      | real/numeric
+/// TypeReal      | real/numeric (non-finite values become null)
 /// TypeString    | string
 /// TypeURI       | string
 /// TypeDate      | string
@@ -72,6 +94,6 @@ LLSD LlsdFromJson(const boost::json::value &val);
 /// TypeMap       | object
 /// TypeArray     | array
 /// TypeBinary    | unsupported
-boost::json::value LlsdToJson(const LLSD &val);
+std::string LlsdToJson(const LLSD& val);
 
 #endif // LL_LLSDJSON_H

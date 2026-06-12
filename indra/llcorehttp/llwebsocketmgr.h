@@ -39,8 +39,6 @@
 #include <thread>
 #include <atomic>
 
-#include <boost/json.hpp>
-
 #include <websocketpp/common/connection_hdl.hpp>
 
 struct Server_impl;
@@ -123,7 +121,6 @@ public:
          * asynchronously and may not be sent immediately.
          */
         bool sendMessage(const std::string& message) const;
-        bool sendMessage(const boost::json::value& json) const;
         bool sendMessage(const LLSD& data) const;
 
         /**

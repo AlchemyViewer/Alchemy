@@ -278,6 +278,7 @@ target_link_libraries(
         ll::tracy
         ll::sse2neon
         ll::xxhash
+        ll::simdjson
         ll::simdutf
         ll::fmt
         Threads::Threads
@@ -331,6 +332,7 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llprocinfo "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llrand "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsd "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llsdjson "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsdserialize "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsdutil "" "llcommon;llmath" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsingleton "" "${test_libs}" "${test_project}")

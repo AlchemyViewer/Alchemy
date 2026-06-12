@@ -43,7 +43,6 @@ class LLWebRTCProtocolParser;
 #include "llparcel.h"
 #include "llmutelist.h"
 #include <queue>
-#include "boost/json.hpp"
 
 #include <expat.h>
 #include "llvoiceclient.h"

@@ -630,12 +630,6 @@ bool LLWebsocketMgr::WSConnection::sendMessage(const std::string& message) const
     return mOwningServer.lock()->sendMessageTo(mConnectionHandle, message);
 }
 
-bool LLWebsocketMgr::WSConnection::sendMessage(const boost::json::value& json) const
-{
-    std::string message = boost::json::serialize(json);
-    return sendMessage(message);
-}
-
 bool LLWebsocketMgr::WSConnection::sendMessage(const LLSD& data) const
 {
     return sendMessage(LlsdToJson(data));

@@ -146,7 +146,6 @@
 #include <unordered_map>
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/json.hpp>
 #include "llcleanup.h"
 #include "llviewershadermgr.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)

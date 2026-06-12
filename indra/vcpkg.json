@@ -11,7 +11,6 @@
     "boost-fiber",
     "boost-graph",
     "boost-iostreams",
-    "boost-json",
     "boost-program-options",
     "boost-random",
     "boost-regex",
@@ -134,6 +133,7 @@
       ]
     },
     "secondlife-emoji-shortcodes",
+    "simdjson",
     "simdutf",
     {
       "name": "sse2neon",

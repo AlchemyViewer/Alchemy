@@ -36,7 +36,6 @@
 
 
 using namespace LL::GLTF;
-using namespace boost::json;
 
 
 // Mesh data useful for Mikktspace tangent generation (and flat normal generation)
@@ -788,7 +787,7 @@ LLRender::eGeomModes gltf_mode_to_gl_mode(Primitive::Mode mode)
     }
 }
 
-void Primitive::serialize(boost::json::object& dst) const
+void Primitive::serialize(JsonWriter& dst) const
 {
     write(mMaterial, "material", dst, -1);
     write(mMode, "mode", dst, Primitive::Mode::TRIANGLES);

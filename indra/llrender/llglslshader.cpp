@@ -64,7 +64,7 @@ U64 LLGLSLShader::sTotalTimeElapsed = 0;
 U32 LLGLSLShader::sTotalTrianglesDrawn = 0;
 U64 LLGLSLShader::sTotalSamplesDrawn = 0;
 U32 LLGLSLShader::sTotalBinds = 0;
-boost::json::value LLGLSLShader::sDefaultStats;
+LLSD LLGLSLShader::sDefaultStats;
 
 //UI shader -- declared here so llui_libtest will link properly
 LLGLSLShader    gUIProgram;
@@ -119,18 +119,17 @@ struct LLGLSLShaderCompareTimeElapsed
 };
 
 //static
-void LLGLSLShader::finishProfile(boost::json::value& statsv)
+void LLGLSLShader::finishProfile(LLSD& stats)
 {
     sProfileEnabled = false;
 
-    if (! statsv.is_null())
+    if (stats.isDefined())
     {
         std::vector<LLGLSLShader*> sorted(sInstances.begin(), sInstances.end());
         std::sort(sorted.begin(), sorted.end(), LLGLSLShaderCompareTimeElapsed());
 
-        auto& stats = statsv.as_object();
-        auto shadersit = stats.emplace("shaders", boost::json::array_kind).first;
-        auto& shaders = shadersit->value().as_array();
+        LLSD& shaders = stats["shaders"];
+        shaders = LLSD::emptyArray();
         bool unbound = false;
         for (auto ptr : sorted)
         {
@@ -140,8 +139,8 @@ void LLGLSLShader::finishProfile(boost::json::value& statsv)
             }
             else
             {
-                auto& shaderit = shaders.emplace_back(boost::json::object_kind);
-                ptr->dumpStats(shaderit.as_object());
+                LLSD& shaderit = shaders.append(LLSD::emptyMap());
+                ptr->dumpStats(shaderit);
             }
         }
 
@@ -152,15 +151,16 @@ void LLGLSLShader::finishProfile(boost::json::value& statsv)
         LL_INFOS() << "Total samples drawn: " << llformat("%.4f million", sTotalSamplesDrawn / mega) << LL_ENDL;
         LL_INFOS() << "Total triangles drawn: " << llformat("%.3f million", sTotalTrianglesDrawn / mega) << LL_ENDL;
         LL_INFOS() << "-----------------------------------" << LL_ENDL;
-        auto totalsit = stats.emplace("totals", boost::json::object_kind).first;
-        auto& totals = totalsit->value().as_object();
-        totals.emplace("time", totalTimeMs / 1000.0);
-        totals.emplace("binds", sTotalBinds);
-        totals.emplace("samples", sTotalSamplesDrawn);
-        totals.emplace("triangles", sTotalTrianglesDrawn);
+        LLSD& totals = stats["totals"];
+        totals = LLSD::emptyMap();
+        totals["time"] = totalTimeMs / 1000.0;
+        totals["binds"] = LLSD::Integer(sTotalBinds);
+        // sample counters are 64-bit; store as Real to avoid S32 overflow
+        totals["samples"] = F64(sTotalSamplesDrawn);
+        totals["triangles"] = LLSD::Integer(sTotalTrianglesDrawn);
 
-        auto unusedit = stats.emplace("unused", boost::json::array_kind).first;
-        auto& unused = unusedit->value().as_array();
+        LLSD& unused = stats["unused"];
+        unused = LLSD::emptyArray();
         if (unbound)
         {
             LL_INFOS() << "The following shaders were unused: " << LL_ENDL;
@@ -169,7 +169,7 @@ void LLGLSLShader::finishProfile(boost::json::value& statsv)
                 if (ptr->mBinds == 0)
                 {
                     LL_INFOS() << ptr->mName << LL_ENDL;
-                    unused.emplace_back(ptr->mName);
+                    unused.append(ptr->mName);
                 }
             }
         }
@@ -184,17 +184,17 @@ void LLGLSLShader::clearStats()
     mBinds = 0;
 }
 
-void LLGLSLShader::dumpStats(boost::json::object& stats)
+void LLGLSLShader::dumpStats(LLSD& stats)
 {
-    stats.emplace("name", mName);
-    auto filesit = stats.emplace("files", boost::json::array_kind).first;
-    auto& files = filesit->value().as_array();
+    stats["name"] = mName;
+    LLSD& files = stats["files"];
+    files = LLSD::emptyArray();
     LL_INFOS() << "=============================================" << LL_ENDL;
     LL_INFOS() << mName << LL_ENDL;
     for (U32 i = 0; i < mShaderFiles.size(); ++i)
     {
         LL_INFOS() << mShaderFiles[i].first << LL_ENDL;
-        files.emplace_back(mShaderFiles[i].first);
+        files.append(mShaderFiles[i].first);
     }
     LL_INFOS() << "=============================================" << LL_ENDL;
 
@@ -217,10 +217,11 @@ void LLGLSLShader::dumpStats(boost::json::object& stats)
     LL_INFOS() << "Binds: " << mBinds << " " << llformat("(%.2f pct of total)", pct_binds) << LL_ENDL;
     LL_INFOS() << "SamplesDrawn: " << mSamplesDrawn << " " << llformat("(%.2f pct of total, %.3f billion/sec)", pct_samples, samples_sec) << LL_ENDL;
     LL_INFOS() << "Time Elapsed: " << mTimeElapsed << " " << llformat("(%.2f pct of total, %.5f ms)\n", (F32)((F64)mTimeElapsed / (F64)sTotalTimeElapsed) * 100.f, ms) << LL_ENDL;
-    stats.emplace("time", seconds);
-    stats.emplace("binds", mBinds);
-    stats.emplace("samples", mSamplesDrawn);
-    stats.emplace("triangles", mTrianglesDrawn);
+    stats["time"] = seconds;
+    stats["binds"] = LLSD::Integer(mBinds);
+    // sample counters are 64-bit; store as Real to avoid S32 overflow
+    stats["samples"] = F64(mSamplesDrawn);
+    stats["triangles"] = LLSD::Integer(mTrianglesDrawn);
 }
 
 //static

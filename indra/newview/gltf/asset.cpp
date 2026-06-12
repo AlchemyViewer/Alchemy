@@ -39,7 +39,6 @@
 #include <future>
 
 using namespace LL::GLTF;
-using namespace boost::json;
 
 
 namespace LL
@@ -387,7 +386,7 @@ void Node::setScale(const vec3& s)
     mMatrixValid = false;
 }
 
-void Node::serialize(object& dst) const
+void Node::serialize(JsonWriter& dst) const
 {
     write(mName, "name", dst);
     write(mMatrix, "matrix", dst, glm::identity<mat4>());
@@ -418,7 +417,7 @@ const Node& Node::operator=(const Value& src)
     return *this;
 }
 
-void Image::serialize(object& dst) const
+void Image::serialize(JsonWriter& dst) const
 {
     write(mUri, "uri", dst);
     write(mMimeType, "mimeType", dst);
@@ -709,7 +708,13 @@ bool Asset::load(std::string_view filename, bool loadIntoVRAM)
 
         if (ext == "gltf")
         {
-            Value val = parse(str);
+            simdjson::dom::parser parser;
+            Value val;
+            if (parser.parse(str).get(val) != simdjson::SUCCESS)
+            {
+                LL_WARNS("GLTF") << "Failed to parse: " << mFilename << LL_ENDL;
+                return false;
+            }
             *this = val;
             return prep();
         }
@@ -796,7 +801,13 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
         return false;
     }
 
-    Value val = parse(std::string_view((const char*)ptr, chunkLength));
+    simdjson::dom::parser parser;
+    Value val;
+    if (parser.parse((const char*)ptr, chunkLength).get(val) != simdjson::SUCCESS)
+    {
+        LL_WARNS("GLTF") << "Failed to parse GLB JSON chunk" << LL_ENDL;
+        return false;
+    }
     *this = val;
 
     if (mBuffers.size() > 0 && mBuffers[0].mUri.empty())
@@ -839,21 +850,23 @@ bool Asset::loadBinary(const std::string& data, bool loadIntoVRAM)
 
 const Asset& Asset::operator=(const Value& src)
 {
-    if (src.is_object())
+    simdjson::dom::object obj;
+    if (src.get_object().get(obj) == simdjson::SUCCESS)
     {
-        const object& obj = src.as_object();
-
-        const auto it = obj.find("asset");
-
-        if (it != obj.end())
+        Value asset;
+        if (obj["asset"].get(asset) == simdjson::SUCCESS)
         {
-            const Value& asset = it->value();
-
             copy(asset, "version", mVersion);
             copy(asset, "minVersion", mMinVersion);
             copy(asset, "generator", mGenerator);
             copy(asset, "copyright", mCopyright);
-            copy(asset, "extras", mExtras);
+
+            // preserve the arbitrary extras subtree as minified JSON text
+            Value extras;
+            if (asset["extras"].get(extras) == simdjson::SUCCESS)
+            {
+                mExtras = simdjson::to_string(extras);
+            }
         }
 
         copy(obj, "scene", mScene);
@@ -876,16 +889,23 @@ const Asset& Asset::operator=(const Value& src)
     return *this;
 }
 
-void Asset::serialize(object& dst) const
+void Asset::serialize(JsonWriter& dst) const
 {
     static const std::string sGenerator = "Linden Lab GLTF Prototype v0.1";
 
-    dst["asset"] = object{};
-    object& asset = dst["asset"].get_object();
+    dst.key("asset");
+    dst.startObject();
+    write(mVersion, "version", dst);
+    write(mMinVersion, "minVersion", dst, std::string());
+    write(sGenerator, "generator", dst);
+    write(mCopyright, "copyright", dst, std::string());
+    if (!mExtras.empty())
+    {
+        dst.key("extras");
+        dst.rawValue(mExtras);
+    }
+    dst.endObject();
 
-    write(mVersion, "version", asset);
-    write(mMinVersion, "minVersion", asset, std::string());
-    write(sGenerator, "generator", asset);
     write(mScene, "scene", dst, INVALID_INDEX);
     write(mScenes, "scenes", dst);
     write(mNodes, "nodes", dst);
@@ -929,11 +949,23 @@ bool Asset::save(const std::string& filename)
     }
 
     // save .gltf
-    object obj;
-    serialize(obj);
-    std::string buffer = boost::json::serialize(obj, {});
+    JsonWriter writer;
+    writer.startObject();
+    serialize(writer);
+    writer.endObject();
+    std::string buffer = writer.str();
     llofstream file(filename, std::ios::binary);
+    if (!file.is_open())
+    {
+        LL_WARNS("GLTF") << "Failed to open file for writing: " << filename << LL_ENDL;
+        return false;
+    }
     file.write(buffer.c_str(), buffer.size());
+    if (!file.good())
+    {
+        LL_WARNS("GLTF") << "Failed to write file: " << filename << LL_ENDL;
+        return false;
+    }
 
     return true;
 }
@@ -1195,7 +1227,7 @@ bool Image::save(Asset& asset, const std::string& folder)
     return true;
 }
 
-void TextureInfo::serialize(object& dst) const
+void TextureInfo::serialize(JsonWriter& dst) const
 {
     write(mIndex, "index", dst, INVALID_INDEX);
     write(mTexCoord, "texCoord", dst, 0);
@@ -1242,7 +1274,7 @@ bool TextureInfo::operator!=(const TextureInfo& rhs) const
     return !(*this == rhs);
 }
 
-void OcclusionTextureInfo::serialize(object& dst) const
+void OcclusionTextureInfo::serialize(JsonWriter& dst) const
 {
     TextureInfo::serialize(dst);
     write(mStrength, "strength", dst, 1.f);
@@ -1260,7 +1292,7 @@ const OcclusionTextureInfo& OcclusionTextureInfo::operator=(const Value& src)
     return *this;
 }
 
-void NormalTextureInfo::serialize(object& dst) const
+void NormalTextureInfo::serialize(JsonWriter& dst) const
 {
     TextureInfo::serialize(dst);
     write(mScale, "scale", dst, 1.f);
@@ -1293,7 +1325,7 @@ const Material::PbrMetallicRoughness& Material::PbrMetallicRoughness::operator=(
     return *this;
 }
 
-void Material::PbrMetallicRoughness::serialize(object& dst) const
+void Material::PbrMetallicRoughness::serialize(JsonWriter& dst) const
 {
     write(mBaseColorFactor, "baseColorFactor", dst, vec4(1.f, 1.f, 1.f, 1.f));
     write(mBaseColorTexture, "baseColorTexture", dst);
@@ -1322,7 +1354,7 @@ const Material::Unlit& Material::Unlit::operator=(const Value& src)
     return *this;
 }
 
-void Material::Unlit::serialize(object& dst) const
+void Material::Unlit::serialize(JsonWriter& dst) const
 {
     // no members and object has already been created, nothing to do
 }
@@ -1347,7 +1379,7 @@ const TextureTransform& TextureTransform::operator=(const Value& src)
     return *this;
 }
 
-void TextureTransform::serialize(object& dst) const
+void TextureTransform::serialize(JsonWriter& dst) const
 {
     write(mOffset, "offset", dst, vec2(0.f, 0.f));
     write(mRotation, "rotation", dst, 0.f);
@@ -1356,7 +1388,7 @@ void TextureTransform::serialize(object& dst) const
 }
 
 
-void Material::serialize(object& dst) const
+void Material::serialize(JsonWriter& dst) const
 {
     write(mName, "name", dst);
     write(mEmissiveFactor, "emissiveFactor", dst, vec3(0.f, 0.f, 0.f));
@@ -1390,7 +1422,7 @@ const Material& Material::operator=(const Value& src)
 }
 
 
-void Mesh::serialize(object& dst) const
+void Mesh::serialize(JsonWriter& dst) const
 {
     write(mPrimitives, "primitives", dst);
     write(mWeights, "weights", dst);
@@ -1422,7 +1454,7 @@ bool Mesh::prep(Asset& asset)
     return true;
 }
 
-void Scene::serialize(object& dst) const
+void Scene::serialize(JsonWriter& dst) const
 {
     write(mNodes, "nodes", dst);
     write(mName, "name", dst);
@@ -1436,7 +1468,7 @@ const Scene& Scene::operator=(const Value& src)
     return *this;
 }
 
-void Texture::serialize(object& dst) const
+void Texture::serialize(JsonWriter& dst) const
 {
     write(mSampler, "sampler", dst, INVALID_INDEX);
     write(mSource, "source", dst, INVALID_INDEX);
@@ -1455,7 +1487,7 @@ const Texture& Texture::operator=(const Value& src)
     return *this;
 }
 
-void Sampler::serialize(object& dst) const
+void Sampler::serialize(JsonWriter& dst) const
 {
     write(mMagFilter, "magFilter", dst, LINEAR);
     write(mMinFilter, "minFilter", dst, LINEAR_MIPMAP_LINEAR);
