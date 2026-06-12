@@ -1185,6 +1185,9 @@ namespace tut
         val.clear();
         ensureParse("invalid integer", "421", val, LLSDParser::PARSE_FAILURE);
         ensureParse("empty integer", "i,", val, LLSDParser::PARSE_FAILURE);
+        // an oversized token must fail whole, not parse as a buffered prefix
+        ensureParse("oversized integer token",
+                    "i" + std::string(100, '1'), val, LLSDParser::PARSE_FAILURE);
     }
 
     template<> template<>
@@ -1205,6 +1208,9 @@ namespace tut
         val.clear();
         ensureParse("invalid real", "456.7", val, LLSDParser::PARSE_FAILURE);
         ensureParse("empty real", "r,", val, LLSDParser::PARSE_FAILURE);
+        // an oversized token must fail whole, not parse as a buffered prefix
+        ensureParse("oversized real token",
+                    "r0." + std::string(600, '3'), val, LLSDParser::PARSE_FAILURE);
     }
 
     template<> template<>

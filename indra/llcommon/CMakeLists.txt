@@ -279,9 +279,10 @@ target_link_libraries(
         ll::sse2neon
         ll::xxhash
         ll::simdutf
-        ll::fastfloat
         ll::fmt
         Threads::Threads
+        PRIVATE
+        ll::fastfloat
     )
 
 target_include_directories(llcommon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

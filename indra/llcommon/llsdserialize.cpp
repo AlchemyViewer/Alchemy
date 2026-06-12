@@ -470,6 +470,19 @@ namespace
         }
     }
 
+    // True when a scan stopped because the buffer filled while the stream
+    // still holds characters of the same numeric lexeme; accepting the
+    // buffered prefix would let one oversized token parse as several values.
+    bool numeric_token_truncated(std::istream& istr, size_t len, size_t cap)
+    {
+        if (len < cap)
+        {
+            return false;
+        }
+        int c = istr.peek();
+        return isalnum(c) || c == '.' || c == '+' || c == '-';
+    }
+
     // Scan an integer token ([ws][+-]digits) from istr into buf, leaving the
     // terminating character in the stream. Returns the token length.
     size_t scan_integer_token(std::istream& istr, char* buf, size_t cap)
@@ -693,7 +706,8 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
         S32 integer = 0;
         auto [ptr, ec] = std::from_chars(start, buf + len, integer);
         data = integer;
-        if (ec != std::errc() || ptr != buf + len)
+        if (numeric_token_truncated(istr, len, sizeof(buf)) ||
+            ec != std::errc() || ptr != buf + len)
         {
             LL_INFOS() << "STREAM FAILURE reading integer." << LL_ENDL;
             parse_count = PARSE_FAILURE;
@@ -714,7 +728,8 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
         F64 real = 0.0;
         auto [ptr, ec] = fast_float::from_chars(start, buf + len, real);
         data = real;
-        if (ec != std::errc() || ptr != buf + len)
+        if (numeric_token_truncated(istr, len, sizeof(buf)) ||
+            ec != std::errc() || ptr != buf + len)
         {
             LL_INFOS() << "STREAM FAILURE reading real." << LL_ENDL;
             parse_count = PARSE_FAILURE;
