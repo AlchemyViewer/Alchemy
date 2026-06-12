@@ -70,6 +70,35 @@ namespace
         return timegm(&in);
 #endif
     }
+
+    // Format "YYYY-MM-DDTHH:MM:SS[.ff]Z" into buf and return the length.
+    // buf must hold at least 32 chars.
+    size_t format_iso8601(F64 seconds_since_epoch, char* buf, size_t cap)
+    {
+        S64 total_usec = (S64)(seconds_since_epoch * (F64)USEC_PER_SEC);
+        time_t secs = (time_t)(total_usec / 1000000);
+        int usec = (int)(total_usec % 1000000);
+
+        struct tm exp_time;
+        if (!gmtime_utc(secs, exp_time))
+        {
+            return snprintf(buf, cap, "1970-01-01T00:00:00Z");
+        }
+
+        size_t len = snprintf(buf, cap, "%04d-%02d-%02dT%02d:%02d:%02d",
+                              exp_time.tm_year + 1900, exp_time.tm_mon + 1,
+                              exp_time.tm_mday, exp_time.tm_hour,
+                              exp_time.tm_min, exp_time.tm_sec);
+        if (usec > 0 && len + 4 <= cap)
+        {
+            len += snprintf(buf + len, cap - len, ".%02d", usec / 10000);
+        }
+        if (len < cap)
+        {
+            buf[len++] = 'Z';
+        }
+        return len;
+    }
 }
 
 
@@ -89,9 +118,8 @@ LLDate::LLDate(const std::string& iso8601_date)
 
 std::string LLDate::asString() const
 {
-    std::ostringstream stream;
-    toStream(stream);
-    return std::move(stream).str();
+    char buffer[48];
+    return std::string(buffer, format_iso8601(mSecondsSinceEpoch, buffer, sizeof(buffer)));
 }
 
 //@ brief Converts time in seconds since EPOCH
@@ -150,31 +178,8 @@ std::string LLDate::toHTTPDateString (tm * gmt, std::string fmt)
 
 void LLDate::toStream(std::ostream& s) const
 {
-    S64 total_usec = (S64)(mSecondsSinceEpoch * (F64)USEC_PER_SEC);
-    time_t secs = (time_t)(total_usec / 1000000);
-    int usec = (int)(total_usec % 1000000);
-
-    struct tm exp_time;
-    if (!gmtime_utc(secs, exp_time))
-    {
-        s << "1970-01-01T00:00:00Z";
-        return;
-    }
-
-    s << std::dec << std::setfill('0');
-    s << std::right;
-    s        << std::setw(4) << (exp_time.tm_year + 1900)
-      << '-' << std::setw(2) << (exp_time.tm_mon + 1)
-      << '-' << std::setw(2) << (exp_time.tm_mday)
-      << 'T' << std::setw(2) << (exp_time.tm_hour)
-      << ':' << std::setw(2) << (exp_time.tm_min)
-      << ':' << std::setw(2) << (exp_time.tm_sec);
-    if (usec > 0)
-    {
-        s << '.' << std::setw(2) << (usec / 10000);
-    }
-    s << 'Z'
-      << std::setfill(' ');
+    char buffer[48];
+    s.write(buffer, format_iso8601(mSecondsSinceEpoch, buffer, sizeof(buffer)));
 }
 
 bool LLDate::split(S32 *year, S32 *month, S32 *day, S32 *hour, S32 *min, S32 *sec) const
