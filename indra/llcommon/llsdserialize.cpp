@@ -32,6 +32,7 @@
 #include "llstreamtools.h" // for fullread
 
 #include <bit>
+#include <charconv>
 #include <iostream>
 #include <limits>
 #include <simdutf.h>
@@ -1391,19 +1392,6 @@ std::string LLSDNotationFormatter::escapeString(const std::string& in)
     return ostr.str();
 }
 
-// virtual
-S32 LLSDNotationFormatter::format(const LLSD& data, std::ostream& ostr,
-                                  EFormatterOptions options) const
-{
-    // The default stream precision (6 significant digits) silently corrupts
-    // Real values on the round trip. max_digits10 guarantees an exact
-    // round trip; an installed realFormat still takes precedence.
-    std::streamsize old_precision = ostr.precision(std::numeric_limits<F64>::max_digits10);
-    S32 rv = format_impl(data, ostr, options, 0);
-    ostr.precision(old_precision);
-    return rv;
-}
-
 S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
                                        EFormatterOptions options, U32 level) const
 {
@@ -1484,16 +1472,21 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, std::ostream& ostr,
         break;
 
     case LLSD::TypeReal:
+    {
         ostr << "r";
         if(mRealFormat.empty())
         {
-            ostr << data.asReal();
+            // shortest representation that round-trips to the same double
+            char buf[32];
+            char* end = std::to_chars(buf, buf + sizeof(buf), data.asReal()).ptr;
+            ostr.write(buf, end - buf);
         }
         else
         {
             formatReal(data.asReal(), ostr);
         }
         break;
+    }
 
     case LLSD::TypeUUID:
         ostr << "u" << data.asUUID();

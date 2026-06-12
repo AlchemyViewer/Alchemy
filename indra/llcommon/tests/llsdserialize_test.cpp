@@ -171,6 +171,14 @@ namespace tut
         // tests with real values.
         std::string expected;
 
+        // default format: shortest representation that round-trips exactly
+        mSD = 0.1;
+        expected = "<llsd><real>0.1</real></llsd>\n";
+        xml_test("real default shortest", expected);
+        mSD = 1.0;
+        expected = "<llsd><real>1</real></llsd>\n";
+        xml_test("real default integral", expected);
+
         mFormatter->realFormat("%.2f");
         mSD = 1.0;
         expected = "<llsd><real>1.00</real></llsd>\n";

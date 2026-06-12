@@ -27,6 +27,7 @@
 #include "linden_common.h"
 #include "llsdserialize_xml.h"
 
+#include <charconv>
 #include <iostream>
 #include <deque>
 
@@ -57,8 +58,6 @@ LLSDXMLFormatter::~LLSDXMLFormatter()
 S32 LLSDXMLFormatter::format(const LLSD& data, std::ostream& ostr,
                              EFormatterOptions options) const
 {
-    std::streamsize old_precision = ostr.precision(25);
-
     std::string post;
     if (options & LLSDFormatter::OPTIONS_PRETTY)
     {
@@ -68,7 +67,6 @@ S32 LLSDXMLFormatter::format(const LLSD& data, std::ostream& ostr,
     S32 rv = format_impl(data, ostr, options, 1);
     ostr << "</llsd>\n";
 
-    ostr.precision(old_precision);
     return rv;
 }
 
@@ -148,10 +146,14 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
         break;
 
     case LLSD::TypeReal:
+    {
         ostr << pre << "<real>";
         if(mRealFormat.empty())
         {
-            ostr << data.asReal();
+            // shortest representation that round-trips to the same double
+            char buf[32];
+            char* end = std::to_chars(buf, buf + sizeof(buf), data.asReal()).ptr;
+            ostr.write(buf, end - buf);
         }
         else
         {
@@ -159,6 +161,7 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
         }
         ostr << "</real>" << post;
         break;
+    }
 
     case LLSD::TypeUUID:
         if(data.asUUID().isNull()) ostr << pre << "<uuid />" << post;
