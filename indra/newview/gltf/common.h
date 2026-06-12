@@ -34,7 +34,7 @@
 #include "glm/ext/quaternion_float.hpp"
 #include "glm/gtx/quaternion.hpp"
 #include "glm/gtx/matrix_decompose.hpp"
-#include <boost/json.hpp>
+#include <simdjson.h>
 
 // Common types and constants used in the GLTF implementation
 namespace LL
@@ -43,7 +43,89 @@ namespace LL
     {
         constexpr S32 INVALID_INDEX = -1;
 
-        using Value = boost::json::value;
+        // JSON documents are parsed with simdjson; Value is a read-only handle
+        // into a parsed document. Serialization streams JSON text through
+        // JsonWriter below.
+        using Value = simdjson::dom::element;
+
+        // Streaming JSON writer over simdjson's string_builder. Handles
+        // comma/colon placement; serialize() implementations emit members
+        // in call order.
+        class JsonWriter
+        {
+        public:
+            void startObject()
+            {
+                comma();
+                mBuilder.start_object();
+                mNeedComma = false;
+            }
+
+            void endObject()
+            {
+                mBuilder.end_object();
+                mNeedComma = true;
+            }
+
+            void startArray()
+            {
+                comma();
+                mBuilder.start_array();
+                mNeedComma = false;
+            }
+
+            void endArray()
+            {
+                mBuilder.end_array();
+                mNeedComma = true;
+            }
+
+            // append "name": leaving the writer expecting the value
+            void key(std::string_view name)
+            {
+                comma();
+                mBuilder.escape_and_append_with_quotes(name);
+                mBuilder.append_colon();
+                mNeedComma = false;
+            }
+
+            template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
+            void value(T v)
+            {
+                comma();
+                mBuilder.append(v);
+                mNeedComma = true;
+            }
+
+            void value(std::string_view v)
+            {
+                comma();
+                mBuilder.escape_and_append_with_quotes(v);
+                mNeedComma = true;
+            }
+
+            std::string str() const
+            {
+                std::string_view view;
+                if (mBuilder.view().get(view) != simdjson::SUCCESS)
+                {
+                    return {};
+                }
+                return std::string(view);
+            }
+
+        private:
+            void comma()
+            {
+                if (mNeedComma)
+                {
+                    mBuilder.append_comma();
+                }
+            }
+
+            simdjson::builder::string_builder mBuilder;
+            bool mNeedComma = false;
+        };
 
         using mat4 = glm::mat4;
         using vec4 = glm::vec4;

@@ -31,7 +31,6 @@
 #include "accessor.h"
 #include "primitive.h"
 #include "animation.h"
-#include "boost/json.hpp"
 #include "common.h"
 #include "../llviewertexture.h"
 #include "llglslshader.h"
@@ -71,7 +70,7 @@ namespace LL
             void getPacked(vec4* dst) const;
 
             const TextureTransform& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class TextureInfo
@@ -90,7 +89,7 @@ namespace LL
             S32 getTexCoord() const;
 
             const TextureInfo& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class NormalTextureInfo : public TextureInfo
@@ -99,7 +98,7 @@ namespace LL
             F32 mScale = 1.0f;
 
             const NormalTextureInfo& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class OcclusionTextureInfo : public TextureInfo
@@ -108,7 +107,7 @@ namespace LL
             F32 mStrength = 1.0f;
 
             const OcclusionTextureInfo& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class Material
@@ -119,7 +118,7 @@ namespace LL
             {
             public:
                 const Unlit& operator=(const Value& src);
-                void serialize(boost::json::object& dst) const;
+                void serialize(JsonWriter& dst) const;
             };
 
             enum class AlphaMode
@@ -142,7 +141,7 @@ namespace LL
                 bool operator==(const PbrMetallicRoughness& rhs) const;
                 bool operator!=(const PbrMetallicRoughness& rhs) const;
                 const PbrMetallicRoughness& operator=(const Value& src);
-                void serialize(boost::json::object& dst) const;
+                void serialize(JsonWriter& dst) const;
             };
 
 
@@ -161,7 +160,7 @@ namespace LL
             bool isMultiUV() const;
 
             const Material& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class Mesh
@@ -172,7 +171,7 @@ namespace LL
             std::string mName;
 
             const Mesh& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             bool prep(Asset& asset);
         };
@@ -205,7 +204,7 @@ namespace LL
             std::string mName;
 
             const Node& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             // update mAssetMatrix and mAssetMatrixInv
             void updateTransforms(Asset& asset, const mat4& parentMatrix);
@@ -246,7 +245,7 @@ namespace LL
             void uploadMatrixPalette(Asset& asset);
 
             const Skin& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class Scene
@@ -256,7 +255,7 @@ namespace LL
             std::string mName;
 
             const Scene& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             void updateTransforms(Asset& asset);
             void updateRenderTransforms(Asset& asset, const mat4& modelview);
@@ -270,7 +269,7 @@ namespace LL
             std::string mName;
 
             const Texture& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         class Sampler
@@ -283,7 +282,7 @@ namespace LL
             std::string mName;
 
             const Sampler& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
         };
 
         // Image is for images that we want to load for the given asset.  This acts as an interface into the viewer's texture pipe.
@@ -307,7 +306,7 @@ namespace LL
             LLPointer<LLViewerFetchedTexture> mTexture;
 
             const Image& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             // save image to disk
             // may remove image data from bufferviews and convert to
@@ -376,7 +375,8 @@ namespace LL
             std::string mCopyright;
 
             S32 mScene = INVALID_INDEX;
-            Value mExtras;
+            // "asset.extras" subtree preserved as minified JSON text
+            std::string mExtras;
 
             U32 mPendingBuffers = 0;
 
@@ -445,7 +445,7 @@ namespace LL
             bool loadBinary(const std::string& data, bool loadIntoVRAM);
 
             const Asset& operator=(const Value& src);
-            void serialize(boost::json::object& dst) const;
+            void serialize(JsonWriter& dst) const;
 
             // save the asset to the given .gltf file
             // saves images and bins alongside the gltf file

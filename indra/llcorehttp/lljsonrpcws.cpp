@@ -31,8 +31,6 @@
 #include "llsdjson.h"
 #include "lldate.h"
 
-#include <boost/json.hpp>
-
 //========================================================================
 // LLJSONRPCConnection Implementation
 //========================================================================
@@ -67,19 +65,15 @@ void LLJSONRPCConnection::onMessage(const std::string& message)
 
     try
     {
-        // Parse JSON message
-        boost::system::error_code ec;
-        boost::json::value json_value = boost::json::parse(message, ec);
-
-        if (ec.failed())
+        // Parse JSON message and convert to LLSD
+        LLSD message_obj;
+        std::string errmsg;
+        if (!LlsdFromJsonString(message, message_obj, &errmsg))
         {
-            LL_WARNS("JSONRPC") << "Failed to parse JSON: " << ec.message() << LL_ENDL;
-            sendError(LLSD(), ParseError(ec.message()));
+            LL_WARNS("JSONRPC") << "Failed to parse JSON: " << errmsg << LL_ENDL;
+            sendError(LLSD(), ParseError(errmsg));
             return;
         }
-
-        // Convert to LLSD
-        LLSD message_obj = LlsdFromJson(json_value);
 
         // Handle batch vs single message
         if (message_obj.isArray())
@@ -571,7 +565,7 @@ void LLJSONRPCServer::broadcastNotification(const std::string& method, const LLS
     }
 
     // Use the base class broadcast functionality
-    broadcastMessage(boost::json::serialize(LlsdToJson(notification)));
+    broadcastMessage(LlsdToJson(notification));
 
     mTotalNotificationsSent += getConnectionCount();
     LL_DEBUGS("JSONRPC") << "Broadcast notification: " << method
@@ -602,7 +596,7 @@ void LLJSONRPCServer::broadcastCall(const std::string& method, const LLSD& param
     }
 
     // Use the base class broadcast functionality
-    broadcastMessage(boost::json::serialize(LlsdToJson(request)));
+    broadcastMessage(LlsdToJson(request));
 
     LL_DEBUGS("JSONRPC") << "Broadcast call: " << method
                          << " to " << getConnectionCount() << " clients" << LL_ENDL;

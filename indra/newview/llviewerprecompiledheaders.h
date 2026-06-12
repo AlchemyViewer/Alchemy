@@ -126,7 +126,7 @@
 #include "llfloater.h"
 
 #include <boost/signals2.hpp>
-#include <boost/json.hpp>
+#include <simdjson.h>
 
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"

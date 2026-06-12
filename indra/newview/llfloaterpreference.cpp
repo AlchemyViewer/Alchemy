@@ -124,7 +124,7 @@
 #include "llpresetsmanager.h"
 #include "llinventoryfunctions.h"
 
-#include <boost/json.hpp>
+#include <simdjson.h>
 #include <utility>
 
 #include "llsearchableui.h"
@@ -651,6 +651,17 @@ void LLFloaterPreference::onAutoRespondNonFriendsResponseChanged()
 ////////////////////////////////////////////////////
 // Skins panel
 
+// extract a string member from a manifest object, with a fallback
+static std::string manifest_member(const simdjson::dom::object& obj, std::string_view key, const std::string& fallback)
+{
+    std::string_view value;
+    if (obj[key].get_string().get(value) == simdjson::SUCCESS)
+    {
+        return std::string(value);
+    }
+    return fallback;
+}
+
 skin_t manifestFromJson(const std::string& filename, const ESkinType type)
 {
     skin_t skin;
@@ -658,17 +669,19 @@ skin_t manifestFromJson(const std::string& filename, const ESkinType type)
     in.open(filename);
     if (in.is_open())
     {
-        boost::system::error_code ec;
-        auto root = boost::json::parse(in, ec);
-        if (!ec.failed() && root.is_object())
+        std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        simdjson::dom::parser parser;
+        simdjson::dom::object jobj;
+        simdjson::error_code err = parser.parse(json).get_object().get(jobj);
+        if (err == simdjson::SUCCESS)
         {
-            auto jobj = root.as_object();
-            skin.mName = jobj.contains("name") ? boost::json::value_to<std::string>(jobj.at("name")) : "Unknown";
-            skin.mAuthor = jobj.contains("author") ? boost::json::value_to<std::string>(jobj.at("author")) : LLTrans::getString("Unknown");
-            skin.mUrl = jobj.contains("url") ? boost::json::value_to<std::string>(jobj.at("url")) : LLTrans::getString("Unknown");
-            skin.mCompatVer = jobj.contains("compatibility") ? boost::json::value_to<std::string>(jobj.at("compatibility")) : LLTrans::getString("Unknown");
-            skin.mDate = jobj.contains("date") ? LLDate(boost::json::value_to<std::string>(jobj.at("date"))) : LLDate::now();
-            skin.mNotes = jobj.contains("notes") ? boost::json::value_to<std::string>(jobj.at("notes")) : "";
+            skin.mName = manifest_member(jobj, "name", "Unknown");
+            skin.mAuthor = manifest_member(jobj, "author", LLTrans::getString("Unknown"));
+            skin.mUrl = manifest_member(jobj, "url", LLTrans::getString("Unknown"));
+            skin.mCompatVer = manifest_member(jobj, "compatibility", LLTrans::getString("Unknown"));
+            std::string_view date_view;
+            skin.mDate = (jobj["date"].get_string().get(date_view) == simdjson::SUCCESS) ? LLDate(std::string(date_view)) : LLDate::now();
+            skin.mNotes = manifest_member(jobj, "notes", "");
             // If it's a system skin, the compatability version is always the current build
             if (type == SYSTEM_SKIN)
             {
@@ -677,7 +690,7 @@ skin_t manifestFromJson(const std::string& filename, const ESkinType type)
         }
         else
         {
-            LL_WARNS() << "Failed to parse " << filename << ": " << ec.message() << LL_ENDL;
+            LL_WARNS() << "Failed to parse " << filename << ": " << simdjson::error_message(err) << LL_ENDL;
         }
         in.close();
     }
@@ -778,16 +791,14 @@ void LLFloaterPreference::onAddSkinCallback(const std::vector<std::string>& file
             auto buf = std::make_unique<char[]>(buf_size);
             zip->extractFile("manifest.json", buf.get(), buf_size);
             buf[buf_size - 1] = '\0'; // force.
-            std::stringstream ss;
-            ss << std::string(const_cast<const char*>(buf.get()), buf_size);
+            std::string json(buf.get());
             buf.reset();
 
-            boost::system::error_code ec;
-            auto root = boost::json::parse(ss, ec);
-            if (!ec.failed() && root.is_object())
+            simdjson::dom::parser parser;
+            simdjson::dom::object jobj;
+            if (parser.parse(json).get_object().get(jobj) == simdjson::SUCCESS)
             {
-                const auto& jobj = root.as_object();
-                const std::string& name = jobj.contains("name") ? boost::json::value_to<std::string>(jobj.at("name")) : "Unknown";
+                const std::string name = manifest_member(jobj, "name", "Unknown");
                 std::string pathname = gDirUtilp->add(gDirUtilp->getOSUserAppDir(), "skins");
                 if (!gDirUtilp->fileExists(pathname))
                 {

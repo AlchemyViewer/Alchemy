@@ -31,7 +31,6 @@
 #include "../llskinningutil.h"
 
 using namespace LL::GLTF;
-using namespace boost::json;
 
 bool Animation::prep(Asset& asset)
 {
@@ -139,7 +138,7 @@ bool Animation::Sampler::prep(Asset& asset)
 }
 
 
-void Animation::Sampler::serialize(object& obj) const
+void Animation::Sampler::serialize(JsonWriter& obj) const
 {
     write(mInput, "input", obj, INVALID_INDEX);
     write(mOutput, "output", obj, INVALID_INDEX);
@@ -171,7 +170,7 @@ bool Animation::Channel::Target::operator!=(const Channel::Target& rhs) const
     return !(*this == rhs);
 }
 
-void Animation::Channel::Target::serialize(object& obj) const
+void Animation::Channel::Target::serialize(JsonWriter& obj) const
 {
     write(mNode, "node", obj, INVALID_INDEX);
     write(mPath, "path", obj);
@@ -187,7 +186,7 @@ const Animation::Channel::Target& Animation::Channel::Target::operator=(const Va
     return *this;
 }
 
-void Animation::Channel::serialize(object& obj) const
+void Animation::Channel::serialize(JsonWriter& obj) const
 {
     write(mSampler, "sampler", obj, INVALID_INDEX);
     write(mTarget, "target", obj);
@@ -345,7 +344,7 @@ void Animation::ScaleChannel::apply(Asset& asset, Sampler& sampler, F32 time)
     }
 }
 
-void Animation::serialize(object& obj) const
+void Animation::serialize(JsonWriter& obj) const
 {
     write(mName, "name", obj);
     write(mSamplers, "samplers", obj);
@@ -360,10 +359,9 @@ void Animation::serialize(object& obj) const
 
 const Animation& Animation::operator=(const Value& src)
 {
-    if (src.is_object())
+    simdjson::dom::object obj;
+    if (src.get_object().get(obj) == simdjson::SUCCESS)
     {
-        const object& obj = src.as_object();
-
         copy(obj, "name", mName);
         copy(obj, "samplers", mSamplers);
 
@@ -480,7 +478,7 @@ const Skin& Skin::operator=(const Value& src)
     return *this;
 }
 
-void Skin::serialize(object& obj) const
+void Skin::serialize(JsonWriter& obj) const
 {
     write(mInverseBindMatrices, "inverseBindMatrices", obj, INVALID_INDEX);
     write(mJoints, "joints", obj);

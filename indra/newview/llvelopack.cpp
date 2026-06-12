@@ -35,7 +35,7 @@
 #include "llcorehttputil.h"
 #include "llversioninfo.h"
 
-#include <boost/json.hpp>
+#include <simdjson.h>
 #include <fstream>
 #include <unordered_map>
 #include "llnotificationsutil.h"
@@ -93,42 +93,103 @@ static std::string extract_basename(const std::string& url)
     return path;
 }
 
-static void rewrite_asset_urls(boost::json::value& jv)
+// re-emit the parsed feed verbatim, replacing absolute "FileName" URLs with
+// their basenames as we stream
+static void rewrite_asset_urls(const simdjson::dom::element& src, simdjson::builder::string_builder& dst)
 {
-    if (jv.is_object())
+    switch (src.type())
     {
-        auto& obj = jv.as_object();
-        auto it = obj.find("FileName");
-        if (it != obj.end() && it->value().is_string())
+    case simdjson::dom::element_type::OBJECT:
+    {
+        dst.start_object();
+        bool first = true;
+        for (const auto& member : src.get_object().value_unsafe())
         {
-            std::string filename(it->value().as_string());
-            if (filename.find("://") != std::string::npos)
+            if (!first)
             {
-                std::string basename = extract_basename(filename);
-                sAssetUrlMap[basename] = filename;
-                it->value() = basename;
+                dst.append_comma();
+            }
+            first = false;
+            dst.escape_and_append_with_quotes(member.key);
+            dst.append_colon();
+
+            std::string_view filename;
+            if (member.key == "FileName" &&
+                member.value.get_string().get(filename) == simdjson::SUCCESS &&
+                filename.find("://") != std::string_view::npos)
+            {
+                std::string url(filename);
+                std::string basename = extract_basename(url);
+                sAssetUrlMap[basename] = url;
+                dst.escape_and_append_with_quotes(basename);
                 LL_DEBUGS("Velopack") << "Rewrote FileName: " << basename << LL_ENDL;
             }
+            else
+            {
+                rewrite_asset_urls(member.value, dst);
+            }
         }
-        for (auto& kv : obj)
-        {
-            rewrite_asset_urls(kv.value());
-        }
+        dst.end_object();
+        break;
     }
-    else if (jv.is_array())
+    case simdjson::dom::element_type::ARRAY:
     {
-        for (auto& elem : jv.as_array())
+        dst.start_array();
+        bool first = true;
+        for (const simdjson::dom::element& elem : src.get_array().value_unsafe())
         {
-            rewrite_asset_urls(elem);
+            if (!first)
+            {
+                dst.append_comma();
+            }
+            first = false;
+            rewrite_asset_urls(elem, dst);
         }
+        dst.end_array();
+        break;
+    }
+    case simdjson::dom::element_type::STRING:
+        dst.escape_and_append_with_quotes(src.get_string().value_unsafe());
+        break;
+    case simdjson::dom::element_type::INT64:
+        dst.append(src.get_int64().value_unsafe());
+        break;
+    case simdjson::dom::element_type::UINT64:
+        dst.append(src.get_uint64().value_unsafe());
+        break;
+    case simdjson::dom::element_type::DOUBLE:
+        dst.append(src.get_double().value_unsafe());
+        break;
+    case simdjson::dom::element_type::BOOL:
+        dst.append(src.get_bool().value_unsafe());
+        break;
+    case simdjson::dom::element_type::NULL_VALUE:
+    default:
+        dst.append_null();
+        break;
     }
 }
 
 static std::string rewrite_release_feed(const std::string& json_str)
 {
-    boost::json::value jv = boost::json::parse(json_str);
-    rewrite_asset_urls(jv);
-    return boost::json::serialize(jv);
+    simdjson::dom::parser parser;
+    simdjson::dom::element root;
+    simdjson::error_code err = parser.parse(json_str).get(root);
+    if (err != simdjson::SUCCESS)
+    {
+        LL_WARNS("Velopack") << "Failed to parse release feed: " << simdjson::error_message(err) << LL_ENDL;
+        // Return original unmodified feed as fallback
+        return json_str;
+    }
+
+    simdjson::builder::string_builder out;
+    rewrite_asset_urls(root, out);
+    std::string_view view;
+    if (out.view().get(view) != simdjson::SUCCESS)
+    {
+        return json_str;
+    }
+    return std::string(view);
 }
 
 static std::string download_url_raw(const std::string& url)

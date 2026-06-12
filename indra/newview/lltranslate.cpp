@@ -40,7 +40,17 @@
 #include "llurlregistry.h"
 #include "stringize.h"
 
-#include <boost/json.hpp>
+#include <simdjson.h>
+
+namespace
+{
+    // reused parse buffers; responses are fully consumed before the next parse
+    simdjson::dom::parser& translationParser()
+    {
+        thread_local simdjson::dom::parser parser;
+        return parser;
+    }
+}
 
 static const std::string AZURE_NOTRANSLATE_OPENING_TAG("<div translate=\"no\">");
 static const std::string AZURE_NOTRANSLATE_CLOSING_TAG("</div>");
@@ -344,11 +354,11 @@ public:
 
 private:
     static void parseErrorResponse(
-        const boost::json::value& root,
+        const simdjson::dom::element& root,
         int& status,
         std::string& err_msg);
     static bool parseTranslation(
-        const boost::json::value& root,
+        const simdjson::dom::element& root,
         std::string& translation,
         std::string& detected_lang);
     static std::string getAPIKey();
@@ -398,11 +408,11 @@ bool LLGoogleTranslationHandler::parseResponse(
 {
     const std::string& text = !body.empty() ? body : http_response["error_body"].asStringRef();
 
-    boost::system::error_code ec;
-    boost::json::value root = boost::json::parse(text, ec);
-    if (ec.failed())
+    simdjson::dom::element root;
+    simdjson::error_code err = translationParser().parse(text.data(), text.size()).get(root);
+    if (err != simdjson::SUCCESS)
     {
-        err_msg = ec.what();
+        err_msg = simdjson::error_message(err);
         return false;
     }
 
@@ -427,53 +437,45 @@ bool LLGoogleTranslationHandler::isConfigured() const
 
 // static
 void LLGoogleTranslationHandler::parseErrorResponse(
-    const boost::json::value& root,
+    const simdjson::dom::element& root,
     int& status,
     std::string& err_msg)
 {
-    boost::system::error_code ec;
-    auto message = root.find_pointer("/data/message", ec);
-    auto code = root.find_pointer("/data/code", ec);
-    if (!message || !code)
+    std::string_view message;
+    int64_t code;
+    if (root.at_pointer("/data/message").get_string().get(message) != simdjson::SUCCESS ||
+        root.at_pointer("/data/code").get_int64().get(code) != simdjson::SUCCESS)
     {
         return;
     }
 
-    auto message_val = boost::json::try_value_to<std::string>(*message);
-    auto code_val = boost::json::try_value_to<int>(*code);
-    if (!message_val || !code_val)
-    {
-        return;
-    }
-
-    err_msg = message_val.value();
-    status = code_val.value();
+    err_msg = message;
+    status = (int)code;
 }
 
 // static
 bool LLGoogleTranslationHandler::parseTranslation(
-    const boost::json::value& root,
+    const simdjson::dom::element& root,
     std::string& translation,
     std::string& detected_lang)
 {
-    boost::system::error_code ec;
-    auto translated_text = root.find_pointer("/data/translations/0/translatedText", ec);
-    if (!translated_text) return false;
+    auto translated_text = root.at_pointer("/data/translations/0/translatedText");
+    if (translated_text.error() != simdjson::SUCCESS) return false;
 
-    auto text_val = boost::json::try_value_to<std::string>(*translated_text);
-    if (!text_val)
+    std::string_view text_view;
+    if (translated_text.get_string().get(text_view) != simdjson::SUCCESS)
     {
-        LL_WARNS() << "Failed to parse translation" << text_val.error() << LL_ENDL;
+        LL_WARNS() << "Failed to parse translation" << LL_ENDL;
         return false;
     }
 
-    translation = text_val.value();
+    translation = text_view;
 
-    auto language = root.find_pointer("/data/translations/0/detectedSourceLanguage", ec);
-    if (language)
+    auto language = root.at_pointer("/data/translations/0/detectedSourceLanguage");
+    if (language.error() == simdjson::SUCCESS)
     {
-        auto lang_val = boost::json::try_value_to<std::string>(*language);
-        detected_lang = lang_val ? lang_val.value() : "";
+        std::string_view lang_view;
+        detected_lang = (language.get_string().get(lang_view) == simdjson::SUCCESS) ? std::string(lang_view) : std::string();
     }
 
     return true;
@@ -656,11 +658,12 @@ bool LLAzureTranslationHandler::checkVerificationResponse(
     // Expected: "{\"error\":{\"code\":400000,\"message\":\"One of the request inputs is not valid.\"}}"
     // But for now just verify response is a valid json
 
-    boost::system::error_code ec;
-    boost::json::value root = boost::json::parse(response["error_body"].asString(), ec);
-    if (ec.failed())
+    const std::string& error_body = response["error_body"].asStringRef();
+    simdjson::dom::element root;
+    simdjson::error_code err = translationParser().parse(error_body.data(), error_body.size()).get(root);
+    if (err != simdjson::SUCCESS)
     {
-        LL_DEBUGS("Translate") << "Failed to parse error_body:" << ec.what() << LL_ENDL;
+        LL_DEBUGS("Translate") << "Failed to parse error_body:" << simdjson::error_message(err) << LL_ENDL;
         return false;
     }
 
@@ -686,29 +689,30 @@ bool LLAzureTranslationHandler::parseResponse(
     //Example:
     // "[{\"detectedLanguage\":{\"language\":\"en\",\"score\":1.0},\"translations\":[{\"text\":\"Hello, what is your name?\",\"to\":\"en\"}]}]"
 
-    boost::system::error_code ec;
-    boost::json::value root = boost::json::parse(body, ec);
-    if (ec.failed())
+    simdjson::dom::element root;
+    simdjson::error_code err = translationParser().parse(body.data(), body.size()).get(root);
+    if (err != simdjson::SUCCESS)
     {
-        err_msg = ec.what();
-        return false;
-    }
-    auto language = root.find_pointer("/0/detectedLanguage/language", ec);
-    if (!language) return false;
-
-    auto translated_text = root.find_pointer("/0/translations/0/text", ec);
-    if (!translated_text) return false;
-
-    auto lang_val = boost::json::try_value_to<std::string>(*language);
-    auto text_val = boost::json::try_value_to<std::string>(*translated_text);
-    if (!lang_val || !text_val)
-    {
-        LL_WARNS() << "Failed to parse translation" << lang_val.error() << text_val.error() << LL_ENDL;
+        err_msg = simdjson::error_message(err);
         return false;
     }
 
-    detected_lang = lang_val.value();
-    translation = text_val.value();
+    auto language = root.at_pointer("/0/detectedLanguage/language");
+    if (language.error() != simdjson::SUCCESS) return false;
+
+    auto translated_text = root.at_pointer("/0/translations/0/text");
+    if (translated_text.error() != simdjson::SUCCESS) return false;
+
+    std::string_view lang_view, text_view;
+    if (language.get_string().get(lang_view) != simdjson::SUCCESS ||
+        translated_text.get_string().get(text_view) != simdjson::SUCCESS)
+    {
+        LL_WARNS() << "Failed to parse translation" << LL_ENDL;
+        return false;
+    }
+
+    detected_lang = lang_view;
+    translation = text_view;
 
     return true;
 }
@@ -726,25 +730,18 @@ std::string LLAzureTranslationHandler::parseErrorResponse(
     // Expected: "{\"error\":{\"code\":400000,\"message\":\"One of the request inputs is not valid.\"}}"
     // But for now just verify response is a valid json with an error
 
-    boost::system::error_code ec;
-    boost::json::value root = boost::json::parse(body, ec);
-    if (ec.failed())
+    simdjson::dom::element root;
+    if (translationParser().parse(body.data(), body.size()).get(root) != simdjson::SUCCESS)
     {
         return {};
     }
 
-    auto err_msg = root.find_pointer("/error/message", ec);
-    if (!err_msg)
+    std::string_view err_msg;
+    if (root.at_pointer("/error/message").get_string().get(err_msg) != simdjson::SUCCESS)
     {
         return {};
     }
-
-    auto err_msg_val = boost::json::try_value_to<std::string>(*err_msg);
-    if (!err_msg_val)
-    {
-        return {};
-    }
-    return err_msg_val.value();
+    return std::string(err_msg);
 }
 
 // static
@@ -956,39 +953,39 @@ bool LLDeepLTranslationHandler::parseResponse(
     //Example:
     // "{\"translations\":[{\"detected_source_language\":\"EN\",\"text\":\"test\"}]}"
 
-    boost::system::error_code ec;
-    boost::json::value root = boost::json::parse(body, ec);
-    if (ec.failed())
+    simdjson::dom::element root;
+    simdjson::error_code err = translationParser().parse(body.data(), body.size()).get(root);
+    if (err != simdjson::SUCCESS)
     {
-        err_msg = ec.message();
+        err_msg = simdjson::error_message(err);
         return false;
     }
 
-    auto detected_langp = root.find_pointer("/translations/0/detected_source_language", ec);
-    if (!detected_langp || ec.failed()) // empty response? should not happen
+    auto detected_langp = root.at_pointer("/translations/0/detected_source_language");
+    if (detected_langp.error() != simdjson::SUCCESS) // empty response? should not happen
     {
-        err_msg = ec.message();
+        err_msg = "Unexpected response format";
         return false;
     }
 
     // Request succeeded, extract translation from the response.
-    auto text_valp = root.find_pointer("/translations/0/text", ec);
-    if (!text_valp || ec.failed())
+    auto text_valp = root.at_pointer("/translations/0/text");
+    if (text_valp.error() != simdjson::SUCCESS)
     {
-        err_msg = ec.message();
+        err_msg = "Unexpected response format";
         return false;
     }
 
-    auto lang_result = boost::json::try_value_to<std::string>(*detected_langp);
-    auto text_result = boost::json::try_value_to<std::string>(*text_valp);
-    if (!lang_result || !text_result)
+    std::string_view lang_view, text_view;
+    if (detected_langp.get_string().get(lang_view) != simdjson::SUCCESS ||
+        text_valp.get_string().get(text_view) != simdjson::SUCCESS)
     {
         return false;
     }
 
-    detected_lang = lang_result.value();
+    detected_lang = lang_view;
     LLStringUtil::toLower(detected_lang);
-    translation = text_result.value();
+    translation = text_view;
 
     return true;
 }
@@ -1004,24 +1001,17 @@ std::string LLDeepLTranslationHandler::parseErrorResponse(
     const std::string& body)
 {
     // Example: "{\"message\":\"One of the request inputs is not valid.\"}"
-    boost::system::error_code ec;
-    boost::json::value root = boost::json::parse(body, ec);
-    if (ec.failed())
+    simdjson::dom::element root;
+    if (translationParser().parse(body.data(), body.size()).get(root) != simdjson::SUCCESS)
     {
         return {};
     }
 
-    auto message_ptr = root.find_pointer("/message", ec);
-    if (!message_ptr || ec.failed())
-    {
-        return {};
-    }
-
-    auto message_val = boost::json::try_value_to<std::string>(*message_ptr);
-    if (!message_val)
+    std::string_view message;
+    if (root["message"].get_string().get(message) != simdjson::SUCCESS)
         return {};
 
-    return message_val.value();
+    return std::string(message);
 }
 
 // static
