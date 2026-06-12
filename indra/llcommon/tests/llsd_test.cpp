@@ -649,6 +649,13 @@ namespace tut
         ensureTypeAndValue("post insert 4", v[4], false);
         ensureTypeAndValue("post insert 5", v[5], true);
 
+        LLSD beyond;
+        beyond.insert(2, "far");
+        ensure_equals("beyond-end insert size", beyond.size(), 3);
+        ensure("beyond-end insert pad 0", beyond[0].isUndefined());
+        ensure("beyond-end insert pad 1", beyond[1].isUndefined());
+        ensureTypeAndValue("beyond-end insert value", beyond[2], "far");
+
         ensureTypeAndValue("get 1", v.get(1), 88);
         v.set(1, "hot");
         ensureTypeAndValue("set 1", v.get(1), "hot");
@@ -809,6 +816,40 @@ namespace tut
         LLSD v;
         v = (const char*)NULL;
         ensure("type is a string", v.isString());
+    }
+
+    template<> template<>
+    void SDTestObject::test<15>()
+        // XMLRPC value serialization
+    {
+        SDCleanupCheck check;
+
+        ensure_equals("xmlrpc undef", LLSD().asXMLRPCValue(),
+            "<value><nil/></value>");
+        ensure_equals("xmlrpc bool", LLSD(true).asXMLRPCValue(),
+            "<value><boolean>1</boolean></value>");
+        ensure_equals("xmlrpc int", LLSD(3).asXMLRPCValue(),
+            "<value><int>3</int></value>");
+        ensure_equals("xmlrpc real", LLSD(1.5).asXMLRPCValue(),
+            "<value><double>1.5</double></value>");
+        ensure_equals("xmlrpc string", LLSD("a<b").asXMLRPCValue(),
+            "<value><string>a&lt;b</string></value>");
+
+        LLSD array = LLSD::emptyArray();
+        array.append(1);
+        array.append("two");
+        ensure_equals("xmlrpc array", array.asXMLRPCValue(),
+            "<value><array><data>"
+            "<value><int>1</int></value>"
+            "<value><string>two</string></value>"
+            "</data></array></value>");
+
+        LLSD map = LLSD::emptyMap();
+        map["a"] = 1;
+        ensure_equals("xmlrpc map", map.asXMLRPCValue(),
+            "<value><struct>"
+            "<member><name>a</name><value><int>1</int></value></member>"
+            "</struct></value>");
     }
 
     /* TO DO:
