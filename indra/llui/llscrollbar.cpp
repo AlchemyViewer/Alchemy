@@ -415,7 +415,26 @@ bool LLScrollbar::scrollByWheel(F32 precise)
     mScrollWheelResidue += precise * (F32)mStepSize;
     S32 lines = lltrunc(mScrollWheelResidue);
     mScrollWheelResidue -= (F32)lines;
-    return changeLine(lines, true);
+    if (changeLine(lines, true))
+    {
+        return true; // moved at least one whole line
+    }
+    // No whole line crossed yet (sub-notch precise scroll). Still report the
+    // gesture as handled so it isn't forwarded to a parent scroller, which would
+    // otherwise advance on the same high-resolution / touchpad gesture (a
+    // visible double-scroll in nested non-opaque scroll areas). The one
+    // exception is being parked at the boundary in the scroll direction: there
+    // the legacy behavior was to let the event chain to the parent, so preserve
+    // that.
+    if (precise > 0.f)
+    {
+        return mDocPos < getDocPosMax();
+    }
+    if (precise < 0.f)
+    {
+        return mDocPos > 0;
+    }
+    return false;
 }
 
 bool LLScrollbar::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
