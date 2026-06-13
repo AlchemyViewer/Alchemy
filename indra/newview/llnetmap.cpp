@@ -836,7 +836,7 @@ LLVector3d LLNetMap::viewPosToGlobal( S32 x, S32 y )
 bool LLNetMap::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     // note that clicks are reversed from what you'd think: i.e. > 0  means zoom out, < 0 means zoom in
-    F32 new_scale = mScale * (F32)pow(MAP_SCALE_ZOOM_FACTOR, -delta.mClicks);
+    F32 new_scale = mScale * (F32)pow(MAP_SCALE_ZOOM_FACTOR, -delta.mPrecise);
     F32 old_scale = mScale;
 
     setScale(new_scale);

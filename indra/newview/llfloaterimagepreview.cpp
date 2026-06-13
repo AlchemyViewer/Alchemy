@@ -676,10 +676,10 @@ bool LLFloaterImagePreview::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (mPreviewRect.pointInRect(x, y) && mAvatarPreview)
     {
-        mAvatarPreview->zoom((F32)delta.mClicks * -0.2f);
+        mAvatarPreview->zoom((F32)delta.mPrecise * -0.2f);
         mAvatarPreview->refresh();
 
-        mSculptedPreview->zoom((F32)delta.mClicks * -0.2f);
+        mSculptedPreview->zoom((F32)delta.mPrecise * -0.2f);
         mSculptedPreview->refresh();
     }
 

@@ -945,7 +945,7 @@ bool LLFloaterModelPreview::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (mPreviewRect.pointInRect(x, y) && mModelPreview)
     {
-        mModelPreview->zoom((F32)delta.mClicks * -0.2f);
+        mModelPreview->zoom((F32)delta.mPrecise * -0.2f);
         mModelPreview->refresh();
     }
     else

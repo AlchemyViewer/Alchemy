@@ -876,9 +876,9 @@ bool LLToolCompGun::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 
         gSavedPerAccountSettings.setF32(
             "AlchemyMouselookAlternativeFOV",
-            mTargetFOV = delta.mClicks > 0 ?
-                llclamp(mTargetFOV += (0.05f * delta.mClicks), 0.1f, 3.0f) :
-                llclamp(mTargetFOV -= (0.05f * -delta.mClicks), 0.1f, 3.0f)
+            mTargetFOV = delta.mPrecise > 0 ?
+                llclamp(mTargetFOV += (0.05f * delta.mPrecise), 0.1f, 3.0f) :
+                llclamp(mTargetFOV -= (0.05f * -delta.mPrecise), 0.1f, 3.0f)
         );
 
         mTimerFOV.start();

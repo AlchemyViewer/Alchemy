@@ -534,7 +534,7 @@ bool LLFloaterBvhPreview::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     if (!mAnimPreview)
         return false;
 
-    mAnimPreview->zoom((F32)delta.mClicks * -0.2f);
+    mAnimPreview->zoom((F32)delta.mPrecise * -0.2f);
     mAnimPreview->requestUpdate();
 
     return true;
