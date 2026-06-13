@@ -28,6 +28,10 @@
 
 #include "llappviewerwin32.h"
 
+#if !LL_SDL_WINDOW
+#include "llwindowwin32.h" // for gIconResource, set in the native WINMAIN below
+#endif
+
 #include "res/resource.h" // *FIX: for setting gIconResource.
 
 #include <WERAPI.H>     // for WerAddExcludedApplication()
