@@ -144,6 +144,9 @@ void init_sdl(const std::string& app_name)
 
                     // Prevent popup of text overlay when holding movement keys on macos
                     {SDL_HINT_MAC_PRESS_AND_HOLD, "0"},
+
+                    // Momentum scrolling on macos is desirable for mac touchpads
+                    {SDL_HINT_MAC_SCROLL_MOMENTUM, "1"},
             };
 
     for (auto hint: hintList)
