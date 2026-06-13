@@ -8372,12 +8372,9 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
                 mFXAAMap.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
             }
 
-            gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
-            gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
-            gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
-            gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
-
-            glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+            // The destination is an FBO; bindTarget already set its viewport.
+            // Forcing the full world-view viewport here makes RenderResolutionDivisor
+            // write only the lower-left fraction of the reduced-size target.
 
             F32 scale_x = (F32)width / mFXAAMap.getWidth();
             F32 scale_y = (F32)height / mFXAAMap.getHeight();
