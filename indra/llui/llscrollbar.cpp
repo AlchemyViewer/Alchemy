@@ -404,20 +404,28 @@ bool LLScrollbar::handleHover(S32 x, S32 y, MASK mask)
 } // end handleHover
 
 
+// Accumulate fractional line movement from the precise (sub-notch) scroll
+// delta and apply whole lines as the accumulator crosses an integer, carrying
+// the remainder. mDocPos is integer "lines", so this residue is what lets
+// high-resolution wheels and touchpads scroll smoothly instead of dropping
+// everything below one whole notch. A whole notch (precise == 1) moves
+// mStepSize lines exactly as before.
+bool LLScrollbar::scrollByWheel(F32 precise)
+{
+    mScrollWheelResidue += precise * (F32)mStepSize;
+    S32 lines = lltrunc(mScrollWheelResidue);
+    mScrollWheelResidue -= (F32)lines;
+    return changeLine(lines, true);
+}
+
 bool LLScrollbar::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    bool handled = changeLine( delta.mClicks * mStepSize, true );
-    return handled;
+    return scrollByWheel(delta.mPrecise);
 }
 
 bool LLScrollbar::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    bool handled = false;
-    if (LLScrollbar::HORIZONTAL == mOrientation)
-    {
-        handled = changeLine(delta.mClicks * mStepSize, true);
-    }
-    return handled;
+    return (LLScrollbar::HORIZONTAL == mOrientation) ? scrollByWheel(delta.mPrecise) : false;
 }
 
 bool LLScrollbar::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
