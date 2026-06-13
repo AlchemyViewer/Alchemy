@@ -113,9 +113,21 @@ void LLWMIMethods::initCOMObjects()
 
     if (FAILED(mHR))
     {
-        LL_WARNS("AppInit") << "Failed to initialize security. Error code = 0x" << std::hex << mHR << LL_ENDL;
-        CoUninitialize();
-        return;               // Program has failed.
+        // RPC_E_TOO_LATE means process-wide COM security was already initialized
+        // before we got here — which is harmless, WMI works with the existing
+        // settings. This happens under the SDL window backend, where SDL brings
+        // COM up during video init (and DXGI/DirectInput marshal interfaces)
+        // before machine-id generation runs. Only a genuine failure is fatal.
+        if (mHR == RPC_E_TOO_LATE)
+        {
+            LL_DEBUGS("AppInit") << "COM security already initialized; continuing with existing settings." << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS("AppInit") << "Failed to initialize security. Error code = 0x" << std::hex << mHR << LL_ENDL;
+            CoUninitialize();
+            return;               // Program has failed.
+        }
     }
 
     // Step 3: ---------------------------------------------------
