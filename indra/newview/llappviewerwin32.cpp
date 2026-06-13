@@ -26,20 +26,15 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "llwin32headers.h"
-
-#include "llwindowwin32.h" // *FIX: for setting gIconResource.
-
 #include "llappviewerwin32.h"
 
-#include "llgl.h"
+#if !LL_SDL_WINDOW
+#include "llwindowwin32.h" // for gIconResource, set in the native WINMAIN below
+#endif
+
 #include "res/resource.h" // *FIX: for setting gIconResource.
 
-#include <fcntl.h>      //_O_APPEND
-#include <io.h>         //_open_osfhandle()
 #include <WERAPI.H>     // for WerAddExcludedApplication()
-#include <process.h>    // _spawnl()
-#include <tchar.h>      // For TCHAR support
 
 #include "llviewercontrol.h"
 #include "lldxhardware.h"
@@ -49,24 +44,17 @@
 
 #include <stdlib.h>
 
-#include "llweb.h"
-
-#include "llviewernetwork.h"
 #include "llmd5.h"
 #include "llfindlocale.h"
 
 #include "llcommandlineparser.h"
-#include "lltrans.h"
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
 #include "llwindebug.h"
 #endif
 
-#include "stringize.h"
 #include "lldir.h"
-#include "llerrorcontrol.h"
 
-#include <fstream>
 #include <exception>
 
 #include "llversioninfovars.h"
@@ -419,6 +407,50 @@ void ll_nvapi_init(NvDRSSessionHandle hSession)
     }
 }
 
+void* ll_nvapi_session_create()
+{
+    NvDRSSessionHandle hSession = 0;
+    static LLCachedControl<bool> use_nv_api(gSavedSettings, "NvAPICreateApplicationProfile", true);
+    if (use_nv_api)
+    {
+        NvAPI_Status status;
+
+        // Initialize NVAPI
+        status = NvAPI_Initialize();
+
+        if (status == NVAPI_OK)
+        {
+            // Create the session handle to access driver settings
+            status = NvAPI_DRS_CreateSession(&hSession);
+            if (status != NVAPI_OK)
+            {
+                nvapi_error(status);
+                hSession = 0;
+            }
+            else
+            {
+                //override driver setting as needed
+                ll_nvapi_init(hSession);
+            }
+        }
+    }
+    return hSession;
+}
+
+void ll_nvapi_session_destroy(void* session)
+{
+    // (NVAPI) (6) We clean up. This is analogous to doing a free()
+    if (session)
+    {
+        NvAPI_DRS_DestroySession(reinterpret_cast<NvDRSSessionHandle>(session));
+    }
+}
+
+// When USE_SDL_WINDOW is enabled on Windows the exe entry point is SDL's
+// generated wWinMain in llappviewersdl.cpp (SDL_MAIN_USE_CALLBACKS), which
+// drives LLAppViewerWin32 through the SDL_App* callbacks instead.
+#if !LL_SDL_WINDOW
+
 //#define DEBUGGING_SEH_FILTER 1
 #if DEBUGGING_SEH_FILTER
 #   define WINMAIN DebuggingWinMain
@@ -496,30 +528,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
         return -1;
     }
 
-    NvDRSSessionHandle hSession = 0;
-    static LLCachedControl<bool> use_nv_api(gSavedSettings, "NvAPICreateApplicationProfile", true);
-    if (use_nv_api)
-    {
-        NvAPI_Status status;
-
-        // Initialize NVAPI
-        status = NvAPI_Initialize();
-
-        if (status == NVAPI_OK)
-        {
-            // Create the session handle to access driver settings
-            status = NvAPI_DRS_CreateSession(&hSession);
-            if (status != NVAPI_OK)
-            {
-                nvapi_error(status);
-            }
-            else
-            {
-                //override driver setting as needed
-                ll_nvapi_init(hSession);
-            }
-        }
-    }
+    NvDRSSessionHandle hSession = reinterpret_cast<NvDRSSessionHandle>(ll_nvapi_session_create());
 
     // Have to wait until after logging is initialized to display LFH info
     if (num_heaps > 0)
@@ -577,12 +586,8 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     delete viewer_app_ptr;
     viewer_app_ptr = NULL;
 
-    // (NVAPI) (6) We clean up. This is analogous to doing a free()
-    if (hSession)
-    {
-        NvAPI_DRS_DestroySession(hSession);
-        hSession = 0;
-    }
+    ll_nvapi_session_destroy(hSession);
+    hSession = 0;
 
     return 0;
 }
@@ -607,6 +612,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     }
 }
 #endif
+
+#endif // !LL_SDL_WINDOW
 
 void LLAppViewerWin32::disableWinErrorReporting()
 {

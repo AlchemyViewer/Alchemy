@@ -404,20 +404,57 @@ bool LLScrollbar::handleHover(S32 x, S32 y, MASK mask)
 } // end handleHover
 
 
-bool LLScrollbar::handleScrollWheel(S32 x, S32 y, S32 clicks)
+// Accumulate fractional line movement from the precise (sub-notch) scroll
+// delta and apply whole lines as the accumulator crosses an integer, carrying
+// the remainder. mDocPos is integer "lines", so this residue is what lets
+// high-resolution wheels and touchpads scroll smoothly instead of dropping
+// everything below one whole notch. A whole notch (precise == 1) moves
+// mStepSize lines exactly as before.
+bool LLScrollbar::scrollByWheel(F32 precise)
 {
-    bool handled = changeLine( clicks * mStepSize, true );
-    return handled;
+    mScrollWheelResidue += precise * (F32)mStepSize;
+    S32 lines = lltrunc(mScrollWheelResidue);
+    mScrollWheelResidue -= (F32)lines;
+    if (changeLine(lines, true))
+    {
+        return true; // moved at least one whole line
+    }
+    // No whole line crossed yet (sub-notch precise scroll). Still report the
+    // gesture as handled so it isn't forwarded to a parent scroller, which would
+    // otherwise advance on the same high-resolution / touchpad gesture (a
+    // visible double-scroll in nested non-opaque scroll areas). The one
+    // exception is being parked at the boundary in the scroll direction: there
+    // the legacy behavior was to let the event chain to the parent, so preserve
+    // that.
+    if (precise > 0.f)
+    {
+        if (mDocPos < getDocPosMax())
+        {
+            return true;
+        }
+        mScrollWheelResidue = 0.f; // forwarding to parent; don't keep partial progress
+        return false;
+    }
+    if (precise < 0.f)
+    {
+        if (mDocPos > 0)
+        {
+            return true;
+        }
+        mScrollWheelResidue = 0.f; // forwarding to parent; don't keep partial progress
+        return false;
+    }
+    return false;
 }
 
-bool LLScrollbar::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLScrollbar::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    bool handled = false;
-    if (LLScrollbar::HORIZONTAL == mOrientation)
-    {
-        handled = changeLine(clicks * mStepSize, true);
-    }
-    return handled;
+    return scrollByWheel(delta.mPrecise);
+}
+
+bool LLScrollbar::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    return (LLScrollbar::HORIZONTAL == mOrientation) ? scrollByWheel(delta.mPrecise) : false;
 }
 
 bool LLScrollbar::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,

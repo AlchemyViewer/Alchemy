@@ -105,7 +105,10 @@ target_link_libraries(llrender
 
 target_precompile_headers(llrender REUSE_FROM llprecompiled)
 
-if (DARWIN OR NOT USE_SDL_WINDOW)
+# llgl.cpp talks to WGL directly on Windows (wglGetCurrentDC for the
+# extensions string) even when SDL owns context creation, so keep the
+# OpenGL link explicit there regardless of the window backend.
+if (DARWIN OR WINDOWS OR NOT USE_SDL_WINDOW)
   target_link_libraries(llrender
           OpenGL::GL
           )

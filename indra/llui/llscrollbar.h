@@ -87,8 +87,8 @@ public:
     virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
     virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask);
     virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleScrollWheel(S32 x, S32 y, S32 clicks);
-    virtual bool    handleScrollHWheel(S32 x, S32 y, S32 clicks);
+    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
     virtual bool    handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
         EDragAndDropType cargo_type, void *cargo_data, EAcceptance *accept, std::string &tooltip_msg);
 
@@ -130,6 +130,7 @@ public:
 private:
     void                updateThumbRect();
     bool                changeLine(S32 delta, bool update_thumb );
+    bool                scrollByWheel(F32 precise); // precise sub-notch wheel delta -> whole lines + residue
 
     callback_t          mChangeCallback;
 
@@ -138,6 +139,7 @@ private:
     S32                 mDocPos;        // Position within the doc that the scrollbar is modeling, in "lines" (user size)
     S32                 mPageSize;      // Maximum number of lines that can be seen at one time.
     S32                 mStepSize;
+    F32                 mScrollWheelResidue = 0.f; // carries sub-line precise scroll between events
     bool                mDocChanged;
 
     LLRect              mThumbRect;

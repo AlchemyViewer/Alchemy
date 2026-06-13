@@ -61,6 +61,18 @@ public:
     // on non-linux platforms we can get by with a smaller native key type
     typedef U16 NATIVE_KEY_TYPE;
 #endif
+
+    // Controls whether the numpad emits distinct KEY_PAD_* codes (so it can
+    // drive avatar/camera independently of the arrow keys and digit row) or
+    // is aliased onto them. Driven by the "NumpadControl" setting; the integer
+    // values line up so the S32 setting casts straight to this enum.
+    typedef enum e_numpad_distinct
+    {
+        ND_NEVER,       // numpad behaves like the normal arrow/digit keys
+        ND_NUMLOCK_OFF, // numpad is distinct when NumLock is off
+        ND_NUMLOCK_ON   // numpad is always distinct (for keyboards with no NumLock)
+    } ENumpadDistinct;
+
     LLKeyboard();
     virtual ~LLKeyboard();
 
@@ -101,6 +113,9 @@ public:
     static std::string stringFromAccelerator( MASK accel_mask, KEY key );
     static std::string stringFromAccelerator(MASK accel_mask, EMouseClickType click);
 
+    e_numpad_distinct getNumpadDistinct() { return mNumpadDistinct; }
+    void setNumpadDistinct(e_numpad_distinct val) { mNumpadDistinct = val; }
+
     void setCallbacks(LLWindowCallbacks *cbs) { mCallbacks = cbs; }
     F32             getKeyElapsedTime( KEY key );  // Returns time in seconds since key was pressed.
     S32             getKeyElapsedFrameCount( KEY key );  // Returns time in frames since key was pressed.
@@ -125,6 +140,8 @@ protected:
     KEY             mCurScanKey;        // Used during the scanKeyboard()
 
     static LLKeyStringTranslatorFunc*   mStringTranslator;  // Used for l10n + PC/Mac/Linux accelerator labeling
+
+    e_numpad_distinct mNumpadDistinct;
 
     EKeyboardInsertMode mInsertMode;
 

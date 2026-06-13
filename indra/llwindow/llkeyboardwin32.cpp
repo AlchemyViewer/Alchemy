@@ -131,11 +131,12 @@ LLKeyboardWin32::LLKeyboardWin32()
     mTranslateNumpadMap[0x67] = KEY_PAD_HOME;   // keypad 7
     mTranslateNumpadMap[0x68] = KEY_PAD_UP;     // keypad 8
     mTranslateNumpadMap[0x69] = KEY_PAD_PGUP;   // keypad 9
-    mTranslateNumpadMap[0x6A] = KEY_PAD_MULTIPLY;   // keypad *
-    mTranslateNumpadMap[0x6B] = KEY_PAD_ADD;    // keypad +
-    mTranslateNumpadMap[0x6D] = KEY_PAD_SUBTRACT;   // keypad -
+    // Numpad '.' is the only non-digit member of the distinct (arrow/nav)
+    // cluster. The operators + - * / are intentionally NOT mapped here: they
+    // keep their KEY_ADD/SUBTRACT/MULTIPLY/KEY_DIVIDE codes in every mode (to
+    // match LLKeyboardSDL), so numpad +/- can drive zoom via those bindings and
+    // numpad '/' keeps firing the start_gesture binding.
     mTranslateNumpadMap[0x6E] = KEY_PAD_DEL;    // keypad .
-    mTranslateNumpadMap[0x6F] = KEY_PAD_DIVIDE; // keypad /
 
     for (iter = mTranslateNumpadMap.begin(); iter != mTranslateNumpadMap.end(); iter++)
     {
@@ -197,6 +198,25 @@ MASK LLKeyboardWin32::updateModifiers()
 
 
 // mask is ignored, except for extended flag -- we poll the modifier keys for the other flags
+namespace
+{
+    // A NumLock-independent handle for the physical key behind a Win32 VK.
+    // NumLock changes which VK a numpad key sends (VK_NUMPAD2 vs VK_DOWN for one
+    // physical key), but MapVirtualKey resolves both to the same scancode, so the
+    // scancode — plus the extended-key flag, which separates the real arrow/nav
+    // cluster from the numpad — is stable across a NumLock toggle. Returns 0 when
+    // there is no scancode (the caller then skips the down/up replay map).
+    U32 win32PhysicalKeyId(U16 os_key, MASK mask)
+    {
+        U32 sc = ::MapVirtualKey(os_key, MAPVK_VK_TO_VSC);
+        if (!sc)
+        {
+            return 0;
+        }
+        return (mask & MASK_EXTENDED) ? (sc | 0x10000u) : sc;
+    }
+}
+
 bool LLKeyboardWin32::handleKeyDown(const LLKeyboard::NATIVE_KEY_TYPE key, MASK mask)
 {
     KEY     translated_key;
@@ -207,6 +227,16 @@ bool LLKeyboardWin32::handleKeyDown(const LLKeyboard::NATIVE_KEY_TYPE key, MASK 
 
     if (translateExtendedKey(key, mask, &translated_key))
     {
+        // Remember what this physical key resolved to so the matching key-up
+        // releases the SAME KEY. translateExtendedKey's numpad-distinct decision
+        // reads the live NumLock state; without this, toggling NumLock while a
+        // numpad key is held makes the up edge translate to a different KEY and
+        // leaves the down KEY's level stuck (e.g. the avatar keeps walking).
+        U32 phys = win32PhysicalKeyId(key, mask);
+        if (phys)
+        {
+            mKeyDownTranslation[phys] = translated_key;
+        }
         handled = handleTranslatedKeyDown(translated_key, translated_mask);
     }
 
@@ -222,7 +252,18 @@ bool LLKeyboardWin32::handleKeyUp(const LLKeyboard::NATIVE_KEY_TYPE key, MASK ma
 
     translated_mask = updateModifiers();
 
-    if (translateExtendedKey(key, mask, &translated_key))
+    // Prefer the translation recorded on key-down so press/release stay
+    // symmetric across a mid-press NumLock toggle; fall back to translating the
+    // up edge for keys with no recorded down (e.g. held across a focus change).
+    U32 phys = win32PhysicalKeyId(key, mask);
+    std::map<U32, KEY>::iterator it = (phys != 0) ? mKeyDownTranslation.find(phys) : mKeyDownTranslation.end();
+    if (it != mKeyDownTranslation.end())
+    {
+        translated_key = it->second;
+        mKeyDownTranslation.erase(it);
+        handled = handleTranslatedKeyUp(translated_key, translated_mask);
+    }
+    else if (translateExtendedKey(key, mask, &translated_key))
     {
         handled = handleTranslatedKeyUp(translated_key, translated_mask);
     }
@@ -274,13 +315,59 @@ void LLKeyboardWin32::scanKeyboard()
 
 bool LLKeyboardWin32::translateExtendedKey(const U16 os_key, const MASK mask, KEY *translated_key)
 {
-    return translateKey(os_key, translated_key);
+    // Whether the numpad should emit distinct KEY_PAD_* codes right now. Mirrors
+    // LLKeyboardSDL::translateNumpadKey so both backends behave identically.
+    const bool numlock_on = (GetKeyState(VK_NUMLOCK) & 1) != 0;
+    const bool distinct = (mNumpadDistinct == ND_NUMLOCK_ON) ||
+                          (mNumpadDistinct == ND_NUMLOCK_OFF && !numlock_on);
+
+    // With NumLock on, the numpad digits arrive as VK_NUMPAD0..9 (and '.' as
+    // VK_DECIMAL); map them straight to KEY_PAD_* when distinct.
+    if (distinct)
+    {
+        std::map<U16, KEY>::iterator iter = mTranslateNumpadMap.find(os_key);
+        if (iter != mTranslateNumpadMap.end())
+        {
+            *translated_key = iter->second;
+            return true;
+        }
+    }
+
+    bool success = translateKey(os_key, translated_key);
+    if (!success || !distinct)
+    {
+        return success;
+    }
+
+    // With NumLock off, the numpad nav keys arrive as the regular nav VKs but
+    // WITHOUT the extended-key flag — the genuine arrow/nav cluster sets
+    // MASK_EXTENDED. Use that to turn only the non-extended ones into KEY_PAD_*.
+    // Operators (+ - * /) and numpad Enter are deliberately left on their normal
+    // KEY_* codes (see the numpad-map construction above and LLKeyboardSDL).
+    if (!(mask & MASK_EXTENDED))
+    {
+        switch (*translated_key)
+        {
+            case KEY_LEFT:      *translated_key = KEY_PAD_LEFT;  break;
+            case KEY_RIGHT:     *translated_key = KEY_PAD_RIGHT; break;
+            case KEY_UP:        *translated_key = KEY_PAD_UP;    break;
+            case KEY_DOWN:      *translated_key = KEY_PAD_DOWN;  break;
+            case KEY_HOME:      *translated_key = KEY_PAD_HOME;  break;
+            case KEY_END:       *translated_key = KEY_PAD_END;   break;
+            case KEY_PAGE_UP:   *translated_key = KEY_PAD_PGUP;  break;
+            case KEY_PAGE_DOWN: *translated_key = KEY_PAD_PGDN;  break;
+            case KEY_INSERT:    *translated_key = KEY_PAD_INS;   break;
+            case KEY_DELETE:    *translated_key = KEY_PAD_DEL;   break;
+            default: break;
+        }
+    }
+    return success;
 }
 
 U16  LLKeyboardWin32::inverseTranslateExtendedKey(const KEY translated_key)
 {
     // if numlock is on, then we need to translate KEY_PAD_FOO to the corresponding number pad number
-    if(GetKeyState(VK_NUMLOCK) & 1)
+    if((mNumpadDistinct == ND_NUMLOCK_ON) && (GetKeyState(VK_NUMLOCK) & 1))
     {
         std::map<KEY, U16>::iterator iter = mInvTranslateNumpadMap.find(translated_key);
         if (iter != mInvTranslateNumpadMap.end())

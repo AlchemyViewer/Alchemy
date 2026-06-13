@@ -44,7 +44,7 @@ public:
     /*virtual*/ bool handleRightMouseUp(S32 x, S32 y, MASK mask);
     /*virtual*/ bool handleDoubleClick(S32 x, S32 y, MASK mask);
     /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool handleScrollWheel(S32 x, S32 y, S32 clicks);
+    /*virtual*/ bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
     /*virtual*/ bool handleToolTip(S32 x, S32 y, MASK mask);
 
     void addPopup(LLView* popup);

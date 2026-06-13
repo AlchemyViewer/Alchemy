@@ -27,6 +27,7 @@
 #define LLWINDOWCALLBACKS_H
 
 #include "llcoord.h"
+#include "llscrolldelta.h"
 class LLWindow;
 
 class LLWindowCallbacks
@@ -56,8 +57,8 @@ public:
     virtual bool handleActivateApp(LLWindow *window, bool activating);
     virtual void handleMouseMove(LLWindow *window,  LLCoordGL pos, MASK mask);
     virtual void handleMouseDragged(LLWindow *window,  LLCoordGL pos, MASK mask);
-    virtual void handleScrollWheel(LLWindow *window,  S32 clicks);
-    virtual void handleScrollHWheel(LLWindow *window,  S32 clicks);
+    virtual void handleScrollWheel(LLWindow *window,  LLScrollDelta delta);
+    virtual void handleScrollHWheel(LLWindow *window,  LLScrollDelta delta);
     virtual void handleResize(LLWindow *window,  S32 width,  S32 height);
     virtual void handleFocus(LLWindow *window);
     virtual void handleFocusLost(LLWindow *window);

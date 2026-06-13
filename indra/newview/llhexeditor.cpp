@@ -280,9 +280,9 @@ U32 LLHexEditor::getProperSelectionEnd() const
     return (mSelectionStart < mSelectionEnd) ? mSelectionEnd : mSelectionStart;
 }
 
-bool LLHexEditor::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLHexEditor::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return mScrollbar->handleScrollWheel( 0, 0, clicks );
+    return mScrollbar->handleScrollWheel( 0, 0, delta );
 }
 
 bool LLHexEditor::handleMouseDown(S32 x, S32 y, MASK mask)

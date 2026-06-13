@@ -354,17 +354,17 @@ bool LLFastTimerView::handleToolTip(S32 x, S32 y, MASK mask)
     return LLFloater::handleToolTip(x, y, mask);
 }
 
-bool LLFastTimerView::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLFastTimerView::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (x < mBarRect.mLeft)
     {
         // Inside mScrollBar and list of timers
-        mScrollBar->handleScrollWheel(x,y,clicks);
+        mScrollBar->handleScrollWheel(x,y,delta);
     }
     else
     {
     setPauseState(true);
-    mScrollIndex = llclamp( mScrollIndex + clicks,
+    mScrollIndex = llclamp( mScrollIndex + delta.mClicks,
                             0,
                             llmin((S32)mRecording.getNumRecordedPeriods(), (S32)mRecording.getNumRecordedPeriods() - MAX_VISIBLE_HISTORY));
     }

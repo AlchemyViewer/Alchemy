@@ -257,11 +257,11 @@ bool LLScrollContainer::handleUnicodeCharHere(llwchar uni_char)
     return false;
 }
 
-bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, S32 clicks )
+bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, LLScrollDelta delta )
 {
     // Give event to my child views - they may have scroll bars
     // (Bad UI design, but technically possible.)
-    if (LLUICtrl::handleScrollWheel(x,y,clicks))
+    if (LLUICtrl::handleScrollWheel(x,y,delta))
         return true;
 
     // When the vertical scrollbar is visible, scroll wheel
@@ -273,7 +273,7 @@ bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, S32 clicks )
         && vertical->getEnabled())
     {
         // Pretend the mouse is over the scrollbar
-        if (vertical->handleScrollWheel( 0, 0, clicks ) )
+        if (vertical->handleScrollWheel( 0, 0, delta ) )
         {
             updateScroll();
         }
@@ -286,7 +286,7 @@ bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, S32 clicks )
     // LLView::childrenHandleScrollWheel().
     if (horizontal->getVisible()
         && horizontal->getEnabled()
-        && horizontal->handleScrollWheel( 0, 0, clicks ) )
+        && horizontal->handleScrollWheel( 0, 0, delta ) )
     {
         updateScroll();
         return true;
@@ -294,9 +294,9 @@ bool LLScrollContainer::handleScrollWheel( S32 x, S32 y, S32 clicks )
     return false;
 }
 
-bool LLScrollContainer::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLScrollContainer::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    if (LLUICtrl::handleScrollHWheel(x,y,clicks))
+    if (LLUICtrl::handleScrollHWheel(x,y,delta))
     {
         return true;
     }
@@ -304,7 +304,7 @@ bool LLScrollContainer::handleScrollHWheel(S32 x, S32 y, S32 clicks)
     LLScrollbar* horizontal = mScrollbar[HORIZONTAL];
     if (horizontal->getVisible()
         && horizontal->getEnabled()
-        && horizontal->handleScrollHWheel( 0, 0, clicks ) )
+        && horizontal->handleScrollHWheel( 0, 0, delta ) )
     {
         updateScroll();
         return true;

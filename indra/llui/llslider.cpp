@@ -277,26 +277,26 @@ bool LLSlider::handleKeyHere(KEY key, MASK mask)
     return handled;
 }
 
-bool LLSlider::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLSlider::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if ( mOrientation == VERTICAL )
     {
-        F32 new_val = getValueF32() - clicks * getIncrement();
+        F32 new_val = getValueF32() - delta.mClicks * getIncrement();
         setValueAndCommit(new_val);
         return true;
     }
-    return LLF32UICtrl::handleScrollWheel(x,y,clicks);
+    return LLF32UICtrl::handleScrollWheel(x,y,delta);
 }
 
-bool LLSlider::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLSlider::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (mOrientation == HORIZONTAL)
     {
-        F32 new_val = getValueF32() - clicks * getIncrement();
+        F32 new_val = getValueF32() - delta.mClicks * getIncrement();
         setValueAndCommit(new_val);
         return true;
     }
-    return LLF32UICtrl::handleScrollHWheel(x, y, clicks);
+    return LLF32UICtrl::handleScrollHWheel(x, y, delta);
 }
 
 void LLSlider::draw()

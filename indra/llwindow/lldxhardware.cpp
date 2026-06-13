@@ -36,6 +36,7 @@
 
 #include <wbemidl.h>
 #include <comdef.h>
+#include <dxgi1_4.h>
 
 #include <boost/tokenizer.hpp>
 
@@ -43,8 +44,10 @@
 
 #include "llerror.h"
 
+#include "llgl.h"
 #include "llstring.h"
 #include "llstl.h"
+#include "llsys.h"
 #include "lltimer.h"
 
 LLDXHardware gDXHardware;
@@ -462,6 +465,135 @@ LCleanup:
 
     CoUninitialize();
     return ret;
+}
+
+// static
+void LLDXHardware::updateVRAMBudgetFromDXGI()
+{
+    if ((gGLManager.mHasAMDAssociations || gGLManager.mHasNVXGpuMemoryInfo) && gGLManager.mVRAM != 0)
+    { // OpenGL already told us the memory budget, don't ask DX
+        return;
+    }
+
+    // Use DXGI to check memory (because WMI doesn't report more than 4Gb)
+    IDXGIFactory4* p_factory = nullptr;
+
+    HRESULT res = CreateDXGIFactory1(__uuidof(IDXGIFactory4), (void**)&p_factory);
+
+    if (FAILED(res))
+    {
+        LL_WARNS() << "CreateDXGIFactory1 failed: 0x" << std::hex << res << LL_ENDL;
+    }
+    else
+    {
+        IDXGIAdapter* p_dxgi_adapter = nullptr;
+        UINT graphics_adapter_index = 0;
+        while (true)
+        {
+            res = p_factory->EnumAdapters(graphics_adapter_index, &p_dxgi_adapter);
+            if (FAILED(res))
+            {
+                if (graphics_adapter_index == 0)
+                {
+                    LL_WARNS() << "EnumAdapters failed: 0x" << std::hex << res << LL_ENDL;
+                }
+            }
+            else
+            {
+                if (graphics_adapter_index == 0) // Should it check largest one isntead of first?
+                {
+                    // EnumAdapters hands back an IDXGIAdapter; QueryInterface up
+                    // to IDXGIAdapter3 for QueryVideoMemoryInfo (Win10+). Zero-init
+                    // info and check the HRESULT so a failed query can't feed
+                    // garbage Budget into the VRAM estimate (it just leaves it 0).
+                    IDXGIAdapter3* p_dxgi_adapter3 = nullptr;
+                    DXGI_QUERY_VIDEO_MEMORY_INFO info = {};
+                    if (SUCCEEDED(p_dxgi_adapter->QueryInterface(__uuidof(IDXGIAdapter3), (void**)&p_dxgi_adapter3)) && p_dxgi_adapter3)
+                    {
+                        if (FAILED(p_dxgi_adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info)))
+                        {
+                            info = {};
+                            LL_WARNS() << "QueryVideoMemoryInfo failed" << LL_ENDL;
+                        }
+                        p_dxgi_adapter3->Release();
+                    }
+                    else
+                    {
+                        LL_WARNS() << "IDXGIAdapter3 unavailable; skipping DXGI VRAM budget" << LL_ENDL;
+                    }
+
+                    // Alternatively use GetDesc from below to get adapter's memory
+                    UINT64 budget_mb = info.Budget / (1024 * 1024);
+                    if (gGLManager.mIsIntel)
+                    {
+                        U32Megabytes phys_mb = gSysMemory.getPhysicalMemoryKB();
+                        LL_WARNS() << "Physical memory: " << phys_mb << " MB" << LL_ENDL;
+
+                        if (phys_mb > 0)
+                        {
+                            if (gGLManager.mIsIntel)
+                            {
+                                // Intel uses 'shared' vram, cap it to 25% of total memory
+                                // Todo: consider a way of detecting integrated Intel and AMD
+                                budget_mb = llmin(budget_mb, (UINT64)(phys_mb * 0.25));
+                            }
+                            else
+                            {
+                                // More budget is generally better, but the way viewer
+                                // utilizes even dedicated VRAM leaves a footprint in RAM
+                                budget_mb = llmin(budget_mb, (UINT64)(phys_mb * 0.75));
+                            }
+                        }
+                        else
+                        {
+                            // if no data available, cap to 2Gb
+                            budget_mb = llmin(budget_mb, (UINT64)2048);
+                        }
+                    }
+                    if (gGLManager.mVRAM < (S32)budget_mb)
+                    {
+                        gGLManager.mVRAM = (S32)budget_mb;
+                        LL_INFOS("RenderInit") << "New VRAM Budget (DX9): " << gGLManager.mVRAM << " MB" << LL_ENDL;
+                    }
+                    else
+                    {
+                        LL_INFOS("RenderInit") << "VRAM Budget (DX9): " << budget_mb
+                            << " MB, current (WMI): " << gGLManager.mVRAM << " MB" << LL_ENDL;
+                    }
+                }
+
+                DXGI_ADAPTER_DESC desc;
+                p_dxgi_adapter->GetDesc(&desc);
+                std::wstring description_w((wchar_t*)desc.Description);
+                std::string description = ll_convert_wide_to_string(description_w);
+                LL_INFOS("Window") << "Graphics adapter index: " << graphics_adapter_index << ", "
+                    << "Description: " << description << ", "
+                    << "DeviceId: " << desc.DeviceId << ", "
+                    << "SubSysId: " << desc.SubSysId << ", "
+                    << "AdapterLuid: " << desc.AdapterLuid.HighPart << "_" << desc.AdapterLuid.LowPart << ", "
+                    << "DedicatedVideoMemory: " << desc.DedicatedVideoMemory / 1024 / 1024 << ", "
+                    << "DedicatedSystemMemory: " << desc.DedicatedSystemMemory / 1024 / 1024 << ", "
+                    << "SharedSystemMemory: " << desc.SharedSystemMemory / 1024 / 1024 << LL_ENDL;
+            }
+
+            if (p_dxgi_adapter)
+            {
+                p_dxgi_adapter->Release();
+                p_dxgi_adapter = NULL;
+            }
+            else
+            {
+                break;
+            }
+
+            graphics_adapter_index++;
+        }
+    }
+
+    if (p_factory)
+    {
+        p_factory->Release();
+    }
 }
 
 #endif

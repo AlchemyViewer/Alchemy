@@ -951,11 +951,11 @@ bool LLComboBox::handleUnicodeCharHere(llwchar uni_char)
 }
 
 // virtual
-bool LLComboBox::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLComboBox::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (mList->getVisible())
     {
-        return mList->handleScrollWheel(x, y, clicks);
+        return mList->handleScrollWheel(x, y, delta);
     }
 
     if (mAllowTextEntry) // We might be editable
@@ -967,9 +967,9 @@ bool LLComboBox::handleScrollWheel(S32 x, S32 y, S32 clicks)
     }
 
     S32 current_index = getCurrentIndex();
-    if (clicks > 0)
+    if (delta.mClicks > 0)
     {
-        for (S32 i = 0; i < clicks; ++i)
+        for (S32 i = 0; i < delta.mClicks; ++i)
         {
             if (!selectNextItem())
                 break;
@@ -977,7 +977,7 @@ bool LLComboBox::handleScrollWheel(S32 x, S32 y, S32 clicks)
     }
     else
     {
-        for (S32 i = 0; i < -clicks; ++i)
+        for (S32 i = 0; i < -delta.mClicks; ++i)
         {
             if (!selectPrevItem())
                 break;

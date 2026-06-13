@@ -104,7 +104,11 @@ LLKeyboardSDL::LLKeyboardSDL()
     mTranslateKeyMap[SDLK_KP_PLUS] = KEY_ADD;
     mTranslateKeyMap[SDLK_KP_MINUS] = KEY_SUBTRACT;
     mTranslateKeyMap[SDLK_KP_MULTIPLY] = KEY_MULTIPLY;
-    mTranslateKeyMap[SDLK_KP_DIVIDE] = KEY_PAD_DIVIDE;
+    // Numpad '/' -> KEY_DIVIDE (not KEY_PAD_DIVIDE) so it matches Win32
+    // (VK_DIVIDE -> KEY_DIVIDE) and keeps driving the "DIVIDE" binding
+    // (start_gesture). The numpad operators stay non-distinct; only the
+    // arrow/nav cluster below participates in numpad-distinct mode.
+    mTranslateKeyMap[SDLK_KP_DIVIDE] = KEY_DIVIDE;
     mTranslateKeyMap[SDLK_F1] = KEY_F1;
     mTranslateKeyMap[SDLK_F2] = KEY_F2;
     mTranslateKeyMap[SDLK_F3] = KEY_F3;
@@ -157,7 +161,10 @@ LLKeyboardSDL::LLKeyboardSDL()
     mTranslateNumpadMap[SDLK_KP_7] = KEY_PAD_HOME;
     mTranslateNumpadMap[SDLK_KP_8] = KEY_PAD_UP;
     mTranslateNumpadMap[SDLK_KP_9] = KEY_PAD_PGUP;
+    // Numpad '.' can arrive as either keysym depending on layout/platform;
+    // adjustNativekeyFromUnhandledMask folds both, so map both here too.
     mTranslateNumpadMap[SDLK_KP_PERIOD] = KEY_PAD_DEL;
+    mTranslateNumpadMap[SDLK_KP_DECIMAL] = KEY_PAD_DEL;
 
     // build inverse numpad map
     for (auto iter = mTranslateNumpadMap.begin();
@@ -246,41 +253,68 @@ LLKeyboard::NATIVE_KEY_TYPE adjustNativekeyFromUnhandledMask(const LLKeyboard::N
 
 bool LLKeyboardSDL::handleKeyDown(const LLKeyboard::NATIVE_KEY_TYPE key, const MASK mask)
 {
-    LLKeyboard::NATIVE_KEY_TYPE adjusted_nativekey;
     KEY translated_key = 0;
-    MASK translated_mask = MASK_NONE;
-    bool handled = false;
+    MASK translated_mask = updateModifiers(mask);
 
-    adjusted_nativekey = adjustNativekeyFromUnhandledMask(key, mask);
-
-    translated_mask = updateModifiers(mask);
-
-    if(translateNumpadKey(adjusted_nativekey, &translated_key))
+    // Numpad-distinct first: when the NumpadControl mode + NumLock state call
+    // for it, emit a KEY_PAD_* code from the raw SDLK_KP_* keysym. Otherwise
+    // fall through to the normal path, which folds NumLock-off numpad onto the
+    // arrow/nav cluster (adjustNativekeyFromUnhandledMask) before translating.
+    if (translateNumpadKey(key, mask, &translated_key))
     {
-        handled = handleTranslatedKeyDown(translated_key, translated_mask);
+        // translateNumpadKey only succeeds for numpad keys; remember the
+        // distinct KEY_PAD_* so the up edge can release it (see handleKeyUp).
+        mNumpadKeyDown[key] = translated_key;
+        return handleTranslatedKeyDown(translated_key, translated_mask);
     }
 
-    return handled;
+    LLKeyboard::NATIVE_KEY_TYPE adjusted_nativekey = adjustNativekeyFromUnhandledMask(key, mask);
+    if (translateKey(adjusted_nativekey, &translated_key))
+    {
+        // A numpad key folded onto the digit/nav cluster (NumLock on, or a
+        // non-distinct mode): record it too so the up edge releases this exact
+        // KEY rather than re-deriving from a possibly-changed NumLock state.
+        if (mTranslateNumpadMap.find(key) != mTranslateNumpadMap.end())
+        {
+            mNumpadKeyDown[key] = translated_key;
+        }
+        return handleTranslatedKeyDown(translated_key, translated_mask);
+    }
+
+    return false;
 }
 
 
 bool LLKeyboardSDL::handleKeyUp(const LLKeyboard::NATIVE_KEY_TYPE key, const MASK mask)
 {
-    LLKeyboard::NATIVE_KEY_TYPE adjusted_nativekey;
     KEY translated_key = 0;
-    U32 translated_mask = MASK_NONE;
-    bool handled = false;
+    MASK translated_mask = updateModifiers(mask);
 
-    adjusted_nativekey = adjustNativekeyFromUnhandledMask(key, mask);
-
-    translated_mask = updateModifiers(mask);
-
-    if(translateNumpadKey(adjusted_nativekey, &translated_key))
+    // Release exactly what the matching key-down emitted. translateNumpadKey's
+    // distinct-vs-folded decision depends on the live NumLock bit, so
+    // re-translating here would pick a different KEY (and leave the down KEY's
+    // level stuck) if NumLock was toggled while the key was held. Replaying the
+    // recorded down translation keeps press/release symmetric.
+    auto it = mNumpadKeyDown.find(key);
+    if (it != mNumpadKeyDown.end())
     {
-        handled = handleTranslatedKeyUp(translated_key, translated_mask);
+        translated_key = it->second;
+        mNumpadKeyDown.erase(it);
+        return handleTranslatedKeyUp(translated_key, translated_mask);
     }
 
-    return handled;
+    if (translateNumpadKey(key, mask, &translated_key))
+    {
+        return handleTranslatedKeyUp(translated_key, translated_mask);
+    }
+
+    LLKeyboard::NATIVE_KEY_TYPE adjusted_nativekey = adjustNativekeyFromUnhandledMask(key, mask);
+    if (translateKey(adjusted_nativekey, &translated_key))
+    {
+        return handleTranslatedKeyUp(translated_key, translated_mask);
+    }
+
+    return false;
 }
 
 MASK LLKeyboardSDL::currentMask(bool for_mouse_event)
@@ -335,13 +369,44 @@ void LLKeyboardSDL::scanKeyboard()
 }
 
 
-bool LLKeyboardSDL::translateNumpadKey( const LLKeyboard::NATIVE_KEY_TYPE os_key, KEY *translated_key)
+bool LLKeyboardSDL::translateNumpadKey( const LLKeyboard::NATIVE_KEY_TYPE os_key, const MASK mask, KEY *translated_key)
 {
-    return translateKey(os_key, translated_key);
+    // ND_NEVER: numpad is never distinct, behave like the arrow/digit keys.
+    if (mNumpadDistinct == ND_NEVER)
+    {
+        return false;
+    }
+    // ND_NUMLOCK_OFF: distinct only while NumLock is off; with it on the numpad
+    // types digits. ND_NUMLOCK_ON: always distinct. mask is the raw SDL_Keymod
+    // from the event (event.key.mod), so SDL_KMOD_NUM is the live NumLock bit.
+    if (mNumpadDistinct == ND_NUMLOCK_OFF && (mask & SDL_KMOD_NUM))
+    {
+        return false;
+    }
+
+    // SDL delivers the raw SDLK_KP_* keysym regardless of NumLock (no
+    // hide_numpad in SDL_HINT_KEYCODE_OPTIONS — see llsdl.cpp), so a numpad key
+    // is identifiable directly. Only the arrow/nav cluster is in this map;
+    // operators (+ - * /) deliberately are not, so they keep their KEY_ADD/
+    // KEY_SUBTRACT/KEY_MULTIPLY/KEY_DIVIDE meaning.
+    auto iter = mTranslateNumpadMap.find(os_key);
+    if (iter != mTranslateNumpadMap.end())
+    {
+        *translated_key = iter->second;
+        return true;
+    }
+    return false;
 }
 
 LLKeyboard::NATIVE_KEY_TYPE LLKeyboardSDL::inverseTranslateNumpadKey(const KEY translated_key)
 {
+    // KEY_PAD_* (other than KEY_PAD_CENTER) only exist in the numpad map, so the
+    // base inverse map can't resolve them — consult the numpad inverse first.
+    auto iter = mInvTranslateNumpadMap.find(translated_key);
+    if (iter != mInvTranslateNumpadMap.end())
+    {
+        return iter->second;
+    }
     return inverseTranslateKey(translated_key);
 }
 

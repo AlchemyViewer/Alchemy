@@ -206,13 +206,13 @@ bool LLMediaCtrl::handleHover( S32 x, S32 y, MASK mask )
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-bool LLMediaCtrl::handleScrollWheel( S32 x, S32 y, S32 clicks )
+bool LLMediaCtrl::handleScrollWheel( S32 x, S32 y, LLScrollDelta delta )
 {
-    if (LLPanel::handleScrollWheel(x, y, clicks)) return true;
+    if (LLPanel::handleScrollWheel(x, y, delta)) return true;
     if (mMediaSource && mMediaSource->hasMedia())
     {
         convertInputCoords(x, y);
-        mMediaSource->scrollWheel(x, y, 0, clicks, gKeyboard->currentMask(true));
+        mMediaSource->scrollWheel(x, y, 0, delta.mClicks, gKeyboard->currentMask(true));
     }
 
     return true;
@@ -220,13 +220,13 @@ bool LLMediaCtrl::handleScrollWheel( S32 x, S32 y, S32 clicks )
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-bool LLMediaCtrl::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLMediaCtrl::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    if (LLPanel::handleScrollHWheel(x, y, clicks)) return true;
+    if (LLPanel::handleScrollHWheel(x, y, delta)) return true;
     if (mMediaSource && mMediaSource->hasMedia())
     {
         convertInputCoords(x, y);
-        mMediaSource->scrollWheel(x, y, clicks, 0, gKeyboard->currentMask(true));
+        mMediaSource->scrollWheel(x, y, delta.mClicks, 0, gKeyboard->currentMask(true));
     }
 
     return true;

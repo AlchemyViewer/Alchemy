@@ -282,7 +282,7 @@ public:
     // Zoom
     //--------------------------------------------------------------------
 public:
-    void            handleScrollWheel(S32 clicks);                          // Mousewheel driven zoom
+    void            handleScrollWheel(F32 clicks);                          // Mousewheel driven zoom
     void            cameraZoomIn(const F32 factor);                         // Zoom in by fraction of current distance
     F32             getCameraZoomFraction(bool get_third_person = false);   // Get camera zoom as fraction of minimum and maximum zoom
     void            setCameraZoomFraction(F32 fraction);                    // Set camera zoom as fraction of minimum and maximum zoom

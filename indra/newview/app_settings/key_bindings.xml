@@ -18,6 +18,19 @@
     <binding key="PGDN" mask="NONE" command="push_down"/>
     <binding key="HOME" mask="NONE" command="toggle_fly"/>
 
+    <!-- Numpad: distinct KEY_PAD_* keys (see the NumpadControl setting). These
+         reach the avatar regardless of UI focus; +/- (Add/Subtract) zoom. -->
+    <binding key="PAD_UP" mask="NONE" command="push_forward"/>
+    <binding key="PAD_DOWN" mask="NONE" command="push_backward"/>
+    <binding key="PAD_LEFT" mask="NONE" command="slide_left"/>
+    <binding key="PAD_RIGHT" mask="NONE" command="slide_right"/>
+    <binding key="PAD_PGUP" mask="NONE" command="jump"/>
+    <binding key="PAD_PGDN" mask="NONE" command="push_down"/>
+    <binding key="PAD_HOME" mask="NONE" command="toggle_fly"/>
+    <binding key="PAD_CENTER" mask="NONE" command="stop_moving"/>
+    <binding key="Add" mask="NONE" command="pan_in"/>
+    <binding key="Subtract" mask="NONE" command="pan_out"/>
+
     <binding key="SPACE" mask="NONE" command="stop_moving"/>
     <binding key="ENTER" mask="NONE" command="start_chat"/>
     <binding key="DIVIDE" mask="NONE" command="start_gesture"/>
@@ -52,6 +65,19 @@
     <binding key="PGUP" mask="NONE" command="jump"/>
     <binding key="PGDN" mask="NONE" command="push_down"/>
     <binding key="HOME" mask="NONE" command="toggle_fly"/>
+
+    <!-- Numpad: distinct KEY_PAD_* keys (see the NumpadControl setting). These
+         reach the avatar regardless of UI focus; +/- (Add/Subtract) zoom. -->
+    <binding key="PAD_UP" mask="NONE" command="push_forward"/>
+    <binding key="PAD_DOWN" mask="NONE" command="push_backward"/>
+    <binding key="PAD_LEFT" mask="NONE" command="turn_left"/>
+    <binding key="PAD_RIGHT" mask="NONE" command="turn_right"/>
+    <binding key="PAD_PGUP" mask="NONE" command="jump"/>
+    <binding key="PAD_PGDN" mask="NONE" command="push_down"/>
+    <binding key="PAD_HOME" mask="NONE" command="toggle_fly"/>
+    <binding key="PAD_CENTER" mask="NONE" command="stop_moving"/>
+    <binding key="Add" mask="NONE" command="pan_in"/>
+    <binding key="Subtract" mask="NONE" command="pan_out"/>
 
     <!--Camera controls in third person on Alt-->
     <binding key="LEFT" mask="ALT" command="spin_around_cw"/>
@@ -172,6 +198,17 @@
     <binding key="E" mask="SHIFT" command="roll_right"/>
     <binding key="Q" mask="CTL_SHIFT" command="roll_reset"/>
     <binding key="E" mask="CTL_SHIFT" command="roll_reset"/>
+
+    <!-- Numpad camera controls while sitting (distinct KEY_PAD_* keys; see the
+         NumpadControl setting). +/- (Add/Subtract) dolly the camera. -->
+    <binding key="PAD_UP" mask="NONE" command="move_forward_sitting"/>
+    <binding key="PAD_DOWN" mask="NONE" command="move_backward_sitting"/>
+    <binding key="PAD_LEFT" mask="NONE" command="spin_around_cw_sitting"/>
+    <binding key="PAD_RIGHT" mask="NONE" command="spin_around_ccw_sitting"/>
+    <binding key="PAD_PGUP" mask="NONE" command="spin_over_sitting"/>
+    <binding key="PAD_PGDN" mask="NONE" command="spin_under_sitting"/>
+    <binding key="Add" mask="NONE" command="move_forward_sitting"/>
+    <binding key="Subtract" mask="NONE" command="move_backward_sitting"/>
   </sitting>
   <edit_avatar>
     <!--Avatar editing camera controls-->

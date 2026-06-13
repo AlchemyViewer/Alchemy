@@ -33,8 +33,14 @@
 #include "lltimer.h"
 #include "llmutex.h"
 
+#include <set>
+
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_endian.h"
+
+#if LL_WINDOWS
+#include "llwin32headers.h" // HWND / WNDPROC for the WM_COPYDATA subclass
+#endif
 
 #ifdef LL_WAYLAND
 #include <wayland-client-protocol.h>
@@ -215,6 +221,21 @@ public:
     static bool sUseMultGL;
 #endif
 
+#if LL_WINDOWS
+    // DirectInput8 access for llviewerjoystick / SpaceNavigator — same
+    // contract as LLWindowWin32 (DI8 needs only the module handle, not the
+    // window, so the SDL backend can provide it too).
+    void* getDirectInput8() override;
+    bool getInputDevices(U32 device_type_filter,
+                         std::function<bool(std::string&, LLSD&, void*)> osx_callback,
+                         void* di8_devices_callback,
+                         void* userdata) override;
+
+    // Forwards WM_COPYDATA payloads (SLURL hand-off from a second viewer
+    // instance) from the subclassed WndProc to the window callbacks.
+    void handleDataCopy(S32 data_type, void* data);
+#endif
+
 protected:
     LLWindowSDL(LLWindowCallbacks *callbacks,
                 const std::string &title, const std::string& name, int x, int y, int width, int height, U32 flags,
@@ -250,6 +271,13 @@ protected:
     // the display/scale-change event handlers when the active monitor's
     // density might have changed under us.
     void refreshMinSizePixelShadow();
+
+    // Re-cache the window pixel density + pixel height that the per-event input
+    // handlers and convertCoords read, so they don't each hit
+    // SDL_GetWindowPixelDensity / SDL_GetWindowSizeInPixels (-> GetClientRect, a
+    // USER32 syscall) on every mouse event. Run wherever the window's pixel size
+    // or density can change (resize / DPI / monitor).
+    void refreshPixelMetrics();
 
     //
     // Platform specific variables
@@ -297,6 +325,12 @@ private:
     // re-clamps against this pixel-unit copy to make the dimensions match.
     U32 mMinWindowWidthPx = 0;
     U32 mMinWindowHeightPx = 0;
+
+    // Cached pixel metrics; see refreshPixelMetrics(). Density is pre-clamped to
+    // > 0. Height starts at 0 — convertCoords falls back to a live query until
+    // the first refresh (end of createContext).
+    F32 mCachedPixelDensity = 1.f;
+    S32 mCachedWindowHeightPx = 0;
 
     F32 mMouseDeltaAccumX = 0.f;
     F32 mMouseDeltaAccumY = 0.f;
@@ -376,29 +410,26 @@ private:
     LLCoordWindow mDeferredCursorWarp;
     bool mHasDeferredCursorWarp = false;
 
-    // Off-screen rendering (OSR) shared GL contexts.
+    // Shared GL contexts for worker threads (texture upload, VBO streaming).
     //
-    // Worker threads (texture loader, etc.) ask for a shared GL context via
-    // createSharedContext() and bind it via makeContextCurrent() so they can
-    // upload textures without interrupting the main render thread. SDL3's
-    // OSR pattern is one hidden 1x1 SDL_Window per shared GL context.
+    // Worker threads ask for a shared GL context via createSharedContext() (on
+    // the main thread), bind it via makeContextCurrent() and release it with
+    // destroySharedContext() (both on the worker thread) so they can stream GL
+    // objects without interrupting the main render thread.
     //
-    // Threading contract:
-    //   * mOSRContexts is touched ONLY under mOSRMutex.
-    //   * Worker threads MAY call createSharedContext / destroySharedContext /
-    //     makeContextCurrent — those acquire the mutex internally.
-    //   * SDL_DestroyWindow is main-thread-only on at least X11 (the X11
-    //     backend grabs the global SDL video lock and assumes single-threaded
-    //     entry), so destroySharedContext does NOT destroy the carrier window
-    //     directly; it queues it onto mDeadOSRWindows for the main thread to
-    //     reap in processMiscNativeEvents() / destroyContext().
-    //   * destroyContext() also walks any contexts still in mOSRContexts at
-    //     shutdown — those represent worker threads that didn't release
-    //     their context — and queues their windows for destruction on the
-    //     same path.
-    LLMutex mOSRMutex;
-    std::unordered_map<SDL_GLContext, SDL_Window*> mOSRContexts;
-    std::list<SDL_Window*> mDeadOSRWindows;
+    // Rather than SDL3's "one hidden carrier SDL_Window per context" pattern
+    // (which forces a main-thread-only deferred-window-destruction dance), we
+    // create the contexts with the platform-native GL API behind SDL:
+    //   * Windows  — WGL sibling context on the main window's HDC
+    //   * macOS    — CGL context sharing the current CGLContextObj (drawable-less)
+    //   * X11      — GLX context bound to a 1x1 GLXPbuffer (offscreen, no WM)
+    //   * Wayland  — EGL context made current surfaceless (EGL_NO_SURFACE)
+    // Each returns an opaque heap handle (LLSDLSharedContext, defined in the
+    // .cpp). mSharedContexts tracks the live handles ONLY so destroyContext can
+    // warn about and reclaim any a worker failed to release; it is touched only
+    // under mSharedCtxMutex.
+    LLMutex mSharedCtxMutex;
+    std::set<void*> mSharedContexts;
 
     // Files accumulated between SDL_EVENT_DROP_BEGIN and SDL_EVENT_DROP_COMPLETE.
     // Each SDL_EVENT_DROP_FILE only carries one path, so we batch them and
@@ -424,6 +455,19 @@ private:
 
     enum EServerProtocol{ X11, Wayland, Unknown };
     EServerProtocol mServerProtocol = Unknown;
+
+#if LL_WINDOWS
+    // Install/remove a WndProc subclass on the SDL window's HWND so we can
+    // service WM_COPYDATA (SLURL hand-off from a second instance) — SDL3's
+    // message hook never sees cross-process SendMessage. Paired around the
+    // SDL window lifetime in createContext/destroyContext.
+    void installWin32Subclass();
+    void removeWin32Subclass();
+    static LRESULT CALLBACK win32WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+
+    HWND mWin32Hwnd = nullptr;
+    WNDPROC mPrevWndProc = nullptr;
+#endif
 public:
 #if LL_X11
     // X11
@@ -456,6 +500,19 @@ public:
     void showImpl() override;
     void updateImpl(const std::string& mesg) override;
     void hideImpl() override;
+
+private:
+    // Redraw the splash (background + current status text) and pump events so
+    // it paints while the main thread is busy loading.
+    void render();
+
+    SDL_Window*   mWindow = nullptr;
+    SDL_Renderer* mRenderer = nullptr;
+    void*         mFont = nullptr;   // TTF_Font* (kept opaque to spare the header SDL_ttf)
+    SDL_Texture*  mIcon = nullptr;   // branded app icon, left side
+    std::string   mMessage;
+    bool          mInitedVideo = false;
+    bool          mInitedTTF = false;
 };
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type);

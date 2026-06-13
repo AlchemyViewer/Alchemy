@@ -1150,14 +1150,14 @@ bool LLAccordionCtrlTab::handleToolTip(S32 x, S32 y, MASK mask)
     return LLUICtrl::handleToolTip(x, y, mask);
 }
 
-bool LLAccordionCtrlTab::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLAccordionCtrlTab::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    if (LLUICtrl::handleScrollWheel(x, y, clicks))
+    if (LLUICtrl::handleScrollWheel(x, y, delta))
     {
         return true;
     }
 
-    if (mScrollbar && mScrollbar->getVisible() && mScrollbar->handleScrollWheel(0, 0, clicks))
+    if (mScrollbar && mScrollbar->getVisible() && mScrollbar->handleScrollWheel(0, 0, delta))
     {
         return true;
     }

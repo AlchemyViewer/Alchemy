@@ -597,7 +597,7 @@ bool FSVirtualTrackpad::handleRightMouseDown(S32 x, S32 y, MASK mask)
 }
 
 // pass wheel-clicks to third axis
-bool FSVirtualTrackpad::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool FSVirtualTrackpad::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (hasMouseCapture() || isPointInTouchArea(x, y))
     {
@@ -607,7 +607,7 @@ bool FSVirtualTrackpad::handleScrollWheel(S32 x, S32 y, S32 clicks)
         if (mask & MASK_CONTROL)
             changeAmount /= 5;
 
-        mWheelClicksSinceLastDelta = -1 * clicks * changeAmount;
+        mWheelClicksSinceLastDelta = -1 * delta.mClicks * changeAmount;
 
         mValueDeltaX = mValueDeltaY = mValueDeltaZ = 0;
         mPinchValueDeltaX = mPinchValueDeltaY = mPinchValueDeltaZ = 0;
@@ -655,5 +655,5 @@ bool FSVirtualTrackpad::handleScrollWheel(S32 x, S32 y, S32 clicks)
         return true;
     }
     else
-        return LLUICtrl::handleScrollWheel(x, y, clicks);
+        return LLUICtrl::handleScrollWheel(x, y, delta);
 }

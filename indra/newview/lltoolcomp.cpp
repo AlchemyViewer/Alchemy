@@ -868,7 +868,7 @@ void    LLToolCompGun::handleDeselect()
 }
 
 
-bool LLToolCompGun::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLToolCompGun::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if(mRightMouseDown)
     {
@@ -876,14 +876,14 @@ bool LLToolCompGun::handleScrollWheel(S32 x, S32 y, S32 clicks)
 
         gSavedPerAccountSettings.setF32(
             "AlchemyMouselookAlternativeFOV",
-            mTargetFOV = clicks > 0 ?
-                llclamp(mTargetFOV += (0.05f * clicks), 0.1f, 3.0f) :
-                llclamp(mTargetFOV -= (0.05f * -clicks), 0.1f, 3.0f)
+            mTargetFOV = delta.mPrecise > 0 ?
+                llclamp(mTargetFOV += (0.05f * delta.mPrecise), 0.1f, 3.0f) :
+                llclamp(mTargetFOV -= (0.05f * -delta.mPrecise), 0.1f, 3.0f)
         );
 
         mTimerFOV.start();
     }
-    else if (clicks > 0)
+    else if (delta.mClicks > 0)
     {
         gAgentCamera.changeCameraToDefault();
     }

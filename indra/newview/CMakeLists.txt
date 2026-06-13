@@ -109,6 +109,15 @@ elseif(LINUX)
     )
 endif ()
 
+# Branded splash icon for the SDL splash screen (LLSplashScreenSDL loads this
+# PNG at runtime from app_settings). Staged on all platforms so the SDL build
+# finds it regardless of which backend the package ends up using.
+execute_process(
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/alchemy_logo.png"
+  )
+
 if (HAVOK)
    # When using HAVOK_TPV, the library is precompiled, so no need for this
 
@@ -1725,6 +1734,15 @@ if (WINDOWS)
          llvelopack.h
          llwindebug.h
          )
+
+    if (USE_SDL_WINDOW)
+        # Unified SDL main-callbacks entry point shared with Linux/macOS.
+        # llappviewerwin32's native wWinMain is compiled out (LL_SDL_WINDOW);
+        # SDL_AppInit instantiates LLAppViewerWin32 to keep the Win32
+        # platform overrides.
+        list(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
+        list(APPEND viewer_HEADER_FILES llappviewersdl.h)
+    endif ()
 
     # Add resource files to the project.
     # viewerRes.rc is the only buildable file, but

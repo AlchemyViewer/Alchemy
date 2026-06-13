@@ -51,6 +51,12 @@ public:
     std::string getDriverVersionWMI(EGPUVendor vendor);
 
     LLSD getDisplayInfo();
+
+    // Raise gGLManager.mVRAM to the DXGI video-memory budget when the GL
+    // vendor paths (AMD associations / NVX memory info) didn't report one —
+    // matters mainly for Intel iGPUs. Must run with GL initialized. Shared
+    // by LLWindowWin32's window thread (checkDXMem) and the SDL backend.
+    static void updateVRAMBudgetFromDXGI();
 };
 
 extern LLDXHardware gDXHardware;

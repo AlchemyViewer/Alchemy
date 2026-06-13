@@ -1028,13 +1028,13 @@ boost::signals2::connection LLChicletPanel::setChicletClickedCallback(
     return setCommitCallback(cb);
 }
 
-bool LLChicletPanel::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLChicletPanel::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    if(clicks > 0)
+    if(delta.mClicks > 0)
     {
         scrollRight();
     }
-    else
+    else if (delta.mClicks < 0)
     {
         scrollLeft();
     }

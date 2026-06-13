@@ -42,7 +42,7 @@ public:
     void reshape(S32 width, S32 height, bool called_from_parent) override;
     void setFocus(bool b) override;
 
-    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;

@@ -833,7 +833,7 @@ void LLPanelPrimMediaControls::draw()
     }
 }
 
-bool LLPanelPrimMediaControls::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLPanelPrimMediaControls::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     mInactivityTimer.start();
     bool res = false;
@@ -843,13 +843,13 @@ bool LLPanelPrimMediaControls::handleScrollWheel(S32 x, S32 y, S32 clicks)
     if (LLViewerMediaFocus::getInstance()->isHoveringOverFocused())
     {
         // either let toolpie handle this or expose mHoverPick.mUVCoords in some way
-        res = LLToolPie::getInstance()->handleScrollWheel(x, y, clicks);
+        res = LLToolPie::getInstance()->handleScrollWheel(x, y, delta);
     }
 
     return res;
 }
 
-bool LLPanelPrimMediaControls::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLPanelPrimMediaControls::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     mInactivityTimer.start();
     bool res = false;
@@ -857,7 +857,7 @@ bool LLPanelPrimMediaControls::handleScrollHWheel(S32 x, S32 y, S32 clicks)
     if (LLViewerMediaFocus::getInstance()->isHoveringOverFocused())
     {
         // either let toolpie handle this or expose mHoverPick.mUVCoords in some way
-        res = LLToolPie::getInstance()->handleScrollHWheel(x, y, clicks);
+        res = LLToolPie::getInstance()->handleScrollHWheel(x, y, delta);
     }
 
     return res;

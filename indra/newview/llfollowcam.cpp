@@ -510,20 +510,26 @@ void LLFollowCam::setSubjectPositionAndRotation( const LLVector3 p, const LLQuat
 
 
 //---------------------------------------------------------
-void LLFollowCam::zoom( S32 z )
+void LLFollowCam::zoom( F32 z )
 {
     F32 zoomAmount = z * mSimulatedDistance * FOLLOW_CAM_ZOOM_FACTOR;
 
-    if (( zoomAmount <  FOLLOW_CAM_MIN_ZOOM_AMOUNT )
-    &&  ( zoomAmount > -FOLLOW_CAM_MIN_ZOOM_AMOUNT ))
+    // Guarantee a full wheel notch always zooms a perceptible amount, but
+    // scale that floor by |z| so sub-notch precise scrolling (high-res wheels
+    // / touchpads) zooms smoothly instead of snapping every fractional event
+    // up to the whole-notch minimum. A whole notch (|z| >= 1) keeps the
+    // original FOLLOW_CAM_MIN_ZOOM_AMOUNT.
+    F32 minZoomAmount = FOLLOW_CAM_MIN_ZOOM_AMOUNT * llmin(1.f, fabsf(z));
+    if (( zoomAmount <  minZoomAmount )
+    &&  ( zoomAmount > -minZoomAmount ))
     {
         if ( zoomAmount < 0.0f )
         {
-            zoomAmount = -FOLLOW_CAM_MIN_ZOOM_AMOUNT;
+            zoomAmount = -minZoomAmount;
         }
         else
         {
-            zoomAmount = FOLLOW_CAM_MIN_ZOOM_AMOUNT;
+            zoomAmount = minZoomAmount;
         }
     }
 

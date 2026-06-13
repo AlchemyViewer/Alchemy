@@ -117,7 +117,7 @@ bool LLToolTipView::handleRightMouseDown(S32 x, S32 y, MASK mask)
 }
 
 
-bool LLToolTipView::handleScrollWheel( S32 x, S32 y, S32 clicks )
+bool LLToolTipView::handleScrollWheel( S32 x, S32 y, LLScrollDelta delta )
 {
     LLToolTipMgr::instance().blockToolTips();
     return false;

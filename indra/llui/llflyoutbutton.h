@@ -62,7 +62,7 @@ protected:
 public:
     void draw() override;
 
-    bool handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
 
 // [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4
     void    setLabel(const LLStringExplicit& name) override;

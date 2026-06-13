@@ -106,6 +106,16 @@
       ]
     },
     {
+      "name": "vs2026-os-sdl",
+      "displayName": "Visual Studio 2026 (SDL window)",
+      "inherits": [
+        "vs2026-os"
+      ],
+      "cacheVariables": {
+        "USE_SDL_WINDOW": true
+      }
+    },
+    {
       "name": "ninja-os-arm64",
       "displayName": "Ninja Multi-Config(arm64)",
       "inherits": [
@@ -334,6 +344,22 @@
     {
       "name": "vs2026-os-release",
       "configurePreset": "vs2026-os",
+      "configuration": "Release",
+      "inherits": [
+        "windows"
+      ]
+    },
+    {
+      "name": "vs2026-os-sdl-relwithdebinfo",
+      "configurePreset": "vs2026-os-sdl",
+      "configuration": "RelWithDebInfo",
+      "inherits": [
+        "windows"
+      ]
+    },
+    {
+      "name": "vs2026-os-sdl-release",
+      "configurePreset": "vs2026-os-sdl",
       "configuration": "Release",
       "inherits": [
         "windows"

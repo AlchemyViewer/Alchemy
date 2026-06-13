@@ -47,7 +47,7 @@ LLKeyStringTranslatorFunc*  LLKeyboard::mStringTranslator = NULL;   // Used for 
 // Class Implementation
 //
 
-LLKeyboard::LLKeyboard() : mCallbacks(NULL)
+LLKeyboard::LLKeyboard() : mCallbacks(NULL), mNumpadDistinct(ND_NUMLOCK_OFF)
 {
     S32 i;
 

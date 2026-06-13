@@ -108,14 +108,14 @@ bool LLTool::handleHover(S32 x, S32 y, MASK mask)
     return true;
 }
 
-bool LLTool::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLTool::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     // by default, didn't handle it
     // LL_INFOS() << "LLTool::handleScrollWheel" << LL_ENDL;
     return false;
 }
 
-bool LLTool::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLTool::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     // by default, didn't handle it
     return false;

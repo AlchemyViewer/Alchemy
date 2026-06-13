@@ -189,6 +189,18 @@ static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleNumpadControlChanged(const LLSD& newvalue)
+{
+    if (gKeyboard)
+    {
+        // Clamp persisted/out-of-range values to the valid enum range so an
+        // edited settings file can't push the keyboard into an undefined mode.
+        S32 mode = llclamp(newvalue.asInteger(), (S32)LLKeyboard::ND_NEVER, (S32)LLKeyboard::ND_NUMLOCK_ON);
+        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(mode));
+    }
+    return true;
+}
+
 
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
@@ -957,6 +969,7 @@ void settings_setup_listeners()
 {
     LL_PROFILE_ZONE_SCOPED;
     setting_setup_signal_listener(gSavedSettings, "FirstPersonAvatarVisible", handleRenderAvatarMouselookChanged);
+    setting_setup_signal_listener(gSavedSettings, "NumpadControl", handleNumpadControlChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFarClip", handleRenderFarClipChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainScale", handleTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRScale", handlePBRTerrainScaleChanged);

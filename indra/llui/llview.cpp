@@ -1146,14 +1146,14 @@ bool LLView::handleDoubleClick(S32 x, S32 y, MASK mask)
     return childrenHandleDoubleClick( x, y, mask ) != NULL;
 }
 
-bool LLView::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLView::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return childrenHandleScrollWheel( x, y, clicks ) != NULL;
+    return childrenHandleScrollWheel( x, y, delta ) != NULL;
 }
 
-bool LLView::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLView::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return childrenHandleScrollHWheel( x, y, clicks ) != NULL;
+    return childrenHandleScrollHWheel( x, y, delta ) != NULL;
 }
 
 bool LLView::handleRightMouseDown(S32 x, S32 y, MASK mask)
@@ -1176,14 +1176,14 @@ bool LLView::handleMiddleMouseUp(S32 x, S32 y, MASK mask)
     return childrenHandleMiddleMouseUp( x, y, mask ) != NULL;
 }
 
-LLView* LLView::childrenHandleScrollWheel(S32 x, S32 y, S32 clicks)
+LLView* LLView::childrenHandleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return childrenHandleMouseEvent(&LLView::handleScrollWheel, x, y, clicks, false);
+    return childrenHandleMouseEvent(&LLView::handleScrollWheel, x, y, delta, false);
 }
 
-LLView* LLView::childrenHandleScrollHWheel(S32 x, S32 y, S32 clicks)
+LLView* LLView::childrenHandleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return childrenHandleMouseEvent(&LLView::handleScrollHWheel, x, y, clicks, false);
+    return childrenHandleMouseEvent(&LLView::handleScrollHWheel, x, y, delta, false);
 }
 
 // Called during downward traversal

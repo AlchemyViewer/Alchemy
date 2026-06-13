@@ -34,10 +34,19 @@
 
 bool gSDLMainHandled = false;
 
-#ifndef LL_SDL_WINDOW
+// SDL_main.h declares SDL_RegisterApp/SDL_UnregisterApp. SDL_MAIN_HANDLED
+// keeps it declaration-only: the entry-point implementation lives in
+// llappviewersdl.cpp (SDL_MAIN_USE_CALLBACKS) on SDL-window builds.
+#if !LL_SDL_WINDOW || LL_WINDOWS
 #define SDL_MAIN_HANDLED 1
 #include "SDL3/SDL_main.h"
+#endif
 
+#if LL_WINDOWS
+#include "llwin32headers.h" // CS_BYTEALIGNCLIENT / CS_OWNDC
+#endif
+
+#ifndef LL_SDL_WINDOW
 void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const char *message)
 {
     switch (priority)
@@ -123,6 +132,15 @@ void init_sdl(const std::string& app_name)
                     // every motion event, and we never want a warp-distance
                     // to land in the camera signal. Don't override.
 
+                    // LOAD-BEARING for numpad support: this is SDL3's default
+                    // value, and it deliberately omits "hide_numpad". With
+                    // "hide_numpad" SDL would pre-fold SDLK_KP_* onto the digit
+                    // row / nav cluster based on NumLock *before* delivering the
+                    // event, which would make NumLock-off numpad keys
+                    // indistinguishable from the real arrow keys and break
+                    // LLKeyboardSDL's numpad-distinct logic (it relies on
+                    // receiving the raw SDLK_KP_* keysym). Do not add
+                    // "hide_numpad" here.
                     {SDL_HINT_KEYCODE_OPTIONS,"french_numbers,latin_letters"},
                     // The viewer renders the IME composition string itself
                     // via LLPreeditor::updatePreedit (see the SDL_EVENT_TEXT_EDITING
@@ -135,6 +153,9 @@ void init_sdl(const std::string& app_name)
 
                     // Prevent popup of text overlay when holding movement keys on macos
                     {SDL_HINT_MAC_PRESS_AND_HOLD, "0"},
+
+                    // Momentum scrolling on macos is desirable for mac touchpads
+                    {SDL_HINT_MAC_SCROLL_MOMENTUM, "1"},
             };
 
     for (auto hint: hintList)

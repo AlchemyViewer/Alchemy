@@ -229,14 +229,14 @@ bool LLToolPie::handleScrollWheelAny(S32 x, S32 y, S32 clicks_x, S32 clicks_y)
     return res;
 }
 
-bool LLToolPie::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLToolPie::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return handleScrollWheelAny(x, y, 0, clicks);
+    return handleScrollWheelAny(x, y, 0, delta.mClicks);
 }
 
-bool LLToolPie::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLToolPie::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return handleScrollWheelAny(x, y, clicks, 0);
+    return handleScrollWheelAny(x, y, delta.mClicks, 0);
 }
 
 // True if you selected an object.

@@ -1994,14 +1994,14 @@ bool LLViewerWindow::handlePaint(LLWindow *window,  S32 x,  S32 y, S32 width,  S
 }
 
 
-void LLViewerWindow::handleScrollWheel(LLWindow *window,  S32 clicks)
+void LLViewerWindow::handleScrollWheel(LLWindow *window,  LLScrollDelta delta)
 {
-    handleScrollWheel( clicks );
+    handleScrollWheel( delta );
 }
 
-void LLViewerWindow::handleScrollHWheel(LLWindow *window,  S32 clicks)
+void LLViewerWindow::handleScrollHWheel(LLWindow *window,  LLScrollDelta delta)
 {
-    handleScrollHWheel(clicks);
+    handleScrollHWheel(delta);
 }
 
 void LLViewerWindow::handleWindowBlock(LLWindow *window)
@@ -2309,6 +2309,17 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     mOverlayTitle = gSavedSettings.getString("OverlayTitle");
     // Can't have spaces in settings.ini strings, so use underscores instead and convert them.
     LLStringUtil::replaceChar(mOverlayTitle, '_', ' ');
+
+    // Sync the keyboard's numpad mode with the saved NumpadControl setting now
+    // that gKeyboard exists. settings_setup_listeners() only connects the change
+    // signal (and ran before the window/keyboard were created), so push the
+    // persisted value into LLKeyboard once here; handleNumpadControlChanged
+    // keeps it in sync on subsequent changes.
+    if (gKeyboard)
+    {
+        S32 numpad_mode = llclamp(gSavedSettings.getS32("NumpadControl"), (S32)LLKeyboard::ND_NEVER, (S32)LLKeyboard::ND_NUMLOCK_ON);
+        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(numpad_mode));
+    }
 
     mDebugText = new LLDebugText(this);
 
@@ -3185,7 +3196,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
             }
 #endif
 
-#ifdef LL_WINDOWS
+#if LL_WINDOWS && !LL_SDL_WINDOW
             // On windows Alt Gr key generates additional Ctrl event, as result handling situations
             // like 'AltGr + D' will result in 'Alt+Ctrl+D'. If it results in WM_CHAR, don't let it
             // pass into menu or it will trigger 'develop' menu assigned to this combination on top
@@ -3485,9 +3496,14 @@ bool LLViewerWindow::handleUnicodeChar(llwchar uni_char, MASK mask)
 }
 
 
-void LLViewerWindow::handleScrollWheel(S32 clicks)
+void LLViewerWindow::handleScrollWheel(LLScrollDelta delta)
 {
     LLUI::getInstance()->resetMouseIdleTimer();
+
+    // Scale the precise (smooth) component by the user's sensitivity multiplier.
+    // Discrete consumers read delta.mClicks and are intentionally left untouched.
+    static LLCachedControl<F32> scroll_sensitivity(gSavedSettings, "MouseWheelScrollSensitivity", 1.f);
+    delta.mPrecise *= scroll_sensitivity;
 
     LLMouseHandler* mouse_captor = gFocusMgr.getMouseCapture();
     if( mouse_captor )
@@ -3495,7 +3511,7 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         mouse_captor->screenPointToLocal( mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y );
-        mouse_captor->handleScrollWheel(local_x, local_y, clicks);
+        mouse_captor->handleScrollWheel(local_x, local_y, delta);
         if (LLView::sDebugMouseHandling)
         {
             LL_INFOS() << "Scroll Wheel handled by captor " << mouse_captor->getName() << LL_ENDL;
@@ -3509,10 +3525,10 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         top_ctrl->screenPointToLocal( mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y );
-        if (top_ctrl->handleScrollWheel(local_x, local_y, clicks)) return;
+        if (top_ctrl->handleScrollWheel(local_x, local_y, delta)) return;
     }
 
-    if (mRootView->handleScrollWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, clicks) )
+    if (mRootView->handleScrollWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, delta) )
     {
         if (LLView::sDebugMouseHandling)
         {
@@ -3530,12 +3546,12 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
     if(top_ctrl == 0
         && getWorldViewRectScaled().pointInRect(mCurrentMousePoint.mX, mCurrentMousePoint.mY)
         && gAgentCamera.isInitialized())
-        gAgentCamera.handleScrollWheel(clicks);
+        gAgentCamera.handleScrollWheel(delta.mPrecise);
 
     return;
 }
 
-void LLViewerWindow::handleScrollHWheel(S32 clicks)
+void LLViewerWindow::handleScrollHWheel(LLScrollDelta delta)
 {
     if (LLAppViewer::instance()->quitRequested())
     {
@@ -3544,13 +3560,16 @@ void LLViewerWindow::handleScrollHWheel(S32 clicks)
 
     LLUI::getInstance()->resetMouseIdleTimer();
 
+    static LLCachedControl<F32> scroll_sensitivity(gSavedSettings, "MouseWheelScrollSensitivity", 1.f);
+    delta.mPrecise *= scroll_sensitivity;
+
     LLMouseHandler* mouse_captor = gFocusMgr.getMouseCapture();
     if (mouse_captor)
     {
         S32 local_x;
         S32 local_y;
         mouse_captor->screenPointToLocal(mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y);
-        mouse_captor->handleScrollHWheel(local_x, local_y, clicks);
+        mouse_captor->handleScrollHWheel(local_x, local_y, delta);
         if (LLView::sDebugMouseHandling)
         {
             LL_INFOS() << "Scroll Horizontal Wheel handled by captor " << mouse_captor->getName() << LL_ENDL;
@@ -3564,10 +3583,10 @@ void LLViewerWindow::handleScrollHWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         top_ctrl->screenPointToLocal(mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y);
-        if (top_ctrl->handleScrollHWheel(local_x, local_y, clicks)) return;
+        if (top_ctrl->handleScrollHWheel(local_x, local_y, delta)) return;
     }
 
-    if (mRootView->handleScrollHWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, clicks))
+    if (mRootView->handleScrollHWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, delta))
     {
         if (LLView::sDebugMouseHandling)
         {

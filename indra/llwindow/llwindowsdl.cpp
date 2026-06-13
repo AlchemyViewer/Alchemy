@@ -40,6 +40,9 @@
 #include "llpreeditor.h"
 #include "llsdl.h"
 
+#include "SDL3_ttf/SDL_ttf.h"     // LLSplashScreenSDL status text
+#include "SDL3_image/SDL_image.h" // LLSplashScreenSDL branded icon (PNG)
+
 #if LL_LINUX
 extern "C" {
 # include "fontconfig/fontconfig.h"
@@ -68,6 +71,28 @@ LLWindowSDL::WAYLAND_DATA LLWindowSDL::sWaylandData = {};
 #include <SDL3_image/SDL_image.h>
 
 bool LLWindowSDL::sUseMultGL = false;
+#endif
+
+#if LL_WINDOWS
+#define DIRECTINPUT_VERSION 0x0800
+#include <dinput.h>
+#include "lldxhardware.h"
+
+// DirectInput8 interface for llviewerjoystick / SpaceNavigator. Created once
+// in the LLWindowSDL constructor; only needs the process module handle, not
+// the window, so the SDL backend can provide the same access LLWindowWin32 does.
+static LPDIRECTINPUT8 gSDLDirectInput8 = nullptr;
+#endif
+
+// Native shared-GL-context creation (see createSharedContext). The GLX/EGL
+// entry points are resolved at runtime via SDL_GL_GetProcAddress /
+// SDL_EGL_GetProcAddress (the viewer doesn't link libGL/libEGL directly under
+// SDL), so we only need the platform types and tokens here.
+#if LL_X11
+#include <GL/glx.h>
+#endif
+#if LL_WAYLAND
+#include <EGL/egl.h>
 #endif
 
 bool gHiDPISupport = true;
@@ -106,6 +131,19 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     gKeyboard = new LLKeyboardSDL();
     gKeyboard->setCallbacks(callbacks);
 
+#if LL_WINDOWS
+    // Init Direct Input - needed for joystick / Spacemouse (see llviewerjoystick).
+    if (!gSDLDirectInput8)
+    {
+        LPDIRECTINPUT8 di8_interface = nullptr;
+        if (DirectInput8Create(GetModuleHandle(nullptr), DIRECTINPUT_VERSION,
+                               IID_IDirectInput8, (LPVOID*)&di8_interface, nullptr) == DI_OK)
+        {
+            gSDLDirectInput8 = di8_interface;
+        }
+    }
+#endif
+
     // Assume 4:3 aspect ratio until we know better
     mNativeAspectRatio = 1024.f / 768.f;
 
@@ -140,6 +178,10 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     {
         gGLManager.initWGL();
         gGLManager.initGL();
+#if LL_WINDOWS
+        // GL didn't always report a VRAM budget (notably Intel iGPUs); ask DXGI.
+        LLDXHardware::updateVRAMBudgetFromDXGI();
+#endif
 
         //start with arrow cursor
         initCursors();
@@ -149,11 +191,12 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     stop_glerror();
 }
 
-#if !LL_DARWIN
-// The BMP cursor/icon tree (res-sdl/) is only shipped in the Linux bundle. On
-// macOS we load cursors from cursors_mac/*.tif (see makeSDLCursorFromMacTIF
-// below), so this helper would be unused there — and the build is -Werror on
-// unused static functions.
+#if LL_LINUX
+// The BMP cursor/icon tree (res-sdl/) is only shipped in the Linux bundle.
+// macOS loads cursors from cursors_mac/*.tif (makeSDLCursorFromMacTIF) and
+// Windows from the exe's embedded .cur resources (makeSDLCursorFromWin32), so
+// this helper would be unused on those platforms — and the build is -Werror
+// on unused static functions.
 static SDL_Surface *Load_BMP_Resource(const char *basename)
 {
     const int PATH_BUFFER_SIZE=1000;
@@ -169,7 +212,7 @@ static SDL_Surface *Load_BMP_Resource(const char *basename)
 
     return SDL_LoadBMP(path_buffer);
 }
-#endif // !LL_DARWIN
+#endif // LL_LINUX
 
 void LLWindowSDL::setTitle(const std::string title)
 {
@@ -248,14 +291,13 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
 
     // Setup default backing colors
     GLint redBits{8}, greenBits{8}, blueBits{8}, alphaBits{8};
-    GLint depthBits{24}, stencilBits{8};
+    GLint depthBits{ 24 };
 
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE,   redBits);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, greenBits);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,  blueBits);
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, alphaBits);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depthBits);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencilBits);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
     // Multi-sample anti-aliasing. Driver may quietly downgrade to 0/2/4/8
@@ -469,7 +511,6 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &blueBits);
     SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &alphaBits);
     SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &depthBits);
-    SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE, &stencilBits);
 
     LL_INFOS() << "GL buffer:" << LL_ENDL;
     LL_INFOS() << "  Red Bits " << S32(redBits) << LL_ENDL;
@@ -477,7 +518,6 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     LL_INFOS() << "  Blue Bits " << S32(blueBits) << LL_ENDL;
     LL_INFOS() << "  Alpha Bits " << S32(alphaBits) << LL_ENDL;
     LL_INFOS() << "  Depth Bits " << S32(depthBits) << LL_ENDL;
-    LL_INFOS() << "  Stencil Bits " << S32(stencilBits) << LL_ENDL;
 
     GLint colorBits = redBits + greenBits + blueBits + alphaBits;
     if (colorBits < 32)
@@ -538,91 +578,379 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     // different density (after switchContext). Recompute now that mWindow
     // reflects the active display.
     refreshMinSizePixelShadow();
+
+#if LL_WINDOWS
+    // Hook WM_COPYDATA on the native HWND for second-instance SLURL hand-off.
+    installWin32Subclass();
+#endif
+
     return true;
 }
 
-void LLWindowSDL::refreshMinSizePixelShadow()
+void LLWindowSDL::refreshPixelMetrics()
 {
-    if (!mWindow || mMinWindowWidth <= 0 || mMinWindowHeight <= 0)
+    if (!mWindow)
     {
         return;
     }
     const float density = SDL_GetWindowPixelDensity(mWindow);
-    const float scale = density > 0.f ? density : 1.f;
-    mMinWindowWidthPx = (U32)(mMinWindowWidth * scale);
-    mMinWindowHeightPx = (U32)(mMinWindowHeight * scale);
+    mCachedPixelDensity = density > 0.f ? density : 1.f;
+    S32 height_pixels = 0;
+    SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    mCachedWindowHeightPx = height_pixels;
 }
 
+void LLWindowSDL::refreshMinSizePixelShadow()
+{
+    refreshPixelMetrics();
+    if (!mWindow || mMinWindowWidth <= 0 || mMinWindowHeight <= 0)
+    {
+        return;
+    }
+    mMinWindowWidthPx = (U32)(mMinWindowWidth * mCachedPixelDensity);
+    mMinWindowHeightPx = (U32)(mMinWindowHeight * mCachedPixelDensity);
+}
+
+// Opaque handle returned from createSharedContext() and passed back to
+// makeContextCurrent()/destroySharedContext(). Carries whatever the platform
+// GL API needs to bind and tear down the context.
+namespace
+{
+    struct LLSDLSharedContext
+    {
+#if LL_WINDOWS
+        HGLRC rc = nullptr;
+        HDC   dc = nullptr;        // main window DC the sibling context binds to
+#elif LL_DARWIN
+        CGLContextObj ctx = nullptr;
+#else // LL_LINUX
+#if LL_X11
+        // X11 / GLX
+        Display*   glx_dpy  = nullptr;
+        GLXContext glx_ctx  = nullptr;
+        GLXPbuffer glx_pbuf = 0;
+#endif
+#if LL_WAYLAND
+        // Wayland / EGL — kept as void* so EGL types stay out of the header
+        void* egl_dpy = nullptr;   // EGLDisplay
+        void* egl_ctx = nullptr;   // EGLContext
+#endif
+#endif
+    };
+
+    // Platform GL teardown for one shared context. No bookkeeping — the caller
+    // owns mSharedContexts and the LLSDLSharedContext allocation.
+    void tearDownNativeSharedContext(LLSDLSharedContext* s)
+    {
+        if (!s) return;
+#if LL_WINDOWS
+        if (s->rc && !wglDeleteContext(s->rc))
+        {
+            LL_WARNS("Window") << "wglDeleteContext(shared) failed: " << GetLastError() << LL_ENDL;
+        }
+#elif LL_DARWIN
+        if (s->ctx)
+        {
+            CGLDestroyContext(s->ctx);
+        }
+#else // LL_LINUX
+#if LL_X11
+        if (s->glx_ctx)
+        {
+            typedef void (*fn_destroyctx)(Display*, GLXContext);
+            typedef void (*fn_destroypb)(Display*, GLXPbuffer);
+            auto glx_destroyctx = (fn_destroyctx)SDL_GL_GetProcAddress("glXDestroyContext");
+            auto glx_destroypb  = (fn_destroypb)SDL_GL_GetProcAddress("glXDestroyPbuffer");
+            if (glx_destroyctx) glx_destroyctx(s->glx_dpy, s->glx_ctx);
+            if (glx_destroypb && s->glx_pbuf) glx_destroypb(s->glx_dpy, s->glx_pbuf);
+        }
+#endif
+#if LL_WAYLAND
+        if (s->egl_ctx)
+        {
+            typedef unsigned int (*fn_destroyctx)(void*, void*);
+            auto egl_destroyctx = (fn_destroyctx)SDL_EGL_GetProcAddress("eglDestroyContext");
+            if (egl_destroyctx) egl_destroyctx(s->egl_dpy, s->egl_ctx);
+        }
+#endif
+#endif
+    }
+}
+
+// Create a GL context that shares object namespace with the main context, for
+// a worker thread (texture upload, VBO streaming). Uses the platform-native GL
+// API behind SDL instead of a hidden carrier SDL_Window — see the header note.
+// Runs on the main thread (the thread that constructs the GL worker pool).
 void* LLWindowSDL::createSharedContext()
 {
-    SDL_PropertiesID props = SDL_CreateProperties();
-    SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Alchemy Viewer OSR Utility");
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 1);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 1);
-    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, false);
-    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
-    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, true);
-    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FOCUSABLE_BOOLEAN, false);
-    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_UTILITY_BOOLEAN, true);
-    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, gHiDPISupport);
-
-    auto osr_window = SDL_CreateWindowWithProperties(props);
-    if (osr_window == nullptr)
-    {
-        SDL_DestroyProperties(props);
-        return nullptr;
-    }
-    SDL_DestroyProperties(props); // Free properties once window is created
-    SDL_GLContext pContext = SDL_GL_CreateContext(osr_window);
-
-    // Restore the main window's context as current — creating the OSR context
-    // typically leaves the new (or null) context bound. Failure here is rare
-    // but serious: the rest of the frame would render without a valid context.
+    // Bind the main context so the platform "get current" queries below return
+    // the main display / config / share-context, and so the new context shares
+    // object namespace with the right context.
     if (!SDL_GL_MakeCurrent(mWindow, mContext))
     {
-        LL_WARNS() << "SDL_GL_MakeCurrent(main) failed after createSharedContext: "
+        LL_WARNS() << "SDL_GL_MakeCurrent(main) failed in createSharedContext: "
                    << SDL_GetError() << LL_ENDL;
     }
 
-    if (!pContext)
+    // A version request derived from the live main context, clamped to the
+    // range the viewer supports. WGL/EGL need this explicitly (mirroring
+    // LLWindowWin32::createSharedContext); GLX/CGL inherit it from the share
+    // context, hence the guard against an unused-variable warning there.
+#if LL_WINDOWS || LL_WAYLAND
+    const F32 gl_ver = llclamp(gGLManager.mGLVersion, 3.0f, 4.6f);
+    const S32 ver_major = (S32)gl_ver;
+    const S32 ver_minor = (S32)ll_round((gl_ver - ver_major) * 10.f);
+#endif
+
+    auto* shared = new LLSDLSharedContext();
+    bool ok = false;
+
+#if LL_WINDOWS
+    HDC   dc    = wglGetCurrentDC();
+    HGLRC share = wglGetCurrentContext();
+    if (dc && share && wglCreateContextAttribsARB)
     {
-        LL_WARNS() << "Creating shared OpenGL context failed: " << SDL_GetError() << LL_ENDL;
-        SDL_DestroyWindow(osr_window);
+        S32 attribs[] =
+        {
+            WGL_CONTEXT_MAJOR_VERSION_ARB, ver_major,
+            WGL_CONTEXT_MINOR_VERSION_ARB, ver_minor,
+            WGL_CONTEXT_PROFILE_MASK_ARB,  LLRender::sGLCoreProfile ? WGL_CONTEXT_CORE_PROFILE_BIT_ARB : WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+            WGL_CONTEXT_FLAGS_ARB, gDebugGL ? WGL_CONTEXT_DEBUG_BIT_ARB : 0,
+            0
+        };
+        HGLRC rc = nullptr;
+        for (;;)
+        {
+            rc = wglCreateContextAttribsARB(dc, share, attribs);
+            if (rc) break;
+            if (attribs[3] > 0)      { attribs[3]--; }                   // step minor down
+            else if (attribs[1] > 3) { attribs[1]--; attribs[3] = 3; }   // step major down
+            else                     { break; }                         // gave up at 3.0
+        }
+        if (rc)
+        {
+            shared->rc = rc;
+            shared->dc = dc;
+            ok = true;
+        }
+        else
+        {
+            LL_WARNS() << "wglCreateContextAttribsARB (shared) failed" << LL_ENDL;
+        }
+    }
+#elif LL_DARWIN
+    CGLContextObj share = CGLGetCurrentContext();
+    if (share)
+    {
+        CGLPixelFormatObj pf = CGLGetPixelFormat(share);
+        CGLContextObj ctx = nullptr;
+        CGLError err = CGLCreateContext(pf, share, &ctx);
+        if (err == kCGLNoError && ctx)
+        {
+            shared->ctx = ctx;
+            ok = true;
+        }
+        else
+        {
+            LL_WARNS() << "CGLCreateContext (shared) failed: " << CGLErrorString(err) << LL_ENDL;
+        }
+    }
+#else // LL_LINUX
+#if LL_X11
+    if (mServerProtocol == X11)
+    {
+        // GLX: bind the shared context to a 1x1 offscreen GLXPbuffer (no window
+        // manager interaction, destroyable from the worker thread). Each worker
+        // needs its own drawable — reusing the main window drawable would
+        // BadAccess (it's already current on the main thread).
+        typedef Display*     (*fn_getdpy)(void);
+        typedef GLXContext   (*fn_getctx)(void);
+        typedef GLXFBConfig* (*fn_choose)(Display*, int, const int*, int*);
+        typedef GLXContext   (*fn_newctx)(Display*, GLXFBConfig, int, GLXContext, Bool);
+        typedef GLXPbuffer   (*fn_pbuffer)(Display*, GLXFBConfig, const int*);
+
+        auto glx_getdpy  = (fn_getdpy)SDL_GL_GetProcAddress("glXGetCurrentDisplay");
+        auto glx_getctx  = (fn_getctx)SDL_GL_GetProcAddress("glXGetCurrentContext");
+        auto glx_choose  = (fn_choose)SDL_GL_GetProcAddress("glXChooseFBConfig");
+        auto glx_newctx  = (fn_newctx)SDL_GL_GetProcAddress("glXCreateNewContext");
+        auto glx_pbuffer = (fn_pbuffer)SDL_GL_GetProcAddress("glXCreatePbuffer");
+
+        if (glx_getdpy && glx_getctx && glx_choose && glx_newctx && glx_pbuffer)
+        {
+            Display*   dpy   = glx_getdpy();
+            GLXContext share = glx_getctx();
+            int screen = (sX11Data.xscreen >= 0) ? sX11Data.xscreen : (dpy ? DefaultScreen(dpy) : 0);
+            const int cfg_attribs[] =
+            {
+                GLX_DRAWABLE_TYPE, GLX_PBUFFER_BIT,
+                GLX_RENDER_TYPE,   GLX_RGBA_BIT,
+                GLX_RED_SIZE, 8, GLX_GREEN_SIZE, 8, GLX_BLUE_SIZE, 8, GLX_ALPHA_SIZE, 8,
+                None
+            };
+            int n = 0;
+            GLXFBConfig* fbc = (dpy ? glx_choose(dpy, screen, cfg_attribs, &n) : nullptr);
+            if (fbc && n > 0)
+            {
+                const int pb_attribs[] = { GLX_PBUFFER_WIDTH, 1, GLX_PBUFFER_HEIGHT, 1, None };
+                GLXPbuffer pbuf = glx_pbuffer(dpy, fbc[0], pb_attribs);
+                GLXContext ctx  = glx_newctx(dpy, fbc[0], GLX_RGBA_TYPE, share, True);
+                // glXChooseFBConfig returns an Xlib-allocated array that must be
+                // released with XFree. The SDL backend doesn't link libX11 (GLX
+                // is reached through SDL_GL_GetProcAddress), so resolve XFree from
+                // the already-resident libX11 at runtime via SDL's loader instead
+                // of taking an X11 link dependency. On the X11 server path libX11
+                // is always loaded; if XFree can't be found, skip the free (a
+                // tiny, bounded, once-per-worker-context leak) rather than crash.
+                if (SDL_SharedObject* x11lib = SDL_LoadObject("libX11.so.6"))
+                {
+                    if (SDL_FunctionPointer x_free = SDL_LoadFunction(x11lib, "XFree"))
+                    {
+                        ((int (*)(void*))x_free)(fbc);
+                    }
+                    SDL_UnloadObject(x11lib);
+                }
+                if (pbuf && ctx)
+                {
+                    shared->glx_dpy  = dpy;
+                    shared->glx_pbuf = pbuf;
+                    shared->glx_ctx  = ctx;
+                    ok = true;
+                }
+                else
+                {
+                    LL_WARNS() << "GLX shared pbuffer/context creation failed" << LL_ENDL;
+                    LLSDLSharedContext tmp; tmp.glx_dpy = dpy; tmp.glx_ctx = ctx; tmp.glx_pbuf = pbuf;
+                    tearDownNativeSharedContext(&tmp);
+                }
+            }
+            else
+            {
+                LL_WARNS() << "glXChooseFBConfig found no pbuffer-capable config" << LL_ENDL;
+            }
+        }
+        else
+        {
+            LL_WARNS() << "Could not resolve GLX entry points for shared context" << LL_ENDL;
+        }
+    }
+#endif // LL_X11
+#if LL_WAYLAND
+    if (mServerProtocol == Wayland)
+    {
+        // Wayland / EGL: a surfaceless context (EGL_NO_SURFACE) avoids needing a
+        // per-worker drawable. Requires EGL_KHR_surfaceless_context (Mesa has
+        // it). SDL exposes the display/config it created the main context with.
+        typedef void* (*fn_getctx)(void);
+        typedef void* (*fn_createctx)(void*, void*, void*, const int*);
+        typedef unsigned int (*fn_bindapi)(unsigned int);
+
+        auto egl_getctx    = (fn_getctx)SDL_EGL_GetProcAddress("eglGetCurrentContext");
+        auto egl_createctx = (fn_createctx)SDL_EGL_GetProcAddress("eglCreateContext");
+        auto egl_bindapi   = (fn_bindapi)SDL_EGL_GetProcAddress("eglBindAPI");
+
+        void* dpy   = (void*)SDL_EGL_GetCurrentDisplay();
+        void* cfg   = (void*)SDL_EGL_GetCurrentConfig();
+        void* share = egl_getctx ? egl_getctx() : nullptr;
+
+        if (dpy && egl_createctx && share)
+        {
+            if (egl_bindapi) egl_bindapi(EGL_OPENGL_API);
+            // Must request the version explicitly — an empty attrib list defaults
+            // to GL 1.0, which can't drive the modern texture/VBO uploads the
+            // worker shares with the main context. (EGL 1.5 tokens.)
+            const int ctx_attribs[] =
+            {
+                EGL_CONTEXT_MAJOR_VERSION, ver_major,
+                EGL_CONTEXT_MINOR_VERSION, ver_minor,
+                EGL_NONE
+            };
+            void* ctx = egl_createctx(dpy, cfg, share, ctx_attribs);
+            if (ctx && ctx != EGL_NO_CONTEXT)
+            {
+                shared->egl_dpy = dpy;
+                shared->egl_ctx = ctx;
+                ok = true;
+            }
+            else
+            {
+                LL_WARNS() << "eglCreateContext (shared) failed" << LL_ENDL;
+            }
+        }
+        else
+        {
+            LL_WARNS() << "Could not resolve EGL state/entry points for shared context" << LL_ENDL;
+        }
+    }
+#endif // LL_WAYLAND
+#endif // LL_LINUX
+
+    if (!ok)
+    {
+        delete shared;
         return nullptr;
     }
 
     {
-        LLMutexLock osr_lock(&mOSRMutex);
-        mOSRContexts.emplace(pContext, osr_window);
+        LLMutexLock lk(&mSharedCtxMutex);
+        mSharedContexts.insert(shared);
     }
-
-    LL_DEBUGS() << "Creating shared OpenGL context successful!" << LL_ENDL;
-    return (void*)pContext;
+    LL_DEBUGS() << "Created native shared GL context." << LL_ENDL;
+    return shared;
 }
 
 void LLWindowSDL::makeContextCurrent(void* contextPtr)
 {
-    LLMutexLock osr_lock(&mOSRMutex);
-    auto it = mOSRContexts.find((SDL_GLContext)contextPtr);
-    if(it != mOSRContexts.end())
+    if (!contextPtr) return;
+    auto* s = (LLSDLSharedContext*)contextPtr;
+#if LL_WINDOWS
+    if (!wglMakeCurrent(s->dc, s->rc))
     {
-        if (!SDL_GL_MakeCurrent((SDL_Window*)it->second, (SDL_GLContext)it->first))
+        LL_WARNS("Window") << "wglMakeCurrent(shared) failed: " << GetLastError() << LL_ENDL;
+    }
+#elif LL_DARWIN
+    CGLSetCurrentContext(s->ctx);
+#else // LL_LINUX
+#if LL_X11
+    if (s->glx_ctx)
+    {
+        typedef Bool (*fn_makecur)(Display*, GLXDrawable, GLXContext);
+        auto glx_makecur = (fn_makecur)SDL_GL_GetProcAddress("glXMakeCurrent");
+        if (glx_makecur && !glx_makecur(s->glx_dpy, s->glx_pbuf, s->glx_ctx))
         {
-            LL_WARNS() << "SDL_GL_MakeCurrent(OSR) failed: " << SDL_GetError() << LL_ENDL;
+            LL_WARNS("Window") << "glXMakeCurrent(shared) failed" << LL_ENDL;
         }
     }
+#endif
+#if LL_WAYLAND
+    if (s->egl_ctx)
+    {
+        // eglBindAPI is per-thread, so re-assert OpenGL on the worker before
+        // binding the context surfaceless.
+        typedef unsigned int (*fn_bindapi)(unsigned int);
+        typedef unsigned int (*fn_makecur)(void*, void*, void*, void*);
+        auto egl_bindapi = (fn_bindapi)SDL_EGL_GetProcAddress("eglBindAPI");
+        auto egl_makecur = (fn_makecur)SDL_EGL_GetProcAddress("eglMakeCurrent");
+        if (egl_bindapi) egl_bindapi(EGL_OPENGL_API);
+        if (egl_makecur && !egl_makecur(s->egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, s->egl_ctx))
+        {
+            LL_WARNS("Window") << "eglMakeCurrent(shared, surfaceless) failed" << LL_ENDL;
+        }
+    }
+#endif
+#endif // LL_LINUX
     LL_PROFILER_GPU_CONTEXT;
 }
 
 void LLWindowSDL::destroySharedContext(void* contextPtr)
 {
-    LLMutexLock osr_lock(&mOSRMutex);
-    auto it = mOSRContexts.find((SDL_GLContext)contextPtr);
-    if(it != mOSRContexts.end())
+    if (!contextPtr) return;
+    auto* s = (LLSDLSharedContext*)contextPtr;
+    tearDownNativeSharedContext(s);
     {
-        SDL_GL_DestroyContext((SDL_GLContext)it->first);
-        mDeadOSRWindows.push_back((SDL_Window*)it->second);
+        LLMutexLock lk(&mSharedCtxMutex);
+        mSharedContexts.erase(s);
     }
+    delete s;
 }
 
 void LLWindowSDL::toggleVSync(bool enable_vsync)
@@ -653,6 +981,9 @@ bool LLWindowSDL::switchContext(bool fullscreen, const LLCoordScreen &size, bool
         {
             gGLManager.initWGL();
             gGLManager.initGL();
+#if LL_WINDOWS
+            LLDXHardware::updateVRAMBudgetFromDXGI();
+#endif
 
             //start with arrow cursor
             initCursors();
@@ -670,30 +1001,30 @@ void LLWindowSDL::destroyContext()
     LL_INFOS() << "destroyContext begins" << LL_ENDL;
 
     {
-        LLMutexLock osr_lock(&mOSRMutex);
-
-        // Tear down any still-live OSR contexts. Worker threads are expected to
-        // release them via destroySharedContext() first; if we still have entries
-        // here at shutdown it means a thread didn't, and we'd leak both the GL
-        // context and its hidden window.
-        if (!mOSRContexts.empty())
+        // Reclaim any shared GL contexts a worker thread failed to release.
+        // Normal shutdown joins the GL worker threads before destroyContext, so
+        // this is defensive — a leftover here means a worker didn't call
+        // destroySharedContext(). The native contexts can be torn down from the
+        // main thread (unlike the old carrier-window path, no deferral needed).
+        LLMutexLock lk(&mSharedCtxMutex);
+        if (!mSharedContexts.empty())
         {
-            LL_WARNS() << "destroyContext: " << mOSRContexts.size()
+            LL_WARNS() << "destroyContext: " << mSharedContexts.size()
                        << " shared GL context(s) still alive at shutdown — releasing." << LL_ENDL;
-            for (auto& kv : mOSRContexts)
+            for (void* handle : mSharedContexts)
             {
-                SDL_GL_DestroyContext(kv.first);
-                mDeadOSRWindows.push_back(kv.second);
+                auto* s = (LLSDLSharedContext*)handle;
+                tearDownNativeSharedContext(s);
+                delete s;
             }
-            mOSRContexts.clear();
+            mSharedContexts.clear();
         }
-
-        for(SDL_Window* pWindow : mDeadOSRWindows)
-        {
-            SDL_DestroyWindow(pWindow);
-        }
-        mDeadOSRWindows.clear();
     }
+
+#if LL_WINDOWS
+    // Unhook WM_COPYDATA before SDL tears the HWND down.
+    removeWin32Subclass();
+#endif
 
     // Stop unicode input — paired with the SDL_StartTextInput in createContext().
     // Guard against the early-failure path where SDL_CreateWindowWithProperties
@@ -740,20 +1071,6 @@ void LLWindowSDL::destroyContext()
         LL_INFOS() << "SDL Window already destroyed" << LL_ENDL;
     }
 
-    // Final OSR drain in case a worker thread queued more dead windows
-    // between the earlier drain and now. Normal shutdown ordering joins
-    // worker threads before destroyContext runs, so this is defensive —
-    // it pairs with the inline note in destroySharedContext that the
-    // drain is single-owner from the main thread.
-    {
-        LLMutexLock osr_lock(&mOSRMutex);
-        for (SDL_Window* pWindow : mDeadOSRWindows)
-        {
-            SDL_DestroyWindow(pWindow);
-        }
-        mDeadOSRWindows.clear();
-    }
-
     // Reset per-window state so switchContext (which calls destroyContext +
     // createContext) doesn't inherit accumulators / pending warp suppression /
     // device classification from the prior window. Stale values would survive
@@ -786,6 +1103,14 @@ LLWindowSDL::~LLWindowSDL()
     destroyContext();
 
     delete[] mSupportedResolutions;
+
+#if LL_WINDOWS
+    if (gSDLDirectInput8)
+    {
+        gSDLDirectInput8->Release();
+        gSDLDirectInput8 = nullptr;
+    }
+#endif
 
     gWindowImplementation = nullptr;
 }
@@ -1202,6 +1527,13 @@ F32 LLWindowSDL::getNativeAspectRatio()
     // of the monitor...this seems to work to a close approximation for most CRTs/LCDs
     S32 num_resolutions;
     LLWindowResolution* resolutions = getSupportedResolutions(num_resolutions);
+    if (!resolutions || num_resolutions <= 0)
+    {
+        // No usable display modes (e.g. Wayland exposes none, or nothing met the
+        // 800x600 floor). Fall back to the 4:3 assumption rather than indexing
+        // resolutions[-1] and dividing by a garbage height.
+        return 1024.f / 768.f;
+    }
 
     return ((F32)resolutions[num_resolutions - 1].mWidth / (F32)resolutions[num_resolutions - 1].mHeight);
 }
@@ -1309,6 +1641,8 @@ void LLWindowSDL::flashIcon(F32 seconds)
     mFlashTimer.reset();
     mFlashTimer.setTimerExpirySec(remaining_time);
 
+    if (!mWindow)
+        return;
     SDL_FlashWindow(mWindow, SDL_FLASH_UNTIL_FOCUSED);
     mFlashing = true;
 }
@@ -1318,7 +1652,8 @@ void LLWindowSDL::maybeStopFlashIcon()
     if (mFlashing && mFlashTimer.hasExpired())
     {
         mFlashing = false;
-        SDL_FlashWindow( mWindow, SDL_FLASH_CANCEL );
+        if (mWindow)
+            SDL_FlashWindow( mWindow, SDL_FLASH_CANCEL );
     }
 }
 
@@ -1496,8 +1831,14 @@ bool LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
     // Both spaces are window-relative PIXEL units. Y-flip using the pixel
     // window height; the X axis is identity. Y-down LLCoordWindow has
     // mY = 0 at the top, Y-up LLCoordGL has mY = 0 at the bottom.
-    S32 height_pixels = 0;
-    SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    // Use the cached pixel height (refreshed on every resize/DPI change) to skip
+    // a GetClientRect syscall on the per-event conversion path; fall back to a
+    // live query before the first refresh (height still 0).
+    S32 height_pixels = mCachedWindowHeightPx;
+    if (height_pixels <= 0)
+    {
+        SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    }
 
     to->mX = from.mX;
     to->mY = height_pixels - from.mY - 1;
@@ -1510,9 +1851,13 @@ bool LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordGL* to)
     if (!to || !mWindow)
         return false;
 
-    // Inverse of the above — Y-flip in pixels, X is identity.
-    S32 height_pixels = 0;
-    SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    // Inverse of the above — Y-flip in pixels, X is identity. Cached height (see
+    // the forward conversion above) with a live fallback before the first refresh.
+    S32 height_pixels = mCachedWindowHeightPx;
+    if (height_pixels <= 0)
+    {
+        SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    }
 
     to->mX = from.mX;
     to->mY = height_pixels - from.mY - 1;
@@ -1675,14 +2020,9 @@ U32 LLWindowSDL::SDLCheckGrabbyKeys(U32 keysym, bool gain)
 // virtual
 void LLWindowSDL::processMiscNativeEvents()
 {
-    {
-        LLMutexLock osr_lock(&mOSRMutex);
-        for(SDL_Window* pWindow : mDeadOSRWindows)
-        {
-            SDL_DestroyWindow(pWindow);
-        }
-        mDeadOSRWindows.clear();
-    }
+    // Native shared GL contexts (createSharedContext) are torn down directly by
+    // the worker thread in destroySharedContext() — there is no deferred
+    // main-thread window-destruction queue to drain here anymore.
 }
 
 void LLWindowSDL::gatherInput()
@@ -1705,7 +2045,8 @@ void LLWindowSDL::gatherInput()
     // expired.
     if (mFlashing && mFlashTimer.hasExpired())
     {
-        SDL_FlashWindow(mWindow, SDL_FLASH_CANCEL);
+        if (mWindow)
+            SDL_FlashWindow(mWindow, SDL_FLASH_CANCEL);
         mFlashing = false;
     }
 }
@@ -1753,8 +2094,9 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // PIXEL units so LLCoordWindow stays in the same unit as
             // mWindowRectRaw and the rest of the viewer's pixel-based hit
             // testing — see the coord-space contract below convertCoords.
-            const float density = SDL_GetWindowPixelDensity(mWindow);
-            const float scale = density > 0.f ? density : 1.f;
+            // Cached density (refreshed on resize/DPI change) — avoids a
+            // GetClientRect syscall per motion event (up to the mouse poll rate).
+            const float scale = mCachedPixelDensity;
 
             // Always accumulate the per-event relative motion (xrel/yrel) so
             // getCursorDelta() — drained once per frame from
@@ -1814,22 +2156,22 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // amplifying sub-tick noise into spurious scroll events the way
             // llfloor would for negative residue.
             const S32 iy = lltrunc(mScrollWheelAccumY);
-            if (iy != 0)
+            mScrollWheelAccumY -= (F32)iy;
+            if (iy != 0 || event.wheel.y != 0.f)
             {
-                mScrollWheelAccumY -= (F32)iy;
-                mCallbacks->handleScrollWheel(this, -iy);
+                mCallbacks->handleScrollWheel(this, LLScrollDelta(-iy, -event.wheel.y));
             }
             const S32 ix = lltrunc(mScrollWheelAccumX);
-            if (ix != 0)
+            mScrollWheelAccumX -= (F32)ix;
+            if (ix != 0 || event.wheel.x != 0.f)
             {
-                mScrollWheelAccumX -= (F32)ix;
                 // Win32 sends WM_MOUSEHWHEEL's HIWORD (+=right) directly with
                 // no sign flip (llwindowwin32.cpp:2929: `h_delta / WHEEL_DELTA`).
                 // SDL3 `event.wheel.x` follows the same +=right convention, so
                 // forward unmodified. Only the Y axis negates to match
                 // Win32's vertical convention ("+ clicks = scroll content
                 // down" — see the line just above).
-                mCallbacks->handleScrollHWheel(this, ix);
+                mCallbacks->handleScrollHWheel(this, LLScrollDelta(ix, event.wheel.x));
             }
             break;
         }
@@ -1928,8 +2270,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                                        || event.button.which == SDL_PEN_MOUSEID);
 
             // Scale screen-coord event coords up to PIXEL units for LLCoordWindow.
-            const float density = SDL_GetWindowPixelDensity(mWindow);
-            const float scale = density > 0.f ? density : 1.f;
+            const float scale = mCachedPixelDensity; // cached; see refreshPixelMetrics
             LLCoordWindow winCoord(llfloor(event.button.x * scale),
                                    llfloor(event.button.y * scale));
             LLCoordGL openGlCoord;
@@ -1970,8 +2311,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             mAbsoluteCursorPosition = (event.button.which == SDL_TOUCH_MOUSEID
                                        || event.button.which == SDL_PEN_MOUSEID);
 
-            const float density = SDL_GetWindowPixelDensity(mWindow);
-            const float scale = density > 0.f ? density : 1.f;
+            const float scale = mCachedPixelDensity; // cached; see refreshPixelMetrics
             LLCoordWindow winCoord(llfloor(event.button.x * scale),
                                    llfloor(event.button.y * scale));
             LLCoordGL openGlCoord;
@@ -2079,8 +2419,15 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // We do NOT filter on MASK_ALT alone — Right-Alt (AltGr) on
             // European keyboards composes characters like Å/Ø/€ and those
             // legitimately arrive via TEXT_INPUT.
-            const Uint16 modstate = SDL_GetModState();
-            if (modstate & SDL_KMOD_CTRL)
+            // Use the modifier state captured WITH the keystroke (mKeyModifiers,
+            // set from event.key.mod on the KEY_DOWN that produced this text),
+            // not the live SDL_GetModState(): gatherInput drains the whole event
+            // batch at once, so a fast Ctrl+key whose Ctrl-release lands in the
+            // same pump would read CTRL as already up here and fail to drop the
+            // accelerator's literal character (Ctrl-A then "a" overwriting the
+            // selection). mKeyModifiers reflects the producing keystroke, and an
+            // IME commit refreshes it via its own non-Ctrl key-downs.
+            if (mKeyModifiers & SDL_KMOD_CTRL)
             {
                 break;
             }
@@ -2201,14 +2548,19 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         case SDL_EVENT_WINDOW_RESIZED:
         {
             LL_INFOS() << "Handling a resize event: " << event.window.data1 << "x" << event.window.data2 << LL_ENDL;
-            // Guard pixel_density against the 0.f the SDL backend can return
-            // briefly during display-change races. Without this, the multiply
-            // below would zero out width/height and we'd call handleResize
-            // with a degenerate 0x0 rectangle.
-            const F32 raw_density = SDL_GetWindowPixelDensity(mWindow);
-            const F32 pixel_density = raw_density > 0.f ? raw_density : 1.f;
-            S32 width = llmax(event.window.data1, (S32)mMinWindowWidth) * pixel_density;
-            S32 height = llmax(event.window.data2, (S32)mMinWindowHeight) * pixel_density;
+            // Window size changed: refresh the cached pixel metrics the input
+            // handlers and convertCoords read, and reuse the density here.
+            // refreshPixelMetrics clamps it > 0, covering the 0.f the SDL backend
+            // can briefly return during display-change races (which would
+            // otherwise zero width/height into a degenerate handleResize).
+            refreshPixelMetrics();
+            const F32 pixel_density = mCachedPixelDensity;
+            // mMinWindowWidth/Height are 0 until setMinSize runs, so llmax can't
+            // keep these positive this early. Floor to 1px so a 0-dimension
+            // resize (some WMs emit one mid-drag / on un-maximize) never reaches
+            // handleResize as a degenerate 0x0 viewport / divide-by-zero aspect.
+            S32 width = llmax(1, (S32)(llmax(event.window.data1, (S32)mMinWindowWidth) * pixel_density));
+            S32 height = llmax(1, (S32)(llmax(event.window.data2, (S32)mMinWindowHeight) * pixel_density));
 
             mCallbacks->handleResize(this, width, height);
             break;
@@ -2222,8 +2574,14 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // so the clamp has to use the PIXEL-unit minimum shadow — the
             // screen-coord mMinWindowWidth/Height would under-clamp on HiDPI.
             LL_INFOS() << "Handling a pixel-size event: " << event.window.data1 << "x" << event.window.data2 << LL_ENDL;
-            S32 width  = llmax(event.window.data1, (S32)mMinWindowWidthPx);
-            S32 height = llmax(event.window.data2, (S32)mMinWindowHeightPx);
+            // Back-buffer dimensions changed; refresh the cached pixel height
+            // convertCoords reads.
+            refreshPixelMetrics();
+            // Floor to 1px: mMinWindowWidthPx/HeightPx are 0 until setMinSize
+            // runs, so a 0-dimension pixel-size event would otherwise pass
+            // through as a degenerate 0x0 resize.
+            S32 width  = llmax(1, llmax(event.window.data1, (S32)mMinWindowWidthPx));
+            S32 height = llmax(1, llmax(event.window.data2, (S32)mMinWindowHeightPx));
             mCallbacks->handleResize(this, width, height);
             break;
         }
@@ -2390,8 +2748,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             //   2) DNDA_DROPPED                           -> upload / apply
             //   3) DNDA_STOP_TRACKING                     -> mDragItems cleared
             // event.drop.x/y are screen-coord units; scale to PIXEL units.
-            const float density = SDL_GetWindowPixelDensity(mWindow);
-            const float scale = density > 0.f ? density : 1.f;
+            const float scale = mCachedPixelDensity; // cached; see refreshPixelMetrics
             LLCoordWindow winCoord(llfloor(event.drop.x * scale),
                                    llfloor(event.drop.y * scale));
             LLCoordGL openGlCoord;
@@ -2482,7 +2839,11 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 // static
 SDL_AppResult LLWindowSDL::handleEvents(const SDL_Event& event)
 {
-    if(!gWindowImplementation) return SDL_APP_CONTINUE;
+    // Drop events once the window is gone. During teardown destroyContext()
+    // nulls mWindow before ~LLWindowSDL clears gWindowImplementation, and the
+    // per-event handlers below deref mWindow (SDL_GetWindowSizeInPixels, relative
+    // mouse mode, DPI) without their own guards.
+    if (!gWindowImplementation || !gWindowImplementation->mWindow) return SDL_APP_CONTINUE;
 
     return gWindowImplementation->handleEvent(event);
 }
@@ -2539,7 +2900,7 @@ static SDL_Cursor *makeSDLCursorFromMacTIF(const char *basename, int hotx, int h
 }
 #endif // LL_DARWIN
 
-#if !LL_DARWIN
+#if LL_LINUX
 static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty)
 {
     SDL_Surface *bmpsurface = Load_BMP_Resource(filename);
@@ -2621,7 +2982,192 @@ static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty
     }
     return sdlcursor;
 }
-#endif // !LL_DARWIN
+#endif // LL_LINUX
+
+#if LL_WINDOWS
+// Convert one of the viewer's embedded Win32 cursor resources (the same
+// branded .cur/.ani assets the native backend loads in
+// LLWindowWin32::initCursors) into an SDL color cursor. The hot-spot is taken
+// from the resource itself via GetIconInfo, so — unlike the BMP path — there
+// is no hand-maintained hot-spot table to keep in sync. Returns nullptr if the
+// resource is missing or can't be converted, letting initCursors fall back to
+// the SDL system arrow.
+// Read a GDI bitmap as `rows` of top-down 32bpp BGRA into `out`. Used for both
+// the colour bitmap and the (1bpp or 8bpp) mask — GetDIBits converts whatever
+// the source depth is to 32bpp, so monochrome masks come back as black(0)/
+// white(0xFFFFFF) pixels we can test a single byte of.
+static bool win32ReadDIB32(HBITMAP hbm, int width, int rows, std::vector<U8>& out)
+{
+    out.assign((size_t)width * rows * 4, 0);
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+    bi.bmiHeader.biWidth       = width;
+    bi.bmiHeader.biHeight      = -rows; // negative => top-down rows
+    bi.bmiHeader.biPlanes      = 1;
+    bi.bmiHeader.biBitCount    = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+    HDC hdc = GetDC(nullptr);
+    const bool ok = GetDIBits(hdc, hbm, 0, rows, out.data(), &bi, DIB_RGB_COLORS) != 0;
+    ReleaseDC(nullptr, hdc);
+    return ok;
+}
+
+// Convert one of the viewer's embedded Win32 cursor resources (the same
+// branded .cur/.ani assets the native backend loads in
+// LLWindowWin32::initCursors) into an SDL color cursor. The hot-spot is taken
+// from the resource itself via GetIconInfo, so — unlike the BMP path — there
+// is no hand-maintained hot-spot table to keep in sync. Returns nullptr if the
+// resource is missing or can't be converted, letting initCursors fall back to
+// the SDL system arrow.
+static SDL_Cursor *makeSDLCursorFromWin32(const char *resource_name)
+{
+    HMODULE module = GetModuleHandle(nullptr);
+    // LR_DEFAULTCOLOR matches LLWindowWin32::loadColorCursor and also works for
+    // the monochrome resources LoadCursor would otherwise handle. LR_SHARED so
+    // we don't have to DestroyCursor an exe-embedded resource.
+    HCURSOR hcur = (HCURSOR)LoadImageA(module, resource_name, IMAGE_CURSOR,
+                                       0, 0, LR_DEFAULTCOLOR | LR_SHARED);
+    if (!hcur)
+    {
+        LL_WARNS() << "Cursor resource not found: " << resource_name << LL_ENDL;
+        return nullptr;
+    }
+
+    ICONINFO ii = {};
+    if (!GetIconInfo(hcur, &ii))
+    {
+        LL_WARNS() << "GetIconInfo failed for cursor " << resource_name
+                   << " (err " << GetLastError() << ")" << LL_ENDL;
+        return nullptr;
+    }
+    // GetIconInfo hands back *copies* of the bitmaps that we own and must free.
+    // For a 1bpp monochrome cursor hbmColor is NULL and hbmMask is double-height
+    // (AND mask stacked over XOR mask); colour cursors (8/32bpp) carry hbmColor.
+    HBITMAP hbmColor = ii.hbmColor;
+    HBITMAP hbmMask  = ii.hbmMask;
+    const bool monochrome = (hbmColor == nullptr);
+
+    SDL_Cursor *result = nullptr;
+    BITMAP bm = {};
+    HBITMAP dim_src = monochrome ? hbmMask : hbmColor;
+    if (dim_src && GetObject(dim_src, sizeof(bm), &bm) && bm.bmWidth > 0 && bm.bmHeight > 0)
+    {
+        const int width  = bm.bmWidth;
+        const int height = monochrome ? bm.bmHeight / 2 : bm.bmHeight;
+        const size_t count = (size_t)width * height;
+
+        std::vector<U8> rgba(count * 4, 0); // final R,G,B,A handed to SDL
+        bool built = false;
+
+        if (!monochrome)
+        {
+            std::vector<U8> color, mask;
+            const bool got_color = win32ReadDIB32(hbmColor, width, height, color);
+            const bool got_mask  = hbmMask && win32ReadDIB32(hbmMask, width, height, mask);
+            if (got_color)
+            {
+                // 32bpp .cur files carry a real per-pixel alpha channel; 8bpp
+                // ones leave it zero and express transparency via the AND mask.
+                bool has_alpha = false;
+                for (size_t i = 0; i < count; ++i)
+                {
+                    if (color[i * 4 + 3] != 0) { has_alpha = true; break; }
+                }
+                for (size_t i = 0; i < count; ++i)
+                {
+                    const U8 b = color[i * 4 + 0];
+                    const U8 g = color[i * 4 + 1];
+                    const U8 r = color[i * 4 + 2];
+                    U8 a = color[i * 4 + 3];
+                    if (!has_alpha)
+                    {
+                        // AND mask: white (set) => transparent, black => opaque.
+                        a = (got_mask && mask[i * 4 + 0]) ? 0 : 255;
+                    }
+                    rgba[i * 4 + 0] = r;
+                    rgba[i * 4 + 1] = g;
+                    rgba[i * 4 + 2] = b;
+                    rgba[i * 4 + 3] = a;
+                }
+                built = true;
+            }
+            else
+            {
+                LL_WARNS() << "GetDIBits failed for cursor " << resource_name << LL_ENDL;
+            }
+        }
+        else
+        {
+            // 1bpp: hbmMask is AND mask (top half) over XOR mask (bottom half).
+            //   AND=1,XOR=0 => transparent;  AND=0,XOR=1 => white;
+            //   AND=0,XOR=0 => black;  AND=1,XOR=1 => invert screen (approximated
+            //   as opaque black — none of the viewer's cursors rely on invert).
+            std::vector<U8> mask;
+            if (win32ReadDIB32(hbmMask, width, height * 2, mask))
+            {
+                for (size_t i = 0; i < count; ++i)
+                {
+                    const bool and_bit = mask[i * 4] != 0;            // top half
+                    const bool xor_bit = mask[(count + i) * 4] != 0;  // bottom half
+                    U8 r, g, b, a;
+                    if (and_bit && !xor_bit)      { r = g = b = 0;   a = 0;   }
+                    else if (!and_bit && xor_bit) { r = g = b = 255; a = 255; }
+                    else                          { r = g = b = 0;   a = 255; }
+                    rgba[i * 4 + 0] = r;
+                    rgba[i * 4 + 1] = g;
+                    rgba[i * 4 + 2] = b;
+                    rgba[i * 4 + 3] = a;
+                }
+                built = true;
+            }
+            else
+            {
+                LL_WARNS() << "GetDIBits failed for monochrome cursor " << resource_name << LL_ENDL;
+            }
+        }
+
+        if (built)
+        {
+            SDL_Surface *surf = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32);
+            if (surf)
+            {
+                const bool must_lock = SDL_MUSTLOCK(surf);
+                if (!must_lock || SDL_LockSurface(surf))
+                {
+                    for (int y = 0; y < height; ++y)
+                    {
+                        memcpy((U8*)surf->pixels + (size_t)y * surf->pitch,
+                               rgba.data() + (size_t)y * width * 4,
+                               (size_t)width * 4);
+                    }
+                    if (must_lock)
+                    {
+                        SDL_UnlockSurface(surf);
+                    }
+
+                    int hotx = llclamp((int)ii.xHotspot, 0, width - 1);
+                    int hoty = llclamp((int)ii.yHotspot, 0, height - 1);
+                    result = SDL_CreateColorCursor(surf, hotx, hoty);
+                    if (!result)
+                    {
+                        LL_WARNS() << "SDL_CreateColorCursor failed for " << resource_name
+                                   << ": " << SDL_GetError() << LL_ENDL;
+                    }
+                }
+                SDL_DestroySurface(surf);
+            }
+        }
+    }
+    else
+    {
+        LL_WARNS() << "Cursor " << resource_name << " has no usable bitmap." << LL_ENDL;
+    }
+
+    if (hbmColor) DeleteObject(hbmColor);
+    if (hbmMask)  DeleteObject(hbmMask);
+    return result;
+}
+#endif // LL_WINDOWS
 
 void LLWindowSDL::updateCursor()
 {
@@ -2706,6 +3252,42 @@ void LLWindowSDL::initCursors()
     mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromMacTIF("UI_CURSOR_PATHFINDING_END.tif", 16, 16);
     mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromMacTIF("UI_CURSOR_PATHFINDING_END_ADD.tif", 16, 16);
     mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromMacTIF("UI_CURSOR_NO.tif", 8, 8);
+#elif LL_WINDOWS
+    // Load the branded cursors from the exe's embedded .cur resources — the
+    // same resource names LLWindowWin32::initCursors uses. Hot-spots come from
+    // the resources themselves (GetIconInfo), so there's no hand-tuned table.
+    mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromWin32("TOOLGRAB");
+    mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromWin32("TOOLLAND");
+    mSDLCursors[UI_CURSOR_TOOLFOCUS] = makeSDLCursorFromWin32("TOOLFOCUS");
+    mSDLCursors[UI_CURSOR_TOOLCREATE] = makeSDLCursorFromWin32("TOOLCREATE");
+    mSDLCursors[UI_CURSOR_ARROWDRAG] = makeSDLCursorFromWin32("ARROWDRAG");
+    mSDLCursors[UI_CURSOR_ARROWCOPY] = makeSDLCursorFromWin32("ARROWCOPY");
+    mSDLCursors[UI_CURSOR_ARROWDRAGMULTI] = makeSDLCursorFromWin32("ARROWDRAGMULTI");
+    mSDLCursors[UI_CURSOR_ARROWCOPYMULTI] = makeSDLCursorFromWin32("ARROWCOPYMULTI");
+    mSDLCursors[UI_CURSOR_NOLOCKED] = makeSDLCursorFromWin32("NOLOCKED");
+    mSDLCursors[UI_CURSOR_ARROWLOCKED] = makeSDLCursorFromWin32("ARROWLOCKED");
+    mSDLCursors[UI_CURSOR_GRABLOCKED] = makeSDLCursorFromWin32("GRABLOCKED");
+    mSDLCursors[UI_CURSOR_TOOLTRANSLATE] = makeSDLCursorFromWin32("TOOLTRANSLATE");
+    mSDLCursors[UI_CURSOR_TOOLROTATE] = makeSDLCursorFromWin32("TOOLROTATE");
+    mSDLCursors[UI_CURSOR_TOOLSCALE] = makeSDLCursorFromWin32("TOOLSCALE");
+    mSDLCursors[UI_CURSOR_TOOLCAMERA] = makeSDLCursorFromWin32("TOOLCAMERA");
+    mSDLCursors[UI_CURSOR_TOOLPAN] = makeSDLCursorFromWin32("TOOLPAN");
+    mSDLCursors[UI_CURSOR_TOOLZOOMIN] = makeSDLCursorFromWin32("TOOLZOOMIN");
+    mSDLCursors[UI_CURSOR_TOOLZOOMOUT] = makeSDLCursorFromWin32("TOOLZOOMOUT");
+    mSDLCursors[UI_CURSOR_TOOLPICKOBJECT3] = makeSDLCursorFromWin32("TOOLPICKOBJECT3");
+    mSDLCursors[UI_CURSOR_TOOLPLAY] = makeSDLCursorFromWin32("TOOLPLAY");
+    mSDLCursors[UI_CURSOR_TOOLPAUSE] = makeSDLCursorFromWin32("TOOLPAUSE");
+    mSDLCursors[UI_CURSOR_TOOLMEDIAOPEN] = makeSDLCursorFromWin32("TOOLMEDIAOPEN");
+    mSDLCursors[UI_CURSOR_PIPETTE] = makeSDLCursorFromWin32("TOOLPIPETTE");
+    mSDLCursors[UI_CURSOR_TOOLSIT] = makeSDLCursorFromWin32("TOOLSIT");
+    mSDLCursors[UI_CURSOR_TOOLBUY] = makeSDLCursorFromWin32("TOOLBUY");
+    mSDLCursors[UI_CURSOR_TOOLOPEN] = makeSDLCursorFromWin32("TOOLOPEN");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING] = makeSDLCursorFromWin32("TOOLPATHFINDING");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START] = makeSDLCursorFromWin32("TOOLPATHFINDINGPATHSTART");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START_ADD] = makeSDLCursorFromWin32("TOOLPATHFINDINGPATHSTARTADD");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromWin32("TOOLPATHFINDINGPATHEND");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromWin32("TOOLPATHFINDINGPATHENDADD");
+    mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromWin32("TOOLNO");
 #else
     mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromBMP("lltoolgrab.BMP",2,13);
     mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromBMP("lltoolland.BMP",1,6);
@@ -2929,9 +3511,29 @@ void LLWindowSDL::showCursorFromMouseMove()
 }
 
 //
-// LLSplashScreenSDL - I don't think we'll bother to implement this; it's
-// fairly obsolete at this point.
+// LLSplashScreenSDL — a small borderless status window shown while the viewer
+// loads, mirroring LLSplashScreenWin32 (the app name plus an updatable status
+// line). Drawn with SDL_Renderer; text rendered with SDL_ttf from one of the
+// viewer's bundled fonts.
 //
+namespace
+{
+    constexpr int   SPLASH_W        = 480;
+    constexpr int   SPLASH_H        = 120;
+    constexpr float SPLASH_FONT_PT  = 18.0f;
+    // Inter (variable WOFF2) — FreeType decompresses WOFF2 via brotli, which the
+    // viewer's freetype build (shared with SDL3_ttf) enables.
+    const char*     SPLASH_FONT     = "InterVariable.woff2";
+    // Branded icon, vertically centered in a square box on the left.
+    constexpr int   SPLASH_ICON     = 80;
+    constexpr int   SPLASH_ICON_X   = 20;
+    constexpr int   SPLASH_ICON_Y   = (SPLASH_H - SPLASH_ICON) / 2;
+    const char*     SPLASH_ICON_PNG = "alchemy_logo.png";
+    // Status text is centered in the area to the right of the icon.
+    constexpr int   SPLASH_TEXT_X0  = SPLASH_ICON_X + SPLASH_ICON + 16;
+    constexpr int   SPLASH_TEXT_X1  = SPLASH_W - 16;
+}
+
 LLSplashScreenSDL::LLSplashScreenSDL()
 {
 }
@@ -2942,14 +3544,198 @@ LLSplashScreenSDL::~LLSplashScreenSDL()
 
 void LLSplashScreenSDL::showImpl()
 {
+    // The splash is shown before createWindow()/init_sdl(), so the video
+    // subsystem may not be up yet. SDL_InitSubSystem is reference-counted, so
+    // initialising it here is safe; hideImpl() releases exactly this reference,
+    // leaving the count the main window's own init_sdl() established.
+    if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
+    {
+        LL_WARNS() << "Splash: SDL_InitSubSystem(VIDEO) failed: " << SDL_GetError() << LL_ENDL;
+        return;
+    }
+    mInitedVideo = true;
+
+    if (TTF_Init())
+    {
+        mInitedTTF = true;
+    }
+    else
+    {
+        LL_WARNS() << "Splash: TTF_Init failed: " << SDL_GetError() << LL_ENDL;
+    }
+
+    SDL_PropertiesID props = SDL_CreateProperties();
+    SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Alchemy");
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, SPLASH_W);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, SPLASH_H);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_ALWAYS_ON_TOP_BOOLEAN, true);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_UTILITY_BOOLEAN, true);
+    mWindow = SDL_CreateWindowWithProperties(props);
+    SDL_DestroyProperties(props);
+
+    if (!mWindow)
+    {
+        LL_WARNS() << "Splash: window creation failed: " << SDL_GetError() << LL_ENDL;
+        return;
+    }
+
+    // Use a software renderer that draws into the window's surface rather than
+    // an accelerated one. SDL's accelerated renderer would create its own
+    // GL/D3D device on the splash window, which can collide with the main
+    // window's OpenGL context initialisation that follows — keep the splash
+    // entirely off the GPU.
+    SDL_Surface* winsurf = SDL_GetWindowSurface(mWindow);
+    if (winsurf)
+    {
+        mRenderer = SDL_CreateSoftwareRenderer(winsurf);
+    }
+    if (!mRenderer)
+    {
+        LL_WARNS() << "Splash: software renderer creation failed: " << SDL_GetError() << LL_ENDL;
+        // Don't leave a blank borderless always-on-top window up for the whole
+        // load. Tear the partial splash window down now; hideImpl() still
+        // balances the TTF/VIDEO subsystem refcounts taken above.
+        SDL_DestroyWindow(mWindow);
+        mWindow = nullptr;
+        return;
+    }
+
+    if (mInitedTTF)
+    {
+        const std::string font_path = gDirUtilp->add(gDirUtilp->getAppRODataDir(), "fonts", SPLASH_FONT);
+        mFont = TTF_OpenFont(font_path.c_str(), SPLASH_FONT_PT);
+        if (!mFont)
+        {
+            LL_WARNS() << "Splash: TTF_OpenFont(" << font_path << ") failed: " << SDL_GetError() << LL_ENDL;
+        }
+    }
+
+    // Branded app icon (PNG), staged into app_settings by CMake.
+    if (mRenderer)
+    {
+        const std::string icon_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, SPLASH_ICON_PNG);
+        SDL_Surface* icon_surf = IMG_Load(icon_path.c_str());
+        if (icon_surf)
+        {
+            mIcon = SDL_CreateTextureFromSurface(mRenderer, icon_surf);
+            // Smooth the downscale from the source (256px) to the splash box.
+            if (mIcon)
+            {
+                SDL_SetTextureScaleMode(mIcon, SDL_SCALEMODE_LINEAR);
+            }
+            SDL_DestroySurface(icon_surf);
+        }
+        else
+        {
+            LL_WARNS() << "Splash: IMG_Load(" << icon_path << ") failed: " << SDL_GetError() << LL_ENDL;
+        }
+    }
+
+    render();
 }
 
 void LLSplashScreenSDL::updateImpl(const std::string& mesg)
 {
+    mMessage = mesg;
+    render();
+}
+
+void LLSplashScreenSDL::render()
+{
+    if (!mRenderer)
+    {
+        return;
+    }
+
+    SDL_SetRenderDrawColor(mRenderer, 28, 28, 34, 255);
+    SDL_RenderClear(mRenderer);
+
+    // Thin accent border around the edge.
+    SDL_SetRenderDrawColor(mRenderer, 90, 110, 160, 255);
+    SDL_FRect border = { 0.5f, 0.5f, (float)SPLASH_W - 1.f, (float)SPLASH_H - 1.f };
+    SDL_RenderRect(mRenderer, &border);
+
+    // Branded icon, vertically centered on the left.
+    if (mIcon)
+    {
+        SDL_FRect dst = { (float)SPLASH_ICON_X, (float)SPLASH_ICON_Y, (float)SPLASH_ICON, (float)SPLASH_ICON };
+        SDL_RenderTexture(mRenderer, mIcon, nullptr, &dst);
+    }
+
+    if (mFont)
+    {
+        TTF_Font* font = (TTF_Font*)mFont;
+        const SDL_Color fg = { 235, 235, 240, 255 };
+        const std::string& text = mMessage.empty() ? std::string("Loading Alchemy...") : mMessage;
+        SDL_Surface* surf = TTF_RenderText_Blended(font, text.c_str(), text.length(), fg);
+        if (surf)
+        {
+            SDL_Texture* tex = SDL_CreateTextureFromSurface(mRenderer, surf);
+            if (tex)
+            {
+                // Center the text in the area to the right of the icon.
+                const int region = SPLASH_TEXT_X1 - SPLASH_TEXT_X0;
+                SDL_FRect dst = {
+                    (float)(SPLASH_TEXT_X0 + (region - surf->w) / 2),
+                    (float)((SPLASH_H - surf->h) / 2),
+                    (float)surf->w,
+                    (float)surf->h
+                };
+                SDL_RenderTexture(mRenderer, tex, nullptr, &dst);
+                SDL_DestroyTexture(tex);
+            }
+            SDL_DestroySurface(surf);
+        }
+    }
+
+    // Flush the queued render commands into the window surface, then blit that
+    // surface to the screen (the software renderer targets the surface, not the
+    // window directly, so SDL_RenderPresent alone wouldn't show anything).
+    SDL_RenderPresent(mRenderer);
+    SDL_UpdateWindowSurface(mWindow);
+
+    // No SDL event loop is running yet (the splash precedes the main window and
+    // SDL_AppIterate), so pump once here to let the window actually composite.
+    SDL_PumpEvents();
 }
 
 void LLSplashScreenSDL::hideImpl()
 {
+    if (mIcon)
+    {
+        SDL_DestroyTexture(mIcon);
+        mIcon = nullptr;
+    }
+    if (mFont)
+    {
+        TTF_CloseFont((TTF_Font*)mFont);
+        mFont = nullptr;
+    }
+    if (mRenderer)
+    {
+        SDL_DestroyRenderer(mRenderer);
+        mRenderer = nullptr;
+    }
+    if (mWindow)
+    {
+        SDL_DestroyWindow(mWindow);
+        mWindow = nullptr;
+    }
+    if (mInitedTTF)
+    {
+        TTF_Quit();
+        mInitedTTF = false;
+    }
+    if (mInitedVideo)
+    {
+        // Release the reference showImpl() took. By now createWindow()'s
+        // init_sdl() has taken its own, so VIDEO stays up for the main window.
+        SDL_QuitSubSystem(SDL_INIT_VIDEO);
+        mInitedVideo = false;
+    }
 }
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type)
@@ -3079,6 +3865,100 @@ void* LLWindowSDL::getPlatformWindow()
     }
     return ret;
 }
+
+#if LL_WINDOWS
+void LLWindowSDL::installWin32Subclass()
+{
+    if (mPrevWndProc) // already installed
+        return;
+
+    HWND hwnd = (HWND)getPlatformWindow();
+    if (!hwnd)
+        return;
+
+    mWin32Hwnd = hwnd;
+    mPrevWndProc = (WNDPROC)SetWindowLongPtrW(hwnd, GWLP_WNDPROC,
+                                              (LONG_PTR)&LLWindowSDL::win32WndProc);
+}
+
+void LLWindowSDL::removeWin32Subclass()
+{
+    if (mWin32Hwnd && mPrevWndProc)
+    {
+        SetWindowLongPtrW(mWin32Hwnd, GWLP_WNDPROC, (LONG_PTR)mPrevWndProc);
+    }
+    mWin32Hwnd = nullptr;
+    mPrevWndProc = nullptr;
+}
+
+// SDL pumps the Win32 message queue on the main thread, so a cross-process
+// SendMessage(WM_COPYDATA) is dispatched here synchronously on the main
+// thread — no cross-thread post needed (unlike LLWindowWin32, whose WndProc
+// runs on its own window thread). Everything else chains to SDL's WndProc so
+// the window keeps working normally.
+LRESULT CALLBACK LLWindowSDL::win32WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+{
+    LLWindowSDL* self = gWindowImplementation;
+
+    if (msg == WM_COPYDATA && self)
+    {
+        // received a URL from a second instance (see sendURLToOtherInstance).
+        PCOPYDATASTRUCT cds = (PCOPYDATASTRUCT)lparam;
+        // The only downstream consumer (LLViewerWindow::handleDataCopy) treats
+        // the payload as a C string. Reject oversized or empty messages and
+        // guarantee NUL-termination so a misbehaving sender can't force a huge
+        // alloc or trigger an OOB read.
+        constexpr DWORD MAX_WM_COPYDATA_BYTES = 64 * 1024;
+        if (cds && cds->lpData && cds->cbData != 0 && cds->cbData <= MAX_WM_COPYDATA_BYTES)
+        {
+            const DWORD cb = cds->cbData;
+            U8* data = new U8[cb + 1];
+            memcpy(data, cds->lpData, cb);
+            data[cb] = 0;
+            self->handleDataCopy((S32)cds->dwData, data);
+            delete[] data;
+        }
+        return TRUE;
+    }
+
+    WNDPROC prev = (self && self->mWin32Hwnd == hwnd) ? self->mPrevWndProc : nullptr;
+    if (prev)
+        return CallWindowProcW(prev, hwnd, msg, wparam, lparam);
+    return DefWindowProcW(hwnd, msg, wparam, lparam);
+}
+
+void LLWindowSDL::handleDataCopy(S32 data_type, void* data)
+{
+    if (mCallbacks)
+    {
+        mCallbacks->handleDataCopy(this, data_type, data);
+    }
+}
+
+void* LLWindowSDL::getDirectInput8()
+{
+    return &gSDLDirectInput8;
+}
+
+bool LLWindowSDL::getInputDevices(U32 device_type_filter,
+                                  std::function<bool(std::string&, LLSD&, void*)> osx_callback,
+                                  void* di8_devices_callback,
+                                  void* userdata)
+{
+    if (gSDLDirectInput8 != nullptr)
+    {
+        // Enumerate devices
+        HRESULT status = gSDLDirectInput8->EnumDevices(
+            (DWORD)device_type_filter,
+            (LPDIENUMDEVICESCALLBACK)di8_devices_callback,
+            (LPVOID*)userdata,
+            DIEDFL_ATTACHEDONLY);
+
+        return status == DI_OK;
+    }
+    return false;
+}
+#endif // LL_WINDOWS
 
 void LLWindowSDL::bringToFront()
 {
