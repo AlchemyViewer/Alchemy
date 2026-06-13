@@ -41,6 +41,7 @@ indra/lib/python/eventlet/
 indra/lib/python/mulib.*
 indra/llwindow/glh/glh_linear.h
 indra/newview/alchemy.icns
+indra/newview/app_settings/alchemy_logo.png
 indra/newview/app_settings/dictionaries
 indra/newview/app_settings/mozilla
 indra/newview/app_settings/mozilla-runtime-*

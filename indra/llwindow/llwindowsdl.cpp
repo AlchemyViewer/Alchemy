@@ -40,6 +40,9 @@
 #include "llpreeditor.h"
 #include "llsdl.h"
 
+#include "SDL3_ttf/SDL_ttf.h"     // LLSplashScreenSDL status text
+#include "SDL3_image/SDL_image.h" // LLSplashScreenSDL branded icon (PNG)
+
 #if LL_LINUX
 extern "C" {
 # include "fontconfig/fontconfig.h"
@@ -3441,9 +3444,29 @@ void LLWindowSDL::showCursorFromMouseMove()
 }
 
 //
-// LLSplashScreenSDL - I don't think we'll bother to implement this; it's
-// fairly obsolete at this point.
+// LLSplashScreenSDL — a small borderless status window shown while the viewer
+// loads, mirroring LLSplashScreenWin32 (the app name plus an updatable status
+// line). Drawn with SDL_Renderer; text rendered with SDL_ttf from one of the
+// viewer's bundled fonts.
 //
+namespace
+{
+    constexpr int   SPLASH_W        = 480;
+    constexpr int   SPLASH_H        = 120;
+    constexpr float SPLASH_FONT_PT  = 18.0f;
+    // Inter (variable WOFF2) — FreeType decompresses WOFF2 via brotli, which the
+    // viewer's freetype build (shared with SDL3_ttf) enables.
+    const char*     SPLASH_FONT     = "InterVariable.woff2";
+    // Branded icon, vertically centered in a square box on the left.
+    constexpr int   SPLASH_ICON     = 80;
+    constexpr int   SPLASH_ICON_X   = 20;
+    constexpr int   SPLASH_ICON_Y   = (SPLASH_H - SPLASH_ICON) / 2;
+    const char*     SPLASH_ICON_PNG = "alchemy_logo.png";
+    // Status text is centered in the area to the right of the icon.
+    constexpr int   SPLASH_TEXT_X0  = SPLASH_ICON_X + SPLASH_ICON + 16;
+    constexpr int   SPLASH_TEXT_X1  = SPLASH_W - 16;
+}
+
 LLSplashScreenSDL::LLSplashScreenSDL()
 {
 }
@@ -3454,14 +3477,192 @@ LLSplashScreenSDL::~LLSplashScreenSDL()
 
 void LLSplashScreenSDL::showImpl()
 {
+    // The splash is shown before createWindow()/init_sdl(), so the video
+    // subsystem may not be up yet. SDL_InitSubSystem is reference-counted, so
+    // initialising it here is safe; hideImpl() releases exactly this reference,
+    // leaving the count the main window's own init_sdl() established.
+    if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
+    {
+        LL_WARNS() << "Splash: SDL_InitSubSystem(VIDEO) failed: " << SDL_GetError() << LL_ENDL;
+        return;
+    }
+    mInitedVideo = true;
+
+    if (TTF_Init())
+    {
+        mInitedTTF = true;
+    }
+    else
+    {
+        LL_WARNS() << "Splash: TTF_Init failed: " << SDL_GetError() << LL_ENDL;
+    }
+
+    SDL_PropertiesID props = SDL_CreateProperties();
+    SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Alchemy");
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, SPLASH_W);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, SPLASH_H);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_ALWAYS_ON_TOP_BOOLEAN, true);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_UTILITY_BOOLEAN, true);
+    mWindow = SDL_CreateWindowWithProperties(props);
+    SDL_DestroyProperties(props);
+
+    if (!mWindow)
+    {
+        LL_WARNS() << "Splash: window creation failed: " << SDL_GetError() << LL_ENDL;
+        return;
+    }
+
+    // Use a software renderer that draws into the window's surface rather than
+    // an accelerated one. SDL's accelerated renderer would create its own
+    // GL/D3D device on the splash window, which can collide with the main
+    // window's OpenGL context initialisation that follows — keep the splash
+    // entirely off the GPU.
+    SDL_Surface* winsurf = SDL_GetWindowSurface(mWindow);
+    if (winsurf)
+    {
+        mRenderer = SDL_CreateSoftwareRenderer(winsurf);
+    }
+    if (!mRenderer)
+    {
+        LL_WARNS() << "Splash: software renderer creation failed: " << SDL_GetError() << LL_ENDL;
+    }
+
+    if (mInitedTTF)
+    {
+        const std::string font_path = gDirUtilp->add(gDirUtilp->getAppRODataDir(), "fonts", SPLASH_FONT);
+        mFont = TTF_OpenFont(font_path.c_str(), SPLASH_FONT_PT);
+        if (!mFont)
+        {
+            LL_WARNS() << "Splash: TTF_OpenFont(" << font_path << ") failed: " << SDL_GetError() << LL_ENDL;
+        }
+    }
+
+    // Branded app icon (PNG), staged into app_settings by CMake.
+    if (mRenderer)
+    {
+        const std::string icon_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, SPLASH_ICON_PNG);
+        SDL_Surface* icon_surf = IMG_Load(icon_path.c_str());
+        if (icon_surf)
+        {
+            mIcon = SDL_CreateTextureFromSurface(mRenderer, icon_surf);
+            // Smooth the downscale from the source (256px) to the splash box.
+            if (mIcon)
+            {
+                SDL_SetTextureScaleMode(mIcon, SDL_SCALEMODE_LINEAR);
+            }
+            SDL_DestroySurface(icon_surf);
+        }
+        else
+        {
+            LL_WARNS() << "Splash: IMG_Load(" << icon_path << ") failed: " << SDL_GetError() << LL_ENDL;
+        }
+    }
+
+    render();
 }
 
 void LLSplashScreenSDL::updateImpl(const std::string& mesg)
 {
+    mMessage = mesg;
+    render();
+}
+
+void LLSplashScreenSDL::render()
+{
+    if (!mRenderer)
+    {
+        return;
+    }
+
+    SDL_SetRenderDrawColor(mRenderer, 28, 28, 34, 255);
+    SDL_RenderClear(mRenderer);
+
+    // Thin accent border around the edge.
+    SDL_SetRenderDrawColor(mRenderer, 90, 110, 160, 255);
+    SDL_FRect border = { 0.5f, 0.5f, (float)SPLASH_W - 1.f, (float)SPLASH_H - 1.f };
+    SDL_RenderRect(mRenderer, &border);
+
+    // Branded icon, vertically centered on the left.
+    if (mIcon)
+    {
+        SDL_FRect dst = { (float)SPLASH_ICON_X, (float)SPLASH_ICON_Y, (float)SPLASH_ICON, (float)SPLASH_ICON };
+        SDL_RenderTexture(mRenderer, mIcon, nullptr, &dst);
+    }
+
+    if (mFont)
+    {
+        TTF_Font* font = (TTF_Font*)mFont;
+        const SDL_Color fg = { 235, 235, 240, 255 };
+        const std::string& text = mMessage.empty() ? std::string("Loading Alchemy...") : mMessage;
+        SDL_Surface* surf = TTF_RenderText_Blended(font, text.c_str(), text.length(), fg);
+        if (surf)
+        {
+            SDL_Texture* tex = SDL_CreateTextureFromSurface(mRenderer, surf);
+            if (tex)
+            {
+                // Center the text in the area to the right of the icon.
+                const int region = SPLASH_TEXT_X1 - SPLASH_TEXT_X0;
+                SDL_FRect dst = {
+                    (float)(SPLASH_TEXT_X0 + (region - surf->w) / 2),
+                    (float)((SPLASH_H - surf->h) / 2),
+                    (float)surf->w,
+                    (float)surf->h
+                };
+                SDL_RenderTexture(mRenderer, tex, nullptr, &dst);
+                SDL_DestroyTexture(tex);
+            }
+            SDL_DestroySurface(surf);
+        }
+    }
+
+    // Flush the queued render commands into the window surface, then blit that
+    // surface to the screen (the software renderer targets the surface, not the
+    // window directly, so SDL_RenderPresent alone wouldn't show anything).
+    SDL_RenderPresent(mRenderer);
+    SDL_UpdateWindowSurface(mWindow);
+
+    // No SDL event loop is running yet (the splash precedes the main window and
+    // SDL_AppIterate), so pump once here to let the window actually composite.
+    SDL_PumpEvents();
 }
 
 void LLSplashScreenSDL::hideImpl()
 {
+    if (mIcon)
+    {
+        SDL_DestroyTexture(mIcon);
+        mIcon = nullptr;
+    }
+    if (mFont)
+    {
+        TTF_CloseFont((TTF_Font*)mFont);
+        mFont = nullptr;
+    }
+    if (mRenderer)
+    {
+        SDL_DestroyRenderer(mRenderer);
+        mRenderer = nullptr;
+    }
+    if (mWindow)
+    {
+        SDL_DestroyWindow(mWindow);
+        mWindow = nullptr;
+    }
+    if (mInitedTTF)
+    {
+        TTF_Quit();
+        mInitedTTF = false;
+    }
+    if (mInitedVideo)
+    {
+        // Release the reference showImpl() took. By now createWindow()'s
+        // init_sdl() has taken its own, so VIDEO stays up for the main window.
+        SDL_QuitSubSystem(SDL_INIT_VIDEO);
+        mInitedVideo = false;
+    }
 }
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type)

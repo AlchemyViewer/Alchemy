@@ -487,6 +487,19 @@ public:
     void showImpl() override;
     void updateImpl(const std::string& mesg) override;
     void hideImpl() override;
+
+private:
+    // Redraw the splash (background + current status text) and pump events so
+    // it paints while the main thread is busy loading.
+    void render();
+
+    SDL_Window*   mWindow = nullptr;
+    SDL_Renderer* mRenderer = nullptr;
+    void*         mFont = nullptr;   // TTF_Font* (kept opaque to spare the header SDL_ttf)
+    SDL_Texture*  mIcon = nullptr;   // branded app icon, left side
+    std::string   mMessage;
+    bool          mInitedVideo = false;
+    bool          mInitedTTF = false;
 };
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type);

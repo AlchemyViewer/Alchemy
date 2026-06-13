@@ -82,6 +82,8 @@ class ViewerManifest(LLManifest):
                 self.exclude("logcontrol-dev.xml")
                 self.path("*.ini")
                 self.path("*.xml")
+                # Branded splash icon for the SDL splash screen (LLSplashScreenSDL)
+                self.path("alchemy_logo.png")
 
                 # include the entire shaders directory recursively
                 self.path("shaders")

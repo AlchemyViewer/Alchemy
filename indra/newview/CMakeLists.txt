@@ -109,6 +109,15 @@ elseif(LINUX)
     )
 endif ()
 
+# Branded splash icon for the SDL splash screen (LLSplashScreenSDL loads this
+# PNG at runtime from app_settings). Staged on all platforms so the SDL build
+# finds it regardless of which backend the package ends up using.
+execute_process(
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/alchemy_logo.png"
+  )
+
 if (HAVOK)
    # When using HAVOK_TPV, the library is precompiled, so no need for this
 
