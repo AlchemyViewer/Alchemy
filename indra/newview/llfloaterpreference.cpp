@@ -40,6 +40,7 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llcheckboxctrl.h"
+#include "llclipboard.h"
 #include "llcolorswatch.h"
 #include "llcombobox.h"
 #include "llcommandhandler.h"
@@ -74,6 +75,7 @@
 #include "llsliderctrl.h"
 #include "lltabcontainer.h"
 #include "lltrans.h"
+#include "lluri.h"
 #include "llviewercontrol.h"
 #include "llviewercamera.h"
 #include "llviewereventrecorder.h"
@@ -396,6 +398,7 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     mCommitCallbackRegistrar.add("Pref.ClearLog",               boost::bind(&LLConversationLog::onClearLog, &LLConversationLog::instance()));
     mCommitCallbackRegistrar.add("Pref.DeleteTranscripts",      boost::bind(&LLFloaterPreference::onDeleteTranscripts, this));
     mCommitCallbackRegistrar.add("UpdateFilter", boost::bind(&LLFloaterPreference::onUpdateFilterTerm, this, false)); // <FS:ND/> Hook up for filtering
+    mCommitCallbackRegistrar.add("Pref.CopySearchAsSLURL",      boost::bind(&LLFloaterPreference::onCopySearch, this));
 #ifdef LL_DISCORD
     gSavedSettings.getControl("EnableDiscord")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
     gSavedSettings.getControl("ShowDiscordActivityDetails")->getCommitSignal()->connect(boost::bind(&LLAppViewer::updateDiscordActivity));
@@ -1411,7 +1414,12 @@ void LLFloaterPreference::onOpen(const LLSD& key)
     }
 
     collectSearchableItems();
-    if (!mFilterEdit->getText().empty())
+    if (key.has("search"))
+    {
+        mFilterEdit->setText(key["search"].asString());
+        onUpdateFilterTerm(true);
+    }
+    else if (!mFilterEdit->getText().empty())
     {
         mFilterEdit->setText(LLStringExplicit(""));
         onUpdateFilterTerm(true);
@@ -4267,6 +4275,12 @@ void LLFloaterPreference::onUpdateFilterTerm(bool force)
 
     if (LLTabContainer* pRoot = getChild<LLTabContainer>("pref core"))
         pRoot->selectFirstTab();
+}
+
+void LLFloaterPreference::onCopySearch()
+{
+    std::string search_query = "secondlife:///app/openfloater/preferences?search=" + LLURI::escape(mFilterEdit->getText());
+    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(search_query), 0, static_cast<S32>(search_query.size()));
 }
 
 void LLFloaterPreference::filterIgnorableNotifications()

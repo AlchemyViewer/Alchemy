@@ -56,7 +56,7 @@
          left="0"
          max_length_bytes="255"
          name="search_prefs_edit"
-         right="-1"
+         right="-28"
          text_pad_left="6"
          tool_tip="Type the search term you are interested in here. Results will be displayed for partial fulltext matches within the setting's name or comment."
          top="0">
@@ -71,6 +71,21 @@
           rect.width="12"
           rect.bottom="-1" />
         </search_editor>
+        <button
+         height="18"
+         width="24"
+         follows="right|top"
+         image_overlay="Icon_Copy"
+         image_unselected="Toolbar_Middle_Off"
+         image_selected="Toolbar_Middle_Selected"
+         layout="topleft"
+         left_pad="4"
+         top_delta="0"
+         name="copy_search_slurl_btn"
+         tool_tip="Copy search query as SLURL">
+          <button.commit_callback
+           function="Pref.CopySearchAsSLURL" />
+        </button>
     </panel>
 
     <tab_container
