@@ -198,6 +198,25 @@ MASK LLKeyboardWin32::updateModifiers()
 
 
 // mask is ignored, except for extended flag -- we poll the modifier keys for the other flags
+namespace
+{
+    // A NumLock-independent handle for the physical key behind a Win32 VK.
+    // NumLock changes which VK a numpad key sends (VK_NUMPAD2 vs VK_DOWN for one
+    // physical key), but MapVirtualKey resolves both to the same scancode, so the
+    // scancode — plus the extended-key flag, which separates the real arrow/nav
+    // cluster from the numpad — is stable across a NumLock toggle. Returns 0 when
+    // there is no scancode (the caller then skips the down/up replay map).
+    U32 win32PhysicalKeyId(U16 os_key, MASK mask)
+    {
+        U32 sc = ::MapVirtualKey(os_key, MAPVK_VK_TO_VSC);
+        if (!sc)
+        {
+            return 0;
+        }
+        return (mask & MASK_EXTENDED) ? (sc | 0x10000u) : sc;
+    }
+}
+
 bool LLKeyboardWin32::handleKeyDown(const LLKeyboard::NATIVE_KEY_TYPE key, MASK mask)
 {
     KEY     translated_key;
@@ -208,6 +227,16 @@ bool LLKeyboardWin32::handleKeyDown(const LLKeyboard::NATIVE_KEY_TYPE key, MASK 
 
     if (translateExtendedKey(key, mask, &translated_key))
     {
+        // Remember what this physical key resolved to so the matching key-up
+        // releases the SAME KEY. translateExtendedKey's numpad-distinct decision
+        // reads the live NumLock state; without this, toggling NumLock while a
+        // numpad key is held makes the up edge translate to a different KEY and
+        // leaves the down KEY's level stuck (e.g. the avatar keeps walking).
+        U32 phys = win32PhysicalKeyId(key, mask);
+        if (phys)
+        {
+            mKeyDownTranslation[phys] = translated_key;
+        }
         handled = handleTranslatedKeyDown(translated_key, translated_mask);
     }
 
@@ -223,7 +252,18 @@ bool LLKeyboardWin32::handleKeyUp(const LLKeyboard::NATIVE_KEY_TYPE key, MASK ma
 
     translated_mask = updateModifiers();
 
-    if (translateExtendedKey(key, mask, &translated_key))
+    // Prefer the translation recorded on key-down so press/release stay
+    // symmetric across a mid-press NumLock toggle; fall back to translating the
+    // up edge for keys with no recorded down (e.g. held across a focus change).
+    U32 phys = win32PhysicalKeyId(key, mask);
+    std::map<U32, KEY>::iterator it = (phys != 0) ? mKeyDownTranslation.find(phys) : mKeyDownTranslation.end();
+    if (it != mKeyDownTranslation.end())
+    {
+        translated_key = it->second;
+        mKeyDownTranslation.erase(it);
+        handled = handleTranslatedKeyUp(translated_key, translated_mask);
+    }
+    else if (translateExtendedKey(key, mask, &translated_key))
     {
         handled = handleTranslatedKeyUp(translated_key, translated_mask);
     }

@@ -50,6 +50,11 @@ protected:
 private:
     std::map<LLKeyboard::NATIVE_KEY_TYPE, KEY> mTranslateNumpadMap;  // special map for translating OS keys to numpad keys
     std::map<KEY, LLKeyboard::NATIVE_KEY_TYPE> mInvTranslateNumpadMap; // inverse of the above
+    // The KEY a held numpad key resolved to on its key-down, so key-up releases
+    // the same KEY even if NumLock was toggled mid-press (otherwise the down
+    // KEY's level sticks). SDL delivers a stable SDLK_KP_* keysym per physical
+    // key regardless of NumLock, so the keysym is a reliable handle.
+    std::map<LLKeyboard::NATIVE_KEY_TYPE, KEY> mNumpadKeyDown;
 
 public:
     static U32 mapSDLtoWin( U32 );

@@ -262,12 +262,22 @@ bool LLKeyboardSDL::handleKeyDown(const LLKeyboard::NATIVE_KEY_TYPE key, const M
     // arrow/nav cluster (adjustNativekeyFromUnhandledMask) before translating.
     if (translateNumpadKey(key, mask, &translated_key))
     {
+        // translateNumpadKey only succeeds for numpad keys; remember the
+        // distinct KEY_PAD_* so the up edge can release it (see handleKeyUp).
+        mNumpadKeyDown[key] = translated_key;
         return handleTranslatedKeyDown(translated_key, translated_mask);
     }
 
     LLKeyboard::NATIVE_KEY_TYPE adjusted_nativekey = adjustNativekeyFromUnhandledMask(key, mask);
     if (translateKey(adjusted_nativekey, &translated_key))
     {
+        // A numpad key folded onto the digit/nav cluster (NumLock on, or a
+        // non-distinct mode): record it too so the up edge releases this exact
+        // KEY rather than re-deriving from a possibly-changed NumLock state.
+        if (mTranslateNumpadMap.find(key) != mTranslateNumpadMap.end())
+        {
+            mNumpadKeyDown[key] = translated_key;
+        }
         return handleTranslatedKeyDown(translated_key, translated_mask);
     }
 
@@ -280,8 +290,19 @@ bool LLKeyboardSDL::handleKeyUp(const LLKeyboard::NATIVE_KEY_TYPE key, const MAS
     KEY translated_key = 0;
     MASK translated_mask = updateModifiers(mask);
 
-    // Mirror handleKeyDown exactly: a key pressed as KEY_PAD_* must release as
-    // KEY_PAD_*, or its level stays stuck.
+    // Release exactly what the matching key-down emitted. translateNumpadKey's
+    // distinct-vs-folded decision depends on the live NumLock bit, so
+    // re-translating here would pick a different KEY (and leave the down KEY's
+    // level stuck) if NumLock was toggled while the key was held. Replaying the
+    // recorded down translation keeps press/release symmetric.
+    auto it = mNumpadKeyDown.find(key);
+    if (it != mNumpadKeyDown.end())
+    {
+        translated_key = it->second;
+        mNumpadKeyDown.erase(it);
+        return handleTranslatedKeyUp(translated_key, translated_mask);
+    }
+
     if (translateNumpadKey(key, mask, &translated_key))
     {
         return handleTranslatedKeyUp(translated_key, translated_mask);
