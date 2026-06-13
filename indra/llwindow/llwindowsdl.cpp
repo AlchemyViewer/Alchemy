@@ -70,6 +70,17 @@ LLWindowSDL::WAYLAND_DATA LLWindowSDL::sWaylandData = {};
 bool LLWindowSDL::sUseMultGL = false;
 #endif
 
+#if LL_WINDOWS
+#define DIRECTINPUT_VERSION 0x0800
+#include <dinput.h>
+#include "lldxhardware.h"
+
+// DirectInput8 interface for llviewerjoystick / SpaceNavigator. Created once
+// in the LLWindowSDL constructor; only needs the process module handle, not
+// the window, so the SDL backend can provide the same access LLWindowWin32 does.
+static LPDIRECTINPUT8 gSDLDirectInput8 = nullptr;
+#endif
+
 bool gHiDPISupport = true;
 
 const S32 MAX_NUM_RESOLUTIONS = 200;
@@ -106,6 +117,19 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     gKeyboard = new LLKeyboardSDL();
     gKeyboard->setCallbacks(callbacks);
 
+#if LL_WINDOWS
+    // Init Direct Input - needed for joystick / Spacemouse (see llviewerjoystick).
+    if (!gSDLDirectInput8)
+    {
+        LPDIRECTINPUT8 di8_interface = nullptr;
+        if (DirectInput8Create(GetModuleHandle(nullptr), DIRECTINPUT_VERSION,
+                               IID_IDirectInput8, (LPVOID*)&di8_interface, nullptr) == DI_OK)
+        {
+            gSDLDirectInput8 = di8_interface;
+        }
+    }
+#endif
+
     // Assume 4:3 aspect ratio until we know better
     mNativeAspectRatio = 1024.f / 768.f;
 
@@ -140,6 +164,10 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     {
         gGLManager.initWGL();
         gGLManager.initGL();
+#if LL_WINDOWS
+        // GL didn't always report a VRAM budget (notably Intel iGPUs); ask DXGI.
+        LLDXHardware::updateVRAMBudgetFromDXGI();
+#endif
 
         //start with arrow cursor
         initCursors();
@@ -149,11 +177,12 @@ LLWindowSDL::LLWindowSDL(LLWindowCallbacks* callbacks,
     stop_glerror();
 }
 
-#if !LL_DARWIN
-// The BMP cursor/icon tree (res-sdl/) is only shipped in the Linux bundle. On
-// macOS we load cursors from cursors_mac/*.tif (see makeSDLCursorFromMacTIF
-// below), so this helper would be unused there — and the build is -Werror on
-// unused static functions.
+#if LL_LINUX
+// The BMP cursor/icon tree (res-sdl/) is only shipped in the Linux bundle.
+// macOS loads cursors from cursors_mac/*.tif (makeSDLCursorFromMacTIF) and
+// Windows from the exe's embedded .cur resources (makeSDLCursorFromWin32), so
+// this helper would be unused on those platforms — and the build is -Werror
+// on unused static functions.
 static SDL_Surface *Load_BMP_Resource(const char *basename)
 {
     const int PATH_BUFFER_SIZE=1000;
@@ -169,7 +198,7 @@ static SDL_Surface *Load_BMP_Resource(const char *basename)
 
     return SDL_LoadBMP(path_buffer);
 }
-#endif // !LL_DARWIN
+#endif // LL_LINUX
 
 void LLWindowSDL::setTitle(const std::string title)
 {
@@ -538,6 +567,12 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     // different density (after switchContext). Recompute now that mWindow
     // reflects the active display.
     refreshMinSizePixelShadow();
+
+#if LL_WINDOWS
+    // Hook WM_COPYDATA on the native HWND for second-instance SLURL hand-off.
+    installWin32Subclass();
+#endif
+
     return true;
 }
 
@@ -653,6 +688,9 @@ bool LLWindowSDL::switchContext(bool fullscreen, const LLCoordScreen &size, bool
         {
             gGLManager.initWGL();
             gGLManager.initGL();
+#if LL_WINDOWS
+            LLDXHardware::updateVRAMBudgetFromDXGI();
+#endif
 
             //start with arrow cursor
             initCursors();
@@ -694,6 +732,11 @@ void LLWindowSDL::destroyContext()
         }
         mDeadOSRWindows.clear();
     }
+
+#if LL_WINDOWS
+    // Unhook WM_COPYDATA before SDL tears the HWND down.
+    removeWin32Subclass();
+#endif
 
     // Stop unicode input — paired with the SDL_StartTextInput in createContext().
     // Guard against the early-failure path where SDL_CreateWindowWithProperties
@@ -786,6 +829,14 @@ LLWindowSDL::~LLWindowSDL()
     destroyContext();
 
     delete[] mSupportedResolutions;
+
+#if LL_WINDOWS
+    if (gSDLDirectInput8)
+    {
+        gSDLDirectInput8->Release();
+        gSDLDirectInput8 = nullptr;
+    }
+#endif
 
     gWindowImplementation = nullptr;
 }
@@ -2207,8 +2258,8 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // with a degenerate 0x0 rectangle.
             const F32 raw_density = SDL_GetWindowPixelDensity(mWindow);
             const F32 pixel_density = raw_density > 0.f ? raw_density : 1.f;
-            S32 width = llmax(event.window.data1, (S32)mMinWindowWidth) * pixel_density;
-            S32 height = llmax(event.window.data2, (S32)mMinWindowHeight) * pixel_density;
+            S32 width = (S32)(llmax(event.window.data1, (S32)mMinWindowWidth) * pixel_density);
+            S32 height = (S32)(llmax(event.window.data2, (S32)mMinWindowHeight) * pixel_density);
 
             mCallbacks->handleResize(this, width, height);
             break;
@@ -2539,7 +2590,7 @@ static SDL_Cursor *makeSDLCursorFromMacTIF(const char *basename, int hotx, int h
 }
 #endif // LL_DARWIN
 
-#if !LL_DARWIN
+#if LL_LINUX
 static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty)
 {
     SDL_Surface *bmpsurface = Load_BMP_Resource(filename);
@@ -2621,7 +2672,192 @@ static SDL_Cursor *makeSDLCursorFromBMP(const char *filename, int hotx, int hoty
     }
     return sdlcursor;
 }
-#endif // !LL_DARWIN
+#endif // LL_LINUX
+
+#if LL_WINDOWS
+// Convert one of the viewer's embedded Win32 cursor resources (the same
+// branded .cur/.ani assets the native backend loads in
+// LLWindowWin32::initCursors) into an SDL color cursor. The hot-spot is taken
+// from the resource itself via GetIconInfo, so — unlike the BMP path — there
+// is no hand-maintained hot-spot table to keep in sync. Returns nullptr if the
+// resource is missing or can't be converted, letting initCursors fall back to
+// the SDL system arrow.
+// Read a GDI bitmap as `rows` of top-down 32bpp BGRA into `out`. Used for both
+// the colour bitmap and the (1bpp or 8bpp) mask — GetDIBits converts whatever
+// the source depth is to 32bpp, so monochrome masks come back as black(0)/
+// white(0xFFFFFF) pixels we can test a single byte of.
+static bool win32ReadDIB32(HBITMAP hbm, int width, int rows, std::vector<U8>& out)
+{
+    out.assign((size_t)width * rows * 4, 0);
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+    bi.bmiHeader.biWidth       = width;
+    bi.bmiHeader.biHeight      = -rows; // negative => top-down rows
+    bi.bmiHeader.biPlanes      = 1;
+    bi.bmiHeader.biBitCount    = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+    HDC hdc = GetDC(nullptr);
+    const bool ok = GetDIBits(hdc, hbm, 0, rows, out.data(), &bi, DIB_RGB_COLORS) != 0;
+    ReleaseDC(nullptr, hdc);
+    return ok;
+}
+
+// Convert one of the viewer's embedded Win32 cursor resources (the same
+// branded .cur/.ani assets the native backend loads in
+// LLWindowWin32::initCursors) into an SDL color cursor. The hot-spot is taken
+// from the resource itself via GetIconInfo, so — unlike the BMP path — there
+// is no hand-maintained hot-spot table to keep in sync. Returns nullptr if the
+// resource is missing or can't be converted, letting initCursors fall back to
+// the SDL system arrow.
+static SDL_Cursor *makeSDLCursorFromWin32(const char *resource_name)
+{
+    HMODULE module = GetModuleHandle(nullptr);
+    // LR_DEFAULTCOLOR matches LLWindowWin32::loadColorCursor and also works for
+    // the monochrome resources LoadCursor would otherwise handle. LR_SHARED so
+    // we don't have to DestroyCursor an exe-embedded resource.
+    HCURSOR hcur = (HCURSOR)LoadImageA(module, resource_name, IMAGE_CURSOR,
+                                       0, 0, LR_DEFAULTCOLOR | LR_SHARED);
+    if (!hcur)
+    {
+        LL_WARNS() << "Cursor resource not found: " << resource_name << LL_ENDL;
+        return nullptr;
+    }
+
+    ICONINFO ii = {};
+    if (!GetIconInfo(hcur, &ii))
+    {
+        LL_WARNS() << "GetIconInfo failed for cursor " << resource_name
+                   << " (err " << GetLastError() << ")" << LL_ENDL;
+        return nullptr;
+    }
+    // GetIconInfo hands back *copies* of the bitmaps that we own and must free.
+    // For a 1bpp monochrome cursor hbmColor is NULL and hbmMask is double-height
+    // (AND mask stacked over XOR mask); colour cursors (8/32bpp) carry hbmColor.
+    HBITMAP hbmColor = ii.hbmColor;
+    HBITMAP hbmMask  = ii.hbmMask;
+    const bool monochrome = (hbmColor == nullptr);
+
+    SDL_Cursor *result = nullptr;
+    BITMAP bm = {};
+    HBITMAP dim_src = monochrome ? hbmMask : hbmColor;
+    if (dim_src && GetObject(dim_src, sizeof(bm), &bm) && bm.bmWidth > 0 && bm.bmHeight > 0)
+    {
+        const int width  = bm.bmWidth;
+        const int height = monochrome ? bm.bmHeight / 2 : bm.bmHeight;
+        const size_t count = (size_t)width * height;
+
+        std::vector<U8> rgba(count * 4, 0); // final R,G,B,A handed to SDL
+        bool built = false;
+
+        if (!monochrome)
+        {
+            std::vector<U8> color, mask;
+            const bool got_color = win32ReadDIB32(hbmColor, width, height, color);
+            const bool got_mask  = hbmMask && win32ReadDIB32(hbmMask, width, height, mask);
+            if (got_color)
+            {
+                // 32bpp .cur files carry a real per-pixel alpha channel; 8bpp
+                // ones leave it zero and express transparency via the AND mask.
+                bool has_alpha = false;
+                for (size_t i = 0; i < count; ++i)
+                {
+                    if (color[i * 4 + 3] != 0) { has_alpha = true; break; }
+                }
+                for (size_t i = 0; i < count; ++i)
+                {
+                    const U8 b = color[i * 4 + 0];
+                    const U8 g = color[i * 4 + 1];
+                    const U8 r = color[i * 4 + 2];
+                    U8 a = color[i * 4 + 3];
+                    if (!has_alpha)
+                    {
+                        // AND mask: white (set) => transparent, black => opaque.
+                        a = (got_mask && mask[i * 4 + 0]) ? 0 : 255;
+                    }
+                    rgba[i * 4 + 0] = r;
+                    rgba[i * 4 + 1] = g;
+                    rgba[i * 4 + 2] = b;
+                    rgba[i * 4 + 3] = a;
+                }
+                built = true;
+            }
+            else
+            {
+                LL_WARNS() << "GetDIBits failed for cursor " << resource_name << LL_ENDL;
+            }
+        }
+        else
+        {
+            // 1bpp: hbmMask is AND mask (top half) over XOR mask (bottom half).
+            //   AND=1,XOR=0 => transparent;  AND=0,XOR=1 => white;
+            //   AND=0,XOR=0 => black;  AND=1,XOR=1 => invert screen (approximated
+            //   as opaque black — none of the viewer's cursors rely on invert).
+            std::vector<U8> mask;
+            if (win32ReadDIB32(hbmMask, width, height * 2, mask))
+            {
+                for (size_t i = 0; i < count; ++i)
+                {
+                    const bool and_bit = mask[i * 4] != 0;            // top half
+                    const bool xor_bit = mask[(count + i) * 4] != 0;  // bottom half
+                    U8 r, g, b, a;
+                    if (and_bit && !xor_bit)      { r = g = b = 0;   a = 0;   }
+                    else if (!and_bit && xor_bit) { r = g = b = 255; a = 255; }
+                    else                          { r = g = b = 0;   a = 255; }
+                    rgba[i * 4 + 0] = r;
+                    rgba[i * 4 + 1] = g;
+                    rgba[i * 4 + 2] = b;
+                    rgba[i * 4 + 3] = a;
+                }
+                built = true;
+            }
+            else
+            {
+                LL_WARNS() << "GetDIBits failed for monochrome cursor " << resource_name << LL_ENDL;
+            }
+        }
+
+        if (built)
+        {
+            SDL_Surface *surf = SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32);
+            if (surf)
+            {
+                const bool must_lock = SDL_MUSTLOCK(surf);
+                if (!must_lock || SDL_LockSurface(surf))
+                {
+                    for (int y = 0; y < height; ++y)
+                    {
+                        memcpy((U8*)surf->pixels + (size_t)y * surf->pitch,
+                               rgba.data() + (size_t)y * width * 4,
+                               (size_t)width * 4);
+                    }
+                    if (must_lock)
+                    {
+                        SDL_UnlockSurface(surf);
+                    }
+
+                    int hotx = llclamp((int)ii.xHotspot, 0, width - 1);
+                    int hoty = llclamp((int)ii.yHotspot, 0, height - 1);
+                    result = SDL_CreateColorCursor(surf, hotx, hoty);
+                    if (!result)
+                    {
+                        LL_WARNS() << "SDL_CreateColorCursor failed for " << resource_name
+                                   << ": " << SDL_GetError() << LL_ENDL;
+                    }
+                }
+                SDL_DestroySurface(surf);
+            }
+        }
+    }
+    else
+    {
+        LL_WARNS() << "Cursor " << resource_name << " has no usable bitmap." << LL_ENDL;
+    }
+
+    if (hbmColor) DeleteObject(hbmColor);
+    if (hbmMask)  DeleteObject(hbmMask);
+    return result;
+}
+#endif // LL_WINDOWS
 
 void LLWindowSDL::updateCursor()
 {
@@ -2706,6 +2942,42 @@ void LLWindowSDL::initCursors()
     mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromMacTIF("UI_CURSOR_PATHFINDING_END.tif", 16, 16);
     mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromMacTIF("UI_CURSOR_PATHFINDING_END_ADD.tif", 16, 16);
     mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromMacTIF("UI_CURSOR_NO.tif", 8, 8);
+#elif LL_WINDOWS
+    // Load the branded cursors from the exe's embedded .cur resources — the
+    // same resource names LLWindowWin32::initCursors uses. Hot-spots come from
+    // the resources themselves (GetIconInfo), so there's no hand-tuned table.
+    mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromWin32("TOOLGRAB");
+    mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromWin32("TOOLLAND");
+    mSDLCursors[UI_CURSOR_TOOLFOCUS] = makeSDLCursorFromWin32("TOOLFOCUS");
+    mSDLCursors[UI_CURSOR_TOOLCREATE] = makeSDLCursorFromWin32("TOOLCREATE");
+    mSDLCursors[UI_CURSOR_ARROWDRAG] = makeSDLCursorFromWin32("ARROWDRAG");
+    mSDLCursors[UI_CURSOR_ARROWCOPY] = makeSDLCursorFromWin32("ARROWCOPY");
+    mSDLCursors[UI_CURSOR_ARROWDRAGMULTI] = makeSDLCursorFromWin32("ARROWDRAGMULTI");
+    mSDLCursors[UI_CURSOR_ARROWCOPYMULTI] = makeSDLCursorFromWin32("ARROWCOPYMULTI");
+    mSDLCursors[UI_CURSOR_NOLOCKED] = makeSDLCursorFromWin32("NOLOCKED");
+    mSDLCursors[UI_CURSOR_ARROWLOCKED] = makeSDLCursorFromWin32("ARROWLOCKED");
+    mSDLCursors[UI_CURSOR_GRABLOCKED] = makeSDLCursorFromWin32("GRABLOCKED");
+    mSDLCursors[UI_CURSOR_TOOLTRANSLATE] = makeSDLCursorFromWin32("TOOLTRANSLATE");
+    mSDLCursors[UI_CURSOR_TOOLROTATE] = makeSDLCursorFromWin32("TOOLROTATE");
+    mSDLCursors[UI_CURSOR_TOOLSCALE] = makeSDLCursorFromWin32("TOOLSCALE");
+    mSDLCursors[UI_CURSOR_TOOLCAMERA] = makeSDLCursorFromWin32("TOOLCAMERA");
+    mSDLCursors[UI_CURSOR_TOOLPAN] = makeSDLCursorFromWin32("TOOLPAN");
+    mSDLCursors[UI_CURSOR_TOOLZOOMIN] = makeSDLCursorFromWin32("TOOLZOOMIN");
+    mSDLCursors[UI_CURSOR_TOOLZOOMOUT] = makeSDLCursorFromWin32("TOOLZOOMOUT");
+    mSDLCursors[UI_CURSOR_TOOLPICKOBJECT3] = makeSDLCursorFromWin32("TOOLPICKOBJECT3");
+    mSDLCursors[UI_CURSOR_TOOLPLAY] = makeSDLCursorFromWin32("TOOLPLAY");
+    mSDLCursors[UI_CURSOR_TOOLPAUSE] = makeSDLCursorFromWin32("TOOLPAUSE");
+    mSDLCursors[UI_CURSOR_TOOLMEDIAOPEN] = makeSDLCursorFromWin32("TOOLMEDIAOPEN");
+    mSDLCursors[UI_CURSOR_PIPETTE] = makeSDLCursorFromWin32("TOOLPIPETTE");
+    mSDLCursors[UI_CURSOR_TOOLSIT] = makeSDLCursorFromWin32("TOOLSIT");
+    mSDLCursors[UI_CURSOR_TOOLBUY] = makeSDLCursorFromWin32("TOOLBUY");
+    mSDLCursors[UI_CURSOR_TOOLOPEN] = makeSDLCursorFromWin32("TOOLOPEN");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING] = makeSDLCursorFromWin32("TOOLPATHFINDING");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START] = makeSDLCursorFromWin32("TOOLPATHFINDINGPATHSTART");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_START_ADD] = makeSDLCursorFromWin32("TOOLPATHFINDINGPATHSTARTADD");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END] = makeSDLCursorFromWin32("TOOLPATHFINDINGPATHEND");
+    mSDLCursors[UI_CURSOR_TOOLPATHFINDING_PATH_END_ADD] = makeSDLCursorFromWin32("TOOLPATHFINDINGPATHENDADD");
+    mSDLCursors[UI_CURSOR_TOOLNO] = makeSDLCursorFromWin32("TOOLNO");
 #else
     mSDLCursors[UI_CURSOR_TOOLGRAB] = makeSDLCursorFromBMP("lltoolgrab.BMP",2,13);
     mSDLCursors[UI_CURSOR_TOOLLAND] = makeSDLCursorFromBMP("lltoolland.BMP",1,6);
@@ -3079,6 +3351,100 @@ void* LLWindowSDL::getPlatformWindow()
     }
     return ret;
 }
+
+#if LL_WINDOWS
+void LLWindowSDL::installWin32Subclass()
+{
+    if (mPrevWndProc) // already installed
+        return;
+
+    HWND hwnd = (HWND)getPlatformWindow();
+    if (!hwnd)
+        return;
+
+    mWin32Hwnd = hwnd;
+    mPrevWndProc = (WNDPROC)SetWindowLongPtrW(hwnd, GWLP_WNDPROC,
+                                              (LONG_PTR)&LLWindowSDL::win32WndProc);
+}
+
+void LLWindowSDL::removeWin32Subclass()
+{
+    if (mWin32Hwnd && mPrevWndProc)
+    {
+        SetWindowLongPtrW(mWin32Hwnd, GWLP_WNDPROC, (LONG_PTR)mPrevWndProc);
+    }
+    mWin32Hwnd = nullptr;
+    mPrevWndProc = nullptr;
+}
+
+// SDL pumps the Win32 message queue on the main thread, so a cross-process
+// SendMessage(WM_COPYDATA) is dispatched here synchronously on the main
+// thread — no cross-thread post needed (unlike LLWindowWin32, whose WndProc
+// runs on its own window thread). Everything else chains to SDL's WndProc so
+// the window keeps working normally.
+LRESULT CALLBACK LLWindowSDL::win32WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+{
+    LLWindowSDL* self = gWindowImplementation;
+
+    if (msg == WM_COPYDATA && self)
+    {
+        // received a URL from a second instance (see sendURLToOtherInstance).
+        PCOPYDATASTRUCT cds = (PCOPYDATASTRUCT)lparam;
+        // The only downstream consumer (LLViewerWindow::handleDataCopy) treats
+        // the payload as a C string. Reject oversized or empty messages and
+        // guarantee NUL-termination so a misbehaving sender can't force a huge
+        // alloc or trigger an OOB read.
+        constexpr DWORD MAX_WM_COPYDATA_BYTES = 64 * 1024;
+        if (cds && cds->lpData && cds->cbData != 0 && cds->cbData <= MAX_WM_COPYDATA_BYTES)
+        {
+            const DWORD cb = cds->cbData;
+            U8* data = new U8[cb + 1];
+            memcpy(data, cds->lpData, cb);
+            data[cb] = 0;
+            self->handleDataCopy((S32)cds->dwData, data);
+            delete[] data;
+        }
+        return TRUE;
+    }
+
+    WNDPROC prev = (self && self->mWin32Hwnd == hwnd) ? self->mPrevWndProc : nullptr;
+    if (prev)
+        return CallWindowProcW(prev, hwnd, msg, wparam, lparam);
+    return DefWindowProcW(hwnd, msg, wparam, lparam);
+}
+
+void LLWindowSDL::handleDataCopy(S32 data_type, void* data)
+{
+    if (mCallbacks)
+    {
+        mCallbacks->handleDataCopy(this, data_type, data);
+    }
+}
+
+void* LLWindowSDL::getDirectInput8()
+{
+    return &gSDLDirectInput8;
+}
+
+bool LLWindowSDL::getInputDevices(U32 device_type_filter,
+                                  std::function<bool(std::string&, LLSD&, void*)> osx_callback,
+                                  void* di8_devices_callback,
+                                  void* userdata)
+{
+    if (gSDLDirectInput8 != nullptr)
+    {
+        // Enumerate devices
+        HRESULT status = gSDLDirectInput8->EnumDevices(
+            (DWORD)device_type_filter,
+            (LPDIENUMDEVICESCALLBACK)di8_devices_callback,
+            (LPVOID*)userdata,
+            DIEDFL_ATTACHEDONLY);
+
+        return status == DI_OK;
+    }
+    return false;
+}
+#endif // LL_WINDOWS
 
 void LLWindowSDL::bringToFront()
 {

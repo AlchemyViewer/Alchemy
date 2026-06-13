@@ -3185,7 +3185,7 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
             }
 #endif
 
-#ifdef LL_WINDOWS
+#if LL_WINDOWS && !LL_SDL_WINDOW
             // On windows Alt Gr key generates additional Ctrl event, as result handling situations
             // like 'AltGr + D' will result in 'Alt+Ctrl+D'. If it results in WM_CHAR, don't let it
             // pass into menu or it will trigger 'develop' menu assigned to this combination on top

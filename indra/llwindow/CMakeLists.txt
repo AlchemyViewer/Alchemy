@@ -73,15 +73,32 @@ if(USE_SDL_WINDOW)
 endif()
 
 if(WINDOWS)
+  # lldxhardware (GPU/driver/VRAM queries) is used regardless of window
+  # backend — the SDL backend calls LLDXHardware::updateVRAMBudgetFromDXGI()
+  # and llappviewer queries WMI driver versions.
   target_sources(llwindow
     PRIVATE
-      llwindowwin32.cpp
       lldxhardware.cpp
-      llkeyboardwin32.cpp
-      lldragdropwin32.cpp
+    PUBLIC
+      lldxhardware.h
+  )
+
+  # The native Win32 backend is only built when SDL isn't driving the window.
+  # llkeyboardwin32 in particular can't compile under LL_SDL_WINDOW (the
+  # NATIVE_KEY_TYPE typedef switches to the SDL flavor), and the factory never
+  # instantiates LLWindowWin32 on an SDL build anyway. Headers stay listed so
+  # llviewerwindow.cpp's (guarded) include still resolves.
+  if(NOT USE_SDL_WINDOW)
+    target_sources(llwindow
+      PRIVATE
+        llwindowwin32.cpp
+        llkeyboardwin32.cpp
+        lldragdropwin32.cpp
+    )
+  endif()
+  target_sources(llwindow
     PUBLIC
       llwindowwin32.h
-      lldxhardware.h
       llkeyboardwin32.h
       lldragdropwin32.h
   )

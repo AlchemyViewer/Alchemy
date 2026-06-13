@@ -1726,6 +1726,15 @@ if (WINDOWS)
          llwindebug.h
          )
 
+    if (USE_SDL_WINDOW)
+        # Unified SDL main-callbacks entry point shared with Linux/macOS.
+        # llappviewerwin32's native wWinMain is compiled out (LL_SDL_WINDOW);
+        # SDL_AppInit instantiates LLAppViewerWin32 to keep the Win32
+        # platform overrides.
+        list(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
+        list(APPEND viewer_HEADER_FILES llappviewersdl.h)
+    endif ()
+
     # Add resource files to the project.
     # viewerRes.rc is the only buildable file, but
     # the rest are all dependencies of it.

@@ -51,6 +51,7 @@ elseif(WINDOWS)
           odbccp32
           oleaut32
           shell32
+          shlwapi
           Vfw32
           wer
           winspool

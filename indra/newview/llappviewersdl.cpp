@@ -48,6 +48,15 @@
 #include "llsdl.h"
 #include "llwindowsdl.h"
 
+#if LL_WINDOWS
+#include "llwin32headers.h"     // GetCommandLineW
+#include "llappviewerwin32.h"   // LLAppViewerWin32, create_app_mutex, NVAPI session helpers
+#include <shlwapi.h>            // PathGetArgsW
+#if LL_VELOPACK
+#include "llvelopack.h"
+#endif
+#endif
+
 #if LL_DARWIN
 #include <sys/types.h>
 #include <unistd.h>
@@ -107,8 +116,13 @@ namespace
 {
     int gArgC = 0;
     char **gArgV = NULL;
-    LLAppViewerSDL* gViewerAppPtr = NULL;
+    // LLAppViewerWin32 on Windows (USE_SDL_WINDOW builds), LLAppViewerSDL elsewhere.
+    LLAppViewer* gViewerAppPtr = NULL;
     void (*gOldTerminateHandler)() = NULL;
+#if LL_WINDOWS
+    // NvDRSSessionHandle from ll_nvapi_session_create(), torn down in SDL_AppQuit.
+    void* gNvApiSession = nullptr;
+#endif
 #if LL_LINUX && LL_DBUS
     // Shared session-bus connection, owned for the lifetime of the process and
     // pumped from SDL_AppIterate so incoming GoSLURL method calls get dispatched.
@@ -564,6 +578,18 @@ void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const ch
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
+#if LL_WINDOWS && LL_VELOPACK
+    // Velopack MUST be initialized first - it may handle install/uninstall
+    // commands and exit the process before we do anything else.
+    if (!velopack_initialize())
+    {
+        // Velopack handled the invocation (install/uninstall hook); exit
+        // cleanly without ever constructing the app. Mirrors WINMAIN's
+        // `return 0` — SDL_AppQuit tolerates the null gViewerAppPtr.
+        return SDL_APP_SUCCESS;
+    }
+#endif
+
     // Call Tracy first thing to have it allocate memory
     // https://github.com/wolfpld/tracy/issues/196
     LL_PROFILER_FRAME_END;
@@ -574,7 +600,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     gArgC = argc;
     gArgV = argv;
 
+#if LL_WINDOWS
+    // Note: gIconResource (consumed by the native LLWindowWin32 window proc)
+    // is not set here — SDL_RegisterApp sources the window-class icon from the
+    // exe's embedded RT_GROUP_ICON (branded ll_icon.ico) automatically.
+    //
+    // LLAppViewerWin32::initParseCommandLine parses a single command-tail
+    // string with no program name — the same shape WINMAIN's pCmdLine has —
+    // so hand it the tail of GetCommandLineW rather than re-joining argv.
+    gViewerAppPtr = new LLAppViewerWin32(ll_convert_wide_to_string(PathGetArgsW(GetCommandLineW())).c_str());
+#else
     gViewerAppPtr = new LLAppViewerSDL();
+#endif
 
     SDL_SetLogOutputFunction(&sdl_logger, nullptr);
 
@@ -592,7 +629,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     // install unexpected exception handler
     gOldTerminateHandler = std::set_terminate(exceptionTerminateHandler);
 
+#if LL_WINDOWS
+    // Set a debug info flag to indicate if multiple instances are running.
+    bool found_other_instance = !create_app_mutex();
+    gDebugInfo["FoundOtherInstanceAtStartup"] = LLSD::Boolean(found_other_instance);
+#else
     unsetenv( "LD_PRELOAD" ); // <FS:ND/> Get rid of any preloading, we do not want this to happen during startup of plugins.
+#endif
 
     // This needs to be set as early as possible
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, LLVersionInfo::getInstance()->getChannel().c_str());
@@ -609,6 +652,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
         LL_WARNS() << "Application init failed." << LL_ENDL;
         return SDL_APP_FAILURE;
     }
+
+#if LL_WINDOWS
+    // Override NVIDIA driver-profile settings as needed. Reads
+    // gSavedSettings, so this must come after init().
+    gNvApiSession = ll_nvapi_session_create();
+#endif
 
     return SDL_APP_CONTINUE;
 }
@@ -666,7 +715,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
-    if (!LLApp::isError())
+    // gViewerAppPtr is null when SDL_AppInit bailed before constructing the
+    // app (e.g. the Windows velopack install-hook path).
+    if (gViewerAppPtr && !LLApp::isError())
     {
         //
         // We don't want to do cleanup here if the error handler got called -
@@ -678,6 +729,11 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
     delete gViewerAppPtr;
     gViewerAppPtr = nullptr;
+
+#if LL_WINDOWS
+    ll_nvapi_session_destroy(gNvApiSession);
+    gNvApiSession = nullptr;
+#endif
 }
 
 bool LLAppViewerSDL::init()
@@ -790,6 +846,7 @@ if(act.sa_sigaction != old_act.sa_sigaction) ++reset_count;
 #else
     // *NOTE:Mani there is a case for implementing this on the mac.
     // Linux doesn't need it to my knowledge.
+    // Windows has its own exception handling that doesn't use Unix signals at all.
     return true;
 #endif
 }
@@ -951,14 +1008,42 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
     // Services / Apple Events automatically — no IPC needed from us.
     return false;
 }
-#else // LL_DBUS
+#elif LL_WINDOWS
 bool LLAppViewerSDL::initSLURLHandler()
 {
-    return false; // not implemented without dbus
+    return false; // not required on Windows
 }
 bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
 {
-    return false; // not implemented without dbus
+    wchar_t window_class[256]; /* Flawfinder: ignore */ // Assume max length < 255 chars.
+    mbstowcs(window_class, sWindowClass, 255);
+    window_class[255] = 0;
+    // Use the class instead of the window name.
+    HWND other_window = FindWindow(window_class, NULL);
+
+    if (other_window != NULL)
+    {
+        LL_DEBUGS() << "Found other window with the name '" << getWindowTitle() << "'" << LL_ENDL;
+        COPYDATASTRUCT cds;
+        const S32      SLURL_MESSAGE_TYPE = 0;
+        cds.dwData                        = SLURL_MESSAGE_TYPE;
+        cds.cbData                        = static_cast<DWORD>(url.length()) + 1;
+        cds.lpData                        = (void*)url.c_str();
+
+        LRESULT msg_result = SendMessage(other_window, WM_COPYDATA, NULL, (LPARAM)&cds);
+        LL_DEBUGS() << "SendMessage(WM_COPYDATA) to other window '" << getWindowTitle() << "' returned " << msg_result << LL_ENDL;
+        return true;
+    }
+    return false;
+}
+#else // LL_DBUS
+bool LLAppViewerSDL::initSLURLHandler()
+{
+    return false; // not implemented
+}
+bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
+{
+    return false; // not implemented
 }
 #endif // LL_DBUS
 
@@ -968,7 +1053,9 @@ void LLAppViewerSDL::initCrashReporting(bool reportFreeze)
 
 bool LLAppViewerSDL::beingDebugged()
 {
-#if LL_DARWIN
+#if LL_WINDOWS
+    return IsDebuggerPresent() != 0;
+#elif LL_DARWIN
     int                 junk;
     int                 mib[4];
     struct kinfo_proc   info;
@@ -1097,7 +1184,30 @@ std::string LLAppViewerSDL::generateSerialNumber()
 {
     char serial_md5[MD5HEX_STR_SIZE];       // Flawfinder: ignore
     serial_md5[0] = 0;
-#if LL_DARWIN
+#if LL_WINDOWS
+    DWORD serial  = 0;
+    DWORD flags   = 0;
+    BOOL  success = GetVolumeInformation(L"C:\\",
+                                         NULL,    // volume name buffer
+                                         0,       // volume name buffer size
+                                         &serial, // volume serial
+                                         NULL,    // max component length
+                                         &flags,  // file system flags
+                                         NULL,    // file system name buffer
+                                         0);      // file system name buffer size
+    if (success)
+    {
+        LLMD5 md5;
+        md5.update((unsigned char*)&serial, sizeof(DWORD));
+        md5.finalize();
+        md5.hex_digest(serial_md5);
+    }
+    else
+    {
+        LL_WARNS() << "GetVolumeInformation failed" << LL_ENDL;
+    }
+    return serial_md5;
+#elif LL_DARWIN
     // JC: Sample code from http://developer.apple.com/technotes/tn/tn1103.html
     CFStringRef serialNumber = NULL;
     io_service_t    platformExpert = IOServiceGetMatchingService(kIOMainPortDefault,

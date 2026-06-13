@@ -34,10 +34,19 @@
 
 bool gSDLMainHandled = false;
 
-#ifndef LL_SDL_WINDOW
+// SDL_main.h declares SDL_RegisterApp/SDL_UnregisterApp. SDL_MAIN_HANDLED
+// keeps it declaration-only: the entry-point implementation lives in
+// llappviewersdl.cpp (SDL_MAIN_USE_CALLBACKS) on SDL-window builds.
+#if !LL_SDL_WINDOW || LL_WINDOWS
 #define SDL_MAIN_HANDLED 1
 #include "SDL3/SDL_main.h"
+#endif
 
+#if LL_WINDOWS
+#include "llwin32headers.h" // CS_BYTEALIGNCLIENT / CS_OWNDC
+#endif
+
+#ifndef LL_SDL_WINDOW
 void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const char *message)
 {
     switch (priority)

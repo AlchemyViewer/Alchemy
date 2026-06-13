@@ -36,6 +36,10 @@
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_endian.h"
 
+#if LL_WINDOWS
+#include "llwin32headers.h" // HWND / WNDPROC for the WM_COPYDATA subclass
+#endif
+
 #ifdef LL_WAYLAND
 #include <wayland-client-protocol.h>
 #endif
@@ -213,6 +217,21 @@ public:
     static void setUseMultGL(bool use_mult_gl);
 
     static bool sUseMultGL;
+#endif
+
+#if LL_WINDOWS
+    // DirectInput8 access for llviewerjoystick / SpaceNavigator — same
+    // contract as LLWindowWin32 (DI8 needs only the module handle, not the
+    // window, so the SDL backend can provide it too).
+    void* getDirectInput8() override;
+    bool getInputDevices(U32 device_type_filter,
+                         std::function<bool(std::string&, LLSD&, void*)> osx_callback,
+                         void* di8_devices_callback,
+                         void* userdata) override;
+
+    // Forwards WM_COPYDATA payloads (SLURL hand-off from a second viewer
+    // instance) from the subclassed WndProc to the window callbacks.
+    void handleDataCopy(S32 data_type, void* data);
 #endif
 
 protected:
@@ -424,6 +443,19 @@ private:
 
     enum EServerProtocol{ X11, Wayland, Unknown };
     EServerProtocol mServerProtocol = Unknown;
+
+#if LL_WINDOWS
+    // Install/remove a WndProc subclass on the SDL window's HWND so we can
+    // service WM_COPYDATA (SLURL hand-off from a second instance) — SDL3's
+    // message hook never sees cross-process SendMessage. Paired around the
+    // SDL window lifetime in createContext/destroyContext.
+    void installWin32Subclass();
+    void removeWin32Subclass();
+    static LRESULT CALLBACK win32WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+
+    HWND mWin32Hwnd = nullptr;
+    WNDPROC mPrevWndProc = nullptr;
+#endif
 public:
 #if LL_X11
     // X11

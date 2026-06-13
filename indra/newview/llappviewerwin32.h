@@ -67,4 +67,14 @@ private:
     bool mIsConsoleAllocated;
 };
 
+// Process-level setup shared between the native WinMain entry point and the
+// SDL main-callbacks driver (llappviewersdl.cpp) used when USE_SDL_WINDOW is
+// enabled on Windows.
+bool create_app_mutex();
+// Wraps NvAPI_Initialize + session creation + ll_nvapi_init, gated on the
+// NvAPICreateApplicationProfile setting; must run after LLAppViewer::init().
+// Returns an NvDRSSessionHandle as void* (null if disabled or unavailable).
+void* ll_nvapi_session_create();
+void ll_nvapi_session_destroy(void* session);
+
 #endif // LL_LLAPPVIEWERWIN32_H
