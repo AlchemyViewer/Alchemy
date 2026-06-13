@@ -814,6 +814,89 @@
     width="95">
      Lindens
    </text>
+   <text
+    type="string"
+    length="1"
+    follows="left|top"
+    height="12"
+    layout="topleft"
+    left="30"
+    name="irc_colors_label"
+    top_pad="20"
+    width="300">
+     IRC-style chat colors:
+   </text>
+   <check_box
+    control_name="AlchemyChatIRCColorsEnabled"
+    follows="left|top"
+    height="16"
+    label="Give each other speaker a unique color"
+    layout="topleft"
+    left="40"
+    name="irc_chat_colors_enabled"
+    tool_tip="Colors other people's local chat by a stable per-avatar color. Your own, system, object and owner-say messages keep the colors set above."
+    top_pad="12"
+    width="440"/>
+   <check_box
+    control_name="AlchemyChatIRCColorNameTags"
+    enabled_control="AlchemyChatIRCColorsEnabled"
+    follows="left|top"
+    height="16"
+    label="Also color their name tag to match"
+    layout="topleft"
+    left="40"
+    name="irc_chat_colors_name_tags"
+    tool_tip="Overwrites each other person's floating name tag with the same per-avatar color used for their chat."
+    top_pad="4"
+    width="440"/>
+   <slider
+    control_name="AlchemyChatIRCAgentSaturation"
+    decimal_digits="2"
+    follows="left|top"
+    height="16"
+    increment="0.01"
+    initial_value="0.7"
+    label="Saturation"
+    label_width="120"
+    layout="topleft"
+    left="40"
+    max_val="1"
+    min_val="0"
+    name="irc_agent_saturation"
+    top_pad="8"
+    width="300"/>
+   <slider
+    control_name="AlchemyChatIRCAgentLightness"
+    decimal_digits="2"
+    follows="left|top"
+    height="16"
+    increment="0.01"
+    initial_value="0.9"
+    label="Lightness"
+    label_width="120"
+    layout="topleft"
+    left="40"
+    max_val="1"
+    min_val="0"
+    name="irc_agent_lightness"
+    top_pad="4"
+    width="300"/>
+   <slider
+    control_name="AlchemyChatIRCNameLightnessScale"
+    decimal_digits="2"
+    follows="left|top"
+    height="16"
+    increment="0.01"
+    initial_value="0.8"
+    label="Name dimming"
+    label_width="120"
+    layout="topleft"
+    left="40"
+    max_val="1"
+    min_val="0"
+    name="irc_name_lightness_scale"
+    top_pad="4"
+    width="300"/>
    </panel>
  </tab_container>
 </panel>
