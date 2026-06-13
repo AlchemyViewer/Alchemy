@@ -3489,6 +3489,11 @@ void LLViewerWindow::handleScrollWheel(LLScrollDelta delta)
 {
     LLUI::getInstance()->resetMouseIdleTimer();
 
+    // Scale the precise (smooth) component by the user's sensitivity multiplier.
+    // Discrete consumers read delta.mClicks and are intentionally left untouched.
+    static LLCachedControl<F32> scroll_sensitivity(gSavedSettings, "MouseWheelScrollSensitivity", 1.f);
+    delta.mPrecise *= scroll_sensitivity;
+
     LLMouseHandler* mouse_captor = gFocusMgr.getMouseCapture();
     if( mouse_captor )
     {
@@ -3543,6 +3548,9 @@ void LLViewerWindow::handleScrollHWheel(LLScrollDelta delta)
     }
 
     LLUI::getInstance()->resetMouseIdleTimer();
+
+    static LLCachedControl<F32> scroll_sensitivity(gSavedSettings, "MouseWheelScrollSensitivity", 1.f);
+    delta.mPrecise *= scroll_sensitivity;
 
     LLMouseHandler* mouse_captor = gFocusMgr.getMouseCapture();
     if (mouse_captor)

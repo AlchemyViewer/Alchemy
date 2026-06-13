@@ -1103,6 +1103,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>MouseWheelScrollSensitivity</key>
+        <map>
+            <key>Comment</key>
+            <string>Multiplier for high-precision (smooth) mouse-wheel scroll and zoom speed: camera zoom, smooth list/container scrolling, minimap/world-map/preview zoom. 1.0 = default. Does not affect item steppers (spinners, menus, combo boxes).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
         <key>NearbyToastHeightRatio</key>
         <map>
             <key>Comment</key>
