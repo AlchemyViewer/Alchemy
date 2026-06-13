@@ -288,6 +288,7 @@ private:
     boost::signals2::connection mAutoResponseNonFriendsConnection;
 
     void onUpdateFilterTerm( bool force = false );
+    void onCopySearch();
     void collectSearchableItems();
     void filterIgnorableNotifications();
 

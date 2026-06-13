@@ -334,7 +334,7 @@ public:
         }
 
         const std::string floater_name = LLURI::unescape(params[0].asString());
-        LLSD key;
+        LLSD key = query_map;
         if (floater_name == FLOATER_PROFILE)
         {
             key["id"] = gAgentID;
