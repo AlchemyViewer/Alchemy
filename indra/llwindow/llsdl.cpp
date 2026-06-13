@@ -132,6 +132,15 @@ void init_sdl(const std::string& app_name)
                     // every motion event, and we never want a warp-distance
                     // to land in the camera signal. Don't override.
 
+                    // LOAD-BEARING for numpad support: this is SDL3's default
+                    // value, and it deliberately omits "hide_numpad". With
+                    // "hide_numpad" SDL would pre-fold SDLK_KP_* onto the digit
+                    // row / nav cluster based on NumLock *before* delivering the
+                    // event, which would make NumLock-off numpad keys
+                    // indistinguishable from the real arrow keys and break
+                    // LLKeyboardSDL's numpad-distinct logic (it relies on
+                    // receiving the raw SDLK_KP_* keysym). Do not add
+                    // "hide_numpad" here.
                     {SDL_HINT_KEYCODE_OPTIONS,"french_numbers,latin_letters"},
                     // The viewer renders the IME composition string itself
                     // via LLPreeditor::updatePreedit (see the SDL_EVENT_TEXT_EDITING

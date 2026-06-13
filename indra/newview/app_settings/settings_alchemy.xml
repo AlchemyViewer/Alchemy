@@ -2,6 +2,17 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="llsd.xsd">
     <map>
+        <key>NumpadControl</key>
+        <map>
+            <key>Comment</key>
+            <string>How the numeric keypad controls your avatar. 0 = behaves like the normal arrow keys; 1 = numpad moves the avatar when NumLock is off (types digits when on); 2 = numpad always moves the avatar regardless of NumLock (use if you have no NumLock key).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AudioFAudioOutputDevice</key>
         <map>
             <key>Comment</key>

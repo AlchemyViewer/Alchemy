@@ -189,6 +189,15 @@ static bool handleAvatarHoverOffsetChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleNumpadControlChanged(const LLSD& newvalue)
+{
+    if (gKeyboard)
+    {
+        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(newvalue.asInteger()));
+    }
+    return true;
+}
+
 
 static bool handleSetShaderChanged(const LLSD& newvalue)
 {
@@ -957,6 +966,7 @@ void settings_setup_listeners()
 {
     LL_PROFILE_ZONE_SCOPED;
     setting_setup_signal_listener(gSavedSettings, "FirstPersonAvatarVisible", handleRenderAvatarMouselookChanged);
+    setting_setup_signal_listener(gSavedSettings, "NumpadControl", handleNumpadControlChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFarClip", handleRenderFarClipChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainScale", handleTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRScale", handlePBRTerrainScaleChanged);

@@ -2310,6 +2310,16 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     // Can't have spaces in settings.ini strings, so use underscores instead and convert them.
     LLStringUtil::replaceChar(mOverlayTitle, '_', ' ');
 
+    // Sync the keyboard's numpad mode with the saved NumpadControl setting now
+    // that gKeyboard exists. settings_setup_listeners() only connects the change
+    // signal (and ran before the window/keyboard were created), so push the
+    // persisted value into LLKeyboard once here; handleNumpadControlChanged
+    // keeps it in sync on subsequent changes.
+    if (gKeyboard)
+    {
+        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(gSavedSettings.getS32("NumpadControl")));
+    }
+
     mDebugText = new LLDebugText(this);
 
     mWorldViewRectScaled = calcScaledRect(mWorldViewRectRaw, mDisplayScale);

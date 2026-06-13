@@ -45,7 +45,7 @@ public:
 protected:
     MASK    updateModifiers(const MASK mask);
     void    setModifierKeyLevel( KEY key, bool new_state );
-    bool    translateNumpadKey( const LLKeyboard::NATIVE_KEY_TYPE os_key, KEY *translated_key );
+    bool    translateNumpadKey( const LLKeyboard::NATIVE_KEY_TYPE os_key, const MASK mask, KEY *translated_key );
     LLKeyboard::NATIVE_KEY_TYPE inverseTranslateNumpadKey(const KEY translated_key);
 private:
     std::map<LLKeyboard::NATIVE_KEY_TYPE, KEY> mTranslateNumpadMap;  // special map for translating OS keys to numpad keys
