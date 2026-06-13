@@ -358,6 +358,15 @@
            is_running_function="Agent.IsMicrophoneOn"
            is_running_parameters="speak"
            />
+  <command name="toggle_hud"
+           available_in_toybox="true"
+           icon="Command_ToggleHUD_Icon"
+           label_ref="Command_ToggleHUD_Label"
+           tooltip_ref="Command_ToggleHUD_Tooltip"
+           execute_function="View.ShowHUDAttachments"
+           is_running_function="View.CheckHUDAttachments"
+           is_enabled_function="View.EnableHUDAttachments"
+           />
   <command name="view"
            available_in_toybox="true"
            icon="Command_View_Icon"
