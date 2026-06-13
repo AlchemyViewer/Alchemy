@@ -33,6 +33,8 @@
 #include "lltimer.h"
 #include "llmutex.h"
 
+#include <set>
+
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_endian.h"
 
@@ -395,29 +397,26 @@ private:
     LLCoordWindow mDeferredCursorWarp;
     bool mHasDeferredCursorWarp = false;
 
-    // Off-screen rendering (OSR) shared GL contexts.
+    // Shared GL contexts for worker threads (texture upload, VBO streaming).
     //
-    // Worker threads (texture loader, etc.) ask for a shared GL context via
-    // createSharedContext() and bind it via makeContextCurrent() so they can
-    // upload textures without interrupting the main render thread. SDL3's
-    // OSR pattern is one hidden 1x1 SDL_Window per shared GL context.
+    // Worker threads ask for a shared GL context via createSharedContext() (on
+    // the main thread), bind it via makeContextCurrent() and release it with
+    // destroySharedContext() (both on the worker thread) so they can stream GL
+    // objects without interrupting the main render thread.
     //
-    // Threading contract:
-    //   * mOSRContexts is touched ONLY under mOSRMutex.
-    //   * Worker threads MAY call createSharedContext / destroySharedContext /
-    //     makeContextCurrent — those acquire the mutex internally.
-    //   * SDL_DestroyWindow is main-thread-only on at least X11 (the X11
-    //     backend grabs the global SDL video lock and assumes single-threaded
-    //     entry), so destroySharedContext does NOT destroy the carrier window
-    //     directly; it queues it onto mDeadOSRWindows for the main thread to
-    //     reap in processMiscNativeEvents() / destroyContext().
-    //   * destroyContext() also walks any contexts still in mOSRContexts at
-    //     shutdown — those represent worker threads that didn't release
-    //     their context — and queues their windows for destruction on the
-    //     same path.
-    LLMutex mOSRMutex;
-    std::unordered_map<SDL_GLContext, SDL_Window*> mOSRContexts;
-    std::list<SDL_Window*> mDeadOSRWindows;
+    // Rather than SDL3's "one hidden carrier SDL_Window per context" pattern
+    // (which forces a main-thread-only deferred-window-destruction dance), we
+    // create the contexts with the platform-native GL API behind SDL:
+    //   * Windows  — WGL sibling context on the main window's HDC
+    //   * macOS    — CGL context sharing the current CGLContextObj (drawable-less)
+    //   * X11      — GLX context bound to a 1x1 GLXPbuffer (offscreen, no WM)
+    //   * Wayland  — EGL context made current surfaceless (EGL_NO_SURFACE)
+    // Each returns an opaque heap handle (LLSDLSharedContext, defined in the
+    // .cpp). mSharedContexts tracks the live handles ONLY so destroyContext can
+    // warn about and reclaim any a worker failed to release; it is touched only
+    // under mSharedCtxMutex.
+    LLMutex mSharedCtxMutex;
+    std::set<void*> mSharedContexts;
 
     // Files accumulated between SDL_EVENT_DROP_BEGIN and SDL_EVENT_DROP_COMPLETE.
     // Each SDL_EVENT_DROP_FILE only carries one path, so we batch them and
