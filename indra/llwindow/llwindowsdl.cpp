@@ -587,16 +587,28 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     return true;
 }
 
-void LLWindowSDL::refreshMinSizePixelShadow()
+void LLWindowSDL::refreshPixelMetrics()
 {
-    if (!mWindow || mMinWindowWidth <= 0 || mMinWindowHeight <= 0)
+    if (!mWindow)
     {
         return;
     }
     const float density = SDL_GetWindowPixelDensity(mWindow);
-    const float scale = density > 0.f ? density : 1.f;
-    mMinWindowWidthPx = (U32)(mMinWindowWidth * scale);
-    mMinWindowHeightPx = (U32)(mMinWindowHeight * scale);
+    mCachedPixelDensity = density > 0.f ? density : 1.f;
+    S32 height_pixels = 0;
+    SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    mCachedWindowHeightPx = height_pixels;
+}
+
+void LLWindowSDL::refreshMinSizePixelShadow()
+{
+    refreshPixelMetrics();
+    if (!mWindow || mMinWindowWidth <= 0 || mMinWindowHeight <= 0)
+    {
+        return;
+    }
+    mMinWindowWidthPx = (U32)(mMinWindowWidth * mCachedPixelDensity);
+    mMinWindowHeightPx = (U32)(mMinWindowHeight * mCachedPixelDensity);
 }
 
 // Opaque handle returned from createSharedContext() and passed back to
@@ -1805,8 +1817,14 @@ bool LLWindowSDL::convertCoords(LLCoordGL from, LLCoordWindow *to)
     // Both spaces are window-relative PIXEL units. Y-flip using the pixel
     // window height; the X axis is identity. Y-down LLCoordWindow has
     // mY = 0 at the top, Y-up LLCoordGL has mY = 0 at the bottom.
-    S32 height_pixels = 0;
-    SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    // Use the cached pixel height (refreshed on every resize/DPI change) to skip
+    // a GetClientRect syscall on the per-event conversion path; fall back to a
+    // live query before the first refresh (height still 0).
+    S32 height_pixels = mCachedWindowHeightPx;
+    if (height_pixels <= 0)
+    {
+        SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    }
 
     to->mX = from.mX;
     to->mY = height_pixels - from.mY - 1;
@@ -1819,9 +1837,13 @@ bool LLWindowSDL::convertCoords(LLCoordWindow from, LLCoordGL* to)
     if (!to || !mWindow)
         return false;
 
-    // Inverse of the above — Y-flip in pixels, X is identity.
-    S32 height_pixels = 0;
-    SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    // Inverse of the above — Y-flip in pixels, X is identity. Cached height (see
+    // the forward conversion above) with a live fallback before the first refresh.
+    S32 height_pixels = mCachedWindowHeightPx;
+    if (height_pixels <= 0)
+    {
+        SDL_GetWindowSizeInPixels(mWindow, nullptr, &height_pixels);
+    }
 
     to->mX = from.mX;
     to->mY = height_pixels - from.mY - 1;
@@ -2058,8 +2080,9 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // PIXEL units so LLCoordWindow stays in the same unit as
             // mWindowRectRaw and the rest of the viewer's pixel-based hit
             // testing — see the coord-space contract below convertCoords.
-            const float density = SDL_GetWindowPixelDensity(mWindow);
-            const float scale = density > 0.f ? density : 1.f;
+            // Cached density (refreshed on resize/DPI change) — avoids a
+            // GetClientRect syscall per motion event (up to the mouse poll rate).
+            const float scale = mCachedPixelDensity;
 
             // Always accumulate the per-event relative motion (xrel/yrel) so
             // getCursorDelta() — drained once per frame from
@@ -2233,8 +2256,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                                        || event.button.which == SDL_PEN_MOUSEID);
 
             // Scale screen-coord event coords up to PIXEL units for LLCoordWindow.
-            const float density = SDL_GetWindowPixelDensity(mWindow);
-            const float scale = density > 0.f ? density : 1.f;
+            const float scale = mCachedPixelDensity; // cached; see refreshPixelMetrics
             LLCoordWindow winCoord(llfloor(event.button.x * scale),
                                    llfloor(event.button.y * scale));
             LLCoordGL openGlCoord;
@@ -2275,8 +2297,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             mAbsoluteCursorPosition = (event.button.which == SDL_TOUCH_MOUSEID
                                        || event.button.which == SDL_PEN_MOUSEID);
 
-            const float density = SDL_GetWindowPixelDensity(mWindow);
-            const float scale = density > 0.f ? density : 1.f;
+            const float scale = mCachedPixelDensity; // cached; see refreshPixelMetrics
             LLCoordWindow winCoord(llfloor(event.button.x * scale),
                                    llfloor(event.button.y * scale));
             LLCoordGL openGlCoord;
@@ -2513,12 +2534,13 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
         case SDL_EVENT_WINDOW_RESIZED:
         {
             LL_INFOS() << "Handling a resize event: " << event.window.data1 << "x" << event.window.data2 << LL_ENDL;
-            // Guard pixel_density against the 0.f the SDL backend can return
-            // briefly during display-change races. Without this, the multiply
-            // below would zero out width/height and we'd call handleResize
-            // with a degenerate 0x0 rectangle.
-            const F32 raw_density = SDL_GetWindowPixelDensity(mWindow);
-            const F32 pixel_density = raw_density > 0.f ? raw_density : 1.f;
+            // Window size changed: refresh the cached pixel metrics the input
+            // handlers and convertCoords read, and reuse the density here.
+            // refreshPixelMetrics clamps it > 0, covering the 0.f the SDL backend
+            // can briefly return during display-change races (which would
+            // otherwise zero width/height into a degenerate handleResize).
+            refreshPixelMetrics();
+            const F32 pixel_density = mCachedPixelDensity;
             // mMinWindowWidth/Height are 0 until setMinSize runs, so llmax can't
             // keep these positive this early. Floor to 1px so a 0-dimension
             // resize (some WMs emit one mid-drag / on un-maximize) never reaches
@@ -2538,6 +2560,9 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // so the clamp has to use the PIXEL-unit minimum shadow — the
             // screen-coord mMinWindowWidth/Height would under-clamp on HiDPI.
             LL_INFOS() << "Handling a pixel-size event: " << event.window.data1 << "x" << event.window.data2 << LL_ENDL;
+            // Back-buffer dimensions changed; refresh the cached pixel height
+            // convertCoords reads.
+            refreshPixelMetrics();
             // Floor to 1px: mMinWindowWidthPx/HeightPx are 0 until setMinSize
             // runs, so a 0-dimension pixel-size event would otherwise pass
             // through as a degenerate 0x0 resize.
@@ -2709,8 +2734,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             //   2) DNDA_DROPPED                           -> upload / apply
             //   3) DNDA_STOP_TRACKING                     -> mDragItems cleared
             // event.drop.x/y are screen-coord units; scale to PIXEL units.
-            const float density = SDL_GetWindowPixelDensity(mWindow);
-            const float scale = density > 0.f ? density : 1.f;
+            const float scale = mCachedPixelDensity; // cached; see refreshPixelMetrics
             LLCoordWindow winCoord(llfloor(event.drop.x * scale),
                                    llfloor(event.drop.y * scale));
             LLCoordGL openGlCoord;

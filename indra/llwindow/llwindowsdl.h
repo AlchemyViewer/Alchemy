@@ -272,6 +272,13 @@ protected:
     // density might have changed under us.
     void refreshMinSizePixelShadow();
 
+    // Re-cache the window pixel density + pixel height that the per-event input
+    // handlers and convertCoords read, so they don't each hit
+    // SDL_GetWindowPixelDensity / SDL_GetWindowSizeInPixels (-> GetClientRect, a
+    // USER32 syscall) on every mouse event. Run wherever the window's pixel size
+    // or density can change (resize / DPI / monitor).
+    void refreshPixelMetrics();
+
     //
     // Platform specific variables
     //
@@ -318,6 +325,12 @@ private:
     // re-clamps against this pixel-unit copy to make the dimensions match.
     U32 mMinWindowWidthPx = 0;
     U32 mMinWindowHeightPx = 0;
+
+    // Cached pixel metrics; see refreshPixelMetrics(). Density is pre-clamped to
+    // > 0. Height starts at 0 — convertCoords falls back to a live query until
+    // the first refresh (end of createContext).
+    F32 mCachedPixelDensity = 1.f;
+    S32 mCachedWindowHeightPx = 0;
 
     F32 mMouseDeltaAccumX = 0.f;
     F32 mMouseDeltaAccumY = 0.f;
