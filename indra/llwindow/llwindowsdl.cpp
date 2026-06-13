@@ -794,7 +794,21 @@ void* LLWindowSDL::createSharedContext()
                 const int pb_attribs[] = { GLX_PBUFFER_WIDTH, 1, GLX_PBUFFER_HEIGHT, 1, None };
                 GLXPbuffer pbuf = glx_pbuffer(dpy, fbc[0], pb_attribs);
                 GLXContext ctx  = glx_newctx(dpy, fbc[0], GLX_RGBA_TYPE, share, True);
-                XFree(fbc);
+                // glXChooseFBConfig returns an Xlib-allocated array that must be
+                // released with XFree. The SDL backend doesn't link libX11 (GLX
+                // is reached through SDL_GL_GetProcAddress), so resolve XFree from
+                // the already-resident libX11 at runtime via SDL's loader instead
+                // of taking an X11 link dependency. On the X11 server path libX11
+                // is always loaded; if XFree can't be found, skip the free (a
+                // tiny, bounded, once-per-worker-context leak) rather than crash.
+                if (SDL_SharedObject* x11lib = SDL_LoadObject("libX11.so.6"))
+                {
+                    if (SDL_FunctionPointer x_free = SDL_LoadFunction(x11lib, "XFree"))
+                    {
+                        ((int (*)(void*))x_free)(fbc);
+                    }
+                    SDL_UnloadObject(x11lib);
+                }
                 if (pbuf && ctx)
                 {
                     shared->glx_dpy  = dpy;
