@@ -216,12 +216,12 @@ bool LLPopupView::handleHover(S32 x, S32 y, MASK mask)
     return handled;
 }
 
-bool LLPopupView::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLPopupView::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    bool handled = handleMouseEvent(boost::bind(&LLMouseHandler::handleScrollWheel, _1, _2, _3, clicks), view_visible_and_enabled, x, y, false);
+    bool handled = handleMouseEvent(boost::bind(&LLMouseHandler::handleScrollWheel, _1, _2, _3, delta), view_visible_and_enabled, x, y, false);
     if (!handled)
     {
-        handled = LLPanel::handleScrollWheel(x, y, clicks);
+        handled = LLPanel::handleScrollWheel(x, y, delta);
     }
     return handled;
 }

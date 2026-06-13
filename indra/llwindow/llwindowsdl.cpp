@@ -2108,22 +2108,22 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // amplifying sub-tick noise into spurious scroll events the way
             // llfloor would for negative residue.
             const S32 iy = lltrunc(mScrollWheelAccumY);
-            if (iy != 0)
+            mScrollWheelAccumY -= (F32)iy;
+            if (iy != 0 || event.wheel.y != 0.f)
             {
-                mScrollWheelAccumY -= (F32)iy;
-                mCallbacks->handleScrollWheel(this, -iy);
+                mCallbacks->handleScrollWheel(this, LLScrollDelta(-iy, -event.wheel.y));
             }
             const S32 ix = lltrunc(mScrollWheelAccumX);
-            if (ix != 0)
+            mScrollWheelAccumX -= (F32)ix;
+            if (ix != 0 || event.wheel.x != 0.f)
             {
-                mScrollWheelAccumX -= (F32)ix;
                 // Win32 sends WM_MOUSEHWHEEL's HIWORD (+=right) directly with
                 // no sign flip (llwindowwin32.cpp:2929: `h_delta / WHEEL_DELTA`).
                 // SDL3 `event.wheel.x` follows the same +=right convention, so
                 // forward unmodified. Only the Y axis negates to match
                 // Win32's vertical convention ("+ clicks = scroll content
                 // down" — see the line just above).
-                mCallbacks->handleScrollHWheel(this, ix);
+                mCallbacks->handleScrollHWheel(this, LLScrollDelta(ix, event.wheel.x));
             }
             break;
         }

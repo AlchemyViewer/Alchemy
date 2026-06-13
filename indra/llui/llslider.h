@@ -76,8 +76,8 @@ public:
     virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
     virtual bool    handleMouseDown(S32 x, S32 y, MASK mask);
     virtual bool    handleKeyHere(KEY key, MASK mask);
-    virtual bool    handleScrollWheel(S32 x, S32 y, S32 clicks);
-    virtual bool    handleScrollHWheel(S32 x, S32 y, S32 clicks);
+    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
     virtual void    draw();
 
 private:

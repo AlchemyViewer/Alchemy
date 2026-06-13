@@ -1469,15 +1469,15 @@ bool LLTextBase::handleHover(S32 x, S32 y, MASK mask)
 }
 
 //virtual
-bool LLTextBase::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLTextBase::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     LLTextSegmentPtr cur_segment = getSegmentAtLocalPos(x, y);
-    if (cur_segment && cur_segment->handleScrollWheel(x, y, clicks))
+    if (cur_segment && cur_segment->handleScrollWheel(x, y, delta))
     {
         return true;
     }
 
-    return LLUICtrl::handleScrollWheel(x, y, clicks);
+    return LLUICtrl::handleScrollWheel(x, y, delta);
 }
 
 //virtual
@@ -3842,8 +3842,8 @@ bool LLTextSegment::handleRightMouseDown(S32 x, S32 y, MASK mask) { return false
 bool LLTextSegment::handleRightMouseUp(S32 x, S32 y, MASK mask) { return false; }
 bool LLTextSegment::handleDoubleClick(S32 x, S32 y, MASK mask) { return false; }
 bool LLTextSegment::handleHover(S32 x, S32 y, MASK mask) { return false; }
-bool LLTextSegment::handleScrollWheel(S32 x, S32 y, S32 clicks) { return false; }
-bool LLTextSegment::handleScrollHWheel(S32 x, S32 y, S32 clicks) { return false; }
+bool LLTextSegment::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) { return false; }
+bool LLTextSegment::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) { return false; }
 bool LLTextSegment::handleToolTip(S32 x, S32 y, MASK mask) { return false; }
 const std::string&  LLTextSegment::getName() const
 {

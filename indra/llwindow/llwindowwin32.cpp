@@ -2907,20 +2907,21 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
 
             S16 incoming_z_delta = HIWORD(w_param);
             z_delta += incoming_z_delta;
-            // cout << "z_delta " << z_delta << endl;
 
             // current mouse wheels report changes in increments of zDelta (+120, -120)
             // Future, higher resolution mouse wheels may report smaller deltas.
-            // So we sum the deltas and only act when we've exceeded WHEEL_DELTA
-            //
-            // If the user rapidly spins the wheel, we can get messages with
-            // large deltas, like 480 or so.  Thus we need to scroll more quickly.
+            // Accumulate into integer "clicks" only on WHEEL_DELTA crossings
+            // (unchanged discrete behavior), but always forward the raw
+            // per-message delta as the precise value so smooth consumers
+            // integrate sub-notch motion. See LLScrollDelta.
+            S32 clicks = 0;
             if (z_delta <= -WHEEL_DELTA || WHEEL_DELTA <= z_delta)
             {
-                short clicks = -z_delta / WHEEL_DELTA;
-                WINDOW_IMP_POST(window_imp->mCallbacks->handleScrollWheel(window_imp, clicks));
+                clicks = -z_delta / WHEEL_DELTA;
                 z_delta = 0;
             }
+            WINDOW_IMP_POST(window_imp->mCallbacks->handleScrollWheel(window_imp,
+                LLScrollDelta(clicks, -(F32)incoming_z_delta / (F32)WHEEL_DELTA)));
             return 0;
         }
         /*
@@ -2965,13 +2966,18 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             S16 incoming_h_delta = HIWORD(w_param);
             h_delta += incoming_h_delta;
 
-            // If the user rapidly spins the wheel, we can get messages with
-            // large deltas, like 480 or so.  Thus we need to scroll more quickly.
+            // Accumulate integer "clicks" on WHEEL_DELTA crossings (unchanged),
+            // but always forward the raw per-message delta as the precise value.
+            // No sign flip on the horizontal axis (matches the old
+            // h_delta / WHEEL_DELTA convention). See LLScrollDelta.
+            S32 h_clicks = 0;
             if (h_delta <= -WHEEL_DELTA || WHEEL_DELTA <= h_delta)
             {
-                WINDOW_IMP_POST(window_imp->mCallbacks->handleScrollHWheel(window_imp, h_delta / WHEEL_DELTA));
+                h_clicks = h_delta / WHEEL_DELTA;
                 h_delta = 0;
             }
+            WINDOW_IMP_POST(window_imp->mCallbacks->handleScrollHWheel(window_imp,
+                LLScrollDelta(h_clicks, (F32)incoming_h_delta / (F32)WHEEL_DELTA)));
             return 0;
         }
         // Handle mouse movement within the window

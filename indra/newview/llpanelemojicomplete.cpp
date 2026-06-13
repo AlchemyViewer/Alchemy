@@ -254,12 +254,12 @@ bool LLPanelEmojiComplete::handleMouseUp(S32 x, S32 y, MASK mask)
     return true;
 }
 
-bool LLPanelEmojiComplete::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLPanelEmojiComplete::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (mNoScroll)
         return false;
 
-    if (mScrollbar && mScrollbar->getVisible() && mScrollbar->handleScrollWheel(x, y, clicks))
+    if (mScrollbar && mScrollbar->getVisible() && mScrollbar->handleScrollWheel(x, y, delta))
     {
         mCurSelected = posToIndex(x, y);
         return true;
@@ -270,7 +270,7 @@ bool LLPanelEmojiComplete::handleScrollWheel(S32 x, S32 y, S32 clicks)
         // In case of wheel up (clicks < 0) we shouldn't subtract more than value of mScrollPos
         // Example: if mScrollPos = 0, clicks = -1 then (mScrollPos + clicks) becomes SIZE_MAX
         // As a result of llclamp<size_t>() mScrollPos becomes (mTotalEmojis - mVisibleEmojis)
-        S32 newScrollPos = llmax(0, (S32)mScrollPos + clicks);
+        S32 newScrollPos = llmax(0, (S32)mScrollPos + delta.mClicks);
         mScrollPos = llclamp<size_t>((size_t)newScrollPos, 0, mTotalEmojis - mVisibleEmojis);
         mCurSelected = posToIndex(x, y);
         return true;

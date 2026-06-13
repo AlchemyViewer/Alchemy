@@ -25,6 +25,7 @@ set(llwindow_BASE_HEADER_FILES
   llkeyboard.h
   llkeyboardheadless.h
   llmousehandler.h
+  llscrolldelta.h
   llwindow.h
   llwindowheadless.h
   llwindowcallbacks.h

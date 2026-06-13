@@ -404,18 +404,18 @@ bool LLScrollbar::handleHover(S32 x, S32 y, MASK mask)
 } // end handleHover
 
 
-bool LLScrollbar::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLScrollbar::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    bool handled = changeLine( clicks * mStepSize, true );
+    bool handled = changeLine( delta.mClicks * mStepSize, true );
     return handled;
 }
 
-bool LLScrollbar::handleScrollHWheel(S32 x, S32 y, S32 clicks)
+bool LLScrollbar::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     bool handled = false;
     if (LLScrollbar::HORIZONTAL == mOrientation)
     {
-        handled = changeLine(clicks * mStepSize, true);
+        handled = changeLine(delta.mClicks * mStepSize, true);
     }
     return handled;
 }

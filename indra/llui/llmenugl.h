@@ -166,7 +166,7 @@ public:
     virtual bool handleKeyHere( KEY key, MASK mask );
     virtual bool handleMouseDown( S32 x, S32 y, MASK mask );
     virtual bool handleMouseUp( S32 x, S32 y, MASK mask );
-    virtual bool handleScrollWheel( S32 x, S32 y, S32 clicks );
+    virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta );
 
     virtual void    onMouseEnter(S32 x, S32 y, MASK mask);
     virtual void    onMouseLeave(S32 x, S32 y, MASK mask);
@@ -443,7 +443,7 @@ public:
     // LLView Functionality
     /*virtual*/ bool handleUnicodeCharHere( llwchar uni_char );
     /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask );
-    /*virtual*/ bool handleScrollWheel( S32 x, S32 y, S32 clicks );
+    /*virtual*/ bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta );
     /*virtual*/ void draw( void );
     /*virtual*/ void drawBackground(LLMenuItemGL* itemp, F32 alpha);
     /*virtual*/ void setVisible(bool visible);

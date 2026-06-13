@@ -51,7 +51,7 @@ public:
 
     // Map virtual functions to the currently active internal tool
     virtual bool            handleHover(S32 x, S32 y, MASK mask)            { return mCur->handleHover( x, y, mask ); }
-    virtual bool            handleScrollWheel(S32 x, S32 y, S32 clicks)     { return mCur->handleScrollWheel( x, y, clicks ); }
+    virtual bool            handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)     { return mCur->handleScrollWheel( x, y, delta ); }
     virtual bool            handleRightMouseDown(S32 x, S32 y, MASK mask)   { return mCur->handleRightMouseDown( x, y, mask ); }
     virtual bool            handleRightMouseUp(S32 x, S32 y, MASK mask)     { return mCur->handleRightMouseUp( x, y, mask ); }
 
@@ -236,7 +236,7 @@ public:
     virtual bool            handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     virtual bool            handleRightMouseUp(S32 x, S32 y, MASK mask) override;
     virtual bool            handleMouseUp(S32 x, S32 y, MASK mask) override;
-    virtual bool            handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    virtual bool            handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
     virtual void            onMouseCaptureLost() override;
     virtual void            handleSelect() override;
     virtual void            handleDeselect() override;

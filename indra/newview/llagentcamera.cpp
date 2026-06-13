@@ -2283,7 +2283,7 @@ LLVector3 LLAgentCamera::getAvatarRootPosition()
 //-----------------------------------------------------------------------------
 // handleScrollWheel()
 //-----------------------------------------------------------------------------
-void LLAgentCamera::handleScrollWheel(S32 clicks)
+void LLAgentCamera::handleScrollWheel(F32 clicks)
 {
     if (mCameraMode == CAMERA_MODE_FOLLOW && getFocusOnAvatar())
     {
@@ -2309,7 +2309,7 @@ void LLAgentCamera::handleScrollWheel(S32 clicks)
 
         if (selection->getObjectCount() && selection->getSelectType() == SELECT_TYPE_HUD)
         {
-            F32 zoom_factor = (F32)pow(0.8, -clicks);
+            F32 zoom_factor = (F32)pow(0.8f, -clicks);
             cameraZoomIn(zoom_factor);
         }
         else if (mFocusOnAvatar && (mCameraMode == CAMERA_MODE_THIRD_PERSON))

@@ -557,7 +557,7 @@ void LLWindowListener::mouseScroll(LLSD const & request)
 {
     S32 clicks = request["clicks"].asInteger();
 
-    mWindow->handleScrollWheel(NULL, clicks);
+    mWindow->handleScrollWheel(NULL, LLScrollDelta(clicks, (F32)clicks));
 }
 
 void LLWindowListener::pasteText(LLSD const & evt)

@@ -109,8 +109,8 @@ public:
     virtual void    reshape(S32 width, S32 height, bool called_from_parent = true);
     virtual bool    handleKeyHere(KEY key, MASK mask);
     virtual bool    handleUnicodeCharHere(llwchar uni_char);
-    virtual bool    handleScrollWheel( S32 x, S32 y, S32 clicks );
-    virtual bool    handleScrollHWheel( S32 x, S32 y, S32 clicks );
+    virtual bool    handleScrollWheel( S32 x, S32 y, LLScrollDelta delta );
+    virtual bool    handleScrollHWheel( S32 x, S32 y, LLScrollDelta delta );
     virtual bool    handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
                                    EDragAndDropType cargo_type,
                                    void* cargo_data,

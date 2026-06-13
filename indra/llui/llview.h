@@ -429,8 +429,8 @@ public:
     /*virtual*/ bool    handleMiddleMouseUp(S32 x, S32 y, MASK mask);
     /*virtual*/ bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask);
     /*virtual*/ bool    handleDoubleClick(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, S32 clicks);
-    /*virtual*/ bool    handleScrollHWheel(S32 x, S32 y, S32 clicks);
+    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    /*virtual*/ bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
     /*virtual*/ bool    handleRightMouseDown(S32 x, S32 y, MASK mask);
     /*virtual*/ bool    handleRightMouseUp(S32 x, S32 y, MASK mask);
     /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask);
@@ -560,8 +560,8 @@ protected:
     LLView* childrenHandleMiddleMouseUp(S32 x, S32 y, MASK mask);
     LLView* childrenHandleMiddleMouseDown(S32 x, S32 y, MASK mask);
     LLView* childrenHandleDoubleClick(S32 x, S32 y, MASK mask);
-    LLView* childrenHandleScrollWheel(S32 x, S32 y, S32 clicks);
-    LLView* childrenHandleScrollHWheel(S32 x, S32 y, S32 clicks);
+    LLView* childrenHandleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    LLView* childrenHandleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
     LLView* childrenHandleRightMouseDown(S32 x, S32 y, MASK mask);
     LLView* childrenHandleRightMouseUp(S32 x, S32 y, MASK mask);
     LLView* childrenHandleToolTip(S32 x, S32 y, MASK mask);

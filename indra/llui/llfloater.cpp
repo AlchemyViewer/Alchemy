@@ -1780,9 +1780,9 @@ bool LLFloater::offerClickToButton(S32 x, S32 y, MASK mask, EFloaterButton index
     return false;
 }
 
-bool LLFloater::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLFloater::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    LLPanel::handleScrollWheel(x,y,clicks);
+    LLPanel::handleScrollWheel(x,y,delta);
     return true;//always
 }
 

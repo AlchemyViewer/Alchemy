@@ -132,11 +132,11 @@ void LLWindowCallbacks::handleMouseDragged(LLWindow *window, const LLCoordGL pos
 {
 }
 
-void LLWindowCallbacks::handleScrollWheel(LLWindow *window, S32 clicks)
+void LLWindowCallbacks::handleScrollWheel(LLWindow *window, LLScrollDelta delta)
 {
 }
 
-void LLWindowCallbacks::handleScrollHWheel(LLWindow *window, S32 clicks)
+void LLWindowCallbacks::handleScrollHWheel(LLWindow *window, LLScrollDelta delta)
 {
 }
 

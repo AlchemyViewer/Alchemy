@@ -48,7 +48,7 @@ public:
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
-    bool handleScrollWheel( S32 x, S32 y, S32 clicks ) override;
+    bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta ) override;
 
     void drawStickyRect();
 

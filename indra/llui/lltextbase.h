@@ -111,8 +111,8 @@ public:
     /*virtual*/ bool            handleRightMouseUp(S32 x, S32 y, MASK mask);
     /*virtual*/ bool            handleDoubleClick(S32 x, S32 y, MASK mask);
     /*virtual*/ bool            handleHover(S32 x, S32 y, MASK mask);
-    /*virtual*/ bool            handleScrollWheel(S32 x, S32 y, S32 clicks);
-    /*virtual*/ bool            handleScrollHWheel(S32 x, S32 y, S32 clicks);
+    /*virtual*/ bool            handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    /*virtual*/ bool            handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
     /*virtual*/ bool            handleToolTip(S32 x, S32 y, MASK mask);
     /*virtual*/ const std::string&  getName() const;
     /*virtual*/ void            onMouseCaptureLost();
@@ -391,7 +391,7 @@ public:
     /*virtual*/ bool        handleRightMouseUp(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool        handleDoubleClick(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool        handleHover(S32 x, S32 y, MASK mask) override;
-    /*virtual*/ bool        handleScrollWheel(S32 x, S32 y, S32 clicks) override;
+    /*virtual*/ bool        handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
     /*virtual*/ bool        handleToolTip(S32 x, S32 y, MASK mask) override;
 
     // LLView interface

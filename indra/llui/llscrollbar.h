@@ -87,8 +87,8 @@ public:
     virtual bool    handleMouseUp(S32 x, S32 y, MASK mask);
     virtual bool    handleDoubleClick(S32 x, S32 y, MASK mask);
     virtual bool    handleHover(S32 x, S32 y, MASK mask);
-    virtual bool    handleScrollWheel(S32 x, S32 y, S32 clicks);
-    virtual bool    handleScrollHWheel(S32 x, S32 y, S32 clicks);
+    virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
     virtual bool    handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
         EDragAndDropType cargo_type, void *cargo_data, EAcceptance *accept, std::string &tooltip_msg);
 

@@ -478,8 +478,9 @@ void LLSpinCtrl::reportInvalidData()
     make_ui_sound("UISndBadKeystroke");
 }
 
-bool LLSpinCtrl::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLSpinCtrl::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
+    S32 clicks = delta.mClicks;
     if( clicks > 0 )
     {
         while( clicks-- )

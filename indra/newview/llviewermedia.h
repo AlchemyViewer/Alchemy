@@ -328,8 +328,8 @@ public:
     // Sadly, these are all pure virtual, so I have to supply implementations here:
     /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) { return false; };
     /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask) { return false; };
-    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, S32 clicks) { return false; };
-    /*virtual*/ bool    handleScrollHWheel(S32 x, S32 y, S32 clicks) { return false; };
+    /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) { return false; };
+    /*virtual*/ bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) { return false; };
     /*virtual*/ bool    handleDoubleClick(S32 x, S32 y, MASK mask) { return false; };
     /*virtual*/ bool    handleRightMouseDown(S32 x, S32 y, MASK mask) { return false; };
     /*virtual*/ bool    handleRightMouseUp(S32 x, S32 y, MASK mask) { return false; };

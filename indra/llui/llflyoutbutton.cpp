@@ -76,9 +76,9 @@ void LLFlyoutButton::draw()
     LLComboBox::draw();
 }
 
-bool LLFlyoutButton::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLFlyoutButton::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    return LLUICtrl::handleScrollWheel(x, y, clicks);
+    return LLUICtrl::handleScrollWheel(x, y, delta);
 }
 
 // [SL:KB] - Patch: Control-FlyoutButton | Checked: Catznip-6.4

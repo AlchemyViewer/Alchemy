@@ -1994,14 +1994,14 @@ bool LLViewerWindow::handlePaint(LLWindow *window,  S32 x,  S32 y, S32 width,  S
 }
 
 
-void LLViewerWindow::handleScrollWheel(LLWindow *window,  S32 clicks)
+void LLViewerWindow::handleScrollWheel(LLWindow *window,  LLScrollDelta delta)
 {
-    handleScrollWheel( clicks );
+    handleScrollWheel( delta );
 }
 
-void LLViewerWindow::handleScrollHWheel(LLWindow *window,  S32 clicks)
+void LLViewerWindow::handleScrollHWheel(LLWindow *window,  LLScrollDelta delta)
 {
-    handleScrollHWheel(clicks);
+    handleScrollHWheel(delta);
 }
 
 void LLViewerWindow::handleWindowBlock(LLWindow *window)
@@ -3485,7 +3485,7 @@ bool LLViewerWindow::handleUnicodeChar(llwchar uni_char, MASK mask)
 }
 
 
-void LLViewerWindow::handleScrollWheel(S32 clicks)
+void LLViewerWindow::handleScrollWheel(LLScrollDelta delta)
 {
     LLUI::getInstance()->resetMouseIdleTimer();
 
@@ -3495,7 +3495,7 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         mouse_captor->screenPointToLocal( mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y );
-        mouse_captor->handleScrollWheel(local_x, local_y, clicks);
+        mouse_captor->handleScrollWheel(local_x, local_y, delta);
         if (LLView::sDebugMouseHandling)
         {
             LL_INFOS() << "Scroll Wheel handled by captor " << mouse_captor->getName() << LL_ENDL;
@@ -3509,10 +3509,10 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         top_ctrl->screenPointToLocal( mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y );
-        if (top_ctrl->handleScrollWheel(local_x, local_y, clicks)) return;
+        if (top_ctrl->handleScrollWheel(local_x, local_y, delta)) return;
     }
 
-    if (mRootView->handleScrollWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, clicks) )
+    if (mRootView->handleScrollWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, delta) )
     {
         if (LLView::sDebugMouseHandling)
         {
@@ -3530,12 +3530,12 @@ void LLViewerWindow::handleScrollWheel(S32 clicks)
     if(top_ctrl == 0
         && getWorldViewRectScaled().pointInRect(mCurrentMousePoint.mX, mCurrentMousePoint.mY)
         && gAgentCamera.isInitialized())
-        gAgentCamera.handleScrollWheel(clicks);
+        gAgentCamera.handleScrollWheel(delta.mPrecise);
 
     return;
 }
 
-void LLViewerWindow::handleScrollHWheel(S32 clicks)
+void LLViewerWindow::handleScrollHWheel(LLScrollDelta delta)
 {
     if (LLAppViewer::instance()->quitRequested())
     {
@@ -3550,7 +3550,7 @@ void LLViewerWindow::handleScrollHWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         mouse_captor->screenPointToLocal(mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y);
-        mouse_captor->handleScrollHWheel(local_x, local_y, clicks);
+        mouse_captor->handleScrollHWheel(local_x, local_y, delta);
         if (LLView::sDebugMouseHandling)
         {
             LL_INFOS() << "Scroll Horizontal Wheel handled by captor " << mouse_captor->getName() << LL_ENDL;
@@ -3564,10 +3564,10 @@ void LLViewerWindow::handleScrollHWheel(S32 clicks)
         S32 local_x;
         S32 local_y;
         top_ctrl->screenPointToLocal(mCurrentMousePoint.mX, mCurrentMousePoint.mY, &local_x, &local_y);
-        if (top_ctrl->handleScrollHWheel(local_x, local_y, clicks)) return;
+        if (top_ctrl->handleScrollHWheel(local_x, local_y, delta)) return;
     }
 
-    if (mRootView->handleScrollHWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, clicks))
+    if (mRootView->handleScrollHWheel(mCurrentMousePoint.mX, mCurrentMousePoint.mY, delta))
     {
         if (LLView::sDebugMouseHandling)
         {

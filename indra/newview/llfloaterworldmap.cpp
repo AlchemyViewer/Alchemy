@@ -571,7 +571,7 @@ bool LLFloaterWorldMap::handleHover(S32 x, S32 y, MASK mask)
     return handled;
 }
 
-bool LLFloaterWorldMap::handleScrollWheel(S32 x, S32 y, S32 clicks)
+bool LLFloaterWorldMap::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     if (!isMinimized() && isFrontmost())
     {
@@ -580,14 +580,14 @@ bool LLFloaterWorldMap::handleScrollWheel(S32 x, S32 y, S32 clicks)
         if (mMapView->pointInView(map_x, map_y))
         {
             F32 old_slider_zoom = (F32) mZoomSlider->getValue().asReal();
-            F32 slider_zoom     = old_slider_zoom + ((F32) clicks * -0.3333f);
+            F32 slider_zoom     = old_slider_zoom + ((F32) delta.mClicks * -0.3333f);
             mZoomSlider->setValue(LLSD(slider_zoom));
             mMapView->zoomWithPivot(slider_zoom, map_x, map_y);
             return true;
         }
     }
 
-    return LLFloater::handleScrollWheel(x, y, clicks);
+    return LLFloater::handleScrollWheel(x, y, delta);
 }
 
 
