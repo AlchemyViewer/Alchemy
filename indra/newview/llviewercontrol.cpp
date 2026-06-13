@@ -193,7 +193,10 @@ static bool handleNumpadControlChanged(const LLSD& newvalue)
 {
     if (gKeyboard)
     {
-        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(newvalue.asInteger()));
+        // Clamp persisted/out-of-range values to the valid enum range so an
+        // edited settings file can't push the keyboard into an undefined mode.
+        S32 mode = llclamp(newvalue.asInteger(), (S32)LLKeyboard::ND_NEVER, (S32)LLKeyboard::ND_NUMLOCK_ON);
+        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(mode));
     }
     return true;
 }

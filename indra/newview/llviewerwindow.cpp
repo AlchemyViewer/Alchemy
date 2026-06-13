@@ -2317,7 +2317,8 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     // keeps it in sync on subsequent changes.
     if (gKeyboard)
     {
-        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(gSavedSettings.getS32("NumpadControl")));
+        S32 numpad_mode = llclamp(gSavedSettings.getS32("NumpadControl"), (S32)LLKeyboard::ND_NEVER, (S32)LLKeyboard::ND_NUMLOCK_ON);
+        gKeyboard->setNumpadDistinct(static_cast<LLKeyboard::e_numpad_distinct>(numpad_mode));
     }
 
     mDebugText = new LLDebugText(this);

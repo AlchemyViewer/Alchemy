@@ -428,11 +428,21 @@ bool LLScrollbar::scrollByWheel(F32 precise)
     // that.
     if (precise > 0.f)
     {
-        return mDocPos < getDocPosMax();
+        if (mDocPos < getDocPosMax())
+        {
+            return true;
+        }
+        mScrollWheelResidue = 0.f; // forwarding to parent; don't keep partial progress
+        return false;
     }
     if (precise < 0.f)
     {
-        return mDocPos > 0;
+        if (mDocPos > 0)
+        {
+            return true;
+        }
+        mScrollWheelResidue = 0.f; // forwarding to parent; don't keep partial progress
+        return false;
     }
     return false;
 }

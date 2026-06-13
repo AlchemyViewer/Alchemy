@@ -486,11 +486,11 @@ void LLDXHardware::updateVRAMBudgetFromDXGI()
     }
     else
     {
-        IDXGIAdapter3* p_dxgi_adapter = nullptr;
+        IDXGIAdapter* p_dxgi_adapter = nullptr;
         UINT graphics_adapter_index = 0;
         while (true)
         {
-            res = p_factory->EnumAdapters(graphics_adapter_index, reinterpret_cast<IDXGIAdapter**>(&p_dxgi_adapter));
+            res = p_factory->EnumAdapters(graphics_adapter_index, &p_dxgi_adapter);
             if (FAILED(res))
             {
                 if (graphics_adapter_index == 0)
@@ -502,8 +502,25 @@ void LLDXHardware::updateVRAMBudgetFromDXGI()
             {
                 if (graphics_adapter_index == 0) // Should it check largest one isntead of first?
                 {
-                    DXGI_QUERY_VIDEO_MEMORY_INFO info;
-                    p_dxgi_adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info);
+                    // EnumAdapters hands back an IDXGIAdapter; QueryInterface up
+                    // to IDXGIAdapter3 for QueryVideoMemoryInfo (Win10+). Zero-init
+                    // info and check the HRESULT so a failed query can't feed
+                    // garbage Budget into the VRAM estimate (it just leaves it 0).
+                    IDXGIAdapter3* p_dxgi_adapter3 = nullptr;
+                    DXGI_QUERY_VIDEO_MEMORY_INFO info = {};
+                    if (SUCCEEDED(p_dxgi_adapter->QueryInterface(__uuidof(IDXGIAdapter3), (void**)&p_dxgi_adapter3)) && p_dxgi_adapter3)
+                    {
+                        if (FAILED(p_dxgi_adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info)))
+                        {
+                            info = {};
+                            LL_WARNS() << "QueryVideoMemoryInfo failed" << LL_ENDL;
+                        }
+                        p_dxgi_adapter3->Release();
+                    }
+                    else
+                    {
+                        LL_WARNS() << "IDXGIAdapter3 unavailable; skipping DXGI VRAM budget" << LL_ENDL;
+                    }
 
                     // Alternatively use GetDesc from below to get adapter's memory
                     UINT64 budget_mb = info.Budget / (1024 * 1024);

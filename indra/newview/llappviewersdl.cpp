@@ -1032,9 +1032,17 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
         cds.cbData                        = static_cast<DWORD>(url.length()) + 1;
         cds.lpData                        = (void*)url.c_str();
 
-        LRESULT msg_result = SendMessage(other_window, WM_COPYDATA, NULL, (LPARAM)&cds);
-        LL_DEBUGS() << "SendMessage(WM_COPYDATA) to other window '" << getWindowTitle() << "' returned " << msg_result << LL_ENDL;
-        return true;
+        // SendMessageTimeout (not SendMessage) so a hung/busy primary instance
+        // can't block this instance's startup; SMTO_ABORTIFHUNG bails fast. Our
+        // WM_COPYDATA handler returns TRUE on receipt, so require both a
+        // successful send and a non-zero result before treating the URL as
+        // handed off — otherwise fall through (return false) and handle it here.
+        DWORD_PTR msg_result = 0;
+        LRESULT sent = SendMessageTimeout(other_window, WM_COPYDATA, NULL, (LPARAM)&cds,
+                                          SMTO_ABORTIFHUNG, 2000, &msg_result);
+        LL_DEBUGS() << "SendMessageTimeout(WM_COPYDATA) to other window '" << getWindowTitle()
+                    << "' sent=" << sent << " result=" << msg_result << LL_ENDL;
+        return sent != 0 && msg_result != 0;
     }
     return false;
 }
