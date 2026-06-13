@@ -633,7 +633,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     // Set a debug info flag to indicate if multiple instances are running.
     bool found_other_instance = !create_app_mutex();
     gDebugInfo["FoundOtherInstanceAtStartup"] = LLSD::Boolean(found_other_instance);
-#else
+#elif LL_LINUX
+    // macOS injects via DYLD_INSERT_LIBRARIES, not LD_PRELOAD, so this is a
+    // Linux-only scrub (clearing LD_PRELOAD on Darwin did nothing).
     unsetenv( "LD_PRELOAD" ); // <FS:ND/> Get rid of any preloading, we do not want this to happen during startup of plugins.
 #endif
 

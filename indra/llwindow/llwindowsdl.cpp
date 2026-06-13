@@ -1501,6 +1501,13 @@ F32 LLWindowSDL::getNativeAspectRatio()
     // of the monitor...this seems to work to a close approximation for most CRTs/LCDs
     S32 num_resolutions;
     LLWindowResolution* resolutions = getSupportedResolutions(num_resolutions);
+    if (!resolutions || num_resolutions <= 0)
+    {
+        // No usable display modes (e.g. Wayland exposes none, or nothing met the
+        // 800x600 floor). Fall back to the 4:3 assumption rather than indexing
+        // resolutions[-1] and dividing by a garbage height.
+        return 1024.f / 768.f;
+    }
 
     return ((F32)resolutions[num_resolutions - 1].mWidth / (F32)resolutions[num_resolutions - 1].mHeight);
 }
@@ -1608,6 +1615,8 @@ void LLWindowSDL::flashIcon(F32 seconds)
     mFlashTimer.reset();
     mFlashTimer.setTimerExpirySec(remaining_time);
 
+    if (!mWindow)
+        return;
     SDL_FlashWindow(mWindow, SDL_FLASH_UNTIL_FOCUSED);
     mFlashing = true;
 }
@@ -1617,7 +1626,8 @@ void LLWindowSDL::maybeStopFlashIcon()
     if (mFlashing && mFlashTimer.hasExpired())
     {
         mFlashing = false;
-        SDL_FlashWindow( mWindow, SDL_FLASH_CANCEL );
+        if (mWindow)
+            SDL_FlashWindow( mWindow, SDL_FLASH_CANCEL );
     }
 }
 
@@ -1999,7 +2009,8 @@ void LLWindowSDL::gatherInput()
     // expired.
     if (mFlashing && mFlashTimer.hasExpired())
     {
-        SDL_FlashWindow(mWindow, SDL_FLASH_CANCEL);
+        if (mWindow)
+            SDL_FlashWindow(mWindow, SDL_FLASH_CANCEL);
         mFlashing = false;
     }
 }
@@ -2373,8 +2384,15 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // We do NOT filter on MASK_ALT alone — Right-Alt (AltGr) on
             // European keyboards composes characters like Å/Ø/€ and those
             // legitimately arrive via TEXT_INPUT.
-            const Uint16 modstate = SDL_GetModState();
-            if (modstate & SDL_KMOD_CTRL)
+            // Use the modifier state captured WITH the keystroke (mKeyModifiers,
+            // set from event.key.mod on the KEY_DOWN that produced this text),
+            // not the live SDL_GetModState(): gatherInput drains the whole event
+            // batch at once, so a fast Ctrl+key whose Ctrl-release lands in the
+            // same pump would read CTRL as already up here and fail to drop the
+            // accelerator's literal character (Ctrl-A then "a" overwriting the
+            // selection). mKeyModifiers reflects the producing keystroke, and an
+            // IME commit refreshes it via its own non-Ctrl key-downs.
+            if (mKeyModifiers & SDL_KMOD_CTRL)
             {
                 break;
             }
@@ -2501,8 +2519,12 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // with a degenerate 0x0 rectangle.
             const F32 raw_density = SDL_GetWindowPixelDensity(mWindow);
             const F32 pixel_density = raw_density > 0.f ? raw_density : 1.f;
-            S32 width = (S32)(llmax(event.window.data1, (S32)mMinWindowWidth) * pixel_density);
-            S32 height = (S32)(llmax(event.window.data2, (S32)mMinWindowHeight) * pixel_density);
+            // mMinWindowWidth/Height are 0 until setMinSize runs, so llmax can't
+            // keep these positive this early. Floor to 1px so a 0-dimension
+            // resize (some WMs emit one mid-drag / on un-maximize) never reaches
+            // handleResize as a degenerate 0x0 viewport / divide-by-zero aspect.
+            S32 width = llmax(1, (S32)(llmax(event.window.data1, (S32)mMinWindowWidth) * pixel_density));
+            S32 height = llmax(1, (S32)(llmax(event.window.data2, (S32)mMinWindowHeight) * pixel_density));
 
             mCallbacks->handleResize(this, width, height);
             break;
@@ -2516,8 +2538,11 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // so the clamp has to use the PIXEL-unit minimum shadow — the
             // screen-coord mMinWindowWidth/Height would under-clamp on HiDPI.
             LL_INFOS() << "Handling a pixel-size event: " << event.window.data1 << "x" << event.window.data2 << LL_ENDL;
-            S32 width  = llmax(event.window.data1, (S32)mMinWindowWidthPx);
-            S32 height = llmax(event.window.data2, (S32)mMinWindowHeightPx);
+            // Floor to 1px: mMinWindowWidthPx/HeightPx are 0 until setMinSize
+            // runs, so a 0-dimension pixel-size event would otherwise pass
+            // through as a degenerate 0x0 resize.
+            S32 width  = llmax(1, llmax(event.window.data1, (S32)mMinWindowWidthPx));
+            S32 height = llmax(1, llmax(event.window.data2, (S32)mMinWindowHeightPx));
             mCallbacks->handleResize(this, width, height);
             break;
         }
@@ -2776,7 +2801,11 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 // static
 SDL_AppResult LLWindowSDL::handleEvents(const SDL_Event& event)
 {
-    if(!gWindowImplementation) return SDL_APP_CONTINUE;
+    // Drop events once the window is gone. During teardown destroyContext()
+    // nulls mWindow before ~LLWindowSDL clears gWindowImplementation, and the
+    // per-event handlers below deref mWindow (SDL_GetWindowSizeInPixels, relative
+    // mouse mode, DPI) without their own guards.
+    if (!gWindowImplementation || !gWindowImplementation->mWindow) return SDL_APP_CONTINUE;
 
     return gWindowImplementation->handleEvent(event);
 }
@@ -3528,6 +3557,12 @@ void LLSplashScreenSDL::showImpl()
     if (!mRenderer)
     {
         LL_WARNS() << "Splash: software renderer creation failed: " << SDL_GetError() << LL_ENDL;
+        // Don't leave a blank borderless always-on-top window up for the whole
+        // load. Tear the partial splash window down now; hideImpl() still
+        // balances the TTF/VIDEO subsystem refcounts taken above.
+        SDL_DestroyWindow(mWindow);
+        mWindow = nullptr;
+        return;
     }
 
     if (mInitedTTF)
