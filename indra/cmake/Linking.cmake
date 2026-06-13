@@ -37,6 +37,7 @@ elseif (WINDOWS)
           advapi32
           shlwapi
           shell32
+          wbemuuid
           ws2_32
           mswsock
           psapi
