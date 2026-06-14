@@ -36,7 +36,11 @@ target_precompile_headers(llxml REUSE_FROM llprecompiled)
 if (BUILD_TESTING)
     # unit tests
     SET(llxml_TEST_SOURCE_FILES
-      # none yet!
+      llxmlnode.cpp
+      )
+    set_source_files_properties(llxmlnode.cpp
+      PROPERTIES
+      LL_TEST_ADDITIONAL_LIBRARIES "ll::expat"
       )
     LL_ADD_PROJECT_UNIT_TESTS(llxml "${llxml_TEST_SOURCE_FILES}")
 
