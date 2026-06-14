@@ -1158,6 +1158,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>RenderAvatarShadowDetail</key>
+        <map>
+            <key>Comment</key>
+            <string>Which avatar passes cast shadows. 0 = opaque only, 1 = opaque + alpha mask, 2 = full (also alpha blend). Lower values speed up crowd scenes by skipping the expensive alpha-blend avatar shadow pass across all cascades.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
         <key>RenderBloomHDR</key>
         <map>
             <key>Comment</key>
