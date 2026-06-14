@@ -164,7 +164,7 @@ protected:
 
 private:
     void            addAttribute( const std::string& name, const std::string& value );
-    void            appendContents( const std::string& str );
+    void            appendContents( const char* str, std::string::size_type len );
     void            addChild( LLXmlTreeNode* child );
 
     void            dump( const std::string& prefix );
