@@ -62,10 +62,10 @@ public:
     // Other message categories (self, system, objects, owner-say) keep their
     // user-configured chat colors.
     bool getIRCChatColor(const LLChat& chat, LLUIColor& color);
-    bool getIRCNameColor(const LLChat& chat, const LLUIColor& chat_color, LLUIColor& color);
+    bool getIRCNameColor(const LLChat& chat, LLUIColor& color);
     bool getIRCNameTagColor(const LLUUID& id, LLColor4& color);
 
 private:
     LLColor4 deterministicAgentColor(const LLUUID& id);
-    LLColor4 dimNameColor(const LLColor4& color);
+    LLColor4 nameColor(const LLUUID& id);
 };

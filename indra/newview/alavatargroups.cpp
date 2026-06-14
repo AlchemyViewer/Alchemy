@@ -322,7 +322,7 @@ bool ALAvatarGroups::getIRCChatColor(const LLChat& chat, LLUIColor& color)
     return false;
 }
 
-bool ALAvatarGroups::getIRCNameColor(const LLChat& chat, const LLUIColor& chat_color, LLUIColor& color)
+bool ALAvatarGroups::getIRCNameColor(const LLChat& chat, LLUIColor& color)
 {
     static LLCachedControl<bool> enabled(gSavedSettings, "AlchemyChatIRCColorsEnabled", false);
     if (!enabled)
@@ -337,7 +337,7 @@ bool ALAvatarGroups::getIRCNameColor(const LLChat& chat, const LLUIColor& chat_c
         return false;
     }
 
-    color = dimNameColor(chat_color.get());
+    color = nameColor(chat.mFromID);
     return true;
 }
 
@@ -353,11 +353,11 @@ bool ALAvatarGroups::getIRCNameTagColor(const LLUUID& id, LLColor4& color)
     // Mirror the chat-color override: only other agents get a per-avatar color,
     // self keeps the user-configured name tag colors. Skip while restricted from
     // seeing this avatar's name so the color can't defeat @shownames. The name
-    // dimming applied to chat names is applied here too so tags match.
+    // lightness applied to chat names is applied here too so tags match.
     if (id.notNull() && id != gAgentID
         && RlvActions::canShowName(RlvActions::SNC_DEFAULT, id))
     {
-        color = dimNameColor(deterministicAgentColor(id));
+        color = nameColor(id);
         return true;
     }
 
@@ -376,17 +376,18 @@ LLColor4 ALAvatarGroups::deterministicAgentColor(const LLUUID& id)
     return color;
 }
 
-LLColor4 ALAvatarGroups::dimNameColor(const LLColor4& color)
+LLColor4 ALAvatarGroups::nameColor(const LLUUID& id)
 {
-    static LLCachedControl<F32> scale(gSavedSettings, "AlchemyChatIRCNameLightnessScale", 0.8f);
+    static LLCachedControl<F32> saturation(gSavedSettings, "AlchemyChatIRCAgentSaturation", 0.7f);
+    static LLCachedControl<F32> name_lightness(gSavedSettings, "AlchemyChatIRCNameLightness", 0.7f);
 
-    F32 hue = 0.f;
-    F32 saturation = 0.f;
-    F32 lightness = 0.f;
-    color.calcHSL(&hue, &saturation, &lightness);
-
+    // Same hue and saturation as the per-agent chat color, but with the name's
+    // own independent lightness. Built from the same inputs as the chat color
+    // rather than derived from it, so the chat Lightness slider doesn't bleed
+    // into the name (a very light/dark chat color loses saturation, and hue at
+    // the extremes, when round-tripped through RGB).
     LLColor4 result;
-    result.setHSL(hue, saturation, lightness * scale());
+    result.setHSL(static_cast<F32>(id.getCRC32() % 360) / 360.f, saturation(), name_lightness());
     result.mV[VALPHA] = 1.f;
 
     return result;

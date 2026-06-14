@@ -34,7 +34,12 @@
 
 #include "llfloaterpreference.h"
 
+#include "alavatargroups.h"
 #include "llaudioengine.h"
+#include "llchat.h"
+#include "llstyle.h"
+#include "lluicolortable.h"
+#include "llviewerchat.h"
 #include "message.h"
 #include "llfloaterautoreplacesettings.h"
 #include "llagent.h"
@@ -74,6 +79,8 @@
 #include "llscrolllistitem.h"
 #include "llsliderctrl.h"
 #include "lltabcontainer.h"
+#include "lltextbox.h"
+#include "lltexteditor.h"
 #include "lltrans.h"
 #include "lluri.h"
 #include "llviewercontrol.h"
@@ -3066,6 +3073,162 @@ private:
 static LLPanelInjector<LLPanelPreferenceGraphics> t_pref_graph("panel_preference_graphics");
 static LLPanelInjector<LLPanelPreferencePrivacy> t_pref_privacy("panel_preference_privacy");
 static LLPanelInjector<LLPanelPreferenceSound> t_pref_sound("panel_preference_sound");
+static LLPanelInjector<LLPanelPreferenceColors> t_pref_colors("panel_preference_colors");
+
+bool LLPanelPreferenceColors::postBuild()
+{
+    mPreviewEditor = getChild<LLTextEditor>("irc_chat_preview");
+    updatePreview();
+    return LLPanelPreference::postBuild();
+}
+
+void LLPanelPreferenceColors::draw()
+{
+    // The chat-color swatches commit straight into LLUIColorTable (no settings
+    // signal to listen to), so poll a cheap signature of everything the preview
+    // depends on and re-render only when it actually changes.
+    static const char* const color_names[] = {
+        "UserChatColor", "AgentChatColor", "FriendChatColor", "SystemChatColor",
+        "ObjectChatColor", "llOwnerSayChatColor", "LindenChatColor", "HTMLLinkColor",
+    };
+    std::string signature;
+    for (const char* name : color_names)
+    {
+        const LLColor4& c = LLUIColorTable::instance().getColor(name).get();
+        signature += llformat("%.3f,%.3f,%.3f;", c.mV[VRED], c.mV[VGREEN], c.mV[VBLUE]);
+    }
+    signature += llformat("%d;%.3f;%.3f;%.3f;%d",
+        gSavedSettings.getBOOL("AlchemyChatIRCColorsEnabled") ? 1 : 0,
+        gSavedSettings.getF32("AlchemyChatIRCAgentSaturation"),
+        gSavedSettings.getF32("AlchemyChatIRCAgentLightness"),
+        gSavedSettings.getF32("AlchemyChatIRCNameLightness"),
+        gSavedSettings.getBOOL("Use24HourClock") ? 1 : 0);
+
+    if (signature != mPreviewSignature)
+    {
+        mPreviewSignature = signature;
+        updatePreview();
+    }
+
+    LLPanelPreference::draw();
+}
+
+void LLPanelPreferenceColors::updatePreview()
+{
+    if (!mPreviewEditor)
+        return;
+
+    // One line per chat category the panel above exposes. Each carries the base
+    // color the real getChatColor() switch would pick (friend/Linden can't be
+    // detected from a fake id, so we set it explicitly), plus a stable id so the
+    // per-avatar IRC color stays constant between refreshes. The IRC override and
+    // name dimming are then applied through the real ALAvatarGroups calls, so the
+    // preview tracks the live colors and settings exactly like in-world local chat.
+    enum EKind { K_SYSTEM, K_SELF, K_RESIDENT, K_FRIEND, K_LINDEN, K_OBJECT, K_OWNER };
+    static const struct
+    {
+        EKind       kind;
+        const char* color;  // base text color name
+        const char* id;     // stable per-avatar id (empty for system/self)
+        S32         hour;    // mock 24h timestamp, formatted per Use24HourClock
+        S32         minute;
+        const char* name;   // speaker name ("" hides the name prefix)
+        const char* text;
+    } samples[] = {
+        { K_SYSTEM,   "SystemChatColor",     "",                                     13, 42, "",                        "Welcome to Quirk Island. Mind the dancing llamas." },
+        { K_SELF,     "UserChatColor",       "",                                     13, 43, "You",                     "ok who moved my virtual cheese" },
+        { K_RESIDENT, "AgentChatColor",      "a1a1a1a1-0000-0000-0000-000000000001", 13, 44, "Bartholomew Bumblecrash", "anyone else seeing the sky do the wobble thing?" },
+        { K_RESIDENT, "AgentChatColor",      "f6f6f6f6-0000-0000-0000-000000000006", 13, 45, "Wandering Pixel",         "https://marketplace.secondlife.com/" },
+        { K_FRIEND,   "FriendChatColor",     "b2b2b2b2-0000-0000-0000-000000000002", 13, 46, "Glittertoes McSparkle",   "omg hi!! brb taming a baby dragon" },
+        { K_LINDEN,   "LindenChatColor",     "c3c3c3c3-0000-0000-0000-000000000003", 13, 47, "Governor Linden",         "Rolling restart in 5, hold onto your hats." },
+        { K_OBJECT,   "ObjectChatColor",     "d4d4d4d4-0000-0000-0000-000000000004", 13, 48, "Object",                  "Welcome to Help Island!" },
+        { K_OWNER,    "llOwnerSayChatColor", "e5e5e5e5-0000-0000-0000-000000000005", 13, 49, "Animation HUD",           "Memory Free: 2167 KiB :)" },
+    };
+
+    static const LLUIColor time_color = LLUIColorTable::instance().getColor("ChatHeaderTimestampColor");
+    const bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
+
+    mPreviewEditor->clear();   // clear before re-appending
+
+    bool prepend_newline = false;  // newline before every line except the first
+    for (const auto& s : samples)
+    {
+        LLChat chat;
+        chat.mFromName = s.name;
+        chat.mText     = s.text;
+        switch (s.kind)
+        {
+        case K_SYSTEM:
+            chat.mSourceType = CHAT_SOURCE_SYSTEM;
+            break;
+        case K_SELF:
+            chat.mSourceType = CHAT_SOURCE_AGENT;
+            chat.mFromID     = gAgentID;
+            break;
+        case K_OBJECT:
+            chat.mSourceType = CHAT_SOURCE_OBJECT;
+            chat.mFromID     = LLUUID(s.id);
+            break;
+        case K_OWNER:
+            chat.mSourceType = CHAT_SOURCE_OBJECT;
+            chat.mChatType   = CHAT_TYPE_OWNER;
+            chat.mFromID     = LLUUID(s.id);
+            break;
+        default:  // resident / friend / Linden are all "other agents"
+            chat.mSourceType = CHAT_SOURCE_AGENT;
+            chat.mFromID     = LLUUID(s.id);
+            break;
+        }
+
+        // Base category color, then the live IRC overrides (mirrors getChatColor +
+        // getIRCNameColor in llchathistory.cpp). getIRCChatColor only recolors other
+        // agents, so self/system/object/owner keep their configured color. Names are
+        // clickable SLURLs in chat, so by default they take the link color; when IRC
+        // coloring is on, getIRCNameColor overrides that with the per-agent name color.
+        LLUIColor txt_color = LLUIColorTable::instance().getColor(s.color);
+        ALAvatarGroups::instance().getIRCChatColor(chat, txt_color);
+
+        LLUIColor name_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+        ALAvatarGroups::instance().getIRCNameColor(chat, name_color);
+
+        // Timestamp prefix, like nearby chat: "[hh:mm] ", honoring the
+        // Use24HourClock pref the way LLFloaterIMSessionTab::appendTime() does.
+        std::string time_str;
+        if (use_24h)
+        {
+            time_str = llformat("%d:%02d", s.hour, s.minute);
+        }
+        else
+        {
+            S32 h12 = s.hour % 12;
+            if (h12 == 0) h12 = 12;
+            time_str = llformat("%d:%02d %s", h12, s.minute, s.hour < 12 ? "AM" : "PM");
+        }
+
+        LLStyle::Params time_style;
+        time_style.color(time_color);
+        time_style.readonly_color(time_color);
+        mPreviewEditor->appendText("[" + time_str + "] ", prepend_newline, time_style);
+        prepend_newline = false;  // keep the rest of the line attached to the timestamp
+
+        if (!chat.mFromName.empty())
+        {
+            LLStyle::Params name_style;
+            name_style.color(name_color);
+            name_style.readonly_color(name_color);
+            mPreviewEditor->appendText(chat.mFromName + ": ", prepend_newline, name_style);
+        }
+
+        // parse_urls is set on the widget, so any URL in the text is linkified
+        // (and colored HTMLLinkColor) automatically by appendText.
+        LLStyle::Params text_style;
+        text_style.color(txt_color);
+        text_style.readonly_color(txt_color);
+        mPreviewEditor->appendText(chat.mText, prepend_newline, text_style);
+
+        prepend_newline = true;
+    }
+}
 
 bool LLPanelPreferenceSound::postBuild()
 {

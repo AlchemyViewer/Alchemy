@@ -662,16 +662,16 @@
             <key>Value</key>
             <real>0.9</real>
         </map>
-        <key>AlchemyChatIRCNameLightnessScale</key>
+        <key>AlchemyChatIRCNameLightness</key>
         <map>
             <key>Comment</key>
-            <string>Scales the lightness of the displayed name relative to its IRC-style chat color (0-1).</string>
+            <string>Lightness of the displayed name in IRC-style chat colors; shares the chat color's hue and saturation (0-1).</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>0.8</real>
+            <real>0.7</real>
         </map>
         <key>AlchemyChatMarkUnnamedObjects</key>
         <map>
