@@ -365,7 +365,7 @@ void XMLCALL StartXMLNode(void *userData,
         {
             U32 version_major = 0;
             U32 version_minor = 0;
-            if (sscanf(atts[pos + 1], "%d.%d", &version_major, &version_minor) > 0)
+            if (sscanf(atts[pos + 1], "%u.%u", &version_major, &version_minor) > 0)
             {
                 new_node->mVersionMajor = version_major;
                 new_node->mVersionMinor = version_minor;
@@ -374,7 +374,7 @@ void XMLCALL StartXMLNode(void *userData,
         else if (('s' == attr_name[0] && "size" == attr_name) || ('l' == attr_name[0] && "length" == attr_name))
         {
             U32 length;
-            if (sscanf(atts[pos + 1], "%d", &length) > 0)
+            if (sscanf(atts[pos + 1], "%u", &length) > 0)
             {
                 new_node->mLength = length;
             }
@@ -382,7 +382,7 @@ void XMLCALL StartXMLNode(void *userData,
         else if ('p' == attr_name[0] && "precision" == attr_name)
         {
             U32 precision;
-            if (sscanf(atts[pos + 1], "%d", &precision) > 0)
+            if (sscanf(atts[pos + 1], "%u", &precision) > 0)
             {
                 new_node->mPrecision = precision;
             }

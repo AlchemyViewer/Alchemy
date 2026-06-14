@@ -601,6 +601,11 @@ void LLXmlTreeParser::endElement(const char* name)
         LL_INFOS() << tabs() << "endElement " << name << LL_ENDL;
     }
 
+    if( !mCurrent )
+    {
+        return;
+    }
+
     if( !mCurrent->mContents.empty() )
     {
         LLStringUtil::trim(mCurrent->mContents);
@@ -612,7 +617,7 @@ void LLXmlTreeParser::endElement(const char* name)
 
 void LLXmlTreeParser::characterData(const char *s, int len)
 {
-    if (!s || len <= 0)
+    if (!s || len <= 0 || !mCurrent)
     {
         return;
     }
