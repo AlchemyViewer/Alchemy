@@ -52,11 +52,10 @@ LLStringTableEntry::~LLStringTableEntry()
 LLStringTable::LLStringTable(int tablesize)
 : mUniqueEntries(0)
 {
-    S32 i;
     if (!tablesize)
         tablesize = 4096; // some arbitrary default
     // Make sure tablesize is power of 2
-    for (i = 31; i>0; i--)
+    for (S32 i = 31; i>0; i--)
     {
         if (tablesize & (1<<i))
         {
@@ -69,20 +68,12 @@ LLStringTable::LLStringTable(int tablesize)
     }
     mMaxEntries = tablesize;
 
-#if !STRING_TABLE_HASH_MAP
-    // ALlocate strings
-    mStringList = new string_list_ptr_t[mMaxEntries];
-    // Clear strings
-    for (i = 0; i < mMaxEntries; i++)
-    {
-        mStringList[i] = NULL;
-    }
-#endif
+    // Allocate the bucket array, value-initialized to null
+    mStringList = new string_list_ptr_t[mMaxEntries]();
 }
 
 LLStringTable::~LLStringTable()
 {
-#if !STRING_TABLE_HASH_MAP
     if (mStringList)
     {
         for (S32 i = 0; i < mMaxEntries; i++)
@@ -95,26 +86,14 @@ LLStringTable::~LLStringTable()
             delete mStringList[i];
         }
         delete [] mStringList;
-        mStringList = NULL;
+        mStringList = nullptr;
     }
-#else
-    // Need to clean up the string hash
-    for_each(mStringHash.begin(), mStringHash.end(), DeletePairedPointer());
-    mStringHash.clear();
-#endif
 }
 
 
 static U32 hash_my_string(const char *str, int max_entries)
 {
     U32 retval = 0;
-#if 0
-    while (*str)
-    {
-        retval <<= 1;
-        retval += *str++;
-    }
-#else
     while (*str)
     {
         retval = (retval<<4) + *str;
@@ -123,8 +102,7 @@ static U32 hash_my_string(const char *str, int max_entries)
         retval = retval & (~x);
         str++;
     }
-#endif
-    return (retval & (max_entries-1)); // max_entries is gauranteed to be power of 2
+    return (retval & (max_entries-1)); // max_entries is guaranteed to be power of 2
 }
 
 char* LLStringTable::checkString(const std::string& str)
@@ -154,43 +132,20 @@ LLStringTableEntry* LLStringTable::checkStringEntry(const char *str)
 {
     if (str)
     {
-        char *ret_val;
-        U32                 hash_value = hash_my_string(str, mMaxEntries);
-#if STRING_TABLE_HASH_MAP
-        LLStringTableEntry  *entry;
-#if 1 // Microsoft
-        string_hash_t::iterator lower = mStringHash.lower_bound(hash_value);
-        string_hash_t::iterator upper = mStringHash.upper_bound(hash_value);
-#else // stlport
-        std::pair<string_hash_t::iterator, string_hash_t::iterator> P = mStringHash.equal_range(hash_value);
-        string_hash_t::iterator lower = P.first;
-        string_hash_t::iterator upper = P.second;
-#endif
-        for (string_hash_t::iterator iter = lower; iter != upper; iter++)
-        {
-            entry = iter->second;
-            ret_val = entry->mString;
-            if (!strncmp(ret_val, str, MAX_STRINGS_LENGTH))
-            {
-                return entry;
-            }
-        }
-#else
-        string_list_t       *strlist = mStringList[hash_value];
+        U32 hash_value = hash_my_string(str, mMaxEntries);
+        string_list_t* strlist = mStringList[hash_value];
         if (strlist)
         {
             for (LLStringTableEntry* entry : *strlist)
             {
-                ret_val = entry->mString;
-                if (!strncmp(ret_val, str, MAX_STRINGS_LENGTH))
+                if (!strncmp(entry->mString, str, MAX_STRINGS_LENGTH))
                 {
                     return entry;
                 }
             }
         }
-#endif
     }
-    return NULL;
+    return nullptr;
 }
 
 char* LLStringTable::addString(const std::string& str)
@@ -222,42 +177,14 @@ LLStringTableEntry* LLStringTable::addStringEntry(const char *str)
 {
     if (str)
     {
-        char *ret_val = NULL;
-        U32                 hash_value = hash_my_string(str, mMaxEntries);
-#if STRING_TABLE_HASH_MAP
-        LLStringTableEntry  *entry;
-#if 1 // Microsoft
-        string_hash_t::iterator lower = mStringHash.lower_bound(hash_value);
-        string_hash_t::iterator upper = mStringHash.upper_bound(hash_value);
-#else // stlport
-        std::pair<string_hash_t::iterator, string_hash_t::iterator> P = mStringHash.equal_range(hash_value);
-        string_hash_t::iterator lower = P.first;
-        string_hash_t::iterator upper = P.second;
-#endif
-        for (string_hash_t::iterator iter = lower; iter != upper; iter++)
-        {
-            entry = iter->second;
-            ret_val = entry->mString;
-            if (!strncmp(ret_val, str, MAX_STRINGS_LENGTH))
-            {
-                entry->incCount();
-                return entry;
-            }
-        }
-
-        // not found, so add!
-        LLStringTableEntry* newentry = new LLStringTableEntry(str);
-        ret_val = newentry->mString;
-        mStringHash.insert(string_hash_t::value_type(hash_value, newentry));
-#else
-        string_list_t       *strlist = mStringList[hash_value];
+        U32 hash_value = hash_my_string(str, mMaxEntries);
+        string_list_t* strlist = mStringList[hash_value];
 
         if (strlist)
         {
             for (LLStringTableEntry* entry : *strlist)
             {
-                ret_val = entry->mString;
-                if (!strncmp(ret_val, str, MAX_STRINGS_LENGTH))
+                if (!strncmp(entry->mString, str, MAX_STRINGS_LENGTH))
                 {
                     entry->incCount();
                     return entry;
@@ -272,15 +199,13 @@ LLStringTableEntry* LLStringTable::addStringEntry(const char *str)
 
         // not found, so add!
         LLStringTableEntry *newentry = new LLStringTableEntry(str);
-        //ret_val = newentry->mString;
         strlist->push_front(newentry);
-#endif
         mUniqueEntries++;
         return newentry;
     }
     else
     {
-        return NULL;
+        return nullptr;
     }
 }
 
@@ -288,48 +213,14 @@ void LLStringTable::removeString(const char *str)
 {
     if (str)
     {
-        char *ret_val;
-        U32                 hash_value = hash_my_string(str, mMaxEntries);
-#if STRING_TABLE_HASH_MAP
-        {
-            LLStringTableEntry  *entry;
-#if 1 // Microsoft
-            string_hash_t::iterator lower = mStringHash.lower_bound(hash_value);
-            string_hash_t::iterator upper = mStringHash.upper_bound(hash_value);
-#else // stlport
-            std::pair<string_hash_t::iterator, string_hash_t::iterator> P = mStringHash.equal_range(hash_value);
-            string_hash_t::iterator lower = P.first;
-            string_hash_t::iterator upper = P.second;
-#endif
-            for (string_hash_t::iterator iter = lower; iter != upper; iter++)
-            {
-                entry = iter->second;
-                ret_val = entry->mString;
-                if (!strncmp(ret_val, str, MAX_STRINGS_LENGTH))
-                {
-                    if (!entry->decCount())
-                    {
-                        mUniqueEntries--;
-                        if (mUniqueEntries < 0)
-                        {
-                            LL_ERRS() << "LLStringTable:removeString trying to remove too many strings!" << LL_ENDL;
-                        }
-                        delete iter->second;
-                        mStringHash.erase(iter);
-                    }
-                    return;
-                }
-            }
-        }
-#else
-        string_list_t       *strlist = mStringList[hash_value];
+        U32 hash_value = hash_my_string(str, mMaxEntries);
+        string_list_t* strlist = mStringList[hash_value];
 
         if (strlist)
         {
             for (LLStringTableEntry* entry : *strlist)
             {
-                ret_val = entry->mString;
-                if (!strncmp(ret_val, str, MAX_STRINGS_LENGTH))
+                if (!strncmp(entry->mString, str, MAX_STRINGS_LENGTH))
                 {
                     if (!entry->decCount())
                     {
@@ -345,7 +236,6 @@ void LLStringTable::removeString(const char *str)
                 }
             }
         }
-#endif
     }
 }
 
