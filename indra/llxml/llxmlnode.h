@@ -295,18 +295,18 @@ protected:
 public:
     std::string mID;                // The ID attribute of this node
 
-    XML_Parser *mParser;        // Temporary pointer while loading
+    XML_Parser *mParser{ nullptr };     // Temporary pointer while loading
 
-    bool mIsAttribute;          // Flag is only used for output formatting
-    U32 mVersionMajor;          // Version of this tag to use
-    U32 mVersionMinor;
-    U32 mLength;                // If the length is nonzero, then only return arrays of this length
-    U32 mPrecision;             // The number of BITS per array item
-    ValueType mType;            // The value type
-    Encoding mEncoding;         // The value encoding
-    S32 mLineNumber;            // line number in source file, if applicable
+    bool mIsAttribute{ false };     // Flag is only used for output formatting
+    U32 mVersionMajor{ 0 };         // Version of this tag to use
+    U32 mVersionMinor{ 0 };
+    U32 mLength{ 0 };               // If the length is nonzero, then only return arrays of this length
+    U32 mPrecision{ 64 };           // The number of BITS per array item
+    ValueType mType{ TYPE_CONTAINER };  // The value type
+    Encoding mEncoding{ ENCODING_DEFAULT };     // The value encoding
+    S32 mLineNumber{ -1 };          // line number in source file, if applicable
 
-    LLXMLNode* mParent;             // The parent node
+    LLXMLNode* mParent{ nullptr };  // The parent node
     LLXMLChildrenPtr mChildren;     // The child nodes
     LLXMLAttribList mAttributes;        // The attribute nodes
     LLXMLNodePtr mPrev;             // Double-linked list previous node
@@ -316,7 +316,7 @@ public:
     static bool sStripWhitespaceValues;
 
 protected:
-    LLStringTableEntry *mName;      // The name of this node
+    LLStringTableEntry *mName{ nullptr };   // The name of this node
 
     // The value of this node (use getters/setters only)
     // Values are not XML-escaped in memory

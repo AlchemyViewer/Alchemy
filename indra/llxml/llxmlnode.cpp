@@ -46,75 +46,25 @@
 #include "llsd.h"
 #include "llstring.h"
 #include "lluuid.h"
-#include "lldir.h"
 
 // static
 bool LLXMLNode::sStripEscapedStrings = true;
 bool LLXMLNode::sStripWhitespaceValues = false;
 
-LLXMLNode::LLXMLNode() :
-    mID(""),
-    mParser(NULL),
-    mIsAttribute(false),
-    mVersionMajor(0),
-    mVersionMinor(0),
-    mLength(0),
-    mPrecision(64),
-    mType(TYPE_CONTAINER),
-    mEncoding(ENCODING_DEFAULT),
-    mLineNumber(-1),
-    mParent(NULL),
-    mChildren(NULL),
-    mAttributes(),
-    mPrev(NULL),
-    mNext(NULL),
-    mName(NULL),
-    mValue(""),
-    mDefault(NULL)
+// Most members are initialized from default member initializers in the header.
+LLXMLNode::LLXMLNode()
 {
 }
 
 LLXMLNode::LLXMLNode(const char* name, bool is_attribute) :
-    mID(""),
-    mParser(NULL),
     mIsAttribute(is_attribute),
-    mVersionMajor(0),
-    mVersionMinor(0),
-    mLength(0),
-    mPrecision(64),
-    mType(TYPE_CONTAINER),
-    mEncoding(ENCODING_DEFAULT),
-    mLineNumber(-1),
-    mParent(NULL),
-    mChildren(NULL),
-    mAttributes(),
-    mPrev(NULL),
-    mNext(NULL),
-    mValue(""),
-    mDefault(NULL)
+    mName(gStringTable.addStringEntry(name))
 {
-    mName = gStringTable.addStringEntry(name);
 }
 
 LLXMLNode::LLXMLNode(LLStringTableEntry* name, bool is_attribute) :
-    mID(""),
-    mParser(NULL),
     mIsAttribute(is_attribute),
-    mVersionMajor(0),
-    mVersionMinor(0),
-    mLength(0),
-    mPrecision(64),
-    mType(TYPE_CONTAINER),
-    mEncoding(ENCODING_DEFAULT),
-    mLineNumber(-1),
-    mParent(NULL),
-    mChildren(NULL),
-    mAttributes(),
-    mPrev(NULL),
-    mNext(NULL),
-    mName(name),
-    mValue(""),
-    mDefault(NULL)
+    mName(name)
 {
 }
 
@@ -129,12 +79,6 @@ LLXMLNode::LLXMLNode(const LLXMLNode& rhs) :
     mType(rhs.mType),
     mEncoding(rhs.mEncoding),
     mLineNumber(0),
-    mParser(NULL),
-    mParent(NULL),
-    mChildren(NULL),
-    mAttributes(),
-    mPrev(NULL),
-    mNext(NULL),
     mName(rhs.mName),
     mValue(rhs.mValue),
     mDefault(rhs.mDefault)
@@ -2510,9 +2454,9 @@ void LLXMLNode::setDoubleValue(U32 length, const F64 *array, Encoding encoding, 
 std::string LLXMLNode::escapeXML(const std::string& xml)
 {
     std::string out;
-    for (std::string::size_type i = 0; i < xml.size(); ++i)
+    out.reserve(xml.size());
+    for (char c : xml)
     {
-        char c = xml[i];
         switch(c)
         {
         case '"':   out.append("&quot;");   break;
