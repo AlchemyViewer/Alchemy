@@ -687,7 +687,10 @@ void LLFlatListView::onItemMouseClick(item_pair_t* item_pair, MASK mask)
         setFocus(true);
     }
 
-    armReorderDrag(item_pair);
+    if (!(mask & (MASK_SHIFT | MASK_CONTROL)))
+    {
+        armReorderDrag(item_pair);
+    }
 
     bool select_item = !isSelected(item_pair);
 
