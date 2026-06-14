@@ -53,6 +53,7 @@ class LLScrollListCell;
 class LLSliderCtrl;
 class LLSD;
 class LLTextBox;
+class LLTextEditor;
 struct skin_t;
 
 namespace ll
@@ -386,6 +387,27 @@ private:
     // destroyed; boost::signals2 makes that safe even if the engine
     // outlives the panel.
     boost::signals2::scoped_connection mDevicesChangedConn;
+};
+
+// Colors > Chat preferences panel. Renders a live mock-chat preview that
+// re-colors whenever a chat-color swatch or any AlchemyChatIRC* setting
+// changes, using the real chat-color path so it matches in-world local chat.
+class LLPanelPreferenceColors : public LLPanelPreference
+{
+    LOG_CLASS(LLPanelPreferenceColors);
+public:
+    bool postBuild() override;
+    void draw() override;
+
+private:
+    void updatePreview();
+
+    LLTextEditor* mPreviewEditor = nullptr;
+
+    // Signature of the colors/settings the preview depends on. The chat-color
+    // swatches commit straight into LLUIColorTable (no settings signal), so
+    // draw() polls this and re-renders only when it actually changes.
+    std::string mPreviewSignature;
 };
 
 class LLPanelPreferenceControls : public LLPanelPreference, public LLKeyBindResponderInterface
