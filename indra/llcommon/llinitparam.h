@@ -32,6 +32,8 @@
 #include <type_traits>
 #include <vector>
 #include <list>
+#include <memory>
+#include <utility>
 #include <boost/unordered_map.hpp>
 #include <boost/function.hpp>
 
@@ -670,39 +672,37 @@ namespace LLInitParam
         class BaseBlock*                mCurrentBlockPtr;       // pointer to block currently being constructed
     };
 
-    // TODO: implement in terms of owned_ptr
+    // Optional, lazily-allocated, heap-stored T with deep-copy value semantics.
+    // Heap storage (rather than e.g. std::optional) keeps a Lazy<> param small
+    // even when T is a large block that is usually absent.
     template<typename T>
     class LazyValue
     {
     public:
         LazyValue() = default;
 
-        ~LazyValue() { delete mPtr; }
+        LazyValue(const T& value) : mPtr(std::make_unique<T>(value)) {}
 
-        LazyValue(const T& value) { mPtr = new T(value); }
-
-        LazyValue(const LazyValue& other) : mPtr(nullptr) { *this = other; }
+        LazyValue(const LazyValue& other) { *this = other; }
+        LazyValue(LazyValue&& other) noexcept = default;
 
         LazyValue& operator=(const LazyValue& other)
         {
             if (!other.mPtr)
             {
-                delete mPtr;
-                mPtr = nullptr;
+                mPtr.reset();
+            }
+            else if (!mPtr)
+            {
+                mPtr = std::make_unique<T>(*other.mPtr);
             }
             else
             {
-                if (!mPtr)
-                {
-                    mPtr = new T(*other.mPtr);
-                }
-                else
-                {
-                    *mPtr = *(other.mPtr);
-                }
+                *mPtr = *other.mPtr;
             }
             return *this;
         }
+        LazyValue& operator=(LazyValue&& other) noexcept = default;
 
         bool operator==(const LazyValue& other) const
         {
