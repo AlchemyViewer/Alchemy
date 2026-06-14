@@ -510,9 +510,11 @@ bool LLGLTFPreviewTexture::render()
         gPipeline.bindDeferredShader(shader);
         fixup_shader_constants(shader);
 
+        LLFetchedGLTFMaterial* lastMat = nullptr;
+        LLViewerTexture* lastTex = nullptr;
         for (PreviewSpherePart& part : preview_sphere)
         {
-            LLRenderPass::pushGLTFBatch(*part->mDrawInfo);
+            LLRenderPass::pushGLTFBatch(*part->mDrawInfo, lastMat, lastTex);
         }
 
         gPipeline.unbindDeferredShader(shader);
