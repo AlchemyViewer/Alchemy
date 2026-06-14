@@ -10391,7 +10391,7 @@ static LLTrace::BlockTimerStatHandle FTM_SHADOW_ALPHA_TREE("Alpha Tree");
 static LLTrace::BlockTimerStatHandle FTM_SHADOW_ALPHA_GRASS("Alpha Grass");
 static LLTrace::BlockTimerStatHandle FTM_SHADOW_FULLBRIGHT_ALPHA_MASKED("Fullbright Alpha Masked");
 
-void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp)
+void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_RENDER);
     LL_PROFILE_GPU_ZONE("renderShadow");
@@ -10427,7 +10427,13 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
 
     LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_LESS);
 
-    updateCull(shadow_cam, result);
+    // In RenderShadowCullMode 1, do_cull is false: generateSunShadow did the single union
+    // octree cull and pre-filtered `result` to this cascade's frustum (bucketShadowCull),
+    // so skip the per-cascade octree walk and only sort/build this cascade's render map.
+    if (do_cull)
+    {
+        updateCull(shadow_cam, result);
+    }
 
     stateSort(shadow_cam, result);
 
@@ -10825,6 +10831,49 @@ public:
     }
 };
 
+// Re-bucket a shared sun-shadow cull (produced by a single union octree walk) down to one
+// cascade: copy the union's visible/drawable groups whose object bounds intersect this
+// cascade's frustum into `dst` (the same AABBInFrustumObjectBounds test the per-cascade
+// cull uses, so the geometry matches mode 0 exactly), then pass the small individual-
+// drawable and bridge lists through unfiltered. stateSort then builds the cascade's render
+// map from `dst`. Lets RenderShadowCullMode 1 share one octree walk across all cascades.
+static void bucketShadowCull(LLCullResult& src, LLCamera& cam, LLCullResult& dst)
+{
+    dst.clear();
+
+    for (LLCullResult::sg_iterator i = src.beginVisibleGroups(), end = src.endVisibleGroups(); i != end; ++i)
+    {
+        LLSpatialGroup* group = *i;
+        if (!group->isDead() &&
+            cam.AABBInFrustum(group->getObjectBounds()[0], group->getObjectBounds()[1]) > 0)
+        {
+            dst.pushVisibleGroup(group);
+        }
+    }
+
+    for (LLCullResult::sg_iterator i = src.beginDrawableGroups(), end = src.endDrawableGroups(); i != end; ++i)
+    {
+        LLSpatialGroup* group = *i;
+        if (!group->isDead() &&
+            cam.AABBInFrustum(group->getObjectBounds()[0], group->getObjectBounds()[1]) > 0)
+        {
+            dst.pushDrawableGroup(group);
+        }
+    }
+
+    // Individual drawables and spatial bridges (attachments/animesh) are few; pass them
+    // through unfiltered -- conservative (they render into every cascade) but correct.
+    for (LLCullResult::drawable_iterator i = src.beginVisibleList(), end = src.endVisibleList(); i != end; ++i)
+    {
+        dst.pushDrawable(*i);
+    }
+
+    for (LLCullResult::bridge_iterator i = src.beginVisibleBridge(), end = src.endVisibleBridge(); i != end; ++i)
+    {
+        dst.pushBridge(*i);
+    }
+}
+
 void LLPipeline::generateSunShadow(LLCamera& camera)
 {
     if (!sRenderDeferred || RenderShadowDetail <= 0)
@@ -11058,6 +11107,105 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     }
     else
     {
+        // RenderShadowCullMode 1: do the expensive octree cull ONCE against a frustum
+        // spanning every sun cascade, then have each cascade cheaply re-bucket the union's
+        // visible groups by its own frustum (bucketShadowCull) and build its own render
+        // map. Saves 3 of 4 octree walks per frame while each cascade still renders only
+        // its own slice -- GPU-neutral vs. per-cascade culling, so it helps CPU-bound
+        // targets without regressing GPU-bound ones. Disabled in cube snapshots. Default 0.
+        static LLCachedControl<S32> sShadowCullMode(gSavedSettings, "RenderShadowCullMode", 0);
+        bool have_union_cull = false;
+        static LLCullResult sUnionShadowResult;
+        if (sShadowCullMode() == 1 && !gCubeSnapshot)
+        {
+            // updateFrustumPlanes below seeds the frustum corners from the *current* GL
+            // matrices, and earlier setup in this function leaves them in a non-main-view
+            // state. Restore the saved (main-view) matrices first, as the cascade loop
+            // does each iteration, so the corner directions used below are correct.
+            set_current_modelview(saved_view);
+            set_current_projection(saved_proj);
+
+            LLCamera ucam = camera;
+            ucam.setFar(16.f);
+            LLViewerCamera::updateFrustumPlanes(ucam, false, false, true);
+
+            LLVector3 ueye = camera.getOrigin();
+            LLVector3* ufrust = ucam.mAgentFrustum;
+            LLVector3 upn = ucam.getAtAxis();
+            for (U32 i = 0; i < 4; i++)
+            {
+                LLVector3 delta = ufrust[i+4]-ueye;
+                delta += (ufrust[i+4]-ufrust[(i+2)%4+4])*0.05f;
+                delta.normVec();
+                F32 dp = delta*upn;
+                ufrust[i]   = ueye + (delta*dist[0]*0.75f)/dp;
+                ufrust[i+4] = ueye + (delta*dist[4]*1.25f)/dp;
+            }
+
+            {
+                glm::mat4 uview = look(camera.getOrigin(), lightDir, -up);
+
+                // AABB the 8 full-range frustum corners directly in light space. ufrust
+                // spans [dist[0], dist[4]] (built above), so this box is a guaranteed
+                // superset of every cascade. getVisiblePointCloud is NOT usable here: the
+                // far corners sit past the view far plane, so it clips the cloud down to
+                // the 4 near corners and the union collapses to a dot at the camera.
+                LLVector3 mn(mul_mat4_vec3(uview, glm::vec3(ufrust[0])));
+                LLVector3 mx = mn;
+                for (U32 i = 1; i < 8; i++)
+                {
+                    LLVector3 p(mul_mat4_vec3(uview, glm::vec3(ufrust[i])));
+                    update_min_max(mn, mx, p);
+                }
+
+                LLVector3 ucenter = (mn+mx)*0.5f;
+
+                // Conservative ortho light-space projection bounding the whole point
+                // cloud. updateFrustumPlanes derives the cull frustum from the *current*
+                // GL modelview/projection, so set them here. Ortho is looser than the
+                // per-cascade perspective fit, so the result is a superset of every
+                // cascade frustum -- no dropped casters.
+                //
+                // Pad the depth range: with the sun near-overhead the light-space
+                // footprint is nearly planar (znear ~= zfar), which makes glm::ortho
+                // singular and updateFrustumPlanes unproject to NaN frustum corners --
+                // shadows then drop and flip with camera angle. The near plane is
+                // replaced by shadow_near_clip below and the far only needs to clear the
+                // receivers, so widening the depth range is always safe.
+                F32 zpad = llmax(mx.mV[0] - mn.mV[0], mx.mV[1] - mn.mV[1]) * 0.5f + 1.f;
+                glm::mat4 uproj = glm::ortho(mn.mV[0], mx.mV[0], mn.mV[1], mx.mV[1], -mx.mV[2] - zpad, -mn.mV[2] + zpad);
+
+                ucam.setOriginAndLookAt(ueye, up, ucenter);
+                ucam.setOrigin(0, 0, 0);
+
+                LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_SUN_SHADOW0;
+                set_current_modelview(uview);
+                set_current_projection(uproj);
+                LLViewerCamera::updateFrustumPlanes(ucam, false, false, true);
+                ucam.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).set(shadow_near_clip);
+
+                bool saved_shadow_render = LLPipeline::sShadowRender;
+                U32 saved_occlusion = sUseOcclusion;
+                LLPipeline::sShadowRender = true;
+                // Disable occlusion culling for the shadow cull exactly as renderShadow
+                // does: occlusion queries are main-camera and previous-frame based, so
+                // leaving them on wrongly culls casters hidden from the main view (their
+                // shadows still show) and flickers as the queries resolve frame to frame.
+                sUseOcclusion = 0;
+                // One octree walk for the whole sun shadow. No stateSort here -- each
+                // cascade re-buckets these visible groups and sorts its own render map.
+                updateCull(ucam, sUnionShadowResult);
+                sUseOcclusion = saved_occlusion;
+                LLPipeline::sShadowRender = saved_shadow_render;
+
+                // restore main matrices (the cascade loop sets its own each iteration)
+                set_current_modelview(saved_view);
+                set_current_projection(saved_proj);
+
+                have_union_cull = true;
+            }
+        }
+
         for (S32 j = 0; j < (gCubeSnapshot ? 2 : 4); j++)
         {
             if (!hasRenderDebugMask(RENDER_DEBUG_SHADOW_FRUSTA) && !gCubeSnapshot)
@@ -11418,7 +11566,11 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
             {
                 static LLCullResult result[4];
-                renderShadow(view[j], proj[j], shadow_cam, result[j], true);
+                if (have_union_cull)
+                {   // re-bucket the shared union cull down to this cascade's frustum
+                    bucketShadowCull(sUnionShadowResult, shadow_cam, result[j]);
+                }
+                renderShadow(view[j], proj[j], shadow_cam, result[j], true, !have_union_cull);
             }
 
             mRT->shadow[j].flush();

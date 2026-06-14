@@ -1169,6 +1169,17 @@
             <key>Value</key>
             <integer>2</integer>
         </map>
+        <key>RenderShadowCullMode</key>
+        <map>
+            <key>Comment</key>
+            <string>How sun shadow cascades are culled. 0 = cull and sort each cascade separately (default). 1 = cull and sort once against a frustum spanning all cascades, sharing the result (less CPU per frame, more GPU vertex work per cascade). Experimental.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>RenderBloomHDR</key>
         <map>
             <key>Comment</key>
