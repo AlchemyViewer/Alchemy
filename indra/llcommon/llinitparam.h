@@ -277,8 +277,8 @@ namespace LLInitParam
         {}
 
         void setValueName(const std::string& key) {}
-        std::string getValueName() const { return ""; }
-        std::string calcValueName(const value_t& value) const { return ""; }
+        const std::string& getValueName() const { static const std::string sEmpty; return sEmpty; }
+        const std::string& calcValueName(const value_t& value) const { static const std::string sEmpty; return sEmpty; }
         void clearValueName() const {}
 
         static bool getValueFromName(const std::string& name, value_t& value)
@@ -336,12 +336,12 @@ namespace LLInitParam
             mValueName = value_name;
         }
 
-        std::string getValueName() const
+        const std::string& getValueName() const
         {
             return mValueName;
         }
 
-        std::string calcValueName(const value_t& value) const
+        const std::string& calcValueName(const value_t& value) const
         {
             value_name_map_t* map = getValueNames();
             for (typename value_name_map_t::value_type& map_pair : *map)
@@ -352,7 +352,8 @@ namespace LLInitParam
                 }
             }
 
-            return "";
+            static const std::string sEmpty;
+            return sEmpty;
         }
 
         void clearValueName() const
@@ -391,11 +392,19 @@ namespace LLInitParam
         static std::vector<std::string>* getPossibleValues()
         {
             static std::vector<std::string> sValues;
+            static bool sInitialized = false;
 
-            value_name_map_t* map = getValueNames();
-            for (typename value_name_map_t::value_type& map_pair : *map)
+            // Populate once: this is called repeatedly (e.g. from inspectBlock,
+            // twice per param), and without a guard sValues grew unboundedly
+            // with duplicate entries on every call.
+            if (!sInitialized)
             {
-                sValues.push_back(map_pair.first);
+                sInitialized = true;
+                value_name_map_t* map = getValueNames();
+                for (typename value_name_map_t::value_type& map_pair : *map)
+                {
+                    sValues.push_back(map_pair.first);
+                }
             }
             return &sValues;
         }
@@ -717,7 +726,7 @@ namespace LLInitParam
         {
             if (!mPtr)
             {
-                mPtr = new T(other);
+                mPtr = std::make_unique<T>(other);
             }
             else
             {
@@ -735,15 +744,15 @@ namespace LLInitParam
         // lazily allocate an instance of T
         T* ensureInstance() const
         {
-            if (mPtr == nullptr)
+            if (!mPtr)
             {
-                mPtr = new T();
+                mPtr = std::make_unique<T>();
             }
-            return mPtr;
+            return mPtr.get();
         }
 
     private:
-        mutable T* mPtr = nullptr;
+        mutable std::unique_ptr<T> mPtr;
     };
 
     // root class of all parameter blocks
@@ -1069,7 +1078,7 @@ namespace LLInitParam
                 name_stack.back().second = true;
             }
 
-            std::string key = typed_param.getValueName();
+            const std::string& key = typed_param.getValueName();
 
             // first try to write out name of name/value pair
 
@@ -1086,7 +1095,7 @@ namespace LLInitParam
                 serialized = parser.writeValue(typed_param.getValue(), name_stack);
                 if (!serialized)
                 {
-                    std::string calculated_key = typed_param.calcValueName(typed_param.getValue());
+                    const std::string& calculated_key = typed_param.calcValueName(typed_param.getValue());
                     if (calculated_key.size()
                         && (!diff_typed_param
                             || !ParamCompare<std::string>::equals(static_cast<const self_t*>(diff_param)->getValueName(), calculated_key)))
@@ -1229,7 +1238,7 @@ namespace LLInitParam
                 name_stack.back().second = true;
             }
 
-            std::string key = typed_param.getValueName();
+            const std::string& key = typed_param.getValueName();
             if (!key.empty())
             {
                 if (!diff_param || !ParamCompare<std::string>::equals(static_cast<const self_t*>(diff_param)->getValueName(), key))
@@ -1364,7 +1373,7 @@ namespace LLInitParam
             mMinCount(min_count),
             mMaxCount(max_count)
         {
-            std::copy(value.begin(), value.end(), std::back_inserter(mValues));
+            mValues = value;
 
             if (LL_UNLIKELY(block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING))
             {
@@ -1378,14 +1387,13 @@ namespace LLInitParam
         bool isValid() const
         {
             size_t num_elements = numValidElements();
-            return mMinCount < num_elements && num_elements < mMaxCount;
+            return mMinCount <= num_elements && num_elements <= mMaxCount;
         }
 
         static bool deserializeParam(Param& param, Parser& parser, Parser::name_stack_range_t& name_stack_range, bool new_name)
         {
             Parser::name_stack_range_t new_name_stack_range(name_stack_range);
             self_t& typed_param = static_cast<self_t&>(param);
-            value_t value;
 
             // pop first element if empty string
             if (new_name_stack_range.first != new_name_stack_range.second && new_name_stack_range.first->first.empty())
@@ -1398,20 +1406,27 @@ namespace LLInitParam
             {
                 std::string name;
 
+                // add a new element and parse directly into it, rather than
+                // parsing into a local and copying it into the container
+                named_value_t& new_value = typed_param.mValues.emplace_back(value_t());
+
                 // try to parse a known named value
                 if(named_value_t::valueNamesExist()
                     && parser.readValue(name)
-                    && named_value_t::getValueFromName(name, value))
+                    && named_value_t::getValueFromName(name, new_value.getValue()))
                 {
-                    typed_param.add(value);
-                    typed_param.mValues.back().setValueName(name);
+                    typed_param.setProvided();
+                    new_value.setValueName(name);
                     return true;
                 }
-                else if (parser.readValue(value))   // attempt to read value directly
+                else if (parser.readValue(new_value.getValue()))   // attempt to read value directly
                 {
-                    typed_param.add(value);
+                    typed_param.setProvided();
                     return true;
                 }
+
+                // failed to parse a value; remove the element we added
+                typed_param.mValues.pop_back();
             }
             return false;
         }
@@ -1434,8 +1449,8 @@ namespace LLInitParam
                 it != end_it;
                 ++it)
             {
-                std::string key = it->getValueName();
-                name_stack.push_back(std::make_pair(std::string(), true));
+                const std::string& key = it->getValueName();
+                name_stack.emplace_back(std::string(), true);
 
                 if(key.empty())
                 // not parsed via name values, write out value directly
@@ -1443,7 +1458,7 @@ namespace LLInitParam
                     bool value_written = parser.writeValue(*it, name_stack);
                     if (!value_written)
                     {
-                        std::string calculated_key = it->calcValueName(it->getValue());
+                        const std::string& calculated_key = it->calcValueName(it->getValue());
                         if (parser.writeValue(calculated_key, name_stack))
                         {
                             serialized = true;
@@ -1485,6 +1500,12 @@ namespace LLInitParam
             setProvided(flag_as_provided);
         }
 
+        void set(container_t&& val, bool flag_as_provided = true)
+        {
+            mValues = std::move(val);
+            setProvided(flag_as_provided);
+        }
+
         param_value_t& add()
         {
             mValues.push_back(value_t());
@@ -1494,7 +1515,7 @@ namespace LLInitParam
 
         self_t& add(const value_t& item)
         {
-            mValues.push_back(item);
+            mValues.emplace_back(item);
             setProvided();
             return *this;
         }
@@ -1596,7 +1617,7 @@ namespace LLInitParam
             mMinCount(min_count),
             mMaxCount(max_count)
         {
-            std::copy(value.begin(), value.end(), back_inserter(mValues));
+            mValues = value;
 
             if (LL_UNLIKELY(block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING))
             {
@@ -1609,7 +1630,7 @@ namespace LLInitParam
         bool isValid() const
         {
             size_t num_elements = numValidElements();
-            return mMinCount < num_elements && num_elements < mMaxCount;
+            return mMinCount <= num_elements && num_elements <= mMaxCount;
         }
 
 
@@ -1689,9 +1710,9 @@ namespace LLInitParam
                 it != end_it;
                 ++it)
             {
-                name_stack.push_back(std::make_pair(std::string(), true));
+                name_stack.emplace_back(std::string(), true);
 
-                std::string key = it->getValueName();
+                const std::string& key = it->getValueName();
                 if (!key.empty())
                 {
                     serialized |= parser.writeValue(key, name_stack);
@@ -1735,6 +1756,12 @@ namespace LLInitParam
             setProvided(flag_as_provided);
         }
 
+        void set(container_t&& val, bool flag_as_provided = true)
+        {
+            mValues = std::move(val);
+            setProvided(flag_as_provided);
+        }
+
         param_value_t& add()
         {
             mValues.push_back(value_t());
@@ -1744,7 +1771,7 @@ namespace LLInitParam
 
         self_t& add(const value_t& item)
         {
-            mValues.push_back(item);
+            mValues.emplace_back(item);
             setProvided();
             return *this;
         }
@@ -2116,9 +2143,21 @@ namespace LLInitParam
                 return *this;
             }
 
+            Multiple& operator =(container_t&& val)
+            {
+                super_t::set(std::move(val));
+                return *this;
+            }
+
             DERIVED_BLOCK& operator()(const container_t& val)
             {
                 super_t::set(val);
+                return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
+            }
+
+            DERIVED_BLOCK& operator()(container_t&& val)
+            {
+                super_t::set(std::move(val));
                 return static_cast<DERIVED_BLOCK&>(Param::enclosingBlock());
             }
 
@@ -2686,7 +2725,7 @@ namespace LLInitParam
             const derived_t& typed_param = static_cast<const derived_t&>(*this);
             const derived_t* diff_param = static_cast<const derived_t*>(diff_block);
 
-            //std::string key = typed_param.getValueName();
+            //const std::string& key = typed_param.getValueName();
 
             //// first try to write out name of name/value pair
             //if (!key.empty())
