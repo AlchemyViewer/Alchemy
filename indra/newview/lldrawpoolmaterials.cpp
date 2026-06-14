@@ -50,9 +50,45 @@ S32 LLDrawPoolMaterials::getNumDeferredPasses()
     return 12*2;
 }
 
+// Render-map pass type for each non-rigged material pass; rigged passes use type + 1.
+// Kept in sync with the shader index table in beginDeferredPass and the type list in
+// renderDeferred (which now indexes this same array).
+static const U32 sMaterialPassType[] =
+{
+    LLRenderPass::PASS_MATERIAL,
+    LLRenderPass::PASS_MATERIAL_ALPHA_MASK,
+    LLRenderPass::PASS_MATERIAL_ALPHA_EMISSIVE,
+    LLRenderPass::PASS_SPECMAP,
+    LLRenderPass::PASS_SPECMAP_MASK,
+    LLRenderPass::PASS_SPECMAP_EMISSIVE,
+    LLRenderPass::PASS_NORMMAP,
+    LLRenderPass::PASS_NORMMAP_MASK,
+    LLRenderPass::PASS_NORMMAP_EMISSIVE,
+    LLRenderPass::PASS_NORMSPEC,
+    LLRenderPass::PASS_NORMSPEC_MASK,
+    LLRenderPass::PASS_NORMSPEC_EMISSIVE,
+};
+
+bool LLDrawPoolMaterials::isPassEmpty(S32 pass)
+{
+    bool rigged = false;
+    if (pass >= 12)
+    {
+        rigged = true;
+        pass -= 12;
+    }
+    U32 type = sMaterialPassType[pass] + (rigged ? 1 : 0);
+    return gPipeline.beginRenderMap(type) == gPipeline.endRenderMap(type);
+}
+
 void LLDrawPoolMaterials::beginDeferredPass(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MATERIAL;
+
+    if (isPassEmpty(pass))
+    {   // nothing to draw this pass -- skip the (costly) deferred shader bind
+        return;
+    }
 
     bool rigged = false;
     if (pass >= 12)
@@ -97,7 +133,10 @@ void LLDrawPoolMaterials::endDeferredPass(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MATERIAL;
 
-    mShader->unbind();
+    if (!isPassEmpty(pass))
+    {   // only unbind if beginDeferredPass actually bound a shader for this pass
+        mShader->unbind();
+    }
 
     LLRenderPass::endRenderPass(pass);
 }
@@ -105,25 +144,11 @@ void LLDrawPoolMaterials::endDeferredPass(S32 pass)
 void LLDrawPoolMaterials::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MATERIAL;
-    static const U32 type_list[] =
-    {
-        LLRenderPass::PASS_MATERIAL,
-        //LLRenderPass::PASS_MATERIAL_ALPHA,
-        LLRenderPass::PASS_MATERIAL_ALPHA_MASK,
-        LLRenderPass::PASS_MATERIAL_ALPHA_EMISSIVE,
-        LLRenderPass::PASS_SPECMAP,
-        //LLRenderPass::PASS_SPECMAP_BLEND,
-        LLRenderPass::PASS_SPECMAP_MASK,
-        LLRenderPass::PASS_SPECMAP_EMISSIVE,
-        LLRenderPass::PASS_NORMMAP,
-        //LLRenderPass::PASS_NORMMAP_BLEND,
-        LLRenderPass::PASS_NORMMAP_MASK,
-        LLRenderPass::PASS_NORMMAP_EMISSIVE,
-        LLRenderPass::PASS_NORMSPEC,
-        //LLRenderPass::PASS_NORMSPEC_BLEND,
-        LLRenderPass::PASS_NORMSPEC_MASK,
-        LLRenderPass::PASS_NORMSPEC_EMISSIVE,
-    };
+
+    if (isPassEmpty(pass))
+    {   // beginDeferredPass skipped the bind for this empty pass; nothing to draw
+        return;
+    }
 
     bool rigged = false;
     if (pass >= 12)
@@ -132,9 +157,9 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         pass -= 12;
     }
 
-    llassert(pass < sizeof(type_list)/sizeof(U32));
+    llassert(pass < sizeof(sMaterialPassType)/sizeof(U32));
 
-    U32 type = type_list[pass];
+    U32 type = sMaterialPassType[pass];
     if (rigged)
     {
         type += 1;
