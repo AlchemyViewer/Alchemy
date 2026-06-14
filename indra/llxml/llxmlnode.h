@@ -254,6 +254,10 @@ public:
     void setUUIDValue(U32 length, const LLUUID *array);
     void setNodeRefValue(U32 length, const LLXMLNode **array);
     void setValue(const std::string& value);
+    void setValue(std::string&& value);
+    // Append to the node value without copying the existing contents out and
+    // back (used by the parser's character-data callback).
+    void appendValue(std::string_view value);
     void setName(const std::string& name);
     void setName(LLStringTableEntry* name);
 

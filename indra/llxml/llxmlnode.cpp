@@ -31,6 +31,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <string_view>
 #include <vector>
 
 #include "llxmlnode.h"
@@ -329,7 +330,6 @@ void XMLCALL StartXMLNode(void *userData,
 
     LLXMLNodePtr new_node = new_node_ptr;
     new_node->mID.clear();
-    LLXMLNodePtr ptr_new_node = new_node;
 
     // Set the parent-child relationship with the current active node
     LLXMLNode* parent = (LLXMLNode *)userData;
@@ -341,29 +341,31 @@ void XMLCALL StartXMLNode(void *userData,
     }
 
     new_node_ptr->mParser = parent->mParser;
-    new_node_ptr->setLineNumber(XML_GetCurrentLineNumber(*new_node_ptr->mParser));
+    const S32 line_number = XML_GetCurrentLineNumber(*new_node_ptr->mParser);
+    new_node_ptr->setLineNumber(line_number);
 
     // Set the current active node to the new node
     XML_Parser *parser = parent->mParser;
     XML_SetUserData(*parser, (void *)new_node_ptr);
 
-    // Parse attributes
+    // Parse attributes. atts is name/value pairs; both are NUL-terminated, so
+    // the names can be inspected as string_views without allocating.
     U32 pos = 0;
     while (atts[pos] != NULL)
     {
-        std::string attr_name = atts[pos];
-        std::string attr_value = atts[pos+1];
+        const std::string_view attr_name = atts[pos];
+        const std::string_view attr_value = atts[pos + 1];
 
         // Special cases
         if ('i' == attr_name[0] && "id" == attr_name)
         {
-            new_node->mID = attr_value;
+            new_node->mID = atts[pos + 1];
         }
         else if ('v' == attr_name[0] && "version" == attr_name)
         {
             U32 version_major = 0;
             U32 version_minor = 0;
-            if (sscanf(attr_value.c_str(), "%d.%d", &version_major, &version_minor) > 0)
+            if (sscanf(atts[pos + 1], "%d.%d", &version_major, &version_minor) > 0)
             {
                 new_node->mVersionMajor = version_major;
                 new_node->mVersionMinor = version_minor;
@@ -372,7 +374,7 @@ void XMLCALL StartXMLNode(void *userData,
         else if (('s' == attr_name[0] && "size" == attr_name) || ('l' == attr_name[0] && "length" == attr_name))
         {
             U32 length;
-            if (sscanf(attr_value.c_str(), "%d", &length) > 0)
+            if (sscanf(atts[pos + 1], "%d", &length) > 0)
             {
                 new_node->mLength = length;
             }
@@ -380,7 +382,7 @@ void XMLCALL StartXMLNode(void *userData,
         else if ('p' == attr_name[0] && "precision" == attr_name)
         {
             U32 precision;
-            if (sscanf(attr_value.c_str(), "%d", &precision) > 0)
+            if (sscanf(atts[pos + 1], "%d", &precision) > 0)
             {
                 new_node->mPrecision = precision;
             }
@@ -428,14 +430,11 @@ void XMLCALL StartXMLNode(void *userData,
             }*/
         }
 
-        // only one attribute child per description
-        LLXMLNodePtr attr_node;
-        if (!new_node->getAttribute(attr_name.c_str(), attr_node, false))
-        {
-            attr_node = new LLXMLNode(attr_name.c_str(), true);
-            attr_node->setLineNumber(XML_GetCurrentLineNumber(*new_node_ptr->mParser));
-        }
-        attr_node->setValue(attr_value);
+        // Attribute names are unique within an element (expat rejects
+        // duplicates), so the matching child cannot already exist - create it.
+        LLXMLNodePtr attr_node = new LLXMLNode(atts[pos], true);
+        attr_node->setLineNumber(line_number);
+        attr_node->setValue(std::string(attr_value));
         new_node->addChild(attr_node);
 
         pos += 2;
@@ -457,21 +456,11 @@ void XMLCALL EndXMLNode(void *userData,
     // SJB: total hack:
     if (LLXMLNode::sStripWhitespaceValues)
     {
-        std::string value = node->getValue();
-        bool is_empty = true;
-        for (std::string::size_type s = 0; s < value.length(); s++)
+        // If the value is empty or all whitespace, clear it (this also flips the
+        // type from TYPE_CONTAINER to TYPE_UNKNOWN, as setValue does).
+        if (node->getValue().find_first_not_of(" \t\n") == std::string::npos)
         {
-            char c = value[s];
-            if (c != ' ' && c != '\t' && c != '\n')
-            {
-                is_empty = false;
-                break;
-            }
-        }
-        if (is_empty)
-        {
-            value.clear();
-            node->setValue(value);
+            node->setValue(LLStringUtil::null);
         }
     }
 }
@@ -481,37 +470,35 @@ void XMLCALL XMLData(void *userData,
                      int len)
 {
     LLXMLNode* current_node = (LLXMLNode *)userData;
-    std::string value = current_node->getValue();
-    if (LLXMLNode::sStripEscapedStrings)
+    if (LLXMLNode::sStripEscapedStrings && len > 0 && s[0] == '\"' && s[len - 1] == '\"')
     {
-        if (s[0] == '\"' && s[len-1] == '\"')
+        // Special-case: Escaped string. Unescape into a scratch buffer and
+        // append it directly to the node value. Appending (rather than copying
+        // the accumulated value out and back) keeps multi-chunk text linear
+        // instead of O(n^2).
+        std::string unescaped_string;
+        unescaped_string.reserve(len > 2 ? (size_t)(len - 2) : 0);
+        for (S32 pos=1; pos<len-1; ++pos)
         {
-            // Special-case: Escaped string.
-            std::string unescaped_string;
-            for (S32 pos=1; pos<len-1; ++pos)
+            if (s[pos] == '\\' && s[pos+1] == '\\')
             {
-                if (s[pos] == '\\' && s[pos+1] == '\\')
-                {
-                    unescaped_string.append("\\");
-                    ++pos;
-                }
-                else if (s[pos] == '\\' && s[pos+1] == '\"')
-                {
-                    unescaped_string.append("\"");
-                    ++pos;
-                }
-                else
-                {
-                    unescaped_string.append(&s[pos], 1);
-                }
+                unescaped_string.push_back('\\');
+                ++pos;
             }
-            value.append(unescaped_string);
-            current_node->setValue(value);
-            return;
+            else if (s[pos] == '\\' && s[pos+1] == '\"')
+            {
+                unescaped_string.push_back('\"');
+                ++pos;
+            }
+            else
+            {
+                unescaped_string.push_back(s[pos]);
+            }
         }
+        current_node->appendValue(unescaped_string);
+        return;
     }
-    value.append(std::string(s, len));
-    current_node->setValue(value);
+    current_node->appendValue(std::string_view(s, len));
 }
 
 
@@ -2134,15 +2121,12 @@ void LLXMLNode::setBoolValue(U32 length, const bool *array)
     {
         if (pos > 0)
         {
-            new_value = llformat("%s %s", new_value.c_str(), array[pos]?"true":"false");
+            new_value.push_back(' ');
         }
-        else
-        {
-            new_value = array[pos]?"true":"false";
-        }
+        new_value.append(array[pos] ? "true" : "false");
     }
 
-    mValue = new_value;
+    mValue = std::move(new_value);
     mEncoding = ENCODING_DEFAULT;
     mLength = length;
     mType = TYPE_BOOLEAN;
@@ -2536,6 +2520,24 @@ void LLXMLNode::setValue(const std::string& value)
         mType = TYPE_UNKNOWN;
     }
     mValue = value;
+}
+
+void LLXMLNode::setValue(std::string&& value)
+{
+    if (TYPE_CONTAINER == mType)
+    {
+        mType = TYPE_UNKNOWN;
+    }
+    mValue = std::move(value);
+}
+
+void LLXMLNode::appendValue(std::string_view value)
+{
+    if (TYPE_CONTAINER == mType)
+    {
+        mType = TYPE_UNKNOWN;
+    }
+    mValue.append(value);
 }
 
 void LLXMLNode::setDefault(LLXMLNode *default_node)
