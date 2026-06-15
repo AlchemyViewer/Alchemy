@@ -212,7 +212,9 @@ LLLineEditor::LLLineEditor(const LLLineEditor::Params& p)
 
     // clamp text padding to current editor size
     updateTextPadding();
-    setCursor(mText.length());
+
+    // read-only fields anchor to start, editable ones to end of initial text
+    setCursor(mReadOnly ? 0 : mText.length());
 
     if (mSpellCheck)
     {
@@ -454,7 +456,16 @@ void LLLineEditor::setText(const LLStringExplicit &new_text, bool use_size_limit
         // try to preserve insertion point, but deselect text
         deselect();
     }
-    setCursor(llmin((S32)mText.length(), getCursor()));
+
+    if (mReadOnly)
+    {
+        // display field, anchor to start so the value isn't scrolled off
+        setCursor(0);
+    }
+    else
+    {
+        setCursor(llmin((S32)mText.length(), getCursor()));
+    }
 
     // Set current history line to end of history.
     if (mLineHistory.empty())
