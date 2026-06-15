@@ -387,6 +387,13 @@ public:
     void pushRiggedGLTFBatches(U32 type, bool textured);
     void pushUntexturedRiggedGLTFBatches(U32 type);
 
+    // rigged indexed/scalar split (see pushGLTFBatchesScalar/Indexed); each batch
+    // is one avatar+skin (the accumulation breaks on skin change), so the matrix
+    // palette is uploaded per draw info as usual.
+    void pushRiggedGLTFBatchesScalar(U32 type);
+    void pushRiggedGLTFBatchesIndexed(U32 type);
+    static void pushRiggedGLTFBatchIndexed(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin);
+
     // push a single GLTF draw call
     // lastMat/lastTex track the most recently bound material+media texture so
     // consecutive draws sharing a material skip the redundant LLFetchedGLTFMaterial::bind

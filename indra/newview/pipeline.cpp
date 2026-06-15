@@ -10523,24 +10523,41 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
 
             U32 type = LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK;
 
+            // multi-material batches alpha-test per-slot; render them with the
+            // indexed shadow program so batched cutouts stay correct
+            bool gltf_indexed = LLGLSLShader::sIndexedGLTFChannels >= 2 && gDeferredShadowGLTFAlphaMaskIndexedProgram.isComplete();
+
             if (rigged)
             {
-                mAlphaMaskPool->pushRiggedGLTFBatches(type + 1);
-            }
-            else if (LLGLSLShader::sIndexedGLTFChannels >= 2 && gDeferredShadowGLTFAlphaMaskIndexedProgram.isComplete())
-            {
-                // multi-material batches alpha-test per-slot; render them with the
-                // indexed shadow program so batched cutouts stay correct
-                mAlphaMaskPool->pushGLTFBatchesScalar(type);
+                if (gltf_indexed)
+                {
+                    mAlphaMaskPool->pushRiggedGLTFBatchesScalar(type + 1);
 
-                gDeferredShadowGLTFAlphaMaskIndexedProgram.bind();
-                gDeferredShadowGLTFAlphaMaskIndexedProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
-                gDeferredShadowGLTFAlphaMaskIndexedProgram.uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                mAlphaMaskPool->pushGLTFBatchesIndexed(type);
+                    gDeferredShadowGLTFAlphaMaskIndexedProgram.bind(true);
+                    LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                    LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                    mAlphaMaskPool->pushRiggedGLTFBatchesIndexed(type + 1);
+                }
+                else
+                {
+                    mAlphaMaskPool->pushRiggedGLTFBatches(type + 1);
+                }
             }
             else
             {
-                mAlphaMaskPool->pushGLTFBatches(type);
+                if (gltf_indexed)
+                {
+                    mAlphaMaskPool->pushGLTFBatchesScalar(type);
+
+                    gDeferredShadowGLTFAlphaMaskIndexedProgram.bind();
+                    LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                    LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                    mAlphaMaskPool->pushGLTFBatchesIndexed(type);
+                }
+                else
+                {
+                    mAlphaMaskPool->pushGLTFBatches(type);
+                }
             }
 
             gGL.loadMatrix(gGLModelView);

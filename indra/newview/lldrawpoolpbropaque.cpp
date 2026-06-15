@@ -73,12 +73,22 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
     }
 
     gDeferredPBROpaqueProgram.bind(true);
-    pushRiggedGLTFBatches(mRenderType + 1);
+    if (indexed)
+    {
+        pushRiggedGLTFBatchesScalar(mRenderType + 1);
+    }
+    else
+    {
+        pushRiggedGLTFBatches(mRenderType + 1);
+    }
 
     if (indexed)
     {
         gDeferredPBROpaqueIndexedProgram.bind();
         pushGLTFBatchesIndexed(mRenderType);
+
+        gDeferredPBROpaqueIndexedProgram.bind(true); // rigged variant
+        pushRiggedGLTFBatchesIndexed(mRenderType + 1);
     }
 }
 

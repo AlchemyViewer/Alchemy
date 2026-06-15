@@ -1070,3 +1070,63 @@ void LLRenderPass::pushUntexturedRiggedGLTFBatch(LLDrawInfo& params, const LLVOA
     }
 }
 
+// rigged counterpart of pushGLTFBatchesScalar -- skips multi-material infos
+void LLRenderPass::pushRiggedGLTFBatchesScalar(U32 type)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    const LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    bool skipLastSkin = false;
+    LLFetchedGLTFMaterial* lastMat = nullptr;
+    LLViewerTexture* lastTex = nullptr;
+
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mGLTFMaterialList.size() > 1)
+        { // multi-material batch -- handled by the indexed sweep
+            continue;
+        }
+
+        pushRiggedGLTFBatch(params, lastAvatar, lastMeshId, skipLastSkin, lastMat, lastTex);
+    }
+}
+
+// rigged counterpart of pushGLTFBatchesIndexed -- only multi-material infos.
+// Assumes the rigged indexed program is bound.
+void LLRenderPass::pushRiggedGLTFBatchesIndexed(U32 type)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    const LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    bool skipLastSkin = false;
+
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mGLTFMaterialList.size() < 2)
+        { // single-material batch -- handled by the scalar sweep
+            continue;
+        }
+
+        pushRiggedGLTFBatchIndexed(params, lastAvatar, lastMeshId, skipLastSkin);
+    }
+}
+
+// static
+void LLRenderPass::pushRiggedGLTFBatchIndexed(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin)
+{
+    if (uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+    {
+        pushGLTFBatchIndexed(params);
+    }
+}
+

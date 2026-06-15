@@ -25,9 +25,17 @@
 
 // Indexed (multi-material) variant of pbrShadowAlphaMaskV. The per-vertex material
 // slot (texture_index) selects this vertex's base-color transform and is forwarded
-// to the fragment shader for per-slot alpha testing.
+// to the fragment shader for per-slot alpha testing. The HAS_SKIN variant adds
+// rigged-mesh matrix-palette skinning.
 
+#if defined(HAS_SKIN)
+uniform mat4 modelview_matrix;
+uniform mat4 projection_matrix;
+mat4 getObjectSkinnedTransform();
+#else
 uniform mat4 modelview_projection_matrix;
+#endif
+
 uniform float shadow_target_width;
 
 uniform vec4 gltf_basecolor_transform[2*GLTF_INDEXED_CHANNELS];
@@ -46,8 +54,16 @@ out vec2 vary_texcoord0;
 
 void main()
 {
+#if defined(HAS_SKIN)
+    vec4 pre_pos = vec4(position.xyz, 1.0);
+    mat4 mat = getObjectSkinnedTransform();
+    mat = modelview_matrix * mat;
+    vec4 pos = mat * pre_pos;
+    pos = projection_matrix * pos;
+#else
     vec4 pre_pos = vec4(position.xyz, 1.0);
     vec4 pos = modelview_projection_matrix * pre_pos;
+#endif
 
     target_pos_x = 0.5 * (shadow_target_width - 1.0) * pos.x;
     post_pos = pos;

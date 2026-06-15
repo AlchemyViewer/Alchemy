@@ -6220,7 +6220,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
         geometryBytes += genDrawInfo(group, norm_mask | extra_mask, sNormFaces[i], norm_count[i], false, false, rigged);
         geometryBytes += genDrawInfo(group, spec_mask | extra_mask, sSpecFaces[i], spec_count[i], false, false, rigged);
         geometryBytes += genDrawInfo(group, normspec_mask | extra_mask, sNormSpecFaces[i], normspec_count[i], false, false, rigged);
-        geometryBytes += genDrawInfo(group, pbr_mask | extra_mask, sPbrFaces[i], pbr_count[i], false, false, rigged, !rigged && gltf_batch_enabled);
+        geometryBytes += genDrawInfo(group, pbr_mask | extra_mask, sPbrFaces[i], pbr_count[i], false, false, rigged, gltf_batch_enabled);
 
         // for rigged set, add weights and disable alpha sorting (rigged items use depth buffer)
         extra_mask |= LLVertexBuffer::MAP_WEIGHT4;
@@ -6488,6 +6488,11 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 const LLGLTFMaterial* anchor_mat = facep->getTextureEntry()->getGLTFRenderMaterial();
                 const bool anchor_double = anchor_mat->mDoubleSided;
                 const U8 anchor_alpha = (U8)anchor_mat->mAlphaMode;
+                // Rigged batches must be a single avatar+skin -- the matrix palette
+                // is uploaded per skin. (Null/0 for the static set; the rigged guard
+                // below keeps it inert there.)
+                const LLVOAvatar* anchor_avatar = facep->mAvatar;
+                const U64 anchor_skin = facep->getSkinHash();
                 mat_slots[slot_count++] = anchor_mat;
                 facep->setTextureIndex(0);
 
@@ -6509,6 +6514,11 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                     if ((U8)m->mAlphaMode != anchor_alpha)
                     { // opaque and mask faces register to different passes -- keep
                       // each indexed batch to a single alpha mode
+                        break;
+                    }
+
+                    if (rigged && (facep->mAvatar != anchor_avatar || facep->getSkinHash() != anchor_skin))
+                    { // rigged batch is limited to one avatar+skin (matrix palette)
                         break;
                     }
 

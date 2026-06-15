@@ -176,6 +176,7 @@ LLGLSLShader            gDeferredShadowAlphaMaskProgram;
 LLGLSLShader            gDeferredSkinnedShadowAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaMaskIndexedProgram; // multi-material indexed
+LLGLSLShader            gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram;
 LLGLSLShader            gDeferredSkinnedShadowGLTFAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaBlendProgram;
 LLGLSLShader            gDeferredSkinnedShadowGLTFAlphaBlendProgram;
@@ -248,6 +249,7 @@ LLGLSLShader            gPBRGlowProgram;
 LLGLSLShader            gPBRGlowSkinnedProgram;
 LLGLSLShader            gDeferredPBROpaqueProgram;
 LLGLSLShader            gDeferredPBROpaqueIndexedProgram;
+LLGLSLShader            gDeferredSkinnedPBROpaqueIndexedProgram;
 LLGLSLShader            gDeferredSkinnedPBROpaqueProgram;
 LLGLSLShader            gHUDPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRAlphaProgram;
@@ -279,6 +281,27 @@ static void add_common_permutations(LLGLSLShader* shader)
     {
         shader->addPermutation("HAS_EMISSIVE", "1");
     }
+}
+
+// Map an indexed GLTF PBR program's per-slot samplers to texture units. Slot s
+// uses base color unit s; when full (the GBuffer-write shaders, not the shadow
+// alpha-mask shader) it also uses normal N+s, ORM 2N+s and emissive 3N+s. Inactive
+// samplers resolve to -1 and are skipped by uniform1i. Safe to call on a program's
+// rigged variant too.
+static void setup_gltf_indexed_samplers(LLGLSLShader& shader, S32 n, bool full)
+{
+    shader.bind();
+    for (S32 s = 0; s < n; ++s)
+    {
+        shader.uniform1i(LLStaticHashedString(llformat("basecolor%d", s)), s);
+        if (full)
+        {
+            shader.uniform1i(LLStaticHashedString(llformat("normalmap%d", s)), n + s);
+            shader.uniform1i(LLStaticHashedString(llformat("ormmap%d", s)), 2 * n + s);
+            shader.uniform1i(LLStaticHashedString(llformat("emissivemap%d", s)), 3 * n + s);
+        }
+    }
+    shader.unbind();
 }
 
 #ifdef SHOW_ASSERT
@@ -1090,6 +1113,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredSkinnedShadowAlphaMaskProgram.unload();
         gDeferredShadowGLTFAlphaMaskProgram.unload();
         gDeferredShadowGLTFAlphaMaskIndexedProgram.unload();
+        gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram.unload();
         gDeferredSkinnedShadowGLTFAlphaMaskProgram.unload();
         gDeferredShadowFullbrightAlphaMaskProgram.unload();
         gDeferredSkinnedShadowFullbrightAlphaMaskProgram.unload();
@@ -1155,6 +1179,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gPBRGlowProgram.unload();
         gDeferredPBROpaqueProgram.unload();
         gDeferredPBROpaqueIndexedProgram.unload();
+        gDeferredSkinnedPBROpaqueIndexedProgram.unload();
         gDeferredSkinnedPBROpaqueProgram.unload();
         gDeferredPBRAlphaProgram.unload();
         gDeferredSkinnedPBRAlphaProgram.unload();
@@ -1376,27 +1401,27 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPBROpaqueIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
         add_common_permutations(&gDeferredPBROpaqueIndexedProgram);
 
-        bool indexed_ok = gDeferredPBROpaqueIndexedProgram.createShader();
+        // rigged (skinned) variant for animesh / avatar attachments
+        bool indexed_ok = make_rigged_variant(gDeferredPBROpaqueIndexedProgram, gDeferredSkinnedPBROpaqueIndexedProgram);
         if (indexed_ok)
         {
-            // Map each slot's four material samplers to texture units:
-            //   base color s -> s, normal s -> N+s, ORM s -> 2N+s, emissive s -> 3N+s
+            indexed_ok = gDeferredPBROpaqueIndexedProgram.createShader();
+        }
+
+        if (indexed_ok)
+        {
+            // Map each slot's four material samplers to texture units, on both the
+            // static and rigged variants.
             const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            gDeferredPBROpaqueIndexedProgram.bind();
-            for (S32 s = 0; s < n; ++s)
-            {
-                gDeferredPBROpaqueIndexedProgram.uniform1i(LLStaticHashedString(llformat("basecolor%d", s)), s);
-                gDeferredPBROpaqueIndexedProgram.uniform1i(LLStaticHashedString(llformat("normalmap%d", s)), n + s);
-                gDeferredPBROpaqueIndexedProgram.uniform1i(LLStaticHashedString(llformat("ormmap%d", s)), 2 * n + s);
-                gDeferredPBROpaqueIndexedProgram.uniform1i(LLStaticHashedString(llformat("emissivemap%d", s)), 3 * n + s);
-            }
-            gDeferredPBROpaqueIndexedProgram.unbind();
+            setup_gltf_indexed_samplers(gDeferredPBROpaqueIndexedProgram, n, true);
+            setup_gltf_indexed_samplers(gDeferredSkinnedPBROpaqueIndexedProgram, n, true);
         }
         else
         {
             // Degrade gracefully: route all PBR faces back to the scalar path.
             LL_WARNS("ShaderLoading") << "Indexed PBR shader failed to load; GLTF batching disabled." << LL_ENDL;
             gDeferredPBROpaqueIndexedProgram.unload();
+            gDeferredSkinnedPBROpaqueIndexedProgram.unload();
             LLGLSLShader::sIndexedGLTFChannels = 0;
         }
     }
@@ -2298,20 +2323,23 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowGLTFAlphaMaskIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
         add_common_permutations(&gDeferredShadowGLTFAlphaMaskIndexedProgram);
 
-        if (gDeferredShadowGLTFAlphaMaskIndexedProgram.createShader())
+        bool shadow_indexed_ok = make_rigged_variant(gDeferredShadowGLTFAlphaMaskIndexedProgram, gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram);
+        if (shadow_indexed_ok)
         {
+            shadow_indexed_ok = gDeferredShadowGLTFAlphaMaskIndexedProgram.createShader();
+        }
+
+        if (shadow_indexed_ok)
+        { // only base color is sampled for the shadow alpha test
             const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            gDeferredShadowGLTFAlphaMaskIndexedProgram.bind();
-            for (S32 s = 0; s < n; ++s)
-            { // only base color is sampled for the shadow alpha test
-                gDeferredShadowGLTFAlphaMaskIndexedProgram.uniform1i(LLStaticHashedString(llformat("basecolor%d", s)), s);
-            }
-            gDeferredShadowGLTFAlphaMaskIndexedProgram.unbind();
+            setup_gltf_indexed_samplers(gDeferredShadowGLTFAlphaMaskIndexedProgram, n, false);
+            setup_gltf_indexed_samplers(gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram, n, false);
         }
         else
         {
             LL_WARNS("ShaderLoading") << "Indexed PBR shadow alpha mask shader failed to load." << LL_ENDL;
             gDeferredShadowGLTFAlphaMaskIndexedProgram.unload();
+            gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram.unload();
         }
     }
 
