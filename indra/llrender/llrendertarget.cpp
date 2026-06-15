@@ -665,7 +665,10 @@ void LLRenderTarget::copyContents(LLRenderTarget& source, S32 srcX0, S32 srcY0, 
         check_framebuffer_status();
         gGL.getTexUnit(0)->bind(this, true);
         stop_glerror();
-        glCopyTexSubImage2D(LLTexUnit::getInternalType(mUsage), 0, srcX0, srcY0, dstX0, dstY0, dstX1, dstY1);
+        // glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height):
+        // xoffset/yoffset are the destination texel offset, x/y the source framebuffer
+        // origin, and the last two are dimensions (not endpoints).
+        glCopyTexSubImage2D(LLTexUnit::getInternalType(mUsage), 0, dstX0, dstY0, srcX0, srcY0, srcX1 - srcX0, srcY1 - srcY0);
         stop_glerror();
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
         stop_glerror();
