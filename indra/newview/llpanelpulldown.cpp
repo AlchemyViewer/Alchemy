@@ -82,6 +82,12 @@ bool LLPanelPulldown::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     return true; //If we got here, then we are in Pulldown's rect, consume the event.
 }
 
+bool LLPanelPulldown::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    LLPanel::handleScrollHWheel(x, y, delta);
+    return true; // If we got here, then we are in Pulldown's rect, consume the event.
+}
+
 /*virtual*/
 void LLPanelPulldown::onMouseLeave(S32 x, S32 y, MASK mask)
 {

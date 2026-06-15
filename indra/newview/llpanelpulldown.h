@@ -43,6 +43,7 @@ public:
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     void onTopLost() override;
     void onVisibilityChange(bool new_visibility) override;
 

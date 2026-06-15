@@ -285,6 +285,11 @@ bool LLHexEditor::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     return mScrollbar->handleScrollWheel( 0, 0, delta );
 }
 
+bool LLHexEditor::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    return mScrollbar->handleScrollHWheel(0, 0, delta);
+}
+
 bool LLHexEditor::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     bool handled = false;

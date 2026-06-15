@@ -1164,3 +1164,18 @@ bool LLAccordionCtrlTab::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 
     return false;
 }
+
+bool LLAccordionCtrlTab::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    if (LLUICtrl::handleScrollHWheel(x, y, delta))
+    {
+        return true;
+    }
+
+    if (mScrollbar && mScrollbar->getVisible() && mScrollbar->handleScrollHWheel(0, 0, delta))
+    {
+        return true;
+    }
+
+    return false;
+}

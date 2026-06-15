@@ -249,6 +249,12 @@ bool LLModalDialog::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     return true;
 }
 
+bool LLModalDialog::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    childrenHandleScrollHWheel(x, y, delta);
+    return true;
+}
+
 bool LLModalDialog::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
     if (!LLFloater::handleDoubleClick(x, y, mask))

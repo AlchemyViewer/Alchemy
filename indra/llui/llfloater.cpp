@@ -1786,6 +1786,12 @@ bool LLFloater::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     return true;//always
 }
 
+bool LLFloater::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    LLPanel::handleScrollHWheel(x, y, delta);
+    return true; // always
+}
+
 // virtual
 bool LLFloater::handleMouseUp(S32 x, S32 y, MASK mask)
 {

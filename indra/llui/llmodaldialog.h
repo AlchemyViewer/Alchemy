@@ -53,6 +53,7 @@ public:
     /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask);
     /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask);
     /*virtual*/ bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    /*virtual*/ bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
     /*virtual*/ bool    handleDoubleClick(S32 x, S32 y, MASK mask);
     /*virtual*/ bool    handleRightMouseDown(S32 x, S32 y, MASK mask);
     /*virtual*/ bool    handleKeyHere(KEY key, MASK mask );

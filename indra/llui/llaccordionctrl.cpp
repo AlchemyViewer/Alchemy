@@ -545,6 +545,15 @@ bool LLAccordionCtrl::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     return false;
 }
 
+bool LLAccordionCtrl::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    if (LLPanel::handleScrollHWheel(x, y, delta))
+        return true;
+    if (mScrollbar->getVisible() && mScrollbar->handleScrollHWheel(0, 0, delta))
+        return true;
+    return false;
+}
+
 bool LLAccordionCtrl::handleKeyHere(KEY key, MASK mask)
 {
     if (mScrollbar->getVisible() && mScrollbar->handleKeyHere(key, mask))

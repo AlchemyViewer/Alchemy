@@ -392,6 +392,7 @@ public:
     /*virtual*/ bool        handleDoubleClick(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool        handleHover(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool        handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    /*virtual*/ bool        handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     /*virtual*/ bool        handleToolTip(S32 x, S32 y, MASK mask) override;
 
     // LLView interface

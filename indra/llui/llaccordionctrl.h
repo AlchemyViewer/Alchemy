@@ -92,6 +92,7 @@ public:
 
     virtual bool handleRightMouseDown   ( S32 x, S32 y, MASK mask);
     virtual bool handleScrollWheel      ( S32 x, S32 y, LLScrollDelta delta );
+    virtual bool handleScrollHWheel     ( S32 x, S32 y, LLScrollDelta delta );
     virtual bool handleKeyHere          (KEY key, MASK mask);
     virtual bool handleDragAndDrop      (S32 x, S32 y, MASK mask, bool drop,
                                          EDragAndDropType cargo_type,

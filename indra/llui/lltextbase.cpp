@@ -1480,6 +1480,18 @@ bool LLTextBase::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
     return LLUICtrl::handleScrollWheel(x, y, delta);
 }
 
+// virtual
+bool LLTextBase::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    LLTextSegmentPtr cur_segment = getSegmentAtLocalPos(x, y);
+    if (cur_segment && cur_segment->handleScrollHWheel(x, y, delta))
+    {
+        return true;
+    }
+
+    return LLUICtrl::handleScrollHWheel(x, y, delta);
+}
+
 //virtual
 bool LLTextBase::handleToolTip(S32 x, S32 y, MASK mask)
 {

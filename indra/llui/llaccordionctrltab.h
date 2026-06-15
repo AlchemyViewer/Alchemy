@@ -169,7 +169,7 @@ public:
 
     virtual bool handleToolTip(S32 x, S32 y, MASK mask);
     virtual bool handleScrollWheel( S32 x, S32 y, LLScrollDelta delta );
-
+    virtual bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
 
     virtual bool addChild(LLView* child, S32 tab_group = 0 );
 

@@ -330,6 +330,7 @@ public:
     virtual bool    handleMiddleMouseDown(S32 x, S32 y, MASK mask);
 
     virtual bool    handleScrollWheel(S32 x, S32 y, LLScrollDelta delta);
+    virtual bool    handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta);
 
     virtual void    draw();
     virtual void    drawShadow(LLPanel* panel);
