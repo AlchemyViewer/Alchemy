@@ -364,6 +364,17 @@ public:
     // assumes draw infos of given type have valid GLTF materials
     void pushGLTFBatches(U32 type);
 
+    // Indexed (multi-material) GLTF PBR helpers. Indexed and scalar draw infos
+    // coexist in the same render map (PASS_GLTF_PBR); they are distinguished by
+    // mGLTFMaterialList.size() > 1. Shadow/probe passes use the plain
+    // pushGLTFBatches (rendering everything scalar for depth); only the main
+    // opaque GBuffer pass splits the two:
+    //   pushGLTFBatchesScalar  -- renders only single-material infos
+    //   pushGLTFBatchesIndexed -- renders only multi-material infos (indexed program bound)
+    void pushGLTFBatchesScalar(U32 type);
+    void pushGLTFBatchesIndexed(U32 type);
+    static void pushGLTFBatchIndexed(LLDrawInfo& params);
+
     // like pushGLTFBatches, but will not bind textures or set up texture transforms
     void pushUntexturedGLTFBatches(U32 type);
 

@@ -1235,6 +1235,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>RenderGLTFPBRBatching</key>
+        <map>
+            <key>Comment</key>
+            <string>Batch multiple GLTF PBR materials into a single indexed draw call (static opaque only). 0 = one draw call per material (legacy), 1 = indexed multi-material batching. Reduces draw calls in material-heavy scenes.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>RenderBloomThreshold</key>
         <map>
             <key>Comment</key>

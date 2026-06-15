@@ -246,6 +246,7 @@ LLGLSLShader            gHUDPBROpaqueProgram;
 LLGLSLShader            gPBRGlowProgram;
 LLGLSLShader            gPBRGlowSkinnedProgram;
 LLGLSLShader            gDeferredPBROpaqueProgram;
+LLGLSLShader            gDeferredPBROpaqueIndexedProgram;
 LLGLSLShader            gDeferredSkinnedPBROpaqueProgram;
 LLGLSLShader            gHUDPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRAlphaProgram;
@@ -480,6 +481,13 @@ void LLViewerShaderMgr::setShaders()
     static LLCachedControl<S32> reserved_texture_units(gSavedSettings, "RenderReservedTextureIndices", 12);
 
     LLGLSLShader::sIndexedTextureChannels = llmax(4, gGLManager.mNumTextureImageUnits - reserved_texture_units);
+
+    // Indexed GLTF PBR batches one material per four texture units (base color,
+    // normal, ORM, emissive). The PBR opaque GBuffer-write pass binds no
+    // shadow/reflection maps, so the full fragment texture-unit budget is
+    // available here -- unlike sIndexedTextureChannels above, no units are
+    // reserved. Capped at 8 to bound shader sampler declarations.
+    LLGLSLShader::sIndexedGLTFChannels = llclamp(gGLManager.mNumTextureImageUnits / 4, 1, 8);
 
     reentrance = true;
 
@@ -1348,6 +1356,50 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             success = gDeferredPBROpaqueProgram.createShader();
         }
         llassert(success);
+    }
+
+    if (success && LLGLSLShader::sIndexedGLTFChannels >= 2)
+    {
+        // Indexed (multi-material) PBR opaque. Optional acceleration: failure here
+        // disables GLTF batching but must NOT fail overall shader loading, so the
+        // result is kept out of the `success` chain.
+        gDeferredPBROpaqueIndexedProgram.mName = "Deferred PBR Opaque Indexed Shader";
+        gDeferredPBROpaqueIndexedProgram.mFeatures.hasSrgb = true;
+        gDeferredPBROpaqueIndexedProgram.mShaderFiles.clear();
+        gDeferredPBROpaqueIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedV.glsl", GL_VERTEX_SHADER));
+        gDeferredPBROpaqueIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbropaqueIndexedF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredPBROpaqueIndexedProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredPBROpaqueIndexedProgram.clearPermutations();
+        gDeferredPBROpaqueIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
+        add_common_permutations(&gDeferredPBROpaqueIndexedProgram);
+
+        bool indexed_ok = gDeferredPBROpaqueIndexedProgram.createShader();
+        if (indexed_ok)
+        {
+            // Map each slot's four material samplers to texture units:
+            //   base color s -> s, normal s -> N+s, ORM s -> 2N+s, emissive s -> 3N+s
+            const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+            gDeferredPBROpaqueIndexedProgram.bind();
+            for (S32 s = 0; s < n; ++s)
+            {
+                gDeferredPBROpaqueIndexedProgram.uniform1i(LLStaticHashedString(llformat("basecolor%d", s)), s);
+                gDeferredPBROpaqueIndexedProgram.uniform1i(LLStaticHashedString(llformat("normalmap%d", s)), n + s);
+                gDeferredPBROpaqueIndexedProgram.uniform1i(LLStaticHashedString(llformat("ormmap%d", s)), 2 * n + s);
+                gDeferredPBROpaqueIndexedProgram.uniform1i(LLStaticHashedString(llformat("emissivemap%d", s)), 3 * n + s);
+            }
+            gDeferredPBROpaqueIndexedProgram.unbind();
+        }
+        else
+        {
+            // Degrade gracefully: route all PBR faces back to the scalar path.
+            LL_WARNS("ShaderLoading") << "Indexed PBR shader failed to load; GLTF batching disabled." << LL_ENDL;
+            gDeferredPBROpaqueIndexedProgram.unload();
+            LLGLSLShader::sIndexedGLTFChannels = 0;
+        }
+    }
+    else
+    {
+        LLGLSLShader::sIndexedGLTFChannels = 0;
     }
 
     if (success)

@@ -5233,6 +5233,45 @@ bool can_batch_texture(LLFace* facep)
     return true;
 }
 
+// Whether a face is eligible for indexed (multi-material) GLTF PBR batching.
+// Double-sidedness is intentionally NOT checked here -- it is a fixed-function
+// cull state, so it is handled as a batch-break key in genDrawInfo rather than
+// excluding the face outright.
+bool can_batch_gltf_material(LLFace* facep)
+{
+    if (LLGLSLShader::sIndexedGLTFChannels < 2)
+    { // no headroom to batch more than one material; use the scalar path
+        return false;
+    }
+
+    const LLTextureEntry* te = facep->getTextureEntry();
+
+    const LLGLTFMaterial* gltf_mat = te->getGLTFRenderMaterial();
+    if (gltf_mat == nullptr)
+    { // not a PBR face
+        return false;
+    }
+
+    if (gltf_mat->mAlphaMode != LLGLTFMaterial::ALPHA_MODE_OPAQUE)
+    { // Phase 1 batches opaque only. Blend is depth-sorted in PASS_ALPHA; mask
+      // routes to PASS_GLTF_PBR_ALPHA_MASK which the indexed sweep does not cover,
+      // so a masked face must never receive a material slot.
+        return false;
+    }
+
+    if (te->hasMedia())
+    { // media overrides base color per-face; keep on the scalar bind path
+        return false;
+    }
+
+    if (facep->isState(LLFace::TEXTURE_ANIM) && facep->getVirtualSize() > MIN_TEX_ANIM_SIZE)
+    { // texture animation drives texture_matrix0 per-face -- breaks batches
+        return false;
+    }
+
+    return true;
+}
+
 const static U32 MAX_FACE_COUNT = 4096U;
 int32_t LLVolumeGeometryManager::sInstanceCount = 0;
 LLFace** LLVolumeGeometryManager::sFullbrightFaces[2] = { NULL };
@@ -5425,6 +5464,11 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
         }
     }
 
+    // A GLTF PBR face carrying a real material slot (assigned by the indexed
+    // accumulation in genDrawInfo) participates in multi-material batching via
+    // mGLTFMaterialList, parallel to mTextureList for diffuse texture batching.
+    bool gltf_indexed = (gltf_mat != nullptr) && (index < FACE_DO_NOT_BATCH_TEXTURES);
+
     bool batchable = false;
 
     U32 shader_mask = 0xFFFFFFFF; //no shader
@@ -5444,7 +5488,26 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 
     if (index < FACE_DO_NOT_BATCH_TEXTURES && idx >= 0)
     {
-        if (mat || gltf_mat || draw_vec[idx]->mMaterial)
+        if (gltf_indexed)
+        { //indexed GLTF PBR: batch by material slot (parallel to mTextureList)
+            if (index < draw_vec[idx]->mGLTFMaterialList.size())
+            {
+                if (draw_vec[idx]->mGLTFMaterialList[index].isNull())
+                {
+                    batchable = true;
+                    draw_vec[idx]->mGLTFMaterialList[index] = gltf_mat;
+                }
+                else if (draw_vec[idx]->mGLTFMaterialList[index] == gltf_mat)
+                { //this face's material slot can be used with this batch
+                    batchable = true;
+                }
+            }
+            else
+            { //material list can be expanded to fit this slot
+                batchable = true;
+            }
+        }
+        else if (mat || gltf_mat || draw_vec[idx]->mMaterial)
         { //can't batch textures when materials are present (yet)
             batchable = false;
         }
@@ -5476,7 +5539,10 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
         info->mEnd - draw_vec[idx]->mStart + facep->getGeomCount() <= (U32) gGLManager.mGLMaxVertexRange &&
         info->mCount + facep->getIndicesCount() <= (U32) gGLManager.mGLMaxIndexRange &&
 #endif
-        info->mMaterialID == mat_id &&
+        // indexed GLTF batches deliberately merge different materials, so the
+        // per-material id differs across the batch -- the material slot list
+        // (checked via `batchable` above) governs membership instead.
+        (gltf_indexed || info->mMaterialID == mat_id) &&
         info->mFullbright == fullbright &&
         info->mBump == bump &&
         (!mat || (info->mShiny == shiny)) && // need to break batches when a material is shared, but legacy settings are different
@@ -5489,7 +5555,15 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
         info->mCount += facep->getIndicesCount();
         info->mEnd += facep->getGeomCount();
 
-        if (index < FACE_DO_NOT_BATCH_TEXTURES && index >= info->mTextureList.size())
+        if (gltf_indexed)
+        {
+            if (index >= info->mGLTFMaterialList.size())
+            {
+                info->mGLTFMaterialList.resize(index+1);
+            }
+            info->mGLTFMaterialList[index] = gltf_mat;
+        }
+        else if (index < FACE_DO_NOT_BATCH_TEXTURES && index >= info->mTextureList.size())
         {
             info->mTextureList.resize(index+1);
             info->mTextureList[index] = tex;
@@ -5576,7 +5650,12 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
             facep->setDrawInfo(draw_info);
         }
 
-        if (index < FACE_DO_NOT_BATCH_TEXTURES)
+        if (gltf_indexed)
+        { //initialize material slot list for indexed GLTF batching
+            draw_info->mGLTFMaterialList.resize(index+1);
+            draw_info->mGLTFMaterialList[index] = gltf_mat;
+        }
+        else if (index < FACE_DO_NOT_BATCH_TEXTURES)
         { //initialize texture list for texture batching
             draw_info->mTextureList.resize(index+1);
             draw_info->mTextureList[index] = tex;
@@ -6122,6 +6201,12 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
 
     U32 geometryBytes = 0;
 
+    // Indexed (multi-material) GLTF PBR batching. Enabled when the indexed shader
+    // is available (sIndexedGLTFChannels gets zeroed on load failure) and not
+    // disabled by setting. Applied to static opaque PBR faces only (see below).
+    static LLCachedControl<bool> gltf_batching(gSavedSettings, "RenderGLTFPBRBatching", true);
+    bool gltf_batch_enabled = gltf_batching && LLGLSLShader::sIndexedGLTFChannels >= 2;
+
     // generate render batches for static geometry
     U32 extra_mask = LLVertexBuffer::MAP_TEXTURE_INDEX;
     bool alpha_sort = true;
@@ -6135,7 +6220,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
         geometryBytes += genDrawInfo(group, norm_mask | extra_mask, sNormFaces[i], norm_count[i], false, false, rigged);
         geometryBytes += genDrawInfo(group, spec_mask | extra_mask, sSpecFaces[i], spec_count[i], false, false, rigged);
         geometryBytes += genDrawInfo(group, normspec_mask | extra_mask, sNormSpecFaces[i], normspec_count[i], false, false, rigged);
-        geometryBytes += genDrawInfo(group, pbr_mask | extra_mask, sPbrFaces[i], pbr_count[i], false, false, rigged);
+        geometryBytes += genDrawInfo(group, pbr_mask | extra_mask, sPbrFaces[i], pbr_count[i], false, false, rigged, !rigged && gltf_batch_enabled);
 
         // for rigged set, add weights and disable alpha sorting (rigged items use depth buffer)
         extra_mask |= LLVertexBuffer::MAP_WEIGHT4;
@@ -6307,7 +6392,7 @@ struct CompareBatchBreakerRigged
     }
 };
 
-U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort, bool batch_textures, bool rigged)
+U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort, bool batch_textures, bool rigged, bool batch_gltf)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
 
@@ -6390,7 +6475,84 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 
         {
             LL_PROFILE_ZONE_NAMED("genDrawInfo - face size");
-            if (batch_textures)
+            if (batch_gltf && !hud_group && can_batch_gltf_material(facep))
+            {
+                // Indexed (multi-material) GLTF PBR: accumulate up to
+                // sIndexedGLTFChannels distinct materials into one batch, assigning
+                // each face a material slot via setTextureIndex. The shader selects
+                // per-vertex by that slot. See LLRenderPass::pushGLTFBatchIndexed.
+                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, 8);
+                const LLGLTFMaterial* mat_slots[8];
+                U32 slot_count = 0;
+
+                const bool anchor_double = facep->getTextureEntry()->getGLTFRenderMaterial()->mDoubleSided;
+                mat_slots[slot_count++] = facep->getTextureEntry()->getGLTFRenderMaterial();
+                facep->setTextureIndex(0);
+
+                while (i != end_faces)
+                {
+                    facep = *i;
+
+                    if (!can_batch_gltf_material(facep))
+                    { // not an opaque batchable PBR face -- ends this batch
+                        break;
+                    }
+
+                    const LLGLTFMaterial* m = facep->getTextureEntry()->getGLTFRenderMaterial();
+                    if (m->mDoubleSided != anchor_double)
+                    { // different cull state can't share a draw call
+                        break;
+                    }
+
+                    // find this material's slot, or assign a new one
+                    S32 slot = -1;
+                    for (U32 s = 0; s < slot_count; ++s)
+                    {
+                        if (mat_slots[s] == m)
+                        {
+                            slot = (S32)s;
+                            break;
+                        }
+                    }
+                    if (slot < 0)
+                    {
+                        if ((S32)slot_count >= gltf_channels)
+                        { // material channels depleted -- cut the batch
+                            break;
+                        }
+                        slot = (S32)slot_count;
+                        mat_slots[slot_count++] = m;
+                    }
+
+                    if (geom_count + facep->getGeomCount() > max_vertices)
+                    { // cut batches on geom count too big
+                        break;
+                    }
+
+                    ++i;
+                    index_count += facep->getIndicesCount();
+                    geom_count += facep->getGeomCount();
+
+                    flexi = flexi || facep->getViewerObject()->getVolume()->isUnique();
+
+                    facep->setTextureIndex((U8)slot);
+                }
+
+                if (slot_count < 2)
+                { // only one material in this span -- fall back to the scalar PBR
+                  // path (registerFace merges these by material id as usual).
+                  // Clear mDrawInfo first, like the non-batch path below:
+                  // setTextureIndex(FACE_DO_NOT_BATCH_TEXTURES) asserts (LL_ERRS) if
+                  // the face still references an indexed-texture draw info, which it
+                  // may from a prior frame.
+                    for (LLFace** f = face_iter; f != i; ++f)
+                    {
+                        (*f)->mDrawInfo = NULL;
+                        (*f)->setTextureIndex(FACE_DO_NOT_BATCH_TEXTURES);
+                    }
+                }
+            }
+            else if (batch_textures)
             {
                 U8 cur_tex = 0;
                 facep->setTextureIndex(cur_tex);

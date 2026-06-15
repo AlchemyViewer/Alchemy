@@ -117,6 +117,13 @@ public:
     // PBR material parameters
     LLPointer<LLFetchedGLTFMaterial> mGLTFMaterial;
 
+    // Indexed (multi-material) GLTF PBR batching: when size() > 1 this draw call
+    // covers several materials, selected per-vertex by the texture_index attribute
+    // (the material slot). Slot s binds its four maps to texture units
+    // [s, N+s, 2N+s, 3N+s] where N == mGLTFMaterialList.size(). Empty for the
+    // single-material path (which uses mGLTFMaterial above).
+    std::vector<LLPointer<LLFetchedGLTFMaterial> > mGLTFMaterialList;
+
     LLVector4 mSpecColor = LLVector4(1.f, 1.f, 1.f, 0.5f); // XYZ = Specular RGB, W = Specular Exponent
 
     std::vector<LLPointer<LLViewerTexture> > mTextureList;
@@ -669,7 +676,7 @@ class LLVolumeGeometryManager: public LLGeometryManager
     virtual void rebuildMesh(LLSpatialGroup* group);
     virtual void getGeometry(LLSpatialGroup* group);
     virtual void addGeometryCount(LLSpatialGroup* group, U32& vertex_count, U32& index_count);
-    U32 genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort = false, bool batch_textures = false, bool rigged = false);
+    U32 genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort = false, bool batch_textures = false, bool rigged = false, bool batch_gltf = false);
     void registerFace(LLSpatialGroup* group, LLFace* facep, U32 type);
 
 private:

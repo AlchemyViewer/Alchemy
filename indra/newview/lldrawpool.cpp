@@ -53,6 +53,8 @@
 #include "llglcommonfunc.h"
 #include "llvoavatar.h"
 #include "llviewershadermgr.h"
+#include "llfetchedgltfmaterial.h"
+#include "llviewertexture.h"
 
 S32 LLDrawPool::sNumDrawPools = 0;
 
@@ -813,6 +815,144 @@ void LLRenderPass::pushUntexturedGLTFBatches(U32 type)
 
         pushUntexturedGLTFBatch(params);
     }
+}
+
+// Like pushGLTFBatches, but skips multi-material (indexed) draw infos -- those are
+// rendered separately by pushGLTFBatchesIndexed under the indexed shader. Used by
+// the main opaque GBuffer pass only.
+void LLRenderPass::pushGLTFBatchesScalar(U32 type)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LLFetchedGLTFMaterial* lastMat = nullptr;
+    LLViewerTexture* lastTex = nullptr;
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mGLTFMaterialList.size() > 1)
+        { // multi-material batch -- handled by the indexed sweep
+            continue;
+        }
+
+        pushGLTFBatch(params, lastMat, lastTex);
+    }
+}
+
+// Renders only the multi-material (indexed) draw infos. Assumes the indexed PBR
+// shader is bound.
+void LLRenderPass::pushGLTFBatchesIndexed(U32 type)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mGLTFMaterialList.size() < 2)
+        { // single-material batch -- handled by the scalar sweep
+            continue;
+        }
+
+        pushGLTFBatchIndexed(params);
+    }
+}
+
+// static
+// Bind one draw call's worth of indexed materials and emit it. Each material slot
+// s binds its four maps to texture units [s, N+s, 2N+s, 3N+s] (N == shader's
+// sIndexedGLTFChannels) and contributes one element to the per-slot scalar/transform
+// uniform arrays. Mirrors LLFetchedGLTFMaterial::bind for the default-texture and
+// factor handling.
+void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+
+    const S32 N = LLGLSLShader::sIndexedGLTFChannels; // shader sampler-array stride
+    const S32 n = (S32)params.mGLTFMaterialList.size(); // materials in this batch
+
+    LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+
+    // gathered per-slot uniform data (max 8 slots; see sIndexedGLTFChannels clamp)
+    F32 roughness[8] = { 0.f };
+    F32 metallic[8]  = { 0.f };
+    F32 min_alpha[8] = { 0.f };
+    F32 emissive[3 * 8] = { 0.f };
+    F32 bc_xform[8 * 8] = { 0.f }; // 2 vec4 (8 floats) per slot
+    F32 nm_xform[8 * 8] = { 0.f };
+    F32 mr_xform[8 * 8] = { 0.f };
+    F32 em_xform[8 * 8] = { 0.f };
+
+    bool double_sided = false;
+
+    for (S32 s = 0; s < n; ++s)
+    {
+        LLFetchedGLTFMaterial* mat = params.mGLTFMaterialList[s].get();
+        if (mat == nullptr)
+        { // gap left by a fragmented batch -- this slot is never sampled
+            min_alpha[s] = -1.f;
+            continue;
+        }
+
+        double_sided = double_sided || mat->mDoubleSided;
+
+        LLViewerTexture* base = mat->mBaseColorTexture.notNull() ? mat->mBaseColorTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+        LLViewerTexture* norm = (mat->mNormalTexture.notNull() && mat->mNormalTexture->getDiscardLevel() <= 4) ? mat->mNormalTexture.get() : LLViewerFetchedTexture::sFlatNormalImagep.get();
+        LLViewerTexture* orm  = mat->mMetallicRoughnessTexture.notNull() ? mat->mMetallicRoughnessTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+        LLViewerTexture* em   = mat->mEmissiveTexture.notNull() ? mat->mEmissiveTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+
+        gGL.getTexUnit(s)->bindFast(base);
+        gGL.getTexUnit(N + s)->bindFast(norm);
+        gGL.getTexUnit(2 * N + s)->bindFast(orm);
+        gGL.getTexUnit(3 * N + s)->bindFast(em);
+
+        roughness[s] = mat->mRoughnessFactor;
+        metallic[s]  = mat->mMetallicFactor;
+        emissive[3 * s + 0] = mat->mEmissiveColor.mV[0];
+        emissive[3 * s + 1] = mat->mEmissiveColor.mV[1];
+        emissive[3 * s + 2] = mat->mEmissiveColor.mV[2];
+        min_alpha[s] = (mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK) ? mat->mAlphaCutoff : -1.f;
+
+        // getPacked() takes F32(&)[8]; copy each transform into its slot stride.
+        LLGLTFMaterial::TextureTransform::Pack packed;
+        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(packed);
+        memcpy(&bc_xform[8 * s], packed, sizeof(packed));
+        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL].getPacked(packed);
+        memcpy(&nm_xform[8 * s], packed, sizeof(packed));
+        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS].getPacked(packed);
+        memcpy(&mr_xform[8 * s], packed, sizeof(packed));
+        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE].getPacked(packed);
+        memcpy(&em_xform[8 * s], packed, sizeof(packed));
+    }
+
+    static const LLStaticHashedString sRoughness("gltf_roughness_factor");
+    static const LLStaticHashedString sMetallic("gltf_metallic_factor");
+    static const LLStaticHashedString sEmissive("gltf_emissive_color");
+    static const LLStaticHashedString sMinAlpha("gltf_minimum_alpha");
+    static const LLStaticHashedString sBcXform("gltf_basecolor_transform");
+    static const LLStaticHashedString sNmXform("gltf_normal_transform");
+    static const LLStaticHashedString sMrXform("gltf_mr_transform");
+    static const LLStaticHashedString sEmXform("gltf_emissive_transform");
+
+    shader->uniform1fv(sRoughness, n, roughness);
+    shader->uniform1fv(sMetallic, n, metallic);
+    shader->uniform1fv(sMinAlpha, n, min_alpha);
+    shader->uniform3fv(sEmissive, n, emissive);
+    shader->uniform4fv(sBcXform, 2 * n, bc_xform);
+    shader->uniform4fv(sNmXform, 2 * n, nm_xform);
+    shader->uniform4fv(sMrXform, 2 * n, mr_xform);
+    shader->uniform4fv(sEmXform, 2 * n, em_xform);
+
+    LLGLDisable cull_face(double_sided ? GL_CULL_FACE : 0);
+
+    applyModelMatrix(params);
+
+    params.mVertexBuffer->setBuffer();
+    params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
 }
 
 // static

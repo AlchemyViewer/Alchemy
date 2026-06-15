@@ -181,6 +181,12 @@ public:
     static LLGLSLShader* sCurBoundShaderPtr;
     static S32 sIndexedTextureChannels;
 
+    // Number of GLTF PBR materials that can be batched into one indexed draw call.
+    // Each material consumes four texture units (base color, normal, ORM, emissive),
+    // so this is roughly (available fragment texture units) / 4. See
+    // PASS_GLTF_PBR_INDEXED and LLVolumeGeometryManager::genDrawInfo.
+    static S32 sIndexedGLTFChannels;
+
     static U32 sMaxGLTFMaterials;
     static U32 sMaxGLTFNodes;
 

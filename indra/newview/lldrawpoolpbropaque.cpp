@@ -55,11 +55,27 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
 
     LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
 
+    // Indexed (multi-material) batching applies to the static opaque pass only.
+    bool indexed = (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR) && LLGLSLShader::sIndexedGLTFChannels >= 2;
+
     gDeferredPBROpaqueProgram.bind();
-    pushGLTFBatches(mRenderType);
+    if (indexed)
+    { // multi-material infos are drawn separately below; render only scalar here
+        pushGLTFBatchesScalar(mRenderType);
+    }
+    else
+    {
+        pushGLTFBatches(mRenderType);
+    }
 
     gDeferredPBROpaqueProgram.bind(true);
     pushRiggedGLTFBatches(mRenderType + 1);
+
+    if (indexed)
+    {
+        gDeferredPBROpaqueIndexedProgram.bind();
+        pushGLTFBatchesIndexed(mRenderType);
+    }
 }
 
 S32 LLDrawPoolGLTFPBR::getNumPostDeferredPasses()
