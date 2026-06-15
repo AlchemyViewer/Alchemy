@@ -7312,14 +7312,8 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
         if (use_history)
         {
             // copy last frame's exposure into mLastExposure
-            mLastExposure.bindTarget();
-            gCopyProgram.bind();
-            gGL.getTexUnit(0)->bind(dst);
-
-            mScreenTriangleVB->setBuffer();
-            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-
-            mLastExposure.flush();
+            mLastExposure.copyContents(*dst, 0, 0, dst->getWidth(), dst->getHeight(), 0, 0, mLastExposure.getWidth(), mLastExposure.getHeight(),
+                             GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
 
         dst->bindTarget();
@@ -7977,23 +7971,8 @@ void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget*
     {
         LL_PROFILE_GPU_ZONE("ssr copy");
         LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
-
-        LLRenderTarget& depth_src = mRT->deferredScreen;
-
-        dst->bindTarget();
-        dst->clear();
-        gCopyDepthProgram.bind();
-
-        S32 diff_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DIFFUSE_MAP);
-        S32 depth_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DEFERRED_DEPTH);
-
-        gGL.getTexUnit(diff_map)->bind(src);
-        gGL.getTexUnit(depth_map)->bind(&depth_src, true);
-
-        mScreenTriangleVB->setBuffer();
-        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-
-        dst->flush();
+        dst->copyContents(*src, 0, 0, src->getWidth(), src->getHeight(), 0, 0, dst->getWidth(), dst->getHeight(),
+                         GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     }
 }
 
@@ -9894,24 +9873,11 @@ void LLPipeline::doAtmospherics()
             LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
 
             LLRenderTarget& src = gPipeline.mRT->screen;
-            LLRenderTarget& depth_src = gPipeline.mRT->deferredScreen;
             LLRenderTarget& dst = gPipeline.mWaterDis;
 
-            mRT->screen.flush();
-            dst.bindTarget();
-            gCopyDepthProgram.bind();
-
-            S32 diff_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DIFFUSE_MAP);
-            S32 depth_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DEFERRED_DEPTH);
-
-            gGL.getTexUnit(diff_map)->bind(&src);
-            gGL.getTexUnit(depth_map)->bind(&depth_src, true);
-
-            gGL.setColorMask(false, false);
-            gPipeline.mScreenTriangleVB->setBuffer();
-            gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-
-            dst.flush();
+            src.flush();
+            dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
+                             GL_DEPTH_BUFFER_BIT, GL_NEAREST);
             mRT->screen.bindTarget();
         }
 
@@ -9958,24 +9924,11 @@ void LLPipeline::doWaterHaze()
             LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
 
             LLRenderTarget& src = gPipeline.mRT->screen;
-            LLRenderTarget& depth_src = gPipeline.mRT->deferredScreen;
             LLRenderTarget& dst = gPipeline.mWaterDis;
 
-            mRT->screen.flush();
-            dst.bindTarget();
-            gCopyDepthProgram.bind();
-
-            S32 diff_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DIFFUSE_MAP);
-            S32 depth_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DEFERRED_DEPTH);
-
-            gGL.getTexUnit(diff_map)->bind(&src);
-            gGL.getTexUnit(depth_map)->bind(&depth_src, true);
-
-            gGL.setColorMask(false, false);
-            gPipeline.mScreenTriangleVB->setBuffer();
-            gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-
-            dst.flush();
+            src.flush();
+            dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
+                    GL_DEPTH_BUFFER_BIT, GL_NEAREST);
             mRT->screen.bindTarget();
         }
 
