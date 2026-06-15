@@ -71,7 +71,7 @@
      tool_tip="Filter by owner"
      left="8"
      top_pad="6"
-     width="130">
+     width="180">
         <combo_box.item label="Any owner" name="any" value="0" />
         <combo_box.item label="Owned by me" name="mine" value="1" />
         <combo_box.item label="Group owned" name="group" value="2" />
