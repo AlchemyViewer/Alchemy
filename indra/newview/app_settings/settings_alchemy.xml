@@ -412,6 +412,50 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyToolbarAutoHideLeft</key>
+        <map>
+            <key>Comment</key>
+            <string>Auto-hide the left toolbar, leaving a small edge hot zone that reveals it while hovered.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyToolbarAutoHideRight</key>
+        <map>
+            <key>Comment</key>
+            <string>Auto-hide the right toolbar, leaving a small edge hot zone that reveals it while hovered.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyToolbarAutoHideBottom</key>
+        <map>
+            <key>Comment</key>
+            <string>Auto-hide the bottom toolbar, leaving a small edge hot zone that reveals it while hovered.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyToolbarAutoHideTop</key>
+        <map>
+            <key>Comment</key>
+            <string>Auto-hide the top toolbar, leaving a small edge hot zone that reveals it while hovered.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyEditRootAxis</key>
         <map>
             <key>Comment</key>

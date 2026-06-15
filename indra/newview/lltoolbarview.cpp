@@ -32,6 +32,7 @@
 #include "llappviewer.h"
 #include "llbutton.h"
 #include "llclipboard.h"
+#include "llcriticaldamp.h"
 #include "lldir.h"
 #include "lldockablefloater.h"
 #include "lldockcontrol.h"
@@ -39,6 +40,7 @@
 #include "lltransientfloatermgr.h"
 #include "lltoolbar.h"
 #include "lltooldraganddrop.h"
+#include "llui.h"
 #include "llxmlnode.h"
 
 #include "llagent.h"  // HACK for destinations guide on startup
@@ -53,6 +55,45 @@ static LLDefaultChildRegistry::Register<LLToolBarView> r("toolbar_view");
 bool isToolDragged()
 {
     return (LLToolDragAndDrop::getInstance()->getSource() == LLToolDragAndDrop::SOURCE_VIEWER);
+}
+
+namespace
+{
+    constexpr S32 TOOLBAR_AUTO_HIDE_HOT_ZONE = 24;     // px of edge that reveals a hidden toolbar
+    constexpr F32 TOOLBAR_AUTO_HIDE_TIME_CONSTANT = 0.03f;
+    constexpr F64 TOOLBAR_AUTO_HIDE_LINGER = 0.175;    // seconds a toolbar stays revealed after the mouse leaves
+
+    const char* auto_hide_setting(LLToolBarEnums::EToolBarLocation toolbar)
+    {
+        switch (toolbar)
+        {
+        case LLToolBarEnums::TOOLBAR_LEFT:
+            return "AlchemyToolbarAutoHideLeft";
+        case LLToolBarEnums::TOOLBAR_RIGHT:
+            return "AlchemyToolbarAutoHideRight";
+        case LLToolBarEnums::TOOLBAR_BOTTOM:
+            return "AlchemyToolbarAutoHideBottom";
+        case LLToolBarEnums::TOOLBAR_TOP:
+            return "AlchemyToolbarAutoHideTop";
+        default:
+            return "";
+        }
+    }
+
+    S32 toolbar_full_dim(LLToolBar* toolbar)
+    {
+        LLView::EOrientation orientation = LLToolBarEnums::getOrientation(toolbar->getSideType());
+        return (orientation == LLLayoutStack::HORIZONTAL)
+            ? toolbar->getRect().getHeight()
+            : toolbar->getRect().getWidth();
+    }
+
+    // Keep toolbars fully revealed while a button is being dragged or the toybox
+    // (the "toolbar buttons" customization floater) is open, so users can drop onto them.
+    bool toolbars_forced_visible()
+    {
+        return isToolDragged() || LLFloaterReg::instanceVisible("toybox");
+    }
 }
 
 LLToolBarView::Toolbar::Toolbar()
@@ -99,15 +140,19 @@ bool LLToolBarView::postBuild()
 {
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT] = getChild<LLToolBar>("toolbar_left");
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_LEFT);
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_LEFT].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getParent());
 
     mToolbars[LLToolBarEnums::TOOLBAR_RIGHT] = getChild<LLToolBar>("toolbar_right");
     mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_RIGHT);
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_RIGHT].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getParent());
 
     mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM] = getChild<LLToolBar>("toolbar_bottom");
     mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_BOTTOM);
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_BOTTOM].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getParent());
 
     mToolbars[LLToolBarEnums::TOOLBAR_TOP] = getChild<LLToolBar>("toolbar_top");
     mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_TOP);
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_TOP].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getParent());
 
     mBottomToolbarPanel = getChild<LLView>("bottom_toolbar_panel");
 
@@ -118,6 +163,11 @@ bool LLToolBarView::postBuild()
         mToolbars[i]->setHandleDropCallback(boost::bind(LLToolBarView::handleDropTool,_1,_2,_3,_4,_5));
         mToolbars[i]->setButtonAddCallback(boost::bind(LLToolBarView::onToolBarButtonAdded,_1));
         mToolbars[i]->setButtonRemoveCallback(boost::bind(LLToolBarView::onToolBarButtonRemoved,_1));
+        if (mAutoHideEdges[i].panel)
+        {
+            mAutoHideEdges[i].full_dim = toolbar_full_dim(mToolbars[i]);
+            mAutoHideEdges[i].visible_dim = (F32)mAutoHideEdges[i].full_dim;
+        }
     }
 
     return true;
@@ -586,10 +636,18 @@ void LLToolBarView::draw()
 {
     LLRect toolbar_rects[LLToolBarEnums::TOOLBAR_COUNT];
 
+    updateAutoHide();
+
+    const bool forced_visible = toolbars_forced_visible();
+
     for (S32 i = LLToolBarEnums::TOOLBAR_FIRST; i <= LLToolBarEnums::TOOLBAR_LAST; i++)
     {
         if (mToolbars[i])
         {
+            // Measure and reshape at the toolbar's home position, then slide it
+            // back out by the current auto-hide offset.
+            clearAutoHideOffset((LLToolBarEnums::EToolBarLocation)i);
+
             LLView::EOrientation orientation = LLToolBarEnums::getOrientation(mToolbars[i]->getSideType());
 
             if (orientation == LLLayoutStack::HORIZONTAL)
@@ -602,14 +660,28 @@ void LLToolBarView::draw()
             }
 
             mToolbars[i]->localRectToOtherView(mToolbars[i]->getLocalRect(), &toolbar_rects[i], this);
+
+            applyAutoHideOffset((LLToolBarEnums::EToolBarLocation)i);
         }
     }
 
     for (S32 i = LLToolBarEnums::TOOLBAR_FIRST; i <= LLToolBarEnums::TOOLBAR_LAST; i++)
     {
-        mToolbars[i]->getParent()->setVisible(mShowToolbars
-                                            && (mToolbars[i]->hasButtons()
-                                            || isToolDragged()));
+        const AutoHideEdge& edge = mAutoHideEdges[i];
+        const bool base_visible = mShowToolbars && (mToolbars[i]->hasButtons() || forced_visible);
+
+        // The parent layout panel stays visible (and full-sized) whenever the
+        // toolbar has content, so the floater snap region keeps reserving the
+        // space and floaters don't jump as the toolbar slides. Once auto-hide
+        // has fully slid the toolbar off screen we hide the toolbar itself to
+        // skip drawing its buttons.
+        const bool fully_hidden = edge.panel
+            && getAutoHideEnabled((LLToolBarEnums::EToolBarLocation)i)
+            && !forced_visible
+            && ll_round(edge.visible_dim) <= 0;
+
+        mToolbars[i]->getParent()->setVisible(base_visible);
+        mToolbars[i]->setVisible(base_visible && !fully_hidden);
     }
 
     // Draw drop zones if drop of a tool is active
@@ -624,6 +696,143 @@ void LLToolBarView::draw()
     }
 
     LLUICtrl::draw();
+}
+
+bool LLToolBarView::getAutoHideEnabled(LLToolBarEnums::EToolBarLocation toolbar) const
+{
+    const char* setting = auto_hide_setting(toolbar);
+    return setting[0] && gSavedSettings.getBOOL(setting);
+}
+
+bool LLToolBarView::isMouseInRevealZone(LLToolBarEnums::EToolBarLocation toolbar, S32 x, S32 y, S32 active_dim) const
+{
+    const S32 width = getRect().getWidth();
+    const S32 height = getRect().getHeight();
+    // Always honour at least the hot-zone thickness, even when fully hidden.
+    active_dim = llmax(TOOLBAR_AUTO_HIDE_HOT_ZONE, active_dim);
+
+    switch (toolbar)
+    {
+    case LLToolBarEnums::TOOLBAR_LEFT:
+        return x >= 0 && x <= active_dim && y >= 0 && y <= height;
+    case LLToolBarEnums::TOOLBAR_RIGHT:
+        return x >= width - active_dim && x <= width && y >= 0 && y <= height;
+    case LLToolBarEnums::TOOLBAR_BOTTOM:
+        return y >= 0 && y <= active_dim && x >= 0 && x <= width;
+    case LLToolBarEnums::TOOLBAR_TOP:
+        return y >= height - active_dim && y <= height && x >= 0 && x <= width;
+    default:
+        return false;
+    }
+}
+
+void LLToolBarView::updateAutoHide()
+{
+    S32 mouse_x = 0;
+    S32 mouse_y = 0;
+    LLUI::getInstance()->getMousePositionLocal(this, &mouse_x, &mouse_y);
+
+    const F64 now = LLFrameTimer::getElapsedSeconds();
+    const F32 interp = LLSmoothInterpolation::getInterpolant(TOOLBAR_AUTO_HIDE_TIME_CONSTANT);
+    const bool forced_visible = toolbars_forced_visible();
+
+    for (S32 i = LLToolBarEnums::TOOLBAR_FIRST; i <= LLToolBarEnums::TOOLBAR_LAST; i++)
+    {
+        LLToolBar* toolbar = mToolbars[i];
+        AutoHideEdge& edge = mAutoHideEdges[i];
+        if (!toolbar || !edge.panel)
+        {
+            continue;
+        }
+
+        // Translation doesn't change the toolbar's measured girth, so this is
+        // safe to read even while an offset is applied.
+        const S32 measured_dim = toolbar_full_dim(toolbar);
+        if (measured_dim > 0)
+        {
+            edge.full_dim = measured_dim;
+        }
+
+        const bool has_content = toolbar->hasButtons() || forced_visible;
+        const bool auto_hide = getAutoHideEnabled((LLToolBarEnums::EToolBarLocation)i)
+            && toolbar->hasButtons()
+            && !forced_visible;
+
+        if (!mShowToolbars || !has_content)
+        {
+            edge.visible_dim = 0.f;
+            edge.last_active_time = 0.0;
+            continue;
+        }
+
+        if (!auto_hide)
+        {
+            edge.visible_dim = (F32)edge.full_dim;
+            edge.last_active_time = now;
+            continue;
+        }
+
+        if (isMouseInRevealZone((LLToolBarEnums::EToolBarLocation)i, mouse_x, mouse_y, ll_round(edge.visible_dim)))
+        {
+            edge.last_active_time = now;
+        }
+
+        const bool revealed = (now - edge.last_active_time) <= TOOLBAR_AUTO_HIDE_LINGER;
+        const F32 target_dim = (F32)(revealed ? edge.full_dim : 0);
+        edge.visible_dim = lerp(edge.visible_dim, target_dim, interp);
+
+        if (llabs(edge.visible_dim - target_dim) < 0.5f)
+        {
+            edge.visible_dim = target_dim;
+        }
+    }
+}
+
+void LLToolBarView::clearAutoHideOffset(LLToolBarEnums::EToolBarLocation toolbar)
+{
+    AutoHideEdge& edge = mAutoHideEdges[toolbar];
+    if (!mToolbars[toolbar] || (edge.offset_x == 0 && edge.offset_y == 0))
+    {
+        return;
+    }
+
+    mToolbars[toolbar]->translate(-edge.offset_x, -edge.offset_y);
+    edge.offset_x = 0;
+    edge.offset_y = 0;
+}
+
+void LLToolBarView::applyAutoHideOffset(LLToolBarEnums::EToolBarLocation toolbar)
+{
+    LLToolBar* toolbar_view = mToolbars[toolbar];
+    AutoHideEdge& edge = mAutoHideEdges[toolbar];
+    if (!toolbar_view || !mShowToolbars)
+    {
+        return;
+    }
+
+    const S32 hidden = llmax(0, edge.full_dim - ll_round(edge.visible_dim));
+    switch (toolbar)
+    {
+    case LLToolBarEnums::TOOLBAR_LEFT:
+        edge.offset_x = -hidden;
+        break;
+    case LLToolBarEnums::TOOLBAR_RIGHT:
+        edge.offset_x = hidden;
+        break;
+    case LLToolBarEnums::TOOLBAR_BOTTOM:
+        edge.offset_y = -hidden;
+        break;
+    case LLToolBarEnums::TOOLBAR_TOP:
+        edge.offset_y = hidden;
+        break;
+    default:
+        return;
+    }
+
+    if (edge.offset_x != 0 || edge.offset_y != 0)
+    {
+        toolbar_view->translate(edge.offset_x, edge.offset_y);
+    }
 }
 
 

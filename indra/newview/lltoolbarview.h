@@ -34,6 +34,7 @@
 #include "llinventory.h"
 
 class LLUICtrlFactory;
+class LLLayoutPanel;
 
 // Parent of all LLToolBar
 
@@ -108,9 +109,25 @@ protected:
     void initFromParams(const Params&);
 
 private:
+    // Per-edge state tracking the slide animation for an auto-hidden toolbar.
+    struct AutoHideEdge
+    {
+        LLLayoutPanel*  panel = nullptr;        // the toolbar's parent layout panel
+        F32             visible_dim = 0.f;      // currently revealed thickness (animated)
+        S32             full_dim = 0;           // measured thickness when fully shown
+        S32             offset_x = 0;           // translate currently applied to the toolbar
+        S32             offset_y = 0;
+        F64             last_active_time = 0.0;  // last time the reveal zone was hovered
+    };
+
     void    saveToolbars() const;
     bool    addCommandInternal(const LLCommandId& commandId, LLToolBar* toolbar);
     void    addToToolset(command_id_list_t& command_list, Toolbar& toolbar) const;
+    void    updateAutoHide();
+    bool    getAutoHideEnabled(LLToolBarEnums::EToolBarLocation toolbar) const;
+    bool    isMouseInRevealZone(LLToolBarEnums::EToolBarLocation toolbar, S32 x, S32 y, S32 active_dim) const;
+    void    clearAutoHideOffset(LLToolBarEnums::EToolBarLocation toolbar);
+    void    applyAutoHideOffset(LLToolBarEnums::EToolBarLocation toolbar);
 
     static void onToolBarButtonAdded(LLView* button);
     static void onToolBarButtonRemoved(LLView* button);
@@ -124,6 +141,7 @@ private:
     LLInventoryObject*  mDragItem;
     bool                mShowToolbars;
     LLView*             mBottomToolbarPanel;
+    AutoHideEdge        mAutoHideEdges[LLToolBarEnums::TOOLBAR_COUNT];
 };
 
 extern LLToolBarView* gToolBarView;
