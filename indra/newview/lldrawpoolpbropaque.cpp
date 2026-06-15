@@ -55,8 +55,12 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
 
     LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
 
-    // Indexed (multi-material) batching applies to the static opaque pass only.
-    bool indexed = (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR) && LLGLSLShader::sIndexedGLTFChannels >= 2;
+    // Indexed (multi-material) batching applies to the static opaque and alpha-mask
+    // passes. The indexed program writes the GBuffer the same way for both; the
+    // per-slot gltf_minimum_alpha array drives the mask discard (-1 == opaque).
+    bool indexed = (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR ||
+                    mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR_ALPHA_MASK) &&
+                   LLGLSLShader::sIndexedGLTFChannels >= 2;
 
     gDeferredPBROpaqueProgram.bind();
     if (indexed)

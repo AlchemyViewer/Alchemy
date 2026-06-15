@@ -10527,6 +10527,17 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
             {
                 mAlphaMaskPool->pushRiggedGLTFBatches(type + 1);
             }
+            else if (LLGLSLShader::sIndexedGLTFChannels >= 2 && gDeferredShadowGLTFAlphaMaskIndexedProgram.isComplete())
+            {
+                // multi-material batches alpha-test per-slot; render them with the
+                // indexed shadow program so batched cutouts stay correct
+                mAlphaMaskPool->pushGLTFBatchesScalar(type);
+
+                gDeferredShadowGLTFAlphaMaskIndexedProgram.bind();
+                gDeferredShadowGLTFAlphaMaskIndexedProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                gDeferredShadowGLTFAlphaMaskIndexedProgram.uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                mAlphaMaskPool->pushGLTFBatchesIndexed(type);
+            }
             else
             {
                 mAlphaMaskPool->pushGLTFBatches(type);

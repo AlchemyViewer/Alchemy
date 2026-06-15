@@ -5252,10 +5252,10 @@ bool can_batch_gltf_material(LLFace* facep)
         return false;
     }
 
-    if (gltf_mat->mAlphaMode != LLGLTFMaterial::ALPHA_MODE_OPAQUE)
-    { // Phase 1 batches opaque only. Blend is depth-sorted in PASS_ALPHA; mask
-      // routes to PASS_GLTF_PBR_ALPHA_MASK which the indexed sweep does not cover,
-      // so a masked face must never receive a material slot.
+    if (gltf_mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_BLEND)
+    { // blend is depth-sorted in PASS_ALPHA, can't be batched across materials.
+      // Opaque and mask are both eligible; the accumulation keeps each batch to a
+      // single alpha mode so opaque/mask faces register to their respective passes.
         return false;
     }
 
@@ -6485,8 +6485,10 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 const LLGLTFMaterial* mat_slots[8];
                 U32 slot_count = 0;
 
-                const bool anchor_double = facep->getTextureEntry()->getGLTFRenderMaterial()->mDoubleSided;
-                mat_slots[slot_count++] = facep->getTextureEntry()->getGLTFRenderMaterial();
+                const LLGLTFMaterial* anchor_mat = facep->getTextureEntry()->getGLTFRenderMaterial();
+                const bool anchor_double = anchor_mat->mDoubleSided;
+                const U8 anchor_alpha = (U8)anchor_mat->mAlphaMode;
+                mat_slots[slot_count++] = anchor_mat;
                 facep->setTextureIndex(0);
 
                 while (i != end_faces)
@@ -6494,13 +6496,19 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                     facep = *i;
 
                     if (!can_batch_gltf_material(facep))
-                    { // not an opaque batchable PBR face -- ends this batch
+                    { // not a batchable PBR face (blend / media / tex-anim) -- ends this batch
                         break;
                     }
 
                     const LLGLTFMaterial* m = facep->getTextureEntry()->getGLTFRenderMaterial();
                     if (m->mDoubleSided != anchor_double)
                     { // different cull state can't share a draw call
+                        break;
+                    }
+
+                    if ((U8)m->mAlphaMode != anchor_alpha)
+                    { // opaque and mask faces register to different passes -- keep
+                      // each indexed batch to a single alpha mode
                         break;
                     }
 

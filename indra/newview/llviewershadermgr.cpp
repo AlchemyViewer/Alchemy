@@ -175,6 +175,7 @@ LLGLSLShader            gDeferredShadowCubeProgram;
 LLGLSLShader            gDeferredShadowAlphaMaskProgram;
 LLGLSLShader            gDeferredSkinnedShadowAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaMaskProgram;
+LLGLSLShader            gDeferredShadowGLTFAlphaMaskIndexedProgram; // multi-material indexed
 LLGLSLShader            gDeferredSkinnedShadowGLTFAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaBlendProgram;
 LLGLSLShader            gDeferredSkinnedShadowGLTFAlphaBlendProgram;
@@ -1088,6 +1089,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowAlphaMaskProgram.unload();
         gDeferredSkinnedShadowAlphaMaskProgram.unload();
         gDeferredShadowGLTFAlphaMaskProgram.unload();
+        gDeferredShadowGLTFAlphaMaskIndexedProgram.unload();
         gDeferredSkinnedShadowGLTFAlphaMaskProgram.unload();
         gDeferredShadowFullbrightAlphaMaskProgram.unload();
         gDeferredSkinnedShadowFullbrightAlphaMaskProgram.unload();
@@ -1152,6 +1154,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gHUDPBROpaqueProgram.unload();
         gPBRGlowProgram.unload();
         gDeferredPBROpaqueProgram.unload();
+        gDeferredPBROpaqueIndexedProgram.unload();
         gDeferredSkinnedPBROpaqueProgram.unload();
         gDeferredPBRAlphaProgram.unload();
         gDeferredSkinnedPBRAlphaProgram.unload();
@@ -2278,6 +2281,38 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         success = make_rigged_variant(gDeferredShadowGLTFAlphaMaskProgram, gDeferredSkinnedShadowGLTFAlphaMaskProgram);
         success = success && gDeferredShadowGLTFAlphaMaskProgram.createShader();
         llassert(success);
+    }
+
+    if (success && LLGLSLShader::sIndexedGLTFChannels >= 2)
+    {
+        // Indexed (multi-material) shadow alpha mask, so batched mask faces alpha-test
+        // per-slot in the shadow map. Optional: if it fails to load the shadow pass
+        // falls back to the scalar program (slightly wrong per-face cutouts, no crash),
+        // so this is kept out of the `success` chain.
+        gDeferredShadowGLTFAlphaMaskIndexedProgram.mName = "Deferred GLTF Shadow Alpha Mask Indexed Shader";
+        gDeferredShadowGLTFAlphaMaskIndexedProgram.mShaderFiles.clear();
+        gDeferredShadowGLTFAlphaMaskIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbrShadowAlphaMaskIndexedV.glsl", GL_VERTEX_SHADER));
+        gDeferredShadowGLTFAlphaMaskIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbrShadowAlphaMaskIndexedF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredShadowGLTFAlphaMaskIndexedProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredShadowGLTFAlphaMaskIndexedProgram.clearPermutations();
+        gDeferredShadowGLTFAlphaMaskIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
+        add_common_permutations(&gDeferredShadowGLTFAlphaMaskIndexedProgram);
+
+        if (gDeferredShadowGLTFAlphaMaskIndexedProgram.createShader())
+        {
+            const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+            gDeferredShadowGLTFAlphaMaskIndexedProgram.bind();
+            for (S32 s = 0; s < n; ++s)
+            { // only base color is sampled for the shadow alpha test
+                gDeferredShadowGLTFAlphaMaskIndexedProgram.uniform1i(LLStaticHashedString(llformat("basecolor%d", s)), s);
+            }
+            gDeferredShadowGLTFAlphaMaskIndexedProgram.unbind();
+        }
+        else
+        {
+            LL_WARNS("ShaderLoading") << "Indexed PBR shadow alpha mask shader failed to load." << LL_ENDL;
+            gDeferredShadowGLTFAlphaMaskIndexedProgram.unload();
+        }
     }
 
     if (success)
