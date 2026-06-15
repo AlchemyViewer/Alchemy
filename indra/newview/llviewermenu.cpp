@@ -9888,6 +9888,17 @@ class LLViewCheckHUDAttachments : public view_listener_t
     }
 };
 
+class LLViewEnableHUDAttachments : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        // Disable the toggle while an RLV lock forces a HUD to stay shown (matches LLViewShowHUDAttachments).
+        if ( (rlv_handler_t::isEnabled()) && (gRlvAttachmentLocks.hasLockedHUD()) && (LLPipeline::sShowHUDAttachments) )
+            return false;
+        return true;
+    }
+};
+
 class LLEditEnableTakeOff : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
@@ -10444,6 +10455,7 @@ void initialize_menus()
     view_listener_t::addMenu(new LLViewStatusAway(), "View.Status.CheckAway");
     view_listener_t::addMenu(new LLViewStatusDoNotDisturb(), "View.Status.CheckDoNotDisturb");
     view_listener_t::addMenu(new LLViewCheckHUDAttachments(), "View.CheckHUDAttachments");
+    view_listener_t::addMenu(new LLViewEnableHUDAttachments(), "View.EnableHUDAttachments");
 
     //Communicate Nearby chat
     view_listener_t::addMenu(new LLCommunicateNearbyChat(), "Communicate.NearbyChat");
