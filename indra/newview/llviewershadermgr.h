@@ -277,6 +277,7 @@ extern LLGLSLShader         gHUDFullbrightAlphaMaskProgram;
 extern LLGLSLShader         gDeferredFullbrightAlphaMaskAlphaProgram;
 extern LLGLSLShader         gHUDFullbrightAlphaMaskAlphaProgram;
 extern LLGLSLShader         gDeferredEmissiveProgram;
+extern LLGLSLShader         gDeferredEmissiveIndexedProgram; // multi-material indexed legacy glow
 extern LLGLSLShader         gDeferredAvatarEyesProgram;
 extern LLGLSLShader         gDeferredAvatarAlphaProgram;
 extern LLGLSLShader         gEnvironmentMapProgram;
@@ -311,6 +312,7 @@ extern LLGLSLShader         gDeferredMaterialIndexedProgram[LLMaterial::SHADER_C
 
 extern LLGLSLShader         gHUDPBROpaqueProgram;
 extern LLGLSLShader         gPBRGlowProgram;
+extern LLGLSLShader         gPBRGlowIndexedProgram; // multi-material indexed PBR glow
 extern LLGLSLShader         gDeferredPBROpaqueProgram;
 extern LLGLSLShader         gDeferredPBROpaqueIndexedProgram; // multi-material indexed PBR opaque
 extern LLGLSLShader         gDeferredPBRAlphaProgram;

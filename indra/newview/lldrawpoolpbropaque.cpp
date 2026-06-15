@@ -107,11 +107,40 @@ void LLDrawPoolGLTFPBR::renderPostDeferred(S32 pass)
     else if (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR) // HACK -- don't render glow except for the non-alpha masked implementation
     {
         gGL.setColorMask(false, true);
+
+        // Multi-material (indexed) glow batches render with the indexed program; the
+        // scalar sweep skips them. If the indexed glow shader failed to load, fall
+        // back to scalar for everything (slot-0 glow, the pre-batching behavior).
+        bool glow_indexed = LLGLSLShader::sIndexedGLTFChannels >= 2 && gPBRGlowIndexedProgram.isComplete();
+
         gPBRGlowProgram.bind();
-        pushGLTFBatches(LLRenderPass::PASS_GLTF_GLOW);
+        if (glow_indexed)
+        {
+            pushGLTFBatchesScalar(LLRenderPass::PASS_GLTF_GLOW);
+        }
+        else
+        {
+            pushGLTFBatches(LLRenderPass::PASS_GLTF_GLOW);
+        }
 
         gPBRGlowProgram.bind(true);
-        pushRiggedGLTFBatches(LLRenderPass::PASS_GLTF_GLOW_RIGGED);
+        if (glow_indexed)
+        {
+            pushRiggedGLTFBatchesScalar(LLRenderPass::PASS_GLTF_GLOW_RIGGED);
+        }
+        else
+        {
+            pushRiggedGLTFBatches(LLRenderPass::PASS_GLTF_GLOW_RIGGED);
+        }
+
+        if (glow_indexed)
+        {
+            gPBRGlowIndexedProgram.bind();
+            pushGLTFBatchesIndexed(LLRenderPass::PASS_GLTF_GLOW, GLTF_MAPS_GLOW);
+
+            gPBRGlowIndexedProgram.bind(true); // rigged variant
+            pushRiggedGLTFBatchesIndexed(LLRenderPass::PASS_GLTF_GLOW_RIGGED, GLTF_MAPS_GLOW);
+        }
 
         gGL.setColorMask(true, false);
     }

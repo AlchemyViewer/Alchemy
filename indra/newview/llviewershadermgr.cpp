@@ -201,6 +201,8 @@ LLGLSLShader            gDeferredFullbrightAlphaMaskAlphaProgram;
 LLGLSLShader            gHUDFullbrightAlphaMaskAlphaProgram;
 LLGLSLShader            gDeferredEmissiveProgram;
 LLGLSLShader            gDeferredSkinnedEmissiveProgram;
+LLGLSLShader            gDeferredEmissiveIndexedProgram; // multi-material indexed legacy glow
+LLGLSLShader            gDeferredSkinnedEmissiveIndexedProgram;
 LLGLSLShader            gDeferredPostProgram;
 LLGLSLShader            gDeferredPostProgramNoNear;
 LLGLSLShader            gDeferredCoFProgram;
@@ -250,6 +252,8 @@ LLGLSLShader            gDeferredMaterialIndexedProgram[LLMaterial::SHADER_COUNT
 LLGLSLShader            gHUDPBROpaqueProgram;
 LLGLSLShader            gPBRGlowProgram;
 LLGLSLShader            gPBRGlowSkinnedProgram;
+LLGLSLShader            gPBRGlowIndexedProgram; // multi-material indexed PBR glow
+LLGLSLShader            gPBRGlowSkinnedIndexedProgram;
 LLGLSLShader            gDeferredPBROpaqueProgram;
 LLGLSLShader            gDeferredPBROpaqueIndexedProgram;
 LLGLSLShader            gDeferredSkinnedPBROpaqueIndexedProgram;
@@ -1159,6 +1163,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gHUDFullbrightAlphaMaskAlphaProgram.unload();
         gDeferredEmissiveProgram.unload();
         gDeferredSkinnedEmissiveProgram.unload();
+        gDeferredEmissiveIndexedProgram.unload();
+        gDeferredSkinnedEmissiveIndexedProgram.unload();
         gDeferredAvatarEyesProgram.unload();
         gDeferredPostProgram.unload();
         gDeferredCoFProgram.unload();
@@ -1205,6 +1211,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         gHUDPBROpaqueProgram.unload();
         gPBRGlowProgram.unload();
+        gPBRGlowIndexedProgram.unload();
+        gPBRGlowSkinnedIndexedProgram.unload();
         gDeferredPBROpaqueProgram.unload();
         gDeferredPBROpaqueIndexedProgram.unload();
         gDeferredSkinnedPBROpaqueIndexedProgram.unload();
@@ -1515,6 +1523,18 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredPBROpaqueIndexedProgram.unload();
             gDeferredSkinnedPBROpaqueIndexedProgram.unload();
             LLGLSLShader::sIndexedGLTFChannels = 0;
+
+            // The legacy material indexed programs were built earlier (above) with the
+            // now-stale channel count and share sIndexedGLTFChannels. Tear them down so
+            // the invariant sIndexedLegacyMaterials => sIndexedGLTFChannels >= 2 holds.
+            if (LLGLSLShader::sIndexedLegacyMaterials)
+            {
+                for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+                {
+                    gDeferredMaterialIndexedProgram[i].unload();
+                }
+                LLGLSLShader::sIndexedLegacyMaterials = false;
+            }
         }
     }
     else
@@ -1539,6 +1559,42 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             success = gPBRGlowProgram.createShader();
         }
         llassert(success);
+    }
+
+    if (success && LLGLSLShader::sIndexedGLTFChannels >= 2)
+    {
+        // Indexed (multi-material) PBR glow, parallel to gPBRGlowProgram. Shares the
+        // GBuffer indexed sampler-unit layout (base color s, emissive 3N+s) so
+        // pushGLTFBatchIndexed drives it directly. Optional: failure leaves the
+        // program incomplete and the pool falls back to scalar glow. Kept out of the
+        // `success` chain.
+        gPBRGlowIndexedProgram.mName = "PBR Glow Indexed Shader";
+        gPBRGlowIndexedProgram.mFeatures.hasSrgb = true;
+        gPBRGlowIndexedProgram.mShaderFiles.clear();
+        gPBRGlowIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbrglowIndexedV.glsl", GL_VERTEX_SHADER));
+        gPBRGlowIndexedProgram.mShaderFiles.push_back(make_pair("deferred/pbrglowIndexedF.glsl", GL_FRAGMENT_SHADER));
+        gPBRGlowIndexedProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gPBRGlowIndexedProgram.clearPermutations();
+        gPBRGlowIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
+        add_common_permutations(&gPBRGlowIndexedProgram);
+
+        bool glow_indexed_ok = make_rigged_variant(gPBRGlowIndexedProgram, gPBRGlowSkinnedIndexedProgram);
+        if (glow_indexed_ok)
+        {
+            glow_indexed_ok = gPBRGlowIndexedProgram.createShader();
+        }
+        if (glow_indexed_ok)
+        {
+            S32 n = LLGLSLShader::sIndexedGLTFChannels;
+            setup_gltf_indexed_samplers(gPBRGlowIndexedProgram, n, true);
+            setup_gltf_indexed_samplers(gPBRGlowSkinnedIndexedProgram, n, true);
+        }
+        else
+        {
+            LL_WARNS("ShaderLoading") << "Indexed PBR glow shader failed to load; multi-material glow falls back to scalar." << LL_ENDL;
+            gPBRGlowIndexedProgram.unload();
+            gPBRGlowSkinnedIndexedProgram.unload();
+        }
     }
 
     if (success)
@@ -2216,6 +2272,41 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         success = make_rigged_variant(gDeferredEmissiveProgram, gDeferredSkinnedEmissiveProgram);
         success = success && gDeferredEmissiveProgram.createShader();
         llassert(success);
+    }
+
+    if (success && LLGLSLShader::sIndexedLegacyMaterials)
+    {
+        // Indexed (multi-material) legacy glow, parallel to gDeferredEmissiveProgram.
+        // Selects each slot's diffuse map (bound to unit s) for the glow alpha mask.
+        // Only enabled when legacy material batching is active; failure leaves the
+        // program incomplete and the pool falls back to scalar glow. Kept out of the
+        // `success` chain.
+        gDeferredEmissiveIndexedProgram.mName = "Deferred Emissive Indexed Shader";
+        gDeferredEmissiveIndexedProgram.mShaderFiles.clear();
+        gDeferredEmissiveIndexedProgram.mShaderFiles.push_back(make_pair("deferred/emissiveIndexedV.glsl", GL_VERTEX_SHADER));
+        gDeferredEmissiveIndexedProgram.mShaderFiles.push_back(make_pair("deferred/emissiveIndexedF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredEmissiveIndexedProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredEmissiveIndexedProgram.clearPermutations();
+        gDeferredEmissiveIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
+        add_common_permutations(&gDeferredEmissiveIndexedProgram);
+
+        bool emissive_indexed_ok = make_rigged_variant(gDeferredEmissiveIndexedProgram, gDeferredSkinnedEmissiveIndexedProgram);
+        if (emissive_indexed_ok)
+        {
+            emissive_indexed_ok = gDeferredEmissiveIndexedProgram.createShader();
+        }
+        if (emissive_indexed_ok)
+        {
+            S32 n = LLGLSLShader::sIndexedGLTFChannels;
+            setup_material_indexed_samplers(gDeferredEmissiveIndexedProgram, n, false, false);
+            setup_material_indexed_samplers(gDeferredSkinnedEmissiveIndexedProgram, n, false, false);
+        }
+        else
+        {
+            LL_WARNS("ShaderLoading") << "Indexed legacy glow shader failed to load; multi-material glow falls back to scalar." << LL_ENDL;
+            gDeferredEmissiveIndexedProgram.unload();
+            gDeferredSkinnedEmissiveIndexedProgram.unload();
+        }
     }
 
     if (success)
