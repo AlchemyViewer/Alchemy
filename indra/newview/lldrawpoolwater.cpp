@@ -116,22 +116,10 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
         LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
 
         LLRenderTarget& src = gPipeline.mRT->screen;
-        LLRenderTarget& depth_src = gPipeline.mRT->deferredScreen;
         LLRenderTarget& dst = gPipeline.mWaterDis;
 
-        dst.bindTarget();
-        gCopyDepthProgram.bind();
-
-        S32 diff_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DIFFUSE_MAP);
-        S32 depth_map = gCopyDepthProgram.getTextureChannel(LLShaderMgr::DEFERRED_DEPTH);
-
-        gGL.getTexUnit(diff_map)->bind(&src);
-        gGL.getTexUnit(depth_map)->bind(&depth_src, true);
-
-        gPipeline.mScreenTriangleVB->setBuffer();
-        gPipeline.mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-
-        dst.flush();
+        dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
+                    GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     }
 }
 

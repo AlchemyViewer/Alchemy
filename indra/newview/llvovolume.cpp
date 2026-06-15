@@ -6248,6 +6248,16 @@ struct CompareBatchBreaker
         const LLTextureEntry* lte = lhs->getTextureEntry();
         const LLTextureEntry* rte = rhs->getTextureEntry();
 
+        // Group faces sharing a GLTF material so the PBR push loop can skip
+        // redundant LLFetchedGLTFMaterial::bind calls (see LLRenderPass::pushGLTFBatch).
+        // Non-PBR faces have a null render material, so this is a no-op for them.
+        const LLGLTFMaterial* lgltf = lte->getGLTFRenderMaterial();
+        const LLGLTFMaterial* rgltf = rte->getGLTFRenderMaterial();
+        if (lgltf != rgltf)
+        {
+            return lgltf < rgltf;
+        }
+
         if (lte->getBumpmap() != rte->getBumpmap())
         {
             return lte->getBumpmap() < rte->getBumpmap();

@@ -40,6 +40,7 @@ class LLDrawInfo;
 class LLVOAvatar;
 class LLGLSLShader;
 class LLMeshSkinInfo;
+class LLFetchedGLTFMaterial;
 
 class LLDrawPool
 {
@@ -376,8 +377,10 @@ public:
     void pushUntexturedRiggedGLTFBatches(U32 type);
 
     // push a single GLTF draw call
-    static void pushGLTFBatch(LLDrawInfo& params);
-    static void pushRiggedGLTFBatch(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin);
+    // lastMat/lastTex track the most recently bound material+media texture so
+    // consecutive draws sharing a material skip the redundant LLFetchedGLTFMaterial::bind
+    static void pushGLTFBatch(LLDrawInfo& params, LLFetchedGLTFMaterial*& lastMat, LLViewerTexture*& lastTex);
+    static void pushRiggedGLTFBatch(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin, LLFetchedGLTFMaterial*& lastMat, LLViewerTexture*& lastTex);
     static void pushUntexturedGLTFBatch(LLDrawInfo& params);
     static void pushUntexturedRiggedGLTFBatch(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin);
 

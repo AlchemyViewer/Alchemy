@@ -155,14 +155,14 @@ constexpr F64 llabs(const F64 a) noexcept
     return std::bit_cast<F64>(std::bit_cast<U64>(a) & 0x7fffffffffffffffull);
 }
 
-constexpr S32 lltrunc(F32 f)
+inline S32 lltrunc(F32 f)
 {
-    return narrow(f);
+    return (S32)std::trunc(f);
 }
 
-constexpr S32 lltrunc(F64 f)
+inline S32 lltrunc(F64 f)
 {
-    return narrow(f);
+    return (S32)std::trunc(f);
 }
 
 inline S32 llfloor(F32 f)
@@ -184,67 +184,19 @@ inline S32 llfloor(F32 f)
 #endif
 }
 
-
 inline S32 llceil( F32 f )
 {
     // This could probably be optimized, but this works.
     return (S32)ceil(f);
 }
 
-
-#ifndef BOGUS_ROUND
-// Use this round.  Does an arithmetic round (0.5 always rounds up)
 inline S32 ll_round(const F32 val)
 {
-    return llfloor(val + 0.5f);
+    return (S32)lround(val);
 }
-
-#else // BOGUS_ROUND
-// Old ll_round implementation - does banker's round (toward nearest even in the case of a 0.5.
-// Not using this because we don't have a consistent implementation on both platforms, use
-// llfloor(val + 0.5f), which is consistent on all platforms.
-inline S32 ll_round(const F32 val)
-{
-    #if LL_WINDOWS
-        // Note: assumes that the floating point control word is set to rounding mode (the default)
-        S32 ret_val;
-        _asm fld    val
-        _asm fistp  ret_val;
-        return ret_val;
-    #elif LL_LINUX
-        // Note: assumes that the floating point control word is set
-        // to rounding mode (the default)
-        S32 ret_val;
-        __asm__ __volatile__( "flds %1    \n\t"
-                              "fistpl %0  \n\t"
-                              : "=m" (ret_val)
-                              : "m" (val) );
-        return ret_val;
-    #else
-        return llfloor(val + 0.5f);
-    #endif
-}
-
-// A fast arithmentic round on intel, from Laurent de Soras http://ldesoras.free.fr
-inline int round_int(double x)
-{
-    const float round_to_nearest = 0.5f;
-    int i;
-    __asm
-    {
-        fld x
-        fadd st, st (0)
-        fadd round_to_nearest
-        fistp i
-        sar i, 1
-    }
-    return (i);
-}
-#endif // BOGUS_ROUND
-
 inline F64 ll_round(const F64 val)
 {
-    return F64(floor(val + 0.5f));
+    return round(val);
 }
 
 inline F32 ll_round( F32 val, F32 nearest )
