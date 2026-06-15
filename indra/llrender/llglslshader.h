@@ -187,6 +187,11 @@ public:
     // PASS_GLTF_PBR_INDEXED and LLVolumeGeometryManager::genDrawInfo.
     static S32 sIndexedGLTFChannels;
 
+    // True once the indexed legacy (Blinn-Phong) material programs have loaded.
+    // Gates indexed POOL_MATERIALS batching (shares sIndexedGLTFChannels for the
+    // per-slot stride); independent so a material-shader failure doesn't disable PBR.
+    static bool sIndexedLegacyMaterials;
+
     static U32 sMaxGLTFMaterials;
     static U32 sMaxGLTFNodes;
 

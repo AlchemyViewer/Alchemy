@@ -5272,6 +5272,65 @@ bool can_batch_gltf_material(LLFace* facep)
     return true;
 }
 
+// Whether a face is eligible for indexed (multi-material) legacy Blinn-Phong
+// batching. Only faces that register to a POOL_MATERIALS pass qualify, so this
+// mirrors the material_pass conditions in genDrawInfo (no fullbright, no blend, no
+// legacy emboss bump). Map-presence (normal/spec) and alpha mode are folded into
+// the shader mask, which the accumulation uses as a batch-break key.
+bool can_batch_legacy_material(LLFace* facep)
+{
+    if (LLGLSLShader::sIndexedGLTFChannels < 2)
+    {
+        return false;
+    }
+
+    const LLTextureEntry* te = facep->getTextureEntry();
+
+    if (te->getGLTFRenderMaterial() != nullptr)
+    { // PBR handled separately
+        return false;
+    }
+
+    const LLMaterial* mat = te->getMaterialParams().get();
+    if (mat == nullptr)
+    { // not a legacy material face
+        return false;
+    }
+
+    if (mat->getDiffuseAlphaMode() == LLMaterial::DIFFUSE_ALPHA_MODE_BLEND ||
+        te->getColor().mV[3] < 0.999f)
+    { // blend is depth-sorted in the alpha pool
+        return false;
+    }
+
+    if (te->getFullbright())
+    { // fullbright materials route to the fullbright passes, not POOL_MATERIALS
+        return false;
+    }
+
+    if (te->getBumpmap() && (te->getBumpmap() < 18) && mat->getNormalID().isNull())
+    { // legacy emboss bump with no normal map routes to PASS_BUMP
+        return false;
+    }
+
+    if (te->hasMedia())
+    {
+        return false;
+    }
+
+    if (facep->isState(LLFace::TEXTURE_ANIM) && facep->getVirtualSize() > MIN_TEX_ANIM_SIZE)
+    { // texture animation isn't baked into texcoords -- breaks batches
+        return false;
+    }
+
+    if (facep->getTexture() && (facep->getTexture()->getPrimaryFormat() == GL_ALPHA || facep->getTexture()->getPrimaryFormat() == GL_RED))
+    { // invisiprim
+        return false;
+    }
+
+    return true;
+}
+
 const static U32 MAX_FACE_COUNT = 4096U;
 int32_t LLVolumeGeometryManager::sInstanceCount = 0;
 LLFace** LLVolumeGeometryManager::sFullbrightFaces[2] = { NULL };
@@ -5469,6 +5528,10 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
     // mGLTFMaterialList, parallel to mTextureList for diffuse texture batching.
     bool gltf_indexed = (gltf_mat != nullptr) && (index < FACE_DO_NOT_BATCH_TEXTURES);
 
+    // A legacy Blinn-Phong face carrying a material slot participates in indexed
+    // batching via mMaterialSlotList (parallel to mGLTFMaterialList for PBR).
+    bool legacy_indexed = (mat != nullptr) && (index < FACE_DO_NOT_BATCH_TEXTURES);
+
     bool batchable = false;
 
     U32 shader_mask = 0xFFFFFFFF; //no shader
@@ -5483,6 +5546,35 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
         else
         {
             shader_mask = mat->getShaderMask(LLMaterial::DIFFUSE_ALPHA_MODE_DEFAULT, is_alpha);
+        }
+    }
+
+    // Build this face's per-slot legacy material data (mirrors the scalar field
+    // assignment below). Diffuse is per-face; normal/spec/scalars come from the
+    // material and the face's texture entry.
+    LLDrawInfo::MaterialSlot legacy_slot;
+    if (legacy_indexed)
+    {
+        legacy_slot.mDiffuse = tex;
+        legacy_slot.mNormalMap = facep->getViewerObject()->getTENormalMap(facep->getTEOffset());
+        legacy_slot.mFullbright = fullbright ? 1.f : 0.f;
+        legacy_slot.mAlphaMaskCutoff = mat->getAlphaMaskCutoff() * (1.f / 255.f);
+
+        static const float spec_lut[4] = { 0.f, 0.25f, 0.5f, 0.75f };
+        float spec_default = spec_lut[shiny & TEM_SHINY_MASK];
+        legacy_slot.mSpecColor = LLVector4(spec_default, spec_default, spec_default, spec_default);
+        legacy_slot.mEnvIntensity = spec_default;
+
+        if (!mat->getSpecularID().isNull())
+        {
+            LLVector4 sc;
+            sc.mV[0] = mat->getSpecularLightColor().mV[0] * (1.f / 255.f);
+            sc.mV[1] = mat->getSpecularLightColor().mV[1] * (1.f / 255.f);
+            sc.mV[2] = mat->getSpecularLightColor().mV[2] * (1.f / 255.f);
+            sc.mV[3] = mat->getSpecularLightExponent() * (1.f / 255.f);
+            legacy_slot.mSpecColor = sc;
+            legacy_slot.mEnvIntensity = mat->getEnvironmentIntensity() * (1.f / 255.f);
+            legacy_slot.mSpecularMap = facep->getViewerObject()->getTESpecularMap(facep->getTEOffset());
         }
     }
 
@@ -5504,6 +5596,25 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
             }
             else
             { //material list can be expanded to fit this slot
+                batchable = true;
+            }
+        }
+        else if (legacy_indexed)
+        { //indexed legacy material: batch by material slot (mMaterialSlotList)
+            if (index < draw_vec[idx]->mMaterialSlotList.size())
+            {
+                if (draw_vec[idx]->mMaterialSlotList[index].mDiffuse.isNull())
+                {
+                    batchable = true;
+                    draw_vec[idx]->mMaterialSlotList[index] = legacy_slot;
+                }
+                else if (draw_vec[idx]->mMaterialSlotList[index].mDiffuse == tex)
+                { //this face's material slot can be used with this batch
+                    batchable = true;
+                }
+            }
+            else
+            { //material slot list can be expanded to fit this slot
                 batchable = true;
             }
         }
@@ -5539,13 +5650,13 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
         info->mEnd - draw_vec[idx]->mStart + facep->getGeomCount() <= (U32) gGLManager.mGLMaxVertexRange &&
         info->mCount + facep->getIndicesCount() <= (U32) gGLManager.mGLMaxIndexRange &&
 #endif
-        // indexed GLTF batches deliberately merge different materials, so the
-        // per-material id differs across the batch -- the material slot list
-        // (checked via `batchable` above) governs membership instead.
-        (gltf_indexed || info->mMaterialID == mat_id) &&
+        // indexed batches deliberately merge different materials, so the
+        // per-material id (and legacy shiny) differs across the batch -- the
+        // slot list (checked via `batchable` above) governs membership instead.
+        (gltf_indexed || legacy_indexed || info->mMaterialID == mat_id) &&
         info->mFullbright == fullbright &&
         info->mBump == bump &&
-        (!mat || (info->mShiny == shiny)) && // need to break batches when a material is shared, but legacy settings are different
+        (!mat || legacy_indexed || (info->mShiny == shiny)) && // need to break batches when a material is shared, but legacy settings are different
         info->mTextureMatrix == tex_mat &&
         info->mModelMatrix == model_mat &&
         info->mShaderMask == shader_mask &&
@@ -5562,6 +5673,14 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
                 info->mGLTFMaterialList.resize(index+1);
             }
             info->mGLTFMaterialList[index] = gltf_mat;
+        }
+        else if (legacy_indexed)
+        {
+            if (index >= info->mMaterialSlotList.size())
+            {
+                info->mMaterialSlotList.resize(index+1);
+            }
+            info->mMaterialSlotList[index] = legacy_slot;
         }
         else if (index < FACE_DO_NOT_BATCH_TEXTURES && index >= info->mTextureList.size())
         {
@@ -5654,6 +5773,11 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
         { //initialize material slot list for indexed GLTF batching
             draw_info->mGLTFMaterialList.resize(index+1);
             draw_info->mGLTFMaterialList[index] = gltf_mat;
+        }
+        else if (legacy_indexed)
+        { //initialize material slot list for indexed legacy batching
+            draw_info->mMaterialSlotList.resize(index+1);
+            draw_info->mMaterialSlotList[index] = legacy_slot;
         }
         else if (index < FACE_DO_NOT_BATCH_TEXTURES)
         { //initialize texture list for texture batching
@@ -6206,6 +6330,9 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
     // disabled by setting. Applied to static opaque PBR faces only (see below).
     static LLCachedControl<bool> gltf_batching(gSavedSettings, "RenderGLTFPBRBatching", true);
     bool gltf_batch_enabled = gltf_batching && LLGLSLShader::sIndexedGLTFChannels >= 2;
+    // Legacy (Blinn-Phong) indexed batching shares the toggle and per-slot stride,
+    // but also requires its own programs to have loaded.
+    bool legacy_batch_enabled = gltf_batch_enabled && LLGLSLShader::sIndexedLegacyMaterials;
 
     // generate render batches for static geometry
     U32 extra_mask = LLVertexBuffer::MAP_TEXTURE_INDEX;
@@ -6217,9 +6344,9 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
         geometryBytes += genDrawInfo(group, fullbright_mask | extra_mask, sFullbrightFaces[i], fullbright_count[i], false, batch_textures, rigged);
         geometryBytes += genDrawInfo(group, alpha_mask | extra_mask, sAlphaFaces[i], alpha_count[i], alpha_sort, batch_textures, rigged);
         geometryBytes += genDrawInfo(group, bump_mask | extra_mask, sBumpFaces[i], bump_count[i], false, false, rigged);
-        geometryBytes += genDrawInfo(group, norm_mask | extra_mask, sNormFaces[i], norm_count[i], false, false, rigged);
-        geometryBytes += genDrawInfo(group, spec_mask | extra_mask, sSpecFaces[i], spec_count[i], false, false, rigged);
-        geometryBytes += genDrawInfo(group, normspec_mask | extra_mask, sNormSpecFaces[i], normspec_count[i], false, false, rigged);
+        geometryBytes += genDrawInfo(group, norm_mask | extra_mask, sNormFaces[i], norm_count[i], false, false, rigged, false, !rigged && legacy_batch_enabled);
+        geometryBytes += genDrawInfo(group, spec_mask | extra_mask, sSpecFaces[i], spec_count[i], false, false, rigged, false, !rigged && legacy_batch_enabled);
+        geometryBytes += genDrawInfo(group, normspec_mask | extra_mask, sNormSpecFaces[i], normspec_count[i], false, false, rigged, false, !rigged && legacy_batch_enabled);
         geometryBytes += genDrawInfo(group, pbr_mask | extra_mask, sPbrFaces[i], pbr_count[i], false, false, rigged, gltf_batch_enabled);
 
         // for rigged set, add weights and disable alpha sorting (rigged items use depth buffer)
@@ -6392,7 +6519,7 @@ struct CompareBatchBreakerRigged
     }
 };
 
-U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort, bool batch_textures, bool rigged, bool batch_gltf)
+U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort, bool batch_textures, bool rigged, bool batch_gltf, bool batch_legacy)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
 
@@ -6563,6 +6690,85 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                   // setTextureIndex(FACE_DO_NOT_BATCH_TEXTURES) asserts (LL_ERRS) if
                   // the face still references an indexed-texture draw info, which it
                   // may from a prior frame.
+                    for (LLFace** f = face_iter; f != i; ++f)
+                    {
+                        (*f)->mDrawInfo = NULL;
+                        (*f)->setTextureIndex(FACE_DO_NOT_BATCH_TEXTURES);
+                    }
+                }
+            }
+            else if (batch_legacy && !hud_group && can_batch_legacy_material(facep))
+            {
+                // Indexed (multi-material) legacy Blinn-Phong: accumulate distinct
+                // (diffuse, material) pairs into one batch. Faces must share the same
+                // shader mask (== gDeferredMaterialProgram index, i.e. the bound
+                // program), so the mask is a hard batch-break key.
+                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, 8);
+                LLViewerTexture* diffuse_slots[8];
+                LLMaterial* mat_slots[8];
+                U32 slot_count = 0;
+
+                LLMaterial* anchor_mat = facep->getTextureEntry()->getMaterialParams().get();
+                const U32 anchor_mask = anchor_mat->getShaderMask(LLMaterial::DIFFUSE_ALPHA_MODE_DEFAULT, false);
+
+                diffuse_slots[0] = facep->getTexture();
+                mat_slots[0] = anchor_mat;
+                slot_count = 1;
+                facep->setTextureIndex(0);
+
+                while (i != end_faces)
+                {
+                    facep = *i;
+
+                    if (!can_batch_legacy_material(facep))
+                    {
+                        break;
+                    }
+
+                    LLMaterial* m = facep->getTextureEntry()->getMaterialParams().get();
+                    if (m->getShaderMask(LLMaterial::DIFFUSE_ALPHA_MODE_DEFAULT, false) != anchor_mask)
+                    { // different program -- can't share a draw call
+                        break;
+                    }
+
+                    LLViewerTexture* d = facep->getTexture();
+                    S32 slot = -1;
+                    for (U32 s = 0; s < slot_count; ++s)
+                    {
+                        if (mat_slots[s] == m && diffuse_slots[s] == d)
+                        {
+                            slot = (S32)s;
+                            break;
+                        }
+                    }
+                    if (slot < 0)
+                    {
+                        if ((S32)slot_count >= gltf_channels)
+                        {
+                            break;
+                        }
+                        slot = (S32)slot_count;
+                        diffuse_slots[slot_count] = d;
+                        mat_slots[slot_count] = m;
+                        slot_count++;
+                    }
+
+                    if (geom_count + facep->getGeomCount() > max_vertices)
+                    {
+                        break;
+                    }
+
+                    ++i;
+                    index_count += facep->getIndicesCount();
+                    geom_count += facep->getGeomCount();
+
+                    flexi = flexi || facep->getViewerObject()->getVolume()->isUnique();
+
+                    facep->setTextureIndex((U8)slot);
+                }
+
+                if (slot_count < 2)
+                { // single material -- fall back to the scalar material path
                     for (LLFace** f = face_iter; f != i; ++f)
                     {
                         (*f)->mDrawInfo = NULL;

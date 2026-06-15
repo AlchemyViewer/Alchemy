@@ -244,6 +244,7 @@ LLGLSLShader            gRlvSphereProgram;
 
 // Deferred materials shaders
 LLGLSLShader            gDeferredMaterialProgram[LLMaterial::SHADER_COUNT*2];
+LLGLSLShader            gDeferredMaterialIndexedProgram[LLMaterial::SHADER_COUNT*2]; // multi-material indexed (GBuffer masks only)
 LLGLSLShader            gHUDPBROpaqueProgram;
 LLGLSLShader            gPBRGlowProgram;
 LLGLSLShader            gPBRGlowSkinnedProgram;
@@ -299,6 +300,27 @@ static void setup_gltf_indexed_samplers(LLGLSLShader& shader, S32 n, bool full)
             shader.uniform1i(LLStaticHashedString(llformat("normalmap%d", s)), n + s);
             shader.uniform1i(LLStaticHashedString(llformat("ormmap%d", s)), 2 * n + s);
             shader.uniform1i(LLStaticHashedString(llformat("emissivemap%d", s)), 3 * n + s);
+        }
+    }
+    shader.unbind();
+}
+
+// Map an indexed legacy material program's per-slot samplers to texture units:
+// diffuse slot s -> unit s; normal s -> N+s (HAS_NORMAL_MAP); spec s -> 2N+s
+// (HAS_SPECULAR_MAP). Inactive samplers resolve to -1 and are skipped.
+static void setup_material_indexed_samplers(LLGLSLShader& shader, S32 n, bool has_normal, bool has_spec)
+{
+    shader.bind();
+    for (S32 s = 0; s < n; ++s)
+    {
+        shader.uniform1i(LLStaticHashedString(llformat("diffuse%d", s)), s);
+        if (has_normal)
+        {
+            shader.uniform1i(LLStaticHashedString(llformat("bump%d", s)), n + s);
+        }
+        if (has_spec)
+        {
+            shader.uniform1i(LLStaticHashedString(llformat("spec%d", s)), 2 * n + s);
         }
     }
     shader.unbind();
@@ -1173,7 +1195,9 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
         {
             gDeferredMaterialProgram[i].unload();
+            gDeferredMaterialIndexedProgram[i].unload();
         }
+        LLGLSLShader::sIndexedLegacyMaterials = false;
 
         gHUDPBROpaqueProgram.unload();
         gPBRGlowProgram.unload();
@@ -1364,6 +1388,70 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     gDeferredMaterialProgram[5+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
     gDeferredMaterialProgram[9+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
     gDeferredMaterialProgram[13+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
+
+    if (success && LLGLSLShader::sIndexedGLTFChannels >= 2)
+    {
+        // Indexed (multi-material) legacy material GBuffer-write programs, parallel to
+        // gDeferredMaterialProgram but covering only the non-blend (GBuffer) masks and
+        // sampling the GBuffer-relevant maps only. Optional: failure leaves
+        // sIndexedLegacyMaterials false so legacy batching is skipped (the pool falls
+        // back to scalar). Kept out of the `success` chain.
+        bool material_indexed_ok = true;
+        for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2 && material_indexed_ok; ++i)
+        {
+            U32 alpha_mode = i & 0x3;
+            if (alpha_mode == 1) // DIFFUSE_ALPHA_MODE_BLEND -- forward/alpha pool, not indexed
+            {
+                continue;
+            }
+
+            bool has_skin   = (i & 0x10) != 0;
+            bool has_spec   = (i & 0x4) != 0;
+            bool has_normal = (i & 0x8) != 0;
+
+            LLGLSLShader& prog = gDeferredMaterialIndexedProgram[i];
+            prog.mName = llformat("Material Indexed Shader %d", i);
+            prog.mShaderFiles.clear();
+            prog.mShaderFiles.push_back(make_pair("deferred/materialIndexedV.glsl", GL_VERTEX_SHADER));
+            prog.mShaderFiles.push_back(make_pair("deferred/materialIndexedF.glsl", GL_FRAGMENT_SHADER));
+            prog.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            prog.clearPermutations();
+            if (has_normal) prog.addPermutation("HAS_NORMAL_MAP", "1");
+            if (has_spec)   prog.addPermutation("HAS_SPECULAR_MAP", "1");
+            prog.addPermutation("DIFFUSE_ALPHA_MODE", llformat("%d", alpha_mode));
+            prog.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
+            add_common_permutations(&prog);
+
+            if (has_skin)
+            {
+                prog.addPermutation("HAS_SKIN", "1");
+                prog.mFeatures.hasObjectSkinning = true;
+            }
+            else
+            {
+                prog.mRiggedVariant = &gDeferredMaterialIndexedProgram[i + 0x10];
+            }
+
+            material_indexed_ok = prog.createShader();
+            if (material_indexed_ok)
+            {
+                setup_material_indexed_samplers(prog, LLGLSLShader::sIndexedGLTFChannels, has_normal, has_spec);
+            }
+        }
+
+        if (material_indexed_ok)
+        {
+            LLGLSLShader::sIndexedLegacyMaterials = true;
+        }
+        else
+        {
+            LL_WARNS("ShaderLoading") << "Indexed legacy material shaders failed to load; legacy batching disabled." << LL_ENDL;
+            for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+            {
+                gDeferredMaterialIndexedProgram[i].unload();
+            }
+        }
+    }
 
     if (success)
     {

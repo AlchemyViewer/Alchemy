@@ -55,6 +55,7 @@ GLuint LLGLSLShader::sCurBoundShader = 0;
 LLGLSLShader* LLGLSLShader::sCurBoundShaderPtr = NULL;
 S32 LLGLSLShader::sIndexedTextureChannels = 0;
 S32 LLGLSLShader::sIndexedGLTFChannels = 0;
+bool LLGLSLShader::sIndexedLegacyMaterials = false;
 U32 LLGLSLShader::sMaxGLTFMaterials = 0;
 U32 LLGLSLShader::sMaxGLTFNodes = 0;
 bool LLGLSLShader::sProfileEnabled = false;

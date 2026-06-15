@@ -124,6 +124,21 @@ public:
     // single-material path (which uses mGLTFMaterial above).
     std::vector<LLPointer<LLFetchedGLTFMaterial> > mGLTFMaterialList;
 
+    // Indexed (multi-material) legacy Blinn-Phong batching: one entry per material
+    // slot (the texture_index attribute), parallel to the GLTF list above but for
+    // the POOL_MATERIALS path. Empty unless this is a multi-material legacy batch.
+    struct MaterialSlot
+    {
+        LLPointer<LLViewerTexture> mDiffuse;
+        LLPointer<LLViewerTexture> mNormalMap;
+        LLPointer<LLViewerTexture> mSpecularMap;
+        LLVector4 mSpecColor = LLVector4(1.f, 1.f, 1.f, 0.5f); // XYZ = specular RGB, W = glossiness
+        F32 mEnvIntensity = 0.f;
+        F32 mAlphaMaskCutoff = 0.5f;
+        F32 mFullbright = 0.f;
+    };
+    std::vector<MaterialSlot> mMaterialSlotList;
+
     LLVector4 mSpecColor = LLVector4(1.f, 1.f, 1.f, 0.5f); // XYZ = Specular RGB, W = Specular Exponent
 
     std::vector<LLPointer<LLViewerTexture> > mTextureList;
@@ -676,7 +691,7 @@ class LLVolumeGeometryManager: public LLGeometryManager
     virtual void rebuildMesh(LLSpatialGroup* group);
     virtual void getGeometry(LLSpatialGroup* group);
     virtual void addGeometryCount(LLSpatialGroup* group, U32& vertex_count, U32& index_count);
-    U32 genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort = false, bool batch_textures = false, bool rigged = false, bool batch_gltf = false);
+    U32 genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace** faces, U32 face_count, bool distance_sort = false, bool batch_textures = false, bool rigged = false, bool batch_gltf = false, bool batch_legacy = false);
     void registerFace(LLSpatialGroup* group, LLFace* facep, U32 type);
 
 private:
