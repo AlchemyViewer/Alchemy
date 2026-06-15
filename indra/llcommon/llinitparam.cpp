@@ -30,6 +30,8 @@
 #include "llinitparam.h"
 #include "llformat.h"
 
+#include <unordered_set>
+
 
 namespace LLInitParam
 {
@@ -145,7 +147,7 @@ namespace LLInitParam
 
         if (param->mValidationFunc)
         {
-            mValidationList.push_back(std::make_pair(param->mParamHandle, param->mValidationFunc));
+            mValidationList.emplace_back(param->mParamHandle, param->mValidationFunc);
         }
     }
 
@@ -246,6 +248,16 @@ namespace LLInitParam
             }
         }
 
+        // Precompute the set of unnamed (implicit) param handles so the loop
+        // below can skip already-serialized params in O(1) instead of rescanning
+        // mUnnamedParams for every named param.
+        std::unordered_set<param_handle_t> unnamed_handles;
+        unnamed_handles.reserve(block_data.mUnnamedParams.size());
+        for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
+        {
+            unnamed_handles.insert(ptr->mParamHandle);
+        }
+
         for (const BlockDescriptor::param_map_t::value_type& pair : block_data.mNamedParams)
         {
             param_handle_t param_handle = pair.second->mParamHandle;
@@ -255,24 +267,14 @@ namespace LLInitParam
             {
                 // Ensure this param has not already been serialized
                 // Prevents <rect> from being serialized as its own tag.
-                bool duplicate = false;
-                for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
-                {
-                    if (param_handle == ptr->mParamHandle)
-                    {
-                        duplicate = true;
-                        break;
-                    }
-                }
-
                 //FIXME: for now, don't attempt to serialize values under synonyms, as current parsers
                 // don't know how to detect them
-                if (duplicate)
+                if (unnamed_handles.find(param_handle) != unnamed_handles.end())
                 {
                     continue;
                 }
 
-                name_stack.push_back(std::make_pair(pair.first, !duplicate));
+                name_stack.emplace_back(pair.first, true);
                 const Param* diff_param = diff_block ? diff_block->getParamFromHandle(param_handle) : NULL;
                 serialized |= serialize_func(*param, parser, name_stack, predicate_rule, diff_param);
                 name_stack.pop_back();
@@ -300,10 +302,18 @@ namespace LLInitParam
             ParamDescriptor::inspect_func_t inspect_func = ptr->mInspectFunc;
             if (inspect_func)
             {
-                name_stack.push_back(std::make_pair("", true));
+                name_stack.emplace_back("", true);
                 inspect_func(*param, parser, name_stack, ptr->mMinCount, ptr->mMaxCount);
                 name_stack.pop_back();
             }
+        }
+
+        // Precompute unnamed (implicit) param handles for O(1) duplicate checks.
+        std::unordered_set<param_handle_t> unnamed_handles;
+        unnamed_handles.reserve(block_data.mUnnamedParams.size());
+        for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
+        {
+            unnamed_handles.insert(ptr->mParamHandle);
         }
 
         for(const BlockDescriptor::param_map_t::value_type& pair : block_data.mNamedParams)
@@ -314,17 +324,9 @@ namespace LLInitParam
             if (inspect_func)
             {
                 // Ensure this param has not already been inspected
-                bool duplicate = false;
-                for (const ParamDescriptorPtr &ptr : block_data.mUnnamedParams)
-                {
-                    if (param_handle == ptr->mParamHandle)
-                    {
-                        duplicate = true;
-                        break;
-                    }
-                }
+                bool duplicate = unnamed_handles.find(param_handle) != unnamed_handles.end();
 
-                name_stack.push_back(std::make_pair(pair.first, !duplicate));
+                name_stack.emplace_back(pair.first, !duplicate);
                 inspect_func(*param, parser, name_stack, pair.second->mMinCount, pair.second->mMaxCount);
                 name_stack.pop_back();
             }

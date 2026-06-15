@@ -678,20 +678,22 @@ const LLXMLNodePtr DUMMY_NODE = new LLXMLNode();
 void LLXUIParser::readXUI(LLXMLNodePtr node, LLInitParam::BaseBlock& block, const std::string& filename, bool silent)
 {
     LL_RECORD_BLOCK_TIME(FTM_PARSE_XUI);
+
+    if (node.isNull())
+    {
+        // Can't use parserWarning() here: it dereferences mCurReadNode, which
+        // is null/stale before any node of this parse has been read.
+        LL_WARNS() << "Invalid (null) node passed to readXUI" << LL_ENDL;
+        return;
+    }
+
     mNameStack.clear();
     mRootNodeName = node->getName()->mString;
     mCurFileName = filename;
     mCurReadDepth = 0;
     setParseSilently(silent);
 
-    if (node.isNull())
-    {
-        parserWarning("Invalid node");
-    }
-    else
-    {
-        readXUIImpl(node, block);
-    }
+    readXUIImpl(node, block);
 }
 
 bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
@@ -702,9 +704,13 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
     bool values_parsed = false;
     bool silent = mCurReadDepth > 0;
 
+    // getSanitizedValue() does real work; compute it once and reuse it for both
+    // the empty-node check and the "value" parameter below.
+    std::string text_contents = nodep->getSanitizedValue();
+
     if (nodep->getFirstChild().isNull()
         && nodep->mAttributes.empty()
-        && nodep->getSanitizedValue().empty())
+        && text_contents.empty())
     {
         // empty node, just parse as flag
         mCurReadNode = DUMMY_NODE;
@@ -715,11 +721,10 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
     values_parsed |= readAttributes(nodep, block);
 
     // treat text contents of xml node as "value" parameter
-    std::string text_contents = nodep->getSanitizedValue();
     if (!text_contents.empty())
     {
         mCurReadNode = nodep;
-        mNameStack.push_back(std::make_pair(std::string("value"), true));
+        mNameStack.emplace_back("value", true);
         // child nodes are not necessarily valid parameters (could be a child widget)
         // so don't complain once we've recursed
         if (!block.submitValue(mNameStack, *this, true))
@@ -752,9 +757,9 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
         // and if not, treat as a child element of the current node
         // e.g. <button><rect left="10"/></button> will interpret <rect> as "button.rect"
         // since there is no widget named "rect"
-        if (child_name.find(".") == std::string::npos)
+        if (child_name.find('.') == std::string::npos)
         {
-            mNameStack.push_back(std::make_pair(child_name, true));
+            mNameStack.emplace_back(child_name, true);
             num_tokens_pushed++;
         }
         else
@@ -790,7 +795,7 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
             // copy remaining tokens on to our running token list
             for(tokenizer::iterator token_to_push = name_token_it; token_to_push != name_tokens.end(); ++token_to_push)
             {
-                mNameStack.push_back(std::make_pair(*token_to_push, true));
+                mNameStack.emplace_back(*token_to_push, true);
                 num_tokens_pushed++;
             }
         }
@@ -840,7 +845,7 @@ bool LLXUIParser::readAttributes(LLXMLNodePtr nodep, LLInitParam::BaseBlock& blo
         // copy remaining tokens on to our running token list
         for(tokenizer::iterator token_to_push = name_tokens.begin(); token_to_push != name_tokens.end(); ++token_to_push)
         {
-            mNameStack.push_back(std::make_pair(*token_to_push, true));
+            mNameStack.emplace_back(*token_to_push, true);
             num_tokens_pushed++;
         }
 
@@ -1330,8 +1335,11 @@ struct ScopedFile
 
     ~ScopedFile()
     {
-        fclose(mFile);
-        mFile = NULL;
+        if (mFile)
+        {
+            fclose(mFile);
+            mFile = NULL;
+        }
     }
 
     S32 getRemainingBytes()
@@ -1388,7 +1396,7 @@ bool LLSimpleXUIParser::readXUI(const std::string& filename, LLInitParam::BaseBl
     XML_SetElementHandler(          mParser,    startElementHandler, endElementHandler);
     XML_SetCharacterDataHandler(    mParser,    characterDataHandler);
 
-    mOutputStack.push_back(std::make_pair(&block, 0));
+    mOutputStack.emplace_back(&block, 0);
     mNameStack.clear();
     mCurFileName = filename;
     mCurReadDepth = 0;
@@ -1471,7 +1479,7 @@ void LLSimpleXUIParser::startElement(const char *name, const char **atts)
         LLInitParam::BaseBlock* blockp = mElementCB(*this, name);
         if (blockp)
         {
-            mOutputStack.push_back(std::make_pair(blockp, 0));
+            mOutputStack.emplace_back(blockp, 0);
         }
     }
 
@@ -1485,7 +1493,7 @@ void LLSimpleXUIParser::startElement(const char *name, const char **atts)
     }
     else
     {   // compound attribute
-        if (child_name.find(".") == std::string::npos)
+        if (child_name.find('.') == std::string::npos)
         {
             mNameStack.emplace_back(child_name, true);
             num_tokens_pushed++;
@@ -1514,7 +1522,7 @@ void LLSimpleXUIParser::startElement(const char *name, const char **atts)
             // copy remaining tokens on to our running token list
             for(tokenizer::iterator token_to_push = name_token_it; token_to_push != name_tokens.end(); ++token_to_push)
             {
-                mNameStack.push_back(std::make_pair(*token_to_push, true));
+                mNameStack.emplace_back(*token_to_push, true);
                 num_tokens_pushed++;
             }
             mScope.push_back(mNameStack.back().first);
@@ -1578,7 +1586,7 @@ bool LLSimpleXUIParser::readAttributes(const char **atts)
         // copy remaining tokens on to our running token list
         for(tokenizer::iterator token_to_push = name_tokens.begin(); token_to_push != name_tokens.end(); ++token_to_push)
         {
-            mNameStack.push_back(std::make_pair(*token_to_push, true));
+            mNameStack.emplace_back(*token_to_push, true);
             num_tokens_pushed++;
         }
 

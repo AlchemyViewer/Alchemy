@@ -181,9 +181,9 @@ LLXmlTreeNode* LLXmlTreeNode::getNextNamedChild()
         return (mChildMapIter++)->second;
 }
 
-void LLXmlTreeNode::appendContents(const std::string& str)
+void LLXmlTreeNode::appendContents(const char* str, std::string::size_type len)
 {
-    mContents.append( str );
+    mContents.append( str, len );
 }
 
 void LLXmlTreeNode::addChild(LLXmlTreeNode* child)
@@ -601,6 +601,11 @@ void LLXmlTreeParser::endElement(const char* name)
         LL_INFOS() << tabs() << "endElement " << name << LL_ENDL;
     }
 
+    if( !mCurrent )
+    {
+        return;
+    }
+
     if( !mCurrent->mContents.empty() )
     {
         LLStringUtil::trim(mCurrent->mContents);
@@ -612,16 +617,18 @@ void LLXmlTreeParser::endElement(const char* name)
 
 void LLXmlTreeParser::characterData(const char *s, int len)
 {
-    std::string str;
-    if (s) str = std::string(s, len);
+    if (!s || len <= 0 || !mCurrent)
+    {
+        return;
+    }
     if( mDump )
     {
-        LL_INFOS() << tabs() << "CharacterData " << str << LL_ENDL;
+        LL_INFOS() << tabs() << "CharacterData " << std::string(s, len) << LL_ENDL;
     }
 
     if (mKeepContents)
     {
-        mCurrent->appendContents( str );
+        mCurrent->appendContents( s, len );
     }
 }
 

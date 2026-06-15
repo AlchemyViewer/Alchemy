@@ -34,14 +34,6 @@
 #include <list>
 #include <set>
 
-#if LL_WINDOWS
-# if (_MSC_VER >= 1300 && _MSC_VER < 1400)
-#  define STRING_TABLE_HASH_MAP 1
-# endif
-#else
-//# define STRING_TABLE_HASH_MAP 1
-#endif
-
 const U32 MAX_STRINGS_LENGTH = 256;
 
 class LL_COMMON_API LLStringTableEntry
@@ -49,6 +41,12 @@ class LL_COMMON_API LLStringTableEntry
 public:
     LLStringTableEntry(const char *str);
     ~LLStringTableEntry();
+
+    // Owns a raw char buffer and is always heap-allocated and referenced by
+    // pointer (never copied), so delete copy to make that single-owner
+    // invariant explicit and rule out an accidental double-free.
+    LLStringTableEntry(const LLStringTableEntry&) = delete;
+    LLStringTableEntry& operator=(const LLStringTableEntry&) = delete;
 
     void incCount()     { mCount++; }
     bool decCount()     { return --mCount != 0; }
@@ -77,18 +75,9 @@ public:
     S32 mMaxEntries;
     S32 mUniqueEntries;
 
-#if STRING_TABLE_HASH_MAP
-#if LL_WINDOWS
-    typedef std::hash_multimap<U32, LLStringTableEntry *> string_hash_t;
-#else
-    typedef __gnu_cxx::hash_multimap<U32, LLStringTableEntry *> string_hash_t;
-#endif
-    string_hash_t mStringHash;
-#else
     typedef std::list<LLStringTableEntry *> string_list_t;
     typedef string_list_t * string_list_ptr_t;
     string_list_ptr_t   *mStringList;
-#endif
 };
 
 extern LL_COMMON_API LLStringTable gStringTable;
