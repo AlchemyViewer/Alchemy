@@ -372,8 +372,8 @@ public:
     //   pushGLTFBatchesScalar  -- renders only single-material infos
     //   pushGLTFBatchesIndexed -- renders only multi-material infos (indexed program bound)
     void pushGLTFBatchesScalar(U32 type);
-    void pushGLTFBatchesIndexed(U32 type);
-    static void pushGLTFBatchIndexed(LLDrawInfo& params);
+    void pushGLTFBatchesIndexed(U32 type, bool base_color_only = false);
+    static void pushGLTFBatchIndexed(LLDrawInfo& params, bool base_color_only = false);
 
     // like pushGLTFBatches, but will not bind textures or set up texture transforms
     void pushUntexturedGLTFBatches(U32 type);
@@ -391,8 +391,8 @@ public:
     // is one avatar+skin (the accumulation breaks on skin change), so the matrix
     // palette is uploaded per draw info as usual.
     void pushRiggedGLTFBatchesScalar(U32 type);
-    void pushRiggedGLTFBatchesIndexed(U32 type);
-    static void pushRiggedGLTFBatchIndexed(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin);
+    void pushRiggedGLTFBatchesIndexed(U32 type, bool base_color_only = false);
+    static void pushRiggedGLTFBatchIndexed(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin, bool base_color_only = false);
 
     // push a single GLTF draw call
     // lastMat/lastTex track the most recently bound material+media texture so

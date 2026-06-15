@@ -842,8 +842,8 @@ void LLRenderPass::pushGLTFBatchesScalar(U32 type)
 }
 
 // Renders only the multi-material (indexed) draw infos. Assumes the indexed PBR
-// shader is bound.
-void LLRenderPass::pushGLTFBatchesIndexed(U32 type)
+// shader is bound. base_color_only is forwarded for the shadow alpha-mask pass.
+void LLRenderPass::pushGLTFBatchesIndexed(U32 type, bool base_color_only)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     auto* begin = gPipeline.beginRenderMap(type);
@@ -858,22 +858,24 @@ void LLRenderPass::pushGLTFBatchesIndexed(U32 type)
             continue;
         }
 
-        pushGLTFBatchIndexed(params);
+        pushGLTFBatchIndexed(params, base_color_only);
     }
 }
 
 // static
 // Bind one draw call's worth of indexed materials and emit it. Each material slot
-// s binds its four maps to texture units [s, N+s, 2N+s, 3N+s] (N == shader's
+// s binds its maps to texture units [s, N+s, 2N+s, 3N+s] (N == shader's
 // sIndexedGLTFChannels) and contributes one element to the per-slot scalar/transform
 // uniform arrays. Mirrors LLFetchedGLTFMaterial::bind for the default-texture and
-// factor handling.
-void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params)
+// factor handling. base_color_only skips the normal/ORM/emissive maps and their
+// uniforms -- used by the shadow alpha-mask pass, which samples only base color.
+void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, bool base_color_only)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
     const S32 N = LLGLSLShader::sIndexedGLTFChannels; // shader sampler-array stride
     const S32 n = (S32)params.mGLTFMaterialList.size(); // materials in this batch
+    LL_PROFILE_ZONE_NUM(n);
 
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
@@ -901,11 +903,24 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params)
         double_sided = double_sided || mat->mDoubleSided;
 
         LLViewerTexture* base = mat->mBaseColorTexture.notNull() ? mat->mBaseColorTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+        gGL.getTexUnit(s)->bindFast(base);
+
+        min_alpha[s] = (mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK) ? mat->mAlphaCutoff : -1.f;
+
+        // getPacked() takes F32(&)[8]; copy each transform into its slot stride.
+        LLGLTFMaterial::TextureTransform::Pack packed;
+        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(packed);
+        memcpy(&bc_xform[8 * s], packed, sizeof(packed));
+
+        if (base_color_only)
+        { // shadow alpha-mask samples only base color
+            continue;
+        }
+
         LLViewerTexture* norm = (mat->mNormalTexture.notNull() && mat->mNormalTexture->getDiscardLevel() <= 4) ? mat->mNormalTexture.get() : LLViewerFetchedTexture::sFlatNormalImagep.get();
         LLViewerTexture* orm  = mat->mMetallicRoughnessTexture.notNull() ? mat->mMetallicRoughnessTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
         LLViewerTexture* em   = mat->mEmissiveTexture.notNull() ? mat->mEmissiveTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
 
-        gGL.getTexUnit(s)->bindFast(base);
         gGL.getTexUnit(N + s)->bindFast(norm);
         gGL.getTexUnit(2 * N + s)->bindFast(orm);
         gGL.getTexUnit(3 * N + s)->bindFast(em);
@@ -915,12 +930,7 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params)
         emissive[3 * s + 0] = mat->mEmissiveColor.mV[0];
         emissive[3 * s + 1] = mat->mEmissiveColor.mV[1];
         emissive[3 * s + 2] = mat->mEmissiveColor.mV[2];
-        min_alpha[s] = (mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK) ? mat->mAlphaCutoff : -1.f;
 
-        // getPacked() takes F32(&)[8]; copy each transform into its slot stride.
-        LLGLTFMaterial::TextureTransform::Pack packed;
-        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(packed);
-        memcpy(&bc_xform[8 * s], packed, sizeof(packed));
         mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL].getPacked(packed);
         memcpy(&nm_xform[8 * s], packed, sizeof(packed));
         mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS].getPacked(packed);
@@ -929,23 +939,28 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params)
         memcpy(&em_xform[8 * s], packed, sizeof(packed));
     }
 
-    static const LLStaticHashedString sRoughness("gltf_roughness_factor");
-    static const LLStaticHashedString sMetallic("gltf_metallic_factor");
-    static const LLStaticHashedString sEmissive("gltf_emissive_color");
     static const LLStaticHashedString sMinAlpha("gltf_minimum_alpha");
     static const LLStaticHashedString sBcXform("gltf_basecolor_transform");
-    static const LLStaticHashedString sNmXform("gltf_normal_transform");
-    static const LLStaticHashedString sMrXform("gltf_mr_transform");
-    static const LLStaticHashedString sEmXform("gltf_emissive_transform");
 
-    shader->uniform1fv(sRoughness, n, roughness);
-    shader->uniform1fv(sMetallic, n, metallic);
     shader->uniform1fv(sMinAlpha, n, min_alpha);
-    shader->uniform3fv(sEmissive, n, emissive);
     shader->uniform4fv(sBcXform, 2 * n, bc_xform);
-    shader->uniform4fv(sNmXform, 2 * n, nm_xform);
-    shader->uniform4fv(sMrXform, 2 * n, mr_xform);
-    shader->uniform4fv(sEmXform, 2 * n, em_xform);
+
+    if (!base_color_only)
+    {
+        static const LLStaticHashedString sRoughness("gltf_roughness_factor");
+        static const LLStaticHashedString sMetallic("gltf_metallic_factor");
+        static const LLStaticHashedString sEmissive("gltf_emissive_color");
+        static const LLStaticHashedString sNmXform("gltf_normal_transform");
+        static const LLStaticHashedString sMrXform("gltf_mr_transform");
+        static const LLStaticHashedString sEmXform("gltf_emissive_transform");
+
+        shader->uniform1fv(sRoughness, n, roughness);
+        shader->uniform1fv(sMetallic, n, metallic);
+        shader->uniform3fv(sEmissive, n, emissive);
+        shader->uniform4fv(sNmXform, 2 * n, nm_xform);
+        shader->uniform4fv(sMrXform, 2 * n, mr_xform);
+        shader->uniform4fv(sEmXform, 2 * n, em_xform);
+    }
 
     LLGLDisable cull_face(double_sided ? GL_CULL_FACE : 0);
 
@@ -1098,7 +1113,7 @@ void LLRenderPass::pushRiggedGLTFBatchesScalar(U32 type)
 
 // rigged counterpart of pushGLTFBatchesIndexed -- only multi-material infos.
 // Assumes the rigged indexed program is bound.
-void LLRenderPass::pushRiggedGLTFBatchesIndexed(U32 type)
+void LLRenderPass::pushRiggedGLTFBatchesIndexed(U32 type, bool base_color_only)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     const LLVOAvatar* lastAvatar = nullptr;
@@ -1117,16 +1132,16 @@ void LLRenderPass::pushRiggedGLTFBatchesIndexed(U32 type)
             continue;
         }
 
-        pushRiggedGLTFBatchIndexed(params, lastAvatar, lastMeshId, skipLastSkin);
+        pushRiggedGLTFBatchIndexed(params, lastAvatar, lastMeshId, skipLastSkin, base_color_only);
     }
 }
 
 // static
-void LLRenderPass::pushRiggedGLTFBatchIndexed(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin)
+void LLRenderPass::pushRiggedGLTFBatchIndexed(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin, bool base_color_only)
 {
     if (uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
     {
-        pushGLTFBatchIndexed(params);
+        pushGLTFBatchIndexed(params, base_color_only);
     }
 }
 

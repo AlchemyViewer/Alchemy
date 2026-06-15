@@ -10536,7 +10536,7 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                     gDeferredShadowGLTFAlphaMaskIndexedProgram.bind(true);
                     LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
                     LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                    mAlphaMaskPool->pushRiggedGLTFBatchesIndexed(type + 1);
+                    mAlphaMaskPool->pushRiggedGLTFBatchesIndexed(type + 1, true); // shadow samples base color only
                 }
                 else
                 {
@@ -10552,7 +10552,7 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                     gDeferredShadowGLTFAlphaMaskIndexedProgram.bind();
                     LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
                     LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
-                    mAlphaMaskPool->pushGLTFBatchesIndexed(type);
+                    mAlphaMaskPool->pushGLTFBatchesIndexed(type, true); // shadow samples base color only
                 }
                 else
                 {
