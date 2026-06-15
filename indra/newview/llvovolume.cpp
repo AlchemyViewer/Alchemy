@@ -6344,9 +6344,9 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
         geometryBytes += genDrawInfo(group, fullbright_mask | extra_mask, sFullbrightFaces[i], fullbright_count[i], false, batch_textures, rigged);
         geometryBytes += genDrawInfo(group, alpha_mask | extra_mask, sAlphaFaces[i], alpha_count[i], alpha_sort, batch_textures, rigged);
         geometryBytes += genDrawInfo(group, bump_mask | extra_mask, sBumpFaces[i], bump_count[i], false, false, rigged);
-        geometryBytes += genDrawInfo(group, norm_mask | extra_mask, sNormFaces[i], norm_count[i], false, false, rigged, false, !rigged && legacy_batch_enabled);
-        geometryBytes += genDrawInfo(group, spec_mask | extra_mask, sSpecFaces[i], spec_count[i], false, false, rigged, false, !rigged && legacy_batch_enabled);
-        geometryBytes += genDrawInfo(group, normspec_mask | extra_mask, sNormSpecFaces[i], normspec_count[i], false, false, rigged, false, !rigged && legacy_batch_enabled);
+        geometryBytes += genDrawInfo(group, norm_mask | extra_mask, sNormFaces[i], norm_count[i], false, false, rigged, false, legacy_batch_enabled);
+        geometryBytes += genDrawInfo(group, spec_mask | extra_mask, sSpecFaces[i], spec_count[i], false, false, rigged, false, legacy_batch_enabled);
+        geometryBytes += genDrawInfo(group, normspec_mask | extra_mask, sNormSpecFaces[i], normspec_count[i], false, false, rigged, false, legacy_batch_enabled);
         geometryBytes += genDrawInfo(group, pbr_mask | extra_mask, sPbrFaces[i], pbr_count[i], false, false, rigged, gltf_batch_enabled);
 
         // for rigged set, add weights and disable alpha sorting (rigged items use depth buffer)
@@ -6710,6 +6710,9 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 
                 LLMaterial* anchor_mat = facep->getTextureEntry()->getMaterialParams().get();
                 const U32 anchor_mask = anchor_mat->getShaderMask(LLMaterial::DIFFUSE_ALPHA_MODE_DEFAULT, false);
+                // rigged batches are one avatar+skin (matrix palette per skin)
+                const LLVOAvatar* anchor_avatar = facep->mAvatar;
+                const U64 anchor_skin = facep->getSkinHash();
 
                 diffuse_slots[0] = facep->getTexture();
                 mat_slots[0] = anchor_mat;
@@ -6728,6 +6731,11 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                     LLMaterial* m = facep->getTextureEntry()->getMaterialParams().get();
                     if (m->getShaderMask(LLMaterial::DIFFUSE_ALPHA_MODE_DEFAULT, false) != anchor_mask)
                     { // different program -- can't share a draw call
+                        break;
+                    }
+
+                    if (rigged && (facep->mAvatar != anchor_avatar || facep->getSkinHash() != anchor_skin))
+                    { // rigged batch is limited to one avatar+skin (matrix palette)
                         break;
                     }
 

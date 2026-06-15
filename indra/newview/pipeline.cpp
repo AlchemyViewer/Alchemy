@@ -10507,6 +10507,18 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                     renderMaskedObjects(LLRenderPass::PASS_MATERIAL_ALPHA_MASK, true, false, rigged);
                     renderMaskedObjects(LLRenderPass::PASS_SPECMAP_MASK, true, false, rigged);
                     renderMaskedObjects(LLRenderPass::PASS_NORMMAP_MASK, true, false, rigged);
+
+                    // multi-material indexed legacy mask batches alpha-test per-slot
+                    if (LLGLSLShader::sIndexedLegacyMaterials && gDeferredShadowMaterialIndexedProgram.isComplete())
+                    {
+                        gDeferredShadowMaterialIndexedProgram.bind(rigged);
+                        LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                        U32 off = rigged ? 1 : 0;
+                        mAlphaMaskPool->pushMaskBatchesIndexed(LLRenderPass::PASS_NORMSPEC_MASK + off, rigged);
+                        mAlphaMaskPool->pushMaskBatchesIndexed(LLRenderPass::PASS_MATERIAL_ALPHA_MASK + off, rigged);
+                        mAlphaMaskPool->pushMaskBatchesIndexed(LLRenderPass::PASS_SPECMAP_MASK + off, rigged);
+                        mAlphaMaskPool->pushMaskBatchesIndexed(LLRenderPass::PASS_NORMMAP_MASK + off, rigged);
+                    }
                 }
             }
         }

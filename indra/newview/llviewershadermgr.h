@@ -248,6 +248,7 @@ extern LLGLSLShader         gDeferredShadowCubeProgram;
 extern LLGLSLShader         gDeferredShadowAlphaMaskProgram;
 extern LLGLSLShader         gDeferredShadowGLTFAlphaMaskProgram;
 extern LLGLSLShader         gDeferredShadowGLTFAlphaMaskIndexedProgram; // multi-material indexed
+extern LLGLSLShader         gDeferredShadowMaterialIndexedProgram; // multi-material indexed legacy mask shadow
 extern LLGLSLShader         gDeferredShadowGLTFAlphaBlendProgram;
 extern LLGLSLShader         gDeferredShadowFullbrightAlphaMaskProgram;
 extern LLGLSLShader         gDeferredPostProgram;

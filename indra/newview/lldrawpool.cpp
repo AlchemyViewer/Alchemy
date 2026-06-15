@@ -522,6 +522,10 @@ void LLRenderPass::pushMaskBatches(U32 type, bool texture, bool batch_textures)
     {
         LLDrawInfo* pparams = *i;
         LLCullResult::increment_iterator(i, end);
+        if (pparams->mMaterialSlotList.size() > 1)
+        { // multi-material legacy batch -- drawn by pushMaskBatchesIndexed
+            continue;
+        }
         LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
         pushBatch(*pparams, texture, batch_textures);
     }
@@ -543,12 +547,69 @@ void LLRenderPass::pushRiggedMaskBatches(U32 type, bool texture, bool batch_text
 
         llassert(pparams);
 
+        if (pparams->mMaterialSlotList.size() > 1)
+        { // multi-material legacy batch -- drawn by pushMaskBatchesIndexed
+            continue;
+        }
+
         LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
 
         if (uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
         {
             pushBatch(*pparams, texture, batch_textures);
         }
+    }
+}
+
+void LLRenderPass::pushMaskBatchesIndexed(U32 type, bool rigged)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    const S32 N = LLGLSLShader::sIndexedGLTFChannels;
+    LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+
+    const LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    bool skipLastSkin = false;
+
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mMaterialSlotList.size() < 2)
+        {
+            continue;
+        }
+
+        if (rigged)
+        {
+            if (!uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+            {
+                continue;
+            }
+        }
+
+        const S32 n = (S32)params.mMaterialSlotList.size();
+        LL_PROFILE_ZONE_NUM(n);
+
+        F32 min_alpha[8] = { 0.f };
+        for (S32 s = 0; s < n; ++s)
+        {
+            const LLDrawInfo::MaterialSlot& slot = params.mMaterialSlotList[s];
+            LLViewerTexture* diffuse = slot.mDiffuse.notNull() ? slot.mDiffuse.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+            gGL.getTexUnit(s)->bindFast(diffuse);
+            min_alpha[s] = slot.mAlphaMaskCutoff;
+        }
+
+        static const LLStaticHashedString sMinAlpha("mat_minimum_alpha");
+        shader->uniform1fv(sMinAlpha, n, min_alpha);
+
+        applyModelMatrix(params);
+
+        params.mVertexBuffer->setBuffer();
+        params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
     }
 }
 

@@ -404,6 +404,10 @@ public:
 
     void pushMaskBatches(U32 type, bool texture = true, bool batch_textures = false);
     void pushRiggedMaskBatches(U32 type, bool texture = true, bool batch_textures = false);
+    // indexed (multi-material) legacy material shadow alpha-mask: binds per-slot
+    // diffuse + per-slot cutoff array, then draws. Assumes the indexed material
+    // shadow program is bound.
+    void pushMaskBatchesIndexed(U32 type, bool rigged);
     void pushBatch(LLDrawInfo& params, bool texture, bool batch_textures = false);
     void pushUntexturedBatch(LLDrawInfo& params);
     void pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_textures = false);

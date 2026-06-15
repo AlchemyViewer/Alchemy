@@ -407,14 +407,14 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
     }
 
     // Draw the multi-material (indexed) batches for this pass with the indexed
-    // program. Static only for now (rigged indexed material batches aren't formed
-    // yet); rigged passes simply have none.
-    if (!rigged && LLGLSLShader::sIndexedLegacyMaterials)
+    // program (its rigged variant for the rigged passes).
+    if (LLGLSLShader::sIndexedLegacyMaterials)
     {
         LLGLSLShader& indexed = gDeferredMaterialIndexedProgram[sMaterialShaderIdx[pass]];
-        if (indexed.isComplete())
+        LLGLSLShader* prog = rigged ? indexed.mRiggedVariant : &indexed;
+        if (prog && prog->isComplete())
         {
-            pushMaterialBatchIndexed(indexed, type, false);
+            pushMaterialBatchIndexed(*prog, type, rigged);
         }
     }
 }
