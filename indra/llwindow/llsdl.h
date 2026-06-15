@@ -30,5 +30,11 @@
 
 extern bool gSDLMainHandled;
 
+// Apply our SDL hints. Must run before the *first* SDL_InitSubSystem(SDL_INIT_VIDEO)
+// of the process: some hints (notably SDL_HINT_MAC_SCROLL_MOMENTUM and
+// SDL_HINT_MAC_PRESS_AND_HOLD) are consumed by SDL's Cocoa registerUserDefaults,
+// which runs once during the first video init and is never revisited. The splash
+// screen brings video up before init_sdl(), so it calls this first too. Idempotent.
+void set_sdl_hints();
 void init_sdl(const std::string& app_name);
 void quit_sdl();

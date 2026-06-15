@@ -72,37 +72,17 @@ void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const ch
 
 #endif
 
-void init_sdl(const std::string& app_name)
+void set_sdl_hints()
 {
-#ifndef LL_SDL_WINDOW
-    if (!gSDLMainHandled)
-    {
-        SDL_SetMainReady();
-    }
-
-    SDL_SetLogOutputFunction(&sdl_logger, nullptr);
-
-    const int c_sdl_version = SDL_VERSION;
-    LL_INFOS() << "Compiled against SDL "
-               << SDL_VERSIONNUM_MAJOR(c_sdl_version) << "."
-               << SDL_VERSIONNUM_MINOR(c_sdl_version) << "."
-               << SDL_VERSIONNUM_MICRO(c_sdl_version) << LL_ENDL;
-    const int r_sdl_version = SDL_GetVersion();
-    LL_INFOS() << "Running with SDL "
-               << SDL_VERSIONNUM_MAJOR(r_sdl_version) << "."
-               << SDL_VERSIONNUM_MINOR(r_sdl_version) << "."
-               << SDL_VERSIONNUM_MICRO(r_sdl_version) << LL_ENDL;
-#endif
-
-#if LL_WINDOWS && defined(LL_SDL_WINDOW)
-    Uint32 style = 0;
-#if defined(CS_BYTEALIGNCLIENT) && defined(CS_OWNDC)
-    style = (CS_BYTEALIGNCLIENT | CS_OWNDC);
-#endif
-    SDL_RegisterApp(app_name.c_str(), style, nullptr);
-#endif
-
 #if LL_SDL_WINDOW
+    // Run once. SDL_SetHint is itself idempotent, but the registerUserDefaults
+    // hints only take effect on the *first* video init, so re-setting them after
+    // that point would be pointless — bail early to make the intent explicit.
+    static bool sHintsSet = false;
+    if (sHintsSet)
+        return;
+    sHintsSet = true;
+
     std::initializer_list<std::tuple< char const*, char const * > > hintList =
             {
                     // Don't ask the compositor to bypass us in fullscreen —
@@ -163,6 +143,42 @@ void init_sdl(const std::string& app_name)
         SDL_SetHint(std::get<0>(hint), std::get<1>(hint));
     }
 #endif
+}
+
+void init_sdl(const std::string& app_name)
+{
+#ifndef LL_SDL_WINDOW
+    if (!gSDLMainHandled)
+    {
+        SDL_SetMainReady();
+    }
+
+    SDL_SetLogOutputFunction(&sdl_logger, nullptr);
+
+    const int c_sdl_version = SDL_VERSION;
+    LL_INFOS() << "Compiled against SDL "
+               << SDL_VERSIONNUM_MAJOR(c_sdl_version) << "."
+               << SDL_VERSIONNUM_MINOR(c_sdl_version) << "."
+               << SDL_VERSIONNUM_MICRO(c_sdl_version) << LL_ENDL;
+    const int r_sdl_version = SDL_GetVersion();
+    LL_INFOS() << "Running with SDL "
+               << SDL_VERSIONNUM_MAJOR(r_sdl_version) << "."
+               << SDL_VERSIONNUM_MINOR(r_sdl_version) << "."
+               << SDL_VERSIONNUM_MICRO(r_sdl_version) << LL_ENDL;
+#endif
+
+#if LL_WINDOWS && defined(LL_SDL_WINDOW)
+    Uint32 style = 0;
+#if defined(CS_BYTEALIGNCLIENT) && defined(CS_OWNDC)
+    style = (CS_BYTEALIGNCLIENT | CS_OWNDC);
+#endif
+    SDL_RegisterApp(app_name.c_str(), style, nullptr);
+#endif
+
+    // Hints must be in place before the first video init. The splash screen
+    // also calls this before its own SDL_InitSubSystem(SDL_INIT_VIDEO); the
+    // once-guard inside makes a second call here a no-op.
+    set_sdl_hints();
 
     // SDL_INIT_VIDEO is the only subsystem the viewer actually uses through
     // SDL3. Joystick / gamepad input goes through libndof (llviewerjoystick),

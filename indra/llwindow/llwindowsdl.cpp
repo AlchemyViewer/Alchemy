@@ -3548,6 +3548,14 @@ void LLSplashScreenSDL::showImpl()
     // subsystem may not be up yet. SDL_InitSubSystem is reference-counted, so
     // initialising it here is safe; hideImpl() releases exactly this reference,
     // leaving the count the main window's own init_sdl() established.
+    //
+    // This is the process's *first* video init, so the SDL hints must already
+    // be set: the Cocoa backend's registerUserDefaults reads them once here and
+    // never again (e.g. SDL_HINT_MAC_SCROLL_MOMENTUM → AppleMomentumScrollSupported).
+    // Setting them only in init_sdl() would be too late and silently disable
+    // macOS momentum scrolling. set_sdl_hints() is idempotent.
+    set_sdl_hints();
+
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
     {
         LL_WARNS() << "Splash: SDL_InitSubSystem(VIDEO) failed: " << SDL_GetError() << LL_ENDL;
@@ -3740,6 +3748,13 @@ void LLSplashScreenSDL::hideImpl()
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type)
 {
+    // A fatal-error dialog can fire before the splash or main window has brought
+    // video up. On macOS SDL_ShowMessageBox routes through Cocoa_RegisterApp →
+    // registerUserDefaults, which reads our hints exactly once. Make sure they're
+    // set first so an early dialog doesn't lock in the wrong defaults (e.g.
+    // momentum scrolling). Idempotent if hints are already applied.
+    set_sdl_hints();
+
     // Use the main viewer window as the message box's parent so it is modal
     // to the viewer and stacks correctly above fullscreen on compositors that
     // place dialogs relative to their parent window.
