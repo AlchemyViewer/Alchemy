@@ -564,7 +564,6 @@ void LLRenderPass::pushRiggedMaskBatches(U32 type, bool texture, bool batch_text
 void LLRenderPass::pushMaskBatchesIndexed(U32 type, bool rigged)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
-    const S32 N = LLGLSLShader::sIndexedGLTFChannels;
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
     const LLVOAvatar* lastAvatar = nullptr;

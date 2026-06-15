@@ -2435,12 +2435,13 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
     }
 
-    if (success && LLGLSLShader::sIndexedGLTFChannels >= 2)
+    if (success && LLGLSLShader::sIndexedLegacyMaterials)
     {
         // Indexed (multi-material) legacy material shadow alpha mask, so batched
-        // masked legacy faces alpha-test per-slot in the shadow map. Optional: a
-        // failure leaves the program incomplete and the shadow split falls back to
-        // scalar (slightly wrong cutouts, no crash). Kept out of `success`.
+        // masked legacy faces alpha-test per-slot in the shadow map. Required when
+        // legacy batching is on: a failure here would leave indexed mask batches
+        // casting no shadow (skipped by the scalar pass, no indexed sweep), so on
+        // failure we disable legacy batching entirely rather than degrade silently.
         gDeferredShadowMaterialIndexedProgram.mName = "Deferred Material Shadow Indexed Shader";
         gDeferredShadowMaterialIndexedProgram.mShaderFiles.clear();
         gDeferredShadowMaterialIndexedProgram.mShaderFiles.push_back(make_pair("deferred/materialShadowIndexedV.glsl", GL_VERTEX_SHADER));
@@ -2463,9 +2464,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
         else
         {
-            LL_WARNS("ShaderLoading") << "Indexed legacy material shadow shader failed to load." << LL_ENDL;
+            LL_WARNS("ShaderLoading") << "Indexed legacy material shadow shader failed to load; legacy batching disabled." << LL_ENDL;
             gDeferredShadowMaterialIndexedProgram.unload();
             gDeferredSkinnedShadowMaterialIndexedProgram.unload();
+            LLGLSLShader::sIndexedLegacyMaterials = false; // can't shadow indexed batches -- don't form them
         }
     }
 
