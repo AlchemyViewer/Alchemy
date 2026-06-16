@@ -3518,8 +3518,8 @@ void LLWindowSDL::showCursorFromMouseMove()
 //
 namespace
 {
-    constexpr int   SPLASH_W        = 480;
-    constexpr int   SPLASH_H        = 120;
+    constexpr int   SPLASH_W        = 440;
+    constexpr int   SPLASH_H        = 100;
     constexpr float SPLASH_FONT_PT  = 18.0f;
     // Inter (variable WOFF2) — FreeType decompresses WOFF2 via brotli, which the
     // viewer's freetype build (shared with SDL3_ttf) enables.
@@ -3544,6 +3544,7 @@ LLSplashScreenSDL::~LLSplashScreenSDL()
 
 void LLSplashScreenSDL::showImpl()
 {
+#if 0
     // The splash is shown before createWindow()/init_sdl(), so the video
     // subsystem may not be up yet. SDL_InitSubSystem is reference-counted, so
     // initialising it here is safe; hideImpl() releases exactly this reference,
@@ -3595,11 +3596,12 @@ void LLSplashScreenSDL::showImpl()
     // GL/D3D device on the splash window, which can collide with the main
     // window's OpenGL context initialisation that follows — keep the splash
     // entirely off the GPU.
-    SDL_Surface* winsurf = SDL_GetWindowSurface(mWindow);
-    if (winsurf)
-    {
-        mRenderer = SDL_CreateSoftwareRenderer(winsurf);
-    }
+    SDL_PropertiesID render_props = SDL_CreateProperties();
+    SDL_SetStringProperty(render_props, SDL_PROP_RENDERER_CREATE_NAME_STRING, "software");
+    SDL_SetPointerProperty(render_props, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, mWindow);
+    mRenderer = SDL_CreateRendererWithProperties(render_props);
+    SDL_DestroyProperties(props);
+
     if (!mRenderer)
     {
         LL_WARNS() << "Splash: software renderer creation failed: " << SDL_GetError() << LL_ENDL;
@@ -3643,16 +3645,20 @@ void LLSplashScreenSDL::showImpl()
     }
 
     render();
+#endif
 }
 
 void LLSplashScreenSDL::updateImpl(const std::string& mesg)
 {
+#if 0
     mMessage = mesg;
     render();
+#endif
 }
 
 void LLSplashScreenSDL::render()
 {
+#if 0
     if (!mRenderer)
     {
         return;
@@ -3708,10 +3714,12 @@ void LLSplashScreenSDL::render()
     // No SDL event loop is running yet (the splash precedes the main window and
     // SDL_AppIterate), so pump once here to let the window actually composite.
     SDL_PumpEvents();
+#endif
 }
 
 void LLSplashScreenSDL::hideImpl()
 {
+#if 0
     if (mIcon)
     {
         SDL_DestroyTexture(mIcon);
@@ -3744,6 +3752,7 @@ void LLSplashScreenSDL::hideImpl()
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
         mInitedVideo = false;
     }
+#endif
 }
 
 S32 OSMessageBoxSDL(const std::string& text, const std::string& caption, U32 type)

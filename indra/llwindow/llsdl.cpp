@@ -46,7 +46,6 @@ bool gSDLMainHandled = false;
 #include "llwin32headers.h" // CS_BYTEALIGNCLIENT / CS_OWNDC
 #endif
 
-#ifndef LL_SDL_WINDOW
 void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const char *message)
 {
     switch (priority)
@@ -69,8 +68,6 @@ void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const ch
             break;
     }
 }
-
-#endif
 
 void set_sdl_hints()
 {

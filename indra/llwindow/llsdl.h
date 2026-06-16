@@ -30,6 +30,7 @@
 
 extern bool gSDLMainHandled;
 
+void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const char *message);
 // Apply our SDL hints. Must run before the *first* SDL_InitSubSystem(SDL_INIT_VIDEO)
 // of the process: some hints (notably SDL_HINT_MAC_SCROLL_MOMENTUM and
 // SDL_HINT_MAC_PRESS_AND_HOLD) are consumed by SDL's Cocoa registerUserDefaults,

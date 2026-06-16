@@ -553,29 +553,6 @@ static void exceptionTerminateHandler()
     gOldTerminateHandler(); // call old terminate() handler
 }
 
-void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const char *message)
-{
-    switch (priority)
-    {
-        case SDL_LOG_PRIORITY_TRACE:
-        case SDL_LOG_PRIORITY_VERBOSE:
-        case SDL_LOG_PRIORITY_DEBUG:
-            LL_DEBUGS("SDL") << "log='" << message << "'" << LL_ENDL;
-            break;
-        case SDL_LOG_PRIORITY_INFO:
-            LL_INFOS("SDL") << "log='" << message << "'" << LL_ENDL;
-            break;
-        case SDL_LOG_PRIORITY_WARN:
-        case SDL_LOG_PRIORITY_ERROR:
-        case SDL_LOG_PRIORITY_CRITICAL:
-            LL_WARNS("SDL") << "log='" << message << "'" << LL_ENDL;
-            break;
-        case SDL_LOG_PRIORITY_INVALID:
-        default:
-            break;
-    }
-}
-
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
 #if LL_WINDOWS && LL_VELOPACK
