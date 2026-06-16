@@ -58,9 +58,15 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
     // Indexed (multi-material) batching applies to the static opaque and alpha-mask
     // passes. The indexed program writes the GBuffer the same way for both; the
     // per-slot gltf_minimum_alpha array drives the mask discard (-1 == opaque).
+    // Only skip multi-material infos in the scalar sweep once BOTH the indexed
+    // program and its rigged variant are complete -- otherwise scalar would skip
+    // them and the indexed sweep would bind an incomplete program.
     bool indexed = (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR ||
                     mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR_ALPHA_MASK) &&
-                   LLGLSLShader::sIndexedGLTFChannels >= 2;
+                   LLGLSLShader::sIndexedGLTFChannels >= 2 &&
+                   gDeferredPBROpaqueIndexedProgram.isComplete() &&
+                   gDeferredPBROpaqueIndexedProgram.mRiggedVariant &&
+                   gDeferredPBROpaqueIndexedProgram.mRiggedVariant->isComplete();
 
     gDeferredPBROpaqueProgram.bind();
     if (indexed)
@@ -109,9 +115,13 @@ void LLDrawPoolGLTFPBR::renderPostDeferred(S32 pass)
         gGL.setColorMask(false, true);
 
         // Multi-material (indexed) glow batches render with the indexed program; the
-        // scalar sweep skips them. If the indexed glow shader failed to load, fall
-        // back to scalar for everything (slot-0 glow, the pre-batching behavior).
-        bool glow_indexed = LLGLSLShader::sIndexedGLTFChannels >= 2 && gPBRGlowIndexedProgram.isComplete();
+        // scalar sweep skips them. Require both the static and rigged indexed glow
+        // programs to be complete; otherwise fall back to scalar for everything
+        // (slot-0 glow, the pre-batching behavior).
+        bool glow_indexed = LLGLSLShader::sIndexedGLTFChannels >= 2 &&
+                            gPBRGlowIndexedProgram.isComplete() &&
+                            gPBRGlowIndexedProgram.mRiggedVariant &&
+                            gPBRGlowIndexedProgram.mRiggedVariant->isComplete();
 
         gPBRGlowProgram.bind();
         if (glow_indexed)

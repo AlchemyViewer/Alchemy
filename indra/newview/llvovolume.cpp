@@ -6706,7 +6706,18 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, 8);
                 LLViewerTexture* diffuse_slots[8];
                 LLMaterial* mat_slots[8];
+                U8 shiny_slots[8];
                 U32 slot_count = 0;
+
+                // A slot's spec color / env intensity come from the TE shiny value when
+                // the material has no specular map, so faces sharing (material, diffuse)
+                // but differing in shiny must NOT share a slot (the later would overwrite
+                // the slot data the earlier vertices reference). Fold shiny into the key.
+                auto shiny_slot_key = [](LLFace* f) -> U8
+                {
+                    LLMaterial* fm = f->getTextureEntry()->getMaterialParams().get();
+                    return (fm && fm->getSpecularID().isNull()) ? f->getTextureEntry()->getShiny() : (U8)0;
+                };
 
                 LLMaterial* anchor_mat = facep->getTextureEntry()->getMaterialParams().get();
                 const U32 anchor_mask = anchor_mat->getShaderMask(LLMaterial::DIFFUSE_ALPHA_MODE_DEFAULT, false);
@@ -6716,6 +6727,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
 
                 diffuse_slots[0] = facep->getTexture();
                 mat_slots[0] = anchor_mat;
+                shiny_slots[0] = shiny_slot_key(facep);
                 slot_count = 1;
                 facep->setTextureIndex(0);
 
@@ -6740,10 +6752,11 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                     }
 
                     LLViewerTexture* d = facep->getTexture();
+                    U8 sh = shiny_slot_key(facep);
                     S32 slot = -1;
                     for (U32 s = 0; s < slot_count; ++s)
                     {
-                        if (mat_slots[s] == m && diffuse_slots[s] == d)
+                        if (mat_slots[s] == m && diffuse_slots[s] == d && shiny_slots[s] == sh)
                         {
                             slot = (S32)s;
                             break;
@@ -6758,6 +6771,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                         slot = (S32)slot_count;
                         diffuse_slots[slot_count] = d;
                         mat_slots[slot_count] = m;
+                        shiny_slots[slot_count] = sh;
                         slot_count++;
                     }
 
@@ -6869,6 +6883,13 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
             }
             else
             {
+                // The anchor face is scalar in this path too: clear any material/texture
+                // slot left on it by a previous indexed rebuild before registerFace runs,
+                // otherwise registerFace (which infers indexed mode from index <
+                // FACE_DO_NOT_BATCH_TEXTURES) would wrongly populate an indexed list.
+                facep->mDrawInfo = NULL;
+                facep->setTextureIndex(FACE_DO_NOT_BATCH_TEXTURES);
+
                 while (i != end_faces &&
                     (LLPipeline::sTextureBindTest ||
                         (distance_sort ||

@@ -1238,7 +1238,7 @@
         <key>RenderGLTFPBRBatching</key>
         <map>
             <key>Comment</key>
-            <string>Batch multiple GLTF PBR materials into a single indexed draw call (static opaque only). 0 = one draw call per material (legacy), 1 = indexed multi-material batching. Reduces draw calls in material-heavy scenes.</string>
+            <string>Batch multiple materials into a single indexed draw call across the supported GLTF PBR and legacy material passes (opaque, alpha-mask, rigged, shadow, glow). 0 = one draw call per material (legacy), 1 = indexed multi-material batching. Reduces draw calls in material-heavy scenes.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

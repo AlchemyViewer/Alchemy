@@ -132,7 +132,10 @@ static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigge
             }
         }
 
-        const S32 n = (S32)params.mMaterialSlotList.size();
+        // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a
+        // stale/over-long list can never overrun the 8-slot arrays / 2N+s units.
+        llassert((S32)params.mMaterialSlotList.size() <= N);
+        const S32 n = llmin((S32)params.mMaterialSlotList.size(), N);
         LL_PROFILE_ZONE_NUM(n);
 
         F32 spec_color[4 * 8] = { 0.f };

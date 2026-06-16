@@ -1401,6 +1401,11 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     gDeferredMaterialProgram[9+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
     gDeferredMaterialProgram[13+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
 
+    // Clear any stale value from a previous load before (re)deciding legacy indexed
+    // eligibility -- if the block below is skipped or fails partway, the flag must
+    // not carry a prior 'true' while the indexed programs are unloaded/incomplete.
+    LLGLSLShader::sIndexedLegacyMaterials = false;
+
     if (success && LLGLSLShader::sIndexedGLTFChannels >= 2)
     {
         // Indexed (multi-material) legacy material GBuffer-write programs, parallel to

@@ -57,10 +57,13 @@ void LLDrawPoolGlow::renderPostDeferred(S32 pass)
     gGL.setColorMask(false, true);
 
     // Multi-material (indexed) legacy glow batches carry a per-slot diffuse list and
-    // must be drawn with the indexed program; the scalar sweep skips them. If the
-    // indexed glow shader failed to load, fall back to scalar for everything (slot-0
-    // diffuse alpha, the pre-batching behavior).
-    bool glow_indexed = LLGLSLShader::sIndexedLegacyMaterials && gDeferredEmissiveIndexedProgram.isComplete();
+    // must be drawn with the indexed program; the scalar sweep skips them. Require
+    // both the static and rigged indexed glow programs to be complete; otherwise fall
+    // back to scalar for everything (slot-0 diffuse alpha, the pre-batching behavior).
+    bool glow_indexed = LLGLSLShader::sIndexedLegacyMaterials &&
+                        gDeferredEmissiveIndexedProgram.isComplete() &&
+                        gDeferredEmissiveIndexedProgram.mRiggedVariant &&
+                        gDeferredEmissiveIndexedProgram.mRiggedVariant->isComplete();
 
     //first pass -- static objects
     shader->bind();

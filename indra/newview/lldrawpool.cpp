@@ -590,7 +590,11 @@ void LLRenderPass::pushMaskBatchesIndexed(U32 type, bool rigged)
             }
         }
 
-        const S32 n = (S32)params.mMaterialSlotList.size();
+        // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a
+        // stale/over-long list can never overrun the 8-slot array or N sampler units.
+        const S32 N = LLGLSLShader::sIndexedGLTFChannels;
+        llassert((S32)params.mMaterialSlotList.size() <= N);
+        const S32 n = llmin((S32)params.mMaterialSlotList.size(), N);
         LL_PROFILE_ZONE_NUM(n);
 
         F32 min_alpha[8] = { 0.f };
@@ -670,7 +674,11 @@ void LLRenderPass::pushEmissiveBatchesIndexed(U32 type, bool rigged)
             }
         }
 
-        const S32 n = (S32)params.mMaterialSlotList.size();
+        // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a
+        // stale/over-long list can never bind past the N diffuse sampler units.
+        const S32 N = LLGLSLShader::sIndexedGLTFChannels;
+        llassert((S32)params.mMaterialSlotList.size() <= N);
+        const S32 n = llmin((S32)params.mMaterialSlotList.size(), N);
         LL_PROFILE_ZONE_NUM(n);
 
         for (S32 s = 0; s < n; ++s)
@@ -1013,7 +1021,10 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
     const bool want_full     = (maps == GLTF_MAPS_FULL); // normal + ORM
 
     const S32 N = LLGLSLShader::sIndexedGLTFChannels; // shader sampler-array stride
-    const S32 n = (S32)params.mGLTFMaterialList.size(); // materials in this batch
+    // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a stale
+    // or over-long list can never overrun the fixed 8-slot arrays / N sampler units.
+    llassert((S32)params.mGLTFMaterialList.size() <= N);
+    const S32 n = llmin((S32)params.mGLTFMaterialList.size(), N); // materials in this batch
     LL_PROFILE_ZONE_NUM(n);
 
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
