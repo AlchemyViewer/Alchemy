@@ -8,6 +8,8 @@ set(llrender_SOURCE_FILES
     llfontface.cpp
     llfontfreetype.cpp
     llfontgl.cpp
+    llfontgpuglyphcache.cpp
+    llfontgpushader.cpp
     llfontshaping.cpp
     llfontvertexbuffer.cpp
     llfontregistry.cpp
@@ -35,6 +37,9 @@ set(llrender_HEADER_FILES
     llfontvertexbuffer.h
     llfontface.h
     llfontfreetype.h
+    llfontgpuglyphcache.h
+    llfontgpushader.h
+    llhbgpu.h
     llfontbitmapcache.h
     llfontcolrv1.h
     llfontregistry.h
@@ -137,6 +142,25 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llfontbitmapcache "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfontshaping "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfontfreetype "" "${registry_test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfontgpu "" "${registry_test_libs}" "${test_project}")
+  if (TARGET INTEGRATION_TEST_llfontgpu)
+    # hb-gpu spike. libharfbuzz-gpu comes in transitively via ll::harfbuzz
+    # (see indra/cmake/Harfbuzz.cmake); just hand the test the font dir.
+    # Tests 1-3 (link/encode/shader-source) run with or without headless GL;
+    # test 4 (GLSL compile) only activates under BUILD_HEADLESS below.
+    target_compile_definitions(INTEGRATION_TEST_llfontgpu PRIVATE
+        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+  endif()
+  LL_ADD_INTEGRATION_TEST(llfontgpuglyphcache "" "${registry_test_libs}" "${test_project}")
+  if (TARGET INTEGRATION_TEST_llfontgpuglyphcache)
+    # Encode/cache/evict tests (1-3) need no GL; the GL-upload test (4) only
+    # activates under BUILD_HEADLESS below. hb-gpu arrives via ll::harfbuzz.
+    target_compile_definitions(INTEGRATION_TEST_llfontgpuglyphcache PRIVATE
+        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+  endif()
+  # Source-assembly test (1) needs no GL; the compile+link test (2) activates
+  # under BUILD_HEADLESS below. hb-gpu arrives via ll::harfbuzz.
+  LL_ADD_INTEGRATION_TEST(llfontgpushader "" "${registry_test_libs}" "${test_project}")
   if (TARGET INTEGRATION_TEST_llfontcolrv1)
     # Hand the source-tree font directory to the test as a string literal.
     # Tests that need a real font file (Noto-COLRv1.ttf, InterVariable.woff2)
@@ -191,6 +215,25 @@ if (BUILD_TESTING)
     if (TARGET INTEGRATION_TEST_llfontfreetype)
       # llfontfreetype's GL-gated rasterizer tests need the OSMesa fixture.
       target_compile_definitions(INTEGRATION_TEST_llfontfreetype PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    if (TARGET INTEGRATION_TEST_llfontgpu)
+      # llfontgpu's GLSL-compile test (test<4>) needs an OSMesa GL context;
+      # the binary already linked llrenderheadless via registry_test_libs.
+      target_compile_definitions(INTEGRATION_TEST_llfontgpu PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    if (TARGET INTEGRATION_TEST_llfontgpuglyphcache)
+      # llfontgpuglyphcache's GL-upload test (test<4>) needs an OSMesa context.
+      target_compile_definitions(INTEGRATION_TEST_llfontgpuglyphcache PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    if (TARGET INTEGRATION_TEST_llfontgpushader)
+      # llfontgpushader's compile+link test (test<2>) needs an OSMesa context.
+      target_compile_definitions(INTEGRATION_TEST_llfontgpushader PRIVATE
           ${headless_test_compile_defs})
     endif()
 
