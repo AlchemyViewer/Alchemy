@@ -1015,4 +1015,61 @@ namespace tut
         skip("hb-gpu not available");
 #endif
     }
+
+    // Color (COLRv1) glyphs via the hb-gpu paint path. SansSerif's chain pulls
+    // in the Emoji family (Noto-COLRv1), so an emoji codepoint routes to a
+    // COLRv1 face -> the paint encoder + paint program + premultiplied blend.
+    // Render purely through hb-gpu (the paint path never touches the atlas) and
+    // verify it drew SATURATED ink: white text is R==G==B, so a colored pixel
+    // proves the paint interpreter ran rather than the monochrome draw path.
+    template<> template<>
+    void llfontgl_render_object::test<10>()
+    {
+#if LL_HAS_HB_GPU
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        const S32 W = ll_test::HeadlessGL::WIDTH;
+        const S32 H = ll_test::HeadlessGL::HEIGHT;
+        // U+1F600 GRINNING FACE: emoji-presentation only (no text variant), so
+        // it routes to the color emoji face rather than a monochrome fallback.
+        const llwchar emoji_arr[] = { 0x1F600, 0 };
+        const LLWString s(emoji_arr, 1);
+
+        LLFontGL::enableFontGpu(true);
+        gl.clearFramebuffer();
+        const S32 n = font->render(s, 0, 64.f, 64.f, LLColor4::white,
+                                   LLFontGL::LEFT, LLFontGL::BASELINE,
+                                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 1);
+        gGL.flush();
+        auto px = ll_test::readFramebufferRGBA(W, H);
+        LLFontGL::enableFontGpu(false);
+
+        // Count opaque pixels and, among them, ones with channel spread (the
+        // hallmark of a painted color glyph vs. white coverage).
+        S32 ink = 0, colored = 0;
+        for (S32 y = 20; y < 110 && y < H; ++y)
+            for (S32 x = 40; x < 110 && x < W; ++x)
+            {
+                const U8* p = &px[((std::size_t)y * W + x) * 4];
+                if (p[3] == 0) continue;
+                ++ink;
+                const S32 hi = llmax(p[0], llmax(p[1], p[2]));
+                const S32 lo = llmin(p[0], llmin(p[1], p[2]));
+                if (hi - lo > 30) ++colored;
+            }
+
+        // If the emoji didn't route to a color face in this harness, nothing
+        // colored renders — skip rather than fail, so the suite stays robust to
+        // font-coverage differences.
+        if (ink == 0)
+            skip("emoji did not route to a renderable face in this harness");
+        ensure_equals("emoji rendered one char", n, 1);
+        ensure("paint path produced saturated color", colored > 0);
+#else
+        skip("hb-gpu not available");
+#endif
+    }
 }

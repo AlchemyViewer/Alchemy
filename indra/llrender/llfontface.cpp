@@ -95,8 +95,11 @@ LLFontGpuGlyphCache* LLFontFace::getGpuGlyphCache() const
         {
             mGpuGlyphCachep = new LLFontGpuGlyphCache();
             // The encode font is built from the face (size-independent); the
-            // hb_font's per-size scale doesn't matter here.
-            mGpuGlyphCachep->init(hb_font_get_face(hbf));
+            // hb_font's per-size scale doesn't matter here. COLRv1 faces encode
+            // color glyphs via the paint encoder (hb-gpu can't paint sbix/CBDT
+            // bitmap or SVG color faces — those keep the bitmap atlas path), so
+            // gate the color mode on hasColrV1() and feed the CPAL palette pick.
+            mGpuGlyphCachep->init(hb_font_get_face(hbf), mHasColrV1, mPaletteIndex);
         }
     }
     return mGpuGlyphCachep;

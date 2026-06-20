@@ -53,14 +53,21 @@ class LLFontGpuShader
 {
 public:
     // The assembled GLSL for each stage (#version + HarfBuzz source + app main).
+    // fragmentSource()       — draw renderer: coverage -> color.a * coverage.
+    // colorFragmentSource()  — paint renderer: COLR(v1) -> premultiplied RGBA.
+    // The vertex stage is identical for both, so vertexSource() serves both.
     static std::string vertexSource();
     static std::string fragmentSource();
+    static std::string colorFragmentSource();
 
     // Assemble, compile, link, and map uniforms into `program`. Returns true on
     // success (program.isComplete()). Requires a current GL context and an
     // initialized LLShaderMgr (for the reserved uniform name table). On failure
     // the program is left unloaded and the GL compile/link log is LL_WARNS'd.
+    // buildProgram      — monochrome draw program (outline coverage).
+    // buildColorProgram — COLR color program (hb-gpu paint, premultiplied out).
     static bool buildProgram(LLGLSLShader& program);
+    static bool buildColorProgram(LLGLSLShader& program);
 };
 
 #endif // LL_HAS_HB_GPU

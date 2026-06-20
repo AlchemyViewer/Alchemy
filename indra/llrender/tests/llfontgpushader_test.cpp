@@ -74,6 +74,30 @@ namespace tut
                fs.find("_hb_gpu_slug") < fs.find("float hb_gpu_draw"));
     }
 
+    // (3) Color (paint) fragment assembly (no GL): shared rasterizer + draw
+    // wrapper + paint interpreter spliced in the required order, then the app
+    // paint main outputting premultiplied RGBA.
+    template<> template<>
+    void llfontgpushader_object::test<3>()
+    {
+        const std::string fs = LLFontGpuShader::colorFragmentSource();
+
+        ensure("color fragment starts with #version", fs.rfind("#version", 0) == 0);
+        ensure("color fragment has _hb_gpu_slug (shared)", contains(fs, "_hb_gpu_slug"));
+        ensure("color fragment has hb_gpu_atlas (shared)", contains(fs, "hb_gpu_atlas"));
+        ensure("color fragment has hb_gpu_draw (draw)", contains(fs, "hb_gpu_draw"));
+        ensure("color fragment has hb_gpu_paint (paint)", contains(fs, "hb_gpu_paint"));
+        ensure("color fragment has main", contains(fs, "void main"));
+
+        // Required splice order: shared rasterizer, then draw wrapper, then the
+        // paint interpreter that builds on both (hb-gpu-paint-fragment.glsl).
+        const auto slug  = fs.find("_hb_gpu_slug");
+        const auto draw  = fs.find("float hb_gpu_draw");
+        const auto paint = fs.find("vec4 hb_gpu_paint");
+        ensure("shared precedes draw", slug < draw);
+        ensure("draw precedes paint", draw < paint);
+    }
+
 #if LL_MESA_HEADLESS
     inline ll_test::HeadlessGL& getSharedHeadlessGL()
     {
@@ -96,6 +120,32 @@ namespace tut
         const bool built = LLFontGpuShader::buildProgram(program);
         ensure("hb-gpu text program built", built);
         ensure("program is complete (linked)", program.isComplete());
+
+        ensure("modelview_projection_matrix resolves",
+               program.getUniformLocation(LLStaticHashedString("modelview_projection_matrix")) >= 0);
+        ensure("viewport resolves",
+               program.getUniformLocation(LLStaticHashedString("viewport")) >= 0);
+        ensure("jac resolves",
+               program.getUniformLocation(LLStaticHashedString("jac")) >= 0);
+        ensure("hb_gpu_atlas resolves",
+               program.getUniformLocation(LLStaticHashedString("hb_gpu_atlas")) >= 0);
+
+        program.unload();
+    }
+
+    // (4) Color (paint) program full compile + LINK in a GL 3.3 core context.
+    // The paint interpreter is much larger GLSL than the draw wrapper, so a
+    // clean link is the real proof the spliced source is valid. Same uniforms
+    // as the draw program (shared vertex stage + the atlas sampler).
+    template<> template<>
+    void llfontgpushader_object::test<4>()
+    {
+        getSharedHeadlessGL();
+
+        LLGLSLShader program;
+        const bool built = LLFontGpuShader::buildColorProgram(program);
+        ensure("hb-gpu color program built", built);
+        ensure("color program is complete (linked)", program.isComplete());
 
         ensure("modelview_projection_matrix resolves",
                program.getUniformLocation(LLStaticHashedString("modelview_projection_matrix")) >= 0);

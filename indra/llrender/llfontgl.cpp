@@ -82,7 +82,8 @@ LLFontRegistry* LLFontGL::sFontRegistry = NULL;
 #if LL_HAS_HB_GPU
 // Analytic (hb-gpu) render-path resources, lazily created on first eligible
 // render and torn down in destroyAllGL. Main-thread / GL-thread only.
-static LLGLSLShader    sFontGpuProgram;
+static LLGLSLShader    sFontGpuProgram;       // monochrome draw (outline coverage)
+static LLGLSLShader    sFontGpuColorProgram;  // COLR color (hb-gpu paint, premultiplied)
 static LLFontGpuBatch* sGpuBatchp = nullptr;
 #endif
 
@@ -599,15 +600,17 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
 #if LL_HAS_HB_GPU
     // Analytic (hb-gpu) fast path. Handles normal/bold/italic style and optional
-    // drop shadow for color text whose slice shaped into contiguous runs from
-    // non-color outline faces — which includes monospace, since fixed-width
-    // faces shape end-to-end too. Color/emoji faces, shaping failures (empty
-    // runs), and ellipsis overflow stay on the atlas loop below. Reuses all the
+    // drop shadow for text whose slice shaped into contiguous runs from outline
+    // faces — which includes monospace (fixed-width faces shape end-to-end too)
+    // and COLR(v1) color faces (rendered via the hb-gpu paint encoder). Bitmap
+    // (sbix/CBDT) and SVG color faces, shaping failures (empty runs), and
+    // ellipsis overflow stay on the atlas loop below. Reuses all the
     // origin/valign/halign/pen setup computed above; underline (drawn before
     // this point) works for both paths.
     if (sEnableFontGpu && use_color && !draw_ellipses)
     {
         bool gpu_eligible = true;
+        bool needs_color  = false;   // any COLR face in the slice -> build paint program
         size_t covered = 0;
         for (size_t r = 0; r < layout.ranges.size(); ++r)
         {
@@ -617,7 +620,19 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             for (const LLShapedGlyph& sg : gv)
             {
                 const LLFontFace* f = sg.face ? sg.face->getFontFace() : nullptr;
-                if (!f || f->hasColor() || f->unitsPerEm() == 0) { gpu_eligible = false; break; }
+                // upem==0 rules out bitmap-only strikes. A color face is GPU
+                // paintable only if it is COLR(v1); bitmap/SVG color faces fall
+                // back to the atlas. ForceMonochromeEmoji keeps emoji on the
+                // atlas grayscale path, so don't claim color faces then.
+                if (!f || f->unitsPerEm() == 0) { gpu_eligible = false; break; }
+                if (f->hasColor())
+                {
+                    if (!f->hasColrV1() || LLFontGL::sForceMonochromeEmoji)
+                    {
+                        gpu_eligible = false; break;
+                    }
+                    needs_color = true;
+                }
             }
             if (!gpu_eligible) break;
             covered = layout.ranges[r].second;
@@ -625,7 +640,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         if (covered != (size_t)length) gpu_eligible = false;
 
         if (gpu_eligible &&
-            (sFontGpuProgram.isComplete() || LLFontGpuShader::buildProgram(sFontGpuProgram)))
+            (sFontGpuProgram.isComplete() || LLFontGpuShader::buildProgram(sFontGpuProgram)) &&
+            (!needs_color || sFontGpuColorProgram.isComplete() ||
+             LLFontGpuShader::buildColorProgram(sFontGpuColorProgram)))
         {
             if (!sGpuBatchp) sGpuBatchp = new LLFontGpuBatch();
 
@@ -636,6 +653,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             {
                 const LLFontFace* face;
                 F32 scale;
+                bool color;     // COLR face -> paint program + premultiplied blend
                 std::vector<LLFontGpuBatch::Placement> shadow;
                 std::vector<LLFontGpuBatch::Placement> fg;
             };
@@ -643,7 +661,8 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             auto run_for = [&runs](const LLFontFace* f) -> GpuRun&
             {
                 for (GpuRun& r : runs) { if (r.face == f) return r; }
-                runs.push_back({ f, (F32)f->ppem() / (F32)f->unitsPerEm(), {}, {} });
+                runs.push_back({ f, (F32)f->ppem() / (F32)f->unitsPerEm(),
+                                 f->hasColor(), {}, {} });
                 return runs.back();
             };
 
@@ -691,7 +710,12 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                                 dst.push_back(p);
                             };
                             // Shadow pass — same offsets as drawGlyphShadow.
-                            if (emit_shadow)
+                            // Color (paint) glyphs render foreground only: a
+                            // silhouette shadow / faux-bold double strike would
+                            // need the monochrome coverage program, not the paint
+                            // program, and emoji drop shadows are an edge case —
+                            // so skip both for color runs.
+                            if (emit_shadow && !run.color)
                             {
                                 if (shadow == DROP_SHADOW_SOFT)
                                 {
@@ -708,7 +732,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                             }
                             // Foreground (+ faux-bold double strike, offset +1px).
                             place(run.fg, 0.f, 0.f, fg_color);
-                            if (emit_bold)
+                            if (emit_bold && !run.color)
                                 place(run.fg, (F32)BOLD_OFFSET, 0.f, fg_color);
                         }
                     }
@@ -731,6 +755,9 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             // Faux-italic shear in screen px (0 when not italic), same value the
             // atlas path feeds renderTriangle.
             const F32 gpu_slant = slant_offset;
+            // Shadows are monochrome only (color runs emit none), so the draw
+            // program serves every shadow pass. Foregrounds pick the program by
+            // run kind: COLR runs use the paint program + premultiplied blend.
             for (GpuRun& run : runs)
             {
                 if (run.shadow.empty()) continue;
@@ -741,7 +768,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             {
                 if (run.fg.empty()) continue;
                 if (LLFontGpuGlyphCache* cache = run.face->getGpuGlyphCache())
-                    sGpuBatchp->render(sFontGpuProgram, *cache, run.fg, run.scale, vp[2], vp[3], gpu_slant);
+                {
+                    LLGLSLShader& prog = run.color ? sFontGpuColorProgram : sFontGpuProgram;
+                    sGpuBatchp->render(prog, *cache, run.fg, run.scale, vp[2], vp[3],
+                                       gpu_slant, /*premultiplied=*/run.color);
+                }
             }
             if (prev_shader) prev_shader->bind(); else LLGLSLShader::unbind();
 
@@ -2118,6 +2149,7 @@ void LLFontGL::destroyAllGL()
     }
 #if LL_HAS_HB_GPU
     sFontGpuProgram.unload();
+    sFontGpuColorProgram.unload();
     delete sGpuBatchp;
     sGpuBatchp = nullptr;
 #endif

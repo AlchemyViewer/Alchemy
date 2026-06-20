@@ -94,9 +94,16 @@ public:
     // Jacobian, and the cache's glyph buffer as hb_gpu_atlas, then draws via
     // LLVertexBuffer (which syncs the MVP). Returns false if nothing is drawable
     // or GL texture-buffer support is missing. Requires a current GL context.
+    //
+    // `premultiplied` selects the blend func for the draw: the COLR paint
+    // program outputs premultiplied RGBA, so color runs pass true (ONE,
+    // ONE_MINUS_SRC_ALPHA); the monochrome draw program outputs straight-alpha
+    // coverage, so text runs pass false and keep the ambient UI blend
+    // (SRC_ALPHA, ONE_MINUS_SRC_ALPHA). The prior blend is restored after.
     bool render(LLGLSLShader& program, LLFontGpuGlyphCache& cache,
                 const std::vector<Placement>& placements, F32 scale,
-                S32 viewport_w, S32 viewport_h, F32 slant = 0.f);
+                S32 viewport_w, S32 viewport_h, F32 slant = 0.f,
+                bool premultiplied = false);
 
     void destroyGL();
 

@@ -73,7 +73,19 @@ public:
     // Bind the cache to a face. Builds an internal encode font scaled to the
     // face's upem so encoded coordinates land in font design units (the blob
     // format's preferred range — see hb-gpu.h). Re-callable; clears contents.
-    void init(hb_face_t* face);
+    //
+    // When `color` is true the cache encodes COLR(v1) color glyphs via the
+    // hb-gpu paint encoder (blobs the paint-renderer fragment shader rasterizes
+    // into premultiplied RGBA), using CPAL palette `palette`. Otherwise it
+    // encodes monochrome outlines via the draw encoder. The two blob formats
+    // are mutually exclusive per face — a face is either a color face or it
+    // isn't — so one cache only ever holds one kind.
+    void init(hb_face_t* face, bool color = false, unsigned palette = 0);
+
+    // True when this cache holds paint (color) blobs — the renderer binds the
+    // paint program + premultiplied blending for these, vs. the draw program +
+    // straight-alpha coverage for monochrome caches.
+    bool isColor() const { return mColor; }
 
     // Encode (on cache miss) and return the glyph's location. Returns a
     // non-drawable GlyphLoc when the glyph has no outline or the cache is
@@ -105,13 +117,20 @@ private:
     void     ensureEncoder();
     bool     ensureGLBuffer();
     GlyphLoc encodeGlyph(U32 glyph_id);
+    GlyphLoc encodeDrawGlyph(U32 glyph_id);
+    GlyphLoc encodePaintGlyph(U32 glyph_id);
 
     // 256K texels = 2 MB. Generous for a single face's working set; eviction is
     // a full reset (see getGlyph), so this is a soft ceiling, not a hard quota.
     static constexpr U32 kDefaultMaxTexels = 1u << 18;
 
-    hb_gpu_draw_t* mEncoder    = nullptr;
-    hb_font_t*     mEncodeFont = nullptr;
+    // Exactly one encoder is live, selected by mColor at init(): the draw
+    // encoder for monochrome outlines, the paint encoder for COLR color glyphs.
+    hb_gpu_draw_t*  mEncoder      = nullptr;
+    hb_gpu_paint_t* mPaintEncoder = nullptr;
+    hb_font_t*      mEncodeFont   = nullptr;
+    bool            mColor        = false;
+    unsigned        mPalette      = 0;
 
     // CPU source of truth, uploaded incrementally to the GL buffer.
     std::vector<U8> mArena;

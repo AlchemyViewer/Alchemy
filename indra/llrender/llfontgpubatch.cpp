@@ -91,7 +91,8 @@ U32 LLFontGpuBatch::buildVertices(LLFontGpuGlyphCache& cache,
 
 bool LLFontGpuBatch::render(LLGLSLShader& program, LLFontGpuGlyphCache& cache,
                             const std::vector<Placement>& placements, F32 scale,
-                            S32 viewport_w, S32 viewport_h, F32 slant)
+                            S32 viewport_w, S32 viewport_h, F32 slant,
+                            bool premultiplied)
 {
     // NOTE: a batch must fit within the cache's texel budget; if buildVertices
     // triggered an eviction mid-run the earlier glyphLocs would be stale. Runs
@@ -157,8 +158,20 @@ bool LLFontGpuBatch::render(LLGLSLShader& program, LLFontGpuGlyphCache& cache,
     }
     program.uniform1i(sAtlas, 0);
 
+    // Color (paint) glyphs come out premultiplied; switch to premultiplied
+    // blending for the draw and restore the UI's straight-alpha blend after.
+    if (premultiplied)
+    {
+        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
+    }
+
     mVB->setBuffer();
     mVB->drawArrays(LLRender::TRIANGLES, 0, nverts);
+
+    if (premultiplied)
+    {
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    }
     return true;
 }
 

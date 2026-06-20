@@ -40,6 +40,8 @@ namespace
     // Plain outline TrueType face in the source tree; .ttf so HarfBuzz opens it
     // directly without a brotli/woff2-enabled build.
     constexpr const char* kOutlineFont = "IBMPlexMono-Regular.ttf";
+    // COLRv1 vector color font — exercises the hb-gpu paint encode path.
+    constexpr const char* kColorFont   = "Noto-COLRv1.ttf";
 
     bool fileExists(const std::string& path)
     {
@@ -57,9 +59,9 @@ namespace
         hb_blob_t* blob = nullptr;
         hb_face_t* face = nullptr;
 
-        TestFace()
+        explicit TestFace(const char* font = kOutlineFont)
         {
-            const std::string path = std::string(kFontDir) + kOutlineFont;
+            const std::string path = std::string(kFontDir) + font;
             if (!fileExists(path))
             {
                 return;
@@ -225,6 +227,41 @@ namespace tut
             ensure("face cache encodes 'A'", cache->getGlyph((U32)gid).drawable());
         }
         LLFontManager::cleanupClass();
+    }
+
+    // (6) Color mode: a cache init'd with color=true encodes a COLRv1 glyph
+    // through the hb-gpu paint encoder into the same RGBA16I arena. The paint
+    // blob differs from a draw blob but the cache contract (drawable, texels,
+    // offset 0, extents) is identical. No GL.
+    template<> template<>
+    void llfontgpuglyphcache_object::test<6>()
+    {
+        TestFace tf(kColorFont);
+        if (!tf.valid())
+        {
+            skip("COLRv1 test font not present in test data dir");
+        }
+
+        // U+2764 HEAVY BLACK HEART — a COLR-painted glyph in Noto-COLRv1.
+        const U32 gid = gidFor(tf.face, (hb_codepoint_t)0x2764);
+        ensure("cmap maps U+2764", gid != 0);
+
+        LLFontGpuGlyphCache cache;
+        cache.init(tf.face, /*color=*/true, /*palette=*/0);
+        ensure("cache reports color mode", cache.isColor());
+
+        const LLFontGpuGlyphCache::GlyphLoc loc = cache.getGlyph(gid);
+        ensure("color glyph is drawable", loc.drawable());
+        ensure("color glyph has texels", loc.mTexelCount > 0);
+        ensure("first glyph lands at offset 0", loc.mTexelOffset == 0);
+        ensure("color glyph has non-zero extents", loc.mWidth != 0 && loc.mHeight != 0);
+        ensure_equals("one glyph cached", cache.getGlyphCount(), 1U);
+
+        // Second lookup is a cache hit (no re-encode, no growth).
+        const U32 texels = cache.getArenaTexels();
+        const LLFontGpuGlyphCache::GlyphLoc loc2 = cache.getGlyph(gid);
+        ensure_equals("cache hit: same offset", loc2.mTexelOffset, loc.mTexelOffset);
+        ensure_equals("cache hit: no growth", cache.getArenaTexels(), texels);
     }
 
 #if LL_MESA_HEADLESS

@@ -103,6 +103,31 @@ void main()
 }
 )GLSL";
 
+    // App fragment main for COLR color glyphs. hb_gpu_paint walks the paint-op
+    // stream and returns PREMULTIPLIED RGBA already folded with per-layer
+    // coverage. vary_color is the UI text color: its rgb is the COLRv1
+    // "foreground" (used only by foreground-referencing layers; full-color
+    // emoji ignore it) and its alpha is overall opacity, mirroring the atlas
+    // path's emoji_color = (255,255,255, text_alpha). We pass foreground at full
+    // alpha and scale the premultiplied result by vary_color.a so opacity is
+    // applied exactly once. The render path binds premultiplied blending
+    // (ONE, ONE_MINUS_SRC_ALPHA) for this program.
+    const char* APP_COLOR_FRAGMENT_MAIN = R"GLSL(
+in vec2 vary_renderCoord;
+flat in uint vary_glyphLoc;
+in vec4 vary_color;
+
+out vec4 frag_color;
+
+void main()
+{
+    float coverage;
+    vec4 premul = hb_gpu_paint(vary_renderCoord, vary_glyphLoc,
+                               vec4(vary_color.rgb, 1.0), coverage);
+    frag_color = premul * vary_color.a;
+}
+)GLSL";
+
     GLuint compileStage(GLenum type, const std::string& src)
     {
         GLuint sh = glCreateShader(type);
@@ -158,48 +183,91 @@ std::string LLFontGpuShader::fragmentSource()
     return src;
 }
 
-bool LLFontGpuShader::buildProgram(LLGLSLShader& program)
+std::string LLFontGpuShader::colorFragmentSource()
 {
-    program.unload();
-
-    GLuint vs = compileStage(GL_VERTEX_SHADER, vertexSource());
-    GLuint fs = compileStage(GL_FRAGMENT_SHADER, fragmentSource());
-    if (!vs || !fs)
+    std::string src = "#version 330\n";
+    // Paint renderer needs, in order: the shared rasterizer (_hb_gpu_slug +
+    // hb_gpu_atlas), the draw wrapper (hb_gpu_draw, used for clip coverage),
+    // then the paint interpreter (hb_gpu_paint) — see hb-gpu-paint-fragment.glsl.
+    if (const char* shared = hb_gpu_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
     {
-        if (vs) glDeleteShader(vs);
-        if (fs) glDeleteShader(fs);
-        return false;
+        src += shared;
     }
-
-    program.mProgramObject = glCreateProgram();
-    program.mName = "font gpu (hb-gpu)";
-    program.attachObject(vs);
-    program.attachObject(fs);
-
-    // mapAttributes() binds the reserved attribute names (position, texcoord0,
-    // diffuse_color, glyph_loc) to their LLVertexBuffer slots and links, so the
-    // standard setBuffer() path feeds this program.
-    if (!program.mapAttributes())
+    src += '\n';
+    if (const char* draw = hb_gpu_draw_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
     {
+        src += draw;
+    }
+    src += '\n';
+    if (const char* paint = hb_gpu_paint_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
+    {
+        src += paint;
+    }
+    src += '\n';
+    src += APP_COLOR_FRAGMENT_MAIN;
+    return src;
+}
+
+namespace
+{
+    // Compile the (shared) vertex stage + the given fragment stage, link with
+    // the reserved attribute bindings, and map uniforms. Shared by the draw and
+    // paint programs, which differ only in fragment source. Returns
+    // program.isComplete(); leaves the program unloaded on any failure.
+    bool buildFromFragment(LLGLSLShader& program, const std::string& fs_src, const char* name)
+    {
+        program.unload();
+
+        GLuint vs = compileStage(GL_VERTEX_SHADER, LLFontGpuShader::vertexSource());
+        GLuint fs = compileStage(GL_FRAGMENT_SHADER, fs_src);
+        if (!vs || !fs)
+        {
+            if (vs) glDeleteShader(vs);
+            if (fs) glDeleteShader(fs);
+            return false;
+        }
+
+        program.mProgramObject = glCreateProgram();
+        program.mName = name;
+        program.attachObject(vs);
+        program.attachObject(fs);
+
+        // mapAttributes() binds the reserved attribute names (position,
+        // texcoord0, diffuse_color, glyph_loc) to their LLVertexBuffer slots and
+        // links, so the standard setBuffer() path feeds this program.
+        if (!program.mapAttributes())
+        {
+            glDeleteShader(vs);
+            glDeleteShader(fs);
+            program.unload();
+            program.mProgramObject = 0;
+            return false;
+        }
+
+        // The linked program retains the stage objects; the standalone handles
+        // can go.
         glDeleteShader(vs);
         glDeleteShader(fs);
-        program.unload();
-        program.mProgramObject = 0;
-        return false;
+
+        if (!program.mapUniforms())
+        {
+            program.unload();
+            program.mProgramObject = 0;
+            return false;
+        }
+
+        return program.isComplete();
     }
+}
 
-    // The linked program retains the stage objects; the standalone handles can go.
-    glDeleteShader(vs);
-    glDeleteShader(fs);
+bool LLFontGpuShader::buildProgram(LLGLSLShader& program)
+{
+    return buildFromFragment(program, fragmentSource(), "font gpu (hb-gpu)");
+}
 
-    if (!program.mapUniforms())
-    {
-        program.unload();
-        program.mProgramObject = 0;
-        return false;
-    }
-
-    return program.isComplete();
+bool LLFontGpuShader::buildColorProgram(LLGLSLShader& program)
+{
+    return buildFromFragment(program, colorFragmentSource(), "font gpu color (hb-gpu paint)");
 }
 
 #endif // LL_HAS_HB_GPU

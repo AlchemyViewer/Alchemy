@@ -49,6 +49,11 @@ LLFontGpuGlyphCache::~LLFontGpuGlyphCache()
         hb_gpu_draw_destroy(mEncoder);
         mEncoder = nullptr;
     }
+    if (mPaintEncoder)
+    {
+        hb_gpu_paint_destroy(mPaintEncoder);
+        mPaintEncoder = nullptr;
+    }
     if (mEncodeFont)
     {
         hb_font_destroy(mEncodeFont);
@@ -56,9 +61,12 @@ LLFontGpuGlyphCache::~LLFontGpuGlyphCache()
     }
 }
 
-void LLFontGpuGlyphCache::init(hb_face_t* face)
+void LLFontGpuGlyphCache::init(hb_face_t* face, bool color, unsigned palette)
 {
     reset();
+
+    mColor   = color;
+    mPalette = palette;
 
     if (mEncodeFont)
     {
@@ -79,7 +87,18 @@ void LLFontGpuGlyphCache::init(hb_face_t* face)
 
 void LLFontGpuGlyphCache::ensureEncoder()
 {
-    if (!mEncoder)
+    if (mColor)
+    {
+        if (!mPaintEncoder)
+        {
+            mPaintEncoder = hb_gpu_paint_create_or_fail();
+            if (mPaintEncoder)
+            {
+                hb_gpu_paint_set_palette(mPaintEncoder, mPalette);
+            }
+        }
+    }
+    else if (!mEncoder)
     {
         mEncoder = hb_gpu_draw_create_or_fail();
     }
@@ -94,6 +113,38 @@ LLFontGpuGlyphCache::GlyphLoc LLFontGpuGlyphCache::encodeGlyph(U32 glyph_id)
     }
 
     ensureEncoder();
+    return mColor ? encodePaintGlyph(glyph_id) : encodeDrawGlyph(glyph_id);
+}
+
+// Append a blob's texels to the arena and fill in `loc` from the blob + the
+// glyph's design-unit extents. Shared by the draw and paint encoders, which
+// differ only in which hb-gpu encoder produced the blob.
+namespace
+{
+    void store_blob(std::vector<U8>& arena, hb_blob_t* blob,
+                    const hb_glyph_extents_t& ext,
+                    LLFontGpuGlyphCache::GlyphLoc& loc)
+    {
+        unsigned len = blob ? hb_blob_get_length(blob) : 0;
+        if (blob && len >= LLFontGpuGlyphCache::kBytesPerTexel)
+        {
+            const char* data = hb_blob_get_data(blob, nullptr);
+            U32 byte_off = static_cast<U32>(arena.size());
+            arena.insert(arena.end(), data, data + len);
+
+            loc.mTexelOffset = byte_off / LLFontGpuGlyphCache::kBytesPerTexel;
+            loc.mTexelCount  = len / LLFontGpuGlyphCache::kBytesPerTexel;
+            loc.mXBearing    = ext.x_bearing;
+            loc.mYBearing    = ext.y_bearing;
+            loc.mWidth       = ext.width;
+            loc.mHeight      = ext.height;
+        }
+    }
+}
+
+LLFontGpuGlyphCache::GlyphLoc LLFontGpuGlyphCache::encodeDrawGlyph(U32 glyph_id)
+{
+    GlyphLoc loc;
     if (!mEncoder)
     {
         return loc;
@@ -103,26 +154,33 @@ LLFontGpuGlyphCache::GlyphLoc LLFontGpuGlyphCache::encodeGlyph(U32 glyph_id)
 
     hb_glyph_extents_t ext = { 0, 0, 0, 0 };
     hb_blob_t* blob = hb_gpu_draw_encode(mEncoder, &ext);
-
-    unsigned len = blob ? hb_blob_get_length(blob) : 0;
-    if (blob && len >= kBytesPerTexel)
-    {
-        const char* data = hb_blob_get_data(blob, nullptr);
-        U32 byte_off = static_cast<U32>(mArena.size());
-        mArena.insert(mArena.end(), data, data + len);
-
-        loc.mTexelOffset = byte_off / kBytesPerTexel;
-        loc.mTexelCount  = len / kBytesPerTexel;
-        loc.mXBearing    = ext.x_bearing;
-        loc.mYBearing    = ext.y_bearing;
-        loc.mWidth       = ext.width;
-        loc.mHeight      = ext.height;
-    }
+    store_blob(mArena, blob, ext, loc);
 
     if (blob)
     {
         // Hand the buffer back so the next encode can reuse the allocation.
         hb_gpu_draw_recycle_blob(mEncoder, blob);
+    }
+    return loc;
+}
+
+LLFontGpuGlyphCache::GlyphLoc LLFontGpuGlyphCache::encodePaintGlyph(U32 glyph_id)
+{
+    GlyphLoc loc;
+    if (!mPaintEncoder)
+    {
+        return loc;
+    }
+
+    hb_gpu_paint_glyph(mPaintEncoder, mEncodeFont, static_cast<hb_codepoint_t>(glyph_id));
+
+    hb_glyph_extents_t ext = { 0, 0, 0, 0 };
+    hb_blob_t* blob = hb_gpu_paint_encode(mPaintEncoder, &ext);
+    store_blob(mArena, blob, ext, loc);
+
+    if (blob)
+    {
+        hb_gpu_paint_recycle_blob(mPaintEncoder, blob);
     }
     return loc;
 }
