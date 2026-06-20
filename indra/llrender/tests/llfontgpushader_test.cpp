@@ -66,6 +66,7 @@ namespace tut
         ensure("fragment has _hb_gpu_slug (shared)", contains(fs, "_hb_gpu_slug"));
         ensure("fragment has hb_gpu_atlas (shared)", contains(fs, "hb_gpu_atlas"));
         ensure("fragment has hb_gpu_draw (draw)", contains(fs, "hb_gpu_draw"));
+        ensure("fragment applies stem darkening", contains(fs, "hb_gpu_stem_darken"));
         ensure("fragment has main", contains(fs, "void main"));
 
         // Shared-fragment must precede the draw wrapper that calls into it.

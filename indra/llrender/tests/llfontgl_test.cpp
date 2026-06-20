@@ -21,6 +21,7 @@
 #include "../llfontgl.h"
 #include "../llfontfreetype.h"
 #include "../llfontbitmapcache.h"
+#include "../llhbgpu.h"   // LL_HAS_HB_GPU (for the hb-gpu render-path test)
 #include "../llimagegl.h"
 
 #include "llheadlessgl_fixture.h"
@@ -853,5 +854,165 @@ namespace tut
             ensure("batch texture is one of the string's atlas pages",
                    entry.mTexName == latin_tex || entry.mTexName == emoji_tex);
         }
+    }
+
+    // Analytic (hb-gpu) render path: with sEnableFontGpu on, render() routes an
+    // eligible run (SansSerif, normal style, no shadow) through the hb-gpu
+    // branch instead of the atlas. Verify it draws glyph ink in the same region
+    // as the atlas path and reports the same character count. Pins the whole
+    // wiring: shape -> per-face GPU cache -> LLFontGpuBatch -> drawArrays ->
+    // analytic raster -> glReadPixels.
+    template<> template<>
+    void llfontgl_render_object::test<7>()
+    {
+#if LL_HAS_HB_GPU
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        const S32 W = ll_test::HeadlessGL::WIDTH;
+        const S32 H = ll_test::HeadlessGL::HEIGHT;
+        const LLWString s = utf8str_to_wstring("A");
+
+        // Count pixels with meaningful luminance (white text on the black
+        // clear) inside a rough bbox around the glyph.
+        auto count_ink = [](const std::vector<U8>& px, S32 w, S32 h) -> S32
+        {
+            S32 c = 0;
+            for (S32 y = 32; y < 100 && y < h; ++y)
+                for (S32 x = 40; x < 100 && x < w; ++x)
+                {
+                    const U8* p = &px[((std::size_t)y * w + x) * 4];
+                    if (((S32)p[0] + p[1] + p[2]) / 3 > 40) ++c;
+                }
+            return c;
+        };
+
+        // Atlas baseline.
+        LLFontGL::enableFontGpu(false);
+        gl.clearFramebuffer();
+        const S32 n_atlas = font->render(s, 0, 64.f, 64.f, LLColor4::white,
+                                         LLFontGL::LEFT, LLFontGL::BASELINE,
+                                         LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 1);
+        gGL.flush();
+        const S32 ink_atlas = count_ink(ll_test::readFramebufferRGBA(W, H), W, H);
+
+        // hb-gpu path.
+        LLFontGL::enableFontGpu(true);
+        gl.clearFramebuffer();
+        const S32 n_gpu = font->render(s, 0, 64.f, 64.f, LLColor4::white,
+                                       LLFontGL::LEFT, LLFontGL::BASELINE,
+                                       LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 1);
+        gGL.flush();
+        const S32 ink_gpu = count_ink(ll_test::readFramebufferRGBA(W, H), W, H);
+        LLFontGL::enableFontGpu(false);
+
+        ensure("atlas path drew ink", ink_atlas > 0);
+        ensure("hb-gpu path drew ink", ink_gpu > 0);
+        ensure_equals("same character count", n_gpu, n_atlas);
+#else
+        skip("hb-gpu not available");
+#endif
+    }
+
+    // hb-gpu bold + drop-shadow passes. Bold double-strikes (offset +1px) so it
+    // must produce at least as much ink as the normal render; shadow is a smoke
+    // test (the black shadow over the black clear isn't visible in luminance,
+    // but the path must render the glyph and report the right char count).
+    template<> template<>
+    void llfontgl_render_object::test<8>()
+    {
+#if LL_HAS_HB_GPU
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        const S32 W = ll_test::HeadlessGL::WIDTH;
+        const S32 H = ll_test::HeadlessGL::HEIGHT;
+        const LLWString s = utf8str_to_wstring("E");
+
+        auto ink = [&](U8 style, LLFontGL::ShadowType shadow) -> std::pair<S32,S32>
+        {
+            gl.clearFramebuffer();
+            const S32 n = font->render(s, 0, 64.f, 64.f, LLColor4::white,
+                                       LLFontGL::LEFT, LLFontGL::BASELINE,
+                                       style, shadow, 1);
+            gGL.flush();
+            auto px = ll_test::readFramebufferRGBA(W, H);
+            S32 c = 0;
+            for (S32 y = 32; y < 100 && y < H; ++y)
+                for (S32 x = 40; x < 110 && x < W; ++x)
+                {
+                    const U8* p = &px[((std::size_t)y * W + x) * 4];
+                    if (((S32)p[0] + p[1] + p[2]) / 3 > 40) ++c;
+                }
+            return { n, c };
+        };
+
+        LLFontGL::enableFontGpu(true);
+        const auto normal = ink(LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+        const auto bold   = ink(LLFontGL::BOLD,   LLFontGL::NO_SHADOW);
+        const auto italic = ink(LLFontGL::ITALIC, LLFontGL::NO_SHADOW);
+        const auto shadow = ink(LLFontGL::NORMAL, LLFontGL::DROP_SHADOW);
+        LLFontGL::enableFontGpu(false);
+
+        ensure_equals("normal char count", normal.first, 1);
+        ensure("normal drew ink", normal.second > 0);
+        ensure_equals("bold char count", bold.first, 1);
+        ensure("bold is at least as heavy as normal", bold.second >= normal.second);
+        ensure_equals("italic char count", italic.first, 1);
+        ensure("italic drew ink", italic.second > 0);
+        ensure_equals("shadow char count", shadow.first, 1);
+        ensure("shadowed glyph still drew foreground ink", shadow.second > 0);
+#else
+        skip("hb-gpu not available");
+#endif
+    }
+
+    // Monospace coverage: fixed-width faces are shaped end-to-end like any
+    // other (build_shape_layout makes one range; shape_sub_run disables
+    // kern/liga for column alignment), so the GPU shaped path covers them with
+    // no codepoint detour. The GPU path never touches the bitmap atlas, so this
+    // renders mono purely through hb-gpu (no warm-up needed) and checks for ink
+    // and the right char count.
+    template<> template<>
+    void llfontgl_render_object::test<9>()
+    {
+#if LL_HAS_HB_GPU
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* mono = LLFontGL::getFontMonospace();
+        if (!mono)
+            skip("monospace font unavailable in this harness");
+
+        const S32 W = ll_test::HeadlessGL::WIDTH;
+        const S32 H = ll_test::HeadlessGL::HEIGHT;
+        const LLWString s = utf8str_to_wstring("Ab");
+
+        LLFontGL::enableFontGpu(true);
+        gl.clearFramebuffer();
+        const S32 n = mono->render(s, 0, 40.f, 64.f, LLColor4::white,
+                                   LLFontGL::LEFT, LLFontGL::BASELINE,
+                                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                   (S32)s.size());
+        gGL.flush();
+        auto px = ll_test::readFramebufferRGBA(W, H);
+        LLFontGL::enableFontGpu(false);
+
+        S32 ink = 0;
+        for (S32 y = 32; y < 100 && y < H; ++y)
+            for (S32 x = 20; x < 130 && x < W; ++x)
+            {
+                const U8* p = &px[((std::size_t)y * W + x) * 4];
+                if (((S32)p[0] + p[1] + p[2]) / 3 > 40) ++ink;
+            }
+
+        ensure_equals("mono gpu rendered both chars", n, (S32)s.size());
+        ensure("mono gpu path drew ink", ink > 0);
+#else
+        skip("hb-gpu not available");
+#endif
     }
 }

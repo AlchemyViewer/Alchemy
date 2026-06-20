@@ -32,6 +32,7 @@
 
 #include "llfontfreetype.h"   // for LLFontGlyphInfo, LLFontManager, ll::fonts::LoadedFont
 #include "llfontgl.h"         // for sUseDarkEmojiPalette
+#include "llfontgpuglyphcache.h" // analytic (hb-gpu) per-face glyph store
 #include "llfontregistry.h"   // for EFontHinting full definition
 #include "llframetimer.h"     // collectGarbage throttle clock
 #include "llimage.h"          // LLImageRaw, LLImageDataLock
@@ -79,7 +80,30 @@ LLFontFace::~LLFontFace()
     }
     delete mFontBitmapCachep;
     mFontBitmapCachep = nullptr;
+#if LL_HAS_HB_GPU
+    delete mGpuGlyphCachep;
+    mGpuGlyphCachep = nullptr;
+#endif
 }
+
+#if LL_HAS_HB_GPU
+LLFontGpuGlyphCache* LLFontFace::getGpuGlyphCache() const
+{
+    if (!mGpuGlyphCachep && isValid())
+    {
+        if (hb_font_t* hbf = getHbFont())
+        {
+            mGpuGlyphCachep = new LLFontGpuGlyphCache();
+            // The encode font is built from the face (size-independent); the
+            // hb_font's per-size scale doesn't matter here.
+            mGpuGlyphCachep->init(hb_font_get_face(hbf));
+        }
+    }
+    return mGpuGlyphCachep;
+}
+#else
+LLFontGpuGlyphCache* LLFontFace::getGpuGlyphCache() const { return nullptr; }
+#endif
 
 bool LLFontFace::load(const std::string& filename, S32 face_index,
                       F32 point_size, F32 vert_dpi, F32 horz_dpi,
@@ -203,6 +227,10 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
     // LLFontFaceKey. Snapshot ppem so getHbFont can assert the invariant.
     mLoadedXPpem = mFTFace->size->metrics.x_ppem;
     mLoadedYPpem = mFTFace->size->metrics.y_ppem;
+    // Font design units per em (0 for bitmap-only strikes). Used by the
+    // analytic (hb-gpu) path to convert font-unit extents to screen pixels:
+    // scale = ppem / unitsPerEm.
+    mUnitsPerEm = (U16)mFTFace->units_per_EM;
 
     // Prefer Unicode cmap explicitly. FT's auto-pick prefers Unicode when
     // present, but a font whose first cmap is non-Unicode (Apple Roman,
@@ -360,6 +388,10 @@ void LLFontFace::destroyGL()
     // renders as solid colored rectangles.
     if (mFontBitmapCachep)
         mFontBitmapCachep->destroyGL();
+#if LL_HAS_HB_GPU
+    if (mGpuGlyphCachep)
+        mGpuGlyphCachep->destroyGL();
+#endif
     resetBitmapCache();
 }
 

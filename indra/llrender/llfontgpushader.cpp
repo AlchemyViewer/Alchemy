@@ -90,6 +90,15 @@ out vec4 frag_color;
 void main()
 {
     float coverage = hb_gpu_draw(vary_renderCoord, vary_glyphLoc);
+    // Stem darkening: adapt thin-stroke coverage at small ppem so text stays
+    // legible (a no-op at large sizes via the smoothstep inside the helper).
+    // NOTE: hb_gpu_stem_darken is a coverage gamma keyed on foreground
+    // brightness; the UI composites in sRGB (not linear-light), so this is an
+    // approximation -- revisit the brightness/curve if it over- or
+    // under-weights at small sizes.
+    float ppem = hb_gpu_ppem(vary_renderCoord, vary_glyphLoc);
+    float brightness = dot(vary_color.rgb, vec3(0.299, 0.587, 0.114));
+    coverage = hb_gpu_stem_darken(coverage, brightness, ppem);
     frag_color = vec4(vary_color.rgb, vary_color.a * coverage);
 }
 )GLSL";

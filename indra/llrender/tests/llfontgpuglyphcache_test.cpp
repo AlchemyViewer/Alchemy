@@ -17,6 +17,10 @@
 
 #if LL_HAS_HB_GPU
 
+#include "../llfontface.h"
+#include "../llfontfreetype.h"   // LLFontManager, gFontManagerp
+#include "../llfontregistry.h"   // EFontHinting
+
 #include <hb.h>
 
 #if LL_MESA_HEADLESS
@@ -189,6 +193,38 @@ namespace tut
         // 'A' must have been evicted — re-fetching it re-encodes (new lookup).
         ensure("'A' no longer present until re-fetched",
                cache.getGlyphCount() == 1U);
+    }
+
+    // (5) Face integration: a real LLFontFace (loaded through LLFontManager)
+    // hands out a GPU glyph cache wired to its hb_face, and that cache encodes
+    // the face's glyphs. Validates the lazy hb_font_get_face init path. No GL.
+    template<> template<>
+    void llfontgpuglyphcache_object::test<5>()
+    {
+        const std::string path = std::string(kFontDir) + kOutlineFont;
+        if (!fileExists(path))
+        {
+            skip("outline test font not present in test data dir");
+        }
+
+        LLFontManager::initClass();
+        {
+            LLFontFaceKey key{ path, /*face_index=*/0, /*point_size=*/14.f,
+                               /*vert_dpi=*/96.f, /*horz_dpi=*/96.f,
+                               EFontHinting::DEFAULT, /*flags=*/0 };
+            LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(key);
+            ensure("face loaded", face.notNull() && face->isValid());
+
+            LLFontGpuGlyphCache* cache = face->getGpuGlyphCache();
+            ensure("face hands out a GPU glyph cache", cache != nullptr);
+            ensure("GPU cache is stable across calls", face->getGpuGlyphCache() == cache);
+
+            hb_codepoint_t gid = 0;
+            ensure("cmap maps 'A'",
+                   hb_font_get_nominal_glyph(face->getHbFont(), (hb_codepoint_t)'A', &gid) && gid != 0);
+            ensure("face cache encodes 'A'", cache->getGlyph((U32)gid).drawable());
+        }
+        LLFontManager::cleanupClass();
     }
 
 #if LL_MESA_HEADLESS

@@ -35,6 +35,10 @@
 #include "llfasttimer.h"
 #include "llfontfreetype.h"
 #include "llfontbitmapcache.h"
+#include "llfontface.h"
+#include "llfontgpubatch.h"
+#include "llfontgpuglyphcache.h"
+#include "llfontgpushader.h"
 #include "llfontregistry.h"
 #include "llfontshaping.h"
 #include "llgl.h"
@@ -72,7 +76,15 @@ std::string LLFontGL::sAppDir;
 
 LLColor4 LLFontGL::sShadowColor(0.f, 0.f, 0.f, 1.f);
 bool     LLFontGL::sEnableShaderShadow = false;
+bool     LLFontGL::sEnableFontGpu = false;
 LLFontRegistry* LLFontGL::sFontRegistry = NULL;
+
+#if LL_HAS_HB_GPU
+// Analytic (hb-gpu) render-path resources, lazily created on first eligible
+// render and torn down in destroyAllGL. Main-thread / GL-thread only.
+static LLGLSLShader    sFontGpuProgram;
+static LLFontGpuBatch* sGpuBatchp = nullptr;
+#endif
 
 LLCoordGL LLFontGL::sCurOrigin;
 F32 LLFontGL::sCurDepth;
@@ -574,15 +586,173 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         }
     };
 
-    // Itemize + shape the slice via the shared helper. Strict-monospace
-    // gets emoji-cluster ranges so ASCII keeps the codepoint path's exact
-    // metrics (visual parity with toggle-off) while embedded emoji
-    // clusters still shape; the non-mono path gets a single range covering
-    // the whole slice. Layout's ranges are slice-local; we compare against
-    // `i - begin_offset` in the loop.
+    // Shape the slice via the shared helper: one range covering the whole slice,
+    // shaped end-to-end through HarfBuzz, for every face including strict
+    // monospace (shape_sub_run disables kern/ligatures for fixed-width faces so
+    // column alignment holds without a separate codepoint partition). The
+    // codepoint path below is reached only for ranges where shaping produced no
+    // glyphs (rare face/HB failures). Layout's ranges are slice-local; we
+    // compare against `i - begin_offset` in the loop.
     LLWStringView slice(wstr.data() + begin_offset, (size_t)length);
     const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
     size_t next_shape_run = 0;
+
+#if LL_HAS_HB_GPU
+    // Analytic (hb-gpu) fast path. Handles normal/bold/italic style and optional
+    // drop shadow for color text whose slice shaped into contiguous runs from
+    // non-color outline faces — which includes monospace, since fixed-width
+    // faces shape end-to-end too. Color/emoji faces, shaping failures (empty
+    // runs), and ellipsis overflow stay on the atlas loop below. Reuses all the
+    // origin/valign/halign/pen setup computed above; underline (drawn before
+    // this point) works for both paths.
+    if (sEnableFontGpu && use_color && !draw_ellipses)
+    {
+        bool gpu_eligible = true;
+        size_t covered = 0;
+        for (size_t r = 0; r < layout.ranges.size(); ++r)
+        {
+            if (layout.ranges[r].first != covered) { gpu_eligible = false; break; }
+            const std::vector<LLShapedGlyph>& gv = *layout.glyphs[r];
+            if (gv.empty()) { gpu_eligible = false; break; }
+            for (const LLShapedGlyph& sg : gv)
+            {
+                const LLFontFace* f = sg.face ? sg.face->getFontFace() : nullptr;
+                if (!f || f->hasColor() || f->unitsPerEm() == 0) { gpu_eligible = false; break; }
+            }
+            if (!gpu_eligible) break;
+            covered = layout.ranges[r].second;
+        }
+        if (covered != (size_t)length) gpu_eligible = false;
+
+        if (gpu_eligible &&
+            (sFontGpuProgram.isComplete() || LLFontGpuShader::buildProgram(sFontGpuProgram)))
+        {
+            if (!sGpuBatchp) sGpuBatchp = new LLFontGpuBatch();
+
+            // Two placement lists per face: shadow (drawn first, underneath) and
+            // foreground. Both reuse the same glyph buffer; only pen offset and
+            // color differ — so shadow/bold are extra placements, not new shaders.
+            struct GpuRun
+            {
+                const LLFontFace* face;
+                F32 scale;
+                std::vector<LLFontGpuBatch::Placement> shadow;
+                std::vector<LLFontGpuBatch::Placement> fg;
+            };
+            std::vector<GpuRun> runs;
+            auto run_for = [&runs](const LLFontFace* f) -> GpuRun&
+            {
+                for (GpuRun& r : runs) { if (r.face == f) return r; }
+                runs.push_back({ f, (F32)f->ppem() / (F32)f->unitsPerEm(), {}, {} });
+                return runs.back();
+            };
+
+            const LLColor4U fg_color(color);
+            const bool emit_bold   = (style_to_add & BOLD) != 0;
+            // Atlas suppresses the shadow under bold (drawGlyphShadow gated on
+            // !BOLD); mirror that so the two paths agree.
+            const bool emit_shadow = (shadow != NO_SHADOW) && !emit_bold;
+            F32 gx = cur_render_x;
+            F32 gy = cur_render_y;
+            S32 gpu_chars = 0;
+            bool overflow = false;
+            for (size_t r = 0; r < layout.ranges.size() && !overflow; ++r)
+            {
+                const std::vector<LLShapedGlyph>& gv = *layout.glyphs[r];
+                S32 ov_cluster = 0;
+                for (const LLShapedGlyph& sg : gv)
+                {
+                    const LLFontFace* f = sg.face->getFontFace();
+                    LLFontGpuGlyphCache* cache = f->getGpuGlyphCache();
+                    const F32 pen_x = gx + sg.x_offset;
+                    const F32 pen_y = gy + sg.y_offset;
+                    if (cache)
+                    {
+                        GpuRun& run = run_for(f);
+                        const LLFontGpuGlyphCache::GlyphLoc& loc = cache->getGlyph(sg.glyph_id);
+                        if (loc.drawable())
+                        {
+                            const F32 right = pen_x + (F32)(loc.mXBearing + loc.mWidth) * run.scale;
+                            if ((start_x + scaled_max_pixels) < right)
+                            {
+                                overflow = true;
+                                ov_cluster = sg.cluster;
+                                break;
+                            }
+                            auto place = [&](std::vector<LLFontGpuBatch::Placement>& dst,
+                                             F32 dx, F32 dy, const LLColor4U& c)
+                            {
+                                LLFontGpuBatch::Placement p;
+                                p.glyph_id = sg.glyph_id;
+                                p.pen_x = pen_x + dx;
+                                p.pen_y = pen_y + dy;
+                                p.color[0] = c.mV[0]; p.color[1] = c.mV[1];
+                                p.color[2] = c.mV[2]; p.color[3] = c.mV[3];
+                                dst.push_back(p);
+                            };
+                            // Shadow pass — same offsets as drawGlyphShadow.
+                            if (emit_shadow)
+                            {
+                                if (shadow == DROP_SHADOW_SOFT)
+                                {
+                                    place(run.shadow, -1.f, -1.f, precomputed_shadow_color);
+                                    place(run.shadow,  1.f, -1.f, precomputed_shadow_color);
+                                    place(run.shadow,  1.f,  1.f, precomputed_shadow_color);
+                                    place(run.shadow, -1.f,  1.f, precomputed_shadow_color);
+                                    place(run.shadow,  0.f, -2.f, precomputed_shadow_color);
+                                }
+                                else // DROP_SHADOW
+                                {
+                                    place(run.shadow, 1.f, -1.f, precomputed_shadow_color);
+                                }
+                            }
+                            // Foreground (+ faux-bold double strike, offset +1px).
+                            place(run.fg, 0.f, 0.f, fg_color);
+                            if (emit_bold)
+                                place(run.fg, (F32)BOLD_OFFSET, 0.f, fg_color);
+                        }
+                    }
+                    gx += sg.x_advance;
+                    gy += sg.y_advance;
+                    if (!subpixel_pen) gx = (F32)ll_round(gx);
+                }
+                if (overflow) { gpu_chars += llmax(0, ov_cluster); break; }
+                gpu_chars += (S32)(layout.ranges[r].second - layout.ranges[r].first);
+            }
+
+            GLint vp[4] = { 0, 0, 0, 0 };
+            glGetIntegerv(GL_VIEWPORT, vp);
+
+            // Restore the caller's shader after drawing — the batch binds the
+            // hb-gpu program and downstream UI assumes the prior binding. All
+            // shadow passes first (across faces), then all foregrounds, so the
+            // foreground always lands on top of any overlapping shadow.
+            LLGLSLShader* prev_shader = LLGLSLShader::sCurBoundShaderPtr;
+            // Faux-italic shear in screen px (0 when not italic), same value the
+            // atlas path feeds renderTriangle.
+            const F32 gpu_slant = slant_offset;
+            for (GpuRun& run : runs)
+            {
+                if (run.shadow.empty()) continue;
+                if (LLFontGpuGlyphCache* cache = run.face->getGpuGlyphCache())
+                    sGpuBatchp->render(sFontGpuProgram, *cache, run.shadow, run.scale, vp[2], vp[3], gpu_slant);
+            }
+            for (GpuRun& run : runs)
+            {
+                if (run.fg.empty()) continue;
+                if (LLFontGpuGlyphCache* cache = run.face->getGpuGlyphCache())
+                    sGpuBatchp->render(sFontGpuProgram, *cache, run.fg, run.scale, vp[2], vp[3], gpu_slant);
+            }
+            if (prev_shader) prev_shader->bind(); else LLGLSLShader::unbind();
+
+            if (right_x)
+                *right_x = (gx - origin.mV[VX]) / sScaleX;
+
+            gGL.popUIMatrix();
+            return gpu_chars;
+        }
+    }
+#endif // LL_HAS_HB_GPU
 
     for (i = begin_offset; i < begin_offset + length; i++)
     {
@@ -1946,6 +2116,11 @@ void LLFontGL::destroyAllGL()
     {
         sFontRegistry->destroyGL();
     }
+#if LL_HAS_HB_GPU
+    sFontGpuProgram.unload();
+    delete sGpuBatchp;
+    sGpuBatchp = nullptr;
+#endif
 }
 
 // static

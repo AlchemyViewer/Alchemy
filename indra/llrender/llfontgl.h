@@ -306,6 +306,14 @@ public:
     static bool sEnableShaderShadow;
     static void enableShaderShadow(bool enable) { sEnableShaderShadow = enable; }
 
+    // Analytic (hb-gpu) glyph rendering: when on, render() routes eligible runs
+    // (no shadow, normal style, non-color faces, fully shaped) through the
+    // resolution-independent hb-gpu path instead of the bitmap atlas, falling
+    // back to the atlas for everything else. Off by default; threaded in from
+    // newview's AlchemyFontRenderGPU setting. Toggle via enableFontGpu().
+    static bool sEnableFontGpu;
+    static void enableFontGpu(bool enable) { sEnableFontGpu = enable; }
+
     static F32 sVertDPI;
     static F32 sHorizDPI;
     static F32 sScaleX;

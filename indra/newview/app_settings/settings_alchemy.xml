@@ -2788,6 +2788,22 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyFontRenderGPU</key>
+        <map>
+            <key>Comment</key>
+            <string>
+                Render UI text through the analytic (hb-gpu) glyph path instead
+                of the bitmap atlas: resolution-independent and atlas-free.
+                Experimental; falls back to the atlas path for color emoji,
+                monospace, shadowed, and bold/italic text.
+            </string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyFancyChatDivider</key>
         <map>
             <key>Comment</key>

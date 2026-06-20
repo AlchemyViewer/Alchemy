@@ -36,7 +36,7 @@
 #include "llvertexbuffer.h"
 
 U32 LLFontGpuBatch::buildVertices(LLFontGpuGlyphCache& cache,
-                                  const std::vector<Placement>& placements, F32 scale)
+                                  const std::vector<Placement>& placements, F32 scale, F32 slant)
 {
     mVerts.clear();
     mVerts.reserve(placements.size() * 6);
@@ -56,10 +56,16 @@ U32 LLFontGpuBatch::buildVertices(LLFontGpuGlyphCache& cache,
         const F32 tu = (F32)loc.mYBearing;
         const F32 bu = (F32)(loc.mYBearing + loc.mHeight);
 
-        auto emit = [&](F32 u, F32 v)
+        // Faux italic: shear the screen quad's bottom edge by `slant` while the
+        // em-space sample coordinate (texcoord) stays upright, so the analytic
+        // glyph samples normally but draws slanted -- the same trick the atlas
+        // path uses in renderTriangle. (Top corners get 0; bottom corners get
+        // `slant`.) The dilation Jacobian stays diagonal, which leaves a tiny
+        // AA approximation on the slanted edges -- acceptable for faux italic.
+        auto emit = [&](F32 u, F32 v, F32 shear)
         {
             Vertex vert;
-            vert.pos[0] = p.pen_x + u * scale;
+            vert.pos[0] = p.pen_x + u * scale + shear;
             vert.pos[1] = p.pen_y + v * scale;
             vert.tc[0]  = u;
             vert.tc[1]  = v;
@@ -72,12 +78,12 @@ U32 LLFontGpuBatch::buildVertices(LLFontGpuGlyphCache& cache,
         // 6 verts (TL,BL,BR,TL,BR,TR) — must match HB_CORNER_NORMAL[] in the
         // vertex shader, which derives each corner's outward normal from
         // gl_VertexID % 6.
-        emit(lu, tu);  // TL
-        emit(lu, bu);  // BL
-        emit(ru, bu);  // BR
-        emit(lu, tu);  // TL
-        emit(ru, bu);  // BR
-        emit(ru, tu);  // TR
+        emit(lu, tu, 0.f);    // TL
+        emit(lu, bu, slant);  // BL
+        emit(ru, bu, slant);  // BR
+        emit(lu, tu, 0.f);    // TL
+        emit(ru, bu, slant);  // BR
+        emit(ru, tu, 0.f);    // TR
     }
 
     return (U32)mVerts.size();
@@ -85,12 +91,12 @@ U32 LLFontGpuBatch::buildVertices(LLFontGpuGlyphCache& cache,
 
 bool LLFontGpuBatch::render(LLGLSLShader& program, LLFontGpuGlyphCache& cache,
                             const std::vector<Placement>& placements, F32 scale,
-                            S32 viewport_w, S32 viewport_h)
+                            S32 viewport_w, S32 viewport_h, F32 slant)
 {
     // NOTE: a batch must fit within the cache's texel budget; if buildVertices
     // triggered an eviction mid-run the earlier glyphLocs would be stale. Runs
     // are small relative to the cache ceiling, so this is acceptable for now.
-    const U32 nverts = buildVertices(cache, placements, scale);
+    const U32 nverts = buildVertices(cache, placements, scale, slant);
     if (nverts == 0)
     {
         return false;

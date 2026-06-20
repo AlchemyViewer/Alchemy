@@ -476,6 +476,14 @@ static bool handleForceMonochromeEmojiChanged(const LLSD& newvalue)
     return true;
 }
 
+static bool handleFontRenderGpuChanged(const LLSD& newvalue)
+{
+    // Read per render(); flipping it takes effect on the next frame, so no
+    // font reload is needed (unlike the emoji-palette/mono toggles).
+    LLFontGL::sEnableFontGpu = newvalue.asBoolean();
+    return true;
+}
+
 static bool handleConsoleMaxLinesChanged(const LLSD& newvalue)
 {
     if(gConsole)
@@ -1044,6 +1052,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "AlchemyUIFontOverrides", handleUIFontOverridesChanged);
     setting_setup_signal_listener(gSavedSettings, "EmojiUseDarkPalette", handleEmojiUseDarkPaletteChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyForceMonochromeEmoji", handleForceMonochromeEmojiChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyFontRenderGPU", handleFontRenderGpuChanged);
     setting_setup_signal_listener(gSavedSettings, "ConsoleMaxLines", handleConsoleMaxLinesChanged);
     setting_setup_signal_listener(gSavedSettings, "UploadBakedTexOld", handleUploadBakedTexOldChanged);
     setting_setup_signal_listener(gSavedSettings, "UseOcclusion", handleUseOcclusionChanged);

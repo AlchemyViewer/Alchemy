@@ -48,6 +48,7 @@ typedef struct FT_FaceRec_* LLFT_Face;
 struct hb_font_t;
 struct LLFontGlyphInfo;
 class  LLFontFreetype;
+class  LLFontGpuGlyphCache;
 // Defined in llfontregistry.h; forward-declared here to keep this header
 // independent of the registry. Translation units that need the values
 // (e.g. llfontface.cpp) include llfontregistry.h directly.
@@ -161,6 +162,12 @@ public:
     bool      isValid() const { return mFTFace != nullptr; }
     EFontHinting hinting() const { return mHinting; }
 
+    // Pixels-per-em the face was rasterized at, and font design units per em.
+    // scale (px per design unit) = ppem / unitsPerEm — used by the analytic
+    // (hb-gpu) render path. unitsPerEm is 0 for bitmap-only strikes.
+    U16 ppem() const        { return mLoadedYPpem; }
+    U16 unitsPerEm() const  { return mUnitsPerEm; }
+
     // Codepoint -> FT glyph index, cached. Equivalent to FT_Get_Char_Index
     // but skips the cmap binary search on repeated lookups. A cached value
     // of 0 is meaningful — it means the face has no glyph for `wch` — and
@@ -212,6 +219,12 @@ public:
     // primary face share the atlas; the same Twemoji face used as a fallback
     // by N heads writes its emoji glyphs into ONE atlas instead of N.
     LLFontBitmapCache* getBitmapCache() const { return mFontBitmapCachep; }
+
+    // Per-face analytic (hb-gpu) glyph store, the atlas-free counterpart to the
+    // bitmap cache. Lazily created on first use from this face's hb_face (the
+    // encoding is size-independent, so one cache serves every point size).
+    // Returns nullptr when hb-gpu support is unavailable or the face is invalid.
+    LLFontGpuGlyphCache* getGpuGlyphCache() const;
 
     // Per-face glyph cache, keyed on FT glyph index. Used by both the
     // codepoint path (which resolves wch -> glyph_index before the lookup)
@@ -303,8 +316,11 @@ private:
     // these stay at the load-time values and the assert in getHbFont fires.
     U16                mLoadedXPpem = 0;
     U16                mLoadedYPpem = 0;
+    U16                mUnitsPerEm  = 0;
 
     LLFontBitmapCache* mFontBitmapCachep = nullptr;
+    // Lazily created in getGpuGlyphCache(); owned here, freed in the dtor.
+    mutable LLFontGpuGlyphCache* mGpuGlyphCachep = nullptr;
     mutable glyph_info_map_t mGlyphInfoMap;
 
     // Earliest wall-clock time (seconds) at which collectGarbage() should

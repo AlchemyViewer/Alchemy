@@ -82,9 +82,11 @@ public:
 
     // CPU-only: encode (on miss) and lay out 6 vertices per drawable glyph;
     // non-drawable glyphs (space) are skipped. Returns the vertex count.
-    // Exposed (with vertices()) for headless geometry tests.
+    // `slant` is a faux-italic shear in screen pixels applied to each quad's
+    // bottom edge (0 = upright), matching the atlas drawGlyph slant. Exposed
+    // (with vertices()) for headless geometry tests.
     U32 buildVertices(LLFontGpuGlyphCache& cache,
-                      const std::vector<Placement>& placements, F32 scale);
+                      const std::vector<Placement>& placements, F32 scale, F32 slant = 0.f);
 
     const std::vector<Vertex>& vertices() const { return mVerts; }
 
@@ -94,7 +96,7 @@ public:
     // or GL texture-buffer support is missing. Requires a current GL context.
     bool render(LLGLSLShader& program, LLFontGpuGlyphCache& cache,
                 const std::vector<Placement>& placements, F32 scale,
-                S32 viewport_w, S32 viewport_h);
+                S32 viewport_w, S32 viewport_h, F32 slant = 0.f);
 
     void destroyGL();
 
