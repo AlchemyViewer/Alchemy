@@ -142,6 +142,7 @@ public:
         TYPE_WEIGHT4,           //  "weight4"
         TYPE_CLOTHWEIGHT,       //  "clothing"
         TYPE_JOINT,             //  "joint"
+        TYPE_GLYPH_LOC,         //  "glyph_loc" — analytic (hb-gpu) glyph buffer texel offset, integer
         TYPE_TEXTURE_INDEX,     //  "texture_index"
         TYPE_MAX,   // TYPE_MAX is the size/boundary marker for attributes that go in the vertex buffer
         TYPE_INDEX, // TYPE_INDEX is beyond _MAX because it lives in a separate (index) buffer
@@ -162,6 +163,7 @@ public:
         MAP_WEIGHT4 = (1<<TYPE_WEIGHT4),
         MAP_CLOTHWEIGHT = (1<<TYPE_CLOTHWEIGHT),
         MAP_JOINT = (1<<TYPE_JOINT),
+        MAP_GLYPH_LOC = (1<<TYPE_GLYPH_LOC),
         MAP_TEXTURE_INDEX = (1<<TYPE_TEXTURE_INDEX),
     };
 
@@ -219,6 +221,7 @@ public:
     bool getTangentStrider(LLStrider<LLVector3>& strider, U32 index=0, S32 count = -1);
     bool getTangentStrider(LLStrider<LLVector4a>& strider, U32 index=0, S32 count = -1);
     bool getColorStrider(LLStrider<LLColor4U>& strider, U32 index=0, S32 count = -1);
+    bool getGlyphLocStrider(LLStrider<U32>& strider, U32 index=0, S32 count = -1);
     bool getEmissiveStrider(LLStrider<LLColor4U>& strider, U32 index=0, S32 count = -1);
     bool getWeightStrider(LLStrider<F32>& strider, U32 index=0, S32 count = -1);
     bool getWeight4Strider(LLStrider<LLVector4>& strider, U32 index=0, S32 count = -1);

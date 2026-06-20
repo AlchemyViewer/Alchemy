@@ -53,11 +53,14 @@ namespace tut
         ensure("vertex starts with #version", vs.rfind("#version", 0) == 0);
         ensure("fragment starts with #version", fs.rfind("#version", 0) == 0);
 
-        // Vertex: HarfBuzz dilate helper + app main wiring.
+        // Vertex: HarfBuzz dilate helper + app main wiring with reserved attrib
+        // names (so LLVertexBuffer's mapAttributes binds them).
         ensure("vertex has hb_gpu_dilate", contains(vs, "hb_gpu_dilate"));
         ensure("vertex has main", contains(vs, "void main"));
         ensure("vertex declares MVP uniform", contains(vs, "modelview_projection_matrix"));
-        ensure("vertex declares glyphLoc attribute", contains(vs, "in uint glyphLoc"));
+        ensure("vertex declares glyph_loc attribute", contains(vs, "in uint glyph_loc"));
+        ensure("vertex declares reserved position", contains(vs, "in vec3 position"));
+        ensure("vertex declares reserved texcoord0", contains(vs, "in vec2 texcoord0"));
 
         // Fragment: shared rasterizer + atlas + draw wrapper + app main.
         ensure("fragment has _hb_gpu_slug (shared)", contains(fs, "_hb_gpu_slug"));
@@ -97,6 +100,8 @@ namespace tut
                program.getUniformLocation(LLStaticHashedString("modelview_projection_matrix")) >= 0);
         ensure("viewport resolves",
                program.getUniformLocation(LLStaticHashedString("viewport")) >= 0);
+        ensure("jac resolves",
+               program.getUniformLocation(LLStaticHashedString("jac")) >= 0);
         ensure("hb_gpu_atlas resolves",
                program.getUniformLocation(LLStaticHashedString("hb_gpu_atlas")) >= 0);
 

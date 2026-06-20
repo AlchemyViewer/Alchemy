@@ -40,24 +40,18 @@ class LLGLSLShader;
 // stage) plus the draw-renderer wrapper (hb_gpu_draw, fragment-only). This
 // class splices those with a thin app main()/IO layer into a linkable program.
 //
+// The vertex shader uses the reserved attribute names (position, texcoord0,
+// diffuse_color, glyph_loc) so the program binds through the standard
+// LLVertexBuffer pipeline via mapAttributes(). The per-vertex normal is derived
+// from gl_VertexID (the draw must start at vertex 0), and the em->screen
+// Jacobian is a per-run uniform (constant for a single point size), so neither
+// needs a vertex attribute.
+//
 // Lives in llrender rather than LLViewerShaderMgr because the source is
 // assembled at runtime, not loaded from .glsl files on disk.
 class LLFontGpuShader
 {
 public:
-    // Vertex attribute locations, pinned via explicit layout(location=) in the
-    // vertex shader so the Phase-4 vertex buffer binds to the same slots
-    // without relying on the reserved-attribute table.
-    enum EAttrib : U32
-    {
-        ATTRIB_POSITION = 0,  // vec2  object-space quad corner (font units * scale)
-        ATTRIB_TEXCOORD = 1,  // vec2  em-space sample coordinate (renderCoord)
-        ATTRIB_NORMAL   = 2,  // vec2  outward normal, for half-pixel dilation
-        ATTRIB_JAC      = 3,  // vec4  inverse em->object Jacobian (row-major)
-        ATTRIB_GLYPHLOC = 4,  // uint  texel offset into the glyph buffer (glyphLoc)
-        ATTRIB_COLOR    = 5,  // vec4  text color
-    };
-
     // The assembled GLSL for each stage (#version + HarfBuzz source + app main).
     static std::string vertexSource();
     static std::string fragmentSource();

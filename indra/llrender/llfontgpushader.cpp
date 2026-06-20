@@ -34,33 +34,45 @@
 
 namespace
 {
-    // App vertex main. hb_gpu_dilate (from the shared vertex source) expands the
-    // quad by ~half a pixel on screen for analytic-edge coverage, adjusting the
-    // em-space sample coordinate to match. modelview_projection_matrix is fed by
-    // LLRender::syncMatrices; viewport is set per-frame by the render path.
+    // App vertex main. Reserved attributes (position, texcoord0, diffuse_color,
+    // glyph_loc) bind through LLVertexBuffer. The corner normal is derived from
+    // gl_VertexID (6 verts/glyph in TL,BL,BR,TL,BR,TR order; the draw starts at
+    // vertex 0). jac is a per-run uniform (one point size => one scale).
+    // hb_gpu_dilate (shared vertex source) expands the quad by ~half a pixel on
+    // screen for analytic-edge coverage, adjusting the em-space sample coord to
+    // match. modelview_projection_matrix is fed by LLRender::syncMatrices.
     const char* APP_VERTEX_MAIN = R"GLSL(
 uniform mat4 modelview_projection_matrix;
 uniform vec2 viewport;
+uniform vec4 jac;
 
-layout(location = 0) in vec2 position;
-layout(location = 1) in vec2 texcoord;
-layout(location = 2) in vec2 normal;
-layout(location = 3) in vec4 jac;
-layout(location = 4) in uint glyphLoc;
-layout(location = 5) in vec4 diffuse_color;
+in vec3 position;
+in vec2 texcoord0;
+in vec4 diffuse_color;
+in uint glyph_loc;
 
 out vec2 vary_renderCoord;
 flat out uint vary_glyphLoc;
 out vec4 vary_color;
 
+const vec2 HB_CORNER_NORMAL[6] = vec2[6](
+    vec2(-1.0,  1.0),   // TL
+    vec2(-1.0, -1.0),   // BL
+    vec2( 1.0, -1.0),   // BR
+    vec2(-1.0,  1.0),   // TL
+    vec2( 1.0, -1.0),   // BR
+    vec2( 1.0,  1.0)    // TR
+);
+
 void main()
 {
-    vec2 pos = position;
-    vec2 tc  = texcoord;
+    vec2 pos = position.xy;
+    vec2 tc  = texcoord0;
+    vec2 normal = HB_CORNER_NORMAL[gl_VertexID % 6];
     hb_gpu_dilate(pos, tc, normal, jac, modelview_projection_matrix, viewport);
     gl_Position      = modelview_projection_matrix * vec4(pos, 0.0, 1.0);
     vary_renderCoord = tc;
-    vary_glyphLoc    = glyphLoc;
+    vary_glyphLoc    = glyph_loc;
     vary_color       = diffuse_color;
 }
 )GLSL";
@@ -155,9 +167,10 @@ bool LLFontGpuShader::buildProgram(LLGLSLShader& program)
     program.attachObject(vs);
     program.attachObject(fs);
 
-    // Attributes are pinned with layout(location=) in the vertex shader, so no
-    // reserved-name binding is needed — link directly instead of mapAttributes().
-    if (!program.link())
+    // mapAttributes() binds the reserved attribute names (position, texcoord0,
+    // diffuse_color, glyph_loc) to their LLVertexBuffer slots and links, so the
+    // standard setBuffer() path feeds this program.
+    if (!program.mapAttributes())
     {
         glDeleteShader(vs);
         glDeleteShader(fs);

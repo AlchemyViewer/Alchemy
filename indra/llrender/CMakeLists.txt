@@ -8,6 +8,7 @@ set(llrender_SOURCE_FILES
     llfontface.cpp
     llfontfreetype.cpp
     llfontgl.cpp
+    llfontgpubatch.cpp
     llfontgpuglyphcache.cpp
     llfontgpushader.cpp
     llfontshaping.cpp
@@ -37,6 +38,7 @@ set(llrender_HEADER_FILES
     llfontvertexbuffer.h
     llfontface.h
     llfontfreetype.h
+    llfontgpubatch.h
     llfontgpuglyphcache.h
     llfontgpushader.h
     llhbgpu.h
@@ -161,6 +163,13 @@ if (BUILD_TESTING)
   # Source-assembly test (1) needs no GL; the compile+link test (2) activates
   # under BUILD_HEADLESS below. hb-gpu arrives via ll::harfbuzz.
   LL_ADD_INTEGRATION_TEST(llfontgpushader "" "${registry_test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfontgpubatch "" "${registry_test_libs}" "${test_project}")
+  if (TARGET INTEGRATION_TEST_llfontgpubatch)
+    # Geometry test (1) needs no GL; the render+readback test (2) activates
+    # under BUILD_HEADLESS below. Both need a real font file.
+    target_compile_definitions(INTEGRATION_TEST_llfontgpubatch PRIVATE
+        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+  endif()
   if (TARGET INTEGRATION_TEST_llfontcolrv1)
     # Hand the source-tree font directory to the test as a string literal.
     # Tests that need a real font file (Noto-COLRv1.ttf, InterVariable.woff2)
@@ -234,6 +243,12 @@ if (BUILD_TESTING)
     if (TARGET INTEGRATION_TEST_llfontgpushader)
       # llfontgpushader's compile+link test (test<2>) needs an OSMesa context.
       target_compile_definitions(INTEGRATION_TEST_llfontgpushader PRIVATE
+          ${headless_test_compile_defs})
+    endif()
+
+    if (TARGET INTEGRATION_TEST_llfontgpubatch)
+      # llfontgpubatch's render+readback test (test<2>) needs an OSMesa context.
+      target_compile_definitions(INTEGRATION_TEST_llfontgpubatch PRIVATE
           ${headless_test_compile_defs})
     endif()
 
