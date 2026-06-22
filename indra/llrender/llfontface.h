@@ -103,6 +103,14 @@ struct LLFontFaceKey
     EFontHinting  hinting;
     S32           flags;
     LLFontVarAxes var_axes;     // wght/opsz/ital/wdth/slnt (each independently optional)
+    // Snapshot of LLFontGL::sEnableFontGpu at load time. The analytic (hb-gpu)
+    // render path wants linear (unhinted) metrics to match the unhinted outlines
+    // it draws, so a face built in that regime configures its shaping hb_font,
+    // subpixel-pen policy, and global metrics differently. That makes it a
+    // genuinely distinct face — keep it in the key so toggling the setting
+    // (which schedules a reload) re-resolves to a fresh face instead of handing
+    // back the stale cached one through getOrCreateFace's fast DPI path.
+    bool          gpu_linear = false;
 
     bool operator==(const LLFontFaceKey& o) const noexcept
     {
@@ -113,6 +121,7 @@ struct LLFontFaceKey
             && horz_dpi == o.horz_dpi
             && hinting == o.hinting
             && flags == o.flags
+            && gpu_linear == o.gpu_linear
             && var_axes == o.var_axes;
     }
 
@@ -126,6 +135,7 @@ struct LLFontFaceKey
         boost::hash_combine(seed, k.horz_dpi);
         boost::hash_combine(seed, static_cast<S32>(k.hinting));
         boost::hash_combine(seed, k.flags);
+        boost::hash_combine(seed, k.gpu_linear);
         // Axis values participate in the hash only when set; an unset
         // axis must not perturb the bucket from a key with no axes set
         // (so the common no-axes-configured path keeps a stable hash).
@@ -156,7 +166,8 @@ public:
     bool load(const std::string& filename, S32 face_index,
               F32 point_size, F32 vert_dpi, F32 horz_dpi,
               EFontHinting hinting, S32 flags,
-              const LLFontVarAxes& var_axes = {});
+              const LLFontVarAxes& var_axes = {},
+              bool gpu_linear = false);
 
     LLFT_Face face() const { return mFTFace; }
     bool      isValid() const { return mFTFace != nullptr; }
@@ -183,6 +194,18 @@ public:
     bool useSubpixelPen() const { return mUseSubpixelPen; }
     bool hasColor() const       { return mHasColor; }
     bool hasSvg() const         { return mHasSvg; }
+
+    // True when this face was built in the analytic (hb-gpu) regime AND is an
+    // outline face — i.e. it should report LINEAR (unhinted) metrics: shaping
+    // advances, the codepoint-path x-advance, and the global ascender /
+    // descender / line height all come from the unrounded scaled outlines so
+    // they match the unhinted glyph shapes the GPU path rasterizes. Bitmap-only
+    // strikes (upem==0) and color/SVG faces keep their native strike metrics
+    // regardless of the regime — there are no outlines to be consistent with.
+    bool useLinearMetrics() const
+    {
+        return mGpuLinear && mUnitsPerEm > 0 && !mHasColor && !mHasSvg;
+    }
     // True iff the face carries a COLR table whose version >= 1. FT_HAS_COLOR
     // is true for any color table (sbix / CBDT / COLRv0 / COLRv1 / SVG); only
     // COLRv1 needs the hb-raster paint walker — FT itself rasterizes the
@@ -320,13 +343,16 @@ private:
     typedef boost::unordered_multimap<U32, LLFontGlyphInfo*> glyph_info_map_t;
 
     LLFT_Face          mFTFace = nullptr;
-    // Single source for both HB load flags (set once in getHbFont via
-    // hb_ft_font_set_load_flags) and FT load flags (read by
-    // LLFontFreetype::renderGlyph as (FT_Int32)mHinting). Set in load() and
-    // never rewritten — divergence between the two paths would break advance
-    // consistency between shaped and codepoint runs. The casts to int /
-    // FT_Int32 rely on EFontHinting's bit pattern matching FT_LOAD_* (see
-    // llfontregistry.h:48-56).
+    // FT load flags for the bitmap-atlas raster path (read by
+    // LLFontFreetype::renderGlyph as (FT_Int32)mHinting) and — in the normal
+    // (non-linear) regime — the HB shaping load flags too (set once in
+    // getHbFont via hb_ft_font_set_load_flags). Set in load() and never
+    // rewritten. In the linear (useLinearMetrics) regime getHbFont instead
+    // forces FT_LOAD_NO_HINTING on the shaping font so advances go unhinted;
+    // shaped/codepoint advance consistency is preserved because the codepoint
+    // path then sources its advance from the glyph's linearHoriAdvance. The
+    // casts to int / FT_Int32 rely on EFontHinting's bit pattern matching
+    // FT_LOAD_* (see llfontregistry.h:48-56).
     EFontHinting       mHinting;
     mutable hb_font_t* mHbFont = nullptr;
     mutable boost::unordered_flat_map<llwchar, U32> mCharIndexCache;
@@ -355,6 +381,9 @@ private:
     mutable F64 mNextGcTime = 0.0;
 
     bool mUseSubpixelPen = false;
+    // Snapshot of LLFontGL::sEnableFontGpu at load (passed down from the cache
+    // key). Gates useLinearMetrics(); see the key's gpu_linear field.
+    bool mGpuLinear      = false;
     bool mHasColor       = false;
     bool mHasSvg         = false;
     bool mHasColrV1      = false;

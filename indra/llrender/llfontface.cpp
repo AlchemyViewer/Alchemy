@@ -147,11 +147,13 @@ U64 LLFontFace::getGpuCacheGeneration() const { return 0; }
 bool LLFontFace::load(const std::string& filename, S32 face_index,
                       F32 point_size, F32 vert_dpi, F32 horz_dpi,
                       EFontHinting hinting, S32 flags,
-                      const LLFontVarAxes& var_axes)
+                      const LLFontVarAxes& var_axes,
+                      bool gpu_linear)
 {
     llassert(!mFTFace); // load() is called once per LLFontFace instance.
 
     mHinting = hinting;
+    mGpuLinear = gpu_linear;
 
     FT_Open_Args openArgs;
     memset(&openArgs, 0, sizeof(openArgs));
@@ -169,22 +171,17 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
         return false;
     }
 
-    // Native-hinted glyphs (HINTING_DEFAULT) are designed by the foundry to
-    // sit on the integer pixel grid; subpixel pen position would wash out
-    // the hinting. Autohinted (FORCE_AUTOHINT), light-autohinted (LIGHT),
-    // and unhinted (NO_HINTING) glyphs tolerate and benefit from subpixel
-    // placement. Color and SVG fonts are designed to be rendered at specific
-    // sizes; subpixel positioning can cause unwanted blurring.
     mHasColor     = FT_HAS_COLOR(mFTFace);
     mHasSvg       = FT_HAS_SVG(mFTFace);
     mIsFixedWidth = (mFTFace->face_flags & FT_FACE_FLAG_FIXED_WIDTH) != 0;
-    mUseSubpixelPen = !mHasColor && !mHasSvg && (hinting != EFontHinting::DEFAULT);
 
     // COLRv1 probe: read the first 2 bytes of the COLR table and check the
     // version field. FreeType's FT_LOAD_COLOR + FT_Render_Glyph rasterize
     // COLRv0 directly but explicitly do NOT rasterize COLRv1 (per ftcolor.h
     // notes); a separate paint walker handles those. Distinguishing here
     // lets renderGlyph branch without re-probing the table on every glyph.
+    // Probed before the subpixel-pen decision below, which special-cases
+    // scalable (COLRv1) color faces.
     {
         FT_ULong length = 2;
         FT_Byte  buf[2] = { 0, 0 };
@@ -194,6 +191,31 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
             mHasColrV1 = (version >= 1);
         }
     }
+
+    // Native-hinted glyphs (HINTING_DEFAULT) are designed by the foundry to
+    // sit on the integer pixel grid; subpixel pen position would wash out
+    // the hinting. Autohinted (FORCE_AUTOHINT), light-autohinted (LIGHT),
+    // and unhinted (NO_HINTING) glyphs tolerate and benefit from subpixel
+    // placement. Color and SVG fonts are designed to be rendered at specific
+    // sizes; subpixel positioning can cause unwanted blurring.
+    //
+    // The analytic (hb-gpu) regime renders unhinted outlines at fractional pen
+    // positions, so an outline face wants the subpixel pen accumulator on even
+    // under DEFAULT (native) hinting — otherwise per-glyph ll_round would crush
+    // the linear advances back onto the integer grid. (mFTFace->units_per_EM is
+    // the upem probe; mUnitsPerEm is set later in this function.)
+    const bool gpu_outline = gpu_linear && mFTFace->units_per_EM > 0;
+    const bool gpu_linear_outline = gpu_outline && !mHasColor && !mHasSvg;
+    // Scalable COLR(v1) color faces are the exception to the "color blurs"
+    // rule: in the GPU regime they render through the analytic paint encoder
+    // (resolution-independent vectors at the exact pen), so fractional
+    // placement is correct and keeps emoji aligned to the surrounding text's
+    // sub-pixel pen instead of snapping to the integer grid. sbix/CBDT bitmap
+    // strikes and OT-SVG still rasterize to the atlas, so they stay excluded.
+    const bool gpu_scalable_color = gpu_outline && mHasColrV1;
+    mUseSubpixelPen =
+        (!mHasColor && !mHasSvg && (hinting != EFontHinting::DEFAULT || gpu_linear_outline))
+        || gpu_scalable_color;
 
     // CPAL palette pick. Default to palette 0 (the font's primary palette).
     // When EmojiUseDarkPalette is on and the face actually carries a palette
@@ -608,11 +630,22 @@ hb_font_t* LLFontFace::getHbFont() const
                 FT_Done_MM_Var(gFTLibrary, mm);
             }
 
-            // Hinting choice for measurement-time outline loads inside hb-ft.
-            // Drawing-time loads in renderGlyph build their own load_flags;
-            // those override these. EFontHinting's bit pattern is laid out to
-            // be a valid FT_LOAD_* flag composite (see EFontHinting comments).
-            hb_ft_font_set_load_flags(mHbFont, static_cast<int>(mHinting));
+            // Hinting choice for measurement-time outline loads inside hb-ft —
+            // these drive the advances HarfBuzz shaping returns. Drawing-time
+            // loads in renderGlyph build their own load_flags; those override
+            // these. EFontHinting's bit pattern is laid out to be a valid
+            // FT_LOAD_* flag composite (see EFontHinting comments).
+            //
+            // In the linear (hb-gpu) regime force FT_LOAD_NO_HINTING so the
+            // shaped advances are the unhinted, fractionally-scaled values that
+            // match the outlines the analytic path draws. NOTE this is the real
+            // FT_LOAD_NO_HINTING (0x2); EFontHinting::NO_HINTING is 0x8000
+            // (FT_LOAD_NO_AUTOHINT), a different flag that still lets native TT
+            // bytecode hinting grid-fit the advance — not what we want here.
+            const int load_flags = useLinearMetrics()
+                ? FT_LOAD_NO_HINTING
+                : static_cast<int>(mHinting);
+            hb_ft_font_set_load_flags(mHbFont, load_flags);
         }
     }
     return mHbFont;

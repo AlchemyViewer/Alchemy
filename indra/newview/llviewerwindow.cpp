@@ -6414,8 +6414,11 @@ void LLViewerWindow::initFonts(F32 zoom_factor)
     // the first font load so the renderer sees the right glyph types from
     // the start.
     LLFontGL::sForceMonochromeEmoji = gSavedSettings.getBOOL("AlchemyForceMonochromeEmoji");
-    // Analytic (hb-gpu) text path toggle. Read per render(), so no reload on
-    // change; seed it here so the preference is live from the first frame.
+    // Analytic (hb-gpu) text path toggle. Seed it before the font load so the
+    // preference is live from the first frame — both the render branch (read
+    // per frame) and the LINEAR metric regime (chosen at face load, keyed into
+    // the face cache) need it set now. Runtime changes go through
+    // handleFontRenderGpuChanged, which schedules a reload to re-resolve faces.
     LLFontGL::sEnableFontGpu = gSavedSettings.getBOOL("AlchemyFontRenderGPU");
 
     LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),

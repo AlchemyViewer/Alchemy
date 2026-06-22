@@ -20,6 +20,8 @@
 
 #include "../llfontgl.h"
 #include "../llfontfreetype.h"
+#include "../llfontface.h"        // LLFontFace (linear-metric regime test)
+#include "../llfontregistry.h"    // EFontHinting
 #include "../llfontbitmapcache.h"
 #include "../llhbgpu.h"   // LL_HAS_HB_GPU (for the hb-gpu render-path test)
 #include "../llimagegl.h"
@@ -28,6 +30,7 @@
 
 #include "../test/lltut.h"
 
+#include <cmath>
 #include <cstdio>
 
 namespace
@@ -38,9 +41,14 @@ namespace
 #ifndef LLFONT_TEST_FONTS_XML
 #  define LLFONT_TEST_FONTS_XML ""
 #endif
+#ifndef LLFONT_TEST_DATA_DIR
+#  define LLFONT_TEST_DATA_DIR ""
+#endif
 
     constexpr const char* kAppDir   = LLFONT_TEST_APP_DIR;
     constexpr const char* kFontsXml = LLFONT_TEST_FONTS_XML;
+    // Raw font files (newview/fonts/) for direct LLFontFreetype::loadFace tests.
+    constexpr const char* kFontDir  = LLFONT_TEST_DATA_DIR;
 
     bool fileExists(const std::string& path)
     {
@@ -508,6 +516,137 @@ namespace tut
             ensure("charFromPixelOffset round=true returns mid-cluster index",
                    !inside_cluster);
         }
+    }
+
+    // Linear (hb-gpu) metric regime. An outline face built with
+    // sEnableFontGpu reports UNHINTED advances + global metrics and forces the
+    // subpixel pen, so layout matches the unhinted outlines the analytic path
+    // draws. The regime is part of LLFontFaceKey, so it caches distinctly from
+    // the hinted face and the AlchemyFontRenderGPU toggle's reload re-resolves
+    // to the right one instead of reusing a stale wrapper.
+    template<> template<>
+    void llfontgl_object::test<19>()
+    {
+        const std::string path = std::string(kFontDir) + "IBMPlexSansVar-Roman.ttf";
+        if (!fileExists(path))
+            skip("test font not found: " + path);
+
+        // Bring up the font manager (gFontManagerp) + FT library. initClass is
+        // single-shot; if a prior test already ran it this warns + no-ops, but
+        // gFontManagerp is up either way.
+        if (fileExists(kFontsXml))
+            LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                                LLSD(), /*create_gl_textures=*/true);
+        if (!gFontManagerp)
+            skip("font manager not initialized (fonts.xml missing?)");
+
+        // Save/restore the process-global so sibling tests aren't perturbed.
+        const bool saved_gpu = LLFontGL::sEnableFontGpu;
+
+        // Small size so DEFAULT (native) hinting visibly grid-fits the advance
+        // and vertical metrics away from their linear (unrounded) values.
+        constexpr F32 PT = 9.f, DPI = 96.f;
+        auto load_head = [&](bool gpu) -> LLPointer<LLFontFreetype>
+        {
+            LLFontGL::sEnableFontGpu = gpu;
+            LLPointer<LLFontFreetype> head = new LLFontFreetype();
+            if (!head->loadFace(path, PT, DPI, DPI, /*is_fallback=*/false,
+                                /*face_n=*/0, EFontHinting::DEFAULT, 0, {}))
+                head = nullptr;
+            return head;
+        };
+
+        LLPointer<LLFontFreetype> hinted  = load_head(false);
+        LLPointer<LLFontFreetype> linear  = load_head(true);
+        LLPointer<LLFontFreetype> hinted2 = load_head(false);  // cache-hit probe
+        LLFontGL::sEnableFontGpu = saved_gpu;
+
+        ensure("hinted face loaded",  hinted.notNull());
+        ensure("linear face loaded",  linear.notNull());
+        ensure("hinted2 face loaded", hinted2.notNull());
+
+        // The regime is in the cache key: hinted vs linear resolve to DISTINCT
+        // face wrappers, while two same-regime loads share one. This is what
+        // makes the GPU toggle's fast-path reload actually swap metric regimes
+        // rather than hand back the stale cached face.
+        ensure("linear regime is a distinct cached face",
+               linear->getFontFace() != hinted->getFontFace());
+        ensure("same regime reuses the cached face",
+               hinted2->getFontFace() == hinted->getFontFace());
+
+        // Subpixel pen forced on in the linear regime even under DEFAULT
+        // hinting (so per-glyph ll_round doesn't crush the linear advances);
+        // off in the hinted regime.
+        ensure("hinted DEFAULT face does not use subpixel pen",
+               !hinted->useSubpixelPen());
+        ensure("linear face uses subpixel pen", linear->useSubpixelPen());
+
+        // Per-glyph advance (codepoint path → mXAdvance): linear sources the
+        // glyph's unhinted linearHoriAdvance, which differs from the grid-fit
+        // hinted advance at this size.
+        const F32 ah = hinted->getXAdvance((llwchar)'m');
+        const F32 al = linear->getXAdvance((llwchar)'m');
+        ensure("advances positive", ah > 0.f && al > 0.f);
+        ensure("linear advance differs from hinted advance",
+               std::fabs(al - ah) > 0.01f);
+
+        // Global vertical metrics: the linear (unrounded) ascender / line
+        // height differ from FreeType's grid-fit size metrics, while staying
+        // within a pixel of them (sanity that it's the same face + size, not a
+        // different rasterization).
+        const F32 asc_h = hinted->getAscenderHeight();
+        const F32 asc_l = linear->getAscenderHeight();
+        const F32 lh_h  = hinted->getLineHeight();
+        const F32 lh_l  = linear->getLineHeight();
+        ensure("ascenders agree within a pixel",   std::fabs(asc_h - asc_l) <= 1.5f);
+        ensure("line heights agree within a pixel", std::fabs(lh_h - lh_l) <= 1.5f);
+        ensure("a linear vertical metric is unrounded (differs from grid-fit)",
+               std::fabs(asc_h - asc_l) > 1e-4f || std::fabs(lh_h - lh_l) > 1e-4f);
+    }
+
+    // Scalable (COLRv1) color faces get the subpixel pen in the GPU regime:
+    // they render through the analytic paint encoder (resolution-independent
+    // vectors at the exact pen), so fractional placement is correct and keeps
+    // emoji aligned to the surrounding text's sub-pixel pen. With GPU off they
+    // rasterize to the atlas, where a subpixel pen would blur, so the pen stays
+    // on the integer grid. sbix/CBDT/SVG color faces stay excluded either way.
+    template<> template<>
+    void llfontgl_object::test<20>()
+    {
+        const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
+        if (!fileExists(path))
+            skip("COLRv1 test font not found: " + path);
+
+        if (fileExists(kFontsXml))
+            LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                                LLSD(), /*create_gl_textures=*/true);
+        if (!gFontManagerp)
+            skip("font manager not initialized (fonts.xml missing?)");
+
+        const bool saved_gpu = LLFontGL::sEnableFontGpu;
+        auto load_head = [&](bool gpu) -> LLPointer<LLFontFreetype>
+        {
+            LLFontGL::sEnableFontGpu = gpu;
+            LLPointer<LLFontFreetype> head = new LLFontFreetype();
+            // is_fallback=true skips the head's notdef pre-warm — we only read
+            // the load-time subpixel-pen flag, no rasterization needed.
+            if (!head->loadFace(path, 12.f, 96.f, 96.f, /*is_fallback=*/true,
+                                /*face_n=*/0, EFontHinting::DEFAULT, 0, {}))
+                head = nullptr;
+            return head;
+        };
+
+        LLPointer<LLFontFreetype> off = load_head(false);
+        LLPointer<LLFontFreetype> on  = load_head(true);
+        LLFontGL::sEnableFontGpu = saved_gpu;
+
+        ensure("COLRv1 face loaded (gpu off)", off.notNull());
+        ensure("COLRv1 face loaded (gpu on)",  on.notNull());
+        // Sanity: this really is a scalable (COLRv1) color face.
+        ensure("face is COLRv1",
+               on->getFontFace() && on->getFontFace()->hasColrV1());
+        ensure("COLRv1 atlas regime keeps integer pen", !off->useSubpixelPen());
+        ensure("COLRv1 GPU regime uses subpixel pen",    on->useSubpixelPen());
     }
 
     // Static getter family — every named getter must resolve to a

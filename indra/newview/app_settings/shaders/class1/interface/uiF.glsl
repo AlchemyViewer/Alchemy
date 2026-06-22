@@ -88,7 +88,7 @@ void main()
         float coverage = hb_gpu_draw(vary_texcoord0, vary_glyphLoc);
         float ppem = hb_gpu_ppem(vary_texcoord0, vary_glyphLoc);
         float brightness = dot(vertex_color.rgb, vec3(0.299, 0.587, 0.114));
-        coverage = hb_gpu_stem_darken(coverage, brightness, ppem);
+        //coverage = hb_gpu_stem_darken(coverage, brightness, ppem);
         frag_color = vec4(vertex_color.rgb, vertex_color.a * coverage);
         return;
     }

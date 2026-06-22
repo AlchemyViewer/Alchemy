@@ -478,9 +478,14 @@ static bool handleForceMonochromeEmojiChanged(const LLSD& newvalue)
 
 static bool handleFontRenderGpuChanged(const LLSD& newvalue)
 {
-    // Read per render(); flipping it takes effect on the next frame, so no
-    // font reload is needed (unlike the emoji-palette/mono toggles).
     LLFontGL::sEnableFontGpu = newvalue.asBoolean();
+    // The render-path branch reads this per frame, but the analytic path also
+    // uses LINEAR (unhinted) font metrics to match the outlines it draws —
+    // advances, ascender/descender, line height — and those are chosen at face
+    // load time and baked into the cache key. Schedule a reload so faces
+    // rebuild in the new metric regime (same pattern as the emoji-palette/mono
+    // toggles); without it, layout would keep the previous regime's metrics.
+    LLFontGL::schedulePendingReload();
     return true;
 }
 
