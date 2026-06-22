@@ -60,6 +60,11 @@ public:
     // writing settings, keeping both surfaces views of the same state.
     void refreshFilters();
 
+    // Canonical "reset all": clears the quick-bar search/owner state and every
+    // persisted filter (flags, types, scope, radius, thresholds) back to its
+    // default. The companion filters floater's reset button delegates here.
+    void doResetFilters();
+
 private:
     ALFloaterSceneExplorer(const LLSD& key);
     ~ALFloaterSceneExplorer() override;
@@ -113,7 +118,6 @@ private:
     bool checkSortMode(const LLSD& param) const;
     void toggleShow(const LLSD& param);
     bool checkShow(const LLSD& param) const;
-    void doResetFilters();
     void doFilterByOwner();
     void doShowFilters();
     void updateOwnerFilterLabel();

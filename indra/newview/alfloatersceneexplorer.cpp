@@ -1855,6 +1855,7 @@ void ALFloaterSceneExplorer::doResetFilters()
     gSavedSettings.setU32("ALSceneExplorerFlagFilter", 0);
     gSavedSettings.setU32("ALSceneExplorerTypeFilter", 0);
     gSavedSettings.setU32("ALSceneExplorerScope", 0);
+    gSavedSettings.getControl("ALSceneExplorerRadius")->resetToDefault();
     gSavedSettings.setF32("ALSceneExplorerMinLandImpact", 0.f);
     gSavedSettings.setU32("ALSceneExplorerMinTriangles", 0);
     refreshFilters();

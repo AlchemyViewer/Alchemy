@@ -60,8 +60,26 @@
 
 //LLFloaterInspect* LLFloaterInspect::sInstance = NULL;
 
+// Opt-in scene-builder metric column bits. Defined once here and reused both in
+// mColumnBits and METRIC_COLUMNS_MASK so the two cannot silently drift apart.
+namespace
+{
+    constexpr U32 COL_LAND_IMPACT = 1u << 10;
+    constexpr U32 COL_RENDERCOST  = 1u << 11;
+    constexpr U32 COL_PHYSICSCOST = 1u << 12;
+    constexpr U32 COL_STREAMCOST  = 1u << 13;
+    constexpr U32 COL_PRIMCOUNT   = 1u << 14;
+    constexpr U32 COL_DISTANCE    = 1u << 15;
+    constexpr U32 COL_SCRIPTS     = 1u << 16;
+    constexpr U32 COL_LIGHTGLOW   = 1u << 17;
+    constexpr U32 COL_MEDIA       = 1u << 18;
+    constexpr U32 COL_ALPHAPBR    = 1u << 19;
+}
+
 // Union of the opt-in scene-builder metric column bits (see mColumnBits).
-static constexpr U32 METRIC_COLUMNS_MASK = 1024 | 2048 | 4096 | 8192 | 16384 | 32768 | 65536 | 131072 | 262144 | 524288;
+static constexpr U32 METRIC_COLUMNS_MASK =
+    COL_LAND_IMPACT | COL_RENDERCOST | COL_PHYSICSCOST | COL_STREAMCOST | COL_PRIMCOUNT |
+    COL_DISTANCE | COL_SCRIPTS | COL_LIGHTGLOW | COL_MEDIA | COL_ALPHAPBR;
 
 LLFloaterInspect::LLFloaterInspect(const LLSD& key)
   : LLFloater(key),
@@ -91,16 +109,16 @@ LLFloaterInspect::LLFloaterInspect(const LLSD& key)
     mColumnBits["creation_date"] = 512;
     // Scene-builder metrics, sourced from ALObjectProperties so this floater
     // and the Scene Explorer always report the same numbers.
-    mColumnBits["land_impact"] = 1024;
-    mColumnBits["rendercost"] = 2048;
-    mColumnBits["physicscost"] = 4096;
-    mColumnBits["streamingcost"] = 8192;
-    mColumnBits["primcount"] = 16384;
-    mColumnBits["distance"] = 32768;
-    mColumnBits["scripts"] = 65536;
-    mColumnBits["lightglow"] = 131072;
-    mColumnBits["media"] = 262144;
-    mColumnBits["alphapbr"] = 524288;
+    mColumnBits["land_impact"] = COL_LAND_IMPACT;
+    mColumnBits["rendercost"] = COL_RENDERCOST;
+    mColumnBits["physicscost"] = COL_PHYSICSCOST;
+    mColumnBits["streamingcost"] = COL_STREAMCOST;
+    mColumnBits["primcount"] = COL_PRIMCOUNT;
+    mColumnBits["distance"] = COL_DISTANCE;
+    mColumnBits["scripts"] = COL_SCRIPTS;
+    mColumnBits["lightglow"] = COL_LIGHTGLOW;
+    mColumnBits["media"] = COL_MEDIA;
+    mColumnBits["alphapbr"] = COL_ALPHAPBR;
 }
 
 bool LLFloaterInspect::postBuild()

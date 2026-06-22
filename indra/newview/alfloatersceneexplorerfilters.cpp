@@ -154,15 +154,24 @@ void ALFloaterSceneExplorerFilters::onCommitAny()
 
 void ALFloaterSceneExplorerFilters::onClickReset()
 {
-    gSavedSettings.setU32("ALSceneExplorerFlagFilter", 0);
-    gSavedSettings.setU32("ALSceneExplorerTypeFilter", 0);
-    gSavedSettings.setU32("ALSceneExplorerScope", (U32)ALSceneExplorerFilter::SCOPE_REGION);
-    gSavedSettings.setF32("ALSceneExplorerMinLandImpact", 0.f);
-    gSavedSettings.setU32("ALSceneExplorerMinTriangles", 0);
-    refreshFromSettings();
+    // The button promises a full reset (see tool_tip). The explorer owns the
+    // canonical "reset all" -- it also clears the quick-bar search/owner state
+    // -- so delegate when it is open. When it is not, fall back to resetting
+    // the shared settings ourselves so the persisted filter set still returns
+    // to defaults.
     if (ALFloaterSceneExplorer* explorer =
             LLFloaterReg::findTypedInstance<ALFloaterSceneExplorer>("scene_explorer"))
     {
-        explorer->refreshFilters();
+        explorer->doResetFilters(); // refreshes our controls via refreshFromSettings()
+    }
+    else
+    {
+        gSavedSettings.setU32("ALSceneExplorerFlagFilter", 0);
+        gSavedSettings.setU32("ALSceneExplorerTypeFilter", 0);
+        gSavedSettings.setU32("ALSceneExplorerScope", (U32)ALSceneExplorerFilter::SCOPE_REGION);
+        gSavedSettings.getControl("ALSceneExplorerRadius")->resetToDefault();
+        gSavedSettings.setF32("ALSceneExplorerMinLandImpact", 0.f);
+        gSavedSettings.setU32("ALSceneExplorerMinTriangles", 0);
+        refreshFromSettings();
     }
 }

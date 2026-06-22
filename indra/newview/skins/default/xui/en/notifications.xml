@@ -13390,7 +13390,7 @@ Full region coverage asks the simulator to stream every object in the region to 
 The simulator returns to normal when you turn this off or close the Scene Explorer.
     <usetemplate
      ignoretext="When enabling full region coverage in the Scene Explorer"
-     name="okbutton"
+     name="okignore"
      yestext="OK"/>
   </notification>
 
