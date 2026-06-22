@@ -32,6 +32,8 @@
 #include "pipeline.h"
 #include "llglcommonfunc.h"
 #include "llvoavatar.h"
+#include "llviewertexture.h"
+#include "llspatialpartition.h"
 
 LLDrawPoolMaterials::LLDrawPoolMaterials()
 :  LLRenderPass(LLDrawPool::POOL_MATERIALS)
@@ -69,6 +71,116 @@ static const U32 sMaterialPassType[] =
     LLRenderPass::PASS_NORMSPEC_EMISSIVE,
 };
 
+// gDeferredMaterialProgram / gDeferredMaterialIndexedProgram index (shader mask)
+// for each of the 12 non-rigged material passes; rigged uses the program's
+// mRiggedVariant. Kept in sync with sMaterialPassType above.
+static const U32 sMaterialShaderIdx[] =
+{
+    0,  // PASS_MATERIAL
+    2,  // PASS_MATERIAL_ALPHA_MASK
+    3,  // PASS_MATERIAL_ALPHA_EMISSIVE
+    4,  // PASS_SPECMAP
+    6,  // PASS_SPECMAP_MASK
+    7,  // PASS_SPECMAP_EMISSIVE
+    8,  // PASS_NORMMAP
+    10, // PASS_NORMMAP_MASK
+    11, // PASS_NORMMAP_EMISSIVE
+    12, // PASS_NORMSPEC
+    14, // PASS_NORMSPEC_MASK
+    15, // PASS_NORMSPEC_EMISSIVE
+};
+
+// Render the multi-material (indexed) draw infos for one material pass. The indexed
+// program is bound lazily on the first such batch (most passes have none). Each slot
+// s binds diffuse->unit s, normal->N+s, spec->2N+s and contributes one element to
+// the per-slot scalar uniform arrays.
+static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigged)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MATERIAL;
+
+    const S32 N = LLGLSLShader::sIndexedGLTFChannels;
+    LLGLSLShader* shader = &program;
+    bool bound = false;
+
+    const LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    bool skipLastSkin = false;
+
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mMaterialSlotList.size() < 2)
+        { // single-material batch -- handled by the scalar loop
+            continue;
+        }
+
+        if (!bound)
+        { // defer the bind until we actually have an indexed batch this pass
+            program.bind();
+            bound = true;
+        }
+
+        if (rigged)
+        {
+            if (!LLRenderPass::uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+            {
+                continue;
+            }
+        }
+
+        // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a
+        // stale/over-long list can never overrun the 8-slot arrays / 2N+s units.
+        llassert((S32)params.mMaterialSlotList.size() <= N);
+        const S32 n = llmin((S32)params.mMaterialSlotList.size(), N);
+        LL_PROFILE_ZONE_NUM(n);
+
+        F32 spec_color[4 * 8] = { 0.f };
+        F32 env[8] = { 0.f };
+        F32 min_alpha[8] = { 0.f };
+        F32 fullbright[8] = { 0.f };
+
+        for (S32 s = 0; s < n; ++s)
+        {
+            const LLDrawInfo::MaterialSlot& slot = params.mMaterialSlotList[s];
+
+            LLViewerTexture* diffuse = slot.mDiffuse.notNull() ? slot.mDiffuse.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+            LLViewerTexture* normal  = slot.mNormalMap.notNull() ? slot.mNormalMap.get() : LLViewerFetchedTexture::sFlatNormalImagep.get();
+            LLViewerTexture* spec    = slot.mSpecularMap.notNull() ? slot.mSpecularMap.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+
+            gGL.getTexUnit(s)->bindFast(diffuse);
+            gGL.getTexUnit(N + s)->bindFast(normal);
+            gGL.getTexUnit(2 * N + s)->bindFast(spec);
+
+            spec_color[4 * s + 0] = slot.mSpecColor.mV[0];
+            spec_color[4 * s + 1] = slot.mSpecColor.mV[1];
+            spec_color[4 * s + 2] = slot.mSpecColor.mV[2];
+            spec_color[4 * s + 3] = slot.mSpecColor.mV[3];
+            env[s] = slot.mEnvIntensity;
+            min_alpha[s] = slot.mAlphaMaskCutoff;
+            fullbright[s] = slot.mFullbright;
+        }
+
+        static const LLStaticHashedString sSpecColor("mat_specular_color");
+        static const LLStaticHashedString sEnv("mat_env_intensity");
+        static const LLStaticHashedString sMinAlpha("mat_minimum_alpha");
+        static const LLStaticHashedString sEmissive("mat_emissive_brightness");
+
+        shader->uniform4fv(sSpecColor, n, spec_color);
+        shader->uniform1fv(sEnv, n, env);
+        shader->uniform1fv(sMinAlpha, n, min_alpha); // inactive outside MASK shaders
+        shader->uniform1fv(sEmissive, n, fullbright);
+
+        LLRenderPass::applyModelMatrix(params);
+
+        params.mVertexBuffer->setBuffer();
+        params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
+    }
+}
+
 bool LLDrawPoolMaterials::isPassEmpty(S32 pass)
 {
     bool rigged = false;
@@ -96,27 +208,7 @@ void LLDrawPoolMaterials::beginDeferredPass(S32 pass)
         rigged = true;
         pass -= 12;
     }
-    U32 shader_idx[] =
-    {
-        0, //LLRenderPass::PASS_MATERIAL,
-        //1, //LLRenderPass::PASS_MATERIAL_ALPHA,
-        2, //LLRenderPass::PASS_MATERIAL_ALPHA_MASK,
-        3, //LLRenderPass::PASS_MATERIAL_ALPHA_GLOW,
-        4, //LLRenderPass::PASS_SPECMAP,
-        //5, //LLRenderPass::PASS_SPECMAP_BLEND,
-        6, //LLRenderPass::PASS_SPECMAP_MASK,
-        7, //LLRenderPass::PASS_SPECMAP_GLOW,
-        8, //LLRenderPass::PASS_NORMMAP,
-        //9, //LLRenderPass::PASS_NORMMAP_BLEND,
-        10, //LLRenderPass::PASS_NORMMAP_MASK,
-        11, //LLRenderPass::PASS_NORMMAP_GLOW,
-        12, //LLRenderPass::PASS_NORMSPEC,
-        //13, //LLRenderPass::PASS_NORMSPEC_BLEND,
-        14, //LLRenderPass::PASS_NORMSPEC_MASK,
-        15, //LLRenderPass::PASS_NORMSPEC_GLOW,
-    };
-
-    U32 idx = shader_idx[pass];
+    U32 idx = sMaterialShaderIdx[pass];
 
     mShader = &(gDeferredMaterialProgram[idx]);
 
@@ -219,6 +311,11 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
 
         LLCullResult::increment_iterator(i, end);
 
+        if (params.mMaterialSlotList.size() > 1)
+        { // multi-material batch -- drawn by the indexed sweep below
+            continue;
+        }
+
         if (specular > -1 && params.mSpecColor != lastSpecular)
         {
             lastSpecular = params.mSpecColor;
@@ -309,6 +406,18 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
             gGL.getTexUnit(0)->activate();
             gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_MODELVIEW);
+        }
+    }
+
+    // Draw the multi-material (indexed) batches for this pass with the indexed
+    // program (its rigged variant for the rigged passes).
+    if (LLGLSLShader::sIndexedLegacyMaterials)
+    {
+        LLGLSLShader& indexed = gDeferredMaterialIndexedProgram[sMaterialShaderIdx[pass]];
+        LLGLSLShader* prog = rigged ? indexed.mRiggedVariant : &indexed;
+        if (prog && prog->isComplete())
+        {
+            pushMaterialBatchIndexed(*prog, type, rigged);
         }
     }
 }

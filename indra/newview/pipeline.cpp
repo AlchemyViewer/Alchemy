@@ -10507,6 +10507,18 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
                     renderMaskedObjects(LLRenderPass::PASS_MATERIAL_ALPHA_MASK, true, false, rigged);
                     renderMaskedObjects(LLRenderPass::PASS_SPECMAP_MASK, true, false, rigged);
                     renderMaskedObjects(LLRenderPass::PASS_NORMMAP_MASK, true, false, rigged);
+
+                    // multi-material indexed legacy mask batches alpha-test per-slot
+                    if (LLGLSLShader::sIndexedLegacyMaterials && gDeferredShadowMaterialIndexedProgram.isComplete())
+                    {
+                        gDeferredShadowMaterialIndexedProgram.bind(rigged);
+                        LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                        U32 off = rigged ? 1 : 0;
+                        mAlphaMaskPool->pushMaskBatchesIndexed(LLRenderPass::PASS_NORMSPEC_MASK + off, rigged);
+                        mAlphaMaskPool->pushMaskBatchesIndexed(LLRenderPass::PASS_MATERIAL_ALPHA_MASK + off, rigged);
+                        mAlphaMaskPool->pushMaskBatchesIndexed(LLRenderPass::PASS_SPECMAP_MASK + off, rigged);
+                        mAlphaMaskPool->pushMaskBatchesIndexed(LLRenderPass::PASS_NORMMAP_MASK + off, rigged);
+                    }
                 }
             }
         }
@@ -10523,13 +10535,41 @@ void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCa
 
             U32 type = LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK;
 
+            // multi-material batches alpha-test per-slot; render them with the
+            // indexed shadow program so batched cutouts stay correct
+            bool gltf_indexed = LLGLSLShader::sIndexedGLTFChannels >= 2 && gDeferredShadowGLTFAlphaMaskIndexedProgram.isComplete();
+
             if (rigged)
             {
-                mAlphaMaskPool->pushRiggedGLTFBatches(type + 1);
+                if (gltf_indexed)
+                {
+                    mAlphaMaskPool->pushRiggedGLTFBatchesScalar(type + 1);
+
+                    gDeferredShadowGLTFAlphaMaskIndexedProgram.bind(true);
+                    LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                    LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                    mAlphaMaskPool->pushRiggedGLTFBatchesIndexed(type + 1, LLRenderPass::GLTF_MAPS_BASE_COLOR); // shadow samples base color only
+                }
+                else
+                {
+                    mAlphaMaskPool->pushRiggedGLTFBatches(type + 1);
+                }
             }
             else
             {
-                mAlphaMaskPool->pushGLTFBatches(type);
+                if (gltf_indexed)
+                {
+                    mAlphaMaskPool->pushGLTFBatchesScalar(type);
+
+                    gDeferredShadowGLTFAlphaMaskIndexedProgram.bind();
+                    LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_up);
+                    LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH, (float)target_width);
+                    mAlphaMaskPool->pushGLTFBatchesIndexed(type, LLRenderPass::GLTF_MAPS_BASE_COLOR); // shadow samples base color only
+                }
+                else
+                {
+                    mAlphaMaskPool->pushGLTFBatches(type);
+                }
             }
 
             gGL.loadMatrix(gGLModelView);

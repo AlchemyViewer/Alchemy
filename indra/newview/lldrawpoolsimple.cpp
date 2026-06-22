@@ -56,14 +56,47 @@ void LLDrawPoolGlow::renderPostDeferred(S32 pass)
     LLGLDepthTest depth(GL_TRUE, GL_FALSE);
     gGL.setColorMask(false, true);
 
+    // Multi-material (indexed) legacy glow batches carry a per-slot diffuse list and
+    // must be drawn with the indexed program; the scalar sweep skips them. Require
+    // both the static and rigged indexed glow programs to be complete; otherwise fall
+    // back to scalar for everything (slot-0 diffuse alpha, the pre-batching behavior).
+    bool glow_indexed = LLGLSLShader::sIndexedLegacyMaterials &&
+                        gDeferredEmissiveIndexedProgram.isComplete() &&
+                        gDeferredEmissiveIndexedProgram.mRiggedVariant &&
+                        gDeferredEmissiveIndexedProgram.mRiggedVariant->isComplete();
+
     //first pass -- static objects
     shader->bind();
-    pushBatches(LLRenderPass::PASS_GLOW, true, true);
+    if (glow_indexed)
+    {
+        pushEmissiveBatchesScalar(LLRenderPass::PASS_GLOW, false);
+    }
+    else
+    {
+        pushBatches(LLRenderPass::PASS_GLOW, true, true);
+    }
 
     // second pass -- rigged objects
     shader = shader->mRiggedVariant;
     shader->bind();
-    pushRiggedBatches(LLRenderPass::PASS_GLOW_RIGGED, true, true);
+    if (glow_indexed)
+    {
+        pushEmissiveBatchesScalar(LLRenderPass::PASS_GLOW_RIGGED, true);
+    }
+    else
+    {
+        pushRiggedBatches(LLRenderPass::PASS_GLOW_RIGGED, true, true);
+    }
+
+    // indexed (multi-material) passes
+    if (glow_indexed)
+    {
+        gDeferredEmissiveIndexedProgram.bind();
+        pushEmissiveBatchesIndexed(LLRenderPass::PASS_GLOW, false);
+
+        gDeferredEmissiveIndexedProgram.bind(true); // rigged variant
+        pushEmissiveBatchesIndexed(LLRenderPass::PASS_GLOW_RIGGED, true);
+    }
 
     gGL.setColorMask(true, false);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);

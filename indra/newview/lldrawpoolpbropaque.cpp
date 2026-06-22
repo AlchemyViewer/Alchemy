@@ -55,11 +55,47 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
 
     LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
 
+    // Indexed (multi-material) batching applies to the static opaque and alpha-mask
+    // passes. The indexed program writes the GBuffer the same way for both; the
+    // per-slot gltf_minimum_alpha array drives the mask discard (-1 == opaque).
+    // Only skip multi-material infos in the scalar sweep once BOTH the indexed
+    // program and its rigged variant are complete -- otherwise scalar would skip
+    // them and the indexed sweep would bind an incomplete program.
+    bool indexed = (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR ||
+                    mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR_ALPHA_MASK) &&
+                   LLGLSLShader::sIndexedGLTFChannels >= 2 &&
+                   gDeferredPBROpaqueIndexedProgram.isComplete() &&
+                   gDeferredPBROpaqueIndexedProgram.mRiggedVariant &&
+                   gDeferredPBROpaqueIndexedProgram.mRiggedVariant->isComplete();
+
     gDeferredPBROpaqueProgram.bind();
-    pushGLTFBatches(mRenderType);
+    if (indexed)
+    { // multi-material infos are drawn separately below; render only scalar here
+        pushGLTFBatchesScalar(mRenderType);
+    }
+    else
+    {
+        pushGLTFBatches(mRenderType);
+    }
 
     gDeferredPBROpaqueProgram.bind(true);
-    pushRiggedGLTFBatches(mRenderType + 1);
+    if (indexed)
+    {
+        pushRiggedGLTFBatchesScalar(mRenderType + 1);
+    }
+    else
+    {
+        pushRiggedGLTFBatches(mRenderType + 1);
+    }
+
+    if (indexed)
+    {
+        gDeferredPBROpaqueIndexedProgram.bind();
+        pushGLTFBatchesIndexed(mRenderType);
+
+        gDeferredPBROpaqueIndexedProgram.bind(true); // rigged variant
+        pushRiggedGLTFBatchesIndexed(mRenderType + 1);
+    }
 }
 
 S32 LLDrawPoolGLTFPBR::getNumPostDeferredPasses()
@@ -77,11 +113,44 @@ void LLDrawPoolGLTFPBR::renderPostDeferred(S32 pass)
     else if (mRenderType == LLPipeline::RENDER_TYPE_PASS_GLTF_PBR) // HACK -- don't render glow except for the non-alpha masked implementation
     {
         gGL.setColorMask(false, true);
+
+        // Multi-material (indexed) glow batches render with the indexed program; the
+        // scalar sweep skips them. Require both the static and rigged indexed glow
+        // programs to be complete; otherwise fall back to scalar for everything
+        // (slot-0 glow, the pre-batching behavior).
+        bool glow_indexed = LLGLSLShader::sIndexedGLTFChannels >= 2 &&
+                            gPBRGlowIndexedProgram.isComplete() &&
+                            gPBRGlowIndexedProgram.mRiggedVariant &&
+                            gPBRGlowIndexedProgram.mRiggedVariant->isComplete();
+
         gPBRGlowProgram.bind();
-        pushGLTFBatches(LLRenderPass::PASS_GLTF_GLOW);
+        if (glow_indexed)
+        {
+            pushGLTFBatchesScalar(LLRenderPass::PASS_GLTF_GLOW);
+        }
+        else
+        {
+            pushGLTFBatches(LLRenderPass::PASS_GLTF_GLOW);
+        }
 
         gPBRGlowProgram.bind(true);
-        pushRiggedGLTFBatches(LLRenderPass::PASS_GLTF_GLOW_RIGGED);
+        if (glow_indexed)
+        {
+            pushRiggedGLTFBatchesScalar(LLRenderPass::PASS_GLTF_GLOW_RIGGED);
+        }
+        else
+        {
+            pushRiggedGLTFBatches(LLRenderPass::PASS_GLTF_GLOW_RIGGED);
+        }
+
+        if (glow_indexed)
+        {
+            gPBRGlowIndexedProgram.bind();
+            pushGLTFBatchesIndexed(LLRenderPass::PASS_GLTF_GLOW, GLTF_MAPS_GLOW);
+
+            gPBRGlowIndexedProgram.bind(true); // rigged variant
+            pushRiggedGLTFBatchesIndexed(LLRenderPass::PASS_GLTF_GLOW_RIGGED, GLTF_MAPS_GLOW);
+        }
 
         gGL.setColorMask(true, false);
     }

@@ -53,6 +53,8 @@
 #include "llglcommonfunc.h"
 #include "llvoavatar.h"
 #include "llviewershadermgr.h"
+#include "llfetchedgltfmaterial.h"
+#include "llviewertexture.h"
 
 S32 LLDrawPool::sNumDrawPools = 0;
 
@@ -520,6 +522,10 @@ void LLRenderPass::pushMaskBatches(U32 type, bool texture, bool batch_textures)
     {
         LLDrawInfo* pparams = *i;
         LLCullResult::increment_iterator(i, end);
+        if (pparams->mMaterialSlotList.size() > 1)
+        { // multi-material legacy batch -- drawn by pushMaskBatchesIndexed
+            continue;
+        }
         LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
         pushBatch(*pparams, texture, batch_textures);
     }
@@ -541,12 +547,151 @@ void LLRenderPass::pushRiggedMaskBatches(U32 type, bool texture, bool batch_text
 
         llassert(pparams);
 
+        if (pparams->mMaterialSlotList.size() > 1)
+        { // multi-material legacy batch -- drawn by pushMaskBatchesIndexed
+            continue;
+        }
+
         LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
 
         if (uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
         {
             pushBatch(*pparams, texture, batch_textures);
         }
+    }
+}
+
+void LLRenderPass::pushMaskBatchesIndexed(U32 type, bool rigged)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+
+    const LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    bool skipLastSkin = false;
+
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mMaterialSlotList.size() < 2)
+        {
+            continue;
+        }
+
+        if (rigged)
+        {
+            if (!uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+            {
+                continue;
+            }
+        }
+
+        // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a
+        // stale/over-long list can never overrun the 8-slot array or N sampler units.
+        const S32 N = LLGLSLShader::sIndexedGLTFChannels;
+        llassert((S32)params.mMaterialSlotList.size() <= N);
+        const S32 n = llmin((S32)params.mMaterialSlotList.size(), N);
+        LL_PROFILE_ZONE_NUM(n);
+
+        F32 min_alpha[8] = { 0.f };
+        for (S32 s = 0; s < n; ++s)
+        {
+            const LLDrawInfo::MaterialSlot& slot = params.mMaterialSlotList[s];
+            LLViewerTexture* diffuse = slot.mDiffuse.notNull() ? slot.mDiffuse.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+            gGL.getTexUnit(s)->bindFast(diffuse);
+            min_alpha[s] = slot.mAlphaMaskCutoff;
+        }
+
+        static const LLStaticHashedString sMinAlpha("mat_minimum_alpha");
+        shader->uniform1fv(sMinAlpha, n, min_alpha);
+
+        applyModelMatrix(params);
+
+        params.mVertexBuffer->setBuffer();
+        params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
+    }
+}
+
+void LLRenderPass::pushEmissiveBatchesScalar(U32 type, bool rigged)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    const LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    bool skipLastSkin = false;
+
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo* pparams = *i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (pparams->mMaterialSlotList.size() > 1)
+        { // multi-material glow batch -- drawn by pushEmissiveBatchesIndexed
+            continue;
+        }
+
+        if (rigged)
+        {
+            if (!uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+            {
+                continue;
+            }
+        }
+
+        pushBatch(*pparams, true, true);
+    }
+}
+
+void LLRenderPass::pushEmissiveBatchesIndexed(U32 type, bool rigged)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    const LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    bool skipLastSkin = false;
+
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mMaterialSlotList.size() < 2)
+        {
+            continue;
+        }
+
+        if (rigged)
+        {
+            if (!uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+            {
+                continue;
+            }
+        }
+
+        // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a
+        // stale/over-long list can never bind past the N diffuse sampler units.
+        const S32 N = LLGLSLShader::sIndexedGLTFChannels;
+        llassert((S32)params.mMaterialSlotList.size() <= N);
+        const S32 n = llmin((S32)params.mMaterialSlotList.size(), N);
+        LL_PROFILE_ZONE_NUM(n);
+
+        for (S32 s = 0; s < n; ++s)
+        {
+            const LLDrawInfo::MaterialSlot& slot = params.mMaterialSlotList[s];
+            LLViewerTexture* diffuse = slot.mDiffuse.notNull() ? slot.mDiffuse.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+            gGL.getTexUnit(s)->bindFast(diffuse);
+        }
+
+        applyModelMatrix(params);
+
+        params.mVertexBuffer->setBuffer();
+        params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
     }
 }
 
@@ -815,6 +960,180 @@ void LLRenderPass::pushUntexturedGLTFBatches(U32 type)
     }
 }
 
+// Like pushGLTFBatches, but skips multi-material (indexed) draw infos -- those are
+// rendered separately by pushGLTFBatchesIndexed under the indexed shader. Used by
+// the main opaque GBuffer pass only.
+void LLRenderPass::pushGLTFBatchesScalar(U32 type)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    LLFetchedGLTFMaterial* lastMat = nullptr;
+    LLViewerTexture* lastTex = nullptr;
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mGLTFMaterialList.size() > 1)
+        { // multi-material batch -- handled by the indexed sweep
+            continue;
+        }
+
+        pushGLTFBatch(params, lastMat, lastTex);
+    }
+}
+
+// Renders only the multi-material (indexed) draw infos. Assumes the indexed PBR
+// shader is bound. maps selects which material maps to bind (see eGLTFIndexedMaps).
+void LLRenderPass::pushGLTFBatchesIndexed(U32 type, eGLTFIndexedMaps maps)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mGLTFMaterialList.size() < 2)
+        { // single-material batch -- handled by the scalar sweep
+            continue;
+        }
+
+        pushGLTFBatchIndexed(params, maps);
+    }
+}
+
+// static
+// Bind one draw call's worth of indexed materials and emit it. Each material slot
+// s binds its maps to texture units [s, N+s, 2N+s, 3N+s] (N == shader's
+// sIndexedGLTFChannels) and contributes one element to the per-slot scalar/transform
+// uniform arrays. Mirrors LLFetchedGLTFMaterial::bind for the default-texture and
+// factor handling. maps trims the bound/uploaded set: GLTF_MAPS_BASE_COLOR (shadow
+// alpha-mask) binds only base color; GLTF_MAPS_GLOW (glow pass) adds emissive but
+// skips normal/ORM; GLTF_MAPS_FULL (GBuffer write) binds everything.
+void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps maps)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+
+    const bool want_emissive = (maps == GLTF_MAPS_FULL || maps == GLTF_MAPS_GLOW);
+    const bool want_full     = (maps == GLTF_MAPS_FULL); // normal + ORM
+
+    const S32 N = LLGLSLShader::sIndexedGLTFChannels; // shader sampler-array stride
+    // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a stale
+    // or over-long list can never overrun the fixed 8-slot arrays / N sampler units.
+    llassert((S32)params.mGLTFMaterialList.size() <= N);
+    const S32 n = llmin((S32)params.mGLTFMaterialList.size(), N); // materials in this batch
+    LL_PROFILE_ZONE_NUM(n);
+
+    LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+
+    // gathered per-slot uniform data (max 8 slots; see sIndexedGLTFChannels clamp)
+    F32 roughness[8] = { 0.f };
+    F32 metallic[8]  = { 0.f };
+    F32 min_alpha[8] = { 0.f };
+    F32 emissive[3 * 8] = { 0.f };
+    F32 bc_xform[8 * 8] = { 0.f }; // 2 vec4 (8 floats) per slot
+    F32 nm_xform[8 * 8] = { 0.f };
+    F32 mr_xform[8 * 8] = { 0.f };
+    F32 em_xform[8 * 8] = { 0.f };
+
+    bool double_sided = false;
+
+    for (S32 s = 0; s < n; ++s)
+    {
+        LLFetchedGLTFMaterial* mat = params.mGLTFMaterialList[s].get();
+        if (mat == nullptr)
+        { // gap left by a fragmented batch -- this slot is never sampled
+            min_alpha[s] = -1.f;
+            continue;
+        }
+
+        double_sided = double_sided || mat->mDoubleSided;
+
+        LLViewerTexture* base = mat->mBaseColorTexture.notNull() ? mat->mBaseColorTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+        gGL.getTexUnit(s)->bindFast(base);
+
+        min_alpha[s] = (mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK) ? mat->mAlphaCutoff : -1.f;
+
+        // getPacked() takes F32(&)[8]; copy each transform into its slot stride.
+        LLGLTFMaterial::TextureTransform::Pack packed;
+        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(packed);
+        memcpy(&bc_xform[8 * s], packed, sizeof(packed));
+
+        if (!want_emissive)
+        { // shadow alpha-mask samples only base color
+            continue;
+        }
+
+        // emissive map/color/transform -- needed by both the glow and GBuffer passes
+        LLViewerTexture* em = mat->mEmissiveTexture.notNull() ? mat->mEmissiveTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+        gGL.getTexUnit(3 * N + s)->bindFast(em);
+
+        emissive[3 * s + 0] = mat->mEmissiveColor.mV[0];
+        emissive[3 * s + 1] = mat->mEmissiveColor.mV[1];
+        emissive[3 * s + 2] = mat->mEmissiveColor.mV[2];
+
+        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE].getPacked(packed);
+        memcpy(&em_xform[8 * s], packed, sizeof(packed));
+
+        if (!want_full)
+        { // glow needs base color + emissive only
+            continue;
+        }
+
+        LLViewerTexture* norm = (mat->mNormalTexture.notNull() && mat->mNormalTexture->getDiscardLevel() <= 4) ? mat->mNormalTexture.get() : LLViewerFetchedTexture::sFlatNormalImagep.get();
+        LLViewerTexture* orm  = mat->mMetallicRoughnessTexture.notNull() ? mat->mMetallicRoughnessTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
+
+        gGL.getTexUnit(N + s)->bindFast(norm);
+        gGL.getTexUnit(2 * N + s)->bindFast(orm);
+
+        roughness[s] = mat->mRoughnessFactor;
+        metallic[s]  = mat->mMetallicFactor;
+
+        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL].getPacked(packed);
+        memcpy(&nm_xform[8 * s], packed, sizeof(packed));
+        mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS].getPacked(packed);
+        memcpy(&mr_xform[8 * s], packed, sizeof(packed));
+    }
+
+    static const LLStaticHashedString sMinAlpha("gltf_minimum_alpha");
+    static const LLStaticHashedString sBcXform("gltf_basecolor_transform");
+
+    shader->uniform1fv(sMinAlpha, n, min_alpha);
+    shader->uniform4fv(sBcXform, 2 * n, bc_xform);
+
+    if (want_emissive)
+    {
+        static const LLStaticHashedString sEmissive("gltf_emissive_color");
+        static const LLStaticHashedString sEmXform("gltf_emissive_transform");
+
+        shader->uniform3fv(sEmissive, n, emissive);
+        shader->uniform4fv(sEmXform, 2 * n, em_xform);
+    }
+
+    if (want_full)
+    {
+        static const LLStaticHashedString sRoughness("gltf_roughness_factor");
+        static const LLStaticHashedString sMetallic("gltf_metallic_factor");
+        static const LLStaticHashedString sNmXform("gltf_normal_transform");
+        static const LLStaticHashedString sMrXform("gltf_mr_transform");
+
+        shader->uniform1fv(sRoughness, n, roughness);
+        shader->uniform1fv(sMetallic, n, metallic);
+        shader->uniform4fv(sNmXform, 2 * n, nm_xform);
+        shader->uniform4fv(sMrXform, 2 * n, mr_xform);
+    }
+
+    LLGLDisable cull_face(double_sided ? GL_CULL_FACE : 0);
+
+    applyModelMatrix(params);
+
+    params.mVertexBuffer->setBuffer();
+    params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
+}
+
 // static
 void LLRenderPass::pushGLTFBatch(LLDrawInfo& params, LLFetchedGLTFMaterial*& lastMat, LLViewerTexture*& lastTex)
 {
@@ -927,6 +1246,66 @@ void LLRenderPass::pushUntexturedRiggedGLTFBatch(LLDrawInfo& params, const LLVOA
     if (uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
     {
         pushUntexturedGLTFBatch(params);
+    }
+}
+
+// rigged counterpart of pushGLTFBatchesScalar -- skips multi-material infos
+void LLRenderPass::pushRiggedGLTFBatchesScalar(U32 type)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    const LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    bool skipLastSkin = false;
+    LLFetchedGLTFMaterial* lastMat = nullptr;
+    LLViewerTexture* lastTex = nullptr;
+
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mGLTFMaterialList.size() > 1)
+        { // multi-material batch -- handled by the indexed sweep
+            continue;
+        }
+
+        pushRiggedGLTFBatch(params, lastAvatar, lastMeshId, skipLastSkin, lastMat, lastTex);
+    }
+}
+
+// rigged counterpart of pushGLTFBatchesIndexed -- only multi-material infos.
+// Assumes the rigged indexed program is bound.
+void LLRenderPass::pushRiggedGLTFBatchesIndexed(U32 type, eGLTFIndexedMaps maps)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+    const LLVOAvatar* lastAvatar = nullptr;
+    U64 lastMeshId = 0;
+    bool skipLastSkin = false;
+
+    auto* begin = gPipeline.beginRenderMap(type);
+    auto* end = gPipeline.endRenderMap(type);
+    for (LLCullResult::drawinfo_iterator i = begin; i != end; )
+    {
+        LLDrawInfo& params = **i;
+        LLCullResult::increment_iterator(i, end);
+
+        if (params.mGLTFMaterialList.size() < 2)
+        { // single-material batch -- handled by the scalar sweep
+            continue;
+        }
+
+        pushRiggedGLTFBatchIndexed(params, lastAvatar, lastMeshId, skipLastSkin, maps);
+    }
+}
+
+// static
+void LLRenderPass::pushRiggedGLTFBatchIndexed(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin, eGLTFIndexedMaps maps)
+{
+    if (uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+    {
+        pushGLTFBatchIndexed(params, maps);
     }
 }
 

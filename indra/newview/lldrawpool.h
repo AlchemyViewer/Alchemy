@@ -364,6 +364,27 @@ public:
     // assumes draw infos of given type have valid GLTF materials
     void pushGLTFBatches(U32 type);
 
+    // Which material maps an indexed GLTF batch binds and uploads. Trimming the set
+    // skips needless texture binds / uniform uploads (and the normal-map discard-level
+    // fetch) when a pass samples only some maps.
+    enum eGLTFIndexedMaps
+    {
+        GLTF_MAPS_FULL = 0,    // base color + normal + ORM + emissive (GBuffer write)
+        GLTF_MAPS_BASE_COLOR,  // base color only (shadow alpha-mask discard)
+        GLTF_MAPS_GLOW,        // base color + emissive (glow/emissive pass)
+    };
+
+    // Indexed (multi-material) GLTF PBR helpers. Indexed and scalar draw infos
+    // coexist in the same render map (PASS_GLTF_PBR); they are distinguished by
+    // mGLTFMaterialList.size() > 1. Shadow/probe passes use the plain
+    // pushGLTFBatches (rendering everything scalar for depth); only the main
+    // opaque GBuffer pass splits the two:
+    //   pushGLTFBatchesScalar  -- renders only single-material infos
+    //   pushGLTFBatchesIndexed -- renders only multi-material infos (indexed program bound)
+    void pushGLTFBatchesScalar(U32 type);
+    void pushGLTFBatchesIndexed(U32 type, eGLTFIndexedMaps maps = GLTF_MAPS_FULL);
+    static void pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps maps = GLTF_MAPS_FULL);
+
     // like pushGLTFBatches, but will not bind textures or set up texture transforms
     void pushUntexturedGLTFBatches(U32 type);
 
@@ -376,6 +397,13 @@ public:
     void pushRiggedGLTFBatches(U32 type, bool textured);
     void pushUntexturedRiggedGLTFBatches(U32 type);
 
+    // rigged indexed/scalar split (see pushGLTFBatchesScalar/Indexed); each batch
+    // is one avatar+skin (the accumulation breaks on skin change), so the matrix
+    // palette is uploaded per draw info as usual.
+    void pushRiggedGLTFBatchesScalar(U32 type);
+    void pushRiggedGLTFBatchesIndexed(U32 type, eGLTFIndexedMaps maps = GLTF_MAPS_FULL);
+    static void pushRiggedGLTFBatchIndexed(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin, eGLTFIndexedMaps maps = GLTF_MAPS_FULL);
+
     // push a single GLTF draw call
     // lastMat/lastTex track the most recently bound material+media texture so
     // consecutive draws sharing a material skip the redundant LLFetchedGLTFMaterial::bind
@@ -386,6 +414,18 @@ public:
 
     void pushMaskBatches(U32 type, bool texture = true, bool batch_textures = false);
     void pushRiggedMaskBatches(U32 type, bool texture = true, bool batch_textures = false);
+    // indexed (multi-material) legacy material shadow alpha-mask: binds per-slot
+    // diffuse + per-slot cutoff array, then draws. Assumes the indexed material
+    // shadow program is bound.
+    void pushMaskBatchesIndexed(U32 type, bool rigged);
+
+    // Emissive/glow indexed split. Multi-material (indexed) glow batches coexist
+    // with scalar/plain ones in PASS_GLOW, distinguished by mMaterialSlotList.size()
+    // > 1. The scalar sweep skips multi-material infos (they would render the whole
+    // range with slot 0's diffuse); the indexed sweep binds each slot's diffuse to
+    // unit s and draws under the indexed emissive program.
+    void pushEmissiveBatchesScalar(U32 type, bool rigged);
+    void pushEmissiveBatchesIndexed(U32 type, bool rigged);
     void pushBatch(LLDrawInfo& params, bool texture, bool batch_textures = false);
     void pushUntexturedBatch(LLDrawInfo& params);
     void pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_textures = false);
