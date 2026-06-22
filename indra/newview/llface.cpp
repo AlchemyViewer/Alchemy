@@ -63,9 +63,6 @@
 
 #define LL_MAX_INDICES_COUNT 1000000
 
-static LLStaticHashedString sTextureIndexIn("texture_index_in");
-static LLStaticHashedString sColorIn("color_in");
-
 bool LLFace::sSafeRenderSelect = true; // false
 
 

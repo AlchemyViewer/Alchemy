@@ -58,8 +58,6 @@ static LLStaticHashedString sTexture1("texture1");
 static LLStaticHashedString sTex0("tex0");
 static LLStaticHashedString sTex1("tex1");
 static LLStaticHashedString sDitherTex("dither_tex");
-static LLStaticHashedString sGlowMap("glowMap");
-static LLStaticHashedString sScreenMap("screenMap");
 
 // Lots of STL stuff in here, using namespace std to keep things more readable
 using std::vector;
@@ -3373,13 +3371,6 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gGlowCombineProgram.mShaderFiles.push_back(make_pair("interface/glowcombineF.glsl", GL_FRAGMENT_SHADER));
         gGlowCombineProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gGlowCombineProgram.createShader();
-        if (success)
-        {
-            gGlowCombineProgram.bind();
-            gGlowCombineProgram.uniform1i(sGlowMap, 0);
-            gGlowCombineProgram.uniform1i(sScreenMap, 1);
-            gGlowCombineProgram.unbind();
-        }
     }
 
     if (success)
@@ -3390,13 +3381,6 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gGlowCombineFXAAProgram.mShaderFiles.push_back(make_pair("interface/glowcombineFXAAF.glsl", GL_FRAGMENT_SHADER));
         gGlowCombineFXAAProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
         success = gGlowCombineFXAAProgram.createShader();
-        if (success)
-        {
-            gGlowCombineFXAAProgram.bind();
-            gGlowCombineFXAAProgram.uniform1i(sGlowMap, 0);
-            gGlowCombineFXAAProgram.uniform1i(sScreenMap, 1);
-            gGlowCombineFXAAProgram.unbind();
-        }
     }
 
 #ifdef LL_WINDOWS

@@ -159,6 +159,16 @@ public:
         NUM_UNIFORM_BLOCKS
     };
 
+    // An active uniform read back from the linked program, plus the texture-unit
+    // ordering used to assign sampler channels deterministically (see mapUniforms).
+    struct gl_uniform_data_t
+    {
+        std::string name;
+        GLenum type = (GLenum)-1;
+        GLint size = -1;
+        U32 texunit_priority = UINT_MAX; // lower value gets an earlier texture-unit index
+    };
+
 
     static std::set<LLGLSLShader*> sInstances;
     static bool sProfileEnabled;
@@ -201,7 +211,7 @@ public:
     void attachObjects(GLuint* objects = NULL, S32 count = 0);
     bool mapAttributes();
     bool mapUniforms();
-    void mapUniform(GLint index);
+    void mapUniform(const gl_uniform_data_t& gl_uniform);
     void uniform1i(U32 index, GLint i);
     void uniform1f(U32 index, GLfloat v);
     void fastUniform1f(U32 index, GLfloat v);

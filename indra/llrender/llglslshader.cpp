@@ -499,42 +499,8 @@ bool LLGLSLShader::createShader()
             unloadInternal();
         }
     }
-    else if (mFeatures.mIndexedTextureChannels > 0)
-    { //override texture channels for indexed texture rendering
-        llassert(mFeatures.mIndexedTextureChannels == LLGLSLShader::sIndexedTextureChannels); // these numbers must always match
-        bind();
-        S32 channel_count = mFeatures.mIndexedTextureChannels;
-
-        for (S32 i = 0; i < channel_count; i++)
-        {
-            LLStaticHashedString uniName(llformat("tex%d", i));
-            uniform1i(uniName, i);
-        }
-
-        //adjust any texture channels that might have been overwritten
-        for (U32 i = 0; i < mTexture.size(); i++)
-        {
-            if (mTexture[i] > -1)
-            {
-                S32 new_tex = mTexture[i] + channel_count;
-                uniform1i(i, new_tex);
-                mTexture[i] = new_tex;
-            }
-        }
-
-        // get the true number of active texture channels
-        mActiveTextureChannels = channel_count;
-        for (auto& tex : mTexture)
-        {
-            mActiveTextureChannels = llmax(mActiveTextureChannels, tex + 1);
-        }
-
-        // when indexed texture channels are used, enforce an upper limit of 32
-        // this should act as a canary in the coal mine for adding textures
-        // and breaking machines that are limited to 32 texture channels
-        llassert(mActiveTextureChannels <= 32);
-        unbind();
-    }
+    // NOTE: indexed texture channels (tex0..texN) are assigned the first texture
+    // units directly in mapUniforms() via texunit_priority -- no post-pass needed.
 
     LL_DEBUGS("GLSLTextureChannels") << mName << " has " << mActiveTextureChannels << " active texture channels" << LL_ENDL;
 
@@ -700,23 +666,16 @@ bool LLGLSLShader::mapAttributes()
     return false;
 }
 
-void LLGLSLShader::mapUniform(GLint index)
+void LLGLSLShader::mapUniform(const gl_uniform_data_t& gl_uniform)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
-    if (index == -1)
-    {
-        return;
-    }
-
-    GLenum type;
-    GLsizei length;
-    GLint size = -1;
+    GLenum type = gl_uniform.type;
+    GLint size = gl_uniform.size;
     char name[1024];        /* Flawfinder: ignore */
-    name[0] = 0;
+    strncpy(name, gl_uniform.name.c_str(), sizeof(name) - 1); /* Flawfinder: ignore */
+    name[sizeof(name) - 1] = 0;
 
-
-    glGetActiveUniform(mProgramObject, index, 1024, &length, &size, &type, (GLchar*)name);
     if (size > 0)
     {
         switch (type)
@@ -774,6 +733,16 @@ void LLGLSLShader::mapUniform(GLint index)
         mUniformMap[hashedName] = location;
 
         LL_DEBUGS("ShaderUniform") << "Uniform " << name << " is at location " << location << LL_ENDL;
+
+        // Indexed textures (tex0..texN) are referenced by hardcoded texture-unit
+        // index, not through a reserved-uniform enum. The priority sort in
+        // mapUniforms() guarantees they are mapped first, so just bind the
+        // texture-unit => sampler-location mapping here and skip mUniform/mTexture.
+        if (gl_uniform.texunit_priority < (U32)mFeatures.mIndexedTextureChannels)
+        {
+            mapUniformTextureChannel(location, type, size);
+            return;
+        }
 
         //find the index of this uniform
         for (S32 i = 0; i < (S32)LLShaderMgr::instance()->mReservedUniforms.size(); i++)
@@ -868,135 +837,83 @@ bool LLGLSLShader::mapUniforms()
     GLint activeCount;
     glGetProgramiv(mProgramObject, GL_ACTIVE_UNIFORMS, &activeCount);
 
-    //........................................................................................................................................
-    //........................................................................................
+    // Texture channels are assigned in the order samplers are mapped (see
+    // mapUniformTextureChannel / mActiveTextureChannels), and the engine is
+    // sensitive to that order -- e.g. "diffuseMap" must win channel 0 so the
+    // texture matrix is applied to the right unit. The GLSL compiler does not
+    // guarantee any particular ordering of glGetActiveUniform() indices, so we
+    // The analytic font glyph buffer (isamplerBuffer) is now an auto-channeled
+    // diffuseMap still wins texture channel 0 if the compiler orders the buffer
+    // sampler first (it is declared earlier, in the injected lib).
+    //   [mIndexedTextureChannels, ...) -> reserved uniforms, in mReservedUniforms order
+    //   UINT_MAX                       -> everything else (order irrelevant; non-samplers)
+    const auto& reservedUniforms = LLShaderMgr::instance()->mReservedUniforms;
+    const U32 max_index = (U32)mFeatures.mIndexedTextureChannels;
+    llassert(max_index == 0 || mFeatures.mIndexedTextureChannels == LLGLSLShader::sIndexedTextureChannels);
 
-    /*
-    EXPLANATION:
-    This is part of code is temporary because as the final result the mapUniform() should be rewrited.
-    But it's a huge a volume of work which is need to be a more carefully performed for avoid possible
-    regression's (i.e. it should be formalized a separate ticket in JIRA).
+    std::vector<gl_uniform_data_t> gl_uniforms;
+    gl_uniforms.reserve(activeCount);
 
-    RESON:
-    The reason of this code is that SL engine is very sensitive to fact that "diffuseMap" should be appear
-    first as uniform parameter which is should get 0-"texture channel" index (see mapUniformTextureChannel() and mActiveTextureChannels)
-    it influence to which is texture matrix will be updated during rendering.
-
-    But, order of indexe's of uniform variables is not defined and GLSL compiler can change it as want
-    , even if the "diffuseMap" will be appear and use first in shader code.
-
-    As example where this situation appear see: "Deferred Material Shader 28/29/30/31"
-    And tickets: MAINT-4165, MAINT-4839, MAINT-3568, MAINT-6437
-
-    --- davep TODO -- pretty sure the entire block here is superstitious and that the uniform index has nothing to do with the texture channel
-                texture channel should follow the uniform VALUE
-    */
-
-
-    S32 diffuseMap = glGetUniformLocation(mProgramObject, "diffuseMap");
-    S32 specularMap = glGetUniformLocation(mProgramObject, "specularMap");
-    S32 bumpMap = glGetUniformLocation(mProgramObject, "bumpMap");
-    S32 altDiffuseMap = glGetUniformLocation(mProgramObject, "altDiffuseMap");
-    S32 environmentMap = glGetUniformLocation(mProgramObject, "environmentMap");
-    S32 reflectionMap = glGetUniformLocation(mProgramObject, "reflectionMap");
-
-    std::set<S32> skip_index;
-
-    if (-1 != diffuseMap && (-1 != specularMap || -1 != bumpMap || -1 != environmentMap || -1 != altDiffuseMap))
-    {
-        GLenum type;
-        GLsizei length;
-        GLint size = -1;
-        char name[1024];
-
-        diffuseMap = altDiffuseMap = specularMap = bumpMap = environmentMap = -1;
-
-        for (S32 i = 0; i < activeCount; i++)
-        {
-            name[0] = '\0';
-
-            glGetActiveUniform(mProgramObject, i, 1024, &length, &size, &type, (GLchar*)name);
-
-            if (-1 == diffuseMap && std::string(name) == "diffuseMap")
-            {
-                diffuseMap = i;
-                continue;
-            }
-
-            if (-1 == specularMap && std::string(name) == "specularMap")
-            {
-                specularMap = i;
-                continue;
-            }
-
-            if (-1 == bumpMap && std::string(name) == "bumpMap")
-            {
-                bumpMap = i;
-                continue;
-            }
-
-            if (-1 == environmentMap && std::string(name) == "environmentMap")
-            {
-                environmentMap = i;
-                continue;
-            }
-
-            if (-1 == reflectionMap && std::string(name) == "reflectionMap")
-            {
-                reflectionMap = i;
-                continue;
-            }
-
-            if (-1 == altDiffuseMap && std::string(name) == "altDiffuseMap")
-            {
-                altDiffuseMap = i;
-                continue;
-            }
-        }
-
-        bool specularDiff = specularMap < diffuseMap && -1 != specularMap;
-        bool bumpLessDiff = bumpMap < diffuseMap && -1 != bumpMap;
-        bool envLessDiff = environmentMap < diffuseMap && -1 != environmentMap;
-        bool refLessDiff = reflectionMap < diffuseMap && -1 != reflectionMap;
-
-        if (specularDiff || bumpLessDiff || envLessDiff || refLessDiff)
-        {
-            mapUniform(diffuseMap);
-            skip_index.insert(diffuseMap);
-
-            if (-1 != specularMap) {
-                mapUniform(specularMap);
-                skip_index.insert(specularMap);
-            }
-
-            if (-1 != bumpMap) {
-                mapUniform(bumpMap);
-                skip_index.insert(bumpMap);
-            }
-
-            if (-1 != environmentMap) {
-                mapUniform(environmentMap);
-                skip_index.insert(environmentMap);
-            }
-
-            if (-1 != reflectionMap) {
-                mapUniform(reflectionMap);
-                skip_index.insert(reflectionMap);
-            }
-        }
-    }
-
-    //........................................................................................
-
+    bool has_diffuse = false;
     for (S32 i = 0; i < activeCount; i++)
     {
-        //........................................................................................
-        if (skip_index.end() != skip_index.find(i)) continue;
-        //........................................................................................
+        // Fetch name, type and size from OpenGL.
+        char name[1024];        /* Flawfinder: ignore */
+        gl_uniform_data_t gl_uniform;
+        GLsizei length = 0;
+        glGetActiveUniform(mProgramObject, i, sizeof(name), &length, &gl_uniform.size, &gl_uniform.type, (GLchar*)name);
+        if (length && name[length - 1] == '\0')
+        {
+            --length; // some drivers include the null terminator in the length, some don't
+        }
+        if (gl_uniform.size < 0 || length <= 0)
+            continue;
+        gl_uniform.name.assign(name, length);
 
-        mapUniform(i);
+        // Track whether diffuseMap is present so we can assert it is never mixed
+        // with indexed textures (they share texture channel 0).
+        has_diffuse |= gl_uniform.name == "diffuseMap";
+
+        // Reserved uniforms keep their relative order, offset past the indexed range.
+        auto it = std::find(reservedUniforms.cbegin(), reservedUniforms.cend(), gl_uniform.name);
+        if (it != reservedUniforms.cend())
+        {
+            gl_uniform.texunit_priority = max_index + (U32)std::distance(reservedUniforms.cbegin(), it);
+        }
+        else
+        {
+            // Indexed textures tex0..texN must always take the first channels, so
+            // give tex<idx> priority <idx>. (Breaks if a tex# index is skipped.)
+            S32 idx;
+            if (sscanf(gl_uniform.name.c_str(), "tex%d", &idx) == 1 && idx >= 0 && idx < (S32)max_index)
+            {
+                gl_uniform.texunit_priority = (U32)idx;
+            }
+        }
+        gl_uniforms.push_back(std::move(gl_uniform));
     }
-    //........................................................................................................................................
+
+    // Stable sort so equal-priority (non-reserved) uniforms keep their GL order.
+    std::stable_sort(gl_uniforms.begin(), gl_uniforms.end(),
+        [](const gl_uniform_data_t& lhs, const gl_uniform_data_t& rhs)
+        {
+            return lhs.texunit_priority < rhs.texunit_priority;
+        });
+
+    // Indexed textures and diffuseMap both want texture channel 0 -- they must never coexist.
+    if (max_index > 0)
+    {
+        llassert_always_msg(!has_diffuse, "Indexed textures and diffuseMap are incompatible!");
+    }
+
+    for (const auto& gl_uniform : gl_uniforms)
+    {
+        mapUniform(gl_uniform);
+    }
+
+    // when indexed texture channels are used, enforce an upper limit of 32; this
+    // acts as a canary for adding textures and breaking machines limited to 32.
+    llassert(max_index == 0 || mActiveTextureChannels <= 32);
 
     // Set up block binding, in a way supported by Apple (rather than binding = 1 in .glsl).
     // See slide 35 and more of https://docs.huihoo.com/apple/wwdc/2011/session_420__advances_in_opengl_for_mac_os_x_lion.pdf
