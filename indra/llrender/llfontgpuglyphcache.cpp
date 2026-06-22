@@ -32,18 +32,29 @@
 #include "llgl.h"
 #include "llglheaders.h"
 
+// The shared (global) texel store. One arena / GL buffer serves every per-face
+// cache so glyph_loc is a global offset and a single buffer texture covers all
+// glyph rendering.
+std::vector<U8> LLFontGpuGlyphCache::sArena;
+U32 LLFontGpuGlyphCache::sUploadedBytes   = 0;
+U32 LLFontGpuGlyphCache::sMaxTexels       = LLFontGpuGlyphCache::kDefaultMaxTexels;
+U32 LLFontGpuGlyphCache::sGLBuffer        = 0;
+U32 LLFontGpuGlyphCache::sGLTexture       = 0;
+U32 LLFontGpuGlyphCache::sGLCapacityBytes = 0;
 // Start at 1 so a freshly default-constructed consumer holding generation 0
-// always reads as stale against any live cache.
-S32 LLFontGpuGlyphCache::sNextGeneration = 1;
+// always reads as stale against the live store.
+S32 LLFontGpuGlyphCache::sGeneration      = 1;
 
 LLFontGpuGlyphCache::LLFontGpuGlyphCache()
-    : mGeneration(sNextGeneration++)
+    : mLastArenaGen(sGeneration)
 {
 }
 
 LLFontGpuGlyphCache::~LLFontGpuGlyphCache()
 {
-    destroyGL();
+    // Do NOT touch the shared GL store here — other faces' caches use it. Only
+    // this cache's per-face encoders/map go away; the shared store is torn down
+    // once via the static destroyGL() at GL teardown.
     if (mEncoder)
     {
         hb_gpu_draw_destroy(mEncoder);
@@ -61,9 +72,12 @@ LLFontGpuGlyphCache::~LLFontGpuGlyphCache()
     }
 }
 
-void LLFontGpuGlyphCache::init(hb_face_t* face, bool color, unsigned palette)
+void LLFontGpuGlyphCache::init(hb_font_t* src_font, bool color, unsigned palette)
 {
-    reset();
+    // Re-init clears only THIS face's map (the shared arena belongs to all faces).
+    // Sync to the current generation so getGlyph doesn't immediately re-clear.
+    mCache.clear();
+    mLastArenaGen = sGeneration;
 
     mColor   = color;
     mPalette = palette;
@@ -74,6 +88,7 @@ void LLFontGpuGlyphCache::init(hb_face_t* face, bool color, unsigned palette)
         mEncodeFont = nullptr;
     }
 
+    hb_face_t* face = src_font ? hb_font_get_face(src_font) : nullptr;
     if (face)
     {
         // Scale the encode font to the face's upem so the outline coordinates
@@ -82,6 +97,20 @@ void LLFontGpuGlyphCache::init(hb_face_t* face, bool color, unsigned palette)
         unsigned upem = hb_face_get_upem(face);
         mEncodeFont = hb_font_create(face);
         hb_font_set_scale(mEncodeFont, static_cast<int>(upem), static_cast<int>(upem));
+
+        // Carry the source font's variation-axis state onto the encode font.
+        // hb_font_create() starts at the face's DEFAULT instance, so a variable
+        // face configured for bold/weight/optical (the source font's var coords,
+        // which LLFontFace mirrors from the FT_Face) would otherwise encode the
+        // regular master and render un-emboldened. Copy the NORMALIZED coords:
+        // src_font and the encode font share the exact same face, so normalized
+        // values transfer directly with no design->normalized round-trip.
+        unsigned num_coords = 0;
+        const int* coords = hb_font_get_var_coords_normalized(src_font, &num_coords);
+        if (coords && num_coords)
+        {
+            hb_font_set_var_coords_normalized(mEncodeFont, coords, num_coords);
+        }
     }
 }
 
@@ -126,6 +155,10 @@ namespace
                     LLFontGpuGlyphCache::GlyphLoc& loc)
     {
         unsigned len = blob ? hb_blob_get_length(blob) : 0;
+        // hb-gpu emits whole RGBA16I texels; trim any partial trailing texel
+        // defensively so a non-multiple length can't misalign every subsequent
+        // glyph's texel offset (byte_off / kBytesPerTexel).
+        len -= len % LLFontGpuGlyphCache::kBytesPerTexel;
         if (blob && len >= LLFontGpuGlyphCache::kBytesPerTexel)
         {
             const char* data = hb_blob_get_data(blob, nullptr);
@@ -154,7 +187,7 @@ LLFontGpuGlyphCache::GlyphLoc LLFontGpuGlyphCache::encodeDrawGlyph(U32 glyph_id)
 
     hb_glyph_extents_t ext = { 0, 0, 0, 0 };
     hb_blob_t* blob = hb_gpu_draw_encode(mEncoder, &ext);
-    store_blob(mArena, blob, ext, loc);
+    store_blob(sArena, blob, ext, loc);
 
     if (blob)
     {
@@ -176,7 +209,7 @@ LLFontGpuGlyphCache::GlyphLoc LLFontGpuGlyphCache::encodePaintGlyph(U32 glyph_id
 
     hb_glyph_extents_t ext = { 0, 0, 0, 0 };
     hb_blob_t* blob = hb_gpu_paint_encode(mPaintEncoder, &ext);
-    store_blob(mArena, blob, ext, loc);
+    store_blob(sArena, blob, ext, loc);
 
     if (blob)
     {
@@ -193,20 +226,32 @@ const LLFontGpuGlyphCache::GlyphLoc& LLFontGpuGlyphCache::getGlyph(U32 glyph_id)
         return sEmpty;
     }
 
+    // The shared arena may have been reset (eviction) by another face's cache
+    // since we last looked; our stored offsets are then stale. Drop them.
+    if (mLastArenaGen != sGeneration)
+    {
+        mCache.clear();
+        mLastArenaGen = sGeneration;
+    }
+
     if (auto it = mCache.find(glyph_id); it != mCache.end())
     {
         return it->second;
     }
 
+    const bool had_prior = !sArena.empty();
     GlyphLoc loc = encodeGlyph(glyph_id);
 
-    // Overflow eviction: if this glyph pushed the arena past the ceiling and
-    // there were prior glyphs, drop everything and re-encode this one into the
-    // fresh arena (so it lands at offset 0). A lone glyph bigger than the whole
-    // budget is pathological; we keep it rather than loop forever.
-    if (loc.drawable() && getArenaTexels() > mMaxTexels && !mCache.empty())
+    // Overflow eviction: if this glyph pushed the SHARED arena past the ceiling
+    // and there was prior content, reset the whole store and re-encode this one
+    // into the fresh arena (so it lands at offset 0). reset() bumps sGeneration;
+    // sync ours and clear our (now-gone) entries. A lone glyph bigger than the
+    // whole budget is pathological; we keep it rather than loop forever.
+    if (loc.drawable() && getArenaTexels() > sMaxTexels && had_prior)
     {
         reset();
+        mCache.clear();
+        mLastArenaGen = sGeneration;
         loc = encodeGlyph(glyph_id);
     }
 
@@ -223,25 +268,28 @@ bool LLFontGpuGlyphCache::ensureGLBuffer()
         return false;
     }
 
-    if (!mGLBuffer)
+    if (!sGLBuffer)
     {
-        glGenBuffers(1, &mGLBuffer);
-        glGenTextures(1, &mGLTexture);
-        mGLCapacityBytes = 0;
-        mUploadedBytes   = 0;
+        glGenBuffers(1, &sGLBuffer);
+        glGenTextures(1, &sGLTexture);
+        sGLCapacityBytes = 0;
+        sUploadedBytes   = 0;
     }
 
     // Pre-size to the ceiling so steady-state growth needs no reallocation;
-    // honor an oversized arena from the pathological lone-glyph case.
-    U32 want = llmax(mMaxTexels * kBytesPerTexel, static_cast<U32>(mArena.size()));
-    if (mGLCapacityBytes < want)
+    // honor an oversized arena from the pathological lone-glyph case. Compute the
+    // ceiling in 64-bit so sMaxTexels * kBytesPerTexel can't overflow U32 (only
+    // reachable via an absurd setMaxTexels, but cheap to guard).
+    U32 want = static_cast<U32>(llmax((U64)sMaxTexels * kBytesPerTexel,
+                                      (U64)sArena.size()));
+    if (sGLCapacityBytes < want)
     {
-        glBindBuffer(GL_TEXTURE_BUFFER, mGLBuffer);
+        glBindBuffer(GL_TEXTURE_BUFFER, sGLBuffer);
         glBufferData(GL_TEXTURE_BUFFER, want, nullptr, GL_DYNAMIC_DRAW);
-        mGLCapacityBytes = want;
-        mUploadedBytes   = 0;   // store was reallocated — re-upload everything
-        glBindTexture(GL_TEXTURE_BUFFER, mGLTexture);
-        glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA16I, mGLBuffer);
+        sGLCapacityBytes = want;
+        sUploadedBytes   = 0;   // store was reallocated — re-upload everything
+        glBindTexture(GL_TEXTURE_BUFFER, sGLTexture);
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA16I, sGLBuffer);
     }
     return true;
 }
@@ -253,44 +301,45 @@ bool LLFontGpuGlyphCache::bindBufferTexture()
         return false;
     }
 
-    if (mUploadedBytes < mArena.size())
+    if (sUploadedBytes < sArena.size())
     {
-        glBindBuffer(GL_TEXTURE_BUFFER, mGLBuffer);
+        glBindBuffer(GL_TEXTURE_BUFFER, sGLBuffer);
         glBufferSubData(GL_TEXTURE_BUFFER,
-                        mUploadedBytes,
-                        mArena.size() - mUploadedBytes,
-                        mArena.data() + mUploadedBytes);
-        mUploadedBytes = static_cast<U32>(mArena.size());
+                        sUploadedBytes,
+                        sArena.size() - sUploadedBytes,
+                        sArena.data() + sUploadedBytes);
+        sUploadedBytes = static_cast<U32>(sArena.size());
     }
 
-    glBindTexture(GL_TEXTURE_BUFFER, mGLTexture);
+    glBindTexture(GL_TEXTURE_BUFFER, sGLTexture);
     return true;
 }
 
 void LLFontGpuGlyphCache::destroyGL()
 {
-    if (mGLTexture)
+    if (sGLTexture)
     {
-        glDeleteTextures(1, &mGLTexture);
-        mGLTexture = 0;
+        glDeleteTextures(1, &sGLTexture);
+        sGLTexture = 0;
     }
-    if (mGLBuffer)
+    if (sGLBuffer)
     {
-        glDeleteBuffers(1, &mGLBuffer);
-        mGLBuffer = 0;
+        glDeleteBuffers(1, &sGLBuffer);
+        sGLBuffer = 0;
     }
-    mGLCapacityBytes = 0;
-    mUploadedBytes   = 0;
+    sGLCapacityBytes = 0;
+    sUploadedBytes   = 0;
 }
 
 void LLFontGpuGlyphCache::reset()
 {
-    mArena.clear();
-    mCache.clear();
-    mUploadedBytes = 0;
+    sArena.clear();
+    sUploadedBytes = 0;
     // Keep the GL objects (capacity is reused); the next bind re-uploads the
-    // fresh, smaller arena. Bump generation so dependent vertex buffers rebuild.
-    mGeneration = sNextGeneration++;
+    // fresh, smaller arena. Bump generation so dependent vertex buffers (and
+    // every per-face map) rebuild. Per-face maps clear lazily on their next
+    // getGlyph when they notice the generation moved.
+    ++sGeneration;
 }
 
 #endif // LL_HAS_HB_GPU

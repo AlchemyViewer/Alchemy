@@ -475,6 +475,10 @@ public:
 
         // End Alchemy Effects Stack
 
+        // Font rendering
+        FONT_SHADOW_MODE,                  //  "shadowMode" (atlas shader-shadow pass)
+        FONT_GLYPH_BUFFER,                 //  "hb_gpu_atlas" (analytic glyph texel buffer, isamplerBuffer)
+
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
     // clang-format on
@@ -489,7 +493,7 @@ public:
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
     bool    linkProgramObject(GLuint obj, bool suppress_errors = false);
     bool    validateProgramObject(GLuint obj);
-    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1);
+    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& extra_source = std::string());
 
     // Implemented in the application to actually point to the shader directory.
     virtual std::string getShaderDirPrefix(void) = 0; // Pure Virtual

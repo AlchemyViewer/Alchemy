@@ -1837,6 +1837,11 @@ void LLVertexBuffer::setColorData(const LLColor4U* data)
     flush_vbo(GL_ARRAY_BUFFER, mOffsets[TYPE_COLOR], mOffsets[TYPE_COLOR] + sTypeSize[TYPE_COLOR] * getNumVerts() - 1, (U8*) data, mMappedData);
 }
 
+void LLVertexBuffer::setGlyphLocData(const U32* data)
+{
+    flush_vbo(GL_ARRAY_BUFFER, mOffsets[TYPE_GLYPH_LOC], mOffsets[TYPE_GLYPH_LOC] + sTypeSize[TYPE_GLYPH_LOC] * getNumVerts() - 1, (U8*) data, mMappedData);
+}
+
 void LLVertexBuffer::setNormalData(const LLVector4a* data)
 {
     flush_vbo(GL_ARRAY_BUFFER, mOffsets[TYPE_NORMAL], mOffsets[TYPE_NORMAL] + sTypeSize[TYPE_NORMAL] * getNumVerts() - 1, (U8*) data, mMappedData);

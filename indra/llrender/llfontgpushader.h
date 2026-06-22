@@ -52,13 +52,24 @@ class LLGLSLShader;
 class LLFontGpuShader
 {
 public:
-    // The assembled GLSL for each stage (#version + HarfBuzz source + app main).
-    // fragmentSource()       — draw renderer: coverage -> color.a * coverage.
-    // colorFragmentSource()  — paint renderer: COLR(v1) -> premultiplied RGBA.
-    // The vertex stage is identical for both, so vertexSource() serves both.
+    // Standalone assembled GLSL (#version + HarfBuzz source + app main). Retained
+    // for the headless shader smoke test (validates the hb-gpu GLSL compiles and
+    // links); the production path injects the lib into the UI shader instead (see
+    // fragmentLibSource). fragmentSource = draw renderer; colorFragmentSource =
+    // paint renderer; vertexSource serves both.
     static std::string vertexSource();
     static std::string fragmentSource();
     static std::string colorFragmentSource();
+
+    // Library-only source — the HarfBuzz functions for a stage, with NO `#version`
+    // line and NO app main(). PRODUCTION path: fragmentLibSource is spliced into
+    // the UI shader (uiF.glsl) so glyphs render under it as ordinary gGL geometry,
+    // keyed per-vertex by glyph_loc — the host supplies main()/IO and calls
+    // hb_gpu_draw (coverage) / hb_gpu_paint (color). vertexLibSource (hb_gpu_dilate)
+    // is NOT injected anymore (the emit pre-dilates on the CPU); it is kept only
+    // for the standalone vertexSource above.
+    static std::string vertexLibSource();
+    static std::string fragmentLibSource();
 
     // Assemble, compile, link, and map uniforms into `program`. Returns true on
     // success (program.isComplete()). Requires a current GL context and an

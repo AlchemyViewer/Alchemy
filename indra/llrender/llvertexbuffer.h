@@ -167,6 +167,19 @@ public:
         MAP_TEXTURE_INDEX = (1<<TYPE_TEXTURE_INDEX),
     };
 
+    // Semantics of the glyph_loc vertex attribute, shared by gGL's immediate
+    // stream (default), the analytic font emit, and the UI shader. The attribute
+    // lets glyphs ride gGL's batched stream alongside plain quads: the fragment
+    // decides per-vertex what to draw from this value.
+    //   GLYPH_LOC_QUAD       -> not a glyph; sample diffuseMap (ordinary UI quad)
+    //   bit GLYPH_LOC_COLOR  set -> COLR(v1) glyph; low bits are the texel offset
+    //   otherwise            -> monochrome glyph; the value is the texel offset
+    // Offsets are < GLYPH_LOC_COLOR by construction (the texel store is far
+    // smaller than 2^31), so there is no aliasing with the quad sentinel.
+    static constexpr U32 GLYPH_LOC_QUAD       = 0xFFFFFFFFu;
+    static constexpr U32 GLYPH_LOC_COLOR      = 0x80000000u;
+    static constexpr U32 GLYPH_LOC_OFFSET_MASK= 0x7FFFFFFFu;
+
 protected:
     friend class LLRender;
 
@@ -235,6 +248,7 @@ public:
     void setTexCoord0Data(const LLVector2* data);
     void setTexCoord1Data(const LLVector2* data);
     void setColorData(const LLColor4U* data);
+    void setGlyphLocData(const U32* data);
     void setIndexData(const U16* data);
     void setIndexData(const U32* data);
 

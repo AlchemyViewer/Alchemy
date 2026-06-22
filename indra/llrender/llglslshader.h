@@ -342,6 +342,17 @@ public:
     typedef std::map<std::string, std::string> defines_map_t; //NOTE: this must be an ordered map to maintain hash consistency
     defines_map_t mDefines;
     static defines_map_t sGlobalDefines;
+
+    // Extra GLSL source injected verbatim ahead of each shader file's body (after
+    // the #version line and the standard #define block). Used to splice the
+    // runtime-generated hb-gpu analytic rasterizer lib into a file-based program
+    // (the UI shader) so glyphs ride gGL's batched stream and rasterize per-vertex
+    // off glyph_loc. Empty for every other shader. mHasFontGpu advertises that
+    // capability so the font path emits glyphs through gGL only when such a shader
+    // is bound (else it uses the atlas). See LLFontGpuShader.
+    std::string mExtraVertexSource;
+    std::string mExtraFragmentSource;
+    bool        mHasFontGpu = false;
     LLUUID mShaderHash;
     bool mUsingBinaryProgram = false;
 

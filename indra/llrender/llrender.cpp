@@ -95,7 +95,10 @@ static const GLint sGLAddressMode[] =
     GL_CLAMP_TO_EDGE
 };
 
-const U32 immediate_mask = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_TEXCOORD0;
+// glyph_loc rides along so analytic-font glyphs can batch in the immediate
+// stream with quads; it defaults to GLYPH_LOC_QUAD for all non-glyph geometry,
+// which the UI shader treats as an ordinary textured quad.
+const U32 immediate_mask = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_GLYPH_LOC;
 
 static const GLenum sGLBlendFactor[] =
 {
@@ -833,6 +836,8 @@ void LLRender::initVertexBuffer()
     mBuffer->getVertexStrider(mVerticesp);
     mBuffer->getTexCoord0Strider(mTexcoordsp);
     mBuffer->getColorStrider(mColorsp);
+    mBuffer->getGlyphLocStrider(mGlyphLocp);
+    mGlyphLocp[0] = LLVertexBuffer::GLYPH_LOC_QUAD;  // current value for the first vertex
     stop_glerror();
 }
 
@@ -1604,6 +1609,11 @@ LLVertexBuffer* LLRender::bufferfromCache(U32 attribute_mask, U32 count)
             hash.update((U8*)mColorsp.get(), count * sizeof(LLColor4U));
         }
 
+        if (attribute_mask & LLVertexBuffer::MAP_GLYPH_LOC)
+        {
+            hash.update((U8*)mGlyphLocp.get(), count * sizeof(U32));
+        }
+
         hash.finalize();
     }
 
@@ -1687,6 +1697,11 @@ LLVertexBuffer* LLRender::genBuffer(U32 attribute_mask, S32 count)
         vb->setColorData(mColorsp.get());
     }
 
+    if (attribute_mask & LLVertexBuffer::MAP_GLYPH_LOC)
+    {
+        vb->setGlyphLocData(mGlyphLocp.get());
+    }
+
 #if LL_DARWIN
     // unmapBuffer creates the GL buffer, uploads, and leaves it bound;
     // drawBuffer's later setBuffer() then runs setupVertexBuffer against
@@ -1709,6 +1724,7 @@ void LLRender::resetStriders(S32 count)
     mVerticesp[0] = mVerticesp[count];
     mTexcoordsp[0] = mTexcoordsp[count];
     mColorsp[0] = mColorsp[count];
+    mGlyphLocp[0] = mGlyphLocp[count];
 
     mCount = 0;
 }
@@ -1748,6 +1764,7 @@ void LLRender::vertex3f(const GLfloat& x, const GLfloat& y, const GLfloat& z)
     mVerticesp[mCount] = mVerticesp[mCount-1];
     mColorsp[mCount] = mColorsp[mCount-1];
     mTexcoordsp[mCount] = mTexcoordsp[mCount-1];
+    mGlyphLocp[mCount] = mGlyphLocp[mCount-1];
 }
 
 void LLRender::vertexBatchPreTransformed(LLVector4a* verts, S32 vert_count)
@@ -1765,6 +1782,7 @@ void LLRender::vertexBatchPreTransformed(LLVector4a* verts, S32 vert_count)
         mCount++;
         mTexcoordsp[mCount] = mTexcoordsp[mCount-1];
         mColorsp[mCount] = mColorsp[mCount-1];
+        mGlyphLocp[mCount] = mGlyphLocp[mCount-1];
     }
 
     if( mCount > 0 ) // ND: Guard against crashes if mCount is zero, yes it can happen
@@ -1786,6 +1804,7 @@ void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, S32 
 
         mCount++;
         mColorsp[mCount] = mColorsp[mCount-1];
+        mGlyphLocp[mCount] = mGlyphLocp[mCount-1];
     }
 
     if (mCount > 0)
@@ -1810,6 +1829,7 @@ void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, LLCo
         mColorsp[mCount] = colors[i];
 
         mCount++;
+        mGlyphLocp[mCount] = mGlyphLocp[mCount-1];
     }
 
     if (mCount > 0)
@@ -1817,6 +1837,36 @@ void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, LLCo
         mVerticesp[mCount] = mVerticesp[mCount - 1];
         mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
         mColorsp[mCount] = mColorsp[mCount - 1];
+    }
+}
+
+// Analytic-font variant: glyph_loc per vertex. After the batch the "current"
+// glyph_loc is reset to GLYPH_LOC_QUAD so subsequent ordinary geometry (which
+// only carries the current value forward) is treated as quads, not glyphs.
+void LLRender::vertexBatchPreTransformed(LLVector4a* verts, LLVector2* uvs, LLColor4U* colors, U32* glyph_locs, S32 vert_count)
+{
+    if (mCount + vert_count > 4094)
+    {
+        //  LL_WARNS() << "GL immediate mode overflow.  Some geometry not drawn." << LL_ENDL;
+        return;
+    }
+
+    for (S32 i = 0; i < vert_count; i++)
+    {
+        mVerticesp[mCount] = verts[i];
+        mTexcoordsp[mCount] = uvs[i];
+        mColorsp[mCount] = colors[i];
+        mGlyphLocp[mCount] = glyph_locs[i];
+
+        mCount++;
+    }
+
+    if (mCount > 0)
+    {
+        mVerticesp[mCount] = mVerticesp[mCount - 1];
+        mTexcoordsp[mCount] = mTexcoordsp[mCount - 1];
+        mColorsp[mCount] = mColorsp[mCount - 1];
+        mGlyphLocp[mCount] = LLVertexBuffer::GLYPH_LOC_QUAD;
     }
 }
 

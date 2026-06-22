@@ -39,6 +39,7 @@
 #include "llversioninfo.h"
 
 #include "llrender.h"
+#include "llfontgpushader.h"   // hb-gpu rasterizer lib injection for the UI shader
 #include "llenvironment.h"
 #include "llerrorcontrol.h"
 #include "llworld.h"
@@ -3666,18 +3667,32 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gUIProgram.mShaderFiles.push_back(make_pair("interface/uiV.glsl", GL_VERTEX_SHADER));
         gUIProgram.mShaderFiles.push_back(make_pair("interface/uiF.glsl", GL_FRAGMENT_SHADER));
         gUIProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+#if LL_HAS_HB_GPU
+        // Splice the runtime hb-gpu analytic rasterizer (fragment lib) into the UI
+        // shader so the GPU font path (AlchemyFontRenderGPU) can draw glyphs that
+        // ride gGL's batched stream: each vertex's glyph_loc tells uiF.glsl to
+        // rasterize coverage / paint instead of sampling a quad texture. Guarded by
+        // HAS_FONT_GPU; mHasFontGpu marks the program font-capable so the font path
+        // emits glyphs only when it (or another such shader) is bound. Always built
+        // in — the runtime setting is read per-draw with no shader reload, and a
+        // GLYPH_LOC_QUAD vertex is byte-identical to the pre-change quad path. The
+        // vertex stage needs no lib (CPU pre-dilation), so only the fragment lib is
+        // injected.
+        gUIProgram.mExtraFragmentSource = LLFontGpuShader::fragmentLibSource();
+        gUIProgram.mDefines["HAS_FONT_GPU"] = "1";
+        gUIProgram.mHasFontGpu = true;
+#endif
         success = gUIProgram.createShader();
         if (success)
         {
             // Initialize the shadow-path uniform to passthrough so non-text UI
             // and NO_SHADOW text take the early-return branch in uiF.glsl. GLSL
             // already zero-initializes uniforms, but pushing an explicit default
-            // documents the contract and protects against driver quirks.
-            // shadowMode is the shader's only shadow uniform — atlas texel size
-            // and channel layout derive from the bound texture in uiF.glsl.
-            static LLStaticHashedString sShadowMode("shadowMode");
+            // documents the contract and protects against driver quirks. (The
+            // hb_gpu_atlas isamplerBuffer is auto-channeled by mapUniforms onto a
+            // unit distinct from diffuseMap's 0, so it needs no manual seed.)
             gUIProgram.bind();
-            gUIProgram.uniform1i(sShadowMode, 0);
+            gUIProgram.uniform1i(LLShaderMgr::FONT_SHADOW_MODE, 0);
             gUIProgram.unbind();
         }
     }

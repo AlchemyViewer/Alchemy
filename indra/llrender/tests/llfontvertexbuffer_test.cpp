@@ -28,6 +28,7 @@
 
 #include "../llfontvertexbuffer.h"
 #include "../llfontgl.h"
+#include "../llhbgpu.h"   // LL_HAS_HB_GPU (analytic-path capture integration test)
 
 #include "llheadlessgl_fixture.h"
 
@@ -612,5 +613,176 @@ namespace tut
                                       true);
         ensure_equals("full-fit render returns the entire string length",
                       n_full, (S32)s.length());
+    }
+
+    // Analytic (hb-gpu) path × LLFontVertexBuffer integration. The GPU path emits
+    // glyphs through gGL, so they're captured into the ordinary gGL display lists
+    // and replay like atlas geometry. Render twice with identical params — the
+    // first call captures + draws, the second is a pure cached replay
+    // (renderBuffers, no genBuffers) — and verify BOTH frames show glyph ink.
+    template<> template<>
+    void llfontvertexbuffer_render_object::test<9>()
+    {
+#if LL_HAS_HB_GPU
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not present in test data dir");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font available", font != nullptr);
+
+        ll_test::FontStateScope scope;
+        const S32 W = ll_test::HeadlessGL::WIDTH;
+        const S32 H = ll_test::HeadlessGL::HEIGHT;
+        const LLWString s = utf8str_to_wstring("Hi");
+
+        auto count_ink = [&]() -> S32
+        {
+            auto px = ll_test::readFramebufferRGBA(W, H);
+            S32 c = 0;
+            for (S32 y = 32; y < 100 && y < H; ++y)
+                for (S32 x = 40; x < 120 && x < W; ++x)
+                {
+                    const U8* p = &px[((std::size_t)y * W + x) * 4];
+                    if (((S32)p[0] + p[1] + p[2]) / 3 > 40) ++c;
+                }
+            return c;
+        };
+
+        LLFontGL::enableFontGpu(true);
+
+        // Pre-warm the per-face GPU glyph cache with a direct render so its
+        // generation is already folded into getCacheGeneration. Otherwise the
+        // cache first appears DURING the buffer's gen frame, bumping the stamp
+        // and forcing a regen on the next render — so the second vb.render below
+        // would not be a true cached replay.
+        gl.clearFramebuffer();
+        font->render(s, 0, 64.f, 64.f, LLColor4::white,
+                     LLFontGL::LEFT, LLFontGL::BASELINE,
+                     LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        gGL.flush();
+
+        LLFontVertexBuffer vb;
+
+        // First render: genBuffers captures the glyph geometry (gGL display lists)
+        // AND draws it.
+        gl.clearFramebuffer();
+        const S32 n1 = vb.render(font, s, 0, 64.f, 64.f, LLColor4::white,
+                                 LLFontGL::LEFT, LLFontGL::BASELINE,
+                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        gGL.flush();
+        const S32 ink_gen = count_ink();
+
+        const auto counts = ll_test::VertexBufferProbe::count(vb);
+
+        // Second render: identical params, GPU cache generation stable -> cached
+        // replay path (renderBuffers, no genBuffers). This is exactly what used
+        // to draw nothing.
+        gl.clearFramebuffer();
+        const S32 n2 = vb.render(font, s, 0, 64.f, 64.f, LLColor4::white,
+                                 LLFontGL::LEFT, LLFontGL::BASELINE,
+                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        gGL.flush();
+        const S32 ink_replay = count_ink();
+        // A third render to be sure the steady-state replay path keeps drawing.
+        gl.clearFramebuffer();
+        vb.render(font, s, 0, 64.f, 64.f, LLColor4::white,
+                  LLFontGL::LEFT, LLFontGL::BASELINE,
+                  LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
+        gGL.flush();
+        const S32 ink_replay2 = count_ink();
+        LLFontGL::enableFontGpu(false);
+
+        ensure_equals("char count stable across gen/replay", n2, n1);
+        // Analytic glyphs now emit through gGL, so they're captured as ordinary
+        // foreground display-list geometry (and the cached replay redraws them).
+        ensure("glyphs captured as gGL foreground geometry", counts.foreground_quads > 0);
+        ensure("first (gen) render drew glyph ink", ink_gen > 0);
+        ensure("cached replay still draws glyph ink", ink_replay > 0);
+        ensure("steady-state replay still draws glyph ink", ink_replay2 > 0);
+#else
+        skip("hb-gpu not available");
+#endif
+    }
+
+    // Ellipsis × GPU × LLFontVertexBuffer: an overflowing run with use_ellipses
+    // truncates and renders "..." recursively through the GPU branch. Both the
+    // truncated text AND the dots emit through gGL, so they're captured as
+    // foreground display-list geometry, and the cached replay must still draw.
+    template<> template<>
+    void llfontvertexbuffer_render_object::test<10>()
+    {
+#if LL_HAS_HB_GPU
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not present in test data dir");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font available", font != nullptr);
+
+        ll_test::FontStateScope scope;
+        font->generateASCIIglyphs();
+        const S32 W = ll_test::HeadlessGL::WIDTH;
+        const S32 H = ll_test::HeadlessGL::HEIGHT;
+        const LLWString s = utf8str_to_wstring("WWWWWWWWWWWWWWWW");
+        const F32 full_w = font->getWidthF32(s.c_str());
+        const S32 budget = (S32)(full_w * 0.5f);
+
+        auto count_ink = [&]() -> S32
+        {
+            auto px = ll_test::readFramebufferRGBA(W, H);
+            S32 c = 0;
+            for (S32 y = 32; y < 100 && y < H; ++y)
+                for (S32 x = 0; x < W; ++x)
+                {
+                    const U8* p = &px[((std::size_t)y * W + x) * 4];
+                    if (((S32)p[0] + p[1] + p[2]) / 3 > 40) ++c;
+                }
+            return c;
+        };
+
+        LLFontGL::enableFontGpu(true);
+
+        // Pre-warm the GPU glyph cache (incl. the ellipsis dots) so its
+        // generation is folded into getCacheGeneration before the buffer's gen
+        // frame — making the second vb.render a true cached replay rather than a
+        // regen triggered by the cache first appearing.
+        gl.clearFramebuffer();
+        font->render(s, 0, 20.f, 64.f, LLColor4::white,
+                     LLFontGL::LEFT, LLFontGL::BASELINE,
+                     LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                     S32_MAX, budget, nullptr, /*use_ellipses=*/true, /*use_color=*/true);
+        gGL.flush();
+
+        LLFontVertexBuffer vb;
+
+        gl.clearFramebuffer();
+        const S32 n1 = vb.render(font, s, 0, 20.f, 64.f, LLColor4::white,
+                                 LLFontGL::LEFT, LLFontGL::BASELINE,
+                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                 S32_MAX, budget, nullptr,
+                                 /*use_ellipses=*/true, /*use_color=*/true);
+        gGL.flush();
+        const S32 ink_gen = count_ink();
+        const auto counts = ll_test::VertexBufferProbe::count(vb);
+
+        // Cached replay (no genBuffers).
+        gl.clearFramebuffer();
+        const S32 n2 = vb.render(font, s, 0, 20.f, 64.f, LLColor4::white,
+                                 LLFontGL::LEFT, LLFontGL::BASELINE,
+                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                 S32_MAX, budget, nullptr,
+                                 /*use_ellipses=*/true, /*use_color=*/true);
+        gGL.flush();
+        const S32 ink_replay = count_ink();
+        LLFontGL::enableFontGpu(false);
+
+        ensure("ellipsis truncated the run", n1 > 0 && n1 < (S32)s.size());
+        // Truncated text + the recursive "..." both emit through gGL -> captured as
+        // foreground display-list geometry (no atlas fallback, which would also be
+        // foreground geometry but is excluded by the all-analytic eligibility scan).
+        ensure("ellipsis run captured as gGL foreground geometry", counts.foreground_quads > 0);
+        ensure_equals("char count stable across gen/replay", n2, n1);
+        ensure("gen render drew ink", ink_gen > 0);
+        ensure("cached replay still draws ink", ink_replay > 0);
+#else
+        skip("hb-gpu not available");
+#endif
     }
 }

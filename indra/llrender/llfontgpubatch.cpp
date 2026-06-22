@@ -1,6 +1,6 @@
 /**
  * @file llfontgpubatch.cpp
- * @brief Geometry build + draw for the analytic (hb-gpu) font path.
+ * @brief Glyph-quad geometry helper for the analytic (hb-gpu) font path.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -28,163 +28,54 @@
 
 #if LL_HAS_HB_GPU
 
-#include "llfontgpuglyphcache.h"
-#include "llgl.h"
-#include "llglheaders.h"
-#include "llglslshader.h"
-#include "llrender.h"
-#include "llvertexbuffer.h"
+#include "llvertexbuffer.h"   // LLVector4a / LLVector2 / LLColor4U
 
-U32 LLFontGpuBatch::buildVertices(LLFontGpuGlyphCache& cache,
-                                  const std::vector<Placement>& placements, F32 scale, F32 slant)
+namespace LLFontGpuBatch
 {
-    mVerts.clear();
-    mVerts.reserve(placements.size() * 6);
 
-    for (const Placement& p : placements)
+void buildGlyphQuad(LLVector4a* pos, LLVector2* uv, LLColor4U* col, U32* gloc,
+                    const LLFontGpuGlyphCache::GlyphLoc& loc,
+                    F32 pen_x, F32 pen_y, F32 scale, F32 slant,
+                    const LLColor4U& color, U32 glyph_loc)
+{
+    // Glyph box in design (em) units. height is negative (downward), so the
+    // bottom edge is yb + h. Font space is y-up (matches screen here -> no flip).
+    const F32 lu = (F32)loc.mXBearing;
+    const F32 ru = (F32)(loc.mXBearing + loc.mWidth);
+    const F32 tu = (F32)loc.mYBearing;
+    const F32 bu = (F32)(loc.mYBearing + loc.mHeight);
+
+    // Half-pixel analytic-edge dilation. Each corner expands outward along its
+    // sign normal by D screen pixels; the renderCoord (em) expands by D/scale so
+    // the Slug sample stays consistent with the enlarged quad. Mirrors the
+    // magnitude of the old in-shader hb_gpu_dilate for the orthographic UI case.
+    constexpr F32 D = 0.5f;
+    const F32 dEm = (scale != 0.f) ? (D / scale) : 0.f;
+
+    // Each corner: em u/v, outward sign normal (nx,ny), and whether the slant
+    // shear applies (bottom edge only). Order TL,BL,BR,TL,BR,TR.
+    struct Corner { F32 u, v, nx, ny, shear; };
+    const Corner corners[6] = {
+        { lu, tu, -1.f,  1.f, 0.f   },   // TL
+        { lu, bu, -1.f, -1.f, slant },   // BL
+        { ru, bu,  1.f, -1.f, slant },   // BR
+        { lu, tu, -1.f,  1.f, 0.f   },   // TL
+        { ru, bu,  1.f, -1.f, slant },   // BR
+        { ru, tu,  1.f,  1.f, 0.f   },   // TR
+    };
+
+    for (S32 i = 0; i < 6; ++i)
     {
-        const LLFontGpuGlyphCache::GlyphLoc& loc = cache.getGlyph(p.glyph_id);
-        if (!loc.drawable())
-        {
-            continue;   // space / outline-less glyph: nothing to draw
-        }
-
-        // Glyph box in design (em) units. height is negative (downward), so the
-        // bottom edge is yb + h.
-        const F32 lu = (F32)loc.mXBearing;
-        const F32 ru = (F32)(loc.mXBearing + loc.mWidth);
-        const F32 tu = (F32)loc.mYBearing;
-        const F32 bu = (F32)(loc.mYBearing + loc.mHeight);
-
-        // Faux italic: shear the screen quad's bottom edge by `slant` while the
-        // em-space sample coordinate (texcoord) stays upright, so the analytic
-        // glyph samples normally but draws slanted -- the same trick the atlas
-        // path uses in renderTriangle. (Top corners get 0; bottom corners get
-        // `slant`.) The dilation Jacobian stays diagonal, which leaves a tiny
-        // AA approximation on the slanted edges -- acceptable for faux italic.
-        auto emit = [&](F32 u, F32 v, F32 shear)
-        {
-            Vertex vert;
-            vert.pos[0] = p.pen_x + u * scale + shear;
-            vert.pos[1] = p.pen_y + v * scale;
-            vert.tc[0]  = u;
-            vert.tc[1]  = v;
-            vert.glyphLoc = loc.mTexelOffset;
-            vert.col[0] = p.color[0]; vert.col[1] = p.color[1];
-            vert.col[2] = p.color[2]; vert.col[3] = p.color[3];
-            mVerts.push_back(vert);
-        };
-
-        // 6 verts (TL,BL,BR,TL,BR,TR) — must match HB_CORNER_NORMAL[] in the
-        // vertex shader, which derives each corner's outward normal from
-        // gl_VertexID % 6.
-        emit(lu, tu, 0.f);    // TL
-        emit(lu, bu, slant);  // BL
-        emit(ru, bu, slant);  // BR
-        emit(lu, tu, 0.f);    // TL
-        emit(ru, bu, slant);  // BR
-        emit(ru, tu, 0.f);    // TR
+        const Corner& c = corners[i];
+        pos[i].set(pen_x + c.u * scale + c.shear + c.nx * D,
+                   pen_y + c.v * scale + c.ny * D,
+                   0.f);
+        uv[i].set(c.u + c.nx * dEm, c.v + c.ny * dEm);
+        col[i]  = color;
+        gloc[i] = glyph_loc;
     }
-
-    return (U32)mVerts.size();
 }
 
-bool LLFontGpuBatch::render(LLGLSLShader& program, LLFontGpuGlyphCache& cache,
-                            const std::vector<Placement>& placements, F32 scale,
-                            S32 viewport_w, S32 viewport_h, F32 slant,
-                            bool premultiplied)
-{
-    // NOTE: a batch must fit within the cache's texel budget; if buildVertices
-    // triggered an eviction mid-run the earlier glyphLocs would be stale. Runs
-    // are small relative to the cache ceiling, so this is acceptable for now.
-    const U32 nverts = buildVertices(cache, placements, scale, slant);
-    if (nverts == 0)
-    {
-        return false;
-    }
-
-    constexpr U32 kMask = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 |
-                          LLVertexBuffer::MAP_COLOR  | LLVertexBuffer::MAP_GLYPH_LOC;
-
-    if (mVB.isNull() || mVB->getNumVerts() < nverts)
-    {
-        mVB = new LLVertexBuffer(kMask);
-        if (!mVB->allocateBuffer(nverts, 0))
-        {
-            mVB = nullptr;
-            return false;
-        }
-    }
-
-    {
-        LLStrider<LLVector3> pos;
-        LLStrider<LLVector2> tc;
-        LLStrider<LLColor4U> col;
-        LLStrider<U32>       gloc;
-        if (!mVB->getVertexStrider(pos) || !mVB->getTexCoord0Strider(tc) ||
-            !mVB->getColorStrider(col) || !mVB->getGlyphLocStrider(gloc))
-        {
-            return false;
-        }
-        for (U32 i = 0; i < nverts; ++i)
-        {
-            const Vertex& v = mVerts[i];
-            pos[i]  = LLVector3(v.pos[0], v.pos[1], 0.f);
-            tc[i]   = LLVector2(v.tc[0], v.tc[1]);
-            col[i]  = LLColor4U(v.col[0], v.col[1], v.col[2], v.col[3]);
-            gloc[i] = v.glyphLoc;
-        }
-    }
-    mVB->unmapBuffer();
-
-    program.bind();
-
-    static const LLStaticHashedString sViewport("viewport");
-    static const LLStaticHashedString sJac("jac");
-    static const LLStaticHashedString sAtlas("hb_gpu_atlas");
-
-    program.uniform2f(sViewport, (F32)viewport_w, (F32)viewport_h);
-    // Inverse em->screen Jacobian: uniform scale, same sign on both axes.
-    const F32 inv_s = (scale != 0.f) ? (1.f / scale) : 0.f;
-    program.uniform4f(sJac, inv_s, 0.f, 0.f, inv_s);
-
-    // Bind the glyph texel buffer as hb_gpu_atlas on unit 0. Activate the unit
-    // through gGL so its tracking stays consistent; the buffer texture itself
-    // lives on the GL_TEXTURE_BUFFER target, which gGL does not manage.
-    gGL.getTexUnit(0)->activate();
-    if (!cache.bindBufferTexture())
-    {
-        return false;
-    }
-    program.uniform1i(sAtlas, 0);
-
-    // Color (paint) glyphs come out premultiplied; switch to premultiplied
-    // blending for the draw and restore the UI's straight-alpha blend after.
-    if (premultiplied)
-    {
-        gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
-    }
-
-    mVB->setBuffer();
-    mVB->drawArrays(LLRender::TRIANGLES, 0, nverts);
-
-    if (premultiplied)
-    {
-        gGL.setSceneBlendType(LLRender::BT_ALPHA);
-    }
-    return true;
-}
-
-void LLFontGpuBatch::destroyGL()
-{
-    mVB = nullptr;
-}
-
-LLFontGpuBatch::LLFontGpuBatch() = default;
-
-LLFontGpuBatch::~LLFontGpuBatch()
-{
-    destroyGL();
-}
+} // namespace LLFontGpuBatch
 
 #endif // LL_HAS_HB_GPU

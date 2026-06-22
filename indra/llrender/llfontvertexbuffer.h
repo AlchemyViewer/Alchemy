@@ -118,6 +118,19 @@ private:
     // color attribute streams without rebuilding geometry.
     std::list<LLVertexBufferData> mShadowBufferList;
     std::list<LLVertexBufferData> mForegroundBufferList;
+
+    // Analytic (hb-gpu) glyphs now emit through gGL, so their geometry is captured
+    // into the gGL display lists above (mShadow/mForeground) like atlas geometry;
+    // renderBuffers binds the global glyph texel buffer so the UI shader can
+    // rasterize them on replay. No separate retained-run storage.
+    //
+    // Any captured COLR (color) glyph? Those bake a fixed premultiplied color, so
+    // a color-only change can't recolor in place (like mLastUsesColorAtlas) and
+    // falls through to full genBuffers. Monochrome glyphs recolor like atlas text.
+    bool mHasColorGlyphs = false;
+    // sEnableFontGpu snapshot at gen time; a runtime toggle of the analytic path
+    // invalidates the cached geometry (captured for the other path entirely).
+    bool mLastEnableFontGpu = false;
     // Set during genBuffers: did any captured batch render glyphs from the
     // color (RGBA emoji) atlas? Mixed text+emoji strings can't be recolored
     // safely without per-entry glyph-type tracking, since emoji glyphs use a

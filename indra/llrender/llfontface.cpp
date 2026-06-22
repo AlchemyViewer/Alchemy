@@ -83,6 +83,8 @@ LLFontFace::~LLFontFace()
 #if LL_HAS_HB_GPU
     delete mGpuGlyphCachep;
     mGpuGlyphCachep = nullptr;
+    delete mGpuColorGlyphCachep;
+    mGpuColorGlyphCachep = nullptr;
 #endif
 }
 
@@ -94,18 +96,52 @@ LLFontGpuGlyphCache* LLFontFace::getGpuGlyphCache() const
         if (hb_font_t* hbf = getHbFont())
         {
             mGpuGlyphCachep = new LLFontGpuGlyphCache();
-            // The encode font is built from the face (size-independent); the
-            // hb_font's per-size scale doesn't matter here. COLRv1 faces encode
-            // color glyphs via the paint encoder (hb-gpu can't paint sbix/CBDT
-            // bitmap or SVG color faces — those keep the bitmap atlas path), so
-            // gate the color mode on hasColrV1() and feed the CPAL palette pick.
-            mGpuGlyphCachep->init(hb_font_get_face(hbf), mHasColrV1, mPaletteIndex);
+            // Monochrome outline coverage. Pass the hb_font (not the bare face)
+            // so the cache copies its variation-axis coords — a variable face's
+            // bold/weight instance must encode its VARIED outlines, not the
+            // default master. The encode font is size-independent; the hb_font's
+            // per-size scale doesn't matter here.
+            mGpuGlyphCachep->init(hbf);
         }
     }
     return mGpuGlyphCachep;
 }
+
+LLFontGpuGlyphCache* LLFontFace::getGpuColorGlyphCache() const
+{
+    // hb-gpu can only paint COLR(v1) faces; sbix/CBDT bitmap and SVG color
+    // faces have no GPU paint form and keep the bitmap atlas path.
+    if (!mHasColrV1)
+    {
+        return nullptr;
+    }
+    if (!mGpuColorGlyphCachep && isValid())
+    {
+        if (hb_font_t* hbf = getHbFont())
+        {
+            mGpuColorGlyphCachep = new LLFontGpuGlyphCache();
+            // Color mode + the load-time CPAL palette pick (dark-emoji aware).
+            // Pass the hb_font so any variation coords carry to the encode font.
+            mGpuColorGlyphCachep->init(hbf, /*color=*/true, mPaletteIndex);
+        }
+    }
+    return mGpuColorGlyphCachep;
+}
+
+U64 LLFontFace::getGpuCacheGeneration() const
+{
+    // The texel store is global now, so its generation is a single shared value
+    // (bumped on any eviction). Report it once when this face has a GPU cache, so
+    // the per-frame invalidation stamp still moves on eviction but doesn't force
+    // lazy GPU-cache creation when the analytic path is off.
+    if (mGpuGlyphCachep || mGpuColorGlyphCachep)
+        return (U64)(U32)LLFontGpuGlyphCache::getGeneration();
+    return 0;
+}
 #else
 LLFontGpuGlyphCache* LLFontFace::getGpuGlyphCache() const { return nullptr; }
+LLFontGpuGlyphCache* LLFontFace::getGpuColorGlyphCache() const { return nullptr; }
+U64 LLFontFace::getGpuCacheGeneration() const { return 0; }
 #endif
 
 bool LLFontFace::load(const std::string& filename, S32 face_index,
@@ -391,10 +427,10 @@ void LLFontFace::destroyGL()
     // renders as solid colored rectangles.
     if (mFontBitmapCachep)
         mFontBitmapCachep->destroyGL();
-#if LL_HAS_HB_GPU
-    if (mGpuGlyphCachep)
-        mGpuGlyphCachep->destroyGL();
-#endif
+    // The analytic glyph texel store is GLOBAL (shared across all faces), so it
+    // is NOT torn down per-face here — a single face reset (e.g. DPI change) must
+    // not pull the buffer out from under other faces. It is dropped once via the
+    // static LLFontGpuGlyphCache::destroyGL() in LLFontGL::destroyAllGL.
     resetBitmapCache();
 }
 

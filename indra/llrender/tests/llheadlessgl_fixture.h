@@ -23,6 +23,7 @@
 #include "../llglslshader.h"
 #include "../llimagegl.h"
 #include "../llfontfreetype.h"
+#include "../llfontgpushader.h"  // hb-gpu lib source for the font-capable stub UI program
 #include "../llfontshaping.h"
 #include "../llfontvertexbuffer.h"
 #include "../llrender.h"
@@ -42,7 +43,7 @@ namespace ll_test
         struct CaptureCounts
         {
             size_t shadow_quads     = 0;
-            size_t foreground_quads = 0;
+            size_t foreground_quads = 0;   // includes analytic glyphs (they emit through gGL now)
         };
 
         static CaptureCounts count(const LLFontVertexBuffer& buf)
@@ -96,14 +97,15 @@ namespace ll_test
         void updateShaderUniforms(LLGLSLShader* /*shader*/) override {}
     };
 
-    // GL 3.3 core pass-through UI vertex shader. Same uniform / attribute
-    // shape as indra/newview/app_settings/shaders/class1/interface/uiV.glsl;
-    // LLRender::syncMatrices recognises modelview_projection_matrix and
-    // texture_matrix0 by reserved-name lookup.
+    // GL 3.3 core UI vertex shader BODY (no #version — setupTestUIProgram adds
+    // it, plus the hb-gpu fragment lib + HAS_FONT_GPU define when LL_HAS_HB_GPU).
+    // Same shape as indra/newview/app_settings/shaders/class1/interface/uiV.glsl,
+    // including the per-vertex glyph_loc font branch — so the render tests exercise
+    // the SAME path the production UI shader uses. LLRender::syncMatrices
+    // recognises modelview_projection_matrix and texture_matrix0 by reserved name.
     inline const char* kTestUIVertexShader()
     {
         return
-            "#version 330\n"
             "uniform mat4 texture_matrix0;\n"
             "uniform mat4 modelview_projection_matrix;\n"
             "in vec3 position;\n"
@@ -111,28 +113,60 @@ namespace ll_test
             "in vec2 texcoord0;\n"
             "out vec4 vertex_color;\n"
             "out vec2 vary_texcoord0;\n"
+            "#ifdef HAS_FONT_GPU\n"
+            "in uint glyph_loc;\n"
+            "flat out uint vary_glyphLoc;\n"
+            "#endif\n"
             "void main()\n"
             "{\n"
             "    gl_Position = modelview_projection_matrix * vec4(position, 1.0);\n"
-            "    vary_texcoord0 = (texture_matrix0 * vec4(texcoord0, 0.0, 1.0)).xy;\n"
             "    vertex_color = diffuse_color;\n"
+            "#ifdef HAS_FONT_GPU\n"
+            "    vary_glyphLoc = glyph_loc;\n"
+            "    if (glyph_loc != 0xFFFFFFFFu)\n"   // GLYPH_LOC_QUAD
+            "    {\n"
+            "        vary_texcoord0 = texcoord0;\n"  // raw em-space renderCoord (CPU pre-dilated)
+            "        return;\n"
+            "    }\n"
+            "#endif\n"
+            "    vary_texcoord0 = (texture_matrix0 * vec4(texcoord0, 0.0, 1.0)).xy;\n"
             "}\n";
     }
 
-    // GL 3.3 core pass-through UI fragment shader. Mirrors uiF.glsl's
-    // shadowMode==0 fast path. Tests run with LLFontGL::sEnableShaderShadow
-    // off (default), so the multi-tap shadow branches are not exercised
-    // and aren't compiled in here.
+    // GL 3.3 core UI fragment shader BODY (no #version). Mirrors uiF.glsl's
+    // shadowMode==0 fast path plus the per-vertex glyph_loc font branch. Tests
+    // run with LLFontGL::sEnableShaderShadow off (default), so the multi-tap
+    // shadow branches are not exercised and aren't compiled in here.
     inline const char* kTestUIFragmentShader()
     {
         return
-            "#version 330\n"
             "out vec4 frag_color;\n"
             "uniform sampler2D diffuseMap;\n"
             "in vec2 vary_texcoord0;\n"
             "in vec4 vertex_color;\n"
+            "#ifdef HAS_FONT_GPU\n"
+            "flat in uint vary_glyphLoc;\n"
+            "#endif\n"
             "void main()\n"
             "{\n"
+            "#ifdef HAS_FONT_GPU\n"
+            "    if (vary_glyphLoc != 0xFFFFFFFFu)\n"   // GLYPH_LOC_QUAD
+            "    {\n"
+            "        if ((vary_glyphLoc & 0x80000000u) != 0u)\n"   // GLYPH_LOC_COLOR
+            "        {\n"
+            "            float cov;\n"
+            "            vec4 premul = hb_gpu_paint(vary_texcoord0, vary_glyphLoc & 0x7FFFFFFFu, vec4(vertex_color.rgb, 1.0), cov);\n"
+            "            frag_color = vec4(premul.rgb / max(premul.a, 1e-5), premul.a * vertex_color.a);\n"
+            "            return;\n"
+            "        }\n"
+            "        float coverage = hb_gpu_draw(vary_texcoord0, vary_glyphLoc);\n"
+            "        float ppem = hb_gpu_ppem(vary_texcoord0, vary_glyphLoc);\n"
+            "        float brightness = dot(vertex_color.rgb, vec3(0.299, 0.587, 0.114));\n"
+            "        coverage = hb_gpu_stem_darken(coverage, brightness, ppem);\n"
+            "        frag_color = vec4(vertex_color.rgb, vertex_color.a * coverage);\n"
+            "        return;\n"
+            "    }\n"
+            "#endif\n"
             "    frag_color = vertex_color * texture(diffuseMap, vary_texcoord0);\n"
             "}\n";
     }
@@ -164,8 +198,27 @@ namespace ll_test
     // table via initAttribsAndUniforms.
     inline bool setupTestUIProgram(LLShaderMgr* /*mgr*/)
     {
-        GLuint vs = compileTestShader(GL_VERTEX_SHADER, kTestUIVertexShader());
-        GLuint fs = compileTestShader(GL_FRAGMENT_SHADER, kTestUIFragmentShader());
+        // Assemble: #version, then (when hb-gpu is built in) the HAS_FONT_GPU
+        // define + the runtime hb-gpu rasterizer lib, then the shader body. This
+        // mirrors how the production gUIProgram is built (LLGLSLShader injects the
+        // same lib via loadShaderFile) so the render tests drive the integrated
+        // analytic font path — glyphs rendering UNDER this program with no
+        // program switch — exactly as the viewer does.
+        std::string vsrc = "#version 330\n";
+        std::string fsrc = "#version 330\n";
+        bool font_capable = false;
+#if LL_HAS_HB_GPU
+        // Only the fragment lib is needed (CPU pre-dilation -> no vertex dilate).
+        vsrc += "#define HAS_FONT_GPU 1\n";
+        fsrc += "#define HAS_FONT_GPU 1\n";
+        fsrc += LLFontGpuShader::fragmentLibSource();
+        font_capable = true;
+#endif
+        vsrc += kTestUIVertexShader();
+        fsrc += kTestUIFragmentShader();
+
+        GLuint vs = compileTestShader(GL_VERTEX_SHADER, vsrc.c_str());
+        GLuint fs = compileTestShader(GL_FRAGMENT_SHADER, fsrc.c_str());
         if (!vs || !fs)
         {
             if (vs) glDeleteShader(vs);
@@ -175,6 +228,9 @@ namespace ll_test
 
         gUIProgram.mProgramObject = glCreateProgram();
         gUIProgram.mName = "ui (test stub)";
+        // Advertise the analytic font path so LLFontGL::render emits glyphs through
+        // gGL under this program (per-vertex glyph_loc) instead of the atlas.
+        gUIProgram.mHasFontGpu = font_capable;
         gUIProgram.attachObject(vs);
         gUIProgram.attachObject(fs);
         // mapAttributes binds reserved attrib slots, links the program,
@@ -199,6 +255,9 @@ namespace ll_test
             gUIProgram.mProgramObject = 0;
             return false;
         }
+        // hb_gpu_atlas (isamplerBuffer) is auto-channeled by mapUniforms onto a
+        // unit distinct from diffuseMap's 0, so no manual seed is needed — mirrors
+        // the production gUIProgram setup.
         return true;
     }
 

@@ -224,7 +224,29 @@ public:
     // bitmap cache. Lazily created on first use from this face's hb_face (the
     // encoding is size-independent, so one cache serves every point size).
     // Returns nullptr when hb-gpu support is unavailable or the face is invalid.
+    //
+    // getGpuGlyphCache()      — monochrome outline coverage (the draw encoder),
+    //                           used for plain text AND for color faces drawn in
+    //                           monochrome mode (use_color=false / force-mono):
+    //                           the silhouette is tinted with the text color,
+    //                           matching the atlas grayscale path.
+    // getGpuColorGlyphCache() — COLR(v1) color glyphs (the paint encoder), used
+    //                           only when color is requested. Returns nullptr
+    //                           unless the face is COLRv1; sbix/CBDT/SVG color
+    //                           faces have no GPU paint form and keep the atlas.
+    // A COLR face can hold both: its silhouette cache and its color cache, each
+    // built on demand by the relevant draw call.
     LLFontGpuGlyphCache* getGpuGlyphCache() const;
+    LLFontGpuGlyphCache* getGpuColorGlyphCache() const;
+
+    // Sum of the already-created GPU glyph caches' generations (0 when none
+    // exist or hb-gpu is unavailable). NON-creating — folded into
+    // LLFontGL::getCacheGeneration so a GPU-cache eviction or a face reload
+    // ticks the per-font invalidation stamp the LLFontVertexBuffer caches watch.
+    // Lets the vertex-buffer cache detect staleness off the LIVE font instead of
+    // dereferencing a retained raw cache pointer (which a freed face would
+    // dangle).
+    U64 getGpuCacheGeneration() const;
 
     // Per-face glyph cache, keyed on FT glyph index. Used by both the
     // codepoint path (which resolves wch -> glyph_index before the lookup)
@@ -319,8 +341,11 @@ private:
     U16                mUnitsPerEm  = 0;
 
     LLFontBitmapCache* mFontBitmapCachep = nullptr;
-    // Lazily created in getGpuGlyphCache(); owned here, freed in the dtor.
-    mutable LLFontGpuGlyphCache* mGpuGlyphCachep = nullptr;
+    // Lazily created in getGpuGlyphCache()/getGpuColorGlyphCache(); owned here,
+    // freed in the dtor. The draw cache holds monochrome outline coverage; the
+    // color cache (COLRv1 faces only) holds paint blobs.
+    mutable LLFontGpuGlyphCache* mGpuGlyphCachep      = nullptr;
+    mutable LLFontGpuGlyphCache* mGpuColorGlyphCachep = nullptr;
     mutable glyph_info_map_t mGlyphInfoMap;
 
     // Earliest wall-clock time (seconds) at which collectGarbage() should

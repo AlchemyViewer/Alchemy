@@ -471,7 +471,7 @@ void LLShaderMgr::dumpObjectLog(GLuint ret, bool warns, const std::string& filen
     }
  }
 
-GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels)
+GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, const std::string& extra_source)
 {
     GLenum error = GL_NO_ERROR;
 
@@ -753,6 +753,16 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
 
     // Master definition can be found in deferredUtil.glsl
     extra_code_text[extra_code_count++] = strdup("struct GBufferInfo { vec4 albedo; vec4 specular; vec3 normal; vec4 emissive; float gbufferFlag; float envIntensity; };\n");
+
+    // Caller-supplied extra source spliced in ahead of the file body (rides the
+    // same insertion path as the #define block, so it lands after #version /
+    // defines and before main()). Used to inject the runtime-generated hb-gpu
+    // analytic rasterizer lib into the UI shader. One entry holds the whole
+    // multi-line blob — glShaderSource concatenates the array verbatim.
+    if (!extra_source.empty())
+    {
+        extra_code_text[extra_code_count++] = strdup(extra_source.c_str());
+    }
 
     //copy file into memory
     enum {
@@ -1671,6 +1681,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uPreviewMode");
 
     // End Alchemy Effects Stack
+
+    // Font rendering (order must match the enum above)
+    mReservedUniforms.push_back("shadowMode");
+    mReservedUniforms.push_back("hb_gpu_atlas");
 
     llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);
 

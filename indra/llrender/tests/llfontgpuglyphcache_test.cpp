@@ -22,6 +22,7 @@
 #include "../llfontregistry.h"   // EFontHinting
 
 #include <hb.h>
+#include <hb-ot.h>   // hb_ot_var_get_axis_count
 
 #if LL_MESA_HEADLESS
 #  include "llheadlessgl_fixture.h"
@@ -42,6 +43,9 @@ namespace
     constexpr const char* kOutlineFont = "IBMPlexMono-Regular.ttf";
     // COLRv1 vector color font — exercises the hb-gpu paint encode path.
     constexpr const char* kColorFont   = "Noto-COLRv1.ttf";
+    // Variable font with a wght axis (.ttf, no woff2/brotli dependency) —
+    // exercises encoding a non-default variation instance (bold).
+    constexpr const char* kVarFont     = "IBMPlexSansVar-Roman.ttf";
 
     bool fileExists(const std::string& path)
     {
@@ -53,15 +57,25 @@ namespace
         return false;
     }
 
-    // RAII for an hb_face_t opened from the test font; null/empty if absent.
+    // RAII for an hb_face_t (+ a default-instance hb_font_t) opened from the
+    // test font; null/empty if absent. init() takes the font so callers can set
+    // variation axes on it before encoding (see the variable-weight test).
     struct TestFace
     {
         hb_blob_t* blob = nullptr;
         hb_face_t* face = nullptr;
+        hb_font_t* font = nullptr;
 
-        explicit TestFace(const char* font = kOutlineFont)
+        explicit TestFace(const char* font_name = kOutlineFont)
         {
-            const std::string path = std::string(kFontDir) + font;
+            // The texel store is now GLOBAL (shared static across all caches), so
+            // it persists across test cases. Reset it (arena + default ceiling) at
+            // the start of each test that builds a TestFace, so offset/eviction
+            // assertions see a clean store regardless of prior tests.
+            LLFontGpuGlyphCache::reset();
+            LLFontGpuGlyphCache::setMaxTexels(1u << 18);
+
+            const std::string path = std::string(kFontDir) + font_name;
             if (!fileExists(path))
             {
                 return;
@@ -70,10 +84,12 @@ namespace
             if (hb_blob_get_length(blob) > 0)
             {
                 face = hb_face_create(blob, 0);
+                font = hb_font_create(face);
             }
         }
         ~TestFace()
         {
+            if (font) hb_font_destroy(font);
             if (face) hb_face_destroy(face);
             if (blob) hb_blob_destroy(blob);
         }
@@ -116,7 +132,7 @@ namespace tut
         ensure("cmap maps 'A'", gid_A != 0);
 
         LLFontGpuGlyphCache cache;
-        cache.init(tf.face);
+        cache.init(tf.font);
 
         const LLFontGpuGlyphCache::GlyphLoc loc = cache.getGlyph(gid_A);
         ensure("'A' is drawable", loc.drawable());
@@ -148,7 +164,7 @@ namespace tut
         ensure("cmap maps space", gid_sp != 0);
 
         LLFontGpuGlyphCache cache;
-        cache.init(tf.face);
+        cache.init(tf.font);
 
         const LLFontGpuGlyphCache::GlyphLoc loc = cache.getGlyph(gid_sp);
         const U32 texels_after_first = cache.getArenaTexels();
@@ -177,7 +193,7 @@ namespace tut
         ensure("cmap maps 'A' and 'B'", gid_A != 0 && gid_B != 0 && gid_A != gid_B);
 
         LLFontGpuGlyphCache cache;
-        cache.init(tf.face);
+        cache.init(tf.font);
 
         const LLFontGpuGlyphCache::GlyphLoc a = cache.getGlyph(gid_A);
         ensure("'A' drawable", a.drawable());
@@ -247,7 +263,7 @@ namespace tut
         ensure("cmap maps U+2764", gid != 0);
 
         LLFontGpuGlyphCache cache;
-        cache.init(tf.face, /*color=*/true, /*palette=*/0);
+        cache.init(tf.font, /*color=*/true, /*palette=*/0);
         ensure("cache reports color mode", cache.isColor());
 
         const LLFontGpuGlyphCache::GlyphLoc loc = cache.getGlyph(gid);
@@ -263,6 +279,53 @@ namespace tut
         ensure_equals("cache hit: same offset", loc2.mTexelOffset, loc.mTexelOffset);
         ensure_equals("cache hit: no growth", cache.getArenaTexels(), texels);
     }
+
+    // (7) Variable-font weight axis: the encode font must honor the SOURCE
+    // font's variation coords, so encoding a glyph from a font set to wght=700
+    // (bold) yields a heavier outline than the face's default master. Regression
+    // for the GPU path rendering variable "bold" faces (fonts.xml
+    // font_weight="700") at regular weight — the encode font was built from the
+    // bare face, silently dropping the weight axis.
+    template<> template<>
+    void llfontgpuglyphcache_object::test<7>()
+    {
+        TestFace tf(kVarFont);
+        if (!tf.valid())
+        {
+            skip("variable test font not present in test data dir");
+        }
+        if (hb_ot_var_get_axis_count(tf.face) == 0)
+        {
+            skip("test font is not variable");
+        }
+
+        const U32 gid_I = gidFor(tf.face, (hb_codepoint_t)'I');
+        ensure("cmap maps 'I'", gid_I != 0);
+
+        // Regular instance: tf.font is the face default (no axes set), so the
+        // cache copies an empty coord set and encodes the default master.
+        LLFontGpuGlyphCache reg;
+        reg.init(tf.font);
+        const LLFontGpuGlyphCache::GlyphLoc loc_reg = reg.getGlyph(gid_I);
+        ensure("regular 'I' drawable", loc_reg.drawable());
+
+        // Bold instance: same face, wght axis pushed to 700.
+        hb_font_t* bold_font = hb_font_create(tf.face);
+        hb_font_set_variation(bold_font, HB_TAG('w', 'g', 'h', 't'), 700.f);
+        LLFontGpuGlyphCache bold;
+        bold.init(bold_font);
+        const LLFontGpuGlyphCache::GlyphLoc loc_bold = bold.getGlyph(gid_I);
+        hb_font_destroy(bold_font);
+        ensure("bold 'I' drawable", loc_bold.drawable());
+
+        // 'I' is a plain vertical stem in IBM Plex Sans; at wght=700 the stem is
+        // thicker, so the design-unit bbox width is strictly larger. If the
+        // encode font had ignored the source font's var coords (the bug), both
+        // would encode the default master and these would be equal.
+        ensure("bold 'I' stem wider than regular master",
+               loc_bold.mWidth > loc_reg.mWidth);
+    }
+
 
 #if LL_MESA_HEADLESS
     inline ll_test::HeadlessGL& getSharedHeadlessGL()
@@ -286,7 +349,7 @@ namespace tut
         getSharedHeadlessGL();
 
         LLFontGpuGlyphCache cache;
-        cache.init(tf.face);
+        cache.init(tf.font);
         const U32 gid_A = gidFor(tf.face, (hb_codepoint_t)'A');
         const LLFontGpuGlyphCache::GlyphLoc loc = cache.getGlyph(gid_A);
         ensure("'A' drawable", loc.drawable());

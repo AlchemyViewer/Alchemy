@@ -456,7 +456,12 @@ bool LLGLSLShader::createShader()
         vector< pair<string, GLenum> >::iterator fileIter = mShaderFiles.begin();
         for (; fileIter != mShaderFiles.end(); fileIter++)
         {
-            GLuint shaderhandle = LLShaderMgr::instance()->loadShaderFile((*fileIter).first, mShaderLevel, (*fileIter).second, &mDefines, mFeatures.mIndexedTextureChannels);
+            // Inject the matching extra source (e.g. the hb-gpu rasterizer lib)
+            // ahead of this stage's body, if any was set for this program.
+            const std::string& extra_source = (fileIter->second == GL_VERTEX_SHADER)
+                                                  ? mExtraVertexSource
+                                                  : mExtraFragmentSource;
+            GLuint shaderhandle = LLShaderMgr::instance()->loadShaderFile((*fileIter).first, mShaderLevel, (*fileIter).second, &mDefines, mFeatures.mIndexedTextureChannels, extra_source);
             LL_DEBUGS("ShaderLoading") << "SHADER FILE: " << (*fileIter).first << " mShaderLevel=" << mShaderLevel << LL_ENDL;
             if (shaderhandle)
             {
@@ -791,7 +796,12 @@ GLint LLGLSLShader::mapUniformTextureChannel(GLint location, GLenum type, GLint 
 
     if ((type >= GL_SAMPLER_1D && type <= GL_SAMPLER_2D_RECT_SHADOW) ||
         type == GL_SAMPLER_2D_MULTISAMPLE ||
-        type == GL_SAMPLER_CUBE_MAP_ARRAY)
+        type == GL_SAMPLER_CUBE_MAP_ARRAY ||
+        // Texture-buffer samplers (e.g. the analytic font glyph buffer,
+        // isamplerBuffer) also occupy a texture unit and want an auto channel.
+        type == GL_SAMPLER_BUFFER ||
+        type == GL_INT_SAMPLER_BUFFER ||
+        type == GL_UNSIGNED_INT_SAMPLER_BUFFER)
     {   //this here is a texture
         GLint ret = mActiveTextureChannels;
         if (size == 1)
@@ -844,9 +854,9 @@ bool LLGLSLShader::mapUniforms()
     // sensitive to that order -- e.g. "diffuseMap" must win channel 0 so the
     // texture matrix is applied to the right unit. The GLSL compiler does not
     // guarantee any particular ordering of glGetActiveUniform() indices, so we
-    // The analytic font glyph buffer (isamplerBuffer) is now an auto-channeled
-    // diffuseMap still wins texture channel 0 if the compiler orders the buffer
-    // sampler first (it is declared earlier, in the injected lib).
+    // assign each active uniform a deterministic texunit_priority and map them
+    // in that order instead of relying on the compiler's whims:
+    //   [0, mIndexedTextureChannels)   -> indexed textures tex0..texN
     //   [mIndexedTextureChannels, ...) -> reserved uniforms, in mReservedUniforms order
     //   UINT_MAX                       -> everything else (order irrelevant; non-samplers)
     const auto& reservedUniforms = LLShaderMgr::instance()->mReservedUniforms;

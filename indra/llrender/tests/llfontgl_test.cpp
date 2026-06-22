@@ -1072,4 +1072,132 @@ namespace tut
         skip("hb-gpu not available");
 #endif
     }
+
+    // use_color=false is the per-draw "monochrome emoji" choice — it must NOT
+    // kick the run to the atlas. With GPU on, a COLR face drawn use_color=false
+    // routes through the draw (silhouette) path tinted with text color, so any
+    // ink it produces is monochrome (R==G==B), never the saturated paint output.
+    // use_color=true on the same glyph is saturated — the two diverge, proving
+    // the want_color branch picks draw vs. paint correctly.
+    template<> template<>
+    void llfontgl_render_object::test<11>()
+    {
+#if LL_HAS_HB_GPU
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        const S32 W = ll_test::HeadlessGL::WIDTH;
+        const S32 H = ll_test::HeadlessGL::HEIGHT;
+        const llwchar emoji_arr[] = { 0x1F600, 0 };
+        const LLWString s(emoji_arr, 1);
+
+        auto render_count = [&](bool use_color) -> std::pair<S32,S32>
+        {
+            gl.clearFramebuffer();
+            font->render(s, 0, 64.f, 64.f, LLColor4::white,
+                         LLFontGL::LEFT, LLFontGL::BASELINE,
+                         LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 1,
+                         S32_MAX, nullptr, /*use_ellipses=*/false, use_color);
+            gGL.flush();
+            auto px = ll_test::readFramebufferRGBA(W, H);
+            S32 ink = 0, colored = 0;
+            for (S32 y = 20; y < 110 && y < H; ++y)
+                for (S32 x = 40; x < 110 && x < W; ++x)
+                {
+                    const U8* p = &px[((std::size_t)y * W + x) * 4];
+                    if (p[3] == 0) continue;
+                    ++ink;
+                    const S32 hi = llmax(p[0], llmax(p[1], p[2]));
+                    const S32 lo = llmin(p[0], llmin(p[1], p[2]));
+                    if (hi - lo > 30) ++colored;
+                }
+            return { ink, colored };
+        };
+
+        LLFontGL::enableFontGpu(true);
+        const auto col  = render_count(/*use_color=*/true);
+        const auto mono = render_count(/*use_color=*/false);
+        LLFontGL::enableFontGpu(false);
+
+        if (col.first == 0)
+            skip("emoji did not route to a renderable face in this harness");
+        ensure("color draw produced saturation", col.second > 0);
+        // The COLR base outline may be empty (all visual is in the paint
+        // layers); if so the silhouette is blank, which is fine. But whatever
+        // monochrome ink appears must carry no saturation.
+        ensure("monochrome draw has no saturated color", mono.second == 0);
+#else
+        skip("hb-gpu not available");
+#endif
+    }
+
+    // Ellipsis on the GPU path: an overflowing run truncates (budget reserved
+    // the "...." width) and the dots render recursively through the GPU branch.
+    // Verify it truncates, draws ink, and the dots extend ink to the RIGHT of
+    // the same truncated prefix drawn without ellipsis — proving the "..." was
+    // actually emitted, not silently dropped.
+    template<> template<>
+    void llfontgl_render_object::test<12>()
+    {
+#if LL_HAS_HB_GPU
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        const S32 W = ll_test::HeadlessGL::WIDTH;
+        const S32 H = ll_test::HeadlessGL::HEIGHT;
+        const LLWString s = utf8str_to_wstring("WWWWWWWWWWWWWWWW");
+
+        // Rightmost framebuffer column carrying glyph ink in the text band.
+        auto rightmost_ink = [&]() -> S32
+        {
+            auto px = ll_test::readFramebufferRGBA(W, H);
+            S32 rm = -1;
+            for (S32 y = 32; y < 100 && y < H; ++y)
+                for (S32 x = 0; x < W; ++x)
+                {
+                    const U8* p = &px[((std::size_t)y * W + x) * 4];
+                    if (((S32)p[0] + p[1] + p[2]) / 3 > 40) rm = llmax(rm, x);
+                }
+            return rm;
+        };
+
+        const F32 full_w = font->getWidthF32(s.c_str());
+        const S32 budget = (S32)(full_w * 0.5f);   // ~half -> forces truncation
+
+        LLFontGL::enableFontGpu(true);
+
+        // Ellipsis render: truncated prefix + "...".
+        gl.clearFramebuffer();
+        const S32 n_ell = font->render(s, 0, 20.f, 64.f, LLColor4::white,
+                                       LLFontGL::LEFT, LLFontGL::BASELINE,
+                                       LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                       S32_MAX, budget, nullptr,
+                                       /*use_ellipses=*/true, /*use_color=*/true);
+        gGL.flush();
+        const S32 rm_ell = rightmost_ink();
+
+        // The same visible prefix, no ellipsis, same origin.
+        gl.clearFramebuffer();
+        const S32 n_pre = font->render(s, 0, 20.f, 64.f, LLColor4::white,
+                                       LLFontGL::LEFT, LLFontGL::BASELINE,
+                                       LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                       n_ell, S32_MAX, nullptr,
+                                       /*use_ellipses=*/false, /*use_color=*/true);
+        gGL.flush();
+        const S32 rm_pre = rightmost_ink();
+
+        LLFontGL::enableFontGpu(false);
+
+        ensure("ellipsis truncated the run", n_ell > 0 && n_ell < (S32)s.size());
+        ensure_equals("prefix render drew the same char count", n_pre, n_ell);
+        ensure("ellipsis render drew ink", rm_ell >= 0);
+        ensure("ellipsis dots extend ink past the truncated prefix", rm_ell > rm_pre);
+#else
+        skip("hb-gpu not available");
+#endif
+    }
 }

@@ -38,7 +38,7 @@
 #include "llfontface.h"
 #include "llfontgpubatch.h"
 #include "llfontgpuglyphcache.h"
-#include "llfontgpushader.h"
+#include "llshadermgr.h"   // LLShaderMgr::FONT_SHADOW_MODE / FONT_GLYPH_BUFFER reserved uniforms
 #include "llfontregistry.h"
 #include "llfontshaping.h"
 #include "llgl.h"
@@ -46,6 +46,7 @@
 #include "llimagegl.h"
 #include "llrender.h"
 #include "llstl.h"
+#include "llvertexbuffer.h"  // GLYPH_LOC_* constants + LLVector4a/LLVector2/LLColor4U
 #include "v4color.h"
 #include "lltexture.h"
 #include "lldir.h"
@@ -77,15 +78,8 @@ std::string LLFontGL::sAppDir;
 LLColor4 LLFontGL::sShadowColor(0.f, 0.f, 0.f, 1.f);
 bool     LLFontGL::sEnableShaderShadow = false;
 bool     LLFontGL::sEnableFontGpu = false;
+bool     LLFontGL::sGpuEmittedColorGlyph = false;
 LLFontRegistry* LLFontGL::sFontRegistry = NULL;
-
-#if LL_HAS_HB_GPU
-// Analytic (hb-gpu) render-path resources, lazily created on first eligible
-// render and torn down in destroyAllGL. Main-thread / GL-thread only.
-static LLGLSLShader    sFontGpuProgram;       // monochrome draw (outline coverage)
-static LLGLSLShader    sFontGpuColorProgram;  // COLR color (hb-gpu paint, premultiplied)
-static LLFontGpuBatch* sGpuBatchp = nullptr;
-#endif
 
 LLCoordGL LLFontGL::sCurOrigin;
 F32 LLFontGL::sCurDepth;
@@ -229,12 +223,24 @@ U64 LLFontGL::getCacheGeneration() const
     U64 gen = 0;
     if (const LLFontBitmapCache* cache = ft->getFontBitmapCache())
         gen += (U64)cache->getCacheGeneration();
+#if LL_HAS_HB_GPU
+    // Fold in the analytic (hb-gpu) glyph caches so a GPU-cache eviction or a
+    // face reload ticks this stamp too — the LLFontVertexBuffer cache then
+    // detects analytic-run staleness off the LIVE font here, instead of
+    // dereferencing a retained raw cache pointer that a freed face would dangle.
+    if (const LLFontFace* face = ft->getFontFace())
+        gen += face->getGpuCacheGeneration();
+#endif
     for (const auto& fb : ft->getFallbackFonts())
     {
         if (fb.first)
         {
             if (const LLFontBitmapCache* cache = fb.first->getFontBitmapCache())
                 gen += (U64)cache->getCacheGeneration();
+#if LL_HAS_HB_GPU
+            if (const LLFontFace* face = fb.first->getFontFace())
+                gen += face->getGpuCacheGeneration();
+#endif
         }
     }
     return gen;
@@ -485,11 +491,10 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // still drives shadow geometry — shader stays at shadowMode=0).
     const bool push_shader_shadow_uniforms =
         sEnableShaderShadow && (shadow != NO_SHADOW) && LLGLSLShader::sCurBoundShaderPtr;
-    static const LLStaticHashedString sShadowMode("shadowMode");
     if (push_shader_shadow_uniforms)
     {
         const int mode = (shadow == DROP_SHADOW) ? 1 : 2; // SOFT
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, mode);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::FONT_SHADOW_MODE, mode);
     }
 
     bool draw_ellipses = false;
@@ -601,37 +606,64 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 #if LL_HAS_HB_GPU
     // Analytic (hb-gpu) fast path. Handles normal/bold/italic style and optional
     // drop shadow for text whose slice shaped into contiguous runs from outline
-    // faces — which includes monospace (fixed-width faces shape end-to-end too)
-    // and COLR(v1) color faces (rendered via the hb-gpu paint encoder). Bitmap
-    // (sbix/CBDT) and SVG color faces, shaping failures (empty runs), and
-    // ellipsis overflow stay on the atlas loop below. Reuses all the
-    // origin/valign/halign/pen setup computed above; underline (drawn before
-    // this point) works for both paths.
-    if (sEnableFontGpu && use_color && !draw_ellipses)
+    // faces — plain text, monospace (fixed-width faces shape end-to-end too),
+    // and emoji. `use_color` is the per-draw "emoji in color or monochrome"
+    // choice: when color is wanted a COLR(v1) face renders via the hb-gpu paint
+    // encoder; otherwise EVERY outline face (incl. color faces) renders a
+    // monochrome silhouette via the draw encoder, tinted with the text color —
+    // the same thing the atlas grayscale path does. Bitmap-only strikes
+    // (upem==0) and color faces we can't paint when color IS wanted
+    // (sbix/CBDT/SVG) stay on the atlas loop below. Shaping failures (empty
+    // runs) are handled here too via a codepoint fallback (resolve each cp's
+    // face directly, no HarfBuzz positioning). Ellipsis overflow IS handled:
+    // scaled_max_pixels was already trimmed by the "...." width above, so the
+    // run truncates leaving room, then "..." is rendered recursively (same as
+    // the atlas path). Reuses all the origin/valign/halign/pen setup computed
+    // above; underline (drawn before this point) works for both paths.
+    if (sEnableFontGpu)
     {
+        // Whether THIS draw wants color emoji. Force-mono collapses everything
+        // to the monochrome silhouette path, matching the atlas grayscale route.
+        const bool want_color = use_color && !LLFontGL::sForceMonochromeEmoji;
+
         bool gpu_eligible = true;
-        bool needs_color  = false;   // any COLR face in the slice -> build paint program
+        // A face is GPU-renderable when it has outlines (upem>0). When color is
+        // wanted, a color face must be COLR(v1) to paint on GPU; sbix/CBDT/SVG
+        // color faces keep the atlas (to preserve their color). In monochrome
+        // mode any outline face is fine — we draw the silhouette and ignore the
+        // color tables.
+        auto face_eligible = [&](const LLFontFace* f) -> bool
+        {
+            if (!f || f->unitsPerEm() == 0) return false;
+            if (want_color && f->hasColor() && !f->hasColrV1()) return false;
+            return true;
+        };
+
         size_t covered = 0;
         for (size_t r = 0; r < layout.ranges.size(); ++r)
         {
             if (layout.ranges[r].first != covered) { gpu_eligible = false; break; }
             const std::vector<LLShapedGlyph>& gv = *layout.glyphs[r];
-            if (gv.empty()) { gpu_eligible = false; break; }
-            for (const LLShapedGlyph& sg : gv)
+            if (gv.empty())
             {
-                const LLFontFace* f = sg.face ? sg.face->getFontFace() : nullptr;
-                // upem==0 rules out bitmap-only strikes. A color face is GPU
-                // paintable only if it is COLR(v1); bitmap/SVG color faces fall
-                // back to the atlas. ForceMonochromeEmoji keeps emoji on the
-                // atlas grayscale path, so don't claim color faces then.
-                if (!f || f->unitsPerEm() == 0) { gpu_eligible = false; break; }
-                if (f->hasColor())
+                // Shaping failed for this range. The GPU path can still render
+                // its codepoints individually if each resolves (via the SAME
+                // getGlyphInfo fallback walk the atlas codepoint path uses, so
+                // the scan and the build below agree on the face) to a
+                // GPU-eligible face.
+                const EFontGlyphType cp_type = want_color ? EFontGlyphType::Color
+                                                          : EFontGlyphType::Grayscale;
+                for (size_t c = layout.ranges[r].first; c < layout.ranges[r].second; ++c)
                 {
-                    if (!f->hasColrV1() || LLFontGL::sForceMonochromeEmoji)
-                    {
-                        gpu_eligible = false; break;
-                    }
-                    needs_color = true;
+                    const LLFontGlyphInfo* fgi = mFontFreetype->getGlyphInfo(wstr[begin_offset + c], cp_type);
+                    if (!fgi || !face_eligible(fgi->mSourceFace)) { gpu_eligible = false; break; }
+                }
+            }
+            else
+            {
+                for (const LLShapedGlyph& sg : gv)
+                {
+                    if (!face_eligible(sg.face ? sg.face->getFontFace() : nullptr)) { gpu_eligible = false; break; }
                 }
             }
             if (!gpu_eligible) break;
@@ -639,34 +671,32 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         }
         if (covered != (size_t)length) gpu_eligible = false;
 
+        // The GPU path emits glyphs through gGL's batched immediate stream (like
+        // the atlas path), so it needs a font-capable UI shader bound (the
+        // per-vertex glyph_loc branch in uiF.glsl). If anything else is bound
+        // (in-world / HUD text), fall through to the atlas path below.
         if (gpu_eligible &&
-            (sFontGpuProgram.isComplete() || LLFontGpuShader::buildProgram(sFontGpuProgram)) &&
-            (!needs_color || sFontGpuColorProgram.isComplete() ||
-             LLFontGpuShader::buildColorProgram(sFontGpuColorProgram)))
+            LLGLSLShader::sCurBoundShaderPtr &&
+            LLGLSLShader::sCurBoundShaderPtr->mHasFontGpu)
         {
-            if (!sGpuBatchp) sGpuBatchp = new LLFontGpuBatch();
-
-            // Two placement lists per face: shadow (drawn first, underneath) and
-            // foreground. Both reuse the same glyph buffer; only pen offset and
-            // color differ — so shadow/bold are extra placements, not new shaders.
-            struct GpuRun
+            // One quad per glyph instance, collected into two passes: shadow
+            // (drawn first, underneath) and foreground. The foreground mixes mono
+            // and color (COLR) glyphs freely — both composite with the ambient
+            // straight-alpha blend (the color fragment un-premultiplies), so no
+            // separate blend state, and they batch with surrounding UI quads. Each
+            // quad carries the resolved GlyphLoc (extents + GLOBAL texel offset),
+            // pen, per-face scale (px per design unit), color, and whether it's a
+            // COLR glyph (sets the glyph_loc COLOR bit at emit).
+            struct GpuQuad
             {
-                const LLFontFace* face;
-                F32 scale;
-                bool color;     // COLR face -> paint program + premultiplied blend
-                std::vector<LLFontGpuBatch::Placement> shadow;
-                std::vector<LLFontGpuBatch::Placement> fg;
+                LLFontGpuGlyphCache::GlyphLoc loc;
+                F32       pen_x, pen_y, scale;
+                LLColor4U color;
+                bool      is_color;
             };
-            std::vector<GpuRun> runs;
-            auto run_for = [&runs](const LLFontFace* f) -> GpuRun&
-            {
-                for (GpuRun& r : runs) { if (r.face == f) return r; }
-                runs.push_back({ f, (F32)f->ppem() / (F32)f->unitsPerEm(),
-                                 f->hasColor(), {}, {} });
-                return runs.back();
-            };
+            std::vector<GpuQuad> shadow_q, fg_q;
 
-            const LLColor4U fg_color(color);
+            const LLColor4U fg_color_u(color);
             const bool emit_bold   = (style_to_add & BOLD) != 0;
             // Atlas suppresses the shadow under bold (drawGlyphShadow gated on
             // !BOLD); mirror that so the two paths agree.
@@ -675,109 +705,196 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             F32 gy = cur_render_y;
             S32 gpu_chars = 0;
             bool overflow = false;
+
+            // Push one resolved glyph's quads. Color (paint) glyphs are foreground
+            // only: a silhouette shadow / faux-bold double strike would need the
+            // mono coverage path, and emoji drop shadows are an edge case.
+            auto place_glyph = [&](const LLFontGpuGlyphCache::GlyphLoc& loc, F32 scale,
+                                   bool color_glyph, F32 pen_x, F32 pen_y)
+            {
+                if (color_glyph)
+                {
+                    fg_q.push_back({ loc, pen_x, pen_y, scale, fg_color_u, true });
+                    // COLR glyphs bake fixed colors -> disable LFVB color-only recolor.
+                    sGpuEmittedColorGlyph = true;
+                    return;
+                }
+                if (emit_shadow)
+                {
+                    auto sh = [&](F32 dx, F32 dy)
+                    { shadow_q.push_back({ loc, pen_x + dx, pen_y + dy, scale, precomputed_shadow_color, false }); };
+                    if (shadow == DROP_SHADOW_SOFT)
+                    { sh(-1.f, -1.f); sh(1.f, -1.f); sh(1.f, 1.f); sh(-1.f, 1.f); sh(0.f, -2.f); }
+                    else  // DROP_SHADOW
+                        sh(1.f, -1.f);
+                }
+                fg_q.push_back({ loc, pen_x, pen_y, scale, fg_color_u, false });
+                if (emit_bold)  // faux-bold double strike, offset +1px
+                    fg_q.push_back({ loc, pen_x + (F32)BOLD_OFFSET, pen_y, scale, fg_color_u, false });
+            };
+
             for (size_t r = 0; r < layout.ranges.size() && !overflow; ++r)
             {
                 const std::vector<LLShapedGlyph>& gv = *layout.glyphs[r];
+                const size_t cp_begin = layout.ranges[r].first;
+                const size_t cp_end   = layout.ranges[r].second;
                 S32 ov_cluster = 0;
-                for (const LLShapedGlyph& sg : gv)
+
+                if (gv.empty())
                 {
-                    const LLFontFace* f = sg.face->getFontFace();
-                    LLFontGpuGlyphCache* cache = f->getGpuGlyphCache();
-                    const F32 pen_x = gx + sg.x_offset;
-                    const F32 pen_y = gy + sg.y_offset;
-                    if (cache)
+                    // Shaping-failure fallback: HarfBuzz produced no glyphs for
+                    // this range (catastrophic, rare). Render each codepoint
+                    // directly through the SAME getGlyphInfo / getXKerning
+                    // machinery the atlas codepoint path uses — so the hinted FT
+                    // advance and kerning match the atlas exactly — but draw the
+                    // resolved glyph analytically via its face's GPU cache.
+                    const EFontGlyphType cp_type = want_color ? EFontGlyphType::Color
+                                                              : EFontGlyphType::Grayscale;
+                    const LLFontGlyphInfo* fgi =
+                        mFontFreetype->getGlyphInfo(wstr[begin_offset + cp_begin], cp_type);
+                    for (size_t c = cp_begin; c < cp_end && fgi; ++c)
                     {
-                        GpuRun& run = run_for(f);
-                        const LLFontGpuGlyphCache::GlyphLoc& loc = cache->getGlyph(sg.glyph_id);
-                        if (loc.drawable())
+                        const LLFontGlyphInfo* next_fgi =
+                            (c + 1 < (size_t)length)
+                                ? mFontFreetype->getGlyphInfo(wstr[begin_offset + c + 1], cp_type)
+                                : nullptr;
+
+                        if (const LLFontFace* f = fgi->mSourceFace)
                         {
-                            const F32 right = pen_x + (F32)(loc.mXBearing + loc.mWidth) * run.scale;
-                            if ((start_x + scaled_max_pixels) < right)
+                            const bool color_glyph = want_color && f->hasColrV1();
+                            LLFontGpuGlyphCache* cache = color_glyph
+                                ? f->getGpuColorGlyphCache() : f->getGpuGlyphCache();
+                            if (cache)
                             {
-                                overflow = true;
-                                ov_cluster = sg.cluster;
-                                break;
-                            }
-                            auto place = [&](std::vector<LLFontGpuBatch::Placement>& dst,
-                                             F32 dx, F32 dy, const LLColor4U& c)
-                            {
-                                LLFontGpuBatch::Placement p;
-                                p.glyph_id = sg.glyph_id;
-                                p.pen_x = pen_x + dx;
-                                p.pen_y = pen_y + dy;
-                                p.color[0] = c.mV[0]; p.color[1] = c.mV[1];
-                                p.color[2] = c.mV[2]; p.color[3] = c.mV[3];
-                                dst.push_back(p);
-                            };
-                            // Shadow pass — same offsets as drawGlyphShadow.
-                            // Color (paint) glyphs render foreground only: a
-                            // silhouette shadow / faux-bold double strike would
-                            // need the monochrome coverage program, not the paint
-                            // program, and emoji drop shadows are an edge case —
-                            // so skip both for color runs.
-                            if (emit_shadow && !run.color)
-                            {
-                                if (shadow == DROP_SHADOW_SOFT)
+                                const LLFontGpuGlyphCache::GlyphLoc loc = cache->getGlyph(fgi->mGlyphIndex);
+                                if (loc.drawable())
                                 {
-                                    place(run.shadow, -1.f, -1.f, precomputed_shadow_color);
-                                    place(run.shadow,  1.f, -1.f, precomputed_shadow_color);
-                                    place(run.shadow,  1.f,  1.f, precomputed_shadow_color);
-                                    place(run.shadow, -1.f,  1.f, precomputed_shadow_color);
-                                    place(run.shadow,  0.f, -2.f, precomputed_shadow_color);
-                                }
-                                else // DROP_SHADOW
-                                {
-                                    place(run.shadow, 1.f, -1.f, precomputed_shadow_color);
+                                    const F32 scale = (F32)f->ppem() / (F32)f->unitsPerEm();
+                                    const F32 right = gx + (F32)(loc.mXBearing + loc.mWidth) * scale;
+                                    if ((start_x + scaled_max_pixels) < right)
+                                    {
+                                        overflow = true;
+                                        ov_cluster = (S32)(c - cp_begin);
+                                        break;
+                                    }
+                                    place_glyph(loc, scale, color_glyph, gx, gy);
                                 }
                             }
-                            // Foreground (+ faux-bold double strike, offset +1px).
-                            place(run.fg, 0.f, 0.f, fg_color);
-                            if (emit_bold && !run.color)
-                                place(run.fg, (F32)BOLD_OFFSET, 0.f, fg_color);
+                            gx += fgi->mXAdvance;
+                            // Only kern within this failed range; the next range
+                            // is shaped and carries its own positioning.
+                            if (next_fgi && (c + 1) < cp_end)
+                                gx += mFontFreetype->getXKerning(fgi, next_fgi);
                         }
+                        if (!subpixel_pen) gx = (F32)ll_round(gx);
+                        fgi = next_fgi;
                     }
-                    gx += sg.x_advance;
-                    gy += sg.y_advance;
-                    if (!subpixel_pen) gx = (F32)ll_round(gx);
                 }
-                if (overflow) { gpu_chars += llmax(0, ov_cluster); break; }
-                gpu_chars += (S32)(layout.ranges[r].second - layout.ranges[r].first);
-            }
-
-            GLint vp[4] = { 0, 0, 0, 0 };
-            glGetIntegerv(GL_VIEWPORT, vp);
-
-            // Restore the caller's shader after drawing — the batch binds the
-            // hb-gpu program and downstream UI assumes the prior binding. All
-            // shadow passes first (across faces), then all foregrounds, so the
-            // foreground always lands on top of any overlapping shadow.
-            LLGLSLShader* prev_shader = LLGLSLShader::sCurBoundShaderPtr;
-            // Faux-italic shear in screen px (0 when not italic), same value the
-            // atlas path feeds renderTriangle.
-            const F32 gpu_slant = slant_offset;
-            // Shadows are monochrome only (color runs emit none), so the draw
-            // program serves every shadow pass. Foregrounds pick the program by
-            // run kind: COLR runs use the paint program + premultiplied blend.
-            for (GpuRun& run : runs)
-            {
-                if (run.shadow.empty()) continue;
-                if (LLFontGpuGlyphCache* cache = run.face->getGpuGlyphCache())
-                    sGpuBatchp->render(sFontGpuProgram, *cache, run.shadow, run.scale, vp[2], vp[3], gpu_slant);
-            }
-            for (GpuRun& run : runs)
-            {
-                if (run.fg.empty()) continue;
-                if (LLFontGpuGlyphCache* cache = run.face->getGpuGlyphCache())
+                else
                 {
-                    LLGLSLShader& prog = run.color ? sFontGpuColorProgram : sFontGpuProgram;
-                    sGpuBatchp->render(prog, *cache, run.fg, run.scale, vp[2], vp[3],
-                                       gpu_slant, /*premultiplied=*/run.color);
+                    for (const LLShapedGlyph& sg : gv)
+                    {
+                        const LLFontFace* f = sg.face->getFontFace();
+                        const bool color_glyph = want_color && f->hasColrV1();
+                        // Color glyphs measure/encode through the paint cache (the
+                        // painted glyph's bbox), mono through the draw cache (the
+                        // silhouette bbox).
+                        LLFontGpuGlyphCache* cache = color_glyph
+                            ? f->getGpuColorGlyphCache() : f->getGpuGlyphCache();
+                        const F32 pen_x = gx + sg.x_offset;
+                        const F32 pen_y = gy + sg.y_offset;
+                        if (cache)
+                        {
+                            const LLFontGpuGlyphCache::GlyphLoc loc = cache->getGlyph(sg.glyph_id);
+                            if (loc.drawable())
+                            {
+                                // Overflow clip on the analytic ink right edge. Pen
+                                // positions match the atlas (same HB advances), so
+                                // this differs only by the last glyph's width term
+                                // (analytic bbox vs hinted bitmap) — sub-pixel,
+                                // self-consistent, harmless (layout/maxDrawableChars
+                                // key off advances, not this clip).
+                                const F32 scale = (F32)f->ppem() / (F32)f->unitsPerEm();
+                                const F32 right = pen_x + (F32)(loc.mXBearing + loc.mWidth) * scale;
+                                if ((start_x + scaled_max_pixels) < right)
+                                {
+                                    overflow = true;
+                                    ov_cluster = sg.cluster;
+                                    break;
+                                }
+                                place_glyph(loc, scale, color_glyph, pen_x, pen_y);
+                            }
+                        }
+                        gx += sg.x_advance;
+                        gy += sg.y_advance;
+                        if (!subpixel_pen) gx = (F32)ll_round(gx);
+                    }
                 }
+
+                if (overflow) { gpu_chars += llmax(0, ov_cluster); break; }
+                gpu_chars += (S32)(cp_end - cp_begin);
             }
-            if (prev_shader) prev_shader->bind(); else LLGLSLShader::unbind();
+
+            // Bind the global glyph texel buffer on the channel the UI shader's
+            // hb_gpu_atlas sampler was auto-assigned (uploads any glyphs just
+            // encoded above) and leave it bound: it serves this frame's glyph batch
+            // flush AND any later LFVB replay. Restore the active unit so gGL keeps
+            // binding ordinary textures to unit 0.
+            const S32 glyph_unit =
+                LLGLSLShader::sCurBoundShaderPtr->getTextureChannel(LLShaderMgr::FONT_GLYPH_BUFFER);
+            if (glyph_unit >= 0)
+            {
+                gGL.getTexUnit(glyph_unit)->activate();
+                LLFontGpuGlyphCache::bindBufferTexture();
+                gGL.getTexUnit(0)->activate();
+            }
+
+            const F32 gpu_slant = slant_offset;   // faux-italic shear in screen px
+
+            // Emit a pass into gGL's batched stream: per-vertex glyph_loc (global
+            // texel offset, | COLOR bit for paint) tells the UI shader to rasterize
+            // coverage / paint instead of sampling a quad texture. gGL accumulates,
+            // flushes, and captures into the LFVB display lists like any UI geometry.
+            auto emit_pass = [&](const std::vector<GpuQuad>& pass)
+            {
+                for (const GpuQuad& gq : pass)
+                {
+                    const U32 gloc = (gq.loc.mTexelOffset & LLVertexBuffer::GLYPH_LOC_OFFSET_MASK)
+                                   | (gq.is_color ? LLVertexBuffer::GLYPH_LOC_COLOR : 0u);
+                    LLVector4a pos[6]; LLVector2 uv[6]; LLColor4U col[6]; U32 gl[6];
+                    LLFontGpuBatch::buildGlyphQuad(pos, uv, col, gl, gq.loc,
+                                                   gq.pen_x, gq.pen_y, gq.scale, gpu_slant,
+                                                   gq.color, gloc);
+                    gGL.begin(LLRender::TRIANGLES);
+                    gGL.vertexBatchPreTransformed(pos, uv, col, gl, 6);
+                    gGL.end();
+                }
+            };
+
+            // Shadow first (underneath), then the pass boundary (so a capturing
+            // LFVB splits shadow vs foreground geometry into its two lists), then
+            // foreground. Submission order preserves the shadow-under-fg layering.
+            emit_pass(shadow_q);
+            if (on_pass_boundary)
+                on_pass_boundary();
+            emit_pass(fg_q);
 
             if (right_x)
                 *right_x = (gx - origin.mV[VX]) / sScaleX;
+
+            if (draw_ellipses)
+            {
+                // Recursively render "..." at the truncation pen, exactly like the
+                // atlas path: the budget above reserved its width, so it fits. The
+                // recursion re-enters this branch (the dots are GPU-eligible) and
+                // emits into the same gGL stream. gpu_chars stays the pre-ellipsis
+                // visible count, matching the atlas return value.
+                static const LLWString s_ellipsis(U"...");
+                render(s_ellipsis, 0,
+                       (gx - origin.mV[VX]) / sScaleX, (F32)y,
+                       color, LEFT, valign, style_to_add, NO_SHADOW,
+                       S32_MAX, max_pixels, right_x, false, use_color);
+            }
 
             gGL.popUIMatrix();
             return gpu_chars;
@@ -1154,7 +1271,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         // branch.
         if (push_shader_shadow_uniforms)
         {
-            LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, 0);
+            LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::FONT_SHADOW_MODE, 0);
         }
 
         // Pass B: emit foreground geometry from deferred metadata. Reset the
@@ -2148,10 +2265,11 @@ void LLFontGL::destroyAllGL()
         sFontRegistry->destroyGL();
     }
 #if LL_HAS_HB_GPU
-    sFontGpuProgram.unload();
-    sFontGpuColorProgram.unload();
-    delete sGpuBatchp;
-    sGpuBatchp = nullptr;
+    // Glyphs now render through gGL under the UI shader (no standalone program /
+    // batch object). Drop the global analytic glyph texel store's GL objects once
+    // (shared across all faces, so it is not torn down per-face in
+    // LLFontFace::destroyGL).
+    LLFontGpuGlyphCache::destroyGL();
 #endif
 }
 

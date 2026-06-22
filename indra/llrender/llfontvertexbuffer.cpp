@@ -30,6 +30,8 @@
 
 #include "llfontbitmapcache.h"
 #include "llfontfreetype.h"
+#include "llfontgpuglyphcache.h"  // LLFontGpuGlyphCache (global texel store bind + generation)
+#include "llshadermgr.h"          // LLShaderMgr::FONT_SHADOW_MODE / FONT_GLYPH_BUFFER reserved uniforms
 #include "llglslshader.h"
 #include "llimagegl.h"
 #include "llrender.h"
@@ -83,6 +85,9 @@ void LLFontVertexBuffer::reset()
     // Regenerating this list is expensive
     mShadowBufferList.clear();
     mForegroundBufferList.clear();
+#if LL_HAS_HB_GPU
+    mHasColorGlyphs = false;
+#endif
 }
 
 S32 LLFontVertexBuffer::render(
@@ -190,12 +195,24 @@ S32 LLFontVertexBuffer::render(
         && ((derive_shadow_alpha(color, shadow) == 0) !=
             (derive_shadow_alpha(mLastColor, mLastShadow) == 0));
 
-    if (mShadowBufferList.empty() && mForegroundBufferList.empty())
+    bool nothing_cached = mShadowBufferList.empty() && mForegroundBufferList.empty();
+    bool analytic_invalid = false;
+#if LL_HAS_HB_GPU
+    // Analytic glyphs are now captured into the ordinary gGL display lists (they
+    // emit through gGL), so nothing_cached already covers them. Toggling the
+    // analytic path at runtime swaps glyph geometry for atlas geometry (or vice
+    // versa) — different captured lists — so force a regen. Glyph-store eviction /
+    // face reload is covered by mLastFontCacheGen (LLFontGL::getCacheGeneration
+    // folds in the GPU store generation), checked off the LIVE font above.
+    analytic_invalid = (mLastEnableFontGpu != LLFontGL::sEnableFontGpu);
+#endif
+
+    if (nothing_cached)
     {
         genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
             style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
     }
-    else if (geometry_invalid || gate_crossed)
+    else if (geometry_invalid || gate_crossed || analytic_invalid)
     {
         genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
             style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
@@ -203,11 +220,18 @@ S32 LLFontVertexBuffer::render(
     else if (mLastColor != color)
     {
         // Color-only change: skip the geometry rebuild and just rewrite the
-        // color attribute streams of the captured GPU buffers. This is the
-        // hot path during button hover/press fades. Falls back to genBuffers
-        // for mixed text+emoji strings (mLastUsesColorAtlas) since emoji
-        // glyphs need fixed (255,255,255) RGB even on color change.
-        if (sEnableColorOnlyRegen && !mLastUsesColorAtlas)
+        // color attribute streams of the captured buffers. This is the hot path
+        // during button hover/press fades. Falls back to genBuffers for mixed
+        // text+emoji strings (mLastUsesColorAtlas) and for captured COLR color
+        // glyphs (mHasColorGlyphs) since both bake a fixed glyph color independent
+        // of the foreground.
+        bool can_recolor = sEnableColorOnlyRegen && !mLastUsesColorAtlas;
+#if LL_HAS_HB_GPU
+        // COLR color glyphs bake fixed premultiplied colors into their captured
+        // vertices, so recoloring would be wrong — fall back to a full regen.
+        can_recolor = can_recolor && !mHasColorGlyphs;
+#endif
+        if (can_recolor)
         {
             recolorBuffers(color, shadow);
             renderBuffers();
@@ -280,9 +304,25 @@ void LLFontVertexBuffer::genBuffers(
     {
         gGL.beginList(&mForegroundBufferList);
     }
+
+#if LL_HAS_HB_GPU
+    // Analytic glyphs emit through gGL, so they're captured into the gGL display
+    // lists above just like atlas geometry — no separate sink. Record the analytic
+    // enable state for toggle invalidation, and reset the color-glyph flag that
+    // render() sets if it emits any COLR glyph this call.
+    mLastEnableFontGpu = LLFontGL::sEnableFontGpu;
+    LLFontGL::sGpuEmittedColorGlyph = false;
+#endif
+
     mChars = fontp->render(text, begin_offset, x, y, color, halign, valign,
         style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color, pass_boundary);
     gGL.endList();
+
+#if LL_HAS_HB_GPU
+    // COLR color glyphs bake fixed premultiplied colors, so a later color-only
+    // change must regenerate rather than recolor in place.
+    mHasColorGlyphs = LLFontGL::sGpuEmittedColorGlyph;
+#endif
 
     // Detect whether any captured batch sampled the color (RGBA emoji) atlas.
     // Mixed strings can't be recolored cheaply because emoji glyphs use a
@@ -398,6 +438,10 @@ void LLFontVertexBuffer::recolorBuffers(
             }
         }
     };
+    // Analytic glyphs now live in these same gGL display lists (they emit through
+    // gGL), so the list recolor above rewrites their diffuse_color exactly like
+    // atlas text — mono foreground/shadow glyphs follow fg_u/shadow_u. COLR color
+    // glyphs bake fixed colors, so the caller guards this path on !mHasColorGlyphs.
     recolor(mForegroundBufferList, fg_u);
     recolor(mShadowBufferList, shadow_u);
 
@@ -421,18 +465,34 @@ void LLFontVertexBuffer::renderBuffers()
     gGL.translatef(0.f, 0.f, LLFontGL::sCurDepth);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
+#if LL_HAS_HB_GPU
+    // Analytic glyphs are captured in the gGL lists below (per-vertex glyph_loc),
+    // and the UI shader samples the GLOBAL glyph texel buffer (hb_gpu_atlas) on the
+    // channel it was auto-assigned. Bind it (uploading any pending glyphs) for the
+    // replay; the lists' ordinary textures stay on unit 0.
+    if (LLGLSLShader::sCurBoundShaderPtr)
+    {
+        const S32 glyph_unit =
+            LLGLSLShader::sCurBoundShaderPtr->getTextureChannel(LLShaderMgr::FONT_GLYPH_BUFFER);
+        if (glyph_unit >= 0)
+        {
+            gGL.getTexUnit(glyph_unit)->activate();
+            LLFontGpuGlyphCache::bindBufferTexture();
+            gGL.getTexUnit(0)->activate();
+        }
+    }
+#endif
+
     // Note: ellipses should technically be covered by push/load/translate of their own
     // but it's more complexity, values do not change, skipping doesn't appear to break
     // anything, so we can skip that until it proves to cause issues.
     // Shadow first (under), foreground second (over). Pass-boundary order matches
     // the original interleaved-per-glyph emission's net visual stacking — shadow
     // contributions sit beneath glyph foregrounds rather than between them.
-    static const LLStaticHashedString sShadowMode("shadowMode");
-
     if (mLastUsedShaderShadow && LLGLSLShader::sCurBoundShaderPtr)
     {
         const int mode = (mLastShadow == LLFontGL::DROP_SHADOW) ? 1 : 2; // SOFT
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, mode);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::FONT_SHADOW_MODE, mode);
     }
     for (LLVertexBufferData& buffer : mShadowBufferList)
     {
@@ -440,12 +500,13 @@ void LLFontVertexBuffer::renderBuffers()
     }
     if (mLastUsedShaderShadow && LLGLSLShader::sCurBoundShaderPtr)
     {
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, 0);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::FONT_SHADOW_MODE, 0);
     }
     for (LLVertexBufferData& buffer : mForegroundBufferList)
     {
         buffer.draw();
     }
+
     gGL.popUIMatrix();
 }
 

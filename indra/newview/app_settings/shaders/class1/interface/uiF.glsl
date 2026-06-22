@@ -40,6 +40,16 @@ uniform int  shadowMode;           // 0 = passthrough, 1 = drop, 2 = soft
 in vec2 vary_texcoord0;
 in vec4 vertex_color;
 
+#ifdef HAS_FONT_GPU
+// Analytic (hb-gpu) font path, decided PER VERTEX from glyph_loc (rides gGL's
+// batched stream): GLYPH_LOC_QUAD (0xFFFFFFFF) -> ordinary quad/atlas path below;
+// COLOR bit (0x80000000) set -> COLR color glyph (hb_gpu_paint, premultiplied);
+// otherwise -> monochrome coverage (hb_gpu_draw). vary_texcoord0 is the em-space
+// renderCoord for glyphs. hb_gpu_draw/paint/ppem/stem_darken are spliced in ahead
+// of main() by the runtime lib injection.
+flat in uint vary_glyphLoc;
+#endif
+
 float sampleAtlasAlpha(vec2 uv)
 {
     // Both atlas types route alpha through .a in the shader: the grayscale
@@ -55,6 +65,34 @@ float sampleAtlasAlpha(vec2 uv)
 
 void main()
 {
+#ifdef HAS_FONT_GPU
+    if (vary_glyphLoc != 0xFFFFFFFFu)   // GLYPH_LOC_QUAD
+    {
+        if ((vary_glyphLoc & 0x80000000u) != 0u)   // GLYPH_LOC_COLOR
+        {
+            // COLR(v1) color glyph: hb_gpu_paint returns PREMULTIPLIED RGBA
+            // (coverage folded in). vertex_color.rgb is the foreground (used only
+            // by foreground-referencing layers); .a is overall opacity. Un-premul
+            // and output straight-alpha so this composites with the SAME
+            // straight-alpha blend as mono glyphs and quads -- no separate blend
+            // state to bracket or to capture for cached replay. (un-premul +
+            // straight-alpha == premultiplied output + premultiplied blend.)
+            float cov;
+            vec4 premul = hb_gpu_paint(vary_texcoord0, vary_glyphLoc & 0x7FFFFFFFu,
+                                       vec4(vertex_color.rgb, 1.0), cov);
+            frag_color = vec4(premul.rgb / max(premul.a, 1e-5), premul.a * vertex_color.a);
+            return;
+        }
+        // Monochrome analytic glyph coverage, composited into the text color's
+        // alpha — same color * coverage semantics as the atlas grayscale path.
+        float coverage = hb_gpu_draw(vary_texcoord0, vary_glyphLoc);
+        float ppem = hb_gpu_ppem(vary_texcoord0, vary_glyphLoc);
+        float brightness = dot(vertex_color.rgb, vec3(0.299, 0.587, 0.114));
+        coverage = hb_gpu_stem_darken(coverage, brightness, ppem);
+        frag_color = vec4(vertex_color.rgb, vertex_color.a * coverage);
+        return;
+    }
+#endif
     if (shadowMode == 0)
     {
         // Default path. Byte-identical to pre-change uiF.glsl.

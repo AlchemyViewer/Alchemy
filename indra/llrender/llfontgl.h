@@ -38,6 +38,8 @@
 #include "llrect.h"
 #include "v2math.h"
 
+#include <vector>
+
 class LLColor4;
 // Key used to request a font.
 class LLFontDescriptor;
@@ -307,12 +309,19 @@ public:
     static void enableShaderShadow(bool enable) { sEnableShaderShadow = enable; }
 
     // Analytic (hb-gpu) glyph rendering: when on, render() routes eligible runs
-    // (no shadow, normal style, non-color faces, fully shaped) through the
-    // resolution-independent hb-gpu path instead of the bitmap atlas, falling
-    // back to the atlas for everything else. Off by default; threaded in from
-    // newview's AlchemyFontRenderGPU setting. Toggle via enableFontGpu().
+    // (fully shaped outline faces — plain text, monospace, and COLR color
+    // emoji) through the resolution-independent hb-gpu path instead of the
+    // bitmap atlas, falling back to the atlas for everything else (bitmap/SVG
+    // color faces, shaping failures, ellipsis). Off by default; threaded in
+    // from newview's AlchemyFontRenderGPU setting. Toggle via enableFontGpu().
     static bool sEnableFontGpu;
     static void enableFontGpu(bool enable) { sEnableFontGpu = enable; }
+
+    // Set by render()'s analytic branch when it emitted any COLR color glyph this
+    // call. LLFontVertexBuffer reads it after a captured render to disable the
+    // color-only recolor fast path (color glyphs bake fixed premultiplied colors,
+    // so recoloring their vertices would be wrong). Main/GL thread only.
+    static bool sGpuEmittedColorGlyph;
 
     static F32 sVertDPI;
     static F32 sHorizDPI;

@@ -151,24 +151,56 @@ void main()
     }
 }
 
-std::string LLFontGpuShader::vertexSource()
+std::string LLFontGpuShader::vertexLibSource()
 {
-    std::string src = "#version 330\n";
+    std::string src;
     if (const char* shared = hb_gpu_shader_source(HB_GPU_SHADER_STAGE_VERTEX, HB_GPU_SHADER_LANG_GLSL))
     {
         src += shared;
     }
     src += '\n';
+    return src;
+}
+
+std::string LLFontGpuShader::fragmentLibSource()
+{
+    // Order is required (see hb-gpu-*-fragment.glsl): shared rasterizer
+    // (_hb_gpu_slug + the hb_gpu_atlas sampler) FIRST, then the draw wrapper
+    // (hb_gpu_draw — also used by paint for clip coverage), then the paint
+    // interpreter (hb_gpu_paint). Includes BOTH draw and paint so a single host
+    // program can render monochrome (coverage) and color (premultiplied) text.
+    std::string src;
+    if (const char* shared = hb_gpu_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
+    {
+        src += shared;
+    }
+    src += '\n';
+    if (const char* draw = hb_gpu_draw_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
+    {
+        src += draw;
+    }
+    src += '\n';
+    if (const char* paint = hb_gpu_paint_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
+    {
+        src += paint;
+    }
+    src += '\n';
+    return src;
+}
+
+std::string LLFontGpuShader::vertexSource()
+{
+    std::string src = "#version 330\n";
+    src += vertexLibSource();
     src += APP_VERTEX_MAIN;
     return src;
 }
 
 std::string LLFontGpuShader::fragmentSource()
 {
+    // Standalone monochrome program: shared rasterizer + draw wrapper only
+    // (no paint), then the draw app main.
     std::string src = "#version 330\n";
-    // Shared fragment source FIRST (provides _hb_gpu_slug + the hb_gpu_atlas
-    // sampler), then the draw-renderer wrapper that calls it — this order is
-    // required (see hb-gpu-draw-fragment.glsl).
     if (const char* shared = hb_gpu_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
     {
         src += shared;
@@ -185,25 +217,10 @@ std::string LLFontGpuShader::fragmentSource()
 
 std::string LLFontGpuShader::colorFragmentSource()
 {
+    // Standalone color program: shared + draw + paint libs, then the paint app
+    // main. Same lib set as fragmentLibSource(); differs only by the main.
     std::string src = "#version 330\n";
-    // Paint renderer needs, in order: the shared rasterizer (_hb_gpu_slug +
-    // hb_gpu_atlas), the draw wrapper (hb_gpu_draw, used for clip coverage),
-    // then the paint interpreter (hb_gpu_paint) — see hb-gpu-paint-fragment.glsl.
-    if (const char* shared = hb_gpu_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
-    {
-        src += shared;
-    }
-    src += '\n';
-    if (const char* draw = hb_gpu_draw_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
-    {
-        src += draw;
-    }
-    src += '\n';
-    if (const char* paint = hb_gpu_paint_shader_source(HB_GPU_SHADER_STAGE_FRAGMENT, HB_GPU_SHADER_LANG_GLSL))
-    {
-        src += paint;
-    }
-    src += '\n';
+    src += fragmentLibSource();
     src += APP_COLOR_FRAGMENT_MAIN;
     return src;
 }
