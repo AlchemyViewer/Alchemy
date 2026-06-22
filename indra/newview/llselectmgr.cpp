@@ -51,6 +51,7 @@
 #include "llquaternion.h"
 
 // viewer includes
+#include "alobjectproperties.h"
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llattachmentsmgr.h"
@@ -6327,7 +6328,14 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
 
         if (!node)
         {
-            LL_WARNS() << "Couldn't find object " << id << " selected." << LL_ENDL;
+            // The Scene Explorer probes properties via bulk select/deselect
+            // without creating select nodes; replies it is awaiting (tracked
+            // per-id, so late arrivals after it closes are covered too) are
+            // expected to have no node and warrant no warning.
+            if (!ALObjectPropertiesCache::isExpectedReply(id))
+            {
+                LL_WARNS() << "Couldn't find object " << id << " selected." << LL_ENDL;
+            }
         }
         else
         {

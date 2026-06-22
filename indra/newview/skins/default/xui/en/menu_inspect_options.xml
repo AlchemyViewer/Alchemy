@@ -91,4 +91,105 @@
 		 function="Inspect.ToggleColumn"
 		 parameter="creation_date"/>
 	</menu_item_check>
+	<menu_item_separator />
+	<menu_item_check
+	 label="Land Impact"
+	 name="land_impact">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="land_impact"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="land_impact"/>
+	</menu_item_check>
+	<menu_item_check
+	 label="Render Cost (ARC)"
+	 name="rendercost">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="rendercost"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="rendercost"/>
+	</menu_item_check>
+	<menu_item_check
+	 label="Physics Cost"
+	 name="physicscost">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="physicscost"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="physicscost"/>
+	</menu_item_check>
+	<menu_item_check
+	 label="Streaming Cost"
+	 name="streamingcost">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="streamingcost"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="streamingcost"/>
+	</menu_item_check>
+	<menu_item_check
+	 label="Prim Count"
+	 name="primcount">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="primcount"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="primcount"/>
+	</menu_item_check>
+	<menu_item_check
+	 label="Distance"
+	 name="distance">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="distance"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="distance"/>
+	</menu_item_check>
+	<menu_item_check
+	 label="Scripts"
+	 name="scripts">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="scripts"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="scripts"/>
+	</menu_item_check>
+	<menu_item_check
+	 label="Light/Glow"
+	 name="lightglow">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="lightglow"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="lightglow"/>
+	</menu_item_check>
+	<menu_item_check
+	 label="Media"
+	 name="media">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="media"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="media"/>
+	</menu_item_check>
+	<menu_item_check
+	 label="Alpha/PBR"
+	 name="alphapbr">
+		<menu_item_check.on_check
+		 function="Inspect.EnableColumn"
+		 parameter="alphapbr"/>
+		<menu_item_check.on_click
+		 function="Inspect.ToggleColumn"
+		 parameter="alphapbr"/>
+	</menu_item_check>
 </toggleable_menu>

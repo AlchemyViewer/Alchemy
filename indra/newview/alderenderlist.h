@@ -151,6 +151,7 @@ public:
     using entry_list_t = std::list<std::unique_ptr<ALDerenderEntry>>;
 
     const entry_list_t& getEntries() const { return m_Entries; }
+    bool                isDerendered(const LLUUID& idObject) { return getObjectEntry(idObject) != nullptr; }
     void removeObject(ALDerenderEntry::EEntryType eType, const LLUUID& idObject);
     void removeObjects(ALDerenderEntry::EEntryType eType, const uuid_vec_t& idsObject);
 protected:
@@ -170,7 +171,6 @@ public:
 protected:
     ALDerenderObject* getObjectEntry(const LLUUID& idObject) /*const*/;
     ALDerenderObject* getObjectEntry(U64 idRegion, const LLUUID& idObject, U32 idRootLocal) /*const*/;
-    bool              isDerendered(const LLUUID& idObject) /*const*/                                { return getObjectEntry(idObject) != nullptr; }
     bool              isDerendered(U64 idRegion, const LLUUID& idObject, U32 idRootLocal) /*const*/ { return getObjectEntry(idRegion, idObject, idRootLocal) != nullptr; }
 
     /*

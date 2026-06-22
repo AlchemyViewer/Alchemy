@@ -748,6 +748,17 @@
              function="Floater.Toggle"
              parameter="fs_poser" />
         </menu_item_check>
+        <menu_item_check
+         label="Scene Explorer"
+         name="Scene Explorer"
+         use_mac_ctrl="true">
+            <menu_item_check.on_check
+             function="Floater.Visible"
+             parameter="scene_explorer" />
+            <menu_item_check.on_click
+             function="Floater.Toggle"
+             parameter="scene_explorer" />
+        </menu_item_check>
         <menu_item_separator/>
         <menu_item_call
          label="Landmark This Place"

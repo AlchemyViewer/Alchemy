@@ -28,6 +28,7 @@
 
 #include "llfloaterinspect.h"
 
+#include "alobjectproperties.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llavataractions.h"
@@ -59,6 +60,27 @@
 
 //LLFloaterInspect* LLFloaterInspect::sInstance = NULL;
 
+// Opt-in scene-builder metric column bits. Defined once here and reused both in
+// mColumnBits and METRIC_COLUMNS_MASK so the two cannot silently drift apart.
+namespace
+{
+    constexpr U32 COL_LAND_IMPACT = 1u << 10;
+    constexpr U32 COL_RENDERCOST  = 1u << 11;
+    constexpr U32 COL_PHYSICSCOST = 1u << 12;
+    constexpr U32 COL_STREAMCOST  = 1u << 13;
+    constexpr U32 COL_PRIMCOUNT   = 1u << 14;
+    constexpr U32 COL_DISTANCE    = 1u << 15;
+    constexpr U32 COL_SCRIPTS     = 1u << 16;
+    constexpr U32 COL_LIGHTGLOW   = 1u << 17;
+    constexpr U32 COL_MEDIA       = 1u << 18;
+    constexpr U32 COL_ALPHAPBR    = 1u << 19;
+}
+
+// Union of the opt-in scene-builder metric column bits (see mColumnBits).
+static constexpr U32 METRIC_COLUMNS_MASK =
+    COL_LAND_IMPACT | COL_RENDERCOST | COL_PHYSICSCOST | COL_STREAMCOST | COL_PRIMCOUNT |
+    COL_DISTANCE | COL_SCRIPTS | COL_LIGHTGLOW | COL_MEDIA | COL_ALPHAPBR;
+
 LLFloaterInspect::LLFloaterInspect(const LLSD& key)
   : LLFloater(key),
     mDirty(false),
@@ -85,6 +107,18 @@ LLFloaterInspect::LLFloaterInspect(const LLSD& key)
     mColumnBits["tramcount"] = 128;
     mColumnBits["vramcount"] = 256;
     mColumnBits["creation_date"] = 512;
+    // Scene-builder metrics, sourced from ALObjectProperties so this floater
+    // and the Scene Explorer always report the same numbers.
+    mColumnBits["land_impact"] = COL_LAND_IMPACT;
+    mColumnBits["rendercost"] = COL_RENDERCOST;
+    mColumnBits["physicscost"] = COL_PHYSICSCOST;
+    mColumnBits["streamingcost"] = COL_STREAMCOST;
+    mColumnBits["primcount"] = COL_PRIMCOUNT;
+    mColumnBits["distance"] = COL_DISTANCE;
+    mColumnBits["scripts"] = COL_SCRIPTS;
+    mColumnBits["lightglow"] = COL_LIGHTGLOW;
+    mColumnBits["media"] = COL_MEDIA;
+    mColumnBits["alphapbr"] = COL_ALPHAPBR;
 }
 
 bool LLFloaterInspect::postBuild()
@@ -325,6 +359,7 @@ void LLFloaterInspect::refresh()
     mTextureMemory = 0;
     mTextureVRAMMemory = 0;
     std::string format_res_string;
+    const U32 column_config = gSavedSettings.getU32("ALInspectColumnConfig");
     static LLCachedControl<F32> max_complexity_setting(gSavedSettings, "MaxAttachmentComplexity");
     F32 max_attachment_complexity = max_complexity_setting;
     max_attachment_complexity = llmax(max_attachment_complexity, 1.0e6f);
@@ -506,6 +541,65 @@ void LLFloaterInspect::refresh()
         row["columns"][15]["column"] = "vramcount_sort";
         row["columns"][15]["type"] = "text";
         row["columns"][15]["value"] = LLSD::Integer(vram_memory / 1024);
+
+        // Scene-builder metric columns (opt-in). Only computed while one is
+        // visible: fromObject() walks faces and triggers the async cost fetch,
+        // which must stay demand-driven.
+        if (column_config & METRIC_COLUMNS_MASK)
+        {
+            const ALObjectProperties::Record metrics = ALObjectProperties::fromObject(vobj);
+            const bool is_link_root = vobj->isRoot() || vobj->isRootEdit();
+
+            S32 col = 16;
+            auto add_cell = [&row, &col](const char* name, const LLSD& value)
+            {
+                row["columns"][col]["column"] = name;
+                row["columns"][col]["type"] = "text";
+                row["columns"][col]["value"] = value;
+                ++col;
+            };
+
+            // Roots show the linkset total; child rows show their own
+            // contribution, so the heavy prim in a linkset stands out.
+            const F32 li = is_link_root ? metrics.mLandImpact : metrics.mObjectCost;
+            add_cell("land_impact", li > 0.f ? llformat("%.0f", li) : std::string("-"));
+            add_cell("land_impact_sort", LLSD::Integer(ll_round(li)));
+
+            add_cell("rendercost", llformat("%.0f", metrics.mRenderCost));
+            add_cell("rendercost_sort", LLSD::Integer(ll_round(metrics.mRenderCost)));
+
+            add_cell("physicscost", metrics.mPhysicsCost > 0.f ? llformat("%.1f", metrics.mPhysicsCost) : std::string("-"));
+            // One-decimal floats sort wrong as strings ("9.5" vs "9.12"), so
+            // sort companions carry the value scaled to an integer.
+            add_cell("physicscost_sort", LLSD::Integer(ll_round(metrics.mPhysicsCost * 10.f)));
+
+            add_cell("streamingcost", metrics.mStreamingCost > 0.f ? llformat("%.1f", metrics.mStreamingCost) : std::string("-"));
+            add_cell("streamingcost_sort", LLSD::Integer(ll_round(metrics.mStreamingCost * 10.f)));
+
+            add_cell("primcount", is_link_root ? llformat("%d", metrics.mPrimCount) : std::string());
+            add_cell("primcount_sort", LLSD::Integer(is_link_root ? metrics.mPrimCount : 0));
+
+            add_cell("distance", llformat("%.1f", metrics.mDistance));
+            add_cell("distance_sort", LLSD::Integer(ll_round(metrics.mDistance * 10.f)));
+
+            add_cell("scripts", metrics.hasFlag(ALObjectProperties::FLAG_SCRIPTED) ? std::string("Yes") : std::string());
+
+            std::string light_glow;
+            if (metrics.hasFlag(ALObjectProperties::FLAG_LIGHT))
+                light_glow = "Light";
+            if (metrics.hasFlag(ALObjectProperties::FLAG_GLOW))
+                light_glow += light_glow.empty() ? "Glow" : "+Glow";
+            add_cell("lightglow", light_glow);
+
+            add_cell("media", metrics.hasFlag(ALObjectProperties::FLAG_MEDIA) ? std::string("Yes") : std::string());
+
+            std::string alpha_pbr;
+            if (metrics.hasFlag(ALObjectProperties::FLAG_ALPHA))
+                alpha_pbr = "Alpha";
+            if (metrics.hasFlag(ALObjectProperties::FLAG_PBR_MATERIAL))
+                alpha_pbr += alpha_pbr.empty() ? "PBR" : "+PBR";
+            add_cell("alphapbr", alpha_pbr);
+        }
 
         primcount = sel_mgr.getSelection()->getObjectCount();
         objcount = sel_mgr.getSelection()->getRootObjectCount();

@@ -435,6 +435,15 @@ public:
     void setLinksetPhysicsCost(F32 cost);
     F32 getLinksetPhysicsCost();
 
+    // Read the last cached accounting values WITHOUT triggering a fetch. The
+    // get* variants above queue a GetObjectCost capability request whenever the
+    // cost is stale — and a failed fetch leaves it stale — so periodic readers
+    // (e.g. the Scene Explorer's reconcile pass) must use these to avoid
+    // re-requesting failed/uncosted objects forever.
+    F32 peekObjectCost() const  { return mObjectCost; }
+    F32 peekLinksetCost() const { return mLinksetCost; }
+    F32 peekPhysicsCost() const { return mPhysicsCost; }
+
     void sendShapeUpdate();
 
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0a) | Added: RLVa-1.2.0a

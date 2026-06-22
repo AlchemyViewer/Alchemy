@@ -170,9 +170,13 @@ set(viewer_SOURCE_FILES
     alfloaterprofilelegacy.cpp
     alfloaterprogressview.cpp
     alfloaterregiontracker.cpp
+    alfloatersceneexplorer.cpp
+    alfloatersceneexplorerfilters.cpp
     alfloatertransactionlog.cpp
+    alsceneexplorerpredicate.cpp
     alfloaterwebprofile.cpp
     allegacynotificationwellwindow.cpp
+    alobjectproperties.cpp
     alpanelaomini.cpp
     alpanelaopulldown.cpp
     alpanelavatarlegacy.cpp
@@ -195,6 +199,7 @@ set(viewer_SOURCE_FILES
     alpanelsearchweb.cpp
     alpanelstreaminfo.cpp
     alpickitem.cpp
+    alsceneexplorermodel.cpp
     alstreaminfo.cpp
     altoolalign.cpp
     alunzip.cpp
@@ -932,9 +937,13 @@ set(viewer_HEADER_FILES
     alfloaterprofilelegacy.h
     alfloaterprogressview.h
     alfloaterregiontracker.h
+    alfloatersceneexplorer.h
+    alfloatersceneexplorerfilters.h
     alfloatertransactionlog.h
+    alsceneexplorerpredicate.h
     alfloaterwebprofile.h
     allegacynotificationwellwindow.h
+    alobjectproperties.h
     alpanelaomini.h
     alpanelaopulldown.h
     alpanelavatarlegacy.h
@@ -957,6 +966,7 @@ set(viewer_HEADER_FILES
     alpanelsearchweb.h
     alpanelstreaminfo.h
     alpickitem.h
+    alsceneexplorermodel.h
     alstreaminfo.h
     altoolalign.h
     alunzip.h
@@ -2351,6 +2361,7 @@ if (BUILD_TESTING)
   # This creates a separate test project per file listed.
 
   SET(viewer_TEST_SOURCE_FILES
+    alsceneexplorerpredicate.cpp
     llagentaccess.cpp
     lldateutil.cpp
 #    llmediadataclient.cpp

@@ -13382,6 +13382,19 @@ Always Run disabled.
  </notification>
 
   <notification
+   icon="alertmodal.tga"
+   name="SceneExplorerFullRegion"
+   type="alertmodal">
+Full region coverage asks the simulator to stream every object in the region to your viewer, instead of only what your camera can see. On a busy region this is a lot of data and can take a while to settle.
+
+The simulator returns to normal when you turn this off or close the Scene Explorer.
+    <usetemplate
+     ignoretext="When enabling full region coverage in the Scene Explorer"
+     name="okignore"
+     yestext="OK"/>
+  </notification>
+
+  <notification
    icon="notify.tga"
    name="LoadCameraPositionNoneSaved"
    type="notify">
