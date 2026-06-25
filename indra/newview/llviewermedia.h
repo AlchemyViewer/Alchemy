@@ -71,14 +71,14 @@ private:
 class LLViewerMediaImpl;
 class LLMediaCtrl;
 
-class LLViewerMedia: public LLSimpleton<LLViewerMedia>
+class LLViewerMedia: public LLSingleton<LLViewerMedia>
 {
+    LLSINGLETON(LLViewerMedia);
+    ~LLViewerMedia();
+    void initSingleton() override;
     LOG_CLASS(LLViewerMedia);
 
 public:
-    LLViewerMedia();
-    ~LLViewerMedia();
-
     // String to get/set media autoplay in gSavedSettings
     static const char* AUTO_PLAY_MEDIA_SETTING;
     static const char* SHOW_MEDIA_ON_OTHERS_SETTING;

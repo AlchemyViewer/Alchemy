@@ -171,12 +171,12 @@ private:
 
 
 class LLCommandManager
-:   public LLSimpleton<LLCommandManager>
+:   public LLSingleton<LLCommandManager>
 {
-public:
-    LLCommandManager();
+    LLSINGLETON(LLCommandManager);
     ~LLCommandManager();
 
+public:
     struct Params : public LLInitParam::Block<Params>
     {
         Multiple< LLCommand::Params, AtLeast<1> > commands;

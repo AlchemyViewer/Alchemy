@@ -105,12 +105,12 @@ struct LLEmojiSearchResult
 // LLEmojiDictionary class
 //
 
-class LLEmojiDictionary : public LLSimpleton<LLEmojiDictionary>, public LLInitClass<LLEmojiDictionary>
+class LLEmojiDictionary : public LLParamSingleton<LLEmojiDictionary>, public LLInitClass<LLEmojiDictionary>
 {
-public:
-    LLEmojiDictionary();
-    ~LLEmojiDictionary() = default;
+    LLSINGLETON(LLEmojiDictionary);
+    ~LLEmojiDictionary() override {};
 
+public:
     typedef std::map<std::string, std::string> cat2cat_map_t;
     typedef std::map<std::string, const LLEmojiGroup*> cat2group_map_t;
     // Keyed by full emoji sequence (LLWString) so ZWJ families and flag

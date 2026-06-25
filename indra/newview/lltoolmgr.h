@@ -40,11 +40,11 @@ const MASK MASK_ORBIT           = MASK_CONTROL;
 const MASK MASK_PAN             = MASK_CONTROL | MASK_SHIFT;
 const MASK MASK_COPY            = MASK_SHIFT;
 
-class LLToolMgr : public LLSimpleton<LLToolMgr>
+class LLToolMgr : public LLSingleton<LLToolMgr>
 {
-public:
-    LLToolMgr();
+    LLSINGLETON(LLToolMgr);
     ~LLToolMgr();
+public:
 
     // Must be called after gSavedSettings set up.
     void            initTools();

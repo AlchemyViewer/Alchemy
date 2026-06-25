@@ -88,12 +88,13 @@ namespace boost {
  * can provide diagnostic info: we can look up the name of the
  * currently-running coroutine.
  */
-class LL_COMMON_API LLCoros: public LLSimpleton<LLCoros>
+class LL_COMMON_API LLCoros: public LLSingleton<LLCoros>
 {
-public:
-    LLCoros();
+    LLSINGLETON(LLCoros);
     ~LLCoros();
 
+    void cleanupSingleton() override;
+public:
     // For debugging, return true if on the main coroutine for the current thread
     // Code that should not be executed from a coroutine should be protected by
     // llassert(LLCoros::on_main_coro())

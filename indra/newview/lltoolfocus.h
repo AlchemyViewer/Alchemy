@@ -32,11 +32,11 @@
 class LLPickInfo;
 
 class LLToolCamera
-:   public LLTool, public LLSimpleton<LLToolCamera>
+:   public LLTool, public LLSingleton<LLToolCamera>
 {
-public:
-    LLToolCamera();
+    LLSINGLETON(LLToolCamera);
     virtual ~LLToolCamera();
+public:
 
     virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
     virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;

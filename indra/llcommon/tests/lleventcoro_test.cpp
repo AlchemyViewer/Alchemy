@@ -92,15 +92,6 @@ namespace tut
 {
     struct test_data
     {
-        test_data()
-        {
-            LLCoros::createInstance();
-        }
-        ~test_data()
-        {
-            LLCoros::deleteSingleton();
-        }
-
         Sync mSync;
         ImmediateAPI immediateAPI{mSync};
         std::string replyName, errorName, threw, stringdata;

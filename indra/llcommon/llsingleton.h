@@ -749,7 +749,7 @@ private:
         // mInitState already set.
         SlotLock lk;
         // For organizational purposes this function shouldn't be called twice
-        if (lk->mInitState != super::UNINITIALIZED)
+        if (lk->mInitState != super::UNINITIALIZED && lk->mInitState != super::DELETED)
         {
             super::logerrs({"Tried to initialize singleton ",
                            super::template classname<DERIVED_TYPE>(),

@@ -1134,8 +1134,8 @@ bool idle_startup()
         {
             // check existance since this part of code can be reached
             // twice due to login failures
-            LLPersistentNotificationStorage::createInstance();
-            LLDoNotDisturbNotificationStorage::createInstance();
+            LLPersistentNotificationStorage::initParamSingleton();
+            LLDoNotDisturbNotificationStorage::initParamSingleton();
         }
         else
         {
@@ -3412,7 +3412,7 @@ void LLStartUp::multimediaInit()
     set_startup_status(0.42f, msg.c_str(), gAgent.mMOTD.c_str());
     do_startup_frame();
 
-    ALStreamInfo::createInstance();
+    ALStreamInfo::getInstance();
 }
 
 void LLStartUp::fontInit()

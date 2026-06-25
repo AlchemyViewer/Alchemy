@@ -34,6 +34,80 @@
 
 extern LLControlGroup gSavedSettings;
 
+static const std::string empty_string;
+
+struct ViewerFolderEntry : public LLDictionaryEntry
+{
+    // Constructor for non-ensembles
+    ViewerFolderEntry(const std::string &new_category_name, // default name when creating a new category of this type
+                      const std::string &icon_name_open,    // name of the folder icon
+                      const std::string &icon_name_closed,
+                      bool is_quiet,                        // folder doesn't need a UI update when changed
+                      bool hide_if_empty,                   // folder not shown if empty
+                      const std::string &dictionary_name = empty_string // no reverse lookup needed on non-ensembles, so in most cases just leave this blank
+        )
+        :
+        LLDictionaryEntry(dictionary_name),
+        mNewCategoryName(new_category_name),
+        mIconNameOpen(icon_name_open),
+        mIconNameClosed(icon_name_closed),
+        mIsQuiet(is_quiet),
+        mHideIfEmpty(hide_if_empty)
+    {
+        mAllowedNames.clear();
+    }
+
+    // Constructor for ensembles
+    ViewerFolderEntry(const std::string &xui_name,          // name of the xui menu item
+                      const std::string &new_category_name, // default name when creating a new category of this type
+                      const std::string &icon_name,         // name of the folder icon
+                      const std::string allowed_names       // allowed item typenames for this folder type
+        )
+        :
+        LLDictionaryEntry(xui_name),
+        /* Just use default icons until we actually support ensembles
+        mIconNameOpen(icon_name),
+        mIconNameClosed(icon_name),
+        */
+        mIconNameOpen("Inv_FolderOpen"), mIconNameClosed("Inv_FolderClosed"),
+        mNewCategoryName(new_category_name),
+        mIsQuiet(false),
+        mHideIfEmpty(false)
+    {
+        const std::string delims (",");
+        LLStringUtilBase<char>::getTokens(allowed_names, mAllowedNames, delims);
+    }
+
+    bool getIsAllowedName(const std::string &name) const
+    {
+        if (mAllowedNames.empty())
+            return false;
+        for (name_vec_t::const_iterator iter = mAllowedNames.begin();
+             iter != mAllowedNames.end();
+             iter++)
+        {
+            if (name == (*iter))
+                return true;
+        }
+        return false;
+    }
+    const std::string mIconNameOpen;
+    const std::string mIconNameClosed;
+    const std::string mNewCategoryName;
+    typedef std::vector<std::string> name_vec_t;
+    name_vec_t mAllowedNames;
+    bool mIsQuiet;
+    bool mHideIfEmpty;
+};
+
+class LLViewerFolderDictionary : public LLSingleton<LLViewerFolderDictionary>,
+                                 public LLDictionary<LLFolderType::EType, ViewerFolderEntry>
+{
+    LLSINGLETON(LLViewerFolderDictionary);
+protected:
+    bool initEnsemblesFromFile(); // Reads in ensemble information from foldertypes.xml
+};
+
 LLViewerFolderDictionary::LLViewerFolderDictionary()
 {
     //                                                                    NEW CATEGORY NAME         FOLDER OPEN             FOLDER CLOSED          QUIET?      HIDE IF EMPTY?

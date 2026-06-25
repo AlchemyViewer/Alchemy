@@ -185,10 +185,12 @@ LLMuteList::LLMuteList() :
 //-----------------------------------------------------------------------------
 LLMuteList::~LLMuteList()
 {
-    if (LLAvatarNameCache::instanceExists())
-    {
-        LLAvatarNameCache::getInstance()->setAccountNameChangedCallback(nullptr);
-    }
+
+}
+
+void LLMuteList::cleanupSingleton()
+{
+    LLAvatarNameCache::getInstance()->setAccountNameChangedCallback(nullptr);
 }
 
 // static

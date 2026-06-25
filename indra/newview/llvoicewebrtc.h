@@ -56,18 +56,18 @@ typedef std::shared_ptr<LLVoiceWebRTCConnection> connectionPtr_t;
 
 extern const std::string WEBRTC_VOICE_SERVER_TYPE;
 
-class LLWebRTCVoiceClient : public LLSimpleton<LLWebRTCVoiceClient>,
+class LLWebRTCVoiceClient : public LLSingleton<LLWebRTCVoiceClient>,
                             virtual public LLVoiceModuleInterface,
                             public llwebrtc::LLWebRTCDevicesObserver,
                             public LLMuteListObserver,
                             public llwebrtc::LLWebRTCLogCallback
 {
+    LLSINGLETON(LLWebRTCVoiceClient);
     LOG_CLASS(LLWebRTCVoiceClient);
-
-public:
-    LLWebRTCVoiceClient();
     virtual ~LLWebRTCVoiceClient();
 
+public:
+    void cleanupSingleton() override;
     /// @name LLVoiceModuleInterface virtual implementations
     ///  @see LLVoiceModuleInterface
     //@{

@@ -35,11 +35,11 @@
 class LLViewerObject;
 class LLObjectSelection;
 
-class LLToolPie : public LLTool, public LLSimpleton<LLToolPie>
+class LLToolPie : public LLTool, public LLSingleton<LLToolPie>
 {
+    LLSINGLETON(LLToolPie);
     LOG_CLASS(LLToolPie);
 public:
-    LLToolPie();
 
     // Virtual functions inherited from LLMouseHandler
     virtual bool        handleAnyMouseClick(S32 x, S32 y, MASK mask, EMouseClickType clicktype, bool down) override;

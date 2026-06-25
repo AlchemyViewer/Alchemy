@@ -98,10 +98,14 @@ namespace tut
 {
     struct llemojidictionary_data
     {
-        // Construct a dictionary directly. Only pure-logic methods are
-        // exercised, so the singleton's normal initClass() flow (which
-        // touches gDirUtilp) is intentionally bypassed.
-        LLEmojiDictionary dict;
+        llemojidictionary_data()
+        {
+            LLEmojiDictionary::initParamSingleton();
+        }
+        ~llemojidictionary_data()
+        {
+            LLEmojiDictionary::deleteSingleton();
+        }
     };
     typedef test_group<llemojidictionary_data> factory;
     typedef factory::object object;
@@ -119,7 +123,7 @@ namespace tut
     void object::test<1>()
     {
         LLEmojiDescriptor d = make_thumbs_up_descriptor();
-        const LLEmojiVariant* v = dict.findVariant(d, 3, -1);
+        const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 3, -1);
         ensure("tone-3 variant found", v != nullptr);
         ensure_equals("tone matches", v->Tone, U8(3));
     }
@@ -129,7 +133,7 @@ namespace tut
     void object::test<2>()
     {
         LLEmojiDescriptor d = make_thumbs_up_descriptor();
-        const LLEmojiVariant* v = dict.findVariant(d, 0, -1);
+        const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 0, -1);
         ensure("no preference returns nullptr", v == nullptr);
     }
 
@@ -139,7 +143,7 @@ namespace tut
     {
         LLEmojiDescriptor empty;
         empty.Character = utf8str_to_wstring("\xF0\x9F\x92\xA9"); // 💩
-        const LLEmojiVariant* v = dict.findVariant(empty, 3, -1);
+        const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(empty, 3, -1);
         ensure("no variants returns nullptr", v == nullptr);
     }
 
@@ -148,7 +152,7 @@ namespace tut
     void object::test<4>()
     {
         LLEmojiDescriptor d = make_astronaut_descriptor();
-        const LLEmojiVariant* v = dict.findVariant(d, 3, 0); // tone=3, man
+        const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 3, 0); // tone=3, man
         ensure("variant found", v != nullptr);
         ensure_equals("tone matches", v->Tone, U8(3));
         ensure_equals("gender matches", v->Gender, S8(0));
@@ -161,7 +165,7 @@ namespace tut
     void object::test<5>()
     {
         LLEmojiDescriptor d = make_astronaut_descriptor();
-        const LLEmojiVariant* v = dict.findVariant(d, 3, -1);
+        const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 3, -1);
         ensure("variant found", v != nullptr);
         ensure_equals("tone matches", v->Tone, U8(3));
         // Gender preference unset — best match should have Gender=2
@@ -181,7 +185,7 @@ namespace tut
         // Ask tone=3, gender=woman, but the descriptor has only
         // gender-neutral variants. Should still return the tone-3
         // variant (partial match).
-        const LLEmojiVariant* v = dict.findVariant(d, 3, 1);
+        const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(d, 3, 1);
         ensure("partial match accepted", v != nullptr);
         ensure_equals("tone matches", v->Tone, U8(3));
     }
@@ -289,9 +293,9 @@ namespace tut
     template<> template<>
     void object::test<10>()
     {
-        dict.loadEmojisFromSD(make_thumbs_up_dictionary_blob());
+        LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
         ensure("base char returned",
-               dict.getEmojiFromShortCode(":thumbs_up:") == utf8str_to_wstring("\xF0\x9F\x91\x8D"));
+               LLEmojiDictionary::instance().getEmojiFromShortCode(":thumbs_up:") == utf8str_to_wstring("\xF0\x9F\x91\x8D"));
     }
 
     // getEmojiFromShortCode returns the VARIANT character for a variant
@@ -299,9 +303,9 @@ namespace tut
     template<> template<>
     void object::test<11>()
     {
-        dict.loadEmojisFromSD(make_thumbs_up_dictionary_blob());
+        LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
         ensure("variant char returned",
-               dict.getEmojiFromShortCode(":thumbs_up_dark_skin_tone:")
+               LLEmojiDictionary::instance().getEmojiFromShortCode(":thumbs_up_dark_skin_tone:")
                    == utf8str_to_wstring("\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF"));
     }
 
@@ -309,8 +313,8 @@ namespace tut
     template<> template<>
     void object::test<12>()
     {
-        dict.loadEmojisFromSD(make_thumbs_up_dictionary_blob());
-        ensure("empty for unknown", dict.getEmojiFromShortCode(":nonsense:").empty());
+        LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
+        ensure("empty for unknown", LLEmojiDictionary::instance().getEmojiFromShortCode(":nonsense:").empty());
     }
 
     // findByShortCode prefix-matching now surfaces variants — typing
@@ -319,10 +323,10 @@ namespace tut
     template<> template<>
     void object::test<13>()
     {
-        dict.loadEmojisFromSD(make_thumbs_up_dictionary_blob());
+        LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
 
         std::vector<LLEmojiSearchResult> results;
-        dict.findByShortCode(results, ":thumbs_up_d");
+        LLEmojiDictionary::instance().findByShortCode(results, ":thumbs_up_d");
         ensure("at least one result", !results.empty());
 
         const LLWString expected_dark = utf8str_to_wstring("\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF");

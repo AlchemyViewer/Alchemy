@@ -167,7 +167,6 @@ void LLVoiceClient::init(LLPumpIO *pump)
     // Initialize all of the voice modules
     m_servicePump = pump;
 #ifndef DISABLE_WEBRTC
-    LLWebRTCVoiceClient::createInstance();
     LLWebRTCVoiceClient::getInstance()->init(pump);
 #endif
 }

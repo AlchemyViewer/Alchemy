@@ -44,7 +44,6 @@ LLHUDManager::LLHUDManager()
 
 LLHUDManager::~LLHUDManager()
 {
-    mHUDEffects.clear();
 }
 
 static LLTrace::BlockTimerStatHandle FTM_UPDATE_HUD_EFFECTS("Update Hud Effects");
@@ -93,6 +92,12 @@ void LLHUDManager::sendEffects()
             gAgent.sendMessage();
         }
     }
+}
+
+//static
+void LLHUDManager::shutdownClass()
+{
+    getInstance()->mHUDEffects.clear();
 }
 
 void LLHUDManager::cleanupEffects()

@@ -41,11 +41,10 @@ class LLViewerRegion;
 class LLVOAvatar;
 class LLPickInfo;
 
-class LLToolDragAndDrop : public LLTool, public LLSimpleton<LLToolDragAndDrop>
+class LLToolDragAndDrop : public LLTool, public LLSingleton<LLToolDragAndDrop>
 {
+    LLSINGLETON(LLToolDragAndDrop);
 public:
-    LLToolDragAndDrop();
-
     typedef boost::signals2::signal<void ()> enddrag_signal_t;
 
     // overridden from LLTool

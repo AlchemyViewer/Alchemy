@@ -32,14 +32,14 @@
 #include "llinvtranslationbrdg.h"
 #include "llsingleton.h"
 
-class LLSettingsType : public LLSimpleton<LLSettingsType>
+class LLSettingsType : public LLParamSingleton<LLSettingsType>
 {
+    LLSINGLETON(LLSettingsType, LLTranslationBridge::ptr_t &trans);
+    ~LLSettingsType();
+
     friend struct SettingsEntry;
 
 public:
-    LLSettingsType(LLTranslationBridge::ptr_t& trans);
-    ~LLSettingsType();
-
     enum type_e
     {
         ST_SKY = 0,

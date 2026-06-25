@@ -133,11 +133,10 @@ protected:
     LLViewerRegion *mRegionp;
 };
 
-class LLViewerPartSim : public LLSimpleton<LLViewerPartSim>
+class LLViewerPartSim : public LLSingleton<LLViewerPartSim>
 {
+    LLSINGLETON(LLViewerPartSim);
 public:
-    LLViewerPartSim();
-
     void destroyClass();
 
     typedef std::vector<LLViewerPartGroup *> group_list_t;

@@ -32,6 +32,41 @@
 #include "llsd.h"
 #include "llsingleton.h"
 
+///----------------------------------------------------------------------------
+/// Class LLFolderType
+///----------------------------------------------------------------------------
+struct FolderEntry : public LLDictionaryEntry
+{
+    FolderEntry(const std::string &type_name, // 8 character limit!
+                bool is_protected, // can the viewer change categories of this type?
+                bool is_automatic, // always made before first login?
+                bool is_singleton  // should exist as a unique copy under root
+        )
+        :
+    LLDictionaryEntry(type_name),
+    mIsProtected(is_protected),
+    mIsAutomatic(is_automatic),
+    mIsSingleton(is_singleton)
+    {
+        llassert(type_name.length() <= 8);
+    }
+
+    const bool mIsProtected;
+    const bool mIsAutomatic;
+    const bool mIsSingleton;
+};
+
+class LLFolderDictionary : public LLSingleton<LLFolderDictionary>,
+                           public LLDictionary<LLFolderType::EType, FolderEntry>
+{
+    LLSINGLETON(LLFolderDictionary);
+protected:
+    virtual LLFolderType::EType notFound() const override
+    {
+        return LLFolderType::FT_NONE;
+    }
+};
+
 // Folder types
 //
 // PROTECTED means that folders of this type can't be moved, deleted

@@ -137,13 +137,11 @@ namespace tut
         // Constructor and destructor of the test wrapper
         worldmap_test()
         {
-            LLWorldMap::createInstance();
             mWorld = LLWorldMap::getInstance();
         }
         ~worldmap_test()
         {
-            mWorld = nullptr;
-            LLWorldMap::deleteSingleton();
+            mWorld = NULL;
         }
     };
 

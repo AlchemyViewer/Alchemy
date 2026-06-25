@@ -219,6 +219,23 @@ mAnyMediaPlaying(false),
 mMaxIntances(MAX_MEDIA_INSTANCES_DEFAULT),
 mSpareBrowserMediaSource(NULL)
 {
+}
+
+LLViewerMedia::~LLViewerMedia()
+{
+    gIdleCallbacks.deleteFunction(LLViewerMedia::onIdle, NULL);
+    mTeleportFinishConnection.disconnect();
+    mMaxInstancesConnection.disconnect();
+    if (mSpareBrowserMediaSource != NULL)
+    {
+        delete mSpareBrowserMediaSource;
+        mSpareBrowserMediaSource = NULL;
+    }
+}
+
+// static
+void LLViewerMedia::initSingleton()
+{
     gIdleCallbacks.addFunction(LLViewerMedia::onIdle, NULL);
     mTeleportFinishConnection = LLViewerParcelMgr::getInstance()->
         setTeleportFinishedCallback(boost::bind(&LLViewerMedia::onTeleportFinished, this));
@@ -235,18 +252,6 @@ mSpareBrowserMediaSource(NULL)
     else
     {
         setMaxInstances(MAX_MEDIA_INSTANCES_DEFAULT);
-    }
-}
-
-LLViewerMedia::~LLViewerMedia()
-{
-    gIdleCallbacks.deleteFunction(LLViewerMedia::onIdle, NULL);
-    mTeleportFinishConnection.disconnect();
-    mMaxInstancesConnection.disconnect();
-    if (mSpareBrowserMediaSource != NULL)
-    {
-        delete mSpareBrowserMediaSource;
-        mSpareBrowserMediaSource = NULL;
     }
 }
 
