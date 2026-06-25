@@ -494,7 +494,6 @@ bool LLKeywords::WStringMapIndex::operator<(const LLKeywords::WStringMapIndex &o
     return result;
 }
 
-LLTrace::BlockTimerStatHandle FTM_SYNTAX_COLORING("Syntax Coloring");
 constexpr size_t AVERAGE_SEGMENT_LENGTH = 8;
 
 void LLKeywords::collectSegmentOps(segment_ops_t& ops, const LLWString& wtext, bool disable_syntax_highlighting) const
@@ -894,7 +893,7 @@ void LLKeywords::applySegmentOps(std::vector<LLTextSegmentPtr> *seg_list,
 // create a list of color segments.
 void LLKeywords::findSegments(std::vector<LLTextSegmentPtr>* seg_list, const LLWString& wtext, LLTextEditor& editor, LLStyleConstSP style)
 {
-    LL_RECORD_BLOCK_TIME(FTM_SYNTAX_COLORING);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     if( wtext.empty() )
     {

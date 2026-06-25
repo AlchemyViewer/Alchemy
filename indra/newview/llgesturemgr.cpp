@@ -807,6 +807,8 @@ struct IsGesturePlaying
 
 void LLGestureMgr::update()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VIEWER;
+
     S32 i;
     for (i = 0; i < (S32)mPlaying.size(); ++i)
     {

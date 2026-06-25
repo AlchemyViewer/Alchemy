@@ -245,7 +245,6 @@
 			<menu_item_check label="Console de débogage" name="Debug Console"/>
 			<menu_item_call label="Console de notifications" name="Notifications"/>
 			<menu_item_check label="Console de débogage de région" name="Region Debug Console"/>
-			<menu_item_check label="Chronos" name="Fast Timers"/>
 			<menu_item_check label="Mémoire" name="Memory"/>
 			<menu_item_check label="Statistiques de la scène" name="Scene Statistics"/>
 			<menu_item_check label="Moniteur de chargement de scène" name="Scene Loading Monitor"/>

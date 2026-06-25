@@ -92,7 +92,6 @@
 #include "lltoast.h"
 #include "llsdutil_math.h"
 #include "lllocationhistory.h"
-#include "llfasttimerview.h"
 #include "llvector4a.h"
 #include "llviewermenufile.h"
 #include "llvoicechannel.h"
@@ -1334,8 +1333,6 @@ void LLAppViewer::initMaxHeapSize()
 
 
 // externally visible timers
-LLTrace::BlockTimerStatHandle FTM_FRAME("Frame");
-
 bool LLAppViewer::frame()
 {
     bool ret = false;
@@ -1378,8 +1375,8 @@ bool LLAppViewer::frame()
 
 bool LLAppViewer::doFrame()
 {
-    LL_RECORD_BLOCK_TIME(FTM_FRAME);
-    LL_PROFILE_GPU_ZONE("Frame");
+    LL_PROFILE_ZONE_SCOPED;
+    LL_PROFILE_GPU_ZONE("doFrame");
 
     resumeMainloopTimeout("Main:doFrameStart");
 
@@ -1409,11 +1406,6 @@ bool LLAppViewer::doFrame()
         LLPerfStats::RecordSceneTime T (LLPerfStats::StatType_t::RENDER_IDLE); // perf stats
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df LLTrace");
-            if (LLFloaterReg::instanceVisible("block_timers"))
-            {
-                LLTrace::BlockTimer::processTimes();
-            }
-
             LLTrace::get_frame_recording().nextPeriod();
             LLTrace::BlockTimer::logStats();
         }
@@ -1775,13 +1767,6 @@ bool LLAppViewer::cleanup()
         }
         LLSceneMonitor::deleteSingleton();
     }
-
-    // There used to be an 'if (LLFastTimerView::sAnalyzePerformance)' block
-    // here, completely redundant with the one that occurs later in this same
-    // function. Presumably the duplication was due to an automated merge gone
-    // bad. Not knowing which instance to prefer, we chose to retain the later
-    // one because it happens just after mFastTimerLogThread is deleted. This
-    // comment is in case we guessed wrong, so we can move it here instead.
 
 #if LL_LINUX
     // remove any old breakpad minidump files from the log directory
@@ -2147,20 +2132,6 @@ bool LLAppViewer::cleanup()
     sPurgeDiskCacheThread = NULL;
     delete mGeneralThreadPool;
     mGeneralThreadPool = NULL;
-
-    if (LLFastTimerView::sAnalyzePerformance)
-    {
-        LL_INFOS() << "Analyzing performance" << LL_ENDL;
-
-        std::string baseline_name = LLTrace::BlockTimer::sLogName + "_baseline.slp";
-        std::string current_name  = LLTrace::BlockTimer::sLogName + ".slp";
-        std::string report_name   = LLTrace::BlockTimer::sLogName + "_report.csv";
-
-        LLFastTimerView::doAnalysis(
-            gDirUtilp->getExpandedFilename(LL_PATH_LOGS, baseline_name),
-            gDirUtilp->getExpandedFilename(LL_PATH_LOGS, current_name),
-            gDirUtilp->getExpandedFilename(LL_PATH_LOGS, report_name));
-    }
 
     SUBSYSTEM_CLEANUP(LLMetricPerformanceTesterBasic) ;
 
@@ -2891,7 +2862,6 @@ bool LLAppViewer::initConfiguration()
         mForceGraphicsLevel = gSavedSettings.getU32("RenderQualityPerformance");
     }
 
-    LLFastTimerView::sAnalyzePerformance = gSavedSettings.getBOOL("AnalyzePerformance");
     gAgentPilot.setReplaySession(gSavedSettings.getBOOL("ReplaySession"));
 
     if (gSavedSettings.getBOOL("DebugSession"))
@@ -5024,20 +4994,6 @@ public:
         }
 };
 
-static LLTrace::BlockTimerStatHandle FTM_AUDIO_UPDATE("Update Audio");
-static LLTrace::BlockTimerStatHandle FTM_CLEANUP("Cleanup");
-static LLTrace::BlockTimerStatHandle FTM_CLEANUP_DRAWABLES("Drawables");
-static LLTrace::BlockTimerStatHandle FTM_IDLE_CB("Idle Callbacks");
-static LLTrace::BlockTimerStatHandle FTM_LOD_UPDATE("Update LOD");
-static LLTrace::BlockTimerStatHandle FTM_OBJECTLIST_UPDATE("Update Objectlist");
-static LLTrace::BlockTimerStatHandle FTM_REGION_UPDATE("Update Region");
-static LLTrace::BlockTimerStatHandle FTM_WORLD_UPDATE("Update World");
-static LLTrace::BlockTimerStatHandle FTM_NETWORK("Network");
-static LLTrace::BlockTimerStatHandle FTM_AGENT_NETWORK("Agent Network");
-static LLTrace::BlockTimerStatHandle FTM_VLMANAGER("VL Manager");
-static LLTrace::BlockTimerStatHandle FTM_AGENT_POSITION("Agent Position");
-static LLTrace::BlockTimerStatHandle FTM_HUD_EFFECTS("HUD Effects");
-
 ///////////////////////////////////////////////////////
 // idle()
 //
@@ -5285,11 +5241,9 @@ void LLAppViewer::idle()
         {
             // Teleported, but waiting for things to load, start processing surface data
             {
-                LL_RECORD_BLOCK_TIME(FTM_NETWORK);
                 gVLManager.unpackData();
             }
             {
-                LL_RECORD_BLOCK_TIME(FTM_REGION_UPDATE);
                 const F32 max_region_update_time = .001f; // 1ms
                 LLWorld::getInstance()->updateRegions(max_region_update_time);
             }
@@ -5312,15 +5266,12 @@ void LLAppViewer::idle()
 
     {
         // Handle pending gesture processing
-        LL_RECORD_BLOCK_TIME(FTM_AGENT_POSITION);
         LLGestureMgr::instance().update();
 
         gAgent.updateAgentPosition(gFrameDTClamped, yaw, current_mouse.mX, current_mouse.mY);
     }
 
     {
-        LL_RECORD_BLOCK_TIME(FTM_OBJECTLIST_UPDATE);
-
         if (!(logoutRequestSent() && hasSavedFinalSnapshot()))
         {
             gObjectList.update(gAgent);
@@ -5334,12 +5285,10 @@ void LLAppViewer::idle()
     //
 
     {
-        LL_RECORD_BLOCK_TIME(FTM_CLEANUP);
         {
             gObjectList.cleanDeadObjects();
         }
         {
-            LL_RECORD_BLOCK_TIME(FTM_CLEANUP_DRAWABLES);
             LLDrawable::cleanupDeadDrawables();
         }
     }
@@ -5358,7 +5307,7 @@ void LLAppViewer::idle()
     //
 
     {
-        LL_RECORD_BLOCK_TIME(FTM_HUD_EFFECTS);
+        LL_PROFILE_ZONE_NAMED("Update HUD Effects");
         LLSelectMgr::getInstance()->updateEffects();
         LLHUDManager::getInstance()->cleanupEffects();
         LLHUDManager::getInstance()->sendEffects();
@@ -5370,7 +5319,6 @@ void LLAppViewer::idle()
     //
 
     {
-        LL_RECORD_BLOCK_TIME(FTM_NETWORK);
         gVLManager.unpackData();
     }
 
@@ -5382,7 +5330,6 @@ void LLAppViewer::idle()
     LLWorld::getInstance()->updateVisibilities();
     {
         const F32 max_region_update_time = .001f; // 1ms
-        LL_RECORD_BLOCK_TIME(FTM_REGION_UPDATE);
         LLWorld::getInstance()->updateRegions(max_region_update_time);
     }
 
@@ -5452,7 +5399,6 @@ void LLAppViewer::idle()
 
     // objects and camera should be in sync, do LOD calculations now
     {
-        LL_RECORD_BLOCK_TIME(FTM_LOD_UPDATE);
         gObjectList.updateApparentAngles(gAgent);
     }
 
@@ -5804,13 +5750,6 @@ void LLAppViewer::idleNameCache()
 constexpr F32 CHECK_MESSAGES_DEFAULT_MAX_TIME = 0.020f; // 50 ms = 50 fps (just for messages!)
 static F32 CheckMessagesMaxTime = CHECK_MESSAGES_DEFAULT_MAX_TIME;
 
-static LLTrace::BlockTimerStatHandle FTM_IDLE_NETWORK("Idle Network");
-static LLTrace::BlockTimerStatHandle FTM_MESSAGE_ACKS("Message Acks");
-static LLTrace::BlockTimerStatHandle FTM_RETRANSMIT("Retransmit");
-static LLTrace::BlockTimerStatHandle FTM_TIMEOUT_CHECK("Timeout Check");
-static LLTrace::BlockTimerStatHandle FTM_DYNAMIC_THROTTLE("Dynamic Throttle");
-static LLTrace::BlockTimerStatHandle FTM_CHECK_REGION_CIRCUIT("Check Region Circuit");
-
 void LLAppViewer::idleNetwork()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
@@ -5822,7 +5761,7 @@ void LLAppViewer::idleNetwork()
     static LLCachedControl<bool> speed_test(gSavedSettings, "SpeedTest", false);
     if (!speed_test())
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_NETWORK("idle network"); //LL_RECORD_BLOCK_TIME(FTM_IDLE_NETWORK); // decode
+        LL_PROFILE_ZONE_NAMED_CATEGORY_NETWORK("idle network"); // decode
 
         LLTimer check_message_timer;
         //  Read all available packets from network

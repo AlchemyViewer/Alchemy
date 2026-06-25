@@ -2308,9 +2308,6 @@ void LLWindowWin32::gatherInput()
     updateCursor();
 }
 
-static LLTrace::BlockTimerStatHandle FTM_KEYHANDLER("Handle Keyboard");
-static LLTrace::BlockTimerStatHandle FTM_MOUSEHANDLER("Handle Mouse");
-
 #define WINDOW_IMP_POST(x) window_imp->post([=]() { x; })
 
 LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_param, LPARAM l_param)
@@ -2709,7 +2706,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_LBUTTONDOWN");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                 window_imp->postMouseButtonEvent([=]()
                     {
                         sHandleLeftMouseUp = true;
@@ -2757,7 +2753,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             {
                 window_imp->postMouseButtonEvent([=]()
                     {
-                        LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                         if (!sHandleLeftMouseUp)
                         {
                             sHandleLeftMouseUp = true;
@@ -2779,7 +2774,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_RBUTTONDOWN");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                 window_imp->post([=]()
                     {
                         if (LLWinImm::isAvailable() && window_imp->mPreeditor)
@@ -2802,7 +2796,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_RBUTTONUP");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                 window_imp->postMouseButtonEvent([=]()
                     {
                         MASK mask = gKeyboard->currentMask(true);
@@ -2817,7 +2810,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_MBUTTONDOWN");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                 window_imp->postMouseButtonEvent([=]()
                     {
                         if (LLWinImm::isAvailable() && window_imp->mPreeditor)
@@ -2836,7 +2828,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_MBUTTONUP");
             {
-                LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                 window_imp->postMouseButtonEvent([=]()
                     {
                         MASK mask = gKeyboard->currentMask(true);
@@ -2850,7 +2841,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_XBUTTONDOWN");
             window_imp->postMouseButtonEvent([=]()
                 {
-                    LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
                     S32 button = GET_XBUTTON_WPARAM(w_param);
                     if (LLWinImm::isAvailable() && window_imp->mPreeditor)
                     {
@@ -2870,9 +2860,6 @@ LRESULT CALLBACK LLWindowWin32::mainWindowProc(HWND h_wnd, UINT u_msg, WPARAM w_
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("mwp - WM_XBUTTONUP");
             window_imp->postMouseButtonEvent([=]()
                 {
-
-                    LL_RECORD_BLOCK_TIME(FTM_MOUSEHANDLER);
-
                     S32 button = GET_XBUTTON_WPARAM(w_param);
                     MASK mask = gKeyboard->currentMask(true);
                     // Windows uses numbers 1 and 2 for buttons, remap to 4, 5

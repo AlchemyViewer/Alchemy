@@ -1299,11 +1299,9 @@ void LLChatHistory::clear()
     mLastFromID = LLUUID::null;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_APPEND_MESSAGE("Append Chat Message");
-
 void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LLStyle::Params& input_append_params)
 {
-    LL_RECORD_BLOCK_TIME(FTM_APPEND_MESSAGE);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     bool use_plain_text_chat_history = args["chat_history_style"].asInteger() >= 1;
     bool use_irssi_text_chat_history = args["chat_history_style"].asInteger() >= 2;
     bool square_brackets = false; // square brackets necessary for a system messages

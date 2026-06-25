@@ -195,7 +195,6 @@
 #include "llxfermanager.h"
 #include "pipeline.h"
 #include "llappviewer.h"
-#include "llfasttimerview.h"
 #include "llfloatermap.h"
 #include "llweb.h"
 #include "llvoiceclient.h"

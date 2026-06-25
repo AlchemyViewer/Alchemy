@@ -754,10 +754,6 @@ class LLAdvancedToggleConsole : public view_listener_t
         {
             toggle_visibility(gDebugView->mDebugConsolep);
         }
-        else if ("fast timers" == console_type)
-        {
-            LLFloaterReg::toggleInstance("block_timers");
-        }
         else if ("scene view" == console_type)
         {
             toggle_visibility(gSceneView);
@@ -783,10 +779,6 @@ class LLAdvancedCheckConsole : public view_listener_t
         else if ("debug" == console_type)
         {
             new_value = get_visibility(gDebugView->mDebugConsolep);
-        }
-        else if ("fast timers" == console_type)
-        {
-            new_value = LLFloaterReg::instanceVisible("block_timers");
         }
         else if ("scene view" == console_type)
         {
