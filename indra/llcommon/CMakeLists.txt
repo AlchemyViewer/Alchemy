@@ -287,7 +287,6 @@ target_link_libraries(
     )
 
 target_include_directories(llcommon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(llcommon PRIVATE ${INDRA_SOURCE_DIR}/llmath)
 
 target_precompile_headers(llcommon REUSE_FROM llprecompiled)
 
@@ -334,7 +333,7 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llsd "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsdjson "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsdserialize "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdutil "" "llcommon;llmath" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llsdutil "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsingleton "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llstreamtools "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llstring "" "${test_libs}" "${test_project}")
