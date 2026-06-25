@@ -49,7 +49,7 @@ jobs:
       FROM_FORK: ${{ github.event.pull_request.head.repo.fork }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -235,13 +235,13 @@ jobs:
           brew install autoconf autoconf-archive automake libtool mono nasm unzip zip
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Checkout master-message-template
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: secondlife/master-message-template
           path: .master-message-template
