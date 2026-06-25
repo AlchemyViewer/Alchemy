@@ -373,4 +373,8 @@ std::string logname() { return LLCoros::logname(); }
 
 } // llcoro
 
+#ifndef LLCOROS_CPP
+extern template class LL_COMMON_API LLCoros* LLSingleton<class LLCoros>::getInstance();
+#endif
+
 #endif /* ! defined(LL_LLCOROS_H) */

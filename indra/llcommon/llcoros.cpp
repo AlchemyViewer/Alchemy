@@ -31,6 +31,7 @@
 // Precompiled header
 #include "linden_common.h"
 // associated header
+#define LLCOROS_CPP
 #include "llcoros.h"
 // STL headers
 // std headers
@@ -460,3 +461,5 @@ LLCoros::CoroData::CoroData(int n):
     mCreationTime(LLTimer::getTotalSeconds())
 {
 }
+
+template class LL_COMMON_API LLCoros* LLSingleton<class LLCoros>::getInstance();
