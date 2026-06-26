@@ -25,6 +25,8 @@
  */
 
 #include "linden_common.h"
+#include "llwin32headers.h"
+
 #include "llprocess.h"
 #include "llsdutil.h"
 #include "llsdserialize.h"

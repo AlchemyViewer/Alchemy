@@ -39,7 +39,7 @@
  * usage. However, most of the value of this base class is in the
  * diagnostic_information() available via Boost.Exception.
  */
-struct LLException:
+struct LL_COMMON_API LLException :
     public std::runtime_error,
     public boost::exception
 {
@@ -55,7 +55,7 @@ struct LLException:
  * derived from LLContinueError will still be logged, the viewer will attempt
  * to continue processing.
  */
-struct LLContinueError: public LLException
+struct LL_COMMON_API LLContinueError : public LLException
 {
     LLContinueError(const std::string& what):
         LLException(what)
@@ -89,18 +89,18 @@ do {                                                                    \
     /* Use the classic 'do { ... } while (0)' macro trick to wrap  */   \
     /* our multiple statements.                                    */   \
 } while (0)
-void annotate_exception_(boost::exception& exc);
+LL_COMMON_API void annotate_exception_(boost::exception& exc);
 
 /// Call this macro from a catch (...) clause
 #define CRASH_ON_UNHANDLED_EXCEPTION(CONTEXT) \
      crash_on_unhandled_exception_(__FILE__, __LINE__, BOOST_CURRENT_FUNCTION, CONTEXT)
-void crash_on_unhandled_exception_(const char*, int, const char*, const std::string&);
+LL_COMMON_API void crash_on_unhandled_exception_(const char*, int, const char*, const std::string&);
 
 /// Call this from a catch (const LLContinueError&) clause, or from a catch
 /// (...) clause in which you do NOT want the viewer to crash.
 #define LOG_UNHANDLED_EXCEPTION(CONTEXT) \
      log_unhandled_exception_(__FILE__, __LINE__, BOOST_CURRENT_FUNCTION, CONTEXT)
-void log_unhandled_exception_(const char*, int, const char*, const std::string&);
+LL_COMMON_API void log_unhandled_exception_(const char*, int, const char*, const std::string&);
 
 
 #if LL_WINDOWS
@@ -108,7 +108,7 @@ void log_unhandled_exception_(const char*, int, const char*, const std::string&)
 // SEH exception filtering for use in __try __except
 // Separates C++ exceptions from C SEH exceptions
 // Todo: might be good idea to do some kind of seh_to_msc_wrapper(function, ARGS&&);
-U32 msc_exception_filter(U32 code, struct _EXCEPTION_POINTERS *exception_infop);
+LL_COMMON_API U32 msc_exception_filter(U32 code, struct _EXCEPTION_POINTERS* exception_infop);
 
 #endif //LL_WINDOWS
 

@@ -33,12 +33,12 @@
 #include "llsingleton.h"
 #include "llinvtranslationbrdg.h"
 
-class LLWearableType : public LLSimpleton<LLWearableType>
+class LLWearableType : public LLParamSingleton<LLWearableType>
 {
-public:
-    LLWearableType(LLTranslationBridge::ptr_t &trans);
+    LLSINGLETON(LLWearableType, LLTranslationBridge::ptr_t &trans);
     ~LLWearableType();
-
+    void initSingleton() override;
+public:
     enum EType
     {
         WT_SHAPE      = 0,

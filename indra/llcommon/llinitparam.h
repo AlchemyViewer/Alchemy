@@ -615,7 +615,7 @@ namespace LLInitParam
 
     typedef LLPredicate::Rule<ESerializePredicates> predicate_rule_t;
 
-    predicate_rule_t default_parse_rules();
+    LL_COMMON_API predicate_rule_t default_parse_rules();
 
     // various callbacks and constraints associated with an individual param
     struct LL_COMMON_API ParamDescriptor

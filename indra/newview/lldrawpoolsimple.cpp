@@ -37,10 +37,6 @@
 #include "llviewershadermgr.h"
 #include "llrender.h"
 
-static LLTrace::BlockTimerStatHandle FTM_RENDER_SIMPLE_DEFERRED("Deferred Simple");
-static LLTrace::BlockTimerStatHandle FTM_RENDER_GRASS_DEFERRED("Deferred Grass");
-
-
 void LLDrawPoolGlow::renderPostDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
@@ -107,8 +103,6 @@ LLDrawPoolSimple::LLDrawPoolSimple() :
 {
 }
 
-static LLTrace::BlockTimerStatHandle FTM_RENDER_ALPHA_MASK("Alpha Mask");
-
 LLDrawPoolAlphaMask::LLDrawPoolAlphaMask() :
     LLRenderPass(POOL_ALPHA_MASK)
 {
@@ -141,9 +135,6 @@ void LLDrawPoolSimple::renderDeferred(S32 pass)
     gDeferredDiffuseProgram.bind(true);
     pushRiggedBatches(LLRenderPass::PASS_SIMPLE_RIGGED, true, true);
 }
-
-static LLTrace::BlockTimerStatHandle FTM_RENDER_ALPHA_MASK_DEFERRED("Deferred Alpha Mask");
-
 
 void LLDrawPoolAlphaMask::renderDeferred(S32 pass)
 {

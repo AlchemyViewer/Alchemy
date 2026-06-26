@@ -91,11 +91,11 @@ namespace LLTrace
 
     };
 
-    ThreadRecorder* get_thread_recorder();
-    void set_thread_recorder(ThreadRecorder*);
+    LL_COMMON_API ThreadRecorder* get_thread_recorder();
+    LL_COMMON_API void set_thread_recorder(ThreadRecorder*);
 
-    void set_master_thread_recorder(ThreadRecorder*);
-    ThreadRecorder* get_master_thread_recorder();
+    LL_COMMON_API void set_master_thread_recorder(ThreadRecorder*);
+    LL_COMMON_API ThreadRecorder* get_master_thread_recorder();
 }
 
 #endif // LL_LLTRACETHREADRECORDER_H

@@ -34,6 +34,10 @@
 #include "lltracethreadrecorder.h"
 #include "llexception.h"
 #include "workqueue.h"
+#include "lockstatic.h"
+
+#include <string>
+#include <unordered_map>
 
 #if LL_LINUX
 #include <sched.h>
@@ -155,6 +159,74 @@ LL_COMMON_API bool assert_main_thread()
                << " outside main thread " << main << LL_ENDL;
     return false;
 }
+
+namespace llthread
+{
+void* getCanonicalStatic(const char* name, void* (*factory)())
+{
+    // The canonical per-type statics live here, in a single translation unit --
+    // hence a single module even in a multi-DLL build -- so every module that
+    // instantiates LockStatic<Static> for a given Static resolves the SAME
+    // instance. Keyed by the mangled name string (typeid(Static).name()) rather
+    // than std::type_index: under -fvisibility=hidden each module has its own
+    // type_info object, so identity comparison would treat the same type as a
+    // different key per module and re-introduce the duplication we are removing.
+    // The mangled name string is identical across modules for one ABI.
+    //
+    // Heap-allocated and intentionally never freed so the statics outlive every
+    // user (LockStatic consumers' own statics may be torn down at process exit).
+    static std::mutex* sMutex = new std::mutex();
+    static auto* sRegistry = new std::unordered_map<std::string, void*>();
+    std::lock_guard<std::mutex> lk(*sMutex);
+    void*& slot = (*sRegistry)[name];
+    if (! slot)
+    {
+        slot = factory();
+    }
+    return slot;
+}
+
+// ---- DLL-safe thread-local slots (see lockstatic.h) ----
+namespace
+{
+    constexpr size_t MAX_THREAD_LOCAL_SLOTS = 256;
+    // The one and only thread_local store, owned by this module. Reached from
+    // every module through the exported accessors below, so all modules share a
+    // single per-thread value per slot.
+    thread_local void* sThreadLocalSlots[MAX_THREAD_LOCAL_SLOTS] = {};
+}
+
+size_t allocThreadLocalSlot(const char* name)
+{
+    // Assign a stable slot index per type name, once, shared across all modules.
+    // (The mangled name string is identical across modules for one ABI -- see
+    // getCanonicalStatic() above for the hidden-visibility rationale.)
+    static std::mutex* sMutex = new std::mutex();
+    static auto* sIndices = new std::unordered_map<std::string, size_t>();
+    std::lock_guard<std::mutex> lk(*sMutex);
+    auto it = sIndices->find(name);
+    if (it != sIndices->end())
+        return it->second;
+    size_t index = sIndices->size();
+    if (index >= MAX_THREAD_LOCAL_SLOTS)
+    {
+        LL_ERRS() << "Exceeded MAX_THREAD_LOCAL_SLOTS (" << MAX_THREAD_LOCAL_SLOTS
+                  << ") allocating thread-local slot for " << name << LL_ENDL;
+    }
+    (*sIndices)[name] = index;
+    return index;
+}
+
+void* getThreadLocalSlot(size_t slot)
+{
+    return sThreadLocalSlots[slot];
+}
+
+void setThreadLocalSlot(size_t slot, void* value)
+{
+    sThreadLocalSlots[slot] = value;
+}
+} // namespace llthread
 
 //
 // Handed to the APR thread creation function

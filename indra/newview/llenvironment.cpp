@@ -105,8 +105,6 @@ namespace
     const std::string LOCAL_ENV_STORAGE_FILE("local_environment_data.bin");
 
     //---------------------------------------------------------------------
-    LLTrace::BlockTimerStatHandle   FTM_ENVIRONMENT_UPDATE("Update Environment Tick");
-
     LLSettingsBase::Seconds         DEFAULT_UPDATE_THRESHOLD(10.0);
     const LLSettingsBase::Seconds   MINIMUM_SPANLENGTH(0.01f);
 

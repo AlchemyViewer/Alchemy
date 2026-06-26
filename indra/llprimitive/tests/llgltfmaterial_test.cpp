@@ -29,7 +29,6 @@
 #include <set>
 
 #include "../llgltfmaterial.h"
-#include "lluuid.cpp"
 
 // Import & define single-header gltf import/export lib
 #define TINYGLTF_IMPLEMENTATION

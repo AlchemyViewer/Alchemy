@@ -1245,8 +1245,6 @@ void LLAgentCamera::updateLookAt(const S32 mouse_x, const S32 mouse_y)
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_CAMERA("Camera");
-
 extern bool gCubeSnapshot;
 
 //-----------------------------------------------------------------------------
@@ -1254,7 +1252,7 @@ extern bool gCubeSnapshot;
 //-----------------------------------------------------------------------------
 void LLAgentCamera::updateCamera()
 {
-    LL_RECORD_BLOCK_TIME(FTM_UPDATE_CAMERA);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VIEWER;
     if (gCubeSnapshot)
     {
         return;

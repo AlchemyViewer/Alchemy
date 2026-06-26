@@ -312,7 +312,6 @@ set(viewer_SOURCE_FILES
     llexperiencelog.cpp
     llexternaleditor.cpp
     llface.cpp
-    llfasttimerview.cpp
     llfavoritesbar.cpp
     llfeaturemanager.cpp
     llfetchedgltfmaterial.cpp
@@ -1081,7 +1080,6 @@ set(viewer_HEADER_FILES
     llexperiencelog.h
     llexternaleditor.h
     llface.h
-    llfasttimerview.h
     llfavoritesbar.h
     llfeaturemanager.h
     llfetchedgltfmaterial.h

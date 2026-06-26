@@ -74,13 +74,11 @@ namespace tut
     {
         coproceduremanager_test()
         {
-            LLCoros::createInstance();
         }
 
         ~coproceduremanager_test()
         {
             LLCoprocedureManager::instance().close();
-            LLCoros::deleteSingleton();
         }
     };
     typedef test_group<coproceduremanager_test> coproceduremanager_t;

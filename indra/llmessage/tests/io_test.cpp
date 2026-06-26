@@ -31,6 +31,7 @@
 
 #include <iterator>
 
+#include "llwin32headers.h"
 #include "apr_pools.h"
 
 #include "llbuffer.h"

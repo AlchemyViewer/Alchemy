@@ -32,7 +32,7 @@
 #include <functional>
 #include <list>
 
-class LLCallbackList
+class LL_COMMON_API LLCallbackList
 {
 public:
     typedef void (*callback_t)(void*);
@@ -64,17 +64,17 @@ typedef std::function<void ()> nullary_func_t;
 typedef std::function<bool ()> bool_func_t;
 
 // Call a given callable once in idle loop.
-void doOnIdleOneTime(nullary_func_t callable);
+LL_COMMON_API void doOnIdleOneTime(nullary_func_t callable);
 
 // Repeatedly call a callable in idle loop until it returns true.
-void doOnIdleRepeating(bool_func_t callable);
+LL_COMMON_API void doOnIdleRepeating(bool_func_t callable);
 
 // Call a given callable once after specified interval.
-void doAfterInterval(nullary_func_t callable, F32 seconds);
+LL_COMMON_API void doAfterInterval(nullary_func_t callable, F32 seconds);
 
 // Call a given callable every specified number of seconds, until it returns true.
-void doPeriodically(bool_func_t callable, F32 seconds);
+LL_COMMON_API void doPeriodically(bool_func_t callable, F32 seconds);
 
-extern LLCallbackList gIdleCallbacks;
+extern LL_COMMON_API LLCallbackList gIdleCallbacks;
 
 #endif

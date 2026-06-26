@@ -239,7 +239,6 @@
 			<menu_item_check label="Debug Console" name="Debug Console"/>
 			<menu_item_call label="Notifications Console" name="Notifications"/>
 			<menu_item_check label="Consola de depuración de región" name="Region Debug Console"/>
-			<menu_item_check label="Fast Timers" name="Fast Timers"/>
 			<menu_item_check label="Memory" name="Memory"/>
 			<menu_item_check label="Datos de la escena" name="Scene Statistics"/>
 			<menu_item_check label="Monitor de carga de escenas" name="Scene Loading Monitor"/>

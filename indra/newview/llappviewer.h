@@ -371,9 +371,6 @@ private:
 
     LLWatchdogTimeout* mMainloopTimeout;
 
-    // For performance and metric gathering
-    class LLThread* mFastTimerLogThread;
-
     // for tracking viewer<->region circuit death
     bool mAgentRegionLastAlive;
     LLUUID mAgentRegionLastID;
@@ -426,7 +423,6 @@ extern LLFrameTimer gRestoreGLTimer;
 extern bool         gRestoreGL;
 extern bool     gUseWireframe;
 
-extern LLMemoryInfo gSysMemory;
 extern U64Bytes gMemoryAllocated;
 
 extern std::string gLastVersionChannel;

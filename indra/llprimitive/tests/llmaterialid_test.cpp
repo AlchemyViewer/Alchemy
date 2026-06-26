@@ -24,7 +24,6 @@
 #include <functional>
 
 #include "../llmaterialid.h"
-#include "lluuid.cpp"
 
 namespace tut
 {

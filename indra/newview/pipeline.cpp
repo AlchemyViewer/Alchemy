@@ -266,40 +266,6 @@ bool    gDebugPipeline = false;
 LLPipeline gPipeline;
 const LLMatrix4* gGLLastMatrix = NULL;
 
-LLTrace::BlockTimerStatHandle FTM_RENDER_GEOMETRY("Render Geometry");
-LLTrace::BlockTimerStatHandle FTM_RENDER_GRASS("Grass");
-LLTrace::BlockTimerStatHandle FTM_RENDER_INVISIBLE("Invisible");
-LLTrace::BlockTimerStatHandle FTM_RENDER_SHINY("Shiny");
-LLTrace::BlockTimerStatHandle FTM_RENDER_SIMPLE("Simple");
-LLTrace::BlockTimerStatHandle FTM_RENDER_TERRAIN("Terrain");
-LLTrace::BlockTimerStatHandle FTM_RENDER_TREES("Trees");
-LLTrace::BlockTimerStatHandle FTM_RENDER_UI("UI");
-LLTrace::BlockTimerStatHandle FTM_RENDER_WATER("Water");
-LLTrace::BlockTimerStatHandle FTM_RENDER_WL_SKY("Windlight Sky");
-LLTrace::BlockTimerStatHandle FTM_RENDER_ALPHA("Alpha Objects");
-LLTrace::BlockTimerStatHandle FTM_RENDER_CHARACTERS("Avatars");
-LLTrace::BlockTimerStatHandle FTM_RENDER_BUMP("Bump");
-LLTrace::BlockTimerStatHandle FTM_RENDER_MATERIALS("Render Materials");
-LLTrace::BlockTimerStatHandle FTM_RENDER_FULLBRIGHT("Fullbright");
-LLTrace::BlockTimerStatHandle FTM_RENDER_GLOW("Glow");
-LLTrace::BlockTimerStatHandle FTM_GEO_UPDATE("Geo Update");
-LLTrace::BlockTimerStatHandle FTM_POOLRENDER("RenderPool");
-LLTrace::BlockTimerStatHandle FTM_POOLS("Pools");
-LLTrace::BlockTimerStatHandle FTM_DEFERRED_POOLRENDER("RenderPool (Deferred)");
-LLTrace::BlockTimerStatHandle FTM_DEFERRED_POOLS("Pools (Deferred)");
-LLTrace::BlockTimerStatHandle FTM_POST_DEFERRED_POOLRENDER("RenderPool (Post)");
-LLTrace::BlockTimerStatHandle FTM_POST_DEFERRED_POOLS("Pools (Post)");
-LLTrace::BlockTimerStatHandle FTM_STATESORT("Sort Draw State");
-LLTrace::BlockTimerStatHandle FTM_PIPELINE("Pipeline");
-LLTrace::BlockTimerStatHandle FTM_CLIENT_COPY("Client Copy");
-LLTrace::BlockTimerStatHandle FTM_RENDER_DEFERRED("Deferred Shading");
-
-LLTrace::BlockTimerStatHandle FTM_RENDER_UI_HUD("HUD");
-LLTrace::BlockTimerStatHandle FTM_RENDER_UI_3D("3D");
-LLTrace::BlockTimerStatHandle FTM_RENDER_UI_2D("2D");
-
-static LLTrace::BlockTimerStatHandle FTM_STATESORT_DRAWABLE("Sort Drawables");
-
 static LLStaticHashedString sTint("tint");
 static LLStaticHashedString sAmbiance("ambiance");
 static LLStaticHashedString sAlphaScale("alpha_scale");
@@ -2775,8 +2741,6 @@ bool LLPipeline::getVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& 
     return res;
 }
 
-static LLTrace::BlockTimerStatHandle FTM_CULL("Object Culling");
-
 // static
 bool LLPipeline::isWaterClip()
 {
@@ -3128,10 +3092,8 @@ void LLPipeline::rebuildPriorityGroups()
 
 void LLPipeline::updateGeom(F32 max_dtime)
 {
-    LLTimer update_timer;
-    LLPointer<LLDrawable> drawablep;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
-    LL_RECORD_BLOCK_TIME(FTM_GEO_UPDATE);
     if (gCubeSnapshot)
     {
         return;
@@ -7237,8 +7199,6 @@ void LLPipeline::bindScreenToTexture()
 
 }
 
-static LLTrace::BlockTimerStatHandle FTM_RENDER_BLOOM("Bloom");
-
 void LLPipeline::visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex)
 {
     dst->bindTarget();
@@ -8818,14 +8778,14 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 
 void LLPipeline::renderFinalize()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    LL_PROFILE_GPU_ZONE("renderFinalize");
+
     llassert(!gCubeSnapshot);
     LLVertexBuffer::unbind();
     LLGLState::checkStates();
 
     assertInitialized();
-
-    LL_RECORD_BLOCK_TIME(FTM_RENDER_BLOOM);
-    LL_PROFILE_GPU_ZONE("renderFinalize");
 
     gGL.color4f(1, 1, 1, 1);
     LLGLDepthTest depth(GL_FALSE);
@@ -10333,17 +10293,6 @@ glm::mat4 look(const LLVector3 pos, const LLVector3 dir, const LLVector3 up)
     return glm::make_mat4(ret);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_RENDER("Render Shadows");
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_ALPHA("Alpha Shadow");
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_SIMPLE("Simple Shadow");
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_GEOM("Shadow Geom");
-
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_ALPHA_MASKED("Alpha Masked");
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_ALPHA_BLEND("Alpha Blend");
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_ALPHA_TREE("Alpha Tree");
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_ALPHA_GRASS("Alpha Grass");
-static LLTrace::BlockTimerStatHandle FTM_SHADOW_FULLBRIGHT_ALPHA_MASKED("Fullbright Alpha Masked");
-
 void LLPipeline::renderShadow(const glm::mat4& view, const glm::mat4& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE; //LL_RECORD_BLOCK_TIME(FTM_SHADOW_RENDER);
@@ -10802,9 +10751,6 @@ LLRenderTarget* LLPipeline::getSpotShadowTarget(U32 i)
     llassert(i < 2);
     return &mSpotShadow[i];
 }
-
-static LLTrace::BlockTimerStatHandle FTM_GEN_SUN_SHADOW("Gen Sun Shadow");
-static LLTrace::BlockTimerStatHandle FTM_GEN_SUN_SHADOW_SPOT_RENDER("Spot Shadow Render");
 
 // helper class for disabling occlusion culling for the current stack frame
 class LLDisableOcclusionCulling

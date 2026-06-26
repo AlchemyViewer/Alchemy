@@ -69,7 +69,6 @@
 #include "lldxhardware.h"
 #endif
 
-extern LLMemoryInfo gSysMemory;
 extern U32 gPacketsIn;
 
 ///----------------------------------------------------------------------------

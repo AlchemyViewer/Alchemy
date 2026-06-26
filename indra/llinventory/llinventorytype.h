@@ -28,8 +28,6 @@
 #define LLINVENTORYTYPE_H
 
 #include "llassettype.h"
-#include "lldictionary.h"
-#include "llsingleton.h"
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLInventoryType
@@ -164,40 +162,5 @@ enum ScriptSubtype_t
 // object, but a wearable can be a bodypart or clothing asset.
 bool inventory_and_asset_types_match(LLInventoryType::EType inventory_type,
                                      LLAssetType::EType asset_type);
-
-///----------------------------------------------------------------------------
-/// Class LLInventoryType
-///----------------------------------------------------------------------------
-struct InventoryEntry : public LLDictionaryEntry
-{
-    InventoryEntry(const std::string &name, // unlike asset type names, not limited to 8 characters; need not match asset type names
-                   const std::string &human_name, // for decoding to human readable form; put any and as many printable characters you want in each one.
-                   int num_asset_types = 0, ...)
-        :
-        LLDictionaryEntry(name),
-        mHumanName(human_name)
-    {
-        va_list argp;
-        va_start(argp, num_asset_types);
-        // Read in local textures
-        for (U8 i=0; i < num_asset_types; i++)
-        {
-            LLAssetType::EType t = (LLAssetType::EType)va_arg(argp,int);
-            mAssetTypes.push_back(t);
-        }
-        va_end(argp);
-    }
-
-    const std::string mHumanName;
-    typedef std::vector<LLAssetType::EType> asset_vec_t;
-    asset_vec_t mAssetTypes;
-};
-
-class LLInventoryDictionary : public LLSimpleton<LLInventoryDictionary>,
-                              public LLDictionary<LLInventoryType::EType, InventoryEntry>
-{
-public:
-    LLInventoryDictionary();
-};
 
 #endif

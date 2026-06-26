@@ -147,10 +147,9 @@ private:
 };
 
 /// This is the LLSingleton instance of LLToolGrab.
-class LLToolGrab : public LLToolGrabBase, public LLSimpleton<LLToolGrab>
+class LLToolGrab : public LLToolGrabBase, public LLSingleton<LLToolGrab>
 {
-public:
-    LLToolGrab() = default;
+    LLSINGLETON_EMPTY_CTOR(LLToolGrab);
 };
 
 extern bool gGrabBtnVertical;

@@ -30,7 +30,7 @@
 #include "llrefcount.h"
 #include <thread>
 
-extern void set_thread_name(const char* threadName);
+extern LL_COMMON_API void set_thread_name(const char* threadName);
 
 namespace LLTrace
 {

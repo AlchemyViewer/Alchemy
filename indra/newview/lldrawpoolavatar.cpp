@@ -853,8 +853,6 @@ void LLDrawPoolAvatar::renderAvatars(LLVOAvatar* single_avatar, S32 pass)
     }
 }
 
-static LLTrace::BlockTimerStatHandle FTM_RIGGED_VBO("Rigged VBO");
-
 //-----------------------------------------------------------------------------
 // getDebugTexture()
 //-----------------------------------------------------------------------------

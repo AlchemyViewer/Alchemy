@@ -44,7 +44,7 @@
 
 //----------------------------------------------------------------------------
 
-class LLPointerBase
+class LL_COMMON_API LLPointerBase
 {
 protected:
     // alert the coder that a referenced type's destructor did something very

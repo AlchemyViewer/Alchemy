@@ -36,16 +36,15 @@
 
 class LLUIColor;
 
-class LLUIColorTable : public LLSimpleton<LLUIColorTable>
+class LLUIColorTable : public LLSingleton<LLUIColorTable>
 {
+    LLSINGLETON_EMPTY_CTOR(LLUIColorTable);
     LOG_CLASS(LLUIColorTable);
 
     // consider using sorted vector, can be much faster
     typedef boost::unordered_map<std::string, LLUIColor, ll::string_hash, std::equal_to<>>  string_color_map_t;
 
 public:
-    LLUIColorTable() = default;
-
     struct ColorParams : LLInitParam::ChoiceBlock<ColorParams>
     {
         Alternative<LLColor4>    value;

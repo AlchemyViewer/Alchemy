@@ -287,6 +287,7 @@ void LLDrawable::removeFromOctree()
 
 void LLDrawable::cleanupDeadDrawables()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
     /*
     S32 i;
     for (i = 0; i < sDeadList.size(); i++)

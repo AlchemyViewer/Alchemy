@@ -783,25 +783,32 @@ ll_convert_forms(ll_convert_alias, std::wstring, LLWString, ll_convert_wstring_t
  */
 LL_COMMON_API std::string ll_convert_string_to_utf8_string(const std::string& in);
 
-/// Get Windows message string for passed GetLastError() code
-// VS 2013 doesn't let us forward-declare this template, which is what we
-// started with, so the implementation could reference the specialization we
-// haven't yet declared. Somewhat weirdly, just stating the generic
-// implementation in terms of the specialization works, even in this order...
-
-// the general case is just a conversion from the sole implementation
+/// Get Windows message string for passed GetLastError() code.
 // Microsoft says DWORD is a typedef for unsigned long
 // https://docs.microsoft.com/en-us/windows/desktop/winprog/windows-data-types
 // so rather than drag windows.h into everybody's include space...
+//
+// Ordering matters for the DLL build: forward-declare the primary template,
+// then declare the exported std::wstring specialization (defined in
+// llstring.cpp), then define the primary in terms of that specialization. The
+// specialization must be declared BEFORE the primary's body references it,
+// else an implicit instantiation is assumed and clashes with the
+// specialization's dll linkage (C2375 "different linkage"). The primary itself
+// carries no LL_COMMON_API: it is defined inline and instantiated per-consumer,
+// so dllexport/dllimport on it is both illegal and unnecessary.
+template<typename STRING>
+STRING windows_message(unsigned long error);
+
+/// There's only one real implementation
+template<>
+LL_COMMON_API std::wstring windows_message<std::wstring>(unsigned long error);
+
+// the general case is just a conversion from the sole implementation
 template<typename STRING>
 STRING windows_message(unsigned long error)
 {
     return ll_convert<STRING>(windows_message<std::wstring>(error));
 }
-
-/// There's only one real implementation
-template<>
-LL_COMMON_API std::wstring windows_message<std::wstring>(unsigned long error);
 
 /// Get Windows message string, implicitly calling GetLastError()
 LL_COMMON_API unsigned long windows_get_last_error();

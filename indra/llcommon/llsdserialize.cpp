@@ -46,6 +46,8 @@
 
 #if !LL_WINDOWS
 #include <netinet/in.h> // htonl & ntohl
+#else
+#include "llwin32headers.h"
 #endif
 
 #include "lldate.h"

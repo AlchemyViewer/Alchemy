@@ -1,6 +1,30 @@
 # -*- cmake -*-
 
-add_library(llcommon STATIC)
+if (LL_COMMON_LINK_SHARED)
+  add_library(llcommon SHARED)
+
+  target_compile_definitions(llcommon PUBLIC LL_COMMON_LINK_SHARED=1)
+
+  add_custom_command(
+    TARGET llcommon POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:llcommon>" "${SHARED_LIB_STAGING_DIR}"
+    COMMAND_EXPAND_LISTS
+  )
+
+  add_custom_command(
+    TARGET llcommon POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:llcommon>" "${VIEWER_STAGING_DIR}"
+    COMMAND_EXPAND_LISTS
+  )
+
+  add_custom_command(
+    TARGET llcommon POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:llcommon>" "${VIEWER_STAGING_DIR}/llplugin"
+    COMMAND_EXPAND_LISTS
+  )
+else()
+  add_library(llcommon STATIC)
+endif()
 
 target_sources(llcommon
     PRIVATE
@@ -54,7 +78,6 @@ target_sources(llcommon
     llmemory.cpp
     llmemorystream.cpp
     llmetrics.cpp
-    llmetricperformancetester.cpp
     llmortician.cpp
     llmutex.cpp
     llpointer.cpp
@@ -172,7 +195,6 @@ target_sources(llcommon
     llmemory.h
     llmemorystream.h
     llmetrics.h
-    llmetricperformancetester.h
     llmortician.h
     llmutex.h
     llnametable.h
@@ -287,9 +309,6 @@ target_link_libraries(
     )
 
 target_include_directories(llcommon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(llcommon PRIVATE ${INDRA_SOURCE_DIR}/llmath)
-
-target_precompile_headers(llcommon REUSE_FROM llprecompiled)
 
 add_dependencies(llcommon stage_third_party_libs)
 
@@ -334,7 +353,7 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llsd "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsdjson "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsdserialize "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(llsdutil "" "llcommon;llmath" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llsdutil "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llsingleton "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llstreamtools "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llstring "" "${test_libs}" "${test_project}")

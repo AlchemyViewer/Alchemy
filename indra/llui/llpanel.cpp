@@ -360,10 +360,10 @@ void LLPanel::setBorderVisible(bool b)
     }
 }
 
-LLTrace::BlockTimerStatHandle FTM_PANEL_CONSTRUCTION("Panel Construction");
-
 LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_node)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     std::string name("panel");
     node->getAttributeString("name", name);
 
@@ -372,8 +372,7 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_
 
     LLPanel* panelp = NULL;
 
-    {   LL_RECORD_BLOCK_TIME(FTM_PANEL_CONSTRUCTION);
-
+    {
         if(!class_attr.empty())
         {
             panelp = LLRegisterPanelClass::instance().createPanelClass(class_attr);
@@ -476,16 +475,11 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
     setAcceptsBadge(p.accepts_badge);
 }
 
-static LLTrace::BlockTimerStatHandle FTM_PANEL_SETUP("Panel Setup");
-static LLTrace::BlockTimerStatHandle FTM_EXTERNAL_PANEL_LOAD("Load Extern Panel Reference");
-static LLTrace::BlockTimerStatHandle FTM_PANEL_POSTBUILD("Panel PostBuild");
-
 bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node, const LLPanel::Params& default_params)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     Params params(default_params);
     {
-        LL_RECORD_BLOCK_TIME(FTM_PANEL_SETUP);
-
         LLXMLNodePtr referenced_xml;
         std::string xml_filename = mXMLFilename;
 
@@ -514,7 +508,7 @@ bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 
             LLUICtrlFactory::instance().pushFileName(xml_filename);
 
-            LL_RECORD_BLOCK_TIME(FTM_EXTERNAL_PANEL_LOAD);
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Load Extern Panel Reference");
             if (!LLUICtrlFactory::getLayeredXMLNode(xml_filename, referenced_xml))
             {
                 LL_WARNS() << "Couldn't parse panel from: " << xml_filename << LL_ENDL;
@@ -545,7 +539,7 @@ bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
         params.from_xui = true;
         applyXUILayout(params, parent);
         {
-            LL_RECORD_BLOCK_TIME(FTM_PANEL_CONSTRUCTION);
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Panel Construction");
             initFromParams(params);
         }
 
@@ -562,7 +556,7 @@ bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
         }
 
         {
-            LL_RECORD_BLOCK_TIME(FTM_PANEL_POSTBUILD);
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Panel PostBuild");
             postBuild();
         }
     }

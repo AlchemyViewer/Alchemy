@@ -27,9 +27,6 @@
 #ifndef LL_LLASSETTYPE_H
 #define LL_LLASSETTYPE_H
 
-#include "lldictionary.h"
-#include "llsingleton.h"
-
 #include <string>
 
 class LL_COMMON_API LLAssetType
@@ -175,42 +172,6 @@ public:
 protected:
     LLAssetType() {}
     ~LLAssetType() {}
-};
-
-///----------------------------------------------------------------------------
-/// Class LLAssetType
-///----------------------------------------------------------------------------
-struct AssetEntry : public LLDictionaryEntry
-{
-    AssetEntry(const char *desc_name,
-               const char *type_name,   // 8 character limit!
-               const char *human_name,  // for decoding to human readable form; put any and as many printable characters you want in each one
-               bool can_link,           // can you create a link to this type?
-               bool can_fetch,          // can you fetch this asset by ID?
-               bool can_know)           // can you see this asset's ID?
-        :
-        LLDictionaryEntry(desc_name),
-        mTypeName(type_name),
-        mHumanName(human_name),
-        mCanLink(can_link),
-        mCanFetch(can_fetch),
-        mCanKnow(can_know)
-    {
-        llassert(strlen(mTypeName) <= 8);
-    }
-
-    const char *mTypeName;
-    const char *mHumanName;
-    bool mCanLink;
-    bool mCanFetch;
-    bool mCanKnow;
-};
-
-class LLAssetDictionary : public LLSimpleton<LLAssetDictionary>,
-                          public LLDictionary<LLAssetType::EType, AssetEntry>
-{
-public:
-    LLAssetDictionary();
 };
 
 #endif // LL_LLASSETTYPE_H

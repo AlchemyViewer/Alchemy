@@ -157,7 +157,6 @@ mRootView(NULL),
 mHelpImpl(NULL)
 {
     LL_PROFILE_ZONE_SCOPED;
-    LLUICtrlFactory::createInstance();
     LLRender2D::createInstance(image_provider);
     LLSpellChecker::createInstance();
 
@@ -198,17 +197,14 @@ mHelpImpl(NULL)
     LLUICtrl::EnableCallbackRegistry::defaultRegistrar().add("Floater.CanShow", boost::bind(&LLFloaterReg::canShowInstance, _2, LLSD()));
 // [/RLVa:KB]
 
-    // Create the command manager and parse the master list of commands
-    LLCommandManager::createInstance();
+    // Parse the master list of commands
     LLCommandManager::load();
 }
 
 LLUI::~LLUI()
 {
-    LLCommandManager::deleteSingleton();
     LLSpellChecker::deleteSingleton();
     LLRender2D::deleteSingleton();
-    LLUICtrlFactory::deleteSingleton();
 }
 
 void LLUI::setPopupFuncs(const add_popup_t& add_popup, const remove_popup_t& remove_popup,  const clear_popups_t& clear_popups)

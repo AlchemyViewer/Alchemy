@@ -28,11 +28,16 @@
 #ifndef LL_STATIC_STRING_TABLE_H
 #define LL_STATIC_STRING_TABLE_H
 
+#include "llpreprocessor.h"
+
 #include "lldefs.h"
 #include "llstl.h"
 
 #include <boost/unordered_map.hpp>
 
+// Header-only: all methods are inline/defaulted, so do NOT tag LL_COMMON_API.
+// Tagging would make consumers import a dtor (and, via the table below, boost
+// unordered_map methods) that the DLL never emits.
 class LLStaticHashedString
 {
 public:
@@ -42,6 +47,7 @@ public:
         string_hash = makehash(s);
         string      = s;
     }
+    ~LLStaticHashedString() = default;
 
     const std::string&  String() const { return string;     }
     size_t              Hash()   const { return string_hash;  }
@@ -74,7 +80,7 @@ struct LLStaticStringHasher
 };
 
 template< typename MappedObject >
-class LL_COMMON_API LLStaticStringTable
+class LLStaticStringTable
     : public boost::unordered_map< LLStaticHashedString, MappedObject, LLStaticStringHasher >
 {
 };

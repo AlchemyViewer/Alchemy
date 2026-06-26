@@ -204,7 +204,6 @@
 			<menu_item_call label="Konsol med notifikationer" name="Notifications"/>
 			<menu_item_check label="Tekstur størrelse konsol" name="Texture Size"/>
 			<menu_item_check label="Konsol med tekstur kategorier" name="Texture Category"/>
-			<menu_item_check label="Hurtig-timere" name="Fast Timers"/>
 			<menu_item_check label="Hukommelse" name="Memory"/>
 			<menu_item_check label="Scene Statistics" name="Scene Statistics"/>
 			<menu_item_call label="Vis Regionsinfo i debug-konsol" name="Region Info to Debug Console"/>

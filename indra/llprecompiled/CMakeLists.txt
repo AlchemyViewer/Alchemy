@@ -6,10 +6,6 @@ set(llprecompiled_SOURCE_FILES
 
 add_library (llprecompiled STATIC ${llprecompiled_SOURCE_FILES})
 
-target_include_directories(llprecompiled PRIVATE
-    ${INDRA_SOURCE_DIR}/llmath
-    )
-
 target_link_libraries(llprecompiled
         llcommon
         ll::apr
@@ -25,7 +21,6 @@ target_precompile_headers(llprecompiled PRIVATE
     [["linden_common.h"]]
     [["llwin32headers.h"]]
     [["llprofiler.h"]]
-    [["llmath.h"]]
     <boost/bind.hpp>
     <boost/fiber/fiber.hpp>
     <boost/fiber/fss.hpp>
@@ -40,10 +35,6 @@ target_precompile_headers(llprecompiled PRIVATE
     )
 
 add_executable(llprecompiled_exe ${llprecompiled_SOURCE_FILES})
-
-target_include_directories(llprecompiled_exe PRIVATE
-    ${INDRA_SOURCE_DIR}/llmath
-    )
 
 target_link_libraries(llprecompiled_exe
         llcommon
@@ -60,7 +51,6 @@ target_precompile_headers(llprecompiled_exe PRIVATE
     [["linden_common.h"]]
     [["llwin32headers.h"]]
     [["llprofiler.h"]]
-    [["llmath.h"]]
     <boost/bind.hpp>
     <boost/fiber/fiber.hpp>
     <boost/fiber/fss.hpp>

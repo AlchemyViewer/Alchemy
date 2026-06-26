@@ -247,10 +247,9 @@ private:
 //
 //Note: LLVOCache is not thread-safe
 //
-class LLVOCache : public LLSimpleton<LLVOCache>
+class LLVOCache : public LLParamSingleton<LLVOCache>
 {
-public:
-    LLVOCache(bool read_only);
+    LLSINGLETON(LLVOCache, bool read_only);
     ~LLVOCache() ;
 
 private:

@@ -37,7 +37,7 @@
 
 // LLWatchdogEntry is the interface used by the tasks that
 // need to be watched.
-class LLWatchdogEntry
+class LL_COMMON_API LLWatchdogEntry
 {
 public:
     LLWatchdogEntry(const std::string &thread_name);
@@ -59,7 +59,7 @@ private:
     std::string mThreadName;
 };
 
-class LLWatchdogTimeout : public LLWatchdogEntry
+class LL_COMMON_API LLWatchdogTimeout : public LLWatchdogEntry
 {
 public:
     LLWatchdogTimeout(const std::string& thread_name);
@@ -83,12 +83,11 @@ private:
 };
 
 class LLWatchdogTimerThread; // Defined in the cpp
-class LLWatchdog : public LLSimpleton<LLWatchdog>
+class LL_COMMON_API LLWatchdog : public LLSingleton<LLWatchdog>
 {
-public:
-    LLWatchdog();
+    LLSINGLETON(LLWatchdog);
     ~LLWatchdog();
-
+public:
     // Add an entry to the watchdog.
     void add(LLWatchdogEntry* e);
     void remove(LLWatchdogEntry* e);

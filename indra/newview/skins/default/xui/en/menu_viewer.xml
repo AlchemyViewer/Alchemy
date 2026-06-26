@@ -3105,18 +3105,6 @@ function="World.EnvPreset"
                parameter="notifications_console" />
             </menu_item_call>
             <menu_item_check
-             label="Fast Timers"
-             name="Fast Timers"
-             shortcut="control|shift|9"
-             use_mac_ctrl="true">
-                <menu_item_check.on_check
-                 function="Advanced.CheckConsole"
-                 parameter="fast timers" />
-                <menu_item_check.on_click
-                 function="Advanced.ToggleConsole"
-                 parameter="fast timers" />
-            </menu_item_check>
-            <menu_item_check
                label="Scene Statistics"
                name="Scene Statistics">
               <menu_item_check.on_check
@@ -4352,12 +4340,6 @@ function="World.EnvPreset"
              name="Dump Inventory">
                 <menu_item_call.on_click
                  function="Advanced.DumpInventory" />
-            </menu_item_call>
-            <menu_item_call
-             label="Dump Timers"
-             name="Dump Timers">
-                <menu_item_call.on_click
-                 function="Advanced.DumpTimers" />
             </menu_item_call>
             <menu_item_call
              label="Dump Focus Holder"

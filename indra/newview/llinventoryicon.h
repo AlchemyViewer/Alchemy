@@ -31,17 +31,6 @@
 #include "llassettype.h"
 #include "llinventorytype.h"
 
-struct IconEntry : public LLDictionaryEntry
-{
-    IconEntry(const std::string& item_name) : LLDictionaryEntry(item_name) {}
-};
-
-class LLIconDictionary : public LLSimpleton<LLIconDictionary>, public LLDictionary<LLInventoryType::EIconName, IconEntry>
-{
-public:
-    LLIconDictionary();
-};
-
 class LLInventoryIcon
 {
 public:

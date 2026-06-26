@@ -182,12 +182,12 @@ const S32 MAP_MAX_SIZE = 2048;
 const S32 MAP_BLOCK_SIZE = 4;
 const S32 MAP_BLOCK_RES = (MAP_MAX_SIZE / MAP_BLOCK_SIZE);
 
-class LLWorldMap : public LLSimpleton<LLWorldMap>
+class LLWorldMap : public LLSingleton<LLWorldMap>
 {
-public:
-    LLWorldMap();
+    LLSINGLETON(LLWorldMap);
     ~LLWorldMap();
 
+public:
     // Clear all: list of region info, tiles, blocks and items
     void reset();
 

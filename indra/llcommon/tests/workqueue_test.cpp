@@ -38,14 +38,6 @@ namespace tut
 {
     struct workqueue_data
     {
-        workqueue_data()
-        {
-            LLCoros::createInstance();
-        }
-        ~workqueue_data()
-        {
-            LLCoros::deleteSingleton();
-        }
         WorkSchedule queue{"queue"};
     };
     typedef test_group<workqueue_data> workqueue_group;

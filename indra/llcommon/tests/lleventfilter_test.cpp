@@ -478,7 +478,6 @@ namespace tut
     }
 } // namespace tut
 
-/*****************************************************************************
-*   Link dependencies
-*****************************************************************************/
-#include "llsdutil.cpp"
+// (llsdutil symbols formerly pulled in via #include "llsdutil.cpp" now come from
+// the linked llcommon library -- including the .cpp here double-defines them and
+// clashes with their dllimport declarations when llcommon is built shared.)

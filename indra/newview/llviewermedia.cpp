@@ -219,6 +219,23 @@ mAnyMediaPlaying(false),
 mMaxIntances(MAX_MEDIA_INSTANCES_DEFAULT),
 mSpareBrowserMediaSource(NULL)
 {
+}
+
+LLViewerMedia::~LLViewerMedia()
+{
+    gIdleCallbacks.deleteFunction(LLViewerMedia::onIdle, NULL);
+    mTeleportFinishConnection.disconnect();
+    mMaxInstancesConnection.disconnect();
+    if (mSpareBrowserMediaSource != NULL)
+    {
+        delete mSpareBrowserMediaSource;
+        mSpareBrowserMediaSource = NULL;
+    }
+}
+
+// static
+void LLViewerMedia::initSingleton()
+{
     gIdleCallbacks.addFunction(LLViewerMedia::onIdle, NULL);
     mTeleportFinishConnection = LLViewerParcelMgr::getInstance()->
         setTeleportFinishedCallback(boost::bind(&LLViewerMedia::onTeleportFinished, this));
@@ -235,18 +252,6 @@ mSpareBrowserMediaSource(NULL)
     else
     {
         setMaxInstances(MAX_MEDIA_INSTANCES_DEFAULT);
-    }
-}
-
-LLViewerMedia::~LLViewerMedia()
-{
-    gIdleCallbacks.deleteFunction(LLViewerMedia::onIdle, NULL);
-    mTeleportFinishConnection.disconnect();
-    mMaxInstancesConnection.disconnect();
-    if (mSpareBrowserMediaSource != NULL)
-    {
-        delete mSpareBrowserMediaSource;
-        mSpareBrowserMediaSource = NULL;
     }
 }
 
@@ -632,15 +637,6 @@ static bool proximity_comparitor(const LLViewerMediaImpl* i1, const LLViewerMedi
         return (i1 < i2);
     }
 }
-
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_UPDATE("Update Media");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SPARE_IDLE("Spare Idle");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_UPDATE_INTEREST("Update/Interest");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_UPDATE_VOLUME("Update/Volume");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SORT("Media Sort");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SORT2("Media Sort 2");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_MISC("Misc");
-
 
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMedia::onIdle(void *dummy_arg)
@@ -2181,7 +2177,7 @@ void LLViewerMediaImpl::setMute(bool mute)
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMediaImpl::updateVolume()
 {
-    LL_RECORD_BLOCK_TIME(FTM_MEDIA_UPDATE_VOLUME);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     if(mMediaSource)
     {
         // always scale the volume by the global media volume
@@ -2916,11 +2912,6 @@ bool LLViewerMediaImpl::canNavigateBack()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_DO_UPDATE("Do Update");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_GET_DATA("Get Data");
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_SET_SUBIMAGE("Set Subimage");
-
-
 void LLViewerMediaImpl::update()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_DO_UPDATE);
@@ -3774,8 +3765,6 @@ bool LLViewerMediaImpl::isUpdated()
 {
     return mIsUpdated ;
 }
-
-static LLTrace::BlockTimerStatHandle FTM_MEDIA_CALCULATE_INTEREST("Calculate Interest");
 
 void LLViewerMediaImpl::calculateInterest()
 {

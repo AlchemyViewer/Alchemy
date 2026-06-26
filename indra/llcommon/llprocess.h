@@ -30,6 +30,7 @@
 #include "llinitparam.h"
 #include "llsdparam.h"
 #include "llexception.h"
+#include "llwin32headers.h"
 #include "apr_thread_proc.h"
 #include <boost/optional.hpp>
 #include <iosfwd>                   // std::ostream

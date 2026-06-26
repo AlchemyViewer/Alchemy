@@ -44,14 +44,11 @@ LLHUDManager::LLHUDManager()
 
 LLHUDManager::~LLHUDManager()
 {
-    mHUDEffects.clear();
 }
-
-static LLTrace::BlockTimerStatHandle FTM_UPDATE_HUD_EFFECTS("Update Hud Effects");
 
 void LLHUDManager::updateEffects()
 {
-    LL_RECORD_BLOCK_TIME(FTM_UPDATE_HUD_EFFECTS);
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWABLE;
     S32 i;
     for (i = 0; i < mHUDEffects.size(); i++)
     {
@@ -93,6 +90,12 @@ void LLHUDManager::sendEffects()
             gAgent.sendMessage();
         }
     }
+}
+
+//static
+void LLHUDManager::shutdownClass()
+{
+    getInstance()->mHUDEffects.clear();
 }
 
 void LLHUDManager::cleanupEffects()

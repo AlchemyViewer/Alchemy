@@ -80,6 +80,8 @@ void LLVLManager::addLayerData(LLVLData *vl_datap, const S32Bytes mesg_size)
 
 void LLVLManager::unpackData(const S32 num_packets)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+
     static LLFrameTimer decode_timer;
 
     S32 i;

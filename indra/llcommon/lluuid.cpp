@@ -49,6 +49,16 @@
 // static
 LLMutex* LLUUID::mMutex = NULL;
 
+// Defined here rather than as an inline constexpr in lluuid.h: LLUUID /
+// LLTransactionID are exported (LL_COMMON_API), so these static members are
+// dllimport in consumers and may not have an in-header definition. Both are
+// constant-initialized (constexpr default ctors), so no static-init-order
+// hazard -- they hold the all-zero UUID before any dynamic initialization runs.
+// static
+const LLUUID LLUUID::null;
+// static
+const LLTransactionID LLTransactionID::tnull;
+
 
 
 /*

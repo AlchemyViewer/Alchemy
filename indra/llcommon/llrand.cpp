@@ -29,6 +29,8 @@
 #include "llrand.h"
 #include "lluuid.h"
 
+#include <random>
+
 /**
  * Through analysis, we have decided that we want to take values which
  * are close enough to 1.0 to map back to 0.0.  We came to this

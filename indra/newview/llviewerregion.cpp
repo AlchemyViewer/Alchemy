@@ -718,9 +718,6 @@ void LLViewerRegion::initStats()
     mAlive = false;                 // can become false if circuit disconnects
 }
 
-static LLTrace::BlockTimerStatHandle FTM_CLEANUP_REGION_OBJECTS("Cleanup Region Objects");
-static LLTrace::BlockTimerStatHandle FTM_SAVE_REGION_CACHE("Save Region Cache");
-
 LLViewerRegion::~LLViewerRegion()
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -737,7 +734,6 @@ LLViewerRegion::~LLViewerRegion()
     LLViewerPartSim::getInstance()->cleanupRegion(this);
 
     {
-        LL_RECORD_BLOCK_TIME(FTM_CLEANUP_REGION_OBJECTS);
         gObjectList.killObjects(this);
     }
 
@@ -751,7 +747,6 @@ LLViewerRegion::~LLViewerRegion()
     std::for_each(mImpl->mObjectPartition.begin(), mImpl->mObjectPartition.end(), DeletePointer());
 
     {
-        LL_RECORD_BLOCK_TIME(FTM_SAVE_REGION_CACHE);
         saveObjectCache();
     }
 
@@ -807,6 +802,7 @@ void LLViewerRegion::loadObjectCache()
 
 void LLViewerRegion::saveObjectCache()
 {
+    LL_PROFILE_ZONE_SCOPED;
     if (!mCacheLoaded)
     {
         return;

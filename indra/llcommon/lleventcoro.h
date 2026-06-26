@@ -77,17 +77,17 @@ namespace llcoro
  * runs without suspending for nontrivial time, sprinkle in calls to this
  * function to avoid stalling the rest of the viewer processing.
  */
-void suspend();
+LL_COMMON_API void suspend();
 
 /**
  * Yield control from a coroutine for at least the specified number of seconds
  */
-void suspendUntilTimeout(float seconds);
+LL_COMMON_API void suspendUntilTimeout(float seconds);
 
 /**
  * Yield control from a coroutine until the next mainloop's newFrame event.
  */
-void suspendUntilNextFrame();
+LL_COMMON_API void suspendUntilNextFrame();
 
 /**
  * Post specified LLSD event on the specified LLEventPump, then suspend for a
@@ -136,7 +136,7 @@ void suspendUntilNextFrame();
  *   @a replyPumpNamePath specifies the entry in the lowest-level structure in
  *   @a event into which to store <tt>replyPump.getName()</tt>.
  */
-LLSD postAndSuspend(const LLSD& event, const LLEventPumpOrPumpName& requestPump,
+LL_COMMON_API LLSD postAndSuspend(const LLSD& event, const LLEventPumpOrPumpName& requestPump,
                  const LLEventPumpOrPumpName& replyPump, const LLSD& replyPumpNamePath=LLSD());
 
 /// Wait for the next event on the specified LLEventPump. Pass either the
@@ -150,7 +150,7 @@ LLSD suspendUntilEventOn(const LLEventPumpOrPumpName& pump)
 
 /// Like postAndSuspend(), but if we wait longer than @a timeout seconds,
 /// stop waiting and return @a timeoutResult instead.
-LLSD postAndSuspendWithTimeout(const LLSD& event,
+LL_COMMON_API LLSD postAndSuspendWithTimeout(const LLSD& event,
                                const LLEventPumpOrPumpName& requestPump,
                                const LLEventPumpOrPumpName& replyPump,
                                const LLSD& replyPumpNamePath,

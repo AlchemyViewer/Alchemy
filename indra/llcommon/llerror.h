@@ -263,7 +263,7 @@ namespace LLError
     };
 
 
-    class End { };
+    class LL_COMMON_API End { };
     inline std::ostream& operator<<(std::ostream& s, const End&)
         { return s; }
         // used to indicate the end of a message
@@ -293,14 +293,14 @@ namespace LLError
     };
 
     // class which, when streamed, inserts the current stack trace
-    struct LLStacktrace
+    struct LL_COMMON_API LLStacktrace
     {
         friend std::ostream& operator<<(std::ostream& out, const LLStacktrace&);
     };
 
     // Provides access to OS notification popup on error, since
     // not everything has access to OS's messages
-    class LLUserWarningMsg
+    class LL_COMMON_API LLUserWarningMsg
     {
     public:
         // error codes, tranlates to last_exec states like LAST_EXEC_OTHER_CRASH

@@ -31,6 +31,7 @@
 // Precompiled header
 #include "linden_common.h"
 // associated header
+#define LLCOROS_CPP
 #include "llcoros.h"
 // STL headers
 // std headers
@@ -83,7 +84,7 @@ LLCoros::CoroData& LLCoros::get_CoroData(const std::string& caller)
 {
     CoroData* current{ nullptr };
     // be careful about attempted accesses in the final throes of app shutdown
-    if (instanceExists())
+    if (! wasDeleted())
     {
         current = instance().mCurrent.get();
     }
@@ -148,6 +149,10 @@ LLCoros::LLCoros():
 }
 
 LLCoros::~LLCoros()
+{
+}
+
+void LLCoros::cleanupSingleton()
 {
     // Some of the coroutines (like voice) will depend onto
     // origin singletons, so clean coros before deleting those
@@ -413,7 +418,7 @@ void LLCoros::toplevel(std::string name, callable_t callable)
 //static
 void LLCoros::checkStop()
 {
-    if (!instanceExists())
+    if (wasDeleted())
     {
         LLTHROW(Shutdown("LLCoros was deleted"));
     }
@@ -456,3 +461,5 @@ LLCoros::CoroData::CoroData(int n):
     mCreationTime(LLTimer::getTotalSeconds())
 {
 }
+
+template class LL_COMMON_API LLCoros* LLSingleton<class LLCoros>::getInstance();
