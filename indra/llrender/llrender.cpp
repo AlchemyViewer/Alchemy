@@ -242,8 +242,7 @@ bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
                     glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
                     if(gl_tex->updateBindStats())
                     {
-                        texture->setActive() ;
-                        texture->updateBindStatsForTester() ;
+                        texture->setActive();
                     }
                     mHasMipMaps = gl_tex->mHasMipMaps;
                     if (gl_tex->mTexOptionsDirty)

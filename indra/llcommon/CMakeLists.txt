@@ -78,7 +78,6 @@ target_sources(llcommon
     llmemory.cpp
     llmemorystream.cpp
     llmetrics.cpp
-    llmetricperformancetester.cpp
     llmortician.cpp
     llmutex.cpp
     llpointer.cpp
@@ -196,7 +195,6 @@ target_sources(llcommon
     llmemory.h
     llmemorystream.h
     llmetrics.h
-    llmetricperformancetester.h
     llmortician.h
     llmutex.h
     llnametable.h

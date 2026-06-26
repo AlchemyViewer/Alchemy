@@ -607,32 +607,6 @@ static void settings_modify()
     gDebugPipeline = gSavedSettings.getBOOL("RenderDebugPipeline");
 }
 
-class LLFastTimerLogThread : public LLThread
-{
-public:
-    std::string mFile;
-
-    LLFastTimerLogThread(std::string& test_name) : LLThread("fast timer log")
-    {
-        std::string file_name = test_name + std::string(".slp");
-        mFile = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, file_name);
-    }
-
-    void run()
-    {
-        llofstream os(mFile.c_str());
-
-        while (!LLAppViewer::instance()->isQuitting())
-        {
-            LLTrace::BlockTimer::writeLog(os);
-            os.flush();
-            ms_sleep(32);
-        }
-
-        os.close();
-    }
-};
-
 //virtual
 bool LLAppViewer::initSLURLHandler()
 {
@@ -682,7 +656,6 @@ LLAppViewer::LLAppViewer()
     mAgentRegionLastAlive(false),
     mRandomizeFramerate(LLCachedControl<bool>(gSavedSettings,"Randomize Framerate", false)),
     mPeriodicSlowFrame(LLCachedControl<bool>(gSavedSettings,"Periodic Slow Frame", false)),
-    mFastTimerLogThread(NULL),
     mSettingsLocationList(NULL),
     mIsFirstRun(false)
 {
@@ -1407,7 +1380,6 @@ bool LLAppViewer::doFrame()
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df LLTrace");
             LLTrace::get_frame_recording().nextPeriod();
-            LLTrace::BlockTimer::logStats();
         }
 
         LLTrace::get_thread_recorder()->pullFromChildren();
@@ -2126,14 +2098,10 @@ bool LLAppViewer::cleanup()
     }
     delete sImageDecodeThread;
     sImageDecodeThread = NULL;
-    delete mFastTimerLogThread;
-    mFastTimerLogThread = NULL;
     delete sPurgeDiskCacheThread;
     sPurgeDiskCacheThread = NULL;
     delete mGeneralThreadPool;
     mGeneralThreadPool = NULL;
-
-    SUBSYSTEM_CLEANUP(LLMetricPerformanceTesterBasic) ;
 
     LL_INFOS() << "Cleaning up Media and Textures" << LL_ENDL;
 
@@ -2264,13 +2232,6 @@ bool LLAppViewer::initThreads()
     LLAppViewer::instance()->initGeneralThread();
 
     LLAppViewer::sPurgeDiskCacheThread = new LLPurgeDiskCacheThread();
-
-    if (LLTrace::BlockTimer::sLog || LLTrace::BlockTimer::sMetricLog)
-    {
-        LLTrace::BlockTimer::setLogLock(new LLMutex());
-        mFastTimerLogThread = new LLFastTimerLogThread(LLTrace::BlockTimer::sLogName);
-        mFastTimerLogThread->start();
-    }
 
     // Mesh streaming and caching
     gMeshRepo.init();
@@ -2833,22 +2794,6 @@ bool LLAppViewer::initConfiguration()
 
     // If we have specified crash on startup, set the global so we'll trigger the crash at the right time
     gCrashOnStartup = gSavedSettings.getBOOL("CrashOnStartup");
-
-    if (gSavedSettings.getBOOL("LogPerformance"))
-    {
-        LLTrace::BlockTimer::sLog = true;
-        LLTrace::BlockTimer::sLogName = std::string("performance");
-    }
-
-    std::string test_name(gSavedSettings.getString("LogMetrics"));
-    if (!test_name.empty())
-    {
-        LLTrace::BlockTimer::sMetricLog = true;
-        // '--logmetrics' is specified with a named test metric argument so the data gathering is done only on that test
-        // In the absence of argument, every metric would be gathered (makes for a rather slow run and hard to decipher report...)
-        LL_INFOS() << "'--logmetrics' argument : " << test_name << LL_ENDL;
-        LLTrace::BlockTimer::sLogName = test_name;
-    }
 
     if (clp.hasOption("graphicslevel"))
     {

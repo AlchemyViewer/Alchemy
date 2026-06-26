@@ -9236,11 +9236,6 @@ void handle_dump_avatar_local_textures()
     gAgentAvatarp->dumpLocalTextures();
 }
 
-void handle_dump_timers()
-{
-    LLTrace::BlockTimer::dumpCurTimes();
-}
-
 void handle_debug_avatar_textures()
 {
     LLViewerObject* objectp = LLSelectMgr::getInstance()->getSelection()->getPrimaryObject();
@@ -10598,7 +10593,6 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedBuyCurrencyTest(), "Advanced.BuyCurrencyTest");
     view_listener_t::addMenu(new LLAdvancedDumpSelectMgr(), "Advanced.DumpSelectMgr");
     view_listener_t::addMenu(new LLAdvancedDumpInventory(), "Advanced.DumpInventory");
-    commit.add("Advanced.DumpTimers", boost::bind(&handle_dump_timers) );
     commit.add("Advanced.DumpFocusHolder", boost::bind(&handle_dump_focus) );
     view_listener_t::addMenu(new LLAdvancedPrintSelectedObjectInfo(), "Advanced.PrintSelectedObjectInfo");
     view_listener_t::addMenu(new LLAdvancedPrintAgentInfo(), "Advanced.PrintAgentInfo");
