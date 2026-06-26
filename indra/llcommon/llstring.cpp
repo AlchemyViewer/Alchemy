@@ -1084,7 +1084,7 @@ unsigned long windows_get_last_error()
 }
 
 template<>
-std::wstring windows_message<std::wstring>(DWORD error)
+LL_COMMON_API std::wstring windows_message<std::wstring>(DWORD error)
 {
     // derived from https://stackoverflow.com/a/455533
     wchar_t* rawptr = nullptr;

@@ -355,45 +355,6 @@ void LLCondition::broadcast()
     mCond.notify_all();
 }
 
-
-//---------------------------------------------------------------------
-//
-// LLMutexTrylock
-//
-LLMutexTrylock::LLMutexTrylock(LLMutex* mutex)
-    : mMutex(mutex),
-    mLocked(false)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    if (mMutex)
-        mLocked = mMutex->trylock();
-}
-
-LLMutexTrylock::LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms)
-    : mMutex(mutex),
-    mLocked(false)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    if (!mMutex)
-        return;
-
-    for (U32 i = 0; i < aTries; ++i)
-    {
-        mLocked = mMutex->trylock();
-        if (mLocked)
-            break;
-        ms_sleep(delay_ms);
-    }
-}
-
-LLMutexTrylock::~LLMutexTrylock()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    if (mMutex && mLocked)
-        mMutex->unlock();
-}
-
-
 //---------------------------------------------------------------------
 //
 // LLScopedLock

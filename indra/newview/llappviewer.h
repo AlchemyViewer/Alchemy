@@ -426,7 +426,6 @@ extern LLFrameTimer gRestoreGLTimer;
 extern bool         gRestoreGL;
 extern bool     gUseWireframe;
 
-extern LLMemoryInfo gSysMemory;
 extern U64Bytes gMemoryAllocated;
 
 extern std::string gLastVersionChannel;

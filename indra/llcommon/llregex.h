@@ -28,7 +28,7 @@
 #include <boost/regex.hpp>
 
 template <typename S, typename M, typename R>
-LL_COMMON_API bool ll_regex_match(const S& string, M& match, const R& regex)
+inline bool ll_regex_match(const S& string, M& match, const R& regex)
 {
     try
     {
@@ -43,7 +43,7 @@ LL_COMMON_API bool ll_regex_match(const S& string, M& match, const R& regex)
 }
 
 template <typename S, typename R>
-LL_COMMON_API bool ll_regex_match(const S& string, const R& regex)
+inline bool ll_regex_match(const S& string, const R& regex)
 {
     try
     {
@@ -58,7 +58,7 @@ LL_COMMON_API bool ll_regex_match(const S& string, const R& regex)
 }
 
 template <typename S, typename M, typename R>
-bool ll_regex_search(const S& string, M& match, const R& regex)
+inline bool ll_regex_search(const S& string, M& match, const R& regex)
 {
     try
     {
@@ -73,7 +73,7 @@ bool ll_regex_search(const S& string, M& match, const R& regex)
 }
 
 template <typename S, typename R>
-bool ll_regex_search(const S& string, const R& regex)
+inline bool ll_regex_search(const S& string, const R& regex)
 {
     try
     {

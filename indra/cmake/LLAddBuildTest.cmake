@@ -98,8 +98,6 @@ MACRO(LL_ADD_PROJECT_UNIT_TESTS project sources)
           )
     endif(DARWIN)
 
-    target_precompile_headers(PROJECT_${project}_TEST_${name} REUSE_FROM llprecompiled_exe)
-
     #
     # Per-codefile additional / external project dep and lib dep property extraction
     #
@@ -246,7 +244,6 @@ FUNCTION(LL_ADD_INTEGRATION_TEST
 
   target_link_libraries(INTEGRATION_TEST_${testname} ${libraries})
   target_include_directories (INTEGRATION_TEST_${testname} PRIVATE ${INDRA_SOURCE_DIR}/test ${INDRA_SOURCE_DIR}/llmath ${INDRA_SOURCE_DIR}/llui)
-  target_precompile_headers(INTEGRATION_TEST_${testname} REUSE_FROM llprecompiled_exe)
 
   # Create the test running command
   set(test_command ${ARGN})

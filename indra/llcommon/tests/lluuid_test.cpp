@@ -38,8 +38,9 @@ namespace tut
 
     // Compile-time verification that LLUUID is constexpr-constructible.
     static_assert(LLUUID{}.mData[0] == 0, "default LLUUID is zero-initialised at compile time");
-    static_assert(LLUUID::null.mData[0] == 0, "LLUUID::null is a compile-time constant");
-    static_assert(LLTransactionID::tnull.mData[0] == 0, "LLTransactionID::tnull is a compile-time constant");
+    // LLUUID::null / LLTransactionID::tnull are exported out-of-line constants
+    // (dllimport in consumers), so they are no longer constexpr. Their all-zero
+    // value is verified at runtime in test<1> instead.
 
     constexpr U8 kConstexprBytes[UUID_BYTES] = {
         0xde, 0xad, 0xbe, 0xef, 0xfe, 0xed, 0xfa, 0xce,
@@ -63,6 +64,10 @@ namespace tut
         ensure("default-constructed isNull", id.isNull());
         ensure("default-constructed !notNull", !id.notNull());
         ensure("default-constructed == LLUUID::null", id == LLUUID::null);
+        // null / tnull are the all-zero UUID (verified at runtime since they are
+        // exported out-of-line constants, no longer constexpr).
+        ensure("LLUUID::null isNull", LLUUID::null.isNull());
+        ensure("LLTransactionID::tnull isNull", LLTransactionID::tnull.isNull());
         for (int i = 0; i < UUID_BYTES; ++i)
         {
             ensure_equals("default byte zero", (int)id.mData[i], 0);

@@ -57,7 +57,7 @@ namespace LLInstanceTrackerPrivate
         LL_PROFILE_MUTEX_NAMED(std::mutex, mMutex, "InstanceTracker Data");
     };
 
-    void logerrs(const char* cls, const std::string&, const std::string&, const std::string&);
+    LL_COMMON_API void logerrs(const char* cls, const std::string&, const std::string&, const std::string&);
 } // namespace LLInstanceTrackerPrivate
 
 /*****************************************************************************

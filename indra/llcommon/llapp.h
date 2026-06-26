@@ -50,7 +50,7 @@ void clear_signals();
 
 #endif
 
-extern bool gDisconnected;
+extern LL_COMMON_API bool gDisconnected;
 
 class LL_COMMON_API LLApp
 {

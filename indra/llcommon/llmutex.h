@@ -225,9 +225,31 @@ using LLExclusiveMutexLock = LLSharedMutexLockTemplate<false>;
 class LLMutexTrylock
 {
 public:
-    LLMutexTrylock(LLMutex* mutex);
-    LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms = 10);
-    ~LLMutexTrylock();
+    LLMutexTrylock(LLMutex* mutex) : mMutex(mutex), mLocked(false)
+    {
+        if (mMutex)
+            mLocked = mMutex->trylock();
+    }
+
+    LLMutexTrylock(LLMutex* mutex, U32 aTries, U32 delay_ms) : mMutex(mutex), mLocked(false)
+    {
+        if (!mMutex)
+            return;
+
+        for (U32 i = 0; i < aTries; ++i)
+        {
+            mLocked = mMutex->trylock();
+            if (mLocked)
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+        }
+    }
+
+    ~LLMutexTrylock()
+    {
+        if (mMutex && mLocked)
+            mMutex->unlock();
+    }
 
     bool isLocked() const
     {

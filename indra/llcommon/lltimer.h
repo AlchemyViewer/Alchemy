@@ -114,7 +114,7 @@ public:
 //
 // Various functions for initializing/accessing clock and timing stuff.  Don't use these without REALLY knowing how they work.
 //
-struct TimerInfo
+struct LL_COMMON_API TimerInfo
 {
     TimerInfo();
     void update();
@@ -126,7 +126,7 @@ struct TimerInfo
     U64                     mLastTotalTimeClockCount;
 };
 
-TimerInfo& get_timer_info();
+LL_COMMON_API TimerInfo& get_timer_info();
 
 LL_COMMON_API U64 get_clock_count();
 

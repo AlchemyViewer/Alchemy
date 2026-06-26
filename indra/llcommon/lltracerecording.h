@@ -40,7 +40,7 @@
 #pragma warning(disable : 4244) // possible loss of data on conversions
 #endif
 
-class LLStopWatchControlsMixinCommon
+class LL_COMMON_API LLStopWatchControlsMixinCommon
 {
 public:
     virtual ~LLStopWatchControlsMixinCommon() {}
@@ -112,6 +112,7 @@ private:
     self_t& operator = (const self_t& other)
     {
         // don't do anything, derived class must implement logic
+        return *this;
     }
 
     // atomically stop this object while starting the other
@@ -154,7 +155,7 @@ namespace LLTrace
         typedef S32 sum_t;
     };
 
-    class Recording
+    class LL_COMMON_API Recording
     :   public LLStopWatchControlsMixin<Recording>
     {
     public:
@@ -668,9 +669,9 @@ namespace LLTrace
         size_t                  mNumRecordedPeriods;
     };
 
-    PeriodicRecording& get_frame_recording();
+    LL_COMMON_API PeriodicRecording& get_frame_recording();
 
-    class ExtendableRecording
+    class LL_COMMON_API ExtendableRecording
     :   public LLStopWatchControlsMixin<ExtendableRecording>
     {
     public:
@@ -694,7 +695,7 @@ namespace LLTrace
         Recording mPotentialRecording;
     };
 
-    class ExtendablePeriodicRecording
+    class LL_COMMON_API ExtendablePeriodicRecording
     :   public LLStopWatchControlsMixin<ExtendablePeriodicRecording>
     {
     public:

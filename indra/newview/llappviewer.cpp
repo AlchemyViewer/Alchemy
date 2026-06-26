@@ -1024,7 +1024,7 @@ bool LLAppViewer::init()
 
     // Initialize event recorder
     LLViewerEventRecorder::createInstance();
-    LLWatchdog::createInstance();
+    LLWatchdog::getInstance(); // Initialize watchdog timer
 
     //
     // Initialize the window

@@ -35,7 +35,7 @@ namespace LL
     /**
      * A typical WorkQueue has a string name that can be used to find it.
      */
-    class WorkQueueBase: public LLInstanceTracker<WorkQueueBase, std::string>
+    class LL_COMMON_API WorkQueueBase : public LLInstanceTracker<WorkQueueBase, std::string>
     {
     private:
         using super = LLInstanceTracker<WorkQueueBase, std::string>;
@@ -213,7 +213,7 @@ namespace LL
 /*****************************************************************************
 *   WorkQueue: no timestamped task support
 *****************************************************************************/
-    class WorkQueue: public LLInstanceTrackerSubclass<WorkQueue, WorkQueueBase>
+    class LL_COMMON_API WorkQueue : public LLInstanceTrackerSubclass<WorkQueue, WorkQueueBase>
     {
     private:
         using super = LLInstanceTrackerSubclass<WorkQueue, WorkQueueBase>;
@@ -276,12 +276,16 @@ namespace LL
 /*****************************************************************************
 *   WorkSchedule: add support for timestamped tasks
 *****************************************************************************/
-    class WorkSchedule: public LLInstanceTrackerSubclass<WorkSchedule, WorkQueueBase>
+    class LL_COMMON_API WorkSchedule : public LLInstanceTrackerSubclass<WorkSchedule, WorkQueueBase>
     {
     private:
         using super = LLInstanceTrackerSubclass<WorkSchedule, WorkQueueBase>;
         using Queue = ThreadSafeSchedule<Work>;
         // helper for postEvery()
+        // NOT LL_COMMON_API: BackJack is instantiated with caller-local types
+        // (the lambda passed to postEvery()), so each consumer must emit its own
+        // instantiation -- tagging it makes consumers try to import an
+        // instantiation the DLL can never contain.
         template <typename Rep, typename Period, typename CALLABLE>
         class BackJack;
 

@@ -39,7 +39,7 @@
 
 // 64 bits hashing class
 
-class HBXXH64
+class LL_COMMON_API HBXXH64
 {
     friend std::ostream& operator<<(std::ostream&, HBXXH64);
 
@@ -151,7 +151,7 @@ inline bool operator!=(const HBXXH64& a, const HBXXH64& b)
 
 // 128 bits hashing class
 
-class HBXXH128
+class LL_COMMON_API HBXXH128
 {
     friend std::ostream& operator<<(std::ostream&, HBXXH128);
 

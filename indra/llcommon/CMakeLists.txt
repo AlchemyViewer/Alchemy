@@ -1,6 +1,30 @@
 # -*- cmake -*-
 
-add_library(llcommon STATIC)
+if (LL_COMMON_LINK_SHARED)
+  add_library(llcommon SHARED)
+
+  target_compile_definitions(llcommon PUBLIC LL_COMMON_LINK_SHARED=1)
+
+  add_custom_command(
+    TARGET llcommon POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:llcommon>" "${SHARED_LIB_STAGING_DIR}"
+    COMMAND_EXPAND_LISTS
+  )
+
+  add_custom_command(
+    TARGET llcommon POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:llcommon>" "${VIEWER_STAGING_DIR}"
+    COMMAND_EXPAND_LISTS
+  )
+
+  add_custom_command(
+    TARGET llcommon POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:llcommon>" "${VIEWER_STAGING_DIR}/llplugin"
+    COMMAND_EXPAND_LISTS
+  )
+else()
+  add_library(llcommon STATIC)
+endif()
 
 target_sources(llcommon
     PRIVATE
@@ -287,8 +311,6 @@ target_link_libraries(
     )
 
 target_include_directories(llcommon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
-target_precompile_headers(llcommon REUSE_FROM llprecompiled)
 
 add_dependencies(llcommon stage_third_party_libs)
 

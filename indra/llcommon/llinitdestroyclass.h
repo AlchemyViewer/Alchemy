@@ -47,7 +47,7 @@
  * LLInitClassList and LLDestroyClassList. It accumulates the initClass() or
  * destroyClass() callbacks for registered classes.
  */
-class LLCallbackRegistry
+class LL_COMMON_API LLCallbackRegistry
 {
 public:
     typedef std::function<void()> func_t;

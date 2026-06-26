@@ -53,7 +53,7 @@ namespace LLTrace
 // use to create blocktimer rvalue to be captured in a reference so that the BlockTimer lives to the end of the block.
 class BlockTimer timeThisBlock(class BlockTimerStatHandle& timer);
 
-class BlockTimer
+class LL_COMMON_API BlockTimer
 {
 public:
     typedef BlockTimer self_t;
@@ -204,8 +204,10 @@ private:
     BlockTimer(BlockTimerStatHandle& timer);
 
     // no-copy
-    BlockTimer(const BlockTimer& other);
-    BlockTimer& operator=(const BlockTimer& other);
+    BlockTimer(const BlockTimer& other) = delete;
+    BlockTimer(BlockTimer&& other) = delete;
+    BlockTimer& operator=(const BlockTimer& other) = delete;
+    BlockTimer& operator=(BlockTimer&& other) = delete;
 
 private:
     U64                     mStartTime;
@@ -213,9 +215,12 @@ private:
 
 public:
     // statics
+    // NOTE: declared separately (not 'static bool sMetricLog, sLog;'): MSVC
+    // mis-handles a multi-declarator static in a dllexport class, flagging the
+    // second name with C2487.
     static std::string      sLogName;
-    static bool             sMetricLog,
-                            sLog;
+    static bool             sMetricLog;
+    static bool             sLog;
     static U64              sClockResolution;
 
 };
@@ -231,7 +236,7 @@ LL_FORCE_INLINE class BlockTimer timeThisBlock(class BlockTimerStatHandle& timer
 }
 
 // stores a "named" timer instance to be reused via multiple BlockTimer stack instances
-class BlockTimerStatHandle
+class LL_COMMON_API BlockTimerStatHandle
 :   public StatType<TimeBlockAccumulator>
 {
 public:
@@ -266,12 +271,12 @@ typedef LLTreeDFSIter<BlockTimerStatHandle, BlockTimerStatHandle::child_const_it
 typedef LLTreeDFSPostIter<BlockTimerStatHandle, BlockTimerStatHandle::child_const_iter> block_timer_tree_df_post_iterator_t;
 typedef LLTreeBFSIter<BlockTimerStatHandle, BlockTimerStatHandle::child_const_iter> block_timer_tree_bf_iterator_t;
 
-block_timer_tree_df_iterator_t begin_block_timer_tree_df(BlockTimerStatHandle& id);
-block_timer_tree_df_iterator_t end_block_timer_tree_df();
-block_timer_tree_df_post_iterator_t begin_block_timer_tree_df_post(BlockTimerStatHandle& id);
-block_timer_tree_df_post_iterator_t end_block_timer_tree_df_post();
-block_timer_tree_bf_iterator_t begin_block_timer_tree_bf(BlockTimerStatHandle& id);
-block_timer_tree_bf_iterator_t end_block_timer_tree_bf();
+LL_COMMON_API block_timer_tree_df_iterator_t begin_block_timer_tree_df(BlockTimerStatHandle& id);
+LL_COMMON_API block_timer_tree_df_iterator_t end_block_timer_tree_df();
+LL_COMMON_API block_timer_tree_df_post_iterator_t begin_block_timer_tree_df_post(BlockTimerStatHandle& id);
+LL_COMMON_API block_timer_tree_df_post_iterator_t end_block_timer_tree_df_post();
+LL_COMMON_API block_timer_tree_bf_iterator_t begin_block_timer_tree_bf(BlockTimerStatHandle& id);
+LL_COMMON_API block_timer_tree_bf_iterator_t end_block_timer_tree_bf();
 
 LL_FORCE_INLINE BlockTimer::BlockTimer(BlockTimerStatHandle& timer)
 {

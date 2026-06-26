@@ -85,7 +85,7 @@ LL_COMMON_API bool compare_llsd_with_template(
 // (3) The element of an array with exactly one element is taken as a template
 //     for *all* the elements of the test array.  If the template array is of
 //     different size, compare_llsd_with_template() semantics apply.
-bool filter_llsd_with_template(
+LL_COMMON_API bool filter_llsd_with_template(
     const LLSD & llsd_to_test,
     const LLSD & template_llsd,
     LLSD & resultant_llsd);
@@ -192,8 +192,8 @@ namespace llsd
  * By implication, if path.isUndefined() or otherwise equivalent to an empty
  * LLSD::Array, drill[_ref]() returns 'blob' as is.
  */
-LLSD  drill(const LLSD& blob, const LLSD& path);
-LLSD& drill_ref(  LLSD& blob, const LLSD& path);
+LL_COMMON_API LLSD   drill(const LLSD& blob, const LLSD& path);
+LL_COMMON_API LLSD& drill_ref(LLSD& blob, const LLSD& path);
 
 }
 
@@ -535,12 +535,12 @@ private:
 // when encountered in a map. A key name of "*" can be specified as a wild card
 // and will specify the default behavior.  If no wild card is given and the clone
 // encounters a name not in the filter, that value will be skipped.
-LLSD llsd_clone(LLSD value, LLSD filter = LLSD());
+LL_COMMON_API LLSD llsd_clone(LLSD value, LLSD filter = LLSD());
 
 // Creates a shallow copy of a map or array.  If passed any other type of LLSD
 // object it simply returns that value.  See llsd_clone for a description of
 // the filter parameter.
-LLSD llsd_shallow(LLSD value, LLSD filter = LLSD());
+LL_COMMON_API LLSD llsd_shallow(LLSD value, LLSD filter = LLSD());
 
 namespace llsd
 {
@@ -722,7 +722,7 @@ namespace LL
 *****************************************************************************/
 // validate incoming LLSD blob, and return an LLSD array suitable to pass to
 // the function of interest
-LLSD apply_llsd_fix(size_t arity, const LLSD& args);
+LL_COMMON_API LLSD apply_llsd_fix(size_t arity, const LLSD& args);
 
 // Derived from https://stackoverflow.com/a/20441189
 // and https://en.cppreference.com/w/cpp/utility/apply .

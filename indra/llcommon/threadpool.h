@@ -24,7 +24,7 @@
 namespace LL
 {
 
-    class ThreadPoolBase: public LLInstanceTracker<ThreadPoolBase, std::string>
+    class LL_COMMON_API ThreadPoolBase: public LLInstanceTracker<ThreadPoolBase, std::string>
     {
     private:
         using super = LLInstanceTracker<ThreadPoolBase, std::string>;
@@ -101,7 +101,7 @@ namespace LL
      * Specialize with WorkQueue or, for timestamped tasks, WorkSchedule
      */
     template <class QUEUE>
-    struct ThreadPoolUsing: public ThreadPoolBase
+    struct LL_COMMON_API ThreadPoolUsing : public ThreadPoolBase
     {
         using queue_t = QUEUE;
 

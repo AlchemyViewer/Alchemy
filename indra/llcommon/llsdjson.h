@@ -52,17 +52,17 @@
 ///
 /// For maps and arrays child entries will be converted and added to the structure.
 /// Order is preserved for an array but not for objects.
-LLSD LlsdFromJson(const simdjson::dom::element& val);
+LL_COMMON_API LLSD LlsdFromJson(const simdjson::dom::element& val);
 
 /// Parse a JSON document from text and convert it into LLSD as above.
 /// Returns false (leaving out undefined) on a parse failure; if errmsg is
 /// non-null it receives a description of the failure.
-bool LlsdFromJsonString(std::string_view json, LLSD& out, std::string* errmsg = nullptr);
+LL_COMMON_API bool LlsdFromJsonString(std::string_view json, LLSD& out, std::string* errmsg = nullptr);
 
 /// As above, but parses the buffer in place with no internal copy. Callers
 /// that materialize a document from raw bytes should read directly into a
 /// simdjson::padded_string and use this overload.
-bool LlsdFromJsonString(const simdjson::padded_string& json, LLSD& out, std::string* errmsg = nullptr);
+LL_COMMON_API bool LlsdFromJsonString(const simdjson::padded_string& json, LLSD& out, std::string* errmsg = nullptr);
 
 /// disambiguate std::string and C strings against the string_view and
 /// padded_string overloads (padded_string converts implicitly from
@@ -94,6 +94,6 @@ inline bool LlsdFromJsonString(const char* json, LLSD& out, std::string* errmsg 
 /// TypeMap       | object
 /// TypeArray     | array
 /// TypeBinary    | unsupported
-std::string LlsdToJson(const LLSD& val);
+LL_COMMON_API std::string LlsdToJson(const LLSD& val);
 
 #endif // LL_LLSDJSON_H

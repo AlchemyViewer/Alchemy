@@ -22,7 +22,6 @@
 #include "lltut.h"
 
 #include "../llmaterial.h"
-#include "lluuid.cpp"
 
 namespace tut
 {

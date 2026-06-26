@@ -32,7 +32,7 @@
  * LLHeteroMap collects objects WITHOUT a common base class, retrieves them by
  * object type and destroys them when the LLHeteroMap is destroyed.
  */
-class LLHeteroMap
+class LL_COMMON_API LLHeteroMap
 {
 public:
     ~LLHeteroMap();

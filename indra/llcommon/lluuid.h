@@ -148,9 +148,12 @@ static_assert(std::is_trivially_copyable<LLUUID>::value, "LLUUID must be trivial
 static_assert(std::is_trivially_move_assignable<LLUUID>::value, "LLUUID must be trivial move");
 static_assert(std::is_standard_layout<LLUUID>::value, "LLUUID must be a standard layout type");
 
-// Defined as inline constexpr after the class definition because the static
-// data member is of LLUUID type, which is incomplete inside the class body.
-inline constexpr LLUUID LLUUID::null{};
+// LLUUID::null is defined out-of-line in lluuid.cpp, NOT as an inline constexpr
+// variable here. LLUUID is exported (class LL_COMMON_API), which makes this
+// static member dllimport in consumer modules, and a dllimport member may not
+// have an in-header (inline) definition. So it is an ordinary exported constant
+// defined once in the DLL. It is still constant-initialized (LLUUID has a
+// constexpr default ctor), so there is no static-init-order hazard.
 
 typedef std::vector<LLUUID> uuid_vec_t;
 typedef std::set<LLUUID> uuid_set_t;
@@ -185,7 +188,9 @@ public:
     LLAssetID makeAssetID(const LLUUID& session) const;
 };
 
-inline constexpr LLTransactionID LLTransactionID::tnull{};
+// As with LLUUID::null above: defined out-of-line in lluuid.cpp because an
+// exported (dllimport-in-consumers) static member can't have an inline
+// definition.
 
 // Canonical hash for LLUUID (also used by boost::container_hash via ADL).
 // Golden-ratio multiply with avalanche mixing: shift by 31 mixes the upper

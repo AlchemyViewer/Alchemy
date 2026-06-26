@@ -68,7 +68,7 @@ typedef FILE LLFILE;
 ///
 /// @nosubgrouping
 ///
-class LLFile
+class LL_COMMON_API LLFile
 {
 public:
     // ================================================================================
@@ -699,7 +699,7 @@ private:
  *  Does The Right Thing when passed a non-ASCII pathname. Sadly, that isn't
  *  true of Microsoft's std::ifstream.
  */
-class llifstream : public std::ifstream
+class LL_COMMON_API llifstream : public std::ifstream
 {
     // input stream associated with a C stream
   public:
@@ -811,7 +811,7 @@ private:
  *  Right Thing when passed a non-ASCII pathname. Sadly, that isn't true of
  *  Microsoft's std::ofstream.
 */
-class llofstream : public std::ofstream
+class LL_COMMON_API llofstream : public std::ofstream
 {
   public:
     // Constructors:
