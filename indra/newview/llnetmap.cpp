@@ -693,6 +693,7 @@ void LLNetMap::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLUICtrl::reshape(width, height, called_from_parent);
     createObjectImage();
+    createParcelImage();
 }
 
 LLVector3 LLNetMap::globalPosToView(const LLVector3d& global_pos)
