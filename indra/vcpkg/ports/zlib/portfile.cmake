@@ -23,6 +23,14 @@ vcpkg_cmake_configure(
 )
 vcpkg_cmake_install()
 file(INSTALL "${CMAKE_CURRENT_LIST_DIR}/vcpkg-cmake-wrapper.cmake" DESTINATION "${CURRENT_PACKAGES_DIR}/share/${PORT}")
+if(VCPKG_TARGET_IS_WINDOWS AND VCPKG_LIBRARY_LINKAGE STREQUAL static)
+    if(NOT DEFINED VCPKG_BUILD_TYPE OR VCPKG_BUILD_TYPE STREQUAL "release")
+        file(RENAME "${CURRENT_PACKAGES_DIR}/lib/zlibstatic.lib" "${CURRENT_PACKAGES_DIR}/lib/zs.lib")
+    endif()
+    if(NOT DEFINED VCPKG_BUILD_TYPE OR VCPKG_BUILD_TYPE STREQUAL "debug")
+        file(RENAME "${CURRENT_PACKAGES_DIR}/debug/lib/zlibstaticd.lib" "${CURRENT_PACKAGES_DIR}/debug/lib/zsd.lib")
+    endif()
+endif()
 
 # Condition in `WIN32`, from https://github.com/zlib-ng/zlib-ng/blob/2.1.5/CMakeLists.txt#L1081-L1100
 # (dynamic) for `zlib` or (static `MSVC) for `zlibstatic` or default `z`
@@ -39,7 +47,7 @@ if(VCPKG_TARGET_IS_WINDOWS AND (NOT (VCPKG_LIBRARY_LINKAGE STREQUAL static AND V
     if(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
         set(_port_output_name "zlib${_port_suffix}")
     else()
-        set(_port_output_name "zlibstatic${_port_suffix}")
+        set(_port_output_name "zs${_port_suffix}")
     endif()
 
     # CMAKE_DEBUG_POSTFIX from https://github.com/zlib-ng/zlib-ng/blob/2.1.5/CMakeLists.txt#L494

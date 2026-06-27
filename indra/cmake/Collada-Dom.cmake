@@ -8,11 +8,6 @@ find_path(COLLADA_DOM_INCLUDE_DIRS NAMES dae.h PATHS "${_VCPKG_INSTALLED_DIR}/${
 
 target_include_directories(ll::colladadom SYSTEM INTERFACE "${COLLADA_DOM_INCLUDE_DIRS}" "${COLLADA_DOM_INCLUDE_DIRS}/1.4")
 
-if(WINDOWS)
-    target_compile_definitions(ll::colladadom INTERFACE DOM_DYNAMIC=1)
-endif()
-
-
 find_library(COLLADA14_LIBRARY_RELEASE
     NAMES collada14dom
     PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib"

@@ -42,11 +42,17 @@ vcpkg_extract_source_archive(
 )
 
 if(VCPKG_TARGET_IS_WINDOWS)
-    vcpkg_cmake_configure(
-        SOURCE_PATH ${CEF_SOURCE_PATH}
-        OPTIONS
-            -DCEF_RUNTIME_LIBRARY_FLAG="/MD"
-    )
+    if(VCPKG_CRT_LINKAGE MATCHES "dynamic")
+        vcpkg_cmake_configure(
+            SOURCE_PATH ${CEF_SOURCE_PATH}
+            OPTIONS
+                -DCEF_RUNTIME_LIBRARY_FLAG="/MD"
+        )
+    else()
+        vcpkg_cmake_configure(
+            SOURCE_PATH ${CEF_SOURCE_PATH}
+        )
+    endif()
 elseif(VCPKG_TARGET_IS_OSX)
     vcpkg_cmake_configure(
         SOURCE_PATH ${CEF_SOURCE_PATH}

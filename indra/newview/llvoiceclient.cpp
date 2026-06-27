@@ -39,6 +39,7 @@
 #include "lltrans.h"
 #include "llmutelist.h"
 #include "llnearbyvoicemoderation.h"
+#include "llviewerregion.h"
 
 const F32 LLVoiceClient::OVERDRIVEN_POWER_LEVEL = 0.7f;
 
@@ -186,10 +187,12 @@ void LLVoiceClient::userAuthorized(const std::string& user_id, const LLUUID &age
 void LLVoiceClient::handleSimulatorFeaturesReceived(const LLSD &simulatorFeatures)
 {
     std::string voiceServerType = simulatorFeatures["VoiceServerType"].asString();
+#ifndef DISABLE_WEBRTC
     if (voiceServerType.empty())
     {
         voiceServerType = WEBRTC_VOICE_SERVER_TYPE;
     }
+#endif
 
     if (mSpatialVoiceModule && !mNonSpatialVoiceModule)
     {
@@ -600,12 +603,14 @@ LLVoiceP2POutgoingCallInterface *LLVoiceClient::getOutgoingCallInterface(const L
         LLVoiceVersionInfo versionInfo = LLVoiceClient::getInstance()->getVersion();
         voice_server_type = versionInfo.internalVoiceServerType;
     }
+#ifndef DISABLE_WEBRTC
     if (voiceChannelInfo.has("voice_server_type") && voiceChannelInfo["voice_server_type"] != voice_server_type)
     {
         // there's a mismatch between what the peer is offering and what our server
         // can handle, so default to webrtc
         voice_server_type = WEBRTC_VOICE_SERVER_TYPE;
     }
+#endif
     LLVoiceModuleInterface *module = getVoiceModule(voice_server_type);
     return dynamic_cast<LLVoiceP2POutgoingCallInterface *>(module);
 }
