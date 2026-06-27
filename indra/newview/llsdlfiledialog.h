@@ -32,7 +32,6 @@
 #include "SDL3/SDL.h"
 #include "llwindowsdl.h"
 
-#include <atomic>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -75,18 +74,6 @@ struct LLSDLFileDialogContext
 
 namespace LLSDLFileDialog
 {
-    // Count of async dialogs on screen, so the frame loop can skip
-    // BackgroundYieldTime while a picker holds focus (the modeless dialog is
-    // serviced by the same loop, so yielding makes it laggy). Atomic: launched
-    // from a worker thread, resolved on the main thread.
-    inline std::atomic<int>& openDialogCount()
-    {
-        static std::atomic<int> sCount{0};
-        return sCount;
-    }
-
-    inline bool anyOpen() { return openDialogCount().load(std::memory_order_relaxed) > 0; }
-
     // C-style trampoline matching SDL_DialogFileCallback. Decodes the
     // filelist into ResultT, invokes the user's typed callback, and
     // frees the heap-allocated context. ResultT-specialised below for
@@ -94,14 +81,9 @@ namespace LLSDLFileDialog
     template <typename ResultT>
     inline void trampoline(void* userdata, const char* const* filelist, int /*filter*/)
     {
-        // Dialog resolved; release the hold taken in show().
-        openDialogCount().fetch_sub(1, std::memory_order_relaxed);
-
-        // Restore viewer focus once the last dialog closes.
-        if (openDialogCount().load(std::memory_order_relaxed) == 0)
-        {
-            LLWindowSDL::restoreFocusAfterDialog();
-        }
+        // Dialog resolved; close the bracket opened in show(). Restores
+        // fullscreen/mouselook and, once the last dialog closes, key focus.
+        LLWindowSDL::exitDialog();
 
         auto* ctx = static_cast<LLSDLFileDialogContext<ResultT>*>(userdata);
         auto* cb = ctx->mCallback;
@@ -169,8 +151,9 @@ namespace LLSDLFileDialog
             SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, location.c_str());
         }
 
-        // Held until trampoline() runs; see openDialogCount().
-        openDialogCount().fetch_add(1, std::memory_order_relaxed);
+        // Open the dialog bracket; trampoline() closes it. Drops fullscreen and
+        // mouselook for the dialog's duration, like the blocking pickers do.
+        LLWindowSDL::enterDialog();
 
         SDL_ShowFileDialogWithProperties(type, &trampoline<ResultT>, ctx, props);
 

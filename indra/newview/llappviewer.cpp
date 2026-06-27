@@ -154,7 +154,6 @@
 
 #if LL_SDL_WINDOW
 #include "llwindowsdl.h"
-#include "llsdlfiledialog.h"
 #endif
 
 // Third party library includes
@@ -1563,7 +1562,7 @@ bool LLAppViewer::doFrame()
             // don't background-yield while one is open or it turns laggy.
             bool native_dialog_open = false;
 #if LL_SDL_WINDOW
-            native_dialog_open = LLSDLFileDialog::anyOpen();
+            native_dialog_open = LLWindowSDL::dialogOpen();
 #endif
 
             // yield cooperatively when not running as foreground window
