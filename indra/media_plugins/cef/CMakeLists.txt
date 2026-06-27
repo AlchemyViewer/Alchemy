@@ -77,20 +77,30 @@ target_link_libraries(media_plugin_cef
 add_dependencies(media_plugin_cef dullahan_host)
 
 ### SLPluginCEF - dedicated host that statically links the CEF plugin instead of
-### dlopen()ing it. Reuses the generic slplugin host driver (slplugin.cpp) plus
-### slplugin_cef.cpp, which registers the linked LLPluginInitEntryPoint.
-add_executable(SLPluginCEF
-    WIN32
-    MACOSX_BUNDLE
-    ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
-    slplugin_cef.cpp
-    $<TARGET_OBJECTS:media_plugin_cef_objs>
-    )
-
-if (DARWIN)
-    target_sources(SLPluginCEF PRIVATE ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm)
-    set_source_files_properties(${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm
-        PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
+### dlopen()ing it. Both forms reuse the generic slplugin host driver
+### (slplugin.cpp) plus slplugin_cef.cpp (registers the linked entry point).
+### On Windows it is a DLL exporting RunWinMain, loaded by CEF's bootstrap
+### executable (shipped renamed to SLPluginCEF.exe) which sets up the sandbox;
+### elsewhere it is a plain executable.
+if (WINDOWS)
+    add_library(SLPluginCEF MODULE
+        ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
+        slplugin_cef.cpp
+        slplugin_cef_bootstrap.cpp
+        $<TARGET_OBJECTS:media_plugin_cef_objs>
+        )
+else ()
+    add_executable(SLPluginCEF
+        MACOSX_BUNDLE
+        ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
+        slplugin_cef.cpp
+        $<TARGET_OBJECTS:media_plugin_cef_objs>
+        )
+    if (DARWIN)
+        target_sources(SLPluginCEF PRIVATE ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm)
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm
+            PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
+    endif ()
 endif ()
 
 target_link_libraries(SLPluginCEF
@@ -114,15 +124,23 @@ if (WINDOWS)
   )
   target_link_options(media_plugin_cef PRIVATE /MANIFEST:NO /IGNORE:4099)
 
-  # SLPluginCEF lives next to libcef.dll (deployed below by media_plugin_cef) so
-  # the statically-referenced CEF runtime resolves from the host's own directory.
+  # SLPluginCEF.dll lives next to libcef.dll and the CEF bootstrap (deployed
+  # below by media_plugin_cef) so the CEF runtime resolves from its own dir.
   set_target_properties(SLPluginCEF
     PROPERTIES
     EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON
     RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
+    LIBRARY_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
   )
-  target_sources(SLPluginCEF PRIVATE "${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.manifest")
   target_link_options(SLPluginCEF PRIVATE /IGNORE:4099)
+
+  # Ship CEF's bootstrap.exe renamed to SLPluginCEF.exe; matching base name makes
+  # it load SLPluginCEF.dll and call our exported RunWinMain with the sandbox
+  # info. media_plugin_cef (a dependency) has already copied bootstrap.exe into
+  # the llplugin dir by this point.
+  add_custom_command(TARGET SLPluginCEF POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VIEWER_STAGING_DIR}/llplugin/bootstrap.exe" "${VIEWER_STAGING_DIR}/llplugin/SLPluginCEF.exe"
+  )
 
   # Copy plugin files to packaging directory
   set(CEF_BIN_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/cef-bin")

@@ -48,6 +48,12 @@ using namespace std;
 // (NULL) or a per-plugin file such as slplugin_cef.cpp (&LLPluginInitEntryPoint).
 LLPluginInstance::pluginInitFunction ll_get_static_plugin_init();
 
+// The host driver: register the (static or dlopen'd) plugin, then pump the
+// plugin<->parent message loop until the plugin is done. Factored out of the
+// platform entry points so the CEF bootstrap host (slplugin_cef_bootstrap.cpp)
+// can reuse it after setting up the sandbox. Defined below.
+int slplugin_run(U32 port);
+
 
 #if LL_DARWIN
     #include "slplugin-objc.h"
@@ -191,7 +197,19 @@ int main(int argc, char **argv)
 #endif
 # if LL_DARWIN
     signal(SIGEMT, &crash_handler);     // emulate instruction executed
+#endif //LL_DARWIN
 
+    // Hand off to the shared host driver (the CEF bootstrap host reuses it too).
+    int rc = slplugin_run(port);
+
+    ll_cleanup_apr();
+
+    return rc;
+}
+
+int slplugin_run(U32 port)
+{
+#if LL_DARWIN
     LLCocoaPlugin cocoa_interface;
     cocoa_interface.setupCocoa();
     cocoa_interface.createAutoReleasePool();
@@ -272,9 +290,6 @@ int main(int argc, char **argv)
 #endif
     }
     delete plugin;
-
-    ll_cleanup_apr();
-
 
     return 0;
 }

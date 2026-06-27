@@ -1821,9 +1821,11 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
         // When the dedicated CEF host is enabled, launch SLPluginCEF (which
         // statically links the CEF plugin) instead of the generic SLPlugin that
         // dlopen()s media_plugin_cef. plugin_name is still passed and validated
-        // below, but the static host ignores it. Falls back to the generic
-        // launcher if SLPluginCEF is missing.
-        if (plugin_basename == "media_plugin_cef" && gSavedSettings.getBOOL("ALCefDedicatedHost"))
+        // below, but the static host ignores it. The Windows sandbox also
+        // requires this host (ALCefSandbox implies it). Falls back to the
+        // generic launcher if SLPluginCEF is missing.
+        if (plugin_basename == "media_plugin_cef" &&
+            (gSavedSettings.getBOOL("ALCefDedicatedHost") || gSavedSettings.getBOOL("ALCefSandbox")))
         {
 #if LL_WINDOWS
             const std::string cef_host_exe = "SLPluginCEF.exe";
