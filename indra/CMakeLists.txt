@@ -76,6 +76,10 @@ else ()
   option(USE_SDL_WINDOW "Build with SDL based window management and input (experimental on Windows)" OFF)
 endif ()
 
+# Spell checking backend
+cmake_dependent_option(USE_NSSPELLCHECKER "Use the native macOS NSSpellChecker instead of Hunspell" ON "APPLE" OFF)
+cmake_dependent_option(USE_WINSPELLCHECK "Use the native Windows Spell Checking API instead of Hunspell" ON "WIN32" OFF)
+
 # Configure crash reporting
 option(RELEASE_CRASH_REPORTING "Enable use of crash reporting in release builds" OFF)
 option(NON_RELEASE_CRASH_REPORTING "Enable use of crash reporting in developer builds" OFF)
@@ -181,6 +185,10 @@ if(BUILD_DULLAHAN_EXAMPLE)
   list(APPEND VCPKG_MANIFEST_FEATURES "dullahan-example")
 endif()
 
+if (NOT USE_NSSPELLCHECKER AND NOT USE_WINSPELLCHECK)
+  list(APPEND VCPKG_MANIFEST_FEATURES "hunspell")
+endif()
+
 # Export compile_commands.json for ninja and makefile generators
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -275,6 +283,7 @@ include(Mesa)
 include(Meshoptimizer)
 include(Mikktspace)
 include(NDOF)
+include(NSSpellChecker)
 include(NVAPI)
 include(OpenAL)
 include(OpenGL)
@@ -297,6 +306,7 @@ include(Vorbis)
 include(WebP)
 include(WebRTC)
 include(websocketpp)
+include(WinSpellCheck)
 include(xxHash)
 include(ZLIBNG)
 
