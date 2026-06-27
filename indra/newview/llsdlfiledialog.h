@@ -97,6 +97,12 @@ namespace LLSDLFileDialog
         // Dialog resolved; release the hold taken in show().
         openDialogCount().fetch_sub(1, std::memory_order_relaxed);
 
+        // Restore viewer focus once the last dialog closes.
+        if (openDialogCount().load(std::memory_order_relaxed) == 0)
+        {
+            LLWindowSDL::restoreFocusAfterDialog();
+        }
+
         auto* ctx = static_cast<LLSDLFileDialogContext<ResultT>*>(userdata);
         auto* cb = ctx->mCallback;
         auto* user = ctx->mUserdata;

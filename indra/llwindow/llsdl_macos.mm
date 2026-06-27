@@ -28,6 +28,8 @@
 
 #import <Cocoa/Cocoa.h>
 
+#include "SDL3/SDL.h"
+
 #include "llsdl_macos.h"
 
 void ll_sdl_macos_strip_default_close_shortcut()
@@ -72,6 +74,31 @@ void ll_sdl_macos_strip_default_close_shortcut()
             }
         }
     }
+}
+
+void ll_sdl_macos_make_window_key_deferred(struct SDL_Window* window)
+{
+    if (!window)
+    {
+        return;
+    }
+
+    NSWindow* ns_window = (__bridge NSWindow*)SDL_GetPointerProperty(
+        SDL_GetWindowProperties(window), SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, nullptr);
+    if (!ns_window)
+    {
+        return;
+    }
+
+    // After a native dialog closes, SDL only reactivates the app, leaving no
+    // key window: keystrokes hit no responder and AppKit beeps. Re-key the
+    // window so it becomes key again and SDL emits FOCUS_GAINED, restoring input.
+    // Defer to the next main-queue turn so this runs after SDL's own
+    // ReactivateAfterDialog instead of being clobbered by it.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [NSApp activateIgnoringOtherApps:YES];
+        [ns_window makeKeyAndOrderFront:nil];
+    });
 }
 
 #endif // LL_DARWIN

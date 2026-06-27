@@ -31,3 +31,7 @@
 // llsdl_macos.mm for the full rationale. Safe to call once after the first
 // SDL_INIT_VIDEO (when SDL has registered the app and built its menu).
 void ll_sdl_macos_strip_default_close_shortcut();
+
+// Make the given SDL window key again after a native file dialog closes.
+struct SDL_Window;
+void ll_sdl_macos_make_window_key_deferred(struct SDL_Window* window);

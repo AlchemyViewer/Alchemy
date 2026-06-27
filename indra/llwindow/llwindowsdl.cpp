@@ -69,6 +69,7 @@ LLWindowSDL::WAYLAND_DATA LLWindowSDL::sWaylandData = {};
 #include <CoreServices/CoreServices.h>
 #include <CoreGraphics/CGDisplayConfiguration.h>
 #include <SDL3_image/SDL_image.h>
+#include "llsdl_macos.h"
 
 bool LLWindowSDL::sUseMultGL = false;
 #endif
@@ -1752,6 +1753,26 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
 SDL_Window* LLWindowSDL::getMainSDLWindow()
 {
     return gWindowImplementation ? gWindowImplementation->mWindow : nullptr;
+}
+
+//static
+void LLWindowSDL::restoreFocusAfterDialog()
+{
+    if (!gWindowImplementation || !gWindowImplementation->mWindow)
+    {
+        return;
+    }
+
+#if LL_DARWIN
+    // SDL's macOS dialog leaves us with no key window on close; see llsdl_macos.mm.
+    ll_sdl_macos_make_window_key_deferred(gWindowImplementation->mWindow);
+#else
+    SDL_RaiseWindow(gWindowImplementation->mWindow);
+    if (gWindowImplementation->mCallbacks)
+    {
+        gWindowImplementation->mCallbacks->handleFocus(gWindowImplementation);
+    }
+#endif
 }
 
 //static

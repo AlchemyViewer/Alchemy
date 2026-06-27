@@ -214,6 +214,9 @@ public:
     // worker thread has its own GL context current.
     static SDL_Window* getMainSDLWindow();
 
+    // Re-focus the main window after a native file dialog closes.
+    static void restoreFocusAfterDialog();
+
 #if LL_DARWIN
     static U64 getVramSize();
     static void setUseMultGL(bool use_mult_gl);
