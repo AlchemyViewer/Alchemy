@@ -72,6 +72,8 @@ namespace
 
     LLWinSpellEngine::LLWinSpellEngine()
     {
+        llassert(on_main_thread());
+
         // The Windows Spell Checking API is COM-based and the viewer keeps no standing COM apartment
         // on the main thread, so own one for this engine's lifetime. Apartment-threaded (STA) matches
         // every existing scoped COM site and is reference-counted, so it nests safely.
@@ -87,6 +89,8 @@ namespace
 
     LLWinSpellEngine::~LLWinSpellEngine()
     {
+        llassert(on_main_thread());
+
         // Release COM interfaces before tearing down the apartment.
         if (mChecker)
         {

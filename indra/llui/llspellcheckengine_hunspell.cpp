@@ -97,7 +97,7 @@ namespace
         const std::string user_path = LLSpellChecker::getDictionaryUserPath();
         for (const std::string& name : candidate_names)
         {
-            if ( (gDirUtilp->fileExists(user_path + name + ".dic")) || (gDirUtilp->fileExists(app_path + name + ".dic")) )
+            if ( (gDirUtilp->fileExists(user_path + name + ".dic") && gDirUtilp->fileExists(user_path + name + ".aff")) || (gDirUtilp->fileExists(app_path + name + ".dic") && gDirUtilp->fileExists(app_path + name + ".aff")) )
             {
                 installed.insert(name);
             }

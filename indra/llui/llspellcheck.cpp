@@ -297,11 +297,15 @@ void LLSpellChecker::refreshDictionaryMap()
 
 void LLSpellChecker::addToCustomDictionary(const std::string& word)
 {
-    addToDictFile(getDictionaryUserPath() + DICT_FILE_CUSTOM, word);
     std::string word_lower(word);
     LLStringUtil::toLower(word_lower);
-    mAcceptedWords.insert(word_lower);
-    sSettingsChangeSignal();
+    if (!mAcceptedWords.contains(word_lower))
+    {
+        addToDictFile(getDictionaryUserPath() + DICT_FILE_CUSTOM, word);
+
+        mAcceptedWords.insert(word_lower);
+        sSettingsChangeSignal();
+    }
 }
 
 void LLSpellChecker::addToIgnoreList(const std::string& word)
