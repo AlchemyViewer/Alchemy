@@ -133,6 +133,12 @@ void set_sdl_hints()
 
                     // Momentum scrolling on macos is desirable for mac touchpads
                     {SDL_HINT_MAC_SCROLL_MOMENTUM, "1"},
+
+                    // Don't let SDL post a synthetic SDL_EVENT_QUIT when the
+                    // last window closes. The viewer owns its own shutdown
+                    // sequence (LLAppViewer), and transient teardown of the
+                    // main window must never be read as a request to quit.
+                    {SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE, "0"},
             };
 
     for (auto hint: hintList)
