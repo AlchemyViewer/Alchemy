@@ -88,7 +88,7 @@ if(WINDOWS)
     endif()
 elseif(DARWIN)
     set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib")
-    if (NOT USE_NSSPELLCHECKER)
+    if (USE_NSSPELLCHECKER)
         set(release_libs "")
     else()
         set(release_libs

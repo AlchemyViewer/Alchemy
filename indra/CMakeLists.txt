@@ -77,8 +77,8 @@ else ()
 endif ()
 
 # Spell checking backend
-cmake_dependent_option(USE_NSSPELLCHECKER "Use the native macOS NSSpellChecker instead of Hunspell" OFF "DARWIN" OFF)
-cmake_dependent_option(USE_WINSPELLCHECK "Use the native Windows Spell Checking API instead of Hunspell" OFF "WIN32" OFF)
+cmake_dependent_option(USE_NSSPELLCHECKER "Use the native macOS NSSpellChecker instead of Hunspell" ON "APPLE" OFF)
+cmake_dependent_option(USE_WINSPELLCHECK "Use the native Windows Spell Checking API instead of Hunspell" ON "WIN32" OFF)
 
 # Configure crash reporting
 option(RELEASE_CRASH_REPORTING "Enable use of crash reporting in release builds" OFF)
