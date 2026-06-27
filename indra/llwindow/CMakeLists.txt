@@ -68,6 +68,22 @@ if(USE_SDL_WINDOW)
 
   target_compile_definitions(llwindow PUBLIC LL_SDL_WINDOW=1)
 
+  if(DARWIN)
+    # macOS-only Objective-C++ helper that fixes up SDL's auto-created Cocoa
+    # menu bar (strips the Cmd+W shortcut off its default Window > Close item).
+    target_sources(llwindow
+      PRIVATE
+        llsdl_macos.mm
+      PUBLIC
+        llsdl_macos.h
+    )
+
+    # llwindow reuses llprecompiled's C++ PCH; that PCH has no Objective-C++
+    # variant, so skip it for the .mm or CMake fails to resolve a cmake_pch.objcxx
+    # header it expects this target to provide.
+    set_source_files_properties(llsdl_macos.mm PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+  endif()
+
   target_link_libraries(llwindow
     ll::SDL3
   )
