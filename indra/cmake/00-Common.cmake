@@ -127,7 +127,7 @@ endif()
 if(WINDOWS)
   set(CMAKE_MSVC_RUNTIME_CHECKS "$<$<CONFIG:Debug>:StackFrameErrorCheck;UninitializedVariable>")
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT $<IF:$<CONFIG:Debug,OptDebug>,EditAndContinue,ProgramDatabase>)
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
   # Don't build DLLs.
   set(BUILD_SHARED_LIBS OFF)
@@ -137,10 +137,8 @@ if(WINDOWS)
     $<$<CONFIG:Release>:/OPT:ICF>
     /DEBUG:FULL
     /LARGEADDRESSAWARE
-    /NODEFAULTLIB:LIBCMT
-    /NODEFAULTLIB:LIBCMTD
-    $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:/NODEFAULTLIB:MSVCRTD>
-    $<$<CONFIG:Debug>:/NODEFAULTLIB:MSVCRT>
+    $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:/NODEFAULTLIB:LIBCMTD>
+    $<$<CONFIG:Debug>:/NODEFAULTLIB:LIBCMT>
   )
 
   add_compile_definitions(
@@ -165,6 +163,10 @@ if(WINDOWS)
   add_compile_definitions(
     $<$<CONFIG:Debug>:DISABLE_WEBRTC=1>
   )
+
+  if(DISABLE_WEBRTC)
+    add_compile_definitions(DISABLE_WEBRTC=1)
+  endif()
 
   # Options shared between all configurations
   add_compile_options(

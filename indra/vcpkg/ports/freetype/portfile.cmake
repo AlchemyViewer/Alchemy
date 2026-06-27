@@ -16,7 +16,6 @@ vcpkg_from_gitlab(
         brotli-static.patch
         bzip2.patch
         fix-exports.patch
-        harffbuzzwin.patch
         ${SUBPIXEL_RENDERING_PATCH}
 )
 
@@ -34,21 +33,12 @@ vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
         brotli        FT_DISABLE_BROTLI
 )
 
-if (VCPKG_TARGET_IS_WINDOWS)
-    vcpkg_cmake_configure(
-        SOURCE_PATH "${SOURCE_PATH}"
-        OPTIONS
-            -DFT_DYNAMIC_HARFBUZZ=ON
-            ${FEATURE_OPTIONS}
-    )
-else()
-    vcpkg_cmake_configure(
-        SOURCE_PATH "${SOURCE_PATH}"
-        OPTIONS
-            -DFT_DISABLE_HARFBUZZ=ON
-            ${FEATURE_OPTIONS}
-    )
-endif()
+vcpkg_cmake_configure(
+    SOURCE_PATH "${SOURCE_PATH}"
+    OPTIONS
+        -DFT_DISABLE_HARFBUZZ=ON
+        ${FEATURE_OPTIONS}
+)
 
 vcpkg_cmake_install()
 vcpkg_copy_pdbs()

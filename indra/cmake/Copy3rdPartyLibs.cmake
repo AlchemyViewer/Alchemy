@@ -41,40 +41,40 @@ if(WINDOWS)
     set(vcpkg_lib_dir "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
 
     # Files that vcpkg fails to automatically stage
-    set(release_libs "legacy.dll") # OpenSSL legacy engine
+    # set(release_libs "legacy.dll") # OpenSSL legacy engine
 
     #*******************************
     # Copy MS C runtime dlls, required for packaging.
-    set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
-    include(InstallRequiredSystemLibraries)
+    # set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+    # include(InstallRequiredSystemLibraries)
 
-    foreach(system_lib_file IN LISTS CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
-        get_filename_component(system_lib_directory ${system_lib_file} DIRECTORY)
-        get_filename_component(system_lib_filename ${system_lib_file} NAME )
-        MESSAGE(DEBUG "Copying redist file from ${system_lib_directory}/${system_lib_filename}")
-        to_staging_dirs(
-            ${system_lib_directory}
-            third_party_targets
-            ${system_lib_filename}
-        )
-        to_viewer_staging_dirs(
-            ${system_lib_directory}
-            third_party_targets
-            ${system_lib_filename}
-        )
-        to_viewer_staging_subdirs(
-            "llplugin"
-            ${system_lib_directory}
-            third_party_targets
-            ${system_lib_filename}
-        )
-    endforeach()
+    # foreach(system_lib_file IN LISTS CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+    #     get_filename_component(system_lib_directory ${system_lib_file} DIRECTORY)
+    #     get_filename_component(system_lib_filename ${system_lib_file} NAME )
+    #     MESSAGE(DEBUG "Copying redist file from ${system_lib_directory}/${system_lib_filename}")
+    #     to_staging_dirs(
+    #         ${system_lib_directory}
+    #         third_party_targets
+    #         ${system_lib_filename}
+    #     )
+    #     to_viewer_staging_dirs(
+    #         ${system_lib_directory}
+    #         third_party_targets
+    #         ${system_lib_filename}
+    #     )
+    #     to_viewer_staging_subdirs(
+    #         "llplugin"
+    #         ${system_lib_directory}
+    #         third_party_targets
+    #         ${system_lib_filename}
+    #     )
+    # endforeach()
 
-    to_viewer_staging_dirs(
-        ${vcpkg_lib_dir}
-        third_party_targets
-        ${release_libs}
-    )
+    # to_viewer_staging_dirs(
+    #     ${vcpkg_lib_dir}
+    #     third_party_targets
+    #     ${release_libs}
+    # )
 
     if(USE_FMODSTUDIO)
         list(APPEND fmod_libs

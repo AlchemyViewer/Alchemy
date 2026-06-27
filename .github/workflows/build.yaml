@@ -173,7 +173,7 @@ jobs:
       velopack_mac_bundle_id:    ${{ steps.build.outputs.velopack_mac_bundle_id }}
     env:
       # Sets Xcode version used for build
-      DEVELOPER_DIR: "/Applications/Xcode_26.2.app/Contents/Developer"
+      DEVELOPER_DIR: "/Applications/Xcode_26.6.app/Contents/Developer"
       # Ensure that Linden viewer builds engage Bugsplat.
       BUGSPLAT_DB: ${{ needs.setup.outputs.bugsplat_db }}
       # Decide if we're building tests or the viewer
@@ -334,17 +334,17 @@ jobs:
             Windows)
               cmake_preset_name="vs2026$cmake_preset_postfix"
               build_directory="build-Windows-$cmake_preset_name"
-              vcpkg_triplet="x64-windows-secondlife-release"
+              vcpkg_triplet="x64-windows-alchemy-release"
               ;;
             macOS)
               cmake_preset_name="ninja$cmake_preset_postfix-$BUILD_ARCH"
               build_directory="build-Darwin-$cmake_preset_name"
-              vcpkg_triplet="$BUILD_ARCH-osx-secondlife-release"
+              vcpkg_triplet="$BUILD_ARCH-osx-alchemy-release"
               ;;
             Linux)
               cmake_preset_name="ninja$cmake_preset_postfix"
               build_directory="build-Linux-$cmake_preset_name"
-              vcpkg_triplet="x64-linux-secondlife-release"
+              vcpkg_triplet="x64-linux-alchemy-release"
               ;;
           esac
 

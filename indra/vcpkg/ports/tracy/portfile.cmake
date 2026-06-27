@@ -46,7 +46,11 @@ vcpkg_cmake_configure(
 vcpkg_cmake_install()
 # Need to manually fix debug file locations on windows
 if(VCPKG_TARGET_IS_WINDOWS AND NOT VCPKG_BUILD_TYPE STREQUAL "release")
-    file(COPY_FILE "${CURRENT_PACKAGES_DIR}/debug/bin/Debug/TracyClient.dll" "${CURRENT_PACKAGES_DIR}/debug/bin/TracyClient.dll")
+    if(VCPKG_LIBRARY_LINKAGE MATCHES "static")
+        file(COPY_FILE "${CURRENT_PACKAGES_DIR}/debug/lib/Debug/TracyClient.lib" "${CURRENT_PACKAGES_DIR}/debug/lib/TracyClient.lib")
+    else()
+        file(COPY_FILE "${CURRENT_PACKAGES_DIR}/debug/bin/Debug/TracyClient.dll" "${CURRENT_PACKAGES_DIR}/debug/bin/TracyClient.dll")
+    endif()
 endif()
 
 vcpkg_copy_pdbs()

@@ -7,9 +7,9 @@ if(VCPKG_TARGET_IS_WINDOWS)
 
     vcpkg_download_distfile(
         WEBRTC_ARCHIVE
-        URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m137.7151.04.20-r10/webrtc.windows_x86_64.tar.xz
+        URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m137.7151.04.20-r11/webrtc.windows_x86_64.tar.xz
         FILENAME webrtc.${VERSION}.windows_x86_64.tar.xz
-        SHA512 f4215881234c9d2b64ee7c21ed5d321952ab1de73e9511846a994d9cc4d76d7e4dccbd3c5e87e7d2068f9871bee7833669d4a0a90cce4482a3d79905cf40bc97
+        SHA512 fa44150d94976c346501be8213689abb4220f4b75ae3ed5526776d9c6982337eaebf2396a5a8cf467e402e3e5707a952cd9f702e39d9129d480a514d12dc23f2
     )
 elseif(VCPKG_TARGET_IS_OSX)
     set(WEBRTC_LIBNAME "libwebrtc.a")
@@ -17,16 +17,16 @@ elseif(VCPKG_TARGET_IS_OSX)
     if(VCPKG_OSX_ARCHITECTURES MATCHES "arm64")
         vcpkg_download_distfile(
             WEBRTC_ARCHIVE
-            URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m137.7151.04.20-r10/webrtc.macos_arm64.tar.xz
+            URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m137.7151.04.20-r11/webrtc.macos_arm64.tar.xz
             FILENAME webrtc.${VERSION}.macos_arm64.tar.xz
-            SHA512 64f0dd819f33a446c480a56897ffb928abdaedb745bd021f1efed50f790ad3ffbefb7b1655ba6f91ac6f7490fb4d4f66892d1882e03a27077a1f4078ffc97ab5
+            SHA512 e67da2870f3b4b4031c89bd828f7b9705397423728d801314de0e17b95296535eaed5132b8dece50faa8f2d599851bc8ce3fd0bd2e911ec5f38d58d65664fb73
         )
     else()
         vcpkg_download_distfile(
             WEBRTC_ARCHIVE
-            URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m137.7151.04.20-r10/webrtc.macos_x86_64.tar.xz
+            URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m137.7151.04.20-r11/webrtc.macos_x86_64.tar.xz
             FILENAME webrtc.${VERSION}.macos_x86_64.tar.xz
-            SHA512 53e831d19c4bcd41145d7f183dfbe401da153dbc311ea8d26b3bdef146cb1349e7792a8b1f94098eebd88fe74801f465344167d6a8b06f99d06f01fa6286ea2e
+            SHA512 804a742da02f2e179a58f163de72db2b438c7a16ba82170b48dff78468a6145815db8566c9acbe22c342de523c2a9bb02a4fb4140e2a549bd0fdc069091b6d87
         )
     endif()
 elseif(VCPKG_TARGET_IS_LINUX)
@@ -34,9 +34,9 @@ elseif(VCPKG_TARGET_IS_LINUX)
 
     vcpkg_download_distfile(
         WEBRTC_ARCHIVE
-        URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m137.7151.04.20-r10/webrtc.ubuntu-22.04_x86_64.tar.xz
+        URLS https://github.com/AlchemyViewer/3p-webrtc/releases/download/m137.7151.04.20-r11/webrtc.ubuntu-22.04_x86_64.tar.xz
         FILENAME webrtc.${VERSION}.ubuntu-22.04_x86_64.tar.xz
-        SHA512 7a7c248929055b0026cf9362188848a4e5624c9ceb149ae3b2f4a27c2e15e41c9063ac20a87c2a6e140fd3ad5c46b010f12be9ab076f383ed871c534bf51403e
+        SHA512 c20db361a98837dfb914821e97e0b813dc6856ebc2492521546f8cb4af45c820ac93d244c00973012d7ba3e84455c4bf80b291f5982785ed6b10cb55688a6f73
     )
 endif()
 
