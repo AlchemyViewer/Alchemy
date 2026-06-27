@@ -33,6 +33,7 @@
 
 #include "llpluginprocesschild.h"
 #include "llpluginmessage.h"
+#include "llplugininstance.h"
 #include "llerrorcontrol.h"
 #include "llapr.h"
 #include "llstring.h"
@@ -40,6 +41,12 @@
 #include <iostream>
 #include <fstream>
 using namespace std;
+
+// Returns the statically-linked plugin init entry point for this host, or NULL
+// for the generic SLPlugin (which dlopen()s the plugin named in load_plugin).
+// Each SLPlugin variant links exactly one definition: slplugin_generic.cpp
+// (NULL) or a per-plugin file such as slplugin_cef.cpp (&LLPluginInitEntryPoint).
+LLPluginInstance::pluginInitFunction ll_get_static_plugin_init();
 
 
 #if LL_DARWIN
@@ -189,6 +196,11 @@ int main(int argc, char **argv)
     cocoa_interface.setupCocoa();
     cocoa_interface.createAutoReleasePool();
 #endif //LL_DARWIN
+
+    // If this is a dedicated single-plugin host (e.g. SLPluginCEF), register the
+    // statically-linked plugin entry point so LLPluginInstance::load() calls it
+    // directly instead of dlopen()ing a plugin library.
+    LLPluginInstance::setStaticInitFunction(ll_get_static_plugin_init());
 
     LLPluginProcessChild *plugin = new LLPluginProcessChild();
 

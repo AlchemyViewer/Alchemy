@@ -11,6 +11,7 @@ add_executable(SLPlugin
 target_sources(SLPlugin
     PRIVATE
     slplugin.cpp
+    slplugin_generic.cpp
     )
 
 

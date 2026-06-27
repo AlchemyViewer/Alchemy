@@ -47,6 +47,14 @@ LLPluginInstanceMessageListener::~LLPluginInstanceMessageListener()
  */
 const char *LLPluginInstance::PLUGIN_INIT_FUNCTION_NAME = "LLPluginInitEntryPoint";
 
+LLPluginInstance::pluginInitFunction LLPluginInstance::sStaticInitFunction = NULL;
+
+// static
+void LLPluginInstance::setStaticInitFunction(pluginInitFunction func)
+{
+    sStaticInitFunction = func;
+}
+
 /**
  * Constructor.
  *
@@ -76,47 +84,56 @@ LLPluginInstance::~LLPluginInstance()
 int LLPluginInstance::load(const std::string& plugin_dir, std::string &plugin_file)
 {
     pluginInitFunction init_function = NULL;
-
-    if ( plugin_dir.length() )
-    {
-#if LL_WINDOWS
-        // VWR-21275:
-        // *SOME* Windows systems fail to load the Qt plugins if the current working
-        // directory is not the same as the directory with the Qt DLLs in.
-        // This should not cause any run time issues since we are changing the cwd for the
-        // plugin shell process and not the viewer.
-        // Changing back to the previous directory is not necessary since the plugin shell
-        // quits once the plugin exits.
-        _chdir( plugin_dir.c_str() );
-#endif
-    };
-
     int result = 0;
 
-    try
+    if (sStaticInitFunction)
     {
-        mDSOHandle.load(boost::dll::fs::path(plugin_file),
-                        boost::dll::load_mode::rtld_now);
+        // Dedicated single-plugin host: the plugin is statically linked into
+        // this executable, so call its entry point directly and skip dlopen
+        // (and the cwd hack below) entirely. plugin_dir/plugin_file are ignored.
+        init_function = sStaticInitFunction;
     }
-    catch (const std::exception& e)
+    else
     {
-        LL_WARNS("Plugin") << "boost::dll load of " << plugin_file
-                           << " failed: " << e.what() << LL_ENDL;
-        result = -1;
-    }
+        if ( plugin_dir.length() )
+        {
+#if LL_WINDOWS
+            // VWR-21275:
+            // *SOME* Windows systems fail to load the Qt plugins if the current working
+            // directory is not the same as the directory with the Qt DLLs in.
+            // This should not cause any run time issues since we are changing the cwd for the
+            // plugin shell process and not the viewer.
+            // Changing back to the previous directory is not necessary since the plugin shell
+            // quits once the plugin exits.
+            _chdir( plugin_dir.c_str() );
+#endif
+        };
 
-    if(result == 0)
-    {
         try
         {
-            init_function = &mDSOHandle.get<std::remove_pointer_t<pluginInitFunction>>(
-                PLUGIN_INIT_FUNCTION_NAME);
+            mDSOHandle.load(boost::dll::fs::path(plugin_file),
+                            boost::dll::load_mode::rtld_now);
         }
         catch (const std::exception& e)
         {
-            LL_WARNS("Plugin") << "symbol lookup for " << PLUGIN_INIT_FUNCTION_NAME
+            LL_WARNS("Plugin") << "boost::dll load of " << plugin_file
                                << " failed: " << e.what() << LL_ENDL;
             result = -1;
+        }
+
+        if(result == 0)
+        {
+            try
+            {
+                init_function = &mDSOHandle.get<std::remove_pointer_t<pluginInitFunction>>(
+                    PLUGIN_INIT_FUNCTION_NAME);
+            }
+            catch (const std::exception& e)
+            {
+                LL_WARNS("Plugin") << "symbol lookup for " << PLUGIN_INIT_FUNCTION_NAME
+                                   << " failed: " << e.what() << LL_ENDL;
+                result = -1;
+            }
         }
     }
 

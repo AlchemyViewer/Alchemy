@@ -83,6 +83,14 @@ public:
    /** Name of plugin init function */
     static const char *PLUGIN_INIT_FUNCTION_NAME;
 
+    // Register a statically-linked plugin init entry point. When set, load()
+    // calls it directly instead of dlopen()ing a plugin library. Used by
+    // dedicated single-plugin host executables (see slplugin) to avoid dlopen
+    // of large TLS-using libraries (CEF on Linux) and to satisfy the Windows
+    // sandbox requirement that the host and its sub-processes be one image.
+    // Process-global: a host links exactly one plugin.
+    static void setStaticInitFunction(pluginInitFunction func);
+
 private:
     static void staticReceiveMessage(const char *message_string, void **user_data);
     void receiveMessage(const char *message_string);
@@ -93,6 +101,9 @@ private:
     sendMessageFunction mPluginSendMessageFunction;
 
     LLPluginInstanceMessageListener *mOwner;
+
+    // non-null in dedicated single-plugin host executables; see setStaticInitFunction
+    static pluginInitFunction sStaticInitFunction;
 };
 
 #endif // LL_LLPLUGININSTANCE_H

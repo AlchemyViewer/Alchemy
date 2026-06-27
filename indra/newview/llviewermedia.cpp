@@ -1818,6 +1818,30 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
         std::string launcher_name = gDirUtilp->getLLPluginLauncher();
         std::string plugin_name = gDirUtilp->getLLPluginFilename(plugin_basename);
 
+        // When the dedicated CEF host is enabled, launch SLPluginCEF (which
+        // statically links the CEF plugin) instead of the generic SLPlugin that
+        // dlopen()s media_plugin_cef. plugin_name is still passed and validated
+        // below, but the static host ignores it. Falls back to the generic
+        // launcher if SLPluginCEF is missing.
+        if (plugin_basename == "media_plugin_cef" && gSavedSettings.getBOOL("ALCefDedicatedHost"))
+        {
+#if LL_WINDOWS
+            const std::string cef_host_exe = "SLPluginCEF.exe";
+#else
+            const std::string cef_host_exe = "SLPluginCEF";
+#endif
+            std::string cef_host_name = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() + cef_host_exe;
+            if (LLFile::isfile(cef_host_name))
+            {
+                launcher_name = cef_host_name;
+            }
+            else
+            {
+                LL_WARNS_ONCE("Media") << "ALCefDedicatedHost set but " << cef_host_name
+                                       << " not found; using generic launcher" << LL_ENDL;
+            }
+        }
+
         std::string user_data_path_cache = gDirUtilp->getCacheDir(false);
         user_data_path_cache += gDirUtilp->getDirDelimiter();
 
@@ -3100,13 +3124,19 @@ void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* da
     // -Cosmic,2023-04-04
     // Allocate GL texture based on LLImageRaw but do NOT copy to GL
     LLGLuint tex_name = 0;
-    if (!media_tex->createGLTexture(0, raw, 0, true, LLGLTexture::OTHER, true, &tex_name))
     {
-        LL_WARNS("Media") << "Failed to create media texture" << LL_ENDL;
-    }
+        // Phase 0 baseline: this GL allocate + CPU->GPU upload is exactly the
+        // per-surface cost the accelerated-paint (shared-texture) path removes,
+        // so isolate it under its own zone for before/after comparison.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media texUpload");
+        if (!media_tex->createGLTexture(0, raw, 0, true, LLGLTexture::OTHER, true, &tex_name))
+        {
+            LL_WARNS("Media") << "Failed to create media texture" << LL_ENDL;
+        }
 
-    // copy just the subimage covered by the image raw to GL
-    media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+        // copy just the subimage covered by the image raw to GL
+        media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+    }
 
     if (sync)
     {
