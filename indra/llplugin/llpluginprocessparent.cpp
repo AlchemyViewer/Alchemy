@@ -716,7 +716,26 @@ void LLPluginProcessParent::idle(void)
                 break;
 
             case STATE_EXITING:
-                if (! LLProcess::isRunning(mProcess))
+                if (mUseDaemon && !mProcess)
+                {
+                    // Daemon mode: we do not own the host process, so there is no
+                    // LLProcess to wait on. Instead wait for the shared daemon's
+                    // tab to finish its graceful teardown and drop its end of the
+                    // socket (EOF / socket error), or for the lockup timeout.
+                    // Tearing our socket down before the tab has unloaded its
+                    // browser would abort the shared-runtime teardown and crash
+                    // every other tab in the daemon.
+                    if (mSocketError != APR_SUCCESS || !mMessagePipe)
+                    {
+                        setState(STATE_CLEANUP);
+                    }
+                    else if (pluginLockedUp())
+                    {
+                        LL_WARNS("Plugin") << "timeout waiting for daemon tab to exit, cleaning up" << LL_ENDL;
+                        setState(STATE_CLEANUP);
+                    }
+                }
+                else if (! LLProcess::isRunning(mProcess))
                 {
                     setState(STATE_CLEANUP);
                 }

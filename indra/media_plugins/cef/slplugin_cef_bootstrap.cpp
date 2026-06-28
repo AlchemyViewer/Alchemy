@@ -86,6 +86,13 @@ namespace
         // independent of whether the sandbox is active. Then run the host loop.
         dullahan::setSandboxInfo(sandbox_info);
         dullahan::setHostHandlesSubprocesses(true);
+        // This host keeps one CEF runtime for its whole life (a dedicated single
+        // tab, or the shared daemon serving many) and shuts it down once below
+        // (shutdownRuntime). Without this the browser refcount would CefShutdown
+        // on a zero-browser gap - e.g. the login web surface closing just before
+        // the next opens - and the next CefInitialize would crash (CEF init is
+        // once-per-process).
+        dullahan::setPersistentRuntime(true);
 
         ll_init_apr();
         {
@@ -125,6 +132,12 @@ namespace
 
         const int rc = rendezvous.empty() ? slplugin_run(port)
                                           : slplugin_daemon_run(port, rendezvous);
+
+        // The host loop has returned (all tabs gone / daemon idle-exit). Because
+        // this is a persistent host, release() left CEF running - shut it down
+        // exactly once now, before the process exits, for a clean teardown.
+        dullahan::shutdownRuntime();
+
         ll_cleanup_apr();
         return rc;
     }

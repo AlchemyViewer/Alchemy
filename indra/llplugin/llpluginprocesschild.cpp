@@ -55,13 +55,28 @@ LLPluginProcessChild::~LLPluginProcessChild()
     {
         sendMessageToPlugin(LLPluginMessage("base", "cleanup"));
 
-        // IMPORTANT: under some (unknown) circumstances the library unload triggered when mInstance is deleted
-        // appears to fail and lock up which means that a given instance of the slplugin process never exits.
-        // This is bad, especially when users try to update their version of SL - it fails because the slplugin
-        // process as well as a bunch of plugin specific files are locked and cannot be overwritten.
-        exit(0);
-        //delete mInstance;
-        //mInstance = NULL;
+        if (mDaemonMode)
+        {
+            // Daemon tab: this process hosts many tabs, so exit() here would kill
+            // every other tab (the "close one media, all of them die" crash). The
+            // library-unload lockup the exit(0) below guards against cannot happen
+            // in the daemon either - daemon plugins are statically linked, so
+            // there is no DSO to unload and ~LLPluginInstance is a no-op. Delete
+            // the instance directly. (Normally the graceful unload path has
+            // already nulled mInstance and we never get here.)
+            delete mInstance;
+            mInstance = NULL;
+        }
+        else
+        {
+            // IMPORTANT: under some (unknown) circumstances the library unload triggered when mInstance is deleted
+            // appears to fail and lock up which means that a given instance of the slplugin process never exits.
+            // This is bad, especially when users try to update their version of SL - it fails because the slplugin
+            // process as well as a bunch of plugin specific files are locked and cannot be overwritten.
+            exit(0);
+            //delete mInstance;
+            //mInstance = NULL;
+        }
     }
 }
 
@@ -86,23 +101,34 @@ void LLPluginProcessChild::idle(void)
         {   // Once we have hit the shutdown request state checking for errors might put us in a spurious
             // error state... don't do that.
 
+            // A lost parent socket means this tab is going away. In the daemon a
+            // hard STATE_ERROR would reap the tab with its browser still live in
+            // the shared CEF runtime (and, pre-unload, leave mInstance set), which
+            // crashes every tab. Instead run the same graceful unload as a normal
+            // shutdown so the browser closes cleanly first, then the daemon reaps
+            // us. The single-process host keeps the old hard-error behaviour.
+            const EState socket_dead_state =
+                (mDaemonMode && mInstance != NULL) ? STATE_SHUTDOWNREQ : STATE_ERROR;
+
             if (APR_STATUS_IS_EOF(mSocketError))
             {
                 // Plugin socket was closed.  This covers both normal plugin termination and host crashes.
-                setState(STATE_ERROR);
+                setState(socket_dead_state);
             }
             else if (mSocketError != APR_SUCCESS)
             {
-                LL_INFOS("Plugin") << "message pipe is in error state (" << mSocketError << "), moving to STATE_ERROR" << LL_ENDL;
-                setState(STATE_ERROR);
+                LL_INFOS("Plugin") << "message pipe is in error state (" << mSocketError << "), moving to "
+                                   << (socket_dead_state == STATE_SHUTDOWNREQ ? "STATE_SHUTDOWNREQ" : "STATE_ERROR") << LL_ENDL;
+                setState(socket_dead_state);
             }
 
-            if ((mState > STATE_INITIALIZED) && (mMessagePipe == NULL))
+            if ((mState > STATE_INITIALIZED) && (mState < STATE_SHUTDOWNREQ) && (mMessagePipe == NULL))
             {
                 // The pipe has been closed -- we're done.
                 // TODO: This could be slightly more subtle, but I'm not sure it needs to be.
-                LL_INFOS("Plugin") << "message pipe went away, moving to STATE_ERROR" << LL_ENDL;
-                setState(STATE_ERROR);
+                LL_INFOS("Plugin") << "message pipe went away, moving to "
+                                   << (socket_dead_state == STATE_SHUTDOWNREQ ? "STATE_SHUTDOWNREQ" : "STATE_ERROR") << LL_ENDL;
+                setState(socket_dead_state);
             }
         }
 

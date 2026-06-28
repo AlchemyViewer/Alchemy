@@ -177,6 +177,7 @@ public:
     // Set before init().
     void setUseDaemon(bool use_daemon, const std::string& rendezvous_path = std::string())
     { mUseDaemon = use_daemon; mDaemonRendezvous = rendezvous_path; if(mPlugin) mPlugin->setUseDaemon(use_daemon, rendezvous_path); };
+    bool getUseDaemon() const { return mUseDaemon; };
 
     // Inherited from LLPluginProcessParentOwner
     /* virtual */ void receivePluginMessage(const LLPluginMessage &message);

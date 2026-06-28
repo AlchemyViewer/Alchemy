@@ -168,6 +168,12 @@ static LLViewerMedia::impl_list sViewerMediaImplList;
 static LLViewerMedia::impl_id_map sViewerMediaTextureIDMap;
 static LLTimer sMediaCreateTimer;
 static const F32 LLVIEWERMEDIA_CREATE_DELAY = 1.0f;
+// Shared-CEF-daemon crash recovery: cap on consecutive re-init attempts before a
+// daemon-mode media gives up, and the backoff schedule between them (so a daemon
+// that crashes on every launch can't spin the viewer respawning it forever).
+static const S32 DAEMON_RECOVERY_MAX_ATTEMPTS = 5;
+static const F32 DAEMON_RECOVERY_BASE_DELAY = 2.0f;   // seconds, multiplied by attempt #
+static const F32 DAEMON_RECOVERY_MAX_DELAY = 30.0f;   // seconds, backoff ceiling
 static F32 sGlobalVolume = 1.0f;
 static bool sForceUpdate = false;
 static LLUUID sOnlyAudibleTextureID = LLUUID::null;
@@ -2975,6 +2981,18 @@ bool LLViewerMediaImpl::canNavigateBack()
 void LLViewerMediaImpl::update()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_DO_UPDATE);
+
+    // Shared CEF daemon crash recovery: once the backoff has elapsed, clear the
+    // failure latch so the normal load path below recreates the source (which
+    // respawns or reconnects the daemon). isForcedUnloaded() pins mPriority to
+    // PRIORITY_UNLOADED while mMediaSourceFailed is set, so this is what lets the
+    // tab come back after a daemon crash.
+    if (mDaemonRecoveryPending && mDaemonRecoveryTimer.hasExpired())
+    {
+        mDaemonRecoveryPending = false;
+        mMediaSourceFailed = false;
+    }
+
     if(mMediaSource == NULL)
     {
         if(mPriority == LLPluginClassMedia::PRIORITY_UNLOADED)
@@ -3476,6 +3494,24 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
             // Reset the last known state of the media to defaults.
             resetPreviousMediaState();
 
+            // Shared CEF daemon: one daemon crash drops every tab at once. Rather
+            // than leaving all of them permanently failed, schedule a bounded,
+            // backed-off re-init for daemon-mode media. The first impl to recreate
+            // its source wins the spawn lock and respawns the daemon
+            // (discover-or-spawn); the rest reconnect to it as new tabs. The retry
+            // cap + backoff keep a daemon that crashes on launch from spinning.
+            if (plugin && plugin->getUseDaemon() && mDaemonRecoveryAttempts < DAEMON_RECOVERY_MAX_ATTEMPTS)
+            {
+                mDaemonRecoveryAttempts++;
+                F32 delay = llmin(DAEMON_RECOVERY_BASE_DELAY * (F32)mDaemonRecoveryAttempts, DAEMON_RECOVERY_MAX_DELAY);
+                mDaemonRecoveryPending = true;
+                mDaemonRecoveryTimer.reset();
+                mDaemonRecoveryTimer.setTimerExpirySec(delay);
+                LL_WARNS("Media") << "CEF daemon tab failed; scheduling recovery attempt "
+                                  << mDaemonRecoveryAttempts << "/" << DAEMON_RECOVERY_MAX_ATTEMPTS
+                                  << " in " << delay << "s" << LL_ENDL;
+            }
+
             LLSD args;
             args["PLUGIN"] = LLMIMETypes::implType(mCurrentMimeType);
             // SJB: This is getting called every frame if the plugin fails to load, continuously respawining the alert!
@@ -3517,6 +3553,10 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
         case LLViewerMediaObserver::MEDIA_EVENT_NAVIGATE_COMPLETE:
         {
             LL_DEBUGS("Media") << "MEDIA_EVENT_NAVIGATE_COMPLETE, uri is: " << plugin->getNavigateURI() << LL_ENDL;
+
+            // A page finished loading: the (possibly just-respawned) daemon tab is
+            // healthy again, so clear the crash-recovery backoff counter.
+            mDaemonRecoveryAttempts = 0;
 
             std::string url = plugin->getNavigateURI();
             if(getNavState() == MEDIANAVSTATE_BEGUN)

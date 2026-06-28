@@ -480,6 +480,13 @@ private:
     bool mNavigateRediscoverType;
     bool mNavigateServerRequest;
     bool mMediaSourceFailed;
+    // Shared-CEF-daemon crash recovery: a daemon crash drops every tab at once,
+    // so instead of leaving each media permanently failed we re-init on a backoff
+    // (which respawns the daemon and reconnects the tab). Bounded by a retry cap
+    // that resets on a clean load. Only used for daemon-mode CEF media.
+    S32 mDaemonRecoveryAttempts = 0;
+    bool mDaemonRecoveryPending = false;
+    LLTimer mDaemonRecoveryTimer;
     F32 mRequestedVolume;
     F32 mPreviousVolume;
     bool mIsMuted;

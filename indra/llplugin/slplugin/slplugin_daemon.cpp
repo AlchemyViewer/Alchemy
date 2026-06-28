@@ -56,6 +56,13 @@
 // gap between the last tab closing and the next opening keeps the warm runtime.
 static const F64 DAEMON_IDLE_TIMEOUT = 10.0;
 
+// Hard ceiling on concurrent tabs in one daemon. The viewer is the primary cap
+// (PluginInstancesTotal -> mMaxIntances keeps excess media PRIORITY_UNLOADED, so
+// no media source -> no tab); this is only a self-protection backstop so a buggy
+// or hostile parent cannot make one process spawn unbounded browsers. Set well
+// above any realistic viewer cap.
+static const size_t DAEMON_MAX_TABS = 64;
+
 namespace
 {
     // Create a non-blocking TCP listen socket on the loopback for parents to
@@ -103,6 +110,18 @@ namespace
             return;   // APR_EAGAIN etc. - no pending registration
         }
 
+        // Self-protection backstop (see DAEMON_MAX_TABS): refuse to grow past the
+        // ceiling. The parent's connect-back never gets a tab, so it heartbeat-
+        // times-out and reports the media failed - which the viewer should have
+        // prevented via its own instance cap. Just drop the registration.
+        if (tabs.size() >= DAEMON_MAX_TABS)
+        {
+            LL_WARNS("slplugin") << "daemon: tab ceiling (" << DAEMON_MAX_TABS
+                                 << ") reached; refusing registration" << LL_ENDL;
+            apr_socket_close(incoming);
+            return;
+        }
+
         // Blocking read of the short port line (the registration is tiny).
         apr_socket_timeout_set(incoming, 1000000);   // 1s
         char buf[32] = {0};
@@ -116,6 +135,7 @@ namespace
             if (!s.empty() && LLStringUtil::convertToU32(s, parent_port) && parent_port)
             {
                 LLPluginProcessChild* tab = new LLPluginProcessChild();
+                tab->setDaemonMode(true);
                 tab->init(parent_port);
                 tabs.push_back(tab);
                 LL_INFOS("slplugin") << "daemon: new tab connecting to parent port " << parent_port
@@ -173,6 +193,7 @@ int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path)
     std::vector<LLPluginProcessChild*> tabs;
     {
         LLPluginProcessChild* first = new LLPluginProcessChild();
+        first->setDaemonMode(true);
         first->init(first_port);
         tabs.push_back(first);
     }
