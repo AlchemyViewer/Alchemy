@@ -85,6 +85,7 @@ add_dependencies(media_plugin_cef dullahan_host)
 if (WINDOWS)
     add_library(SLPluginCEF MODULE
         ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
+        ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_daemon.cpp
         slplugin_cef.cpp
         slplugin_cef_bootstrap.cpp
         $<TARGET_OBJECTS:media_plugin_cef_objs>

@@ -119,6 +119,18 @@ public:
     bool getDisableTimeout() { return mDisableTimeout; };
     void setDisableTimeout(bool disable) { mDisableTimeout = disable; };
 
+    // In daemon mode this parent connects to a shared host process it does not
+    // own (mProcess stays null), so liveness is tracked via the socket/heartbeat
+    // rather than LLProcess::isRunning. Has no effect unless the daemon launch
+    // path is taken. Set before init().
+    bool getUseDaemon() const { return mUseDaemon; };
+    // rendezvous_path must be a user-writable absolute path supplied by the
+    // caller (NOT the install/plugin dir, which may be read-only): the daemon
+    // writes its control port there and later tabs read it to find the running
+    // daemon. Daemon mode is skipped if the path is empty.
+    void setUseDaemon(bool use_daemon, const std::string& rendezvous_path = std::string())
+    { mUseDaemon = use_daemon; mDaemonRendezvous = rendezvous_path; };
+
     void setLaunchTimeout(F32 timeout) { mPluginLaunchTimeout = timeout; };
     void setLockupTimeout(F32 timeout) { mPluginLockupTimeout = timeout; };
 
@@ -160,6 +172,24 @@ private:
     bool pluginLockedUp();
     bool pluginLockedUpOrQuit();
 
+    // --- shared CEF daemon (mUseDaemon) discover-or-spawn ---
+    enum EDaemonDisp
+    {
+        DAEMON_CONNECTED,    // registered with a running daemon; it connects back
+        DAEMON_NEED_SPAWN,   // no daemon; this parent should launch one (holds the lock)
+        DAEMON_WAIT          // another parent is launching the daemon; retry next idle
+    };
+    // path of the file the daemon writes its control port to (per plugin dir)
+    std::string daemonRendezvousPath() const;
+    // try to register a tab with a running daemon, else decide to spawn/wait
+    EDaemonDisp daemonDiscoverOrRegister();
+    // read the daemon control port from the rendezvous file (0 if none/invalid)
+    static U32 readDaemonControlPort(const std::string& path);
+    // connect to the daemon control port and send our listen port (mBoundPort)
+    bool registerWithDaemon(U32 control_port);
+    // atomically take the spawn lock (stealing a stale one); true if we got it
+    static bool acquireSpawnLock(const std::string& lock_path);
+
     bool accept();
 
     LLSocket::ptr_t mListenSocket;
@@ -169,6 +199,11 @@ private:
     LLProcess::Params mProcessParams;
     LLProcessPtr mProcess;
     bool mProcessCreationRequested = false;
+    // true when this parent talks to a shared daemon host instead of its own
+    // launched process (see setUseDaemon)
+    bool mUseDaemon = false;
+    // user-writable path the daemon publishes its control port to (caller-supplied)
+    std::string mDaemonRendezvous;
 
     std::string mPluginFile;
     std::string mPluginDir;

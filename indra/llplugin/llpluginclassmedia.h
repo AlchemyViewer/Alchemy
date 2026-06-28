@@ -172,6 +172,12 @@ public:
     bool getDisableTimeout() { return mPlugin?mPlugin->getDisableTimeout():false; };
     void setDisableTimeout(bool disable) { if(mPlugin) mPlugin->setDisableTimeout(disable); };
 
+    // Route this media instance through the shared CEF daemon host, using a
+    // user-writable rendezvous path (see LLPluginProcessParent::setUseDaemon).
+    // Set before init().
+    void setUseDaemon(bool use_daemon, const std::string& rendezvous_path = std::string())
+    { mUseDaemon = use_daemon; mDaemonRendezvous = rendezvous_path; if(mPlugin) mPlugin->setUseDaemon(use_daemon, rendezvous_path); };
+
     // Inherited from LLPluginProcessParentOwner
     /* virtual */ void receivePluginMessage(const LLPluginMessage &message);
     /* virtual */ void pluginLaunchFailed();
@@ -430,6 +436,8 @@ protected:
 
 
     LLPluginProcessParent::ptr_t mPlugin;
+    bool mUseDaemon = false;
+    std::string mDaemonRendezvous;
 
     LLRect mDirtyRect;
 

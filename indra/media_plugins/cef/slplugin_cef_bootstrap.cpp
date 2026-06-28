@@ -51,6 +51,8 @@
 
 // Defined in slplugin.cpp - the shared plugin<->parent host message loop.
 int slplugin_run(U32 port);
+// Defined in slplugin_daemon.cpp - the multi-tab daemon host loop.
+int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path);
 
 namespace
 {
@@ -78,9 +80,12 @@ namespace
         }
 
         // Browser process: make the sandbox info available to the runtime's
-        // CefInitialize (no_sandbox=false, no browser_subprocess_path), then run
-        // the standard plugin host loop.
+        // CefInitialize, and tell dullahan that this host dispatches CEF
+        // sub-processes itself (CEF re-launches this image -> RunWinMain ->
+        // CefExecuteProcess), so it never uses the dullahan_host helper -
+        // independent of whether the sandbox is active. Then run the host loop.
         dullahan::setSandboxInfo(sandbox_info);
+        dullahan::setHostHandlesSubprocesses(true);
 
         ll_init_apr();
         {
@@ -88,24 +93,38 @@ namespace
             LLError::setDefaultLevel(LLError::LEVEL_INFO);
         }
 
-        // RunWinMain's lpCmdLine is LPTSTR (wide under UNICODE); the launcher
-        // passes just the numeric port, so narrow each char explicitly
-        // (ASCII-safe, and avoids the implicit-narrowing warning-as-error).
-        U32 port = 0;
+        // RunWinMain's lpCmdLine is LPTSTR (wide under UNICODE); narrow each char
+        // explicitly (ASCII-safe, avoids the implicit-narrowing warning-as-error).
+        // The command line is "<port>" for a single tab, or
+        // "<port> --daemon <rendezvous-path>" to run as the shared multi-tab
+        // daemon (the rendezvous path may contain spaces, so it is taken as the
+        // whole remainder after --daemon).
         std::string cmd;
         for (LPCWSTR p = lpCmdLine; p && *p; ++p)
         {
             cmd.push_back(static_cast<char>(*p));
         }
         LLStringUtil::trim(cmd);
-        if (cmd.empty() || !LLStringUtil::convertToU32(cmd, port))
+
+        const std::string first = cmd.substr(0, cmd.find(' '));
+        U32 port = 0;
+        if (first.empty() || !LLStringUtil::convertToU32(first, port) || !port)
         {
             LL_WARNS("slplugin") << "SLPluginCEF: missing/invalid launcher port" << LL_ENDL;
             ll_cleanup_apr();
             return 1;
         }
 
-        const int rc = slplugin_run(port);
+        std::string rendezvous;
+        const size_t dpos = cmd.find("--daemon");
+        if (dpos != std::string::npos)
+        {
+            rendezvous = cmd.substr(dpos + 8);   // strlen("--daemon")
+            LLStringUtil::trim(rendezvous);
+        }
+
+        const int rc = rendezvous.empty() ? slplugin_run(port)
+                                          : slplugin_daemon_run(port, rendezvous);
         ll_cleanup_apr();
         return rc;
     }

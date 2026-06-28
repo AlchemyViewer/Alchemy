@@ -75,6 +75,7 @@ bool LLPluginClassMedia::init(const std::string &launcher_filename, const std::s
 
     mPlugin = LLPluginProcessParent::create(this);
     mPlugin->setSleepTime(mSleepTime);
+    mPlugin->setUseDaemon(mUseDaemon, mDaemonRendezvous);
 
     // Queue up the media init message -- it will be sent after all the currently queued messages.
     LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "init");

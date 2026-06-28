@@ -519,6 +519,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
         if self.args['buildtype'].lower() != 'debug':
             with self.prefix(src_dst=os.path.join(self.get_dst_prefix(), 'llplugin')):
                 # Plugin and dependency DLL files
+                self.path("SLPluginCEF.exe")
                 self.path("*.dll")
                 # CEF files
                 self.path("*.exe")

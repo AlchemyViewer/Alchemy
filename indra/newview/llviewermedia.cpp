@@ -213,6 +213,19 @@ static bool sViewerMediaMuteListObserverInitialized = false;
 /*static*/ const char* LLViewerMedia::SHOW_MEDIA_WITHIN_PARCEL_SETTING = "MediaShowWithinParcel";
 /*static*/ const char* LLViewerMedia::SHOW_MEDIA_OUTSIDE_PARCEL_SETTING = "MediaShowOutsideParcel";
 
+namespace
+{
+    // Per-viewer-instance CEF daemon rendezvous file: user-writable logs dir
+    // (never the read-only install dir) plus this viewer's PID so separate
+    // viewer instances don't share a daemon. newSourceFromMediaType() hands this
+    // exact path to setUseDaemon(); the cleanup in ~LLViewerMedia() recomputes
+    // it to remove the file the (force-killed) daemon cannot remove itself.
+    std::string cefDaemonRendezvousPath()
+    {
+        return gDirUtilp->getExpandedFilename(LL_PATH_LOGS, llformat("SLPluginCEF_%d.daemon", LLApp::getPid()));
+    }
+}
+
 LLViewerMedia::LLViewerMedia():
 mAnyMediaShowing(false),
 mAnyMediaPlaying(false),
@@ -230,6 +243,17 @@ LLViewerMedia::~LLViewerMedia()
     {
         delete mSpareBrowserMediaSource;
         mSpareBrowserMediaSource = NULL;
+    }
+
+    // The shared CEF daemon lives in this viewer's job object, so it is
+    // force-killed on exit and never reaches its own rendezvous cleanup. Remove
+    // the rendezvous (and any stale spawn lock) here. No-op if daemon mode was
+    // never used or the files are already gone.
+    if (gDirUtilp)
+    {
+        const std::string rv = cefDaemonRendezvousPath();
+        std::remove(rv.c_str());
+        std::remove((rv + ".lock").c_str());
     }
 }
 
@@ -1821,11 +1845,13 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
         // When the dedicated CEF host is enabled, launch SLPluginCEF (which
         // statically links the CEF plugin) instead of the generic SLPlugin that
         // dlopen()s media_plugin_cef. plugin_name is still passed and validated
-        // below, but the static host ignores it. The Windows sandbox also
-        // requires this host (ALCefSandbox implies it). Falls back to the
-        // generic launcher if SLPluginCEF is missing.
+        // below, but the static host ignores it. The Windows sandbox and the
+        // shared daemon both require this host (ALCefSandbox/ALCefDaemonEnabled
+        // imply it). Falls back to the generic launcher if SLPluginCEF is missing.
         if (plugin_basename == "media_plugin_cef" &&
-            (gSavedSettings.getBOOL("ALCefDedicatedHost") || gSavedSettings.getBOOL("ALCefSandbox")))
+            (gSavedSettings.getBOOL("ALCefDedicatedHost") ||
+             gSavedSettings.getBOOL("ALCefSandbox") ||
+             gSavedSettings.getBOOL("ALCefDaemonEnabled")))
         {
 #if LL_WINDOWS
             const std::string cef_host_exe = "SLPluginCEF.exe";
@@ -1860,6 +1886,14 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
         {
             media_source = new LLPluginClassMedia(owner);
             media_source->setSize(default_width, default_height);
+            // Route CEF media through the shared daemon host when enabled. The
+            // rendezvous file lives in a user-writable runtime dir (the logs
+            // dir) - never the install/plugin dir, which may be read-only - and
+            // carries this viewer's PID so separate viewer instances do not
+            // share a daemon. Computed once and used by every CEF tab here.
+            const bool use_daemon = (plugin_basename == "media_plugin_cef" &&
+                                     gSavedSettings.getBOOL("ALCefDaemonEnabled"));
+            media_source->setUseDaemon(use_daemon, use_daemon ? cefDaemonRendezvousPath() : std::string());
             std::string user_data_path_cef_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "cef.log");
             media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log);
             media_source->setLanguageCode(LLUI::getLanguage());

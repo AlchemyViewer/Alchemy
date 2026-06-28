@@ -39,6 +39,11 @@
 
 #include "llapr.h"
 
+#include "apr_network_io.h"
+#include "apr_file_io.h"
+
+#include <fstream>
+
 //virtual
 LLPluginProcessParentOwner::~LLPluginProcessParentOwner()
 {
@@ -494,8 +499,60 @@ void LLPluginProcessParent::idle(void)
 
             case STATE_LISTENING:
                 {
+                    // Shared CEF daemon: register a tab with (or decide to spawn)
+                    // the daemon instead of launching a private process. Runs
+                    // once, gated by the launch state below.
+                    if (mUseDaemon && !mDaemonRendezvous.empty() && !mProcess && !mProcessCreationRequested)
+                    {
+                        EDaemonDisp disp = daemonDiscoverOrRegister();
+                        if (disp == DAEMON_CONNECTED)
+                        {
+                            // Registered: the daemon connects back to our listen
+                            // port. We own no process (mProcess stays null);
+                            // liveness comes from the heartbeat.
+                            mProcessCreationRequested = true;
+                            mHeartbeat.start();
+                            mHeartbeat.setTimerExpirySec(mPluginLaunchTimeout);
+                            setState(STATE_LAUNCHED);
+                            break;
+                        }
+                        if (disp == DAEMON_WAIT)
+                        {
+                            // Another parent is launching the daemon; retry next idle.
+                            break;
+                        }
+
+                        // DAEMON_NEED_SPAWN: launch the daemon so it outlives this
+                        // parent and is shared by later tabs - no parent owns it
+                        // (otherwise closing this tab's media would kill the whole
+                        // daemon). It serves us as its first tab via our port, then
+                        // connects back like any registration.
+                        //
+                        // Keep autokill at its default (true) so the daemon joins
+                        // the viewer's job object: it dies with the viewer, and the
+                        // CEF sandbox broker requires it - the job object is the
+                        // only launch difference from the (working) per-process
+                        // host, and launching the daemon outside it breaks the
+                        // sandbox. attached=false so discarding this handle below
+                        // does NOT kill the daemon (it must outlive this tab).
+                        LLProcess::Params params = mProcessParams;
+                        params.args.add(stringize(mBoundPort));
+                        params.args.add("--daemon");
+                        params.args.add(daemonRendezvousPath());
+                        params.attached = false;
+                        LLProcess::create(params);   // fire and forget; keep no mProcess
+                        mProcessCreationRequested = true;
+                        mHeartbeat.start();
+                        mHeartbeat.setTimerExpirySec(mPluginLaunchTimeout);
+                        setState(STATE_LAUNCHED);
+                        break;
+                    }
+
                     // Only argument to the launcher is the port number we're listening on
-                    mProcessParams.args.add(stringize(mBoundPort));
+                    if (!mProcess && !mProcessCreationRequested)
+                    {
+                        mProcessParams.args.add(stringize(mBoundPort));
+                    }
 
                     // Launch the plugin process.
                     if (mDebug && !mProcess)
@@ -1263,7 +1320,12 @@ bool LLPluginProcessParent::pluginLockedUpOrQuit()
 {
     bool result = false;
 
-    if (! LLProcess::isRunning(mProcess))
+    // In daemon mode this parent does not own the host process (mProcess is
+    // null - the shared daemon owns it), so a missing process is NOT death;
+    // liveness comes from the socket/heartbeat (pluginLockedUp) instead. When a
+    // process is owned (the normal path, and daemon launch before connect) the
+    // isRunning check applies as usual.
+    if (!(mUseDaemon && !mProcess) && ! LLProcess::isRunning(mProcess))
     {
         LL_WARNS("Plugin") << "child exited" << LL_ENDL;
         result = true;
@@ -1287,5 +1349,106 @@ bool LLPluginProcessParent::pluginLockedUp()
 
     // If the timer is running and has expired, the plugin has locked up.
     return (mHeartbeat.getStarted() && mHeartbeat.hasExpired());
+}
+
+std::string LLPluginProcessParent::daemonRendezvousPath() const
+{
+    // Caller-supplied, user-writable path (see setUseDaemon). All CEF tabs in a
+    // viewer are given the same path so they agree on one daemon; it must not be
+    // the install/plugin dir, which may be read-only.
+    return mDaemonRendezvous;
+}
+
+// static
+U32 LLPluginProcessParent::readDaemonControlPort(const std::string& path)
+{
+    std::ifstream f(path.c_str());
+    if (!f.is_open())
+    {
+        return 0;
+    }
+    U32 port = 0;
+    f >> port;
+    return port;
+}
+
+bool LLPluginProcessParent::registerWithDaemon(U32 control_port)
+{
+    if (!control_port)
+    {
+        return false;
+    }
+
+    apr_socket_t* sock = nullptr;
+    if (apr_socket_create(&sock, APR_INET, SOCK_STREAM, APR_PROTO_TCP, gAPRPoolp) != APR_SUCCESS)
+    {
+        return false;
+    }
+    apr_socket_timeout_set(sock, 2 * APR_USEC_PER_SEC);
+
+    bool ok = false;
+    apr_sockaddr_t* addr = nullptr;
+    if (apr_sockaddr_info_get(&addr, "127.0.0.1", APR_INET, (apr_port_t)control_port, 0, gAPRPoolp) == APR_SUCCESS &&
+        apr_socket_connect(sock, addr) == APR_SUCCESS)
+    {
+        // Tell the daemon which port to connect back to for this tab.
+        std::string msg = stringize(mBoundPort) + "\n";
+        apr_size_t len = msg.size();
+        ok = (apr_socket_send(sock, msg.data(), &len) == APR_SUCCESS) && (len == msg.size());
+    }
+    apr_socket_close(sock);
+    return ok;
+}
+
+// static
+bool LLPluginProcessParent::acquireSpawnLock(const std::string& lock_path)
+{
+    apr_file_t* f = nullptr;
+    apr_status_t s = apr_file_open(&f, lock_path.c_str(),
+        APR_FOPEN_CREATE | APR_FOPEN_EXCL | APR_FOPEN_WRITE, APR_FPROT_OS_DEFAULT, gAPRPoolp);
+    if (s == APR_SUCCESS)
+    {
+        apr_file_close(f);
+        return true;
+    }
+    if (APR_STATUS_IS_EEXIST(s))
+    {
+        // Steal a stale lock left by an aborted launch (older than the launch timeout).
+        apr_finfo_t finfo;
+        if (apr_stat(&finfo, lock_path.c_str(), APR_FINFO_MTIME, gAPRPoolp) == APR_SUCCESS &&
+            (apr_time_now() - finfo.mtime) > 15 * APR_USEC_PER_SEC)
+        {
+            apr_file_remove(lock_path.c_str(), gAPRPoolp);
+            if (apr_file_open(&f, lock_path.c_str(),
+                    APR_FOPEN_CREATE | APR_FOPEN_EXCL | APR_FOPEN_WRITE, APR_FPROT_OS_DEFAULT, gAPRPoolp) == APR_SUCCESS)
+            {
+                apr_file_close(f);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+LLPluginProcessParent::EDaemonDisp LLPluginProcessParent::daemonDiscoverOrRegister()
+{
+    const std::string rv = daemonRendezvousPath();
+
+    // 1. A daemon already running? Register our tab with it (it connects back).
+    U32 control_port = readDaemonControlPort(rv);
+    if (control_port && registerWithDaemon(control_port))
+    {
+        LL_INFOS("Plugin") << "registered CEF tab with daemon (control port " << control_port << ")" << LL_ENDL;
+        return DAEMON_CONNECTED;
+    }
+
+    // 2. No reachable daemon (missing or stale rendezvous). Serialize launching.
+    if (acquireSpawnLock(rv + ".lock"))
+    {
+        return DAEMON_NEED_SPAWN;
+    }
+
+    // 3. Another parent is launching the daemon; wait and retry next idle.
+    return DAEMON_WAIT;
 }
 
