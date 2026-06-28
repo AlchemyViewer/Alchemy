@@ -1558,9 +1558,17 @@ bool LLAppViewer::doFrame()
                 ms_sleep(non_interactive_ms_sleep_time);
             }
 
+            // A native picker steals key focus but is serviced by this loop, so
+            // don't background-yield while one is open or it turns laggy.
+            bool native_dialog_open = false;
+#if LL_SDL_WINDOW
+            native_dialog_open = LLWindowSDL::dialogOpen();
+#endif
+
             // yield cooperatively when not running as foreground window
             // and when not quiting (causes trouble at mac's cleanup stage)
             if (!LLApp::isExiting()
+                && !native_dialog_open
                 && ((gViewerWindow && !gViewerWindow->getWindow()->getVisible())
                     || !gFocusMgr.getAppHasFocus()))
             {

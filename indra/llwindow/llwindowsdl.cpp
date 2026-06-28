@@ -69,6 +69,7 @@ LLWindowSDL::WAYLAND_DATA LLWindowSDL::sWaylandData = {};
 #include <CoreServices/CoreServices.h>
 #include <CoreGraphics/CGDisplayConfiguration.h>
 #include <SDL3_image/SDL_image.h>
+#include "llsdl_macos.h"
 
 bool LLWindowSDL::sUseMultGL = false;
 #endif
@@ -1752,6 +1753,51 @@ LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_reso
 SDL_Window* LLWindowSDL::getMainSDLWindow()
 {
     return gWindowImplementation ? gWindowImplementation->mWindow : nullptr;
+}
+
+//static
+void LLWindowSDL::enterDialog()
+{
+    if (gWindowImplementation)
+    {
+        gWindowImplementation->beforeDialog();
+    }
+}
+
+//static
+void LLWindowSDL::exitDialog()
+{
+    LLWindowSDL* self = gWindowImplementation;
+    if (!self)
+    {
+        return;
+    }
+
+    self->afterDialog();
+
+    if (self->mDialogDepth != 0 || !self->mWindow)
+    {
+        return;
+    }
+
+    // afterDialog() restores fullscreen and mouselook; the file dialog also needs
+    // key-window focus back once the last one closes. SDL's dialog sheet leaves no
+    // key window, so without this keystrokes hit no responder and AppKit beeps.
+#if LL_DARWIN
+    ll_sdl_macos_make_window_key_deferred(self->mWindow);
+#else
+    SDL_RaiseWindow(self->mWindow);
+    if (self->mCallbacks)
+    {
+        self->mCallbacks->handleFocus(self);
+    }
+#endif
+}
+
+//static
+bool LLWindowSDL::dialogOpen()
+{
+    return gWindowImplementation && gWindowImplementation->mDialogDepth > 0;
 }
 
 //static

@@ -214,6 +214,18 @@ public:
     // worker thread has its own GL context current.
     static SDL_Window* getMainSDLWindow();
 
+    // Bracket an async OS dialog. SDL3's file picker resolves on a later frame,
+    // so beforeDialog()/afterDialog() can't wrap it on a single stack frame;
+    // enterDialog()/exitDialog() drive the same mDialogDepth machinery from the
+    // launch site and the completion callback instead. exitDialog() also restores
+    // key-window focus, which SDL leaves dropped after its dialog sheet closes.
+    static void enterDialog();
+    static void exitDialog();
+
+    // True while any OS dialog is up. The frame loop services modeless pickers,
+    // so it must skip BackgroundYieldTime while one is open or it turns laggy.
+    static bool dialogOpen();
+
 #if LL_DARWIN
     static U64 getVramSize();
     static void setUseMultGL(bool use_mult_gl);

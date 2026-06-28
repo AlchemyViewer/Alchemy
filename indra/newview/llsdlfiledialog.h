@@ -81,6 +81,11 @@ namespace LLSDLFileDialog
     template <typename ResultT>
     inline void trampoline(void* userdata, const char* const* filelist, int /*filter*/)
     {
+        // Close the bracket opened in show(), on the main thread: the callback can
+        // fire on a worker thread (the Linux Zenity backend), and exitDialog()
+        // touches mDialogDepth and window focus. Runs inline when already on main.
+        SDL_RunOnMainThread([](void*) { LLWindowSDL::exitDialog(); }, nullptr, false);
+
         auto* ctx = static_cast<LLSDLFileDialogContext<ResultT>*>(userdata);
         auto* cb = ctx->mCallback;
         auto* user = ctx->mUserdata;
@@ -146,6 +151,10 @@ namespace LLSDLFileDialog
         {
             SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, location.c_str());
         }
+
+        // Open the dialog bracket; trampoline() closes it. Drops fullscreen and
+        // mouselook for the dialog's duration, like the blocking pickers do.
+        LLWindowSDL::enterDialog();
 
         SDL_ShowFileDialogWithProperties(type, &trampoline<ResultT>, ctx, props);
 

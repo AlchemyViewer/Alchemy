@@ -31,7 +31,7 @@
             <button
              follows="top|left"
              layout="topleft"
-             height="19" 
+             height="19"
              left="258"
              tab_stop="false"
              image_overlay="Clipboard_Copy"
@@ -57,7 +57,7 @@
              mouse_opaque="true"
              tab_stop="false"
              image_selected="eye_button_active.tga"
-             image_unselected="eye_button_inactive.tga" 
+             image_unselected="eye_button_inactive.tga"
              name="pipette_color_btn"
              tool_tip="Paste Color Parameters using the Pipette tool"
              width="20" />
@@ -204,15 +204,15 @@
                 <radio_item
                 label="Texture (diffuse)"
                 name="Texture (diffuse)"
-                top="0" 
+                top="0"
                 layout="topleft"
-                height="16" 
+                height="16"
                 value="0"/>
                 <radio_item
                 label="Bumpiness (normal)"
                 layout="topleft"
-                top_pad="1" 
-                height="16" 
+                top_pad="1"
+                height="16"
                 name="Bumpiness (normal)"
                 value="1"/>
                 <radio_item
@@ -242,8 +242,8 @@
                 label="Base color"
                 name="Base color"
                 layout="topleft"
-                top_pad="1" 
-                height="16" 
+                top_pad="1"
+                height="16"
                 value="1"/>
                 <radio_item
                 label="Metallic/roughness"
@@ -256,21 +256,21 @@
                 label="Emissive"
                 name="Emissive"
                 layout="topleft"
-                top_pad="1" 
-                height="16" 
+                top_pad="1"
+                height="16"
                 value="3"/>
                 <radio_item
                 label="Normal"
                 layout="topleft"
-                top_pad="1" 
-                height="16" 
+                top_pad="1"
+                height="16"
                 name="Normal"
                 value="4"/>
             </radio_group>
             <button
              follows="top|left"
              layout="topleft"
-             height="19" 
+             height="19"
              left="258"
              top_delta="0"
              tab_stop="false"
@@ -297,7 +297,7 @@
              mouse_opaque="true"
              tab_stop="false"
              image_selected="eye_button_active.tga"
-             image_unselected="eye_button_inactive.tga" 
+             image_unselected="eye_button_inactive.tga"
              name="pipette_texture_btn"
              tool_tip="Paste Texture Parameters using the Pipette tool"
              width="20" />
@@ -320,7 +320,7 @@
              height="23"
              layout="topleft"
              left_pad="10"
-             top_delta="10"
+             top_delta="22"
              name="pbr_from_inventory"
              label="Choose from inventory"
              width="140"/>
@@ -369,7 +369,7 @@
              left="10"
              name="texture control"
              tool_tip="Click to choose a picture"
-             top_delta="-64"
+             top_delta="-76"
              width="64" />
             <text
             visible="false"
@@ -748,7 +748,7 @@
              left="10"
              name="tex gen"
              text_readonly_color="LabelDisabledColor"
-             top_pad="51"
+             top_pad="56"
              width="196">
                 Mapping
             </text>

@@ -46,6 +46,10 @@ bool gSDLMainHandled = false;
 #include "llwin32headers.h" // CS_BYTEALIGNCLIENT / CS_OWNDC
 #endif
 
+#if LL_DARWIN
+#include "llsdl_macos.h"
+#endif
+
 void sdl_logger(void *userdata, int category, SDL_LogPriority priority, const char *message)
 {
     switch (priority)
@@ -133,6 +137,12 @@ void set_sdl_hints()
 
                     // Momentum scrolling on macos is desirable for mac touchpads
                     {SDL_HINT_MAC_SCROLL_MOMENTUM, "1"},
+
+                    // Don't let SDL post a synthetic SDL_EVENT_QUIT when the
+                    // last window closes. The viewer owns its own shutdown
+                    // sequence (LLAppViewer), and transient teardown of the
+                    // main window must never be read as a request to quit.
+                    {SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE, "0"},
             };
 
     for (auto hint: hintList)
@@ -200,6 +210,14 @@ void init_sdl(const std::string& app_name)
             }
         }
     }
+
+#if LL_DARWIN
+    // SDL has now registered the app and built its default Cocoa menu bar. Drop
+    // the Cmd+W shortcut off its auto-created Window > Close item so the
+    // shortcut reaches the viewer's own "Close Window" handler instead of
+    // tearing down the window (which the SDL backend reads as a quit request).
+    ll_sdl_macos_strip_default_close_shortcut();
+#endif
 }
 
 void quit_sdl()
