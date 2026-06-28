@@ -152,6 +152,14 @@ extern PFNWGLGETPIXELFORMATATTRIBIVARBPROC wglGetPixelFormatAttribivARB;
 extern PFNWGLGETPIXELFORMATATTRIBFVARBPROC wglGetPixelFormatAttribfvARB;
 extern PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
 
+// WGL_NV_DX_interop / interop2 (D3D<->GL sharing; used for zero-copy CEF media)
+extern PFNWGLDXOPENDEVICENVPROC       wglDXOpenDeviceNV;
+extern PFNWGLDXCLOSEDEVICENVPROC      wglDXCloseDeviceNV;
+extern PFNWGLDXREGISTEROBJECTNVPROC   wglDXRegisterObjectNV;
+extern PFNWGLDXUNREGISTEROBJECTNVPROC wglDXUnregisterObjectNV;
+extern PFNWGLDXLOCKOBJECTSNVPROC      wglDXLockObjectsNV;
+extern PFNWGLDXUNLOCKOBJECTSNVPROC    wglDXUnlockObjectsNV;
+
 #endif // LL_WINDOWS
 
 #if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS

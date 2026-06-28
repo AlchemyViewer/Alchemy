@@ -57,6 +57,24 @@ public:
     // matters mainly for Intel iGPUs. Must run with GL initialized. Shared
     // by LLWindowWin32's window thread (checkDXMem) and the SDL backend.
     static void updateVRAMBudgetFromDXGI();
+
+    // --- Shared D3D11 <-> OpenGL interop (WGL_NV_DX_interop2) ---
+    // One D3D11 device + one wglDXOpenDeviceNV interop device for the whole
+    // process, brought up once after the GL context and WGL extensions exist.
+    // The zero-copy CEF media surfaces share these instead of each creating their
+    // own. Must be called with the GL context current. Returns true if available.
+    // No-op / false on platforms without WGL_NV_DX_interop2.
+    bool initGLDXInterop();
+    void cleanupGLDXInterop();
+    bool hasGLDXInterop() const { return mGLDXInteropDevice != nullptr; }
+    void* getD3DDevice() const { return mD3DDevice; }            // ID3D11Device1*
+    void* getD3DContext() const { return mD3DContext; }          // ID3D11DeviceContext*
+    void* getGLDXInteropDevice() const { return mGLDXInteropDevice; } // wglDXOpenDeviceNV handle
+
+private:
+    void* mD3DDevice = nullptr;
+    void* mD3DContext = nullptr;
+    void* mGLDXInteropDevice = nullptr;
 };
 
 extern LLDXHardware gDXHardware;

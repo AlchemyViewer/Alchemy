@@ -33,6 +33,12 @@
 #include "llpluginmessageclasses.h"
 #include "llcontrol.h"
 
+#if LL_WINDOWS
+#include <process.h>   // _getpid (host pid for accelerated-paint handle dup)
+#else
+#include <unistd.h>    // getpid
+#endif
+
 extern LLControlGroup gSavedSettings;
 #if LL_DARWIN || LL_LINUX
 extern bool gHiDPISupport;
@@ -81,6 +87,15 @@ bool LLPluginClassMedia::init(const std::string &launcher_filename, const std::s
     LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "init");
     message.setValue("target", mTarget);
     message.setValueReal("factor", mZoomFactor);
+    // Zero-copy paint: ask for GPU shared-texture handles, and hand the plugin
+    // this (viewer) process id so it can DuplicateHandle the shared texture into
+    // us across the process boundary.
+    message.setValueBoolean("accelerated_paint", mUseAcceleratedPaint);
+#if LL_WINDOWS
+    message.setValueS32("host_pid", (S32)_getpid());
+#else
+    message.setValueS32("host_pid", (S32)getpid());
+#endif
     sendMessage(message);
 
     mPlugin->init(launcher_filename, plugin_dir, plugin_filename, debug);
@@ -1049,6 +1064,30 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
             setSizeInternal();
 
             mTextureParamsReceived = true;
+        }
+        else if(message_name == "accelerated_paint")
+        {
+            // Zero-copy frame ready. The plugin holds one persistent keyed-mutex
+            // shared texture and sends its viewer-side handle ONLY when that
+            // texture is (re)created (handle != 0, once per size); a "0" handle
+            // means "same texture, new frame". Keep the last real handle so a
+            // per-frame ping doesn't clear it before the consumer takes it. The
+            // value is a decimal string so a 64-bit handle survives intact.
+            unsigned long long h = strtoull(message.getValue("handle").c_str(), nullptr, 10);
+            if (h != 0)
+            {
+                mAcceleratedPaintHandle = h;
+            }
+            mAcceleratedPaintFormat = message.getValueS32("format");
+            mAcceleratedPaintWidth = message.getValueS32("width");
+            mAcceleratedPaintHeight = message.getValueS32("height");
+            // Linux dma-buf layout (absent -> 0 on Windows/macOS).
+            mAcceleratedPaintStride = message.getValueS32("stride");
+            mAcceleratedPaintSrcPid = message.getValueS32("src_pid");
+            mAcceleratedPaintOffset = strtoull(message.getValue("offset").c_str(), nullptr, 10);
+            mAcceleratedPaintModifier = strtoull(message.getValue("modifier").c_str(), nullptr, 10);
+            mAcceleratedPaintDirty = true;
+            mediaEvent(LLPluginClassMediaOwner::MEDIA_EVENT_CONTENT_UPDATED);
         }
         else if(message_name == "updated")
         {

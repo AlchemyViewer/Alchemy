@@ -1025,6 +1025,9 @@ void LLWindowWin32::close()
         gGLManager.shutdownGL();
     }
 
+    // Tear down the shared D3D11<->GL interop device while its context is current.
+    gDXHardware.cleanupGLDXInterop();
+
     LL_DEBUGS("Window") << "Releasing Context" << LL_ENDL;
     if (mhRC)
     {
@@ -1210,6 +1213,9 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
     mRefreshRate = current_refresh;
 
     gGLManager.shutdownGL();
+    // Tear down the shared D3D11<->GL interop device (recreated below for the new
+    // context) while the old context is still current.
+    gDXHardware.cleanupGLDXInterop();
     //destroy gl context
     if (mhRC)
     {
@@ -1718,6 +1724,13 @@ const   S32   max_format  = (S32)num_formats - 1;
         close();
         return false;
     }
+
+    // Bring up the process-shared D3D11 <-> GL interop device once, here on the
+    // main thread with the render context current and the WGL extensions loaded.
+    // Zero-copy CEF media surfaces share it instead of each creating a private
+    // D3D device. Best-effort - failure just means accelerated paint falls back
+    // to the CPU path.
+    gDXHardware.initGLDXInterop();
 
     // Setup Tracy gpu context
     {

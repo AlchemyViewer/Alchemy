@@ -65,6 +65,9 @@
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
 #include "llviewerwindow.h"
+#include "llcefaccelinterop.h"
+#include "llrender.h"
+#include "llgl.h"
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
 #include "llvovolume.h"
@@ -258,8 +261,8 @@ LLViewerMedia::~LLViewerMedia()
     if (gDirUtilp)
     {
         const std::string rv = cefDaemonRendezvousPath();
-        std::remove(rv.c_str());
-        std::remove((rv + ".lock").c_str());
+        LLFile::remove(rv);
+        LLFile::remove(rv + ".lock");
     }
 }
 
@@ -1707,6 +1710,13 @@ LLViewerMediaImpl::~LLViewerMediaImpl()
 {
     destroyMediaSource();
 
+    if (mAccelInterop)
+    {
+        mAccelInterop->shutdown();
+        delete mAccelInterop;
+        mAccelInterop = nullptr;
+    }
+
     LLViewerMediaTexture::removeMediaImplFromTexture(mTextureId) ;
 
     setTextureID();
@@ -1777,6 +1787,9 @@ void LLViewerMediaImpl::destroyMediaSource()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     mNeedsNewTexture = true;
+    // The plugin's shared texture is going away; force a fresh interop bind when
+    // the next media source delivers a handle (even if the value is reused).
+    mAccelBoundHandle = 0;
 
     // Tell the viewer media texture it's no longer active
     LLViewerMediaTexture* oldImage = LLViewerTextureManager::findMediaTexture( mTextureId );
@@ -1861,10 +1874,14 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
         {
 #if LL_WINDOWS
             const std::string cef_host_exe = "SLPluginCEF.exe";
+            std::string cef_host_name = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() + cef_host_exe;
+#elif LL_DARWIN
+            const std::string cef_host_exe = "SLPluginCEF.app/Contents/MacOS/SLPluginCEF";
+            std::string cef_host_name = gDirUtilp->getAppRODataDir() + gDirUtilp->getDirDelimiter() + cef_host_exe;
 #else
             const std::string cef_host_exe = "SLPluginCEF";
-#endif
             std::string cef_host_name = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() + cef_host_exe;
+#endif
             if (LLFile::isfile(cef_host_name))
             {
                 launcher_name = cef_host_name;
@@ -1900,6 +1917,11 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
             const bool use_daemon = (plugin_basename == "media_plugin_cef" &&
                                      gSavedSettings.getBOOL("ALCefDaemonEnabled"));
             media_source->setUseDaemon(use_daemon, use_daemon ? cefDaemonRendezvousPath() : std::string());
+
+            // Zero-copy GPU paint: deliver shared-texture handles instead of CPU
+            // pixels (the plugin duplicates them into this process).
+            media_source->setUseAcceleratedPaint(plugin_basename == "media_plugin_cef" &&
+                                                 gSavedSettings.getBOOL("ALCefAcceleratedPaint"));
             std::string user_data_path_cef_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "cef.log");
             media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log);
             media_source->setLanguageCode(LLUI::getLanguage());
@@ -3058,6 +3080,19 @@ void LLViewerMediaImpl::update()
         return;
     }
 
+    // Zero-copy paint: the plugin delivers a GPU shared texture instead of CPU
+    // pixels, so this media never uses the shm/setSubImage upload path below.
+    // Pull the latest frame straight into the media GL texture on this (main)
+    // thread and we're done.
+    if (mMediaSource->getUseAcceleratedPaint())
+    {
+        if (!mSuspendUpdates && mVisible && mMediaSource->getAcceleratedPaintDirty())
+        {
+            updateAcceleratedTexture();
+        }
+        return;
+    }
+
     if(!mMediaSource->textureValid())
     {
         return;
@@ -3209,6 +3244,69 @@ void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* da
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMediaImpl::updateImagesMediaStreams()
 {
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Zero-copy paint consumer. Bring the plugin's GPU shared texture straight into
+// the media GL texture with no CPU round-trip. Main thread (has the GL context).
+bool LLViewerMediaImpl::updateAcceleratedTexture()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
+
+    // Bring up the interop first so a failure here doesn't consume the frame; the
+    // plugin's handle is persistent and we retry next frame.
+    if (!mAccelInterop)
+    {
+        mAccelInterop = new LLCEFAccelInterop();
+        if (!mAccelInterop->init())
+        {
+            delete mAccelInterop;
+            mAccelInterop = nullptr;
+            return false;
+        }
+    }
+
+    // The handle is persistent (re)sent only on (re)create. (Re)bind the interop
+    // when it differs from what we have bound; only advance mAccelBoundHandle on a
+    // successful bind so a transient failure is retried with the same handle.
+    mMediaSource->clearAcceleratedPaintDirty();
+    unsigned long long handle = mMediaSource->getAcceleratedPaintHandle();
+    if (handle != 0 && handle != mAccelBoundHandle)
+    {
+        if (mAccelInterop->setStableTexture(handle,
+                                            mMediaSource->getAcceleratedPaintWidth(),
+                                            mMediaSource->getAcceleratedPaintHeight(),
+                                            mMediaSource->getAcceleratedPaintFormat(),
+                                            (unsigned int)mMediaSource->getAcceleratedPaintStride(),
+                                            mMediaSource->getAcceleratedPaintOffset(),
+                                            mMediaSource->getAcceleratedPaintModifier(),
+                                            mMediaSource->getAcceleratedPaintSrcPid()))
+        {
+            mAccelBoundHandle = handle;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    LLViewerMediaTexture* media_tex = updateMediaImage();
+    if (!media_tex || !media_tex->getGLTexture())
+    {
+        return false;
+    }
+    media_tex->setPlaying(true);
+
+    U32 tex_name = media_tex->getGLTexture()->getTexName();
+    if (!tex_name)
+    {
+        return false;
+    }
+
+    // The interop blit reads the shared texture through a framebuffer, which
+    // both samples it in the correct channel order and flips it to bottom-up, so
+    // no swizzle / coord fix-up is needed here.
+    return mAccelInterop->blitTo(tex_name, media_tex->getWidth(), media_tex->getHeight());
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////

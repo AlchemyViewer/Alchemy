@@ -904,13 +904,28 @@ class DarwinManifest(ViewerManifest):
 
                 # our apps
                 executable_path = {}
-                embedded_apps = [ (os.path.join("llplugin", "slplugin"), "SLPlugin.app") ]
+                embedded_apps = [ (os.path.join("llplugin", "slplugin"), "SLPlugin.app"), (os.path.join("media_plugins", "cef"), "SLPluginCEF.app") ]
                 for app_bld_dir, app in embedded_apps:
                     self.path2basename(os.path.join(os.pardir,
                                                     app_bld_dir, self.args['configuration']),
                                        app)
                     executable_path[app] = \
                         self.dst_path_of(os.path.join(app, "Contents", "MacOS"))
+
+                # Dullahan helper apps go inside SLPlugin.app
+                with self.prefix(dst=os.path.join(
+                    "SLPluginCEF.app", "Contents", "Frameworks")):
+
+                    # CEF framework and vlc libraries goes inside Contents/Frameworks.
+                    with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'lib')):
+                        self.path("Chromium Embedded Framework.framework")
+
+                    with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'dullahan', self.args['configuration'])):
+                        self.path("DullahanHelper.app")
+                        self.path("DullahanHelper (Alerts).app")
+                        self.path("DullahanHelper (GPU).app")
+                        self.path("DullahanHelper (Renderer).app")
+                        self.path("DullahanHelper (Plugin).app")
 
                 # Dullahan helper apps go inside SLPlugin.app
                 with self.prefix(dst=os.path.join(

@@ -45,7 +45,168 @@
 #include <unistd.h>
 #endif
 
+#if LL_DARWIN
+#include <IOSurface/IOSurface.h>   // accelerated paint shares an IOSurface by id
+#endif
+
+#if LL_LINUX
+#include <deque>
+#include <fcntl.h>
+#endif
+
 #include "dullahan.h"
+
+#if LL_WINDOWS
+#include <d3d11_1.h>
+#include <dxgi1_2.h>
+
+////////////////////////////////////////////////////////////////////////////////
+// Producer half of zero-copy paint. Owns a D3D11 device and ONE persistent
+// keyed-mutex shared texture. Each accelerated-paint frame it copies CEF's
+// pooled (NT-handle) shared texture into the stable one under the mutex. The
+// stable texture's NT handle is duplicated to the viewer only when it is
+// (re)created (first frame / size change) - no per-frame DuplicateHandle. The
+// viewer opens it once and samples under the same single-key (mutual-exclusion)
+// mutex, which also provides the cross-process/cross-device GPU sync.
+class CefAccelProducer
+{
+public:
+    CefAccelProducer() = default;
+    ~CefAccelProducer() { shutdown(); }
+
+    bool init()
+    {
+        UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+        HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
+                                       nullptr, 0, D3D11_SDK_VERSION, &mDevice, nullptr, &mContext);
+        if (FAILED(hr) || !mDevice)
+        {
+            return false;
+        }
+        mDevice->QueryInterface(__uuidof(ID3D11Device1), (void**)&mDevice1);
+        return mDevice1 != nullptr;
+    }
+
+    void shutdown()
+    {
+        releaseStable();
+        if (mDevice1) { mDevice1->Release(); mDevice1 = nullptr; }
+        if (mContext) { mContext->Release(); mContext = nullptr; }
+        if (mDevice)  { mDevice->Release();  mDevice = nullptr; }
+    }
+
+    // Copy this frame's CEF shared texture (cef_handle) into the stable texture.
+    // If the stable texture was (re)created, out_handle receives a fresh NT handle
+    // duplicated into viewer_process (to send once) and out_recreated is true.
+    bool produce(void* cef_handle, void* viewer_process,
+                 HANDLE& out_handle, bool& out_recreated, int& out_w, int& out_h, int& out_fmt)
+    {
+        out_recreated = false;
+        out_handle = nullptr;
+        if (!mDevice1 || !cef_handle)
+        {
+            return false;
+        }
+
+        ID3D11Texture2D* cef = nullptr;
+        if (FAILED(mDevice1->OpenSharedResource1((HANDLE)cef_handle, __uuidof(ID3D11Texture2D), (void**)&cef)) || !cef)
+        {
+            return false;
+        }
+
+        D3D11_TEXTURE2D_DESC cd = {};
+        cef->GetDesc(&cd);
+        out_w = (int)cd.Width;
+        out_h = (int)cd.Height;
+        out_fmt = (int)cd.Format;
+
+        if (!mStable || mW != cd.Width || mH != cd.Height || mFmt != cd.Format)
+        {
+            if (!createStable(cd, viewer_process, out_handle))
+            {
+                cef->Release();
+                return false;
+            }
+            out_recreated = true;
+        }
+
+        if (mMutex && SUCCEEDED(mMutex->AcquireSync(0, 1000)))
+        {
+            mContext->CopyResource(mStable, cef);
+            mContext->Flush();
+            mMutex->ReleaseSync(0);
+        }
+        cef->Release();
+        return true;
+    }
+
+private:
+    bool createStable(const D3D11_TEXTURE2D_DESC& cd, void* viewer_process, HANDLE& out_handle)
+    {
+        releaseStable();
+
+        D3D11_TEXTURE2D_DESC d = {};
+        d.Width = cd.Width;
+        d.Height = cd.Height;
+        d.MipLevels = 1;
+        d.ArraySize = 1;
+        d.Format = cd.Format;
+        d.SampleDesc.Count = 1;
+        d.Usage = D3D11_USAGE_DEFAULT;
+        d.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        d.MiscFlags = D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
+        if (FAILED(mDevice->CreateTexture2D(&d, nullptr, &mStable)) || !mStable)
+        {
+            return false;
+        }
+
+        mStable->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&mMutex);
+
+        IDXGIResource1* res = nullptr;
+        if (FAILED(mStable->QueryInterface(__uuidof(IDXGIResource1), (void**)&res)) || !res)
+        {
+            return false;
+        }
+        HANDLE local = nullptr;
+        HRESULT hr = res->CreateSharedHandle(nullptr, DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE, nullptr, &local);
+        res->Release();
+        if (FAILED(hr) || !local)
+        {
+            return false;
+        }
+
+        // Share the stable texture to the viewer; we keep the texture alive so the
+        // local share handle can be closed once duplicated.
+        BOOL ok = DuplicateHandle(GetCurrentProcess(), local, (HANDLE)viewer_process,
+                                  &out_handle, 0, FALSE, DUPLICATE_SAME_ACCESS);
+        CloseHandle(local);
+        if (!ok || !out_handle)
+        {
+            return false;
+        }
+
+        mW = cd.Width;
+        mH = cd.Height;
+        mFmt = cd.Format;
+        return true;
+    }
+
+    void releaseStable()
+    {
+        if (mMutex)  { mMutex->Release();  mMutex = nullptr; }
+        if (mStable) { mStable->Release(); mStable = nullptr; }
+        mW = 0; mH = 0; mFmt = DXGI_FORMAT_UNKNOWN;
+    }
+
+    ID3D11Device*        mDevice = nullptr;
+    ID3D11Device1*       mDevice1 = nullptr;
+    ID3D11DeviceContext* mContext = nullptr;
+    ID3D11Texture2D*     mStable = nullptr;
+    IDXGIKeyedMutex*     mMutex = nullptr;
+    UINT mW = 0, mH = 0;
+    DXGI_FORMAT mFmt = DXGI_FORMAT_UNKNOWN;
+};
+#endif // LL_WINDOWS
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -63,6 +224,11 @@ private:
     bool init();
 
     void onPageChangedCallback(const unsigned char* pixels, int x, int y, const int width, const int height);
+    void onAcceleratedPaintCallback(void* native_handle, int format, int width, int height);
+#if LL_LINUX
+    void onAcceleratedPaintDmabufCallback(int fd, int format, int width, int height,
+                                          unsigned int stride, unsigned long long offset, unsigned long long modifier);
+#endif
     void onCustomSchemeURLCallback(std::string url, bool user_gesture, bool is_redirect);
     void onConsoleMessageCallback(std::string message, std::string source, int line);
     void onStatusMessageCallback(std::string value);
@@ -120,6 +286,22 @@ private:
     VolumeCatcher mVolumeCatcher;
     F32 mCurVolume;
     dullahan* mCEFLib;
+
+    // accelerated (zero-copy) paint: deliver GPU shared-texture handles to the
+    // viewer instead of CPU pixels. mHostPid is the viewer process, mViewerProcess
+    // its opened handle (with PROCESS_DUP_HANDLE) used to DuplicateHandle the
+    // shared texture across the boundary.
+    bool mUseAcceleratedPaint;
+    int  mHostPid;
+    void* mViewerProcess;
+#if LL_WINDOWS
+    CefAccelProducer* mAccelProducer;
+#endif
+#if LL_LINUX
+    // dma-buf fds dup'd from CEF, kept alive briefly so the viewer can re-open
+    // them via /proc/<pid>/fd before they are closed.
+    std::deque<int> mDmabufFdRing;
+#endif
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +322,12 @@ MediaPluginBase(host_send_func, host_user_data)
     mProxyHost = "";
     mProxyPort = 0;
     mDisableGPU = false;
+    mUseAcceleratedPaint = false;
+    mHostPid = 0;
+    mViewerProcess = nullptr;
+#if LL_WINDOWS
+    mAccelProducer = nullptr;
+#endif
     mUseMockKeyChain = true;
     mDisableWebSecurity = false;
     mFileAccessFromFileUrls = false;
@@ -169,6 +357,26 @@ MediaPluginBase(host_send_func, host_user_data)
 MediaPluginCEF::~MediaPluginCEF()
 {
     mCEFLib->shutdown();
+#if LL_WINDOWS
+    if (mAccelProducer)
+    {
+        mAccelProducer->shutdown();
+        delete mAccelProducer;
+        mAccelProducer = nullptr;
+    }
+    if (mViewerProcess)
+    {
+        CloseHandle((HANDLE)mViewerProcess);
+        mViewerProcess = nullptr;
+    }
+#endif
+#if LL_LINUX
+    for (int fd : mDmabufFdRing)
+    {
+        ::close(fd);
+    }
+    mDmabufFdRing.clear();
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -204,6 +412,126 @@ void MediaPluginCEF::onPageChangedCallback(const unsigned char* pixels, int x, i
         setDirty(0, 0, mWidth, mHeight);
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Zero-copy paint: CEF handed us a GPU shared-texture handle (valid in THIS
+// process). Duplicate it into the viewer process and send the viewer the
+// duplicated handle, so it can open the texture and bind it with no CPU copy.
+// The handle is only valid for the duration of this callback, so duplicate now.
+void MediaPluginCEF::onAcceleratedPaintCallback(void* native_handle, int format, int width, int height)
+{
+#if LL_WINDOWS
+    if (!native_handle || !mHostPid)
+    {
+        return;
+    }
+
+    // Open the viewer process once (cached) so we can duplicate handles into it.
+    if (!mViewerProcess)
+    {
+        mViewerProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE, (DWORD)mHostPid);
+        if (!mViewerProcess)
+        {
+            LL_WARNS("media") << "accelerated paint: OpenProcess(viewer pid " << mHostPid
+                              << ") failed: " << GetLastError() << LL_ENDL;
+            return;
+        }
+    }
+
+    // Bring up the D3D producer once. CEF hands a different pooled texture each
+    // frame; the producer copies it into ONE persistent keyed-mutex shared
+    // texture so we only duplicate a handle to the viewer when that texture is
+    // (re)created, not every frame.
+    if (!mAccelProducer)
+    {
+        mAccelProducer = new CefAccelProducer();
+        if (!mAccelProducer->init())
+        {
+            LL_WARNS("media") << "accelerated paint: D3D producer init failed" << LL_ENDL;
+            delete mAccelProducer;
+            mAccelProducer = nullptr;
+            return;
+        }
+    }
+
+    HANDLE stable_handle = nullptr;
+    bool recreated = false;
+    int w = 0, h = 0, fmt = 0;
+    if (!mAccelProducer->produce(native_handle, mViewerProcess, stable_handle, recreated, w, h, fmt))
+    {
+        return;
+    }
+
+    // Tell the viewer a new frame is ready. The handle field is the stable
+    // texture's viewer-side handle ONLY when it was just (re)created (sent once
+    // per size); otherwise "0" means "same texture, new frame". Carried as a
+    // decimal string so the full 64-bit value survives the LLSD message.
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "accelerated_paint");
+    message.setValue("handle", recreated ? std::to_string((unsigned long long)(uintptr_t)stable_handle)
+                                          : std::string("0"));
+    message.setValueS32("format", fmt);
+    message.setValueS32("width", w);
+    message.setValueS32("height", h);
+    sendMessage(message);
+#elif LL_DARWIN
+    // macOS: the handle is an IOSurfaceRef. Share its global IOSurfaceID (an
+    // integer any process can IOSurfaceLookup), so no per-frame duplication or
+    // producer texture is needed - send the id every frame (CEF cycles a pool,
+    // so the id can change). The viewer looks it up and binds it.
+    if (!native_handle)
+    {
+        return;
+    }
+    uint32_t iosurface_id = IOSurfaceGetID((IOSurfaceRef)native_handle);
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "accelerated_paint");
+    message.setValue("handle", std::to_string((unsigned long long)iosurface_id));
+    message.setValueS32("format", format);
+    message.setValueS32("width", width);
+    message.setValueS32("height", height);
+    sendMessage(message);
+#else
+    // Linux uses the dma-buf callback path instead (see onAcceleratedPaintDmabufCallback).
+    (void)native_handle; (void)format; (void)width; (void)height;
+#endif
+}
+
+#if LL_LINUX
+////////////////////////////////////////////////////////////////////////////////
+// Linux zero-copy paint: CEF hands us a dma-buf (fd + plane layout) valid only
+// for this callback. dup the fd and keep it alive briefly so the viewer can
+// re-open it via /proc/<our pid>/fd/<fd> (no SCM_RIGHTS side channel needed),
+// then send the fd number + layout. Single plane only.
+void MediaPluginCEF::onAcceleratedPaintDmabufCallback(int fd, int format, int width, int height,
+                                                      unsigned int stride, unsigned long long offset, unsigned long long modifier)
+{
+    if (fd < 0)
+    {
+        return;
+    }
+    int dupfd = dup(fd);
+    if (dupfd < 0)
+    {
+        return;
+    }
+    mDmabufFdRing.push_back(dupfd);
+    while (mDmabufFdRing.size() > 4)
+    {
+        ::close(mDmabufFdRing.front());
+        mDmabufFdRing.pop_front();
+    }
+
+    LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "accelerated_paint");
+    message.setValue("handle", std::to_string((unsigned long long)dupfd));
+    message.setValueS32("src_pid", (S32)getpid());
+    message.setValueS32("format", format);
+    message.setValueS32("width", width);
+    message.setValueS32("height", height);
+    message.setValueS32("stride", (S32)stride);
+    message.setValue("offset", std::to_string(offset));
+    message.setValue("modifier", std::to_string(modifier));
+    sendMessage(message);
+}
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -630,8 +958,24 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
         {
             if (message_name == "init")
             {
+                // Zero-copy paint: the viewer asks for GPU shared-texture handles
+                // and tells us its process id so we can DuplicateHandle into it.
+                mUseAcceleratedPaint = message_in.getValueBoolean("accelerated_paint");
+                mHostPid = message_in.getValueS32("host_pid");
+
                 // event callbacks from Dullahan
                 mCEFLib->setOnPageChangedCallback(std::bind(&MediaPluginCEF::onPageChangedCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
+                if (mUseAcceleratedPaint)
+                {
+#if LL_LINUX
+                    // Linux frames are dma-bufs (fd + layout), not a single handle.
+                    mCEFLib->setOnAcceleratedPaintDmabufCallback(std::bind(&MediaPluginCEF::onAcceleratedPaintDmabufCallback, this,
+                        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
+                        std::placeholders::_5, std::placeholders::_6, std::placeholders::_7));
+#else
+                    mCEFLib->setOnAcceleratedPaintCallback(std::bind(&MediaPluginCEF::onAcceleratedPaintCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+#endif
+                }
                 mCEFLib->setOnCustomSchemeURLCallback(std::bind(&MediaPluginCEF::onCustomSchemeURLCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
                 mCEFLib->setOnConsoleMessageCallback(std::bind(&MediaPluginCEF::onConsoleMessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
                 mCEFLib->setOnStatusMessageCallback(std::bind(&MediaPluginCEF::onStatusMessageCallback, this, std::placeholders::_1));
@@ -667,6 +1011,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 settings.host_process_path = ll_convert_wide_to_string(&buffer[0]);
 #endif
                 settings.accept_language_list = mHostLanguage;
+                settings.accelerated_paint = mUseAcceleratedPaint;
 
                 // SL-15560: Product team overruled my change to set the default
                 // embedded background color to match the floater background
@@ -742,7 +1087,10 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 message.setValueS32("default_width", 1024);
                 message.setValueS32("default_height", 1024);
                 message.setValueS32("depth", mDepth);
-                message.setValueU32("internalformat", GL_RGB);
+                // Accelerated paint copies the BGRA shared texture into the media
+                // texture with glCopyImageSubData, which needs matching 32-bit
+                // (RGBA8) storage; the CPU path uploads BGRA into RGB as before.
+                message.setValueU32("internalformat", mUseAcceleratedPaint ? GL_RGBA8 : GL_RGB);
                 message.setValueU32("format", GL_BGRA);
                 message.setValueU32("type", GL_UNSIGNED_BYTE);
                 message.setValueBoolean("coords_opengl", true);

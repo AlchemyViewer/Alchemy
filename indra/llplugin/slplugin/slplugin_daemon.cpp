@@ -159,7 +159,7 @@ LLPluginInstance::pluginInitFunction ll_get_static_plugin_init();
 // Run the daemon: serve the first tab (first_port) plus any later tabs that
 // register on the control port (written to rendezvous_path). Returns when no
 // tab has been live for DAEMON_IDLE_TIMEOUT.
-int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path)
+int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path_str)
 {
     // Register the statically-linked plugin so every tab's LLPluginInstance::load
     // calls it directly instead of dlopen()ing the plugin DLL. Without this the
@@ -178,15 +178,18 @@ int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path)
         return slplugin_run(first_port);
     }
 
+    std::filesystem::path rendezvous_path = fsyspath(rendezvous_path_str);
+    std::filesystem::path rendezvous_lock_path = fsyspath(rendezvous_path_str + ".lock");
+
     // Publish the control port for discover-or-spawn. Write then flush+close so a
     // racing parent reads a complete value.
     {
-        std::ofstream rv(rendezvous_path.c_str(), std::ios::trunc);
+        llofstream rv(rendezvous_path, std::ios::trunc);
         rv << control_port << std::endl;
     }
     // The rendezvous is now published, so release the spawn lock the launching
     // parent took - other parents can stop waiting and register.
-    std::remove((rendezvous_path + ".lock").c_str());
+    LLFile::remove(rendezvous_lock_path);
     LL_INFOS("slplugin") << "daemon: control port " << control_port
                          << " -> " << rendezvous_path << LL_ENDL;
 
@@ -244,7 +247,7 @@ int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path)
     }
 
     apr_socket_close(control);
-    std::remove(rendezvous_path.c_str());
+    LLFile::remove(rendezvous_path);
     LL_INFOS("slplugin") << "daemon: idle, exiting" << LL_ENDL;
     return 0;
 }

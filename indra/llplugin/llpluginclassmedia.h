@@ -179,6 +179,30 @@ public:
     { mUseDaemon = use_daemon; mDaemonRendezvous = rendezvous_path; if(mPlugin) mPlugin->setUseDaemon(use_daemon, rendezvous_path); };
     bool getUseDaemon() const { return mUseDaemon; };
 
+    // Zero-copy paint: ask the plugin to deliver a GPU shared-texture handle
+    // (duplicated into this process) instead of CPU pixels. Set before init().
+    void setUseAcceleratedPaint(bool b) { mUseAcceleratedPaint = b; };
+    bool getUseAcceleratedPaint() const { return mUseAcceleratedPaint; };
+
+    // The plugin's stable shared texture: a native handle already duplicated into
+    // THIS process (Windows: a D3D11 shared-texture HANDLE), plus its
+    // cef_color_type format and coded size. The handle is PERSISTENT - it is only
+    // (re)sent when the plugin recreates the texture (per size), so it is kept,
+    // not consumed: the consumer compares it against what it last bound and only
+    // re-opens when it changes. mAcceleratedPaintDirty marks a fresh frame.
+    bool getAcceleratedPaintDirty() const { return mAcceleratedPaintDirty; };
+    int getAcceleratedPaintFormat() const { return mAcceleratedPaintFormat; };
+    int getAcceleratedPaintWidth() const { return mAcceleratedPaintWidth; };
+    int getAcceleratedPaintHeight() const { return mAcceleratedPaintHeight; };
+    unsigned long long getAcceleratedPaintHandle() const { return mAcceleratedPaintHandle; };
+    void clearAcceleratedPaintDirty() { mAcceleratedPaintDirty = false; };
+    // Linux dma-buf layout (0 on Windows/macOS): the handle is an fd in process
+    // getAcceleratedPaintSrcPid(), with this plane stride/offset and DRM modifier.
+    int getAcceleratedPaintStride() const { return mAcceleratedPaintStride; };
+    unsigned long long getAcceleratedPaintOffset() const { return mAcceleratedPaintOffset; };
+    unsigned long long getAcceleratedPaintModifier() const { return mAcceleratedPaintModifier; };
+    int getAcceleratedPaintSrcPid() const { return mAcceleratedPaintSrcPid; };
+
     // Inherited from LLPluginProcessParentOwner
     /* virtual */ void receivePluginMessage(const LLPluginMessage &message);
     /* virtual */ void pluginLaunchFailed();
@@ -439,6 +463,19 @@ protected:
     LLPluginProcessParent::ptr_t mPlugin;
     bool mUseDaemon = false;
     std::string mDaemonRendezvous;
+
+    // accelerated (zero-copy) paint - see setUseAcceleratedPaint / the getters above
+    bool mUseAcceleratedPaint = false;
+    unsigned long long mAcceleratedPaintHandle = 0;   // native handle, dup'd into this process
+    int mAcceleratedPaintFormat = 0;
+    int mAcceleratedPaintWidth = 0;
+    int mAcceleratedPaintHeight = 0;
+    bool mAcceleratedPaintDirty = false;
+    // Linux dma-buf only:
+    int mAcceleratedPaintStride = 0;
+    unsigned long long mAcceleratedPaintOffset = 0;
+    unsigned long long mAcceleratedPaintModifier = 0;
+    int mAcceleratedPaintSrcPid = 0;
 
     LLRect mDirtyRect;
 

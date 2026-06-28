@@ -366,7 +366,7 @@ bool LLSyntaxDefCache::writeCacheFile(const std::string &fileSpec, const LLSD& c
     bool                    binary(content_ref.isBinary());
     std::ios_base::openmode mode(binary ? (std::ios_base::out | std::ios_base::binary)
                                         : std::ios_base::out);
-    std::ofstream           file(fileSpec.c_str(), mode);
+    llofstream           file(fileSpec, mode);
 
     if (!file.is_open())
     {

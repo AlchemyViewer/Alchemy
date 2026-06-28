@@ -64,7 +64,7 @@ target_link_libraries(media_plugin_cef_objs PUBLIC
 
 add_library(media_plugin_cef
     SHARED
-    $<TARGET_OBJECTS:media_plugin_cef_objs>
+    ${media_plugin_cef_SOURCE_FILES}
     )
 
 target_link_libraries(media_plugin_cef
@@ -73,6 +73,11 @@ target_link_libraries(media_plugin_cef
         ll::cef
         ll::glib_headers
 )
+
+if (WINDOWS)
+    # zero-copy paint producer: D3D11 keyed-mutex shared texture
+    target_link_libraries(media_plugin_cef d3d11 dxgi)
+endif ()
 
 add_dependencies(media_plugin_cef dullahan_host)
 
@@ -114,6 +119,11 @@ target_link_libraries(SLPluginCEF
         llcommon
         ll::pluginlibraries
 )
+
+if (WINDOWS)
+    # zero-copy paint producer: D3D11 keyed-mutex shared texture
+    target_link_libraries(SLPluginCEF d3d11 dxgi)
+endif ()
 
 add_dependencies(SLPluginCEF media_plugin_cef)
 
@@ -177,12 +187,21 @@ elseif (DARWIN)
     # macOS has extra helper bundles
     add_dependencies(media_plugin_cef dullahan_host_alerts dullahan_host_gpu dullahan_host_plugin dullahan_host_renderer)
 
+    find_library(IOSURFACE_FRAMEWORK IOSurface)
+    find_library(COREGRAPHICS_FRAMEWORK CoreGraphics)
     find_library(CORESERVICES_LIBRARY CoreServices)
     find_library(AUDIOUNIT_LIBRARY AudioUnit)
 
     target_link_libraries(media_plugin_cef
+    ${IOSURFACE_FRAMEWORK}
+    ${COREGRAPHICS_FRAMEWORK}
     ${CORESERVICES_LIBRARY}     # for Component Manager calls
     ${AUDIOUNIT_LIBRARY}        # for AudioUnit calls
+    )
+
+    target_link_libraries(SLPluginCEF
+    ${IOSURFACE_FRAMEWORK}
+    ${COREGRAPHICS_FRAMEWORK}
     )
 
   # Don't prepend 'lib' to the executable name, and don't embed a full path in the library's install name

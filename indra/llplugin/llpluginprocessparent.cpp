@@ -38,10 +38,11 @@
 #include "workqueue.h"
 
 #include "llapr.h"
+#include "llfile.h"
 
 #include "apr_network_io.h"
-#include "apr_file_io.h"
 
+#include <ctime>
 #include <fstream>
 
 //virtual
@@ -1381,7 +1382,7 @@ std::string LLPluginProcessParent::daemonRendezvousPath() const
 // static
 U32 LLPluginProcessParent::readDaemonControlPort(const std::string& path)
 {
-    std::ifstream f(path.c_str());
+    llifstream f(path);
     if (!f.is_open())
     {
         return 0;
@@ -1422,26 +1423,33 @@ bool LLPluginProcessParent::registerWithDaemon(U32 control_port)
 // static
 bool LLPluginProcessParent::acquireSpawnLock(const std::string& lock_path)
 {
-    apr_file_t* f = nullptr;
-    apr_status_t s = apr_file_open(&f, lock_path.c_str(),
-        APR_FOPEN_CREATE | APR_FOPEN_EXCL | APR_FOPEN_WRITE, APR_FPROT_OS_DEFAULT, gAPRPoolp);
-    if (s == APR_SUCCESS)
+    // A stale lock left by an aborted launch is stolen once it is older than this.
+    static const time_t LOCK_STALE_SECONDS = 15;
+
+    // Atomic create-exclusive: LLFile::noreplace maps to O_EXCL / CREATE_NEW, so
+    // exactly one parent wins the create even if several race here. The LLFile is
+    // closed when it leaves scope; the lock file itself persists until the daemon
+    // publishes the rendezvous (slplugin_daemon_run removes it) or it is stolen
+    // as stale below.
+    std::error_code ec;
     {
-        apr_file_close(f);
-        return true;
-    }
-    if (APR_STATUS_IS_EEXIST(s))
-    {
-        // Steal a stale lock left by an aborted launch (older than the launch timeout).
-        apr_finfo_t finfo;
-        if (apr_stat(&finfo, lock_path.c_str(), APR_FINFO_MTIME, gAPRPoolp) == APR_SUCCESS &&
-            (apr_time_now() - finfo.mtime) > 15 * APR_USEC_PER_SEC)
+        LLFile lock(lock_path, LLFile::out | LLFile::noreplace, ec);
+        if (lock)
         {
-            apr_file_remove(lock_path.c_str(), gAPRPoolp);
-            if (apr_file_open(&f, lock_path.c_str(),
-                    APR_FOPEN_CREATE | APR_FOPEN_EXCL | APR_FOPEN_WRITE, APR_FPROT_OS_DEFAULT, gAPRPoolp) == APR_SUCCESS)
+            return true;
+        }
+    }
+
+    if (ec == std::errc::file_exists)
+    {
+        llstat st;
+        if (LLFile::stat(lock_path, &st) == 0 &&
+            (time(nullptr) - st.st_mtime) > LOCK_STALE_SECONDS)
+        {
+            LLFile::remove(lock_path);
+            LLFile lock(lock_path, LLFile::out | LLFile::noreplace, ec);
+            if (lock)
             {
-                apr_file_close(f);
                 return true;
             }
         }

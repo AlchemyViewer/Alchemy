@@ -245,6 +245,14 @@ PFNWGLBLITCONTEXTFRAMEBUFFERAMDPROC             wglBlitContextFramebufferAMD = n
 // WGL_EXT_swap_control
 PFNWGLSWAPINTERVALEXTPROC    wglSwapIntervalEXT = nullptr;
 PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = nullptr;
+
+// WGL_NV_DX_interop / interop2
+PFNWGLDXOPENDEVICENVPROC       wglDXOpenDeviceNV = nullptr;
+PFNWGLDXCLOSEDEVICENVPROC      wglDXCloseDeviceNV = nullptr;
+PFNWGLDXREGISTEROBJECTNVPROC   wglDXRegisterObjectNV = nullptr;
+PFNWGLDXUNREGISTEROBJECTNVPROC wglDXUnregisterObjectNV = nullptr;
+PFNWGLDXLOCKOBJECTSNVPROC      wglDXLockObjectsNV = nullptr;
+PFNWGLDXUNLOCKOBJECTSNVPROC    wglDXUnlockObjectsNV = nullptr;
 #endif
 
 #if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
@@ -1035,6 +1043,17 @@ void LLGLManager::initWGL()
     {
         wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglSwapIntervalEXT");
         wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglGetSwapIntervalEXT");
+    }
+
+    // WGL_NV_DX_interop2 (D3D<->GL sharing for zero-copy CEF media textures)
+    if (mGLExtensions.contains("WGL_NV_DX_interop2") || mGLExtensions.contains("WGL_NV_DX_interop"))
+    {
+        wglDXOpenDeviceNV = (PFNWGLDXOPENDEVICENVPROC)LL_GET_PROC_ADDRESS("wglDXOpenDeviceNV");
+        wglDXCloseDeviceNV = (PFNWGLDXCLOSEDEVICENVPROC)LL_GET_PROC_ADDRESS("wglDXCloseDeviceNV");
+        wglDXRegisterObjectNV = (PFNWGLDXREGISTEROBJECTNVPROC)LL_GET_PROC_ADDRESS("wglDXRegisterObjectNV");
+        wglDXUnregisterObjectNV = (PFNWGLDXUNREGISTEROBJECTNVPROC)LL_GET_PROC_ADDRESS("wglDXUnregisterObjectNV");
+        wglDXLockObjectsNV = (PFNWGLDXLOCKOBJECTSNVPROC)LL_GET_PROC_ADDRESS("wglDXLockObjectsNV");
+        wglDXUnlockObjectsNV = (PFNWGLDXUNLOCKOBJECTSNVPROC)LL_GET_PROC_ADDRESS("wglDXUnlockObjectsNV");
     }
 
     if(!mGLExtensions.contains("WGL_ARB_pbuffer"))
