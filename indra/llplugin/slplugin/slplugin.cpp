@@ -54,6 +54,17 @@ LLPluginInstance::pluginInitFunction ll_get_static_plugin_init();
 // can reuse it after setting up the sandbox. Defined below.
 int slplugin_run(U32 port);
 
+// Host-provided entry the platform main() hands control to. Serves connection
+// `port`; if `daemon_rendezvous` is non-empty the host runs as the shared
+// multi-tab CEF daemon (publishing its control port to that path), otherwise it
+// serves the single connection. The generic loader's definition
+// (slplugin_generic.cpp) just calls slplugin_run(); the CEF host's
+// (slplugin_cef.cpp) adds the persistent-runtime / daemon behaviour, keeping
+// dullahan out of the generic host. The Windows CEF DLL uses its own bootstrap
+// entry (slplugin_cef_bootstrap.cpp) instead of this. Mirrors the per-host
+// ll_get_static_plugin_init() hook above.
+int ll_run_slplugin_host(U32 port, const std::string& daemon_rendezvous);
+
 
 #if LL_DARWIN
     #include "slplugin-objc.h"
@@ -160,6 +171,11 @@ int main(int argc, char **argv)
 //      LLError::logToFile("slplugin.log");
     }
 
+    // Non-empty only for a CEF daemon launch (parsed from argv below); empty for
+    // the generic host and on Windows (where the bootstrap entry handles daemon
+    // mode instead).
+    std::string daemon_rendezvous;
+
 #if LL_WINDOWS
     if( strlen( lpCmdLine ) == 0 )
     {
@@ -188,6 +204,18 @@ int main(int argc, char **argv)
         LL_ERRS("slplugin") << "port number must be numeric" << LL_ENDL;
     }
 
+    // Optional "--daemon <rendezvous-path>" tells a CEF host to run as the shared
+    // multi-tab daemon (on Windows this is handled by the bootstrap entry). The
+    // rendezvous path is taken as a single argument.
+    for (int i = 2; i + 1 < argc; ++i)
+    {
+        if (std::string(argv[i]) == "--daemon")
+        {
+            daemon_rendezvous = argv[i + 1];
+            break;
+        }
+    }
+
     // Catch signals that most kinds of crashes will generate, and exit cleanly so the system crash dialog isn't shown.
     signal(SIGILL, &crash_handler);     // illegal instruction
     signal(SIGFPE, &crash_handler);     // floating-point exception
@@ -199,8 +227,9 @@ int main(int argc, char **argv)
     signal(SIGEMT, &crash_handler);     // emulate instruction executed
 #endif //LL_DARWIN
 
-    // Hand off to the shared host driver (the CEF bootstrap host reuses it too).
-    int rc = slplugin_run(port);
+    // Hand off to the per-host entry (generic: single connection; CEF: persistent
+    // runtime, and the shared daemon when a rendezvous path was supplied).
+    int rc = ll_run_slplugin_host(port, daemon_rendezvous);
 
     ll_cleanup_apr();
 

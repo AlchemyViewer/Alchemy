@@ -99,6 +99,7 @@ else ()
     add_executable(SLPluginCEF
         MACOSX_BUNDLE
         ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
+        ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_daemon.cpp
         slplugin_cef.cpp
         $<TARGET_OBJECTS:media_plugin_cef_objs>
         )
@@ -106,6 +107,12 @@ else ()
         target_sources(SLPluginCEF PRIVATE ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm)
         set_source_files_properties(${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm
             PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
+
+        set_target_properties(SLPluginCEF PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/SLPluginCEF-Info.plist.in
+            MACOSX_BUNDLE_GUI_IDENTIFIER "org.achemyviewer.viewer.slplugincef"
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.achemyviewer.viewer.slplugincef"
+        )
     endif ()
 endif ()
 

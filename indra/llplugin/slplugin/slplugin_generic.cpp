@@ -32,7 +32,19 @@
 
 #include "llplugininstance.h"
 
+#include <string>
+
 LLPluginInstance::pluginInitFunction ll_get_static_plugin_init()
 {
     return nullptr;
+}
+
+// Defined in slplugin.cpp.
+int slplugin_run(U32 port);
+
+// The generic host has no daemon mode: ignore any rendezvous path and serve the
+// single connection. (Only the CEF host overrides this - see slplugin_cef.cpp.)
+int ll_run_slplugin_host(U32 port, const std::string& /*daemon_rendezvous*/)
+{
+    return slplugin_run(port);
 }

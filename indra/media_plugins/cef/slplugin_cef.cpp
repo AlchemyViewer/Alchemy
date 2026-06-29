@@ -33,6 +33,10 @@
 
 #include "llplugininstance.h"
 
+#include "dullahan.h"
+
+#include <string>
+
 // Exported by media_plugin_base, which is statically linked into this host.
 extern "C" int LLPluginInitEntryPoint(LLPluginInstance::sendMessageFunction host_send_func,
                                       void *host_user_data,
@@ -42,4 +46,34 @@ extern "C" int LLPluginInitEntryPoint(LLPluginInstance::sendMessageFunction host
 LLPluginInstance::pluginInitFunction ll_get_static_plugin_init()
 {
     return &LLPluginInitEntryPoint;
+}
+
+// Defined in slplugin.cpp / slplugin_daemon.cpp.
+int slplugin_run(U32 port);
+int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path);
+
+// CEF host entry handed control by the platform main() (slplugin.cpp). This is
+// the non-Windows analog of slplugin_cef_bootstrap.cpp's run_cef_host (on Windows
+// the bootstrap entry is used instead, and CEF sub-processes are dispatched there
+// by CefExecuteProcess; on macOS/Linux the DullahanHelper bundles / dullahan_host
+// dispatch them, so there is nothing to do here for sub-processes).
+int ll_run_slplugin_host(U32 port, const std::string& daemon_rendezvous)
+{
+    // Keep one process-global CEF runtime up for the whole life of this host (a
+    // dedicated single tab, or the shared daemon serving many) and shut it down
+    // exactly once below. Without this a zero-browser gap - e.g. the login web
+    // surface closing just before the next opens - would CefShutdown and the next
+    // CefInitialize would crash (CEF init is once-per-process). The macOS sandbox
+    // toggle is applied separately when the plugin builds its settings
+    // (media_plugin_cef.cpp).
+    dullahan::setPersistentRuntime(true);
+
+    const int rc = daemon_rendezvous.empty()
+                       ? slplugin_run(port)
+                       : slplugin_daemon_run(port, daemon_rendezvous);
+
+    // Persistent host: release() left CEF running, so tear it down once now,
+    // before the process exits, for a clean teardown.
+    dullahan::shutdownRuntime();
+    return rc;
 }
