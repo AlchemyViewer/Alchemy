@@ -477,6 +477,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           submodules: recursive
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -564,22 +565,29 @@ jobs:
           fi
 
       - name: Find Velopack installer
+        id: find-installer
         shell: bash
         run: |
-          installer="$(ls -t .app/*_Setup.exe | head -n 1)"
-          echo "installer=$installer" >> "$GITHUB_ENV"
+          installer="$(ls -t .app/*_Setup.exe 2>/dev/null | head -n 1 || true)"
+          if [[ -z "$installer" ]]; then
+            echo "::error::No Velopack installer found under .app"
+            exit 1
+          fi
+          echo "installer=$installer" >> "$GITHUB_OUTPUT"
 
       - name: Post the installer
         uses: actions/upload-artifact@v7
         with:
           name: "Windows-installer"
-          path: ${{ env.installer }}
+          path: ${{ steps.find-installer.outputs.installer }}
+          if-no-files-found: error
 
       - name: Upload Velopack releases
         uses: actions/upload-artifact@v7
         with:
           name: "Windows-releases"
           path: Releases/
+          if-no-files-found: error
 
   # sign-and-package-mac:
   #   env:
