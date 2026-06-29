@@ -339,7 +339,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         self.build_prefix = [args['build']]
         self.dst_prefix = [args['dest']]
         self.created_paths = []
-        self.package_name = "Unknown"
+        self.package_file = "Unknown"
         self.missing = []
 
     def default_channel(self):
