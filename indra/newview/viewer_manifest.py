@@ -689,6 +689,94 @@ class DarwinManifest(ViewerManifest):
         # non-empty?
         return bool(set(["package", "unpacked"]).intersection(self.args['actions']))
 
+    def _codesign(self, path, entitlements=None):
+        """Code-sign a single bundle / Mach-O in place.
+
+        The identity comes from the --signature argument when supplied (a real
+        Developer ID, i.e. "normal" signing for distribution / notarization);
+        otherwise it falls back to ad-hoc ("-") so a locally built bundle still
+        runs - and the macOS CEF seatbelt sandbox still engages - without a cert.
+
+        Nested code is always signed explicitly (deepest first, see
+        package_finish_local); we never pass --deep. --deep re-signs nested code
+        with the OUTER bundle's identity and entitlements, which would strip the
+        helper-specific sandbox / JIT entitlements, and Apple has deprecated it.
+        """
+        identity = self.args.get('signature') or '-'
+        adhoc = (identity == '-')
+        command = ['codesign', '--force', '--sign', identity, '--options', 'runtime']
+        if not adhoc:
+            # Ad-hoc signatures cannot carry a secure timestamp; only request one
+            # for a real identity (notarization requires it).
+            command.append('--timestamp')
+        if entitlements and os.path.exists(entitlements):
+            command.extend(['--entitlements', entitlements])
+        command.append(path)
+        self.run_command(command)
+
+    def macos_code_sign(self):
+        """Sign the .app bundle for local (non-Velopack) packaging.
+
+        Supports both ad-hoc signing (the default - no certificate required) and
+        normal Developer ID signing (when --signature is passed). All nested code
+        is signed inside-out, without --deep, so each plugin host / CEF helper
+        keeps its own entitlements (the sandbox + JIT entitlements the macOS CEF
+        sandbox needs).
+        """
+        app_bundle = self.get_dst_prefix()
+        if not app_bundle.endswith('.app') or not os.path.isdir(app_bundle):
+            print("package_finish_local: no .app bundle at %s; skipping signing"
+                  % app_bundle)
+            return
+
+        identity = self.args.get('signature') or '-'
+        print("Code-signing %s (identity: %s)"
+              % (app_bundle, 'ad-hoc' if identity == '-' else identity))
+
+        # Per-bundle entitlements. Both files include
+        # com.apple.security.cs.disable-library-validation, which is what lets the
+        # hardened runtime load our (ad-hoc or self-signed) dylibs.
+        slplugin_entitlements = os.path.join(self.args['source'], 'slplugin.entitlements')
+        dullahan_entitlements = os.path.join(
+            self.args['source'], os.pardir, 'dullahan', 'src', 'dullahan.entitlements')
+
+        contents = os.path.join(app_bundle, 'Contents')
+
+        # 1. Loose Mach-O libraries (.dylib / .so) anywhere in the bundle -
+        #    including those inside frameworks and plugin sub-apps. Sign these
+        #    first so every enclosing bundle seals over already-signed code.
+        for root, _dirs, files in os.walk(contents):
+            for name in files:
+                if name.endswith('.dylib') or name.endswith('.so') or name.endswith('.bin') or name.endswith('.dat'):
+                    self._codesign(os.path.join(root, name))
+
+        # 2. Frameworks (the CEF framework appears at the top level and inside
+        #    each SLPlugin host; BugSplatMac is optional). Deepest first.
+        frameworks = [os.path.join(root, d)
+                      for root, dirs, _files in os.walk(contents)
+                      for d in dirs if d.endswith('.framework')]
+        for fw in sorted(frameworks, key=lambda p: p.count(os.sep), reverse=True):
+            self._codesign(fw)
+
+        # 3. Nested .app bundles: the DullahanHelper CEF sub-process helpers
+        #    (which engage the seatbelt sandbox) inside the SLPlugin/SLPluginCEF
+        #    hosts, then the hosts themselves. Deepest first, each with its own
+        #    entitlements.
+        nested_apps = [os.path.join(root, d)
+                       for root, dirs, _files in os.walk(contents)
+                       for d in dirs if d.endswith('.app')]
+        for app in sorted(nested_apps, key=lambda p: p.count(os.sep), reverse=True):
+            ent = (dullahan_entitlements
+                   if os.path.basename(app).startswith('DullahanHelper')
+                   else slplugin_entitlements)
+            self._codesign(app, entitlements=ent)
+
+        # 4. Finally the outer viewer app, sealing everything above. Reuse the
+        #    SLPlugin entitlements (no viewer-specific file exists) - it carries
+        #    disable-library-validation so the hardened runtime accepts our signed
+        #    dylibs.
+        self._codesign(app_bundle, entitlements=slplugin_entitlements)
+
     def construct(self):
         # copy over the build result (this is a no-op if run within the xcode
         # script)
@@ -854,6 +942,11 @@ class DarwinManifest(ViewerManifest):
                         self.path( "*.dylib" )
                         self.path( "plugins.dat" )
 
+        # We always code-sign the app bundle when not building in GHA
+        RUNNER_TEMP = os.getenv('RUNNER_TEMP')
+        if not RUNNER_TEMP:
+            self.macos_code_sign()
+
         # This will be overwritten in package_finish during the actual package step
         self.package_file = "copied_deps"
 
@@ -862,6 +955,8 @@ class DarwinManifest(ViewerManifest):
         self.set_github_output('imagename', imagename)
         finalname = imagename + ".dmg"
         self.package_file = finalname
+
+        velopack_enabled = self.args.get('velopack', 'OFF').upper() in ('ON', 'TRUE', '1')
 
         RUNNER_TEMP = os.getenv('RUNNER_TEMP')
         # When running as a GitHub Action job, RUNNER_TEMP is the recommended
@@ -891,7 +986,7 @@ class DarwinManifest(ViewerManifest):
         # Generate Velopack update packages if enabled
         # This creates the nupkg and RELEASES files needed for auto-updates
         # Distribution is still via DMG, but updates use Velopack
-        if self.args.get('velopack', 'OFF') == 'ON':
+        if velopack_enabled:
             self.velopack_package_finish()
 
     def velopack_package_finish(self):

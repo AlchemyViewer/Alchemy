@@ -120,6 +120,11 @@ set(SIGNING_IDENTITY "" CACHE STRING "Specifies the signing identity to use, if 
 # macOS deploy target(must be set BEFORE first project call)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS version to target for deployment (at runtime); newer APIs weak linked. Set to empty string for default value.")
 
+if (APPLE)
+  # Disable app-local dependencies on macOS, since we use a custom bundle structure and don't want vcpkg to copy dependencies into the bundle.
+  set(VCPKG_APPLOCAL_DEPS OFF CACHE BOOL "Use app-local dependencies instead of system-installed dependencies")
+endif()
+
 # Set our supported configuration types
 set(CMAKE_CONFIGURATION_TYPES "Debug;OptDebug;RelWithDebInfo;Release" CACHE STRING "Supported build types.")
 
