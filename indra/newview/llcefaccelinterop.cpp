@@ -310,9 +310,11 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, i
     }
     MacAccel* m = (MacAccel*)mImpl;
 
-    // The "handle" is an IOSurfaceID (the surface changes each frame in CEF's
-    // pool); look it up and (re)bind it to our rectangle texture.
-    IOSurfaceRef surf = IOSurfaceLookup((IOSurfaceID)handle);
+    // The "handle" is an already-resolved IOSurfaceRef (+1 retained) handed over
+    // by the mach receiver (LLCEFSurfaceReceiver) - CEF shares its IOSurface via a
+    // mach port, which can't be resolved from a cross-process global id, so the
+    // surface arrives out-of-band rather than as an IOSurfaceID. We take ownership.
+    IOSurfaceRef surf = (IOSurfaceRef)(uintptr_t)handle;
     if (!surf)
     {
         return false;

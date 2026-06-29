@@ -46,7 +46,9 @@
 #endif
 
 #if LL_DARWIN
-#include <IOSurface/IOSurface.h>   // accelerated paint shares an IOSurface by id
+#include <IOSurface/IOSurface.h>   // accelerated paint hands the viewer an IOSurface
+#include <mach/mach.h>             // ...shared cross-process via a mach send right
+#include <servers/bootstrap.h>     // ...rendezvous'd through the bootstrap server
 #endif
 
 #if LL_LINUX
@@ -293,6 +295,7 @@ private:
     // shared texture across the boundary.
     bool mUseAcceleratedPaint;
     int  mHostPid;
+    int  mAccelId;        // per-media id echoed in each macOS surface mach message
     void* mViewerProcess;
 #if LL_WINDOWS
     CefAccelProducer* mAccelProducer;
@@ -324,6 +327,7 @@ MediaPluginBase(host_send_func, host_user_data)
     mDisableGPU = false;
     mUseAcceleratedPaint = false;
     mHostPid = 0;
+    mAccelId = 0;
     mViewerProcess = nullptr;
 #if LL_WINDOWS
     mAccelProducer = nullptr;
@@ -416,6 +420,101 @@ void MediaPluginCEF::onPageChangedCallback(const unsigned char* pixels, int x, i
 ////////////////////////////////////////////////////////////////////////////////
 // Zero-copy paint: CEF handed us a GPU shared-texture handle (valid in THIS
 // process). Duplicate it into the viewer process and send the viewer the
+#if LL_DARWIN
+namespace
+{
+    // Sends a CEF accelerated-paint IOSurface to the viewer over a mach channel.
+    // CEF's IOSurface is shared via mach ports (not a global id), so the only way
+    // to hand it across the process boundary is a mach send right - which can't go
+    // through the socket/LLSD channel. We rendezvous with the viewer's receive
+    // port through the bootstrap server using a name derived from its pid, then
+    // mach_msg one IOSurfaceCreateMachPort() right per frame, tagged with accel_id.
+    //
+    // Wire format MUST match LLCEFSurfaceReceiver (newview/llcefsurfacereceiver.cpp).
+    typedef struct
+    {
+        mach_msg_header_t          header;
+        mach_msg_body_t            body;
+        mach_msg_port_descriptor_t surface;
+        int32_t                    accel_id;
+        int32_t                    width;
+        int32_t                    height;
+        int32_t                    format;
+    } CefSurfaceSendMsg;
+
+    class CefMacSurfaceSender
+    {
+    public:
+        // Look up the viewer's receive port once; retried each frame until the
+        // viewer has registered it (no ordering guarantee between the processes).
+        bool connect(int host_pid)
+        {
+            if (mViewerPort != MACH_PORT_NULL) return true;
+            if (host_pid <= 0) return false;
+
+            char name[128];
+            snprintf(name, sizeof(name), "org.alchemyviewer.cefsurface.%d", host_pid);
+            kern_return_t kr = bootstrap_look_up(bootstrap_port, name, &mViewerPort);
+            if (kr != KERN_SUCCESS)
+            {
+                mViewerPort = MACH_PORT_NULL;   // not up yet; try again next frame
+                return false;
+            }
+            return true;
+        }
+
+        bool send(int accel_id, IOSurfaceRef surface, int width, int height, int format)
+        {
+            if (mViewerPort == MACH_PORT_NULL || !surface) return false;
+
+            // A fresh send right to this frame's surface; the message copies it to
+            // the viewer and we drop our reference afterwards.
+            mach_port_t surf_port = IOSurfaceCreateMachPort(surface);
+            if (surf_port == MACH_PORT_NULL) return false;
+
+            CefSurfaceSendMsg msg = {};
+            msg.header.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
+            msg.header.msgh_size = sizeof(msg);
+            msg.header.msgh_remote_port = mViewerPort;
+            msg.header.msgh_local_port = MACH_PORT_NULL;
+            msg.body.msgh_descriptor_count = 1;
+            msg.surface.name = surf_port;
+            msg.surface.disposition = MACH_MSG_TYPE_COPY_SEND;
+            msg.surface.type = MACH_MSG_PORT_DESCRIPTOR;
+            msg.accel_id = accel_id;
+            msg.width = width;
+            msg.height = height;
+            msg.format = format;
+
+            kern_return_t kr = mach_msg(&msg.header, MACH_SEND_MSG | MACH_SEND_TIMEOUT,
+                                        sizeof(msg), 0, MACH_PORT_NULL, 100 /*ms*/, MACH_PORT_NULL);
+            mach_port_deallocate(mach_task_self(), surf_port);
+
+            if (kr != KERN_SUCCESS)
+            {
+                // The viewer likely went away / its port died; drop it and re-look-up.
+                if (kr == MACH_SEND_INVALID_DEST)
+                {
+                    mach_port_deallocate(mach_task_self(), mViewerPort);
+                    mViewerPort = MACH_PORT_NULL;
+                }
+                return false;
+            }
+            return true;
+        }
+
+    private:
+        mach_port_t mViewerPort = MACH_PORT_NULL;
+    };
+
+    CefMacSurfaceSender& macSurfaceSender()
+    {
+        static CefMacSurfaceSender sSender;
+        return sSender;
+    }
+}
+#endif // LL_DARWIN
+
 // duplicated handle, so it can open the texture and bind it with no CPU copy.
 // The handle is only valid for the duration of this callback, so duplicate now.
 void MediaPluginCEF::onAcceleratedPaintCallback(void* native_handle, int format, int width, int height)
@@ -474,17 +573,25 @@ void MediaPluginCEF::onAcceleratedPaintCallback(void* native_handle, int format,
     message.setValueS32("height", h);
     sendMessage(message);
 #elif LL_DARWIN
-    // macOS: the handle is an IOSurfaceRef. Share its global IOSurfaceID (an
-    // integer any process can IOSurfaceLookup), so no per-frame duplication or
-    // producer texture is needed - send the id every frame (CEF cycles a pool,
-    // so the id can change). The viewer looks it up and binds it.
+    // macOS: the handle is an IOSurfaceRef shared (by CEF) via mach ports, so a
+    // global-id lookup in the viewer cannot work. Hand the surface over as a mach
+    // send right on our side channel, then post the usual message as the viewer's
+    // per-frame "dirty" trigger (the surface itself arrives out-of-band).
     if (!native_handle)
     {
         return;
     }
-    uint32_t iosurface_id = IOSurfaceGetID((IOSurfaceRef)native_handle);
+    CefMacSurfaceSender& sender = macSurfaceSender();
+    if (!sender.connect(mHostPid))
+    {
+        return;   // viewer's receive port not registered yet; retry next frame
+    }
+    if (!sender.send(mAccelId, (IOSurfaceRef)native_handle, width, height, format))
+    {
+        return;
+    }
     LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "accelerated_paint");
-    message.setValue("handle", std::to_string((unsigned long long)iosurface_id));
+    message.setValue("handle", "0");   // unused on macOS (surface came via mach)
     message.setValueS32("format", format);
     message.setValueS32("width", width);
     message.setValueS32("height", height);
@@ -962,6 +1069,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 // and tells us its process id so we can DuplicateHandle into it.
                 mUseAcceleratedPaint = message_in.getValueBoolean("accelerated_paint");
                 mHostPid = message_in.getValueS32("host_pid");
+                mAccelId = message_in.getValueS32("accel_id");
 
                 // event callbacks from Dullahan
                 mCEFLib->setOnPageChangedCallback(std::bind(&MediaPluginCEF::onPageChangedCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));

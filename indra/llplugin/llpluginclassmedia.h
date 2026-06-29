@@ -184,6 +184,11 @@ public:
     void setUseAcceleratedPaint(bool b) { mUseAcceleratedPaint = b; };
     bool getUseAcceleratedPaint() const { return mUseAcceleratedPaint; };
 
+    // Per-media id sent to the plugin in init() and tagged onto each macOS
+    // IOSurface mach-port message, so the process-global viewer-side receiver can
+    // demux surfaces from many tabs/plugin processes back to the right media.
+    int getAccelId() const { return mAccelId; }
+
     // The plugin's stable shared texture: a native handle already duplicated into
     // THIS process (Windows: a D3D11 shared-texture HANDLE), plus its
     // cef_color_type format and coded size. The handle is PERSISTENT - it is only
@@ -466,6 +471,8 @@ protected:
 
     // accelerated (zero-copy) paint - see setUseAcceleratedPaint / the getters above
     bool mUseAcceleratedPaint = false;
+    // Unique per-media id (macOS mach-port demux); assigned at construction.
+    int mAccelId = 0;
     unsigned long long mAcceleratedPaintHandle = 0;   // native handle, dup'd into this process
     int mAcceleratedPaintFormat = 0;
     int mAcceleratedPaintWidth = 0;

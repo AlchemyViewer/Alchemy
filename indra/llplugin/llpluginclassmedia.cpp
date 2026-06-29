@@ -62,6 +62,11 @@ LLPluginClassMedia::LLPluginClassMedia(LLPluginClassMediaOwner *owner)
     mOwner = owner;
     reset();
 
+    // Unique per-media id for the macOS accelerated-paint mach-port demux. Media
+    // sources are created on the main thread, so a plain counter is fine.
+    static int sNextAccelId = 1;
+    mAccelId = sNextAccelId++;
+
     //debug use
     mDeleteOK = true ;
 }
@@ -91,6 +96,10 @@ bool LLPluginClassMedia::init(const std::string &launcher_filename, const std::s
     // this (viewer) process id so it can DuplicateHandle the shared texture into
     // us across the process boundary.
     message.setValueBoolean("accelerated_paint", mUseAcceleratedPaint);
+    // macOS shares the accelerated-paint IOSurface over a mach channel; the plugin
+    // rendezvous via the bootstrap name derived from host_pid, and tags each frame
+    // with accel_id so the viewer demuxes it back to this media.
+    message.setValueS32("accel_id", mAccelId);
 #if LL_WINDOWS
     message.setValueS32("host_pid", (S32)_getpid());
 #else

@@ -66,6 +66,7 @@
 #include "llviewertexturelist.h"
 #include "llviewerwindow.h"
 #include "llcefaccelinterop.h"
+#include "llcefsurfacereceiver.h"
 #include "llrender.h"
 #include "llgl.h"
 #include "llvoavatar.h"
@@ -3086,6 +3087,12 @@ void LLViewerMediaImpl::update()
     // thread and we're done.
     if (mMediaSource->getUseAcceleratedPaint())
     {
+#if LL_DARWIN
+        // Register the mach receive port up front (not gated on a frame): the
+        // plugin only starts producing once our bootstrap service exists, so
+        // waiting for the first frame to register would deadlock.
+        LLCEFSurfaceReceiver::instance().ensureStarted();
+#endif
         if (!mSuspendUpdates && mVisible && mMediaSource->getAcceleratedPaintDirty())
         {
             updateAcceleratedTexture();
@@ -3266,10 +3273,26 @@ bool LLViewerMediaImpl::updateAcceleratedTexture()
         }
     }
 
+    mMediaSource->clearAcceleratedPaintDirty();
+#if LL_DARWIN
+    // macOS: CEF's IOSurface is shared via a mach port (no cross-process global
+    // id), so the surface arrives out-of-band through the mach receiver, demuxed
+    // by this media's accel id. Drain the newest and (re)bind it; the interop
+    // takes ownership of the +1-retained IOSurfaceRef (and releases it on a
+    // failed bind). If no new surface this frame, keep the current binding.
+    void* surf = LLCEFSurfaceReceiver::instance().takeLatest(mMediaSource->getAccelId());
+    if (surf)
+    {
+        mAccelInterop->setStableTexture((unsigned long long)(uintptr_t)surf,
+                                        mMediaSource->getAcceleratedPaintWidth(),
+                                        mMediaSource->getAcceleratedPaintHeight(),
+                                        mMediaSource->getAcceleratedPaintFormat(),
+                                        0, 0, 0, 0);
+    }
+#else
     // The handle is persistent (re)sent only on (re)create. (Re)bind the interop
     // when it differs from what we have bound; only advance mAccelBoundHandle on a
     // successful bind so a transient failure is retried with the same handle.
-    mMediaSource->clearAcceleratedPaintDirty();
     unsigned long long handle = mMediaSource->getAcceleratedPaintHandle();
     if (handle != 0 && handle != mAccelBoundHandle)
     {
@@ -3289,6 +3312,7 @@ bool LLViewerMediaImpl::updateAcceleratedTexture()
             return false;
         }
     }
+#endif
 
     LLViewerMediaTexture* media_tex = updateMediaImage();
     if (!media_tex || !media_tex->getGLTexture())
