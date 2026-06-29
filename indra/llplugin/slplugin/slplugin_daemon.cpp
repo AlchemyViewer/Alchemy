@@ -48,6 +48,10 @@
 
 #include "apr_network_io.h"
 
+#if LL_DARWIN
+#include "slplugin-objc.h"   // LLCocoaPlugin: pump NSApp so macOS sees us alive
+#endif
+
 #include <vector>
 #include <fstream>
 #include <cstdio>
@@ -193,6 +197,14 @@ int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path_str)
     LL_INFOS("slplugin") << "daemon: control port " << control_port
                          << " -> " << rendezvous_path << LL_ENDL;
 
+#if LL_DARWIN
+    // Without a serviced Cocoa run loop the WindowServer flags this process as
+    // "Not Responding" (even while it works). Pump NSApp each iteration, like the
+    // single-tab slplugin_run() loop does.
+    LLCocoaPlugin cocoa_interface;
+    cocoa_interface.setupCocoa();
+#endif
+
     std::vector<LLPluginProcessChild*> tabs;
     {
         LLPluginProcessChild* first = new LLPluginProcessChild();
@@ -206,7 +218,14 @@ int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path_str)
 
     while (true)
     {
+#if LL_DARWIN
+        cocoa_interface.createAutoReleasePool();
+#endif
         acceptRegistration(control, tabs);
+
+#if LL_DARWIN
+        cocoa_interface.processEvents();
+#endif
 
         // Service every tab, reaping finished ones.
         for (std::vector<LLPluginProcessChild*>::iterator it = tabs.begin(); it != tabs.end();)
@@ -242,6 +261,10 @@ int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path_str)
         {
             idle_running = false;
         }
+
+#if LL_DARWIN
+        cocoa_interface.deleteAutoReleasePool();
+#endif
 
         ms_sleep(10);
     }
