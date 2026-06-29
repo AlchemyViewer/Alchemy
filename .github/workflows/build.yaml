@@ -26,6 +26,9 @@ on:
     branches: ["main", "release/*", "beta/*", "project/*"]
     tags: ["Alchemy*"]
 
+permissions:
+  contents: read
+
 jobs:
   # The whole point of the setup job is that we want to set variables once
   # that will be consumed by multiple subsequent jobs.
@@ -56,7 +59,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       - name: Determine source branch
         id: which-branch
@@ -138,7 +141,7 @@ jobs:
         runner: ["windows-2025-vs2026", "macos-26", "ubuntu-24.04"]
         configuration: [release]
         arch: [x64, arm64]
-        build_variant: [Viewer, Tests]
+        build_variant: [Viewer]
         exclude:
           - runner: ubuntu-24.04
             arch: arm64
@@ -160,10 +163,13 @@ jobs:
       # Windows Velopack outputs (passed to sign-pkg-windows)
       velopack_pack_id:       ${{ steps.build.outputs.velopack_pack_id }}
       velopack_pack_version:  ${{ steps.build.outputs.velopack_pack_version }}
+      velopack_pack_authors:  ${{ steps.build.outputs.velopack_pack_authors }}
       velopack_pack_title:    ${{ steps.build.outputs.velopack_pack_title }}
       velopack_main_exe:      ${{ steps.build.outputs.velopack_main_exe }}
       velopack_exclude:       ${{ steps.build.outputs.velopack_exclude }}
       velopack_icon:          ${{ steps.build.outputs.velopack_icon }}
+      velopack_splash:        ${{ steps.build.outputs.velopack_splash }}
+      velopack_splash_color:  ${{ steps.build.outputs.velopack_splash_color }}
       velopack_installer_base: ${{ steps.build.outputs.velopack_installer_base }}
       # macOS Velopack outputs (passed to sign-pkg-mac)
       velopack_mac_pack_id:      ${{ steps.build.outputs.velopack_mac_pack_id }}
@@ -253,14 +259,6 @@ jobs:
 
       - name: Install python dependencies
         run: pip3 install llsd cmake ninja
-
-      - name: Setup .NET for Velopack
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '10.x'
-
-      - name: Install Velopack CLI
-        run: dotnet tool restore
 
       - name: Bootstrap vcpkg Windows
         if: runner.os == 'Windows'
@@ -472,34 +470,124 @@ jobs:
       #       ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-bin
       #       ${{ steps.configure.outputs.build_directory }}/llappearanceutility/Release/appearance-utility-headless-bin
 
-  # sign-and-package-windows:
-  #   env:
-  #     AZURE_KEY_VAULT_URI: ${{ secrets.AZURE_KEY_VAULT_URI }}
-  #     AZURE_CERT_NAME: ${{ secrets.AZURE_CERT_NAME }}
-  #     AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  #     AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-  #     AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-  #   needs: [setup, build]
-  #   runs-on: windows-2022
-  #   if: needs.setup.outputs.build_type == 'proprietary'
-  #   steps:
-  #     - name: Sign and package Windows viewer
-  #       if: env.AZURE_KEY_VAULT_URI && env.AZURE_CERT_NAME && env.AZURE_CLIENT_ID && env.AZURE_CLIENT_SECRET && env.AZURE_TENANT_ID
-  #       uses: secondlife/viewer-build-util/sign-pkg-windows@geenz/velopack
-  #       with:
-  #         vault_uri: "${{ env.AZURE_KEY_VAULT_URI }}"
-  #         cert_name: "${{ env.AZURE_CERT_NAME }}"
-  #         client_id: "${{ env.AZURE_CLIENT_ID }}"
-  #         client_secret: "${{ env.AZURE_CLIENT_SECRET }}"
-  #         tenant_id: "${{ env.AZURE_TENANT_ID }}"
-  #         installer_type: "${{ github.event.inputs.installer_type || 'velopack' }}"
-  #         velopack_pack_id: "${{ needs.build.outputs.velopack_pack_id }}"
-  #         velopack_pack_version: "${{ needs.build.outputs.velopack_pack_version }}"
-  #         velopack_pack_title: "${{ needs.build.outputs.velopack_pack_title }}"
-  #         velopack_main_exe: "${{ needs.build.outputs.velopack_main_exe }}"
-  #         velopack_exclude: "${{ needs.build.outputs.velopack_exclude }}"
-  #         velopack_icon: "${{ needs.build.outputs.velopack_icon }}"
-  #         velopack_installer_base: "${{ needs.build.outputs.velopack_installer_base }}"
+  sign-and-package-windows:
+    needs: [setup, build]
+    runs-on: windows-2025
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup .NET for Velopack
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.x'
+
+      - name: Install Velopack CLI
+        run: dotnet tool restore
+
+      - name: Fetch Windows app
+        uses: actions/download-artifact@v8
+        if: needs.setup.outputs.build_type == 'proprietary'
+        with:
+          name: Windows-x64-app
+          path: .app
+
+      - name: Fetch Windows OS app
+        uses: actions/download-artifact@v8
+        if: needs.setup.outputs.build_type != 'proprietary'
+        with:
+          name: Windows-OS-x64-app
+          path: .app
+
+      - name: Build and sign Velopack package
+        shell: bash
+        env:
+          PACK_ID: ${{ needs.build.outputs.velopack_pack_id }}
+          PACK_VERSION: ${{ needs.build.outputs.velopack_pack_version }}
+          PACK_TITLE: ${{ needs.build.outputs.velopack_pack_title }}
+          PACK_AUTHORS: ${{ needs.build.outputs.velopack_pack_authors }}
+          MAIN_EXE: ${{ needs.build.outputs.velopack_main_exe }}
+          EXCLUDE: ${{ needs.build.outputs.velopack_exclude }}
+          ICON: ${{ needs.build.outputs.velopack_icon }}
+          SPLASH_IMAGE: ${{ needs.build.outputs.velopack_splash }}
+          SPLASH_COLOR: ${{ needs.build.outputs.velopack_splash_color }}
+          INSTALLER_BASE: ${{ needs.build.outputs.velopack_installer_base }}
+        run: |
+          set -x
+
+          vpk_args=(
+            dotnet vpk pack
+            --packId "$PACK_ID"
+            --packVersion "$PACK_VERSION"
+            --packAuthors "$PACK_AUTHORS"
+            --packDir .app
+            --mainExe "$MAIN_EXE"
+            --packTitle "$PACK_TITLE"
+            --exclude "$EXCLUDE"
+            --shortcuts ''
+            --splashProgressColor "$SPLASH_COLOR"
+          )
+
+          # Add icon if provided
+          if [[ -n "$ICON" && -f ".app/$ICON" ]]; then
+            vpk_args+=(--icon ".app/$ICON")
+          fi
+
+          # Add splash if provided
+          if [[ -n "$SPLASH_IMAGE" && -f ".app/$SPLASH_IMAGE" ]]; then
+            vpk_args+=(--splashImage ".app/$SPLASH_IMAGE")
+          fi
+
+          "${vpk_args[@]}"
+
+      - name: Rename Velopack outputs
+        shell: bash
+        env:
+          PACK_ID: ${{ needs.build.outputs.velopack_pack_id }}
+          INSTALLER_BASE: ${{ needs.build.outputs.velopack_installer_base }}
+        run: |
+          # Move Setup.exe into .app for the installer upload step
+          setup="Releases/${PACK_ID}-win-Setup.exe"
+          if [[ -f "$setup" ]]; then
+            mv "$setup" ".app/${INSTALLER_BASE}_Setup.exe"
+            echo "Moved $setup to .app/${INSTALLER_BASE}_Setup.exe"
+          fi
+
+          # Rename Portable.zip to include version
+          portable="Releases/${PACK_ID}-win-Portable.zip"
+          if [[ -f "$portable" ]]; then
+            mv "$portable" "Releases/${INSTALLER_BASE}_Portable.zip"
+            echo "Moved $portable to Releases/${INSTALLER_BASE}_Portable.zip"
+          fi
+
+      - name: Find Velopack installer
+        id: find-installer
+        shell: bash
+        run: |
+          installer="$(ls -t .app/*_Setup.exe 2>/dev/null | head -n 1 || true)"
+          if [[ -z "$installer" ]]; then
+            echo "::error::No Velopack installer found under .app"
+            exit 1
+          fi
+          echo "installer=$installer" >> "$GITHUB_OUTPUT"
+
+      - name: Post the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: "Windows-installer"
+          path: ${{ steps.find-installer.outputs.installer }}
+          if-no-files-found: error
+
+      - name: Upload Velopack releases
+        uses: actions/upload-artifact@v7
+        with:
+          name: "Windows-releases"
+          path: Releases/
+          if-no-files-found: error
 
   # sign-and-package-mac:
   #   env:
@@ -610,60 +698,43 @@ jobs:
   #         node-version: "22"
   #         dumpSyms: false
 
-  # release:
-  #   needs: [setup, build, sign-and-package-windows, sign-and-package-mac]
-  #   runs-on: ubuntu-latest
-  #   if: needs.setup.outputs.release_run
-  #   steps:
-  #     # - uses: actions/download-artifact@v8
-  #     #   with:
-  #     #     pattern: "*-installer"
+  release:
+    needs: [setup, build, sign-and-package-windows]
+    runs-on: ubuntu-latest
+    if: needs.setup.outputs.release_run
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "*-installer"
 
-  #     - uses: actions/download-artifact@v8
-  #       with:
-  #         pattern: "*-metadata"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: "*-releases"
 
-  #     - uses: actions/download-artifact@v8
-  #       with:
-  #         pattern: "*-releases"
+      - uses: actions/download-artifact@v8
+        with:
+          name: "Linux-x64-app"
 
-  #     - uses: actions/download-artifact@v8
-  #       with:
-  #         name: "Linux-app"
+      # forked from softprops/action-gh-release
+      - name: Create GitHub release
+        id: release
+        uses: AlchemyViewer/action-gh-release@v3
+        with:
+          # name the release page for the branch. We want channel and version.
+          name: "${{ needs.setup.outputs.viewer_channel }} ${{ needs.build.outputs.viewer_version }}"
+          body: |
+          prerelease: true
+          generate_release_notes: true
+          target_commitish: ${{ github.sha }}
+          append_body: true
+          fail_on_unmatched_files: true
+          files: |
+            Windows-installer/*.exe
+            *.tar.xz
+            Windows-releases/*
 
-  #     - name: Rename metadata
-  #       run: |
-  #         cp Windows-metadata/newview/viewer_version.txt Windows-viewer_version.txt
-  #         cp macOS-metadata/newview/viewer_version.txt macOS-viewer_version.txt
-  #         cp Linux-metadata/newview/viewer_version.txt Linux-viewer_version.txt
-
-  #     # forked from softprops/action-gh-release
-  #     - name: Create GitHub release
-  #       id: release
-  #       uses: AlchemyViewer/action-gh-release@v2
-  #       with:
-  #         # name the release page for the branch
-  #         name: "${{ needs.setup.outputs.viewer_branch }}"
-  #         # SL-20546: want the channel and version to be visible on the
-  #         # release page
-  #         body: |
-  #           Build ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-  #           ${{ needs.setup.outputs.viewer_channel }}
-  #           ${{ needs.build.outputs.viewer_version }}
-  #           ${{ needs.setup.outputs.relnotes }}
-  #         prerelease: true
-  #         generate_release_notes: true
-  #         target_commitish: ${{ github.sha }}
-  #         append_body: true
-  #         fail_on_unmatched_files: true
-  #         files: |
-  #           macOS-installer/*.dmg
-  #           Windows-installer/*.exe
-  #           *.tar.xz
-  #           *-viewer_version.txt
-  #           Windows-releases/*
-  #           macOS-releases/*
-
-  #     - name: post release URL
-  #       run: |
-  #         echo "::notice::Release ${{ steps.release.outputs.url }}"
+      - name: post release URL
+        run: |
+          echo "::notice::Release ${{ steps.release.outputs.url }}"

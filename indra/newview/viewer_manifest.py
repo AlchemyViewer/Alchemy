@@ -270,16 +270,6 @@ class ViewerManifest(LLManifest):
             }
         return "%(channel_vendor_base)s%(channel_variant_underscores)s_%(version_underscores)s_%(arch)s" % substitution_strings
 
-    def installer_base_name_mac(self):
-        global CHANNEL_VENDOR_BASE
-        # a standard map of strings for replacing in the templates
-        substitution_strings = {
-            'channel_vendor_base' : '_'.join(CHANNEL_VENDOR_BASE.split()),
-            'channel_variant_underscores':self.channel_variant_app_suffix(),
-            'version_underscores' : '_'.join(self.args['version'])
-            }
-        return "%(channel_vendor_base)s%(channel_variant_underscores)s_%(version_underscores)s_universal" % substitution_strings
-
     def app_name(self):
         global CHANNEL_VENDOR_BASE
         channel_type=self.channel_type()
@@ -554,6 +544,12 @@ class Windows_x86_64_Manifest(ViewerManifest):
         if self.args.get('velopack', 'OFF').upper() != 'ON' and self.args.get('velopack', 'OFF').upper() != 'TRUE' and self.args.get('velopack', 'OFF').upper() != '1':
             return
 
+        # Velopack packaging author metadata. This is the "Authors" field in the Velopack installer.
+        pack_authors = 'Alchemy Viewer Project'
+
+        # Velopack splash progress bar color
+        splash_color = '#00a5dc'
+
         # packId determines install folder: %LocalAppData%\{packId}
         # Uses same naming as NSIS INSTNAME for channel separation
         pack_id = self.app_name_oneword()  # "SecondLife", "SecondLifeBeta", etc.
@@ -600,9 +596,11 @@ class Windows_x86_64_Manifest(ViewerManifest):
             self.set_github_output('velopack_pack_id', pack_id)
             self.set_github_output('velopack_pack_version', pack_version)
             self.set_github_output('velopack_pack_title', pack_title)
+            self.set_github_output('velopack_pack_authors', pack_authors)
             self.set_github_output('velopack_main_exe', main_exe)
             self.set_github_output('velopack_icon', icon_filename)
             self.set_github_output('velopack_splash', splash_filename)
+            self.set_github_output('velopack_splash_color', splash_color)
             self.set_github_output('velopack_installer_base', installer_base)
             self.set_github_output('velopack_exclude', exclude_pattern)
             # Set package_file so llmanifest's touched.bat logic doesn't crash
@@ -615,6 +613,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
             'dotnet', 'vpk', 'pack',
             '--packId', pack_id,
             '--packVersion', pack_version,
+            '--packAuthors', pack_authors,
             '--packDir', pack_dir,
             '--mainExe', main_exe,
             '--packTitle', pack_title,
@@ -624,7 +623,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
             '--shortcuts', '',
             '--outputDir', os.path.join(self.args['build'], 'Releases'),
             '--splashImage', splash_path,
-            '--splashProgressColor', '#00a5dc',
+            '--splashProgressColor', splash_color,
         ]
 
         # Add icon — CMake copies the channel-appropriate secondlife.ico to res/ll_icon.ico
@@ -859,7 +858,7 @@ class DarwinManifest(ViewerManifest):
         self.package_file = "copied_deps"
 
     def package_finish(self):
-        imagename = self.installer_base_name_mac()
+        imagename = self.installer_base_name()
         self.set_github_output('imagename', imagename)
         finalname = imagename + ".dmg"
         self.package_file = finalname
