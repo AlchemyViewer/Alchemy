@@ -46,7 +46,6 @@ public:
 
     virtual std::string getCurPath();
 
-    /*virtual*/ std::string getLLPluginLauncher();
     /*virtual*/ std::string getLLPluginFilename(std::string base_name);
 };
 

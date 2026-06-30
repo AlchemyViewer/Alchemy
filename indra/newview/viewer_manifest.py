@@ -513,13 +513,14 @@ class Windows_x86_64_Manifest(ViewerManifest):
         with self.prefix(src_dst=self.get_dst_prefix()):
             self.path(self.final_exe())
             self.path("*.dll")
-            self.path("SLPlugin.exe")
 
         # Plugins are only built in non-debug builds on windows
         if self.args['buildtype'].lower() != 'debug':
             with self.prefix(src_dst=os.path.join(self.get_dst_prefix(), 'llplugin')):
-                # Plugin and dependency DLL files
-                self.path("SLPluginCEF.exe")
+                # Per-plugin host executables (media_plugin_*.exe, including the
+                # renamed CEF bootstrap media_plugin_cef.exe) and their dependency
+                # DLLs (media_plugin_cef.dll, libcef.dll, ...). The *.exe / *.dll
+                # globs below pick them all up.
                 self.path("*.dll")
                 # CEF files
                 self.path("*.exe")
@@ -902,9 +903,11 @@ class DarwinManifest(ViewerManifest):
                 libfile_parent = self.get_dst_prefix()
                 dylibs=[]
 
-                # our apps
+                # our apps - each media plugin is now its own host .app bundle
+                # (no SLPlugin.app launcher and no dlopen'd plugin dylib).
                 executable_path = {}
-                embedded_apps = [ (os.path.join("llplugin", "slplugin"), "SLPlugin.app"), (os.path.join("media_plugins", "cef"), "SLPluginCEF.app") ]
+                embedded_apps = [ (os.path.join("media_plugins", "cef"), "media_plugin_cef.app"),
+                                  (os.path.join("media_plugins", "libvlc"), "media_plugin_libvlc.app") ]
                 for app_bld_dir, app in embedded_apps:
                     self.path2basename(os.path.join(os.pardir,
                                                     app_bld_dir, self.args['configuration']),
@@ -912,11 +915,11 @@ class DarwinManifest(ViewerManifest):
                     executable_path[app] = \
                         self.dst_path_of(os.path.join(app, "Contents", "MacOS"))
 
-                # Dullahan helper apps go inside SLPlugin.app
+                # The CEF framework + dullahan helper apps live in the CEF host
+                # bundle (media_plugin_cef.app), the only host that runs CEF.
                 with self.prefix(dst=os.path.join(
-                    "SLPluginCEF.app", "Contents", "Frameworks")):
+                    "media_plugin_cef.app", "Contents", "Frameworks")):
 
-                    # CEF framework and vlc libraries goes inside Contents/Frameworks.
                     with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'lib')):
                         self.path("Chromium Embedded Framework.framework")
 
@@ -927,33 +930,12 @@ class DarwinManifest(ViewerManifest):
                         self.path("DullahanHelper (Renderer).app")
                         self.path("DullahanHelper (Plugin).app")
 
-                # Dullahan helper apps go inside SLPlugin.app
+                # libvlc + its runtime plugins live in the LibVLC host bundle.
                 with self.prefix(dst=os.path.join(
-                    "SLPlugin.app", "Contents", "Frameworks")):
-                    # copy CEF plugin
-                    self.path2basename("../media_plugins/cef/" + self.args['configuration'],
-                                       "media_plugin_cef.dylib")
-
-                    # CEF framework and vlc libraries goes inside Contents/Frameworks.
-                    with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'lib')):
-                        self.path("Chromium Embedded Framework.framework")
-
-                    with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'dullahan', self.args['configuration'])):
-                        self.path("DullahanHelper.app")
-                        self.path("DullahanHelper (Alerts).app")
-                        self.path("DullahanHelper (GPU).app")
-                        self.path("DullahanHelper (Renderer).app")
-                        self.path("DullahanHelper (Plugin).app")
-
-                    # copy LibVLC plugin
-                    self.path2basename("../media_plugins/libvlc/" + self.args['configuration'],
-                                       "media_plugin_libvlc.dylib")
-
-                    # Copy libvlc
+                    "media_plugin_libvlc.app", "Contents", "Frameworks")):
                     with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'lib')):
                         self.path( "libvlc*.dylib*" )
 
-                    # copy LibVLC plugins folder
                     with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'plugins', 'vlc-bin'), dst="plugins"):
                         self.path( "*.dylib" )
                         self.path( "plugins.dat" )
@@ -1138,10 +1120,6 @@ class LinuxManifest(ViewerManifest):
                 self.path("refresh_desktop_app_entry.sh")
             self.path("install.sh")
 
-        with self.prefix(dst="bin"):
-            with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'llplugin', 'slplugin', self.args['configuration'])):
-                self.path("SLPlugin")
-
         # recurses, packaged again
         self.path("res-sdl")
 
@@ -1161,47 +1139,31 @@ class LinuxManifest(ViewerManifest):
         # plugins
         with self.prefix(dst="bin/llplugin"):
             with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'media_plugins')):
+                # Each media plugin is its own host executable now - there is no
+                # SLPlugin launcher and no dlopen'd plugin .so.
                 with self.prefix(src=os.path.join('cef', self.args['configuration'])):
-                    self.path("libmedia_plugin_cef.so")
-                    self.path("SLPluginCEF")
+                    self.path("media_plugin_cef")
 
                 # Media plugins - LibVLC
                 with self.prefix(src=os.path.join('libvlc', self.args['configuration'])):
-                    self.path("libmedia_plugin_libvlc.so")
+                    self.path("media_plugin_libvlc")
 
                 # GStreamer 1.0 Media Plugin
                 with self.prefix(src=os.path.join('gstreamer10', self.args['configuration'])):
-                    self.path("libmedia_plugin_gstreamer10.so")
+                    self.path("media_plugin_gstreamer10")
 
                 # Media plugins - Example (useful for debugging - not shipped with release viewer)
                 if self.channel_type() != 'release':
                     with self.prefix(src=os.path.join('example', self.args['configuration'])):
-                        self.path("libmedia_plugin_example.so")
+                        self.path("media_plugin_example")
 
                 with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'dullahan', self.args['configuration'])):
                     self.path( "dullahan_host" )
-
-                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'lib')):
-                    self.path( "libcef.so" )
-
-                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Release')):
-                    self.path( "libEGL*" )
-                    self.path( "libvulkan*" )
-                    self.path( "libvk_swiftshader*" )
-                    self.path( "libGLESv2*" )
-                    self.path( "v8_context_snapshot.bin" )
-                    self.path( "vk_swiftshader_icd.json")
 
                 with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Release')):
                     self.path( "chrome-sandbox" )
                     self.path( "v8_context_snapshot.bin" )
                     self.path( "vk_swiftshader_icd.json")
-
-                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Resources')):
-                    self.path( "chrome_100_percent.pak" )
-                    self.path( "chrome_200_percent.pak" )
-                    self.path( "resources.pak" )
-                    self.path( "icudtl.dat" )
 
                 with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Resources', 'locales'), dst="locales"):
                     self.path("*.pak")
@@ -1217,11 +1179,6 @@ class LinuxManifest(ViewerManifest):
             self.path( "libvulkan*" )
             self.path( "libvk_swiftshader*" )
             self.path( "libGLESv2*" )
-            self.path( "v8_context_snapshot.bin" )
-            self.path( "vk_swiftshader_icd.json")
-
-        with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Release'), dst="bin"):
-            self.path( "chrome-sandbox" )
             self.path( "v8_context_snapshot.bin" )
             self.path( "vk_swiftshader_icd.json")
 

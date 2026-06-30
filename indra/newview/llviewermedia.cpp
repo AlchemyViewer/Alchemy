@@ -1859,52 +1859,20 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
         }
 #endif
 
-        std::string launcher_name = gDirUtilp->getLLPluginLauncher();
-        std::string plugin_name = gDirUtilp->getLLPluginFilename(plugin_basename);
-
-        // When the dedicated CEF host is enabled, launch SLPluginCEF (which
-        // statically links the CEF plugin) instead of the generic SLPlugin that
-        // dlopen()s media_plugin_cef. plugin_name is still passed and validated
-        // below, but the static host ignores it. The Windows sandbox and the
-        // shared daemon both require this host (ALCefSandbox/ALCefDaemonEnabled
-        // imply it). Falls back to the generic launcher if SLPluginCEF is missing.
-        if (plugin_basename == "media_plugin_cef" &&
-            (gSavedSettings.getBOOL("ALCefDedicatedHost") ||
-             gSavedSettings.getBOOL("ALCefSandbox") ||
-             gSavedSettings.getBOOL("ALCefDaemonEnabled")))
-        {
-#if LL_WINDOWS
-            const std::string cef_host_exe = "SLPluginCEF.exe";
-            std::string cef_host_name = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() + cef_host_exe;
-#elif LL_DARWIN
-            const std::string cef_host_exe = "SLPluginCEF.app/Contents/MacOS/SLPluginCEF";
-            std::string cef_host_name = gDirUtilp->getAppRODataDir() + gDirUtilp->getDirDelimiter() + cef_host_exe;
-#else
-            const std::string cef_host_exe = "SLPluginCEF";
-            std::string cef_host_name = gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() + cef_host_exe;
-#endif
-            if (LLFile::isfile(cef_host_name))
-            {
-                launcher_name = cef_host_name;
-            }
-            else
-            {
-                LL_WARNS_ONCE("Media") << "ALCefDedicatedHost set but " << cef_host_name
-                                       << " not found; using generic launcher" << LL_ENDL;
-            }
-        }
+        // Each plugin is its own host executable now, named exactly for the
+        // plugin (e.g. media_plugin_cef) and launched directly - there is no
+        // generic SLPlugin shell and no dlopen'd plugin library. The CEF host's
+        // daemon/sandbox behaviour is selected at runtime (see setUseDaemon and
+        // the ALCef* settings), not by choosing a different executable.
+        std::string launcher_name = gDirUtilp->getLLPluginFilename(plugin_basename);
 
         std::string user_data_path_cache = gDirUtilp->getCacheDir(false);
         user_data_path_cache += gDirUtilp->getDirDelimiter();
 
-        // See if the plugin executable exists
+        // See if the plugin host executable exists
         if (!LLFile::isfile(launcher_name))
         {
-            LL_WARNS_ONCE("Media") << "Couldn't find launcher at " << launcher_name << LL_ENDL;
-        }
-        else if (!LLFile::isfile(plugin_name))
-        {
-            LL_WARNS_ONCE("Media") << "Couldn't find plugin at " << plugin_name << LL_ENDL;
+            LL_WARNS_ONCE("Media") << "Couldn't find plugin host at " << launcher_name << LL_ENDL;
         }
         else
         {
@@ -1974,7 +1942,10 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 #endif
 
             const std::string plugin_dir = gDirUtilp->getLLPluginDir();
-            if (media_source->init(launcher_name, plugin_dir, plugin_name, gSavedSettings.getBOOL("PluginAttachDebuggerToPlugins")))
+            // plugin_dir/plugin_basename are vestigial now (the host statically
+            // links its plugin); they ride along in the load_plugin message only
+            // to satisfy its non-empty contract.
+            if (media_source->init(launcher_name, plugin_dir, plugin_basename, gSavedSettings.getBOOL("PluginAttachDebuggerToPlugins")))
             {
                 return media_source;
             }

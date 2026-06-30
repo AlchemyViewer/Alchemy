@@ -30,22 +30,10 @@
 
 #include "llplugininstance.h"
 
-#include <boost/dll/shared_library.hpp>
-#include <boost/dll/shared_library_load_mode.hpp>
-
-#if LL_WINDOWS
-#include "direct.h" // needed for _chdir()
-#endif
-
 /** Virtual destructor. */
 LLPluginInstanceMessageListener::~LLPluginInstanceMessageListener()
 {
 }
-
-/**
- * TODO:DOC describe how it's used
- */
-const char *LLPluginInstance::PLUGIN_INIT_FUNCTION_NAME = "LLPluginInitEntryPoint";
 
 LLPluginInstance::pluginInitFunction LLPluginInstance::sStaticInitFunction = NULL;
 
@@ -72,79 +60,33 @@ LLPluginInstance::LLPluginInstance(LLPluginInstanceMessageListener *owner) :
  */
 LLPluginInstance::~LLPluginInstance()
 {
-    // mDSOHandle's destructor unloads the shared library if loaded.
 }
 
 /**
- * Dynamically loads the plugin and runs the plugin's init function.
+ * Runs the statically-linked plugin's init function.
  *
- * @param[in] plugin_file Name of plugin dll/dylib/so. TODO:DOC is this correct? see .h
- * @return 0 if successful, APR error code or error code from the plugin's init function on failure.
+ * Each plugin now lives in its own host executable that statically links exactly
+ * one plugin and registers its entry point via setStaticInitFunction(), so there
+ * is no longer a dlopen path. plugin_dir/plugin_file are vestigial - they remain
+ * in the load_plugin message contract but are ignored here.
+ *
+ * @return 0 if successful, or the error code returned from the plugin's init function.
  */
 int LLPluginInstance::load(const std::string& plugin_dir, std::string &plugin_file)
 {
-    pluginInitFunction init_function = NULL;
-    int result = 0;
+    (void)plugin_dir;
+    (void)plugin_file;
 
-    if (sStaticInitFunction)
+    if (!sStaticInitFunction)
     {
-        // Dedicated single-plugin host: the plugin is statically linked into
-        // this executable, so call its entry point directly and skip dlopen
-        // (and the cwd hack below) entirely. plugin_dir/plugin_file are ignored.
-        init_function = sStaticInitFunction;
-    }
-    else
-    {
-        if ( plugin_dir.length() )
-        {
-#if LL_WINDOWS
-            // VWR-21275:
-            // *SOME* Windows systems fail to load the Qt plugins if the current working
-            // directory is not the same as the directory with the Qt DLLs in.
-            // This should not cause any run time issues since we are changing the cwd for the
-            // plugin shell process and not the viewer.
-            // Changing back to the previous directory is not necessary since the plugin shell
-            // quits once the plugin exits.
-            _chdir( plugin_dir.c_str() );
-#endif
-        };
-
-        try
-        {
-            mDSOHandle.load(boost::dll::fs::path(plugin_file),
-                            boost::dll::load_mode::rtld_now);
-        }
-        catch (const std::exception& e)
-        {
-            LL_WARNS("Plugin") << "boost::dll load of " << plugin_file
-                               << " failed: " << e.what() << LL_ENDL;
-            result = -1;
-        }
-
-        if(result == 0)
-        {
-            try
-            {
-                init_function = &mDSOHandle.get<std::remove_pointer_t<pluginInitFunction>>(
-                    PLUGIN_INIT_FUNCTION_NAME);
-            }
-            catch (const std::exception& e)
-            {
-                LL_WARNS("Plugin") << "symbol lookup for " << PLUGIN_INIT_FUNCTION_NAME
-                                   << " failed: " << e.what() << LL_ENDL;
-                result = -1;
-            }
-        }
+        LL_WARNS("Plugin") << "no statically-linked plugin init function registered" << LL_ENDL;
+        return -1;
     }
 
-    if(result == 0)
+    int result = sStaticInitFunction(staticReceiveMessage, (void*)this, &mPluginSendMessageFunction, &mPluginUserData);
+    if (result != 0)
     {
-        result = init_function(staticReceiveMessage, (void*)this, &mPluginSendMessageFunction, &mPluginUserData);
-
-        if(result != 0)
-        {
-            LL_WARNS("Plugin") << "call to init function failed with error " << result << LL_ENDL;
-        }
+        LL_WARNS("Plugin") << "call to init function failed with error " << result << LL_ENDL;
     }
 
     return result;

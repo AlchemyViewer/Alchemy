@@ -238,14 +238,10 @@ std::string LLDir_Linux::getCurPath()
     return tmp_str;
 }
 
-/*virtual*/ std::string LLDir_Linux::getLLPluginLauncher()
-{
-    return gDirUtilp->getExecutableDir() + gDirUtilp->getDirDelimiter() +
-        "SLPlugin";
-}
-
 /*virtual*/ std::string LLDir_Linux::getLLPluginFilename(std::string base_name)
 {
-    return gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() +
-        "lib" + base_name + ".so";
+    // Each plugin is now its own host executable named exactly for the plugin
+    // (e.g. media_plugin_cef), launched directly - there is no separate SLPlugin
+    // launcher or dlopen'd .so any more.
+    return gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() + base_name;
 }

@@ -30,8 +30,6 @@
 
 #include "llstring.h"
 
-#include <boost/dll/shared_library.hpp>
-
 /**
  * @brief LLPluginInstanceMessageListener receives messages sent from the plugin loader shell to the plugin.
  */
@@ -53,8 +51,9 @@ public:
     LLPluginInstance(LLPluginInstanceMessageListener *owner);
     virtual ~LLPluginInstance();
 
-    // Load a plugin dll/dylib/so
-    // Returns 0 if successful, APR error code or error code returned from the plugin's init function on failure.
+    // Run the statically-linked plugin's init function (registered via
+    // setStaticInitFunction). plugin_dir/plugin_file are ignored - kept only for
+    // the load_plugin message contract. Returns 0 on success.
     int load(const std::string& plugin_dir, std::string &plugin_file);
 
     // Sends a message to the plugin.
@@ -80,22 +79,16 @@ public:
     */
     typedef int (*pluginInitFunction) (sendMessageFunction host_send_func, void *host_user_data, sendMessageFunction *plugin_send_func, void **plugin_user_data);
 
-   /** Name of plugin init function */
-    static const char *PLUGIN_INIT_FUNCTION_NAME;
-
-    // Register a statically-linked plugin init entry point. When set, load()
-    // calls it directly instead of dlopen()ing a plugin library. Used by
-    // dedicated single-plugin host executables (see slplugin) to avoid dlopen
-    // of large TLS-using libraries (CEF on Linux) and to satisfy the Windows
-    // sandbox requirement that the host and its sub-processes be one image.
-    // Process-global: a host links exactly one plugin.
+    // Register the statically-linked plugin init entry point. Each plugin now
+    // lives in its own host executable that links exactly one plugin, so load()
+    // always calls this directly - there is no dlopen path. (This also satisfies
+    // the Windows sandbox requirement that a host and its sub-processes be one
+    // image, and avoids dlopen of large TLS-using libraries like CEF on Linux.)
     static void setStaticInitFunction(pluginInitFunction func);
 
 private:
     static void staticReceiveMessage(const char *message_string, void **user_data);
     void receiveMessage(const char *message_string);
-
-    boost::dll::shared_library mDSOHandle;
 
     void *mPluginUserData;
     sendMessageFunction mPluginSendMessageFunction;

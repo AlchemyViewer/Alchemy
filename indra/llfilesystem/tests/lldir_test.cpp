@@ -133,11 +133,6 @@ struct LLDir_Dummy: public LLDir
         return (mFilesystem.find(pathname) != mFilesystem.end());
     }
 
-    virtual std::string getLLPluginLauncher()
-    {
-        // Implement this when we write a test that needs it
-        return "";
-    }
 
     virtual std::string getLLPluginFilename(std::string base_name)
     {

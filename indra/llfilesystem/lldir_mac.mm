@@ -208,16 +208,13 @@ std::string LLDir_Mac::getCurPath()
     return std::filesystem::path( std::filesystem::current_path() ).string();
 }
 
-/*virtual*/ std::string LLDir_Mac::getLLPluginLauncher()
-{
-    return gDirUtilp->getAppRODataDir() + gDirUtilp->getDirDelimiter() +
-        "SLPlugin.app/Contents/MacOS/SLPlugin";
-}
-
 /*virtual*/ std::string LLDir_Mac::getLLPluginFilename(std::string base_name)
 {
-    return gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() +
-        base_name + ".dylib";
+    // Each plugin is now its own host .app bundle named for the plugin
+    // (e.g. media_plugin_cef.app), launched directly - there is no separate
+    // SLPlugin launcher or dlopen'd .dylib any more.
+    return gDirUtilp->getAppRODataDir() + gDirUtilp->getDirDelimiter() +
+        base_name + ".app/Contents/MacOS/" + base_name;
 }
 
 

@@ -42,13 +42,13 @@
 #include <fstream>
 using namespace std;
 
-// Returns the statically-linked plugin init entry point for this host, or NULL
-// for the generic SLPlugin (which dlopen()s the plugin named in load_plugin).
-// Each SLPlugin variant links exactly one definition: slplugin_generic.cpp
-// (NULL) or a per-plugin file such as slplugin_cef.cpp (&LLPluginInitEntryPoint).
+// Returns the statically-linked plugin init entry point for this host. Each
+// per-plugin host executable links exactly one definition: slplugin_static.cpp
+// for a plain plugin, or slplugin_cef.cpp for the CEF host - both return
+// &LLPluginInitEntryPoint (there is no dlopen path any more).
 LLPluginInstance::pluginInitFunction ll_get_static_plugin_init();
 
-// The host driver: register the (static or dlopen'd) plugin, then pump the
+// The host driver: register the statically-linked plugin, then pump the
 // plugin<->parent message loop until the plugin is done. Factored out of the
 // platform entry points so the CEF bootstrap host (slplugin_cef_bootstrap.cpp)
 // can reuse it after setting up the sandbox. Defined below.
@@ -57,11 +57,11 @@ int slplugin_run(U32 port);
 // Host-provided entry the platform main() hands control to. Serves connection
 // `port`; if `daemon_rendezvous` is non-empty the host runs as the shared
 // multi-tab CEF daemon (publishing its control port to that path), otherwise it
-// serves the single connection. The generic loader's definition
-// (slplugin_generic.cpp) just calls slplugin_run(); the CEF host's
-// (slplugin_cef.cpp) adds the persistent-runtime / daemon behaviour, keeping
-// dullahan out of the generic host. The Windows CEF DLL uses its own bootstrap
-// entry (slplugin_cef_bootstrap.cpp) instead of this. Mirrors the per-host
+// serves the single connection. The plain hosts' definition (slplugin_static.cpp)
+// just calls slplugin_run(); the CEF host's (slplugin_cef.cpp) adds the
+// persistent-runtime / daemon behaviour, keeping dullahan out of the other
+// hosts. The Windows CEF DLL uses its own bootstrap entry
+// (slplugin_cef_bootstrap.cpp) instead of this. Mirrors the per-host
 // ll_get_static_plugin_init() hook above.
 int ll_run_slplugin_host(U32 port, const std::string& daemon_rendezvous);
 

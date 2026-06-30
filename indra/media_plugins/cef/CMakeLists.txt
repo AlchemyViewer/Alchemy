@@ -49,11 +49,10 @@ endif ()
 
 list(APPEND media_plugin_cef_SOURCE_FILES ${media_plugin_cef_HEADER_FILES})
 
-# Compile the plugin sources once into an object library so they can be both
-# built into the loadable media_plugin_cef module (the legacy dlopen path) and
-# statically linked into the dedicated SLPluginCEF host (Phase 2). Static
-# linking avoids dlopen of libcef - which exhausts the static TLS block on
-# Linux - and is the basis for the Windows-sandbox single-image host.
+# Compile the plugin sources once into an object library, statically linked into
+# the media_plugin_cef host executable below. Static linking avoids dlopen of
+# libcef (which exhausts the static TLS block on Linux) and is the basis for the
+# Windows-sandbox single-image host.
 add_library(media_plugin_cef_objs OBJECT ${media_plugin_cef_SOURCE_FILES})
 target_link_libraries(media_plugin_cef_objs PUBLIC
         media_plugin_base
@@ -62,33 +61,15 @@ target_link_libraries(media_plugin_cef_objs PUBLIC
         ll::glib_headers
 )
 
-add_library(media_plugin_cef
-    SHARED
-    ${media_plugin_cef_SOURCE_FILES}
-    )
-
-target_link_libraries(media_plugin_cef
-        media_plugin_base
-        dullahan
-        ll::cef
-        ll::glib_headers
-)
-
+### media_plugin_cef - the CEF media plugin's dedicated host executable. It
+### statically links the plugin object code plus the slplugin host driver and
+### slplugin_cef.cpp (which registers the linked entry point and adds the shared
+### daemon mode + CEF runtime lifecycle). There is no dlopen'd plugin library any
+### more. On Windows it is a DLL exporting RunWinMain, loaded by CEF's bootstrap
+### executable (shipped renamed to media_plugin_cef.exe) which sets up the
+### sandbox; elsewhere it is a plain executable.
 if (WINDOWS)
-    # zero-copy paint producer: D3D11 keyed-mutex shared texture
-    target_link_libraries(media_plugin_cef d3d11 dxgi)
-endif ()
-
-add_dependencies(media_plugin_cef dullahan_host)
-
-### SLPluginCEF - dedicated host that statically links the CEF plugin instead of
-### dlopen()ing it. Both forms reuse the generic slplugin host driver
-### (slplugin.cpp) plus slplugin_cef.cpp (registers the linked entry point).
-### On Windows it is a DLL exporting RunWinMain, loaded by CEF's bootstrap
-### executable (shipped renamed to SLPluginCEF.exe) which sets up the sandbox;
-### elsewhere it is a plain executable.
-if (WINDOWS)
-    add_library(SLPluginCEF MODULE
+    add_library(media_plugin_cef MODULE
         ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
         ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_daemon.cpp
         slplugin_cef.cpp
@@ -96,7 +77,7 @@ if (WINDOWS)
         $<TARGET_OBJECTS:media_plugin_cef_objs>
         )
 else ()
-    add_executable(SLPluginCEF
+    add_executable(media_plugin_cef
         MACOSX_BUNDLE
         ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin.cpp
         ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin_daemon.cpp
@@ -104,19 +85,19 @@ else ()
         $<TARGET_OBJECTS:media_plugin_cef_objs>
         )
     if (DARWIN)
-        target_sources(SLPluginCEF PRIVATE ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm)
+        target_sources(media_plugin_cef PRIVATE ${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm)
         set_source_files_properties(${CMAKE_SOURCE_DIR}/llplugin/slplugin/slplugin-objc.mm
             PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 
-        set_target_properties(SLPluginCEF PROPERTIES
+        set_target_properties(media_plugin_cef PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/SLPluginCEF-Info.plist.in
-            MACOSX_BUNDLE_GUI_IDENTIFIER "org.achemyviewer.viewer.slplugincef"
-            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.achemyviewer.viewer.slplugincef"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "org.achemyviewer.viewer.mediaplugincef"
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.achemyviewer.viewer.mediaplugincef"
         )
     endif ()
 endif ()
 
-target_link_libraries(SLPluginCEF
+target_link_libraries(media_plugin_cef
         media_plugin_base
         dullahan
         ll::cef
@@ -129,38 +110,30 @@ target_link_libraries(SLPluginCEF
 
 if (WINDOWS)
     # zero-copy paint producer: D3D11 keyed-mutex shared texture
-    target_link_libraries(SLPluginCEF d3d11 dxgi)
+    target_link_libraries(media_plugin_cef d3d11 dxgi)
 endif ()
 
-add_dependencies(SLPluginCEF media_plugin_cef)
+add_dependencies(media_plugin_cef dullahan_host)
 
 if (WINDOWS)
+  # media_plugin_cef.dll lives next to libcef.dll and the CEF bootstrap (deployed
+  # below) so the CEF runtime resolves from its own dir.
   set_target_properties(media_plugin_cef
-    PROPERTIES
-    EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON
-    RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
-  )
-  target_link_options(media_plugin_cef PRIVATE /MANIFEST:NO /IGNORE:4099)
-
-  # SLPluginCEF.dll lives next to libcef.dll and the CEF bootstrap (deployed
-  # below by media_plugin_cef) so the CEF runtime resolves from its own dir.
-  set_target_properties(SLPluginCEF
     PROPERTIES
     EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON
     RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
     LIBRARY_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
   )
-  target_link_options(SLPluginCEF PRIVATE /IGNORE:4099)
+  target_link_options(media_plugin_cef PRIVATE /IGNORE:4099)
 
-  # Ship CEF's bootstrap.exe renamed to SLPluginCEF.exe; matching base name makes
-  # it load SLPluginCEF.dll and call our exported RunWinMain with the sandbox
-  # info. media_plugin_cef (a dependency) has already copied bootstrap.exe into
-  # the llplugin dir by this point.
-  add_custom_command(TARGET SLPluginCEF POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VIEWER_STAGING_DIR}/llplugin/bootstrap.exe" "${VIEWER_STAGING_DIR}/llplugin/SLPluginCEF.exe"
+  # Ship CEF's bootstrap.exe renamed to media_plugin_cef.exe; matching base name
+  # makes it load media_plugin_cef.dll and call our exported RunWinMain with the
+  # sandbox info. The bootstrap.exe is part of the CEF Release payload copied below.
+  add_custom_command(TARGET media_plugin_cef POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VIEWER_STAGING_DIR}/llplugin/bootstrap.exe" "${VIEWER_STAGING_DIR}/llplugin/media_plugin_cef.exe"
   )
 
-  # Copy plugin files to packaging directory
+  # Copy the CEF runtime + resources to the packaging directory.
   set(CEF_BIN_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/cef-bin")
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD
@@ -205,20 +178,6 @@ elseif (DARWIN)
     ${CORESERVICES_LIBRARY}     # for Component Manager calls
     ${AUDIOUNIT_LIBRARY}        # for AudioUnit calls
     )
-
-    target_link_libraries(SLPluginCEF
-    ${IOSURFACE_FRAMEWORK}
-    ${COREGRAPHICS_FRAMEWORK}
-    )
-
-  # Don't prepend 'lib' to the executable name, and don't embed a full path in the library's install name
-  set_target_properties(
-    media_plugin_cef
-    PROPERTIES
-    PREFIX ""
-    BUILD_WITH_INSTALL_RPATH 1
-    INSTALL_RPATH "@executable_path/../Frameworks"
-  )
 
 elseif (LINUX)
   target_link_options(media_plugin_cef PRIVATE  "LINKER:--build-id" "LINKER:-rpath,'$ORIGIN:$ORIGIN/../../lib'")

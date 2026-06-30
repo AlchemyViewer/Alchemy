@@ -45,7 +45,6 @@ public:
     /*virtual*/ std::string getCurPath();
     /*virtual*/ U32 countFilesInDir(const std::string &dirname, const std::string &mask);
 
-    /*virtual*/ std::string getLLPluginLauncher();
     /*virtual*/ std::string getLLPluginFilename(std::string base_name);
 
 private:

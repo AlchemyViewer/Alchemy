@@ -2022,8 +2022,6 @@ if (WINDOWS)
   add_custom_target(copy_input_dependencies
       DEPENDS
       stage_third_party_libs
-      SLPlugin
-      $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:$<TARGET_NAME_IF_EXISTS:SLPluginCEF>>
       $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:$<TARGET_NAME_IF_EXISTS:media_plugin_cef>>
       $<TARGET_NAME_IF_EXISTS:media_plugin_gstreamer10>
       $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:$<TARGET_NAME_IF_EXISTS:media_plugin_libvlc>>
@@ -2033,8 +2031,6 @@ else()
   add_custom_target(copy_input_dependencies
       DEPENDS
       stage_third_party_libs
-      SLPlugin
-      $<TARGET_NAME_IF_EXISTS:SLPluginCEF>
       $<TARGET_NAME_IF_EXISTS:media_plugin_cef>
       $<TARGET_NAME_IF_EXISTS:media_plugin_gstreamer10>
       $<TARGET_NAME_IF_EXISTS:media_plugin_libvlc>
