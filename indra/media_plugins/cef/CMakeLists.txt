@@ -120,33 +120,33 @@ if (WINDOWS)
   # below) so the CEF runtime resolves from its own dir.
   set_target_properties(media_plugin_cef
     PROPERTIES
-    EXCLUDE_FROM_DEFAULT_BUILD_DEBUG ON
     RUNTIME_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
     LIBRARY_OUTPUT_DIRECTORY "${VIEWER_STAGING_DIR}/llplugin"
   )
   target_link_options(media_plugin_cef PRIVATE /IGNORE:4099)
 
   set(CEF_BIN_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/cef-bin")
+  set(CEF_BIN_BINARY_DIR "$<IF:$<CONFIG:Debug>,${CEF_BIN_DIR}/Debug,${CEF_BIN_DIR}/Release>")
 
   # Ship CEF's bootstrap.exe renamed to media_plugin_cef.exe; matching base name
   # makes it load media_plugin_cef.dll and call our exported RunWinMain with the
   # sandbox info. The bootstrap.exe is part of the CEF Release payload copied below.
   add_custom_command(TARGET media_plugin_cef POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CEF_BIN_DIR}/Release/bootstrap.exe" "${VIEWER_STAGING_DIR}/llplugin/media_plugin_cef.exe"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CEF_BIN_BINARY_DIR}/bootstrap.exe" "${VIEWER_STAGING_DIR}/llplugin/media_plugin_cef.exe"
   )
 
   # Copy the CEF runtime + resources to the packaging directory.
   set(CEF_BIN_FILES
-    "${CEF_BIN_DIR}/Release/chrome_elf.dll"
-    "${CEF_BIN_DIR}/Release/d3dcompiler_47.dll"
-    "${CEF_BIN_DIR}/Release/dxcompiler.dll"
-    "${CEF_BIN_DIR}/Release/dxil.dll"
-    "${CEF_BIN_DIR}/Release/libEGL.dll"
-    "${CEF_BIN_DIR}/Release/libGLESv2.dll"
-    "${CEF_BIN_DIR}/Release/v8_context_snapshot.bin"
-    "${CEF_BIN_DIR}/Release/vk_swiftshader.dll"
-    "${CEF_BIN_DIR}/Release/vk_swiftshader_icd.json"
-    "${CEF_BIN_DIR}/Release/vulkan-1.dll"
+    "${CEF_BIN_BINARY_DIR}/chrome_elf.dll"
+    "${CEF_BIN_BINARY_DIR}/d3dcompiler_47.dll"
+    "${CEF_BIN_BINARY_DIR}/dxcompiler.dll"
+    "${CEF_BIN_BINARY_DIR}/dxil.dll"
+    "${CEF_BIN_BINARY_DIR}/libEGL.dll"
+    "${CEF_BIN_BINARY_DIR}/libGLESv2.dll"
+    "${CEF_BIN_BINARY_DIR}/v8_context_snapshot.bin"
+    "${CEF_BIN_BINARY_DIR}/vk_swiftshader.dll"
+    "${CEF_BIN_BINARY_DIR}/vk_swiftshader_icd.json"
+    "${CEF_BIN_BINARY_DIR}/vulkan-1.dll"
   )
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD

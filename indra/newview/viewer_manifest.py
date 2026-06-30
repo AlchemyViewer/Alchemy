@@ -514,23 +514,21 @@ class Windows_x86_64_Manifest(ViewerManifest):
             self.path(self.final_exe())
             self.path("*.dll")
 
-        # Plugins are only built in non-debug builds on windows
-        if self.args['buildtype'].lower() != 'debug':
-            with self.prefix(src_dst=os.path.join(self.get_dst_prefix(), 'llplugin')):
-                # Per-plugin host executables (media_plugin_*.exe, including the
-                # renamed CEF bootstrap media_plugin_cef.exe) and their dependency
-                # DLLs (media_plugin_cef.dll, libcef.dll, ...). The *.exe / *.dll
-                # globs below pick them all up.
-                self.path("*.dll")
-                # CEF files
-                self.path("*.exe")
-                self.path("*.pak")
-                self.path("*.bin")
-                self.path("*.json")
-                # VLC files
-                self.path("*.dat")
-                self.path("locales")
-                self.path("plugins")
+        with self.prefix(src_dst=os.path.join(self.get_dst_prefix(), 'llplugin')):
+            # Per-plugin host executables (media_plugin_*.exe, including the
+            # renamed CEF bootstrap media_plugin_cef.exe) and their dependency
+            # DLLs (media_plugin_cef.dll, libcef.dll, ...). The *.exe / *.dll
+            # globs below pick them all up.
+            self.path("*.dll")
+            # CEF files
+            self.path("*.exe")
+            self.path("*.pak")
+            self.path("*.bin")
+            self.path("*.json")
+            # VLC files
+            self.path("*.dat")
+            self.path("locales")
+            self.path("plugins")
 
         self.path(src="licenses-win32.txt", dst="licenses.txt")
         self.path("featuretable.txt")
