@@ -188,6 +188,9 @@ public:
 
     void *getPlatformWindow() override;
 
+    // "wayland" / "x11" / "" - reports the SDL video driver this window is on.
+    std::string getDisplayServer() const override;
+
     void bringToFront() override;
 
     void setLanguageTextInput(const LLCoordGL& pos) override;

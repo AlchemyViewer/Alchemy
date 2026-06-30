@@ -1163,6 +1163,7 @@ class LinuxManifest(ViewerManifest):
             with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'media_plugins')):
                 with self.prefix(src=os.path.join('cef', self.args['configuration'])):
                     self.path("libmedia_plugin_cef.so")
+                    self.path("SLPluginCEF")
 
                 # Media plugins - LibVLC
                 with self.prefix(src=os.path.join('libvlc', self.args['configuration'])):
@@ -1176,6 +1177,34 @@ class LinuxManifest(ViewerManifest):
                 if self.channel_type() != 'release':
                     with self.prefix(src=os.path.join('example', self.args['configuration'])):
                         self.path("libmedia_plugin_example.so")
+
+                with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'dullahan', self.args['configuration'])):
+                    self.path( "dullahan_host" )
+
+                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'lib')):
+                    self.path( "libcef.so" )
+
+                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Release')):
+                    self.path( "libEGL*" )
+                    self.path( "libvulkan*" )
+                    self.path( "libvk_swiftshader*" )
+                    self.path( "libGLESv2*" )
+                    self.path( "v8_context_snapshot.bin" )
+                    self.path( "vk_swiftshader_icd.json")
+
+                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Release')):
+                    self.path( "chrome-sandbox" )
+                    self.path( "v8_context_snapshot.bin" )
+                    self.path( "vk_swiftshader_icd.json")
+
+                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Resources')):
+                    self.path( "chrome_100_percent.pak" )
+                    self.path( "chrome_200_percent.pak" )
+                    self.path( "resources.pak" )
+                    self.path( "icudtl.dat" )
+
+                with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Resources', 'locales'), dst="locales"):
+                    self.path("*.pak")
 
         with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'dullahan', self.args['configuration']), dst="bin"):
             self.path( "dullahan_host" )

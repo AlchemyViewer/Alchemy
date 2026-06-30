@@ -184,6 +184,11 @@ public:
     void setUseAcceleratedPaint(bool b) { mUseAcceleratedPaint = b; };
     bool getUseAcceleratedPaint() const { return mUseAcceleratedPaint; };
 
+    // Linux: the viewer's windowing backend ("wayland"/"x11"), forwarded to the
+    // CEF plugin in init() so its Ozone platform matches ours. Empty lets the
+    // plugin auto-detect. Set before init().
+    void setDisplayServer(const std::string& display_server) { mDisplayServer = display_server; };
+
     // Per-media id sent to the plugin in init() and tagged onto each macOS
     // IOSurface mach-port message, so the process-global viewer-side receiver can
     // demux surfaces from many tabs/plugin processes back to the right media.
@@ -201,12 +206,9 @@ public:
     int getAcceleratedPaintHeight() const { return mAcceleratedPaintHeight; };
     unsigned long long getAcceleratedPaintHandle() const { return mAcceleratedPaintHandle; };
     void clearAcceleratedPaintDirty() { mAcceleratedPaintDirty = false; };
-    // Linux dma-buf layout (0 on Windows/macOS): the handle is an fd in process
-    // getAcceleratedPaintSrcPid(), with this plane stride/offset and DRM modifier.
-    int getAcceleratedPaintStride() const { return mAcceleratedPaintStride; };
-    unsigned long long getAcceleratedPaintOffset() const { return mAcceleratedPaintOffset; };
-    unsigned long long getAcceleratedPaintModifier() const { return mAcceleratedPaintModifier; };
-    int getAcceleratedPaintSrcPid() const { return mAcceleratedPaintSrcPid; };
+    // The accelerated frame's pixel layout/handle travels out-of-band on macOS
+    // (IOSurface mach port) and Linux (dma-buf fds via SCM_RIGHTS, demuxed by accel
+    // id - see LLCEFSurfaceReceiver), so no dma-buf plumbing is carried here.
 
     // Inherited from LLPluginProcessParentOwner
     /* virtual */ void receivePluginMessage(const LLPluginMessage &message);
@@ -471,6 +473,8 @@ protected:
 
     // accelerated (zero-copy) paint - see setUseAcceleratedPaint / the getters above
     bool mUseAcceleratedPaint = false;
+    // Linux windowing backend name forwarded to the CEF plugin - see setDisplayServer.
+    std::string mDisplayServer;
     // Unique per-media id (macOS mach-port demux); assigned at construction.
     int mAccelId = 0;
     unsigned long long mAcceleratedPaintHandle = 0;   // native handle, dup'd into this process
@@ -478,11 +482,6 @@ protected:
     int mAcceleratedPaintWidth = 0;
     int mAcceleratedPaintHeight = 0;
     bool mAcceleratedPaintDirty = false;
-    // Linux dma-buf only:
-    int mAcceleratedPaintStride = 0;
-    unsigned long long mAcceleratedPaintOffset = 0;
-    unsigned long long mAcceleratedPaintModifier = 0;
-    int mAcceleratedPaintSrcPid = 0;
 
     LLRect mDirtyRect;
 

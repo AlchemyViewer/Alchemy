@@ -52,8 +52,11 @@
 #endif
 
 #if LL_LINUX
-#include <deque>
-#include <fcntl.h>
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
+#include <sys/socket.h>   // accelerated paint hands the viewer the dma-buf fds...
+#include <sys/un.h>       // ...over an AF_UNIX datagram, as SCM_RIGHTS ancillary data
 #endif
 
 #include "dullahan.h"
@@ -228,8 +231,8 @@ private:
     void onPageChangedCallback(const unsigned char* pixels, int x, int y, const int width, const int height);
     void onAcceleratedPaintCallback(void* native_handle, int format, int width, int height);
 #if LL_LINUX
-    void onAcceleratedPaintDmabufCallback(int fd, int format, int width, int height,
-                                          unsigned int stride, unsigned long long offset, unsigned long long modifier);
+    void onAcceleratedPaintDmabufCallback(const dullahan::dmabuf_plane* planes, int plane_count,
+                                          int format, int width, int height, unsigned long long modifier);
 #endif
     void onCustomSchemeURLCallback(std::string url, bool user_gesture, bool is_redirect);
     void onConsoleMessageCallback(std::string message, std::string source, int line);
@@ -271,6 +274,7 @@ private:
     bool mDisableWebSecurity;
     bool mFileAccessFromFileUrls;
     std::string mUserAgentSubtring;
+    std::string mDisplayServer;     // viewer's windowing backend ("wayland"/"x11"); Linux Ozone platform
     std::string mAuthUsername;
     std::string mAuthPassword;
     bool mAuthOK;
@@ -299,11 +303,6 @@ private:
     void* mViewerProcess;
 #if LL_WINDOWS
     CefAccelProducer* mAccelProducer;
-#endif
-#if LL_LINUX
-    // dma-buf fds dup'd from CEF, kept alive briefly so the viewer can re-open
-    // them via /proc/<pid>/fd before they are closed.
-    std::deque<int> mDmabufFdRing;
 #endif
 };
 
@@ -373,13 +372,6 @@ MediaPluginCEF::~MediaPluginCEF()
         CloseHandle((HANDLE)mViewerProcess);
         mViewerProcess = nullptr;
     }
-#endif
-#if LL_LINUX
-    for (int fd : mDmabufFdRing)
-    {
-        ::close(fd);
-    }
-    mDmabufFdRing.clear();
 #endif
 }
 
@@ -515,6 +507,107 @@ namespace
 }
 #endif // LL_DARWIN
 
+#if LL_LINUX
+namespace
+{
+    // Wire header shared with the viewer (newview/llcefsurfacereceiver.cpp).
+    // MUST stay in sync. The plane fds ride alongside as SCM_RIGHTS ancillary data.
+    struct CefDmabufMsg
+    {
+        int32_t  accel_id;
+        int32_t  plane_count;
+        int32_t  width;
+        int32_t  height;
+        int32_t  format;
+        uint32_t stride[4];
+        uint64_t offset[4];
+        uint64_t modifier;
+    };
+
+    // Hands CEF's accelerated-paint dma-buf to the viewer over an AF_UNIX datagram
+    // socket. CEF's dma-buf fd cannot cross to the viewer through the LLSD/TCP
+    // channel (text fd numbers re-opened via /proc fail with ENXIO for a dma-buf),
+    // so we pass the fds themselves as SCM_RIGHTS ancillary data. We send to the
+    // viewer's abstract socket named from its pid (learned via the init message's
+    // host_pid), tagging each frame with accel_id so the viewer demuxes it back.
+    class CefLinuxSurfaceSender
+    {
+    public:
+        // CEF's fds are valid only during this callback, but sendmsg() captures a
+        // kernel reference to each underlying dma-buf, so they survive until the
+        // viewer recvmsg()s them - we do not dup or keep them alive ourselves.
+        bool send(int host_pid, int accel_id, const dullahan::dmabuf_plane* planes, int plane_count,
+                  int format, int width, int height, unsigned long long modifier)
+        {
+            if (host_pid <= 0 || !planes || plane_count <= 0) return false;
+            if (plane_count > 4) plane_count = 4;
+
+            if (mSock < 0)
+            {
+                mSock = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+                if (mSock < 0) return false;
+            }
+
+            CefDmabufMsg hdr = {};
+            hdr.accel_id = accel_id;
+            hdr.plane_count = plane_count;
+            hdr.width = width;
+            hdr.height = height;
+            hdr.format = format;
+            hdr.modifier = modifier;
+            int fds[4];
+            for (int i = 0; i < plane_count; ++i)
+            {
+                fds[i] = planes[i].fd;
+                hdr.stride[i] = planes[i].stride;
+                hdr.offset[i] = planes[i].offset;
+            }
+
+            struct sockaddr_un addr;
+            memset(&addr, 0, sizeof(addr));
+            addr.sun_family = AF_UNIX;
+            int n = snprintf(addr.sun_path + 1, sizeof(addr.sun_path) - 1,
+                             "org.alchemyviewer.cefsurface.%d", host_pid);   // [0] NUL = abstract
+            socklen_t addrlen = (socklen_t)(offsetof(struct sockaddr_un, sun_path) + 1 + n);
+
+            struct iovec iov = { &hdr, sizeof(hdr) };
+            char cbuf[CMSG_SPACE(sizeof(int) * 4)];
+            memset(cbuf, 0, sizeof(cbuf));
+
+            struct msghdr msg;
+            memset(&msg, 0, sizeof(msg));
+            msg.msg_name = &addr;
+            msg.msg_namelen = addrlen;
+            msg.msg_iov = &iov;
+            msg.msg_iovlen = 1;
+            msg.msg_control = cbuf;
+            msg.msg_controllen = CMSG_SPACE(sizeof(int) * plane_count);
+
+            struct cmsghdr* c = CMSG_FIRSTHDR(&msg);
+            c->cmsg_level = SOL_SOCKET;
+            c->cmsg_type = SCM_RIGHTS;
+            c->cmsg_len = CMSG_LEN(sizeof(int) * plane_count);
+            memcpy(CMSG_DATA(c), fds, sizeof(int) * plane_count);
+
+            // Non-blocking + connectionless: a not-yet-listening viewer (ENOENT/
+            // ECONNREFUSED) or a full queue (EAGAIN) just drops this frame; the
+            // viewer keeps the previous frame and we send a fresh one next paint.
+            ssize_t s = sendmsg(mSock, &msg, MSG_DONTWAIT | MSG_NOSIGNAL);
+            return s == (ssize_t)sizeof(hdr);
+        }
+
+    private:
+        int mSock = -1;
+    };
+
+    CefLinuxSurfaceSender& linuxSurfaceSender()
+    {
+        static CefLinuxSurfaceSender sSender;
+        return sSender;
+    }
+}
+#endif // LL_LINUX
+
 // duplicated handle, so it can open the texture and bind it with no CPU copy.
 // The handle is only valid for the duration of this callback, so duplicate now.
 void MediaPluginCEF::onAcceleratedPaintCallback(void* native_handle, int format, int width, int height)
@@ -604,38 +697,30 @@ void MediaPluginCEF::onAcceleratedPaintCallback(void* native_handle, int format,
 
 #if LL_LINUX
 ////////////////////////////////////////////////////////////////////////////////
-// Linux zero-copy paint: CEF hands us a dma-buf (fd + plane layout) valid only
-// for this callback. dup the fd and keep it alive briefly so the viewer can
-// re-open it via /proc/<our pid>/fd/<fd> (no SCM_RIGHTS side channel needed),
-// then send the fd number + layout. Single plane only.
-void MediaPluginCEF::onAcceleratedPaintDmabufCallback(int fd, int format, int width, int height,
-                                                      unsigned int stride, unsigned long long offset, unsigned long long modifier)
+// Linux zero-copy paint: CEF hands us a dma-buf (one or more planes + a DRM
+// modifier) valid only for this callback. Pass the plane fds to the viewer over
+// the SCM_RIGHTS side channel - a dma-buf fd cannot be reopened across the
+// process boundary via /proc (open() returns ENXIO), so the fds themselves must
+// be handed over as ancillary data. Then post the usual LLSD "dirty" trigger; the
+// fds arrived out-of-band, demuxed by accel_id, mirroring the macOS IOSurface path.
+void MediaPluginCEF::onAcceleratedPaintDmabufCallback(const dullahan::dmabuf_plane* planes, int plane_count,
+                                                      int format, int width, int height, unsigned long long modifier)
 {
-    if (fd < 0)
+    if (!planes || plane_count <= 0)
     {
         return;
     }
-    int dupfd = dup(fd);
-    if (dupfd < 0)
+
+    if (!linuxSurfaceSender().send(mHostPid, mAccelId, planes, plane_count, format, width, height, modifier))
     {
-        return;
-    }
-    mDmabufFdRing.push_back(dupfd);
-    while (mDmabufFdRing.size() > 4)
-    {
-        ::close(mDmabufFdRing.front());
-        mDmabufFdRing.pop_front();
+        return;   // viewer not listening yet / queue full - retried next paint
     }
 
     LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "accelerated_paint");
-    message.setValue("handle", std::to_string((unsigned long long)dupfd));
-    message.setValueS32("src_pid", (S32)getpid());
+    message.setValue("handle", "0");   // fds came via the side channel, not here
     message.setValueS32("format", format);
     message.setValueS32("width", width);
     message.setValueS32("height", height);
-    message.setValueS32("stride", (S32)stride);
-    message.setValue("offset", std::to_string(offset));
-    message.setValue("modifier", std::to_string(modifier));
     sendMessage(message);
 }
 #endif
@@ -1070,16 +1155,19 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 mUseAcceleratedPaint = message_in.getValueBoolean("accelerated_paint");
                 mHostPid = message_in.getValueS32("host_pid");
                 mAccelId = message_in.getValueS32("accel_id");
+                // Linux: the viewer's windowing backend, used below to pin CEF's
+                // Ozone platform (X11 vs Wayland) instead of guessing from env.
+                mDisplayServer = message_in.getValue("display_server");
 
                 // event callbacks from Dullahan
                 mCEFLib->setOnPageChangedCallback(std::bind(&MediaPluginCEF::onPageChangedCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4, std::placeholders::_5));
                 if (mUseAcceleratedPaint)
                 {
 #if LL_LINUX
-                    // Linux frames are dma-bufs (fd + layout), not a single handle.
+                    // Linux frames are dma-bufs (planes + modifier), not a single handle.
                     mCEFLib->setOnAcceleratedPaintDmabufCallback(std::bind(&MediaPluginCEF::onAcceleratedPaintDmabufCallback, this,
-                        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4,
-                        std::placeholders::_5, std::placeholders::_6, std::placeholders::_7));
+                        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
+                        std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
 #else
                     mCEFLib->setOnAcceleratedPaintCallback(std::bind(&MediaPluginCEF::onAcceleratedPaintCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
 #endif
@@ -1128,6 +1216,10 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
 
                 settings.root_cache_path = mRootCachePath;
                 settings.cookies_enabled = mCookiesEnabled;
+
+                // Linux only: pin CEF's Ozone backend to the viewer's windowing
+                // backend (empty = let dullahan auto-detect). No-op elsewhere.
+                settings.ozone_platform = mDisplayServer;
 
                 // configure proxy argument if enabled and valid
                 if (mProxyEnabled && mProxyHost.length())

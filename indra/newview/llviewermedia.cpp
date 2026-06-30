@@ -1963,6 +1963,16 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 
             media_source->setTarget(target);
 
+#if LL_LINUX
+            // Tell the CEF plugin which windowing backend the viewer is on so
+            // its Ozone platform (X11 vs Wayland) matches ours, rather than the
+            // plugin guessing from its own subprocess environment.
+            if (gViewerWindow && gViewerWindow->getWindow())
+            {
+                media_source->setDisplayServer(gViewerWindow->getWindow()->getDisplayServer());
+            }
+#endif
+
             const std::string plugin_dir = gDirUtilp->getLLPluginDir();
             if (media_source->init(launcher_name, plugin_dir, plugin_name, gSavedSettings.getBOOL("PluginAttachDebuggerToPlugins")))
             {
@@ -3087,10 +3097,11 @@ void LLViewerMediaImpl::update()
     // thread and we're done.
     if (mMediaSource->getUseAcceleratedPaint())
     {
-#if LL_DARWIN
-        // Register the mach receive port up front (not gated on a frame): the
-        // plugin only starts producing once our bootstrap service exists, so
-        // waiting for the first frame to register would deadlock.
+#if LL_DARWIN || LL_LINUX
+        // Bring up the surface side channel up front (not gated on a frame): the
+        // plugin only starts producing once our receive endpoint exists (mach port
+        // on macOS, AF_UNIX socket on Linux), so waiting for the first frame to
+        // register would deadlock.
         LLCEFSurfaceReceiver::instance().ensureStarted();
 #endif
         if (!mSuspendUpdates && mVisible && mMediaSource->getAcceleratedPaintDirty())
@@ -3289,7 +3300,7 @@ bool LLViewerMediaImpl::updateAcceleratedTexture()
                                         mMediaSource->getAcceleratedPaintFormat(),
                                         0, 0, 0, 0);
     }
-#else
+#elif LL_WINDOWS
     // The handle is persistent (re)sent only on (re)create. (Re)bind the interop
     // when it differs from what we have bound; only advance mAccelBoundHandle on a
     // successful bind so a transient failure is retried with the same handle.
@@ -3299,11 +3310,7 @@ bool LLViewerMediaImpl::updateAcceleratedTexture()
         if (mAccelInterop->setStableTexture(handle,
                                             mMediaSource->getAcceleratedPaintWidth(),
                                             mMediaSource->getAcceleratedPaintHeight(),
-                                            mMediaSource->getAcceleratedPaintFormat(),
-                                            (unsigned int)mMediaSource->getAcceleratedPaintStride(),
-                                            mMediaSource->getAcceleratedPaintOffset(),
-                                            mMediaSource->getAcceleratedPaintModifier(),
-                                            mMediaSource->getAcceleratedPaintSrcPid()))
+                                            mMediaSource->getAcceleratedPaintFormat()))
         {
             mAccelBoundHandle = handle;
         }
@@ -3311,6 +3318,32 @@ bool LLViewerMediaImpl::updateAcceleratedTexture()
         {
             return false;
         }
+    }
+#else  // LL_LINUX
+    // CEF's dma-buf fds arrive out-of-band via the SCM_RIGHTS side channel (a
+    // dma-buf fd cannot cross the process boundary through the LLSD/TCP channel,
+    // nor be reopened via /proc), demuxed by this media's accel id. Take the
+    // newest frame, import its planes directly (the fds are open in this process),
+    // then close them. Keep the current binding if no new frame arrived this tick.
+    LLCEFSurfaceReceiver::DmabufFrame frame;
+    if (LLCEFSurfaceReceiver::instance().takeLatestDmabuf(mMediaSource->getAccelId(), frame))
+    {
+        unsigned long long plane_fds[4]     = {};
+        unsigned int       plane_strides[4] = {};
+        unsigned long long plane_offsets[4] = {};
+        for (int i = 0; i < frame.plane_count && i < 4; ++i)
+        {
+            plane_fds[i]     = (unsigned long long)frame.fd[i];
+            plane_strides[i] = frame.stride[i];
+            plane_offsets[i] = frame.offset[i];
+        }
+        // The interop imports the fds directly (no /proc); we own them and close
+        // them right after - EGL keeps its own reference once the image is made.
+        mAccelInterop->setStableTexture(plane_fds[0],
+                                        frame.width, frame.height, frame.format,
+                                        plane_strides[0], plane_offsets[0], frame.modifier,
+                                        0, frame.plane_count, plane_fds, plane_strides, plane_offsets);
+        frame.closeFds();
     }
 #endif
 

@@ -266,6 +266,13 @@ PFNGLXQUERYRENDERERSTRINGMESAPROC glXQueryRendererStringMESA = nullptr;
 #if LL_LINUX && LL_WAYLAND &&!LL_MESA_HEADLESS
 // EGL_VERSION_1_0
 PFNEGLQUERYSTRINGPROC eglQueryString = nullptr;
+
+// EGL_KHR_image
+PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR = nullptr;
+PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR = nullptr;
+
+// GL_OES_EGL_image
+PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES = nullptr;
 #endif
 
 // GL_VERSION_1_0
@@ -1096,7 +1103,14 @@ void LLGLManager::initEGL()
     reloadExtensionsString();
 
     // EGL_VERSION_1_0
-    eglQueryString = (PFNEGLQUERYSTRINGPROC)LL_GET_PROC_ADDRESS("eglQueryString");
+    eglQueryString = (PFNEGLQUERYSTRINGPROC)SDL_EGL_GetProcAddress("eglQueryString");
+
+    // EGL_KHR_image
+    eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC)SDL_EGL_GetProcAddress("eglCreateImageKHR");
+    eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC)SDL_EGL_GetProcAddress("eglDestroyImageKHR");
+
+    // GL_OES_EGL_image
+    glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)SDL_EGL_GetProcAddress("glEGLImageTargetTexture2DOES");
 
     LL_INFOS("RenderInit") << "EGL_VENDOR     " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VENDOR)) << LL_ENDL;
     LL_INFOS("RenderInit") << "EGL_VERSION    " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VERSION)) << LL_ENDL;
@@ -1573,7 +1587,7 @@ void LLGLManager::reloadExtensionsString()
         SDL_EGLDisplay egl_display = SDL_EGL_GetCurrentDisplay();
         if (egl_display)
         {
-            PFNEGLQUERYSTRINGPROC lleglQueryString = (PFNEGLQUERYSTRINGPROC)LL_GET_PROC_ADDRESS("eglQueryString");
+            PFNEGLQUERYSTRINGPROC lleglQueryString = (PFNEGLQUERYSTRINGPROC)SDL_EGL_GetProcAddress("eglQueryString");
             if (lleglQueryString)
             {
                 std::string egl_exts = ll_safe_string((const char*)lleglQueryString((EGLDisplay)egl_display, EGL_EXTENSIONS));

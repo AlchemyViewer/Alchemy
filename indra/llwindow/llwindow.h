@@ -207,6 +207,12 @@ public:
 // return a platform-specific window reference (HWND on Windows, WindowRef on the Mac, Gtk window on Linux)
     virtual void *getPlatformWindow() = 0;
 
+    // Lowercase name of the display server / windowing backend in use
+    // ("wayland" or "x11" on Linux/SDL). Empty when not applicable or unknown.
+    // Lets out-of-process children (e.g. the CEF media plugin) pin their backend
+    // to the viewer's instead of guessing from their own environment.
+    virtual std::string getDisplayServer() const { return {}; }
+
     // control platform's Language Text Input mechanisms.
     virtual void allowLanguageTextInput(LLPreeditor *preeditor, bool b) {}
     virtual void setLanguageTextInput( const LLCoordGL & pos ) {};

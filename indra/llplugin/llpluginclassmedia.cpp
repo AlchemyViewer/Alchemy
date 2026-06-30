@@ -105,6 +105,9 @@ bool LLPluginClassMedia::init(const std::string &launcher_filename, const std::s
 #else
     message.setValueS32("host_pid", (S32)getpid());
 #endif
+    // Linux: which windowing backend the viewer chose, so the CEF plugin can pin
+    // its Ozone platform (X11 vs Wayland) to match. Empty on other platforms.
+    message.setValue("display_server", mDisplayServer);
     sendMessage(message);
 
     mPlugin->init(launcher_filename, plugin_dir, plugin_filename, debug);
@@ -1082,6 +1085,13 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
             // means "same texture, new frame". Keep the last real handle so a
             // per-frame ping doesn't clear it before the consumer takes it. The
             // value is a decimal string so a 64-bit handle survives intact.
+            // On Windows the handle is the persistent shared-texture handle, sent
+            // only when it is (re)created (handle != 0, once per size); "0" means
+            // "same texture, new frame", so keep the last real handle. On macOS and
+            // Linux the frame travels out-of-band (IOSurface mach port / dma-buf
+            // SCM_RIGHTS), so handle is always "0" and this message is just the
+            // per-frame dirty trigger. Value is a decimal string so a 64-bit handle
+            // survives intact.
             unsigned long long h = strtoull(message.getValue("handle").c_str(), nullptr, 10);
             if (h != 0)
             {
@@ -1090,11 +1100,6 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
             mAcceleratedPaintFormat = message.getValueS32("format");
             mAcceleratedPaintWidth = message.getValueS32("width");
             mAcceleratedPaintHeight = message.getValueS32("height");
-            // Linux dma-buf layout (absent -> 0 on Windows/macOS).
-            mAcceleratedPaintStride = message.getValueS32("stride");
-            mAcceleratedPaintSrcPid = message.getValueS32("src_pid");
-            mAcceleratedPaintOffset = strtoull(message.getValue("offset").c_str(), nullptr, 10);
-            mAcceleratedPaintModifier = strtoull(message.getValue("modifier").c_str(), nullptr, 10);
             mAcceleratedPaintDirty = true;
             mediaEvent(LLPluginClassMediaOwner::MEDIA_EVENT_CONTENT_UPDATED);
         }

@@ -112,9 +112,12 @@ void LLCEFAccelInterop::shutdown()
 
 bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, int height,
                                          int format, unsigned int stride,
-                                         unsigned long long offset, unsigned long long modifier, int src_pid)
+                                         unsigned long long offset, unsigned long long modifier, int src_pid,
+                                         int plane_count, const unsigned long long* plane_fds,
+                                         const unsigned int* plane_strides, const unsigned long long* plane_offsets)
 {
     (void)format; (void)stride; (void)offset; (void)modifier; (void)src_pid;
+    (void)plane_count; (void)plane_fds; (void)plane_strides; (void)plane_offsets;
     if (!mValid || !handle)
     {
         return false;
@@ -301,9 +304,12 @@ void LLCEFAccelInterop::shutdown()
 
 bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, int height,
                                          int format, unsigned int stride,
-                                         unsigned long long offset, unsigned long long modifier, int src_pid)
+                                         unsigned long long offset, unsigned long long modifier, int src_pid,
+                                         int plane_count, const unsigned long long* plane_fds,
+                                         const unsigned int* plane_strides, const unsigned long long* plane_offsets)
 {
     (void)format; (void)stride; (void)offset; (void)modifier; (void)src_pid;
+    (void)plane_count; (void)plane_fds; (void)plane_strides; (void)plane_offsets;
     if (!mValid || !handle)
     {
         return false;
@@ -377,12 +383,11 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 #elif LL_LINUX  // import the plugin's dma-buf via EGL, blit to the media texture
 
 #include "llgl.h"
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include <GLES2/gl2ext.h>   // glEGLImageTargetTexture2DOES
+#include <SDL3/SDL.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstdio>
+#include <cstring>
 
 namespace
 {
@@ -392,12 +397,15 @@ namespace
         return (unsigned)a | ((unsigned)b << 8) | ((unsigned)c << 16) | ((unsigned)d << 24);
     }
 
+    // DRM "no explicit modifier" sentinel (from drm_fourcc.h; declared here to
+    // avoid a hard dependency on it). Must NOT be passed to eglCreateImageKHR as
+    // an explicit modifier - doing so fails the import.
+    static const unsigned long long DH_DRM_FORMAT_MOD_INVALID = 0x00ffffffffffffffULL;
+
     struct LinuxAccel
     {
         EGLDisplay display = EGL_NO_DISPLAY;
-        PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR = nullptr;
-        PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR = nullptr;
-        PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES = nullptr;
+        bool     has_import_modifiers = false;   // EGL_EXT_image_dma_buf_import_modifiers
 
         GLuint   tex = 0;          // GL texture the EGLImage is bound to
         EGLImageKHR image = EGL_NO_IMAGE_KHR;
@@ -424,18 +432,29 @@ LLCEFAccelInterop::~LLCEFAccelInterop()
 
 bool LLCEFAccelInterop::init()
 {
-    LinuxAccel* l = new LinuxAccel();
-    l->display = eglGetCurrentDisplay();   // requires the viewer to use an EGL context
-    l->eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR");
-    l->eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR");
-    l->glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES");
+    SDL_EGLDisplay egl_display = SDL_EGL_GetCurrentDisplay();
+    if(!egl_display)
+    {
+        LL_WARNS("Media") << "accelerated paint: EGL display not found (no EGL context?); CPU paint" << LL_ENDL;
+        return false;
+    }
 
-    if (l->display == EGL_NO_DISPLAY || !l->eglCreateImageKHR || !l->glEGLImageTargetTexture2DOES)
+    LinuxAccel* l = new LinuxAccel();
+    l->display = egl_display;   // requires the viewer to use an EGL context
+
+    if (l->display == EGL_NO_DISPLAY || !eglCreateImageKHR || !glEGLImageTargetTexture2DOES)
     {
         LL_WARNS("Media") << "accelerated paint: EGL dma-buf import unavailable (no EGL context?); CPU paint" << LL_ENDL;
         delete l;
         return false;
     }
+
+    // DRM format modifiers (tiling/compression) can only be passed to the import
+    // when the driver advertises this extension; otherwise we must let it assume
+    // the buffer's default layout. (Mesa supports it; this is a safety net.)
+    const char* exts = eglQueryString ? eglQueryString(l->display, EGL_EXTENSIONS) : nullptr;
+    l->has_import_modifiers = exts && strstr(exts, "EGL_EXT_image_dma_buf_import_modifiers") != nullptr;
+
     glGenTextures(1, &l->tex);
     mImpl = l;
     mValid = true;
@@ -460,53 +479,98 @@ void LLCEFAccelInterop::shutdown()
 
 bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, int height,
                                          int format, unsigned int stride,
-                                         unsigned long long offset, unsigned long long modifier, int src_pid)
+                                         unsigned long long offset, unsigned long long modifier, int src_pid,
+                                         int plane_count, const unsigned long long* plane_fds,
+                                         const unsigned int* plane_strides, const unsigned long long* plane_offsets)
 {
-    if (!mValid || !src_pid)
+    if (!mValid)
     {
         return false;
     }
+    (void)src_pid;   // unused on Linux: the fds arrive already open via SCM_RIGHTS
     LinuxAccel* l = (LinuxAccel*)mImpl;
 
-    // `handle` is the dma-buf fd number in the plugin process; re-open it here via
-    // /proc (the plugin keeps it alive briefly).
-    char path[64];
-    snprintf(path, sizeof(path), "/proc/%d/fd/%llu", src_pid, handle);
-    int fd = open(path, O_RDONLY | O_CLOEXEC);
-    if (fd < 0)
+    // Build a local plane table. The plane fds are already open in THIS (viewer)
+    // process - handed over by the plugin as SCM_RIGHTS ancillary data - so we
+    // import them directly (a dma-buf fd cannot be reopened via /proc anyway). We
+    // do NOT own them: the caller closes them after we return, and EGL keeps its
+    // own reference once the image is created. Fall back to the scalar
+    // handle/stride/offset for plane 0 if no array was supplied.
+    int n = plane_count;
+    if (n <= 0) n = 1;
+    if (n > 4) n = 4;
+    int                fds[4];
+    unsigned int       strides[4];
+    unsigned long long offsets[4];
+    for (int i = 0; i < n; ++i)
     {
-        return false;
+        fds[i]     = (int)(plane_fds ? plane_fds[i] : (i == 0 ? handle : 0));
+        strides[i] = plane_strides ? plane_strides[i] : (i == 0 ? stride : 0);
+        offsets[i] = plane_offsets ? plane_offsets[i] : (i == 0 ? offset : 0);
     }
 
     // CEF formats: 0 = RGBA_8888, 1 = BGRA_8888 (cef_color_type_t). Map to fourcc.
     unsigned int fourcc = (format == 0) ? dh_fourcc('A','B','2','4')    // DRM_FORMAT_ABGR8888 (RGBA)
                                         : dh_fourcc('A','R','2','4');   // DRM_FORMAT_ARGB8888 (BGRA)
 
-    EGLint attrs[] = {
-        EGL_WIDTH, width,
-        EGL_HEIGHT, height,
-        EGL_LINUX_DRM_FOURCC_EXT, (EGLint)fourcc,
-        EGL_DMA_BUF_PLANE0_FD_EXT, fd,
-        EGL_DMA_BUF_PLANE0_OFFSET_EXT, (EGLint)offset,
-        EGL_DMA_BUF_PLANE0_PITCH_EXT, (EGLint)stride,
-        EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT, (EGLint)(modifier & 0xFFFFFFFFu),
-        EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, (EGLint)(modifier >> 32),
-        EGL_NONE
-    };
+    // Pass the DRM modifier per plane ONLY when it's a real, known value and the
+    // driver supports import-with-modifiers. Passing DRM_FORMAT_MOD_INVALID (or
+    // any modifier without the extension) makes eglCreateImageKHR fail - the
+    // classic "accelerated web page renders grey".
+    const bool use_modifier = l->has_import_modifiers && modifier != DH_DRM_FORMAT_MOD_INVALID;
+
+    static const EGLint FD_ATTR[4]  = { EGL_DMA_BUF_PLANE0_FD_EXT, EGL_DMA_BUF_PLANE1_FD_EXT, EGL_DMA_BUF_PLANE2_FD_EXT, EGL_DMA_BUF_PLANE3_FD_EXT };
+    static const EGLint OFF_ATTR[4] = { EGL_DMA_BUF_PLANE0_OFFSET_EXT, EGL_DMA_BUF_PLANE1_OFFSET_EXT, EGL_DMA_BUF_PLANE2_OFFSET_EXT, EGL_DMA_BUF_PLANE3_OFFSET_EXT };
+    static const EGLint PIT_ATTR[4] = { EGL_DMA_BUF_PLANE0_PITCH_EXT, EGL_DMA_BUF_PLANE1_PITCH_EXT, EGL_DMA_BUF_PLANE2_PITCH_EXT, EGL_DMA_BUF_PLANE3_PITCH_EXT };
+    static const EGLint MLO_ATTR[4] = { EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT, EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT, EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT, EGL_DMA_BUF_PLANE3_MODIFIER_LO_EXT };
+    static const EGLint MHI_ATTR[4] = { EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT, EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT, EGL_DMA_BUF_PLANE3_MODIFIER_HI_EXT };
+
+    EGLint attrs[64];
+    int a = 0;
+    attrs[a++] = EGL_WIDTH;             attrs[a++] = width;
+    attrs[a++] = EGL_HEIGHT;            attrs[a++] = height;
+    attrs[a++] = EGL_LINUX_DRM_FOURCC_EXT; attrs[a++] = (EGLint)fourcc;
+    for (int i = 0; i < n; ++i)
+    {
+        attrs[a++] = FD_ATTR[i];  attrs[a++] = fds[i];
+        attrs[a++] = OFF_ATTR[i]; attrs[a++] = (EGLint)offsets[i];
+        attrs[a++] = PIT_ATTR[i]; attrs[a++] = (EGLint)strides[i];
+        if (use_modifier)
+        {
+            attrs[a++] = MLO_ATTR[i]; attrs[a++] = (EGLint)(modifier & 0xFFFFFFFFu);
+            attrs[a++] = MHI_ATTR[i]; attrs[a++] = (EGLint)(modifier >> 32);
+        }
+    }
+    attrs[a++] = EGL_NONE;
 
     l->releaseImage();
-    l->image = l->eglCreateImageKHR(l->display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, (EGLClientBuffer)0, attrs);
-    close(fd);   // EGL keeps its own reference once the image is created
+    l->image = eglCreateImageKHR(l->display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, (EGLClientBuffer)0, attrs);
+    // The fds belong to the caller (received via SCM_RIGHTS); it closes them once
+    // we return. EGL has taken its own reference to the buffer by now.
+
+    static bool logged = false;
+    if (!logged)
+    {
+        logged = true;
+        LL_INFOS("Media") << "accelerated paint dma-buf import: " << (l->image != EGL_NO_IMAGE_KHR ? "ok" : "FAILED")
+                          << " planes=" << n << " fourcc=0x" << std::hex << fourcc
+                          << " modifier=0x" << modifier << std::dec
+                          << " mod_ext=" << (l->has_import_modifiers ? 1 : 0)
+                          << " used_mod=" << (use_modifier ? 1 : 0)
+                          << " " << width << "x" << height << LL_ENDL;
+    }
+
     if (l->image == EGL_NO_IMAGE_KHR)
     {
-        LL_WARNS("Media") << "accelerated paint: eglCreateImageKHR(dma_buf) failed" << LL_ENDL;
+        LL_WARNS("Media") << "accelerated paint: eglCreateImageKHR(dma_buf) failed (planes=" << n
+                          << " modifier=0x" << std::hex << modifier << std::dec << ")" << LL_ENDL;
         return false;
     }
 
     l->width = width;
     l->height = height;
     glBindTexture(GL_TEXTURE_2D, l->tex);
-    l->glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, l->image);
+    glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, l->image);
     glBindTexture(GL_TEXTURE_2D, 0);
     return true;
 }
@@ -557,7 +621,8 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 LLCEFAccelInterop::~LLCEFAccelInterop() { shutdown(); }
 bool LLCEFAccelInterop::init() { return false; }
 void LLCEFAccelInterop::shutdown() {}
-bool LLCEFAccelInterop::setStableTexture(unsigned long long, int, int, int, unsigned int, unsigned long long, unsigned long long, int) { return false; }
+bool LLCEFAccelInterop::setStableTexture(unsigned long long, int, int, int, unsigned int, unsigned long long, unsigned long long, int,
+                                         int, const unsigned long long*, const unsigned int*, const unsigned long long*) { return false; }
 bool LLCEFAccelInterop::blitTo(unsigned int, int, int) { return false; }
 
 #endif
