@@ -3342,7 +3342,6 @@ bool LLViewerMediaImpl::updateAcceleratedTexture()
     {
         return false;
     }
-    media_tex->setPlaying(true);
 
     U32 tex_name = media_tex->getGLTexture()->getTexName();
     if (!tex_name)
@@ -3353,7 +3352,17 @@ bool LLViewerMediaImpl::updateAcceleratedTexture()
     // The interop blit reads the shared texture through a framebuffer, which
     // both samples it in the correct channel order and flips it to bottom-up, so
     // no swizzle / coord fix-up is needed here.
-    return mAccelInterop->blitTo(tex_name, media_tex->getWidth(), media_tex->getHeight());
+    if (!mAccelInterop->blitTo(tex_name, media_tex->getWidth(), media_tex->getHeight()))
+    {
+        return false;
+    }
+
+    // Only switch the prim face onto the media texture once it actually holds a
+    // blitted frame. The CPU path waits on textureValid() for the same reason;
+    // the accelerated path skips that check, so presenting before the first blit
+    // would flash the empty placeholder texture (the grey-before-media flicker).
+    media_tex->setPlaying(true);
+    return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
