@@ -1788,9 +1788,17 @@ void LLViewerMediaImpl::destroyMediaSource()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     mNeedsNewTexture = true;
-    // The plugin's shared texture is going away; force a fresh interop bind when
-    // the next media source delivers a handle (even if the value is reused).
+    // The plugin's shared texture is going away; tear the interop down fully and
+    // force a fresh bind when the next media source delivers a handle (even if the
+    // value is reused). Keeping the old interop alive would let a stray accelerated
+    // dirty event blit stale/invalid content from the previous source.
     mAccelBoundHandle = 0;
+    if (mAccelInterop)
+    {
+        mAccelInterop->shutdown();
+        delete mAccelInterop;
+        mAccelInterop = nullptr;
+    }
 
     // Tell the viewer media texture it's no longer active
     LLViewerMediaTexture* oldImage = LLViewerTextureManager::findMediaTexture( mTextureId );
@@ -1888,9 +1896,13 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
             media_source->setUseDaemon(use_daemon, use_daemon ? cefDaemonRendezvousPath() : std::string());
 
             // Zero-copy GPU paint: deliver shared-texture handles instead of CPU
-            // pixels (the plugin duplicates them into this process).
+            // pixels (the plugin duplicates them into this process). Only request
+            // it when the consumer-side interop is actually available on this
+            // platform - otherwise the plugin would emit GPU frames the viewer
+            // cannot bind, leaving the media blank with no CPU fallback.
             media_source->setUseAcceleratedPaint(plugin_basename == "media_plugin_cef" &&
-                                                 gSavedSettings.getBOOL("ALCefAcceleratedPaint"));
+                                                 gSavedSettings.getBOOL("ALCefAcceleratedPaint") &&
+                                                 LLCEFAccelInterop::isSupported());
             std::string user_data_path_cef_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "cef.log");
             media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log);
             media_source->setLanguageCode(LLUI::getLanguage());
@@ -3265,11 +3277,14 @@ bool LLViewerMediaImpl::updateAcceleratedTexture()
     void* surf = LLCEFSurfaceReceiver::instance().takeLatest(mMediaSource->getAccelId());
     if (surf)
     {
-        mAccelInterop->setStableTexture((unsigned long long)(uintptr_t)surf,
-                                        mMediaSource->getAcceleratedPaintWidth(),
-                                        mMediaSource->getAcceleratedPaintHeight(),
-                                        mMediaSource->getAcceleratedPaintFormat(),
-                                        0, 0, 0, 0);
+        if (!mAccelInterop->setStableTexture((unsigned long long)(uintptr_t)surf,
+                                             mMediaSource->getAcceleratedPaintWidth(),
+                                             mMediaSource->getAcceleratedPaintHeight(),
+                                             mMediaSource->getAcceleratedPaintFormat(),
+                                             0, 0, 0, 0))
+        {
+            return false;   // import failed; don't blit a stale/invalid binding
+        }
     }
 #elif LL_WINDOWS
     // The handle is persistent (re)sent only on (re)create. (Re)bind the interop
@@ -3310,11 +3325,15 @@ bool LLViewerMediaImpl::updateAcceleratedTexture()
         }
         // The interop imports the fds directly (no /proc); we own them and close
         // them right after - EGL keeps its own reference once the image is made.
-        mAccelInterop->setStableTexture(plane_fds[0],
+        bool imported = mAccelInterop->setStableTexture(plane_fds[0],
                                         frame.width, frame.height, frame.format,
                                         plane_strides[0], plane_offsets[0], frame.modifier,
                                         0, frame.plane_count, plane_fds, plane_strides, plane_offsets);
         frame.closeFds();
+        if (!imported)
+        {
+            return false;   // import failed; don't blit a stale/invalid binding
+        }
     }
 #endif
 

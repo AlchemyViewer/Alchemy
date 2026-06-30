@@ -1112,8 +1112,17 @@ void LLGLManager::initEGL()
     // GL_OES_EGL_image
     glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)SDL_EGL_GetProcAddress("glEGLImageTargetTexture2DOES");
 
-    LL_INFOS("RenderInit") << "EGL_VENDOR     " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VENDOR)) << LL_ENDL;
-    LL_INFOS("RenderInit") << "EGL_VERSION    " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VERSION)) << LL_ENDL;
+    // SDL_EGL_GetProcAddress can return null for core EGL symbols (driver/version
+    // dependent), so guard before calling through the pointer.
+    if (eglQueryString)
+    {
+        LL_INFOS("RenderInit") << "EGL_VENDOR     " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VENDOR)) << LL_ENDL;
+        LL_INFOS("RenderInit") << "EGL_VERSION    " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VERSION)) << LL_ENDL;
+    }
+    else
+    {
+        LL_WARNS("RenderInit") << "eglQueryString unavailable; skipping EGL vendor/version log" << LL_ENDL;
+    }
 #endif
 }
 

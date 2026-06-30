@@ -100,16 +100,21 @@ namespace
             LLError::setDefaultLevel(LLError::LEVEL_INFO);
         }
 
-        // RunWinMain's lpCmdLine is LPTSTR (wide under UNICODE); narrow each char
-        // explicitly (ASCII-safe, avoids the implicit-narrowing warning-as-error).
-        // The command line is "<port>" for a single tab, or
-        // "<port> --daemon <rendezvous-path>" to run as the shared multi-tab
+        // RunWinMain's lpCmdLine is LPTSTR (wide under UNICODE). Convert it to UTF-8
+        // rather than narrowing each wchar, so a localized rendezvous path with
+        // non-ASCII characters survives. The command line is "<port>" for a single
+        // tab, or "<port> --daemon <rendezvous-path>" to run as the shared multi-tab
         // daemon (the rendezvous path may contain spaces, so it is taken as the
         // whole remainder after --daemon).
         std::string cmd;
-        for (LPCWSTR p = lpCmdLine; p && *p; ++p)
+        if (lpCmdLine && *lpCmdLine)
         {
-            cmd.push_back(static_cast<char>(*p));
+            int needed = WideCharToMultiByte(CP_UTF8, 0, lpCmdLine, -1, nullptr, 0, nullptr, nullptr);
+            if (needed > 1)
+            {
+                cmd.resize(static_cast<size_t>(needed) - 1);   // drop the NUL terminator
+                WideCharToMultiByte(CP_UTF8, 0, lpCmdLine, -1, cmd.data(), needed, nullptr, nullptr);
+            }
         }
         LLStringUtil::trim(cmd);
 

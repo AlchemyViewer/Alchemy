@@ -127,13 +127,23 @@ namespace
         }
 
         // Blocking read of the short port line (the registration is tiny).
+        // apr_socket_recv can return a partial TCP segment, so accumulate until the
+        // newline terminator (or the buffer fills / times out) before parsing -
+        // a trimmed partial port would connect the tab to the wrong local port.
         apr_socket_timeout_set(incoming, 1000000);   // 1s
-        char buf[32] = {0};
-        apr_size_t len = sizeof(buf) - 1;
-        if (apr_socket_recv(incoming, buf, &len) == APR_SUCCESS && len > 0)
+        std::string s;
+        char buf[32];
+        while (s.find('\n') == std::string::npos && s.size() < sizeof(buf))
         {
-            buf[len] = '\0';
-            std::string s(buf);
+            apr_size_t len = sizeof(buf);
+            if (apr_socket_recv(incoming, buf, &len) != APR_SUCCESS || len == 0)
+            {
+                break;
+            }
+            s.append(buf, len);
+        }
+        if (s.find('\n') != std::string::npos)
+        {
             LLStringUtil::trim(s);
             U32 parent_port = 0;
             if (!s.empty() && LLStringUtil::convertToU32(s, parent_port) && parent_port)
@@ -187,9 +197,26 @@ int slplugin_daemon_run(U32 first_port, const std::string& rendezvous_path_str)
 
     // Publish the control port for discover-or-spawn. Write then flush+close so a
     // racing parent reads a complete value.
+    bool rendezvous_published = false;
     {
         llofstream rv(rendezvous_path, std::ios::trunc);
-        rv << control_port << std::endl;
+        if (rv)
+        {
+            rv << control_port << std::endl;
+            rv.close();
+            rendezvous_published = rv.good();
+        }
+    }
+    if (!rendezvous_published)
+    {
+        // If the rendezvous never published, releasing the lock would let later
+        // parents spawn additional daemons instead of finding this one. Drop the
+        // lock and fall back to serving only the first tab.
+        LL_WARNS("slplugin") << "daemon: failed to publish rendezvous at "
+                             << rendezvous_path << "; serving a single tab" << LL_ENDL;
+        LLFile::remove(rendezvous_lock_path);
+        apr_socket_close(control);
+        return slplugin_run(first_port);
     }
     // The rendezvous is now published, so release the spawn lock the launching
     // parent took - other parents can stop waiting and register.

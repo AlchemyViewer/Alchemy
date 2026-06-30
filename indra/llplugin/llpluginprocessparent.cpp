@@ -541,7 +541,19 @@ void LLPluginProcessParent::idle(void)
                         params.args.add("--daemon");
                         params.args.add(daemonRendezvousPath());
                         params.attached = false;
-                        LLProcess::create(params);   // fire and forget; keep no mProcess
+                        // fire and forget; keep no mProcess (attached=false means
+                        // dropping this handle does not terminate the daemon).
+                        LLProcessPtr daemon_process = LLProcess::create(params);
+                        if (!daemon_process)
+                        {
+                            // Launch failed - release the spawn lock so another
+                            // parent can retry instead of waiting for a daemon
+                            // callback that will never arrive.
+                            LL_WARNS("Plugin") << "failed to launch CEF daemon" << LL_ENDL;
+                            LLFile::remove(daemonRendezvousPath() + ".lock");
+                            errorState();
+                            break;
+                        }
                         mProcessCreationRequested = true;
                         mHeartbeat.start();
                         mHeartbeat.setTimerExpirySec(mPluginLaunchTimeout);
@@ -1388,7 +1400,12 @@ U32 LLPluginProcessParent::readDaemonControlPort(const std::string& path)
         return 0;
     }
     U32 port = 0;
-    f >> port;
+    // A corrupt/stale rendezvous file can hold a value above 65535; casting that to
+    // apr_port_t would wrap and register with the wrong localhost port. Reject it.
+    if (!(f >> port) || port > 65535)
+    {
+        return 0;
+    }
     return port;
 }
 

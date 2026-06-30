@@ -44,6 +44,12 @@ public:
     void shutdown();
     bool valid() const { return mValid; }
 
+    // True if this platform can actually consume the plugin's GPU shared texture.
+    // Probed once (requires a current GL context). Callers should only request
+    // accelerated paint from the plugin when this is true; otherwise the plugin
+    // would produce GPU frames the viewer cannot bind, leaving the media blank.
+    static bool isSupported();
+
     // (Re)bind the plugin's shared frame. `handle` is the platform shared-texture
     // handle on Windows (NT handle) / macOS (IOSurfaceID). On Linux the frame is a
     // dma-buf: `handle` is plane 0's fd number in process `src_pid` (opened via

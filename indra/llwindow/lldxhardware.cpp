@@ -608,9 +608,14 @@ bool LLDXHardware::initGLDXInterop()
     {
         return true;   // already up
     }
-    if (!wglDXOpenDeviceNV)
+    // Require every WGL DX interop entry point the accelerated-paint path uses, not
+    // just wglDXOpenDeviceNV. Otherwise hasGLDXInterop() could report success while
+    // (e.g.) wglDXUnlockObjectsNV is missing, and the consumer would fail mid-blit
+    // instead of cleanly disabling the path up front.
+    if (!wglDXOpenDeviceNV || !wglDXCloseDeviceNV || !wglDXRegisterObjectNV ||
+        !wglDXUnregisterObjectNV || !wglDXLockObjectsNV || !wglDXUnlockObjectsNV)
     {
-        LL_INFOS("RenderInit") << "WGL_NV_DX_interop2 not available; no D3D/GL interop" << LL_ENDL;
+        LL_INFOS("RenderInit") << "WGL_NV_DX_interop2 not fully available; no D3D/GL interop" << LL_ENDL;
         return false;
     }
 

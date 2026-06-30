@@ -131,7 +131,15 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, i
         LL_WARNS("Media") << "accelerated paint: OpenSharedResource1 failed" << LL_ENDL;
         return false;
     }
-    w->stable->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&w->mutex);
+    // The producer/consumer contract relies on keyed-mutex synchronization; an
+    // unsynchronized CopyResource could read while the plugin is mid-write. Fail
+    // the bind (rather than silently fall back) if the mutex is missing.
+    if (FAILED(w->stable->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&w->mutex)) || !w->mutex)
+    {
+        LL_WARNS("Media") << "accelerated paint: shared texture is missing IDXGIKeyedMutex" << LL_ENDL;
+        w->releaseStable();
+        return false;
+    }
 
     D3D11_TEXTURE2D_DESC sd = {};
     w->stable->GetDesc(&sd);
@@ -192,21 +200,22 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 
     // Copy the plugin's latest frame into our intermediate under the keyed mutex
     // (single key 0 = mutual exclusion with the producer + cross-process sync).
-    if (w->mutex)
+    // Acquire with a zero timeout so a busy producer never stalls the viewer GL
+    // thread; just skip this frame and retry next tick.
+    const HRESULT acq_hr = w->mutex->AcquireSync(0, 0);
+    if (acq_hr == (HRESULT)WAIT_TIMEOUT || acq_hr == DXGI_ERROR_WAIT_TIMEOUT)
     {
-        if (FAILED(w->mutex->AcquireSync(0, 1000)))
-        {
-            return false;   // producer busy this frame; try again next
-        }
-        ctx->CopyResource(w->local, w->stable);
-        ctx->Flush();
-        w->mutex->ReleaseSync(0);
+        return false;   // producer busy this frame; try again next
     }
-    else
+    if (FAILED(acq_hr))
     {
-        ctx->CopyResource(w->local, w->stable);
-        ctx->Flush();
+        LL_WARNS("Media") << "accelerated paint: AcquireSync failed hr=0x"
+                          << std::hex << acq_hr << std::dec << LL_ENDL;
+        return false;
     }
+    ctx->CopyResource(w->local, w->stable);
+    ctx->Flush();
+    w->mutex->ReleaseSync(0);
 
     // Lock the GL view of the intermediate and blit it into the media texture
     // via framebuffers. Reading the interop texture through a framebuffer samples
@@ -325,18 +334,29 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, i
     {
         return false;
     }
-    if (m->surface) { CFRelease(m->surface); }
-    m->surface = surf;
-    m->width = (int)IOSurfaceGetWidth(surf);
-    m->height = (int)IOSurfaceGetHeight(surf);
+    // Bind into the GL texture first; only swap in the new surface once the bind
+    // succeeds, so a failed import leaves the previous (good) binding intact for
+    // blitTo() rather than dropping to a stale/invalid surface.
+    const int new_width = (int)IOSurfaceGetWidth(surf);
+    const int new_height = (int)IOSurfaceGetHeight(surf);
 
     CGLContextObj cgl = CGLGetCurrentContext();
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, m->tex);
     CGLError err = CGLTexImageIOSurface2D(cgl, GL_TEXTURE_RECTANGLE_ARB, GL_RGBA,
-                                          m->width, m->height, GL_BGRA,
+                                          new_width, new_height, GL_BGRA,
                                           GL_UNSIGNED_INT_8_8_8_8_REV, surf, 0);
     glBindTexture(GL_TEXTURE_RECTANGLE_ARB, 0);
-    return err == kCGLNoError;
+    if (err != kCGLNoError)
+    {
+        CFRelease(surf);
+        return false;
+    }
+
+    if (m->surface) { CFRelease(m->surface); }
+    m->surface = surf;
+    m->width = new_width;
+    m->height = new_height;
+    return true;
 }
 
 bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
@@ -543,8 +563,9 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, i
     }
     attrs[a++] = EGL_NONE;
 
-    l->releaseImage();
-    l->image = eglCreateImageKHR(l->display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, (EGLClientBuffer)0, attrs);
+    // Import into a temporary handle first; a bad frame must not destroy the
+    // current binding before we know the replacement is usable.
+    EGLImageKHR new_image = eglCreateImageKHR(l->display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, (EGLClientBuffer)0, attrs);
     // The fds belong to the caller (received via SCM_RIGHTS); it closes them once
     // we return. EGL has taken its own reference to the buffer by now.
 
@@ -552,7 +573,7 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, i
     if (!logged)
     {
         logged = true;
-        LL_INFOS("Media") << "accelerated paint dma-buf import: " << (l->image != EGL_NO_IMAGE_KHR ? "ok" : "FAILED")
+        LL_INFOS("Media") << "accelerated paint dma-buf import: " << (new_image != EGL_NO_IMAGE_KHR ? "ok" : "FAILED")
                           << " planes=" << n << " fourcc=0x" << std::hex << fourcc
                           << " modifier=0x" << modifier << std::dec
                           << " mod_ext=" << (l->has_import_modifiers ? 1 : 0)
@@ -560,13 +581,15 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, i
                           << " " << width << "x" << height << LL_ENDL;
     }
 
-    if (l->image == EGL_NO_IMAGE_KHR)
+    if (new_image == EGL_NO_IMAGE_KHR)
     {
         LL_WARNS("Media") << "accelerated paint: eglCreateImageKHR(dma_buf) failed (planes=" << n
                           << " modifier=0x" << std::hex << modifier << std::dec << ")" << LL_ENDL;
         return false;
     }
 
+    l->releaseImage();
+    l->image = new_image;
     l->width = width;
     l->height = height;
     glBindTexture(GL_TEXTURE_2D, l->tex);
@@ -626,3 +649,22 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long, int, int, int, unsi
 bool LLCEFAccelInterop::blitTo(unsigned int, int, int) { return false; }
 
 #endif
+
+// static - platform-agnostic capability preflight. Probes the interop once (it
+// needs a current GL/EGL context, which exists on the main thread when media
+// sources are created) so callers only request accelerated paint from the plugin
+// when the consumer can actually bind it - otherwise the plugin would emit GPU
+// frames the viewer drops, leaving the media blank with no CPU fallback.
+bool LLCEFAccelInterop::isSupported()
+{
+    static bool s_probed = false;
+    static bool s_supported = false;
+    if (!s_probed)
+    {
+        LLCEFAccelInterop probe;
+        s_supported = probe.init();
+        probe.shutdown();
+        s_probed = true;
+    }
+    return s_supported;
+}

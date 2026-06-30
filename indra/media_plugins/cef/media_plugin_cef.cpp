@@ -135,12 +135,23 @@ public:
             out_recreated = true;
         }
 
-        if (mMutex && SUCCEEDED(mMutex->AcquireSync(0, 1000)))
+        // Only report success when the frame actually lands in the stable texture.
+        // Returning true on a missed copy (no mutex / acquire timeout) would emit
+        // an accelerated_paint message for a texture the consumer never received -
+        // worst case a just-(re)created texture that was never populated.
+        if (!mMutex)
         {
-            mContext->CopyResource(mStable, cef);
-            mContext->Flush();
-            mMutex->ReleaseSync(0);
+            cef->Release();
+            return false;
         }
+        if (FAILED(mMutex->AcquireSync(0, 1000)))
+        {
+            cef->Release();
+            return false;
+        }
+        mContext->CopyResource(mStable, cef);
+        mContext->Flush();
+        mMutex->ReleaseSync(0);
         cef->Release();
         return true;
     }
