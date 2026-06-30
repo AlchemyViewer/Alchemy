@@ -126,18 +126,32 @@ if (WINDOWS)
   )
   target_link_options(media_plugin_cef PRIVATE /IGNORE:4099)
 
+  set(CEF_BIN_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/cef-bin")
+
   # Ship CEF's bootstrap.exe renamed to media_plugin_cef.exe; matching base name
   # makes it load media_plugin_cef.dll and call our exported RunWinMain with the
   # sandbox info. The bootstrap.exe is part of the CEF Release payload copied below.
   add_custom_command(TARGET media_plugin_cef POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VIEWER_STAGING_DIR}/llplugin/bootstrap.exe" "${VIEWER_STAGING_DIR}/llplugin/media_plugin_cef.exe"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CEF_BIN_DIR}/Release/bootstrap.exe" "${VIEWER_STAGING_DIR}/llplugin/media_plugin_cef.exe"
   )
 
   # Copy the CEF runtime + resources to the packaging directory.
-  set(CEF_BIN_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/cef-bin")
+  set(CEF_BIN_FILES
+    "${CEF_BIN_DIR}/Release/chrome_elf.dll"
+    "${CEF_BIN_DIR}/Release/d3dcompiler_47.dll"
+    "${CEF_BIN_DIR}/Release/dxcompiler.dll"
+    "${CEF_BIN_DIR}/Release/dxil.dll"
+    "${CEF_BIN_DIR}/Release/libEGL.dll"
+    "${CEF_BIN_DIR}/Release/libGLESv2.dll"
+    "${CEF_BIN_DIR}/Release/v8_context_snapshot.bin"
+    "${CEF_BIN_DIR}/Release/vk_swiftshader.dll"
+    "${CEF_BIN_DIR}/Release/vk_swiftshader_icd.json"
+    "${CEF_BIN_DIR}/Release/vulkan-1.dll"
+  )
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_BIN_DIR}/Release" "${VIEWER_STAGING_DIR}/llplugin"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_BIN_FILES} "${VIEWER_STAGING_DIR}/llplugin"
+    COMMAND_EXPAND_LISTS
   )
 
   set(CEF_RESOURCE_FILES
