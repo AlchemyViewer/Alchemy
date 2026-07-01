@@ -33,6 +33,12 @@
 #include "llpluginmessageclasses.h"
 #include "llcontrol.h"
 
+#if LL_WINDOWS
+#include <process.h>   // _getpid (host pid for accelerated-paint handle dup)
+#else
+#include <unistd.h>    // getpid
+#endif
+
 extern LLControlGroup gSavedSettings;
 #if LL_DARWIN || LL_LINUX
 extern bool gHiDPISupport;
@@ -56,6 +62,11 @@ LLPluginClassMedia::LLPluginClassMedia(LLPluginClassMediaOwner *owner)
     mOwner = owner;
     reset();
 
+    // Unique per-media id for the macOS accelerated-paint mach-port demux. Media
+    // sources are created on the main thread, so a plain counter is fine.
+    static int sNextAccelId = 1;
+    mAccelId = sNextAccelId++;
+
     //debug use
     mDeleteOK = true ;
 }
@@ -75,11 +86,28 @@ bool LLPluginClassMedia::init(const std::string &launcher_filename, const std::s
 
     mPlugin = LLPluginProcessParent::create(this);
     mPlugin->setSleepTime(mSleepTime);
+    mPlugin->setUseDaemon(mUseDaemon, mDaemonRendezvous);
 
     // Queue up the media init message -- it will be sent after all the currently queued messages.
     LLPluginMessage message(LLPLUGIN_MESSAGE_CLASS_MEDIA, "init");
     message.setValue("target", mTarget);
     message.setValueReal("factor", mZoomFactor);
+    // Zero-copy paint: ask for GPU shared-texture handles, and hand the plugin
+    // this (viewer) process id so it can DuplicateHandle the shared texture into
+    // us across the process boundary.
+    message.setValueBoolean("accelerated_paint", mUseAcceleratedPaint);
+    // macOS shares the accelerated-paint IOSurface over a mach channel; the plugin
+    // rendezvous via the bootstrap name derived from host_pid, and tags each frame
+    // with accel_id so the viewer demuxes it back to this media.
+    message.setValueS32("accel_id", mAccelId);
+#if LL_WINDOWS
+    message.setValueS32("host_pid", (S32)_getpid());
+#else
+    message.setValueS32("host_pid", (S32)getpid());
+#endif
+    // Linux: which windowing backend the viewer chose, so the CEF plugin can pin
+    // its Ozone platform (X11 vs Wayland) to match. Empty on other platforms.
+    message.setValue("display_server", mDisplayServer);
     sendMessage(message);
 
     mPlugin->init(launcher_filename, plugin_dir, plugin_filename, debug);
@@ -1048,6 +1076,32 @@ void LLPluginClassMedia::receivePluginMessage(const LLPluginMessage &message)
             setSizeInternal();
 
             mTextureParamsReceived = true;
+        }
+        else if(message_name == "accelerated_paint")
+        {
+            // Zero-copy frame ready. The plugin holds one persistent keyed-mutex
+            // shared texture and sends its viewer-side handle ONLY when that
+            // texture is (re)created (handle != 0, once per size); a "0" handle
+            // means "same texture, new frame". Keep the last real handle so a
+            // per-frame ping doesn't clear it before the consumer takes it. The
+            // value is a decimal string so a 64-bit handle survives intact.
+            // On Windows the handle is the persistent shared-texture handle, sent
+            // only when it is (re)created (handle != 0, once per size); "0" means
+            // "same texture, new frame", so keep the last real handle. On macOS and
+            // Linux the frame travels out-of-band (IOSurface mach port / dma-buf
+            // SCM_RIGHTS), so handle is always "0" and this message is just the
+            // per-frame dirty trigger. Value is a decimal string so a 64-bit handle
+            // survives intact.
+            unsigned long long h = strtoull(message.getValue("handle").c_str(), nullptr, 10);
+            if (h != 0)
+            {
+                mAcceleratedPaintHandle = h;
+            }
+            mAcceleratedPaintFormat = message.getValueS32("format");
+            mAcceleratedPaintWidth = message.getValueS32("width");
+            mAcceleratedPaintHeight = message.getValueS32("height");
+            mAcceleratedPaintDirty = true;
+            mediaEvent(LLPluginClassMediaOwner::MEDIA_EVENT_CONTENT_UPDATED);
         }
         else if(message_name == "updated")
         {

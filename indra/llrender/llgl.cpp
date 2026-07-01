@@ -245,6 +245,14 @@ PFNWGLBLITCONTEXTFRAMEBUFFERAMDPROC             wglBlitContextFramebufferAMD = n
 // WGL_EXT_swap_control
 PFNWGLSWAPINTERVALEXTPROC    wglSwapIntervalEXT = nullptr;
 PFNWGLGETSWAPINTERVALEXTPROC wglGetSwapIntervalEXT = nullptr;
+
+// WGL_NV_DX_interop / interop2
+PFNWGLDXOPENDEVICENVPROC       wglDXOpenDeviceNV = nullptr;
+PFNWGLDXCLOSEDEVICENVPROC      wglDXCloseDeviceNV = nullptr;
+PFNWGLDXREGISTEROBJECTNVPROC   wglDXRegisterObjectNV = nullptr;
+PFNWGLDXUNREGISTEROBJECTNVPROC wglDXUnregisterObjectNV = nullptr;
+PFNWGLDXLOCKOBJECTSNVPROC      wglDXLockObjectsNV = nullptr;
+PFNWGLDXUNLOCKOBJECTSNVPROC    wglDXUnlockObjectsNV = nullptr;
 #endif
 
 #if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
@@ -258,6 +266,13 @@ PFNGLXQUERYRENDERERSTRINGMESAPROC glXQueryRendererStringMESA = nullptr;
 #if LL_LINUX && LL_WAYLAND &&!LL_MESA_HEADLESS
 // EGL_VERSION_1_0
 PFNEGLQUERYSTRINGPROC eglQueryString = nullptr;
+
+// EGL_KHR_image
+PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR = nullptr;
+PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR = nullptr;
+
+// GL_OES_EGL_image
+PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES = nullptr;
 #endif
 
 // GL_VERSION_1_0
@@ -1037,6 +1052,17 @@ void LLGLManager::initWGL()
         wglGetSwapIntervalEXT = (PFNWGLGETSWAPINTERVALEXTPROC)LL_GET_PROC_ADDRESS("wglGetSwapIntervalEXT");
     }
 
+    // WGL_NV_DX_interop2 (D3D<->GL sharing for zero-copy CEF media textures)
+    if (mGLExtensions.contains("WGL_NV_DX_interop2") || mGLExtensions.contains("WGL_NV_DX_interop"))
+    {
+        wglDXOpenDeviceNV = (PFNWGLDXOPENDEVICENVPROC)LL_GET_PROC_ADDRESS("wglDXOpenDeviceNV");
+        wglDXCloseDeviceNV = (PFNWGLDXCLOSEDEVICENVPROC)LL_GET_PROC_ADDRESS("wglDXCloseDeviceNV");
+        wglDXRegisterObjectNV = (PFNWGLDXREGISTEROBJECTNVPROC)LL_GET_PROC_ADDRESS("wglDXRegisterObjectNV");
+        wglDXUnregisterObjectNV = (PFNWGLDXUNREGISTEROBJECTNVPROC)LL_GET_PROC_ADDRESS("wglDXUnregisterObjectNV");
+        wglDXLockObjectsNV = (PFNWGLDXLOCKOBJECTSNVPROC)LL_GET_PROC_ADDRESS("wglDXLockObjectsNV");
+        wglDXUnlockObjectsNV = (PFNWGLDXUNLOCKOBJECTSNVPROC)LL_GET_PROC_ADDRESS("wglDXUnlockObjectsNV");
+    }
+
     if(!mGLExtensions.contains("WGL_ARB_pbuffer"))
     {
         LL_WARNS("RenderInit") << "No ARB WGL PBuffer extensions" << LL_ENDL;
@@ -1077,10 +1103,26 @@ void LLGLManager::initEGL()
     reloadExtensionsString();
 
     // EGL_VERSION_1_0
-    eglQueryString = (PFNEGLQUERYSTRINGPROC)LL_GET_PROC_ADDRESS("eglQueryString");
+    eglQueryString = (PFNEGLQUERYSTRINGPROC)SDL_EGL_GetProcAddress("eglQueryString");
 
-    LL_INFOS("RenderInit") << "EGL_VENDOR     " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VENDOR)) << LL_ENDL;
-    LL_INFOS("RenderInit") << "EGL_VERSION    " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VERSION)) << LL_ENDL;
+    // EGL_KHR_image
+    eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC)SDL_EGL_GetProcAddress("eglCreateImageKHR");
+    eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC)SDL_EGL_GetProcAddress("eglDestroyImageKHR");
+
+    // GL_OES_EGL_image
+    glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)SDL_EGL_GetProcAddress("glEGLImageTargetTexture2DOES");
+
+    // SDL_EGL_GetProcAddress can return null for core EGL symbols (driver/version
+    // dependent), so guard before calling through the pointer.
+    if (eglQueryString)
+    {
+        LL_INFOS("RenderInit") << "EGL_VENDOR     " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VENDOR)) << LL_ENDL;
+        LL_INFOS("RenderInit") << "EGL_VERSION    " << ll_safe_string((const char *)eglQueryString(SDL_EGL_GetCurrentDisplay(), EGL_VERSION)) << LL_ENDL;
+    }
+    else
+    {
+        LL_WARNS("RenderInit") << "eglQueryString unavailable; skipping EGL vendor/version log" << LL_ENDL;
+    }
 #endif
 }
 
@@ -1554,7 +1596,7 @@ void LLGLManager::reloadExtensionsString()
         SDL_EGLDisplay egl_display = SDL_EGL_GetCurrentDisplay();
         if (egl_display)
         {
-            PFNEGLQUERYSTRINGPROC lleglQueryString = (PFNEGLQUERYSTRINGPROC)LL_GET_PROC_ADDRESS("eglQueryString");
+            PFNEGLQUERYSTRINGPROC lleglQueryString = (PFNEGLQUERYSTRINGPROC)SDL_EGL_GetProcAddress("eglQueryString");
             if (lleglQueryString)
             {
                 std::string egl_exts = ll_safe_string((const char*)lleglQueryString((EGLDisplay)egl_display, EGL_EXTENSIONS));

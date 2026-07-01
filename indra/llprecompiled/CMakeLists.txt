@@ -15,6 +15,7 @@ target_link_libraries(llprecompiled
         ll::oslibraries
         ll::tracy
         ll::sse2neon
+        Threads::Threads
     )
 
 target_precompile_headers(llprecompiled PRIVATE
@@ -45,6 +46,7 @@ target_link_libraries(llprecompiled_exe
         ll::oslibraries
         ll::tracy
         ll::sse2neon
+        Threads::Threads
     )
 
 target_precompile_headers(llprecompiled_exe PRIVATE

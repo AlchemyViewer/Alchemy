@@ -175,7 +175,7 @@
           "name": "glad",
           "platform": "windows | linux",
           "features": [
-            "gl-api-21",
+            "gl-api-41",
             "loader"
           ]
         },

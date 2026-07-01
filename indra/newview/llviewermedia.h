@@ -50,6 +50,7 @@ class LLViewerMediaTexture;
 class LLMediaEntry;
 class LLVOVolume;
 class LLMimeDiscoveryResponder;
+class LLCEFAccelInterop;
 
 typedef LLPointer<LLViewerMediaImpl> viewer_media_t;
 ///////////////////////////////////////////////////////////////////////////////
@@ -208,6 +209,10 @@ public:
 
     void createMediaSource();
     void destroyMediaSource();
+    // Zero-copy paint: pull the plugin's GPU shared texture into the media
+    // texture (no CPU upload). Main thread only. No-op / returns false if the
+    // platform interop isn't available.
+    bool updateAcceleratedTexture();
     void setMediaType(const std::string& media_type);
     bool initializeMedia(const std::string& mime_type);
     bool initializePlugin(const std::string& media_type);
@@ -480,6 +485,19 @@ private:
     bool mNavigateRediscoverType;
     bool mNavigateServerRequest;
     bool mMediaSourceFailed;
+    // Shared-CEF-daemon crash recovery: a daemon crash drops every tab at once,
+    // so instead of leaving each media permanently failed we re-init on a backoff
+    // (which respawns the daemon and reconnects the tab). Bounded by a retry cap
+    // that resets on a clean load. Only used for daemon-mode CEF media.
+    S32 mDaemonRecoveryAttempts = 0;
+    bool mDaemonRecoveryPending = false;
+    LLTimer mDaemonRecoveryTimer;
+    // Zero-copy paint consumer (created lazily on the first accelerated frame);
+    // owns the D3D/GL interop that aliases the plugin's shared texture.
+    LLCEFAccelInterop* mAccelInterop = nullptr;
+    // The stable-texture handle currently bound into the interop; re-bind only
+    // when the plugin's persistent handle differs from this.
+    unsigned long long mAccelBoundHandle = 0;
     F32 mRequestedVolume;
     F32 mPreviousVolume;
     bool mIsMuted;

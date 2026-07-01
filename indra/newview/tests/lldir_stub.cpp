@@ -51,7 +51,6 @@ public:
     std::string getCurPath() override { return "CUR_PATH_FROM_LLDIR"; }
     bool fileExists(const std::string &filename) const override { return false; }
 
-    std::string getLLPluginLauncher()  override { return ""; }
     std::string getLLPluginFilename(std::string base_name) override { return ""; }
 };
 

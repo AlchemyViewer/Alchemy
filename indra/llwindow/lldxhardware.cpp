@@ -37,6 +37,8 @@
 #include <wbemidl.h>
 #include <comdef.h>
 #include <dxgi1_4.h>
+#include <d3d11_1.h>   // shared D3D11 <-> GL interop device
+#pragma comment(lib, "d3d11")
 
 #include <boost/tokenizer.hpp>
 
@@ -593,6 +595,86 @@ void LLDXHardware::updateVRAMBudgetFromDXGI()
     if (p_factory)
     {
         p_factory->Release();
+    }
+}
+
+// One D3D11 device + one GL interop device for the whole process. CEF zero-copy
+// media surfaces register their textures against these instead of each spinning
+// up a private D3D device. Requires the GL context current and the WGL
+// extensions loaded (LLGLManager::initWGL).
+bool LLDXHardware::initGLDXInterop()
+{
+    if (mGLDXInteropDevice)
+    {
+        return true;   // already up
+    }
+    // Require every WGL DX interop entry point the accelerated-paint path uses, not
+    // just wglDXOpenDeviceNV. Otherwise hasGLDXInterop() could report success while
+    // (e.g.) wglDXUnlockObjectsNV is missing, and the consumer would fail mid-blit
+    // instead of cleanly disabling the path up front.
+    if (!wglDXOpenDeviceNV || !wglDXCloseDeviceNV || !wglDXRegisterObjectNV ||
+        !wglDXUnregisterObjectNV || !wglDXLockObjectsNV || !wglDXUnlockObjectsNV)
+    {
+        LL_INFOS("RenderInit") << "WGL_NV_DX_interop2 not fully available; no D3D/GL interop" << LL_ENDL;
+        return false;
+    }
+
+    ID3D11Device* device = nullptr;
+    ID3D11DeviceContext* context = nullptr;
+    UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+    HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags,
+                                   nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context);
+    if (FAILED(hr) || !device)
+    {
+        LL_WARNS("RenderInit") << "D3D11CreateDevice (GL interop) failed: 0x" << std::hex << hr << std::dec << LL_ENDL;
+        if (context) context->Release();
+        if (device) device->Release();
+        return false;
+    }
+
+    // ID3D11Device1 is needed for OpenSharedResource1 (NT-handle shared textures).
+    ID3D11Device1* device1 = nullptr;
+    device->QueryInterface(__uuidof(ID3D11Device1), (void**)&device1);
+    device->Release();
+    if (!device1)
+    {
+        LL_WARNS("RenderInit") << "ID3D11Device1 unavailable; no D3D/GL interop" << LL_ENDL;
+        if (context) context->Release();
+        return false;
+    }
+
+    HANDLE gl_dx = wglDXOpenDeviceNV(device1);
+    if (!gl_dx)
+    {
+        LL_WARNS("RenderInit") << "wglDXOpenDeviceNV failed; no D3D/GL interop" << LL_ENDL;
+        device1->Release();
+        if (context) context->Release();
+        return false;
+    }
+
+    mD3DDevice = device1;
+    mD3DContext = context;
+    mGLDXInteropDevice = gl_dx;
+    LL_INFOS("RenderInit") << "D3D11 <-> GL interop device ready" << LL_ENDL;
+    return true;
+}
+
+void LLDXHardware::cleanupGLDXInterop()
+{
+    if (mGLDXInteropDevice && wglDXCloseDeviceNV)
+    {
+        wglDXCloseDeviceNV((HANDLE)mGLDXInteropDevice);
+    }
+    mGLDXInteropDevice = nullptr;
+    if (mD3DContext)
+    {
+        ((ID3D11DeviceContext*)mD3DContext)->Release();
+        mD3DContext = nullptr;
+    }
+    if (mD3DDevice)
+    {
+        ((ID3D11Device1*)mD3DDevice)->Release();
+        mD3DDevice = nullptr;
     }
 }
 

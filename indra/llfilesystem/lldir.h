@@ -86,8 +86,10 @@ class LLDir
     const std::string findFile(const std::string& filename, const std::vector<std::string> filenames) const;
     const std::string findFile(const std::string& filename, const std::string& searchPath1 = "", const std::string& searchPath2 = "", const std::string& searchPath3 = "") const;
 
-    virtual std::string getLLPluginLauncher() = 0; // full path and name for the plugin shell
-    virtual std::string getLLPluginFilename(std::string base_name) = 0; // full path and name to the plugin DSO for this base_name (i.e. 'FOO' -> '/bar/baz/libFOO.so')
+    // full path and name of the plugin's host executable for this base_name
+    // (i.e. 'media_plugin_cef' -> '/bar/baz/llplugin/media_plugin_cef'); each
+    // plugin is its own executable now, launched directly (no SLPlugin shell).
+    virtual std::string getLLPluginFilename(std::string base_name) = 0;
 
     const std::string &getExecutablePathAndName() const;    // Full pathname of the executable
     const std::string &getAppName() const;          // install directory under progams/ ie "AlchemyViewer"

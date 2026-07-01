@@ -172,6 +172,44 @@ public:
     bool getDisableTimeout() { return mPlugin?mPlugin->getDisableTimeout():false; };
     void setDisableTimeout(bool disable) { if(mPlugin) mPlugin->setDisableTimeout(disable); };
 
+    // Route this media instance through the shared CEF daemon host, using a
+    // user-writable rendezvous path (see LLPluginProcessParent::setUseDaemon).
+    // Set before init().
+    void setUseDaemon(bool use_daemon, const std::string& rendezvous_path = std::string())
+    { mUseDaemon = use_daemon; mDaemonRendezvous = rendezvous_path; if(mPlugin) mPlugin->setUseDaemon(use_daemon, rendezvous_path); };
+    bool getUseDaemon() const { return mUseDaemon; };
+
+    // Zero-copy paint: ask the plugin to deliver a GPU shared-texture handle
+    // (duplicated into this process) instead of CPU pixels. Set before init().
+    void setUseAcceleratedPaint(bool b) { mUseAcceleratedPaint = b; };
+    bool getUseAcceleratedPaint() const { return mUseAcceleratedPaint; };
+
+    // Linux: the viewer's windowing backend ("wayland"/"x11"), forwarded to the
+    // CEF plugin in init() so its Ozone platform matches ours. Empty lets the
+    // plugin auto-detect. Set before init().
+    void setDisplayServer(const std::string& display_server) { mDisplayServer = display_server; };
+
+    // Per-media id sent to the plugin in init() and tagged onto each macOS
+    // IOSurface mach-port message, so the process-global viewer-side receiver can
+    // demux surfaces from many tabs/plugin processes back to the right media.
+    int getAccelId() const { return mAccelId; }
+
+    // The plugin's stable shared texture: a native handle already duplicated into
+    // THIS process (Windows: a D3D11 shared-texture HANDLE), plus its
+    // cef_color_type format and coded size. The handle is PERSISTENT - it is only
+    // (re)sent when the plugin recreates the texture (per size), so it is kept,
+    // not consumed: the consumer compares it against what it last bound and only
+    // re-opens when it changes. mAcceleratedPaintDirty marks a fresh frame.
+    bool getAcceleratedPaintDirty() const { return mAcceleratedPaintDirty; };
+    int getAcceleratedPaintFormat() const { return mAcceleratedPaintFormat; };
+    int getAcceleratedPaintWidth() const { return mAcceleratedPaintWidth; };
+    int getAcceleratedPaintHeight() const { return mAcceleratedPaintHeight; };
+    unsigned long long getAcceleratedPaintHandle() const { return mAcceleratedPaintHandle; };
+    void clearAcceleratedPaintDirty() { mAcceleratedPaintDirty = false; };
+    // The accelerated frame's pixel layout/handle travels out-of-band on macOS
+    // (IOSurface mach port) and Linux (dma-buf fds via SCM_RIGHTS, demuxed by accel
+    // id - see LLCEFSurfaceReceiver), so no dma-buf plumbing is carried here.
+
     // Inherited from LLPluginProcessParentOwner
     /* virtual */ void receivePluginMessage(const LLPluginMessage &message);
     /* virtual */ void pluginLaunchFailed();
@@ -430,6 +468,20 @@ protected:
 
 
     LLPluginProcessParent::ptr_t mPlugin;
+    bool mUseDaemon = false;
+    std::string mDaemonRendezvous;
+
+    // accelerated (zero-copy) paint - see setUseAcceleratedPaint / the getters above
+    bool mUseAcceleratedPaint = false;
+    // Linux windowing backend name forwarded to the CEF plugin - see setDisplayServer.
+    std::string mDisplayServer;
+    // Unique per-media id (macOS mach-port demux); assigned at construction.
+    int mAccelId = 0;
+    unsigned long long mAcceleratedPaintHandle = 0;   // native handle, dup'd into this process
+    int mAcceleratedPaintFormat = 0;
+    int mAcceleratedPaintWidth = 0;
+    int mAcceleratedPaintHeight = 0;
+    bool mAcceleratedPaintDirty = false;
 
     LLRect mDirtyRect;
 

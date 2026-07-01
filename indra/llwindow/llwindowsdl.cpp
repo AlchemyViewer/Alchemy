@@ -499,11 +499,11 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         // NOTE: the Wayland init path used to unsetenv("DISPLAY") here to
         // coax dullahan/CEF onto the native Wayland path. That global env
         // mutation affected every other subprocess the viewer spawns, so
-        // we dropped it. Routing CEF to Wayland needs a per-spawn fix on
-        // the dullahan side (e.g. scrubbing DISPLAY only when launching
-        // dullahan_host, or passing OZONE_PLATFORM=wayland via the launch
-        // env). Until that lands, CEF will continue to use XWayland when
-        // DISPLAY is set, which is the SDL2-era behaviour.
+        // we dropped it. Instead, the viewer now reports its backend to the
+        // CEF media plugin via getDisplayServer() ->
+        // LLPluginClassMedia::setDisplayServer(), which forwards it to
+        // dullahan as the forced Ozone platform - routing CEF onto native
+        // Wayland without mutating any shared environment.
     }
 #endif
 
@@ -3934,6 +3934,17 @@ void* LLWindowSDL::getPlatformWindow()
 #endif
     }
     return ret;
+}
+
+std::string LLWindowSDL::getDisplayServer() const
+{
+    // mServerProtocol is latched in createContext() from SDL_GetCurrentVideoDriver().
+    switch (mServerProtocol)
+    {
+    case Wayland: return "wayland";
+    case X11:     return "x11";
+    default:      return {};
+    }
 }
 
 #if LL_WINDOWS

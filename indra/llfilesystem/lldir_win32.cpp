@@ -373,16 +373,13 @@ std::string LLDir_Win32::getCurPath()
     return ll_convert<std::string>(std::wstring(w_str));
 }
 
-/*virtual*/ std::string LLDir_Win32::getLLPluginLauncher()
-{
-    return gDirUtilp->getExecutableDir() + gDirUtilp->getDirDelimiter() +
-        "SLPlugin.exe";
-}
-
 /*virtual*/ std::string LLDir_Win32::getLLPluginFilename(std::string base_name)
 {
+    // Each plugin is now its own host executable named for the plugin
+    // (e.g. media_plugin_cef.exe), launched directly - there is no separate
+    // SLPlugin launcher or dlopen'd .dll any more.
     return gDirUtilp->getLLPluginDir() + gDirUtilp->getDirDelimiter() +
-        base_name + ".dll";
+        base_name + ".exe";
 }
 
 

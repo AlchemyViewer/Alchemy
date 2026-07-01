@@ -59,6 +59,9 @@
 #if LL_LINUX && LL_WAYLAND && !LL_MESA_HEADLESS
 #define EGL_EGL_PROTOTYPES 0
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2platform.h>
+#include <GLES2/gl2ext.h>   // glEGLImageTargetTexture2DOES
 #endif
 
 // GL_NVX_gpu_memory_info constants
@@ -152,6 +155,14 @@ extern PFNWGLGETPIXELFORMATATTRIBIVARBPROC wglGetPixelFormatAttribivARB;
 extern PFNWGLGETPIXELFORMATATTRIBFVARBPROC wglGetPixelFormatAttribfvARB;
 extern PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
 
+// WGL_NV_DX_interop / interop2 (D3D<->GL sharing; used for zero-copy CEF media)
+extern PFNWGLDXOPENDEVICENVPROC       wglDXOpenDeviceNV;
+extern PFNWGLDXCLOSEDEVICENVPROC      wglDXCloseDeviceNV;
+extern PFNWGLDXREGISTEROBJECTNVPROC   wglDXRegisterObjectNV;
+extern PFNWGLDXUNREGISTEROBJECTNVPROC wglDXUnregisterObjectNV;
+extern PFNWGLDXLOCKOBJECTSNVPROC      wglDXLockObjectsNV;
+extern PFNWGLDXUNLOCKOBJECTSNVPROC    wglDXUnlockObjectsNV;
+
 #endif // LL_WINDOWS
 
 #if LL_LINUX && LL_X11 && !LL_MESA_HEADLESS
@@ -163,7 +174,15 @@ extern PFNGLXQUERYRENDERERSTRINGMESAPROC glXQueryRendererStringMESA;
 #endif
 
 #if LL_LINUX && LL_WAYLAND &&!LL_MESA_HEADLESS
+// EGL_VERSION_1_0
 extern PFNEGLQUERYSTRINGPROC eglQueryString;
+
+// EGL_KHR_image
+extern PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
+extern PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR;
+
+// GL_OES_EGL_image
+extern PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
 #endif
 
 // We get all functions via getProcAddress when using SDL

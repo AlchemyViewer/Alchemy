@@ -2,6 +2,50 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="llsd.xsd">
     <map>
+        <key>ALCefAcceleratedPaint</key>
+        <map>
+            <key>Comment</key>
+            <string>Use CEF GPU shared-texture (accelerated paint) zero-copy path for browser media instead of CPU pixel readback/upload. Requires a viewer restart. (CEF daemon rework, on by default; falls back to CPU paint where the GPU interop is unavailable.)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALCefDaemonEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Host all browser (CEF) media instances in a single shared tab-manager daemon process instead of one process per instance. Requires a viewer restart. (CEF daemon rework, on by default.)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALCefDedicatedHost</key>
+        <map>
+            <key>Comment</key>
+            <string>Launch browser (CEF) media via the dedicated SLPluginCEF host, which statically links the CEF plugin instead of dlopen()ing it (avoids the Linux static-TLS crash; prerequisite for the sandbox). Requires a viewer restart. (CEF daemon rework, on by default.)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALCefSandbox</key>
+        <map>
+            <key>Comment</key>
+            <string>Enable the Chromium sandbox for CEF browser sub-processes (renderer/GPU/utility). Requires a viewer restart. (CEF daemon rework, on by default.)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALSceneExplorerActivateAction</key>
         <map>
             <key>Comment</key>

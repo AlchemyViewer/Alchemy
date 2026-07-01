@@ -65,6 +65,10 @@
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
 #include "llviewerwindow.h"
+#include "llcefaccelinterop.h"
+#include "llcefsurfacereceiver.h"
+#include "llrender.h"
+#include "llgl.h"
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
 #include "llvovolume.h"
@@ -168,6 +172,12 @@ static LLViewerMedia::impl_list sViewerMediaImplList;
 static LLViewerMedia::impl_id_map sViewerMediaTextureIDMap;
 static LLTimer sMediaCreateTimer;
 static const F32 LLVIEWERMEDIA_CREATE_DELAY = 1.0f;
+// Shared-CEF-daemon crash recovery: cap on consecutive re-init attempts before a
+// daemon-mode media gives up, and the backoff schedule between them (so a daemon
+// that crashes on every launch can't spin the viewer respawning it forever).
+static const S32 DAEMON_RECOVERY_MAX_ATTEMPTS = 5;
+static const F32 DAEMON_RECOVERY_BASE_DELAY = 2.0f;   // seconds, multiplied by attempt #
+static const F32 DAEMON_RECOVERY_MAX_DELAY = 30.0f;   // seconds, backoff ceiling
 static F32 sGlobalVolume = 1.0f;
 static bool sForceUpdate = false;
 static LLUUID sOnlyAudibleTextureID = LLUUID::null;
@@ -213,6 +223,19 @@ static bool sViewerMediaMuteListObserverInitialized = false;
 /*static*/ const char* LLViewerMedia::SHOW_MEDIA_WITHIN_PARCEL_SETTING = "MediaShowWithinParcel";
 /*static*/ const char* LLViewerMedia::SHOW_MEDIA_OUTSIDE_PARCEL_SETTING = "MediaShowOutsideParcel";
 
+namespace
+{
+    // Per-viewer-instance CEF daemon rendezvous file: user-writable logs dir
+    // (never the read-only install dir) plus this viewer's PID so separate
+    // viewer instances don't share a daemon. newSourceFromMediaType() hands this
+    // exact path to setUseDaemon(); the cleanup in ~LLViewerMedia() recomputes
+    // it to remove the file the (force-killed) daemon cannot remove itself.
+    std::string cefDaemonRendezvousPath()
+    {
+        return gDirUtilp->getExpandedFilename(LL_PATH_LOGS, llformat("SLPluginCEF_%d.daemon", LLApp::getPid()));
+    }
+}
+
 LLViewerMedia::LLViewerMedia():
 mAnyMediaShowing(false),
 mAnyMediaPlaying(false),
@@ -230,6 +253,17 @@ LLViewerMedia::~LLViewerMedia()
     {
         delete mSpareBrowserMediaSource;
         mSpareBrowserMediaSource = NULL;
+    }
+
+    // The shared CEF daemon lives in this viewer's job object, so it is
+    // force-killed on exit and never reaches its own rendezvous cleanup. Remove
+    // the rendezvous (and any stale spawn lock) here. No-op if daemon mode was
+    // never used or the files are already gone.
+    if (gDirUtilp)
+    {
+        const std::string rv = cefDaemonRendezvousPath();
+        LLFile::remove(rv);
+        LLFile::remove(rv + ".lock");
     }
 }
 
@@ -1677,6 +1711,13 @@ LLViewerMediaImpl::~LLViewerMediaImpl()
 {
     destroyMediaSource();
 
+    if (mAccelInterop)
+    {
+        mAccelInterop->shutdown();
+        delete mAccelInterop;
+        mAccelInterop = nullptr;
+    }
+
     LLViewerMediaTexture::removeMediaImplFromTexture(mTextureId) ;
 
     setTextureID();
@@ -1747,6 +1788,17 @@ void LLViewerMediaImpl::destroyMediaSource()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
     mNeedsNewTexture = true;
+    // The plugin's shared texture is going away; tear the interop down fully and
+    // force a fresh bind when the next media source delivers a handle (even if the
+    // value is reused). Keeping the old interop alive would let a stray accelerated
+    // dirty event blit stale/invalid content from the previous source.
+    mAccelBoundHandle = 0;
+    if (mAccelInterop)
+    {
+        mAccelInterop->shutdown();
+        delete mAccelInterop;
+        mAccelInterop = nullptr;
+    }
 
     // Tell the viewer media texture it's no longer active
     LLViewerMediaTexture* oldImage = LLViewerTextureManager::findMediaTexture( mTextureId );
@@ -1815,25 +1867,42 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
         }
 #endif
 
-        std::string launcher_name = gDirUtilp->getLLPluginLauncher();
-        std::string plugin_name = gDirUtilp->getLLPluginFilename(plugin_basename);
+        // Each plugin is its own host executable now, named exactly for the
+        // plugin (e.g. media_plugin_cef) and launched directly - there is no
+        // generic SLPlugin shell and no dlopen'd plugin library. The CEF host's
+        // daemon/sandbox behaviour is selected at runtime (see setUseDaemon and
+        // the ALCef* settings), not by choosing a different executable.
+        std::string launcher_name = gDirUtilp->getLLPluginFilename(plugin_basename);
 
         std::string user_data_path_cache = gDirUtilp->getCacheDir(false);
         user_data_path_cache += gDirUtilp->getDirDelimiter();
 
-        // See if the plugin executable exists
+        // See if the plugin host executable exists
         if (!LLFile::isfile(launcher_name))
         {
-            LL_WARNS_ONCE("Media") << "Couldn't find launcher at " << launcher_name << LL_ENDL;
-        }
-        else if (!LLFile::isfile(plugin_name))
-        {
-            LL_WARNS_ONCE("Media") << "Couldn't find plugin at " << plugin_name << LL_ENDL;
+            LL_WARNS_ONCE("Media") << "Couldn't find plugin host at " << launcher_name << LL_ENDL;
         }
         else
         {
             media_source = new LLPluginClassMedia(owner);
             media_source->setSize(default_width, default_height);
+            // Route CEF media through the shared daemon host when enabled. The
+            // rendezvous file lives in a user-writable runtime dir (the logs
+            // dir) - never the install/plugin dir, which may be read-only - and
+            // carries this viewer's PID so separate viewer instances do not
+            // share a daemon. Computed once and used by every CEF tab here.
+            const bool use_daemon = (plugin_basename == "media_plugin_cef" &&
+                                     gSavedSettings.getBOOL("ALCefDaemonEnabled"));
+            media_source->setUseDaemon(use_daemon, use_daemon ? cefDaemonRendezvousPath() : std::string());
+
+            // Zero-copy GPU paint: deliver shared-texture handles instead of CPU
+            // pixels (the plugin duplicates them into this process). Only request
+            // it when the consumer-side interop is actually available on this
+            // platform - otherwise the plugin would emit GPU frames the viewer
+            // cannot bind, leaving the media blank with no CPU fallback.
+            media_source->setUseAcceleratedPaint(plugin_basename == "media_plugin_cef" &&
+                                                 gSavedSettings.getBOOL("ALCefAcceleratedPaint") &&
+                                                 LLCEFAccelInterop::isSupported());
             std::string user_data_path_cef_log = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "cef.log");
             media_source->setUserDataPath(user_data_path_cache, gDirUtilp->getUserName(), user_data_path_cef_log);
             media_source->setLanguageCode(LLUI::getLanguage());
@@ -1874,8 +1943,21 @@ LLPluginClassMedia* LLViewerMediaImpl::newSourceFromMediaType(std::string media_
 
             media_source->setTarget(target);
 
+#if LL_LINUX
+            // Tell the CEF plugin which windowing backend the viewer is on so
+            // its Ozone platform (X11 vs Wayland) matches ours, rather than the
+            // plugin guessing from its own subprocess environment.
+            if (gViewerWindow && gViewerWindow->getWindow())
+            {
+                media_source->setDisplayServer(gViewerWindow->getWindow()->getDisplayServer());
+            }
+#endif
+
             const std::string plugin_dir = gDirUtilp->getLLPluginDir();
-            if (media_source->init(launcher_name, plugin_dir, plugin_name, gSavedSettings.getBOOL("PluginAttachDebuggerToPlugins")))
+            // plugin_dir/plugin_basename are vestigial now (the host statically
+            // links its plugin); they ride along in the load_plugin message only
+            // to satisfy its non-empty contract.
+            if (media_source->init(launcher_name, plugin_dir, plugin_basename, gSavedSettings.getBOOL("PluginAttachDebuggerToPlugins")))
             {
                 return media_source;
             }
@@ -2915,6 +2997,18 @@ bool LLViewerMediaImpl::canNavigateBack()
 void LLViewerMediaImpl::update()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA; //LL_RECORD_BLOCK_TIME(FTM_MEDIA_DO_UPDATE);
+
+    // Shared CEF daemon crash recovery: once the backoff has elapsed, clear the
+    // failure latch so the normal load path below recreates the source (which
+    // respawns or reconnects the daemon). isForcedUnloaded() pins mPriority to
+    // PRIORITY_UNLOADED while mMediaSourceFailed is set, so this is what lets the
+    // tab come back after a daemon crash.
+    if (mDaemonRecoveryPending && mDaemonRecoveryTimer.hasExpired())
+    {
+        mDaemonRecoveryPending = false;
+        mMediaSourceFailed = false;
+    }
+
     if(mMediaSource == NULL)
     {
         if(mPriority == LLPluginClassMedia::PRIORITY_UNLOADED)
@@ -2977,6 +3071,26 @@ void LLViewerMediaImpl::update()
     {
         resetPreviousMediaState();
         destroyMediaSource();
+        return;
+    }
+
+    // Zero-copy paint: the plugin delivers a GPU shared texture instead of CPU
+    // pixels, so this media never uses the shm/setSubImage upload path below.
+    // Pull the latest frame straight into the media GL texture on this (main)
+    // thread and we're done.
+    if (mMediaSource->getUseAcceleratedPaint())
+    {
+#if LL_DARWIN || LL_LINUX
+        // Bring up the surface side channel up front (not gated on a frame): the
+        // plugin only starts producing once our receive endpoint exists (mach port
+        // on macOS, AF_UNIX socket on Linux), so waiting for the first frame to
+        // register would deadlock.
+        LLCEFSurfaceReceiver::instance().ensureStarted();
+#endif
+        if (!mSuspendUpdates && mVisible && mMediaSource->getAcceleratedPaintDirty())
+        {
+            updateAcceleratedTexture();
+        }
         return;
     }
 
@@ -3100,13 +3214,19 @@ void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* da
     // -Cosmic,2023-04-04
     // Allocate GL texture based on LLImageRaw but do NOT copy to GL
     LLGLuint tex_name = 0;
-    if (!media_tex->createGLTexture(0, raw, 0, true, LLGLTexture::OTHER, true, &tex_name))
     {
-        LL_WARNS("Media") << "Failed to create media texture" << LL_ENDL;
-    }
+        // Phase 0 baseline: this GL allocate + CPU->GPU upload is exactly the
+        // per-surface cost the accelerated-paint (shared-texture) path removes,
+        // so isolate it under its own zone for before/after comparison.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_MEDIA("media texUpload");
+        if (!media_tex->createGLTexture(0, raw, 0, true, LLGLTexture::OTHER, true, &tex_name))
+        {
+            LL_WARNS("Media") << "Failed to create media texture" << LL_ENDL;
+        }
 
-    // copy just the subimage covered by the image raw to GL
-    media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+        // copy just the subimage covered by the image raw to GL
+        media_tex->setSubImage(data, data_width, data_height, x_pos, y_pos, width, height, tex_name);
+    }
 
     if (sync)
     {
@@ -3125,6 +3245,124 @@ void LLViewerMediaImpl::doMediaTexUpdate(LLViewerMediaTexture* media_tex, U8* da
 //////////////////////////////////////////////////////////////////////////////////////////
 void LLViewerMediaImpl::updateImagesMediaStreams()
 {
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Zero-copy paint consumer. Bring the plugin's GPU shared texture straight into
+// the media GL texture with no CPU round-trip. Main thread (has the GL context).
+bool LLViewerMediaImpl::updateAcceleratedTexture()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_MEDIA;
+
+    // Bring up the interop first so a failure here doesn't consume the frame; the
+    // plugin's handle is persistent and we retry next frame.
+    if (!mAccelInterop)
+    {
+        mAccelInterop = new LLCEFAccelInterop();
+        if (!mAccelInterop->init())
+        {
+            delete mAccelInterop;
+            mAccelInterop = nullptr;
+            return false;
+        }
+    }
+
+    mMediaSource->clearAcceleratedPaintDirty();
+#if LL_DARWIN
+    // macOS: CEF's IOSurface is shared via a mach port (no cross-process global
+    // id), so the surface arrives out-of-band through the mach receiver, demuxed
+    // by this media's accel id. Drain the newest and (re)bind it; the interop
+    // takes ownership of the +1-retained IOSurfaceRef (and releases it on a
+    // failed bind). If no new surface this frame, keep the current binding.
+    void* surf = LLCEFSurfaceReceiver::instance().takeLatest(mMediaSource->getAccelId());
+    if (surf)
+    {
+        if (!mAccelInterop->setStableTexture((unsigned long long)(uintptr_t)surf,
+                                             mMediaSource->getAcceleratedPaintWidth(),
+                                             mMediaSource->getAcceleratedPaintHeight(),
+                                             mMediaSource->getAcceleratedPaintFormat(),
+                                             0, 0, 0, 0))
+        {
+            return false;   // import failed; don't blit a stale/invalid binding
+        }
+    }
+#elif LL_WINDOWS
+    // The handle is persistent (re)sent only on (re)create. (Re)bind the interop
+    // when it differs from what we have bound; only advance mAccelBoundHandle on a
+    // successful bind so a transient failure is retried with the same handle.
+    unsigned long long handle = mMediaSource->getAcceleratedPaintHandle();
+    if (handle != 0 && handle != mAccelBoundHandle)
+    {
+        if (mAccelInterop->setStableTexture(handle,
+                                            mMediaSource->getAcceleratedPaintWidth(),
+                                            mMediaSource->getAcceleratedPaintHeight(),
+                                            mMediaSource->getAcceleratedPaintFormat()))
+        {
+            mAccelBoundHandle = handle;
+        }
+        else
+        {
+            return false;
+        }
+    }
+#else  // LL_LINUX
+    // CEF's dma-buf fds arrive out-of-band via the SCM_RIGHTS side channel (a
+    // dma-buf fd cannot cross the process boundary through the LLSD/TCP channel,
+    // nor be reopened via /proc), demuxed by this media's accel id. Take the
+    // newest frame, import its planes directly (the fds are open in this process),
+    // then close them. Keep the current binding if no new frame arrived this tick.
+    LLCEFSurfaceReceiver::DmabufFrame frame;
+    if (LLCEFSurfaceReceiver::instance().takeLatestDmabuf(mMediaSource->getAccelId(), frame))
+    {
+        unsigned long long plane_fds[4]     = {};
+        unsigned int       plane_strides[4] = {};
+        unsigned long long plane_offsets[4] = {};
+        for (int i = 0; i < frame.plane_count && i < 4; ++i)
+        {
+            plane_fds[i]     = (unsigned long long)frame.fd[i];
+            plane_strides[i] = frame.stride[i];
+            plane_offsets[i] = frame.offset[i];
+        }
+        // The interop imports the fds directly (no /proc); we own them and close
+        // them right after - EGL keeps its own reference once the image is made.
+        bool imported = mAccelInterop->setStableTexture(plane_fds[0],
+                                        frame.width, frame.height, frame.format,
+                                        plane_strides[0], plane_offsets[0], frame.modifier,
+                                        0, frame.plane_count, plane_fds, plane_strides, plane_offsets);
+        frame.closeFds();
+        if (!imported)
+        {
+            return false;   // import failed; don't blit a stale/invalid binding
+        }
+    }
+#endif
+
+    LLViewerMediaTexture* media_tex = updateMediaImage();
+    if (!media_tex || !media_tex->getGLTexture())
+    {
+        return false;
+    }
+
+    U32 tex_name = media_tex->getGLTexture()->getTexName();
+    if (!tex_name)
+    {
+        return false;
+    }
+
+    // The interop blit reads the shared texture through a framebuffer, which
+    // both samples it in the correct channel order and flips it to bottom-up, so
+    // no swizzle / coord fix-up is needed here.
+    if (!mAccelInterop->blitTo(tex_name, media_tex->getWidth(), media_tex->getHeight()))
+    {
+        return false;
+    }
+
+    // Only switch the prim face onto the media texture once it actually holds a
+    // blitted frame. The CPU path waits on textureValid() for the same reason;
+    // the accelerated path skips that check, so presenting before the first blit
+    // would flash the empty placeholder texture (the grey-before-media flicker).
+    media_tex->setPlaying(true);
+    return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -3410,6 +3648,24 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
             // Reset the last known state of the media to defaults.
             resetPreviousMediaState();
 
+            // Shared CEF daemon: one daemon crash drops every tab at once. Rather
+            // than leaving all of them permanently failed, schedule a bounded,
+            // backed-off re-init for daemon-mode media. The first impl to recreate
+            // its source wins the spawn lock and respawns the daemon
+            // (discover-or-spawn); the rest reconnect to it as new tabs. The retry
+            // cap + backoff keep a daemon that crashes on launch from spinning.
+            if (plugin && plugin->getUseDaemon() && mDaemonRecoveryAttempts < DAEMON_RECOVERY_MAX_ATTEMPTS)
+            {
+                mDaemonRecoveryAttempts++;
+                F32 delay = llmin(DAEMON_RECOVERY_BASE_DELAY * (F32)mDaemonRecoveryAttempts, DAEMON_RECOVERY_MAX_DELAY);
+                mDaemonRecoveryPending = true;
+                mDaemonRecoveryTimer.reset();
+                mDaemonRecoveryTimer.setTimerExpirySec(delay);
+                LL_WARNS("Media") << "CEF daemon tab failed; scheduling recovery attempt "
+                                  << mDaemonRecoveryAttempts << "/" << DAEMON_RECOVERY_MAX_ATTEMPTS
+                                  << " in " << delay << "s" << LL_ENDL;
+            }
+
             LLSD args;
             args["PLUGIN"] = LLMIMETypes::implType(mCurrentMimeType);
             // SJB: This is getting called every frame if the plugin fails to load, continuously respawining the alert!
@@ -3451,6 +3707,10 @@ void LLViewerMediaImpl::handleMediaEvent(LLPluginClassMedia* plugin, LLPluginCla
         case LLViewerMediaObserver::MEDIA_EVENT_NAVIGATE_COMPLETE:
         {
             LL_DEBUGS("Media") << "MEDIA_EVENT_NAVIGATE_COMPLETE, uri is: " << plugin->getNavigateURI() << LL_ENDL;
+
+            // A page finished loading: the (possibly just-respawned) daemon tab is
+            // healthy again, so clear the crash-recovery backoff counter.
+            mDaemonRecoveryAttempts = 0;
 
             std::string url = plugin->getNavigateURI();
             if(getNavState() == MEDIANAVSTATE_BEGUN)

@@ -1,60 +1,8 @@
+# -*- cmake -*-
 
-include(PluginAPI)
-
-### SLPlugin
-
-add_executable(SLPlugin
-    WIN32
-    MACOSX_BUNDLE
-    )
-
-target_sources(SLPlugin
-    PRIVATE
-    slplugin.cpp
-    )
-
-
-if (WINDOWS)
-  target_sources(SLPlugin
-    PRIVATE
-    slplugin.manifest
-  )
-elseif (DARWIN)
-  target_sources(SLPlugin
-    PRIVATE
-    slplugin-objc.mm
-
-    PUBLIC
-    FILE_SET HEADERS
-    FILES
-    slplugin-objc.h
-  )
-
-  set_source_files_properties(
-    slplugin-objc.mm
-    PROPERTIES
-    SKIP_PRECOMPILE_HEADERS TRUE
-  )
-endif ()
-
-target_link_libraries(SLPlugin
-        llplugin
-        llmessage
-        llcommon
-        ll::pluginlibraries
-        )
-
-if(WINDOWS)
-  set_target_properties(SLPlugin
-    PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
-  )
-elseif (DARWIN)
-  set_target_properties(SLPlugin
-    PROPERTIES
-    BUILD_WITH_INSTALL_RPATH 1
-    INSTALL_RPATH "@executable_path/../../../../Frameworks;@executable_path/../Frameworks;@executable_path/../Frameworks/plugins"
-    MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/slplugin_info.plist
-    XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf-with-dsym"
-  )
-endif ()
+# The generic SLPlugin launcher and its dlopen-based plugin loading have been
+# removed: each media plugin is now its own host executable that statically links
+# the plugin (see media_plugins/*/CMakeLists.txt). This directory no longer builds
+# a target of its own - it just provides the shared host driver sources
+# (slplugin.cpp, slplugin_static.cpp, slplugin_daemon.cpp, slplugin-objc.mm) that
+# those per-plugin executables compile in by path.

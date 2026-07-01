@@ -253,6 +253,8 @@ set(viewer_SOURCE_FILES
     llbrowsernotification.cpp
     llbuycurrencyhtml.cpp
     llcallingcard.cpp
+    llcefaccelinterop.cpp
+    llcefsurfacereceiver.cpp
     llchannelmanager.cpp
     #llchatbar.cpp
     llchathistory.cpp
@@ -1021,6 +1023,8 @@ set(viewer_HEADER_FILES
     llbuycurrencyhtml.h
     llcallingcard.h
     llcapabilityprovider.h
+    llcefaccelinterop.h
+    llcefsurfacereceiver.h
     llchannelmanager.h
     #llchatbar.h
     llchathistory.h
@@ -2002,14 +2006,23 @@ if (NOT DISABLE_WEBRTC)
     endif()
 endif()
 
+if (DARWIN)
+    find_library(IOSURFACE_FRAMEWORK IOSurface)
+    find_library(COREGRAPHICS_FRAMEWORK CoreGraphics)
+    target_link_libraries(${VIEWER_BINARY_NAME}
+      ${IOSURFACE_FRAMEWORK}
+      ${COREGRAPHICS_FRAMEWORK}
+    )
+endif()
+
 # These are the generated targets that are copied for packaging that we do not directly link to
 # We special case for windows due to targets incompatible with Debug builds
 if (WINDOWS)
+  target_link_libraries(${VIEWER_BINARY_NAME} d3d11 dxgi )
   add_custom_target(copy_input_dependencies
       DEPENDS
       stage_third_party_libs
-      SLPlugin
-      $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:$<TARGET_NAME_IF_EXISTS:media_plugin_cef>>
+      $<TARGET_NAME_IF_EXISTS:media_plugin_cef>
       $<TARGET_NAME_IF_EXISTS:media_plugin_gstreamer10>
       $<$<CONFIG:OptDebug,RelWithDebInfo,Release>:$<TARGET_NAME_IF_EXISTS:media_plugin_libvlc>>
       $<TARGET_NAME_IF_EXISTS:media_plugin_example>
@@ -2018,7 +2031,6 @@ else()
   add_custom_target(copy_input_dependencies
       DEPENDS
       stage_third_party_libs
-      SLPlugin
       $<TARGET_NAME_IF_EXISTS:media_plugin_cef>
       $<TARGET_NAME_IF_EXISTS:media_plugin_gstreamer10>
       $<TARGET_NAME_IF_EXISTS:media_plugin_libvlc>
