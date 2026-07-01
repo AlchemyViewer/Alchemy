@@ -173,7 +173,7 @@ namespace tut
     }
 
     // Owner gating: avatars are their own owner; objects without props yet
-    // pass owner modes (the predicate can't judge what it doesn't know).
+    // fail owner modes until the reply lands.
     template<> template<>
     void predicate_object::test<7>()
     {
@@ -187,7 +187,15 @@ namespace tut
         mFacts.mIsAvatar = false;
         mFacts.mItemId = mRec.mId;
         mRec.mPropsValid = false;
-        ensure("unresolved props pass owner modes", matches(mFacts, mC));
+        ensure("unresolved props fail owner modes", !matches(mFacts, mC));
+
+        mRec.mPropsValid = true;
+        mRec.mOwnerId = mAgentId;
+        ensure("resolved props re-apply owner modes", matches(mFacts, mC));
+
+        mRec.mPropsValid = false;
+        mC.mOwnerMode = OWNER_ANY;
+        ensure("unresolved props pass without an owner mode", matches(mFacts, mC));
     }
 
     // Geometry mask: empty = any; otherwise the item's kind must be in it.

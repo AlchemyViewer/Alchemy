@@ -53,22 +53,23 @@ bool matches(const ItemFacts& item, const Constraints& c)
     if (c.mOwnerMode != OWNER_ANY)
     {
         // Avatars are their own "owner" so owner filters behave sensibly for
-        // them; object rows apply the predicate only once props have arrived.
+        // them. Objects with unresolved props stay hidden until the fetch
+        // lands and the row re-filters.
+        if (!item.mIsAvatar && !rec.mPropsValid)
+            return false;
+
         const LLUUID& owner = item.mIsAvatar ? item.mItemId : rec.mOwnerId;
         const bool group_owned = !item.mIsAvatar && rec.mGroupOwned;
-        if (item.mIsAvatar || rec.mPropsValid)
+        switch (c.mOwnerMode)
         {
-            switch (c.mOwnerMode)
-            {
-            case OWNER_MINE:   if (owner != c.mAgentId) return false; break;
-            case OWNER_GROUP:  if (!group_owned) return false; break;
-            case OWNER_OTHERS: if (owner == c.mAgentId || group_owned) return false; break;
-            case OWNER_SPECIFIC:
-                if (owner != c.mOwnerId && !(group_owned && rec.mGroupId == c.mOwnerId))
-                    return false;
-                break;
-            default: break;
-            }
+        case OWNER_MINE:   if (owner != c.mAgentId) return false; break;
+        case OWNER_GROUP:  if (!group_owned) return false; break;
+        case OWNER_OTHERS: if (owner == c.mAgentId || group_owned) return false; break;
+        case OWNER_SPECIFIC:
+            if (owner != c.mOwnerId && !(group_owned && rec.mGroupId == c.mOwnerId))
+                return false;
+            break;
+        default: break;
         }
     }
 
