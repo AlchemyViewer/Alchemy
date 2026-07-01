@@ -56,7 +56,7 @@ namespace
 
     bool fileExists(const std::string& path)
     {
-        if (FILE* f = std::fopen(path.c_str(), "rb"))
+        if (FILE* f = LLFile::fopen(path.c_str(), LLFILE_MODE("rb")))
         {
             std::fclose(f);
             return true;
