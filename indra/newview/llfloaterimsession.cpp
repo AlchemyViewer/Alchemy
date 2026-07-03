@@ -278,6 +278,28 @@ void LLFloaterIMSession::GearDoToSelectedGroup(const LLSD& userdata)
 // [/SL:KB]
 
 // [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+void LLFloaterIMSession::onSnoozeGroupClicked(const LLUICtrl* pCtrl)
+{
+    if (!pCtrl)
+    {
+        return;
+    }
+
+    const std::string value = pCtrl->getValue().asString();
+    if (value == "-1")
+    {
+        LLGroupActions::leaveIM(mSessionID);
+    }
+    else if (value.empty())
+    {
+        LLGroupActions::snoozeIM(mSessionID, 0);
+    }
+    else
+    {
+        LLGroupActions::snoozeIM(mSessionID, boost::lexical_cast<S32>(value) * 60);
+    }
+}
+
 void LLFloaterIMSession::onTeleportClicked(const LLUICtrl* pCtrl)
 {
     if (pCtrl)
@@ -478,6 +500,7 @@ bool LLFloaterIMSession::postBuild()
         mExtendedButtonPanel->getChild<LLUICtrl>("profile_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_profile"));
         mExtendedButtonPanel->getChild<LLUICtrl>("chat_history_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "chat_history"));
         mExtendedButtonPanel->getChild<LLUICtrl>("view_notices_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_notices"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("snooze_groupt_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::onSnoozeGroupClicked, this, _1));
     }
 // [/SL:KB]
 

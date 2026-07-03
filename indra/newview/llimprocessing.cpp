@@ -1345,7 +1345,12 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             // should happen after you get an "invitation"
             if (!gIMMgr->hasSession(session_id))
             {
-                return;
+                if (!gAgent.isInGroup(session_id) ||
+                    !gIMMgr->checkSnoozeExpiration(session_id) ||
+                    !gIMMgr->restoreSnoozedSession(session_id))
+                {
+                    return;
+                }
             }
 
             else if (offline == IM_ONLINE && is_do_not_disturb)
