@@ -923,7 +923,6 @@ class DarwinManifest(ViewerManifest):
 
                     with self.prefix(src=os.path.join(self.args['build'], os.pardir, 'dullahan', self.args['configuration'])):
                         self.path("DullahanHelper.app")
-                        self.path("DullahanHelper (Alerts).app")
                         self.path("DullahanHelper (GPU).app")
                         self.path("DullahanHelper (Renderer).app")
                         self.path("DullahanHelper (Plugin).app")
