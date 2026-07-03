@@ -69,6 +69,7 @@
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llviewerobjectlist.h"
+#include "alavatargroups.h"
 // [SL:KB] - Patch: Chat-Alerts | Checked: 2012-07-10 (Catznip-3.3)
 #include "llaudioengine.h"
 #include "lltextparser.h"
@@ -1336,6 +1337,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
     LLUIColor txt_color = LLUIColorTable::instance().getColor("White");
     LLUIColor name_color = LLUIColorTable::instance().getColor("ChatHeaderDisplayNameColor"); // <alchemy/>
     LLViewerChat::getChatColor(chat, txt_color, alpha);
+    const bool irc_name_color = ALAvatarGroups::instance().getIRCNameColor(chat, name_color);
 
     LLFontGL* fontp = LLViewerChat::getChatFont();
     std::string font_name = LLFontGL::nameFromFont(fontp);
@@ -1461,6 +1463,11 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                 static LLUIColor link_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
                 link_params.color = link_color;
                 link_params.readonly_color = link_color;
+                if (irc_name_color)
+                {
+                    link_params.color = name_color;
+                    link_params.readonly_color = name_color;
+                }
                 link_params.is_link = true;
                 link_params.link_href = url;
 
@@ -1498,6 +1505,14 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
             {
                 LLStyle::Params link_params(body_message_params);
                 link_params.overwriteFrom(LLStyleMap::instance().lookupAgent(chat.mFromID));
+                if (irc_name_color)
+                {
+                    // Keep our dimmed name color instead of letting the agent
+                    // SLURL re-parse to the default HTMLLinkColor link style.
+                    link_params.use_default_link_style = false;
+                    link_params.color = name_color;
+                    link_params.readonly_color = name_color;
+                }
 
                 if (use_irssi_text_chat_history)
                 {
