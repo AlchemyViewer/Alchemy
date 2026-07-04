@@ -4873,7 +4873,7 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
         {
             found = gPipeline.lineSegmentIntersectInWorld(mw_start, mw_end, pick_transparent, pick_rigged, pick_unselectable, pick_reflection_probe,
                                                           face_hit, intersection, uv, normal, tangent);
-            if (found && !pick_transparent)
+            if (found && !pick_transparent && intersection)
             {
                 gDebugRaycastIntersection = *intersection;
             }
