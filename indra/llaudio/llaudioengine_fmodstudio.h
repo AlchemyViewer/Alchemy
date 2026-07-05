@@ -124,8 +124,13 @@ protected:
     std::string mActiveDeviceName;
 
     bool mReverbActive = false;
+    FMOD::DSP *mFFtDSP = nullptr;
 
 public:
+    void idle() override;
+    typedef void (*FFTCallback)(const float* spectrum_data, int length);
+    static FFTCallback sFFTCallback;
+
     static FMOD::ChannelGroup *mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT];
     // Cached wet-send level applied to every new channel in play().
     // Static so the channel class can reach it without an engine back-

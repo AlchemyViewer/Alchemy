@@ -50,6 +50,7 @@ FMOD_RESULT F_CALL windCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, floa
 
 FMOD::ChannelGroup *LLAudioEngine_FMODSTUDIO::mChannelGroups[LLAudioEngine::AUDIO_TYPE_COUNT] = {0};
 float LLAudioEngine_FMODSTUDIO::sReverbSendScale = 0.0f;
+LLAudioEngine_FMODSTUDIO::FFTCallback LLAudioEngine_FMODSTUDIO::sFFTCallback = nullptr;
 
 namespace
 {
@@ -363,6 +364,19 @@ bool LLAudioEngine_FMODSTUDIO::init(void* userdata, const std::string &app_title
                          "FMOD::System::setReverbProperties (init seed)");
     }
 
+    // Create and attach FMOD FFT DSP to master channel group
+    if (mSystem)
+    {
+        FMOD::ChannelGroup* master_group = nullptr;
+        if (mSystem->getMasterChannelGroup(&master_group) == FMOD_OK && master_group)
+        {
+            if (mSystem->createDSPByType(FMOD_DSP_TYPE_FFT, &mFFtDSP) == FMOD_OK && mFFtDSP)
+            {
+                master_group->addDSP(FMOD_CHANNELCONTROL_DSP_TAIL, mFFtDSP);
+            }
+        }
+    }
+
     LL_INFOS("AppInit") << "LLAudioEngine_FMODSTUDIO::init(): initialization complete." << LL_ENDL;
 
     return true;
@@ -547,6 +561,16 @@ void LLAudioEngine_FMODSTUDIO::shutdown()
     LLAudioEngine::shutdown();
 
     LL_INFOS("FMOD") << "LLAudioEngine_FMODSTUDIO::shutdown() closing FMOD Studio" << LL_ENDL;
+    if (mFFtDSP)
+    {
+        FMOD::ChannelGroup* master_group = nullptr;
+        if (mSystem && mSystem->getMasterChannelGroup(&master_group) == FMOD_OK && master_group)
+        {
+            master_group->removeDSP(mFFtDSP);
+        }
+        mFFtDSP->release();
+        mFFtDSP = nullptr;
+    }
     if (mSystem)
     {
         mSystem->close();
@@ -556,6 +580,28 @@ void LLAudioEngine_FMODSTUDIO::shutdown()
 
     delete mListenerp;
     mListenerp = nullptr;
+}
+
+
+void LLAudioEngine_FMODSTUDIO::idle()
+{
+    LLAudioEngine::idle();
+
+    if (mInited && mSystem && mFFtDSP && sFFTCallback)
+    {
+        FMOD_DSP_PARAMETER_FFT* fft_param = nullptr;
+        unsigned int length = 0;
+        FMOD_RESULT r = mFFtDSP->getParameterData(FMOD_DSP_FFT_SPECTRUMDATA, (void**)&fft_param, &length, nullptr, 0);
+        if (r == FMOD_OK && fft_param)
+        {
+            int num_channels = fft_param->numchannels;
+            int fft_length = fft_param->length;
+            if (num_channels > 0 && fft_length > 0 && fft_param->spectrum[0])
+            {
+                sFFTCallback(fft_param->spectrum[0], fft_length);
+            }
+        }
+    }
 }
 
 

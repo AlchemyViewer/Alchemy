@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<floater
+ name="estim"
+ title="E-Stim Device Controls"
+ width="340"
+ height="460"
+ min_width="340"
+ min_height="460"
+ can_resize="true"
+ can_minimize="true"
+ can_close="true"
+ save_rect="true">
+
+    <text name="battery_label" left="10" top="15" width="300" height="20">
+        Coyote Battery: Unknown
+    </text>
+    <text name="load_a_label" left="10" top="40" width="140" height="20">
+        Channel A Load: Connected
+    </text>
+    <text name="load_b_label" left="160" top="40" width="140" height="20">
+        Channel B Load: Connected
+    </text>
+    <text name="status_label" left="10" top="65" width="300" height="20">
+        Connection: Disconnected
+    </text>
+
+    <text name="max_a_text" left="10" top="90" width="90" height="20">
+        Max Output A:
+    </text>
+    <slider name="max_a_slider" left="100" top="90" width="230" height="20" min_val="0" max_val="255" initial_value="255" increment="1" show_text="true" />
+
+    <text name="max_b_text" left="10" top="115" width="90" height="20">
+        Max Output B:
+    </text>
+    <slider name="max_b_slider" left="100" top="115" width="230" height="20" min_val="0" max_val="255" initial_value="255" increment="1" show_text="true" />
+
+    <text name="triggers_title" left="10" top="140" width="300" height="20">
+        Active Trigger Rules:
+    </text>
+    <scroll_list name="trigger_list" left="10" top="165" width="320" height="100">
+        <scroll_list.column name="rule" label="Rule" width="300" />
+    </scroll_list>
+
+    <text name="sensors_title" left="10" top="275" width="300" height="20">
+        Connected Sensors:
+    </text>
+    <scroll_list name="sensor_list" left="10" top="300" width="320" height="70">
+        <scroll_list.column name="sensor" label="Sensor" width="100" />
+        <scroll_list.column name="values" label="Values" width="200" />
+    </scroll_list>
+
+    <button name="test_a_btn" label="Test A" left="10" top="380" width="100" height="20" />
+    <button name="test_b_btn" label="Test B" left="120" top="380" width="100" height="20" />
+    <button name="clear_btn" label="Clear Triggers" left="230" top="380" width="100" height="20" />
+
+    <button
+     name="panic_button"
+     label="PANIC STOP"
+     left="10"
+     top="410"
+     width="320"
+     height="40"
+     font="SansSerifLarge" />
+</floater>
