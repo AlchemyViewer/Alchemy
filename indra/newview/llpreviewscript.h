@@ -332,6 +332,8 @@ public:
     void setObjectName(std::string name) { mObjectName = name; }
 
     bool getIsModifiable() const { return mIsModifiable; } // Evaluated on load assert
+    void setOpenExternalOnLoad(bool val) { mOpenExternalOnLoad = val; }
+    bool getOpenExternalOnLoad() const { return mOpenExternalOnLoad; }
 
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
     LLScriptEditor* getEditor() { return (mScriptEd) ? mScriptEd->mEditor : NULL; }
@@ -388,5 +390,6 @@ private:
     LLSD                mExperienceIds;
     LLHandle<LLFloater> mExperienceProfile;
     std::string         mObjectName;
+    bool                mOpenExternalOnLoad;
 };
 

@@ -33,6 +33,7 @@
 #include "llerror.h"
 #include "llfiltereditor.h"
 #include "llfloaterreg.h"
+#include "llnotificationsutil.h"
 #include "llfontgl.h"
 #include "llinventorydefines.h"
 #include "llmaterialtable.h"
@@ -87,6 +88,7 @@ bool LLPanelContents::postBuild()
     setMouseOpaque(false);
 
     getChild<LLUICtrl>("button new script")->setCommitCallback(boost::bind(&LLPanelContents::onClickNewScript, this, _1));
+    getChild<LLUICtrl>("button edit all")->setCommitCallback(boost::bind(&LLPanelContents::onClickEditAll, this, _1));
     childSetAction("button permissions",&LLPanelContents::onClickPermissions, this);
 
     mFilterEditor = getChild<LLFilterEditor>("contents_filter");
@@ -129,6 +131,7 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     if( !objectp )
     {
         getChildView("button new script")->setEnabled(false);
+        getChildView("button edit all")->setEnabled(false);
         return;
     }
 
@@ -137,6 +140,7 @@ void LLPanelContents::getState(LLViewerObject *objectp )
         // Client-only local mesh preview: it has no server-side task inventory,
         // so scripts/contents/permissions don't apply.
         getChildView("button new script")->setEnabled(false);
+        getChildView("button edit all")->setEnabled(false);
         getChildView("button permissions")->setEnabled(false);
         if (mFilterEditor)
         {
@@ -180,6 +184,29 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     // Edit script button - ok if object is editable and there's an unambiguous destination for the object.
     getChildView("button new script")->setEnabled(
         editable &&
+        all_volume &&
+        ((LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() == 1)
+            || (LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1)));
+
+    // Check if the object contains any LSL scripts to enable "Edit All"
+    bool has_scripts = false;
+    if (objectp && !objectp->isLocalOnly())
+    {
+        LLInventoryObject::object_list_t contents;
+        objectp->getInventoryContents(contents);
+        for (const LLPointer<LLInventoryObject>& obj : contents)
+        {
+            if (obj->getType() == LLAssetType::AT_LSL_TEXT)
+            {
+                has_scripts = true;
+                break;
+            }
+        }
+    }
+
+    getChildView("button edit all")->setEnabled(
+        editable &&
+        has_scripts &&
         all_volume &&
         ((LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() == 1)
             || (LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1)));
@@ -365,4 +392,53 @@ void LLPanelContents::onClickPermissions(void *userdata)
 {
     LLPanelContents* self = (LLPanelContents*)userdata;
     gFloaterView->getParentFloater(self)->addDependentFloater(LLFloaterReg::showInstance("bulk_perms"));
+}
+
+void LLPanelContents::updateButtons()
+{
+    const bool children_ok = true;
+    LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
+    getState(object);
+}
+
+void LLPanelContents::onClickEditAll(LLUICtrl* ctrl)
+{
+    const bool children_ok = true;
+    LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
+    if (!object || object->isLocalOnly() || object->isInventoryPending())
+    {
+        return;
+    }
+
+    if (!(object->permModify() || gAgent.isGodlike()))
+    {
+        LLNotificationsUtil::add("CannotOpenScriptObjectNoMod");
+        return;
+    }
+
+    LLInventoryObject::object_list_t contents;
+    object->getInventoryContents(contents);
+
+    for (const LLPointer<LLInventoryObject>& obj : contents)
+    {
+        if (obj->getType() == LLAssetType::AT_LSL_TEXT)
+        {
+            LLSD floater_key;
+            floater_key["taskid"] = object->getID();
+            floater_key["itemid"] = obj->getUUID();
+
+            LLLiveLSLEditor* preview = LLFloaterReg::showTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key, TAKE_FOCUS_NO);
+            if (preview)
+            {
+                preview->setOpenExternalOnLoad(true); // Tell LLLiveLSLEditor to trigger external editor on load
+                LLSelectNode *node = LLSelectMgr::getInstance()->getSelection()->getFirstRootNode(NULL, true);
+                if (node && node->mValid)
+                {
+                    preview->setObjectName(node->mName);
+                }
+                preview->setObjectID(object->getID());
+                preview->setMinimized(true); // Minimize immediately to keep the screen clean
+            }
+        }
+    }
 }

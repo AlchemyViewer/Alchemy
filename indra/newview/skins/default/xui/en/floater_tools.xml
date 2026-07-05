@@ -2999,7 +2999,7 @@ even though the user gets a free copy.
              name="button new script"
              tool_tip="Create a new script in this object"
              top="10"
-             width="140">
+             width="100">
                 <flyout_button.item
                  label="New LSL Script"
                  name="new_lsl_script_item"
@@ -3012,11 +3012,20 @@ even though the user gets a free copy.
             <button
              follows="left|top"
              height="23"
+             label="Edit All"
+             layout="topleft"
+             left_pad="5"
+             name="button edit all"
+             tool_tip="Open all scripts inside this object in the external editor"
+             width="80" />
+            <button
+             follows="left|top"
+             height="23"
              label="Permissions"
              layout="topleft"
-             left_pad="8"
+             left_pad="5"
              name="button permissions"
-             width="140" />
+             width="100" />
             <filter_editor
              follows="left|top|right"
              label="Enter filter text"

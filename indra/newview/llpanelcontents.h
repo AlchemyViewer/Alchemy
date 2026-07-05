@@ -53,6 +53,8 @@ public:
 
 
     void     onClickNewScript(LLUICtrl* ctrl);
+    void     onClickEditAll(LLUICtrl* ctrl);
+    void     updateButtons();
     static void     onClickPermissions(void*);
 
     // Key suffix for "tentative" fields

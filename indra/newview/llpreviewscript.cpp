@@ -2290,7 +2290,8 @@ LLLiveLSLEditor::LLLiveLSLEditor(const LLSD& key) :
     mIsModifiable(false),
     mIsNew(false),
     mIsSaving(false),
-    mObjectName("")
+    mObjectName(""),
+    mOpenExternalOnLoad(false)
 {
     mFactoryMap["script ed panel"] = LLCallbackMap(LLLiveLSLEditor::createScriptEdPanel, this);
 }
@@ -2500,6 +2501,12 @@ void LLLiveLSLEditor::onLoadComplete(const LLUUID& asset_id,
             instance->mAssetStatus = PREVIEW_ASSET_LOADED;
             instance->mScriptEd->setAssetID(asset_id);
 
+            // Check if we should open this script in the external editor automatically
+            if (instance->getOpenExternalOnLoad())
+            {
+                instance->mScriptEd->openInExternalEditor();
+            }
+
 // [SL:KB] - Patch: Build-ScriptRecover | Checked: 2011-11-23 (Catznip-3.2)
             // Start the timer which will perform regular backup saves
             if (!instance->isBackupRunning())
@@ -2707,39 +2714,28 @@ LLLiveLSLSaveData::LLLiveLSLSaveData(const LLUUID& id,
 /*static*/
 void LLLiveLSLEditor::finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response, bool isRunning)
 {
-    // This callback runs directly on the upload coprocedure's fiber
-    // (AssetInventoryUploadCoproc), not on the main coroutine. The work
-    // below eventually touches UI (selectFirstError() -> onErrorList() ->
-    // LLTextBase::reflow() -> LLScriptEditorSyntaxWorker::pump(), which
-    // takes an LLMutex) and LLMutex asserts/crashes if locked off the main
-    // coro. Shuttle the whole callback back to the main thread first, via
-    // LLAppViewer::postToMainCoro() (see llappviewer.h).
-    LLAppViewer::instance()->postToMainCoro(
-        [itemId, taskId, newAssetId, response, isRunning]() mutable
+    LLSD floater_key;
+    floater_key["taskid"] = taskId;
+    floater_key["itemid"] = itemId;
+
+    LLLiveLSLEditor* preview = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key);
+    if (preview)
+    {
+        preview->mItem->setAssetUUID(newAssetId);
+        preview->mScriptEd->setAssetID(newAssetId);
+
+        // Bytecode save completed
+        if (response["compiled"])
         {
-            LLSD floater_key;
-            floater_key["taskid"] = taskId;
-            floater_key["itemid"] = itemId;
-
-            LLLiveLSLEditor* preview = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key);
-            if (preview)
-            {
-                preview->mItem->setAssetUUID(newAssetId);
-                preview->mScriptEd->setAssetID(newAssetId);
-
-                // Bytecode save completed
-                if (response["compiled"])
-                {
-                    preview->callbackLSLCompileSucceeded(taskId, itemId, isRunning);
-                }
-                else
-                {
-                    preview->callbackLSLCompileFailed(response["errors"]);
-                }
-                response["is_running"] = isRunning;
-                preview->sendCompileResults(response);
-            }
-        });
+            preview->callbackLSLCompileSucceeded(taskId, itemId, isRunning);
+        }
+        else
+        {
+            preview->callbackLSLCompileFailed(response["errors"]);
+        }
+        response["is_running"] = isRunning;
+        preview->sendCompileResults(response);
+    }
 }
 
 // virtual
