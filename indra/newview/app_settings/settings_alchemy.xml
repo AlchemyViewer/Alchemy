@@ -2,21 +2,10 @@
 <llsd xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="llsd.xsd">
     <map>
-        <key>ALCefAcceleratedPaint</key>
+        <key>RLVStartupLock</key>
         <map>
             <key>Comment</key>
-            <string>Use CEF GPU shared-texture (accelerated paint) zero-copy path for browser media instead of CPU pixel readback/upload. Requires a viewer restart. (CEF daemon rework, on by default; falls back to CPU paint where the GPU interop is unavailable.)</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>Boolean</string>
-            <key>Value</key>
-            <integer>0</integer>
-        </map>
-        <key>ALCefDaemonEnabled</key>
-        <map>
-            <key>Comment</key>
-            <string>Host all browser (CEF) media instances in a single shared tab-manager daemon process instead of one process per instance. Requires a viewer restart. (CEF daemon rework, on by default.)</string>
+            <string>Enables RLV startup screen lock.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -24,27 +13,60 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>ALCefDedicatedHost</key>
+        <key>RLVVersionViewerString</key>
         <map>
             <key>Comment</key>
-            <string>Launch browser (CEF) media via the dedicated SLPluginCEF host, which statically links the CEF plugin instead of dlopen()ing it (avoids the Linux static-TLS crash; prerequisite for the sandbox). Requires a viewer restart. (CEF daemon rework, on by default.)</string>
+            <string>Custom identification string returned by @versionviewer command.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Boolean</string>
+            <string>String</string>
             <key>Value</key>
-            <integer>1</integer>
+            <string>Alchemy Test</string>
         </map>
-        <key>ALCefSandbox</key>
+        <key>RLVStartupLockMinDelay</key>
         <map>
             <key>Comment</key>
-            <string>Enable the Chromium sandbox for CEF browser sub-processes (renderer/GPU/utility). Requires a viewer restart. (CEF daemon rework, on by default.)</string>
+            <string>Minimum delay in seconds before RLV startup lock is released.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Boolean</string>
+            <string>F32</string>
             <key>Value</key>
+            <real>5.0</real>
+        </map>
+        <key>RLVStartupLockQuietPeriod</key>
+        <map>
+            <key>Comment</key>
+            <string>Quiet period in seconds (no new RLV commands received) before startup lock is released.</string>
+            <key>Persist</key>
             <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>RLVStartupLockTimeout</key>
+        <map>
+            <key>Comment</key>
+            <string>Maximum timeout in seconds to wait for RLV startup lock.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>15.0</real>
+        </map>
+        <key>SkinCurrent</key>
+        <map>
+            <key>Comment</key>
+            <string>The currently selected skin.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>alchemy</string>
         </map>
         <key>ALSceneExplorerActivateAction</key>
         <map>
@@ -2994,6 +3016,28 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>1</integer>
+        </map>
+        <key>EstimMaxIntensityCap</key>
+        <map>
+            <key>Comment</key>
+            <string>Maximum intensity percentage cap for E-stim devices (0-255).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>255</integer>
+        </map>
+        <key>EstimWebsocketPort</key>
+        <map>
+            <key>Comment</key>
+            <string>Websocket server port for the e-stim daemon connection.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>9030</integer>
         </map>
     </map>
 </llsd>

@@ -52,7 +52,6 @@ class LLFloaterIMSessionTab
     using super = LLTransientDockableFloater;
 // [RLVa:KB] - @shownames
     friend struct RlvCommandHandler<RLV_TYPE_ADDREM, RLV_BHVR_SHOWNAMES>;
-    friend struct RlvCommandHandler<RLV_TYPE_ADDREM, RLV_BHVR_SHOWNEARBY>;
 // [/RLVa:KB]
 
 public:

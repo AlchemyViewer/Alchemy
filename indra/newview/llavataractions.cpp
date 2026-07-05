@@ -82,6 +82,7 @@
 // [RLVa:KB] - Checked: 2011-04-11 (RLVa-1.3.0)
 #include "rlvactions.h"
 #include "rlvcommon.h"
+#include "rlvhandler.h"
 // [/RLVa:KB]
 
 #if 0
@@ -378,6 +379,11 @@ void LLAvatarActions::startConference(const uuid_vec_t& ids, const LLUUID& float
 // static
 void LLAvatarActions::showProfile(const LLUUID& avatar_id)
 {
+    if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWPROFILES) && avatar_id != gAgent.getID())
+    {
+        return;
+    }
+
     if (avatar_id.notNull())
     {
         if (gSkinSettings.getBOOL("LegacyProfile"))

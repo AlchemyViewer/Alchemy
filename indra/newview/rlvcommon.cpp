@@ -457,6 +457,12 @@ std::string RlvStrings::getVersionAbout()
                     RLV_VERSION_MAJOR, RLV_VERSION_MINOR, RLV_VERSION_PATCH, RLVa_VERSION_MAJOR, RLVa_VERSION_MINOR, RLVa_VERSION_PATCH, LLVersionInfo::instance().getBuild());
 }
 
+std::string RlvStrings::getViewerName()
+{
+    std::string custom_string = gSavedSettings.getString("RLVVersionViewerString");
+    return custom_string.empty() ? LLVersionInfo::instance().getChannel() : custom_string;
+}
+
 std::string RlvStrings::getVersionNum(const LLUUID& idRlvObject)
 {
     bool fCompatMode = RlvSettings::isCompatibilityModeObject(idRlvObject);
@@ -518,7 +524,7 @@ void RlvUtil::filterLocation(std::string& strUTF8Text)
 }
 
 // Checked: 2010-12-08 (RLVa-1.2.2c) | Modified: RLVa-1.2.2c
-void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fClearMatches)
+void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy)
 {
     uuid_vec_t idAgents;
     LLWorld::getInstance()->getAvatars(&idAgents, NULL);
@@ -526,13 +532,13 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
     {
         LLAvatarName avName;
         // NOTE: if we're agressively culling nearby names then ignore exceptions
-        if ( (LLAvatarNameCache::get(idAgents[idxAgent], &avName)) && ((fClearMatches) || (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idAgents[idxAgent]))) )
+        if ( (LLAvatarNameCache::get(idAgents[idxAgent], &avName)) && (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idAgents[idxAgent])) )
         {
             const std::string& strDisplayName = escape_for_regex(avName.getDisplayName());
             bool fFilterDisplay = (strDisplayName.length() > 2);
             const std::string& strLegacyName = avName.getLegacyName();
             fFilterLegacy &= (strLegacyName.length() > 2);
-            const std::string& strAnonym = (!fClearMatches) ? RlvStrings::getAnonym(avName) : LLStringUtil::null;
+            const std::string& strAnonym = RlvStrings::getAnonym(avName);
 
             // If the display name is a subset of the legacy name we need to filter that first, otherwise it's the other way around
             if (boost::icontains(strLegacyName, strDisplayName))
@@ -802,6 +808,11 @@ bool rlvMenuMainToggleVisible(LLUICtrl* pMenuCtrl)
             pMenuItem->setLabel(strLabel + " " + LLTrans::getString("RLVaPendingRestart"));
     }
     return true;
+}
+
+bool rlvMenuMainToggleEnabled(LLUICtrl* pMenuCtrl)
+{
+    return !gRlvHandler.hasBehaviour(RLV_BHVR_LOCKRLV);
 }
 
 // Checked: 2011-08-16 (RLVa-1.4.0b) | Added: RLVa-1.4.0b

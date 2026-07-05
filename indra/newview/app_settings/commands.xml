@@ -29,6 +29,8 @@
            tooltip_ref="Command_Appearance_Tooltip"
            execute_function="Floater.ToggleOrBringToFront"
            execute_parameters="appearance"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showoutfits"
            is_running_function="Floater.IsOpen"
            is_running_parameters="appearance"
            />
@@ -62,6 +64,8 @@
            tooltip_ref="Command_Conversations_Tooltip"
            execute_function="Floater.ToggleOrBringToFront"
            execute_parameters="im_container"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showconversation"
            is_running_function="Floater.IsOpen"
            is_running_parameters="im_container"
            />
@@ -92,6 +96,8 @@
            tooltip_ref="Command_Destinations_Tooltip"
            execute_function="Floater.ToggleOrBringToFront"
            execute_parameters="destinations"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showdestinations"
            is_running_function="Floater.IsOpen"
            is_running_parameters="destinations"
            />
@@ -208,6 +214,8 @@
            tooltip_ref="Command_People_Tooltip"
            execute_function="Floater.ToggleOrBringToFront"
            execute_parameters="people"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showpeople"
            is_running_function="Floater.IsOpen"
            is_running_parameters="people"
            />
@@ -256,6 +264,8 @@
            tooltip_ref="Command_Preferences_Tooltip"
            execute_function="Floater.ToggleOrBringToFront"
            execute_parameters="preferences"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showpreferences"
            is_running_function="Floater.IsOpen"
            is_running_parameters="preferences"
            />
@@ -334,6 +344,8 @@
            tooltip_ref="Command_Search_Tooltip"
            execute_function="Floater.ToggleOrBringToFront"
            execute_parameters="search"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showsearch"
            is_running_function="Floater.IsOpen"
            is_running_parameters="search"
            />
@@ -384,6 +396,8 @@
            tooltip_ref="Command_View_Tooltip"
            execute_function="Floater.ToggleOrBringToFront"
            execute_parameters="camera"
+           is_enabled_function="RLV.EnableIfNot"
+           is_enabled_parameters="showcamera"
            is_running_function="Floater.IsOpen"
            is_running_parameters="camera"
            />
@@ -451,5 +465,16 @@
            execute_parameters="https://www.google.com"
            is_running_function="Floater.IsOpen"
            is_running_parameters="web_content"
+           />
+  <command name="estim_panic"
+           available_in_toybox="true"
+           execute_function="Estim.Panic"
+           />
+  <command name="estim_toggle"
+           available_in_toybox="true"
+           execute_function="Floater.ToggleOrBringToFront"
+           execute_parameters="estim"
+           is_running_function="Floater.IsOpen"
+           is_running_parameters="estim"
            />
 </commands>

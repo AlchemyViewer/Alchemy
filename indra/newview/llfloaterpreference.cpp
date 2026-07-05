@@ -704,7 +704,7 @@ skin_t manifestFromJson(const std::string& filename, const ESkinType type)
 void LLFloaterPreference::loadUserSkins()
 {
     mUserSkins.clear();
-#if 1
+#if 0
     const std::string& fullpath = gDirUtilp->add(gDirUtilp->getSkinBaseDir(), "default");
     if (LLFile::isdir(fullpath))
     {

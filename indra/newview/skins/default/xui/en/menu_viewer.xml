@@ -166,6 +166,20 @@
              function="Floater.Toggle"
              parameter="preferences" />
         </menu_item_call>
+       <menu_item_call
+          label="E-Stim Panic Stop"
+          name="EstimPanic"
+          shortcut="control|shift|P">
+             <menu_item_call.on_click
+              function="Estim.Panic" />
+       </menu_item_call>
+       <menu_item_call
+          label="E-Stim UI"
+          name="EstimUI">
+             <menu_item_call.on_click
+              function="Floater.Toggle"
+              parameter="estim" />
+       </menu_item_call>
          <menu_item_call
          label="Toolbar buttons..."
          name="Toolbars">
@@ -3033,6 +3047,8 @@ function="World.EnvPreset"
               <menu_item_check.on_click
                function="ToggleControl"
                parameter="RestrainedLove" />
+              <menu_item_check.on_enable
+               function="RLV.MainToggleEnabled" />
               <menu_item_check.on_visible
                function="RLV.MainToggleVisible" />
         </menu_item_check>

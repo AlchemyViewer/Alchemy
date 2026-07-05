@@ -72,6 +72,7 @@
 #include "rlvhandler.h"
 #include "rlvlocks.h"
 // [/RLVa:KB]
+#include "llpanelcontents.h"
 
 const LLColor4U DEFAULT_WHITE(255, 255, 255);
 
@@ -1637,6 +1638,12 @@ void LLPanelObjectInventory::updateInventory()
     if (mFolders)
     {
         mFolders->requestArrange();
+    }
+
+    LLPanelContents* parent_panel = dynamic_cast<LLPanelContents*>(getParent());
+    if (parent_panel)
+    {
+        parent_panel->updateButtons();
     }
 
     mInventoryNeedsUpdate = false;

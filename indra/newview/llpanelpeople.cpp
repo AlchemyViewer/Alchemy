@@ -78,6 +78,7 @@
 #include "llslurl.h"
 // [RLVa:KB] - Checked: RLVa-1.2.2
 #include "rlvactions.h"
+#include "rlvhandler.h"
 // [/RLVa:KB]
 
 
@@ -763,6 +764,8 @@ bool LLPanelPeople::postBuild()
     mOnlineFriendList->setRefreshCompleteCallback(boost::bind(&LLPanelPeople::onFriendListRefreshComplete, this, _1, _2));
     mAllFriendList->setRefreshCompleteCallback(boost::bind(&LLPanelPeople::onFriendListRefreshComplete, this, _1, _2));
 
+    rlvUpdateTabStates();
+
     return true;
 }
 
@@ -814,10 +817,17 @@ void LLPanelPeople::updateFriendListHelpText()
         //update help text for empty lists
         const std::string& filter = mSavedOriginalFilters[mTabContainer->getCurrentPanelIndex()];
 
-        std::string message_name = filter.empty() ? "no_friends_msg" : "no_filtered_friends_msg";
-        LLStringUtil::format_map_t args;
-        args["[SEARCH_TERM]"] = LLURI::escape(filter);
-        no_friends_text->setText(getString(message_name, args));
+        if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWFRIENDS))
+        {
+            no_friends_text->setText(RlvStrings::getString("blocked_friends"));
+        }
+        else
+        {
+            std::string message_name = filter.empty() ? "no_friends_msg" : "no_filtered_friends_msg";
+            LLStringUtil::format_map_t args;
+            args["[SEARCH_TERM]"] = LLURI::escape(filter);
+            no_friends_text->setText(getString(message_name, args));
+        }
     }
     else
     {
@@ -831,6 +841,11 @@ void LLPanelPeople::updateFriendList()
 {
     if (!mOnlineFriendList || !mAllFriendList)
         return;
+
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWFRIENDS))
+    {
+        return;
+    }
 
     // get all buddies we know about
     const LLAvatarTracker& av_tracker = LLAvatarTracker::instance();
@@ -890,42 +905,7 @@ void LLPanelPeople::updateNearbyList()
 
     std::vector<LLVector3d> positions;
 
-// [RLVa:KB] - Checked: RLVa-2.0.3
-    if (RlvActions::canShowNearbyAgents())
-    {
-// [/RLVa:KB]
-        LLWorld::getInstance()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), gSavedSettings.getF32("NearMeRange"));
-        int count_in_region = 0;
-        LLViewerRegion* cur_region = gAgent.getRegion();
-
-         if (!cur_region)
-         {
-            LL_WARNS() << "Current region is null" << LL_ENDL;
-            return;
-        }
-
-        // Iterate through avatars in the region.
-        // The nearby list reports the avatars in 4096m range (`ALControlCache::NearMeRange`)
-        // Reported UUIDs may not be in same region.
-        // Also the TOTAL changes based on your filter results -- Fallen
-        for (size_t i = 0; i < positions.size(); ++i)
-        {
-            if (cur_region->pointInRegionGlobal(positions[i]))
-            {
-                count_in_region++;
-            }
-        }
-
-        mNearbyCountText->setTextArg("[TOTAL]", std::to_string(mNearbyList->size()));
-        mNearbyCountText->setTextArg("[COUNT]", std::to_string(count_in_region));
-        mNearbyCountText->setTextArg("[REGION]", RlvActions::canShowLocation() ? cur_region->getName() : "[REDACTED]");
-// [RLVa:KB] - Checked: RLVa-2.0.3
-    }
-    else
-    {
-        mNearbyList->getIDs().clear();
-    }
-// [/RLVa:KB]
+    LLWorld::getInstance()->getAvatars(&mNearbyList->getIDs(), &positions, gAgent.getPositionGlobal(), gSavedSettings.getF32("NearMeRange"));
     mNearbyList->setDirty();
 #ifdef LL_DISCORD
     if (gSavedSettings.getBOOL("EnableDiscord"))
@@ -940,6 +920,11 @@ void LLPanelPeople::updateRecentList()
 {
     if (!mRecentList)
         return;
+
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWFRIENDS))
+    {
+        return;
+    }
 
     LLRecentPeople::instance().get(mRecentList->getIDs());
     mRecentList->setDirty();
@@ -1636,6 +1621,38 @@ void    LLPanelPeople::onOpen(const LLSD& key)
         //        blocked_tab->onOpen(key);
         //    }
         //}
+    }
+    rlvUpdateTabStates();
+}
+
+void LLPanelPeople::rlvUpdateTabStates()
+{
+    if (!mTabContainer)
+        return;
+
+    bool enable = !(RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWFRIENDS));
+
+    LLPanel* pFriendsPanel = mTabContainer->getPanelByName(FRIENDS_TAB_NAME);
+    if (pFriendsPanel)
+    {
+        S32 idx = mTabContainer->getIndexForPanel(pFriendsPanel);
+        mTabContainer->enableTabButton(idx, enable);
+    }
+
+    LLPanel* pRecentPanel = mTabContainer->getPanelByName(RECENT_TAB_NAME);
+    if (pRecentPanel)
+    {
+        S32 idx = mTabContainer->getIndexForPanel(pRecentPanel);
+        mTabContainer->enableTabButton(idx, enable);
+    }
+
+    if (!enable)
+    {
+        const std::string& active_tab = getActiveTabName();
+        if (active_tab == FRIENDS_TAB_NAME || active_tab == RECENT_TAB_NAME)
+        {
+            mTabContainer->selectTabByName(NEARBY_TAB_NAME);
+        }
     }
 }
 

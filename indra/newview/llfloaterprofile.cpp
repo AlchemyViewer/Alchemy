@@ -32,6 +32,8 @@
 #include "llnotificationsutil.h"
 #include "llpanelavatar.h"
 #include "llpanelprofile.h"
+#include "rlvactions.h"
+#include "rlvhandler.h"
 
 static const std::string PANEL_PROFILE_VIEW = "panel_profile_view";
 
@@ -53,6 +55,12 @@ LLFloaterProfile::~LLFloaterProfile()
 
 void LLFloaterProfile::onOpen(const LLSD& key)
 {
+    if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWPROFILES) && mAvatarId != gAgent.getID())
+    {
+        closeFloater();
+        return;
+    }
+
     mPanelProfile->onOpen(key);
 
     // Update the avatar name.

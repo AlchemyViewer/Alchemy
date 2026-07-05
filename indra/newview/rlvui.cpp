@@ -309,6 +309,10 @@ bool RlvUIEnabler::addGenericFloaterFilter(const std::string& strFloaterName, co
     {
         m_ConnFloaterGeneric = LLFloaterReg::setValidateCallback(boost::bind(&RlvUIEnabler::filterFloaterGeneric, this, _1, _2));
     }
+    if (!m_ConnPanelGeneric.connected())
+    {
+        m_ConnPanelGeneric = LLFloaterSidePanelContainer::setValidateCallback(boost::bind(&RlvUIEnabler::filterPanelGeneric, this, _1, _2, _3));
+    }
 
     return true;
 }
@@ -323,22 +327,36 @@ bool RlvUIEnabler::removeGenericFloaterFilter(const std::string& strFloaterName)
 
     RLV_ASSERT_DBG(m_ConnFloaterGeneric.connected());
     if (m_FilteredFloaterMap.empty())
+    {
         m_ConnFloaterGeneric.disconnect();
+        m_ConnPanelGeneric.disconnect();
+    }
 
     return true;
 }
 
-bool RlvUIEnabler::filterFloaterGeneric(const std::string& strFloaterName, const LLSD&)
+bool RlvUIEnabler::filterFloaterGeneric(const std::string& strFloaterName, const LLSD& sdKey)
 {
     auto itFloater = m_FilteredFloaterMap.find(strFloaterName);
     if (m_FilteredFloaterMap.end() != itFloater)
     {
-        if (itFloater->second)
+        if (itFloater->second && !sdKey["silent"].asBoolean())
             itFloater->second();
         return false;
     }
     return true;
+}
 
+bool RlvUIEnabler::filterPanelGeneric(const std::string& strFloaterName, const std::string&, const LLSD& sdKey)
+{
+    auto itFloater = m_FilteredFloaterMap.find(strFloaterName);
+    if (m_FilteredFloaterMap.end() != itFloater)
+    {
+        if (itFloater->second && !sdKey["silent"].asBoolean())
+            itFloater->second();
+        return false;
+    }
+    return true;
 }
 
 // Checked: 2010-04-22 (RLVa-1.4.5) | Added: RLVa-1.2.0
@@ -368,21 +386,24 @@ bool RlvUIEnabler::filterPanelShowLoc(const std::string& strFloater, const std::
 }
 
 // Checked: 2010-03-01 (RLVa-1.2.0b) | Added: RLVa-1.2.0a
-bool RlvUIEnabler::filterFloaterViewXXX(const std::string& strName, const LLSD&)
+bool RlvUIEnabler::filterFloaterViewXXX(const std::string& strName, const LLSD& sdKey)
 {
     if ( (gRlvHandler.hasBehaviour(RLV_BHVR_VIEWNOTE)) && ("preview_notecard" == strName) )
     {
-        RlvUtil::notifyBlockedViewXXX(LLAssetType::AT_NOTECARD);
+        if (!sdKey["silent"].asBoolean())
+            RlvUtil::notifyBlockedViewXXX(LLAssetType::AT_NOTECARD);
         return false;
     }
     else if ( (gRlvHandler.hasBehaviour(RLV_BHVR_VIEWSCRIPT)) && (("preview_script" == strName) || ("preview_scriptedit" == strName)) )
     {
-        RlvUtil::notifyBlockedViewXXX(LLAssetType::AT_SCRIPT);
+        if (!sdKey["silent"].asBoolean())
+            RlvUtil::notifyBlockedViewXXX(LLAssetType::AT_SCRIPT);
         return false;
     }
     else if ( (gRlvHandler.hasBehaviour(RLV_BHVR_VIEWTEXTURE)) && ("preview_texture" == strName) )
     {
-        RlvUtil::notifyBlockedViewXXX(LLAssetType::AT_TEXTURE);
+        if (!sdKey["silent"].asBoolean())
+            RlvUtil::notifyBlockedViewXXX(LLAssetType::AT_TEXTURE);
         return false;
     }
     return true;

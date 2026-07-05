@@ -492,6 +492,12 @@ void LLFloaterReg::registerControlVariables()
 //static
 void LLFloaterReg::toggleInstanceOrBringToFront(const LLSD& sdname, const LLSD& key)
 {
+    std::string name = sdname.asString();
+    if (!canShowInstance(name, key))
+    {
+        return;
+    }
+
     //
     // Floaters controlled by the toolbar behave a bit differently from others.
     // Namely they have 3-4 states as defined in the design wiki page here:
@@ -504,7 +510,6 @@ void LLFloaterReg::toggleInstanceOrBringToFront(const LLSD& sdname, const LLSD& 
     //       * Also, if it is not on top, bring it forward when focus is given.
     // * Else the target floater is open, close it.
     //
-    std::string name = sdname.asString();
     LLFloater* instance = getInstance(name, key);
 
     if (!instance)
@@ -564,6 +569,11 @@ void LLFloaterReg::toggleInstanceOrBringToFront(const LLSD& sdname, const LLSD& 
 void LLFloaterReg::showInstanceOrBringToFront(const LLSD& sdname, const LLSD& key)
 {
     std::string name = sdname.asString();
+    if (!canShowInstance(name, key))
+    {
+        return;
+    }
+
     LLFloater* instance = getInstance(name, key);
 
 

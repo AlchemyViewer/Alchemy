@@ -5084,4 +5084,52 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 フレンド以外の人からインスタントメッセージを受信したときに、設定した自動応答で応答されるようになります。
 		<usetemplate ignoretext="ステータスを非フレンドへの自動応答モードに変えたとき" name="okignore" yestext="ＯＫ"/>
 	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVSearchBlocked"
+	 type="notify">
+		検索はRLVの制限によってブロックされています。
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVPeopleBlocked"
+	 type="notify">
+		ピープルはRLVの制限によってブロックされています。
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVConversationBlocked"
+	 type="notify">
+		会話履歴はRLVの制限によってブロックされています。
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVAppearanceBlocked"
+	 type="notify">
+		外観はRLVの制限によってブロックされています。
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVBuildBlocked"
+	 type="notify">
+		編集ツールはRLVの制限によってブロックされています。
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVDestinationsBlocked"
+	 type="notify">
+		行き先ガイドはRLVの制限によってブロックされています。
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVCameraBlocked"
+	 type="notify">
+		カメラコントロールはRLVの制限によってブロックされています。
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVPreferencesBlocked"
+	 type="notify">
+		設定はRLVの制限によってブロックされています。
+	</notification>
 </notifications>

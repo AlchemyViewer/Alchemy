@@ -26,6 +26,10 @@
 
 #include "llviewerprecompiledheaders.h"
 
+// [RLVa:KB] - @blockcontacts
+#include "rlvhandler.h"
+// [/RLVa:KB]
+
 #include "llcheckboxctrl.h"
 
 #include "llagent.h"

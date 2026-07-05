@@ -34,6 +34,9 @@
 #include "alpanelprofilelegacy.h"
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
+#include "rlvactions.h"
+#include "rlvhandler.h"
+#include "llagent.h"
 
 ALFloaterProfileLegacy::ALFloaterProfileLegacy(LLSD const& key)
 :   LLFloater(key)
@@ -56,6 +59,12 @@ void ALFloaterProfileLegacy::onOpen(const LLSD& key)
 {
     if (!key.has("avatar_id")) return;
     const LLUUID av_id = key["avatar_id"].asUUID();
+
+    if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWPROFILES) && av_id != gAgent.getID())
+    {
+        closeFloater();
+        return;
+    }
 
     mAvatarNameCacheConnection = LLAvatarNameCache::get(av_id,
         boost::bind(&ALFloaterProfileLegacy::onAvatarNameCache, this, _1, _2));

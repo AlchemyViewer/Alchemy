@@ -1091,11 +1091,24 @@ LLToolBarButton* LLToolBar::createButton(const LLCommandId& id)
         enable_callback_t isEnabledCB;
 
         const std::string& isEnabledFunction = commandp->isEnabledFunctionName();
-        if (isEnabledFunction.length() > 0)
+        std::string resolvedEnabledFunction = isEnabledFunction;
+        LLSD resolvedEnabledParam = commandp->isEnabledParameters();
+
+        if (resolvedEnabledFunction.empty() && 
+            (commandp->executeFunctionName() == "Floater.Toggle" || 
+             commandp->executeFunctionName() == "Floater.ToggleOrBringToFront" || 
+             commandp->executeFunctionName() == "Floater.Show" || 
+             commandp->executeFunctionName() == "Floater.ShowOrBringToFront"))
+        {
+            resolvedEnabledFunction = "Floater.CanShow";
+            resolvedEnabledParam = commandp->executeParameters();
+        }
+
+        if (resolvedEnabledFunction.length() > 0)
         {
             LLUICtrl::EnableCallbackParam isEnabledParam;
-            isEnabledParam.function_name = isEnabledFunction;
-            isEnabledParam.parameter = commandp->isEnabledParameters();
+            isEnabledParam.function_name = resolvedEnabledFunction;
+            isEnabledParam.parameter = resolvedEnabledParam;
             isEnabledCB = initEnableCallback(isEnabledParam);
 
             if (NULL == button->mIsEnabledSignal)

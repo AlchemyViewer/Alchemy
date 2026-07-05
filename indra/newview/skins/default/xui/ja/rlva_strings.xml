@@ -120,11 +120,6 @@
 				<key>value</key>
 				<string>ＲＬＶによってフォルダがロックされているため、インベントリに対するアクションを実行できません。</string>
 			</map>
-			<key>blocked_nearby</key>
-			<map>
-				<key>value</key>
-				<string>ＲＬＶの制限により、近くにいるアバターの存在を確認できません。</string>
-			</map>
 			<key>blocked_permattach</key>
 			<map>
 				<key>value</key>
@@ -179,6 +174,46 @@
 			<map>
 				<key>value</key>
 				<string>ＲＬＶの制限により、ワイヤーフレームモードを有効にできません。</string>
+			</map>
+			<key>blocked_showsearch</key>
+			<map>
+				<key>value</key>
+				<string>ＲＬＶの制限により、検索はブロックされています。</string>
+			</map>
+			<key>blocked_showpeople</key>
+			<map>
+				<key>value</key>
+				<string>ＲＬＶの制限により、ピープルはブロックされています。</string>
+			</map>
+			<key>blocked_showconversation</key>
+			<map>
+				<key>value</key>
+				<string>ＲＬＶの制限により、会話履歴はブロックされています。</string>
+			</map>
+			<key>blocked_showoutfits</key>
+			<map>
+				<key>value</key>
+				<string>ＲＬＶの制限により、外観はブロックされています。</string>
+			</map>
+			<key>blocked_showbuild</key>
+			<map>
+				<key>value</key>
+				<string>ＲＬＶの制限により、編集ツールはブロックされています。</string>
+			</map>
+			<key>blocked_showdestinations</key>
+			<map>
+				<key>value</key>
+				<string>ＲＬＶの制限により、行き先ガイドはブロックされています。</string>
+			</map>
+			<key>blocked_showcamera</key>
+			<map>
+				<key>value</key>
+				<string>ＲＬＶの制限により、カメラコントロールはブロックされています。</string>
+			</map>
+			<key>blocked_showpreferences</key>
+			<map>
+				<key>value</key>
+				<string>ＲＬＶの制限により、設定はブロックされています。</string>
 			</map>
 			<!-- Sent as "Busy" messages to the remote party -->
 			<key>blocked_recvim_remote</key>

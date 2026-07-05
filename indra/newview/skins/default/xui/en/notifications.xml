@@ -1,5 +1,66 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <notifications>
+<!-- RLV Custom Notifications -->
+	<notification
+	 icon="notify.png"
+	 name="RLVProfileBlocked"
+	 type="notify">
+		Profile viewing is blocked by your RLV restrictions
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVShutdownCountdown"
+	 type="notify">
+		Viewer will shut down in [SECONDS] seconds due to RLV request.
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVSearchBlocked"
+	 type="notify">
+		Search is blocked by your RLV restrictions
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVPeopleBlocked"
+	 type="notify">
+		People is blocked by your RLV restrictions
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVConversationBlocked"
+	 type="notify">
+		Conversation history is blocked by your RLV restrictions
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVAppearanceBlocked"
+	 type="notify">
+		Appearance is blocked by your RLV restrictions
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVBuildBlocked"
+	 type="notify">
+		Edit Tools is blocked by your RLV restrictions
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVDestinationsBlocked"
+	 type="notify">
+		Destinations Guide is blocked by your RLV restrictions
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVCameraBlocked"
+	 type="notify">
+		Camera Controls are blocked by your RLV restrictions
+	</notification>
+	<notification
+	 icon="notify.png"
+	 name="RLVPreferencesBlocked"
+	 type="notify">
+		Preferences are blocked by your RLV restrictions
+	</notification>
     <global name="skipnexttime">
 
 		Don&apos;t show me this again
@@ -9264,6 +9325,16 @@ Are you sure you want to close all IMs?
   <notification icon="notifytip.tga"
 		name="AttachmentSaved" type="notifytip">
 Attachment has been saved.
+  </notification>
+
+  <notification icon="notifytip.tga"
+		name="EstimLoadDisconnect" type="notifytip">
+E-Stim device load disconnected! Stimulation has been cut off for safety.
+  </notification>
+
+  <notification icon="notifytip.tga"
+		name="EstimLowBattery" type="notifytip">
+E-Stim device or sensor battery is low! Please check your devices.
   </notification>
   
   <notification icon="notify.tga" persist="true"

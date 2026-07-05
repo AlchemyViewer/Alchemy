@@ -24,6 +24,7 @@
 
 #include "rlvcommon.h"
 #include "rlvhelper.h"
+#include "llframetimer.h"
 
 // ============================================================================
 // RlvHandler class
@@ -118,6 +119,7 @@ public:
     const LLUUID&     getAgentGroup() const         { return m_idAgentGroup; }                  // @setgroup
     bool              getCanCancelTp() const        { return m_fCanCancelTp; }                  // @accepttp and @tpto
     void              setCanCancelTp(bool fAllow)   { m_fCanCancelTp = fAllow; }                // @accepttp and @tpto
+    F64               getLastCommandTime() const    { return m_LastCommandTime; }
     const LLVector3d& getSitSource() const                      { return m_posSitSource; }      // @standtp
     void              setSitSource(const LLVector3d& posSource) { m_posSitSource = posSource; } // @standtp
 
@@ -139,6 +141,9 @@ public:
     static bool canEnable();
     static bool isEnabled() { return m_fEnabled; }
     static bool setEnabled(bool fEnable);
+    bool isStartupLockActive();
+    void startStartupLock();
+    void drawStartupLockOverlay();
 protected:
     // Command specific helper functions (NOTE: these generally do not perform safety checks)
     bool checkActiveGroupThrottle(const LLUUID& idRlvObj);                                      // @setgroup=force
@@ -277,6 +282,9 @@ protected:
     std::pair<LLTimer, LLUUID>              m_GroupChangeExpiration;        // @setgroup=force
 
     std::string                             m_strCameraPresetRestore;       // @setcam_eyeoffset, @setcam_eyeoffsetscale and @setcam_focusoffset
+    F64                                     m_LastCommandTime;
+    LLFrameTimer                            m_StartupLockTimer;
+    bool                                    m_StartupLockStarted;
 
     friend class RlvSharedRootFetcher;              // Fetcher needs access to m_fFetchComplete
     friend class RlvGCTimer;                        // Timer clear its own point at destruction

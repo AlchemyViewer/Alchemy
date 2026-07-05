@@ -17,9 +17,13 @@
 
 // Generic includes
 #include "llviewerprecompiledheaders.h"
+#include "llviewerwindow.h"
+#include "llfontgl.h"
+#include "llrender2dutils.h"
 #include "llagent.h"
 #include "llappearancemgr.h"
 #include "llappviewer.h"
+#include "lleventtimer.h"
 #include "llexperiencecache.h"
 #include "llexperiencelog.h"
 #include "llgroupactions.h"
@@ -27,6 +31,7 @@
 #include "llmoveview.h"
 #include "llslurl.h"
 #include "llstartup.h"
+#include "llframetimer.h"
 #include "llviewermessage.h"
 #include "llviewermenu.h"
 #include "llviewerobjectlist.h"
@@ -57,6 +62,7 @@
 #include "llworldmapmessage.h"          // @tpto
 #include "llviewertexturelist.h"        // @setcam_texture
 #include "pipeline.h"                   // @setsphere
+#include "lltoolbarview.h"
 
 // RLVa includes
 #include "rlvactions.h"
@@ -67,6 +73,7 @@
 #include "rlvhandler.h"
 #include "rlvhelper.h"
 #include "rlvinventory.h"
+#include "llestimrlvhandler.h"
 #include "rlvlocks.h"
 #include "rlvmodifiers.h"
 #include "rlvui.h"
@@ -142,7 +149,7 @@ static bool rlvParseGetStatusOption(const std::string& strOption, std::string& s
 //
 
 // Checked: 2010-04-07 (RLVa-1.2.0d) | Modified: RLVa-1.0.1d
-RlvHandler::RlvHandler() : m_fCanCancelTp(true), m_posSitSource(), m_pGCTimer(NULL)
+RlvHandler::RlvHandler() : m_fCanCancelTp(true), m_posSitSource(), m_pGCTimer(NULL), m_LastCommandTime(0.0), m_StartupLockStarted(false)
 {
     // Array auto-initialization to 0 is still not supported in VS2013
     memset(m_Behaviours, 0, sizeof(S16) * RLV_BHVR_COUNT);
@@ -582,8 +589,18 @@ ERlvCmdRet RlvHandler::processCommand(std::reference_wrapper<const RlvCommand> r
 // Checked: 2009-11-25 (RLVa-1.1.0f) | Modified: RLVa-1.1.0f
 ERlvCmdRet RlvHandler::processCommand(const LLUUID& idObj, const std::string& strCommand, bool fFromObj)
 {
+    m_LastCommandTime = LLFrameTimer::getElapsedSeconds();
     const RlvCommand rlvCmd(idObj, strCommand);
-    if (STATE_STARTED != LLStartUp::getStartupState())
+    bool fAllowProcess = (STATE_STARTED == LLStartUp::getStartupState());
+    if (!fAllowProcess && gSavedSettings.getBOOL("RLVStartupLock"))
+    {
+        if (LLStartUp::getStartupState() == STATE_WEARABLES_WAIT && gAgentWearables.areWearablesLoaded())
+        {
+            fAllowProcess = true;
+        }
+    }
+
+    if (!fAllowProcess)
     {
         m_Retained.push_back(rlvCmd);
         return RLV_RET_RETAINED;
@@ -626,7 +643,14 @@ ERlvCmdRet RlvHandler::processClearCommand(const RlvCommand& rlvCmd)
             if ( (strFilter.empty()) || (std::string::npos != strCmdRem.find(strFilter)) )
             {
                 fContinue = (rlvObj.m_Commands.size() > 1); // rlvObj will become invalid once we remove the last command
-                processCommand(rlvCmd.getObjectID(), strCmdRem.append("=y"), false);
+                if (strCmdRem.rfind("lockmouselook", 0) == 0 || strCmdRem.rfind("lockrlv", 0) == 0)
+                {
+                    processCommand(rlvCmd.getObjectID(), strCmdRem.append("=n"), false);
+                }
+                else
+                {
+                    processCommand(rlvCmd.getObjectID(), strCmdRem.append("=y"), false);
+                }
             }
         }
     }
@@ -1548,6 +1572,7 @@ bool RlvHandler::setEnabled(bool fEnable)
 
         RlvHandler::instance().addCommandHandler(std::make_unique<RlvEnvironment>());
         RlvHandler::instance().addCommandHandler(std::make_unique<RlvExtGetSet>());
+        RlvHandler::instance().addCommandHandler(std::make_unique<LLEstimRLVHandler>());
 
         // Make sure we get notified when login is successful
         if (LLStartUp::getStartupState() < STATE_STARTED)
@@ -2693,42 +2718,155 @@ ERlvCmdRet RlvBehaviourHandler<RLV_BHVR_SHOWNAMETAGS>::onCommand(const RlvComman
     return RlvBehaviourGenericHandler<RLV_OPTION_NONE_OR_MODIFIER>::onCommand(rlvCmd, fRefCount);
 }
 
-// Handles: @shownearby=n|y toggles
+
+// Handles: @showfriends=n|y toggles
 template<> template<>
-void RlvBehaviourToggleHandler<RLV_BHVR_SHOWNEARBY>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWFRIENDS>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
 {
     if (LLApp::isExiting())
         return; // Nothing to do if the viewer is shutting down
 
-    // Refresh the nearby people list
     LLPanelPeople* pPeoplePanel = LLFloaterSidePanelContainer::getPanel<LLPanelPeople>("people", "panel_people");
-    LLAvatarList* pNearbyList = (pPeoplePanel) ? pPeoplePanel->getNearbyList() : NULL;
-    RLV_ASSERT( (pPeoplePanel) && (pNearbyList) );
-    if (pNearbyList)
+    LLAvatarList* pOnlineFriendsList = (pPeoplePanel) ? pPeoplePanel->getOnlineFriendList() : NULL;
+    LLAvatarList* pAllFriendsList = (pPeoplePanel) ? pPeoplePanel->getAllFriendList() : NULL;
+    LLAvatarList* pRecentList = (pPeoplePanel) ? pPeoplePanel->getRecentList() : NULL;
+    
+    if (pOnlineFriendsList && pAllFriendsList)
     {
-        static std::string s_strNoItemsMsg = pNearbyList->getNoItemsMsg();
-        pNearbyList->setNoItemsMsg( (fHasBhvr) ? RlvStrings::getString("blocked_nearby") : s_strNoItemsMsg );
-        pNearbyList->clear();
+        static std::string s_strNoOnlineFriendsMsg = pOnlineFriendsList->getNoItemsMsg();
+        static std::string s_strNoAllFriendsMsg = pAllFriendsList->getNoItemsMsg();
+        pOnlineFriendsList->setNoItemsMsg( (fHasBhvr) ? RlvStrings::getString("blocked_friends") : s_strNoOnlineFriendsMsg );
+        pAllFriendsList->setNoItemsMsg( (fHasBhvr) ? RlvStrings::getString("blocked_friends") : s_strNoAllFriendsMsg );
+        pOnlineFriendsList->clear();
+        pAllFriendsList->clear();
+    }
 
-        if (pNearbyList->isInVisibleChain())
-            pPeoplePanel->onCommit();
+    if (pRecentList)
+    {
+        static std::string s_strNoRecentMsg = pRecentList->getNoItemsMsg();
+        pRecentList->setNoItemsMsg( (fHasBhvr) ? RlvStrings::getString("blocked_recent") : s_strNoRecentMsg );
+        pRecentList->clear();
+    }
+
+    if (pPeoplePanel)
+    {
+        pPeoplePanel->rlvUpdateTabStates();
         if (!fHasBhvr)
-            pPeoplePanel->updateNearbyList();
+        {
+            pPeoplePanel->rlvUpdateFriendList();
+            pPeoplePanel->rlvUpdateRecentList();
+        }
     }
+}
 
-#ifdef CATZNIP
-    // Refresh the nearby participant list
-    if (LLFloaterIMNearbyChat* pNearbyChatFloater = LLFloaterReg::findTypedInstance<LLFloaterIMNearbyChat>("nearby_chat"))
+// Handles: @showprofiles=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWPROFILES>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
     {
-
-        pNearbyChatFloater->updateShowParticipantList();
-        pNearbyChatFloater->updateExpandCollapseBtn();
-        // *TODO - Solution for CHUI
+        // Close "profile" (new profiles)
+        LLFloaterReg::const_instance_list_t floaters1 = LLFloaterReg::getFloaterList("profile");
+        for (LLFloater* pFloater : floaters1)
+        {
+            if (pFloater->getKey()["id"].asUUID() != gAgent.getID())
+                pFloater->closeFloater();
+        }
+        
+        // Close "legacy_profile" (legacy profiles)
+        LLFloaterReg::const_instance_list_t floaters2 = LLFloaterReg::getFloaterList("legacy_profile");
+        for (LLFloater* pFloater : floaters2)
+        {
+            if (pFloater->getKey()["avatar_id"].asUUID() != gAgent.getID())
+                pFloater->closeFloater();
+        }
+        
+        // Close "webprofile" (web profiles)
+        LLFloaterReg::const_instance_list_t floaters3 = LLFloaterReg::getFloaterList("webprofile");
+        for (LLFloater* pFloater : floaters3)
+        {
+            if (pFloater->getKey()["id"].asUUID() != gAgent.getID())
+                pFloater->closeFloater();
+        }
     }
-#endif // CATZNIP
+}
 
-    // Refresh that avatar's name tag and all HUD text
-    LLHUDText::refreshAllObjectText();
+// Handles: @showdevelop=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWDEVELOP>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    show_debug_menus();
+}
+
+// Handles: @lockmouselook=y|n toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_LOCKMOUSELOOK>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
+    {
+        gAgentCamera.changeCameraToMouselook();
+    }
+}
+
+// Handles: @lockrlv=y|n toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_LOCKRLV>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+}
+
+// Handles: @hideui=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_HIDEUI>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+
+    LLFloaterView::skip_list_t skip_list;
+    if (LLFloater* pIMContainer = LLFloaterReg::findInstance("im_container"))
+    {
+        skip_list.insert(pIMContainer);
+    }
+    if (LLFloater* pNearbyChat = LLFloaterReg::findInstance("nearby_chat"))
+    {
+        skip_list.insert(pNearbyChat);
+    }
+
+    if (fHasBhvr)
+    {
+        if (gFloaterView)
+        {
+            gFloaterView->pushVisibleAll(false, skip_list);
+        }
+        if (gMenuBarView)
+        {
+            gMenuBarView->setVisible(false);
+        }
+        if (gToolBarView)
+        {
+            gToolBarView->setVisible(false);
+        }
+    }
+    else
+    {
+        if (gFloaterView)
+        {
+            gFloaterView->popVisibleAll(skip_list);
+        }
+        if (gMenuBarView)
+        {
+            gMenuBarView->setVisible(true);
+        }
+        if (gToolBarView)
+        {
+            gToolBarView->setVisible(true);
+        }
+    }
 }
 
 // Handles: @showself=n|y and @showselfhead=n|y toggles
@@ -2756,6 +2894,168 @@ void RlvBehaviourToggleHandler<RLV_BHVR_VIEWWIREFRAME>::onCommandToggle(ERlvBeha
     if (fHasBhvr)
     {
         set_use_wireframe(false);
+    }
+}
+
+// Handles: @showsearch=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWSEARCH>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
+    {
+        LLFloaterReg::const_instance_list_t floaters = LLFloaterReg::getFloaterList("search");
+        for (LLFloater* pFloater : floaters)
+            pFloater->closeFloater();
+        RlvUIEnabler::instance().addGenericFloaterFilter("search", []() { LLNotificationsUtil::add("RLVSearchBlocked"); });
+    }
+    else
+    {
+        RlvUIEnabler::instance().removeGenericFloaterFilter("search");
+    }
+}
+
+// Handles: @showpeople=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWPEOPLE>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
+    {
+        LLFloaterReg::const_instance_list_t floaters = LLFloaterReg::getFloaterList("people");
+        for (LLFloater* pFloater : floaters)
+            pFloater->closeFloater();
+        RlvUIEnabler::instance().addGenericFloaterFilter("people", []() { LLNotificationsUtil::add("RLVPeopleBlocked"); });
+    }
+    else
+    {
+        RlvUIEnabler::instance().removeGenericFloaterFilter("people");
+    }
+}
+
+// Handles: @showconversation=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWCONVERSATION>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
+    {
+        LLFloaterReg::const_instance_list_t floaters1 = LLFloaterReg::getFloaterList("conversation");
+        for (LLFloater* pFloater : floaters1)
+            pFloater->closeFloater();
+        LLFloaterReg::const_instance_list_t floaters2 = LLFloaterReg::getFloaterList("im_container");
+        for (LLFloater* pFloater : floaters2)
+            pFloater->closeFloater();
+        RlvUIEnabler::instance().addGenericFloaterFilter("conversation", []() { LLNotificationsUtil::add("RLVConversationBlocked"); });
+        RlvUIEnabler::instance().addGenericFloaterFilter("im_container", []() { LLNotificationsUtil::add("RLVConversationBlocked"); });
+    }
+    else
+    {
+        RlvUIEnabler::instance().removeGenericFloaterFilter("conversation");
+        RlvUIEnabler::instance().removeGenericFloaterFilter("im_container");
+    }
+}
+
+// Handles: @showoutfits=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWOUTFITS>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
+    {
+        LLFloaterReg::const_instance_list_t floaters = LLFloaterReg::getFloaterList("appearance");
+        for (LLFloater* pFloater : floaters)
+            pFloater->closeFloater();
+        RlvUIEnabler::instance().addGenericFloaterFilter("appearance", []() { LLNotificationsUtil::add("RLVAppearanceBlocked"); });
+    }
+    else
+    {
+        RlvUIEnabler::instance().removeGenericFloaterFilter("appearance");
+    }
+}
+
+// Handles: @showbuild=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWBUILD>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
+    {
+        LLFloaterReg::const_instance_list_t floaters = LLFloaterReg::getFloaterList("build");
+        for (LLFloater* pFloater : floaters)
+            pFloater->closeFloater();
+        RlvUIEnabler::instance().addGenericFloaterFilter("build", []() { LLNotificationsUtil::add("RLVBuildBlocked"); });
+    }
+    else
+    {
+        RlvUIEnabler::instance().removeGenericFloaterFilter("build");
+    }
+}
+
+// Handles: @showdestinations=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWDESTINATIONS>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
+    {
+        LLFloaterReg::const_instance_list_t floaters = LLFloaterReg::getFloaterList("destinations");
+        for (LLFloater* pFloater : floaters)
+            pFloater->closeFloater();
+        RlvUIEnabler::instance().addGenericFloaterFilter("destinations", []() { LLNotificationsUtil::add("RLVDestinationsBlocked"); });
+    }
+    else
+    {
+        RlvUIEnabler::instance().removeGenericFloaterFilter("destinations");
+    }
+}
+
+// Handles: @showcamera=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWCAMERA>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
+    {
+        LLFloaterReg::const_instance_list_t floaters1 = LLFloaterReg::getFloaterList("camera");
+        for (LLFloater* pFloater : floaters1)
+            pFloater->closeFloater();
+        LLFloaterReg::const_instance_list_t floaters2 = LLFloaterReg::getFloaterList("camera_presets");
+        for (LLFloater* pFloater : floaters2)
+            pFloater->closeFloater();
+        RlvUIEnabler::instance().addGenericFloaterFilter("camera", []() { LLNotificationsUtil::add("RLVCameraBlocked"); });
+        RlvUIEnabler::instance().addGenericFloaterFilter("camera_presets", []() { LLNotificationsUtil::add("RLVCameraBlocked"); });
+    }
+    else
+    {
+        RlvUIEnabler::instance().removeGenericFloaterFilter("camera");
+        RlvUIEnabler::instance().removeGenericFloaterFilter("camera_presets");
+    }
+}
+
+// Handles: @showpreferences=n|y toggles
+template<> template<>
+void RlvBehaviourToggleHandler<RLV_BHVR_SHOWPREFERENCES>::onCommandToggle(ERlvBehaviour eBhvr, bool fHasBhvr)
+{
+    if (LLApp::isExiting())
+        return;
+    if (fHasBhvr)
+    {
+        LLFloaterReg::const_instance_list_t floaters = LLFloaterReg::getFloaterList("preferences");
+        for (LLFloater* pFloater : floaters)
+            pFloater->closeFloater();
+        RlvUIEnabler::instance().addGenericFloaterFilter("preferences", []() { LLNotificationsUtil::add("RLVPreferencesBlocked"); });
+    }
+    else
+    {
+        RlvUIEnabler::instance().removeGenericFloaterFilter("preferences");
     }
 }
 
@@ -3427,6 +3727,9 @@ ERlvCmdRet RlvHandler::processReplyCommand(const RlvCommand& rlvCmd) const
             // NOTE: RLV will respond even if there's an option
             strReply = RlvStrings::getVersion(rlvCmd.getObjectID(), RLV_BHVR_VERSION == rlvCmd.getBehaviourType());
             break;
+        case RLV_BHVR_VERSIONVIEWER:    // @versionviewer=<channel>
+            strReply = RlvStrings::getViewerName();
+            break;
         case RLV_BHVR_VERSIONNUM:       // @versionnum=<channel>                - Checked: 2010-03-27 (RLVa-1.4.0a) | Added: RLVa-1.0.4b
             // NOTE: RLV will respond even if there's an option
             if (!rlvCmd.hasOption())
@@ -3979,3 +4282,114 @@ ERlvCmdRet RlvHandler::onGetPath(const RlvCommand& rlvCmd, std::string& strReply
 //
 
 // ============================================================================
+
+class RlvShutdownTimer : public LLEventTimer
+{
+public:
+    RlvShutdownTimer(S32 seconds) : LLEventTimer(1.0f), mSeconds(seconds)
+    {
+        if (mSeconds <= 0)
+        {
+            LLAppViewer::instance()->requestQuit();
+        }
+        else
+        {
+            LLSD args;
+            args["SECONDS"] = mSeconds;
+            LLNotificationsUtil::add("RLVShutdownCountdown", args);
+        }
+    }
+
+    bool tick() override
+    {
+        if (mSeconds <= 0)
+        {
+            return true;
+        }
+        mSeconds--;
+        LLSD args;
+        args["SECONDS"] = mSeconds;
+        LLNotificationsUtil::add("RLVShutdownCountdown", args);
+        if (mSeconds <= 0)
+        {
+            LLAppViewer::instance()->requestQuit();
+            return true;
+        }
+        return false;
+    }
+
+private:
+    S32 mSeconds;
+};
+
+// Handles: @shutdown[:<seconds>]=force
+template<> template<>
+ERlvCmdRet RlvForceHandler<RLV_BHVR_SHUTDOWN>::onCommand(const RlvCommand& rlvCmd)
+{
+    S32 seconds = 10;
+    if (rlvCmd.hasOption())
+    {
+        if (!RlvCommandOptionHelper::parseOption(rlvCmd.getOption(), seconds))
+        {
+            seconds = 10;
+        }
+    }
+
+    new RlvShutdownTimer(seconds);
+    return RLV_RET_SUCCESS;
+}
+
+bool RlvHandler::isStartupLockActive()
+{
+    if (!m_StartupLockStarted)
+    {
+        return false;
+    }
+
+    F32 min_delay = gSavedSettings.getF32("RLVStartupLockMinDelay");
+    F32 quiet_period = gSavedSettings.getF32("RLVStartupLockQuietPeriod");
+    F32 timeout = gSavedSettings.getF32("RLVStartupLockTimeout");
+
+    F32 elapsed = m_StartupLockTimer.getElapsedTimeF32();
+    F64 last_cmd_time = getLastCommandTime();
+    F64 time_since_last_cmd = LLFrameTimer::getElapsedSeconds() - last_cmd_time;
+
+    if ((elapsed >= min_delay && (last_cmd_time == 0.0 || time_since_last_cmd >= quiet_period)) || (elapsed >= timeout))
+    {
+        m_StartupLockStarted = false;
+        return false;
+    }
+
+    return true;
+}
+
+void RlvHandler::startStartupLock()
+{
+    m_StartupLockTimer.start();
+    m_StartupLockStarted = true;
+    processRetainedCommands();
+}
+
+void RlvHandler::drawStartupLockOverlay()
+{
+    if (!gViewerWindow)
+        return;
+
+    S32 width = gViewerWindow->getWindowWidthScaled();
+    S32 height = gViewerWindow->getWindowHeightScaled();
+
+    // Draw full screen black quad
+    gl_rect_2d(0, height, width, 0, LLColor4::black, true);
+
+    // Draw centering text
+    LLFontGL::getFontSansSerifBig()->renderUTF8(
+        "Initializing RLV restrictions...",
+        0,
+        width / 2,
+        height / 2,
+        LLColor4::white,
+        LLFontGL::HCENTER,
+        LLFontGL::VCENTER
+    );
+}
+

@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llviewerdisplay.h"
+#include "rlvhandler.h"
 
 #include "alfloaterprogressview.h"
 #include "fsyspath.h"

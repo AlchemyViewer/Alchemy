@@ -43,6 +43,8 @@
 #include "llfloaterreporter.h"
 #include "llfloaterwebcontent.h"
 #include "llslurl.h"
+#include "rlvactions.h"
+#include "rlvhandler.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llviewerobjectlist.h"
@@ -870,6 +872,11 @@ static void on_avatar_name_show_profile(const LLUUID& agent_id, const LLAvatarNa
 // static
 void ALAvatarActions::showWebProfile(const LLUUID& id)
 {
+    if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWPROFILES) && id != gAgent.getID())
+    {
+        return;
+    }
+
     if (id.notNull())
     {
         LLAvatarNameCache::get(id, boost::bind(&on_avatar_name_show_profile, _1, _2));

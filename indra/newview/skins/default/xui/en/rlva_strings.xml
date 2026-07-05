@@ -126,10 +126,15 @@
 			<key>value</key>
 			<string>Unable to perform the requested inventory action due to an RLV locked folder.</string>
 		</map>
-		<key>blocked_nearby</key>
+		<key>blocked_friends</key>
 		<map>
 			<key>value</key>
-			<string>Unable to see the presence of nearby avatars due to RLV restrictions</string>
+			<string>Unable to see friends due to RLV restrictions</string>
+		</map>
+		<key>blocked_recent</key>
+		<map>
+			<key>value</key>
+			<string>Unable to see recent avatars due to RLV restrictions</string>
 		</map>
 		<key>blocked_permattach</key>
 		<map>
@@ -185,6 +190,46 @@
 		<map>
 			<key>value</key>
 			<string>Unable to enable wireframe mode due to RLV restrictions</string>
+		</map>
+		<key>blocked_showsearch</key>
+		<map>
+			<key>value</key>
+			<string>Search is blocked by your RLV restrictions</string>
+		</map>
+		<key>blocked_showpeople</key>
+		<map>
+			<key>value</key>
+			<string>People is blocked by your RLV restrictions</string>
+		</map>
+		<key>blocked_showconversation</key>
+		<map>
+			<key>value</key>
+			<string>Conversation history is blocked by your RLV restrictions</string>
+		</map>
+		<key>blocked_showoutfits</key>
+		<map>
+			<key>value</key>
+			<string>Appearance is blocked by your RLV restrictions</string>
+		</map>
+		<key>blocked_showbuild</key>
+		<map>
+			<key>value</key>
+			<string>Edit Tools is blocked by your RLV restrictions</string>
+		</map>
+		<key>blocked_showdestinations</key>
+		<map>
+			<key>value</key>
+			<string>Destinations Guide is blocked by your RLV restrictions</string>
+		</map>
+		<key>blocked_showcamera</key>
+		<map>
+			<key>value</key>
+			<string>Camera Controls are blocked by your RLV restrictions</string>
+		</map>
+		<key>blocked_showpreferences</key>
+		<map>
+			<key>value</key>
+			<string>Preferences are blocked by your RLV restrictions</string>
 		</map>
 
 		<!-- Sent as "Busy" messages to the remote party -->

@@ -35,6 +35,7 @@
 #include "../test/lltut.h"
 #include <memory>
 #include <vector>
+#include <algorithm>
 
 namespace tut
 {
@@ -149,6 +150,49 @@ namespace tut
         mCG->getControl("TestSetting")->getSignal()->connect(boost::bind(&this->handleListenerTest));
         mCG->setU32("TestSetting", 13);
         ensure("listener fired on changed setting", mListenerFired);
+    }
+
+    // include file handling
+    template<> template<>
+    void control_group_t::test<5>()
+    {
+        // Write included settings file
+        std::string included_file = mTestConfigDir + "included_settings.xml";
+        mCleanups.push_back(included_file);
+        
+        LLSD inc_config;
+        inc_config["IncludedSetting"]["Comment"] = "Dummy setting in included file";
+        inc_config["IncludedSetting"]["Persist"] = 1;
+        inc_config["IncludedSetting"]["Type"] = "U32";
+        inc_config["IncludedSetting"]["Value"] = 42;
+        
+        llofstream inc_file(included_file.c_str());
+        if (inc_file.is_open())
+        {
+            LLSDSerialize::toPrettyXML(inc_config, inc_file);
+        }
+        inc_file.close();
+        
+        // Write master settings file that includes the other one
+        std::string master_file = mTestConfigDir + "master.xml";
+        mCleanups.push_back(master_file);
+        
+        // Force the path of master_file to have forward slashes to test the fix
+        std::replace(master_file.begin(), master_file.end(), '\\', '/');
+        
+        LLSD master_config;
+        master_config["Include"] = LLSD::emptyArray();
+        master_config["Include"].append("included_settings.xml");
+        
+        llofstream mast_file(master_file.c_str());
+        if (mast_file.is_open())
+        {
+            LLSDSerialize::toPrettyXML(master_config, mast_file);
+        }
+        mast_file.close();
+        
+        int results = mCG->loadFromFile(master_file, true);
+        ensure("loaded include setting successfully", (mCG->getU32("IncludedSetting") == 42));
     }
 
 }

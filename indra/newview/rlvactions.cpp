@@ -215,6 +215,7 @@ bool RlvActions::canSendTypingStart()
 
 bool RlvActions::canStartIM(const LLUUID& idRecipient, bool fIgnoreOpen)
 {
+
     // User can start an IM session with "recipient" (could be an agent or a group) if:
     //   - not generally restricted from starting IM sessions (or the recipient is an exception or inside the exclusion range)
     //   - not specifically restricted from starting an IM session with the recipient
@@ -228,6 +229,7 @@ bool RlvActions::canStartIM(const LLUUID& idRecipient, bool fIgnoreOpen)
 
 bool RlvActions::canShowName(EShowNamesContext eContext, const LLUUID& idAgent)
 {
+
     // Handle most common case upfront
     if (!s_BlockNamesContexts[eContext])
         return true;
@@ -258,11 +260,6 @@ bool RlvActions::canShowNameTag(const LLVOAvatar* pAvatar)
 
     const F32 nShowNameTagsDist = RlvBehaviourDictionary::instance().getModifier(RLV_MODIFIER_SHOWNAMETAGSDIST)->getValue<F32>();
     return (nShowNameTagsDist != 0.f) && (dist_vec_squared(pAvatar->getPositionGlobal(), gAgent.getPositionGlobal()) < nShowNameTagsDist * nShowNameTagsDist);
-}
-
-bool RlvActions::canShowNearbyAgents()
-{
-    return !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNEARBY);
 }
 
 // Handles: @chatwhisper, @chatnormal and @chatshout
@@ -308,10 +305,9 @@ bool RlvActions::canPreviewTextures()
 {
     return (!gRlvHandler.hasBehaviour(RLV_BHVR_VIEWTEXTURE));
 }
-
 // ============================================================================
 // Movement
-//
+// 
 
 bool RlvActions::canAcceptTpOffer(const LLUUID& idSender)
 {

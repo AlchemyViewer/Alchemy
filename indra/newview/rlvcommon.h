@@ -145,6 +145,7 @@ public:
     static const std::string& getStringMapPath() { return m_StringMapPath; }
     static std::string        getVersion(const LLUUID& idRlvObject, bool fLegacy = false);
     static std::string        getVersionAbout();
+    static std::string        getViewerName();
     static std::string        getVersionImplNum();
     static std::string        getVersionNum(const LLUUID& idRlvObject);
     static bool               hasString(const std::string& strStringName, bool fCheckCustom = false);
@@ -169,7 +170,7 @@ public:
     static bool isNearbyRegion(const std::string& strRegion);                       // @showloc
 
     static void filterLocation(std::string& strUTF8Text);                           // @showloc
-    static void filterNames(std::string& strUTF8Text, bool fFilterLegacy = true, bool fClearMatches = false);   // @shownames
+    static void filterNames(std::string& strUTF8Text, bool fFilterLegacy = true);   // @shownames
     static void filterMentions(std::string& strUTF8Text);                           // @shownames (mention URIs)
     static void filterScriptQuestions(S32& nQuestions, LLSD& sdPayload);
 
@@ -211,6 +212,7 @@ typedef bool (RlvExtCommandHandler::*rlvExtCommandHandler)(const RlvCommand& rlv
 //
 
 bool rlvMenuMainToggleVisible(LLUICtrl* pMenuItem);
+bool rlvMenuMainToggleEnabled(LLUICtrl* pMenuItem);
 void rlvMenuToggleVisible();
 bool rlvMenuCanShowName();
 bool rlvMenuEnableIfNot(const LLSD& sdParam);

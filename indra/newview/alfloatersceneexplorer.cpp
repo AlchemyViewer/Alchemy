@@ -1259,17 +1259,6 @@ void ALFloaterSceneExplorer::reconcile()
         const bool is_attachment = obj->isAttachment();
         if ((is_avatar || is_attachment) && !mShowAvatars)
             continue;
-        // RLVa: when nearby-agent presence is restricted, other avatars (and
-        // their attachments) must not be listed at all; self always stays.
-        // Re-evaluated every pass, so imposing/lifting the restriction prunes
-        // or restores the rows within a reconcile tick.
-        if ((is_avatar || is_attachment) && RlvActions::isRlvEnabled()
-            && !RlvActions::canShowNearbyAgents())
-        {
-            const LLVOAvatar* wearer = is_avatar ? avatarp : obj->getAvatarAncestor();
-            if (wearer && !wearer->isSelf())
-                continue;
-        }
         // Unselectable objects (water/sky/ground, no-select prims) can neither be
         // fetched from the server nor edited, so leave them out entirely.
         if (!is_avatar && !obj->mbCanSelect)

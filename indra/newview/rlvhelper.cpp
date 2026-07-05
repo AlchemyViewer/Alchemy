@@ -74,6 +74,44 @@
  *   Implement : void RlvBehaviourModifierHandler::onValueChanged()
  *
  */
+class RlvLockMouselookProcessor : public RlvBehaviourGenericToggleProcessor<RLV_BHVR_LOCKMOUSELOOK, RLV_OPTION_NONE>
+{
+public:
+    RlvLockMouselookProcessor() : RlvBehaviourGenericToggleProcessor<RLV_BHVR_LOCKMOUSELOOK, RLV_OPTION_NONE>("lockmouselook") {}
+    ERlvCmdRet processCommand(const RlvCommand& rlvCmd) const override
+    {
+        ERlvParamType eInvertedType = RLV_TYPE_UNKNOWN;
+        if (rlvCmd.getParamType() == RLV_TYPE_ADD)
+            eInvertedType = RLV_TYPE_REMOVE;
+        else if (rlvCmd.getParamType() == RLV_TYPE_REMOVE)
+            eInvertedType = RLV_TYPE_ADD;
+        else
+            eInvertedType = rlvCmd.getParamType();
+
+        RlvCommand invertedCmd(rlvCmd, eInvertedType);
+        return RlvBehaviourGenericToggleProcessor<RLV_BHVR_LOCKMOUSELOOK, RLV_OPTION_NONE>::processCommand(invertedCmd);
+    }
+};
+
+class RlvLockRlvProcessor : public RlvBehaviourGenericToggleProcessor<RLV_BHVR_LOCKRLV, RLV_OPTION_NONE>
+{
+public:
+    RlvLockRlvProcessor() : RlvBehaviourGenericToggleProcessor<RLV_BHVR_LOCKRLV, RLV_OPTION_NONE>("lockrlv") {}
+    ERlvCmdRet processCommand(const RlvCommand& rlvCmd) const override
+    {
+        ERlvParamType eInvertedType = RLV_TYPE_UNKNOWN;
+        if (rlvCmd.getParamType() == RLV_TYPE_ADD)
+            eInvertedType = RLV_TYPE_REMOVE;
+        else if (rlvCmd.getParamType() == RLV_TYPE_REMOVE)
+            eInvertedType = RLV_TYPE_ADD;
+        else
+            eInvertedType = rlvCmd.getParamType();
+
+        RlvCommand invertedCmd(rlvCmd, eInvertedType);
+        return RlvBehaviourGenericToggleProcessor<RLV_BHVR_LOCKRLV, RLV_OPTION_NONE>::processCommand(invertedCmd);
+    }
+};
+
 RlvBehaviourDictionary::RlvBehaviourDictionary()
 {
     // Array auto-initialization to 0 is still not supported in VS2013
@@ -154,7 +192,20 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourToggleProcessor<RLV_BHVR_SHOWNAMES>("shownames", RlvBehaviourInfo::BHVR_STRICT));
     addEntry(new RlvBehaviourProcessor<RLV_BHVR_SHOWNAMETAGS>("shownametags", RlvBehaviourInfo::BHVR_STRICT));
     addModifier(RLV_BHVR_SHOWNAMETAGS, RLV_MODIFIER_SHOWNAMETAGSDIST, new RlvBehaviourModifierHandler<RLV_MODIFIER_SHOWNAMETAGSDIST>("Name Tags - Visible Distance", 0.0f, true, new RlvBehaviourModifierCompMin));
-    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWNEARBY, RLV_OPTION_NONE>("shownearby", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWFRIENDS, RLV_OPTION_NONE>("showfriends"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWPROFILES, RLV_OPTION_NONE>("showprofiles"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWDEVELOP, RLV_OPTION_NONE>("showdevelop"));
+    addEntry(new RlvLockMouselookProcessor());
+    addEntry(new RlvLockRlvProcessor());
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_HIDEUI, RLV_OPTION_NONE>("hideui", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWSEARCH, RLV_OPTION_NONE>("showsearch"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWPEOPLE, RLV_OPTION_NONE>("showpeople"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWCONVERSATION, RLV_OPTION_NONE>("showconversation"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWOUTFITS, RLV_OPTION_NONE>("showoutfits"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWBUILD, RLV_OPTION_NONE>("showbuild"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWDESTINATIONS, RLV_OPTION_NONE>("showdestinations"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWCAMERA, RLV_OPTION_NONE>("showcamera"));
+    addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWPREFERENCES, RLV_OPTION_NONE>("showpreferences"));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWSELF, RLV_OPTION_NONE, RlvBehaviourShowSelfToggleHandler>("showself", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvBehaviourGenericToggleProcessor<RLV_BHVR_SHOWSELFHEAD, RLV_OPTION_NONE, RlvBehaviourShowSelfToggleHandler>("showselfhead", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvBehaviourGenericProcessor<RLV_OPTION_NONE>("showworldmap", RLV_BHVR_SHOWWORLDMAP));
@@ -295,6 +346,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvForceProcessor<RLV_BHVR_SIT>("sit"));
     addEntry(new RlvForceProcessor<RLV_BHVR_SITGROUND>("sitground"));
     addEntry(new RlvForceProcessor<RLV_BHVR_TPTO>("tpto"));
+    addEntry(new RlvForceProcessor<RLV_BHVR_SHUTDOWN>("shutdown", RlvBehaviourInfo::BHVR_EXPERIMENTAL));
     addEntry(new RlvBehaviourInfo("unsit",                  RLV_BHVR_UNSIT,                 RLV_TYPE_FORCE));
 
     //
@@ -330,6 +382,7 @@ RlvBehaviourDictionary::RlvBehaviourDictionary()
     addEntry(new RlvBehaviourInfo("version",                RLV_BHVR_VERSION,               RLV_TYPE_REPLY));
     addEntry(new RlvBehaviourInfo("versionnew",             RLV_BHVR_VERSIONNEW,            RLV_TYPE_REPLY));
     addEntry(new RlvBehaviourInfo("versionnum",             RLV_BHVR_VERSIONNUM,            RLV_TYPE_REPLY));
+    addEntry(new RlvBehaviourInfo("versionviewer",          RLV_BHVR_VERSIONVIEWER,         RLV_TYPE_REPLY));
 
     // Populate m_String2InfoMap (the tuple <behaviour, type> should be unique)
     for (const RlvBehaviourInfo* pBhvrInfo : m_BhvrInfoList)
@@ -731,6 +784,10 @@ RlvCommand::RlvCommand(const LLUUID& idObj, const std::string& strCommand)
             m_eParamType = RLV_TYPE_FORCE;
         else if (LLStringUtil::convertToS32(m_strParam, nTemp)) // Assume it's a reply command if we can convert <param> to an S32
             m_eParamType = RLV_TYPE_REPLY;
+        else if (m_strBehaviour.rfind("estim_", 0) == 0)
+        {
+            m_eParamType = RLV_TYPE_FORCE;
+        }
         else
         {
             m_eParamType = RLV_TYPE_UNKNOWN;

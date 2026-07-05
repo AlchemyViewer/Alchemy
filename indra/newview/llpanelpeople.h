@@ -61,7 +61,12 @@ public:
 
 // [RLVa:KB] - Checked: RLVa-1.2.0
     LLAvatarList* getNearbyList() { return mNearbyList; }
-    void          updateNearbyList();
+    void          rlvUpdateTabStates();
+    LLAvatarList* getOnlineFriendList() { return mOnlineFriendList; }
+    LLAvatarList* getAllFriendList() { return mAllFriendList; }
+    LLAvatarList* getRecentList() { return mRecentList; }
+    void          rlvUpdateFriendList() { updateFriendList(); }
+    void          rlvUpdateRecentList() { updateRecentList(); }
 // [/RLVa:KB]
 
     // internals
@@ -93,7 +98,7 @@ private:
     void                    updateFriendListHelpText();
     void                    updateFriendList();
     void                    updateFriendAccordionTitles();
-//  void                    updateNearbyList();
+    void                    updateNearbyList();
     void                    updateRecentList();
 
     bool                    isItemsFreeOfFriends(const uuid_vec_t& uuids);

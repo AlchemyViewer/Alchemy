@@ -280,6 +280,10 @@ bool LLToolMgr::canEdit()
 
 bool LLToolMgr::buildEnabledOrActive()
 {
+    if (RlvActions::isRlvEnabled() && RlvActions::hasBehaviour(RLV_BHVR_SHOWBUILD))
+    {
+        return false;
+    }
     return LLFloaterReg::instanceVisible("build") || canEdit();
 }
 

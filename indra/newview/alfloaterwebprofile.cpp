@@ -32,6 +32,9 @@
 #include "llcommandhandler.h"
 #include "llviewercontrol.h"
 #include "llweb.h"
+#include "rlvactions.h"
+#include "rlvhandler.h"
+#include "llagent.h"
 
 ALFloaterWebProfile::ALFloaterWebProfile(const Params& key) :
     LLFloaterWebContent(key)
@@ -41,6 +44,11 @@ ALFloaterWebProfile::ALFloaterWebProfile(const Params& key) :
 void ALFloaterWebProfile::onOpen(const LLSD& key)
 {
     Params p(key);
+    if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWPROFILES) && p.id() != gAgent.getID().asString())
+    {
+        closeFloater();
+        return;
+    }
     p.show_chrome(true);
     p.window_class("web_content");
     p.allow_address_entry(false);

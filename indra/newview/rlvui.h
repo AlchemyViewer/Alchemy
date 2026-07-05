@@ -74,6 +74,9 @@ protected:
     bool filterPanelShowLoc(const std::string&, const std::string&, const LLSD& );
     boost::signals2::connection m_ConnPanelShowLoc;                     // showloc
 
+    bool filterPanelGeneric(const std::string&, const std::string&, const LLSD&);
+    boost::signals2::connection m_ConnPanelGeneric;
+
     /*
      * Helper functions
      */

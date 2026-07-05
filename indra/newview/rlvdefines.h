@@ -139,7 +139,22 @@ enum ERlvBehaviour {
     RLV_BHVR_SHOWLOC,               // "showloc"
     RLV_BHVR_SHOWNAMES,             // "shownames"
     RLV_BHVR_SHOWNAMETAGS,          // "shownametags"
-    RLV_BHVR_SHOWNEARBY,
+    RLV_BHVR_SHOWFRIENDS,
+    RLV_BHVR_SHOWPROFILES,
+    RLV_BHVR_SHOWDEVELOP,
+    RLV_BHVR_LOCKMOUSELOOK,
+    RLV_BHVR_LOCKRLV,
+    RLV_BHVR_VERSIONVIEWER,
+    RLV_BHVR_SHUTDOWN,
+    RLV_BHVR_HIDEUI,
+    RLV_BHVR_SHOWSEARCH,
+    RLV_BHVR_SHOWPEOPLE,
+    RLV_BHVR_SHOWCONVERSATION,
+    RLV_BHVR_SHOWOUTFITS,
+    RLV_BHVR_SHOWBUILD,
+    RLV_BHVR_SHOWDESTINATIONS,
+    RLV_BHVR_SHOWCAMERA,
+    RLV_BHVR_SHOWPREFERENCES,
     RLV_BHVR_SHOWHOVERTEXT,         // "showhovertext"
     RLV_BHVR_SHOWHOVERTEXTHUD,      // "showhovertexthud"
     RLV_BHVR_SHOWHOVERTEXTWORLD,    // "showhovertextworld"
@@ -448,6 +463,14 @@ namespace RlvStringKeys
         /*inline*/ constexpr std::string_view TpRequestRemote = "blocked_tprequest_remote"sv;
         /*inline*/ constexpr std::string_view ViewXxx = "blocked_viewxxx"sv;
         /*inline*/ constexpr std::string_view Wireframe = "blocked_wireframe"sv;
+        /*inline*/ constexpr std::string_view ShowSearch = "blocked_showsearch"sv;
+        /*inline*/ constexpr std::string_view ShowPeople = "blocked_showpeople"sv;
+        /*inline*/ constexpr std::string_view ShowConversation = "blocked_showconversation"sv;
+        /*inline*/ constexpr std::string_view ShowOutfits = "blocked_showoutfits"sv;
+        /*inline*/ constexpr std::string_view ShowBuild = "blocked_showbuild"sv;
+        /*inline*/ constexpr std::string_view ShowDestinations = "blocked_showdestinations"sv;
+        /*inline*/ constexpr std::string_view ShowCamera = "blocked_showcamera"sv;
+        /*inline*/ constexpr std::string_view ShowPreferences = "blocked_showpreferences"sv;
     }
 
     namespace Hidden

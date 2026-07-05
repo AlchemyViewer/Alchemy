@@ -318,6 +318,12 @@ void LLAgentCamera::resetView(bool reset_camera, bool change_camera)
         gMenuHolder->hideMenus();
     }
 
+    // [RLVa:KB] / Alchemy: If locked in mouselook, do not allow resetting/changing camera mode, toolset, or cursor.
+    if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_LOCKMOUSELOOK) && mCameraMode == CAMERA_MODE_MOUSELOOK)
+    {
+        return;
+    }
+
     if (change_camera && !gSavedSettings.getBOOL("FreezeTime"))
     {
         changeCameraToDefault();
@@ -2475,6 +2481,11 @@ void LLAgentCamera::changeCameraToDefault()
 //-----------------------------------------------------------------------------
 void LLAgentCamera::changeCameraToFollow(bool animate)
 {
+    if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_LOCKMOUSELOOK) && mCameraMode == CAMERA_MODE_MOUSELOOK)
+    {
+        return;
+    }
+
     if (LLViewerJoystick::getInstance()->getOverrideCamera())
     {
         return;
@@ -2531,6 +2542,11 @@ void LLAgentCamera::changeCameraToFollow(bool animate)
 //-----------------------------------------------------------------------------
 void LLAgentCamera::changeCameraToThirdPerson(bool animate)
 {
+    if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_LOCKMOUSELOOK) && mCameraMode == CAMERA_MODE_MOUSELOOK)
+    {
+        return;
+    }
+
     if (LLViewerJoystick::getInstance()->getOverrideCamera())
     {
         return;

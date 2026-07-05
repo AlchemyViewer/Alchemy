@@ -187,6 +187,7 @@
 #include "llpolymesh.h"
 #include "llproxy.h"
 #include "llaudioengine.h"
+#include "llestimwsmgr.h"
 #include "llstreamingaudio.h"
 #include "llviewermenu.h"
 #include "llselectmgr.h"
@@ -1276,6 +1277,16 @@ bool LLAppViewer::init()
         gDirUtilp->deleteDirAndContents(gDirUtilp->getDumpLogsDirPath());
     }
 #endif
+
+    // Instantiate and start e-stim WebSocket server
+    {
+        LLWebsocketMgr& wsmgr = LLWebsocketMgr::instance();
+        U16 port = (U16)gSavedSettings.getU32("EstimWebsocketPort");
+        auto estim_server = std::make_shared<LLEstimWSServer>(LLEstimWSServer::DEFAULT_SERVER_NAME, port, true);
+        wsmgr.addServer(estim_server);
+        wsmgr.startServer(LLEstimWSServer::DEFAULT_SERVER_NAME);
+    }
+
     LL_PROFILER_FRAME_END;
     return true;
 }
@@ -1558,17 +1569,9 @@ bool LLAppViewer::doFrame()
                 ms_sleep(non_interactive_ms_sleep_time);
             }
 
-            // A native picker steals key focus but is serviced by this loop, so
-            // don't background-yield while one is open or it turns laggy.
-            bool native_dialog_open = false;
-#if LL_SDL_WINDOW
-            native_dialog_open = LLWindowSDL::dialogOpen();
-#endif
-
             // yield cooperatively when not running as foreground window
             // and when not quiting (causes trouble at mac's cleanup stage)
             if (!LLApp::isExiting()
-                && !native_dialog_open
                 && ((gViewerWindow && !gViewerWindow->getWindow()->getVisible())
                     || !gFocusMgr.getAppHasFocus()))
             {
@@ -2834,11 +2837,9 @@ bool LLAppViewer::initConfiguration()
         gSavedSettings.setBOOL("RenderDebugGLSession", false);
     }
 
-    LLControlVariable* skinfolder = gSavedSettings.getControl("SkinCurrent");
+    const LLControlVariable* skinfolder = gSavedSettings.getControl("SkinCurrent");
     if (skinfolder && LLStringUtil::null != skinfolder->getValue().asString())
     {
-        skinfolder->setValue("default", false);
-
         // Examining "Language" may not suffice -- see LLUI::getLanguage()
         // logic. Unfortunately LLUI::getLanguage() doesn't yet do us much
         // good because we haven't yet called LLUI::initClass().

@@ -2509,6 +2509,8 @@ bool idle_startup()
         const F32 wearables_time = wearables_timer.getElapsedTimeF32();
         const F32 MAX_WEARABLES_TIME = 10.f;
 
+        bool transition_to_cleanup = false;
+
         if (!gAgent.isOutfitChosen() && isAgentAvatarValid())
         {
             // No point in waiting for clothing, we don't even know
@@ -2521,7 +2523,7 @@ bool idle_startup()
             // to generic outfits. JC
             LLNotificationsUtil::add("WelcomeChooseSex", LLSD(), LLSD(),
                 callback_choose_gender);
-            LLStartUp::setStartupState( STATE_CLEANUP );
+            transition_to_cleanup = true;
         }
 
         do_startup_frame();
@@ -2533,7 +2535,7 @@ bool idle_startup()
                 LLNotificationsUtil::add("ClothingLoading");
             }
             record(LLStatViewer::LOADING_WEARABLES_LONG_DELAY, wearables_time);
-            LLStartUp::setStartupState( STATE_CLEANUP );
+            transition_to_cleanup = true;
         }
         else if (gAgent.isFirstLogin()
                 && isAgentAvatarValid()
@@ -2544,8 +2546,7 @@ bool idle_startup()
                 && gAgentAvatarp->isFullyLoaded())
             {
                 LL_DEBUGS("Avatar") << "avatar fully loaded" << LL_ENDL;
-                LLStartUp::setStartupState( STATE_CLEANUP );
-                return true;
+                transition_to_cleanup = true;
             }
         }
         else
@@ -2555,11 +2556,19 @@ bool idle_startup()
             {
                 // We have our clothing, proceed.
                 LL_DEBUGS("Avatar") << "wearables loaded" << LL_ENDL;
-                LLStartUp::setStartupState( STATE_CLEANUP );
-                return true;
+                transition_to_cleanup = true;
             }
         }
-        //fall through this frame to STATE_CLEANUP
+
+        if (transition_to_cleanup)
+        {
+            if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock"))
+            {
+                gRlvHandler.startStartupLock();
+            }
+            LLStartUp::setStartupState(STATE_CLEANUP);
+            return true;
+        }
     }
 
     if (STATE_CLEANUP == LLStartUp::getStartupState())

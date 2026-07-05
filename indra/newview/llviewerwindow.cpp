@@ -1186,6 +1186,10 @@ bool LLViewerWindow::handleAnyMouseClick(LLWindow *window, LLCoordGL pos, MASK m
 
 bool LLViewerWindow::handleMouseDown(LLWindow *window,  LLCoordGL pos, MASK mask)
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return true;
+    }
     mAllowMouseDragging = false;
     if (!mMouseDownTimer.getStarted())
     {
@@ -1202,6 +1206,10 @@ bool LLViewerWindow::handleMouseDown(LLWindow *window,  LLCoordGL pos, MASK mask
 
 bool LLViewerWindow::handleDoubleClick(LLWindow *window,  LLCoordGL pos, MASK mask)
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return true;
+    }
     // try handling as a double-click first, then a single-click if that
     // wasn't handled.
     bool down = true;
@@ -1214,6 +1222,10 @@ bool LLViewerWindow::handleDoubleClick(LLWindow *window,  LLCoordGL pos, MASK ma
 
 bool LLViewerWindow::handleMouseUp(LLWindow *window,  LLCoordGL pos, MASK mask)
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return true;
+    }
     if (mMouseDownTimer.getStarted())
     {
         mMouseDownTimer.stop();
@@ -1223,18 +1235,30 @@ bool LLViewerWindow::handleMouseUp(LLWindow *window,  LLCoordGL pos, MASK mask)
 }
 bool LLViewerWindow::handleRightMouseDown(LLWindow *window,  LLCoordGL pos, MASK mask)
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return true;
+    }
     bool down = true;
     return gViewerInput.handleMouse(window, pos, mask, CLICK_RIGHT, down);
 }
 
 bool LLViewerWindow::handleRightMouseUp(LLWindow *window,  LLCoordGL pos, MASK mask)
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return true;
+    }
     bool down = false;
     return gViewerInput.handleMouse(window, pos, mask, CLICK_RIGHT, down);
 }
 
 bool LLViewerWindow::handleMiddleMouseDown(LLWindow *window,  LLCoordGL pos, MASK mask)
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return true;
+    }
     bool down = true;
     gViewerInput.handleMouse(window, pos, mask, CLICK_MIDDLE, down);
 
@@ -3080,6 +3104,12 @@ void LLViewerWindow::draw()
                 LLFontGL::HCENTER, LLFontGL::TOP);
         }
 
+        // Draw RLV Startup Lock Overlay on top of everything
+        if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+        {
+            gRlvHandler.drawStartupLockOverlay();
+        }
+
         LLUI::setScaleFactor(old_scale_factor);
     }
     LLUI::popMatrix();
@@ -3093,6 +3123,10 @@ void LLViewerWindow::draw()
 // Takes a single keyup event, usually when UI is visible
 bool LLViewerWindow::handleKeyUp(KEY key, MASK mask)
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return true;
+    }
     if (LLSetKeyBindDialog::recordKey(key, mask, false))
     {
         LL_DEBUGS() << "KeyUp handled by LLSetKeyBindDialog" << LL_ENDL;
@@ -3149,6 +3183,10 @@ bool LLViewerWindow::handleKeyUp(KEY key, MASK mask)
 // Takes a single keydown event, usually when UI is visible
 bool LLViewerWindow::handleKey(KEY key, MASK mask)
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return true;
+    }
     // hide tooltips on keypress
     LLToolTipMgr::instance().blockToolTips();
 
@@ -3496,6 +3534,10 @@ bool LLViewerWindow::handleUnicodeChar(llwchar uni_char, MASK mask)
 
 void LLViewerWindow::handleScrollWheel(LLScrollDelta delta)
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return;
+    }
     LLUI::getInstance()->resetMouseIdleTimer();
 
     // Scale the precise (smooth) component by the user's sensitivity multiplier.
@@ -3704,6 +3746,10 @@ void append_xui_tooltip(LLView* viewp, LLToolTip::Params& params)
 // event processing.
 void LLViewerWindow::updateUI()
 {
+    if (rlv_handler_t::isEnabled() && gSavedSettings.getBOOL("RLVStartupLock") && gRlvHandler.isStartupLockActive())
+    {
+        return;
+    }
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     static std::string last_handle_msg;
@@ -4873,7 +4919,7 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
         {
             found = gPipeline.lineSegmentIntersectInWorld(mw_start, mw_end, pick_transparent, pick_rigged, pick_unselectable, pick_reflection_probe,
                                                           face_hit, intersection, uv, normal, tangent);
-            if (found && !pick_transparent && intersection)
+            if (found && !pick_transparent)
             {
                 gDebugRaycastIntersection = *intersection;
             }

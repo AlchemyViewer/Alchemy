@@ -1024,6 +1024,7 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
 
     U32 validitems = 0;
     bool hidefromsettingseditor = false;
+    std::vector<std::string> files_to_include;
 
     for(LLSD::map_const_iterator itr = settings.beginMap(); itr != settings.endMap(); ++itr)
     {
@@ -1035,17 +1036,10 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
         {
             if(control_map.isArray())
             {
-#if LL_WINDOWS
-                size_t pos = filename.find_last_of('\\');
-#else
-                size_t pos = filename.find_last_of('/');
-#endif
-                if(pos != std::string::npos)
+                for(LLSD::array_const_iterator array_itr = control_map.beginArray(), array_end = control_map.endArray();
+                    array_itr != array_end; ++array_itr)
                 {
-                    const std::string dir = filename.substr(0,++pos);
-                    for(LLSD::array_const_iterator array_itr = control_map.beginArray(), array_end = control_map.endArray();
-                        array_itr != array_end; ++array_itr)
-                        validitems+=loadFromFile(dir+(*array_itr).asString(),set_default_values);
+                    files_to_include.push_back((*array_itr).asString());
                 }
             }
             continue;
@@ -1169,6 +1163,19 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
         }
 
         ++validitems;
+    }
+
+    if (!files_to_include.empty())
+    {
+        size_t pos = filename.find_last_of("\\/");
+        if(pos != std::string::npos)
+        {
+            const std::string dir = filename.substr(0,++pos);
+            for(const std::string& inc_file : files_to_include)
+            {
+                validitems += loadFromFile(dir + inc_file, set_default_values);
+            }
+        }
     }
 
     LL_DEBUGS("Settings") << "Loaded " << validitems << " settings from " << filename << LL_ENDL;

@@ -3587,7 +3587,7 @@ class LLLandEnableBuyPass : public view_listener_t
 
 bool enable_object_edit()
 {
-    if (!isAgentAvatarValid()) return false;
+    if (!isAgentAvatarValid() || !LLToolMgr::getInstance()->buildEnabledOrActive()) return false;
 
     // *HACK:  The new "prelude" Help Islands have a build sandbox area,
     // so users need the Edit and Create pie menu options when they are
@@ -4689,7 +4689,7 @@ class LLEditEnableCustomizeAvatar : public view_listener_t
     {
 //      bool new_value = gAgentWearables.areWearablesLoaded();
 // [RLVa:KB] - Checked: 2010-04-01 (RLVa-1.2.0c) | Modified: RLVa-1.0.0g
-        bool new_value = gAgentWearables.areWearablesLoaded() && ((!rlv_handler_t::isEnabled()) || (RlvActions::canStand()));
+        bool new_value = gAgentWearables.areWearablesLoaded() && ((!rlv_handler_t::isEnabled()) || (RlvActions::canStand() && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWOUTFITS)));
 // [/RLVa:KB]
         return new_value;
     }
@@ -4699,6 +4699,7 @@ class LLEnableEditShape : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
+        if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWOUTFITS)) return false;
         return gAgentWearables.isWearableModifiable(LLWearableType::WT_SHAPE, 0);
     }
 };
@@ -4707,6 +4708,7 @@ class LLEnableHoverHeight : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
+        if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWOUTFITS)) return false;
         return gAgent.getRegion() && gAgent.getRegion()->avatarHoverHeightEnabled();
     }
 };
@@ -6628,6 +6630,12 @@ void show_debug_menus()
     {
         bool debug = gSavedSettings.getBOOL("UseDebugMenus");
         bool qamode = gSavedSettings.getBOOL("QAMode");
+
+        if (RlvActions::isRlvEnabled() && gRlvHandler.hasBehaviour(RLV_BHVR_SHOWDEVELOP))
+        {
+            debug = false;
+            qamode = false;
+        }
 
         gMenuBarView->setItemVisible("Advanced", debug);
 //      gMenuBarView->setItemEnabled("Advanced", debug); // Don't disable Advanced keyboard shortcuts when hidden
@@ -9950,6 +9958,9 @@ class LLToolsSelectTool : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
+        if (!LLToolMgr::getInstance()->buildEnabledOrActive())
+            return true;
+
         std::string tool_name = userdata.asString();
         if (tool_name == "focus")
         {
@@ -10901,6 +10912,7 @@ void initialize_menus()
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
     enable.add("RLV.MainToggleVisible", boost::bind(&rlvMenuMainToggleVisible, _1));
+    enable.add("RLV.MainToggleEnabled", boost::bind(&rlvMenuMainToggleEnabled, _1));
     enable.add("RLV.CanShowName", boost::bind(&rlvMenuCanShowName));
     enable.add("RLV.EnableIfNot", boost::bind(&rlvMenuEnableIfNot, _2));
 // [/RLVa:KB]

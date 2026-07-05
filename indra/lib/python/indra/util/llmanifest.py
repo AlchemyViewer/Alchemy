@@ -259,8 +259,8 @@ def main(extra=[]):
     # Store package file for later if making touched file.
     base_package_file = ""
     if touch:
-        print('================ Created base package ', wm.package_file)
-        base_package_file = "" + wm.package_file
+        print('================ Created base package ', wm.package_name)
+        base_package_file = "" + wm.package_name
     else:
         print('================ Finished base copy')
 
@@ -298,9 +298,9 @@ def main(extra=[]):
             except Exception as err:
                 sys.exit(str(err))
             if touch:
-                print('================ Created additional package ', wm.package_file, ' for ', package_id)
+                print('================ Created additional package ', wm.package_name, ' for ', package_id)
                 with open(base_touch_template.format(package_id), 'w') as fp:
-                    fp.write('set package_file=%s\n' % wm.package_file)
+                    fp.write('set package_file=%s\n' % wm.package_name)
             else:
                 print('================ Finished additional copy "', package_id, '" in ', args['dest'])
     # Write out the package file in this format, so that it can easily be called
@@ -339,7 +339,7 @@ class LLManifest(object, metaclass=LLManifestRegistry):
         self.build_prefix = [args['build']]
         self.dst_prefix = [args['dest']]
         self.created_paths = []
-        self.package_file = "Unknown"
+        self.package_name = "Unknown"
         self.missing = []
 
     def default_channel(self):
