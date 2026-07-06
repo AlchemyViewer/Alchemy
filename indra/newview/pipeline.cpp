@@ -57,6 +57,7 @@
 
 // newview includes
 #include "llagent.h"
+#include "aldofbokeh.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
 #include "lltexturecache.h"
@@ -8736,6 +8737,18 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
                 post_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
                 post_program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
                 post_program.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
+
+                // Bokeh aperture shaping (polygonal iris + anamorphic squeeze). Baked
+                // once per pass so the gather shader avoids per-tap trig; this reshapes
+                // where taps land, not how many, so the O(CoC^2) cost is unchanged. All
+                // controls default to neutral, leaving the classic circular bokeh intact.
+                static LLCachedControl<S32> bokeh_blades(gSavedSettings, "RenderDoFBokehBlades", 0);
+                static LLCachedControl<F32> bokeh_roundness(gSavedSettings, "RenderDoFBokehRoundness", 0.f);
+                static LLCachedControl<F32> bokeh_rotation(gSavedSettings, "RenderDoFBokehRotation", 0.f);
+                static LLCachedControl<F32> bokeh_anamorphic(gSavedSettings, "RenderDoFAnamorphicRatio", 1.f);
+                ALDoFBokeh::Kernel bokeh = ALDoFBokeh::bakeKernel(bokeh_blades, bokeh_roundness, bokeh_rotation, bokeh_anamorphic);
+                post_program.uniform4f(LLShaderMgr::DOF_BOKEH_SHAPE, bokeh.seg, bokeh.halfSeg, bokeh.edge, bokeh.roundness);
+                post_program.uniform4f(LLShaderMgr::DOF_BOKEH_LENS, bokeh.rotationRad, bokeh.anisoX, bokeh.anisoY, bokeh.active ? 1.f : 0.f);
 
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);

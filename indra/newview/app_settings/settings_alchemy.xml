@@ -2761,6 +2761,50 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>RenderDoFBokehBlades</key>
+        <map>
+            <key>Comment</key>
+            <string>Depth of Field bokeh aperture blade count. Fewer than 3 gives a round bokeh (off/default); 5-9 emulates a partially-closed lens iris (pentagon..enneagon). Range 0 to 12.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderDoFBokehRoundness</key>
+        <map>
+            <key>Comment</key>
+            <string>How rounded the bokeh polygon edges are when RenderDoFBokehBlades is 3 or more. 0 is a crisp straight-edged polygon; 1 is a full circle. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderDoFBokehRotation</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotation of the bokeh aperture polygon, in degrees. Only meaningful when RenderDoFBokehBlades is 3 or more. Range 0 to 360.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderDoFAnamorphicRatio</key>
+        <map>
+            <key>Comment</key>
+            <string>Anamorphic bokeh squeeze. 1.0 is circular (off/default); greater than 1 stretches the bokeh into a vertical oval for an anamorphic-lens look. Area preserving. Range 0.25 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
         <key>AllowNoCopyRezRestoreToWorld</key>
         <map>
             <key>Comment</key>

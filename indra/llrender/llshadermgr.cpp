@@ -1416,6 +1416,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("res_scale");
     mReservedUniforms.push_back("dof_width");
     mReservedUniforms.push_back("dof_height");
+    mReservedUniforms.push_back("bokeh_shape");
+    mReservedUniforms.push_back("bokeh_lens");
 
     mReservedUniforms.push_back("depthMap");
     mReservedUniforms.push_back("shadowMap0");

@@ -34,6 +34,10 @@ uniform vec2 screen_res;
 uniform float max_cof;
 uniform float res_scale;
 
+// Bokeh aperture shaping, CPU-baked in LLPipeline::renderDoF() via ALDoFBokeh::bakeKernel().
+uniform vec4 bokeh_shape;   // (2pi/N, pi/N, cos(pi/N), roundness); N = aperture blade count
+uniform vec4 bokeh_lens;    // (rotation_radians, anamorphic_x, anamorphic_y, active flag)
+
 in vec2 vary_fragcoord;
 
 void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc)
@@ -69,6 +73,28 @@ void dofSampleNear(inout vec4 diff, inout float w, float min_sc, vec2 tc)
     w += wg;
 }
 
+// Aperture-shaped bokeh tap offset. Reshapes WHERE a tap lands (aperture polygon
+// and/or anamorphic squeeze); the caller's tap COUNT is unchanged, so this does
+// not affect the O(CoC^2) gather cost. When the kernel is inactive it returns the
+// exact circular offset the gather used before, so the default look and cost are
+// preserved bit-for-bit.
+vec2 bokehOffset(float r, float a)
+{
+    if (bokeh_lens.w < 0.5)
+        return vec2(sin(a), cos(a)) * r;               // fast path: unchanged circular bokeh
+
+    a += bokeh_lens.x;                                 // aperture rotation
+    float shape = 1.0;
+    if (bokeh_shape.x > 0.0)                           // polygon active (blades >= 3)
+    {
+        // Fold the angle into one blade segment and pinch the ring onto the
+        // inscribed N-gon edge, then blend back toward a circle by roundness.
+        float s = mod(a, bokeh_shape.x) - bokeh_shape.y;
+        shape = mix(bokeh_shape.z / cos(s), 1.0, bokeh_shape.w);
+    }
+    return vec2(sin(a), cos(a)) * (r * shape) * bokeh_lens.yz;  // anamorphic per-axis squeeze
+}
+
 vec3 clampHDRRange(vec3 color);
 
 void main()
@@ -94,10 +120,9 @@ void main()
                 for (int i=0; i<its; ++i)
                 {
                     float ang = sc+i*2*PI/its; // sc is added for rotary perturbance
-                    float samp_x = sc*sin(ang);
-                    float samp_y = sc*cos(ang);
-                    // you could test sample coords against an interesting non-circular aperture shape here, if desired.
-                    dofSampleNear(diff, w, sc, vary_fragcoord.xy + (vec2(samp_x,samp_y) / screen_res));
+                    // Aperture-shaped tap offset (polygonal / anamorphic bokeh); circular when off.
+                    vec2 samp = bokehOffset(sc, ang);
+                    dofSampleNear(diff, w, sc, vary_fragcoord.xy + (samp / screen_res));
                 }
                 sc -= 1.0;
             }
@@ -114,10 +139,9 @@ void main()
                 for (int i=0; i<its; ++i)
                 {
                     float ang = sc+i*2*PI/its; // sc is added for rotary perturbance
-                    float samp_x = sc*sin(ang);
-                    float samp_y = sc*cos(ang);
-                    // you could test sample coords against an interesting non-circular aperture shape here, if desired.
-                    dofSample(diff, w, sc, vary_fragcoord.xy + (vec2(samp_x,samp_y) / screen_res));
+                    // Aperture-shaped tap offset (polygonal / anamorphic bokeh); circular when off.
+                    vec2 samp = bokehOffset(sc, ang);
+                    dofSample(diff, w, sc, vary_fragcoord.xy + (samp / screen_res));
                 }
                 sc -= 1.0;
             }

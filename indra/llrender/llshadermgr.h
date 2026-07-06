@@ -220,6 +220,8 @@ public:
         DOF_RES_SCALE,                      //  "res_scale"
         DOF_WIDTH,                          //  "dof_width"
         DOF_HEIGHT,                         //  "dof_height"
+        DOF_BOKEH_SHAPE,                    //  "bokeh_shape" (vec4: 2pi/N, pi/N, cos(pi/N), roundness)
+        DOF_BOKEH_LENS,                     //  "bokeh_lens"  (vec4: rotationRad, anisoX, anisoY, active)
 
         DEFERRED_DEPTH,                     //  "depthMap"
         DEFERRED_SHADOW0,                   //  "shadowMap0"
