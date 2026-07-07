@@ -2808,7 +2808,7 @@
         <key>RenderDoFBokehIntensity</key>
         <map>
             <key>Comment</key>
-            <string>How strongly bright out-of-focus highlights dominate the bokeh. 1.0 is the default; higher makes highlights "pop" into brighter, more defined bokeh discs (which makes the aperture shape and rotation easier to see); 0 gives a flat, uniform soft blur. Range 0 to 16.</string>
+            <string>Exponent controlling how sharply bright out-of-focus highlights dominate the bokeh. 1.0 is the default (classic look); higher values (try 2 to 4) make bright points form punchier, more defined bokeh discs, which makes the aperture shape and rotation easier to see; below 1 softens toward a flat, uniform blur (0 = fully flat). Range 0 to 8.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

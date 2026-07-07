@@ -37,7 +37,7 @@ uniform float res_scale;
 // Bokeh aperture shaping, CPU-baked in LLPipeline::renderDoF() via ALDoFBokeh::bakeKernel().
 uniform vec4  bokeh_shape;     // (2pi/N, pi/N, cos(pi/N), roundness); N = aperture blade count
 uniform vec4  bokeh_lens;      // (rotation_radians, anamorphic_x, anamorphic_y, active flag)
-uniform float bokeh_intensity; // highlight-weight scale (1 = classic pop, higher = more defined)
+uniform float bokeh_intensity; // exponent on the highlight weight (1 = classic, higher = more defined)
 
 in vec2 vary_fragcoord;
 
@@ -49,9 +49,13 @@ void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc)
 
     if (sc > min_sc) //sampled pixel is more "out of focus" than current sample radius
     {
-        // de-weight dull areas to make highlights 'pop'; bokeh_intensity scales how
-        // strongly bright samples dominate the disc (1.0 = classic behavior).
-        float wg = 0.25 + bokeh_intensity*(s.r+s.g+s.b);
+        // de-weight dull areas to make highlights 'pop'. bokeh_intensity is an
+        // exponent, not a scale: a scale cancels in the normalized average below,
+        // so it would saturate; an exponent changes which samples dominate and
+        // keeps working across its whole range. 1.0 is the classic linear weight
+        // (bit-exact fast path). Base is clamped for overflow safety.
+        float lum = s.r+s.g+s.b;
+        float wg = 0.25 + (bokeh_intensity == 1.0 ? lum : pow(min(max(lum, 0.0), 1024.0), bokeh_intensity));
 
         diff += wg*s;
 
@@ -63,9 +67,11 @@ void dofSampleNear(inout vec4 diff, inout float w, float min_sc, vec2 tc)
 {
     vec4 s = texture(diffuseRect, tc);
 
-    // de-weight dull areas to make highlights 'pop'; bokeh_intensity scales how
-    // strongly bright samples dominate the disc (1.0 = classic behavior).
-    float wg = 0.25 + bokeh_intensity*(s.r+s.g+s.b);
+    // de-weight dull areas to make highlights 'pop'. bokeh_intensity is an exponent
+    // (see dofSample): a scale would cancel in the normalized average and saturate,
+    // while an exponent keeps working across its range. 1.0 = classic linear weight.
+    float lum = s.r+s.g+s.b;
+    float wg = 0.25 + (bokeh_intensity == 1.0 ? lum : pow(min(max(lum, 0.0), 1024.0), bokeh_intensity));
 
     diff += wg*s;
 

@@ -44,15 +44,16 @@ namespace ALDoFBokeh
         F32  rotationRad; // aperture rotation, radians
         F32  anisoX;      // anamorphic per-axis scale, area preserving: anisoX * anisoY == 1
         F32  anisoY;
-        F32  intensity;   // highlight-weight scale: 1 = default, higher = more "pop", 0 = flat.
-                          //   Independent of `active` -- it also intensifies a round bokeh.
+        F32  intensity;   // highlight-weight EXPONENT: 1 = classic, higher = punchier / more
+                          //   defined highlights, 0 = flat. Independent of `active` (it also
+                          //   intensifies a round bokeh).
     };
 
     // Bake the shader kernel from raw setting values. Inputs are clamped to their
     // documented, sane ranges here so an out-of-range debug setting can never feed
     // garbage into the gather: blades below 3 disable the polygon (circular);
     // roundness clamps to [0, 1]; anamorphicRatio clamps to [0.25, 4] (1 = off);
-    // intensity clamps to [0, 16] (1 = off).
+    // intensity clamps to [0, 8] (1 = off; the shader applies it as an exponent).
     Kernel bakeKernel(S32 blades, F32 roundness, F32 rotationDeg, F32 anamorphicRatio, F32 intensity);
 }
 

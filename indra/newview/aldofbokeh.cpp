@@ -27,7 +27,7 @@ namespace ALDoFBokeh
         const S32 clampedBlades = (blades < 3) ? 0 : llmin(blades, 12);
         roundness               = llclamp(roundness, 0.f, 1.f);
         anamorphicRatio         = llclamp(anamorphicRatio, 0.25f, 4.f);
-        intensity               = llclamp(intensity, 0.f, 16.f);
+        intensity               = llclamp(intensity, 0.f, 8.f);
 
         Kernel k;
 

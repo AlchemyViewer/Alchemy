@@ -115,7 +115,7 @@ namespace tut
         ensure_distance("default intensity passes through", bakeKernel(0, 0.f, 0.f, 1.f, 1.f).intensity, 1.f, 1e-6f);
         ensure_distance("a mid intensity passes through", bakeKernel(0, 0.f, 0.f, 1.f, 4.f).intensity, 4.f, 1e-6f);
         ensure_distance("negative intensity clamps to 0", bakeKernel(0, 0.f, 0.f, 1.f, -5.f).intensity, 0.f, 1e-6f);
-        ensure_distance("huge intensity clamps to 16", bakeKernel(0, 0.f, 0.f, 1.f, 999.f).intensity, 16.f, 1e-6f);
+        ensure_distance("huge intensity clamps to 8", bakeKernel(0, 0.f, 0.f, 1.f, 999.f).intensity, 8.f, 1e-6f);
 
         // Intensity alone must not flip the offset reshape on.
         ensure("intensity alone does not activate offset", !bakeKernel(0, 0.f, 0.f, 1.f, 8.f).active);
