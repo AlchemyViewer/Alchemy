@@ -8746,9 +8746,11 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
                 static LLCachedControl<F32> bokeh_roundness(gSavedSettings, "RenderDoFBokehRoundness", 0.f);
                 static LLCachedControl<F32> bokeh_rotation(gSavedSettings, "RenderDoFBokehRotation", 0.f);
                 static LLCachedControl<F32> bokeh_anamorphic(gSavedSettings, "RenderDoFAnamorphicRatio", 1.f);
-                ALDoFBokeh::Kernel bokeh = ALDoFBokeh::bakeKernel(bokeh_blades, bokeh_roundness, bokeh_rotation, bokeh_anamorphic);
+                static LLCachedControl<F32> bokeh_intensity(gSavedSettings, "RenderDoFBokehIntensity", 1.f);
+                ALDoFBokeh::Kernel bokeh = ALDoFBokeh::bakeKernel(bokeh_blades, bokeh_roundness, bokeh_rotation, bokeh_anamorphic, bokeh_intensity);
                 post_program.uniform4f(LLShaderMgr::DOF_BOKEH_SHAPE, bokeh.seg, bokeh.halfSeg, bokeh.edge, bokeh.roundness);
                 post_program.uniform4f(LLShaderMgr::DOF_BOKEH_LENS, bokeh.rotationRad, bokeh.anisoX, bokeh.anisoY, bokeh.active ? 1.f : 0.f);
+                post_program.uniform1f(LLShaderMgr::DOF_BOKEH_INTENSITY, bokeh.intensity);
 
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);

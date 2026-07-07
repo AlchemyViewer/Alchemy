@@ -29,13 +29,14 @@
 // LLPipeline::colorCorrect) and hand the shader a ready-to-use form.
 namespace ALDoFBokeh
 {
-    // Shader-ready bokeh kernel. Packs directly into two vec4 uniforms consumed
-    // by postDeferredF.glsl:
-    //   bokeh_shape = (seg, halfSeg, edge, roundness)
-    //   bokeh_lens  = (rotationRad, anisoX, anisoY, active ? 1 : 0)
+    // Shader-ready bokeh kernel. The geometry packs into two vec4 uniforms
+    // consumed by postDeferredF.glsl, plus a scalar intensity uniform:
+    //   bokeh_shape     = (seg, halfSeg, edge, roundness)
+    //   bokeh_lens      = (rotationRad, anisoX, anisoY, active ? 1 : 0)
+    //   bokeh_intensity = intensity
     struct Kernel
     {
-        bool active;      // false => shader takes the plain circular path (today's look & cost)
+        bool active;      // false => shader takes the plain circular path for the OFFSET
         F32  seg;         // 2*pi / blades   (0 when no polygon)
         F32  halfSeg;     // pi / blades     (0 when no polygon)
         F32  edge;        // cos(pi / blades) -- inscribed N-gon radius factor (1 when no polygon)
@@ -43,13 +44,16 @@ namespace ALDoFBokeh
         F32  rotationRad; // aperture rotation, radians
         F32  anisoX;      // anamorphic per-axis scale, area preserving: anisoX * anisoY == 1
         F32  anisoY;
+        F32  intensity;   // highlight-weight scale: 1 = default, higher = more "pop", 0 = flat.
+                          //   Independent of `active` -- it also intensifies a round bokeh.
     };
 
     // Bake the shader kernel from raw setting values. Inputs are clamped to their
     // documented, sane ranges here so an out-of-range debug setting can never feed
     // garbage into the gather: blades below 3 disable the polygon (circular);
-    // roundness clamps to [0, 1]; anamorphicRatio clamps to [0.25, 4] (1 = off).
-    Kernel bakeKernel(S32 blades, F32 roundness, F32 rotationDeg, F32 anamorphicRatio);
+    // roundness clamps to [0, 1]; anamorphicRatio clamps to [0.25, 4] (1 = off);
+    // intensity clamps to [0, 16] (1 = off).
+    Kernel bakeKernel(S32 blades, F32 roundness, F32 rotationDeg, F32 anamorphicRatio, F32 intensity);
 }
 
 #endif // AL_DOFBOKEH_H

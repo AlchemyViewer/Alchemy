@@ -35,8 +35,9 @@ uniform float max_cof;
 uniform float res_scale;
 
 // Bokeh aperture shaping, CPU-baked in LLPipeline::renderDoF() via ALDoFBokeh::bakeKernel().
-uniform vec4 bokeh_shape;   // (2pi/N, pi/N, cos(pi/N), roundness); N = aperture blade count
-uniform vec4 bokeh_lens;    // (rotation_radians, anamorphic_x, anamorphic_y, active flag)
+uniform vec4  bokeh_shape;     // (2pi/N, pi/N, cos(pi/N), roundness); N = aperture blade count
+uniform vec4  bokeh_lens;      // (rotation_radians, anamorphic_x, anamorphic_y, active flag)
+uniform float bokeh_intensity; // highlight-weight scale (1 = classic pop, higher = more defined)
 
 in vec2 vary_fragcoord;
 
@@ -48,10 +49,9 @@ void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc)
 
     if (sc > min_sc) //sampled pixel is more "out of focus" than current sample radius
     {
-        float wg = 0.25;
-
-        // de-weight dull areas to make highlights 'pop'
-        wg += s.r+s.g+s.b;
+        // de-weight dull areas to make highlights 'pop'; bokeh_intensity scales how
+        // strongly bright samples dominate the disc (1.0 = classic behavior).
+        float wg = 0.25 + bokeh_intensity*(s.r+s.g+s.b);
 
         diff += wg*s;
 
@@ -63,10 +63,9 @@ void dofSampleNear(inout vec4 diff, inout float w, float min_sc, vec2 tc)
 {
     vec4 s = texture(diffuseRect, tc);
 
-    float wg = 0.25;
-
-    // de-weight dull areas to make highlights 'pop'
-    wg += s.r+s.g+s.b;
+    // de-weight dull areas to make highlights 'pop'; bokeh_intensity scales how
+    // strongly bright samples dominate the disc (1.0 = classic behavior).
+    float wg = 0.25 + bokeh_intensity*(s.r+s.g+s.b);
 
     diff += wg*s;
 
@@ -83,7 +82,8 @@ vec2 bokehOffset(float r, float a)
     if (bokeh_lens.w < 0.5)
         return vec2(sin(a), cos(a)) * r;               // fast path: unchanged circular bokeh
 
-    a += bokeh_lens.x;                                 // aperture rotation
+    // Build the aperture in its own (unrotated) frame: N-gon radius, then the
+    // anamorphic per-axis squeeze.
     float shape = 1.0;
     if (bokeh_shape.x > 0.0)                           // polygon active (blades >= 3)
     {
@@ -92,7 +92,14 @@ vec2 bokehOffset(float r, float a)
         float s = mod(a, bokeh_shape.x) - bokeh_shape.y;
         shape = mix(bokeh_shape.z / cos(s), 1.0, bokeh_shape.w);
     }
-    return vec2(sin(a), cos(a)) * (r * shape) * bokeh_lens.yz;  // anamorphic per-axis squeeze
+    vec2 local = vec2(sin(a), cos(a)) * (r * shape) * bokeh_lens.yz;
+
+    // Rigidly rotate the whole aperture -- polygon AND anamorphic oval -- into
+    // screen space. bokeh_lens.x is a uniform, so this cos/sin is loop-invariant
+    // and gets hoisted out of the gather loop by the compiler.
+    float cs = cos(bokeh_lens.x);
+    float sn = sin(bokeh_lens.x);
+    return vec2(local.x * cs - local.y * sn, local.x * sn + local.y * cs);
 }
 
 vec3 clampHDRRange(vec3 color);

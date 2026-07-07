@@ -20,13 +20,14 @@
 
 namespace ALDoFBokeh
 {
-    Kernel bakeKernel(S32 blades, F32 roundness, F32 rotationDeg, F32 anamorphicRatio)
+    Kernel bakeKernel(S32 blades, F32 roundness, F32 rotationDeg, F32 anamorphicRatio, F32 intensity)
     {
         // Clamp to documented ranges up front: a bad debug-setting value must
         // never reach the gather shader. Fewer than 3 blades has no polygon.
         const S32 clampedBlades = (blades < 3) ? 0 : llmin(blades, 12);
         roundness               = llclamp(roundness, 0.f, 1.f);
         anamorphicRatio         = llclamp(anamorphicRatio, 0.25f, 4.f);
+        intensity               = llclamp(intensity, 0.f, 16.f);
 
         Kernel k;
 
@@ -54,8 +55,14 @@ namespace ALDoFBokeh
         k.anisoX = 1.f / s;
         k.anisoY = s;
 
-        // Only mark the kernel active when it actually reshapes the bokeh, so the
+        // Highlight-weight scale for the gather. Independent of the offset reshape
+        // (it also intensifies a plain round bokeh); 1.0 reproduces the classic
+        // weighting exactly.
+        k.intensity = intensity;
+
+        // Only mark the kernel active when it actually reshapes the OFFSET, so the
         // default (no polygon, ratio 1.0) leaves the gather on its circular path.
+        // Intensity is deliberately excluded -- it is applied regardless.
         k.active = (clampedBlades >= 3) || (anamorphicRatio != 1.f);
 
         return k;
