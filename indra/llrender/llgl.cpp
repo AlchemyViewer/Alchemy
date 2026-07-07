@@ -969,6 +969,25 @@ PFNGLMULTIDRAWARRAYSINDIRECTCOUNTPROC    glMultiDrawArraysIndirectCount = nullpt
 PFNGLMULTIDRAWELEMENTSINDIRECTCOUNTPROC  glMultiDrawElementsIndirectCount = nullptr;
 PFNGLPOLYGONOFFSETCLAMPPROC              glPolygonOffsetClamp = nullptr;
 
+// GL_EXT_memory_object
+PFNGLCREATEMEMORYOBJECTSEXTPROC        glCreateMemoryObjectsEXT        = nullptr;
+PFNGLDELETEMEMORYOBJECTSEXTPROC        glDeleteMemoryObjectsEXT        = nullptr;
+PFNGLMEMORYOBJECTPARAMETERIVEXTPROC    glMemoryObjectParameterivEXT    = nullptr;
+PFNGLTEXSTORAGEMEM2DEXTPROC            glTexStorageMem2DEXT            = nullptr;
+
+// GL_EXT_semaphore
+PFNGLGENSEMAPHORESEXTPROC              glGenSemaphoresEXT              = nullptr;
+PFNGLDELETESEMAPHORESEXTPROC           glDeleteSemaphoresEXT           = nullptr;
+PFNGLSEMAPHOREPARAMETERUI64VEXTPROC    glSemaphoreParameterui64vEXT    = nullptr;
+PFNGLWAITSEMAPHOREEXTPROC              glWaitSemaphoreEXT              = nullptr;
+PFNGLSIGNALSEMAPHOREEXTPROC            glSignalSemaphoreEXT            = nullptr;
+
+// GL_EXT_memory_object_win32
+PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC    glImportMemoryWin32HandleEXT    = nullptr;
+
+// GL_EXT_semaphore_win32
+PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC glImportSemaphoreWin32HandleEXT = nullptr;
+
 #endif
 
 LLGLManager gGLManager;
@@ -1630,6 +1649,10 @@ void LLGLManager::initExtensions()
 
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
+    mHasEXTMemoryObject  = mGLExtensions.contains("GL_EXT_memory_object");
+    mHasEXTSemaphore     = mGLExtensions.contains("GL_EXT_semaphore");
+    mHasEXTMemoryObjectWin32 = mGLExtensions.contains("GL_EXT_memory_object_win32");
+    mHasEXTSemaphoreWin32 = mGLExtensions.contains("GL_EXT_semaphore_win32");
 
     // Misc
     glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
@@ -1641,6 +1664,43 @@ void LLGLManager::initExtensions()
 #if LL_GL_FUNC_POINTER
     // Load entire OpenGL API through GetProcAddress, leaving sections beyond mGLVersion unloaded
     LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
+
+    // Init EXT and ARB extensions FIRST, because they may be used in later GL versions
+
+    // GL_EXT_memory_object
+    if (mHasEXTMemoryObject)
+    {
+        glCreateMemoryObjectsEXT = (PFNGLCREATEMEMORYOBJECTSEXTPROC)LL_GET_PROC_ADDRESS("glCreateMemoryObjectsEXT");
+        glDeleteMemoryObjectsEXT = (PFNGLDELETEMEMORYOBJECTSEXTPROC)LL_GET_PROC_ADDRESS("glDeleteMemoryObjectsEXT");
+        glMemoryObjectParameterivEXT = (PFNGLMEMORYOBJECTPARAMETERIVEXTPROC)LL_GET_PROC_ADDRESS("glMemoryObjectParameterivEXT");
+        glTexStorageMem2DEXT = (PFNGLTEXSTORAGEMEM2DEXTPROC)LL_GET_PROC_ADDRESS("glTexStorageMem2DEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_memory_object symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_semaphore
+    if (mHasEXTSemaphore)
+    {
+        glGenSemaphoresEXT = (PFNGLGENSEMAPHORESEXTPROC)LL_GET_PROC_ADDRESS("glGenSemaphoresEXT");
+        glDeleteSemaphoresEXT = (PFNGLDELETESEMAPHORESEXTPROC)LL_GET_PROC_ADDRESS("glDeleteSemaphoresEXT");
+        glSemaphoreParameterui64vEXT = (PFNGLSEMAPHOREPARAMETERUI64VEXTPROC)LL_GET_PROC_ADDRESS("glSemaphoreParameterui64vEXT");
+        glWaitSemaphoreEXT = (PFNGLWAITSEMAPHOREEXTPROC)LL_GET_PROC_ADDRESS("glWaitSemaphoreEXT");
+        glSignalSemaphoreEXT = (PFNGLSIGNALSEMAPHOREEXTPROC)LL_GET_PROC_ADDRESS("glSignalSemaphoreEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_semaphore symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_memory_object_win32
+    if (mHasEXTMemoryObjectWin32)
+    {
+        glImportMemoryWin32HandleEXT = (PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC)LL_GET_PROC_ADDRESS("glImportMemoryWin32HandleEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_memory_object_win32 symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_semaphore_win32
+    if (mHasEXTSemaphoreWin32)
+    {
+        glImportSemaphoreWin32HandleEXT = (PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC)LL_GET_PROC_ADDRESS("glImportSemaphoreWin32HandleEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_semaphore_win32 symbols loaded" << LL_ENDL;
+    }
 
     // GL_VERSION_1_2
     if (mGLVersion < 1.19f)

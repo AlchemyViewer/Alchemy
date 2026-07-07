@@ -106,6 +106,10 @@ public:
     bool mHasNVXGpuMemoryInfo = false;
     bool mHasATIMemInfo = false;
     bool mHasGLXMESAQueryRenderer = false;
+    bool mHasEXTMemoryObject           = false;
+    bool mHasEXTSemaphore              = false;
+    bool mHasEXTMemoryObjectWin32      = false;
+    bool mHasEXTSemaphoreWin32         = false;
 
     bool mIsAMD;
     bool mIsNVIDIA;
