@@ -1683,7 +1683,11 @@ void AISUpdate::doUpdate()
         // fetching can receive massive amount of items and folders
         if (gInventory.getChangedIDs().size() > MAX_UPDATE_BACKLOG)
         {
-            gInventory.notifyObservers();
+            LLAppViewer::instance()->postToMainCoro(
+                []()
+                {
+                    gInventory.notifyObservers();
+                });
             checkTimeout();
         }
     }
@@ -1744,7 +1748,11 @@ void AISUpdate::doUpdate()
         // fetching can receive massive amount of items and folders
         if (gInventory.getChangedIDs().size() > MAX_UPDATE_BACKLOG)
         {
-            gInventory.notifyObservers();
+            LLAppViewer::instance()->postToMainCoro(
+                []()
+                {
+                    gInventory.notifyObservers();
+                });
             checkTimeout();
         }
     }
@@ -1815,6 +1823,10 @@ void AISUpdate::doUpdate()
 
     checkTimeout();
 
-    gInventory.notifyObservers();
+    LLAppViewer::instance()->postToMainCoro(
+        []()
+        {
+            gInventory.notifyObservers();
+        });
 }
 
