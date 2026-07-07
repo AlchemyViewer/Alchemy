@@ -67,10 +67,11 @@ public:
 
     /** The signature of the function for sending a message from plugin to plugin loader shell.
     *
-     * @param[in] message_string Null-terminated C string
+     * @param[in] message_string Message bytes (may contain embedded NULs - it is binary LLSD)
+     * @param[in] message_size Length of message_string in bytes
     * @param[in] user_data The opaque reference that the callee supplied during setup.
     */
-    typedef void (*sendMessageFunction) (const char *message_string, void **user_data);
+    typedef void (*sendMessageFunction) (const char *message_string, size_t message_size, void **user_data);
 
     /** The signature of the plugin init function. TODO:DOC check direction (pluging loader shell to plugin?)
     *
@@ -87,8 +88,8 @@ public:
     static void setStaticInitFunction(pluginInitFunction func);
 
 private:
-    static void staticReceiveMessage(const char *message_string, void **user_data);
-    void receiveMessage(const char *message_string);
+    static void staticReceiveMessage(const char *message_string, size_t message_size, void **user_data);
+    void receiveMessage(const char *message_string, size_t message_size);
 
     void *mPluginUserData;
     sendMessageFunction mPluginSendMessageFunction;

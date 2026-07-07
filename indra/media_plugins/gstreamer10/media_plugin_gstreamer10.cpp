@@ -66,7 +66,7 @@ public:
     MediaPluginGStreamer10(LLPluginInstance::sendMessageFunction host_send_func, void *host_user_data);
     ~MediaPluginGStreamer10();
 
-    /* virtual */ void receiveMessage(const char *message_string);
+    /* virtual */ void receiveMessage(const std::string &message_string);
 
     static bool startup();
     static bool closedown();
@@ -743,7 +743,7 @@ std::string MediaPluginGStreamer10::getVersion()
     return plugin_version;
 }
 
-void MediaPluginGStreamer10::receiveMessage(const char *message_string)
+void MediaPluginGStreamer10::receiveMessage(const std::string &message_string)
 {
     LLPluginMessage message_in;
 
