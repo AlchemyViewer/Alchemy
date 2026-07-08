@@ -397,20 +397,24 @@ void LLViewerRegionImpl::requestBaseCapabilitiesCoro(U64 regionHandle)
     while (true);
 
     LLAppViewer::instance()->postToMainCoro(
-            [regionHandle]()
+        [regionHandle]()
+        {
+            if (!LLWorld::instanceExists())
             {
-                LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
-                if (!regionp)
-                {
-                    return;
-                }
-                regionp->setCapabilitiesReceived(true);
-                if (regionp->isCapabilityAvailable("ServerReleaseNotes") &&
-                        regionp->getReleaseNotesRequested())
-                {   // *HACK: we're waiting for the ServerReleaseNotes
-                    regionp->showReleaseNotes();
-                }
-            });
+                return;
+            }
+            LLViewerRegion* regionp = LLWorld::getInstance()->getRegionFromHandle(regionHandle);
+            if (!regionp)
+            {
+                return;
+            }
+            regionp->setCapabilitiesReceived(true);
+            if (regionp->isCapabilityAvailable("ServerReleaseNotes") &&
+                    regionp->getReleaseNotesRequested())
+            {   // *HACK: we're waiting for the ServerReleaseNotes
+                regionp->showReleaseNotes();
+            }
+        });
 }
 
 
