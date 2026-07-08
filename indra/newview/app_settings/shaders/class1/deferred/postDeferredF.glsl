@@ -53,9 +53,11 @@ void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc)
         // exponent, not a scale: a scale cancels in the normalized average below,
         // so it would saturate; an exponent changes which samples dominate and
         // keeps working across its whole range. 1.0 is the classic linear weight
-        // (bit-exact fast path). Base is clamped for overflow safety.
+        // (bit-exact fast path). Base is clamped for overflow safety and floored
+        // so bokeh_intensity==0 ("fully flat", a documented value) cannot hit
+        // undefined pow(0,0) on a black tap -- NaN there smears across the disc.
         float lum = s.r+s.g+s.b;
-        float wg = 0.25 + (bokeh_intensity == 1.0 ? lum : pow(min(max(lum, 0.0), 1024.0), bokeh_intensity));
+        float wg = 0.25 + (bokeh_intensity == 1.0 ? lum : pow(clamp(lum, 1e-5, 1024.0), bokeh_intensity));
 
         diff += wg*s;
 
@@ -71,7 +73,7 @@ void dofSampleNear(inout vec4 diff, inout float w, float min_sc, vec2 tc)
     // (see dofSample): a scale would cancel in the normalized average and saturate,
     // while an exponent keeps working across its range. 1.0 = classic linear weight.
     float lum = s.r+s.g+s.b;
-    float wg = 0.25 + (bokeh_intensity == 1.0 ? lum : pow(min(max(lum, 0.0), 1024.0), bokeh_intensity));
+    float wg = 0.25 + (bokeh_intensity == 1.0 ? lum : pow(clamp(lum, 1e-5, 1024.0), bokeh_intensity));
 
     diff += wg*s;
 
