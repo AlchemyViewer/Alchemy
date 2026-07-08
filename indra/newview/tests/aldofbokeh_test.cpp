@@ -120,4 +120,16 @@ namespace tut
         // Intensity alone must not flip the offset reshape on.
         ensure("intensity alone does not activate offset", !bakeKernel(0, 0.f, 0.f, 1.f, 8.f).active);
     }
+
+    // blades == 3 is the exact activation boundary (the most off-by-one-prone value):
+    // it must be active and bake the triangle N-gon constants.
+    template<> template<>
+    void dofbokeh_object::test<8>()
+    {
+        Kernel k = bakeKernel(3, 0.f, 0.f, 1.f, 1.f);
+        ensure("blades==3 is active", k.active);
+        ensure_distance("seg = 2pi/3", k.seg, 2.f * F_PI / 3.f, 1e-5f);
+        ensure_distance("halfSeg = pi/3", k.halfSeg, F_PI / 3.f, 1e-5f);
+        ensure_distance("edge = cos(pi/3)", k.edge, cosf(F_PI / 3.f), 1e-5f);
+    }
 }

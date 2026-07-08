@@ -55,15 +55,17 @@ namespace ALDoFBokeh
         k.anisoX = 1.f / s;
         k.anisoY = s;
 
-        // Highlight-weight scale for the gather. Independent of the offset reshape
+        // Highlight-weight exponent for the gather. Independent of the offset reshape
         // (it also intensifies a plain round bokeh); 1.0 reproduces the classic
         // weighting exactly.
         k.intensity = intensity;
 
         // Only mark the kernel active when it actually reshapes the OFFSET, so the
         // default (no polygon, ratio 1.0) leaves the gather on its circular path.
-        // Intensity is deliberately excluded -- it is applied regardless.
-        k.active = (clampedBlades >= 3) || (anamorphicRatio != 1.f);
+        // Intensity is deliberately excluded -- it is applied regardless. A small
+        // epsilon keeps ratios that round to ~1.0 (e.g. UI-slider noise) on the
+        // circular path, since they are visually indistinguishable from it.
+        k.active = (clampedBlades >= 3) || (fabsf(anamorphicRatio - 1.f) > 1e-3f);
 
         return k;
     }

@@ -51,9 +51,10 @@ namespace ALDoFBokeh
 
     // Bake the shader kernel from raw setting values. Inputs are clamped to their
     // documented, sane ranges here so an out-of-range debug setting can never feed
-    // garbage into the gather: blades below 3 disable the polygon (circular);
-    // roundness clamps to [0, 1]; anamorphicRatio clamps to [0.25, 4] (1 = off);
-    // intensity clamps to [0, 8] (1 = off; the shader applies it as an exponent).
+    // garbage into the gather: blades below 3 disable the polygon (circular) and
+    // blades above 12 are capped at 12; roundness clamps to [0, 1]; anamorphicRatio
+    // clamps to [0.25, 4] (1 = off); intensity clamps to [0, 8] (1 = off; the shader
+    // applies it as an exponent).
     Kernel bakeKernel(S32 blades, F32 roundness, F32 rotationDeg, F32 anamorphicRatio, F32 intensity);
 }
 

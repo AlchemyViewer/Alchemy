@@ -222,7 +222,7 @@ public:
         DOF_HEIGHT,                         //  "dof_height"
         DOF_BOKEH_SHAPE,                    //  "bokeh_shape" (vec4: 2pi/N, pi/N, cos(pi/N), roundness)
         DOF_BOKEH_LENS,                     //  "bokeh_lens"  (vec4: rotationRad, anisoX, anisoY, active)
-        DOF_BOKEH_INTENSITY,                //  "bokeh_intensity" (float: highlight-weight scale)
+        DOF_BOKEH_INTENSITY,                //  "bokeh_intensity" (float: highlight-weight exponent)
 
         DEFERRED_DEPTH,                     //  "depthMap"
         DEFERRED_SHADOW0,                   //  "shadowMap0"
