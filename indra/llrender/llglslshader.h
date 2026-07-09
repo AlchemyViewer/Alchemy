@@ -236,25 +236,13 @@ public:
     void uniform2fv(U32 index, U32 count, const GLfloat* v);
     void uniform3fv(U32 index, U32 count, const GLfloat* v);
     void uniform4fv(U32 index, U32 count, const GLfloat* v);
+    void fastUniform4fv(U32 index, U32 count, const GLfloat* v);
     void uniform4uiv(U32 index, U32 count, const GLuint* v);
-    void uniform2i(const LLStaticHashedString& uniform, GLint i, GLint j);
     void uniformMatrix2fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
     void uniformMatrix3fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
     void uniformMatrix3x4fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
     void uniformMatrix4fv(U32 index, U32 count, GLboolean transpose, const GLfloat* v);
     void uniform1i(const LLStaticHashedString& uniform, GLint i);
-    void uniform1iv(const LLStaticHashedString& uniform, U32 count, const GLint* v);
-    void uniform4iv(const LLStaticHashedString& uniform, U32 count, const GLint* v);
-    void uniform1f(const LLStaticHashedString& uniform, GLfloat v);
-    void uniform2f(const LLStaticHashedString& uniform, GLfloat x, GLfloat y);
-    void uniform3f(const LLStaticHashedString& uniform, GLfloat x, GLfloat y, GLfloat z);
-    void uniform4f(const LLStaticHashedString& uniform, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
-    void uniform1fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
-    void uniform2fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
-    void uniform3fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
-    void uniform4fv(const LLStaticHashedString& uniform, U32 count, const GLfloat* v);
-    void uniform4uiv(const LLStaticHashedString& uniform, U32 count, const GLuint* v);
-    void uniformMatrix4fv(const LLStaticHashedString& uniform, U32 count, GLboolean transpose, const GLfloat* v);
 
     void setMinimumAlpha(F32 minimum);
 
@@ -264,6 +252,12 @@ public:
     //GLint getUniformLocation(const std::string& uniform);
     GLint getUniformLocation(const LLStaticHashedString& uniform);
     GLint getUniformLocation(U32 index);
+
+    // True if the reserved uniform is present, whether as a default-block
+    // uniform (real location) or a Slang $Globals block member (UBO-backed).
+    // Use this instead of getUniformLocation()>-1 for presence checks that then
+    // set via the uniform*() setters, so block-resident uniforms aren't skipped.
+    bool hasUniform(U32 index) const;
 
     GLint getAttribLocation(U32 attrib);
     GLint mapUniformTextureChannel(GLint location, GLenum type, GLint size);
@@ -290,11 +284,8 @@ public:
 
     // bindTexture returns the texture unit we've bound the texture to.
     // You can reuse the return value to unbind a texture when required.
-    S32 bindTexture(const std::string& uniform, LLTexture* texture, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
     S32 bindTexture(S32 uniform, LLTexture* texture, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
-    S32 bindTexture(const std::string& uniform, LLRenderTarget* texture, bool depth = false, LLTexUnit::eTextureFilterOptions mode = LLTexUnit::TFO_BILINEAR);
     S32 bindTexture(S32 uniform, LLRenderTarget* texture, bool depth = false, LLTexUnit::eTextureFilterOptions mode = LLTexUnit::TFO_BILINEAR, U32 index = 0);
-    S32 unbindTexture(const std::string& uniform, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
     S32 unbindTexture(S32 uniform, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
 
     bool link(bool suppress_errors = false);

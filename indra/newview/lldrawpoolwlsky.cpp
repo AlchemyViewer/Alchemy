@@ -51,12 +51,6 @@
 
 extern bool gCubeSnapshot;
 
-static LLStaticHashedString sCamPosLocal("camPosLocal");
-static LLStaticHashedString sCustomAlpha("custom_alpha");
-static LLStaticHashedString sMeteorWidth("meteor_width_pixels");
-static LLStaticHashedString sAuroraIntensity("aurora_intensity");
-static LLStaticHashedString sAuroraTime("aurora_time");
-
 static LLGLSLShader* cloud_shader = NULL;
 static LLGLSLShader* sky_shader   = NULL;
 static LLGLSLShader* sun_shader   = NULL;
@@ -126,7 +120,7 @@ void LLDrawPoolWLSky::renderDome(const LLVector3& camPosLocal, F32 camHeightLoca
     gGL.translatef(0.f,-camHeightLocal, 0.f);
 
     // Draw WL Sky
-    shader->uniform3f(sCamPosLocal, 0.f, camHeightLocal, 0.f);
+    shader->uniform3f(LLShaderMgr::WL_CAMPOSLOCAL, 0.f, camHeightLocal, 0.f);
 
     gSky.mVOWLSkyp->drawDome();
 
@@ -171,14 +165,13 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
             static LLCachedControl<F32> hdri_exposure(gSavedSettings, "RenderHDRIExposure", 0.0f);
             static LLCachedControl<F32> hdri_rotation(gSavedSettings, "RenderHDRIRotation", 0.f);
             static LLCachedControl<F32> hdri_split(gSavedSettings, "RenderHDRISplitScreen", 1.f);
-            static LLStaticHashedString hdri_split_screen("hdri_split_screen");
 
             LLMatrix3 rot;
             rot.setRot(0.f, hdri_rotation*DEG_TO_RAD, 0.f);
 
             sky_shader->uniform1f(LLShaderMgr::SKY_HDR_SCALE, powf(2.f, hdri_exposure));
             sky_shader->uniformMatrix3fv(LLShaderMgr::DEFERRED_ENV_MAT, 1, GL_FALSE, (F32*) rot.mMatrix);
-            sky_shader->uniform1f(hdri_split_screen, gCubeSnapshot ? 1.f : hdri_split);
+            sky_shader->uniform1f(LLShaderMgr::HDRI_SPLIT_SCREEN, gCubeSnapshot ? 1.f : hdri_split);
         }
         else
         {
@@ -257,7 +250,7 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
     {
         star_alpha = 1.0f;
     }
-    gDeferredStarProgram.uniform1f(sCustomAlpha, star_alpha);
+    gDeferredStarProgram.uniform1f(LLShaderMgr::CUSTOM_ALPHA, star_alpha);
 
     // Screen resolution for GPU-side pixel-sized billboarding.
     LLRenderTarget* deferred_target = &gPipeline.mRT->deferredScreen;
@@ -324,7 +317,7 @@ void LLDrawPoolWLSky::renderMeteorsDeferred(const LLVector3& camPosLocal) const
     gDeferredMeteorProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
                                      (GLfloat)deferred_target->getWidth(),
                                      (GLfloat)deferred_target->getHeight());
-    gDeferredMeteorProgram.uniform1f(sMeteorWidth, 1.5f);
+    gDeferredMeteorProgram.uniform1f(LLShaderMgr::METEOR_WIDTH_PIXELS, 1.5f);
 
     gSky.mVOWLSkyp->drawMeteors();
 
@@ -361,8 +354,8 @@ void LLDrawPoolWLSky::renderAuroraDeferred(const LLVector3& camPosLocal, F32 cam
     if (dt > 0.1f) dt = 0.1f;
     s_aurora_time = (F32)fmod(s_aurora_time + dt, 86400.0);
 
-    gDeferredAuroraProgram.uniform1f(sAuroraIntensity, intensity);
-    gDeferredAuroraProgram.uniform1f(sAuroraTime, s_aurora_time);
+    gDeferredAuroraProgram.uniform1f(LLShaderMgr::AURORA_INTENSITY, intensity);
+    gDeferredAuroraProgram.uniform1f(LLShaderMgr::AURORA_TIME, s_aurora_time);
 
     // Re-use the WL sky dome mesh — a ready-made hemisphere. Aurora shader
     // discards the zenith cap and below-horizon region.

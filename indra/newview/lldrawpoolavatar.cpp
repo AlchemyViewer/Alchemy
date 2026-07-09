@@ -308,9 +308,8 @@ void LLDrawPoolAvatar::beginShadowPass(S32 pass)
         sVertexProgram = &gDeferredAvatarAlphaShadowProgram;
 
         // bind diffuse tex so we can reference the alpha channel...
-        S32 loc = sVertexProgram->getUniformLocation(LLViewerShaderMgr::DIFFUSE_MAP);
         sDiffuseChannel = 0;
-        if (loc != -1)
+        if (sVertexProgram->hasUniform(LLViewerShaderMgr::DIFFUSE_MAP))
         {
             sDiffuseChannel = sVertexProgram->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
         }
@@ -328,9 +327,8 @@ void LLDrawPoolAvatar::beginShadowPass(S32 pass)
         sVertexProgram = &gDeferredAvatarAlphaMaskShadowProgram;
 
         // bind diffuse tex so we can reference the alpha channel...
-        S32 loc = sVertexProgram->getUniformLocation(LLViewerShaderMgr::DIFFUSE_MAP);
         sDiffuseChannel = 0;
-        if (loc != -1)
+        if (sVertexProgram->hasUniform(LLViewerShaderMgr::DIFFUSE_MAP))
         {
             sDiffuseChannel = sVertexProgram->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
         }

@@ -181,6 +181,8 @@ public:
         DEFERRED_SSAO_FACTOR,               //  "ssao_factor"
         DEFERRED_SSAO_FACTOR_INV,           //  "ssao_factor_inv"
         DEFERRED_SSAO_EFFECT_MAT,           //  "ssao_effect_mat"
+        DEFERRED_SSAO_IRRADIANCE_SCALE,     //  "ssao_irradiance_scale"
+        DEFERRED_SSAO_IRRADIANCE_MAX,       //  "ssao_irradiance_max"
         DEFERRED_SCREEN_RES,                //  "screen_res"
         DEFERRED_NEAR_CLIP,                 //  "near_clip"
         DEFERRED_SHADOW_OFFSET,             //  "shadow_offset"
@@ -263,6 +265,7 @@ public:
         WATER_REFSCALE,                     //  "refScale"
         WATER_WATERHEIGHT,                  //  "waterHeight"
         WATER_WATERPLANE,                   //  "waterPlane"
+        WATER_WATERSIGN,                    //  "waterSign"
         WATER_NORM_SCALE,                   //  "normScale"
         WATER_FRESNEL_SCALE,                //  "fresnelScale"
         WATER_FRESNEL_OFFSET,               //  "fresnelOffset"
@@ -270,6 +273,7 @@ public:
         WATER_SUN_ANGLE,                    //  "sunAngle"
         WATER_SCALED_ANGLE,                 //  "scaledAngle"
         WATER_SUN_ANGLE2,                   //  "sunAngle2"
+        WATER_ABOVE_WATER,                  //  "above_water"
 
         WL_CAMPOSLOCAL,                     //  "camPosLocal"
 // [RLVa:KB] - @setsphere
@@ -318,6 +322,20 @@ public:
 
         REGION_SCALE,                              //  "region_scale" (GLTF)
 
+        GLTF_MINIMUM_ALPHA,                        //  "gltf_minimum_alpha" (GLTF)
+        GLTF_BASECOLOR_TRANSFORM,                  //  "gltf_basecolor_transform" (GLTF)
+        GLTF_EMISSIVE_COLOR,                       //  "gltf_emissive_color" (GLTF)
+        GLTF_EMISSIVE_TRANSFORM,                   //  "gltf_emissive_transform" (GLTF)
+        GLTF_ROUGHNESS_FACTOR,                     //  "gltf_roughness_factor" (GLTF)
+        GLTF_METALLIC_FACTOR,                      //  "gltf_metallic_factor" (GLTF)
+        GLTF_NORMAL_TRANSFORM,                     // "gltf_normal_transform" (GLTF)
+        GLTF_MR_TRANSFORM,                         // "gltf_mr_transform" (GLTF)
+
+        MAT_SPECULAR_COLOR,                     //  "mat_specular_color"
+        MAT_ENV_INTENSITY,                      //  "mat_env_intensity"
+        MAT_MINIMUM_ALPHA,                      //  "mat_minimum_alpha"
+        MAT_EMISSIVE_BRIGHTNESS,                //  "mat_emissive_brightness"
+
         SHINY_ORIGIN,                       //  "origin"
         DISPLAY_GAMMA,                      //  "display_gamma"
 
@@ -343,8 +361,18 @@ public:
         CLOUD_VARIANCE,                     //  "cloud_variance"
 
         REFLECTION_PROBE_AMBIANCE,          //  "reflection_probe_ambiance"
-        REFLECTION_PROBE_MAX_LOD,            //  "max_probe_lod"
-        REFLECTION_PROBE_STRENGTH,            //  "probe_strength"
+        REFLECTION_PROBE_MAX_LOD,           //  "max_probe_lod"
+        REFLECTION_PROBE_STRENGTH,          //  "probe_strength"
+
+        RES_SCALE,                          //  "resScale"
+        DIRECTION,                          //  "direction"
+        ZNEAR,                              //  "znear"
+        ZFAR,                               //  "zfar"
+        SOURCE_IDX,                         //  "sourceIdx"
+        MIP_LEVEL,                          //  "mipLevel"
+        ROUGHNESS,                          //  "roughness"
+        U_WIDTH,                            //  "u_width"
+
         SH_INPUT_L1R,                       //  "sh_input_r"
         SH_INPUT_L1G,                       //  "sh_input_g"
         SH_INPUT_L1B,                       //  "sh_input_b"
@@ -356,16 +384,56 @@ public:
 
         DEBUG_NORMAL_DRAW_LENGTH,           //  "debug_normal_draw_length"
 
+        TINT,                               //  "tint"
+        AMBIANCE,                           //  "ambiance"
+        ALPHA_SCALE,                        //  "alpha_scale"
+
+        NORM_SCALE,                         //  "norm_scale"
+        STEP_X,                             //  "stepX"
+        STEP_Y,                             //  "stepY"
+        BUMP_CODE,                          //  "bump_code"
+
+        DELTA,                              //  "delta"
+        DIST_FACTOR,                        //  "dist_factor"
+        KERN,                               //  "kern"
+        KERN_SCALE,                         //  "kern_scale"
+
+        // Debug
+        TOLERANCE,                          //  "tolerance"
+        DITHER_SCALE,                       //  "dither_scale"
+        DITHER_SCALE_S,                     //  "dither_scale_s"
+        DITHER_SCALE_T,                     //  "dither_scale_t"
+
         SMAA_EDGE_TEX,                      //  "edgesTex"
         SMAA_AREA_TEX,                      //  "areaTex"
         SMAA_SEARCH_TEX,                    //  "searchTex"
         SMAA_BLEND_TEX,                     //  "blendTex"
         SMAA_PREDICATION_TEX,               //  "predicationTex"
+        SMAA_RT_METRICS,                    //  "SMAA_RT_METRICS"
 
-        EXPOSURE,
-        TONEMAP_TYPE,
-        TONEMAP_MIX,
-        TONEMAP_PARAMS,
+        // CAS
+        CAS_PARAM_0,                       //  "cas_param_0"
+        CAS_PARAM_1,                       //  "cas_param_1"
+        OUT_SCREEN_RES,                     //  "out_screen_res"
+
+        //Exposure and tonemapping
+        DT,                                 //  "dt"
+        NOISE_VEC,                          //  "noiseVec"
+        DYNAMIC_EXPOSURE_PARAMS,            //  "dynamic_exposure_params"
+        DYNAMIC_EXPOSURE_PARAMS2,           //  "dynamic_exposure_params2"
+
+        EXPOSURE,                           //  "exposure"
+        TONEMAP_TYPE,                       //  "tonemap_type"
+        TONEMAP_MIX,                        //  "tonemap_mix"
+        TONEMAP_PARAMS,                     //  "tonemap_params"
+        HDRI_SPLIT_SCREEN,                  //  "hdri_split_screen"
+        DIFFUSE_LUMINANCE_SCALE,            //  "diffuse_luminance_scale"
+
+        // Alchemy-specific uniforms for Sky
+        CUSTOM_ALPHA,                       //  "custom_alpha"
+        METEOR_WIDTH_PIXELS,                //  "meteor_width_pixels"
+        AURORA_INTENSITY,                   //  "aurora_intensity"
+        AURORA_TIME,                        //  "aurora_time"
 
         // Alchemy Effects Stack
         FRAME_ID,                           //  "uFrameId"
@@ -471,9 +539,11 @@ public:
         DITHER_ANIMATE,                     //  "uDitherAnimate"
 
         // Previews
-        PREVIEW_MODE,                      //  "uPreviewMode"
+        PREVIEW_MODE,                       //  "uPreviewMode"
 
         // End Alchemy Effects Stack
+        TEXT_SHADOW_MODE,                   //  "textShadowMode"
+
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;

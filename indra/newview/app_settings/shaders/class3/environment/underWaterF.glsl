@@ -46,7 +46,6 @@ uniform vec3 eyeVec;
 uniform vec4 waterFogColor;
 uniform vec3 waterFogColorLinear;
 uniform float waterFogKS;
-uniform vec2 screenRes;
 
 //bigWave is (refCoord.w, view.w);
 in vec4 refCoord;

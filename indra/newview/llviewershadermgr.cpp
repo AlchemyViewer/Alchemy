@@ -3673,11 +3673,10 @@ bool LLViewerShaderMgr::loadShadersInterface()
             // and NO_SHADOW text take the early-return branch in uiF.glsl. GLSL
             // already zero-initializes uniforms, but pushing an explicit default
             // documents the contract and protects against driver quirks.
-            // shadowMode is the shader's only shadow uniform — atlas texel size
+            // textShadowMode is the shader's only shadow uniform — atlas texel size
             // and channel layout derive from the bound texture in uiF.glsl.
-            static LLStaticHashedString sShadowMode("shadowMode");
             gUIProgram.bind();
-            gUIProgram.uniform1i(sShadowMode, 0);
+            gUIProgram.uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, 0);
             gUIProgram.unbind();
         }
     }

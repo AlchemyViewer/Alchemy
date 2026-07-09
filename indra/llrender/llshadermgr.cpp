@@ -1375,6 +1375,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("ssao_factor");
     mReservedUniforms.push_back("ssao_factor_inv");
     mReservedUniforms.push_back("ssao_effect_mat");
+    mReservedUniforms.push_back("ssao_irradiance_scale");
+    mReservedUniforms.push_back("ssao_irradiance_max");
     mReservedUniforms.push_back("screen_res");
     mReservedUniforms.push_back("near_clip");
     mReservedUniforms.push_back("shadow_offset");
@@ -1463,6 +1465,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("refScale");
     mReservedUniforms.push_back("waterHeight");
     mReservedUniforms.push_back("waterPlane");
+    mReservedUniforms.push_back("waterSign");
     mReservedUniforms.push_back("normScale");
     mReservedUniforms.push_back("fresnelScale");
     mReservedUniforms.push_back("fresnelOffset");
@@ -1470,6 +1473,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("sunAngle");
     mReservedUniforms.push_back("scaledAngle");
     mReservedUniforms.push_back("sunAngle2");
+    mReservedUniforms.push_back("above_water");
+    llassert(mReservedUniforms.size() == LLShaderMgr::WATER_ABOVE_WATER + 1);
 
     mReservedUniforms.push_back("camPosLocal");
 // [RLVa:KB] - @setsphere
@@ -1517,6 +1522,21 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("minimum_alphas");
 
     mReservedUniforms.push_back("region_scale");
+    llassert(mReservedUniforms.size() == LLShaderMgr::REGION_SCALE + 1);
+
+    mReservedUniforms.push_back("gltf_minimum_alpha");
+    mReservedUniforms.push_back("gltf_basecolor_transform");
+    mReservedUniforms.push_back("gltf_emissive_color");
+    mReservedUniforms.push_back("gltf_emissive_transform");
+    mReservedUniforms.push_back("gltf_roughness_factor");
+    mReservedUniforms.push_back("gltf_metallic_factor");
+    mReservedUniforms.push_back("gltf_normal_transform");
+    mReservedUniforms.push_back("gltf_mr_transform");
+
+    mReservedUniforms.push_back("mat_specular_color");
+    mReservedUniforms.push_back("mat_env_intensity");
+    mReservedUniforms.push_back("mat_minimum_alpha");
+    mReservedUniforms.push_back("mat_emissive_brightness");
 
     mReservedUniforms.push_back("origin");
     mReservedUniforms.push_back("display_gamma");
@@ -1541,6 +1561,15 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("max_probe_lod");
     mReservedUniforms.push_back("probe_strength");
 
+    mReservedUniforms.push_back("resScale");
+    mReservedUniforms.push_back("direction");
+    mReservedUniforms.push_back("znear");
+    mReservedUniforms.push_back("zfar");
+    mReservedUniforms.push_back("sourceIdx");
+    mReservedUniforms.push_back("mipLevel");
+    mReservedUniforms.push_back("roughness");
+    mReservedUniforms.push_back("u_width");
+
     mReservedUniforms.push_back("sh_input_r");
     mReservedUniforms.push_back("sh_input_g");
     mReservedUniforms.push_back("sh_input_b");
@@ -1551,17 +1580,62 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("moonlight_color");
 
     mReservedUniforms.push_back("debug_normal_draw_length");
+    llassert(mReservedUniforms.size() == LLShaderMgr::DEBUG_NORMAL_DRAW_LENGTH + 1);
 
+    // Pathfinding Debug
+    mReservedUniforms.push_back("tint");
+    mReservedUniforms.push_back("ambiance");
+    mReservedUniforms.push_back("alpha_scale");
+
+    // Bump mapping
+    mReservedUniforms.push_back("norm_scale");
+    mReservedUniforms.push_back("stepX");
+    mReservedUniforms.push_back("stepY");
+    mReservedUniforms.push_back("bump_code");
+
+    mReservedUniforms.push_back("delta");
+    mReservedUniforms.push_back("dist_factor");
+    mReservedUniforms.push_back("kern");
+    mReservedUniforms.push_back("kern_scale");
+
+    // Debug
+    mReservedUniforms.push_back("tolerance");
+    mReservedUniforms.push_back("dither_scale");
+    mReservedUniforms.push_back("dither_scale_s");
+    mReservedUniforms.push_back("dither_scale_t");
+
+    // SMAA
     mReservedUniforms.push_back("edgesTex");
     mReservedUniforms.push_back("areaTex");
     mReservedUniforms.push_back("searchTex");
     mReservedUniforms.push_back("blendTex");
     mReservedUniforms.push_back("predicationTex");
+    mReservedUniforms.push_back("SMAA_RT_METRICS");
+
+    // CAS
+    mReservedUniforms.push_back("cas_param_0");
+    mReservedUniforms.push_back("cas_param_1");
+    mReservedUniforms.push_back("out_screen_res");
+
+    // Tonemapping + Exposure
+    mReservedUniforms.push_back("dt");
+    mReservedUniforms.push_back("noiseVec");
+    mReservedUniforms.push_back("dynamic_exposure_params");
+    mReservedUniforms.push_back("dynamic_exposure_params2");
 
     mReservedUniforms.push_back("exposure");
     mReservedUniforms.push_back("tonemap_type");
     mReservedUniforms.push_back("tonemap_mix");
     mReservedUniforms.push_back("tonemap_params");
+    mReservedUniforms.push_back("hdri_split_screen");
+    mReservedUniforms.push_back("diffuse_luminance_scale");
+
+    // Stars/Aurora/Meteors
+    mReservedUniforms.push_back("custom_alpha");
+    mReservedUniforms.push_back("meteor_width_pixels");
+    mReservedUniforms.push_back("aurora_intensity");
+    mReservedUniforms.push_back("aurora_time");
+    llassert(mReservedUniforms.size() == LLShaderMgr::AURORA_TIME + 1);
 
     // Alchemy Effects Stack
     mReservedUniforms.push_back("uFrameId");
@@ -1668,6 +1742,9 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     // Previews
     mReservedUniforms.push_back("uPreviewMode");
+
+    // Text Shadow
+    mReservedUniforms.push_back("textShadowMode");
 
     // End Alchemy Effects Stack
 

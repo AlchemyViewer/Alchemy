@@ -46,6 +46,7 @@
 #include "lltexture.h"
 #include "lldir.h"
 #include "llstring.h"
+#include "llshadermgr.h"
 
 // Third party library includes
 #include <boost/tokenizer.hpp>
@@ -459,7 +460,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     F32 inv_width  = font_bitmap_cache ? 1.f / font_bitmap_cache->getBitmapWidth()  : 0.f;
     F32 inv_height = font_bitmap_cache ? 1.f / font_bitmap_cache->getBitmapHeight() : 0.f;
 
-    // shadowMode is pushed once before pass A starts and reset to
+    // textShadowMode is pushed once before pass A starts and reset to
     // passthrough (0) before pass B's foreground emission. It is the only
     // shadow uniform by design: per-pass constant, so the captured-buffer
     // replay (LLFontVertexBuffer::renderBuffers re-pushes it; LLVertexBufferData
@@ -469,14 +470,13 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // (textureSize + the RG-swizzle/.a sampling), so glyphs from
     // differently-sized head and fallback atlases all shadow correctly.
     // Skipped when sEnableShaderShadow is off (legacy multi-quad emission
-    // still drives shadow geometry — shader stays at shadowMode=0).
+    // still drives shadow geometry — shader stays at textShadowMode=0).
     const bool push_shader_shadow_uniforms =
         sEnableShaderShadow && (shadow != NO_SHADOW) && LLGLSLShader::sCurBoundShaderPtr;
-    static const LLStaticHashedString sShadowMode("shadowMode");
     if (push_shader_shadow_uniforms)
     {
         const int mode = (shadow == DROP_SHADOW) ? 1 : 2; // SOFT
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, mode);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, mode);
     }
 
     bool draw_ellipses = false;
@@ -948,12 +948,12 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             on_pass_boundary();
         }
 
-        // Reset shadowMode for foreground emission. Pass B's flushes (and any
+        // Reset textShadowMode for foreground emission. Pass B's flushes (and any
         // subsequent UI rendering) take the shader's default-passthrough
         // branch.
         if (push_shader_shadow_uniforms)
         {
-            LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, 0);
+            LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, 0);
         }
 
         // Pass B: emit foreground geometry from deferred metadata. Reset the
@@ -2296,7 +2296,7 @@ void LLFontGL::drawGlyphShadow(S32& glyph_count, LLVector4a* vertex_out, LLVecto
     if (sEnableShaderShadow)
     {
         // Shader-based shadow: emit a single dilated quad. uiF.glsl with
-        // shadowMode > 0 takes 2 (DROP) or 5 (SOFT) atlas taps and accumulates
+        // textShadowMode > 0 takes 2 (DROP) or 5 (SOFT) atlas taps and accumulates
         // alpha as max() to reproduce the multi-quad coverage profile. The
         // dilated screen rect grows by 2px on each side to host the ±2px tap
         // pattern; the dilated UV rect grows by 2 atlas texels (callers fill

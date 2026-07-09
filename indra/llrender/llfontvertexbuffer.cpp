@@ -33,6 +33,7 @@
 #include "llglslshader.h"
 #include "llimagegl.h"
 #include "llrender.h"
+#include "llshadermgr.h"
 #include "llvertexbuffer.h"
 
 #include "llmath.h"  // clamp_rescale
@@ -427,12 +428,10 @@ void LLFontVertexBuffer::renderBuffers()
     // Shadow first (under), foreground second (over). Pass-boundary order matches
     // the original interleaved-per-glyph emission's net visual stacking — shadow
     // contributions sit beneath glyph foregrounds rather than between them.
-    static const LLStaticHashedString sShadowMode("shadowMode");
-
     if (mLastUsedShaderShadow && LLGLSLShader::sCurBoundShaderPtr)
     {
         const int mode = (mLastShadow == LLFontGL::DROP_SHADOW) ? 1 : 2; // SOFT
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, mode);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, mode);
     }
     for (LLVertexBufferData& buffer : mShadowBufferList)
     {
@@ -440,7 +439,7 @@ void LLFontVertexBuffer::renderBuffers()
     }
     if (mLastUsedShaderShadow && LLGLSLShader::sCurBoundShaderPtr)
     {
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, 0);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, 0);
     }
     for (LLVertexBufferData& buffer : mForegroundBufferList)
     {

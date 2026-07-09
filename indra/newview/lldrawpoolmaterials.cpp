@@ -164,15 +164,10 @@ static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigge
             fullbright[s] = slot.mFullbright;
         }
 
-        static const LLStaticHashedString sSpecColor("mat_specular_color");
-        static const LLStaticHashedString sEnv("mat_env_intensity");
-        static const LLStaticHashedString sMinAlpha("mat_minimum_alpha");
-        static const LLStaticHashedString sEmissive("mat_emissive_brightness");
-
-        shader->uniform4fv(sSpecColor, n, spec_color);
-        shader->uniform1fv(sEnv, n, env);
-        shader->uniform1fv(sMinAlpha, n, min_alpha); // inactive outside MASK shaders
-        shader->uniform1fv(sEmissive, n, fullbright);
+        shader->uniform4fv(LLShaderMgr::MAT_SPECULAR_COLOR, n, spec_color);
+        shader->uniform1fv(LLShaderMgr::MAT_ENV_INTENSITY, n, env);
+        shader->uniform1fv(LLShaderMgr::MAT_MINIMUM_ALPHA, n, min_alpha); // inactive outside MASK shaders
+        shader->uniform1fv(LLShaderMgr::MAT_EMISSIVE_BRIGHTNESS, n, fullbright);
 
         LLRenderPass::applyModelMatrix(params);
 
@@ -265,10 +260,10 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
     F32 lastMinimumAlpha = 0.f;
     LLVector4 lastSpecular = LLVector4(0, 0, 0, 0);
 
-    GLint intensity = mShader->getUniformLocation(LLShaderMgr::ENVIRONMENT_INTENSITY);
-    GLint brightness = mShader->getUniformLocation(LLShaderMgr::EMISSIVE_BRIGHTNESS);
-    GLint minAlpha = mShader->getUniformLocation(LLShaderMgr::MINIMUM_ALPHA);
-    GLint specular = mShader->getUniformLocation(LLShaderMgr::SPECULAR_COLOR);
+    bool has_intensity = mShader->hasUniform(LLShaderMgr::ENVIRONMENT_INTENSITY);
+    bool has_brightness = mShader->hasUniform(LLShaderMgr::EMISSIVE_BRIGHTNESS);
+    bool has_minAlpha = mShader->hasUniform(LLShaderMgr::MINIMUM_ALPHA);
+    bool has_specular = mShader->hasUniform(LLShaderMgr::SPECULAR_COLOR);
 
     GLint diffuseChannel = mShader->enableTexture(LLShaderMgr::DIFFUSE_MAP);
     GLint specChannel = mShader->enableTexture(LLShaderMgr::SPECULAR_MAP);
@@ -280,24 +275,24 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
 
     gGL.getTexUnit(diffuseChannel)->unbindFast(LLTexUnit::TT_TEXTURE);
 
-    if (intensity > -1)
+    if (has_intensity)
     {
-        glUniform1f(intensity, lastIntensity);
+        mShader->fastUniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, lastIntensity);
     }
 
-    if (brightness > -1)
+    if (has_brightness)
     {
-        glUniform1f(brightness, lastFullbright);
+        mShader->fastUniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, lastFullbright);
     }
 
-    if (minAlpha > -1)
+    if (has_minAlpha)
     {
-        glUniform1f(minAlpha, lastMinimumAlpha);
+        mShader->fastUniform1f(LLShaderMgr::MINIMUM_ALPHA, lastMinimumAlpha);
     }
 
-    if (specular > -1)
+    if (has_specular)
     {
-        glUniform4fv(specular, 1, lastSpecular.mV);
+        mShader->fastUniform4fv(LLShaderMgr::SPECULAR_COLOR, 1, lastSpecular.mV);
     }
 
     const LLVOAvatar* lastAvatar = nullptr;
@@ -316,29 +311,29 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
             continue;
         }
 
-        if (specular > -1 && params.mSpecColor != lastSpecular)
+        if (has_specular && params.mSpecColor != lastSpecular)
         {
             lastSpecular = params.mSpecColor;
-            glUniform4fv(specular, 1, lastSpecular.mV);
+            mShader->fastUniform4fv(LLShaderMgr::SPECULAR_COLOR, 1, lastSpecular.mV);
         }
 
-        if (intensity != -1 && lastIntensity != params.mEnvIntensity)
+        if (has_intensity && lastIntensity != params.mEnvIntensity)
         {
             lastIntensity = params.mEnvIntensity;
-            glUniform1f(intensity, lastIntensity);
+            mShader->fastUniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, lastIntensity);
         }
 
-        if (minAlpha > -1 && lastMinimumAlpha != params.mAlphaMaskCutoff)
+        if (has_minAlpha && lastMinimumAlpha != params.mAlphaMaskCutoff)
         {
             lastMinimumAlpha = params.mAlphaMaskCutoff;
-            glUniform1f(minAlpha, lastMinimumAlpha);
+            mShader->fastUniform1f(LLShaderMgr::MINIMUM_ALPHA, lastMinimumAlpha);
         }
 
         F32 fullbright = params.mFullbright ? 1.f : 0.f;
-        if (brightness > -1 && lastFullbright != fullbright)
+        if (has_brightness && lastFullbright != fullbright)
         {
             lastFullbright = fullbright;
-            glUniform1f(brightness, lastFullbright);
+            mShader->fastUniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, lastFullbright);
         }
 
         if (normChannel > -1 && params.mNormalMap != lastNormalMap)

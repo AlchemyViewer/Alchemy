@@ -606,8 +606,7 @@ void LLRenderPass::pushMaskBatchesIndexed(U32 type, bool rigged)
             min_alpha[s] = slot.mAlphaMaskCutoff;
         }
 
-        static const LLStaticHashedString sMinAlpha("mat_minimum_alpha");
-        shader->uniform1fv(sMinAlpha, n, min_alpha);
+        shader->uniform1fv(LLShaderMgr::MAT_MINIMUM_ALPHA, n, min_alpha);
 
         applyModelMatrix(params);
 
@@ -1098,32 +1097,21 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
         memcpy(&mr_xform[8 * s], packed, sizeof(packed));
     }
 
-    static const LLStaticHashedString sMinAlpha("gltf_minimum_alpha");
-    static const LLStaticHashedString sBcXform("gltf_basecolor_transform");
-
-    shader->uniform1fv(sMinAlpha, n, min_alpha);
-    shader->uniform4fv(sBcXform, 2 * n, bc_xform);
+    shader->uniform1fv(LLShaderMgr::GLTF_MINIMUM_ALPHA, n, min_alpha);
+    shader->uniform4fv(LLShaderMgr::GLTF_BASECOLOR_TRANSFORM, 2 * n, bc_xform);
 
     if (want_emissive)
     {
-        static const LLStaticHashedString sEmissive("gltf_emissive_color");
-        static const LLStaticHashedString sEmXform("gltf_emissive_transform");
-
-        shader->uniform3fv(sEmissive, n, emissive);
-        shader->uniform4fv(sEmXform, 2 * n, em_xform);
+        shader->uniform3fv(LLShaderMgr::GLTF_EMISSIVE_COLOR, n, emissive);
+        shader->uniform4fv(LLShaderMgr::GLTF_EMISSIVE_TRANSFORM, 2 * n, em_xform);
     }
 
     if (want_full)
     {
-        static const LLStaticHashedString sRoughness("gltf_roughness_factor");
-        static const LLStaticHashedString sMetallic("gltf_metallic_factor");
-        static const LLStaticHashedString sNmXform("gltf_normal_transform");
-        static const LLStaticHashedString sMrXform("gltf_mr_transform");
-
-        shader->uniform1fv(sRoughness, n, roughness);
-        shader->uniform1fv(sMetallic, n, metallic);
-        shader->uniform4fv(sNmXform, 2 * n, nm_xform);
-        shader->uniform4fv(sMrXform, 2 * n, mr_xform);
+        shader->uniform1fv(LLShaderMgr::GLTF_ROUGHNESS_FACTOR, n, roughness);
+        shader->uniform1fv(LLShaderMgr::GLTF_METALLIC_FACTOR, n, metallic);
+        shader->uniform4fv(LLShaderMgr::GLTF_NORMAL_TRANSFORM, 2 * n, nm_xform);
+        shader->uniform4fv(LLShaderMgr::GLTF_MR_TRANSFORM, 2 * n, mr_xform);
     }
 
     LLGLDisable cull_face(double_sided ? GL_CULL_FACE : 0);

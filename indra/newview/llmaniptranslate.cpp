@@ -1679,7 +1679,6 @@ void LLManipTranslate::highlightIntersection(LLVector3 normal,
 
         plane = glm::inverse(gGL.getModelviewMatrix()) * plane;
 
-        static LLStaticHashedString sClipPlane("clip_plane");
         gClipProgram.uniform4fv(sClipPlane, 1, plane.v);
 
         bool particles = gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_PARTICLES);

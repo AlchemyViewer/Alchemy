@@ -331,10 +331,6 @@ bool LLSceneMonitor::needsUpdate() const
     return mDiffState == NEED_DIFF;
 }
 
-static LLStaticHashedString sDitherScale("dither_scale");
-static LLStaticHashedString sDitherScaleS("dither_scale_s");
-static LLStaticHashedString sDitherScaleT("dither_scale_t");
-
 void LLSceneMonitor::compare()
 {
 #ifdef LL_WINDOWS
@@ -374,9 +370,9 @@ void LLSceneMonitor::compare()
 
     gTwoTextureCompareProgram.bind();
 
-    gTwoTextureCompareProgram.uniform1f(sDitherScale, mDitherScale);
-    gTwoTextureCompareProgram.uniform1f(sDitherScaleS, mDitherScaleS);
-    gTwoTextureCompareProgram.uniform1f(sDitherScaleT, mDitherScaleT);
+    gTwoTextureCompareProgram.uniform1f(LLShaderMgr::DITHER_SCALE, mDitherScale);
+    gTwoTextureCompareProgram.uniform1f(LLShaderMgr::DITHER_SCALE_S, mDitherScaleS);
+    gTwoTextureCompareProgram.uniform1f(LLShaderMgr::DITHER_SCALE_T, mDitherScaleT);
 
     gGL.getTexUnit(0)->activate();
     gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
@@ -413,8 +409,6 @@ void LLSceneMonitor::compare()
 #endif
 }
 
-static LLStaticHashedString sTolerance("tolerance");
-
 //calculate Diff aggregate information in GPU, and enable gl occlusion query to capture it.
 void LLSceneMonitor::calcDiffAggregate()
 {
@@ -440,7 +434,7 @@ void LLSceneMonitor::calcDiffAggregate()
 
     cur_shader = LLGLSLShader::sCurBoundShaderPtr;
     gOneTextureFilterProgram.bind();
-    gOneTextureFilterProgram.uniform1f(sTolerance, mDiffTolerance);
+    gOneTextureFilterProgram.uniform1f(LLShaderMgr::TOLERANCE, mDiffTolerance);
 
     if(mDiffState == EXECUTE_DIFF)
     {

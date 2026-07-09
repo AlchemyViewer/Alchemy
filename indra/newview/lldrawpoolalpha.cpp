@@ -93,8 +93,6 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
     static LLCachedControl<F32> displayGamma(gSavedSettings, "RenderDeferredDisplayGamma");
     F32 gamma = displayGamma;
 
-    static LLStaticHashedString waterSign("waterSign");
-
     // Does this deferred shader need environment uniforms set such as sun_dir, etc. ?
     // NOTE: We don't actually need a gbuffer since we are doing forward rendering (for transparency) post deferred rendering
     // TODO: bindDeferredShader() probably should have the updating of the environment uniforms factored out into updateShaderEnvironmentUniforms()
@@ -110,12 +108,12 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
     if (LLPipeline::sRenderingHUDs)
     { // for HUD attachments, only the pre-water pass is executed and we never want to clip anything
         LLVector4 near_clip(0, 0, -1, 0);
-        shader->uniform1f(waterSign, 1.f);
+        shader->uniform1f(LLShaderMgr::WATER_WATERSIGN, 1.f);
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, near_clip.mV);
     }
     else
     {
-        shader->uniform1f(waterSign, water_sign);
+        shader->uniform1f(LLShaderMgr::WATER_WATERSIGN, water_sign);
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
     }
 

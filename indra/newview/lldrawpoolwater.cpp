@@ -241,20 +241,16 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     shader->uniform1f(LLShaderMgr::WATER_FRESNEL_OFFSET, pwater->getFresnelOffset());
     shader->uniform1f(LLShaderMgr::WATER_BLUR_MULTIPLIER, fmaxf(0, pwater->getBlurMultiplier()) * 2);
 
-    static LLStaticHashedString s_exposure("exposure");
-    static LLStaticHashedString tonemap_mix("tonemap_mix");
-    static LLStaticHashedString tonemap_type("tonemap_type");
-
     static LLCachedControl<F32> exposure(gSavedSettings, "RenderExposure", 1.f);
 
     F32 e = llclamp(exposure(), 0.5f, 4.f);
 
     static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
 
-    shader->uniform1f(s_exposure, e);
+    shader->uniform1f(LLShaderMgr::EXPOSURE, e);
     static LLCachedControl<S32> tonemap_type_setting(gSavedSettings, "AlchemyRenderTonemapType", 0U);
-    shader->uniform1i(tonemap_type, tonemap_type_setting);
-    shader->uniform1f(tonemap_mix, psky->getTonemapMix(should_auto_adjust()));
+    shader->uniform1i(LLShaderMgr::TONEMAP_TYPE, tonemap_type_setting);
+    shader->uniform1f(LLShaderMgr::TONEMAP_MIX, psky->getTonemapMix(should_auto_adjust()));
 
     F32 sunAngle = llmax(0.f, light_dir.mV[1]);
     F32 scaledAngle = 1.f - sunAngle;
