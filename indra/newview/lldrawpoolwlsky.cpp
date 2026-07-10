@@ -101,11 +101,6 @@ void LLDrawPoolWLSky::renderDome(const LLVector3& camPosLocal, F32 camHeightLoca
     gGL.pushMatrix();
 
     //chop off translation
-    if (LLPipeline::sReflectionRender && camPosLocal.mV[2] > 256.f)
-    {
-        gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], 256.f-camPosLocal.mV[2]*0.5f);
-    }
-    else
     {
         gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
     }
@@ -246,10 +241,6 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
     // Subtle rotation so fixed patterns drift over long time scales.
     gGL.rotatef(gFrameTimeSeconds * 0.01f, 0.f, 0.f, 1.f);
 
-    if (LLPipeline::sReflectionRender)
-    {
-        star_alpha = 1.0f;
-    }
     gDeferredStarProgram.uniform1f(LLShaderMgr::CUSTOM_ALPHA, star_alpha);
 
     // Screen resolution for GPU-side pixel-sized billboarding.

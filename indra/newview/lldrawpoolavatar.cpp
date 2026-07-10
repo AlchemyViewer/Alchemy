@@ -515,13 +515,10 @@ void LLDrawPoolAvatar::beginImpostor()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
-    if (!LLPipeline::sReflectionRender)
-    {
-        LLVOAvatar::sNumVisibleAvatars = 0;
-    }
+    LLVOAvatar::sNumVisibleAvatars = 0;
 
-        gImpostorProgram.bind();
-        gImpostorProgram.setMinimumAlpha(0.01f);
+    gImpostorProgram.bind();
+    gImpostorProgram.setMinimumAlpha(0.01f);
 
     gPipeline.enableLightsFullbright();
     sDiffuseChannel = 0;
@@ -531,7 +528,7 @@ void LLDrawPoolAvatar::endImpostor()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
-        gImpostorProgram.unbind();
+    gImpostorProgram.unbind();
     gPipeline.enableLightsDynamic();
 }
 
@@ -570,10 +567,7 @@ void LLDrawPoolAvatar::beginDeferredImpostor()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
-    if (!LLPipeline::sReflectionRender)
-    {
-        LLVOAvatar::sNumVisibleAvatars = 0;
-    }
+    LLVOAvatar::sNumVisibleAvatars = 0;
 
     sVertexProgram = &gDeferredImpostorProgram;
     specular_channel = sVertexProgram->enableTexture(LLViewerShaderMgr::SPECULAR_MAP);
@@ -789,15 +783,12 @@ void LLDrawPoolAvatar::renderAvatars(LLVOAvatar* single_avatar, S32 pass)
 
     if (pass == 0)
     {
-        if (!LLPipeline::sReflectionRender)
-        {
-            LLVOAvatar::sNumVisibleAvatars++;
-        }
+        LLVOAvatar::sNumVisibleAvatars++;
 
 //      if (impostor || (LLVOAvatar::AV_DO_NOT_RENDER == avatarp->getVisualMuteSettings() && !avatarp->needsImpostorUpdate()))
         if (impostor || (LLVOAvatar::AOA_NORMAL != avatarp->getOverallAppearance() && !avatarp->needsImpostorUpdate()))
         {
-            if (LLPipeline::sRenderDeferred && !LLPipeline::sReflectionRender && avatarp->mImpostor.isComplete())
+            if (LLPipeline::sRenderDeferred && avatarp->mImpostor.isComplete())
             {
                 if (normal_channel > -1)
                 {

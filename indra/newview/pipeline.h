@@ -650,8 +650,6 @@ public:
     static bool             sShadowRender;
     static bool             sDynamicLOD;
     static bool             sPickAvatar;
-    static bool             sReflectionRender;
-    static bool             sDistortionRender;
     static bool             sImpostorRender;
     static bool             sImpostorRenderAlphaDepthPass;
     static bool             sUnderWaterRender;

@@ -300,8 +300,6 @@ bool    LLPipeline::sNoAlpha = false;
 bool    LLPipeline::sUseFarClip = true;
 bool    LLPipeline::sShadowRender = false;
 bool    LLPipeline::sRenderGlow = false;
-bool    LLPipeline::sReflectionRender = false;
-bool    LLPipeline::sDistortionRender = false;
 bool    LLPipeline::sImpostorRender = false;
 bool    LLPipeline::sImpostorRenderAlphaDepthPass = false;
 bool    LLPipeline::sUnderWaterRender = false;
@@ -3875,7 +3873,7 @@ void LLPipeline::postSort(LLCamera &camera)
                 LLDrawInfo *info = *k;
 
                 sCull->pushDrawInfo(j->first, info);
-                if (!sShadowRender && !sReflectionRender && !gCubeSnapshot)
+                if (!sShadowRender && !gCubeSnapshot)
                 {
                     addTrianglesDrawn(info->mCount);
                 }
@@ -4072,7 +4070,7 @@ void render_hud_elements()
     gGL.color4f(1, 1, 1, 1);
     LLGLDepthTest depth(GL_TRUE, GL_FALSE);
 
-    if (!LLPipeline::sReflectionRender && gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
+    if (gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
     {
         gViewerWindow->renderSelections(false, false, false); // For HUD version in render_ui_3d()
 
@@ -5753,7 +5751,7 @@ void LLPipeline::calcNearbyLights(LLCamera& camera)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     assertInitialized();
 
-    if (LLPipeline::sReflectionRender || gCubeSnapshot || LLPipeline::sRenderingHUDs || LLApp::isExiting())
+    if (gCubeSnapshot || LLPipeline::sRenderingHUDs || LLApp::isExiting())
     {
         return;
     }
@@ -9128,11 +9126,6 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
                                     (F32) gGLViewport[3]);
     }
 
-    if (sReflectionRender && shader.hasUniform(LLShaderMgr::MODELVIEW_MATRIX))
-    {
-        shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_MATRIX, 1, false, glm::value_ptr(mReflectionModelView));
-    }
-
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_NOISE);
     if (channel > -1)
     {
@@ -11842,8 +11835,6 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
     S32 occlusion = sUseOcclusion;
     sUseOcclusion = 0;
 
-    sReflectionRender = ! sRenderDeferred;
-
     sShadowRender = true;
     sImpostorRender = true;
 
@@ -12124,7 +12115,6 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
     }
 
     sUseOcclusion = occlusion;
-    sReflectionRender = false;
     sImpostorRender = false;
     sShadowRender = false;
     popRenderTypeMask();

@@ -92,7 +92,7 @@ U32 LLViewerJoint::render( F32 pixelArea, bool first_pass, bool is_dummy )
         {
             triangle_count += drawShape(pixelArea, first_pass, is_dummy );
         }
-        else if ( isTransparent() && !LLPipeline::sReflectionRender)
+        else if ( isTransparent() )
         {
             // Hair and Skirt
             if ((pixelArea > MIN_PIXEL_AREA_3PASS_HAIR))
