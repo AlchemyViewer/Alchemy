@@ -2174,7 +2174,10 @@ void LLInventoryModel::deleteObject(const LLUUID& id, bool fix_broken_links, boo
 
     // Note : We need to tell the inventory observers that those things are going to be deleted *before* the tree is cleared or they won't know what to delete (in views and view models)
     addChangedMask(LLInventoryObserver::REMOVE, id);
-    gInventory.notifyObservers();
+    if (do_notify_observers)
+    {
+        notifyObservers();
+    }
 
     if (item_array_t* item_list = getUnlockedItemArray(id))
     {
