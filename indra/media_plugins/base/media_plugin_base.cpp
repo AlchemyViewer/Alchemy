@@ -104,13 +104,14 @@ void MediaPluginBase::setStatus(EStatus status)
  * @param[in] user_data Message data
  *
  */
-void MediaPluginBase::staticReceiveMessage(const char *message_string, void **user_data)
+void MediaPluginBase::staticReceiveMessage(const char *message_string, size_t message_size, void **user_data)
 {
     MediaPluginBase *self = (MediaPluginBase*)*user_data;
 
     if(self != NULL)
     {
-        self->receiveMessage(message_string);
+        // Reconstruct with the exact length: binary LLSD may contain NULs.
+        self->receiveMessage(std::string(message_string, message_size));
 
         // If the plugin has processed the delete message, delete it.
         if(self->mDeleteMe)
@@ -130,7 +131,7 @@ void MediaPluginBase::staticReceiveMessage(const char *message_string, void **us
 void MediaPluginBase::sendMessage(const LLPluginMessage &message)
 {
     std::string output = message.generate();
-    mHostSendFunction(output.c_str(), &mHostUserData);
+    mHostSendFunction(output.data(), output.size(), &mHostUserData);
 }
 
 /**

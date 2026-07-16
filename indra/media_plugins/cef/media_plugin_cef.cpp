@@ -234,7 +234,7 @@ public:
     ~MediaPluginCEF();
 
     /*virtual*/
-    void receiveMessage(const char* message_string);
+    void receiveMessage(const std::string& message_string);
 
 private:
     bool init();
@@ -1078,7 +1078,7 @@ void MediaPluginCEF::authResponse(LLPluginMessage &message)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void MediaPluginCEF::receiveMessage(const char* message_string)
+void MediaPluginCEF::receiveMessage(const std::string& message_string)
 {
     //  std::cerr << "MediaPluginCEF::receiveMessage: received message: \"" << message_string << "\"" << std::endl;
     LLPluginMessage message_in;

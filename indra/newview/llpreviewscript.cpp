@@ -2707,28 +2707,39 @@ LLLiveLSLSaveData::LLLiveLSLSaveData(const LLUUID& id,
 /*static*/
 void LLLiveLSLEditor::finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response, bool isRunning)
 {
-    LLSD floater_key;
-    floater_key["taskid"] = taskId;
-    floater_key["itemid"] = itemId;
-
-    LLLiveLSLEditor* preview = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key);
-    if (preview)
-    {
-        preview->mItem->setAssetUUID(newAssetId);
-        preview->mScriptEd->setAssetID(newAssetId);
-
-        // Bytecode save completed
-        if (response["compiled"])
+    // This callback runs directly on the upload coprocedure's fiber
+    // (AssetInventoryUploadCoproc), not on the main coroutine. The work
+    // below eventually touches UI (selectFirstError() -> onErrorList() ->
+    // LLTextBase::reflow() -> LLScriptEditorSyntaxWorker::pump(), which
+    // takes an LLMutex) and LLMutex asserts/crashes if locked off the main
+    // coro. Shuttle the whole callback back to the main thread first, via
+    // LLAppViewer::postToMainCoro() (see llappviewer.h).
+    LLAppViewer::instance()->postToMainCoro(
+        [itemId, taskId, newAssetId, response, isRunning]() mutable
         {
-            preview->callbackLSLCompileSucceeded(taskId, itemId, isRunning);
-        }
-        else
-        {
-            preview->callbackLSLCompileFailed(response["errors"]);
-        }
-        response["is_running"] = isRunning;
-        preview->sendCompileResults(response);
-    }
+            LLSD floater_key;
+            floater_key["taskid"] = taskId;
+            floater_key["itemid"] = itemId;
+
+            LLLiveLSLEditor* preview = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key);
+            if (preview)
+            {
+                preview->mItem->setAssetUUID(newAssetId);
+                preview->mScriptEd->setAssetID(newAssetId);
+
+                // Bytecode save completed
+                if (response["compiled"])
+                {
+                    preview->callbackLSLCompileSucceeded(taskId, itemId, isRunning);
+                }
+                else
+                {
+                    preview->callbackLSLCompileFailed(response["errors"]);
+                }
+                response["is_running"] = isRunning;
+                preview->sendCompileResults(response);
+            }
+        });
 }
 
 // virtual

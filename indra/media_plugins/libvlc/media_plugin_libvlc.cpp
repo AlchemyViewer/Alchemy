@@ -56,7 +56,7 @@ public:
     MediaPluginLibVLC(LLPluginInstance::sendMessageFunction host_send_func, void *host_user_data);
     ~MediaPluginLibVLC();
 
-    /*virtual*/ void receiveMessage(const char* message_string);
+    /*virtual*/ void receiveMessage(const std::string& message_string);
 
 private:
     bool init();
@@ -464,7 +464,7 @@ void MediaPluginLibVLC::setVolume(const F64 volume)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void MediaPluginLibVLC::receiveMessage(const char* message_string)
+void MediaPluginLibVLC::receiveMessage(const std::string& message_string)
 {
     LLPluginMessage message_in;
 

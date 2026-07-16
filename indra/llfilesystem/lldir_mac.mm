@@ -180,7 +180,7 @@ LLDir_Mac::LLDir_Mac()
 
         mWorkingDir = getCurPath();
 
-        mLLPluginDir = mAppRODataDir + mDirDelimiter + "SLPlugin.app" + mDirDelimiter + "Contents" + mDirDelimiter + "Frameworks";
+        mLLPluginDir = mAppRODataDir;
     }
 }
 

@@ -45,7 +45,7 @@ S32 check_for_invalid_wav_formats(const std::string& in_fname, std::string& erro
     U32 bytes_per_sec = 0;
     bool uncompressed_pcm = false;
 
-    char wav_header[44];       /*Flawfinder: ignore*/
+    unsigned char wav_header[44];       /*Flawfinder: ignore*/
 
     error_msg.clear();
 
@@ -58,7 +58,7 @@ S32 check_for_invalid_wav_formats(const std::string& in_fname, std::string& erro
         return(LLVORBISENC_SOURCE_OPEN_ERR);
     }
 
-    infile.read(wav_header, 44);
+    infile.read((char*)wav_header, 44);
     infile.seekg(0, std::ios::end);
     physical_file_size = narrow(infile.tellg());
     infile.seekg(0, std::ios::beg);
@@ -82,7 +82,7 @@ S32 check_for_invalid_wav_formats(const std::string& in_fname, std::string& erro
     while ((file_pos + 8)< physical_file_size)
     {
         infile.seekg(file_pos, std::ios::beg);
-        infile.read(wav_header, 44);
+        infile.read((char*)wav_header, 44);
 
         chunk_length = ((U32) wav_header[7] << 24)
             + ((U32) wav_header[6] << 16)

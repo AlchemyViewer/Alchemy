@@ -358,8 +358,8 @@ std::string LLPluginMessage::generate(void) const
     std::ostringstream result;
 
     // Pretty XML may be slightly easier to deal with while debugging...
-//  LLSDSerialize::toXML(mMessage, result);
-    LLSDSerialize::toPrettyXML(mMessage, result);
+//  LLSDSerialize::toPrettyXML(mMessage, result);
+    LLSDSerialize::toBinary(mMessage, result);
 
     return result.str();
 }
@@ -374,9 +374,10 @@ int LLPluginMessage::parse(const std::string &message)
     // clear any previous state
     clear();
 
-    std::istringstream input(message);
+    boost::iostreams::stream<boost::iostreams::array_source> input(message.data(), message.size());
 
-    S32 parse_result = LLSDSerialize::fromXML(mMessage, input);
+    //S32 parse_result = LLSDSerialize::fromXML(mMessage, input);
+    S32 parse_result = LLSDSerialize::fromBinary(mMessage, input, LLSDSerialize::SIZE_UNLIMITED);
 
     return (int)parse_result;
 }

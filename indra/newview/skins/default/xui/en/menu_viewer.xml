@@ -2431,6 +2431,24 @@ function="World.EnvPreset"
              function="ToggleControl"
              parameter="DisableCameraConstraints" />
         </menu_item_check>
+        <!-- Lock the Depth-of-Field focus point in place. Registers the
+             Alt+Shift+X accelerator advertised by the "Lock Focus (alt+shift+X)"
+             checkbox in the Lightbox (graphics) floater; both drive the same
+             RenderFocusPointLocked setting, which is read by
+             LLPipeline::renderDoF(). Kept always-enabled (no enabled_control)
+             so the shortcut fires regardless of whether the Advanced menu is
+             visible or Depth of Field is currently on. -->
+        <menu_item_check
+         label="Lock DoF Focus Point"
+         name="Lock DoF Focus Point"
+         shortcut="alt|shift|X">
+            <menu_item_check.on_check
+             function="CheckControl"
+             parameter="RenderFocusPointLocked" />
+            <menu_item_check.on_click
+             function="ToggleControl"
+             parameter="RenderFocusPointLocked" />
+        </menu_item_check>
 
         <menu_item_separator/>
 		<menu_item_check

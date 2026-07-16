@@ -50,6 +50,7 @@
 #include "llviewerregion.h"
 #include "llvoavatarself.h"
 #include "llviewerwearable.h"
+#include "llappviewer.h"
 
 static LLPanelInjector<LLSidepanelAppearance> t_appearance("sidepanel_appearance");
 
@@ -457,6 +458,24 @@ void LLSidepanelAppearance::toggleWearableEditPanel(bool visible, LLViewerWearab
 }
 
 void LLSidepanelAppearance::refreshCurrentOutfitName(const std::string& name)
+{
+    // May be invoked from a background coroutine (e.g. an AIS inventory
+    // update). Text layout here can rasterize new glyphs / create GL
+    // textures, which is only safe on the main coroutine, so hop there.
+    LLHandle<LLPanel> handle = getHandle();
+    std::string name_copy = name;
+    LLAppViewer::instance()->postToMainCoro(
+        [handle, name_copy]()
+        {
+            LLSidepanelAppearance* self = dynamic_cast<LLSidepanelAppearance*>(handle.get());
+            if (self)
+            {
+                self->refreshCurrentOutfitNameImpl(name_copy);
+            }
+        });
+}
+
+void LLSidepanelAppearance::refreshCurrentOutfitNameImpl(const std::string& name)
 {
     // Set current outfit status (wearing/unsaved).
     bool dirty = LLAppearanceMgr::getInstance()->isOutfitDirty();
