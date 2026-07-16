@@ -3559,7 +3559,8 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
     if (im_session->isGroupSessionType() && im_session->mCloseAction == LLIMModel::LLIMSession::SCloseAction::CLOSE_SNOOZE)
     {
         const S32 duration = im_session->mSnoozeDuration;
-        mSnoozedSessions[session_id] = duration < 0 ? -1.0 : LLTimer::getTotalSeconds() + duration;
+        const F64 now = LLTimer::getTotalSeconds();
+        mSnoozedSessions[session_id] = duration < 0 ? -1.0 : now + duration;
     }
     else
     {
