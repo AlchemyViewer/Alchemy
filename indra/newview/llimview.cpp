@@ -3558,8 +3558,8 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
 
     if (im_session->isGroupSessionType() && im_session->mCloseAction == LLIMModel::LLIMSession::SCloseAction::CLOSE_SNOOZE)
     {
-        const F64 duration = llmax(0, im_session->mSnoozeDuration);
-        mSnoozedSessions[session_id] = LLTimer::getTotalSeconds() + duration;
+        const S32 duration = im_session->mSnoozeDuration;
+        mSnoozedSessions[session_id] = duration < 0 ? -1.0 : LLTimer::getTotalSeconds() + duration;
     }
     else
     {
@@ -3760,7 +3760,7 @@ bool LLIMMgr::hasSession(const LLUUID& session_id)
 bool LLIMMgr::checkSnoozeExpiration(const LLUUID& session_id) const
 {
     snoozed_sessions_t::const_iterator it = mSnoozedSessions.find(session_id);
-    return it != mSnoozedSessions.end() && it->second <= LLTimer::getTotalSeconds();
+    return it != mSnoozedSessions.end() && it->second >= 0.0 && it->second <= LLTimer::getTotalSeconds();
 }
 
 bool LLIMMgr::isSnoozedSession(const LLUUID& session_id) const
@@ -3776,13 +3776,13 @@ bool LLIMMgr::restoreSnoozedSession(const LLUUID& session_id)
         return false;
     }
 
-    mSnoozedSessions.erase(it);
-
     LLGroupData group_data;
     if (!gAgent.getGroupData(session_id, group_data))
     {
         return false;
     }
+
+    mSnoozedSessions.erase(it);
 
     gIMMgr->addSession(group_data.mName, IM_SESSION_GROUP_START, session_id);
 

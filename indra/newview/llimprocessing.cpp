@@ -1353,7 +1353,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 }
             }
 
-            else if (offline == IM_ONLINE && is_do_not_disturb)
+            if (offline == IM_ONLINE && is_do_not_disturb)
             {
 
                 // return a standard "do not disturb" message, but only do it to online IM

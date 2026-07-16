@@ -309,7 +309,7 @@
                    label=""
                    layout="topleft"
                    left_pad="2"
-                   name="snooze_groupt_btn"
+                   name="snooze_group_btn"
                    tool_tip="Snooze group chat"
                    top="1"
                    width="44">
