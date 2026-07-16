@@ -126,7 +126,6 @@ LLGLSLShader        gPathfindingNoNormalsProgram;
 
 //avatar shader handles
 LLGLSLShader        gAvatarProgram;
-LLGLSLShader        gAvatarEyeballProgram;
 LLGLSLShader        gImpostorProgram;
 
 // Effects Shaders
@@ -137,7 +136,6 @@ LLGLSLShader            gBloomDownsampleProgram;
 LLGLSLShader            gBloomDownsampleFirstProgram;
 LLGLSLShader            gBloomUpsampleProgram;
 LLGLSLShader            gBloomCompositeProgram;
-LLGLSLShader            gPostScreenSpaceReflectionProgram;
 
 // Deferred rendering shaders
 LLGLSLShader            gDeferredImpostorProgram;
@@ -3063,17 +3061,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     }
 
     if (success) {
-        gPostScreenSpaceReflectionProgram.mName = "Screen Space Reflection Post";
-        gPostScreenSpaceReflectionProgram.mShaderFiles.clear();
-        gPostScreenSpaceReflectionProgram.mShaderFiles.push_back(make_pair("deferred/screenSpaceReflPostV.glsl", GL_VERTEX_SHADER));
-        gPostScreenSpaceReflectionProgram.mShaderFiles.push_back(make_pair("deferred/screenSpaceReflPostF.glsl", GL_FRAGMENT_SHADER));
-        gPostScreenSpaceReflectionProgram.mFeatures.hasScreenSpaceReflections = true;
-        gPostScreenSpaceReflectionProgram.mFeatures.isDeferred                = true;
-        gPostScreenSpaceReflectionProgram.mShaderLevel = 3;
-        success = gPostScreenSpaceReflectionProgram.createShader();
-    }
-
-    if (success) {
         gDeferredBufferVisualProgram.mName = "Deferred Buffer Visualization Shader";
         gDeferredBufferVisualProgram.mShaderFiles.clear();
         gDeferredBufferVisualProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
@@ -3459,7 +3446,6 @@ bool LLViewerShaderMgr::loadShadersAvatar()
     if (mShaderLevel[SHADER_AVATAR] == 0)
     {
         gAvatarProgram.unload();
-        gAvatarEyeballProgram.unload();
         return true;
     }
 
@@ -3484,23 +3470,6 @@ bool LLViewerShaderMgr::loadShadersAvatar()
         {
             mMaxAvatarShaderLevel = mShaderLevel[SHADER_AVATAR] = gAvatarProgram.mShaderLevel;
         }
-    }
-
-    if (success)
-    {
-        gAvatarEyeballProgram.mName = "Avatar Eyeball Program";
-        gAvatarEyeballProgram.mFeatures.calculatesLighting = true;
-        gAvatarEyeballProgram.mFeatures.isSpecular = true;
-        gAvatarEyeballProgram.mFeatures.calculatesAtmospherics = true;
-        gAvatarEyeballProgram.mFeatures.hasGamma = true;
-        gAvatarEyeballProgram.mFeatures.hasAtmospherics = true;
-        gAvatarEyeballProgram.mFeatures.hasLighting = true;
-        gAvatarEyeballProgram.mFeatures.hasAlphaMask = true;
-        gAvatarEyeballProgram.mShaderFiles.clear();
-        gAvatarEyeballProgram.mShaderFiles.push_back(make_pair("avatar/eyeballV.glsl", GL_VERTEX_SHADER));
-        gAvatarEyeballProgram.mShaderFiles.push_back(make_pair("avatar/eyeballF.glsl", GL_FRAGMENT_SHADER));
-        gAvatarEyeballProgram.mShaderLevel = mShaderLevel[SHADER_AVATAR];
-        success = gAvatarEyeballProgram.createShader();
     }
 
     if( !success )
