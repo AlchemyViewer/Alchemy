@@ -37,6 +37,7 @@
 #include "llshadermgr.h"
 #include "hbxxh.h"
 #include "glm/gtc/type_ptr.hpp"
+#include "glm/gtc/matrix_inverse.hpp" // glm::affineInverse
 
 #if GL_ARB_debug_output
 #ifndef APIENTRY
@@ -946,6 +947,10 @@ void LLRender::syncMatrices()
     static glm::mat4 cached_inv_mdv;
     static U32 cached_mvp_mdv_hash = 0xFFFFFFFF;
     static U32 cached_mvp_proj_hash = 0xFFFFFFFF;
+    static U32 cached_inv_mdv_hash = 0xFFFFFFFF;   // tracks cached_inv_mdv independently of the MVP cache
+
+    static glm::mat4 cached_inv_proj;
+    static U32 cached_inv_proj_hash = 0xFFFFFFFF;
 
     static glm::mat4 cached_normal;
     static U32 cached_normal_hash = 0xFFFFFFFF;
@@ -959,10 +964,15 @@ void LLRender::syncMatrices()
         { //update modelview, normal, and MVP
             const glm::mat4& mat = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
 
-            // if MDV has changed, update the cached inverse as well
-            if (cached_mvp_mdv_hash != mMatHash[MM_MODELVIEW])
+            // if MDV has changed, update the cached inverse as well. Keyed on its own hash --
+            // NOT cached_mvp_mdv_hash, which only advances for shaders that carry the MVP uniform,
+            // so a run of MVP-less shaders would otherwise re-inverse the same modelview each time.
+            // The modelview is affine (view * model, no perspective), so affineInverse is exact and
+            // much cheaper than a general 4x4 inverse.
+            if (cached_inv_mdv_hash != mMatHash[MM_MODELVIEW])
             {
-                cached_inv_mdv = glm::inverse(mat);
+                cached_inv_mdv = glm::affineInverse(mat);
+                cached_inv_mdv_hash = mMatHash[MM_MODELVIEW];
             }
 
             shader->uniformMatrix4fv(name[MM_MODELVIEW], 1, GL_FALSE, glm::value_ptr(mat));
@@ -1022,8 +1032,14 @@ void LLRender::syncMatrices()
             // Anything beyond the standard proj and inv proj mats are special cases.  Please setup special uniforms accordingly in the future.
             if (shader->hasUniform(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
             {
-                glm::mat4 inv_proj = glm::inverse(mat);
-                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, false, glm::value_ptr(inv_proj));
+                // Cache by projection hash so a run of shaders synced after one projection change
+                // shares a single inverse (projection is not affine -- general inverse required).
+                if (cached_inv_proj_hash != mMatHash[MM_PROJECTION])
+                {
+                    cached_inv_proj = glm::inverse(mat);
+                    cached_inv_proj_hash = mMatHash[MM_PROJECTION];
+                }
+                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, false, glm::value_ptr(cached_inv_proj));
             }
 
             // Used by some full screen effects - such as full screen lights, glow, etc.
