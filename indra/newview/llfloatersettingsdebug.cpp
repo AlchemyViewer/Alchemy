@@ -479,7 +479,7 @@ void LLFloaterSettingsDebug::updateControl(LLControlVariable* controlp)
             LLColor3 clr;
             clr.setValue(sd);
             mColorSwatch->setVisible(true);
-            mColorSwatch->setValue(sd);
+            mColorSwatch->setValue(clr.getValue());
             break;
           }
 // [RLVa:KB] - Patch: RLVa-2.1.0

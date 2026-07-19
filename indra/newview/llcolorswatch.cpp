@@ -30,6 +30,8 @@
 #include "llcolorswatch.h"
 
 // Linden library includes
+#include "llcontrol.h"
+#include "v3color.h"
 #include "v4color.h"
 #include "llwindow.h"   // setCursor()
 
@@ -302,10 +304,16 @@ void LLColorSwatchCtrl::setEnabled( bool enabled )
 void LLColorSwatchCtrl::setValue(const LLSD& value)
 {
     LLColor4 color(value);
-    // A 3-element array (Color3 control) carries no alpha; LLColor4(LLSD) reads
-    // the missing element as 0 and the swatch draws fully transparent. Treat
-    // missing alpha as opaque.
-    if (value.isArray() && value.size() == 3)
+    // Color3 controls carry no meaningful alpha: a 3-element array reads as
+    // alpha 0 through LLColor4(LLSD), and a round-trip through the picker can
+    // persist that stale 0 as a 4th element. Show such colors opaque.
+    bool opaque = value.isArray() && value.size() == 3;
+    if (!opaque)
+    {
+        LLControlVariable* controlp = getControlVariable();
+        opaque = controlp && controlp->type() == TYPE_COL3;
+    }
+    if (opaque)
     {
         color.mV[VALPHA] = 1.f;
     }
@@ -332,7 +340,17 @@ void LLColorSwatchCtrl::onColorChanged ( void* data, EColorPickOp pick_op )
             if (color_changed)
             {
                 subject->mColor = updatedColor;
-                subject->setControlValue(updatedColor.getValue());
+                LLControlVariable* controlp = subject->getControlVariable();
+                if (controlp && controlp->type() == TYPE_COL3)
+                {
+                    // Color3 controls store three components; writing the
+                    // swatch's four would persist a meaningless alpha.
+                    subject->setControlValue(LLColor3(updatedColor).getValue());
+                }
+                else
+                {
+                    subject->setControlValue(updatedColor.getValue());
+                }
             }
 
             if (pick_op == COLOR_CANCEL && subject->mOnCancelCallback)
