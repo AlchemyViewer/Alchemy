@@ -83,8 +83,21 @@ void LLFloaterSavePrefPreset::onOpen(const LLSD& key)
         setTitle(getString(title_type));
     }
 
-    EDefaultOptions option = DEFAULT_HIDE;
-    LLPresetsManager::getInstance()->setPresetNamesInComboBox(mSubdirectory, mPresetCombo, option);
+    if (PRESETS_LOOKS == mSubdirectory)
+    {
+        // A clean name field for Looks: prefilled names invite silent
+        // overwrites because the combo's text entry autocompletes typed names
+        // to existing items. Overwriting deliberately is what the Save button
+        // on the Lightbox bar is for.
+        mPresetCombo->removeall();
+        mPresetCombo->clear();
+        mPresetCombo->setEnabled(true);
+    }
+    else
+    {
+        EDefaultOptions option = DEFAULT_HIDE;
+        LLPresetsManager::getInstance()->setPresetNamesInComboBox(mSubdirectory, mPresetCombo, option);
+    }
 
     onPresetNameEdited();
 }
@@ -112,6 +125,11 @@ void LLFloaterSavePrefPreset::onBtnSave()
 
 void LLFloaterSavePrefPreset::onPresetsListChange()
 {
+    if (PRESETS_LOOKS == mSubdirectory)
+    {
+        // Looks keep a clean name field; don't repopulate over typed text.
+        return;
+    }
     EDefaultOptions option = DEFAULT_HIDE;
     LLPresetsManager::getInstance()->setPresetNamesInComboBox(mSubdirectory, mPresetCombo, option);
 }
