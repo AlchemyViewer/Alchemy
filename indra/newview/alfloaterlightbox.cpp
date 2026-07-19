@@ -37,6 +37,7 @@
 #include "llviewercontrol.h"
 
 #include <set>
+#include <utility>
 
 namespace
 {
@@ -123,6 +124,10 @@ ALFloaterLightBox::~ALFloaterLightBox()
 bool ALFloaterLightBox::postBuild()
 {
     populateLUTCombo();
+
+    mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect(
+        [this](LLControlVariable*, const LLSD&, const LLSD&) { updateTonemapperRows(); });
+    updateTonemapperRows();
 
     collectVec3Spinners(this, mVec3Rows);
     for (const auto& row : mVec3Rows)
@@ -253,6 +258,26 @@ void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
     }
     updated[component] = LLSD::Real(ctrl->getValue().asReal());
     controlp->set(updated);
+}
+
+void ALFloaterLightBox::updateTonemapperRows()
+{
+    // Khronos Neutral (0), ACES (1), and GT (5) take no parameters, so their
+    // selection leaves every per-operator row disabled.
+    const S32 type = gSavedSettings.getS32("AlchemyRenderTonemapType");
+    static const std::pair<const char*, S32> param_rows[] = {
+        { "tone_aces_white", 2 },
+        { "tone_reinhard_white", 3 },
+        { "tone_filmic_white", 4 },
+        { "tone_agx_contrast", 6 },
+        { "tone_agx_white", 6 },
+    };
+    for (const auto& row : param_rows)
+    {
+        const bool active = (type == row.second);
+        getChild<LLUICtrl>(row.first)->setEnabled(active);
+        getChild<LLUICtrl>(std::string(row.first) + "_rst")->setEnabled(active);
+    }
 }
 
 void ALFloaterLightBox::refreshVec3Row(const std::string& setting_name)

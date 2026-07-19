@@ -55,12 +55,14 @@ public:
     void onCommitVec3(LLUICtrl* ctrl);
     void refreshVec3Row(const std::string& setting_name);
     void populateLUTCombo();
+    void updateTonemapperRows();
 
     // Spinner triplets named "vec3_<Setting>_<0|1|2>", keyed by setting name.
     // Rows are discovered by walking the widget tree in postBuild; adding a
     // vector-valued row is pure XUI.
     std::map<std::string, std::array<LLSpinCtrl*, 3>> mVec3Rows;
     std::vector<boost::signals2::scoped_connection> mVec3Connections;
+    boost::signals2::scoped_connection mTonemapConnection;
     bool mVec3Updating = false;
 };
 

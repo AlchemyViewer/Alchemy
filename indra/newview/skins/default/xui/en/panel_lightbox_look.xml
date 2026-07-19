@@ -7,6 +7,9 @@ Row conventions:
   color   = <color_swatch control_name=.../> (0-1 tints only)
   section = <accordion_tab> "sec_<id>"; long tail in sibling "sec_<id>_adv"; "Reset All" resets
             every bound control in the section (essential sections include their Advanced tab)
+  heights = accordion_tab height MUST be its inner panel height + 29 (25 header + 2+2 padding);
+            the tab's rect is the expand height and fit_panel squeezes the panel into what is
+            left after the header, so an undersized tab clips the bottom rows
 -->
 <panel
  name="panel_lightbox_look"
@@ -26,7 +29,7 @@ Row conventions:
 		<accordion_tab
 		 expanded="true"
 		 layout="topleft"
-		 height="108"
+		 height="137"
 		 name="atab_sec_tone"
 		 title="Exposure &amp; Tone"
 		 fit_panel="true">
@@ -191,7 +194,7 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="258"
+		 height="287"
 		 name="atab_sec_tone_adv"
 		 title="Exposure &amp; Tone - Advanced"
 		 fit_panel="true">
@@ -516,7 +519,7 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="108"
+		 height="137"
 		 name="atab_sec_lut"
 		 title="Color LUT"
 		 fit_panel="true">
@@ -739,7 +742,7 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="90"
+		 height="119"
 		 name="atab_sec_split"
 		 title="Split Toning"
 		 fit_panel="true">
@@ -843,7 +846,7 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="114"
+		 height="143"
 		 name="atab_sec_lgg"
 		 title="Lift / Gamma / Gain"
 		 fit_panel="true">
