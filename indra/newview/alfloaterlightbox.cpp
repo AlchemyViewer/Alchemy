@@ -150,31 +150,20 @@ bool ALFloaterLightBox::postBuild()
 void ALFloaterLightBox::populateLUTCombo()
 {
     LLComboBox* lut_combo = getChild<LLComboBox>("colorlut_combo");
-    const std::string& user_luts = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
 
-    std::error_code ec;
-    std::filesystem::path user_luts_path = fsyspath(user_luts);
-    if(std::filesystem::is_directory(user_luts_path, ec))
+    auto add_luts_from = [lut_combo](const std::string& dir_name)
     {
-        if(ec)
+        std::error_code ec;
+        std::filesystem::path luts_path = fsyspath(dir_name);
+        if (!std::filesystem::is_directory(luts_path, ec) || ec)
         {
-            LL_WARNS() << "Error checking user LUTs directory: " << ec.message() << LL_ENDL;
             return;
         }
-        if(!std::filesystem::is_empty(user_luts_path, ec) && !ec)
+        for (std::filesystem::directory_iterator lut(luts_path, ec); lut != std::filesystem::directory_iterator(); ++lut)
         {
-            if(ec)
+            if (ec)
             {
-                LL_WARNS() << "Error checking contents of user LUTs directory: " << ec.message() << LL_ENDL;
-                return;
-            }
-            lut_combo->addSeparator();
-        }
-        for (std::filesystem::directory_iterator lut(user_luts_path, ec); lut != std::filesystem::directory_iterator(); ++lut)
-        {
-            if(ec)
-            {
-                LL_WARNS() << "Error reading user LUT file: " << ec.message() << LL_ENDL;
+                LL_WARNS() << "Error reading LUT file in " << dir_name << ": " << ec.message() << LL_ENDL;
                 continue;
             }
 #if LL_WINDOWS
@@ -186,9 +175,24 @@ void ALFloaterLightBox::populateLUTCombo()
 #endif
             lut_combo->add(lut_stem, lut_filename);
         }
-        lut_combo->selectByValue(gSavedSettings.getString("RenderColorGradeLUT"));
-        lut_combo->resetDirty();
+    };
+
+    // Bundled LUTs first, then user LUTs behind a separator — the same order
+    // the renderer resolves a name in, where the user dir wins.
+    add_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut"));
+
+    const std::string& user_luts = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
+    std::error_code ec;
+    std::filesystem::path user_luts_path = fsyspath(user_luts);
+    if (std::filesystem::is_directory(user_luts_path, ec) && !ec &&
+        !std::filesystem::is_empty(user_luts_path, ec) && !ec)
+    {
+        lut_combo->addSeparator();
+        add_luts_from(user_luts);
     }
+
+    lut_combo->selectByValue(gSavedSettings.getString("RenderColorGradeLUT"));
+    lut_combo->resetDirty();
 }
 
 void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
