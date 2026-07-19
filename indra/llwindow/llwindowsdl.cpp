@@ -322,6 +322,14 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
         context_flags |= SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG;
+#else
+        // GLX/EGL only honor the core profile mask when the requested version
+        // is >= 3.2; without an explicit version SDL defaults to 2.1 and the
+        // driver silently returns a compatibility context (Mesa hands back 4.6
+        // Compatibility). Request the highest version the viewer targets; the
+        // create-context loop below steps this down if the driver caps lower.
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
 #endif
     }
 
@@ -359,8 +367,31 @@ bool LLWindowSDL::createContext(int x, int y, int width, int height, int bits, b
     }
     SDL_DestroyProperties(props); // Free properties once window is created
 
-    // Create the context
+    // Create the context. A core profile requires an explicit >= 3.2 version
+    // (set above); the exact 4.6 request fails on drivers that cap lower, so
+    // step the requested version down until creation succeeds, mirroring the
+    // WGL path in createSharedContext().
     mContext = SDL_GL_CreateContext(mWindow);
+#if !LL_DARWIN
+    if (!mContext && LLRender::sGLCoreProfile)
+    {
+        S32 major = 4, minor = 6;
+        while (!mContext)
+        {
+            if (minor > 0)      { --minor; }              // step minor down
+            else if (major > 3) { --major; minor = 3; }   // step major down
+            else                { break; }                // gave up at 3.0
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, major);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minor);
+            mContext = SDL_GL_CreateContext(mWindow);
+        }
+        if (mContext)
+        {
+            LL_INFOS() << "Created GL core context at fallback version "
+                       << major << "." << minor << LL_ENDL;
+        }
+    }
+#endif
     if(!mContext)
     {
         LL_WARNS() << "Cannot create GL context " << SDL_GetError() << LL_ENDL;
