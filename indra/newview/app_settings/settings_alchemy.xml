@@ -1477,6 +1477,28 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>PresetLooksActive</key>
+        <map>
+            <key>Comment</key>
+            <string>Name of the currently applied Lightbox Look; blank once settings drift from it</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
+        <key>PresetLooksLastApplied</key>
+        <map>
+            <key>Comment</key>
+            <string>Name of the most recently applied Lightbox Look, kept for revert</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
         <key>RenderAvatarShadowDetail</key>
         <map>
             <key>Comment</key>

@@ -40,6 +40,7 @@
 #include <string>
 #include <vector>
 
+class LLComboBox;
 class LLSpinCtrl;
 
 class ALFloaterLightBox final : public LLFloater
@@ -56,6 +57,12 @@ public:
     void refreshVec3Row(const std::string& setting_name);
     void populateLUTCombo();
     void updateTonemapperRows();
+    void onLookSelected();
+    void onClickLookSave();
+    void onClickLookSaveAs();
+    void onClickLookDelete();
+    void onClickLookRevert();
+    void refreshLooksBar();
 
     // Spinner triplets named "vec3_<Setting>_<0|1|2>", keyed by setting name.
     // Rows are discovered by walking the widget tree in postBuild; adding a
@@ -63,6 +70,9 @@ public:
     std::map<std::string, std::array<LLSpinCtrl*, 3>> mVec3Rows;
     std::vector<boost::signals2::scoped_connection> mVec3Connections;
     boost::signals2::scoped_connection mTonemapConnection;
+    boost::signals2::scoped_connection mLooksListConnection;
+    boost::signals2::scoped_connection mLooksActiveConnection;
+    LLComboBox* mLooksCombo = nullptr;
     bool mVec3Updating = false;
 };
 

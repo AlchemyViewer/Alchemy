@@ -45,9 +45,12 @@
 
 LLPresetsManager::LLPresetsManager()
 {
+    copyDefaultLooks();
+
     // Connect preset signals
     startWatching(PRESETS_GRAPHIC);
     startWatching(PRESETS_CAMERA);
+    startWatching(PRESETS_LOOKS);
 }
 
 LLPresetsManager::~LLPresetsManager()
@@ -64,6 +67,12 @@ LLPresetsManager::~LLPresetsManager()
         signal.disconnect();
     }
     mCameraChangedSignals.clear();
+
+    for (auto& signal : mLooksChangedSignals)
+    {
+        signal.disconnect();
+    }
+    mLooksChangedSignals.clear();
 }
 
 void LLPresetsManager::triggerChangeCameraSignal()
@@ -74,6 +83,11 @@ void LLPresetsManager::triggerChangeCameraSignal()
 void LLPresetsManager::triggerChangeSignal()
 {
     mPresetListChangeSignal();
+}
+
+void LLPresetsManager::triggerChangeLooksSignal()
+{
+    mPresetListChangeLooksSignal();
 }
 
 void LLPresetsManager::createMissingDefault(const std::string& subdirectory)
@@ -109,6 +123,35 @@ void LLPresetsManager::createCameraDefaultPresets()
     if (is_default_created)
     {
         triggerChangeCameraSignal();
+    }
+}
+
+void LLPresetsManager::copyDefaultLooks()
+{
+    // Seed the user's looks directory from the app-bundled starters on the
+    // first run only, so users stay free to rename or delete them afterwards.
+    std::string user_dir = getPresetsDir(PRESETS_LOOKS);
+    {
+        LLDirIterator user_iter(user_dir, "*.xml");
+        std::string existing;
+        if (user_iter.next(existing))
+        {
+            return;
+        }
+    }
+
+    std::string app_dir = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESETS_LOOKS);
+    LLDirIterator app_iter(app_dir, "*.xml");
+    bool found = true;
+    while (found)
+    {
+        std::string file;
+        found = app_iter.next(file);
+        if (found)
+        {
+            LL_INFOS("Presets") << "Seeding bundled Look '" << file << "'" << LL_ENDL;
+            LLFile::copy(gDirUtilp->add(app_dir, file), gDirUtilp->add(user_dir, file));
+        }
     }
 }
 
@@ -173,6 +216,26 @@ void LLPresetsManager::startWatching(const std::string& subdirectory)
             }
         }
     }
+    else if (PRESETS_LOOKS == subdirectory)
+    {
+        std::vector<std::string> name_list;
+        getLooksControlNames(name_list);
+
+        for (const std::string& ctrl_name : name_list)
+        {
+            if (gSavedSettings.controlExists(ctrl_name))
+            {
+                LLPointer<LLControlVariable> cntrl_ptr = gSavedSettings.getControl(ctrl_name);
+                mLooksChangedSignals.push_back(cntrl_ptr->getCommitSignal()->connect(boost::bind(&LLPresetsManager::looksSettingChanged, this)));
+            }
+            else
+            {
+                // Loud on purpose: a renamed setting must not silently fall
+                // out of the Looks whitelist.
+                LL_WARNS("Presets") << "Looks control does not exist: '" << ctrl_name << "'" << LL_ENDL;
+            }
+        }
+    }
 }
 
 std::string LLPresetsManager::getPresetsDir(const std::string& subdirectory)
@@ -192,6 +255,7 @@ void LLPresetsManager::loadPresetNamesFromDir(const std::string& subdirectory, p
 {
     bool IS_CAMERA = (PRESETS_CAMERA == subdirectory);
     bool IS_GRAPHIC = (PRESETS_GRAPHIC == subdirectory);
+    bool IS_LOOKS = (PRESETS_LOOKS == subdirectory);
 
     std::string dir = LLPresetsManager::getInstance()->getPresetsDir(subdirectory);
     LL_INFOS("AppInit") << "Loading list of preset names from " << dir << LL_ENDL;
@@ -250,7 +314,16 @@ void LLPresetsManager::loadPresetNamesFromDir(const std::string& subdirectory, p
                     }
                 }
             }
+            if (IS_LOOKS)
+            {
+                mPresetNames.push_back(name);
+            }
         }
+    }
+
+    if (IS_LOOKS)
+    {
+        mPresetNames.sort(LLStringUtil::precedesDict);
     }
 
     if (IS_CAMERA)
@@ -275,6 +348,17 @@ void LLPresetsManager::graphicsSettingChanged()
         gSavedSettings.setString("PresetGraphicActive", "");
 
         triggerChangeSignal();
+    }
+}
+
+void LLPresetsManager::looksSettingChanged()
+{
+    static LLCachedControl<std::string> looks_preset_active(gSavedSettings, "PresetLooksActive", "");
+    if (!looks_preset_active().empty() && !mIgnoreChangedSignal)
+    {
+        gSavedSettings.setString("PresetLooksActive", "");
+
+        triggerChangeLooksSignal();
     }
 }
 
@@ -341,10 +425,141 @@ void LLPresetsManager::getCameraControlNames(std::vector<std::string>& names)
     names = camera_controls;
 }
 
+void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
+{
+    // The single source of truth for what a Look carries. Aesthetic-only by
+    // design: scene/performance/quality keys belong to graphics presets, and
+    // session-scoped (Persist=0) or buffer-shape keys would create phantom
+    // dirty state. Any new aesthetic setting exposed in panel_lightbox_look
+    // or panel_lightbox_lens MUST be added here; Scene-tab keys must not be.
+    // Applying a Look writes only keys on this list, so a shared Look file
+    // cannot smuggle unrelated settings.
+    const std::vector<std::string> looks_controls = {
+        // Exposure & tone
+        "RenderExposure",
+        "AlchemyRenderTonemapType",
+        "RenderTonemapMix",
+        "RenderTonemapACESWhite",
+        "RenderTonemapReinhardWhite",
+        "RenderTonemapFilmicWhite",
+        "RenderTonemapAgxContrast",
+        "RenderTonemapAgxWhite",
+        "RenderDynamicExposureEnabled",
+        "RenderDynamicExposureCoefficient",
+        "RenderDynamicExposureSpeedError",
+        "RenderDynamicExposureSpeedTarget",
+        "RenderUseExposureSkySettings",
+        // Color LUT
+        "RenderColorGrade",
+        "RenderColorGradeLUT",
+        "RenderColorGradeLUTStrength",
+        // Basic grade, white balance, curves
+        "RenderColorGradeBrightness",
+        "RenderColorGradeContrast",
+        "RenderColorGradeSaturation",
+        "RenderColorGradeVibrance",
+        "RenderColorGradeHighlights",
+        "RenderColorGradeShadows",
+        "RenderColorGradeHueShift",
+        "RenderColorGradeBlackPoint",
+        "RenderColorGradeWhitePoint",
+        "RenderColorGradeWhiteBalanceCCT",
+        "RenderColorGradeWhiteBalanceDuv",
+        "RenderColorGradeLift",
+        "RenderColorGradeGamma",
+        "RenderColorGradeGain",
+        "RenderColorGradeCurveToe",
+        "RenderColorGradeCurveShoulder",
+        "RenderColorGradeCurveStrength",
+        // Split toning
+        "RenderSplitToneAmount",
+        "RenderSplitToneBalance",
+        "RenderSplitToneShadowTint",
+        "RenderSplitToneHighlightTint",
+        "RenderSplitToneMidtoneTint",
+        "RenderSplitToneMidtoneAmount",
+        // HDR bloom aesthetics (not the structural mip/resolution knobs)
+        "RenderBloomStrength",
+        "RenderBloomThreshold",
+        "RenderBloomKnee",
+        "RenderBloomScatter",
+        "RenderBloomAlphaGlowBoost",
+        "RenderBloomHalation",
+        "RenderBloomHalationStrength",
+        "RenderBloomHalationTint",
+        // Legacy glow (minus RenderGlowResolutionPow, owned by graphics presets)
+        "RenderGlow",
+        "RenderGlowStrength",
+        "RenderGlowWidth",
+        "RenderGlowIterations",
+        "RenderGlowLumWeights",
+        "RenderGlowMaxExtractAlpha",
+        "RenderGlowMinLuminance",
+        "RenderGlowHDR",
+        "RenderGlowWarmthAmount",
+        "RenderGlowWarmthWeights",
+        "RenderGlowNoise",
+        // Lens flare
+        "RenderLensFlareStrength",
+        "RenderLensFlareStreakLength",
+        "RenderLensFlareStreakFalloff",
+        "RenderLensFlareStreakThickness",
+        "RenderLensFlareStreakIntensity",
+        "RenderLensFlareStreakTint",
+        "RenderLensFlareChromaticSpread",
+        "RenderLensFlareGlow",
+        "RenderLensFlareGlowRadius",
+        "RenderLensFlareGlowFalloff",
+        "RenderLensFlareGhost",
+        "RenderLensFlareGhostCount",
+        "RenderLensFlareGhostSpacing",
+        "RenderLensFlareHalo",
+        "RenderLensFlareHaloRadius",
+        "RenderLensFlareHaloWidth",
+        "RenderLensFlareStarburst",
+        "RenderLensFlareStarburstSpikes",
+        "RenderLensFlareStarburstSharpness",
+        "RenderLensFlareStarburstLength",
+        "RenderLensFlareOcclusionRadius",
+        "RenderLensFlareOcclusionTaps",
+        // Chromatic aberration
+        "RenderChromaticAberrationStrength",
+        "RenderChromaticAberrationFalloff",
+        "RenderChromaticAberrationAngle",
+        "RenderChromaticAberrationAnisotropy",
+        "RenderChromaticAberrationOffsetRX",
+        "RenderChromaticAberrationOffsetRY",
+        "RenderChromaticAberrationOffsetBX",
+        "RenderChromaticAberrationOffsetBY",
+        // Vignette
+        "RenderVignetteAmount",
+        "RenderVignetteCenter",
+        "RenderVignetteColor",
+        "RenderVignetteCorrectAspect",
+        "RenderVignetteFeather",
+        "RenderVignetteMidColor",
+        "RenderVignetteMidPoint",
+        "RenderVignetteRadius",
+        "RenderVignetteShape",
+        "RenderVignetteSoft",
+        // Film grain
+        "RenderFilmGrainAmount",
+        "RenderFilmGrainAnimated",
+        "RenderFilmGrainRange",
+        "RenderFilmGrainSize",
+        "RenderFilmGrainStyle",
+        "RenderFilmGrainTint",
+        // Sharpen
+        "RenderCASSharpness",
+    };
+    names = looks_controls;
+}
+
 bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string name, bool createDefault)
 {
     bool IS_CAMERA = (PRESETS_CAMERA == subdirectory);
     bool IS_GRAPHIC = (PRESETS_GRAPHIC == subdirectory);
+    bool IS_LOOKS = (PRESETS_LOOKS == subdirectory);
 
     if (LLTrans::getString(PRESETS_DEFAULT) == name)
     {
@@ -381,6 +596,14 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
         name_list.clear();
         getCameraControlNames(name_list);
         name_list.push_back("PresetCameraActive");
+    }
+    else if (IS_LOOKS)
+    {
+        // The active-name tracking settings are deliberately not embedded in
+        // the file: Looks are shared as files, and the filtered apply sets
+        // them explicitly.
+        name_list.clear();
+        getLooksControlNames(name_list);
     }
     else
     {
@@ -498,6 +721,14 @@ bool LLPresetsManager::savePreset(const std::string& subdirectory, std::string n
                 // signal interested parties
                 triggerChangeCameraSignal();
             }
+
+            if (IS_LOOKS)
+            {
+                gSavedSettings.setString("PresetLooksActive", name);
+                gSavedSettings.setString("PresetLooksLastApplied", name);
+                // signal interested parties
+                triggerChangeLooksSignal();
+            }
         }
         else
         {
@@ -592,6 +823,67 @@ void LLPresetsManager::loadPreset(const std::string& subdirectory, std::string n
     }
 }
 
+bool LLPresetsManager::loadLooksPreset(std::string name)
+{
+    std::string full_path(getPresetsDir(PRESETS_LOOKS) + gDirUtilp->getDirDelimiter() + LLURI::escape(name) + ".xml");
+
+    llifstream preset_file(full_path.c_str());
+    if (!preset_file.is_open())
+    {
+        LL_WARNS("Presets") << "Cannot open Look '" << name << "' at '" << full_path << "'" << LL_ENDL;
+        return false;
+    }
+
+    LLSD params;
+    LLSDSerialize::fromXML(params, preset_file);
+    preset_file.close();
+    if (!params.isMap() || params.size() == 0)
+    {
+        LL_WARNS("Presets") << "Look '" << name << "' is not a valid preset file" << LL_ENDL;
+        return false;
+    }
+
+    // Whitelist-filtered apply: only recognized aesthetic keys are ever
+    // written, so a shared Look file cannot alter unrelated settings.
+    std::vector<std::string> allowed;
+    getLooksControlNames(allowed);
+
+    S32 applied = 0;
+    mIgnoreChangedSignal = true;
+    for (const std::string& ctrl_name : allowed)
+    {
+        if (!params.has(ctrl_name))
+        {
+            continue;
+        }
+        const LLSD& entry = params[ctrl_name];
+        if (!entry.isMap() || !entry.has("Value"))
+        {
+            continue;
+        }
+        LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
+        if (ctrl)
+        {
+            ctrl->set(entry["Value"]);
+            ++applied;
+        }
+    }
+    mIgnoreChangedSignal = false;
+
+    if (applied == 0)
+    {
+        LL_WARNS("Presets") << "Look '" << name << "' contained no applicable settings" << LL_ENDL;
+        return false;
+    }
+
+    LL_DEBUGS("Presets") << "Applied Look '" << name << "'; " << applied << " settings" << LL_ENDL;
+    gSavedSettings.setString("PresetLooksActive", name);
+    gSavedSettings.setString("PresetLooksLastApplied", name);
+    triggerChangeLooksSignal();
+
+    return true;
+}
+
 bool LLPresetsManager::deletePreset(const std::string& subdirectory, std::string name)
 {
     if (LLTrans::getString(PRESETS_DEFAULT) == name)
@@ -633,6 +925,20 @@ bool LLPresetsManager::deletePreset(const std::string& subdirectory, std::string
         }
         // signal interested parties
         triggerChangeCameraSignal();
+    }
+
+    if(PRESETS_LOOKS == subdirectory)
+    {
+        if (gSavedSettings.getString("PresetLooksActive") == name)
+        {
+            gSavedSettings.setString("PresetLooksActive", "");
+        }
+        if (gSavedSettings.getString("PresetLooksLastApplied") == name)
+        {
+            gSavedSettings.setString("PresetLooksLastApplied", "");
+        }
+        // signal interested parties
+        triggerChangeLooksSignal();
     }
 
     return sts;
@@ -682,4 +988,9 @@ boost::signals2::connection LLPresetsManager::setPresetListChangeCameraCallback(
 boost::signals2::connection LLPresetsManager::setPresetListChangeCallback(const preset_list_signal_t::slot_type& cb)
 {
     return mPresetListChangeSignal.connect(cb);
+}
+
+boost::signals2::connection LLPresetsManager::setPresetListChangeLooksCallback(const preset_list_signal_t::slot_type& cb)
+{
+    return mPresetListChangeLooksSignal.connect(cb);
 }

@@ -32,7 +32,9 @@
 #include "alfloaterlightbox.h"
 
 #include "llcombobox.h"
+#include "llfloaterreg.h"
 #include "llpanel.h"
+#include "llpresetsmanager.h"
 #include "llspinctrl.h"
 #include "llviewercontrol.h"
 
@@ -115,6 +117,11 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.ResetSection", std::bind(&ALFloaterLightBox::onClickResetSection, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.CommitVec3", std::bind(&ALFloaterLightBox::onCommitVec3, this, std::placeholders::_1));
+    mCommitCallbackRegistrar.add("LightBox.LookSelected", std::bind(&ALFloaterLightBox::onLookSelected, this));
+    mCommitCallbackRegistrar.add("LightBox.LookSave", std::bind(&ALFloaterLightBox::onClickLookSave, this));
+    mCommitCallbackRegistrar.add("LightBox.LookSaveAs", std::bind(&ALFloaterLightBox::onClickLookSaveAs, this));
+    mCommitCallbackRegistrar.add("LightBox.LookDelete", std::bind(&ALFloaterLightBox::onClickLookDelete, this));
+    mCommitCallbackRegistrar.add("LightBox.LookRevert", std::bind(&ALFloaterLightBox::onClickLookRevert, this));
 }
 
 ALFloaterLightBox::~ALFloaterLightBox()
@@ -128,6 +135,13 @@ bool ALFloaterLightBox::postBuild()
     mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect(
         [this](LLControlVariable*, const LLSD&, const LLSD&) { updateTonemapperRows(); });
     updateTonemapperRows();
+
+    mLooksCombo = getChild<LLComboBox>("looks_combo");
+    mLooksListConnection = LLPresetsManager::instance().setPresetListChangeLooksCallback(
+        std::bind(&ALFloaterLightBox::refreshLooksBar, this));
+    mLooksActiveConnection = gSavedSettings.getControl("PresetLooksActive")->getSignal()->connect(
+        [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshLooksBar(); });
+    refreshLooksBar();
 
     collectVec3Spinners(this, mVec3Rows);
     for (const auto& row : mVec3Rows)
@@ -262,6 +276,76 @@ void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
     }
     updated[component] = LLSD::Real(ctrl->getValue().asReal());
     controlp->set(updated);
+}
+
+void ALFloaterLightBox::onLookSelected()
+{
+    const std::string name = mLooksCombo ? mLooksCombo->getSimple() : std::string();
+    if (!name.empty())
+    {
+        LLPresetsManager::getInstance()->loadLooksPreset(name);
+    }
+}
+
+void ALFloaterLightBox::onClickLookSave()
+{
+    std::string name = gSavedSettings.getString("PresetLooksActive");
+    if (name.empty())
+    {
+        name = gSavedSettings.getString("PresetLooksLastApplied");
+    }
+    if (name.empty())
+    {
+        // Nothing to overwrite yet; fall through to the name dialog
+        onClickLookSaveAs();
+        return;
+    }
+    LLPresetsManager::getInstance()->savePreset(PRESETS_LOOKS, name);
+}
+
+void ALFloaterLightBox::onClickLookSaveAs()
+{
+    LLFloaterReg::showInstance("save_pref_preset", LLSD(PRESETS_LOOKS));
+}
+
+void ALFloaterLightBox::onClickLookDelete()
+{
+    LLFloaterReg::showInstance("delete_pref_preset", LLSD(PRESETS_LOOKS));
+}
+
+void ALFloaterLightBox::onClickLookRevert()
+{
+    const std::string last = gSavedSettings.getString("PresetLooksLastApplied");
+    if (!last.empty())
+    {
+        LLPresetsManager::getInstance()->loadLooksPreset(last);
+    }
+}
+
+void ALFloaterLightBox::refreshLooksBar()
+{
+    if (!mLooksCombo)
+    {
+        return;
+    }
+
+    LLPresetsManager::getInstance()->setPresetNamesInComboBox(PRESETS_LOOKS, mLooksCombo, DEFAULT_HIDE);
+
+    const std::string active = gSavedSettings.getString("PresetLooksActive");
+    const std::string last = gSavedSettings.getString("PresetLooksLastApplied");
+    const bool modified = active.empty() && !last.empty();
+    if (!active.empty())
+    {
+        mLooksCombo->selectByValue(active);
+    }
+    else if (!last.empty())
+    {
+        mLooksCombo->setLabel(last);
+    }
+    getChild<LLUICtrl>("look_modified")->setVisible(modified);
+    getChild<LLUICtrl>("look_save")->setEnabled(!active.empty() || !last.empty());
+    getChild<LLUICtrl>("look_delete")->setEnabled(mLooksCombo->getItemCount() > 0);
+    getChild<LLUICtrl>("look_revert")->setEnabled(modified);
 }
 
 void ALFloaterLightBox::updateTonemapperRows()

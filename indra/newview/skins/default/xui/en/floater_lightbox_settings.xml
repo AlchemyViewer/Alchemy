@@ -18,9 +18,82 @@
 	 top="18"
 	 right="-4"
 	 height="22">
-		<!-- The Looks preset bar lands here in P4. (A "bypass post" toggle was
-		     removed: RenderDisablePostProcessing only acts while build tools
-		     are open, pipeline.cpp no_post gate.) -->
+		<combo_box
+		 follows="left|top"
+		 layout="topleft"
+		 left="6"
+		 top="1"
+		 width="150"
+		 height="20"
+		 name="looks_combo"
+		 tool_tip="Apply a saved Look (a bundle of the aesthetic settings from the Look and Lens tabs)">
+			<combo_box.commit_callback
+			 function="LightBox.LookSelected" />
+		</combo_box>
+		<text
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="4"
+		 top="3"
+		 width="10"
+		 height="15"
+		 font="SansSerifBold"
+		 visible="false"
+		 name="look_modified"
+		 tool_tip="Settings have changed since this Look was applied"
+		 value="*" />
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="2"
+		 top="1"
+		 width="44"
+		 height="20"
+		 label="Save"
+		 name="look_save"
+		 tool_tip="Overwrite the current Look with the settings as they are now">
+			<button.commit_callback
+			 function="LightBox.LookSave" />
+		</button>
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="4"
+		 top="1"
+		 width="60"
+		 height="20"
+		 label="Save As"
+		 name="look_saveas"
+		 tool_tip="Save the current settings as a new Look">
+			<button.commit_callback
+			 function="LightBox.LookSaveAs" />
+		</button>
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="4"
+		 top="1"
+		 width="36"
+		 height="20"
+		 label="Del"
+		 name="look_delete"
+		 tool_tip="Delete a saved Look">
+			<button.commit_callback
+			 function="LightBox.LookDelete" />
+		</button>
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="4"
+		 top="1"
+		 width="52"
+		 height="20"
+		 label="Revert"
+		 name="look_revert"
+		 tool_tip="Discard changes and re-apply the last applied Look">
+			<button.commit_callback
+			 function="LightBox.LookRevert" />
+		</button>
 	</panel>
 	<tab_container
 	 follows="all"

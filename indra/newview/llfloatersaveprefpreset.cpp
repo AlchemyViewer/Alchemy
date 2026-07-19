@@ -57,6 +57,7 @@ bool LLFloaterSavePrefPreset::postBuild()
     getChild<LLButton>("cancel")->setCommitCallback(boost::bind(&LLFloaterSavePrefPreset::onBtnCancel, this));
 
     LLPresetsManager::instance().setPresetListChangeCallback(boost::bind(&LLFloaterSavePrefPreset::onPresetsListChange, this));
+    LLPresetsManager::instance().setPresetListChangeLooksCallback(boost::bind(&LLFloaterSavePrefPreset::onPresetsListChange, this));
 
     mSaveButton = getChild<LLButton>("save");
     mPresetCombo = getChild<LLComboBox>("preset_combo");
@@ -75,6 +76,12 @@ void LLFloaterSavePrefPreset::onPresetNameEdited()
 void LLFloaterSavePrefPreset::onOpen(const LLSD& key)
 {
     mSubdirectory = key.asString();
+
+    std::string title_type = std::string("title_") + mSubdirectory;
+    if (hasString(title_type))
+    {
+        setTitle(getString(title_type));
+    }
 
     EDefaultOptions option = DEFAULT_HIDE;
     LLPresetsManager::getInstance()->setPresetNamesInComboBox(mSubdirectory, mPresetCombo, option);
