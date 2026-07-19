@@ -114,6 +114,8 @@ The deferred rendering pipeline is orchestrated by `LLPipeline` (`indra/newview/
 - **Final blit effects** (`blitWithEffectsF.glsl` in `shaders/class1/alchemy/`): Vignette (configurable shape/softness/color), film grain (luma/color/coarse/photon styles), TPDF dithering, CVD compensation/preview
 - **Chromatic aberration** (`colorCorrectF.glsl` in `shaders/class1/alchemy/`): Per-channel offset with amount, falloff, angle, anisotropy controls
 
+Post-processing settings are exposed in the Lightbox floater (`ALFloaterLightBox`); see `doc/LIGHTBOX.md` for how to add UI sections for new effects.
+
 ### Shader System
 
 Shader management has two layers:

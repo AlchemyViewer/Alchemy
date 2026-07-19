@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <!--
 Lightbox "Look" tab: color science / tone.
+Full guide for adding sections: doc/LIGHTBOX.md. Quick reference:
 Row conventions:
   scalar  = <slider label=... can_edit_text="true" control_name=.../> + 18px reset button
   vector  = <text> label + three <spinner name="vec3_<Setting>_<0|1|2>"> with LightBox.CommitVec3
