@@ -9,7 +9,10 @@ Row conventions:
             every bound control in the section (essential sections include their Advanced tab)
   heights = accordion_tab height MUST be its inner panel height + 29 (25 header + 2+2 padding);
             the tab's rect is the expand height and fit_panel squeezes the panel into what is
-            left after the header, so an undersized tab clips the bottom rows
+            left after the header, so an undersized tab clips the bottom rows. Compute panel
+            height from the LAST widget's bottom: top_pad chains from the previous widget,
+            which for a slider row is its reset button (hangs 1px below the slider), so
+            slider+reset rows pitch 26px, not 25
 -->
 <panel
  name="panel_lightbox_look"
@@ -194,14 +197,14 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="287"
+		 height="320"
 		 name="atab_sec_tone_adv"
 		 title="Exposure &amp; Tone - Advanced"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="258"
+			 height="291"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -804,6 +807,7 @@ Row conventions:
 				 top_pad="-18"
 				 width="60"
 				 height="24"
+				 label_height="0"
 				 name="split_shadow_tint"
 				 tool_tip="Tint applied to shadows"
 				 control_name="RenderSplitToneShadowTint" />
