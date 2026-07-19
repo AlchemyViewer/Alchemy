@@ -301,7 +301,15 @@ void LLColorSwatchCtrl::setEnabled( bool enabled )
 
 void LLColorSwatchCtrl::setValue(const LLSD& value)
 {
-    set(LLColor4(value), true, true);
+    LLColor4 color(value);
+    // A 3-element array (Color3 control) carries no alpha; LLColor4(LLSD) reads
+    // the missing element as 0 and the swatch draws fully transparent. Treat
+    // missing alpha as opaque.
+    if (value.isArray() && value.size() == 3)
+    {
+        color.mV[VALPHA] = 1.f;
+    }
+    set(color, true, true);
 }
 
 //////////////////////////////////////////////////////////////////////////////
