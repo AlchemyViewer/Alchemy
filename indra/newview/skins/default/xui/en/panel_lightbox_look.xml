@@ -1,0 +1,1110 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+Lightbox "Look" tab: color science / tone.
+Row conventions:
+  scalar  = <slider label=... can_edit_text="true" control_name=.../> + 18px reset button
+  vector  = <text> label + three <spinner name="vec3_<Setting>_<0|1|2>"> with LightBox.CommitVec3
+  color   = <color_swatch control_name=.../> (0-1 tints only)
+  section = <accordion_tab> "sec_<id>"; long tail in sibling "sec_<id>_adv"; "Reset All" resets
+            every bound control in the section (essential sections include their Advanced tab)
+-->
+<panel
+ name="panel_lightbox_look"
+ layout="topleft"
+ width="450"
+ height="490"
+ follows="all">
+	<accordion
+	 follows="all"
+	 layout="topleft"
+	 left="2"
+	 top="2"
+	 right="-2"
+	 height="484"
+	 single_expansion="false"
+	 name="look_accordion">
+		<accordion_tab
+		 expanded="true"
+		 layout="topleft"
+		 height="108"
+		 name="atab_sec_tone"
+		 title="Exposure &amp; Tone"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="108"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_tone">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Exposure"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0.5"
+				 max_val="4"
+				 name="tone_exposure"
+				 tool_tip="Overall image brightness applied by the tonemapper"
+				 control_name="RenderExposure" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_exposure_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderExposure" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="tone_type_label"
+				 value="Tone mapping" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="tone_type_combo"
+				 tool_tip="Which tonemapping operator maps scene brightness to your display"
+				 control_name="AlchemyRenderTonemapType">
+					<combo_box.item
+					 label="Khronos Neutral"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="ACES"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="ACES Boosted"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Reinhard"
+					 name="3"
+					 value="3" />
+					<combo_box.item
+					 label="Filmic"
+					 name="4"
+					 value="4" />
+					<combo_box.item
+					 label="GT"
+					 name="5"
+					 value="5" />
+					<combo_box.item
+					 label="AgX"
+					 name="6"
+					 value="6" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_type_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="AlchemyRenderTonemapType" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Tonemap mix"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="tone_mix"
+				 tool_tip="Blend between linear (0) and tonemapped (1) color. Classic/legacy skies force this to 0."
+				 control_name="RenderTonemapMix" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_mix_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderTonemapMix" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_tone_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_tone" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="258"
+		 name="atab_sec_tone_adv"
+		 title="Exposure &amp; Tone - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="258"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_tone_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="ACES white point"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="1"
+				 max_val="16"
+				 name="tone_aces_white"
+				 tool_tip="White point for the ACES Boosted operator (no effect on other operators)"
+				 control_name="RenderTonemapACESWhite" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_aces_white_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderTonemapACESWhite" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Reinhard white point"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="1"
+				 max_val="16"
+				 name="tone_reinhard_white"
+				 tool_tip="White point for the Reinhard operator (no effect on other operators)"
+				 control_name="RenderTonemapReinhardWhite" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_reinhard_white_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderTonemapReinhardWhite" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Filmic white point"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="1"
+				 max_val="16"
+				 name="tone_filmic_white"
+				 tool_tip="White point for the Filmic operator (no effect on other operators)"
+				 control_name="RenderTonemapFilmicWhite" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_filmic_white_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderTonemapFilmicWhite" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="AgX contrast"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="2.5"
+				 name="tone_agx_contrast"
+				 tool_tip="Contrast for the AgX operator (no effect on other operators)"
+				 control_name="RenderTonemapAgxContrast" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_agx_contrast_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderTonemapAgxContrast" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="AgX white point"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="1"
+				 max_val="32"
+				 name="tone_agx_white"
+				 tool_tip="White point for the AgX operator (no effect on other operators)"
+				 control_name="RenderTonemapAgxWhite" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_agx_white_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderTonemapAgxWhite" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="Automatic exposure (HDR)"
+				 tool_tip="Dynamically adapt exposure to scene brightness. Requires HDR rendering."
+				 name="tone_autoexposure"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderDynamicExposureEnabled" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 right="-32"
+				 height="16"
+				 label="Auto-exposure strength"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.05"
+				 max_val="1"
+				 name="tone_autoexp_coeff"
+				 tool_tip="How strongly automatic exposure reacts to scene luminance"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="RenderDynamicExposureCoefficient" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_autoexp_coeff_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderDynamicExposureCoefficient" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Adapt speed (far)"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.01"
+				 max_val="1"
+				 name="tone_autoexp_speed_error"
+				 tool_tip="How quickly exposure adapts while far from its target"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="RenderDynamicExposureSpeedError" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_autoexp_speed_error_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderDynamicExposureSpeedError" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Adapt speed (near)"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0.1"
+				 max_val="10"
+				 name="tone_autoexp_speed_target"
+				 tool_tip="How quickly exposure settles once near its target"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="RenderDynamicExposureSpeedTarget" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_autoexp_speed_target_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderDynamicExposureSpeedTarget" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="Use sky exposure range"
+				 tool_tip="Let the active sky's HDR settings define the automatic exposure range"
+				 name="tone_autoexp_sky"
+				 control_name="RenderUseExposureSkySettings" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="12"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_tone_adv_reset"
+				 tool_tip="Reset the advanced tone settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_tone_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="108"
+		 name="atab_sec_lut"
+		 title="Color LUT"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="108"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_lut">
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top="8"
+				 width="300"
+				 label="Enable color LUT"
+				 tool_tip="Grade the image through a color look-up table"
+				 name="lut_enable"
+				 control_name="RenderColorGrade" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="140"
+				 height="15"
+				 name="lut_label"
+				 value="LUT" />
+				<combo_box
+				 allow_text_entry="true"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 max_chars="200"
+				 name="colorlut_combo"
+				 tool_tip="Which color look-up table to grade with. Files dropped into the user 'colorlut' folder appear here."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeLUT">
+					<combo_box.item
+					 label="None"
+					 name="lut_none"
+					 value="" />
+					<combo_box.item
+					 label="Neutral"
+					 name="lut_neutral"
+					 value="NeutralLUT.png" />
+					<combo_box.item
+					 label="CrossProcess - Warm"
+					 name="lut_xprocess_warm"
+					 value="CrossWarm.png" />
+					<combo_box.item
+					 label="CrossProcess - Cool"
+					 name="lut_xprocess_cool"
+					 value="CrossCool.png" />
+					<combo_box.item
+					 label="Acid Trip"
+					 name="lut_acidTrip"
+					 value="AcidTrip.png" />
+					<combo_box.item
+					 label="Battleblue"
+					 name="lut_battleblue"
+					 value="Battleblue.png" />
+					<combo_box.item
+					 label="Crunchy"
+					 name="lut_crunchy"
+					 value="Crunchy.png" />
+					<combo_box.item
+					 label="Dreary"
+					 name="lut_dreary"
+					 value="Dreary.png" />
+					<combo_box.item
+					 label="Fall Painty"
+					 name="lut_fallPainty"
+					 value="FallPainty.png" />
+					<combo_box.item
+					 label="Harshness"
+					 name="lut_harshness"
+					 value="Harshness.png" />
+					<combo_box.item
+					 label="Nuked"
+					 name="lut_nuked"
+					 value="Nuked.png" />
+					<combo_box.item
+					 label="OG Boy"
+					 name="lut_ogBoy"
+					 value="OGBoy.png" />
+					<combo_box.item
+					 label="Old Photo"
+					 name="lut_oldPhoto"
+					 value="OldPhoto.png" />
+					<combo_box.item
+					 label="Pastel Dreams"
+					 name="lut_pastelDreams"
+					 value="PastelDreams.png" />
+					<combo_box.item
+					 label="Purple Haze"
+					 name="lut_purpleHaze"
+					 value="PurpleHaze.png" />
+					<combo_box.item
+					 label="Sickly Blue"
+					 name="lut_sicklyBlue"
+					 value="SicklyBlue.png" />
+					<combo_box.item
+					 label="Sinner 1"
+					 name="lut_sinner1"
+					 value="Sinner.png" />
+					<combo_box.item
+					 label="Sinner 2"
+					 name="lut_sinner2"
+					 value="Sinner2.png" />
+					<combo_box.item
+					 label="Tealness"
+					 name="lut_tealness"
+					 value="Tealness.png" />
+					<combo_box.item
+					 label="Toonland"
+					 name="lut_toonland"
+					 value="Toonland.png" />
+					<combo_box.item
+					 label="Warm"
+					 name="lut_warm"
+					 value="Warm.png" />
+					<combo_box.item
+					 label="A E S T H E T I C S  1"
+					 name="lut_AST1"
+					 value="AESTHETICS_1.png" />
+					<combo_box.item
+					 label="A E S T H E T I C S  2"
+					 name="lut_AST2"
+					 value="AESTHETICS_2.png" />
+					<combo_box.item
+					 label="A E S T H E T I C S  3"
+					 name="lut_AST3"
+					 value="AESTHETICS_3.png" />
+					<combo_box.item
+					 label="A E S T H E T I C S  4"
+					 name="lut_AST4"
+					 value="AESTHETICS_4.png" />
+					<combo_box.item
+					 label="A E S T H E T I C S  5"
+					 name="lut_AST5"
+					 value="AESTHETICS_5.png" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lut_combo_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeLUT" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Strength"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="lut_strength"
+				 tool_tip="How strongly the LUT grades the image"
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeLUTStrength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lut_strength_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeLUTStrength" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_lut_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_lut" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="90"
+		 name="atab_sec_split"
+		 title="Split Toning"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="90"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_split">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Amount"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="split_amount"
+				 tool_tip="Overall strength of split toning"
+				 control_name="RenderSplitToneAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="split_amount_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSplitToneAmount" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 width="140"
+				 height="15"
+				 name="split_shadow_tint_label"
+				 value="Shadow tint" />
+				<color_swatch
+				 can_apply_immediately="true"
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-18"
+				 width="60"
+				 height="24"
+				 name="split_shadow_tint"
+				 tool_tip="Tint applied to shadows"
+				 control_name="RenderSplitToneShadowTint" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-21"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="split_shadow_tint_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSplitToneShadowTint" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="13"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_split_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_split" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="114"
+		 name="atab_sec_lgg"
+		 title="Lift / Gamma / Gain"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="114"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_lgg">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="10"
+				 width="110"
+				 height="15"
+				 name="lgg_lift_label"
+				 tool_tip="Raises or lowers shadows per channel"
+				 value="Lift" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="68"
+				 height="18"
+				 label="R"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="vec3_RenderColorGradeLift_0">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="G"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="vec3_RenderColorGradeLift_1">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="B"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="vec3_RenderColorGradeLift_2">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lgg_lift_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeLift" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="110"
+				 height="15"
+				 name="lgg_gamma_label"
+				 tool_tip="Adjusts midtones per channel"
+				 value="Gamma" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="68"
+				 height="18"
+				 label="R"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="1.5"
+				 name="vec3_RenderColorGradeGamma_0">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="G"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="1.5"
+				 name="vec3_RenderColorGradeGamma_1">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="B"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="1.5"
+				 name="vec3_RenderColorGradeGamma_2">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lgg_gamma_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeGamma" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="110"
+				 height="15"
+				 name="lgg_gain_label"
+				 tool_tip="Scales highlights per channel"
+				 value="Gain" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="68"
+				 height="18"
+				 label="R"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="1.5"
+				 name="vec3_RenderColorGradeGain_0">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="G"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="1.5"
+				 name="vec3_RenderColorGradeGain_1">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="B"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="1.5"
+				 name="vec3_RenderColorGradeGain_2">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lgg_gain_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeGain" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="12"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_lgg_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_lgg" />
+				</button>
+			</panel>
+		</accordion_tab>
+	</accordion>
+</panel>

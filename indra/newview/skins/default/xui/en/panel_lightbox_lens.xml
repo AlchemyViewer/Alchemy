@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel
+ name="panel_lightbox_lens"
+ layout="topleft"
+ width="450"
+ height="490"
+ follows="all">
+	<text
+	 follows="left|top|right"
+	 layout="topleft"
+	 left="12"
+	 top="16"
+	 right="-12"
+	 height="48"
+	 word_wrap="true"
+	 name="lens_placeholder">
+		Lens effects (depth of field, bloom and halation, lens flare, chromatic aberration, vignette, film grain, sharpening) will appear here.
+	</text>
+</panel>

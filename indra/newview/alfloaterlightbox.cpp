@@ -1,6 +1,6 @@
 /**
  * @file alfloaterlightbox.cpp
- * @brief A generic text floater for dumping info (usually debug info)
+ * @brief Lightbox post-processing control floater
  *
  * Copyright (C) Rye Mutt <rye@alchemyviewer.org>
  *
@@ -31,41 +31,115 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
-//#include "alrenderutils.h"
-#include "llviewercontrol.h"
-#include "llspinctrl.h"
-#include "llsliderctrl.h"
-#include "lltextbox.h"
 #include "llcombobox.h"
+#include "llpanel.h"
+#include "llspinctrl.h"
+#include "llviewercontrol.h"
+
+#include <set>
+
+namespace
+{
+// Vector-valued rows follow the widget naming contract "vec3_<Setting>_<0|1|2>";
+// setting names never contain '_', so the parse is unambiguous.
+bool parseVec3WidgetName(const std::string& name, std::string& setting, S32& component)
+{
+    static const std::string prefix = "vec3_";
+    if (name.size() <= prefix.size() || name.compare(0, prefix.size(), prefix) != 0)
+    {
+        return false;
+    }
+    size_t sep = name.rfind('_');
+    if (sep <= prefix.size() || sep + 2 != name.size())
+    {
+        return false;
+    }
+    S32 comp = name[sep + 1] - '0';
+    if (comp < 0 || comp > 2)
+    {
+        return false;
+    }
+    setting = name.substr(prefix.size(), sep - prefix.size());
+    component = comp;
+    return true;
+}
+
+void collectVec3Spinners(LLView* viewp, std::map<std::string, std::array<LLSpinCtrl*, 3>>& rows)
+{
+    for (LLView* childp : *viewp->getChildList())
+    {
+        if (LLSpinCtrl* spinnerp = dynamic_cast<LLSpinCtrl*>(childp))
+        {
+            std::string setting;
+            S32 component = 0;
+            if (parseVec3WidgetName(spinnerp->getName(), setting, component))
+            {
+                rows[setting][component] = spinnerp;
+            }
+        }
+        collectVec3Spinners(childp, rows);
+    }
+}
+
+void collectBoundControls(LLView* viewp, std::set<std::string>& keys)
+{
+    for (LLView* childp : *viewp->getChildList())
+    {
+        if (LLUICtrl* ctrlp = dynamic_cast<LLUICtrl*>(childp))
+        {
+            if (LLControlVariable* controlp = ctrlp->getControlVariable())
+            {
+                // Only reset controls owned by gSavedSettings; enabled/visibility
+                // bindings live in separate slots and are not touched here.
+                if (gSavedSettings.getControl(controlp->getName()) == controlp)
+                {
+                    keys.insert(controlp->getName());
+                }
+            }
+            std::string setting;
+            S32 component = 0;
+            if (parseVec3WidgetName(ctrlp->getName(), setting, component))
+            {
+                keys.insert(setting);
+            }
+        }
+        collectBoundControls(childp, keys);
+    }
+}
+} // namespace
 
 ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
 :   LLFloater(key)
 {
     mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
-    mCommitCallbackRegistrar.add("LightBox.ResetGroupDefault", std::bind(&ALFloaterLightBox::onClickResetGroupDefault, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ResetSection", std::bind(&ALFloaterLightBox::onClickResetSection, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.CommitVec3", std::bind(&ALFloaterLightBox::onCommitVec3, this, std::placeholders::_1));
 }
 
 ALFloaterLightBox::~ALFloaterLightBox()
 {
-    mTonemapConnection.disconnect();
-    mCASConnection.disconnect();
 }
 
 bool ALFloaterLightBox::postBuild()
 {
     populateLUTCombo();
-    updateTonemapper();
-    updateCAS();
 
-    mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&) { updateTonemapper(); });
-    //mCASConnection = gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&) { updateCAS(); });
+    collectVec3Spinners(this, mVec3Rows);
+    for (const auto& row : mVec3Rows)
+    {
+        const std::string& setting = row.first;
+        LLControlVariable* controlp = gSavedSettings.getControl(setting);
+        if (!controlp)
+        {
+            LL_WARNS() << "Vec3 row bound to unknown setting: " << setting << LL_ENDL;
+            continue;
+        }
+        mVec3Connections.emplace_back(controlp->getSignal()->connect(
+            [this, setting](LLControlVariable*, const LLSD&, const LLSD&) { refreshVec3Row(setting); }));
+        refreshVec3Row(setting);
+    }
 
     return LLFloater::postBuild();
-}
-
-void ALFloaterLightBox::draw()
-{
-    LLFloater::draw();
 }
 
 void ALFloaterLightBox::populateLUTCombo()
@@ -122,537 +196,82 @@ void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
     }
 }
 
-void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
+void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
 {
-    const std::string& setting_group = userdata.asString();
-    if (setting_group == "sharpen")
+    const std::string& section = userdata.asString();
+    if (section.empty())
     {
-        LLControlVariable* controlp = gSavedSettings.getControl("RenderSharpenMethod");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderSharpenCASSharpness");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderSharpenDLSSharpness");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderSharpenDLSDenoise");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
+        return;
     }
-    else if (setting_group == "tonemap")
-    {
-        {
-            LLControlVariable* controlp = gSavedSettings.getControl("RenderExposure");
-            if (controlp)
-            {
-                controlp->resetToDefault(true);
-            }
-        }
 
-        //S32 tone_map_type = gSavedSettings.getS32("AlchemyRenderTonemapType");
-        //switch (tone_map_type)
-        //{
-        //case ALRenderUtil::TONEMAP_AMD:
-        //{
-        //    LLControlVariable* controlp = gSavedSettings.getControl("AlchemyToneMapAMDHDRMax");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDExposure");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDContrast");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDSaturationR");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDSaturationG");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDSaturationB");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    break;
-        //}
-        //case ALRenderUtil::TONEMAP_UCHIMURA:
-        //{
-        //    LLControlVariable* controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraMaxBrightness");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraContrast");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraLinearStart");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraLinearLength");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraBlackLevel");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    break;
-        //}
-        //case ALRenderUtil::TONEMAP_UNCHARTED:
-        //{
-        //    LLControlVariable* controlp = gSavedSettings.getControl("AlchemyToneMapFilmicToeStr");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicToeLen");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicShoulderStr");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicShoulderLen");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicShoulderAngle");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicGamma");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicWhitePoint");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    break;
-        //}
-        //}
+    std::set<std::string> keys;
+    if (LLPanel* panelp = findChild<LLPanel>(section))
+    {
+        collectBoundControls(panelp, keys);
+    }
+    if (LLPanel* advp = findChild<LLPanel>(section + "_adv"))
+    {
+        collectBoundControls(advp, keys);
+    }
+
+    for (const std::string& key : keys)
+    {
+        if (LLControlVariable* controlp = gSavedSettings.getControl(key))
+        {
+            controlp->resetToDefault(true);
+        }
     }
 }
 
-void ALFloaterLightBox::updateTonemapper()
+void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
 {
-    //Init Text
-    LLTextBox* text1 = getChild<LLTextBox>("tonemapper_dynamic_text1");
-    LLTextBox* text2 = getChild<LLTextBox>("tonemapper_dynamic_text2");
-    LLTextBox* text3 = getChild<LLTextBox>("tonemapper_dynamic_text3");
-    LLTextBox* text4 = getChild<LLTextBox>("tonemapper_dynamic_text4");
-    LLTextBox* text5 = getChild<LLTextBox>("tonemapper_dynamic_text5");
-    LLTextBox* text6 = getChild<LLTextBox>("tonemapper_dynamic_text6");
-    LLTextBox* text7 = getChild<LLTextBox>("tonemapper_dynamic_text7");
-
-    //Init Spinners
-    LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner1");
-    LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner2");
-    LLSpinCtrl* spinner3 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner3");
-    LLSpinCtrl* spinner4 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner4");
-    LLSpinCtrl* spinner5 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner5");
-    LLSpinCtrl* spinner6 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner6");
-    LLSpinCtrl* spinner7 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner7");
-
-    // Init Sliders
-    LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider1");
-    LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider2");
-    LLSliderCtrl* slider3 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider3");
-    LLSliderCtrl* slider4 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider4");
-    LLSliderCtrl* slider5 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider5");
-    LLSliderCtrl* slider6 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider6");
-    LLSliderCtrl* slider7 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider7");
-
-    // Check the state of AlchemyRenderTonemapType
-    /* switch (gSavedSettings.getS32("AlchemyRenderTonemapType"))
+    if (mVec3Updating || !ctrl)
     {
-    default:
-    {
-        text1->setVisible(false);
-        spinner1->setVisible(false);
-        slider1->setVisible(false);
-
-        text2->setVisible(false);
-        spinner2->setVisible(false);
-        slider2->setVisible(false);
-
-        text3->setVisible(false);
-        spinner3->setVisible(false);
-        slider3->setVisible(false);
-
-        text4->setVisible(false);
-        spinner4->setVisible(false);
-        slider4->setVisible(false);
-
-        text5->setVisible(false);
-        spinner5->setVisible(false);
-        slider5->setVisible(false);
-
-        text6->setVisible(false);
-        spinner6->setVisible(false);
-        slider6->setVisible(false);
-
-        text7->setVisible(false);
-        spinner7->setVisible(false);
-        slider7->setVisible(false);
-        break;
+        return;
     }
-    case ALRenderUtil::TONEMAP_UCHIMURA:
+
+    std::string setting;
+    S32 component = 0;
+    if (!parseVec3WidgetName(ctrl->getName(), setting, component))
     {
-        text1->setVisible(true);
-        text1->setText(std::string("Max Brightness"));
-        spinner1->setVisible(true);
-        spinner1->setMinValue(0.01f);
-        spinner1->setMaxValue(8.0f);
-        spinner1->setIncrement(0.1f);
-        spinner1->setControlName("AlchemyToneMapUchimuraMaxBrightness");
-        slider1->setVisible(true);
-        slider1->setMinValue(0.01f);
-        slider1->setMaxValue(8.0f);
-        slider1->setIncrement(0.1f);
-        slider1->setControlName("AlchemyToneMapUchimuraMaxBrightness", nullptr);
-
-        text2->setVisible(true);
-        text2->setText(std::string("Contrast"));
-        spinner2->setVisible(true);
-        spinner2->setMinValue(0.01f);
-        spinner2->setMaxValue(2.0f);
-        spinner2->setIncrement(0.01f);
-        spinner2->setControlName("AlchemyToneMapUchimuraContrast");
-        slider2->setVisible(true);
-        slider2->setMinValue(0.01f);
-        slider2->setMaxValue(2.0f);
-        slider2->setIncrement(0.01f);
-        slider2->setControlName("AlchemyToneMapUchimuraContrast", nullptr);
-
-        text3->setVisible(true);
-        text3->setText(std::string("Linear Start"));
-        spinner3->setVisible(true);
-        spinner3->setMinValue(0.01f);
-        spinner3->setMaxValue(1.0f);
-        spinner3->setIncrement(0.01f);
-        spinner3->setControlName("AlchemyToneMapUchimuraLinearStart");
-        slider3->setVisible(true);
-        slider3->setMinValue(0.01f);
-        slider3->setMaxValue(1.0f);
-        slider3->setIncrement(0.01f);
-        slider3->setControlName("AlchemyToneMapUchimuraLinearStart", nullptr);
-
-        text4->setVisible(true);
-        text4->setText(std::string("Linear Length"));
-        spinner4->setVisible(true);
-        spinner4->setMinValue(0.01f);
-        spinner4->setMaxValue(1.0f);
-        spinner4->setIncrement(0.01f);
-        spinner4->setControlName("AlchemyToneMapUchimuraLinearLength");
-        slider4->setVisible(true);
-        slider4->setMinValue(0.01f);
-        slider4->setMaxValue(1.0f);
-        slider4->setIncrement(0.01f);
-        slider4->setControlName("AlchemyToneMapUchimuraLinearLength", nullptr);
-
-        text5->setVisible(true);
-        text5->setText(std::string("Black Level"));
-        spinner5->setVisible(true);
-        spinner5->setMinValue(0.01f);
-        spinner5->setMaxValue(4.0f);
-        spinner5->setIncrement(0.01f);
-        spinner5->setControlName("AlchemyToneMapUchimuraBlackLevel");
-        slider5->setVisible(true);
-        slider5->setMinValue(0.01f);
-        slider5->setMaxValue(4.0f);
-        slider5->setIncrement(0.01f);
-        slider5->setControlName("AlchemyToneMapUchimuraBlackLevel", nullptr);
-
-        text6->setVisible(false);
-        spinner6->setVisible(false);
-        slider6->setVisible(false);
-
-        text7->setVisible(false);
-        spinner7->setVisible(false);
-        slider7->setVisible(false);
-        break;
+        return;
     }
-    case ALRenderUtil::TONEMAP_AMD:
+
+    LLControlVariable* controlp = gSavedSettings.getControl(setting);
+    if (!controlp)
     {
-        text1->setVisible(true);
-        text1->setText(std::string("HDR Max"));
-        spinner1->setVisible(true);
-        spinner1->setMinValue(1.0f);
-        spinner1->setMaxValue(512.0f);
-        spinner1->setIncrement(1.f);
-        spinner1->setControlName("AlchemyToneMapAMDHDRMax");
-        slider1->setVisible(true);
-        slider1->setMinValue(1.0f);
-        slider1->setMaxValue(512.0f);
-        slider1->setIncrement(1.f);
-        slider1->setControlName("AlchemyToneMapAMDHDRMax", nullptr);
-
-        text2->setVisible(true);
-        text2->setText(std::string("Tone Exposure"));
-        spinner2->setVisible(true);
-        spinner2->setMinValue(1.0f);
-        spinner2->setMaxValue(16.0f);
-        spinner2->setIncrement(0.1f);
-        spinner2->setControlName("AlchemyToneMapAMDExposure");
-        slider2->setVisible(true);
-        slider2->setMinValue(1.0f);
-        slider2->setMaxValue(16.0f);
-        slider2->setIncrement(0.1f);
-        slider2->setControlName("AlchemyToneMapAMDExposure", nullptr);
-
-        text3->setVisible(true);
-        text3->setText(std::string("Contrast"));
-        spinner3->setVisible(true);
-        spinner3->setMinValue(0.0f);
-        spinner3->setMaxValue(1.0f);
-        spinner3->setIncrement(0.01f);
-        spinner3->setControlName("AlchemyToneMapAMDContrast");
-        slider3->setVisible(true);
-        slider3->setMinValue(0.0f);
-        slider3->setMaxValue(1.0f);
-        slider3->setIncrement(0.01f);
-        slider3->setControlName("AlchemyToneMapAMDContrast", nullptr);
-
-        text4->setVisible(true);
-        text4->setText(std::string("R Saturation"));
-        spinner4->setVisible(true);
-        spinner4->setMinValue(-2.0f);
-        spinner4->setMaxValue(2.0f);
-        spinner4->setIncrement(0.1f);
-        spinner4->setControlName("AlchemyToneMapAMDSaturationR");
-        slider4->setVisible(true);
-        slider4->setMinValue(-2.0f);
-        slider4->setMaxValue(2.0f);
-        slider4->setIncrement(0.1f);
-        slider4->setControlName("AlchemyToneMapAMDSaturationR", nullptr);
-
-        text5->setVisible(true);
-        text5->setText(std::string("G Saturation"));
-        spinner5->setVisible(true);
-        spinner5->setMinValue(-2.0f);
-        spinner5->setMaxValue(2.0f);
-        spinner5->setIncrement(0.1f);
-        spinner5->setControlName("AlchemyToneMapAMDSaturationG");
-        slider5->setVisible(true);
-        slider5->setMinValue(-2.0f);
-        slider5->setMaxValue(2.0f);
-        slider5->setIncrement(0.1f);
-        slider5->setControlName("AlchemyToneMapAMDSaturationG", nullptr);
-
-        text6->setVisible(true);
-        text6->setText(std::string("B Saturation"));
-        spinner6->setVisible(true);
-        spinner6->setMinValue(-2.0f);
-        spinner6->setMaxValue(2.0f);
-        spinner6->setIncrement(0.1f);
-        spinner6->setControlName("AlchemyToneMapAMDSaturationB");
-        slider6->setVisible(true);
-        slider6->setMinValue(-2.0f);
-        slider6->setMaxValue(2.0f);
-        slider6->setIncrement(0.1f);
-        slider6->setControlName("AlchemyToneMapAMDSaturationB", nullptr);
-
-        text7->setVisible(false);
-        spinner7->setVisible(false);
-        slider7->setVisible(false);
-        break;
+        return;
     }
-    case ALRenderUtil::TONEMAP_UNCHARTED:
+
+    // Rebuild the full component array so a single spinner commit writes back
+    // one component without disturbing the others; works for VEC3 and COL3.
+    const LLSD current = controlp->getValue();
+    LLSD updated = LLSD::emptyArray();
+    for (S32 i = 0; i < 3; ++i)
     {
-        text1->setVisible(true);
-        text1->setText(std::string("Toe Strength"));
-        spinner1->setVisible(true);
-        spinner1->setMinValue(0.0f);
-        spinner1->setMaxValue(1.0f);
-        spinner1->setIncrement(0.01f);
-        spinner1->setControlName("AlchemyToneMapFilmicToeStr");
-        slider1->setVisible(true);
-        slider1->setMinValue(0.0f);
-        slider1->setMaxValue(1.0f);
-        slider1->setIncrement(0.01f);
-        slider1->setControlName("AlchemyToneMapFilmicToeStr", nullptr);
-
-        text2->setVisible(true);
-        text2->setText(std::string("Toe Length"));
-        spinner2->setVisible(true);
-        spinner2->setMinValue(0.01f);
-        spinner2->setMaxValue(1.0f);
-        spinner2->setIncrement(0.01f);
-        spinner2->setControlName("AlchemyToneMapFilmicToeLen");
-        slider2->setVisible(true);
-        slider2->setMinValue(0.01f);
-        slider2->setMaxValue(1.0f);
-        slider2->setIncrement(0.01f);
-        slider2->setControlName("AlchemyToneMapFilmicToeLen", nullptr);
-
-        text3->setVisible(true);
-        text3->setText(std::string("Shoulder Strength"));
-        spinner3->setVisible(true);
-        spinner3->setMinValue(0.0f);
-        spinner3->setMaxValue(1.0f);
-        spinner3->setIncrement(0.01f);
-        spinner3->setControlName("AlchemyToneMapFilmicShoulderStr");
-        slider3->setVisible(true);
-        slider3->setMinValue(0.0f);
-        slider3->setMaxValue(1.0f);
-        slider3->setIncrement(0.01f);
-        slider3->setControlName("AlchemyToneMapFilmicShoulderStr", nullptr);
-
-        text4->setVisible(true);
-        text4->setText(std::string("Shoulder Length"));
-        spinner4->setVisible(true);
-        spinner4->setMinValue(0.01f);
-        spinner4->setMaxValue(8.0f);
-        spinner4->setIncrement(0.01f);
-        spinner4->setControlName("AlchemyToneMapFilmicShoulderLen");
-        slider4->setVisible(true);
-        slider4->setMinValue(0.01f);
-        slider4->setMaxValue(8.0f);
-        slider4->setIncrement(0.01f);
-        slider4->setControlName("AlchemyToneMapFilmicShoulderLen", nullptr);
-
-        text5->setVisible(true);
-        text5->setText(std::string("Shoulder Angle"));
-        spinner5->setVisible(true);
-        spinner5->setMinValue(0.0f);
-        spinner5->setMaxValue(1.0f);
-        spinner5->setIncrement(0.01f);
-        spinner5->setControlName("AlchemyToneMapFilmicShoulderAngle");
-        slider5->setVisible(true);
-        slider5->setMinValue(0.0f);
-        slider5->setMaxValue(1.0f);
-        slider5->setIncrement(0.01f);
-        slider5->setControlName("AlchemyToneMapFilmicShoulderAngle", nullptr);
-
-        text6->setVisible(true);
-        text6->setText(std::string("Gamma"));
-        spinner6->setVisible(true);
-        spinner6->setMinValue(0.01f);
-        spinner6->setMaxValue(5.0f);
-        spinner6->setIncrement(0.01f);
-        spinner6->setControlName("AlchemyToneMapFilmicGamma");
-        slider6->setVisible(true);
-        slider6->setMinValue(0.01f);
-        slider6->setMaxValue(5.0f);
-        slider6->setIncrement(0.01f);
-        slider6->setControlName("AlchemyToneMapFilmicGamma", nullptr);
-
-        text7->setVisible(true);
-        text7->setText(std::string("White Point"));
-        spinner7->setVisible(true);
-        spinner7->setMinValue(1.0f);
-        spinner7->setMaxValue(16.0f);
-        spinner7->setIncrement(0.1f);
-        spinner7->setControlName("AlchemyToneMapFilmicWhitePoint");
-        slider7->setVisible(true);
-        slider7->setMinValue(1.0f);
-        slider7->setMaxValue(16.0f);
-        slider7->setIncrement(0.1f);
-        slider7->setControlName("AlchemyToneMapFilmicWhitePoint", nullptr);
-        break;
+        updated.append(LLSD::Real(current[i].asReal()));
     }
-    }*/
+    updated[component] = LLSD::Real(ctrl->getValue().asReal());
+    controlp->set(updated);
 }
 
-void ALFloaterLightBox::updateCAS()
+void ALFloaterLightBox::refreshVec3Row(const std::string& setting_name)
 {
-    // Init UI
-    LLTextBox* text2 = getChild<LLTextBox>("sharp_dynamic_text");
-    LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("sharp_strength_spinner");
-    LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("sharp_dynamic_spinner");
-    LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("sharp_strength_slider");
-    LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("sharp_dynamic_slider");
+    auto row = mVec3Rows.find(setting_name);
+    LLControlVariable* controlp = gSavedSettings.getControl(setting_name);
+    if (row == mVec3Rows.end() || !controlp)
+    {
+        return;
+    }
 
-    //switch (gSavedSettings.getU32("RenderSharpenMethod"))
-    //{
-    //default:
-    //case ALRenderUtil::SHARPEN_NONE:
-    //{
-    //    spinner1->setVisible(false);
-    //    slider1->setVisible(false);
-    //    text2->setVisible(false);
-    //    spinner2->setVisible(false);
-    //    slider2->setVisible(false);
-    //    break;
-    //}
-    //case ALRenderUtil::SHARPEN_CAS:
-    //{
-    //    spinner1->setVisible(true);
-    //    spinner1->setMinValue(0.0f);
-    //    spinner1->setMaxValue(1.0f);
-    //    spinner1->setIncrement(0.1f);
-    //    spinner1->setControlName("RenderSharpenCASSharpness");
-    //    slider1->setVisible(true);
-    //    slider1->setMinValue(0.0f);
-    //    slider1->setMaxValue(1.0f);
-    //    slider1->setIncrement(0.1f);
-    //    slider1->setControlName("RenderSharpenCASSharpness", nullptr);
-
-    //    text2->setVisible(false);
-    //    spinner2->setVisible(false);
-    //    slider2->setVisible(false);
-    //    break;
-    //}
-    //case ALRenderUtil::SHARPEN_DLS:
-    //{
-    //    spinner1->setVisible(true);
-    //    spinner1->setMinValue(0.0f);
-    //    spinner1->setMaxValue(1.0f);
-    //    spinner1->setIncrement(0.1f);
-    //    spinner1->setControlName("RenderSharpenDLSSharpness");
-    //    slider1->setVisible(true);
-    //    slider1->setMinValue(0.0f);
-    //    slider1->setMaxValue(1.0f);
-    //    slider1->setIncrement(0.1f);
-    //    slider1->setControlName("RenderSharpenDLSSharpness", nullptr);
-
-    //    text2->setVisible(true);
-    //    text2->setText(std::string("Denoise:"));
-    //    spinner2->setVisible(true);
-    //    spinner2->setMinValue(0.0f);
-    //    spinner2->setMaxValue(1.0f);
-    //    spinner2->setIncrement(0.1f);
-    //    spinner2->setControlName("RenderSharpenDLSDenoise");
-    //    slider2->setVisible(true);
-    //    slider2->setMinValue(0.0f);
-    //    slider2->setMaxValue(1.0f);
-    //    slider2->setIncrement(0.1f);
-    //    slider2->setControlName("RenderSharpenDLSDenoise", nullptr);
-    //    break;
-    //}
-    //}
+    const LLSD value = controlp->getValue();
+    mVec3Updating = true;
+    for (S32 i = 0; i < 3; ++i)
+    {
+        if (LLSpinCtrl* spinnerp = row->second[i])
+        {
+            spinnerp->setValue(value[i].asReal());
+        }
+    }
+    mVec3Updating = false;
 }

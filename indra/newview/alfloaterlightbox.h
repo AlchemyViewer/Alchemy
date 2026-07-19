@@ -1,6 +1,6 @@
 /**
  * @file alfloaterlightbox.h
- * @brief A generic text floater for dumping info (usually debug info)
+ * @brief Lightbox post-processing control floater
  *
  * Copyright (c) Rye Mutt <rye@alchemyviewer.org>
  *
@@ -34,7 +34,13 @@
 #define AL_FLOATERLIGHTBOX_H
 
 #include "llfloater.h"
+
+#include <array>
+#include <map>
 #include <string>
+#include <vector>
+
+class LLSpinCtrl;
 
 class ALFloaterLightBox final : public LLFloater
 {
@@ -42,17 +48,20 @@ public:
     ALFloaterLightBox(const LLSD& key);
     ~ALFloaterLightBox() override;
     bool postBuild() override;
-    virtual void draw() override;
 
   private:
     void onClickResetControlDefault(const LLSD& userdata);
-    void onClickResetGroupDefault(const LLSD& userdata);
-    void updateTonemapper();
-    void updateCAS();
+    void onClickResetSection(const LLSD& userdata);
+    void onCommitVec3(LLUICtrl* ctrl);
+    void refreshVec3Row(const std::string& setting_name);
     void populateLUTCombo();
 
-    boost::signals2::scoped_connection mTonemapConnection;
-    boost::signals2::scoped_connection mCASConnection;
+    // Spinner triplets named "vec3_<Setting>_<0|1|2>", keyed by setting name.
+    // Rows are discovered by walking the widget tree in postBuild; adding a
+    // vector-valued row is pure XUI.
+    std::map<std::string, std::array<LLSpinCtrl*, 3>> mVec3Rows;
+    std::vector<boost::signals2::scoped_connection> mVec3Connections;
+    bool mVec3Updating = false;
 };
 
 #endif // AL_FLOATERLIGHTBOX_H
