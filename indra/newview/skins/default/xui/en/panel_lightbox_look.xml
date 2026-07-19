@@ -524,7 +524,7 @@ Row conventions:
 		 layout="topleft"
 		 height="137"
 		 name="atab_sec_lut"
-		 title="Color LUT"
+		 title="Color Grading"
 		 fit_panel="true">
 			<panel
 			 follows="all"
@@ -541,8 +541,8 @@ Row conventions:
 				 left="8"
 				 top="8"
 				 width="300"
-				 label="Enable color LUT"
-				 tool_tip="Grade the image through a color look-up table"
+				 label="Enable color grading"
+				 tool_tip="Master switch for ALL color grading: the LUT plus every Basic Grade, White Balance, Split Toning, Lift/Gamma/Gain, and Tone Curve control"
 				 name="lut_enable"
 				 control_name="RenderColorGrade" />
 				<text
@@ -673,6 +673,7 @@ Row conventions:
 				 max_val="0.5"
 				 name="grade_brightness"
 				 tool_tip="Shifts the whole image lighter or darker. Small values (0.05) are already noticeable."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeBrightness" />
 				<button
 				 follows="top|right"
@@ -706,6 +707,7 @@ Row conventions:
 				 max_val="2"
 				 name="grade_contrast"
 				 tool_tip="S-curve around midgray. Below 1 flattens (matte film); above 1 punches; above 1.3 starts clipping."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeContrast" />
 				<button
 				 follows="top|right"
@@ -739,6 +741,7 @@ Row conventions:
 				 max_val="2"
 				 name="grade_saturation"
 				 tool_tip="Uniform saturation. 1 is identity, 0 is black-and-white, 1.2 is punchy."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeSaturation" />
 				<button
 				 follows="top|right"
@@ -772,6 +775,7 @@ Row conventions:
 				 max_val="1"
 				 name="grade_vibrance"
 				 tool_tip="Smart saturation that pushes muted colors harder than saturated ones. Skin-friendly; 0.3 is a subtle lift."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeVibrance" />
 				<button
 				 follows="top|right"
@@ -840,6 +844,7 @@ Row conventions:
 				 max_val="1"
 				 name="grade_highlights"
 				 tool_tip="Recovers (negative) or boosts (positive) highlights without touching midtones. Try -0.3 to pull blown skies back."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeHighlights" />
 				<button
 				 follows="top|right"
@@ -873,6 +878,7 @@ Row conventions:
 				 max_val="1"
 				 name="grade_shadows"
 				 tool_tip="Lifts (positive) or crushes (negative) shadows without touching midtones. Try 0.2 to reveal detail in dark scenes."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeShadows" />
 				<button
 				 follows="top|right"
@@ -907,6 +913,7 @@ Row conventions:
 				 max_val="0.5"
 				 name="grade_blackpoint"
 				 tool_tip="Crushes values at or below this level to pure black. 0.05 deepens blacks cinematically; 0.1 and up clips shadow detail."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeBlackPoint" />
 				<button
 				 follows="top|right"
@@ -941,6 +948,7 @@ Row conventions:
 				 max_val="1.5"
 				 name="grade_whitepoint"
 				 tool_tip="Clips values at or above this level to pure white. 0.95 blooms highlights; 0.9 gives a washed bleach-bypass look."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeWhitePoint" />
 				<button
 				 follows="top|right"
@@ -974,6 +982,7 @@ Row conventions:
 				 max_val="180"
 				 name="grade_hueshift"
 				 tool_tip="Rotates all hues around the color wheel, in degrees. 30 warms everything; 180 inverts to complements."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeHueShift" />
 				<button
 				 follows="top|right"
@@ -1042,6 +1051,7 @@ Row conventions:
 				 max_val="5000"
 				 name="wb_cct"
 				 tool_tip="Temperature shift in Kelvin from neutral daylight. Negative warms, positive cools. Try -2500 tungsten, -1000 golden hour, 1500 blue hour."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeWhiteBalanceCCT" />
 				<button
 				 follows="top|right"
@@ -1075,6 +1085,7 @@ Row conventions:
 				 max_val="1"
 				 name="wb_duv"
 				 tool_tip="Green/magenta tint, perpendicular to temperature. Negative pushes magenta, positive pushes green."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderColorGradeWhiteBalanceDuv" />
 				<button
 				 follows="top|right"
@@ -1143,6 +1154,7 @@ Row conventions:
 				 max_val="1"
 				 name="split_amount"
 				 tool_tip="Overall strength of split toning"
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderSplitToneAmount" />
 				<button
 				 follows="top|right"
@@ -1180,6 +1192,7 @@ Row conventions:
 				 label_height="0"
 				 name="split_shadow_tint"
 				 tool_tip="Target color for shadows. Neutral gray is identity; cool teal gives the classic teal-and-orange look."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderSplitToneShadowTint" />
 				<button
 				 follows="top|right"
@@ -1217,6 +1230,7 @@ Row conventions:
 				 label_height="0"
 				 name="split_highlight_tint"
 				 tool_tip="Target color for highlights. Neutral gray is identity; warm amber complements teal shadows."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderSplitToneHighlightTint" />
 				<button
 				 follows="top|right"
@@ -1250,6 +1264,7 @@ Row conventions:
 				 max_val="1"
 				 name="split_balance"
 				 tool_tip="Slides the midpoint between shadow and highlight tints. Negative widens shadows; positive widens highlights."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderSplitToneBalance" />
 				<button
 				 follows="top|right"
@@ -1287,6 +1302,7 @@ Row conventions:
 				 label_height="0"
 				 name="split_midtone_tint"
 				 tool_tip="Target color for midtones. Neutral gray is identity; warm tints flatter skin."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderSplitToneMidtoneTint" />
 				<button
 				 follows="top|right"
@@ -1320,6 +1336,7 @@ Row conventions:
 				 max_val="1"
 				 name="split_midtone_amount"
 				 tool_tip="Midtone tint strength, independent of shadows and highlights. Subtle values (0.15-0.35) add mood without muddying skin."
+				 enabled_control="RenderColorGrade"
 				 control_name="RenderSplitToneMidtoneAmount" />
 				<button
 				 follows="top|right"
@@ -1395,6 +1412,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="-0.5"
 				 max_val="0.5"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeLift_0">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1412,6 +1430,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="-0.5"
 				 max_val="0.5"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeLift_1">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1429,6 +1448,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="-0.5"
 				 max_val="0.5"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeLift_2">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1472,6 +1492,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0.5"
 				 max_val="1.5"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeGamma_0">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1489,6 +1510,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0.5"
 				 max_val="1.5"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeGamma_1">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1506,6 +1528,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0.5"
 				 max_val="1.5"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeGamma_2">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1549,6 +1572,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0.5"
 				 max_val="1.5"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeGain_0">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1566,6 +1590,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0.5"
 				 max_val="1.5"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeGain_1">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1583,6 +1608,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0.5"
 				 max_val="1.5"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeGain_2">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1661,6 +1687,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeCurveToe_0">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1678,6 +1705,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeCurveToe_1">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1695,6 +1723,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeCurveToe_2">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1738,6 +1767,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeCurveShoulder_0">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1755,6 +1785,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeCurveShoulder_1">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1772,6 +1803,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeCurveShoulder_2">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1815,6 +1847,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeCurveStrength_0">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1832,6 +1865,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeCurveStrength_1">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
@@ -1849,6 +1883,7 @@ Row conventions:
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 enabled_control="RenderColorGrade"
 				 name="vec3_RenderColorGradeCurveStrength_2">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />

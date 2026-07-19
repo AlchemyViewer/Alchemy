@@ -212,7 +212,7 @@
             <key>Type</key>
             <string>Boolean</string>
             <key>Value</key>
-            <integer>0</integer>
+            <boolean>1</boolean>
         </map>
         <key>RenderColorGradeBlackPoint</key>
         <map>
