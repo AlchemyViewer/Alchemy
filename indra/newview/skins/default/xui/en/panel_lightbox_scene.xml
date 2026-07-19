@@ -1003,14 +1003,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="380"
+		 height="406"
 		 name="atab_sec_shadow_adv"
 		 title="Shadows &amp; AO - Advanced"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="351"
+			 height="377"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1349,59 +1349,25 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 layout="topleft"
 				 left="8"
 				 top_pad="10"
-				 width="110"
+				 width="140"
 				 height="15"
-				 name="ssao_effect_label"
-				 tool_tip="Per-component ambient occlusion effect weights"
-				 value="Effect" />
+				 name="ssao_effect_value_label"
+				 value="Occluded value" />
 				<spinner
 				 follows="left|top"
 				 layout="topleft"
-				 left_delta="110"
+				 left_delta="140"
 				 top_pad="-16"
-				 width="68"
+				 width="80"
 				 height="18"
-				 label="X"
-				 label_width="10"
+				 label_width="0"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
 				 max_val="2"
-				 name="vec3_RenderSSAOEffect_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="Y"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="2"
-				 name="vec3_RenderSSAOEffect_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="Z"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="2"
-				 name="vec3_RenderSSAOEffect_2">
+				 name="vec3_RenderSSAOEffect_0"
+				 tool_tip="Brightness (HSV value) multiplier for fully occluded areas; partial occlusion blends toward the original color"
+				 enabled_control="RenderDeferredSSAO">
 					<spinner.commit_callback
 					 function="LightBox.CommitVec3" />
 				</spinner>
@@ -1411,16 +1377,43 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 height="18"
 				 width="18"
 				 right="-8"
-				 top_delta="0"
+				 top_pad="-18"
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="center"
 				 name="ssao_effect_rst"
-				 tool_tip="Reset to default">
+				 tool_tip="Reset the occlusion effect (both components) to default">
 					<button.commit_callback
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderSSAOEffect" />
 				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="ssao_effect_sat_label"
+				 value="Occluded saturation" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 width="80"
+				 height="18"
+				 label_width="0"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="vec3_RenderSSAOEffect_1"
+				 tool_tip="Saturation multiplier for fully occluded areas; partial occlusion blends toward the original color"
+				 enabled_control="RenderDeferredSSAO">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
 				<button
 				 follows="top|right"
 				 layout="topleft"
