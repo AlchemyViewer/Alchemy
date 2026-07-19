@@ -619,31 +619,54 @@ without layout holes.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderBloomMipCount" />
 				</button>
-				<slider
-				 follows="left|top|right"
+				<text
+				 follows="left|top"
 				 layout="topleft"
 				 left="8"
 				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="bloom_res_scale_label"
+				 value="Base resolution" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
 				 right="-32"
-				 height="16"
-				 label="Base resolution"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="0"
-				 increment="1"
-				 min_val="0"
-				 max_val="4"
-				 name="bloom_res_scale"
-				 tool_tip="Pyramid base resolution: 0 full, 1 three-quarter, 2 half, 3 quarter, 4 eighth. Higher is faster with wider reach. Changing causes a brief hitch."
+				 height="18"
+				 name="bloom_res_scale_combo"
+				 tool_tip="Resolution the bloom pyramid starts at. Lower resolutions are faster and reach wider per mip. Changing causes a brief hitch."
 				 enabled_control="RenderBloomHDR"
-				 control_name="RenderBloomResolutionScale" />
+				 control_name="RenderBloomResolutionScale">
+					<combo_box.item
+					 label="Full"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="3/4"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Half"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Quarter"
+					 name="3"
+					 value="3" />
+					<combo_box.item
+					 label="Eighth"
+					 name="4"
+					 value="4" />
+				</combo_box>
 				<button
 				 follows="top|right"
 				 layout="topleft"
 				 height="18"
 				 width="18"
 				 right="-8"
-				 top_pad="-17"
+				 top_pad="-18"
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="center"
@@ -1439,14 +1462,14 @@ without layout holes.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="675"
+		 height="715"
 		 name="atab_sec_flare_adv"
 		 title="Lens Flare - Advanced"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="646"
+			 height="686"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1458,6 +1481,7 @@ without layout holes.
 				 top="8"
 				 width="200"
 				 height="15"
+				 font="SansSerifBold"
 				 name="flare_hdr_streak"
 				 value="Streak" />
 				<slider
@@ -1625,13 +1649,23 @@ without layout holes.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderLensFlareChromaticSpread" />
 				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_glow" />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
+				 top_pad="6"
 				 width="200"
 				 height="15"
+				 font="SansSerifBold"
 				 name="flare_hdr_glow"
 				 value="Glow" />
 				<slider
@@ -1700,13 +1734,23 @@ without layout holes.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderLensFlareGlowFalloff" />
 				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_ghosts" />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
+				 top_pad="6"
 				 width="200"
 				 height="15"
+				 font="SansSerifBold"
 				 name="flare_hdr_ghosts"
 				 value="Ghosts" />
 				<slider
@@ -1808,13 +1852,23 @@ without layout holes.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderLensFlareGhostSpacing" />
 				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_halo" />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
+				 top_pad="6"
 				 width="200"
 				 height="15"
+				 font="SansSerifBold"
 				 name="flare_hdr_halo"
 				 value="Halo" />
 				<slider
@@ -1916,13 +1970,23 @@ without layout holes.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderLensFlareHaloWidth" />
 				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_starburst" />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
+				 top_pad="6"
 				 width="200"
 				 height="15"
+				 font="SansSerifBold"
 				 name="flare_hdr_starburst"
 				 value="Starburst" />
 				<slider
@@ -2024,13 +2088,23 @@ without layout holes.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderLensFlareStarburstLength" />
 				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_occlusion" />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
+				 top_pad="6"
 				 width="200"
 				 height="15"
+				 font="SansSerifBold"
 				 name="flare_hdr_occlusion"
 				 value="Occlusion" />
 				<slider
@@ -2122,14 +2196,14 @@ without layout holes.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="90"
+		 height="272"
 		 name="atab_sec_ca"
 		 title="Chromatic Aberration"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="61"
+			 height="243"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -2167,46 +2241,11 @@ without layout holes.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderChromaticAberrationStrength" />
 				</button>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="10"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_ca_reset"
-				 tool_tip="Reset this section (including Advanced) to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_ca" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="246"
-		 name="atab_sec_ca_adv"
-		 title="Chromatic Aberration - Advanced"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="217"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_ca_adv">
 				<slider
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
+				 top_pad="9"
 				 right="-32"
 				 height="16"
 				 label="Falloff"
@@ -2445,11 +2484,11 @@ without layout holes.
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="right"
-				 name="sec_ca_adv_reset"
-				 tool_tip="Reset the advanced chromatic aberration settings to defaults">
+				 name="sec_ca_reset"
+				 tool_tip="Reset this section to defaults">
 					<button.commit_callback
 					 function="LightBox.ResetSection"
-					 parameter="sec_ca_adv" />
+					 parameter="sec_ca" />
 				</button>
 			</panel>
 		</accordion_tab>
@@ -3023,7 +3062,7 @@ without layout holes.
 				 top_pad="9"
 				 right="-32"
 				 height="16"
-				 label="Range"
+				 label="Luma range"
 				 label_width="140"
 				 can_edit_text="true"
 				 decimal_digits="2"
@@ -3120,14 +3159,14 @@ without layout holes.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="140"
+		 height="90"
 		 name="atab_sec_sharp"
-		 title="Sharpen &amp; Dither"
+		 title="Sharpen"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="111"
+			 height="61"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -3165,29 +3204,6 @@ without layout holes.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderCASSharpness" />
 				</button>
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top_pad="10"
-				 width="300"
-				 label="Dithering"
-				 tool_tip="Apply output dithering to reduce banding in gradients"
-				 name="sharp_dither"
-				 control_name="RenderDitherEnabled" />
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top_pad="8"
-				 width="300"
-				 label="Animated dither"
-				 tool_tip="Re-randomize the dither pattern every frame"
-				 name="sharp_dither_animated"
-				 enabled_control="RenderDitherEnabled"
-				 control_name="RenderDitherAnimated" />
 				<button
 				 follows="top|right"
 				 layout="topleft"
