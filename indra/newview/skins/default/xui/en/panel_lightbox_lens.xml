@@ -2,9 +2,12 @@
 <!--
 Lightbox "Lens" tab: optical / film effects.
 Row and height conventions are documented in panel_lightbox_look.xml. The
-bloom/glow pair is the HDR fork: Bloom rows grey out unless RenderBloomHDR is
+bloom/glow pair is the HDR fork: Bloom rows grey out unless RenderHDREnabled is
 on; Legacy Glow rows grey out while it is on, so both modes stay discoverable
-without layout holes.
+without layout holes. (RenderBloomHDR is currently unwired renderer-side, so
+the fork gates on RenderHDREnabled — which is deliberately NOT offered as a
+toggle here; it cascades probe resets, buffer reallocation, and a shader
+rebuild. Revisit if RenderBloomHDR gets wired.)
 -->
 <panel
  name="panel_lightbox_lens"
@@ -357,34 +360,23 @@ without layout holes.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="168"
+		 height="142"
 		 name="atab_sec_bloom"
 		 title="Bloom (HDR)"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="139"
+			 height="113"
 			 left="0"
 			 top="0"
 			 right="-1"
 			 name="sec_bloom">
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top="8"
-				 width="300"
-				 label="HDR bloom"
-				 tool_tip="Use the HDR bloom pyramid instead of legacy glow. Off = the Legacy Glow section below applies. Toggling causes a brief hitch."
-				 name="bloom_hdr"
-				 control_name="RenderBloomHDR" />
 				<slider
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
+				 top="8"
 				 right="-32"
 				 height="16"
 				 label="Strength"
@@ -396,7 +388,7 @@ without layout holes.
 				 max_val="2"
 				 name="bloom_strength"
 				 tool_tip="How strongly the bloom is blended into the scene"
-				 enabled_control="RenderBloomHDR"
+				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomStrength" />
 				<button
 				 follows="top|right"
@@ -430,7 +422,7 @@ without layout holes.
 				 max_val="8"
 				 name="bloom_threshold"
 				 tool_tip="Luminance (linear light) above which pixels bloom; 1.0 is roughly brighter-than-white"
-				 enabled_control="RenderBloomHDR"
+				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomThreshold" />
 				<button
 				 follows="top|right"
@@ -464,7 +456,7 @@ without layout holes.
 				 max_val="2.5"
 				 name="bloom_scatter"
 				 tool_tip="Bloom spread per octave. Above about 2.5 the filter starts to alias."
-				 enabled_control="RenderBloomHDR"
+				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomScatter" />
 				<button
 				 follows="top|right"
@@ -533,7 +525,7 @@ without layout holes.
 				 max_val="1"
 				 name="bloom_knee"
 				 tool_tip="Soft-knee width below the threshold; wider gives a more gradual bloom onset"
-				 enabled_control="RenderBloomHDR"
+				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomKnee" />
 				<button
 				 follows="top|right"
@@ -567,7 +559,7 @@ without layout holes.
 				 max_val="8"
 				 name="bloom_alpha_boost"
 				 tool_tip="Multiplier for legacy prim-glow when fed into HDR bloom, so glowing objects match legacy brightness"
-				 enabled_control="RenderBloomHDR"
+				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomAlphaGlowBoost" />
 				<button
 				 follows="top|right"
@@ -601,7 +593,7 @@ without layout holes.
 				 max_val="7"
 				 name="bloom_mips"
 				 tool_tip="Bloom pyramid levels; more mips = wider, softer bloom. Changing causes a brief hitch."
-				 enabled_control="RenderBloomHDR"
+				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomMipCount" />
 				<button
 				 follows="top|right"
@@ -637,7 +629,7 @@ without layout holes.
 				 height="18"
 				 name="bloom_res_scale_combo"
 				 tool_tip="Resolution the bloom pyramid starts at. Lower resolutions are faster and reach wider per mip. Changing causes a brief hitch."
-				 enabled_control="RenderBloomHDR"
+				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomResolutionScale">
 					<combo_box.item
 					 label="Full"
@@ -686,7 +678,7 @@ without layout holes.
 				 label="Halation"
 				 tool_tip="Enable the warm halo signal around bright highlights (uses a wider pyramid format). Toggling causes a brief hitch."
 				 name="bloom_halation"
-				 enabled_control="RenderBloomHDR"
+				 enabled_control="RenderHDREnabled"
 				 control_name="RenderBloomHalation" />
 				<slider
 				 follows="left|top|right"
@@ -803,7 +795,7 @@ without layout holes.
 				 right="-8"
 				 height="15"
 				 name="glow_caption">
-					Applies when HDR bloom is off.
+					Applies when HDR rendering is off.
 				</text>
 				<check_box
 				 follows="left|top"
@@ -815,7 +807,7 @@ without layout holes.
 				 label="Glow"
 				 tool_tip="Legacy screen-space glow"
 				 name="glow_enable"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlow" />
 				<slider
 				 follows="left|top|right"
@@ -833,7 +825,7 @@ without layout holes.
 				 max_val="1"
 				 name="glow_strength"
 				 tool_tip="Additive strength of the glow"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowStrength" />
 				<button
 				 follows="top|right"
@@ -867,7 +859,7 @@ without layout holes.
 				 max_val="4"
 				 name="glow_width"
 				 tool_tip="Glow sample size; wider is softer but eventually pixelated"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowWidth" />
 				<button
 				 follows="top|right"
@@ -936,7 +928,7 @@ without layout holes.
 				 max_val="8"
 				 name="glow_iterations"
 				 tool_tip="Blur passes; higher is wider and smoother but slower"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowIterations" />
 				<button
 				 follows="top|right"
@@ -970,7 +962,7 @@ without layout holes.
 				 max_val="1"
 				 name="glow_max_alpha"
 				 tool_tip="Cap on brightness-extracted auto-glow"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowMaxExtractAlpha" />
 				<button
 				 follows="top|right"
@@ -1004,7 +996,7 @@ without layout holes.
 				 max_val="10000"
 				 name="glow_min_lum"
 				 tool_tip="Minimum luminance for an object to auto-glow; 9999 effectively disables auto-glow"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowMinLuminance" />
 				<button
 				 follows="top|right"
@@ -1038,7 +1030,7 @@ without layout holes.
 				 max_val="11"
 				 name="glow_res_pow"
 				 tool_tip="Glow map resolution as a power of two (9 = 512)"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowResolutionPow" />
 				<button
 				 follows="top|right"
@@ -1066,7 +1058,7 @@ without layout holes.
 				 label="HDR glow map"
 				 tool_tip="Use an HDR format for the glow map"
 				 name="glow_hdr"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowHDR" />
 				<slider
 				 follows="left|top|right"
@@ -1084,7 +1076,7 @@ without layout holes.
 				 max_val="1"
 				 name="glow_warmth"
 				 tool_tip="Blend between luminance extraction (0) and warmth extraction (1)"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowWarmthAmount" />
 				<button
 				 follows="top|right"
@@ -1266,7 +1258,7 @@ without layout holes.
 				 label="Glow noise (dither)"
 				 tool_tip="Dither the glow to reduce banding"
 				 name="glow_noise"
-				 disabled_control="RenderBloomHDR"
+				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowNoise" />
 				<button
 				 follows="top|right"
