@@ -1113,14 +1113,14 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="179"
+		 height="232"
 		 name="atab_sec_split"
 		 title="Split Toning"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="150"
+			 height="203"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1265,46 +1265,11 @@ Row conventions:
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderSplitToneBalance" />
 				</button>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="10"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_split_reset"
-				 tool_tip="Reset this section (including Advanced) to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_split" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="117"
-		 name="atab_sec_split_adv"
-		 title="Split Toning - Advanced"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="88"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_split_adv">
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top="8"
+				 top_pad="12"
 				 width="140"
 				 height="15"
 				 name="split_midtone_tint_label"
@@ -1382,11 +1347,11 @@ Row conventions:
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="right"
-				 name="sec_split_adv_reset"
-				 tool_tip="Reset the advanced split toning settings to defaults">
+				 name="sec_split_reset"
+				 tool_tip="Reset this section to defaults">
 					<button.commit_callback
 					 function="LightBox.ResetSection"
-					 parameter="sec_split_adv" />
+					 parameter="sec_split" />
 				</button>
 			</panel>
 		</accordion_tab>
