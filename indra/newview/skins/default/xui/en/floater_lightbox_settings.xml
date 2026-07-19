@@ -18,16 +18,9 @@
 	 top="18"
 	 right="-4"
 	 height="22">
-		<check_box
-		 follows="left|top"
-		 layout="topleft"
-		 height="16"
-		 left="6"
-		 top="3"
-		 width="220"
-		 label="Bypass post-processing"
-		 tool_tip="Temporarily skip tonemapping, exposure, and color processing. Not saved between sessions."
-		 control_name="RenderDisablePostProcessing" />
+		<!-- The Looks preset bar lands here in P4. (A "bypass post" toggle was
+		     removed: RenderDisablePostProcessing only acts while build tools
+		     are open, pipeline.cpp no_post gate.) -->
 	</panel>
 	<tab_container
 	 follows="all"
