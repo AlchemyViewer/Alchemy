@@ -148,169 +148,10 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="right"
 				 name="sec_aa_reset"
-				 tool_tip="Reset this section (including Advanced) to defaults">
+				 tool_tip="Reset this section to defaults">
 					<button.commit_callback
 					 function="LightBox.ResetSection"
 					 parameter="sec_aa" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="194"
-		 name="atab_sec_aa_adv"
-		 title="Anti-Aliasing - Advanced"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="165"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_aa_adv">
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top="8"
-				 width="300"
-				 label="Predicated thresholding (SMAA)"
-				 tool_tip="Sample the depth buffer during SMAA edge detection to preserve texture detail while sharpening silhouettes"
-				 name="aa_predication"
-				 control_name="RenderSMAAPredication" />
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="10"
-				 right="-32"
-				 height="16"
-				 label="Predication threshold"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="4"
-				 increment="0.0005"
-				 min_val="0"
-				 max_val="0.01"
-				 name="aa_pred_threshold"
-				 tool_tip="Threshold applied to the depth predication texture (SMAA only)"
-				 enabled_control="RenderSMAAPredication"
-				 control_name="RenderSMAAPredicationThreshold" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="aa_pred_threshold_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSMAAPredicationThreshold" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Predication scale"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="1"
-				 increment="0.1"
-				 min_val="1"
-				 max_val="5"
-				 name="aa_pred_scale"
-				 tool_tip="How much to scale the SMAA edge threshold when predication is on (SMAA only)"
-				 enabled_control="RenderSMAAPredication"
-				 control_name="RenderSMAAPredicationScale" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="aa_pred_scale_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSMAAPredicationScale" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Predication strength"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 name="aa_pred_strength"
-				 tool_tip="How much to locally decrease the edge threshold along predicated edges (SMAA only)"
-				 enabled_control="RenderSMAAPredication"
-				 control_name="RenderSMAAPredicationStrength" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="aa_pred_strength_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSMAAPredicationStrength" />
-				</button>
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top_pad="10"
-				 width="300"
-				 label="Stencil optimization (SMAA)"
-				 tool_tip="Use a stencil mask to skip blend-weight work on non-edge pixels"
-				 name="aa_stencil"
-				 control_name="RenderSMAAUseStencil" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="10"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_aa_adv_reset"
-				 tool_tip="Reset the advanced anti-aliasing settings to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_aa_adv" />
 				</button>
 			</panel>
 		</accordion_tab>
@@ -388,17 +229,58 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderReflectionProbeDetail" />
 				</button>
-				<check_box
+				<text
 				 follows="left|top"
 				 layout="topleft"
-				 height="16"
 				 left="8"
-				 top_pad="10"
-				 width="300"
-				 label="Mirrors"
-				 tool_tip="High-quality planar mirror surfaces. Toggling causes a brief hitch."
-				 name="reflect_mirrors"
-				 control_name="RenderMirrors" />
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="reflect_level_label"
+				 value="Coverage" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="reflect_level_combo"
+				 tool_tip="How much of the scene gets probe coverage"
+				 control_name="RenderReflectionProbeLevel">
+					<combo_box.item
+					 label="None"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Manual only"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Manual + terrain"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Full scene"
+					 name="3"
+					 value="3" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="reflect_level_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderReflectionProbeLevel" />
+				</button>
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -422,14 +304,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="405"
+		 height="327"
 		 name="atab_sec_reflect_adv"
 		 title="Reflections - Advanced"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="376"
+			 height="298"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -674,58 +556,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 top_pad="8"
 				 width="140"
 				 height="15"
-				 name="reflect_level_label"
-				 value="Coverage" />
-				<combo_box
-				 follows="left|top|right"
-				 layout="topleft"
-				 left_delta="140"
-				 top_pad="-16"
-				 right="-32"
-				 height="18"
-				 name="reflect_level_combo"
-				 tool_tip="How much of the scene gets probe coverage"
-				 control_name="RenderReflectionProbeLevel">
-					<combo_box.item
-					 label="None"
-					 name="0"
-					 value="0" />
-					<combo_box.item
-					 label="Manual only"
-					 name="1"
-					 value="1" />
-					<combo_box.item
-					 label="Manual + terrain"
-					 name="2"
-					 value="2" />
-					<combo_box.item
-					 label="Full scene"
-					 name="3"
-					 value="3" />
-				</combo_box>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-18"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="reflect_level_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderReflectionProbeLevel" />
-				</button>
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 width="140"
-				 height="15"
 				 name="reflect_count_label"
 				 value="Max probes" />
 				<combo_box
@@ -808,15 +638,61 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderReflectionProbeDrawDistance" />
 				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_reflect_adv_reset"
+				 tool_tip="Reset the advanced reflection settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_reflect_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="142"
+		 name="atab_sec_mirrors"
+		 title="Mirrors"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_mirrors">
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top="8"
+				 width="300"
+				 label="Mirrors"
+				 tool_tip="High-quality planar mirror surfaces. Toggling causes a brief hitch."
+				 name="reflect_mirrors"
+				 control_name="RenderMirrors" />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top_pad="9"
+				 top_pad="10"
 				 width="140"
 				 height="15"
-				 name="reflect_mirror_res_label"
-				 value="Mirror resolution" />
+				 name="mirrors_res_label"
+				 value="Resolution" />
 				<combo_box
 				 follows="left|top|right"
 				 layout="topleft"
@@ -824,7 +700,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 top_pad="-16"
 				 right="-32"
 				 height="18"
-				 name="reflect_mirror_res_combo"
+				 name="mirrors_res_combo"
 				 tool_tip="Resolution of mirror (hero probe) surfaces"
 				 enabled_control="RenderMirrors"
 				 control_name="RenderHeroProbeResolution">
@@ -855,7 +731,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="center"
-				 name="reflect_mirror_res_rst"
+				 name="mirrors_res_rst"
 				 tool_tip="Reset to default">
 					<button.commit_callback
 					 function="LightBox.ResetControlDefault"
@@ -868,8 +744,8 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 top_pad="9"
 				 width="140"
 				 height="15"
-				 name="reflect_mirror_rate_label"
-				 value="Mirror update rate" />
+				 name="mirrors_rate_label"
+				 value="Update rate" />
 				<combo_box
 				 follows="left|top|right"
 				 layout="topleft"
@@ -877,7 +753,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 top_pad="-16"
 				 right="-32"
 				 height="18"
-				 name="reflect_mirror_rate_combo"
+				 name="mirrors_rate_combo"
 				 tool_tip="How often mirror surfaces refresh"
 				 enabled_control="RenderMirrors"
 				 control_name="RenderHeroProbeUpdateRate">
@@ -908,7 +784,7 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="center"
-				 name="reflect_mirror_rate_rst"
+				 name="mirrors_rate_rst"
 				 tool_tip="Reset to default">
 					<button.commit_callback
 					 function="LightBox.ResetControlDefault"
@@ -926,11 +802,11 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="right"
-				 name="sec_reflect_adv_reset"
-				 tool_tip="Reset the advanced reflection settings to defaults">
+				 name="sec_mirrors_reset"
+				 tool_tip="Reset this section to defaults">
 					<button.commit_callback
 					 function="LightBox.ResetSection"
-					 parameter="sec_reflect_adv" />
+					 parameter="sec_mirrors" />
 				</button>
 			</panel>
 		</accordion_tab>
@@ -997,30 +873,45 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderShadowDetail" />
 				</button>
-				<slider
-				 follows="left|top|right"
+				<text
+				 follows="left|top"
 				 layout="topleft"
 				 left="8"
 				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="shadow_res_scale_label"
+				 value="Resolution scale" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
 				 right="-32"
-				 height="16"
-				 label="Resolution scale"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.05"
-				 min_val="0.25"
-				 max_val="2"
-				 name="shadow_res_scale"
-				 tool_tip="Shadow map resolution multiplier. High values can exhaust VRAM on limited GPUs."
-				 control_name="RenderShadowResolutionScale" />
+				 height="18"
+				 name="shadow_res_scale_combo"
+				 tool_tip="Shadow map resolution multiplier. Each change reallocates the shadow maps; x2 can exhaust VRAM on limited GPUs."
+				 control_name="RenderShadowResolutionScale">
+					<combo_box.item
+					 label="x2"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="x1"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="x0.5"
+					 name="0.5"
+					 value="0.5" />
+				</combo_box>
 				<button
 				 follows="top|right"
 				 layout="topleft"
 				 height="18"
 				 width="18"
 				 right="-8"
-				 top_pad="-17"
+				 top_pad="-18"
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="center"
@@ -2183,63 +2074,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					<button.commit_callback
 					 function="LightBox.ResetSection"
 					 parameter="sec_preview" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="113"
-		 name="atab_sec_output"
-		 title="Output"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="84"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_output">
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top="8"
-				 width="300"
-				 label="High-precision post buffers"
-				 tool_tip="Use 16-bit floating point buffers for post-processing to reduce banding. May require a restart to fully apply."
-				 name="output_high_precision"
-				 control_name="RenderHighPrecisionPostProcess" />
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top_pad="8"
-				 width="300"
-				 label="10-bit SDR output (experimental)"
-				 tool_tip="Request a 10-bit SDR framebuffer. Experimental; requires a restart."
-				 name="output_10bit"
-				 control_name="RenderGLContext10bitSDR" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="10"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_output_reset"
-				 tool_tip="Reset this section to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_output" />
 				</button>
 			</panel>
 		</accordion_tab>
