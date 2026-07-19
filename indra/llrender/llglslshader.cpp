@@ -685,8 +685,9 @@ void LLGLSLShader::mapUniform(const gl_uniform_data_t& gl_uniform)
         case GL_FLOAT_VEC2: size *= 2; break;
         case GL_FLOAT_VEC3: size *= 3; break;
         case GL_FLOAT_VEC4: size *= 4; break;
+        // Doubles occupy two 4-byte words per component (component_count * 2).
         case GL_DOUBLE: size *= 2; break;
-        case GL_DOUBLE_VEC2: size *= 2; break;
+        case GL_DOUBLE_VEC2: size *= 4; break;
         case GL_DOUBLE_VEC3: size *= 6; break;
         case GL_DOUBLE_VEC4: size *= 8; break;
         case GL_INT_VEC2: size *= 2; break;
@@ -695,6 +696,17 @@ void LLGLSLShader::mapUniform(const gl_uniform_data_t& gl_uniform)
         case GL_UNSIGNED_INT_VEC2: size *= 2; break;
         case GL_UNSIGNED_INT_VEC3: size *= 3; break;
         case GL_UNSIGNED_INT_VEC4: size *= 4; break;
+        // 64-bit integers (ARB_gpu_shader_int64 / bindless texture handles) are two
+        // 4-byte words per component, same sizing as GL_DOUBLE. (NV enums alias the
+        // ARB values, so listing only the ARB names covers both.)
+        case GL_INT64_ARB: size *= 2; break;
+        case GL_INT64_VEC2_ARB: size *= 4; break;
+        case GL_INT64_VEC3_ARB: size *= 6; break;
+        case GL_INT64_VEC4_ARB: size *= 8; break;
+        case GL_UNSIGNED_INT64_ARB: size *= 2; break;
+        case GL_UNSIGNED_INT64_VEC2_ARB: size *= 4; break;
+        case GL_UNSIGNED_INT64_VEC3_ARB: size *= 6; break;
+        case GL_UNSIGNED_INT64_VEC4_ARB: size *= 8; break;
         case GL_BOOL_VEC2: size *= 2; break;
         case GL_BOOL_VEC3: size *= 3; break;
         case GL_BOOL_VEC4: size *= 4; break;
