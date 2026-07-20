@@ -222,7 +222,7 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
         }
 
         // Make corresponding GL image.
-        mImageGLVec[bitmap_idx][slot] = new LLImageGL(image_raw, false, false);
+        mImageGLVec[bitmap_idx][slot] = new LLImageGL(image_raw, false);
         LLImageGL* image_gl = mImageGLVec[bitmap_idx][slot];
 
         // Fresh sheet hasn't been read or written yet.

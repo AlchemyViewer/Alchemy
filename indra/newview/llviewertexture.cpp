@@ -3271,7 +3271,6 @@ LLViewerMediaTexture::LLViewerMediaTexture(const LLUUID& id, bool usemipmaps, LL
         generateGLTexture();
     }
 
-    mGLTexturep->setAllowCompression(false);
 
     mGLTexturep->setNeedsAlphaAndPickMask(false);
 

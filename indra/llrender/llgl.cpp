@@ -1244,15 +1244,6 @@ bool LLGLManager::initGL()
         parse_glsl_version(mGLSLVersionMajor, mGLSLVersionMinor);
     }
 
-    if (mGLVersion >= 2.1f && LLImageGL::sCompressTextures)
-    { //use texture compression
-        glHint(GL_TEXTURE_COMPRESSION_HINT, GL_NICEST);
-    }
-    else
-    { //GL version is < 3.0, always disable texture compression
-        LLImageGL::sCompressTextures = false;
-    }
-
     // Trailing space necessary to keep "nVidia Corpor_ati_on" cards
     // from being recognized as ATI.
     // NOTE: AMD has been pretty good about not breaking this check, do not rename without good reason

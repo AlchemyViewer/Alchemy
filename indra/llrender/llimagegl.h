@@ -126,9 +126,9 @@ public:
     static bool create(LLPointer<LLImageGL>& dest, const LLImageRaw* imageraw, bool usemipmaps = true);
 
 public:
-    LLImageGL(bool usemipmaps = true, bool allow_compression = true);
-    LLImageGL(U32 width, U32 height, U8 components, bool usemipmaps = true, bool allow_compression = true);
-    LLImageGL(const LLImageRaw* imageraw, bool usemipmaps = true, bool allow_compression = true);
+    LLImageGL(bool usemipmaps = true);
+    LLImageGL(U32 width, U32 height, U8 components, bool usemipmaps = true);
+    LLImageGL(const LLImageRaw* imageraw, bool usemipmaps = true);
 
     // For wrapping textures created via GL elsewhere with our API only. Use with caution.
     LLImageGL(LLGLuint mTexName, U32 components, LLGLenum target, LLGLint  formatInternal, LLGLenum formatPrimary, LLGLenum formatType, LLTexUnit::eTextureAddressMode addressMode);
@@ -157,7 +157,6 @@ public:
 
     bool setSize(S32 width, S32 height, S32 ncomponents, S32 discard_level = -1);
     void setComponents(S32 ncomponents) { mComponents = (S8)ncomponents ;}
-    void setAllowCompression(bool allow) { mAllowCompression = allow; }
 
     // has_mips signals VRAM accounting that this allocation will own a
     // full mip pyramid (either by additional setManualImage calls per
@@ -166,7 +165,7 @@ public:
     // otherwise. Defaults to false so non-LLImageGL callers
     // (llrendertarget, manip tools, drawpoolbump scratch uploads, etc.)
     // keep their existing single-level accounting.
-    static void setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels, bool allow_compression = true, bool has_mips = false);
+    static void setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels, bool has_mips = false);
 
     // Apply the GL_TEXTURE_SWIZZLE_RGBA mask that re-expresses a deprecated
     // source format on the currently-bound texture as samplable RGBA.
@@ -190,9 +189,9 @@ public:
     bool createGLTexture(S32 discard_level, const U8* data, bool data_hasmips = false, S32 usename = 0, bool defer_copy = false, LLGLuint* tex_name = nullptr);
     void setImage(const LLImageRaw* imageraw);
     bool setImage(const U8* data_in, bool data_hasmips = false, S32 usename = 0);
-    // *TODO: This function may not work if the textures is compressed (i.e.
-    // RenderCompressTextures is 0). Partial image updates do not work on
-    // compressed textures.
+    // *TODO: This function may not work on block-compressed textures (i.e. those
+    // uploaded already compressed, where isCompressed() is true). Partial image
+    // updates do not work on compressed textures.
     bool setSubImage(const LLImageRaw* imageraw, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update = false, LLGLuint use_name = 0, bool skip_unbind = false);
     bool setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update = false, LLGLuint use_name = 0, bool skip_unbind = false);
     bool setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_pos, S32 width, S32 height);
@@ -267,7 +266,7 @@ public:
 
     LLGLenum getTexTarget()const { return mTarget; }
 
-    void init(bool usemipmaps, bool allow_compression);
+    void init(bool usemipmaps);
     virtual void cleanup(); // Clean up the LLImageGL so it can be reinitialized.  Be careful when using this in derived class destructors
 
     void setNeedsAlphaAndPickMask(bool need_mask);
@@ -315,7 +314,6 @@ private:
     U16      mHeight;
     S8       mCurrentDiscardLevel;
 
-    bool mAllowCompression;
 
 protected:
     LLGLenum mTarget;       // Normally GL_TEXTURE2D, sometimes something else (ex. cube maps)
@@ -357,7 +355,6 @@ public:
     static U32 sUniqueCount;                // Tracks number of unique texture binds for current frame
     static LLImageGL* sDefaultGLTexture ;
     static bool sAutomatedTest;
-    static bool sCompressTextures;          //use GL texture compression
 #if DEBUG_MISS
     bool mMissed; // Missed on last bind?
     bool getMissed() const { return mMissed; };

@@ -161,7 +161,6 @@ S32 LLImageGL::sCount                   = 0;
 
 F32 LLImageGL::sLastFrameTime           = 0.f;
 LLImageGL* LLImageGL::sDefaultGLTexture = NULL ;
-bool LLImageGL::sCompressTextures = false;
 boost::unordered_set<LLImageGL*> LLImageGL::sImageList;
 
 
@@ -542,29 +541,29 @@ bool LLImageGL::create(LLPointer<LLImageGL>& dest, const LLImageRaw* imageraw, b
 
 //----------------------------------------------------------------------------
 
-LLImageGL::LLImageGL(bool usemipmaps/* = true*/, bool allow_compression/* = true*/)
+LLImageGL::LLImageGL(bool usemipmaps/* = true*/)
 :   mSaveData(0), mExternalTexture(false)
 {
-    init(usemipmaps, allow_compression);
+    init(usemipmaps);
     setSize(0, 0, 0);
     sImageList.insert(this);
     sCount++;
 }
 
-LLImageGL::LLImageGL(U32 width, U32 height, U8 components, bool usemipmaps/* = true*/, bool allow_compression/* = true*/)
+LLImageGL::LLImageGL(U32 width, U32 height, U8 components, bool usemipmaps/* = true*/)
 :   mSaveData(0), mExternalTexture(false)
 {
     llassert( components <= 4 );
-    init(usemipmaps, allow_compression);
+    init(usemipmaps);
     setSize(width, height, components);
     sImageList.insert(this);
     sCount++;
 }
 
-LLImageGL::LLImageGL(const LLImageRaw* imageraw, bool usemipmaps/* = true*/, bool allow_compression/* = true*/)
+LLImageGL::LLImageGL(const LLImageRaw* imageraw, bool usemipmaps/* = true*/)
 :   mSaveData(0), mExternalTexture(false)
 {
-    init(usemipmaps, allow_compression);
+    init(usemipmaps);
     setSize(0, 0, 0);
     sImageList.insert(this);
     sCount++;
@@ -589,7 +588,7 @@ LLImageGL::LLImageGL(
                             // sImageList.erase / sCount-- the other ctors
                             // would do (sCount drifts negative over time).
 {
-    init(false, true);
+    init(false);
     mTexName = texName;
     mTarget = target;
     mComponents = components;
@@ -617,7 +616,7 @@ LLImageGL::~LLImageGL()
     }
 }
 
-void LLImageGL::init(bool usemipmaps, bool allow_compression)
+void LLImageGL::init(bool usemipmaps)
 {
 #if LL_IMAGEGL_THREAD_CHECK
     mActiveThread = LLThread::currentID();
@@ -646,8 +645,6 @@ void LLImageGL::init(bool usemipmaps, bool allow_compression)
     mWidth = 0;
     mHeight = 0;
     mCurrentDiscardLevel = -1;
-
-    mAllowCompression = allow_compression;
 
     mTarget = GL_TEXTURE_2D;
     mBindTarget = LLTexUnit::TT_TEXTURE;
@@ -861,7 +858,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
         S32 w = getWidth();
         S32 h = getHeight();
         LLImageGL::setManualImage(mTarget, 0, mFormatInternal, w, h,
-            mFormatPrimary, mFormatType, (GLvoid*)data_in, mAllowCompression, mUseMipMaps);
+            mFormatPrimary, mFormatType, (GLvoid*)data_in, mUseMipMaps);
     }
     else if (mUseMipMaps)
     {
@@ -896,7 +893,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                         stop_glerror();
                     }
 
-                    LLImageGL::setManualImage(mTarget, gl_level, mFormatInternal, w, h, mFormatPrimary, mFormatType, (GLvoid*)data_in, mAllowCompression, mUseMipMaps);
+                    LLImageGL::setManualImage(mTarget, gl_level, mFormatInternal, w, h, mFormatPrimary, mFormatType, (GLvoid*)data_in, mUseMipMaps);
                     if (gl_level == 0)
                     {
                         analyzeAlpha(data_in, w, h);
@@ -939,7 +936,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                     LLImageGL::setManualImage(mTarget, 0, mFormatInternal,
                                  w, h,
                                  mFormatPrimary, mFormatType,
-                                 data_in, mAllowCompression, mUseMipMaps);
+                                 data_in, mUseMipMaps);
                     analyzeAlpha(data_in, w, h);
                     stop_glerror();
 
@@ -1040,7 +1037,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                             stop_glerror();
                         }
 
-                        LLImageGL::setManualImage(mTarget, m, mFormatInternal, w, h, mFormatPrimary, mFormatType, cur_mip_data, mAllowCompression, mUseMipMaps);
+                        LLImageGL::setManualImage(mTarget, m, mFormatInternal, w, h, mFormatPrimary, mFormatType, cur_mip_data, mUseMipMaps);
                         if (m == 0)
                         {
                             analyzeAlpha(data_in, w, h);
@@ -1097,7 +1094,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
             }
 
             LLImageGL::setManualImage(mTarget, 0, mFormatInternal, w, h,
-                         mFormatPrimary, mFormatType, (GLvoid *)data_in, mAllowCompression);
+                         mFormatPrimary, mFormatType, (GLvoid *)data_in);
             analyzeAlpha(data_in, w, h);
 
             updatePickMask(w, h, data_in);
@@ -1142,6 +1139,17 @@ U32 type_width_from_pixtype(U32 pixtype)
     return type_width;
 }
 
+// Whether to break an upload into sub_image_lines slices. This is latency smoothing,
+// not throughput: it only ever applies on the main thread, where one large
+// glTexSubImage2D can stall long enough to cost a frame. Off-thread uploads issue a
+// single call.
+//
+// The compressed guard is structural, not a driver workaround: sub_image_lines slices
+// by scanline stride, which is meaningless for block-compressed data. (The comment that
+// used to be here blamed an NVIDIA/Win10 glTexSubImage2D bug, long since fixed -- but the
+// guard would still be required without it.) setSubImage can pass a genuinely
+// block-compressed texture; setManualImage now always passes false, since driver-side
+// generic compression is gone.
 bool should_stagger_image_set(bool compressed)
 {
 #if LL_MESA_HEADLESS
@@ -1151,7 +1159,6 @@ bool should_stagger_image_set(bool compressed)
 #elif LL_DARWIN
     return !compressed && on_main_thread() && gGLManager.mIsAMD;
 #else
-    // glTexSubImage2D doesn't work with compressed textures on select tested Nvidia GPUs on Windows 10 -Cosmic,2023-03-08
     // Setting media textures off-thread seems faster when not using sub_image_lines (Nvidia/Windows 10) -Cosmic,2023-03-31
     return !compressed && on_main_thread() && !gGLManager.mIsIntel;
 #endif
@@ -1408,7 +1415,7 @@ void LLImageGL::deleteTextures(S32 numTextures, const U32 *textures)
 }
 
 // static
-void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels, bool allow_compression, bool has_mips)
+void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels, bool has_mips)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     // Gate on GL version. GL_TEXTURE_SWIZZLE_RGBA is in both core and
@@ -1537,53 +1544,6 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
         }
     }
 
-    const bool compress = LLImageGL::sCompressTextures && allow_compression;
-    if (compress)
-    {
-        switch (intformat)
-        {
-        case GL_RED:
-        case GL_R8:
-            intformat = GL_COMPRESSED_RED;
-            break;
-        case GL_RG:
-        case GL_RG8:
-            intformat = GL_COMPRESSED_RG;
-            break;
-        case GL_RGB:
-        case GL_RGB8:
-            intformat = GL_COMPRESSED_RGB;
-            break;
-        case GL_SRGB:
-        case GL_SRGB8:
-            intformat = GL_COMPRESSED_SRGB;
-            break;
-        case GL_RGBA:
-        case GL_RGBA8:
-            intformat = GL_COMPRESSED_RGBA;
-            break;
-        case GL_SRGB_ALPHA:
-        case GL_SRGB8_ALPHA8:
-            intformat = GL_COMPRESSED_SRGB_ALPHA;
-            break;
-        case GL_LUMINANCE:
-        case GL_LUMINANCE8:
-            intformat = GL_COMPRESSED_LUMINANCE;
-            break;
-        case GL_LUMINANCE_ALPHA:
-        case GL_LUMINANCE8_ALPHA8:
-            intformat = GL_COMPRESSED_LUMINANCE_ALPHA;
-            break;
-        case GL_ALPHA:
-        case GL_ALPHA8:
-            intformat = GL_COMPRESSED_ALPHA;
-            break;
-        default:
-            LL_WARNS() << "Could not compress format: " << std::hex << intformat << std::dec << LL_ENDL;
-            break;
-        }
-    }
-
     stop_glerror();
     {
         LL_PROFILE_ZONE_NAMED("glTexImage2D");
@@ -1601,7 +1561,7 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
         {
             free_cur_tex_image();
         }
-        const bool use_sub_image = should_stagger_image_set(compress);
+        const bool use_sub_image = should_stagger_image_set(false);
         if (!use_sub_image)
         {
             LL_PROFILE_ZONE_NAMED("glTexImage2D alloc + copy");

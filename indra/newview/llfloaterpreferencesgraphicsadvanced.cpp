@@ -375,11 +375,6 @@ void LLFloaterPreferenceGraphicsAdvanced::refreshEnabledState()
         getChildView("vbo")->setEnabled(false);
     }
 
-    if (!LLFeatureManager::getInstance()->isFeatureAvailable("RenderCompressTextures"))
-    {
-        getChildView("texture compression")->setEnabled(false);
-    }
-
     getChildView("antialiasing restart")->setVisible(!LLFeatureManager::getInstance()->isFeatureAvailable("RenderDeferred"));
 
     LLComboBox* af_combo = getChild<LLComboBox>("anisotropic_filter");

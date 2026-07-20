@@ -1680,7 +1680,6 @@ LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, std::str
     imagep->setAddressMode(LLTexUnit::TAM_CLAMP);
 
     //don't compress UI images
-    imagep->getGLTexture()->setAllowCompression(false);
 
     LLUIImagePtr new_imagep = new LLUIImage(std::string(name), imagep);
     new_imagep->setScaleStyle(scale_style);

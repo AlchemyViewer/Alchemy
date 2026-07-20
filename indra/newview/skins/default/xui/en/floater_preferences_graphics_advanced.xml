@@ -361,18 +361,6 @@
   </text>
 
   <check_box
-    control_name="RenderCompressTextures"
-    height="16"
-    initial_value="true"
-    label="Enable Texture Compression (requires restart)"
-    layout="topleft"
-    left="30"
-    top_delta="16"
-    name="texture compression"
-    tool_tip="Compresses textures in video memory, allowing for higher resolution textures to be loaded at the cost of some color quality."
-    width="315" />
-
-  <check_box
     control_name="RenderHiDPI"
     height="16"
     initial_value="true"
