@@ -569,14 +569,15 @@ LLThreadSafeRefCount::LLThreadSafeRefCount() :
 
 LLThreadSafeRefCount::LLThreadSafeRefCount(const LLThreadSafeRefCount& src)
 {
-    mRef = 0;
+    mRef.store(0, std::memory_order_relaxed);
 }
 
 LLThreadSafeRefCount::~LLThreadSafeRefCount()
 {
-    if (mRef != 0)
+    const S32 refs = getNumRefs();
+    if (refs != 0)
     {
-        LL_ERRS() << "deleting referenced object mRef = " << mRef << LL_ENDL;
+        LL_ERRS() << "deleting referenced object mRef = " << refs << LL_ENDL;
     }
 }
 
