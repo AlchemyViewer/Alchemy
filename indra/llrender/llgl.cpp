@@ -2119,6 +2119,18 @@ void LLGLManager::initExtensions()
                                << "allocation will fail." << LL_ENDL;
     }
 
+    // REQUIRED, like immutable storage. Never promoted to core, so it is an extension
+    // query at every version. Without it an sRGB-format texture always applies its
+    // transfer function on read and there is no way to say otherwise, which the renderer
+    // relies on being able to do -- see ALSampler::SRGBDecode.
+    mHasTextureSRGBDecode = mGLExtensions.contains("GL_EXT_texture_sRGB_decode");
+    if (!mHasTextureSRGBDecode)
+    {
+        LL_WARNS("RenderInit") << "GL_EXT_texture_sRGB_decode is missing. sRGB-format "
+                               << "textures will decode on every read regardless of what the "
+                               << "sampler asks for." << LL_ENDL;
+    }
+
     // Core in 4.5; also an ARB extension. Downgraded below if the entry points don't resolve.
     mHasDirectStateAccess = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_direct_state_access");
 

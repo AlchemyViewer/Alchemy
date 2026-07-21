@@ -82,6 +82,13 @@
 #define GL_RENDERBUFFER_FREE_MEMORY_ATI            0x87FD
 #endif
 
+#ifndef GL_EXT_texture_sRGB_decode
+#define GL_EXT_texture_sRGB_decode 1
+#define GL_TEXTURE_SRGB_DECODE_EXT        0x8A48
+#define GL_DECODE_EXT                     0x8A49
+#define GL_SKIP_DECODE_EXT                0x8A4A
+#endif
+
 #ifndef GL_EXT_memory_object
 #define GL_EXT_memory_object 1
 #define GL_TEXTURE_TILING_EXT             0x9580

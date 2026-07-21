@@ -7145,7 +7145,11 @@ void LLPipeline::visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 
 {
     dst->bindTarget();
     gDeferredBufferVisualProgram.bind();
-    gDeferredBufferVisualProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::BilinearMirror, bufferIndex);
+    // Attachment 0 of deferredScreen is sRGB, so match what the lighting pass sees; the
+    // other attachments and the other targets this visualises are not, where the bit is inert.
+    gDeferredBufferVisualProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src,
+                                             ALSamplers::BilinearMirror | ALSampler::SRGBDecode,
+                                             bufferIndex);
 
     if (RenderBufferVisualization != 4)
         gDeferredBufferVisualProgram.uniform1f(LLShaderMgr::MIP_LEVEL, 0);
@@ -9084,7 +9088,13 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
     if (channel > -1)
     {
-        deferred_target->bindTexture(0, channel, ALSamplers::PointClamp); // frag_data[0]
+        // SRGBDecode: deferredScreen attachment 0 is GL_SRGB8_ALPHA8, and getGBuffer()
+        // reads it straight into GBufferInfo::albedo with no conversion of its own -- the
+        // hardware decode is what makes that value linear. Now that samplers skip the decode
+        // by default, this pass has to ask for it. The alternative is srgb_to_linear() in
+        // gbufferread.slang, which would make the dependency shader-visible rather than
+        // bind-visible; either is defensible, this one preserves the pixels exactly.
+        deferred_target->bindTexture(0, channel, ALSamplers::PointClamp | ALSampler::SRGBDecode); // frag_data[0]
     }
 
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_SPECULAR);

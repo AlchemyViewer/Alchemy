@@ -113,6 +113,12 @@ public:
     // 4.1 context via GL_ARB_texture_storage -- which is how macOS gets it. Only true
     // once the entry point has actually resolved, so callers may trust it directly.
     bool mHasTextureStorage = false;
+    // GL_EXT_texture_sRGB_decode: sampler/texture control over whether an sRGB-format
+    // texture has its transfer function applied on read. Never promoted to core, but
+    // universally supported on the hardware this viewer runs on, and REQUIRED here --
+    // the renderer decodes explicitly rather than implicitly, so it needs to be able to
+    // turn the implicit decode off. See ALSampler::SRGBDecode.
+    bool mHasTextureSRGBDecode = false;
     // Direct state access (glBindTextureUnit, glCreateSamplers, glTextureStorage*, ...).
     // Core in 4.5, also reachable as GL_ARB_direct_state_access. Only true once the entry
     // points have actually resolved, so callers may trust it directly.

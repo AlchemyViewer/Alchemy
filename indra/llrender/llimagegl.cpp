@@ -1579,6 +1579,23 @@ void LLImageGL::setManualSubImage(U32 target, S32 miplevel, S32 width, S32 heigh
     stop_glerror();
 }
 
+// Opt a freshly-allocated texture out of the sRGB transfer function.
+//
+// GL applies it on every read of an sRGB-format texture unless told otherwise, so without
+// this the decode is decided by the internal format and nothing else -- see
+// ALSampler::SRGBDecode for why that is the wrong way round for this renderer.
+//
+// The samplers already skip it, and a sampler object overrides the texture when one is
+// bound, so this is what makes a bind with sampler 0 behave the same way rather than
+// quietly linearising. Harmless on a non-sRGB format: the state exists but nothing reads it.
+static void skipSRGBDecode(U32 target)
+{
+    if (gGLManager.mHasTextureSRGBDecode)
+    {
+        glTexParameteri(target, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
+    }
+}
+
 // Allocate a 2D texture on the currently-bound name and upload level 0.
 //
 // This owns the whole texture: call it exactly once per texture object. The result cannot
@@ -1605,6 +1622,7 @@ void LLImageGL::allocateTexture2D(U32 target, S32 intformat, S32 width, S32 heig
     {
         LL_PROFILE_ZONE_NAMED("glTexStorage2D");
         glTexStorage2D(target, levels, intformat, width, height);
+        skipSRGBDecode(target);
 
         if (pixels != nullptr)
         {
@@ -2773,6 +2791,7 @@ void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
         // object. Every later write must be a sub-image, and any change of size or format
         // must create a new texture -- see scaleDown and createGLTexture.
         glTexStorage2D(mTarget, mMipLevels, getStorageInternalFormat(), width, height);
+        skipSRGBDecode(mTarget);
         mStorageAllocated = true;
     }
 

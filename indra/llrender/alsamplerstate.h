@@ -79,6 +79,23 @@ enum class ALSampler : U16
     // --- depth compare, bit 4. Makes this a shadow sampler. ---
     Compare = 1u << 4,
 
+    // --- bit 5: apply the sRGB transfer function on read (GL_EXT_texture_sRGB_decode) ---
+    //
+    // OPT IN, which inverts GL's default. GL decodes an sRGB-format texture on every read
+    // unless told not to, so the transfer function is applied by the format rather than by
+    // anyone's decision, and a pass that wants the stored bits has no say. That is backwards
+    // for a renderer that converts explicitly: 26 shader modules import environment.srgb and
+    // do the conversion themselves, and hardware decode underneath them is a second,
+    // invisible conversion nobody wrote.
+    //
+    // So every sampler skips the decode unless it names this, and the texture objects skip
+    // it too (see LLImageGL::allocateTexture2D) so a bind with no sampler object behaves the
+    // same way. A pass that genuinely wants the hardware to linearise says so.
+    //
+    // No effect on a non-sRGB format, which is most of them -- the bit only matters where
+    // the internal format carries a transfer function to begin with.
+    SRGBDecode = 1u << 5,
+
     // There was a fifth field here, HasMips, recording whether the RESOURCE had a mip
     // chain. It existed because GL treats a mipmapped minification filter on a texture with
     // no mip chain as *incomplete*, which samples black -- so the bind had to reconcile the
@@ -166,6 +183,11 @@ struct ALSamplerDesc
     // GL_NONE, or GL_COMPARE_REF_TO_TEXTURE for a shadow sampler.
     U32 mCompareMode = GL_NONE;
     U32 mCompareFunc = GL_LEQUAL;
+    // GL_SKIP_DECODE_EXT or GL_DECODE_EXT. Defaults to SKIP, which is the opposite of GL's
+    // own default -- see ALSampler::SRGBDecode. No D3D11_SAMPLER_DESC equivalent: there the
+    // SRV's format decides (DXGI_FORMAT_*_UNORM vs _UNORM_SRGB), which is the same choice
+    // expressed at a different bind point.
+    U32 mSRGBDecode = GL_SKIP_DECODE_EXT;
 
     bool operator==(const ALSamplerDesc& rhs) const = default;
 };
@@ -208,7 +230,7 @@ namespace ALSamplers
 // Owns the sampler objects belonging to one GL context.
 //
 // The descriptor space the renderer actually uses is small and enumerable -- filter x
-// address mode x compare -- so the common path is a flat array index rather
+// address mode x compare x srgb-decode -- so the common path is a flat array index rather
 // than a hash lookup, which matters because it runs per bind. Objects are created lazily
 // on first use and then live until the context goes away; they are immutable, so sharing
 // one between unrelated call sites is safe by construction.
@@ -262,7 +284,7 @@ public:
 
     // Create every reachable sampler up front.
     //
-    // The table is 32 slots of which 24 are reachable, and a sampler object is a few words of
+    // The table is 64 slots of which 48 are reachable, and a sampler object is a few words of
     // driver state -- so building them all costs less than the branch that testing for them
     // would cost on every bind, forever. Call once the context is up, and again after clear()
     // drops them (an anisotropy change does that).
@@ -284,10 +306,10 @@ private:
 
     static U32 create(const ALSamplerDesc& desc);
 
-    // Five bits: filter(2) + address(2) + compare(1). 8 of the 32 slots are unreachable
-    // (address only uses 3 of its 4 values) and stay 0 -- 32 U32s is 128 bytes, and the
-    // alternative is arithmetic on every bind to compact them away.
-    static constexpr U32 KEY_BITS    = 5;
+    // Six bits: filter(2) + address(2) + compare(1) + srgb-decode(1). 16 of the 64 slots
+    // are unreachable (address only uses 3 of its 4 values) and stay 0 -- 64 U32s is 256
+    // bytes, and the alternative is arithmetic on every bind to compact them away.
+    static constexpr U32 KEY_BITS    = 6;
     static constexpr U32 KEY_MASK    = (1u << KEY_BITS) - 1u;
     static constexpr U32 NUM_SAMPLERS = 1u << KEY_BITS;
 

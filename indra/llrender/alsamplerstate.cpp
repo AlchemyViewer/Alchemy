@@ -50,6 +50,7 @@ ALSamplerDesc ALSamplerCache::makeDesc(ALSampler key)
     const U16  filter  = alSamplerFilter(key);
     const U16  address = alSamplerAddress(key);
     const bool compare = alSamplerHas(key, ALSampler::Compare);
+    const bool decode  = alSamplerHas(key, ALSampler::SRGBDecode);
 
     // The unreachable quarter of the address field. Reaching it means a mask was built by
     // arithmetic rather than by composing ALSampler values.
@@ -94,6 +95,8 @@ ALSamplerDesc ALSamplerCache::makeDesc(ALSampler key)
         desc.mCompareFunc = GL_LEQUAL;
     }
 
+    desc.mSRGBDecode = decode ? GL_DECODE_EXT : GL_SKIP_DECODE_EXT;
+
     return desc;
 }
 
@@ -135,6 +138,13 @@ U32 ALSamplerCache::create(const ALSamplerDesc& desc)
     {
         glSamplerParameteri(name, GL_TEXTURE_COMPARE_MODE, desc.mCompareMode);
         glSamplerParameteri(name, GL_TEXTURE_COMPARE_FUNC, desc.mCompareFunc);
+    }
+
+    // Written unconditionally when supported, including where it matches GL's default, so a
+    // sampler's behaviour is fully described by its descriptor rather than partly inherited.
+    if (gGLManager.mHasTextureSRGBDecode)
+    {
+        glSamplerParameteri(name, GL_TEXTURE_SRGB_DECODE_EXT, desc.mSRGBDecode);
     }
 
     stop_glerror();
