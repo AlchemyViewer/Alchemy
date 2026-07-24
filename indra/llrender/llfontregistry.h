@@ -32,7 +32,7 @@
 #define LL_LLFONTREGISTRY_H
 
 #include "llpointer.h"
-#include "llfontface.h"  // for LLFontFaceKey
+#include "alfontface.h"  // for ALFontFaceKey
 #include "llsd.h"        // mLastFontOverrides stored by value
 
 #include <boost/unordered_map.hpp>
@@ -59,12 +59,12 @@ enum class EFontHinting : S32
     LIGHT = 0x10020, // FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_LIGHT
 };
 
-// LLFontVarAxes is defined in llfontface.h (so LLFontFaceKey can carry
+// ALFontVarAxes is defined in alfontface.h (so ALFontFaceKey can carry
 // it) and re-used here without redefinition.
 
 struct LLFontFileInfo
 {
-    LLFontFileInfo(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false, bool load_collection = false, const LLFontVarAxes& var_axes = {})
+    LLFontFileInfo(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false, bool load_collection = false, const ALFontVarAxes& var_axes = {})
         : FileName(file_name)
         , CharFunctor(char_functor)
         , mHinting(hinting)
@@ -84,7 +84,7 @@ struct LLFontFileInfo
     // is independently gated by its matching *_set flag — unset = no
     // FT_Set_Var call for that axis = file default carries through.
     // The legacy `weight` field is gone; var_axes.wght carries it now.
-    LLFontVarAxes mVarAxes;
+    ALFontVarAxes mVarAxes;
 
     // Not all fonts are the same size, Ex: dejavu is bigger than inter,
     // so in some cases we want to adjust relative sizes to make characters
@@ -146,7 +146,7 @@ public:
     const std::string& getSize() const { return mSize; }
     void setSize(const std::string& size) { mSize = size; }
 
-    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false, bool load_collection = false, const LLFontVarAxes& var_axes = {});
+    void addFontFile(const std::string& file_name, EFontHinting hinting, S32 flags, F32 size_delta, const std::function<bool(llwchar)>& char_functor = nullptr, bool monospace_ligatures = false, bool load_collection = false, const ALFontVarAxes& var_axes = {});
     const font_file_info_vec_t & getFontFiles() const { return mFontFiles; }
     void setFontFiles(const font_file_info_vec_t& font_files) { mFontFiles = font_files; }
     // Stamp `family` onto every file in this descriptor whose mSourceFamily
@@ -290,10 +290,10 @@ public:
     const string_vec_t& getUltimateFallbackList() const;
 
     // Identity key for a fallback LLFontFreetype instance — face params
-    // plus the LLFontFreetype-level flags that don't go on LLFontFace.
+    // plus the LLFontFreetype-level flags that don't go on ALFontFace.
     struct FallbackInstanceKey
     {
-        LLFontFaceKey face_key;
+        ALFontFaceKey face_key;
         bool          monospace_ligatures;
 
         bool operator==(const FallbackInstanceKey& o) const noexcept

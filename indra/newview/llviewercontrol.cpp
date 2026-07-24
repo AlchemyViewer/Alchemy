@@ -455,7 +455,7 @@ static bool handleUIFontOverridesChanged(const LLSD& newvalue)
 
 static bool handleEmojiUseDarkPaletteChanged(const LLSD& newvalue)
 {
-    // Push the new value into LLFontGL's static so LLFontFace::load picks
+    // Push the new value into LLFontGL's static so ALFontFace::load picks
     // it up during the upcoming reload. A bare schedulePendingReload would
     // just re-init the font system with the same statics — without updating
     // sUseDarkEmojiPalette here the reload would stay on palette 0.

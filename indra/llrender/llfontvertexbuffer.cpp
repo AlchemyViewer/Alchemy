@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2024, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -294,7 +297,7 @@ void LLFontVertexBuffer::genBuffers(
     mLastUsesColorAtlas = false;
     if (const LLFontFreetype* face = fontp->getFontFreetype())
     {
-        // After the LLFontFace move, color atlases live on individual face
+        // After the ALFontFace move, color atlases live on individual face
         // wrappers — head primary, each fallback's face. Walk all of them
         // to gather the set of color atlas textures this batch might have
         // sampled from.

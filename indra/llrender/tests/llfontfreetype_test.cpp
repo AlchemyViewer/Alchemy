@@ -1,6 +1,6 @@
 /**
  * @file llfontfreetype_test.cpp
- * @brief Unit tests for LLFontFreetype + LLFontFace + the manager.
+ * @brief Unit tests for LLFontFreetype + ALFontFace + the manager.
  *        Covers face caching identity, load success/failure, fallback
  *        chain resolution, fixed-width/hinting flags, COLR/SVG probes,
  *        cmap cache, and refcount semantics.
@@ -9,19 +9,34 @@
  * #if LL_MESA_HEADLESS exercises the rasterizer paths
  * (getGlyphInfo, addGlyph, collectGarbage) that route into
  * LLFontBitmapCache::nextOpenPos and gGL.bind. Same single-file
- * pattern as llfontregistry_test.cpp / llfontshaping_test.cpp —
+ * pattern as llfontregistry_test.cpp / alfontshaping_test.cpp —
  * library swap via registry_test_libs in CMake flips
  * LL_MESA_HEADLESS in headless builds.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * $/LicenseInfo$
  */
 
 #include "linden_common.h"
 
 #include "../llfontfreetype.h"
-#include "../llfontface.h"
+#include "../alfontface.h"
 #include "../llfontregistry.h"  // EFontHinting full definition
 #include "../llfontgl.h"        // sUseDarkEmojiPalette static for palette test
 
@@ -53,9 +68,9 @@ namespace
         return false;
     }
 
-    LLFontFaceKey makeKey(const std::string& filename, F32 point_size = 14.f)
+    ALFontFaceKey makeKey(const std::string& filename, F32 point_size = 14.f)
     {
-        return LLFontFaceKey{
+        return ALFontFaceKey{
             filename, /*face_index=*/0, point_size,
             /*vert_dpi=*/96.f, /*horz_dpi=*/96.f,
             EFontHinting::DEFAULT, /*flags=*/0
@@ -74,7 +89,7 @@ namespace
                                      EFontHinting hinting = EFontHinting::DEFAULT)
     {
         LLPointer<LLFontFreetype> ft = new LLFontFreetype;
-        LLFontVarAxes va;
+        ALFontVarAxes va;
         if (weight >= 0)
         {
             va.wght = static_cast<F32>(weight);
@@ -125,9 +140,9 @@ namespace tut
         if (!fileExists(path))
             skip("DejaVuSans.woff2 not present");
 
-        LLPointer<LLFontFace> a = gFontManagerp->getOrCreateFace(makeKey(path, 14.f));
-        LLPointer<LLFontFace> b = gFontManagerp->getOrCreateFace(makeKey(path, 14.f));
-        LLPointer<LLFontFace> c = gFontManagerp->getOrCreateFace(makeKey(path, 18.f));
+        LLPointer<ALFontFace> a = gFontManagerp->getOrCreateFace(makeKey(path, 14.f));
+        LLPointer<ALFontFace> b = gFontManagerp->getOrCreateFace(makeKey(path, 14.f));
+        LLPointer<ALFontFace> c = gFontManagerp->getOrCreateFace(makeKey(path, 18.f));
         ensure("face a loaded", a.notNull() && a->isValid());
         ensure("face b loaded", b.notNull() && b->isValid());
         ensure("face c loaded", c.notNull() && c->isValid());
@@ -213,7 +228,7 @@ namespace tut
     // useSubpixelPen depends on hinting and color/svg flags:
     // FORCE_AUTOHINT on a non-color font => true; DEFAULT hinting => false;
     // a color font (regardless of hinting) => false. Pins the rule at
-    // llfontface.cpp:99.
+    // alfontface.cpp:99.
     template<> template<>
     void llfontfreetype_object::test<7>()
     {
@@ -397,27 +412,27 @@ namespace tut
     }
 
     // -------------------------------------------------------------
-    // LLFontFace group: identity key, COLR/SVG/color/wght probes,
+    // ALFontFace group: identity key, COLR/SVG/color/wght probes,
     // cmap cache, refcount sharing semantics.
     // -------------------------------------------------------------
 
-    struct llfontface_data
+    struct alfontface_data
     {
-        llfontface_data()  { LLFontManager::initClass(); }
-        ~llfontface_data() { LLFontManager::cleanupClass(); }
+        alfontface_data()  { LLFontManager::initClass(); }
+        ~alfontface_data() { LLFontManager::cleanupClass(); }
     };
 
-    typedef test_group<llfontface_data> llfontface_test;
-    typedef llfontface_test::object     llfontface_object;
-    tut::llfontface_test llfontface_testcase("LLFontFace");
+    typedef test_group<alfontface_data> alfontface_test;
+    typedef alfontface_test::object     alfontface_object;
+    tut::alfontface_test alfontface_testcase("ALFontFace");
 
-    // LLFontFaceKey equality + hash: equal keys equal+hash-equal;
+    // ALFontFaceKey equality + hash: equal keys equal+hash-equal;
     // any single-field difference produces unequal keys.
     template<> template<>
-    void llfontface_object::test<1>()
+    void alfontface_object::test<1>()
     {
-        LLFontFaceKey a{ "x.ttf", 0, 14.f, 96.f, 96.f, EFontHinting::DEFAULT, 0 };
-        LLFontFaceKey b = a;
+        ALFontFaceKey a{ "x.ttf", 0, 14.f, 96.f, 96.f, EFontHinting::DEFAULT, 0 };
+        ALFontFaceKey b = a;
         ensure("identical keys equal",
                a == b);
         ensure_equals("identical keys hash equal",
@@ -437,15 +452,15 @@ namespace tut
 
     // hasColrV1: Noto-COLRv1 yes, DejaVuSans no.
     template<> template<>
-    void llfontface_object::test<2>()
+    void alfontface_object::test<2>()
     {
         const std::string noto = std::string(kFontDir) + "Noto-COLRv1.ttf";
         const std::string dv   = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(noto) || !fileExists(dv))
             skip("Noto-COLRv1 + DejaVuSans required");
 
-        LLPointer<LLFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
-        LLPointer<LLFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
+        LLPointer<ALFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
+        LLPointer<ALFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
         ensure("both faces valid", nf->isValid() && df->isValid());
         ensure("Noto-COLRv1 hasColrV1",  nf->hasColrV1());
         ensure("DejaVuSans !hasColrV1", !df->hasColrV1());
@@ -454,15 +469,15 @@ namespace tut
     // hasColor: Noto-COLRv1 yes (FT_HAS_COLOR is set for any color
     // table); DejaVuSans no.
     template<> template<>
-    void llfontface_object::test<3>()
+    void alfontface_object::test<3>()
     {
         const std::string noto = std::string(kFontDir) + "Noto-COLRv1.ttf";
         const std::string dv   = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(noto) || !fileExists(dv))
             skip("Noto-COLRv1 + DejaVuSans required");
 
-        LLPointer<LLFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
-        LLPointer<LLFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
+        LLPointer<ALFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
+        LLPointer<ALFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
         ensure("Noto-COLRv1 hasColor",  nf->hasColor());
         ensure("DejaVuSans !hasColor", !df->hasColor());
     }
@@ -471,15 +486,15 @@ namespace tut
     // either. Both should report false. (TwemojiSVG would be the
     // positive case but isn't checked into the fixture set.)
     template<> template<>
-    void llfontface_object::test<4>()
+    void alfontface_object::test<4>()
     {
         const std::string noto = std::string(kFontDir) + "Noto-COLRv1.ttf";
         const std::string dv   = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(noto) || !fileExists(dv))
             skip("Noto-COLRv1 + DejaVuSans required");
 
-        LLPointer<LLFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
-        LLPointer<LLFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
+        LLPointer<ALFontFace> nf = gFontManagerp->getOrCreateFace(makeKey(noto));
+        LLPointer<ALFontFace> df = gFontManagerp->getOrCreateFace(makeKey(dv));
         ensure("Noto-COLRv1 !hasSvg",  !nf->hasSvg());
         ensure("DejaVuSans !hasSvg",   !df->hasSvg());
     }
@@ -487,20 +502,20 @@ namespace tut
     // wghtAxisSet: InterVariable is variable; loading at weight=600
     // sets the wght axis. Loading at weight=-1 leaves wght axis off.
     template<> template<>
-    void llfontface_object::test<5>()
+    void alfontface_object::test<5>()
     {
         const std::string path = std::string(kFontDir) + "InterVariable.woff2";
         if (!fileExists(path))
             skip("InterVariable.woff2 not present");
 
-        LLFontFaceKey k_default = makeKey(path);
+        ALFontFaceKey k_default = makeKey(path);
         // wght not set -> face takes the file's default
-        LLFontFaceKey k_bold = makeKey(path);
+        ALFontFaceKey k_bold = makeKey(path);
         k_bold.var_axes.wght = 600.f;
         k_bold.var_axes.wght_set = true;
 
-        LLPointer<LLFontFace> def = gFontManagerp->getOrCreateFace(k_default);
-        LLPointer<LLFontFace> bld = gFontManagerp->getOrCreateFace(k_bold);
+        LLPointer<ALFontFace> def = gFontManagerp->getOrCreateFace(k_default);
+        LLPointer<ALFontFace> bld = gFontManagerp->getOrCreateFace(k_bold);
         ensure("both loaded", def->isValid() && bld->isValid());
         ensure("wght unset -> wghtAxisSet=false", !def->wghtAxisSet());
         ensure("wght=600 on variable face -> wghtAxisSet=true",
@@ -511,14 +526,14 @@ namespace tut
     // Mirrors the LLFontFreetype-level test but exercises the
     // wrapper's mIsFixedWidth field directly.
     template<> template<>
-    void llfontface_object::test<6>()
+    void alfontface_object::test<6>()
     {
         const std::string mono = std::string(kFontDir) + "DejaVuSansMono.woff2";
         const std::string prop = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(mono) || !fileExists(prop))
             skip("DejaVuSans + DejaVuSansMono required");
-        LLPointer<LLFontFace> m = gFontManagerp->getOrCreateFace(makeKey(mono));
-        LLPointer<LLFontFace> p = gFontManagerp->getOrCreateFace(makeKey(prop));
+        LLPointer<ALFontFace> m = gFontManagerp->getOrCreateFace(makeKey(mono));
+        LLPointer<ALFontFace> p = gFontManagerp->getOrCreateFace(makeKey(prop));
         ensure("Mono isFixedWidth",  m->isFixedWidth());
         ensure("Prop !isFixedWidth", !p->isFixedWidth());
     }
@@ -527,12 +542,12 @@ namespace tut
     // returns 0 for absent ones. Also the caching path: a 0 result
     // is just as cacheable as a non-zero result.
     template<> template<>
-    void llfontface_object::test<7>()
+    void alfontface_object::test<7>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             skip("DejaVuSans.woff2 not present");
-        LLPointer<LLFontFace> f = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(makeKey(path));
 
         const U32 g_a       = f->getCharGlyphIndex(L'A');
         const U32 g_a_again = f->getCharGlyphIndex(L'A');
@@ -547,23 +562,23 @@ namespace tut
     }
 
     // Refcount sharing: two LLFontFreetype instances that point at
-    // the same LLFontFace via getOrCreateFace must keep the face
+    // the same ALFontFace via getOrCreateFace must keep the face
     // alive while either lives. The face cache also holds a ref,
     // so getNumRefs >= 3 (cache + a + b) when both shares exist.
     template<> template<>
-    void llfontface_object::test<8>()
+    void alfontface_object::test<8>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             skip("DejaVuSans.woff2 not present");
 
-        LLPointer<LLFontFace> a = gFontManagerp->getOrCreateFace(makeKey(path));
-        LLPointer<LLFontFace> b = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> a = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> b = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure_equals("a == b (shared face)", a.get(), b.get());
         ensure("refcount >= 3 (cache + a + b)",
                a->getNumRefs() >= 3);
 
-        LLFontFace* raw = a.get();
+        ALFontFace* raw = a.get();
         b = nullptr; // drop b's ref
         ensure("face still alive after b dropped",
                raw->getNumRefs() >= 2);
@@ -571,7 +586,7 @@ namespace tut
         // Cache still holds a ref, so the face is alive but has
         // refcount 1. Verify by re-fetching: should return the same
         // pointer (cache hit), not a freshly-loaded face.
-        LLPointer<LLFontFace> c = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> c = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure_equals("cache kept face alive after both refs dropped",
                       c.get(), raw);
     }
@@ -579,12 +594,12 @@ namespace tut
     // resetBitmapCache clears atlas state without destroying the face.
     // A subsequent getCharGlyphIndex still works (cmap survives).
     template<> template<>
-    void llfontface_object::test<9>()
+    void alfontface_object::test<9>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             skip("DejaVuSans.woff2 not present");
-        LLPointer<LLFontFace> f = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure("face valid before reset", f->isValid());
         f->resetBitmapCache();
         ensure("face still valid after resetBitmapCache",
@@ -600,9 +615,9 @@ namespace tut
     // index. Test by force-evicting between loads. If Noto-COLRv1 ships no
     // FT_PALETTE_FOR_DARK_BACKGROUND palette the second load still returns 0
     // and we skip the equality check rather than fail. Pins b6ba746728's
-    // load-time read at llfontface.cpp:122-137.
+    // load-time read at alfontface.cpp:122-137.
     template<> template<>
-    void llfontface_object::test<10>()
+    void alfontface_object::test<10>()
     {
         const std::string noto = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(noto))
@@ -616,7 +631,7 @@ namespace tut
         LLFontGL::sUseDarkEmojiPalette = false;
         U32 pi_default;
         {
-            LLPointer<LLFontFace> f = gFontManagerp->getOrCreateFace(k);
+            LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
             ensure("face valid (dark=false)", f.notNull() && f->isValid());
             pi_default = f->paletteIndex();
             ensure_equals("paletteIndex defaults to 0 with dark=false",
@@ -628,7 +643,7 @@ namespace tut
         LLFontGL::sUseDarkEmojiPalette = true;
         U32 pi_dark;
         {
-            LLPointer<LLFontFace> f = gFontManagerp->getOrCreateFace(k);
+            LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
             ensure("face valid (dark=true)", f.notNull() && f->isValid());
             pi_dark = f->paletteIndex();
         }
@@ -650,18 +665,18 @@ namespace tut
     // Variable axis on a non-variable font: requesting weight=600 on
     // DejaVuSans (which lacks a wght axis) leaves wghtAxisSet=false —
     // setVariationAxis returned false and the load fell through. Pins
-    // the negative branch at llfontface.cpp:139-146.
+    // the negative branch at alfontface.cpp:139-146.
     template<> template<>
-    void llfontface_object::test<11>()
+    void alfontface_object::test<11>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             skip("DejaVuSans.woff2 not present");
 
-        LLFontFaceKey k = makeKey(path);
+        ALFontFaceKey k = makeKey(path);
         k.var_axes.wght = 600.f;
         k.var_axes.wght_set = true;
-        LLPointer<LLFontFace> f = gFontManagerp->getOrCreateFace(k);
+        LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
         ensure("face loaded", f.notNull() && f->isValid());
         ensure("non-variable face leaves wghtAxisSet=false",
                !f->wghtAxisSet());
@@ -670,18 +685,18 @@ namespace tut
     // FaceKey weight is part of the identity key — distinct weight
     // values map to distinct face cache entries even on the same file.
     // Existing test 5 confirms the wghtAxisSet flag side; this pins
-    // the cache-identity side at llfontface.h:64-76.
+    // the cache-identity side at alfontface.h:64-76.
     template<> template<>
-    void llfontface_object::test<12>()
+    void alfontface_object::test<12>()
     {
         const std::string path = std::string(kFontDir) + "InterVariable.woff2";
         if (!fileExists(path))
             skip("InterVariable.woff2 not present");
 
-        LLFontFaceKey k_400 = makeKey(path);
+        ALFontFaceKey k_400 = makeKey(path);
         k_400.var_axes.wght = 400.f;
         k_400.var_axes.wght_set = true;
-        LLFontFaceKey k_600 = makeKey(path);
+        ALFontFaceKey k_600 = makeKey(path);
         k_600.var_axes.wght = 600.f;
         k_600.var_axes.wght_set = true;
 
@@ -689,34 +704,34 @@ namespace tut
         ensure_not_equals("hash differs by weight",
                           hash_value(k_400), hash_value(k_600));
 
-        LLPointer<LLFontFace> f400 = gFontManagerp->getOrCreateFace(k_400);
-        LLPointer<LLFontFace> f600 = gFontManagerp->getOrCreateFace(k_600);
+        LLPointer<ALFontFace> f400 = gFontManagerp->getOrCreateFace(k_400);
+        LLPointer<ALFontFace> f600 = gFontManagerp->getOrCreateFace(k_600);
         ensure("both faces valid", f400->isValid() && f600->isValid());
         ensure_not_equals("distinct weights produce distinct face entries",
                           f400.get(), f600.get());
     }
 
-    // ital/wdth/slnt axis plumbing: distinct LLFontVarAxes values must
+    // ital/wdth/slnt axis plumbing: distinct ALFontVarAxes values must
     // produce distinct face cache entries even on the same file. Pins
-    // the LLFontFaceKey hash + equality changes that added var_axes
+    // the ALFontFaceKey hash + equality changes that added var_axes
     // to the key. The bundled fonts don't actually expose ital/wdth/
     // slnt axes (so setVariationAxis silently no-ops), but the key
     // identity check fires regardless of whether the axis takes effect.
     template<> template<>
-    void llfontface_object::test<13>()
+    void alfontface_object::test<13>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             skip("DejaVuSans.woff2 not present");
 
-        LLFontFaceKey k_default = makeKey(path);
-        LLFontFaceKey k_ital    = makeKey(path);
+        ALFontFaceKey k_default = makeKey(path);
+        ALFontFaceKey k_ital    = makeKey(path);
         k_ital.var_axes.ital     = 1.f;
         k_ital.var_axes.ital_set = true;
-        LLFontFaceKey k_wdth    = makeKey(path);
+        ALFontFaceKey k_wdth    = makeKey(path);
         k_wdth.var_axes.wdth     = 87.5f;
         k_wdth.var_axes.wdth_set = true;
-        LLFontFaceKey k_slnt    = makeKey(path);
+        ALFontFaceKey k_slnt    = makeKey(path);
         k_slnt.var_axes.slnt     = -12.f;
         k_slnt.var_axes.slnt_set = true;
 
@@ -733,7 +748,7 @@ namespace tut
                           hash_value(k_default), hash_value(k_slnt));
 
         // Identical axis values produce equal keys + equal hashes.
-        LLFontFaceKey k_ital_dup = makeKey(path);
+        ALFontFaceKey k_ital_dup = makeKey(path);
         k_ital_dup.var_axes.ital     = 1.f;
         k_ital_dup.var_axes.ital_set = true;
         ensure("ital == ital_dup", k_ital == k_ital_dup);
@@ -741,8 +756,8 @@ namespace tut
                       hash_value(k_ital), hash_value(k_ital_dup));
 
         // Cache identity round-trips through the face manager.
-        LLPointer<LLFontFace> fd = gFontManagerp->getOrCreateFace(k_default);
-        LLPointer<LLFontFace> fi = gFontManagerp->getOrCreateFace(k_ital);
+        LLPointer<ALFontFace> fd = gFontManagerp->getOrCreateFace(k_default);
+        LLPointer<ALFontFace> fi = gFontManagerp->getOrCreateFace(k_ital);
         ensure("both faces valid", fd->isValid() && fi->isValid());
         ensure_not_equals("distinct ital settings produce distinct face entries",
                           fd.get(), fi.get());
@@ -754,13 +769,13 @@ namespace tut
     // and that requesting an unsupported axis doesn't poison the
     // existing wghtAxisSet path.
     template<> template<>
-    void llfontface_object::test<14>()
+    void alfontface_object::test<14>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             skip("DejaVuSans.woff2 not present");
 
-        LLFontFaceKey k = makeKey(path);
+        ALFontFaceKey k = makeKey(path);
         k.var_axes.ital     = 1.f;
         k.var_axes.ital_set = true;
         k.var_axes.wdth     = 87.5f;
@@ -768,7 +783,7 @@ namespace tut
         k.var_axes.slnt     = -10.f;
         k.var_axes.slnt_set = true;
 
-        LLPointer<LLFontFace> f = gFontManagerp->getOrCreateFace(k);
+        LLPointer<ALFontFace> f = gFontManagerp->getOrCreateFace(k);
         ensure("face loaded", f.notNull() && f->isValid());
         ensure("DejaVu lacks ital axis -> italAxisSet false",
                !f->italAxisSet());
@@ -778,15 +793,15 @@ namespace tut
                !f->slntAxisSet());
     }
 
-    // LLFontVarAxes equality: the comparison ignores value fields when
+    // ALFontVarAxes equality: the comparison ignores value fields when
     // *_set is false (an unset axis MUST equal another unset axis with
     // a different stale value). Required so cache lookups for "no axes
     // set" don't depend on uninitialised float bits.
     template<> template<>
-    void llfontface_object::test<15>()
+    void alfontface_object::test<15>()
     {
-        LLFontVarAxes a;
-        LLFontVarAxes b;
+        ALFontVarAxes a;
+        ALFontVarAxes b;
         ensure("default ctor equal", a == b);
 
         // Differing values with *_set=false still equal.
@@ -893,9 +908,9 @@ namespace tut
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
             skip("DejaVuSans.woff2 not present");
-        LLFontFace* raw = nullptr;
+        ALFontFace* raw = nullptr;
         {
-            LLPointer<LLFontFace> face =
+            LLPointer<ALFontFace> face =
                 gFontManagerp->getOrCreateFace(makeKey(path, 9.f));
             ensure("face loaded", face.notNull() && face->isValid());
             raw = face.get();
@@ -907,7 +922,7 @@ namespace tut
         gFontManagerp->collectGarbage();
         // Re-fetching produces a NEW face (different pointer) since
         // the cache entry was evicted.
-        LLPointer<LLFontFace> reloaded =
+        LLPointer<ALFontFace> reloaded =
             gFontManagerp->getOrCreateFace(makeKey(path, 9.f));
         ensure("re-fetched face is distinct after GC",
                reloaded.get() != raw);
@@ -959,14 +974,14 @@ namespace tut
         if (!fileExists(path))
             skip("InterVariable.woff2 not present");
 
-        LLFontVarAxes va_light;
+        ALFontVarAxes va_light;
         va_light.wght = 300.f; va_light.wght_set = true;
         LLPointer<LLFontFreetype> ft_light = new LLFontFreetype;
         ensure("weight=300 load",
                ft_light->loadFace(path, 32.f, 96.f, 96.f,
                                   /*is_fallback=*/false, 0,
                                   EFontHinting::DEFAULT, /*flags=*/0, va_light));
-        LLFontVarAxes va_black;
+        ALFontVarAxes va_black;
         va_black.wght = 900.f; va_black.wght_set = true;
         LLPointer<LLFontFreetype> ft_black = new LLFontFreetype;
         ensure("weight=900 load",
@@ -1010,7 +1025,7 @@ namespace tut
 
         const S32 gen_before = cache->getCacheGeneration();
         // Honor the purge-before-release contract the production sweep
-        // maintains (LLFontFace::collectGarbage): delete the face-owned
+        // maintains (ALFontFace::collectGarbage): delete the face-owned
         // glyph entries referencing sheet 0 before releasing it. Without
         // this, 'A''s stale entry would survive pointing into the slot the
         // next allocation recycles — exactly the state recycling forbids.
@@ -1070,7 +1085,7 @@ namespace tut
 
     // Cross-head sheet eviction: when one freetype's collectGarbage
     // releases a sheet and deletes face-owned glyph entries, a *sibling*
-    // freetype that shares the same LLFontFace must continue rendering
+    // freetype that shares the same ALFontFace must continue rendering
     // the same glyph correctly on its next lookup. Pre-fix, the head
     // memoized glyph pointers in its own (fontp, glyph_index) map, and
     // the sibling's map was untouched by the GC — so its fast-path
@@ -1089,7 +1104,7 @@ namespace tut
         LLPointer<LLFontFreetype> head_a = loadFtHead(path);
         LLPointer<LLFontFreetype> head_b = loadFtHead(path);
         ensure("both heads loaded", head_a.notNull() && head_b.notNull());
-        // Same LLFontFaceKey -> shared LLFontFace via getOrCreateFace.
+        // Same ALFontFaceKey -> shared ALFontFace via getOrCreateFace.
         ensure_equals("siblings share the underlying face wrapper",
                       head_a->getFontFace(), head_b->getFontFace());
 

@@ -1,17 +1,32 @@
 /**
- * @file llfontcolrv1_test.cpp
+ * @file alfontcolrv1_test.cpp
  * @brief Unit tests for COLRv1 detection and the paint walker that
  *        rasterises Noto-COLRv1 glyphs.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * $/LicenseInfo$
  */
 
 #include "linden_common.h"
 
-#include "../llfontcolrv1.h"
-#include "../llfontface.h"
+#include "../alfontcolrv1.h"
+#include "../alfontface.h"
 #include "../llfontfreetype.h"
 #include "../llfontregistry.h"
 
@@ -56,9 +71,9 @@ namespace
     // Construct a face key with reasonable defaults. point_size 14 / DPI 96
     // is a typical UI-text size; the painter doesn't care what we pick as
     // long as ppem is non-zero.
-    LLFontFaceKey makeKey(const std::string& filename)
+    ALFontFaceKey makeKey(const std::string& filename)
     {
-        return LLFontFaceKey{
+        return ALFontFaceKey{
             filename,
             /*face_index=*/0,
             /*point_size=*/14.f,
@@ -93,30 +108,30 @@ namespace tut
     // so init/cleanup the font manager once per test rather than once per
     // process. Cheaper than tracking init state and matches the test-
     // isolation model TUT expects.
-    struct llfontcolrv1_data
+    struct alfontcolrv1_data
     {
-        llfontcolrv1_data()
+        alfontcolrv1_data()
         {
             LLFontManager::initClass();
         }
-        ~llfontcolrv1_data()
+        ~alfontcolrv1_data()
         {
             LLFontManager::cleanupClass();
         }
     };
 
-    typedef test_group<llfontcolrv1_data> llfontcolrv1_test;
-    typedef llfontcolrv1_test::object     llfontcolrv1_object;
-    tut::llfontcolrv1_test llfontcolrv1_testcase("LLFontColrV1");
+    typedef test_group<alfontcolrv1_data> alfontcolrv1_test;
+    typedef alfontcolrv1_test::object     alfontcolrv1_object;
+    tut::alfontcolrv1_test alfontcolrv1_testcase("ALFontColrV1");
 
     // Painter input validation: null hb_font fails cleanly without a crash.
     // Doesn't need a real font, so this test runs even when the test data
     // dir is empty (e.g., a stripped CI checkout).
     template<> template<>
-    void llfontcolrv1_object::test<1>()
+    void alfontcolrv1_object::test<1>()
     {
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result result;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
         ensure("paintGlyph(null hb_font) returns false",
                !painter.paintGlyph(nullptr, /*glyph_index=*/0,
@@ -132,7 +147,7 @@ namespace tut
     // rasterise this — route through the paint walker." Verify it fires
     // for Noto-COLRv1.ttf, which ships a COLRv1 paint table.
     template<> template<>
-    void llfontcolrv1_object::test<2>()
+    void alfontcolrv1_object::test<2>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -140,7 +155,7 @@ namespace tut
             skip("Noto-COLRv1.ttf not present in test data dir");
         }
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure("Noto-COLRv1 loaded", face.notNull() && face->isValid());
         ensure("Noto-COLRv1 hasColrV1 == true", face->hasColrV1());
         ensure("Noto-COLRv1 hasColor == true (general flag)", face->hasColor());
@@ -150,7 +165,7 @@ namespace tut
     // table, so hasColrV1 must stay false. Guards against the probe
     // false-positiving on any FT_HAS_COLOR-y face.
     template<> template<>
-    void llfontcolrv1_object::test<3>()
+    void alfontcolrv1_object::test<3>()
     {
         const std::string path = std::string(kFontDir) + "InterVariable.woff2";
         if (!fileExists(path))
@@ -158,7 +173,7 @@ namespace tut
             skip("InterVariable.woff2 not present in test data dir");
         }
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure("Inter loaded", face.notNull() && face->isValid());
         ensure("Inter hasColrV1 == false", !face->hasColrV1());
     }
@@ -169,7 +184,7 @@ namespace tut
     // path (Noto-COLRv1 ships clip boxes for its glyphs) and the BGRA atlas
     // packing logic in paintGlyph.
     template<> template<>
-    void llfontcolrv1_object::test<4>()
+    void alfontcolrv1_object::test<4>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -177,7 +192,7 @@ namespace tut
             skip("Noto-COLRv1.ttf not present in test data dir");
         }
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure("face loaded",     face.notNull() && face->isValid());
         ensure("face has COLRv1", face->hasColrV1());
 
@@ -192,8 +207,8 @@ namespace tut
                hb_font_get_nominal_glyph(hb_font, fire_cp, &fire_gid)
                && fire_gid != 0);
 
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result result;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
         const bool ok = painter.paintGlyph(hb_font, fire_gid, /*point_size=*/14.f,
                                            fg, /*palette_index=*/0, result);
@@ -211,7 +226,7 @@ namespace tut
     // VS-16 not. Other emoji fonts that ship VS-16 (e.g. Twemoji) take the
     // no-strip path; the shape pipeline branches on this flag per-face.
     template<> template<>
-    void llfontcolrv1_object::test<5>()
+    void alfontcolrv1_object::test<5>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -219,7 +234,7 @@ namespace tut
             skip("Noto-COLRv1.ttf not present in test data dir");
         }
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure("face loaded", face.notNull() && face->isValid());
 
         // ZWJ should resolve to a real glyph (cmap entry present).
@@ -236,7 +251,7 @@ namespace tut
     // wrapper turns that into a Result with mBitmap=null and
     // mWidth=0.
     template<> template<>
-    void llfontcolrv1_object::test<6>()
+    void alfontcolrv1_object::test<6>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -244,13 +259,13 @@ namespace tut
             skip("Noto-COLRv1.ttf not present in test data dir");
         }
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure("face loaded", face.notNull() && face->isValid());
         hb_font_t* hb_font = face->getHbFont();
         ensure("hb_font available", hb_font != nullptr);
 
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result result;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
 
         // Use a clearly out-of-range glyph index. Real fonts have
@@ -272,7 +287,7 @@ namespace tut
     // — a staging-buffer leak would surface as the second result
     // pointing at stale first-glyph bytes when dimensions match).
     template<> template<>
-    void llfontcolrv1_object::test<7>()
+    void alfontcolrv1_object::test<7>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -280,7 +295,7 @@ namespace tut
             skip("Noto-COLRv1.ttf not present in test data dir");
         }
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure("face loaded", face.notNull() && face->isValid());
         hb_font_t* hb_font = face->getHbFont();
 
@@ -298,8 +313,8 @@ namespace tut
         if (fire == 0 || heart == 0)
             skip("Noto-COLRv1 missing one of the test emoji codepoints");
 
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result r1, r2;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result r1, r2;
         ensure("first paintGlyph (fire) succeeded",
                painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
         ensure("first painter produced bitmap",
@@ -323,7 +338,7 @@ namespace tut
     // glyph forcing the fallback) requires a hand-built TTF and
     // is left for the integration suite.
     template<> template<>
-    void llfontcolrv1_object::test<8>()
+    void alfontcolrv1_object::test<8>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -331,7 +346,7 @@ namespace tut
             skip("Noto-COLRv1.ttf not present in test data dir");
         }
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         ensure("face loaded", face.notNull() && face->isValid());
         hb_font_t* hb_font = face->getHbFont();
 
@@ -341,8 +356,8 @@ namespace tut
             skip("Noto-COLRv1 has no fire emoji");
 
         constexpr F32 point_size = 14.f;
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result result;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
         ensure("paintGlyph succeeded",
                painter.paintGlyph(hb_font, fire, point_size, fg, 0, result));
@@ -369,21 +384,21 @@ namespace tut
     // produce a single solid color → 1 distinct triple. Real gradient
     // emojis show many colors. Pin >= 3.
     template<> template<>
-    void llfontcolrv1_object::test<10>()
+    void alfontcolrv1_object::test<10>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             skip("Noto-COLRv1.ttf not present");
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
             skip("Noto-COLRv1 has no fire emoji");
 
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result result;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result result;
         // Use a larger point size so the rendered bitmap has enough
         // pixels to sample distinct gradient stops without aliasing
         // them away.
@@ -421,13 +436,13 @@ namespace tut
     // present (no observable difference, but the code path is exercised
     // either way).
     template<> template<>
-    void llfontcolrv1_object::test<11>()
+    void alfontcolrv1_object::test<11>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             skip("Noto-COLRv1.ttf not present");
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
@@ -436,8 +451,8 @@ namespace tut
 
         const LLColor4U fg(255, 255, 255, 255);
 
-        LLFontColrV1Painter painter_a, painter_b;
-        LLFontColrV1Painter::Result r0, r1;
+        ALFontColrV1Painter painter_a, painter_b;
+        ALFontColrV1Painter::Result r0, r1;
         ensure("palette=0 paintGlyph succeeded",
                painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0, r0));
         ensure("palette=1 paintGlyph succeeded",
@@ -476,30 +491,30 @@ namespace tut
     // non-zero coverage somewhere in the bitmap. Pins the §1/§2 contract
     // that Gray output is single-channel, top-row first, tightly packed.
     template<> template<>
-    void llfontcolrv1_object::test<12>()
+    void alfontcolrv1_object::test<12>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             skip("Noto-COLRv1.ttf not present");
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
             skip("Noto-COLRv1 has no fire emoji");
 
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result result;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
         ensure("paintGlyph(format=Gray) succeeded",
                painter.paintGlyph(hb_font, fire, /*point_size=*/14.f, fg,
                                   /*palette=*/0,
-                                  LLFontColrV1Painter::OutputFormat::Gray,
+                                  ALFontColrV1Painter::OutputFormat::Gray,
                                   result));
         ensure_equals("Result.mFormat == Gray",
                       (S32)result.mFormat,
-                      (S32)LLFontColrV1Painter::OutputFormat::Gray);
+                      (S32)ALFontColrV1Painter::OutputFormat::Gray);
         ensure("Gray output has positive dims",
                result.mWidth > 0 && result.mHeight > 0);
         ensure_equals("Gray pitch is width (tightly packed single channel)",
@@ -527,21 +542,21 @@ namespace tut
     // Y == A and Y > A*0.15 holds, so the test is a strict superset of
     // the "fg-only collapses to alpha" case.
     template<> template<>
-    void llfontcolrv1_object::test<13>()
+    void alfontcolrv1_object::test<13>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             skip("Noto-COLRv1.ttf not present");
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
             skip("Noto-COLRv1 has no fire emoji");
 
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result rgba_r, gray_r;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result rgba_r, gray_r;
         const LLColor4U fg(255, 255, 255, 255);
         ensure("BGRA paint succeeded",
                painter.paintGlyph(hb_font, fire, 14.f, fg, 0, rgba_r));
@@ -554,7 +569,7 @@ namespace tut
 
         ensure("Gray paint succeeded",
                painter.paintGlyph(hb_font, fire, 14.f, fg, 0,
-                                  LLFontColrV1Painter::OutputFormat::Gray,
+                                  ALFontColrV1Painter::OutputFormat::Gray,
                                   gray_r));
         ensure_equals("Gray and BGRA produce same width",  gray_r.mWidth,  bgra_w);
         ensure_equals("Gray and BGRA produce same height", gray_r.mHeight, bgra_h);
@@ -592,13 +607,13 @@ namespace tut
     // to lock the constant against future tweaks that would silently
     // crush dark CPAL details.
     template<> template<>
-    void llfontcolrv1_object::test<14>()
+    void alfontcolrv1_object::test<14>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             skip("Noto-COLRv1.ttf not present");
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
 
         // Sweep a handful of likely candidates: emoji that commonly carry
@@ -614,8 +629,8 @@ namespace tut
             hb_font_get_nominal_glyph(hb_font, cp, &gid);
             if (gid == 0) continue;
 
-            LLFontColrV1Painter painter;
-            LLFontColrV1Painter::Result rgba_r, gray_r;
+            ALFontColrV1Painter painter;
+            ALFontColrV1Painter::Result rgba_r, gray_r;
             const LLColor4U fg(255, 255, 255, 255);
             if (!painter.paintGlyph(hb_font, gid, 32.f, fg, 0, rgba_r))
                 continue;
@@ -624,7 +639,7 @@ namespace tut
             const S32 bgra_w = rgba_r.mWidth, bgra_h = rgba_r.mHeight;
             const S32 bgra_pitch = rgba_r.mPitch;
             if (!painter.paintGlyph(hb_font, gid, 32.f, fg, 0,
-                                    LLFontColrV1Painter::OutputFormat::Gray,
+                                    ALFontColrV1Painter::OutputFormat::Gray,
                                     gray_r))
                 continue;
 
@@ -657,21 +672,21 @@ namespace tut
     // be byte-identical (the painter clamps any oversized index to 0
     // before calling hb_font_paint_glyph).
     template<> template<>
-    void llfontcolrv1_object::test<15>()
+    void alfontcolrv1_object::test<15>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             skip("Noto-COLRv1.ttf not present");
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
             skip("Noto-COLRv1 has no fire emoji");
 
-        LLFontColrV1Painter painter_a, painter_b;
-        LLFontColrV1Painter::Result r_zero, r_huge;
+        ALFontColrV1Painter painter_a, painter_b;
+        ALFontColrV1Painter::Result r_zero, r_huge;
         const LLColor4U fg(255, 255, 255, 255);
         ensure("palette=0 paint succeeded",
                painter_a.paintGlyph(hb_font, fire, 14.f, fg, /*palette=*/0u, r_zero));
@@ -693,13 +708,13 @@ namespace tut
     // 2-em fallback inside the empty-bbox branch — without the
     // fallback point_size override, that branch would return false.
     template<> template<>
-    void llfontcolrv1_object::test<16>()
+    void alfontcolrv1_object::test<16>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             skip("Noto-COLRv1.ttf not present");
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         // Build a dedicated hb_font on top of the same FT_Face so we can
         // mutate its ppem without affecting the face cache shared with
         // other tests in this group.
@@ -725,8 +740,8 @@ namespace tut
             skip("Noto-COLRv1 has no fire emoji");
         }
 
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result result;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result result;
         const LLColor4U fg(255, 255, 255, 255);
         // fallback_point_size = 14: should drive the empty-bbox branch
         // to size against ~14 px instead of returning false.
@@ -754,21 +769,21 @@ namespace tut
     // 1 (or below) would surface here as a fringe of non-zero pixels at
     // the buffer boundary that visually clips the glyph at the atlas.
     template<> template<>
-    void llfontcolrv1_object::test<17>()
+    void alfontcolrv1_object::test<17>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             skip("Noto-COLRv1.ttf not present");
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
             skip("Noto-COLRv1 has no fire emoji");
 
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result r;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result r;
         const LLColor4U fg(255, 255, 255, 255);
         ensure("paintGlyph succeeded",
                painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r));
@@ -801,15 +816,15 @@ namespace tut
     // setSubImageBGRA → LLImageGL upload land on a live GL state.
     // -------------------------------------------------------------
 
-    struct llfontcolrv1_render_data
+    struct alfontcolrv1_render_data
     {
         std::unique_ptr<ll_test::HeadlessGL> gl = std::make_unique<ll_test::HeadlessGL>();
         ll_test::FontStateScope font_scope;
     };
 
-    typedef test_group<llfontcolrv1_render_data> llfontcolrv1_render_test;
-    typedef llfontcolrv1_render_test::object     llfontcolrv1_render_object;
-    tut::llfontcolrv1_render_test llfontcolrv1_render_testcase("LLFontColrV1Render");
+    typedef test_group<alfontcolrv1_render_data> alfontcolrv1_render_test;
+    typedef alfontcolrv1_render_test::object     alfontcolrv1_render_object;
+    tut::alfontcolrv1_render_test alfontcolrv1_render_testcase("ALFontColrV1Render");
 
     // Build an LLFontFreetype as a real head face. The non-fallback
     // path's notdef pre-warm calls into the rasterizer, which is fine
@@ -832,7 +847,7 @@ namespace tut
     // Color glyph type and the cache's Color page has a live GL
     // texture name.
     template<> template<>
-    void llfontcolrv1_render_object::test<1>()
+    void alfontcolrv1_render_object::test<1>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -863,7 +878,7 @@ namespace tut
     // bitmaps. Pins that the painter+atlas integration doesn't
     // allocate an extra sheet per glyph.
     template<> template<>
-    void llfontcolrv1_render_object::test<2>()
+    void alfontcolrv1_render_object::test<2>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -892,7 +907,7 @@ namespace tut
     // info cache (so each render call doesn't rebuild the painter
     // input on every frame).
     template<> template<>
-    void llfontcolrv1_render_object::test<3>()
+    void alfontcolrv1_render_object::test<3>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -914,7 +929,7 @@ namespace tut
     // the global-generation contract that LLFontBitmapCache holds
     // for COLRv1 atlases too — not just Grayscale.
     template<> template<>
-    void llfontcolrv1_render_object::test<4>()
+    void alfontcolrv1_render_object::test<4>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -938,26 +953,26 @@ namespace tut
 
     // Painter staging surface dimension consistency: paint the SAME
     // glyph twice on one painter; second result's dimensions match
-    // the first. Pins that mStaging.resize at llfontcolrv1.cpp:819
+    // the first. Pins that mStaging.resize at alfontcolrv1.cpp:819
     // doesn't accumulate state across calls (e.g., a regression that
     // grew the staging buffer on every call would still produce a
     // valid bitmap but mWidth/mHeight could drift).
     template<> template<>
-    void llfontcolrv1_render_object::test<6>()
+    void alfontcolrv1_render_object::test<6>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
             skip("Noto-COLRv1.ttf not present");
 
-        LLPointer<LLFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
+        LLPointer<ALFontFace> face = gFontManagerp->getOrCreateFace(makeKey(path));
         hb_font_t* hb_font = face->getHbFont();
         hb_codepoint_t fire = 0;
         hb_font_get_nominal_glyph(hb_font, 0x1F525, &fire);
         if (fire == 0)
             skip("Noto-COLRv1 has no fire emoji");
 
-        LLFontColrV1Painter painter;
-        LLFontColrV1Painter::Result r1, r2;
+        ALFontColrV1Painter painter;
+        ALFontColrV1Painter::Result r1, r2;
         const LLColor4U fg(255, 255, 255, 255);
         ensure("first paintGlyph succeeded",
                painter.paintGlyph(hb_font, fire, 14.f, fg, 0, r1));
@@ -975,7 +990,7 @@ namespace tut
     // Grayscale lookups on COLRv1 faces produce a luminance-shaded mask
     // in the LA atlas instead of an empty / outline-only glyph.
     template<> template<>
-    void llfontcolrv1_render_object::test<7>()
+    void alfontcolrv1_render_object::test<7>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -1007,7 +1022,7 @@ namespace tut
     // what the call-site code does at llfontgl.cpp:560/715/862. Save and
     // restore the static so the test doesn't perturb sibling tests.
     template<> template<>
-    void llfontcolrv1_render_object::test<8>()
+    void alfontcolrv1_render_object::test<8>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))

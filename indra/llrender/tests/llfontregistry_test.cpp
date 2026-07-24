@@ -6,7 +6,7 @@
  * Exercises the pure-CPU surface of llfontregistry — descriptor
  * normalization, init_from_xml, resolveFontReferences, applyFamilyOverrides,
  * nameToSize/getMatchingFontDesc/getClosestFontTemplate, getAvailableFamilies.
- * FreeType-backed integration is covered by llfontcolrv1_test.cpp.
+ * FreeType-backed integration is covered by alfontcolrv1_test.cpp.
  *
  * When the binary is built against llrenderheadless (BUILD_HEADLESS=ON,
  * which sets LL_MESA_HEADLESS=1), the trailing block at the bottom of
@@ -17,6 +17,21 @@
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * $/LicenseInfo$
  */
 
@@ -2458,7 +2473,7 @@ namespace tut
                       wfiles[0].mVarAxes.slnt, -12.0f);
     }
 
-    // Files without any axis attribute leave LLFontVarAxes at its
+    // Files without any axis attribute leave ALFontVarAxes at its
     // default (no *_set flags). Pins the negative path that the cache
     // key + face-load skip rely on.
     template<> template<>
@@ -3216,7 +3231,7 @@ namespace tut
         // re-builds templates from scratch — i.e. the same teardown the
         // production reload() does before re-parsing fonts.xml. Skips the
         // mFallbackInstanceCache pin/restore (the test re-creates everything
-        // from scratch) and LLFontShaping::clearCache (the GL bring-up here
+        // from scratch) and ALFontShaping::clearCache (the GL bring-up here
         // doesn't go through real shaping pipelines).
         void simulateReload()
         {
@@ -3298,7 +3313,7 @@ namespace tut
     // destroyGL must drop GL textures and reset the face's bitmap cache
     // without removing registry entries — the LLFontGL pointer stays
     // valid (so widget caches don't dangle) and getFont still hits.
-    // Reset semantics: LLFontFace::destroyGL → resetBitmapCache clears
+    // Reset semantics: ALFontFace::destroyGL → resetBitmapCache clears
     // the LLImageGL vector entirely, so post-destroyGL the page count
     // is 0 (not "page count preserved with texname=0"). The next render
     // through the face re-allocates fresh atlas pages.
@@ -3708,7 +3723,7 @@ namespace tut
         }
 
         // Two heads with DIFFERENT primary faces (so they don't share a
-        // head LLFontFace) but a COMMON Noto-COLRv1 fallback at the same
+        // head ALFontFace) but a COMMON Noto-COLRv1 fallback at the same
         // size — that's what triggers mFallbackInstanceCache deduplication.
         constexpr const char* kXml =
             "<fonts>"
@@ -3775,7 +3790,7 @@ namespace tut
         // then release the sheet itself. The whole point of this test:
         // pre-fix, both heads' mGlyphInfoMap retained dangling pointers
         // to the deleted entry; post-fix, neither head has such a cache.
-        const LLFontFace* emoji_face = emoji_a->getFontFace();
+        const ALFontFace* emoji_face = emoji_a->getFontFace();
         LLFontBitmapCache* cache = emoji_a->getBitmapCache();
         ensure("fallback freetype exposes its face", emoji_face != nullptr);
         ensure("fallback freetype exposes its atlas", cache != nullptr);
