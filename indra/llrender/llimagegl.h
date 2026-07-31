@@ -190,9 +190,12 @@ public:
     bool createGLTexture(S32 discard_level, const U8* data, bool data_hasmips = false, S32 usename = 0, bool defer_copy = false, LLGLuint* tex_name = nullptr);
     void setImage(const LLImageRaw* imageraw);
     bool setImage(const U8* data_in, bool data_hasmips = false, S32 usename = 0);
-    // *TODO: This function may not work if the textures is compressed (i.e.
-    // RenderCompressTextures is 0). Partial image updates do not work on
-    // compressed textures.
+    // Partial (non-whole-image) sub-region updates do not work on
+    // compressed textures -- glTexSubImage2D is illegal on a compressed
+    // internal format, and there is no way to implement the generic
+    // driver-compression case at all (see the LL_ERRS in the .cpp).
+    // A whole-image call (x=0, y=0, width/height == getWidth()/getHeight())
+    // redirects to setImage() instead, which does handle compression.
     bool setSubImage(const LLImageRaw* imageraw, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update = false, LLGLuint use_name = 0, bool skip_unbind = false);
     bool setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update = false, LLGLuint use_name = 0, bool skip_unbind = false);
     bool setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_pos, S32 width, S32 height);
@@ -294,6 +297,7 @@ private:
     U32 createPickMask(S32 pWidth, S32 pHeight);
     void freePickMask();
     bool isCompressed();
+    bool willCompressOnUpload();
 
     LLPointer<LLImageRaw> mSaveData; // used for destroyGL/restoreGL
     LL::WorkQueue::weak_t mMainQueue;

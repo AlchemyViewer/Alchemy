@@ -100,6 +100,7 @@ public:
     bool mHasDebugOutput = false;
     bool mHasTransformFeedback = false;
     bool mHasAnisotropic = false;
+    bool mHasBPTCTextureCompression = false;
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;

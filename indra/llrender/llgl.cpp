@@ -1647,6 +1647,12 @@ void LLGLManager::initExtensions()
         mHasAnisotropic = mGLExtensions.contains("GL_EXT_texture_filter_anisotropic");
     }
 
+    mHasBPTCTextureCompression = mGLVersion >= 4.19f;
+    if (!mHasBPTCTextureCompression)
+    {
+        mHasBPTCTextureCompression = mGLExtensions.contains("GL_ARB_texture_compression_bptc");
+    }
+
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
     mHasEXTMemoryObject  = mGLExtensions.contains("GL_EXT_memory_object");

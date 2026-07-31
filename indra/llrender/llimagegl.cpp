@@ -356,6 +356,9 @@ S32 LLImageGL::dataFormatBits(S32 dataformat)
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT:    return 8;
     case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:          return 8;
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:    return 8;
+    // BC7/BPTC: fixed 16 bytes per 4x4 block, same 8 bits/pixel rate as DXT3/DXT5
+    case GL_COMPRESSED_RGBA_BPTC_UNORM:              return 8;
+    case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM:        return 8;
     case GL_LUMINANCE:                              return 8;
     case GL_LUMINANCE8:                             return 8;
     case GL_ALPHA:                                  return 8;
@@ -408,6 +411,10 @@ S64 LLImageGL::dataFormatBytes(S32 dataformat, S32 width, S32 height)
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT:
     case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
+    case GL_COMPRESSED_RGBA_BPTC_UNORM:
+    case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM:
+        // All 4x4-block formats: a texture smaller than one block still
+        // consumes a full block's worth of storage.
         if (width < 4) width = 4;
         if (height < 4) height = 4;
         break;
@@ -447,6 +454,10 @@ S64 LLImageGL::dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height)
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT:
     case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
+    case GL_COMPRESSED_RGBA_BPTC_UNORM:
+    case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM:
+        // All 4x4-block formats: a texture smaller than one block still
+        // consumes a full block's worth of storage.
         if (width < 4) width = 4;
         if (height < 4) height = 4;
         break;
@@ -469,6 +480,8 @@ S32 LLImageGL::dataFormatComponents(S32 dataformat)
       case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT: return 4;
       case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:    return 4;
       case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT: return 4;
+      case GL_COMPRESSED_RGBA_BPTC_UNORM:       return 4;
+      case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM: return 4;
       case GL_LUMINANCE:                        return 1;
       case GL_ALPHA:                            return 1;
       case GL_RED:                              return 1;
@@ -1246,6 +1259,20 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
             dump();
             LL_ERRS() << "setSubImage called with mipmapped image (not supported)" << LL_ENDL;
         }
+        if (isCompressed() || willCompressOnUpload())
+        {
+            // glTexSubImage2D is illegal on a compressed internal format --
+            // GL requires glCompressedTexSubImage2D instead, and for the
+            // generic driver-chosen compression path (willCompressOnUpload)
+            // there isn't even a way to implement that: the driver encodes
+            // the whole image opaquely on upload, and there's no API to ask
+            // it to compress just this sub-rectangle and splice it in. A
+            // real fix only exists for source data compressed via a format
+            // we control the encoder for. Until then, refuse rather than
+            // issue a GL call that silently corrupts or no-ops the update.
+            dump();
+            LL_ERRS() << "setSubImage called with a compressed (or to-be-compressed) image (not supported)" << LL_ENDL;
+        }
         llassert_always(mCurrentDiscardLevel == 0);
         llassert_always(x_pos >= 0 && y_pos >= 0);
 
@@ -1293,7 +1320,7 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         if (!res) LL_ERRS() << "LLImageGL::setSubImage(): bindTexture failed" << LL_ENDL;
         stop_glerror();
 
-        const bool use_sub_image = should_stagger_image_set(isCompressed());
+        const bool use_sub_image = should_stagger_image_set(isCompressed() || willCompressOnUpload());
         if (!use_sub_image)
         {
             // *TODO: Why does this work here, in setSubImage, but not in
@@ -1334,6 +1361,14 @@ bool LLImageGL::setSubImage(const LLImageRaw* imageraw, S32 x_pos, S32 y_pos, S3
 // Copy sub image from frame buffer
 bool LLImageGL::setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_pos, S32 width, S32 height)
 {
+    if (isCompressed() || willCompressOnUpload())
+    {
+        // Same issue as the setSubImage() guard above: glCopyTexSubImage2D
+        // is illegal on a compressed internal format, for the same reasons.
+        dump();
+        LL_ERRS() << "setSubImageFromFrameBuffer called on a compressed (or to-be-compressed) image (not supported)" << LL_ENDL;
+    }
+
     if (gGL.getTexUnit(0)->bind(this, false, true))
     {
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, x_pos, y_pos, fb_x, fb_y, width, height);
@@ -1404,6 +1439,69 @@ void LLImageGL::deleteTextures(S32 numTextures, const U32 *textures)
         {
             sFreeList[idx].push_back(textures[i]);
         }
+    }
+}
+
+// Generic (driver-chosen) GPU compression only applies to a fixed set of
+// uncompressed internal formats -- this is the single source of truth for
+// that set, shared between the swap performed in setManualImage and
+// LLImageGL::willCompressOnUpload()'s prediction of it. Keeping one table
+// here avoids the two silently drifting apart, which is how
+// willCompressOnUpload() (folded into isCompressed() in an earlier version
+// of this fix) missed this compression path entirely: setManualImage's swap
+// is local to that call and never written back to mFormatInternal, so
+// nothing could observe it without duplicating this logic.
+static bool compressed_internal_format(S32 intformat, S32& out_compressed)
+{
+    switch (intformat)
+    {
+    case GL_RED:
+    case GL_R8:
+        out_compressed = GL_COMPRESSED_RED;
+        return true;
+    case GL_RG:
+    case GL_RG8:
+        out_compressed = GL_COMPRESSED_RG;
+        return true;
+    case GL_RGB:
+    case GL_RGB8:
+        // BC7/BPTC has no RGB-only (alpha-less) variant -- only the RGBA
+        // form exists. Promoting an alpha-less source to it is harmless
+        // (same as the pre-existing GL_COMPRESSED_RGB generic case, which
+        // is also driver-chosen and may itself pad an implicit alpha), and
+        // BC7's fixed 16 bytes/4x4 block cost doesn't change either way.
+        out_compressed = gGLManager.mHasBPTCTextureCompression ?
+            GL_COMPRESSED_RGBA_BPTC_UNORM : GL_COMPRESSED_RGB;
+        return true;
+    case GL_SRGB:
+    case GL_SRGB8:
+        out_compressed = gGLManager.mHasBPTCTextureCompression ?
+            GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM : GL_COMPRESSED_SRGB;
+        return true;
+    case GL_RGBA:
+    case GL_RGBA8:
+        out_compressed = gGLManager.mHasBPTCTextureCompression ?
+            GL_COMPRESSED_RGBA_BPTC_UNORM : GL_COMPRESSED_RGBA;
+        return true;
+    case GL_SRGB_ALPHA:
+    case GL_SRGB8_ALPHA8:
+        out_compressed = gGLManager.mHasBPTCTextureCompression ?
+            GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM : GL_COMPRESSED_SRGB_ALPHA;
+        return true;
+    case GL_LUMINANCE:
+    case GL_LUMINANCE8:
+        out_compressed = GL_COMPRESSED_LUMINANCE;
+        return true;
+    case GL_LUMINANCE_ALPHA:
+    case GL_LUMINANCE8_ALPHA8:
+        out_compressed = GL_COMPRESSED_LUMINANCE_ALPHA;
+        return true;
+    case GL_ALPHA:
+    case GL_ALPHA8:
+        out_compressed = GL_COMPRESSED_ALPHA;
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -1540,47 +1638,21 @@ void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 widt
     const bool compress = LLImageGL::sCompressTextures && allow_compression;
     if (compress)
     {
-        switch (intformat)
+        S32 compressed_format;
+        if (compressed_internal_format(intformat, compressed_format))
         {
-        case GL_RED:
-        case GL_R8:
-            intformat = GL_COMPRESSED_RED;
-            break;
-        case GL_RG:
-        case GL_RG8:
-            intformat = GL_COMPRESSED_RG;
-            break;
-        case GL_RGB:
-        case GL_RGB8:
-            intformat = GL_COMPRESSED_RGB;
-            break;
-        case GL_SRGB:
-        case GL_SRGB8:
-            intformat = GL_COMPRESSED_SRGB;
-            break;
-        case GL_RGBA:
-        case GL_RGBA8:
-            intformat = GL_COMPRESSED_RGBA;
-            break;
-        case GL_SRGB_ALPHA:
-        case GL_SRGB8_ALPHA8:
-            intformat = GL_COMPRESSED_SRGB_ALPHA;
-            break;
-        case GL_LUMINANCE:
-        case GL_LUMINANCE8:
-            intformat = GL_COMPRESSED_LUMINANCE;
-            break;
-        case GL_LUMINANCE_ALPHA:
-        case GL_LUMINANCE8_ALPHA8:
-            intformat = GL_COMPRESSED_LUMINANCE_ALPHA;
-            break;
-        case GL_ALPHA:
-        case GL_ALPHA8:
-            intformat = GL_COMPRESSED_ALPHA;
-            break;
-        default:
+            // Logged once so RenderCompressTextures can be verified from a
+            // log file instead of guessed at -- which format actually gets
+            // used matters here: BC7 and driver-generic compression are
+            // very different encode-cost profiles on the upload hot path.
+            LL_INFOS_ONCE("Texture") << "Texture compression active, using "
+                << (gGLManager.mHasBPTCTextureCompression ? "BC7/BPTC" : "generic driver-chosen")
+                << " compressed formats" << LL_ENDL;
+            intformat = compressed_format;
+        }
+        else
+        {
             LL_WARNS() << "Could not compress format: " << std::hex << intformat << std::dec << LL_ENDL;
-            break;
         }
     }
 
@@ -2610,6 +2682,23 @@ bool LLImageGL::isCompressed()
         break;
     }
     return is_compressed;
+}
+
+bool LLImageGL::willCompressOnUpload()
+{
+    // setManualImage swaps mFormatInternal to a compressed GL_COMPRESSED_*
+    // internal format at upload time when RenderCompressTextures is enabled
+    // -- BC7/BPTC where the driver supports it, generic driver-chosen
+    // compression otherwise -- but that swap is local to the call and never
+    // written back to mFormatInternal here. Predict it via the same table
+    // setManualImage uses. Distinct from isCompressed(), which
+    // answers "is my source data already GPU-compressed blocks" (the S3TC/
+    // DXT-container case) -- conflating the two broke setImage()'s
+    // data_hasmips branch, which uses isCompressed() to decide whether the
+    // incoming bytes are raw pixels or pre-compressed blocks.
+    S32 compressed_format;
+    return LLImageGL::sCompressTextures && mAllowCompression &&
+        compressed_internal_format(mFormatInternal, compressed_format);
 }
 
 //----------------------------------------------------------------------------
