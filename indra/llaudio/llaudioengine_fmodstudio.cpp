@@ -53,6 +53,17 @@ float LLAudioEngine_FMODSTUDIO::sReverbSendScale = 0.0f;
 
 namespace
 {
+    // Reinterpret-casting an LLVector3's float array to FMOD_VECTOR* (as
+    // this file used to do at its set3DAttributes call site) is
+    // type-punning that violates strict aliasing -- GCC flags it as an
+    // error under -Werror=strict-aliasing. FMOD_VECTOR is layout-compatible
+    // (three floats), so building one by value sidesteps the violation.
+    // Mirrors lllistener_fmodstudio.cpp's identical helper.
+    FMOD_VECTOR to_fmod_vector(const LLVector3& v)
+    {
+        return FMOD_VECTOR{ v.mV[0], v.mV[1], v.mV[2] };
+    }
+
     // Serialise an FMOD_GUID into the canonical Windows-style
     // "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" form. Used as the stable
     // device id in the picker UI / settings; round-trips via simple
@@ -802,7 +813,9 @@ void LLAudioChannelFMODSTUDIO::update3DPosition()
 
         LLVector3 float_pos;
         float_pos.setVec(mCurrentSourcep->getPositionGlobal());
-        FMOD_RESULT result = mChannelp->set3DAttributes((FMOD_VECTOR*)float_pos.mV, (FMOD_VECTOR*)mCurrentSourcep->getVelocity().mV);
+        FMOD_VECTOR pos = to_fmod_vector(float_pos);
+        FMOD_VECTOR vel = to_fmod_vector(mCurrentSourcep->getVelocity());
+        FMOD_RESULT result = mChannelp->set3DAttributes(&pos, &vel);
         Check_FMOD_Error(result, "FMOD::Channel::set3DAttributes");
     }
 }
@@ -1026,10 +1039,16 @@ FMOD_RESULT F_CALL windCallback(FMOD_DSP_STATE *dsp_state, float *inbuffer, floa
     // outbuffer = the buffer passed from the previous DSP unit.
     // length = length in samples at this mix time.
 
-    LLWindGen<LLAudioEngine_FMODSTUDIO::MIXBUFFERFORMAT> *windgen = nullptr;
     FMOD::DSP *thisdsp = (FMOD::DSP *)dsp_state->instance;
 
-    thisdsp->getUserData((void **)&windgen);
+    // Receive as void* and convert the pointer *value* afterward, rather
+    // than handing FMOD a (void**) alias of an LLWindGen<...>* lvalue --
+    // the latter is type-punning that GCC flags under
+    // -Werror=strict-aliasing.
+    void *userdata = nullptr;
+    thisdsp->getUserData(&userdata);
+    LLWindGen<LLAudioEngine_FMODSTUDIO::MIXBUFFERFORMAT> *windgen =
+        static_cast<LLWindGen<LLAudioEngine_FMODSTUDIO::MIXBUFFERFORMAT>*>(userdata);
 
     if (windgen)
     {

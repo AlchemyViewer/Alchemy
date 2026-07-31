@@ -2181,18 +2181,38 @@ elseif(LINUX)
   set(MANIFEST_PACKAGE_OUT_FILE ${product}.tar.xz)
 endif()
 
+# FMOD Studio isn't a vcpkg package (see FMODSTUDIO.cmake) so viewer_manifest.py
+# needs to be told directly where to find its shared libraries to bundle them
+# on Linux. Empty when FMOD Studio isn't in use.
+set(FMOD_MANIFEST_LIB_DIR "")
+if(LINUX AND USE_FMODSTUDIO)
+  set(FMOD_MANIFEST_LIB_DIR "${FMODSTUDIO_SDK_DIR}/api/core/lib/x86_64")
+endif()
+
 # Viewer Manifest Copy
+#
+# --actions must include both "copy" and "package": is_packaging_viewer()
+# (which gates whether shaders/fonts/skins/app_settings XML etc. are even
+# considered in construct()) checks for "package" in the actions list, but
+# the actual file-write only happens via copy_action() -- package_action()
+# on its own is a no-op. Passing "copy" alone (as this used to) silently
+# produced a package missing everything gated by is_packaging_viewer(),
+# which doesn't fail the build -- it just makes the result fail to launch.
+# strip_binaries() (invoked by package_finish()) is a no-op for anything
+# other than a Release buildtype, so this doesn't strip debug info from
+# the more common Debug/RelWithDebInfo/OptDebug dev builds.
 add_custom_command(
   TARGET ${VIEWER_BINARY_NAME} POST_BUILD
   COMMAND ${Python3_EXECUTABLE}
   ARGS
     ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-    --actions=copy
+    "--actions=\"copy package\""
     --arch=${ARCH}
     --artwork=${ARTWORK_DIR}
     "--bugsplat=${BUGSPLAT_DB}"
     "--discord=${USE_DISCORD}"
     "--openal=${USE_OPENAL}"
+    "--fmod=${FMOD_MANIFEST_LIB_DIR}"
     "--tracy=${USE_TRACY}"
     --build=${CMAKE_CURRENT_BINARY_DIR}
     --buildtype=$<CONFIG>
@@ -2226,6 +2246,7 @@ if(IS_DIRECTORY ${LOCAL_DIST_DIR})
       "--bugsplat=${BUGSPLAT_DB}"
       "--discord=${USE_DISCORD}"
       "--openal=${USE_OPENAL}"
+      "--fmod=${FMOD_MANIFEST_LIB_DIR}"
       "--tracy=${USE_TRACY}"
       --build=${CMAKE_CURRENT_BINARY_DIR}
       --buildtype=$<CONFIG>
@@ -2265,6 +2286,7 @@ if (PACKAGE)
               --bundleid=${MACOSX_BUNDLE_GUI_IDENTIFIER}
           "--discord=${USE_DISCORD}"
           "--openal=${USE_OPENAL}"
+          "--fmod=${FMOD_MANIFEST_LIB_DIR}"
           "--tracy=${USE_TRACY}"
               "--velopack=${USE_VELOPACK}"
           --build=${CMAKE_CURRENT_BINARY_DIR}

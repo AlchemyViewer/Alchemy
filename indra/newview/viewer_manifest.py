@@ -1111,6 +1111,7 @@ class LinuxManifest(ViewerManifest):
         self.path("licenses-linux.txt","licenses.txt")
         with self.prefix("linux_tools"):
             self.path("wrapper.sh","vayu")
+            self.path("wrapper-zink.sh","vayu-zink")
             with self.prefix(dst="etc"):
                 self.path("handle_secondlifeprotocol.sh")
                 self.path("register_secondlifeprotocol.sh")
@@ -1187,6 +1188,15 @@ class LinuxManifest(ViewerManifest):
 
         with self.prefix(src=os.path.join(self.args['vcpkg_dir'], 'share', 'cef-bin', 'Resources', 'locales'), dst=os.path.join('lib', 'locales')):
             self.path("*.pak")
+
+        # FMOD Studio isn't a vcpkg package -- it's found via FMODSTUDIO_SDK_DIR
+        # outside the repo, so unlike everything above it needs an explicit
+        # bundling step here or the shared libraries never make it into the
+        # package at all, even though the binary is dynamically linked against
+        # them (self.args['fmod'] is empty when FMOD Studio isn't in use).
+        if self.args['fmod']:
+            with self.prefix(src=self.args['fmod'], dst="lib"):
+                self.path("libfmod.so*")
 
         self.path("featuretable_linux.txt")
         self.path("cube.dae")
@@ -1285,6 +1295,9 @@ if __name__ == "__main__":
              if BugSplat crash reporting is desired""", default=''),
         dict(name='discord', description="""Indication discord social sdk libraries are needed""", default='OFF'),
         dict(name='openal', description="""Indication openal libraries are needed""", default='OFF'),
+        dict(name='fmod', description="""Directory containing the FMOD Studio shared libraries to
+             bundle (Linux only; empty means FMOD Studio isn't in use, or is linked statically /
+             handled by another platform's own packaging step)""", default=''),
         dict(name='tracy', description="""Indication tracy profiler is enabled""", default='OFF'),
         dict(name='velopack', description="""Use Velopack installer instead of NSIS""", default='OFF'),
         ]

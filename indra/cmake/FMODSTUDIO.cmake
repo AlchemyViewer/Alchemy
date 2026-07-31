@@ -25,7 +25,9 @@ if (USE_FMODSTUDIO)
       if(WINDOWS)
         set(fmod_lib_paths "${FMODSTUDIO_SDK_DIR}/api/core/lib/x64")
       elseif(LINUX)
-        set(fmod_lib_paths "${FMODSTUDIO_SDK_DIR}/api/core/lib/x64")
+        set(fmod_lib_paths
+          "${FMODSTUDIO_SDK_DIR}/api/core/lib/x86_64"
+          "${FMODSTUDIO_SDK_DIR}/api/core/lib/x64")
       endif()
       set(fmod_inc_paths "${FMODSTUDIO_SDK_DIR}/api/core/inc")
 

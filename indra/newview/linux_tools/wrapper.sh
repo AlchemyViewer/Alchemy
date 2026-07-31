@@ -8,6 +8,22 @@
 ## GL Driver Options
 export mesa_glthread=true
 
+## --- AMD PERFORMANCE TUNING (carried over from the Firestorm High
+##     Performance launcher) ---
+## AMD_DEBUG=lowprecision trades a small amount of rendering precision
+## for throughput on radeonsi/radv. Harmless no-op on non-AMD Mesa
+## drivers. Comment out if you see visual artifacts.
+export AMD_DEBUG=lowprecision
+
+## Swap in mimalloc as the allocator -- measurably lower allocator
+## overhead than glibc malloc for this workload. Path assumes an
+## RPM-family distro layout (openSUSE/Fedora); adjust for others
+## (e.g. /usr/lib/x86_64-linux-gnu/libmimalloc.so.3 on Debian/Ubuntu).
+## A missing path here just produces a harmless ld.so warning, it
+## doesn't stop the viewer from starting.
+export LD_PRELOAD=/usr/lib64/libmimalloc.so.3
+# export LD_PRELOAD=/usr/lib64/libjemalloc.so.2
+
 ## Everything below this line is just for advanced troubleshooters.
 ##-------------------------------------------------------------------
 

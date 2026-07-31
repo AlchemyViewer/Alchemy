@@ -30,6 +30,21 @@
 #include "lllistener_fmodstudio.h"
 #include <fmod.hpp>
 
+namespace
+{
+    // Reinterpret-casting an LLVector3's float array to FMOD_VECTOR* and
+    // dereferencing it (as this file used to do at every call site below)
+    // is type-punning that violates strict aliasing -- GCC flags it as an
+    // error under -Werror=strict-aliasing. FMOD_VECTOR is layout-compatible
+    // (three floats), so building one by value sidesteps the aliasing
+    // violation entirely instead of relying on the cast being "safe enough
+    // in practice".
+    FMOD_VECTOR to_fmod_vector(const LLVector3& v)
+    {
+        return FMOD_VECTOR{ v.mV[0], v.mV[1], v.mV[2] };
+    }
+}
+
 //-----------------------------------------------------------------------
 // constructor
 //-----------------------------------------------------------------------
@@ -58,7 +73,10 @@ void LLListener_FMODSTUDIO::translate(LLVector3 offset)
 {
     LLListener::translate(offset);
 
-    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
+    FMOD_VECTOR pos = to_fmod_vector(mPosition);
+    FMOD_VECTOR at = to_fmod_vector(mListenAt);
+    FMOD_VECTOR up = to_fmod_vector(mListenUp);
+    mSystem->set3DListenerAttributes(0, &pos, nullptr, &at, &up);
 }
 
 //-----------------------------------------------------------------------
@@ -66,7 +84,10 @@ void LLListener_FMODSTUDIO::setPosition(LLVector3 pos)
 {
     LLListener::setPosition(pos);
 
-    mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
+    FMOD_VECTOR fmod_pos = to_fmod_vector(mPosition);
+    FMOD_VECTOR at = to_fmod_vector(mListenAt);
+    FMOD_VECTOR up = to_fmod_vector(mListenUp);
+    mSystem->set3DListenerAttributes(0, &fmod_pos, nullptr, &at, &up);
 }
 
 //-----------------------------------------------------------------------
@@ -74,7 +95,10 @@ void LLListener_FMODSTUDIO::setVelocity(LLVector3 vel)
 {
     LLListener::setVelocity(vel);
 
-    mSystem->set3DListenerAttributes(0, nullptr, (FMOD_VECTOR*)mVelocity.mV, (FMOD_VECTOR*)mListenAt.mV, (FMOD_VECTOR*)mListenUp.mV);
+    FMOD_VECTOR fmod_vel = to_fmod_vector(mVelocity);
+    FMOD_VECTOR at = to_fmod_vector(mListenAt);
+    FMOD_VECTOR up = to_fmod_vector(mListenUp);
+    mSystem->set3DListenerAttributes(0, nullptr, &fmod_vel, &at, &up);
 }
 
 //-----------------------------------------------------------------------
@@ -85,7 +109,9 @@ void LLListener_FMODSTUDIO::orient(LLVector3 up, LLVector3 at)
     // at = -at; by default Fmod studio is 'left-handed' but we are providing
     // flag FMOD_INIT_3D_RIGHTHANDED so no correction are needed
 
-    mSystem->set3DListenerAttributes(0, nullptr, nullptr, (FMOD_VECTOR*)at.mV, (FMOD_VECTOR*)up.mV);
+    FMOD_VECTOR fmod_at = to_fmod_vector(at);
+    FMOD_VECTOR fmod_up = to_fmod_vector(up);
+    mSystem->set3DListenerAttributes(0, nullptr, nullptr, &fmod_at, &fmod_up);
 }
 
 //-----------------------------------------------------------------------
@@ -109,8 +135,10 @@ void LLListener_FMODSTUDIO::setRolloffFactor(F32 factor)
     if (mRolloffFactor != factor)
     {
         LLVector3 pos = mPosition - LLVector3(0.f, 0.f, .1f);
-        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)pos.mV, nullptr, nullptr, nullptr);
-        mSystem->set3DListenerAttributes(0, (FMOD_VECTOR*)mPosition.mV, nullptr, nullptr, nullptr);
+        FMOD_VECTOR fmod_pos = to_fmod_vector(pos);
+        FMOD_VECTOR fmod_mPosition = to_fmod_vector(mPosition);
+        mSystem->set3DListenerAttributes(0, &fmod_pos, nullptr, nullptr, nullptr);
+        mSystem->set3DListenerAttributes(0, &fmod_mPosition, nullptr, nullptr, nullptr);
     }
     mRolloffFactor = factor;
     mSystem->set3DSettings(mDopplerFactor, 1.f, mRolloffFactor);
