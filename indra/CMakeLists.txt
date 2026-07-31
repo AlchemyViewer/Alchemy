@@ -42,6 +42,7 @@ option(USE_LTO "Enable Link Time Optimization" OFF)
 option(USE_NVAPI "Use NVidia NVAPI library for gpu profile support (Windows Only)" ON)
 option(USE_OPENXR "Enable building with OpenXR support (Experimental)" OFF)
 option(USE_PRECOMPILED_HEADERS "Enable use of precompiled header directives where supported." ON)
+option(USE_CCACHE "Use ccache to speed up recompilation if it is available" ON)
 
 # Audio Engines
 option(USE_FMODSTUDIO "Enable support for the FMOD Studio audio engine" OFF)
@@ -206,6 +207,23 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_BINAR
 
 # Setup VCPKG toolchains and targets
 include(BootstrapVcpkg)
+
+# Wire up ccache (if present) before project()/enable_language(), since that's
+# when CMake does compiler detection and starts honoring
+# CMAKE_<LANG>_COMPILER_LAUNCHER. Silently a no-op if ccache isn't installed,
+# so this is safe to leave on by default for everyone.
+if(USE_CCACHE)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    if(DARWIN)
+      set(CMAKE_OBJC_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+      set(CMAKE_OBJCXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    endif()
+  endif()
+endif()
 
 # Generate base project after setting pre-generation variables
 project(${ROOT_PROJECT_NAME})
