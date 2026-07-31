@@ -1553,6 +1553,9 @@ class LLAdvancedTerrainCreateLocalPaintMap : public view_listener_t
         dim = 1 << U32(std::ceil(std::log2(dim)));
         LLPointer<LLImageRaw> image_raw = new LLImageRaw(dim,dim,3);
         LLPointer<LLViewerTexture> tex = LLViewerTextureManager::getLocalTexture(image_raw.get(), true);
+        // Baking uses setSubImageFromFrameBuffer(), which cannot work on a
+        // compressed texture (see LLImageGL::setSubImageFromFrameBuffer).
+        tex->getGLTexture()->setAllowCompression(false);
         const bool success = LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(*region, *tex);
         // This calls gLocalTerrainMaterials.setPaintType
         gSavedSettings.setBOOL("LocalTerrainPaintEnabled", true);
