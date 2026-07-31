@@ -59,57 +59,63 @@ static const struct
     U32                         mMax;
     U32                         mRate;
     bool                        mPipelined;
+    bool                        mContentDecoding;
     std::string                 mKey;
     const char *                mUsage;
 } init_data[LLAppCoreHttp::AP_COUNT] =
 {
     { // AP_DEFAULT
-        8,      8,      8,      0,      false,
+        8,      8,      8,      0,      false,  true,
         "",
         "other"
     },
     { // AP_TEXTURE
-        8,      1,      12,     0,      true,
+        // Binary asset fetch direct from the asset CDN, which is known to
+        // send a bogus Content-Encoding (a MIME type, not a transfer
+        // coding) on every response -- libcurl treats that as a hard
+        // failure once auto-decoding is requested at all, so leave
+        // Content-Encoding alone for this class (see PO_CONTENT_DECODING).
+        8,      1,      12,     0,      true,   false,
         "TextureFetchConcurrency",
         "texture fetch"
     },
     { // AP_MESH1
-        32,     1,      128,    0,      false,
+        32,     1,      128,    0,      false,  false,
         "MeshMaxConcurrentRequests",
         "mesh fetch"
     },
     { // AP_MESH2
-        8,      1,      32,     0,      true,
+        8,      1,      32,     0,      true,   false,
         "Mesh2MaxConcurrentRequests",
         "mesh2 fetch"
     },
     { // AP_LARGE_MESH
-        2,      1,      8,      0,      false,
+        2,      1,      8,      0,      false,  false,
         "",
         "large mesh fetch"
     },
     { // AP_UPLOADS
-        2,      1,      8,      0,      false,
+        2,      1,      8,      0,      false,  true,
         "",
         "asset upload"
     },
     { // AP_LONG_POLL
-        32,     32,     32,     0,      false,
+        32,     32,     32,     0,      false,  true,
         "",
         "long poll"
     },
     { // AP_INVENTORY
-        4,      1,      4,      0,      false,
+        4,      1,      4,      0,      false,  true,
         "",
         "inventory"
     },
     { // AP_MATERIALS
-        2,      1,      8,      0,      false,
+        2,      1,      8,      0,      false,  true,
         "RenderMaterials",
         "material manager requests"
     },
     { // AP_AGENT
-        2,      1,      32,     0,      false,
+        2,      1,      32,     0,      false,  true,
         "Agent",
         "Agent requests"
     }
@@ -413,6 +419,23 @@ void LLAppCoreHttp::refreshSettings(bool initial)
                 {
                     LL_WARNS("Init") << "Unable to set " << init_data[i].mUsage
                                      << " throttle rate.  Reason:  " << status.toString()
+                                     << LL_ENDL;
+                }
+            }
+
+            if (! init_data[i].mContentDecoding)
+            {
+                // This class's server is known to send a bogus
+                // Content-Encoding; don't ask libcurl to negotiate or
+                // auto-decode it (see PO_CONTENT_DECODING).
+                status = LLCore::HttpRequest::setStaticPolicyOption(LLCore::HttpRequest::PO_CONTENT_DECODING,
+                                                                    mHttpClasses[app_policy].mPolicy,
+                                                                    0L,
+                                                                    NULL);
+                if (! status)
+                {
+                    LL_WARNS("Init") << "Unable to disable content decoding for " << init_data[i].mUsage
+                                     << ".  Reason:  " << status.toString()
                                      << LL_ENDL;
                 }
             }

@@ -64,6 +64,7 @@ public:
     long                        mPerHostConnectionLimit;
     long                        mPipelining;
     long                        mThrottleRate;
+    long                        mContentDecoding;
 };  // end class HttpPolicyClass
 
 }  // end namespace LLCore

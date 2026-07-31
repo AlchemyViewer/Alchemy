@@ -7403,6 +7403,17 @@
       <key>Value</key>
       <integer>-1</integer>
     </map>
+    <key>QAModeHttpTrace</key>
+    <map>
+      <key>Comment</key>
+      <string>HTTP tracing level for llcorehttp/libcurl (0=off, 1=basic, 2=libcurl verbose headers, 3=verbose plus body content)</string>
+      <key>Persist</key>
+      <integer>0</integer>
+      <key>Type</key>
+      <string>U32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>QAModeTermCode</key>
     <map>
       <key>Comment</key>

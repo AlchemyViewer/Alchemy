@@ -278,9 +278,12 @@ void HttpOpRequest::visitNotifier(HttpRequest * request)
 
         HttpResponse::TransferStats::ptr_t stats = std::make_shared<HttpResponse::TransferStats>();
 
-        curl_easy_getinfo(mCurlHandle, CURLINFO_SIZE_DOWNLOAD, &stats->mSizeDownload);
+        curl_off_t size_download = 0, speed_download = 0;
+        curl_easy_getinfo(mCurlHandle, CURLINFO_SIZE_DOWNLOAD_T, &size_download);
         curl_easy_getinfo(mCurlHandle, CURLINFO_TOTAL_TIME, &stats->mTotalTime);
-        curl_easy_getinfo(mCurlHandle, CURLINFO_SPEED_DOWNLOAD, &stats->mSpeedDownload);
+        curl_easy_getinfo(mCurlHandle, CURLINFO_SPEED_DOWNLOAD_T, &speed_download);
+        stats->mSizeDownload = static_cast<F64>(size_download);
+        stats->mSpeedDownload = static_cast<F64>(speed_download);
 
         response->setTransferStats(stats);
 
@@ -519,7 +522,24 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
     check_curl_easy_setopt(mCurlHandle, CURLOPT_NOPROGRESS, 1);
     check_curl_easy_setopt(mCurlHandle, CURLOPT_URL, mReqURL.c_str());
     check_curl_easy_setopt(mCurlHandle, CURLOPT_PRIVATE, getHandle());
-    check_curl_easy_setopt(mCurlHandle, CURLOPT_ENCODING, "");
+    // Auto-negotiate and auto-decode Content-Encoding, unless this class
+    // disables it (PO_CONTENT_DECODING=0): some asset servers send a
+    // non-encoding value here (e.g. a MIME type where a transfer coding
+    // was meant), which libcurl treats as a hard failure
+    // (CURLE_BAD_CONTENT_ENCODING) once content decoding is enabled.
+    // CURLOPT_HTTP_CONTENT_DECODING is the actual gate on whether libcurl
+    // inspects/validates the response's Content-Encoding at all -- it
+    // defaults to enabled independently of CURLOPT_ENCODING, so clearing
+    // just CURLOPT_ENCODING (as a prior version of this fix did) left
+    // libcurl still validating the header and still failing.  Both are
+    // set explicitly (not just left unset) on every request, not only
+    // when disabling: easy handles are recycled from a pool
+    // (HandleCache::getHandle()) with no reset, so a handle last used by
+    // a decoding-enabled class would otherwise carry that setting forward.
+    check_curl_easy_setopt(mCurlHandle, CURLOPT_HTTP_CONTENT_DECODING,
+                            cpolicy.mContentDecoding ? 1L : 0L);
+    check_curl_easy_setopt(mCurlHandle, CURLOPT_ENCODING,
+                            cpolicy.mContentDecoding ? "" : static_cast<char *>(NULL));
 
     check_curl_easy_setopt(mCurlHandle, CURLOPT_AUTOREFERER, 1);
     check_curl_easy_setopt(mCurlHandle, CURLOPT_MAXREDIRS, HTTP_REDIRECTS_DEFAULT);
@@ -622,7 +642,7 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
     case HOR_POST:
         {
             check_curl_easy_setopt(mCurlHandle, CURLOPT_POST, 1);
-            check_curl_easy_setopt(mCurlHandle, CURLOPT_ENCODING, "");
+            // CURLOPT_ENCODING already set above for all methods.
             long data_size(0);
             if (mReqBody)
             {

@@ -157,6 +157,9 @@ constexpr long HTTP_PIPELINING_MAX = 20L;
 constexpr bool HTTP_USE_RETRY_AFTER_DEFAULT = true;
 constexpr long HTTP_THROTTLE_RATE_DEFAULT = 0L;
 
+// Content-Encoding auto-decode: on by default, matching historical behavior
+constexpr long HTTP_CONTENT_DECODING_DEFAULT = 1L;
+
 // Tuning parameters
 
 // Time worker thread sleeps after a pass through the

@@ -232,6 +232,22 @@ public:
         /// Global only
         PO_SSL_VERIFY_CALLBACK,
 
+        /// Long value controlling whether libcurl is asked to
+        /// negotiate and auto-decode HTTP Content-Encoding for this
+        /// class (non-zero, the default) or left entirely alone
+        /// (zero).  When left alone, libcurl neither advertises
+        /// Accept-Encoding nor inspects/validates any Content-Encoding
+        /// the server sends back -- the payload is delivered as-is.
+        ///
+        /// Use zero for classes whose servers are known to send a
+        /// non-encoding value in Content-Encoding (e.g. a MIME type
+        /// where a transfer coding was meant): libcurl treats an
+        /// unrecognized value as a hard transfer failure
+        /// (CURLE_BAD_CONTENT_ENCODING) when decoding is requested.
+        ///
+        /// Per-class only
+        PO_CONTENT_DECODING,
+
         PO_LAST  // Always at end
     };
 
