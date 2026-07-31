@@ -91,8 +91,8 @@ else ()
 
         set_target_properties(media_plugin_cef PROPERTIES
             MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/SLPluginCEF-Info.plist.in
-            MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer.mediaplugincef"
-            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.alchemyviewer.viewer.mediaplugincef"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "org.vayuviewer.viewer.mediaplugincef"
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.vayuviewer.viewer.mediaplugincef"
         )
     endif ()
 endif ()

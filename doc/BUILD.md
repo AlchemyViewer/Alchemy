@@ -1,6 +1,6 @@
-# Building Alchemy Viewer
+# Building Vayu Viewer
 
-Everything you need to build Alchemy from source: platform setup, presets, options, tests, packaging, and troubleshooting.
+Everything you need to build Vayu Viewer from source: platform setup, presets, options, tests, packaging, and troubleshooting.
 
 - [Prerequisites](#prerequisites)
 - [Platform setup](#platform-setup) — Windows, macOS, Linux
@@ -164,11 +164,11 @@ rustup default stable
 
 ## Clone and bootstrap
 
-Alchemy vendors the [Dullahan](https://github.com/AlchemyViewer/dullahan) CEF wrapper — used by the in-world web media plugin — as a git submodule under `indra/dullahan`. It builds from source as part of the tree, so the submodule must be present before you configure. Clone with `--recurse-submodules`, then set up the Python venv and .NET tools:
+Vayu Viewer vendors the [Dullahan](https://github.com/AlchemyViewer/dullahan) CEF wrapper — used by the in-world web media plugin — as a git submodule under `indra/dullahan`. It builds from source as part of the tree, so the submodule must be present before you configure. Clone with `--recurse-submodules`, then set up the Python venv and .NET tools:
 
 ```
-git clone --recurse-submodules https://github.com/AlchemyViewer/Alchemy.git alchemy
-cd alchemy
+git clone --recurse-submodules https://github.com/Shadowolf7/Vayu-Viewer.git vayu-viewer
+cd vayu-viewer
 python3 -m venv .venv
 # Windows: .\.venv\Scripts\Activate.ps1
 # Unix:    source .venv/bin/activate
@@ -257,10 +257,10 @@ cmake --build --preset ninja-os-release
 
 ```
 # Visual Studio
-start .\build-Windows-vs2026-os\Alchemy.slnx
+start .\build-Windows-vs2026-os\Vayu.slnx
 
 # Xcode
-open ./build-Darwin-xcode-os-arm64/Alchemy.xcodeproj
+open ./build-Darwin-xcode-os-arm64/Vayu.xcodeproj
 ```
 
 > `.slnx` is the newer Visual Studio solution format. Requires VS 2022 17.10+ or VS 2026.
@@ -275,7 +275,7 @@ The viewer executable lands under `build-<OS>-<preset>/newview/<Config>/`:
 | macOS    | `build-Darwin-<preset>/newview/<Config>/<ChannelName>.app`  |
 | Linux    | `build-Linux-<preset>/newview/<Config>/<ChannelName>`       |
 
-`<ChannelName>` follows `VIEWER_CHANNEL` (default `Alchemy Test` → `AlchemyTest.exe` / `AlchemyTest.app`).
+`<ChannelName>` follows `VIEWER_CHANNEL` (default `Vayu Test` → `VayuTest.exe` / `VayuTest.app`).
 
 ## Configuration types
 
@@ -413,7 +413,7 @@ If the run produces no output for a very long time it usually isn't hung — che
 
 ### CMake is too old
 
-Alchemy requires CMake 3.27+. If your distro ships something older, install a newer version via pip inside your venv:
+Vayu Viewer requires CMake 3.27+. If your distro ships something older, install a newer version via pip inside your venv:
 
 ```
 pip install --upgrade cmake ninja
@@ -454,7 +454,7 @@ cmake -S indra --preset ninja-os -DGCC_DISABLE_FATAL_WARNINGS=TRUE
 cmake -S indra --preset ninja-os -DCLANG_DISABLE_FATAL_WARNINGS=TRUE
 ```
 
-### Visual Studio doesn't recognize `Alchemy.slnx`
+### Visual Studio doesn't recognize `Vayu.slnx`
 
 `.slnx` is the newer Visual Studio solution format. Use Visual Studio 2022 17.10+ or Visual Studio 2026, or configure with the `vs2022-os` preset on an older compatible edition.
 
@@ -472,8 +472,7 @@ Double-check the package list for your distro under [Platform setup → Linux](#
 
 ### Still stuck?
 
-- Ask on the [Discord](https://discordapp.com/invite/KugCgs6).
-- File a build bug at <https://github.com/AlchemyViewer/Alchemy/issues>.
+- File a build bug at <https://github.com/Shadowolf7/Vayu-Viewer/issues>.
 
 ## See also
 

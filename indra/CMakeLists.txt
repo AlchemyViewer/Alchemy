@@ -8,11 +8,11 @@ cmake_minimum_required(VERSION 3.27...4.2 FATAL_ERROR)
 
 include(CMakeDependentOption)
 
-set(ROOT_PROJECT_NAME "Alchemy" CACHE STRING
-    "The root project/makefile/solution name. Defaults to Alchemy.")
+set(ROOT_PROJECT_NAME "Vayu" CACHE STRING
+    "The root project/makefile/solution name. Defaults to Vayu.")
 
 # Set our base channel
-set(VIEWER_CHANNEL "Alchemy Test" CACHE STRING "Viewer Channel Name")
+set(VIEWER_CHANNEL "Vayu Test" CACHE STRING "Viewer Channel Name")
 
 # Default deploy grid
 set(GRID agni CACHE STRING "Target Grid")
@@ -104,7 +104,7 @@ option(USE_SENTRY "Use the Sentry crash reporting system" OFF)
 # Default Tracy profiling on for test builds, but off for all others
 set(BUILDING_TEST_CHANNEL OFF)
 string(TOLOWER "${VIEWER_CHANNEL}" channel_lower)
-if(channel_lower MATCHES "^alchemy test")
+if(channel_lower MATCHES "^vayu test")
   set(BUILDING_TEST_CHANNEL ON)
 endif()
 cmake_dependent_option(USE_TRACY "Enable support for Tracy profiler" ON "BUILDING_TEST_CHANNEL" OFF)

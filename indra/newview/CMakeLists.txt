@@ -6,7 +6,7 @@ include(CMakeCopyIfDifferent)
 include(Velopack)
 include(TemplateCheck)
 
-set(VIEWER_BINARY_NAME "alchemy-bin" CACHE STRING
+set(VIEWER_BINARY_NAME "vayu-bin" CACHE STRING
     "The name of the viewer executable to create.")
 
 # Generate version vars header
@@ -56,33 +56,33 @@ endforeach()
 set(ICON_PATH "test")
 set(VIEWER_MACOSX_PHASE "d")
 string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
-if(channel_lower MATCHES "^alchemy release")
+if(channel_lower MATCHES "^vayu release")
     set(ICON_PATH "release")
     set(VIEWER_MACOSX_PHASE "f")
-elseif(channel_lower MATCHES "^alchemy beta")
+elseif(channel_lower MATCHES "^vayu beta")
     set(ICON_PATH "beta")
     set(VIEWER_MACOSX_PHASE "b")
-elseif(channel_lower MATCHES "^alchemy project")
+elseif(channel_lower MATCHES "^vayu project")
     set(ICON_PATH "project")
     set(VIEWER_MACOSX_PHASE "a")
 endif()
 message(STATUS "Copying icons for ${ICON_PATH}")
 
-set(BRANDING_SOURCE_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/alchemy-branding")
+set(BRANDING_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/branding")
 if (WINDOWS)
   execute_process(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.ico"
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/vayu.ico"
       "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.ico"
     )
   execute_process(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/vayu_256.BMP"
       "${CMAKE_CURRENT_SOURCE_DIR}/res/ll_icon.BMP"
     )
   execute_process(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/vayu_256.BMP"
       "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
     )
   execute_process(
@@ -98,13 +98,13 @@ if (WINDOWS)
 elseif(DARWIN)
   execute_process(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy.icns"
-      "${CMAKE_CURRENT_SOURCE_DIR}/alchemy.icns"
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/vayu.icns"
+      "${CMAKE_CURRENT_SOURCE_DIR}/vayu.icns"
     )
 elseif(LINUX)
   execute_process(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.BMP"
+      "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/vayu_256.BMP"
       "${CMAKE_CURRENT_SOURCE_DIR}/res-sdl/ll_icon.BMP"
     )
 endif ()
@@ -114,8 +114,8 @@ endif ()
 # finds it regardless of which backend the package ends up using.
 execute_process(
   COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/alchemy_256.png"
-    "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/alchemy_logo.png"
+    "${BRANDING_SOURCE_DIR}/viewer/icons/${ICON_PATH}/vayu_256.png"
+    "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/vayu_logo.png"
   )
 
 if (HAVOK)
@@ -1698,7 +1698,7 @@ if (DARWIN)
 
   # Add resource files to the project.
   set(viewer_RESOURCE_FILES
-    alchemy.icns
+    vayu.icns
     # CMake doesn't seem to support Xcode language variants well just yet
     English.lproj/InfoPlist.strings
     English.lproj/language.txt
@@ -1710,7 +1710,7 @@ if (DARWIN)
   LIST(APPEND viewer_SOURCE_FILES llappviewersdl.cpp)
   LIST(APPEND viewer_HEADER_FILES llappviewersdl.h)
   LIST(APPEND viewer_RESOURCE_FILES
-    Info-AlchemySDL.plist
+    Info-VayuSDL.plist
     )
 
   set_source_files_properties(llappviewersdl.cpp PROPERTIES LANGUAGE OBJCXX)
@@ -2049,8 +2049,8 @@ set(VIEWER_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}$<IF:$<BOOL:${LL_GENERATOR_IS_M
 
 if (WINDOWS)
     string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
-    if(channel_lower MATCHES "^alchemy release")
-        set(OUTPUT_BINARY_NAME "AlchemyViewer")
+    if(channel_lower MATCHES "^vayu release")
+        set(OUTPUT_BINARY_NAME "VayuViewer")
     else()
         set(OUTPUT_BINARY_NAME "${VIEWER_CHANNEL_ONEWORD}")
     endif()
@@ -2064,7 +2064,7 @@ if (WINDOWS)
       )
 
   if(HAVOK)
-      target_link_options(${VIEWER_BINARY_NAME} PRIVATE "/MAP\"alchemy-bin.MAP\"") # generate symbol map for havok_tpv scripts
+      target_link_options(${VIEWER_BINARY_NAME} PRIVATE "/MAP\"vayu-bin.MAP\"") # generate symbol map for havok_tpv scripts
   endif()
 
   set(product ${OUTPUT_BINARY_NAME}-${ARCH}-${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION})
@@ -2073,17 +2073,17 @@ if (WINDOWS)
 elseif(DARWIN)
   # These all get set with PROPERTIES. It's not that the property names are
   # magically known to CMake -- it's that these names are referenced in the
-  # Info-Alchemy.plist file in the configure_file() directive below.
+  # Info-VayuSDL.plist file in the configure_file() directive below.
   set(product "${VIEWER_CHANNEL}")
   set(MACOSX_EXECUTABLE_NAME "${VIEWER_CHANNEL}")
   set(MACOSX_BUNDLE_INFO_STRING "${VIEWER_CHANNEL}")
-  set(MACOSX_BUNDLE_ICON_FILE "alchemy.icns")
-  set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.alchemyviewer.viewer")
+  set(MACOSX_BUNDLE_ICON_FILE "vayu.icns")
+  set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.vayuviewer.viewer")
   set(MACOSX_BUNDLE_LONG_VERSION_STRING "${VIEWER_CHANNEL} ${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
-  set(MACOSX_BUNDLE_BUNDLE_NAME "Alchemy")
+  set(MACOSX_BUNDLE_BUNDLE_NAME "Vayu Viewer")
   set(MACOSX_BUNDLE_SHORT_VERSION_STRING "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}")
   set(MACOSX_BUNDLE_BUNDLE_VERSION "${VIEWER_SHORT_VERSION}${VIEWER_MACOSX_PHASE}${VIEWER_REVISION}")
-  set(MACOSX_BUNDLE_COPYRIGHT "Copyright © Alchemy Development Team 2012-2026")
+  set(MACOSX_BUNDLE_COPYRIGHT "Copyright © Vayu Viewer Contributors 2026")
   set(MACOSX_BUNDLE_NSPRINCIPAL_CLASS "LLApplication")
 
   # https://blog.kitware.com/upcoming-in-cmake-2-8-12-osx-rpath-support/
@@ -2094,10 +2094,10 @@ elseif(DARWIN)
     PROPERTIES
     OUTPUT_NAME "${product}"
     RUNTIME_OUTPUT_DIRECTORY ${VIEWER_STAGING_DIR}
-    # From Contents/MacOS/Alchemy, look in Contents/Frameworks
+    # From Contents/MacOS/Vayu Viewer, look in Contents/Frameworks
     BUILD_WITH_INSTALL_RPATH 1
     INSTALL_RPATH "@executable_path/../Frameworks"
-    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-AlchemySDL.plist"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info-VayuSDL.plist"
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
     )
 
@@ -2108,7 +2108,7 @@ elseif(DARWIN)
       find_program(DSYMUTIL_PROGRAM dsymutil REQUIRED)
       add_custom_command(TARGET ${VIEWER_BINARY_NAME} POST_BUILD
             COMMAND ${DSYMUTIL_PROGRAM} -o ${VIEWER_DEBUG_BUNDLE} $<TARGET_FILE:${VIEWER_BINARY_NAME}>
-            COMMENT "Generating Alchemy.dSYM")
+            COMMENT "Generating Vayu Viewer.dSYM")
     endif()
   endif()
 
@@ -2170,8 +2170,8 @@ elseif(LINUX)
   endif()
 
   string(TOLOWER ${VIEWER_CHANNEL} channel_lower)
-  if(channel_lower MATCHES "^alchemy release")
-    set(OUTPUT_PRODUCT_NAME "AlchemyViewer")
+  if(channel_lower MATCHES "^vayu release")
+    set(OUTPUT_PRODUCT_NAME "VayuViewer")
   else()
     set(OUTPUT_PRODUCT_NAME "${VIEWER_CHANNEL_ONEWORD}")
   endif()

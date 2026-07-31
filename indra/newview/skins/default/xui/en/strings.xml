@@ -7,9 +7,9 @@
 
 	<!-- Default Args - these arguments will be replaced in all strings -->
 	<string name="SECOND_LIFE">Second Life</string>
-	<string name="ALCHEMY">Alchemy</string>
-	<string name="APP_NAME">Alchemy</string>
-	<string name="CAPITALIZED_APP_NAME">ALCHEMY</string>
+	<string name="ALCHEMY">Vayu</string>
+	<string name="APP_NAME">Vayu Viewer</string>
+	<string name="CAPITALIZED_APP_NAME">VAYU VIEWER</string>
 	<string name="SECOND_LIFE_GRID">Second Life Grid</string>
 	<string name="SUPPORT_SITE">Second Life Support Portal</string>
 
@@ -128,10 +128,10 @@ Voice Server Version: [VOICE_VERSION]
     <string name="AgniGridLabelShort">Agni (production)</string>
     <string name="AditiGridLabelShort">Aditi (beta)</string>
 	
-	<string name="ViewerDownloadURL">https://www.alchemyviewer.org/downloads</string>
+	<string name="ViewerDownloadURL">https://github.com/Shadowolf7/Vayu-Viewer/releases</string>
 	<string name="LoginFailedViewerNotPermitted">
 The viewer you are using can no longer access Second Life. Please visit the following page to download a new viewer:
-https://www.alchemyviewer.org/downloads</string>
+https://github.com/Shadowolf7/Vayu-Viewer/releases</string>
 	<string name="LoginFailed">"Login process did not complete due to system issues. Try again in a few minutes.
 If you feel this is an error, please contact Support.</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">Optional viewer update available: [VERSION]</string>
@@ -344,7 +344,7 @@ are allowed.
 
 	<string name="ReleaseNotes">Release Notes</string>
 	<!-- Always mark translate="false" for strings that are nothing but URLs, as they don't need translation. -->
-	<string name="RELEASE_NOTES_BASE_URL" translate="false">https://github.com/AlchemyViewer/Alchemy/releases/tag/</string>
+	<string name="RELEASE_NOTES_BASE_URL" translate="false">https://github.com/Shadowolf7/Vayu-Viewer/releases/tag/</string>
 
 	<!-- Indicates something is being loaded. Maybe should be merged with RetrievingData -->
 	<string name="LoadingData">Loading...</string>
@@ -3045,7 +3045,7 @@ Do you wish to continue?
 	<string name="MBWarning">Warning</string>
 	<string name="MBNoAutoUpdate">
 		Automatic updating is not yet implemented for Linux.
-Please download the latest version from https://www.alchemyviewer.org
+Please download the latest version from https://github.com/Shadowolf7/Vayu-Viewer/releases
 	</string>
 	<string name="MBRegClassFailed">RegisterClass failed</string>
 	<string name="MBError">Error</string>
@@ -3070,12 +3070,12 @@ If you continue to receive this message, contact the [SUPPORT_SITE].
     <string name="MBOutOfMemoryErr">
         [APP_NAME]'s request for memory failed. Application can't proceed and will be closed.
 
-If your computer's RAM is low, quit any heavy applications before running Alchemy, allocate a page file or reduce graphical settings like draw distance.
+If your computer's RAM is low, quit any heavy applications before running [APP_NAME], allocate a page file or reduce graphical settings like draw distance.
     </string>
     <string name="MBMissingFile">
         [APP_NAME] couldn't access or find some of the files it needs and will be closed.
 
-Please reinstall viewer from https://alchemyviewer.org/downloads and contact the Alchemy Viewer team if issue persists after reinstall.
+Please reinstall viewer from https://github.com/Shadowolf7/Vayu-Viewer/releases and contact the Vayu Viewer team if issue persists after reinstall.
     </string>
 
     <!-- Avatar Shape Information -->
@@ -3689,7 +3689,7 @@ Please reinstall viewer from https://alchemyviewer.org/downloads and contact the
 	  Failed to download update
 	</string>
 	<string name="UpdaterFailUpdateDescriptive">
-	  An error occurred while updating [APP_NAME]. Please download the latest version from https://www.alchemyviewer.org
+	  An error occurred while updating [APP_NAME]. Please download the latest version from https://github.com/Shadowolf7/Vayu-Viewer/releases
 	</string>
 	<string name="UpdaterFailInstallTitle">
 	  Failed to install update
@@ -4457,7 +4457,7 @@ and report the problem.
 [https://community.secondlife.com/knowledgebase/english/error-messages-r520/#Section__3 Knowledge Base]
   </string>
 
-<!-- Alchemy Below This Line-->
+<!-- Alchemy/Vayu Below This Line-->
   <!-- panel preferences chat rejection -->
   <string name="RejectTeleportOffersResponseDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;reject all teleport offers and requests mode&apos; which means they have requested not to be disturbed with teleport offers and requests. You may still send an IM manually.</string>
   <string name="RejectFriendshipRequestsResponseDefault">The Resident you messaged has activated [APP_NAME] viewer&apos;s &apos;reject all friendship requests mode&apos; which means they have requested not to be disturbed with friendship requests. You may still send an IM manually</string>

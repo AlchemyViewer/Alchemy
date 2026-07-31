@@ -83,7 +83,7 @@ class ViewerManifest(LLManifest):
                 self.path("*.ini")
                 self.path("*.xml")
                 # Branded splash icon for the SDL splash screen (LLSplashScreenSDL)
-                self.path("alchemy_logo.png")
+                self.path("vayu_logo.png")
 
                 # include the entire shaders directory recursively
                 self.path("shaders")
@@ -286,7 +286,7 @@ class ViewerManifest(LLManifest):
         return ''.join(self.app_name().split())
 
     def icon_path(self):
-        return os.path.join(self.args['vcpkg_dir'], 'share', 'alchemy-branding', 'viewer', 'icons', self.channel_type())
+        return os.path.join(self.args['source'], 'branding', 'viewer', 'icons', self.channel_type())
 
     def extract_names(self,src):
         """Extract contributor names from source file, returns string"""
@@ -493,7 +493,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
                                     # except for this stuff
                                     *(('!' + os.path.join(appbase, pattern))
                                         for pattern in (
-                                                'alchemy-bin.*',
+                                                'vayu-bin.*',
                                                 '*_Setup.exe',
                                                 '**/*.bat',
                                                 '**/*.pdb',
@@ -545,7 +545,7 @@ class Windows_x86_64_Manifest(ViewerManifest):
             return
 
         # Velopack packaging author metadata. This is the "Authors" field in the Velopack installer.
-        pack_authors = 'Alchemy Viewer Project'
+        pack_authors = 'Vayu Viewer Project'
 
         # Velopack splash progress bar color
         splash_color = '#00a5dc'
@@ -835,7 +835,7 @@ class DarwinManifest(ViewerManifest):
 
                 # need .icns file referenced by Info.plist
                 with self.prefix(src=self.icon_path(), dst="") :
-                    self.path("alchemy.icns")
+                    self.path("vayu.icns")
                 with self.prefix(src_dst="cursors_mac"):
                     self.path("*.tif")
 
@@ -1002,10 +1002,10 @@ class DarwinManifest(ViewerManifest):
         # The .app bundle path (e.g., "/path/to/Second Life Release.app")
         app_bundle = self.get_dst_prefix()
         # Bundle ID from args (e.g., "com.secondlife.viewer")
-        bundle_id = self.args.get('bundleid', 'org.alchemyviewer.viewer')
+        bundle_id = self.args.get('bundleid', 'org.vayuviewer.viewer')
 
         # Icon path for macOS
-        icon_path = os.path.join(self.get_src_prefix(), self.icon_path(), 'alchemy.icns')
+        icon_path = os.path.join(self.get_src_prefix(), self.icon_path(), 'vayu.icns')
 
         # The main executable inside Contents/MacOS/ is named after the channel
         main_exe = self.channel()
@@ -1110,7 +1110,7 @@ class LinuxManifest(ViewerManifest):
 
         self.path("licenses-linux.txt","licenses.txt")
         with self.prefix("linux_tools"):
-            self.path("wrapper.sh","alchemy")
+            self.path("wrapper.sh","vayu")
             with self.prefix(dst="etc"):
                 self.path("handle_secondlifeprotocol.sh")
                 self.path("register_secondlifeprotocol.sh")
@@ -1126,9 +1126,9 @@ class LinuxManifest(ViewerManifest):
         icon_path = self.icon_path()
         print("DEBUG: icon_path '%s'" % icon_path)
         with self.prefix(src=icon_path) :
-            self.path("alchemy_256.png","alchemy_icon.png")
+            self.path("vayu_256.png","vayu_icon.png")
             with self.prefix(dst="res-sdl") :
-                self.path("alchemy_256.BMP","ll_icon.BMP")
+                self.path("vayu_256.BMP","ll_icon.BMP")
 
         with self.prefix(src=os.path.join(self.args['build'], os.pardir, "llwebrtc", self.args['configuration']), dst="lib"):
             self.path("libllwebrtc.so")

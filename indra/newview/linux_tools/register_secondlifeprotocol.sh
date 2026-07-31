@@ -24,16 +24,16 @@ function install_desktop_entry()
 
     local desktop_entry="\
 [Desktop Entry]\n\
-Name=Second Life SLURL handler for Alchemy\n\
+Name=Second Life SLURL handler for Vayu Viewer\n\
 Path=${installation_prefix}\n\
 Exec=${HANDLER} %u\n\
-Icon=${installation_prefix}/alchemy_icon.png\n\
+Icon=${installation_prefix}/vayu_icon.png\n\
 Terminal=false\n\
 Type=Application\n\
 StartupNotify=true\n\
-StartupWMClass="org.alchemyviewer.viewer"\n\
+StartupWMClass="org.vayuviewer.viewer"\n\
 NoDisplay=true\n\
-MimeType=x-scheme-handler/alchemy\n\
+MimeType=x-scheme-handler/vayu\n\
 X-Desktop-File-Install-Version=3.0"
 
     echo " - Installing protocol entries in ${desktop_entries_dir}"

@@ -27,7 +27,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>${MACOSX_BUNDLE_COPYRIGHT}</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>For voice chat, you must grant permission for Alchemy to use the microphone.</string>
+	<string>For voice chat, you must grant permission for Vayu Viewer to use the microphone.</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -36,7 +36,7 @@
 				<string>slurl</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>alchemy.icns</string>
+			<string>vayu.icns</string>
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				<string>application/x-grid-location-info</string>
