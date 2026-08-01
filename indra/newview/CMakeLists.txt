@@ -205,9 +205,11 @@ set(viewer_SOURCE_FILES
     alunzip.cpp
     alviewermenu.cpp
     fsfloaterposer.cpp
+    fsfloaterposestand.cpp
     fsjointpose.cpp
     fsmaniprotatejoint.cpp
     fsmaniptranslatejoint.cpp
+    fspose.cpp
     fsposeranimator.cpp
     fsposestate.cpp
     fsposingmotion.cpp
@@ -973,9 +975,11 @@ set(viewer_HEADER_FILES
     alunzip.h
     alviewermenu.h
     fsfloaterposer.h
+    fsfloaterposestand.h
     fsjointpose.h
     fsmaniprotatejoint.h
     fsmaniptranslatejoint.h
+    fspose.h
     fsposeranimator.h
     fsposestate.h
     fsposingmotion.h
@@ -2201,12 +2205,19 @@ endif()
 # strip_binaries() (invoked by package_finish()) is a no-op for anything
 # other than a Release buildtype, so this doesn't strip debug info from
 # the more common Debug/RelWithDebInfo/OptDebug dev builds.
+#
+# Pass this as ONE quoted CMake argument with a literal space, not with
+# embedded \"...\" -- escaped-quote content inside an ARGS string is not
+# reliably preserved through Ninja's own re-escaping, and previously
+# arrived at viewer_manifest.py as "copy\" package" (note the stray
+# backslash), which made its actions.split() miss "copy" and silently
+# skip is_packaging_viewer()'s file staging on every dev build.
 add_custom_command(
   TARGET ${VIEWER_BINARY_NAME} POST_BUILD
   COMMAND ${Python3_EXECUTABLE}
   ARGS
     ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-    "--actions=\"copy package\""
+    "--actions=copy package"
     --arch=${ARCH}
     --artwork=${ARTWORK_DIR}
     "--bugsplat=${BUGSPLAT_DB}"
@@ -2240,7 +2251,7 @@ if(IS_DIRECTORY ${LOCAL_DIST_DIR})
       COMMAND ${Python3_EXECUTABLE}
       ARGS
       ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-      "--actions=\"copy package unpacked\""
+      "--actions=copy package unpacked"
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
       "--bugsplat=${BUGSPLAT_DB}"

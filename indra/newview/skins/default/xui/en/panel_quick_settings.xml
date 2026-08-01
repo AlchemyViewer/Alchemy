@@ -3,7 +3,7 @@
  class="quick_settings"
  layout="topleft"
  width="300"
- height="209"
+ height="349"
  name="quick_settings">
   <text
    follows="left|top"
@@ -221,4 +221,49 @@
    increment="0.001"
    name="hover_spinner"
    control_name="AvatarHoverOffsetZ"/>
+  <text
+   follows="left|top"
+   height="15"
+   left="10"
+   top_pad="6"
+   width="280"
+   layout="topleft"
+   value="Environment:"
+   name="environment_label" />
+  <combo_box
+   allow_text_entry="false"
+   follows="left|top|right"
+   height="23"
+   layout="topleft"
+   left="10"
+   top_pad="2"
+   right="-10"
+   name="sky_preset_combo" />
+  <combo_box
+   allow_text_entry="false"
+   follows="left|top|right"
+   height="23"
+   layout="topleft"
+   left="10"
+   top_pad="4"
+   right="-10"
+   name="water_preset_combo" />
+  <combo_box
+   allow_text_entry="false"
+   follows="left|top|right"
+   height="23"
+   layout="topleft"
+   left="10"
+   top_pad="4"
+   right="-10"
+   name="day_preset_combo" />
+  <button
+   follows="left|top"
+   height="23"
+   label="Reset to Region Default"
+   layout="topleft"
+   left="10"
+   top_pad="6"
+   width="280"
+   name="reset_environment_btn" />
 </panel>

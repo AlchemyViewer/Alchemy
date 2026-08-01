@@ -52,8 +52,19 @@ private:
     void onSimulatorFeaturesReceived(const LLUUID &region_id);
     void updateEditHoverEnabled();
 
+    // Environment quick-select (sky/water/day-cycle presets)
+    void loadEnvironmentPresets();
+    void onSelectSkyPreset();
+    void onSelectWaterPreset();
+    void onSelectDayPreset();
+    void onResetEnvironment();
+
     LLSlider* mHoverSlider;
     LLSpinCtrl* mHoverSpinner;
+
+    LLComboBox* mSkyPresetCombo;
+    LLComboBox* mWaterPresetCombo;
+    LLComboBox* mDayPresetCombo;
 
     boost::signals2::connection mRegionChangedSlot;
 };

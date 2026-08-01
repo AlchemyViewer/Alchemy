@@ -27,6 +27,8 @@
 
 #include "alpanelquicksettings.h"
 
+#include <set>
+
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
@@ -34,17 +36,59 @@
 #include "llspinctrl.h"
 
 #include "llagent.h"
+#include "llenvironment.h"
+#include "llinventoryfunctions.h"
+#include "llinventorymodel.h"
+#include "llinventorysettings.h"
 #include "llviewercontrol.h"
 #include "llviewerregion.h"
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
+#include "rlvhandler.h"
+
+namespace
+{
+    // Sentinel LLSD value (not a UUID) stored in each preset combo for the
+    // "no local override, use the region's environment" entry.
+    const std::string REGION_DEFAULT_VALUE = "__region_default__";
+
+    // Filters inventory for non-marketplace settings (sky/water/day-cycle) items,
+    // deduplicated by asset id.
+    class ALQuickSettingsCollector : public LLInventoryCollectFunctor
+    {
+    public:
+        ALQuickSettingsCollector()
+        {
+            mMarketplaceFolderUUID = gInventory.getMarketplaceListingsUUID();
+        }
+
+        bool operator()(LLInventoryCategory* cat, LLInventoryItem* item) override
+        {
+            if (item && item->getType() == LLAssetType::AT_SETTINGS &&
+                !gInventory.isObjectDescendentOf(item->getUUID(), mMarketplaceFolderUUID) &&
+                mSeen.find(item->getAssetUUID()) == mSeen.end())
+            {
+                mSeen.insert(item->getAssetUUID());
+                return true;
+            }
+            return false;
+        }
+
+    private:
+        LLUUID mMarketplaceFolderUUID;
+        std::set<LLUUID> mSeen;
+    };
+}
 
 static LLPanelInjector<ALPanelQuickSettings> t_quick_settings("quick_settings");
 
 ALPanelQuickSettings::ALPanelQuickSettings()
     : LLPanel(),
     mHoverSlider(nullptr),
-    mHoverSpinner(nullptr)
+    mHoverSpinner(nullptr),
+    mSkyPresetCombo(nullptr),
+    mWaterPresetCombo(nullptr),
+    mDayPresetCombo(nullptr)
 {
 }
 
@@ -86,6 +130,20 @@ bool ALPanelQuickSettings::postBuild()
     }
     // Set up based on initial region.
     onRegionChanged();
+
+    // Environment quick-select
+    mSkyPresetCombo = getChild<LLComboBox>("sky_preset_combo");
+    mSkyPresetCombo->setCommitCallback(boost::bind(&ALPanelQuickSettings::onSelectSkyPreset, this));
+
+    mWaterPresetCombo = getChild<LLComboBox>("water_preset_combo");
+    mWaterPresetCombo->setCommitCallback(boost::bind(&ALPanelQuickSettings::onSelectWaterPreset, this));
+
+    mDayPresetCombo = getChild<LLComboBox>("day_preset_combo");
+    mDayPresetCombo->setCommitCallback(boost::bind(&ALPanelQuickSettings::onSelectDayPreset, this));
+
+    getChild<LLButton>("reset_environment_btn")->setCommitCallback(boost::bind(&ALPanelQuickSettings::onResetEnvironment, this));
+
+    loadEnvironmentPresets();
 
     return LLPanel::postBuild();
 }
@@ -166,4 +224,107 @@ void ALPanelQuickSettings::updateEditHoverEnabled()
     {
         syncFromPreferenceSetting();
     }
+}
+
+void ALPanelQuickSettings::loadEnvironmentPresets()
+{
+    LLInventoryModel::cat_array_t cats;
+    LLInventoryModel::item_array_t items;
+    ALQuickSettingsCollector collector;
+    gInventory.collectDescendentsIf(LLUUID::null, cats, items, LLInventoryModel::EXCLUDE_TRASH, collector);
+
+    std::multimap<std::string, LLUUID> sky_map;
+    std::multimap<std::string, LLUUID> water_map;
+    std::multimap<std::string, LLUUID> day_map;
+
+    for (const auto& item : items)
+    {
+        switch (LLSettingsType::fromInventoryFlags(item->getFlags()))
+        {
+        case LLSettingsType::ST_SKY:
+            sky_map.emplace(item->getName(), item->getAssetUUID());
+            break;
+        case LLSettingsType::ST_WATER:
+            water_map.emplace(item->getName(), item->getAssetUUID());
+            break;
+        case LLSettingsType::ST_DAYCYCLE:
+            day_map.emplace(item->getName(), item->getAssetUUID());
+            break;
+        default:
+            break;
+        }
+    }
+
+    auto fill_combo = [](LLComboBox* combo, const std::multimap<std::string, LLUUID>& preset_map)
+    {
+        combo->removeall();
+        combo->add("Region Default", LLSD(REGION_DEFAULT_VALUE));
+        combo->addSeparator();
+        for (const auto& [name, asset_id] : preset_map)
+        {
+            if (!name.empty())
+            {
+                combo->add(name, LLSD(asset_id));
+            }
+        }
+        combo->setCurrentByIndex(0);
+    };
+
+    fill_combo(mSkyPresetCombo, sky_map);
+    fill_combo(mWaterPresetCombo, water_map);
+    fill_combo(mDayPresetCombo, day_map);
+}
+
+void ALPanelQuickSettings::onSelectSkyPreset()
+{
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SETENV))
+    {
+        return;
+    }
+    LLSD value = mSkyPresetCombo->getSelectedValue();
+    if (value.isUUID() && value.asUUID().notNull())
+    {
+        LLEnvironment::instance().setEnvironment(LLEnvironment::ENV_LOCAL, value.asUUID());
+        LLEnvironment::instance().setSelectedEnvironment(LLEnvironment::ENV_LOCAL);
+    }
+}
+
+void ALPanelQuickSettings::onSelectWaterPreset()
+{
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SETENV))
+    {
+        return;
+    }
+    LLSD value = mWaterPresetCombo->getSelectedValue();
+    if (value.isUUID() && value.asUUID().notNull())
+    {
+        LLEnvironment::instance().setEnvironment(LLEnvironment::ENV_LOCAL, value.asUUID());
+        LLEnvironment::instance().setSelectedEnvironment(LLEnvironment::ENV_LOCAL);
+    }
+}
+
+void ALPanelQuickSettings::onSelectDayPreset()
+{
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SETENV))
+    {
+        return;
+    }
+    LLSD value = mDayPresetCombo->getSelectedValue();
+    if (value.isUUID() && value.asUUID().notNull())
+    {
+        LLEnvironment::instance().setEnvironment(LLEnvironment::ENV_LOCAL, value.asUUID());
+        LLEnvironment::instance().setSelectedEnvironment(LLEnvironment::ENV_LOCAL);
+    }
+}
+
+void ALPanelQuickSettings::onResetEnvironment()
+{
+    if (gRlvHandler.hasBehaviour(RLV_BHVR_SETENV))
+    {
+        return;
+    }
+    mSkyPresetCombo->setValue(LLSD(REGION_DEFAULT_VALUE));
+    mWaterPresetCombo->setValue(LLSD(REGION_DEFAULT_VALUE));
+    mDayPresetCombo->setValue(LLSD(REGION_DEFAULT_VALUE));
+    LLEnvironment::instance().setSharedEnvironment();
 }

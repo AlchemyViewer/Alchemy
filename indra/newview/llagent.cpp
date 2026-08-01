@@ -312,7 +312,11 @@ bool LLAgent::isActionAllowed(const LLSD& sdname)
 
     const std::string& param = sdname.asString();
 
-    if (param == "speak")
+    if (param == "not_sitting")
+    {
+        retval = isAgentAvatarValid() && !gAgentAvatarp->isSitting();
+    }
+    else if (param == "speak")
     {
         bool allow_agent_voice = false;
         LLVoiceChannel* channel = LLVoiceChannel::getCurrentVoiceChannel();
@@ -4763,7 +4767,7 @@ void LLAgent::setTeleportState(ETeleportState state)
     }
 }
 
-void LLAgent::stopCurrentAnimations()
+void LLAgent::stopCurrentAnimations(bool force_keep_script_perms)
 {
     LL_DEBUGS("Avatar") << "Stopping current animations" << LL_ENDL;
 
@@ -4802,6 +4806,7 @@ void LLAgent::stopCurrentAnimations()
 
         // Revoke all animation permissions
         if (mRegionp &&
+            !force_keep_script_perms &&
             gSavedSettings.getBOOL("RevokePermsOnStopAnimation"))
         {
             U32 permissions = SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_TRIGGER_ANIMATION].permbit | SCRIPT_PERMISSIONS[SCRIPT_PERMISSION_OVERRIDE_ANIMATIONS].permbit;

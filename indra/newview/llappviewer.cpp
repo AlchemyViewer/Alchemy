@@ -1586,6 +1586,26 @@ bool LLAppViewer::doFrame()
                 }
             }
 
+            // Optional hard frame-rate cap: sleep off whatever's left of the
+            // target frame time. Ported from Firestorm's FSLimitFramerate.
+            {
+                static LLTimer s_frame_limit_timer;
+                static LLCachedControl<bool> limit_framerate(gSavedSettings, "ALLimitFramerate", false);
+                static LLCachedControl<U32> frame_rate_limit(gSavedSettings, "ALFrameRateLimit", 60);
+                if (limit_framerate && LLStartUp::getStartupState() == STATE_STARTED
+                    && !gTeleportDisplay && !logoutRequestSent() && frame_rate_limit > 0)
+                {
+                    F32 min_frame_time = 1.f / (F32)frame_rate_limit;
+                    S32 milliseconds_to_sleep = llclamp((S32)((min_frame_time - s_frame_limit_timer.getElapsedTimeF64()) * 1000.f), 0, 1000);
+                    if (milliseconds_to_sleep > 0)
+                    {
+                        LL_PROFILE_ZONE_NAMED_CATEGORY_APP("FPS limiter sleep");
+                        ms_sleep(milliseconds_to_sleep);
+                    }
+                }
+                s_frame_limit_timer.reset();
+            }
+
             if (mRandomizeFramerate)
             {
                 ms_sleep(rand() % 200);
