@@ -1357,23 +1357,32 @@ void LLScriptEdCore::onBtnLoadFromFile( void* data )
 
 void LLScriptEdCore::loadScriptFromFile(const std::vector<std::string>& filenames, void* data)
 {
+    if (filenames.empty())
+    {
+        return;
+    }
     std::string filename = filenames[0];
 
-    llifstream fin(filename.c_str());
-
-    std::string line;
-    std::string text;
-    std::string linetotal;
-    while (!fin.eof())
+    // Open in binary mode: this may be an arbitrary file picked off disk
+    // (e.g. authored on another OS), not one of our own tmp-file round
+    // trips, so line-ending translation must be handled explicitly below
+    // rather than left to the stream's platform-default text mode.
+    llifstream fin(filename.c_str(), std::ios::binary);
+    if (!fin.is_open())
     {
-        getline(fin, line);
-        text += line;
-        if (!fin.eof())
-        {
-            text += "\n";
-        }
+        return;
     }
+
+    std::string text((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
     fin.close();
+
+    // Strip a UTF-8 byte order mark some external editors/OSes add.
+    static const std::string utf8_bom("\xEF\xBB\xBF");
+    if (text.compare(0, utf8_bom.size(), utf8_bom) == 0)
+    {
+        text.erase(0, utf8_bom.size());
+    }
+    LLStringUtil::removeCRLF(text);
 
     // Only replace the script if there is something to replace with.
     LLScriptEdCore* self = (LLScriptEdCore*)data;

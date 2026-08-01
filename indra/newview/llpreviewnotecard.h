@@ -121,6 +121,7 @@ protected:
     static void finishTaskUpload(LLUUID itemId, LLUUID newAssetId, LLUUID taskId);
 
     void openInExternalEditor();
+    void loadFromFile();
     bool onExternalChange(const std::string& filename);
     bool loadNotecardText(const std::string& filename);
     bool writeToFile(const std::string& filename);
@@ -132,6 +133,7 @@ protected:
     LLLineEditor* mDescEditor = nullptr;
     LLButton* mSaveBtn = nullptr;
     LLButton* mEditBtn = nullptr;
+    LLButton* mLoadBtn = nullptr;
     LLButton* mDeleteBtn = nullptr;
     LLUICtrl* mLockBtn = nullptr;
 
