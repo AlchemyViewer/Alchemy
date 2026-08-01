@@ -5494,7 +5494,8 @@ void LLVolumeGeometryManager::registerFace(LLSpatialGroup* group, LLFace* facep,
 
     LLUUID mat_id;
 
-    auto* gltf_mat = (LLFetchedGLTFMaterial*)te->getGLTFRenderMaterial();
+    static LLCachedControl<bool> render_pbr_materials(gSavedSettings, "RenderPBRMaterials", true);
+    auto* gltf_mat = render_pbr_materials ? (LLFetchedGLTFMaterial*)te->getGLTFRenderMaterial() : nullptr;
     llassert(gltf_mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(te->getGLTFRenderMaterial()) != nullptr);
     if (gltf_mat != nullptr)
     {

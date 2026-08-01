@@ -1180,7 +1180,8 @@ bool LLFace::canRenderAsMask()
         return false;
     }
 
-    if (te->getGLTFRenderMaterial())
+    static LLCachedControl<bool> render_pbr_materials(gSavedSettings, "RenderPBRMaterials", true);
+    if (render_pbr_materials && te->getGLTFRenderMaterial())
     {
         return false;
     }

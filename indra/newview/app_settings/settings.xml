@@ -7791,6 +7791,17 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
+    <key>RenderPBRMaterials</key>
+    <map>
+        <key>Comment</key>
+        <string>Shade faces with a PBR (metallic-roughness) material using physically based rendering. When disabled, such faces are shown with their legacy fallback diffuse texture instead, shaded like an ordinary Blinn-Phong material.</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>1</integer>
+    </map>
     <key>RenderCanUseGLTFPBROpaqueShaders</key>
     <map>
         <key>Comment</key>
