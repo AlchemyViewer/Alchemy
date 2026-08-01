@@ -50,10 +50,11 @@ function install_desktop_entries()
     # Actions= + a [Desktop Action ...] section is the freedesktop Desktop
     # Actions spec -- it surfaces as a right-click context-menu item on the
     # launcher icon (GNOME Shell, KDE Plasma, etc.), rather than a second,
-    # separate app entry. PrefersNonDefaultGPU hints to the desktop
-    # environment (GNOME/KDE via switcheroo-control) that this app should
-    # run on the more powerful GPU when there's a choice, e.g. a discrete
-    # GPU over an integrated one.
+    # separate app entry. GPU selection (switcherooctl) and GameMode are
+    # handled explicitly by the "vayu" wrapper script itself rather than via
+    # the PrefersNonDefaultGPU hint here, since that hint is only honored by
+    # some desktop environments and does nothing when launching from a
+    # terminal.
     local main_entry="\
 [Desktop Entry]\n\
 Name=Vayu Viewer\n\
@@ -67,7 +68,6 @@ Type=Application\n\
 Categories=Game;Simulation;\n\
 StartupNotify=true\n\
 StartupWMClass="org.vayuviewer.viewer"\n\
-PrefersNonDefaultGPU=true\n\
 Actions=Zink;\n\
 X-Desktop-File-Install-Version=3.0\n\
 \n\

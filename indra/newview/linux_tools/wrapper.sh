@@ -40,6 +40,15 @@ export LD_PRELOAD=/usr/lib64/libmimalloc.so.3
 ## Nothing worth editing below this line.
 ##-------------------------------------------------------------------
 
+# Our statically-linked OpenSSL still reads the system's /etc/ssl/openssl.cnf
+# (compiled-in OPENSSLDIR). On distros whose crypto-policy include file uses
+# properties our vendored OpenSSL doesn't recognize (e.g. openSUSE/Fedora's
+# rh-allow-sha1-signatures), the very first TLS handshake of the process
+# fails config parsing and curl misreports it as CURLE_OUT_OF_MEMORY; every
+# handshake after that succeeds since OpenSSL doesn't retry the failed load.
+# Skip the system config entirely so we always get OpenSSL's built-in defaults.
+export OPENSSL_CONF=/dev/null
+
 SCRIPTSRC=$(readlink -f "$0" || echo "$0")
 RUN_PATH=$(dirname "${SCRIPTSRC}" || echo .)
 echo "Running from ${RUN_PATH}"
@@ -68,11 +77,36 @@ for ARG in "$@"; do
     fi
 done
 
+# gamemoderun asks the gamemode daemon for performance-mode tuning (CPU
+# governor, GPU power profile, etc.) for the process tree below it.
+# switcherooctl launch runs that process tree on the system's preferred
+# (usually discrete/more powerful) GPU via switcheroo-control. We do this
+# directly here rather than relying on desktop-entry hints like
+# PrefersNonDefaultGPU, since those are only honored by some desktop
+# environments and don't cover launching from a terminal at all. Both are
+# optional performance tools: skip whichever isn't installed rather than
+# failing to launch, and skip both under LL_WRAPPER (gdb/valgrind/etc.)
+# since advanced troubleshooters want a plain, unwrapped process tree.
+CMD=()
+if [ -z "$LL_WRAPPER" ]; then
+    if command -v gamemoderun >/dev/null 2>&1; then
+        CMD+=(gamemoderun)
+    else
+        echo "gamemoderun not found; launching without GameMode." >&2
+    fi
+    if command -v switcherooctl >/dev/null 2>&1; then
+        CMD+=(switcherooctl launch)
+    else
+        echo "switcherooctl not found; launching without explicit GPU selection." >&2
+    fi
+fi
+
 # Run the program.
 # Don't quote $LL_WRAPPER because, if empty, it should simply vanish from the
 # command line. But DO quote "${ARGS[@]}": preserve separate args as
 # individually quoted.
-$LL_WRAPPER bin/vayu-bin "${ARGS[@]}"
+CMD+=($LL_WRAPPER bin/vayu-bin "${ARGS[@]}")
+"${CMD[@]}"
 LL_RUN_ERR=$?
 
 # Handle any resulting errors
