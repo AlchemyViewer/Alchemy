@@ -65,6 +65,7 @@
 #include "lllineeditor.h"
 #include "lluictrlfactory.h"
 #include "llviewerassetupload.h"
+#include "llviewermenufile.h"
 
 ///----------------------------------------------------------------------------
 /// Class LLPreviewNotecard
@@ -111,6 +112,9 @@ bool LLPreviewNotecard::postBuild()
 
     mEditBtn = getChild<LLButton>("Edit");
     mEditBtn->setCommitCallback(boost::bind(&LLPreviewNotecard::openInExternalEditor, this));
+
+    mLoadBtn = getChild<LLButton>("Load");
+    mLoadBtn->setCommitCallback(boost::bind(&LLPreviewNotecard::loadFromFile, this));
 
     const LLInventoryItem* item = getItem();
     std::string note_name = mNoteName;
@@ -893,6 +897,23 @@ void LLPreviewNotecard::openInExternalEditor()
     }
 }
 
+void LLPreviewNotecard::loadFromFile()
+{
+    LLHandle<LLPreviewNotecard> handle = getDerivedHandle<LLPreviewNotecard>();
+    LLFilePickerReplyThread::startPicker(
+        [handle](const std::vector<std::string>& filenames, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter)
+        {
+            LLPreviewNotecard* self = handle.get();
+            if (!self || filenames.empty())
+            {
+                return;
+            }
+            self->loadNotecardText(filenames[0]);
+        },
+        LLFilePicker::FFLOAD_ALL,
+        false);
+}
+
 bool LLPreviewNotecard::onExternalChange(const std::string& filename)
 {
     if (!loadNotecardText(filename))
@@ -934,10 +955,22 @@ bool LLPreviewNotecard::loadNotecardText(const std::string& filename)
     fclose(file);
 
     std::string text = std::string(buffer);
+    delete[] buffer;
+
+    // Strip a UTF-8 byte order mark and CR characters (CRLF or lone-CR
+    // line endings) some external editors/OSes add: this may be an
+    // arbitrary file picked off disk, not one of our own tmp-file round
+    // trips. This also applies to the external-editor sync path, which
+    // shares this function.
+    static const std::string utf8_bom("\xEF\xBB\xBF");
+    if (text.compare(0, utf8_bom.size(), utf8_bom) == 0)
+    {
+        text.erase(0, utf8_bom.size());
+    }
+    LLStringUtil::removeCRLF(text);
     LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
 
     mEditor->setText(text);
-    delete[] buffer;
 
     return true;
 }

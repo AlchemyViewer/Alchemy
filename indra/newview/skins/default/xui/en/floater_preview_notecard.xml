@@ -90,6 +90,16 @@
      top="332"
      width="100" />
     <button
+     follows="left|bottom"
+     height="22"
+     label="Load..."
+     label_selected="Load"
+     layout="topleft"
+     left_pad="4"
+     name="Load"
+     top_delta="0"
+     width="66" />
+    <button
      follows="right|bottom"
      height="22"
      label="Save"
