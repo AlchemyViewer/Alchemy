@@ -8,6 +8,51 @@ cmake_minimum_required(VERSION 3.27...4.2 FATAL_ERROR)
 
 include(CMakeDependentOption)
 
+# Git worktrees do not inherit submodule checkouts from the main clone, so a
+# freshly-added worktree has indra/dullahan and vcpkg both empty. Left alone
+# that produces two unhelpful failures: a bare "does not contain a
+# CMakeLists.txt" from add_subdirectory(dullahan) ~1100 lines into the log
+# (after a full vcpkg install), or a missing-toolchain-file error from the
+# preset's CMAKE_TOOLCHAIN_FILE. Neither names the actual cause. Check up
+# front, before project() loads the toolchain, and fix it instead.
+#
+# This must stay ahead of the first project() call. On a normal checkout it is
+# two EXISTS tests and nothing else.
+set(_required_submodules
+  "${CMAKE_CURRENT_SOURCE_DIR}/dullahan/CMakeLists.txt"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../vcpkg/scripts/buildsystems/vcpkg.cmake"
+)
+set(_missing_submodules FALSE)
+foreach(_marker IN LISTS _required_submodules)
+  if(NOT EXISTS "${_marker}")
+    set(_missing_submodules TRUE)
+  endif()
+endforeach()
+
+if(_missing_submodules)
+  set(_submodule_hint "Run 'git submodule update --init --recursive' from the repository root, then re-run cmake.")
+  find_package(Git QUIET)
+  if(NOT Git_FOUND)
+    message(FATAL_ERROR
+      "Required git submodules are not checked out, and git was not found to "
+      "check them out automatically.\n${_submodule_hint}")
+  endif()
+  message(STATUS "Required git submodules are not checked out - initialising them (this may take a while)")
+  execute_process(
+    COMMAND "${GIT_EXECUTABLE}" submodule update --init --recursive
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.."
+    RESULT_VARIABLE _submodule_result
+  )
+  foreach(_marker IN LISTS _required_submodules)
+    if(NOT EXISTS "${_marker}")
+      message(FATAL_ERROR
+        "Failed to check out the required git submodules automatically "
+        "(git exited ${_submodule_result}; '${_marker}' is still missing)."
+        "\n${_submodule_hint}")
+    endif()
+  endforeach()
+endif()
+
 set(ROOT_PROJECT_NAME "Vayu" CACHE STRING
     "The root project/makefile/solution name. Defaults to Vayu.")
 
