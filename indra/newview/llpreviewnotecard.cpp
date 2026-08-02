@@ -66,6 +66,7 @@
 #include "lluictrlfactory.h"
 #include "llviewerassetupload.h"
 #include "llviewermenufile.h"
+#include "llfontgl.h"
 
 ///----------------------------------------------------------------------------
 /// Class LLPreviewNotecard
@@ -438,6 +439,7 @@ void LLPreviewNotecard::onLoadComplete(const LLUUID& asset_uuid,
                 previewEditor->setText(LLStringExplicit(&buffer[0]));
             }
 
+            preview->detectAndApplyRulerWidth();
             previewEditor->makePristine();
             bool modifiable = preview->canModify(preview->mObjectID, preview->getItem());
             preview->setEnabled(modifiable);
@@ -926,6 +928,72 @@ bool LLPreviewNotecard::onExternalChange(const std::string& filename)
     return true;
 }
 
+// Some notecard authors include a line made of one repeated character,
+// solely to indicate the character width the content was formatted for
+// (word-wrap/ASCII-art alignment assumes that width). Detect the longest
+// such line and, if found, switch to a monospace font and size the
+// floater to match -- the convention is meaningless in a proportional
+// font, since character widths vary.
+void LLPreviewNotecard::detectAndApplyRulerWidth()
+{
+    // Ordinary short dividers (e.g. "-----") are common and are not width
+    // guides; a genuine ruler line spans close to the intended full width.
+    static const size_t RULER_MIN_LENGTH = 20;
+
+    std::string text = mEditor->getText();
+
+    size_t best_len = 0;
+    char best_char = 0;
+    size_t line_start = 0;
+    while (line_start <= text.size())
+    {
+        size_t line_end = text.find('\n', line_start);
+        if (line_end == std::string::npos)
+        {
+            line_end = text.size();
+        }
+
+        size_t len = line_end - line_start;
+        if (len > 0 && !LLStringOps::isSpace(text[line_start]))
+        {
+            char c = text[line_start];
+            bool uniform = true;
+            for (size_t i = 1; i < len; ++i)
+            {
+                if (text[line_start + i] != c)
+                {
+                    uniform = false;
+                    break;
+                }
+            }
+            if (uniform && len >= RULER_MIN_LENGTH && len > best_len)
+            {
+                best_len = len;
+                best_char = c;
+            }
+        }
+
+        line_start = line_end + 1;
+    }
+
+    if (best_len == 0)
+    {
+        return;
+    }
+
+    LLFontGL* mono_font = LLFontGL::getFontMonospace();
+    mEditor->setFont(mono_font);
+
+    std::string ruler(best_len, best_char);
+    S32 target_text_width = mono_font->getWidth(ruler);
+    S32 width_delta = target_text_width - mEditor->getRect().getWidth();
+    if (width_delta > 0)
+    {
+        LLRect floater_rect = getRect();
+        reshape(floater_rect.getWidth() + width_delta, floater_rect.getHeight());
+    }
+}
+
 bool LLPreviewNotecard::loadNotecardText(const std::string& filename)
 {
     if (filename.empty())
@@ -971,6 +1039,7 @@ bool LLPreviewNotecard::loadNotecardText(const std::string& filename)
     LLStringUtil::replaceTabsWithSpaces(text, LLTextEditor::spacesPerTab());
 
     mEditor->setText(text);
+    detectAndApplyRulerWidth();
 
     return true;
 }

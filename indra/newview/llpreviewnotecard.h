@@ -125,6 +125,7 @@ protected:
     bool onExternalChange(const std::string& filename);
     bool loadNotecardText(const std::string& filename);
     bool writeToFile(const std::string& filename);
+    void detectAndApplyRulerWidth();
     std::string getCleanNameForTmpFile() const;
     std::string getTmpFileName(const std::string& note_name) const;
 
