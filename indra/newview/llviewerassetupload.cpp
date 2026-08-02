@@ -353,6 +353,16 @@ bool LLResourceUploadInfo::findAssetTypeAndCodecOfExtension(const std::string& e
         asset_type = LLAssetType::AT_ANIMATION;
         succ = true;
     }
+    else if (exten_lc == "txt")
+    {
+        asset_type = LLAssetType::AT_NOTECARD;
+        succ = true;
+    }
+    else if (exten_lc == "lsl" || exten_lc == "luau")
+    {
+        asset_type = LLAssetType::AT_LSL_TEXT;
+        succ = true;
+    }
 
     return succ;
 }
@@ -577,6 +587,61 @@ LLSD LLNewFileResourceUploadInfo::exportTempFile()
                     else
                     {
                         errorMessage = "Failed reading animation file";
+                    }
+                }
+            }
+        }
+    }
+    else if (assetType == LLAssetType::AT_NOTECARD || assetType == LLAssetType::AT_LSL_TEXT)
+    {
+        // Plain text asset types need no transcoding -- just BOM/CRLF
+        // normalization, since this may be an arbitrary file off disk
+        // rather than one of the viewer's own tmp-file round trips.
+        LLFile infile(getFileName(), LLFile::in | LLFile::binary, ec);
+        S64 size = ec ? 0 : infile.size(ec);
+        if (ec || size <= 0)
+        {
+            errorMessage = llformat("Couldn't open file for reading: %s", getFileName().c_str());
+            errorLabel = "ProblemWithFile";
+            error = true;
+        }
+        else
+        {
+            std::vector<char> buf(size + 1);
+            S64 size_read = infile.read(buf.data(), size, ec);
+            if (ec || size_read != size)
+            {
+                errorMessage = llformat("Failed to read file %s", getFileName().c_str());
+                errorLabel = "ProblemWithFile";
+                error = true;
+            }
+            else
+            {
+                buf[size] = '\0';
+                std::string text(buf.data());
+
+                static const std::string utf8_bom("\xEF\xBB\xBF");
+                if (text.compare(0, utf8_bom.size(), utf8_bom) == 0)
+                {
+                    text.erase(0, utf8_bom.size());
+                }
+                LLStringUtil::removeCRLF(text);
+
+                LLFile outfile(filename, LLFile::out | LLFile::trunc | LLFile::binary, ec);
+                if (ec)
+                {
+                    errorMessage = llformat("Failed saving temporary file for %s", getFileName().c_str());
+                    errorLabel = "ProblemWithFile";
+                    error = true;
+                }
+                else
+                {
+                    outfile.write(text.data(), (S64)text.size(), ec);
+                    if (ec)
+                    {
+                        errorMessage = llformat("Failed saving temporary file for %s", getFileName().c_str());
+                        errorLabel = "ProblemWithFile";
+                        error = true;
                     }
                 }
             }

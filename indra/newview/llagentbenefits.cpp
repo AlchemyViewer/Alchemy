@@ -235,6 +235,12 @@ bool LLAgentBenefits::findUploadCost(const LLAssetType::EType& asset_type, S32& 
         cost = getAnimationUploadCost();
         succ = true;
     }
+    else if (asset_type == LLAssetType::AT_NOTECARD || asset_type == LLAssetType::AT_LSL_TEXT)
+    {
+        // Notecards and scripts have always been free to create.
+        cost = 0;
+        succ = true;
+    }
     return succ;
 }
 
