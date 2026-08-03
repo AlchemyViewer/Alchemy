@@ -369,12 +369,12 @@ public:
     // there is a texture whose SAMPLER disagrees with the declaration -- in practice a shadow
     // map under a compare sampler, which is undefined even where the shader's dynamic branch
     // never reaches it. LLPipeline::bindShadowMaps is the only compare-sampler bind in the
-    // tree and it tracks its units in mBoundShadowChannels precisely so they can be released
-    // before a program that maps them to this ladder runs. validate_bound_samplers() asserts
-    // the invariant at the draw under gDebugGL.
+    // tree and it publishes its units in LLGLSLShader::sCompareSamplerUnits, which bind()
+    // releases before any program that declares no shadow samplers runs.
+    // validate_bound_samplers() asserts the invariant at the draw under gDebugGL.
     //
     // So: a NEW compare sampler, or any depth texture bound outside that tracking, breaks
-    // this. Add it to the release path rather than clearing the tail here.
+    // this. Publish it in the same mask rather than clearing the tail here.
     static void bindIndexedTextures(const LLDrawInfo& params, const LLGLSLShader* shader);
     void pushBatches(U32 type, bool texture = true, bool batch_textures = false);
     void pushUntexturedBatches(U32 type);

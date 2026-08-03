@@ -155,7 +155,7 @@ static bool FindModel(const LLModelLoader::scene& scene, const std::string& name
 //-----------------------------------------------------------------------------
 
 LLModelPreview::LLModelPreview(S32 width, S32 height, LLFloater* fmp)
-    : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE, false), LLMutex()
+    : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE), LLMutex()
     , mLodsQuery()
     , mLodsWithParsingError()
     , mPelvisZOffset(0.0f)

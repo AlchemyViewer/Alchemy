@@ -840,15 +840,10 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                 // The emissive programs declare the indexed-texture array (tex0..tex20) as
                 // plain sampler2D, and that range covers the units the alpha shader's shadow
-                // maps sit on -- 8..13 in practice. Sampling a depth texture that still has
-                // the compare sampler bound through a non-shadow sampler is undefined
-                // behaviour, so drop the maps for the excursion and put them back below.
-                const bool has_emissives = !emissives.empty() || !pbr_emissives.empty()
-                                        || !rigged_emissives.empty() || !pbr_rigged_emissives.empty();
-                if (has_emissives)
-                {
-                    gPipeline.unbindShadowMaps();
-                }
+                // maps sit on -- 8..13 in practice. No explicit release is needed for the
+                // excursion: LLGLSLShader::bind() drops the compare-sampler units when it
+                // binds any program that declares no shadow samplers, emissives included.
+                // The restore below still has to come back through the deferred path.
 
                 if (!emissives.empty())
                 {
@@ -902,8 +897,9 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
-    // Unbind the shadow maps this pass bound, so they do not survive into programs that
-    // map those units to ordinary samplers.
+    // Release the shadow maps at the pass boundary. LLGLSLShader::bind() would do this on
+    // the next non-declaring program switch anyway; doing it here keeps the maps from
+    // riding along to whatever runs between passes.
     //
     // Deliberately NOT unbindDeferredShader: that unbinds by a single shader's channel
     // layout and asserts each unit still holds the type that shader expects. By the time the

@@ -7145,7 +7145,7 @@ void LLPipeline::visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 
 {
     dst->bindTarget();
     gDeferredBufferVisualProgram.bind();
-    gDeferredBufferVisualProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_BILINEAR, bufferIndex);
+    gDeferredBufferVisualProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::BilinearMirror, bufferIndex);
 
     if (RenderBufferVisualization != 4)
         gDeferredBufferVisualProgram.uniform1f(LLShaderMgr::MIP_LEVEL, 0);
@@ -7176,7 +7176,7 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
         channel = gLuminanceProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
         if (channel > -1)
         {
-            src->bindTexture(0, channel, LLTexUnit::TFO_POINT);
+            src->bindTexture(0, channel, ALSamplers::PointMirror);
         }
 
         channel = gLuminanceProgram.enableTexture(LLShaderMgr::DEFERRED_EMISSIVE);
@@ -7189,7 +7189,7 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
         if (channel > -1)
         {
             // bind the normal map to get the environment mask
-            mRT->deferredScreen.bindTexture(2, channel, LLTexUnit::TFO_POINT);
+            mRT->deferredScreen.bindTexture(2, channel, ALSamplers::PointMirror);
         }
 
         gLuminanceProgram.uniform1f(LLShaderMgr::DIFFUSE_LUMINANCE_SCALE, diffuse_luminance_scale);
@@ -7235,7 +7235,7 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
         S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_EMISSIVE);
         if (channel > -1)
         {
-            src->bindTexture(0, channel, LLTexUnit::TFO_TRILINEAR);
+            src->bindTexture(0, channel, ALSamplers::TrilinearMirror);
         }
 
         if (use_history)
@@ -7427,8 +7427,8 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
         shader->bind();
 
-        S32 diffuse_channel = shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
-        S32 depth_channel = shader->bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+        S32 diffuse_channel = shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
+        S32 depth_channel = shader->bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
         S32 exposure_channel = shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, &mExposureMap);
 
         // HDR bloom pyramid is folded into the tonemap variants of this shader
@@ -7438,7 +7438,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         S32 bloom_channel = -1;
         if (mRT->bloomMipCount > 0)
         {
-            bloom_channel = shader->bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], false, LLTexUnit::TFO_BILINEAR);
+            bloom_channel = shader->bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], ALSamplers::BilinearMirror);
             if (bloom_channel > -1)
             {
                 static LLCachedControl<F32>      bloom_strength(gSavedSettings, "RenderBloomStrength", 0.325f);
@@ -7897,7 +7897,7 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
             if (channel > -1)
             {
                 // Tiled across the screen, so GL_REPEAT as before.
-                gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap, false,
+                gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap,
                                                     gGL.getSampler(ALSamplers::PointWrap));
             }
             gGlowExtractProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
@@ -8051,7 +8051,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
             mRT->bloomMip[i].clear();
 
             shader->bind();
-            shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, srcMip, false, LLTexUnit::TFO_BILINEAR);
+            shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, srcMip, ALSamplers::BilinearMirror);
             shader->uniform2f(LLShaderMgr::BLOOM_TEXEL_SIZE,
                               1.0f / (F32)srcMip->getWidth(),
                               1.0f / (F32)srcMip->getHeight());
@@ -8080,7 +8080,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
             dstMip->bindTarget();
 
-            gBloomUpsampleProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, srcMip, false, LLTexUnit::TFO_BILINEAR);
+            gBloomUpsampleProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, srcMip, ALSamplers::BilinearMirror);
             gBloomUpsampleProgram.uniform2f(LLShaderMgr::BLOOM_TEXEL_SIZE,
                                             1.0f / (F32)srcMip->getWidth(),
                                             1.0f / (F32)srcMip->getHeight());
@@ -8121,7 +8121,7 @@ void LLPipeline::compositeBloomHDR(LLRenderTarget* scene)
     scene->bindTarget();
 
     gBloomCompositeProgram.bind();
-    gBloomCompositeProgram.bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], false, LLTexUnit::TFO_BILINEAR);
+    gBloomCompositeProgram.bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], ALSamplers::BilinearMirror);
     gBloomCompositeProgram.uniform1f(LLShaderMgr::BLOOM_STRENGTH, llmax(bloom_strength(), 0.0f));
     gBloomCompositeProgram.uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f));
     const LLColor3& tint = halation_tint();
@@ -8166,7 +8166,7 @@ void LLPipeline::applyCAS(LLRenderTarget* src, LLRenderTarget* dst)
         gCASProgram.uniform2f(LLShaderMgr::OUT_SCREEN_RES, (AF1)dst->getWidth(), (AF1)dst->getHeight());
     }
 
-    gCASProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, false, LLTexUnit::TFO_POINT);
+    gCASProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
 
     // Draw
     gPipeline.mScreenTriangleVB->setBuffer();
@@ -8201,7 +8201,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
             S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, src->getUsage());
             if (channel > -1)
             {
-                src->bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+                src->bindTexture(0, channel, ALSamplers::BilinearMirror);
             }
 
             {
@@ -8226,7 +8226,7 @@ void LLPipeline::applyFXAA(LLRenderTarget* src, LLRenderTarget* dst)
             channel = shader->enableTexture(LLShaderMgr::DIFFUSE_MAP, mFXAAMap.getUsage());
             if (channel > -1)
             {
-                mFXAAMap.bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+                mFXAAMap.bindTexture(0, channel, ALSamplers::BilinearMirror);
             }
 
             // The destination is an FBO; bindTarget already set its viewport.
@@ -8301,11 +8301,11 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             {
                 if (!use_sample)
                 {
-                    src->bindTexture(0, channel, LLTexUnit::TFO_BILINEAR, LLTexUnit::TAM_CLAMP);
+                    src->bindTexture(0, channel, ALSamplers::BilinearClamp);
                 }
                 else
                 {
-                    gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASampleMap, false,
+                    gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASampleMap,
                                                         gGL.getSampler(ALSamplers::BilinearClamp));
                 }
             }
@@ -8355,18 +8355,18 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             S32 edge_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_EDGE_TEX, mFXAAMap.getUsage());
             if (edge_tex_channel > -1)
             {
-                mFXAAMap.bindTexture(0, edge_tex_channel, LLTexUnit::TFO_BILINEAR, LLTexUnit::TAM_CLAMP);
+                mFXAAMap.bindTexture(0, edge_tex_channel, ALSamplers::BilinearClamp);
             }
             S32 area_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_AREA_TEX, LLTexUnit::TT_TEXTURE);
             if (area_tex_channel > -1)
             {
-                gGL.getTexUnit(area_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAAAreaMap, false,
+                gGL.getTexUnit(area_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAAAreaMap,
                                                              gGL.getSampler(ALSamplers::BilinearClamp));
             }
             S32 search_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_SEARCH_TEX, LLTexUnit::TT_TEXTURE);
             if (search_tex_channel > -1)
             {
-                gGL.getTexUnit(search_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASearchMap, false,
+                gGL.getTexUnit(search_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASearchMap,
                                                                gGL.getSampler(ALSamplers::BilinearClamp));
             }
 
@@ -8426,13 +8426,13 @@ void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst)
             S32 diffuse_channel = blend_shader.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
             if(diffuse_channel > -1)
             {
-                src->bindTexture(0, diffuse_channel, LLTexUnit::TFO_BILINEAR, LLTexUnit::TAM_CLAMP);
+                src->bindTexture(0, diffuse_channel, ALSamplers::BilinearClamp);
             }
 
             S32 blend_channel = blend_shader.enableTexture(LLShaderMgr::SMAA_BLEND_TEX);
             if (blend_channel > -1)
             {
-                mSMAABlendBuffer.bindTexture(0, blend_channel, LLTexUnit::TFO_BILINEAR);
+                mSMAABlendBuffer.bindTexture(0, blend_channel, ALSamplers::BilinearMirror);
             }
 
             mScreenTriangleVB->setBuffer();
@@ -8459,7 +8459,7 @@ void LLPipeline::copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst)
     gDeferredPostNoDoFProgram.bind();
 
     gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src);
-    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+    gDeferredPostNoDoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
 
     {
         mScreenTriangleVB->setBuffer();
@@ -8623,8 +8623,8 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 
                 gDeferredCoFProgram.bind();
 
-                gDeferredCoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, LLTexUnit::TFO_POINT);
-                gDeferredCoFProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+                gDeferredCoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
+                gDeferredCoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
 
                 gDeferredCoFProgram.uniform1f(LLShaderMgr::DEFERRED_DEPTH_CUTOFF, RenderEdgeDepthCutoff);
                 gDeferredCoFProgram.uniform1f(LLShaderMgr::DEFERRED_NORM_CUTOFF, RenderEdgeNormCutoff);
@@ -8655,7 +8655,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
                 LLGLSLShader& post_program = RenderDepthOfFieldNearBlur ? gDeferredPostProgram : gDeferredPostProgramNoNear;
 
                 post_program.bind();
-                post_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->deferredLight, LLTexUnit::TFO_POINT);
+                post_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->deferredLight, ALSamplers::PointMirror);
 
                 post_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
                 post_program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
@@ -8676,8 +8676,8 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
                 glViewport(0, 0, dst->getWidth(), dst->getHeight());
 
                 gDeferredDoFCombineProgram.bind();
-                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, LLTexUnit::TFO_POINT);
-                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mRT->deferredLight, LLTexUnit::TFO_POINT);
+                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
+                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mRT->deferredLight, ALSamplers::PointMirror);
 
                 gDeferredDoFCombineProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
                 gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
@@ -8853,7 +8853,7 @@ void LLPipeline::renderFinalize()
 
         // Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems.
         gBlitWithEffectsProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, sourceBuffer);
-        gBlitWithEffectsProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen, true);
+        gBlitWithEffectsProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
 
         // Setup Uniforms
         gBlitWithEffectsProgram.uniform1ui(LLShaderMgr::FRAME_ID, LLFrameTimer::getFrameCount());
@@ -8968,7 +8968,7 @@ void LLPipeline::bindLightFunc(LLGLSLShader& shader)
             mLightFuncSampler           = gGL.getSampler(desc);
             mLightFuncSamplerGeneration = generation;
         }
-        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc, false,
+        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc,
                                             mLightFuncSampler);
     }
 
@@ -8990,7 +8990,7 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     // chain the filter resolves to GL_LINEAR, which is what gives the compare its 2x2 PCF.
     const U32 shadow_sampler = gGL.getSampler(ALSamplers::ShadowCompare);
 
-    std::array<S32, 6> channels = { -1, -1, -1, -1, -1, -1 };
+    U32 bound_units = 0;
 
     for (U32 i = 0; i < 4; i++)
     {
@@ -9001,7 +9001,7 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
             if (channel > -1)
             {
                 gGL.getTexUnit(channel)->bind(shadow_target, true, shadow_sampler);
-                channels[i] = channel;
+                bound_units |= 1u << channel;
             }
         }
     }
@@ -9015,7 +9015,7 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
             if (shadow_target)
             {
                 gGL.getTexUnit(channel)->bind(shadow_target, true, shadow_sampler);
-                channels[i] = channel;
+                bound_units |= 1u << channel;
             }
         }
     }
@@ -9025,37 +9025,34 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     // samplers, and a depth texture left under the compare sampler there is undefined
     // behaviour. Only fires when the layout actually changes, so the common case of
     // rebinding the same channels costs nothing.
-    for (S32 previous : mBoundShadowChannels)
+    //
+    // The published mask is also what LLGLSLShader::bind() consults to release these units
+    // before a program that declares no shadow samplers runs -- this relayout only handles
+    // declaring programs, whose bind() deliberately leaves the units to us.
+    U32 stale = LLGLSLShader::sCompareSamplerUnits & ~bound_units;
+    for (S32 unit = 0; stale != 0; ++unit, stale >>= 1)
     {
-        if (previous >= 0 && std::find(channels.begin(), channels.end(), previous) == channels.end())
+        if (stale & 1u)
         {
-            gGL.getTexUnit(previous)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTexUnit(unit)->unbind(LLTexUnit::TT_TEXTURE);
             // And the compare sampler with it. unbind() leaves the sampler alone by design --
             // the next bind names its own, so a leftover is normally unreachable. A COMPARE
             // sampler is the exception: unbind puts the white placeholder on the unit, which
             // IS sampleable, and reading it through depth comparison is undefined. So the
             // release has to be explicit here, where the compare sampler was selected.
-            gGL.getTexUnit(previous)->bindSampler(0);
+            gGL.getTexUnit(unit)->bindSampler(0);
         }
     }
 
-    mBoundShadowChannels = channels;
+    LLGLSLShader::sCompareSamplerUnits = bound_units;
 }
 
 void LLPipeline::unbindShadowMaps()
 {
-    for (S32& channel : mBoundShadowChannels)
-    {
-        if (channel >= 0)
-        {
-            gGL.getTexUnit(channel)->unbind(LLTexUnit::TT_TEXTURE);
-            // See bindShadowMaps: the compare sampler must go too, or it survives onto the
-            // white placeholder unbind() leaves behind and the next program to map this unit
-            // to an ordinary sampler2D reads it through depth comparison.
-            gGL.getTexUnit(channel)->bindSampler(0);
-            channel = -1;
-        }
-    }
+    // See bindShadowMaps: the compare sampler goes with the texture, or it survives onto
+    // the white placeholder unbind() leaves behind and the next program to map the unit to
+    // an ordinary sampler2D reads it through depth comparison.
+    LLGLSLShader::releaseCompareSamplerUnits();
 }
 
 void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
@@ -9085,25 +9082,25 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, deferred_target->getUsage());
     if (channel > -1)
     {
-        deferred_target->bindTexture(0, channel, LLTexUnit::TFO_POINT, LLTexUnit::TAM_CLAMP); // frag_data[0]
+        deferred_target->bindTexture(0, channel, ALSamplers::PointClamp); // frag_data[0]
     }
 
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_SPECULAR, deferred_target->getUsage());
     if (channel > -1)
     {
-        deferred_target->bindTexture(1, channel, LLTexUnit::TFO_POINT, LLTexUnit::TAM_CLAMP); // frag_data[1]
+        deferred_target->bindTexture(1, channel, ALSamplers::PointClamp); // frag_data[1]
     }
 
     channel = shader.enableTexture(LLShaderMgr::NORMAL_MAP, deferred_target->getUsage());
     if (channel > -1)
     {
-        deferred_target->bindTexture(2, channel, LLTexUnit::TFO_POINT, LLTexUnit::TAM_CLAMP); // frag_data[2]
+        deferred_target->bindTexture(2, channel, ALSamplers::PointClamp); // frag_data[2]
     }
 
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_EMISSIVE, deferred_target->getUsage());
     if (channel > -1)
     {
-        deferred_target->bindTexture(3, channel, LLTexUnit::TFO_POINT, LLTexUnit::TAM_CLAMP); // frag_data[3]
+        deferred_target->bindTexture(3, channel, ALSamplers::PointClamp); // frag_data[3]
     }
 
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_DEPTH, deferred_target->getUsage());
@@ -9138,7 +9135,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     if (channel > -1)
     {
         // The noise map is tiled across the screen, so it keeps GL's GL_REPEAT default.
-        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap, false,
+        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap,
                                             gGL.getSampler(ALSamplers::PointWrap));
     }
 
@@ -9152,7 +9149,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     {
         if (light_target->isComplete())
         {
-            light_target->bindTexture(0, channel, LLTexUnit::TFO_POINT);
+            light_target->bindTexture(0, channel, ALSamplers::PointMirror);
         }
         else
         {

@@ -925,9 +925,8 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
         dst_img->setDiscardLevel(0);
         dst_img->createGLTexture();
 
-        // Bind-to-edit: storage is allocated into this texture, nothing samples it here,
-        // so no sampler is named.
-        gGL.getTexUnit(0)->bind(bump, ALSamplers::AnisoWrap);
+        // Bind-to-edit: storage is allocated into this texture, nothing samples it here.
+        gGL.getTexUnit(0)->bindSampled(bump, ALSamplers::AnisoWrap);
 
         // Full mip chain: storage is immutable, so the glGenerateMipmap below can only
         // fill levels allocated here -- with a single level it is a spec-defined no-op
@@ -986,7 +985,7 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
         }
 
         // generate mipmap -- bind-to-edit again, glGenerateMipmap acts on the bound texture
-        gGL.getTexUnit(0)->bind(bump, ALSamplers::AnisoWrap);
+        gGL.getTexUnit(0)->bindSampled(bump, ALSamplers::AnisoWrap);
         glGenerateMipmap(GL_TEXTURE_2D);
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     }
@@ -1037,13 +1036,10 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
 
     if (batch_textures && params.mTextureList.size() > 1)
     {
-        for (U32 i = 0; i < params.mTextureList.size(); ++i)
-        {
-            if (params.mTextureList[i].notNull())
-            {
-                gGL.getTexUnit(i)->bindFast(params.mTextureList[i], ALSamplers::AnisoWrap);
-            }
-        }
+        // Clamped to the bound program's ladder and null slots stood in for, same as every
+        // other indexed pass -- a raw loop here would bind past the last declared sampler
+        // whenever a batch was built at a wider ladder than the current program's.
+        bindIndexedTextures(params, LLGLSLShader::sCurBoundShaderPtr);
     }
     else
     { //not batching textures or batch has only 1 texture -- might need a texture matrix

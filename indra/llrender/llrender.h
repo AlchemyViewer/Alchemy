@@ -320,10 +320,6 @@ public:
     // compositions in namespace ALSamplers.
     U32 getSampler(ALSampler key) { return mSamplerCache.get(key); }
 
-    // Intent reconciled against a resource that may or may not have a mip chain. Prefer this
-    // wherever the texture is known; it keeps ALSampler::HasMips out of call sites.
-    U32 getSampler(ALSampler key, bool has_mips) { return mSamplerCache.get(key, has_mips); }
-
     // For sampling modes a mask cannot express; see ALSamplerCache::get(desc).
     U32 getSampler(const ALSamplerDesc& desc) { return mSamplerCache.get(desc); }
 

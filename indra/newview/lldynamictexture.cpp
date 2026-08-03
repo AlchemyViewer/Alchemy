@@ -50,9 +50,8 @@ S32 LLViewerDynamicTexture::sNumRenders = 0;
 //-----------------------------------------------------------------------------
 // LLViewerDynamicTexture()
 //-----------------------------------------------------------------------------
-LLViewerDynamicTexture::LLViewerDynamicTexture(S32 width, S32 height, S32 components, EOrder order, bool clamp) :
-    LLViewerTexture(width, height, components, false),
-    mClamp(clamp)
+LLViewerDynamicTexture::LLViewerDynamicTexture(S32 width, S32 height, S32 components, EOrder order) :
+    LLViewerTexture(width, height, components, false)
 {
     llassert((1 <= components) && (components <= 4));
 

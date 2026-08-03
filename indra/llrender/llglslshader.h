@@ -181,6 +181,20 @@ public:
     static LLGLSLShader* sCurBoundShaderPtr;
     static S32 sIndexedTextureChannels;
 
+    // Units currently holding a depth texture under a compare sampler, as a bitmask by
+    // unit. LLPipeline::bindShadowMaps -- the only compare-sampler bind in the tree --
+    // publishes its units here, and bind() releases them before any program that does not
+    // declare the shadow samplers runs: a compare-mode depth read through a plain
+    // sampler2D is undefined even where the shader's dynamic branching never reaches the
+    // unit. Programs that DO declare them are relayouted by the next bindShadowMaps
+    // instead, so the deferred family pays nothing here.
+    static U32 sCompareSamplerUnits;
+    // Unbind the texture AND the sampler on every published unit. The sampler must go
+    // too: unbind() leaves the white placeholder on the unit, which IS sampleable, and
+    // reading it through depth comparison is undefined.
+    static void releaseCompareSamplerUnits();
+    // Does this program declare any of the shadow-map samplers (shadowMap0..5)?
+    bool declaresShadowSamplers() const;
     // Number of GLTF PBR materials that can be batched into one indexed draw call.
     // Each material consumes four texture units (base color, normal, ORM, emissive),
     // so this is roughly (available fragment texture units) / 4. See
@@ -291,7 +305,22 @@ public:
     // a winner and be wrong for the other. The inferring form existed until every call site
     // had chosen; it was deleted once that count reached zero, so it cannot come back by habit.
     S32 bindTexture(S32 uniform, LLTexture* texture, ALSampler key);
-    S32 bindTexture(S32 uniform, LLRenderTarget* texture, bool depth = false, LLTexUnit::eTextureFilterOptions mode = LLTexUnit::TFO_BILINEAR, U32 index = 0);
+    // An unnamed key resolves to the target's per-attachment default (bilinear for
+    // attachment 0, point for data attachments) -- see LLRenderTarget::bindTexture.
+    S32 bindTexture(S32 uniform, LLRenderTarget* texture, ALSampler key = ALSamplers::TargetDefault, U32 index = 0);
+
+    // Colour and depth attachments are separate calls rather than one with a bool.
+    //
+    // They were one, and the bool sat third -- exactly where a filter reads naturally. The
+    // legacy filter enum is unscoped and TFO_POINT is 0, so four post-process call sites wrote
+    // bindTexture(uniform, target, LLTexUnit::TFO_POINT), meaning "sample this point-filtered",
+    // and silently got depth=false plus the DEFAULT bilinear filter. It compiled, it ran, and
+    // the depth-of-field passes had been reading bilinear for as long as the call existed.
+    // Splitting the two removes the parameter that made that expressible.
+    // Point by default, matching LLRenderTarget::getDefaultDepthSampler: linear filtering a
+    // DEPTH_COMPONENT texture without compare mode is implementation-defined, and at
+    // silhouette edges it averages foreground and background into a depth no surface has.
+    S32 bindDepthTexture(S32 uniform, LLRenderTarget* texture, ALSampler key = ALSamplers::PointClamp);
     S32 unbindTexture(S32 uniform, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
 
     bool link(bool suppress_errors = false);

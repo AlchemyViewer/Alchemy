@@ -211,47 +211,6 @@ void LLCubeMap::initReflectionMap(U32 resolution, U32 components)
     gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
 }
 
-void LLCubeMap::initEnvironmentMap(const std::vector<LLPointer<LLImageRaw> >& rawimages)
-{
-    llassert(rawimages.size() == 6);
-
-    U32 texname = 0;
-
-    LLImageGL::generateTextures(1, &texname);
-
-    U32 resolution = rawimages[0]->getWidth();
-    U32 components = rawimages[0]->getComponents();
-
-    for (int i = 0; i < 6; i++)
-    {
-        llassert(rawimages[i]->getWidth() == resolution);
-        llassert(rawimages[i]->getHeight() == resolution);
-        llassert(rawimages[i]->getComponents() == components);
-
-        mImages[i] = new LLImageGL(resolution, resolution, components, true);
-        mImages[i]->setTarget(mTargets[i], LLTexUnit::TT_CUBE_MAP);
-        mRawImages[i] = rawimages[i];
-        if (!mImages[i]->createGLTexture(0, mRawImages[i], texname))
-        {
-            LL_WARNS() << "Failed to create GL texture for environment cubemap face " << i << LL_ENDL;
-        }
-
-        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
-        stop_glerror();
-
-        mImages[i]->setSubImage(mRawImages[i], 0, 0, resolution, resolution);
-    }
-    enableTexture(0);
-    // bind() for glGenerateMipmap's sake -- it acts on the bound texture. The
-    // setFilteringOption that used to sit here declared how the map would be SAMPLED, which
-    // is no longer the resource's call; bind() names AnisoClamp and the shiny pass names its
-    // own. glGenerateMipmap never consulted the filter anyway.
-    bind();
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-    gGL.getTexUnit(0)->disable();
-    disable();
-}
-
 GLuint LLCubeMap::getGLName()
 {
     return mImages[0]->getTexName();

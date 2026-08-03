@@ -152,6 +152,30 @@ namespace
         }
     }
 
+    // Re-entrancy latch for gl_debug_callback; see the guard there for why.
+    thread_local bool sInDebugCallback = false;
+
+    struct DebugCallbackGuard
+    {
+        DebugCallbackGuard()  { sInDebugCallback = true;  }
+        ~DebugCallbackGuard() { sInDebugCallback = false; }
+    };
+
+    // glGetTexLevelParameteriv describes one IMAGE, and a cube map is six of them -- so it
+    // takes a face target and rejects GL_TEXTURE_CUBE_MAP outright ("The cube map target is
+    // not available for specifying or querying cube map images", GL_INVALID_ENUM). Every
+    // face of every cube we build shares an internal format -- glTexStorage2D allocates all
+    // six in one call, and the per-face uploads are handed the same explicit format -- so
+    // +X answers for the whole object.
+    //
+    // Only the LEVEL query needs this. glGetTexParameteriv describes the OBJECT and does
+    // take the general target, which is why the compare-mode reads nearby are fine as they
+    // are.
+    GLenum level_query_target(GLenum target)
+    {
+        return target == GL_TEXTURE_CUBE_MAP ? GL_TEXTURE_CUBE_MAP_POSITIVE_X : target;
+    }
+
     bool is_depth_format(GLint internal_format)
     {
         return internal_format == GL_DEPTH_COMPONENT16
@@ -304,7 +328,7 @@ static void log_texture_unit_state()
             GLint tex_compare     = GL_NONE;
             if (target.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
             {
-                glGetTexLevelParameteriv(target.mTarget, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
+                glGetTexLevelParameteriv(level_query_target(target.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
                 glGetTexParameteriv(target.mTarget, GL_TEXTURE_COMPARE_MODE, &tex_compare);
             }
 
@@ -438,7 +462,7 @@ bool validate_bound_samplers()
         GLint internal_format = 0;
         if (sampler.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
         {
-            glGetTexLevelParameteriv(sampler.mTarget, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
+            glGetTexLevelParameteriv(level_query_target(sampler.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
         }
         const bool is_depth = is_depth_format(internal_format);
 
@@ -490,6 +514,20 @@ void APIENTRY gl_debug_callback(GLenum source,
                                 const GLchar* message,
                                 GLvoid* userParam)
 {
+    // This callback makes GL calls of its own -- the buffer/shader/texture-unit dump below.
+    // Any error one of THOSE raises comes straight back here, which reports it, dumps
+    // again, and raises it again: one real fault turns into a burst of identical messages
+    // whose true origin is buried, and every one of them re-reads the state it is meant to
+    // be describing. That is exactly how the cube-map level query above showed up.
+    //
+    // Per-thread because the texture upload thread has its own context and its own
+    // callback; a shared flag would let one thread silence the other's diagnostics.
+    if (sInDebugCallback)
+    {
+        return;
+    }
+    DebugCallbackGuard reentry_guard;
+
     /*if (severity != GL_DEBUG_SEVERITY_HIGH &&
         severity != GL_DEBUG_SEVERITY_MEDIUM &&
         severity != GL_DEBUG_SEVERITY_LOW
@@ -2067,7 +2105,19 @@ void LLGLManager::initExtensions()
 
     // Core in 4.2; on a 4.1 context (macOS) it is still reachable as an ARB extension.
     // Downgraded below if the entry point turns out not to resolve.
+    //
+    // REQUIRED, alongside GL 4.1 -- not a capability the renderer adapts to. Every texture
+    // is allocated with glTexStorage2D and written by sub-image thereafter, which is the
+    // only model D3D11/12 and Vulkan have: dimensions, format and mip count fixed at
+    // creation. There is no mutable path left to fall back to. Diagnostic only, matching
+    // the GL_MINIMUM_VERSION check -- refusing to launch is a separate change.
     mHasTextureStorage = mGLVersion >= 4.19f || mGLExtensions.contains("GL_ARB_texture_storage");
+    if (!mHasTextureStorage)
+    {
+        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " exposes neither GL 4.2 nor "
+                               << "GL_ARB_texture_storage, which this viewer requires. Texture "
+                               << "allocation will fail." << LL_ENDL;
+    }
 
     // Core in 4.5; also an ARB extension. Downgraded below if the entry points don't resolve.
     mHasDirectStateAccess = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_direct_state_access");

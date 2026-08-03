@@ -77,15 +77,14 @@ public:
     // Get an estimate of how many bytes have been allocated in vram for
     // textures. Allocations recorded via alloc_tex_image with has_mips=true
     // include the full mip pyramid (driver-padded via dataFormatVRAMBytes);
-    // allocations from external setManualImage callers that don't pass
-    // has_mips=true cover level 0 only.
+    // single-level allocations cover level 0 only.
     //
     // NOTE: viewer consumers (llviewertexture.cpp, lltextureview.cpp)
     // historically scaled this by 2x via a /512 divisor instead of /1024
     // when converting to MB. That fudge predates per-mip accounting and
     // also compensates for driver-side overhead (descriptor structs, page
-    // alignment) plus the unaccounted external-setManualImage callers.
-    // Leave it alone until the budget code is reconciled holistically.
+    // alignment). Leave it alone until the budget code is reconciled
+    // holistically.
     static U64 getTextureBytesAllocated();
 
     // These 2 functions replace glGenTextures() and glDeleteTextures()
@@ -170,28 +169,19 @@ public:
     bool setSize(S32 width, S32 height, S32 ncomponents, S32 discard_level = -1);
     void setComponents(S32 ncomponents) { mComponents = (S8)ncomponents ;}
 
-    // has_mips signals VRAM accounting that this allocation will own a
-    // full mip pyramid (either by additional setManualImage calls per
-    // level or via glGenerateMipmap). Only consulted on the miplevel==0
-    // call (the only one that records allocation bytes); ignored
-    // otherwise. Defaults to false so non-LLImageGL callers
-    // (llrendertarget, manip tools, drawpoolbump scratch uploads, etc.)
-    // keep their existing single-level accounting.
-    static void setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels, bool has_mips = false);
-
-    // Allocate a single-level 2D texture on the currently-bound name and upload it.
-    // Unlike setManualImage, which allocates one mip level per call, this owns the whole
-    // texture: call it exactly once per texture object, and build a new texture rather
-    // than resizing or reformatting this one. pixels may be null to allocate only.
-    // levels is the mip level COUNT; storage is allocated for all of them on both the
-    // immutable and mutable paths, so levels 1+ can be filled with setManualSubImage.
+    // Allocate a 2D texture on the currently-bound name and upload level 0. This owns the
+    // whole texture: call it exactly once per texture object, and build a new texture
+    // rather than resizing or reformatting this one -- that is what glTexStorage2D
+    // requires, and what D3D11/12 and Vulkan require of every resource. pixels may be null
+    // to allocate only. levels is the mip level COUNT; storage is allocated for all of
+    // them, so levels 1+ can be filled with setManualSubImage.
     static void allocateTexture2D(U32 target, S32 intformat, S32 width, S32 height,
                                   U32 pixformat, U32 pixtype, const void *pixels,
                                   S32 levels = 1);
 
-    // Upload one level into a texture that already has storage. Unlike setManualImage
-    // this allocates nothing and does no VRAM accounting, so it is legal on immutable
-    // storage. The caller must have allocated with a compatible format and size.
+    // Upload one level into a texture that already has storage. Allocates nothing and does
+    // no VRAM accounting, which is what makes it legal on immutable storage. The caller
+    // must have allocated with a compatible format and size.
     static void setManualSubImage(U32 target, S32 miplevel, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels);
 
     // Apply the GL_TEXTURE_SWIZZLE_RGBA mask that re-expresses a deprecated
@@ -203,8 +193,8 @@ public:
     //
     // For LLImageGL instances, createGLTexture calls this internally based
     // on the format resolved by setExplicitFormat / the auto-format switch;
-    // direct setManualImage callers (e.g. llvoavatar's morph-mask upload
-    // on a raw GL texture) call this themselves before/after binding.
+    // callers uploading into a raw GL texture name (e.g. llvoavatar's
+    // morph-mask upload) call this themselves before/after binding.
     static void applySwizzleForDeprecatedFormat(LLTexUnit::eTextureType type, U32 original_format);
 
     bool createGLTexture() ;
@@ -322,8 +312,8 @@ private:
     // format rewriting (GL_ALPHA/GL_LUMINANCE -> R8/RG8, read back through the
     // texture's swizzle). In/out parameters are rewritten in place.
     //
-    // Split out of setManualImage because allocation and upload need the resolved
-    // format independently: glTexStorage2D has to be given the internal format before
+    // Split out because allocation and upload need the resolved format
+    // independently: glTexStorage2D has to be given the internal format before
     // any pixels are written. Resolution is deterministic, so resolving once for the
     // allocation and again per upload yields consistent formats.
     static void resolveUploadFormat(S32& intformat, U32& pixformat, U32& pixtype,
@@ -333,11 +323,6 @@ private:
     // size, and record its VRAM accounting. Sets mMipLevels. Callers replacing an
     // existing texture must release the old accounting themselves.
     void allocateTextureStorage(S32 width, S32 height, bool has_mips);
-
-    // Whether this texture can use immutable storage, and if not, why. Single decision
-    // point shared by allocateTextureStorage and setImage so the rule and its diagnostic
-    // cannot drift. Returns EMutableCause::None when immutable storage is usable.
-    enum class EMutableCause classifyImmutableStorage() const;
 
     U32 createPickMask(S32 pWidth, S32 pHeight);
     void freePickMask();
@@ -392,10 +377,13 @@ private:
 
     bool     mGLTextureCreated ;
     LLGLuint mTexName;
-    // Whether mTexName was allocated with glTexStorage2D. Immutable textures cannot be
-    // reallocated, so uploads must be sub-image writes and any size or format change has
-    // to build a new texture object. Reset whenever a fresh texture name is bound.
-    bool     mImmutableStorage = false;
+    // Whether mTexName has had its storage allocated yet. Storage is always immutable
+    // (glTexStorage2D), so it can be allocated exactly once: every upload afterwards is a
+    // sub-image write, and any size or format change has to build a new texture object.
+    // Set either by allocateTextureStorage or by markStorageAllocated when the owner of a
+    // shared texture object allocated on this instance's behalf -- see LLCubeMap, where one
+    // glTexStorage2D call covers all six faces. Reset whenever a fresh name is bound.
+    bool     mStorageAllocated = false;
     U16      mWidth;
     U16      mHeight;
     S8       mCurrentDiscardLevel;
@@ -479,7 +467,7 @@ public:
     // objects and no individual object is in a position to allocate: glTexStorage2D on
     // GL_TEXTURE_CUBE_MAP allocates all six faces in one call, so LLCubeMap makes it and
     // the six per-face objects only ever write sub-images.
-    void markStorageAllocated() { mImmutableStorage = true; }
+    void markStorageAllocated() { mStorageAllocated = true; }
 
     //similar to setTexName, but will call deleteTextures on mTexName if mTexName is not 0 or texname
     void syncTexName(LLGLuint texname);

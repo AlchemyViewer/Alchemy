@@ -217,8 +217,7 @@ void LLCubeMapArray::bind(S32 stage)
     const ALSampler key = mImage->getUseMipMaps() ? ALSamplers::AnisoClamp
                                                   : ALSamplers::BilinearClamp;
     gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_CUBE_MAP_ARRAY, getGLName(),
-                                      mImage->getUseMipMaps(),
-                                      gGL.getSampler(key, mImage->getUseMipMaps()));
+                                      gGL.getSampler(key));
 }
 
 void LLCubeMapArray::unbind()

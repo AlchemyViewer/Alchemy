@@ -334,7 +334,7 @@ void LLFloaterImagePreview::draw()
 
             if(mImagep.notNull())
             {
-                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mImagep->getTexName(), false,
+                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mImagep->getTexName(),
                                               gGL.getSampler(ALSamplers::BilinearClamp));
             }
             else
@@ -342,7 +342,7 @@ void LLFloaterImagePreview::draw()
                 mImagep = LLViewerTextureManager::getLocalTexture(mRawImagep.get(), false) ;
 
                 gGL.getTexUnit(0)->unbind(mImagep->getTarget()) ;
-                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mImagep->getTexName(), false,
+                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mImagep->getTexName(),
                                               gGL.getSampler(ALSamplers::BilinearClamp));
                 stop_glerror();
                 if (mAvatarPreview)
@@ -697,7 +697,7 @@ void LLFloaterImagePreview::onMouseCaptureLostImagePreview(LLMouseHandler* handl
 //-----------------------------------------------------------------------------
 // LLImagePreviewAvatar
 //-----------------------------------------------------------------------------
-LLImagePreviewAvatar::LLImagePreviewAvatar(S32 width, S32 height) : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE, false)
+LLImagePreviewAvatar::LLImagePreviewAvatar(S32 width, S32 height) : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE)
 {
     mNeedsUpdate = true;
     mTargetJoint = NULL;
@@ -886,7 +886,7 @@ void LLImagePreviewAvatar::pan(F32 right, F32 up)
 // LLImagePreviewSculpted
 //-----------------------------------------------------------------------------
 
-LLImagePreviewSculpted::LLImagePreviewSculpted(S32 width, S32 height) : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE, false)
+LLImagePreviewSculpted::LLImagePreviewSculpted(S32 width, S32 height) : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE)
 {
     mNeedsUpdate = true;
     mCameraDistance = 0.f;

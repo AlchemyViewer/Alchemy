@@ -55,6 +55,7 @@ using std::string;
 GLuint LLGLSLShader::sCurBoundShader = 0;
 LLGLSLShader* LLGLSLShader::sCurBoundShaderPtr = NULL;
 S32 LLGLSLShader::sIndexedTextureChannels = 0;
+U32 LLGLSLShader::sCompareSamplerUnits = 0;
 S32 LLGLSLShader::sIndexedGLTFChannels = 0;
 bool LLGLSLShader::sIndexedLegacyMaterials = false;
 U32 LLGLSLShader::sMaxGLTFMaterials = 0;
@@ -986,6 +987,37 @@ bool LLGLSLShader::link(bool suppress_errors)
     return success;
 }
 
+bool LLGLSLShader::declaresShadowSamplers() const
+{
+    if (mTexture.size() <= (size_t)LLShaderMgr::DEFERRED_SHADOW5)
+    {
+        return false;
+    }
+    for (S32 i = LLShaderMgr::DEFERRED_SHADOW0; i <= LLShaderMgr::DEFERRED_SHADOW5; ++i)
+    {
+        if (mTexture[i] > -1)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// static
+void LLGLSLShader::releaseCompareSamplerUnits()
+{
+    U32 units = sCompareSamplerUnits;
+    sCompareSamplerUnits = 0;
+    for (S32 unit = 0; units != 0; ++unit, units >>= 1)
+    {
+        if (units & 1u)
+        {
+            gGL.getTexUnit(unit)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTexUnit(unit)->bindSampler(0);
+        }
+    }
+}
+
 void LLGLSLShader::bind()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
@@ -1006,6 +1038,16 @@ void LLGLSLShader::bind()
         sCurBoundShaderPtr = this;
         placeProfileQuery();
         LLVertexBuffer::setupClientArrays(mAttributeMask);
+
+        // Shadow maps ride compare samplers on units this program may map to ordinary
+        // sampler2Ds -- a pairing GL calls undefined even where the shader never reads the
+        // unit. Release them here, at the one place every program switch passes through,
+        // rather than by ritual unbind calls at each pass that interleaves shader families.
+        // Declaring programs skip this: bindShadowMaps relayouts their units itself.
+        if (sCompareSamplerUnits != 0 && !declaresShadowSamplers())
+        {
+            releaseCompareSamplerUnits();
+        }
     }
 
     if (mUniformsDirty)
@@ -1075,7 +1117,7 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, ALSampler key)
     return uniform;
 }
 
-S32 LLGLSLShader::bindTexture(S32 uniform, LLRenderTarget* texture, bool depth, LLTexUnit::eTextureFilterOptions mode, U32 index)
+S32 LLGLSLShader::bindTexture(S32 uniform, LLRenderTarget* texture, ALSampler key, U32 index)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
@@ -1090,23 +1132,33 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLRenderTarget* texture, bool depth, 
 
     if (uniform > -1)
     {
-        if (depth)
-        {
-            // Depth attachments are never mipmapped, and a shadow-compare sampler is not
-            // wanted here -- this is a plain depth fetch.
-            //
-            // TAM_CLAMP: a repeat wrap on depth returns the opposite edge of the screen for
-            // any fetch that strays outside [0,1], which is geometry from the wrong place
-            // rather than a merely inexact sample. These textures carried GL_REPEAT only
-            // because allocateDepth never set an address mode. See
-            // LLRenderTarget::getDefaultDepthSampler.
-            gGL.getTexUnit(uniform)->bind(texture, true,
-                                          gGL.getSampler(al_sampler(mode, LLTexUnit::TAM_CLAMP), false));
-        }
-        else
-        {
-            texture->bindTexture(index, uniform, mode);
-        }
+        texture->bindTexture(index, uniform, key);
+    }
+
+    return uniform;
+}
+
+S32 LLGLSLShader::bindDepthTexture(S32 uniform, LLRenderTarget* texture, ALSampler key)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    if (uniform < 0 || uniform >= (S32)mTexture.size())
+    {
+        LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
+        llassert(false);
+        return -1;
+    }
+
+    uniform = getTextureChannel(uniform);
+
+    if (uniform > -1)
+    {
+        // Clamp by default, and a shadow-compare sampler is never wanted here -- this is a
+        // plain depth fetch. A repeat wrap on depth returns the opposite edge of the screen
+        // for any fetch that strays outside [0,1], which is geometry from the wrong place
+        // rather than a merely inexact sample. These textures carried GL_REPEAT only because
+        // allocateDepth never set an address mode. See LLRenderTarget::getDefaultDepthSampler.
+        gGL.getTexUnit(uniform)->bind(texture, true, gGL.getSampler(key));
     }
 
     return uniform;

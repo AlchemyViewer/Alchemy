@@ -54,7 +54,6 @@ ALSamplerDesc ALSamplerCache::makeDesc(ALSampler key)
     const LLTexUnit::eTextureAddressMode address =
         static_cast<LLTexUnit::eTextureAddressMode>((bits >> 2) & 0x3u);
     const bool compare  = (bits & static_cast<U16>(ALSampler::Compare)) != 0;
-    const bool has_mips = (bits & static_cast<U16>(ALSampler::HasMips)) != 0;
 
     // The unreachable quarter of the address field. Reaching it means a mask was built by
     // arithmetic rather than by composing ALSampler values.
@@ -66,20 +65,24 @@ ALSamplerDesc ALSamplerCache::makeDesc(ALSampler key)
 
     // Mirrors the old LLTexUnit::setTextureFilteringOptionFast ladder exactly, including
     // its asymmetry: TRILINEAR and above get a linear mip filter, BILINEAR gets a nearest
-    // one, and POINT stays nearest in both. Without a mip chain every case collapses to
-    // the non-mipmapped filter -- selecting a mipmap mode there would make the texture
-    // incomplete and sample black.
-    if (filter >= LLTexUnit::TFO_TRILINEAR && has_mips)
+    // one, and POINT stays nearest in both.
+    //
+    // Unconditional now. These used to collapse to the non-mipmapped filter when the
+    // resource had no mip chain, because GL calls that combination incomplete and samples
+    // black. Every texture carries immutable storage, which is mipmap-complete by
+    // construction, so a mip filter on a one-level texture selects level 0 and needs no
+    // reconciling -- see the note where ALSampler::HasMips used to be.
+    if (filter >= LLTexUnit::TFO_TRILINEAR)
     {
         desc.mMinFilter = GL_LINEAR_MIPMAP_LINEAR;
     }
     else if (filter >= LLTexUnit::TFO_BILINEAR)
     {
-        desc.mMinFilter = has_mips ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR;
+        desc.mMinFilter = GL_LINEAR_MIPMAP_NEAREST;
     }
     else
     {
-        desc.mMinFilter = has_mips ? GL_NEAREST_MIPMAP_NEAREST : GL_NEAREST;
+        desc.mMinFilter = GL_NEAREST_MIPMAP_NEAREST;
     }
 
     desc.mWrapS = desc.mWrapT = desc.mWrapR = sGLAddressMode[address];

@@ -326,90 +326,13 @@ void LLImageGL::cleanupClass()
 }
 
 
-// Why a texture could not be given immutable storage.
-//
-// This matters beyond GL: D3D11 fixes dimensions, format and mip count in
-// D3D11_TEXTURE2D_DESC at resource creation and has no mutable equivalent -- there is no
-// glTexImage2D-style re-specification of a live resource. So every case below except
-// NoDriverSupport is a path that has to be promoted before a D3D11 backend is viable,
-// and each is reported once so the log enumerates the remaining work.
-enum class EMutableCause
-{
-    None,             // immutable storage is in use
-    NoDriverSupport,  // no GL 4.2 / ARB_texture_storage -- not promotable, GL-only concern
-    UnsizedFormat,    // promotable: caller supplied an unsized internal format
-    NonTexture2D,     // promotable: needs the glTexStorage2D/3D variant for this target
-};
-
-// Report a texture that had to fall back to mutable storage. Deduplicated on
-// cause+target+format so this reads as a to-do list rather than a flood. Called from the
-// texture upload thread as well as the main thread, hence the lock.
-//
-// Deliberately non-fatal. An assert here would stop at the first unpromoted path and
-// hide every other one, which is the opposite of what is wanted: the point is to
-// enumerate all of them in a single run so they can be promoted. Breakpoint this
-// function to get the offending call stack.
-static void reportMutableAllocation(EMutableCause cause, U32 target, S32 intformat)
-{
-    if (cause == EMutableCause::None)
-    {
-        return;
-    }
-
-    {
-        static LLMutex sSeenMutex;
-        static boost::unordered_set<U64> sSeen;
-        const U64 key = ((U64)cause << 48) | ((U64)target << 32) | (U64)(U32)intformat;
-
-        LLMutexLock lock(&sSeenMutex);
-        if (!sSeen.insert(key).second)
-        {
-            return;
-        }
-    }
-
-    switch (cause)
-    {
-    case EMutableCause::NoDriverSupport:
-        // Nothing to promote -- the driver cannot do it at all. Phase 1 already logs the
-        // capability at startup; this just records that textures are affected.
-        LL_INFOS("RenderInit") << "Textures are using mutable storage: driver has no "
-                               << "immutable texture storage." << LL_ENDL;
-        break;
-
-    case EMutableCause::UnsizedFormat:
-        // A call-site issue rather than structural: whoever set this format asked for an
-        // unsized one where a sized equivalent exists.
-        LL_WARNS("RenderInit") << "Mutable texture storage: internal format 0x" << std::hex
-                               << intformat << std::dec << " is unsized, so glTexStorage2D "
-                               << "cannot express it. Give this path a sized format "
-                               << "(e.g. GL_RGBA8 rather than GL_RGBA) -- D3D11 has no "
-                               << "mutable texture equivalent." << LL_ENDL;
-        break;
-
-    case EMutableCause::NonTexture2D:
-        // Structural rather than a call-site mistake: one texture object shared by
-        // several LLImageGL instances, where no single instance can allocate. LLCubeMap
-        // was the known case and is now promoted -- it calls glTexStorage2D once on
-        // GL_TEXTURE_CUBE_MAP and the per-face objects write sub-images. Anything still
-        // reaching here needs the same treatment for its own target.
-        LL_INFOS("RenderInit") << "Mutable texture storage for target 0x" << std::hex << target
-                               << std::dec << " (known: non-2D targets need their own "
-                               << "glTexStorage call, made once for the whole object)." << LL_ENDL;
-        break;
-
-    default:
-        break;
-    }
-}
-
 // Whether an internal format is *sized*, i.e. legal for glTexStorage2D. Unsized
 // formats (GL_RGBA, GL_RGB, GL_RED, the legacy GL_LUMINANCE family, generic
 // GL_COMPRESSED_*) let the driver choose the actual storage, which immutable
 // allocation cannot express -- glTexStorage2D rejects them with GL_INVALID_ENUM.
 //
-// Whitelist rather than blacklist: an unrecognised format falls back to the mutable
-// path, which is always correct, instead of failing the allocation outright.
+// Whitelist rather than blacklist: an unrecognised format trips the assertion below
+// rather than being quietly handed to glTexStorage2D.
 static bool isSizedInternalFormat(S32 intformat)
 {
     switch (intformat)
@@ -452,24 +375,46 @@ static bool isSizedInternalFormat(S32 intformat)
     }
 }
 
-// Whether a texture with this target and internal format can use immutable storage,
-// and if not, why. Shared by LLImageGL instances and by the static allocateTexture2D,
-// so the rule and the diagnostic keyed off it cannot drift apart.
-static EMutableCause classifyStorage(U32 target, S32 intformat)
+// The preconditions glTexStorage2D imposes, asserted rather than branched on.
+//
+// There is no mutable path any more. Immutable storage is required alongside GL 4.1 (see
+// LLGLManager::initExtensions), so nothing here chooses between two ways of allocating --
+// it catches a call site that would violate the requirement. Both cases below used to
+// report and silently fall back to glTexImage2D; a session exercising the render paths hit
+// neither, which is what made removing the fallback possible.
+//
+// Warned as well as asserted, because llassert compiles out unless SHOW_ASSERT is defined
+// and a plain Release build does not define it -- so on the builds that actually ship, the
+// assertion alone would say nothing and the only symptom would be a GL error and a texture
+// that never got storage. The warning is once-per-site and costs nothing on the path where
+// the invariant holds.
+//
+// The failure is deliberately not degraded: a texture that cannot be allocated immutably
+// cannot be expressed in D3D11/12 or Vulkan either, so there is nothing to fall back to.
+static void assertStorageAllocatable(U32 target, S32 intformat)
 {
-    if (!gGLManager.mHasTextureStorage)
-    {
-        return EMutableCause::NoDriverSupport;
-    }
+    // A non-2D target needs its own glTexStorage variant, called ONCE for the whole object
+    // -- six cube faces are one allocation, not six -- after which the members write
+    // sub-images. LLCubeMap, LLCubeMapArray and ALTexture3D each do that themselves and
+    // call markStorageAllocated(), so they never arrive here.
     if (target != GL_TEXTURE_2D)
     {
-        return EMutableCause::NonTexture2D;
+        LL_WARNS_ONCE("RenderInit") << "Non-2D target 0x" << std::hex << target << std::dec
+                                    << " reached the 2D allocator. Allocate it once for the "
+                                    << "whole object, then call markStorageAllocated()."
+                                    << LL_ENDL;
+        llassert(false);
     }
+
+    // glTexStorage2D cannot express a format that lets the driver pick the storage, and
+    // D3D11 has no unsized formats at all. Name a sized one (GL_RGBA8, not GL_RGBA).
     if (!isSizedInternalFormat(intformat))
     {
-        return EMutableCause::UnsizedFormat;
+        LL_WARNS_ONCE("RenderInit") << "Internal format 0x" << std::hex << intformat << std::dec
+                                    << " is unsized, so glTexStorage2D cannot express it. Name "
+                                    << "a sized format (GL_RGBA8, not GL_RGBA)." << LL_ENDL;
+        llassert(false);
     }
-    return EMutableCause::None;
 }
 
 
@@ -985,51 +930,26 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
 
     gGL.getTexUnit(0)->bind(this, false, false, usename);
 
-    // Allocate the whole texture up front where immutable storage is possible, so the
-    // branches below become pure sub-image writes. glTexStorage2D must be called exactly
-    // once for the object and needs the level count before any pixels exist, which is why
-    // this cannot live inside the per-level loops the way setManualImage does.
+    // Allocate the whole texture up front, so every write below is a sub-image.
+    // glTexStorage2D must be called exactly once for the object and needs the level count
+    // before any pixels exist, which is why this cannot live inside the per-level loops.
     //
-    // Skipped when storage already exists: createGLTexture's early path re-uploads into
-    // the live mTexName when the size has not changed, and reallocating an immutable
-    // texture is illegal. Where immutable storage is not available the mutable path below
-    // is unchanged, still allocating per level via setManualImage.
-    const EMutableCause cause = classifyImmutableStorage();
-
-    if (mImmutableStorage)
-    {
-        // Storage already exists: either allocated here on an earlier pass (the early
-        // re-upload path), or by the owner of a shared texture object -- see
-        // markStorageAllocated, which is how cube maps work. Either way there is nothing
-        // to allocate and the branches below write sub-images.
-    }
-    else if (cause == EMutableCause::None)
+    // Skipped when storage already exists: either allocated here on an earlier pass (the
+    // early re-upload path, where createGLTexture writes into the live mTexName because the
+    // size has not changed), or by the owner of a shared texture object -- see
+    // markStorageAllocated, which is how cube maps work. Reallocating is illegal either way.
+    // Live members, not the getters: during an off-thread createGLTexture the getters
+    // answer for the still-published texture (mUploadInFlight), and storage sized from
+    // that would build the new texture at the old texture's dimensions.
+    if (!mStorageAllocated)
     {
         free_cur_tex_image();
         allocateTextureStorage(liveWidth(mCurrentDiscardLevel), liveHeight(mCurrentDiscardLevel), mUseMipMaps);
     }
-    else
-    {
-        // Falls through to the per-level setManualImage path below, which allocates
-        // mutably and so never reaches allocateTextureStorage's diagnostic. Report here
-        // instead -- this is the texture streaming path, the one that most needs
-        // promoting for D3D11.
-        reportMutableAllocation(cause, mTarget, getStorageInternalFormat());
-    }
 
     if (data_in == nullptr)
     {
-        S32 w = liveWidth(mCurrentDiscardLevel);
-        S32 h = liveHeight(mCurrentDiscardLevel);
-        if (mImmutableStorage)
-        {
-            // storage is the whole point here; there are no pixels to write
-        }
-        else
-        {
-            LLImageGL::setManualImage(mTarget, 0, mFormatInternal, w, h,
-                mFormatPrimary, mFormatType, (GLvoid*)data_in, mUseMipMaps);
-        }
+        // Storage is the whole point of this call; there are no pixels to write.
     }
     else if (mUseMipMaps)
     {
@@ -1053,14 +973,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                 if (is_compressed)
                 {
                     GLsizei tex_size = (GLsizei)dataFormatBytes(mFormatPrimary, w, h);
-                    if (mImmutableStorage)
-                    {
-                        glCompressedTexSubImage2D(mTarget, gl_level, 0, 0, w, h, mFormatPrimary, tex_size, (GLvoid *)data_in);
-                    }
-                    else
-                    {
-                        glCompressedTexImage2D(mTarget, gl_level, mFormatPrimary, w, h, 0, tex_size, (GLvoid *)data_in);
-                    }
+                    glCompressedTexSubImage2D(mTarget, gl_level, 0, 0, w, h, mFormatPrimary, tex_size, (GLvoid *)data_in);
                     stop_glerror();
                 }
                 else
@@ -1071,14 +984,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                         stop_glerror();
                     }
 
-                    if (mImmutableStorage)
-                    {
-                        LLImageGL::setManualSubImage(mTarget, gl_level, w, h, mFormatPrimary, mFormatType, (GLvoid*)data_in);
-                    }
-                    else
-                    {
-                        LLImageGL::setManualImage(mTarget, gl_level, mFormatInternal, w, h, mFormatPrimary, mFormatType, (GLvoid*)data_in, mUseMipMaps);
-                    }
+                    LLImageGL::setManualSubImage(mTarget, gl_level, w, h, mFormatPrimary, mFormatType, (GLvoid*)data_in);
                     if (gl_level == 0)
                     {
                         analyzeAlpha(data_in, w, h);
@@ -1118,17 +1024,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
 
                     mMipLevels = calcMipLevelCount(w, h);
 
-                    if (mImmutableStorage)
-                    {
-                        LLImageGL::setManualSubImage(mTarget, 0, w, h, mFormatPrimary, mFormatType, data_in);
-                    }
-                    else
-                    {
-                        LLImageGL::setManualImage(mTarget, 0, mFormatInternal,
-                                     w, h,
-                                     mFormatPrimary, mFormatType,
-                                     data_in, mUseMipMaps);
-                    }
+                    LLImageGL::setManualSubImage(mTarget, 0, w, h, mFormatPrimary, mFormatType, data_in);
                     analyzeAlpha(data_in, w, h);
                     stop_glerror();
 
@@ -1229,14 +1125,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                             stop_glerror();
                         }
 
-                        if (mImmutableStorage)
-                        {
-                            LLImageGL::setManualSubImage(mTarget, m, w, h, mFormatPrimary, mFormatType, cur_mip_data);
-                        }
-                        else
-                        {
-                            LLImageGL::setManualImage(mTarget, m, mFormatInternal, w, h, mFormatPrimary, mFormatType, cur_mip_data, mUseMipMaps);
-                        }
+                        LLImageGL::setManualSubImage(mTarget, m, w, h, mFormatPrimary, mFormatType, cur_mip_data);
                         if (m == 0)
                         {
                             analyzeAlpha(data_in, w, h);
@@ -1281,14 +1170,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
         if (is_compressed)
         {
             GLsizei tex_size = (GLsizei)dataFormatBytes(mFormatPrimary, w, h);
-            if (mImmutableStorage)
-            {
-                glCompressedTexSubImage2D(mTarget, 0, 0, 0, w, h, mFormatPrimary, tex_size, (GLvoid *)data_in);
-            }
-            else
-            {
-                glCompressedTexImage2D(mTarget, 0, mFormatPrimary, w, h, 0, tex_size, (GLvoid *)data_in);
-            }
+            glCompressedTexSubImage2D(mTarget, 0, 0, 0, w, h, mFormatPrimary, tex_size, (GLvoid *)data_in);
             stop_glerror();
         }
         else
@@ -1299,20 +1181,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                 stop_glerror();
             }
 
-            // As the auto-mip, mipmapped and compressed branches above: glTexImage2D on a
-            // texture that already carries immutable storage is GL_INVALID_OPERATION, and
-            // the upload is discarded. This branch was the one that never got the check,
-            // so a non-mipmapped uncompressed upload onto an immutable name silently kept
-            // whatever the texture held before.
-            if (mImmutableStorage)
-            {
-                LLImageGL::setManualSubImage(mTarget, 0, w, h, mFormatPrimary, mFormatType, (GLvoid *)data_in);
-            }
-            else
-            {
-                LLImageGL::setManualImage(mTarget, 0, mFormatInternal, w, h,
-                             mFormatPrimary, mFormatType, (GLvoid *)data_in);
-            }
+            LLImageGL::setManualSubImage(mTarget, 0, w, h, mFormatPrimary, mFormatType, (GLvoid *)data_in);
             stop_glerror();
 
             analyzeAlpha(data_in, w, h);
@@ -1369,7 +1238,7 @@ U32 type_width_from_pixtype(U32 pixtype)
 // by scanline stride, which is meaningless for block-compressed data. (The comment that
 // used to be here blamed an NVIDIA/Win10 glTexSubImage2D bug, long since fixed -- but the
 // guard would still be required without it.) setSubImage can pass a genuinely
-// block-compressed texture; setManualImage now always passes false, since driver-side
+// block-compressed texture; the allocation paths always pass false, since driver-side
 // generic compression is gone.
 bool should_stagger_image_set(bool compressed)
 {
@@ -1644,7 +1513,7 @@ void LLImageGL::resolveUploadFormat(S32& intformat, U32& pixformat, U32& pixtype
     // texture's swizzle attribute. GL_TEXTURE_SWIZZLE_RGBA is in both core and compat
     // profiles since GL 3.3, so this works everywhere at the 4.1 floor.
     //
-    // setManualImage does not write GL_TEXTURE_SWIZZLE_RGBA itself — overwriting it is
+    // The upload paths do not write GL_TEXTURE_SWIZZLE_RGBA themselves — overwriting it is
     // destructive when the bound texture already has a custom swizzle (e.g. an LLImageGL
     // whose resolveDeprecatedFormat ran and applied a specific mask in createGLTexture,
     // or any caller that set up its own swizzle before this call). The format rewrite
@@ -1671,10 +1540,10 @@ void LLImageGL::resolveUploadFormat(S32& intformat, U32& pixformat, U32& pixtype
     }
 }
 
-// Upload one level into a texture that already has storage. The non-allocating half of
-// setManualImage: same format resolution, but a sub-image write, so it is legal on
-// immutable storage. Does no VRAM accounting -- allocateTextureStorage recorded the
-// whole object when it created the storage.
+// Upload one level into a texture that already has storage. Same format resolution as the
+// allocating paths, but a sub-image write, which is what makes it legal on immutable
+// storage. Does no VRAM accounting -- allocateTextureStorage recorded the whole object
+// when it created the storage.
 void LLImageGL::setManualSubImage(U32 target, S32 miplevel, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -1708,14 +1577,12 @@ void LLImageGL::setManualSubImage(U32 target, S32 miplevel, S32 width, S32 heigh
 
 // Allocate a 2D texture on the currently-bound name and upload level 0.
 //
-// Unlike setManualImage, which allocates one mip level per call, this owns the whole
-// texture: call it exactly once per texture object. The result cannot then be resized or
-// reformatted -- build a new texture instead. That is the contract glTexStorage2D imposes,
-// and the one D3D11 requires of every resource.
+// This owns the whole texture: call it exactly once per texture object. The result cannot
+// then be resized or reformatted -- build a new texture instead. That is the contract
+// glTexStorage2D imposes, and the one D3D11 requires of every resource.
 //
 // levels is the mip level COUNT (see calcMipLevelCount). Storage is allocated for all of
-// them on both paths, so the caller can fill levels 1+ with setManualSubImage regardless
-// of whether immutable storage was available.
+// them, so the caller can fill levels 1+ with setManualSubImage.
 //
 // pixels may be null to allocate without uploading.
 void LLImageGL::allocateTexture2D(U32 target, S32 intformat, S32 width, S32 height,
@@ -1729,8 +1596,8 @@ void LLImageGL::allocateTexture2D(U32 target, S32 intformat, S32 width, S32 heig
 
     free_cur_tex_image();
 
-    const EMutableCause cause = classifyStorage(target, intformat);
-    if (cause == EMutableCause::None)
+    assertStorageAllocatable(target, intformat);
+
     {
         LL_PROFILE_ZONE_NAMED("glTexStorage2D");
         glTexStorage2D(target, levels, intformat, width, height);
@@ -1747,78 +1614,8 @@ void LLImageGL::allocateTexture2D(U32 target, S32 intformat, S32 width, S32 heig
             }
         }
     }
-    else
-    {
-        LL_PROFILE_ZONE_NAMED("glTexImage2D alloc + copy");
-        reportMutableAllocation(cause, target, intformat);
-
-        // Allocate every level here too, so a caller filling the mip chain with
-        // setManualSubImage behaves identically on both paths. glTexImage2D would
-        // otherwise leave levels 1+ without storage for the sub-image writes to land in.
-        S32 w = width;
-        S32 h = height;
-        for (S32 level = 0; level < levels; ++level)
-        {
-            glTexImage2D(target, level, intformat, w, h, 0, pixformat, pixtype,
-                         level == 0 ? pixels : nullptr);
-            w = llmax(1, w >> 1);
-            h = llmax(1, h >> 1);
-        }
-    }
 
     alloc_tex_image(width, height, intformat, 1, levels > 1);
-    stop_glerror();
-}
-
-void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels, bool has_mips)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-
-    resolveUploadFormat(intformat, pixformat, pixtype, pixels, width, height);
-
-    stop_glerror();
-    {
-        LL_PROFILE_ZONE_NAMED("glTexImage2D");
-        LL_PROFILE_ZONE_NUM(width);
-        LL_PROFILE_ZONE_NUM(height);
-
-        // Memory accounting runs on the miplevel==0 call only — that's
-        // when the texture's full footprint (level 0 + the optional mip
-        // pyramid, signalled by has_mips) is recorded. Updating on every
-        // miplevel call previously replaced the level-0 size with each
-        // successive sub-mip's tiny size, leaving e.g. a 256x256 RGBA
-        // texture tracked at the bytes of mip 8 instead of mip 0.
-        const bool track_alloc = (miplevel == 0);
-        if (track_alloc)
-        {
-            free_cur_tex_image();
-        }
-        const bool use_sub_image = should_stagger_image_set(false);
-        if (!use_sub_image)
-        {
-            LL_PROFILE_ZONE_NAMED("glTexImage2D alloc + copy");
-            glTexImage2D(target, miplevel, intformat, width, height, 0, pixformat, pixtype, pixels);
-        }
-        else
-        {
-            // break up calls to a manageable size for the GL command buffer
-            {
-                LL_PROFILE_ZONE_NAMED("glTexImage2D alloc");
-                glTexImage2D(target, miplevel, intformat, width, height, 0, pixformat, pixtype, nullptr);
-            }
-
-            U8* src = (U8*)(pixels);
-            if (src)
-            {
-                LL_PROFILE_ZONE_NAMED("glTexImage2D copy");
-                sub_image_lines(target, miplevel, 0, 0, width, height, pixformat, pixtype, src, width);
-            }
-        }
-        if (track_alloc)
-        {
-            alloc_tex_image(width, height, intformat, 1, has_mips);
-        }
-    }
     stop_glerror();
 }
 
@@ -2031,7 +1828,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
     else
     {
         LLImageGL::generateTextures(1, &new_texname);
-        mImmutableStorage = false; // brand-new name, no storage allocated yet
+        mStorageAllocated = false; // brand-new name, no storage allocated yet
         {
             gGL.getTexUnit(0)->bind(this, false, false, new_texname);
             glTexParameteri(LLTexUnit::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
@@ -2067,10 +1864,6 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
             return false;
         }
     }
-
-    // The unit's mip-map flag is the only sampling-adjacent thing left to set: it is a fact
-    // about the resource, which the bind folds into its sampler choice.
-    gGL.getTexUnit(0)->setHasMipMaps(mHasMipMaps);
 
     // things will break if we don't unbind after creation
     gGL.getTexUnit(0)->unbind(mBindTarget);
@@ -2954,13 +2747,6 @@ void LLImageGL::resetCurTexSizebar()
 // Single place so the upcoming switch to immutable storage (glTexStorage2D, which also
 // needs mMipLevels and a sized internal format) lands in one spot rather than at every
 // allocation site.
-// Single decision point for immutable storage, so the eligibility rule and the
-// diagnostic below it cannot drift apart. Reports the reason when it says no.
-EMutableCause LLImageGL::classifyImmutableStorage() const
-{
-    return classifyStorage(mTarget, getStorageInternalFormat());
-}
-
 // The internal format glTexStorage* should be handed. Block-compressed textures carry
 // their (sized) compressed format in mFormatPrimary rather than mFormatInternal, which is
 // the convention the glCompressedTexImage2D calls already follow.
@@ -2975,22 +2761,15 @@ void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
 
     mMipLevels = has_mips ? calcMipLevelCount(width, height) : 1;
 
-    const EMutableCause cause = classifyImmutableStorage();
-    if (cause == EMutableCause::None)
+    assertStorageAllocatable(mTarget, getStorageInternalFormat());
+
     {
         LL_PROFILE_ZONE_NAMED("glTexStorage2D");
-        // Immutable: dimensions, format and level count are fixed for the lifetime of
-        // this texture object. Every later write must be a sub-image, and any change of
-        // size or format must create a new texture -- see scaleDown and createGLTexture.
+        // Dimensions, format and level count are fixed for the lifetime of this texture
+        // object. Every later write must be a sub-image, and any change of size or format
+        // must create a new texture -- see scaleDown and createGLTexture.
         glTexStorage2D(mTarget, mMipLevels, getStorageInternalFormat(), width, height);
-        mImmutableStorage = true;
-    }
-    else
-    {
-        LL_PROFILE_ZONE_NAMED("glTexImage2D alloc");
-        reportMutableAllocation(cause, mTarget, getStorageInternalFormat());
-        glTexImage2D(mTarget, 0, mFormatInternal, width, height, 0, mFormatPrimary, mFormatType, nullptr);
-        mImmutableStorage = false;
+        mStorageAllocated = true;
     }
 
     alloc_tex_image(width, height, mFormatInternal, 1, has_mips);
@@ -3030,7 +2809,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     const LLGLuint old_texname = mTexName;
     LLGLuint new_texname = 0;
     generateTextures(1, &new_texname);
-    mImmutableStorage = false; // brand-new name; allocateTextureStorage sets this
+    mStorageAllocated = false; // brand-new name; allocateTextureStorage sets this
     if (new_texname == 0)
     {
         LL_WARNS_ONCE("LLImageGL") << "Failed to allocate a texture name for downscaling." << LL_ENDL;
@@ -3049,7 +2828,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
             // Bind the new name and give it storage, then copy the rendered result out
             // of the framebuffer into it. glCopyTexSubImage2D is a sub-image write, so
             // it is legal on immutable storage.
-            gGL.getTexUnit(0)->bindManual(mBindTarget, new_texname, mHasMipMaps);
+            gGL.getTexUnit(0)->bindManual(mBindTarget, new_texname);
             allocateTextureStorage(desired_width, desired_height, mHasMipMaps);
             glCopyTexSubImage2D(mTarget, 0, 0, 0, 0, 0, desired_width, desired_height);
 
@@ -3094,7 +2873,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 
         // ...and back out of the PBO into the new one
-        gGL.getTexUnit(0)->bindManual(mBindTarget, new_texname, mHasMipMaps);
+        gGL.getTexUnit(0)->bindManual(mBindTarget, new_texname);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, sScratchPBO);
         allocateTextureStorage(desired_width, desired_height, mHasMipMaps);
         glTexSubImage2D(mTarget, 0, 0, 0, desired_width, desired_height, mFormatPrimary, mFormatType, nullptr);
@@ -3131,56 +2910,6 @@ void LLImageGL::checkActiveThread()
 
 //----------------------------------------------------------------------------
 
-
-// Manual Mip Generation
-/*
-        S32 width = getWidth(discard_level);
-        S32 height = getHeight(discard_level);
-        S32 w = width, h = height;
-        S32 nummips = 1;
-        while (w > 4 && h > 4)
-        {
-            w >>= 1; h >>= 1;
-            nummips++;
-        }
-        stop_glerror();
-        w = width, h = height;
-        const U8* prev_mip_data = 0;
-        const U8* cur_mip_data = 0;
-        for (int m=0; m<nummips; m++)
-        {
-            if (m==0)
-            {
-                cur_mip_data = rawdata;
-            }
-            else
-            {
-                S32 bytes = w * h * mComponents;
-                U8* new_data = new U8[bytes];
-                LLImageBase::generateMip(prev_mip_data, new_data, w, h, mComponents);
-                cur_mip_data = new_data;
-            }
-            llassert(w > 0 && h > 0 && cur_mip_data);
-            U8 test = cur_mip_data[w*h*mComponents-1];
-            {
-                LLImageGL::setManualImage(mTarget, m, mFormatInternal, w, h, mFormatPrimary, mFormatType, cur_mip_data);
-                stop_glerror();
-            }
-            if (prev_mip_data && prev_mip_data != rawdata)
-            {
-                delete prev_mip_data;
-            }
-            prev_mip_data = cur_mip_data;
-            w >>= 1;
-            h >>= 1;
-        }
-        if (prev_mip_data && prev_mip_data != rawdata)
-        {
-            delete prev_mip_data;
-        }
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL,  nummips);
-*/
 
 LLImageGLThread::LLImageGLThread(LLWindow* window)
     // We want exactly one thread.

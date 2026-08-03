@@ -627,7 +627,7 @@ void LLVertexBufferData::drawWithMatrix()
 
     if (mTexName)
     {
-        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTexName, false, mTexSampler);
+        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTexName, mTexSampler);
     }
     else
     {
@@ -665,7 +665,7 @@ void LLVertexBufferData::draw()
 
     if (mTexName)
     {
-        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTexName, false, mTexSampler);
+        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTexName, mTexSampler);
     }
     else
     {

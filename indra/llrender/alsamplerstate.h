@@ -69,17 +69,17 @@ enum class ALSampler : U16
     // --- depth compare, bit 4. Makes this a shadow sampler. ---
     Compare = 1u << 4,
 
-    // --- bit 5: whether the RESOURCE has a mip chain ---
+    // There was a fifth field here, HasMips, recording whether the RESOURCE had a mip
+    // chain. It existed because GL treats a mipmapped minification filter on a texture with
+    // no mip chain as *incomplete*, which samples black -- so the bind had to reconcile the
+    // caller's intent against what the texture actually had, doubling the table to carry a
+    // fact that was never sampling intent in the first place.
     //
-    // Not sampling intent, and normally NOT set by the caller. GL makes a mipmapped
-    // minification filter on a texture with no mip chain *incomplete*, and an incomplete
-    // texture samples black -- so the bind reconciles the caller's intent against what the
-    // texture actually has. D3D11 has no such rule (a trilinear sampler on a 1-mip resource
-    // simply clamps), so this bit is GL repair and would not exist on that backend.
-    //
-    // Binds that go through an LLImageGL get it from the resource. A bind of a RAW GL name
-    // has no resource to ask, so those call sites do pass it -- see LLTexUnit::bindManual.
-    HasMips = 1u << 5,
+    // Immutable storage removed the rule it was repairing. glTexStorage2D allocates every
+    // level it declares, and an immutable texture clamps TEXTURE_MAX_LEVEL to levels-1, so
+    // a one-level texture is mipmap-complete under any minification filter and simply
+    // samples level 0. That is what D3D11 always did, and now the only kind of texture we
+    // allocate. A sampler describes the use again, with nothing of the resource in it.
 };
 
 constexpr ALSampler operator|(ALSampler a, ALSampler b)
@@ -96,19 +96,6 @@ static_assert((U16)LLTexUnit::TFO_ANISOTROPIC == (U16)ALSampler::Anisotropic);
 static_assert(((U16)LLTexUnit::TAM_WRAP   << 2) == (U16)ALSampler::Wrap);
 static_assert(((U16)LLTexUnit::TAM_MIRROR << 2) == (U16)ALSampler::Mirror);
 static_assert(((U16)LLTexUnit::TAM_CLAMP  << 2) == (U16)ALSampler::Clamp);
-
-// Compose a mask from the legacy filter/address pair.
-//
-// TRANSITIONAL. It exists for the handful of signatures that still take the two enums as
-// parameters -- LLRenderTarget::bindTexture, LLGLSLShader::bindTexture, LLTexUnit's per-unit
-// mode tracking -- and for LLImageGL, whose stored mode is on its way out entirely. New code
-// composes ALSampler values directly; every use of this is a place the mask has not reached
-// yet, so the count going to zero is the measure of the migration.
-constexpr ALSampler al_sampler(LLTexUnit::eTextureFilterOptions filter,
-                               LLTexUnit::eTextureAddressMode   address)
-{
-    return static_cast<ALSampler>(static_cast<U16>(filter) | (static_cast<U16>(address) << 2));
-}
 
 constexpr ALSampler& operator|=(ALSampler& a, ALSampler b)
 {
@@ -159,24 +146,34 @@ namespace ALSamplers
 {
     inline constexpr ALSampler PointWrap      = ALSampler::Point     | ALSampler::Wrap;
     inline constexpr ALSampler PointClamp     = ALSampler::Point     | ALSampler::Clamp;
+    inline constexpr ALSampler PointMirror    = ALSampler::Point     | ALSampler::Mirror;
     inline constexpr ALSampler BilinearClamp  = ALSampler::Bilinear  | ALSampler::Clamp;
     inline constexpr ALSampler BilinearWrap   = ALSampler::Bilinear  | ALSampler::Wrap;
     inline constexpr ALSampler BilinearMirror = ALSampler::Bilinear  | ALSampler::Mirror;
-    inline constexpr ALSampler TrilinearWrap  = ALSampler::Trilinear | ALSampler::Wrap;
-    inline constexpr ALSampler TrilinearClamp = ALSampler::Trilinear | ALSampler::Clamp;
+    inline constexpr ALSampler TrilinearWrap   = ALSampler::Trilinear | ALSampler::Wrap;
+    inline constexpr ALSampler TrilinearClamp  = ALSampler::Trilinear | ALSampler::Clamp;
+    inline constexpr ALSampler TrilinearMirror = ALSampler::Trilinear | ALSampler::Mirror;
     inline constexpr ALSampler AnisoWrap      = ALSampler::Anisotropic | ALSampler::Wrap;
     inline constexpr ALSampler AnisoClamp     = ALSampler::Anisotropic | ALSampler::Clamp;
 
     // Shadow maps: anisotropic + clamp with the depth comparison enabled, which is what
-    // gives the 2x2 PCF. HasMips is deliberately absent -- shadow targets have no mip chain.
+    // gives the 2x2 PCF.
     inline constexpr ALSampler ShadowCompare  = ALSampler::Anisotropic | ALSampler::Clamp
                                               | ALSampler::Compare;
+
+    // NOT a sampling mode: "resolve from the render target's per-attachment policy"
+    // (getDefaultColorSampler -- bilinear for attachment 0, point for the data attachments).
+    // Only LLRenderTarget::bindTexture interprets it; it must never reach getSampler().
+    // Built on the addressing field's unused fourth encoding, so if it leaks through anyway
+    // the masked slot is one warmup() never fills and the cache's debug assert fires instead
+    // of silently sampling wrong.
+    inline constexpr ALSampler TargetDefault = static_cast<ALSampler>((3u << 2) | (1u << 15));
 }
 
 // Owns the sampler objects belonging to one GL context.
 //
 // The descriptor space the renderer actually uses is small and enumerable -- filter x
-// address mode x has-mips x compare -- so the common path is a flat array index rather
+// address mode x compare -- so the common path is a flat array index rather
 // than a hash lookup, which matters because it runs per bind. Objects are created lazily
 // on first use and then live until the context goes away; they are immutable, so sharing
 // one between unrelated call sites is safe by construction.
@@ -214,21 +211,6 @@ public:
         return name;
     }
 
-    // Resolve for a specific resource: the caller's sampling intent, reconciled against
-    // whether the texture actually has a mip chain.
-    //
-    // Callers state intent only. Whether a mipmapped minification filter is *legal* is a
-    // property of the resource -- GL treats the mismatch as an incomplete texture and samples
-    // black -- so folding it in belongs here rather than at every bind site. See
-    // ALSampler::HasMips.
-    U32 get(ALSampler key, bool has_mips) const
-    {
-        // Bit insert rather than a branch: HasMips is a single bit and has_mips is already 0/1.
-        return get(static_cast<ALSampler>(static_cast<U16>(key)
-                                          | (static_cast<U16>(has_mips)
-                                             * static_cast<U16>(ALSampler::HasMips))));
-    }
-
     // Drop this thread's sampler objects. Call while the owning context is still current:
     // from LLRender::shutdown(), or when a global feeding the descriptors changes
     // (currently only LLRender::sAnisotropicFilteringLevel, from graphics preferences).
@@ -245,7 +227,7 @@ public:
 
     // Create every reachable sampler up front.
     //
-    // The table is 64 slots of which 48 are reachable, and a sampler object is a few words of
+    // The table is 32 slots of which 24 are reachable, and a sampler object is a few words of
     // driver state -- so building them all costs less than the branch that testing for them
     // would cost on every bind, forever. Call once the context is up, and again after clear()
     // drops them (an anisotropy change does that).
@@ -267,10 +249,10 @@ private:
 
     static U32 create(const ALSamplerDesc& desc);
 
-    // Six bits: filter(2) + address(2) + compare(1) + mips(1). 16 of the 64 slots are
-    // unreachable (address only uses 3 of its 4 values) and stay 0 -- 64 U32s is 256 bytes,
-    // and the alternative is arithmetic on every bind to compact them away.
-    static constexpr U32 KEY_BITS    = 6;
+    // Five bits: filter(2) + address(2) + compare(1). 8 of the 32 slots are unreachable
+    // (address only uses 3 of its 4 values) and stay 0 -- 32 U32s is 128 bytes, and the
+    // alternative is arithmetic on every bind to compact them away.
+    static constexpr U32 KEY_BITS    = 5;
     static constexpr U32 KEY_MASK    = (1u << KEY_BITS) - 1u;
     static constexpr U32 NUM_SAMPLERS = 1u << KEY_BITS;
 

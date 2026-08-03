@@ -118,18 +118,16 @@ void ALTexture3D::bind(S32 stage)
         return;
     }
 
-    mTextureStage = stage;
     // Bound by name, so the sampler is passed explicitly -- otherwise this samples with GL's
     // defaults. Bilinear clamp: a colour-grading LUT is interpolated and must not wrap, or
     // the ends of the ramp bleed into each other.
     gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_TEXTURE_3D, mImage->getTexName(),
-                                      false, gGL.getSampler(ALSamplers::BilinearClamp));
+                                      gGL.getSampler(ALSamplers::BilinearClamp));
 }
 
 void ALTexture3D::unbind(S32 stage)
 {
     gGL.getTexUnit(stage)->unbind(LLTexUnit::TT_TEXTURE_3D);
-    mTextureStage = -1;
 }
 
 void ALTexture3D::destroyGL()
@@ -137,7 +135,6 @@ void ALTexture3D::destroyGL()
     // LLImageGL owns the name and releases it (and its accounting) on destruction.
     mImage = nullptr;
     mWidth = mHeight = mDepth = 0;
-    mTextureStage = -1;
 }
 
 GLuint ALTexture3D::getGLName() const

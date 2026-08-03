@@ -51,17 +51,9 @@ U32 LLTexUnit::sSamplerSkips  = 0;
 U32 LLTexUnit::sTextureBinds  = 0;
 U32 LLTexUnit::sSamplerBindsFlushed = 0;
 
-static const GLint sGLAddressMode[] =
-{
-    GL_REPEAT,
-    GL_MIRRORED_REPEAT,
-    GL_CLAMP_TO_EDGE
-};
-
 LLTexUnit::LLTexUnit(S32 index)
     : mCurrTexType(TT_NONE),
     mCurrTexture(0),
-    mHasMipMaps(false),
     mIndex(index)
 {
     llassert_always(index < (S32)LL_NUM_TEXTURE_LAYERS);
@@ -174,7 +166,7 @@ void LLTexUnit::bindFast(LLTexture* texture, ALSampler key)
     // sampler is chosen from the result rather than re-fetching. LLTexUnit is a friend of
     // LLImageGL, so the mip truth is read directly.
     LLImageGL* gl_tex = texture->getGLTexture();
-    bindFastImpl(texture, gl_tex, gGL.getSampler(key, gl_tex->mHasMipMaps));
+    bindFastImpl(texture, gl_tex, gGL.getSampler(key));
 }
 
 void LLTexUnit::bindFastImpl(LLTexture* texture, LLImageGL* gl_tex, U32 sampler)
@@ -221,18 +213,10 @@ void LLTexUnit::bindFastImpl(LLTexture* texture, LLImageGL* gl_tex, U32 sampler)
     // stale target left over from earlier passes. The fast path used to skip this -- the
     // slow enable() path was the only place mCurrTexType was updated.
     mCurrTexType = gl_tex->getTarget();
-    mHasMipMaps = gl_tex->mHasMipMaps;
 }
 
-bool LLTexUnit::bind(LLTexture* texture, ALSampler key, bool for_rendering, bool forceBind)
-{
-    return bindImpl(texture, forceBind, key);
-}
-
-
-// Mask form. The sampler is named by the caller and the texture's own mode is not consulted at
-// all, which is the shape the slow path is migrating to -- the enum-pair overloads above still
-// take half their answer from the resource.
+// The sampler is named by the caller and the texture's own mode is not consulted at all --
+// it has none to consult.
 bool LLTexUnit::bindSampled(LLTexture* texture, ALSampler key, bool forceBind)
 {
     return bindImpl(texture, forceBind, key);
@@ -245,7 +229,7 @@ bool LLTexUnit::bindSampled(LLImageGL* texture, ALSampler key, bool forceBind)
     {
         return false;
     }
-    bindSampler(gGL.getSampler(key, texture->mHasMipMaps));
+    bindSampler(gGL.getSampler(key));
     return true;
 }
 
@@ -277,12 +261,11 @@ bool LLTexUnit::bindImpl(LLTexture* texture, bool forceBind, ALSampler key)
                     {
                         texture->setActive();
                     }
-                    mHasMipMaps = gl_tex->mHasMipMaps;
-                }
+                            }
                 // Outside the redundancy check on purpose: the same texture can be bound
                 // again after a pass that left a different sampler on this unit.
                 // bindSampler() no-ops when nothing changes.
-                bindSampler(gGL.getSampler(key, gl_tex->mHasMipMaps));
+                bindSampler(gGL.getSampler(key));
             }
             else
             {
@@ -352,7 +335,6 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
         glBindTexture(sGLTextureType[texture->getTarget()], mCurrTexture);
         stop_glerror();
         texture->updateBindStats();
-        mHasMipMaps = texture->mHasMipMaps;
     }
 
     // The sampler is deliberately LEFT ALONE.
@@ -398,13 +380,12 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap, ALSampler key)
             enable(LLTexUnit::TT_CUBE_MAP);
             mCurrTexture = cubeMap->mImages[0]->getTexName();
             glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
-            mHasMipMaps = cubeMap->mImages[0]->mHasMipMaps;
             cubeMap->mImages[0]->updateBindStats();
             // Named by the caller, not read off face 0. A cube map is as much a shared
             // resource as any other texture -- the environment map is sampled by every
             // shiny surface in the scene -- so which sampler a pass wants is the pass's
             // business.
-            bindSampler(gGL.getSampler(key, mHasMipMaps));
+            bindSampler(gGL.getSampler(key));
             return true;
         }
         else
@@ -432,19 +413,19 @@ bool LLTexUnit::bind(LLRenderTarget* renderTarget, bool bindDepth, U32 sampler)
         // unspecified sampler resolves to the target's default rather than to nothing, which
         // would otherwise leave these binds on GL's defaults (nearest, repeat) and quietly
         // unfilter every pass that reads a target without naming a sampler.
-        bindManual(renderTarget->getUsage(), renderTarget->getDepth(), false,
+        bindManual(renderTarget->getUsage(), renderTarget->getDepth(),
                    sampler ? sampler : renderTarget->getDefaultDepthSampler());
     }
     else
     {
-        bindManual(renderTarget->getUsage(), renderTarget->getTexture(), false,
+        bindManual(renderTarget->getUsage(), renderTarget->getTexture(),
                    sampler ? sampler : renderTarget->getDefaultColorSampler(0));
     }
 
     return true;
 }
 
-bool LLTexUnit::bindManual(eTextureType type, U32 texture, bool hasMips, U32 sampler)
+bool LLTexUnit::bindManual(eTextureType type, U32 texture, U32 sampler)
 {
     if (mIndex < 0)
     {
@@ -463,7 +444,6 @@ bool LLTexUnit::bindManual(eTextureType type, U32 texture, bool hasMips, U32 sam
         // target (LLRenderTarget::allocateColorTexture, LLCubeMap::initGL, the pipeline
         // noise/SMAA LUTs). glBindTextureUnit rejects a target-less name.
         glBindTexture(sGLTextureType[type], texture);
-        mHasMipMaps = hasMips;
     }
 
     // Outside the redundancy check: re-binding the same texture with a different sampler

@@ -46,11 +46,6 @@ public:
     //  avoids usage of LLImageRaw
     void initReflectionMap(U32 resolution, U32 components = 3);
 
-    // init from environment map images
-    // Similar to init, but takes ownership of rawimages and makes this cubemap
-    // respect the resolution of rawimages
-    // Raw images must point to array of six square images that are all the same resolution
-    void initEnvironmentMap(const std::vector<LLPointer<LLImageRaw> >& rawimages);
     void initGL();
     void initRawData(const std::vector<LLPointer<LLImageRaw> >& rawimages);
     void initGLData();

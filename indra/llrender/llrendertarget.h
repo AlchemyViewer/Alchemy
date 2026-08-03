@@ -177,15 +177,14 @@ public:
 
     // Bind an attachment for sampling.
     //
-    // filter_options and address_mode select an immutable sampler object rather than
-    // writing state onto the texture, so two passes can sample the same attachment
-    // differently in one frame -- which the post-process chain does constantly.
+    // The key selects an immutable sampler object rather than writing state onto the
+    // texture, so two passes can sample the same attachment differently in one frame --
+    // which the post-process chain does constantly.
     //
-    // address_mode defaults to the target's natural mode: TAM_MIRROR, or TAM_CLAMP for
-    // a rectangle texture, which cannot do mirrored repeat.
-    void bindTexture(U32 index, S32 channel,
-                     LLTexUnit::eTextureFilterOptions filter_options = LLTexUnit::TFO_BILINEAR,
-                     LLTexUnit::eTextureAddressMode   address_mode   = LLTexUnit::TAM_MIRROR);
+    // An unnamed key resolves through getDefaultColorSampler for THIS attachment --
+    // bilinear for 0, point for the data attachments -- rather than a flat constant that
+    // would quietly answer the question differently from the policy function.
+    void bindTexture(U32 index, S32 channel, ALSampler key = ALSamplers::TargetDefault);
 
     //flush rendering operations
     //must be called when rendering is complete

@@ -5889,7 +5889,7 @@ void LLVOAvatar::updateTextures()
             {
                 // Same shape as LLLocalTextureObject's: a bind with nothing drawn after it,
                 // touching a baked layer that has not loaded. A residency nudge, not a sample.
-                gGL.getTexUnit(0)->bind(getImage( mBakedTextureDatas[i].mTextureIndex, 0 ), ALSamplers::AnisoWrap);
+                gGL.getTexUnit(0)->bindSampled(getImage( mBakedTextureDatas[i].mTextureIndex, 0 ), ALSamplers::AnisoWrap);
             }
         }
     }

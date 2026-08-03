@@ -612,24 +612,20 @@ U32 LLRenderTarget::getNumTextures() const
     return static_cast<U32>(mTex.size());
 }
 
-void LLRenderTarget::bindTexture(U32 index, S32 channel,
-                                 LLTexUnit::eTextureFilterOptions filter_options,
-                                 LLTexUnit::eTextureAddressMode   address_mode)
+void LLRenderTarget::bindTexture(U32 index, S32 channel, ALSampler key)
 {
-    // Only mipmapped when this target generates mips; asking for a mipmapping filter on
-    // a target without them makes the texture incomplete, which samples black.
-    const bool has_mips = mGenerateMipMaps != LLTexUnit::TMG_NONE
-                          && (filter_options == LLTexUnit::TFO_TRILINEAR
-                              || filter_options == LLTexUnit::TFO_ANISOTROPIC);
-
-    // Rectangle textures have neither mips nor mirrored repeat.
-    if (mUsage == LLTexUnit::TT_RECT_TEXTURE && address_mode == LLTexUnit::TAM_MIRROR)
-    {
-        address_mode = LLTexUnit::TAM_CLAMP;
-    }
-
-    gGL.getTexUnit(channel)->bindManual(mUsage, getTexture(index), has_mips,
-                                        gGL.getSampler(al_sampler(filter_options, address_mode), has_mips));
+    // The caller's key is taken as stated. Two adjustments used to happen here and neither
+    // is needed now: a mipmapping filter was downgraded when the target had no mip chain
+    // (immutable storage makes that combination legal), and TAM_MIRROR was rewritten to
+    // TAM_CLAMP for rectangle textures, which cannot do mirrored repeat -- no target is
+    // allocated as TT_RECT_TEXTURE anywhere in the viewer, so that branch never ran.
+    //
+    // An unnamed key defers to the per-attachment policy: bilinear only for the attachment
+    // a pass reads as an image, point for the data attachments behind it, whose values mean
+    // nothing interpolated.
+    const U32 sampler = (key == ALSamplers::TargetDefault) ? getDefaultColorSampler(index)
+                                                           : gGL.getSampler(key);
+    gGL.getTexUnit(channel)->bindManual(mUsage, getTexture(index), sampler);
 }
 
 U32 LLRenderTarget::getDefaultColorSampler(U32 attachment) const
@@ -637,19 +633,10 @@ U32 LLRenderTarget::getDefaultColorSampler(U32 attachment) const
     // Attachment 0 is the one a pass normally reads as an image, so it filters. Everything
     // behind it carries data -- normals, ORM, indices -- where interpolating between texels
     // produces values that mean nothing.
-    const LLTexUnit::eTextureFilterOptions filter =
-        (attachment == 0) ? LLTexUnit::TFO_BILINEAR : LLTexUnit::TFO_POINT;
-
-    // ATI does not support mirrored repeat on rectangle textures.
-    const LLTexUnit::eTextureAddressMode address =
-        (mUsage == LLTexUnit::TT_RECT_TEXTURE) ? LLTexUnit::TAM_CLAMP : LLTexUnit::TAM_MIRROR;
-
-    // has_mips = false, matching what the replaced code produced. The old
-    // setTextureFilteringOption call read the texture unit's mHasMipMaps, and the bind that
-    // preceded it during allocation never set it -- so TFO_BILINEAR resolved to a plain
-    // GL_LINEAR minification filter, not a mipmapped one, whatever mGenerateMipMaps said. A
-    // caller that actually wants the mip chain asks for it through bindTexture.
-    return gGL.getSampler(al_sampler(filter, address), false);
+    //
+    // Mirror either way. A caller that wants something else asks for it through bindTexture.
+    return gGL.getSampler((attachment == 0) ? ALSamplers::BilinearMirror
+                                            : ALSamplers::PointMirror);
 }
 
 U32 LLRenderTarget::getDefaultDepthSampler() const
@@ -663,9 +650,9 @@ U32 LLRenderTarget::getDefaultDepthSampler() const
     // depth of the OPPOSITE edge of the screen rather than the nearest one, so the sample is
     // not merely clamped-wrong, it is geometry from somewhere else entirely.
     //
-    // The rest of the renderer already agreed: bindShadowMaps samples with TAM_CLAMP, and the
-    // SMAA predication pass binds this very texture through commonSamplers().mPointClamp. The
-    // default was the odd one out.
+    // The rest of the renderer already agreed: shadow maps sample clamped, and the SMAA
+    // predication pass binds this very texture point-clamped. The default was the odd one
+    // out.
     return gGL.getSampler(ALSamplers::PointClamp);
 }
 
@@ -680,7 +667,7 @@ void LLRenderTarget::flush()
     if (mGenerateMipMaps == LLTexUnit::TMG_AUTO)
     {
         LL_PROFILE_GPU_ZONE("rt generate mipmaps");
-        bindTexture(0, 0, LLTexUnit::TFO_TRILINEAR);
+        bindTexture(0, 0, ALSamplers::TrilinearMirror);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
 

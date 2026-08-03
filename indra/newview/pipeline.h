@@ -796,16 +796,16 @@ public:
     //noise map
     U32                 mNoiseMap;
     U32                 mTrueNoiseMap;
-    // Texture units the shadow maps are currently bound to, -1 where unused. See
-    // unbindShadowMaps -- this exists because the unit numbers are per-program.
-    std::array<S32, 6>  mBoundShadowChannels = { -1, -1, -1, -1, -1, -1 };
+    // The units the shadow maps are bound to live in LLGLSLShader::sCompareSamplerUnits --
+    // published there because LLGLSLShader::bind() is what releases them ahead of
+    // non-declaring programs; see bindShadowMaps.
 
     U32                 mLightFunc;
-    // The deferred lighting LUT wants mag=LINEAR + min=NEAREST, which no
-    // LLTexUnit::eTextureFilterOptions value covers, so it resolves through ALSamplerCache's
-    // descriptor path -- a linear scan, kept out of every deferred shader bind by memoising
-    // it here and revalidating against the cache generation (0 = unresolved). Every other
-    // fixed mode comes from gGL.commonSamplers().
+    // The deferred lighting LUT wants mag=LINEAR + min=NEAREST, which no ALSampler mask
+    // spells, so it resolves through ALSamplerCache's descriptor path -- a linear scan,
+    // kept out of every deferred shader bind by memoising it here and revalidating against
+    // the cache generation (0 = unresolved). Every other fixed mode is an ALSampler named
+    // at the bind site.
     U32                 mLightFuncSampler = 0;
     U32                 mLightFuncSamplerGeneration = 0;
 

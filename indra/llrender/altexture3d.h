@@ -72,5 +72,4 @@ protected:
     U32 mWidth = 0;
     U32 mHeight = 0;
     U32 mDepth = 0;
-    S32 mTextureStage = -1;
 };

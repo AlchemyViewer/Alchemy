@@ -56,11 +56,12 @@ protected:
 public:
     enum EOrder { ORDER_FIRST = 0, ORDER_MIDDLE = 1, ORDER_LAST = 2, ORDER_RESET = 3, ORDER_COUNT = 4 };
 
+    // No address-mode parameter: sampling state belongs to the bind, so a draw site that
+    // wants its preview clamped names a clamped sampler there (LLVisualParamHint::draw).
     LLViewerDynamicTexture(S32 width,
                      S32 height,
                      S32 components,        // = 4,
-                     EOrder order,          // = ORDER_MIDDLE,
-                     bool clamp);
+                     EOrder order);         // = ORDER_MIDDLE
 
     /*virtual*/ S8 getType() const ;
 
@@ -88,7 +89,6 @@ protected:
     void generateGLTexture(LLGLint internal_format, LLGLenum primary_format, LLGLenum type_format, bool swap_bytes = false);
 
 protected:
-    bool mClamp;
     LLCoordGL mOrigin;
     LLCamera mCamera;
 
