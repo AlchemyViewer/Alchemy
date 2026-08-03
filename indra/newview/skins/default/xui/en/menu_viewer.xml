@@ -748,6 +748,16 @@
              function="Floater.Toggle"
              parameter="fs_poser" />
         </menu_item_check>
+        <menu_item_call
+         label="Pose Stand..."
+         name="Pose Stand">
+            <menu_item_call.on_click
+             function="Floater.Show"
+             parameter="fs_posestand" />
+            <menu_item_call.on_enable
+             function="Agent.IsActionAllowed"
+             parameter="not_sitting" />
+        </menu_item_call>
         <menu_item_check
          label="Scene Explorer"
          name="Scene Explorer"

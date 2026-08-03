@@ -51,6 +51,7 @@
 #include "allegacynotificationwellwindow.h"
 
 #include "fsfloaterposer.h" // <FS:AR> [FIRE-30873]: Poser
+#include "fsfloaterposestand.h"
 
 #include "llcommandhandler.h"
 #include "llcompilequeue.h"
@@ -611,6 +612,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("webprofile", "floater_al_web_profile.xml", (LLFloaterBuildFunc)&ALFloaterWebProfile::create);
 
     LLFloaterReg::add("fs_poser", "floater_fs_poser.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSFloaterPoser>); // <FS:AR> [FIRE-30873]: Poser
+    LLFloaterReg::add("fs_posestand", "floater_fs_posestand.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<FSFloaterPoseStand>);
 
     // *NOTE: Please keep these alphabetized for easier merges
 

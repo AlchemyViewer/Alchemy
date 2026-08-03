@@ -46,6 +46,39 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALDrawDistanceVRAMOptimization</key>
+        <map>
+            <key>Comment</key>
+            <string>Reduce draw distance automatically when the texture VRAM budget is exceeded. On by default (matches this viewer's prior unconditional behavior); disable to always render at full draw distance regardless of VRAM pressure.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALFrameRateLimit</key>
+        <map>
+            <key>Comment</key>
+            <string>Target upper limit of frames per second when ALLimitFramerate is enabled.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>60</integer>
+        </map>
+        <key>ALLimitFramerate</key>
+        <map>
+            <key>Comment</key>
+            <string>Sleep at the end of each frame to cap the frame rate at ALFrameRateLimit.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALSceneExplorerActivateAction</key>
         <map>
             <key>Comment</key>

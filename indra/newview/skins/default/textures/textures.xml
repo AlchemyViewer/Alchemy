@@ -166,6 +166,7 @@ with the same filename but different name
   <texture name="Command_Picks_Icon"        file_name="toolbar_icons/picks.png"        preload="true" />
   <texture name="Command_Places_Icon"       file_name="toolbar_icons/places.png"       preload="true" />
   <texture name="Command_Poser_Icon"        file_name="toolbar_icons/poser.png"        preload="true" />
+  <texture name="Command_Pose_Stand_Icon"   file_name="toolbar_icons/posestand.png"    preload="true" />
   <texture name="Command_Preferences_Icon"  file_name="toolbar_icons/preferences.png"  preload="true" />
   <texture name="Command_Profile_Icon"      file_name="toolbar_icons/profile.png"      preload="true" />
   <texture name="Command_RegionTracker_Icon" file_name="toolbar_icons/regiontracker.png"       preload="true" />

@@ -223,7 +223,11 @@ void display_update_camera()
     }
     else if (LLViewerTexture::sDesiredDiscardBias > 2.f)
     {
-        final_far = llmax(32.f, final_far / (LLViewerTexture::sDesiredDiscardBias - 1.f));
+        static LLCachedControl<bool> vram_draw_distance_optimization(gSavedSettings, "ALDrawDistanceVRAMOptimization", true);
+        if (vram_draw_distance_optimization)
+        {
+            final_far = llmax(32.f, final_far / (LLViewerTexture::sDesiredDiscardBias - 1.f));
+        }
     }
     LLViewerCamera::getInstance()->setFar(final_far);
     LLVOAvatar::sRenderDistance = llclamp(final_far, 16.f, 256.f);
