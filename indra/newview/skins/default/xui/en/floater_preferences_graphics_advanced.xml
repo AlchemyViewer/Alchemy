@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <floater
-  height="452"
+  height="477"
   layout="topleft"
   name="prefs_graphics_advanced"
   help_topic="Preferences_Graphics_Advanced"
@@ -661,7 +661,7 @@
     layout="topleft"
     left="30"
     name="RenderPBRMaterials"
-    tool_tip="When checked, faces with a PBR (metallic-roughness) material are shaded using physically based rendering. When unchecked, such faces fall back to their legacy diffuse texture and are shaded like an ordinary Blinn-Phong material instead."
+    tool_tip="When checked, PBR (metallic-roughness) faces are shaded with physically based rendering. When unchecked, they fall back to whatever legacy diffuse texture is set on the object -- which may just be SL's default blank texture if the creator didn't provide one, since a good fallback isn't guaranteed, only an optional best practice. Draw pool routing and alpha-mask eligibility fall back too, not just the shading. Reflection probes, hero probes, screen-space reflections, and ambient occlusion are unaffected (controlled by their own settings). Takes effect on an object's next rebuild (LOD change, region change, or relog), not immediately."
     top_delta="24"
     width="300">
   </check_box>
@@ -1164,7 +1164,7 @@
       layout="topleft"
       left="13"
       name="horiz_border"
-      top="415"
+      top="440"
       top_delta="5"
       width="774"/>
   <button
