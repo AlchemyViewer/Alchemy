@@ -1301,7 +1301,7 @@ void MediaPluginCEF::receiveMessage(const std::string& message_string)
                 // Accelerated paint copies the BGRA shared texture into the media
                 // texture with glCopyImageSubData, which needs matching 32-bit
                 // (RGBA8) storage; the CPU path uploads BGRA into RGB as before.
-                message.setValueU32("internalformat", mUseAcceleratedPaint ? GL_RGBA8 : GL_RGB);
+                message.setValueU32("internalformat", mUseAcceleratedPaint ? GL_RGBA8 : GL_RGB8);
                 message.setValueU32("format", GL_BGRA);
                 message.setValueU32("type", GL_UNSIGNED_BYTE);
                 message.setValueBoolean("coords_opengl", true);

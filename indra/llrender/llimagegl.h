@@ -123,6 +123,11 @@ public:
 
     static bool checkSize(S32 width, S32 height);
 
+    // Number of mip levels in a full pyramid for these level-0 dimensions, counting
+    // level 0 itself: 256x256 -> 9. This is a COUNT, which is what glTexStorage* takes.
+    // Each dimension clamps at 1 independently, so 1024x16 is 11 levels, not 5.
+    static S32 calcMipLevelCount(S32 width, S32 height);
+
     //for server side use only.
     // Not currently necessary for LLImageGL, but required in some derived classes,
     // so include for compatability
@@ -171,6 +176,11 @@ public:
     // (llrendertarget, manip tools, drawpoolbump scratch uploads, etc.)
     // keep their existing single-level accounting.
     static void setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels, bool has_mips = false);
+
+    // Upload one level into a texture that already has storage. Unlike setManualImage
+    // this allocates nothing and does no VRAM accounting, so it is legal on immutable
+    // storage. The caller must have allocated with a compatible format and size.
+    static void setManualSubImage(U32 target, S32 miplevel, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels);
 
     // Apply the GL_TEXTURE_SWIZZLE_RGBA mask that re-expresses a deprecated
     // source format on the currently-bound texture as samplable RGBA.
@@ -303,9 +313,23 @@ private:
     static void resolveUploadFormat(S32& intformat, U32& pixformat, U32& pixtype,
                                     const void*& pixels, S32 width, S32 height);
 
+    // Allocate backing storage for the currently-bound texture at the given level-0
+    // size, and record its VRAM accounting. Sets mMipLevels. Callers replacing an
+    // existing texture must release the old accounting themselves.
+    void allocateTextureStorage(S32 width, S32 height, bool has_mips);
+
+    // Whether this texture can use immutable storage, and if not, why. Single decision
+    // point shared by allocateTextureStorage and setImage so the rule and its diagnostic
+    // cannot drift. Returns EMutableCause::None when immutable storage is usable.
+    enum class EMutableCause classifyImmutableStorage() const;
+
+    // Internal format to hand glTexStorage*. Block-compressed textures keep their sized
+    // compressed format in mFormatPrimary rather than mFormatInternal.
+    S32 getStorageInternalFormat() const;
+
     U32 createPickMask(S32 pWidth, S32 pHeight);
     void freePickMask();
-    bool isCompressed();
+    bool isCompressed() const;
 
     LLPointer<LLImageRaw> mSaveData; // used for destroyGL/restoreGL
     LL::WorkQueue::weak_t mMainQueue;
@@ -323,6 +347,10 @@ private:
 
     bool     mGLTextureCreated ;
     LLGLuint mTexName;
+    // Whether mTexName was allocated with glTexStorage2D. Immutable textures cannot be
+    // reallocated, so uploads must be sub-image writes and any size or format change has
+    // to build a new texture object. Reset whenever a fresh texture name is bound.
+    bool     mImmutableStorage = false;
     U16      mWidth;
     U16      mHeight;
     S8       mCurrentDiscardLevel;
@@ -404,6 +432,13 @@ public:
     S32  getCategory()const {return mCategory;}
 
     void setTexName(GLuint texName) { mTexName = texName; }
+
+    // Declare that this image's texture object already has immutable storage, allocated
+    // by whoever owns it. Needed where one GL texture is shared by several LLImageGL
+    // objects and no individual object is in a position to allocate: glTexStorage2D on
+    // GL_TEXTURE_CUBE_MAP allocates all six faces in one call, so LLCubeMap makes it and
+    // the six per-face objects only ever write sub-images.
+    void markStorageAllocated() { mImmutableStorage = true; }
 
     //similar to setTexName, but will call deleteTextures on mTexName if mTexName is not 0 or texname
     void syncTexName(LLGLuint texname);

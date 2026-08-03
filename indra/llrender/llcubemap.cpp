@@ -76,15 +76,42 @@ void LLCubeMap::initGL()
 
             LLImageGL::generateTextures(1, &texname);
 
+        #if USE_SRGB_DECODE
+            const S32 internal_format = mIssRGB ? GL_SRGB8_ALPHA8 : GL_RGBA8;
+        #else
+            const S32 internal_format = GL_RGBA8;
+        #endif
+
+            // Allocate the whole cube up front. glTexStorage2D on GL_TEXTURE_CUBE_MAP
+            // allocates all six faces in a single call, and may only be called once for
+            // the object -- so it has to happen here rather than inside the per-face
+            // loop. The faces are then told storage exists, which makes their uploads
+            // sub-image writes instead of allocations.
+            bool immutable = false;
+            if (gGLManager.mHasTextureStorage)
+            {
+                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
+                glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, RESOLUTION, RESOLUTION);
+                // count of 6: alloc_tex_image's count covers cube faces. The per-face
+                // path used to account one face at a time onto the same texture name,
+                // each call releasing the last, so only one face's worth was ever
+                // recorded for the whole cube.
+                LLImageGLMemory::alloc_tex_image(RESOLUTION, RESOLUTION, internal_format, 6, false);
+                immutable = true;
+                stop_glerror();
+            }
+
             for (int i = 0; i < 6; i++)
             {
                 mImages[i] = new LLImageGL(RESOLUTION, RESOLUTION, 4, false);
-            #if USE_SRGB_DECODE
-                if (mIssRGB) {
-                    mImages[i]->setExplicitFormat(GL_SRGB8_ALPHA8, GL_RGBA);
-                }
-            #endif
+                // Explicit either way, so each face's format matches the storage exactly
+                // rather than relying on the auto-format switch agreeing with it.
+                mImages[i]->setExplicitFormat(internal_format, GL_RGBA);
                 mImages[i]->setTarget(mTargets[i], LLTexUnit::TT_CUBE_MAP);
+                if (immutable)
+                {
+                    mImages[i]->markStorageAllocated();
+                }
                 mRawImages[i] = new LLImageRaw(RESOLUTION, RESOLUTION, 4);
                 if (!mImages[i]->createGLTexture(0, mRawImages[i], texname))
                 {

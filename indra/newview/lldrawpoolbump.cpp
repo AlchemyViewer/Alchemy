@@ -819,7 +819,7 @@ void LLBumpImageList::onSourceStandardLoaded( bool success, LLViewerFetchedTextu
         {
             generateNormalMapFromAlpha(src, nrm_image);
         }
-        src_vi->setExplicitFormat(GL_RGBA, GL_RGBA);
+        src_vi->setExplicitFormat(GL_RGBA8, GL_RGBA);
         {
             if (!src_vi->createGLTexture(src_vi->getDiscardLevel(), nrm_image))
             {

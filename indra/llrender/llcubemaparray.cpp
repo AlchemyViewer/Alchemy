@@ -168,19 +168,33 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
     {
         format = components == 4 ? GL_RGBA8 : GL_RGB8;
     }
-    U32 mip = 0;
-    U32 mip_resolution = resolution;
-    while (mip_resolution >= 1)
+    // One allocation for the whole array. glTexStorage3D covers every layer and mip in a
+    // single call and may only be called once for the object, so it replaces the per-mip
+    // glTexImage3D loop rather than sitting inside it. Every format above is sized, which
+    // is what glTexStorage3D requires.
+    if (gGLManager.mHasTextureStorage)
     {
-        glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, mip, format, mip_resolution, mip_resolution, count * 6, 0,
-            GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-        if (!use_mips)
+        const S32 levels = use_mips ? LLImageGL::calcMipLevelCount(resolution, resolution) : 1;
+        glTexStorage3D(GL_TEXTURE_CUBE_MAP_ARRAY, levels, format, resolution, resolution, count * 6);
+        mImage->markStorageAllocated();
+        stop_glerror();
+    }
+    else
+    {
+        U32 mip = 0;
+        U32 mip_resolution = resolution;
+        while (mip_resolution >= 1)
         {
-            break;
+            glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, mip, format, mip_resolution, mip_resolution, count * 6, 0,
+                GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+            if (!use_mips)
+            {
+                break;
+            }
+            mip_resolution /= 2;
+            ++mip;
         }
-        mip_resolution /= 2;
-        ++mip;
     }
 
     alloc_tex_image(resolution, resolution, format, count * 6, use_mips);

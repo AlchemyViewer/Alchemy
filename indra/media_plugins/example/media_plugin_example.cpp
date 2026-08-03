@@ -182,7 +182,7 @@ void mediaPluginExample::receiveMessage(const std::string& message_string)
                 message.setValueS32("default_width", 1024);
                 message.setValueS32("default_height", 1024);
                 message.setValueS32("depth", mDepth);
-                message.setValueU32("internalformat", GL_RGB);
+                message.setValueU32("internalformat", GL_RGB8);
                 message.setValueU32("format", GL_RGBA);
                 message.setValueU32("type", GL_UNSIGNED_BYTE);
                 message.setValueBoolean("coords_opengl", true);
