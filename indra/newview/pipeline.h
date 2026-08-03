@@ -40,6 +40,7 @@
 #include "lldrawpoolmaterials.h"
 #include "llgl.h"
 #include "lldrawable.h"
+#include "altexture3d.h"
 #include "llrendertarget.h"
 #include "llreflectionmapmanager.h"
 #include "llheroprobemanager.h"
@@ -953,7 +954,7 @@ protected:
     // Note: no need to keep an quick-lookup to avatar pools, since there's only one per avatar
 
     // Color grading lookup texture and size
-    U32       mCGLut{};
+    LLPointer<ALTexture3D> mCGLut;
     LLVector4 mCGLutSize{};
 
 public:

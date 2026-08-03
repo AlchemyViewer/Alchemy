@@ -177,6 +177,16 @@ public:
     // keep their existing single-level accounting.
     static void setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels, bool has_mips = false);
 
+    // Allocate a single-level 2D texture on the currently-bound name and upload it.
+    // Unlike setManualImage, which allocates one mip level per call, this owns the whole
+    // texture: call it exactly once per texture object, and build a new texture rather
+    // than resizing or reformatting this one. pixels may be null to allocate only.
+    // levels is the mip level COUNT; storage is allocated for all of them on both the
+    // immutable and mutable paths, so levels 1+ can be filled with setManualSubImage.
+    static void allocateTexture2D(U32 target, S32 intformat, S32 width, S32 height,
+                                  U32 pixformat, U32 pixtype, const void *pixels,
+                                  S32 levels = 1);
+
     // Upload one level into a texture that already has storage. Unlike setManualImage
     // this allocates nothing and does no VRAM accounting, so it is legal on immutable
     // storage. The caller must have allocated with a compatible format and size.

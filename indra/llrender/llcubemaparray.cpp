@@ -226,6 +226,13 @@ void LLCubeMapArray::unbind()
     mTextureStage = -1;
 }
 
+void LLCubeMapArray::copyFaceFromFramebuffer(S32 mip, S32 cube_index, S32 face, S32 res)
+{
+    // Sub-image write, so this stays legal now that the array has immutable storage.
+    glCopyTexSubImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, cube_index * 6 + face, 0, 0, res, res);
+    stop_glerror();
+}
+
 GLuint LLCubeMapArray::getGLName()
 {
     return mImage->getTexName();

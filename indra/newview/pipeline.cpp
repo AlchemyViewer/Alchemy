@@ -1397,7 +1397,7 @@ void LLPipeline::createGLBuffers()
         LLImageGL::generateTextures(1, &mNoiseMap);
 
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap);
-        LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise, false);
+        LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise);
         gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
     }
 
@@ -1412,7 +1412,7 @@ void LLPipeline::createGLBuffers()
 
         LLImageGL::generateTextures(1, &mTrueNoiseMap);
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap);
-        LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB16F, noiseRes, noiseRes, GL_RGB,GL_FLOAT, noise, false);
+        LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise);
         gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
     }
 
@@ -1428,8 +1428,8 @@ void LLPipeline::createGLBuffers()
 
         LLImageGL::generateTextures(1, &mSMAAAreaMap);
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSMAAAreaMap);
-        LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RG8, AREATEX_WIDTH, AREATEX_HEIGHT, GL_RG,
-            GL_UNSIGNED_BYTE, tempBuffer.data(), false);
+        LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_RG8, AREATEX_WIDTH, AREATEX_HEIGHT, GL_RG,
+            GL_UNSIGNED_BYTE, tempBuffer.data());
         gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
         gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
     }
@@ -1446,8 +1446,8 @@ void LLPipeline::createGLBuffers()
 
         LLImageGL::generateTextures(1, &mSMAASearchMap);
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASearchMap);
-        LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_R8, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT,
-            GL_RED, GL_UNSIGNED_BYTE, tempBuffer.data(), false);
+        LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_R8, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT,
+            GL_RED, GL_UNSIGNED_BYTE, tempBuffer.data());
         gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
         gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
     }
@@ -1479,8 +1479,8 @@ void LLPipeline::createGLBuffers()
             };
             LLImageGL::generateTextures(1, &mSMAASampleMap);
             gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASampleMap);
-            LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, GL_RGB, raw_image->getWidth(),
-                raw_image->getHeight(), format, GL_UNSIGNED_BYTE, raw_image->getData(), false);
+            LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_RGB8, raw_image->getWidth(),
+                raw_image->getHeight(), format, GL_UNSIGNED_BYTE, raw_image->getData());
             stop_glerror();
             gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
             gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
@@ -1553,7 +1553,7 @@ void LLPipeline::createLUTBuffers()
 #endif
         LLImageGL::generateTextures(1, &mLightFunc);
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc);
-        LLImageGL::setManualImage(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), 0, pix_format, lightResX, lightResY, GL_RED, GL_FLOAT, ls, false);
+        LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), pix_format, lightResX, lightResY, GL_RED, GL_FLOAT, ls);
         gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
         gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_TRILINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -1600,11 +1600,7 @@ void LLPipeline::createLUTBuffers()
 
 void LLPipeline::setupGradingLUT()
 {
-    if (mCGLut)
-    {
-        LLImageGL::deleteTextures(1, &mCGLut);
-        mCGLut = 0;
-    }
+    mCGLut = nullptr;
 
     std::string lut_name = gSavedSettings.getString("RenderColorGradeLUT");
     if (gSavedSettings.getBOOL("RenderColorGrade") && !lut_name.empty())
@@ -1761,17 +1757,16 @@ void LLPipeline::setupGradingLUT()
                 {
                     mCGLutSize = LLVector4((F32)image_height, (F32)flip_green, (F32)swap_bluegreen);
 
-                    LLImageGL::generateTextures(1, &mCGLut);
-                    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
+                    // The LUT is a cube of side image_height, stored in the raw image
+                    // as image_height slices laid out horizontally.
+                    mCGLut = new ALTexture3D();
+                    if (!mCGLut->allocate(image_height, image_height, image_height,
+                                          int_format, primary_format, GL_UNSIGNED_BYTE,
+                                          raw_image->getData()))
                     {
-                        stop_glerror();
-                        glTexImage3D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE_3D), 0, int_format, image_height, image_height,
-                                        image_height, 0, primary_format, GL_UNSIGNED_BYTE, raw_image->getData());
-                        stop_glerror();
+                        LL_WARNS() << "Failed to allocate color grading LUT texture." << LL_ENDL;
+                        mCGLut = nullptr;
                     }
-                    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-                    gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-                    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
                 }
                 else
                 {
@@ -7741,14 +7736,12 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         S32 cglut_channel = -1;
         if (color_grade)
         {
-            if (mCGLut != 0)
+            if (mCGLut.notNull())
             {
                 cglut_channel = shader->getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
                 if (cglut_channel > -1)
                 {
-                    gGL.getTexUnit(cglut_channel)->bindManual(LLTexUnit::TT_TEXTURE_3D, mCGLut);
-                    gGL.getTexUnit(cglut_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-                    gGL.getTexUnit(cglut_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                    mCGLut->bind(cglut_channel);
                 }
 
                 shader->uniform4fv(LLShaderMgr::COLOR_GRADE_LUT_SIZE, 1, mCGLutSize.mV);
@@ -7881,9 +7874,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         mScreenTriangleVB->setBuffer();
         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-        if (cglut_channel > -1)
+        if (cglut_channel > -1 && mCGLut.notNull())
         {
-            gGL.getTexUnit(cglut_channel)->unbind(LLTexUnit::TT_TEXTURE_3D);
+            mCGLut->unbind(cglut_channel);
         }
         if (exposure_channel > -1)
         {

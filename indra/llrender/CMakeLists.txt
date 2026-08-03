@@ -1,6 +1,7 @@
 # -*- cmake -*-
 
 set(llrender_SOURCE_FILES
+    altexture3d.cpp
     alfontcolrv1.cpp
     alfontface.cpp
     alfontshaping.cpp
@@ -29,6 +30,7 @@ set(llrender_SOURCE_FILES
     )
 
 set(llrender_HEADER_FILES
+    altexture3d.h
     alfontcolrv1.h
     alfontface.h
     alfontshaping.h

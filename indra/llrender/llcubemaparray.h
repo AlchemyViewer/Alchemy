@@ -57,6 +57,11 @@ public:
     void bind(S32 stage);
     void unbind();
 
+    // Copy a res x res region out of the current read framebuffer into one face of one
+    // cube in the array. The array must already be bound -- callers bind to differing
+    // stages, so the bind stays theirs.
+    void copyFaceFromFramebuffer(S32 mip, S32 cube_index, S32 face, S32 res);
+
     GLuint getGLName();
 
     void destroyGL();

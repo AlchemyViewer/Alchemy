@@ -444,6 +444,27 @@ static bool isSizedInternalFormat(S32 intformat)
     }
 }
 
+// Whether a texture with this target and internal format can use immutable storage,
+// and if not, why. Shared by LLImageGL instances and by the static allocateTexture2D,
+// so the rule and the diagnostic keyed off it cannot drift apart.
+static EMutableCause classifyStorage(U32 target, S32 intformat)
+{
+    if (!gGLManager.mHasTextureStorage)
+    {
+        return EMutableCause::NoDriverSupport;
+    }
+    if (target != GL_TEXTURE_2D)
+    {
+        return EMutableCause::NonTexture2D;
+    }
+    if (!isSizedInternalFormat(intformat))
+    {
+        return EMutableCause::UnsizedFormat;
+    }
+    return EMutableCause::None;
+}
+
+
 //static
 S32 LLImageGL::dataFormatBits(S32 dataformat)
 {
@@ -1683,6 +1704,70 @@ void LLImageGL::setManualSubImage(U32 target, S32 miplevel, S32 width, S32 heigh
     stop_glerror();
 }
 
+// Allocate a 2D texture on the currently-bound name and upload level 0.
+//
+// Unlike setManualImage, which allocates one mip level per call, this owns the whole
+// texture: call it exactly once per texture object. The result cannot then be resized or
+// reformatted -- build a new texture instead. That is the contract glTexStorage2D imposes,
+// and the one D3D11 requires of every resource.
+//
+// levels is the mip level COUNT (see calcMipLevelCount). Storage is allocated for all of
+// them on both paths, so the caller can fill levels 1+ with setManualSubImage regardless
+// of whether immutable storage was available.
+//
+// pixels may be null to allocate without uploading.
+void LLImageGL::allocateTexture2D(U32 target, S32 intformat, S32 width, S32 height,
+                                  U32 pixformat, U32 pixtype, const void* pixels, S32 levels)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+
+    levels = llmax(1, levels);
+
+    resolveUploadFormat(intformat, pixformat, pixtype, pixels, width, height);
+
+    free_cur_tex_image();
+
+    const EMutableCause cause = classifyStorage(target, intformat);
+    if (cause == EMutableCause::None)
+    {
+        LL_PROFILE_ZONE_NAMED("glTexStorage2D");
+        glTexStorage2D(target, levels, intformat, width, height);
+
+        if (pixels != nullptr)
+        {
+            if (should_stagger_image_set(false))
+            {
+                sub_image_lines(target, 0, 0, 0, width, height, pixformat, pixtype, (const U8*)pixels, width);
+            }
+            else
+            {
+                glTexSubImage2D(target, 0, 0, 0, width, height, pixformat, pixtype, pixels);
+            }
+        }
+    }
+    else
+    {
+        LL_PROFILE_ZONE_NAMED("glTexImage2D alloc + copy");
+        reportMutableAllocation(cause, target, intformat);
+
+        // Allocate every level here too, so a caller filling the mip chain with
+        // setManualSubImage behaves identically on both paths. glTexImage2D would
+        // otherwise leave levels 1+ without storage for the sub-image writes to land in.
+        S32 w = width;
+        S32 h = height;
+        for (S32 level = 0; level < levels; ++level)
+        {
+            glTexImage2D(target, level, intformat, w, h, 0, pixformat, pixtype,
+                         level == 0 ? pixels : nullptr);
+            w = llmax(1, w >> 1);
+            h = llmax(1, h >> 1);
+        }
+    }
+
+    alloc_tex_image(width, height, intformat, 1, levels > 1);
+    stop_glerror();
+}
+
 void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels, bool has_mips)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -2860,19 +2945,7 @@ void LLImageGL::resetCurTexSizebar()
 // diagnostic below it cannot drift apart. Reports the reason when it says no.
 EMutableCause LLImageGL::classifyImmutableStorage() const
 {
-    if (!gGLManager.mHasTextureStorage)
-    {
-        return EMutableCause::NoDriverSupport;
-    }
-    if (mTarget != GL_TEXTURE_2D)
-    {
-        return EMutableCause::NonTexture2D;
-    }
-    if (!isSizedInternalFormat(getStorageInternalFormat()))
-    {
-        return EMutableCause::UnsizedFormat;
-    }
-    return EMutableCause::None;
+    return classifyStorage(mTarget, getStorageInternalFormat());
 }
 
 // The internal format glTexStorage* should be handed. Block-compressed textures carry

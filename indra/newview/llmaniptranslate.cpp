@@ -177,6 +177,11 @@ void LLManipTranslate::restoreGL()
     gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, sGridTex->getTexName(), true);
     gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_TRILINEAR);
 
+    // Allocate the whole mip chain up front: immutable storage is allocated once for the
+    // texture, before any level is written, so it cannot happen inside the loop below.
+    LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, rez, rez, GL_RGBA, GL_UNSIGNED_BYTE,
+                                 nullptr, LLImageGL::calcMipLevelCount(rez, rez));
+
     while (rez >= 1)
     {
         for (U32 i = 0; i < rez*rez; i++)
@@ -270,7 +275,7 @@ void LLManipTranslate::restoreGL()
                 }
             }
         }
-        LLImageGL::setManualImage(GL_TEXTURE_2D, mip, GL_RGBA, rez, rez, GL_RGBA, GL_UNSIGNED_BYTE, d);
+        LLImageGL::setManualSubImage(GL_TEXTURE_2D, mip, rez, rez, GL_RGBA, GL_UNSIGNED_BYTE, d);
         rez = rez >> 1;
         mip++;
     }
