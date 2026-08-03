@@ -85,7 +85,7 @@ void main()
     vec4 spec = vec4(0,0,0,0);
     sampleReflectionProbesLegacy(ambenv, glossenv, legacyenv, vec2(0), pos.xyz, norm.xyz, spec.a, env_intensity, false, amblit);
 
-    color.rgb = srgb_to_linear(color.rgb);
+    // Diffuse arrived linear (decoded on the sampler), tint linearised in the vertex stage.
 
     applyLegacyEnv(color.rgb, legacyenv, spec, pos, norm, env_intensity);
 #endif

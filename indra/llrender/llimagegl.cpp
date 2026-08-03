@@ -341,6 +341,7 @@ static bool isSizedInternalFormat(S32 intformat)
     case GL_RG8:
     case GL_RGB8:
     case GL_RGBA8:
+    case GL_SRGB8:
     case GL_SRGB8_ALPHA8:
     case GL_RGB10_A2:
     case GL_R11F_G11F_B10F:
@@ -452,6 +453,7 @@ S32 LLImageGL::dataFormatBits(S32 dataformat)
     case GL_RGB:                                    return 24;
     case GL_SRGB:                                   return 24;
     case GL_RGB8:                                   return 24;
+    case GL_SRGB8:                                  return 24;
     case GL_R11F_G11F_B10F:                         return 32;
     case GL_RGBA:                                   return 32;
     case GL_RGBA8:                                  return 32;
@@ -511,6 +513,7 @@ S32 LLImageGL::dataFormatVRAMBits(S32 dataformat)
     switch (dataformat)
     {
     case GL_RGB8:                   return 32;  // padded to RGBX
+    case GL_SRGB8:                  return 32;  // padded, as GL_RGB8
     case GL_RGB16F:                 return 64;  // padded to RGBA16F
     case GL_RGB32F:                 return 128; // padded to RGBA32F
     case GL_DEPTH_COMPONENT24:      return 32;  // padded to 32-bit
@@ -1759,12 +1762,23 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
             mFormatType = GL_UNSIGNED_BYTE;
             break;
         case 3:
-            mFormatInternal = GL_RGB8;
+            // sRGB, not linear. The bits are identical either way -- an 8-bit texture
+            // uploaded from a JPEG2000/PNG/TGA asset already holds sRGB-encoded values --
+            // so this changes nothing about what is stored, only whether GL is willing to
+            // decode it. Sampling is unaffected unless a bind asks for the decode with
+            // ALSampler::SRGBDecode, and nothing does by default.
+            //
+            // Worth stating why it cannot be narrowed to colour textures: the same
+            // LLViewerFetchedTexture object serves whichever glTF slot references its UUID
+            // (see fetch_texture), so one image can be base colour for one material and a
+            // normal map for another. The format cannot know; only the bind can. Which is
+            // exactly the split the sampler work established.
+            mFormatInternal = GL_SRGB8;
             mFormatPrimary = GL_RGB;
             mFormatType = GL_UNSIGNED_BYTE;
             break;
         case 4:
-            mFormatInternal = GL_RGBA8;
+            mFormatInternal = GL_SRGB8_ALPHA8;
             mFormatPrimary = GL_RGBA;
             mFormatType = GL_UNSIGNED_BYTE;
             break;

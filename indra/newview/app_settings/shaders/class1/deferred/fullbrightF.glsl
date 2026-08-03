@@ -80,7 +80,8 @@ void main()
 
     color.a = final_alpha;
 #ifndef IS_HUD
-    color.rgb = srgb_to_linear(color.rgb);
+    // Diffuse arrived linear (decoded on the sampler) and the tint was linearised in the
+    // vertex stage, so color is already linear here.
 #ifdef IS_ALPHA
 
     vec3 sunlit;

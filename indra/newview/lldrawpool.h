@@ -129,6 +129,19 @@ public:
     bool mSkipRender;
 };
 
+// Diffuse sampler for the legacy G-buffer writers that have been converted to shade in
+// linear. Hardware decodes the colour texture, the shader linearises the prim tint in its
+// vertex stage, and GL_FRAMEBUFFER_SRGB re-encodes on store -- all three together, or the
+// pass renders at the wrong gamma.
+//
+// Converted so far: diffuse, diffusealphamask, bump, tree, terrain (the texture path; the
+// PBR terrain branch already enabled FRAMEBUFFER_SRGB on its own). The rest still write the
+// sRGB texel through unchanged and take the AnisoWrap default.
+//
+// Data textures never take this even in a converted pass -- terrain's alpha_ramp is a mask
+// read through .a, and alpha is not part of the sRGB transfer function anyway.
+inline constexpr ALSampler DIFFUSE_SRGB_SAMPLER = ALSamplers::AnisoWrap | ALSampler::SRGBDecode;
+
 class LLRenderPass : public LLDrawPool
 {
 public:
@@ -375,11 +388,21 @@ public:
     //
     // So: a NEW compare sampler, or any depth texture bound outside that tracking, breaks
     // this. Publish it in the same mask rather than clearing the tail here.
-    static void bindIndexedTextures(const LLDrawInfo& params, const LLGLSLShader* shader);
-    void pushBatches(U32 type, bool texture = true, bool batch_textures = false);
+    //
+    // The diffuse sampler is named by the caller. Most legacy passes still want the plain
+    // AnisoWrap default: they write the sRGB texel straight into the G-buffer and let the
+    // lighting pass's decode close the loop. The passes that have been converted to linear
+    // shading pass AnisoWrap|SRGBDecode instead, and must also enable GL_FRAMEBUFFER_SRGB so
+    // the linear result is re-encoded on store. The two go together -- one without the other
+    // is a whole pass rendered at the wrong gamma.
+    static void bindIndexedTextures(const LLDrawInfo& params, const LLGLSLShader* shader,
+                                    ALSampler key = ALSamplers::AnisoWrap);
+    void pushBatches(U32 type, bool texture = true, bool batch_textures = false,
+                     ALSampler key = ALSamplers::AnisoWrap);
     void pushUntexturedBatches(U32 type);
 
-    void pushRiggedBatches(U32 type, bool texture = true, bool batch_textures = false);
+    void pushRiggedBatches(U32 type, bool texture = true, bool batch_textures = false,
+                           ALSampler key = ALSamplers::AnisoWrap);
     void pushUntexturedRiggedBatches(U32 type);
 
     // push full GLTF batches
@@ -434,8 +457,10 @@ public:
     static void pushUntexturedGLTFBatch(LLDrawInfo& params);
     static void pushUntexturedRiggedGLTFBatch(LLDrawInfo& params, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin);
 
-    void pushMaskBatches(U32 type, bool texture = true, bool batch_textures = false);
-    void pushRiggedMaskBatches(U32 type, bool texture = true, bool batch_textures = false);
+    void pushMaskBatches(U32 type, bool texture = true, bool batch_textures = false,
+                         ALSampler key = ALSamplers::AnisoWrap);
+    void pushRiggedMaskBatches(U32 type, bool texture = true, bool batch_textures = false,
+                               ALSampler key = ALSamplers::AnisoWrap);
     // indexed (multi-material) legacy material shadow alpha-mask: binds per-slot
     // diffuse + per-slot cutoff array, then draws. Assumes the indexed material
     // shadow program is bound.
@@ -448,9 +473,11 @@ public:
     // unit s and draws under the indexed emissive program.
     void pushEmissiveBatchesScalar(U32 type, bool rigged);
     void pushEmissiveBatchesIndexed(U32 type, bool rigged);
-    void pushBatch(LLDrawInfo& params, bool texture, bool batch_textures = false);
+    void pushBatch(LLDrawInfo& params, bool texture, bool batch_textures = false,
+                   ALSampler key = ALSamplers::AnisoWrap);
     void pushUntexturedBatch(LLDrawInfo& params);
-    void pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_textures = false);
+    void pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_textures = false,
+                       ALSampler key = ALSamplers::AnisoWrap);
     static bool uploadMatrixPalette(LLDrawInfo& params);
     static bool uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinInfo);
     static bool uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinInfo, const LLVOAvatar*& lastAvatar, U64& lastMeshId, bool& skipLastSkin);

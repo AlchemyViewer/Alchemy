@@ -10067,8 +10067,9 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     {
         if (img)
         {
-            // Projector cookie: carries LLImageGL's defaults, as it always has.
-            gGL.getTextureSlot(channel)->bindSampled(img, ALSamplers::AnisoWrap);
+            // Projector cookie: an sRGB colour texture, decoded on the sampler so the
+            // projected light filters in linear -- deferredUtil no longer decodes it in-shader.
+            gGL.getTextureSlot(channel)->bindSampled(img, ALSamplers::AnisoWrap | ALSampler::SRGBDecode);
 
             F32 lod_range = logf((F32)img->getWidth())/logf(2.f);
 
@@ -12006,7 +12007,15 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
                 || resX != avatar->mImpostor.getWidth()
                 || resY != avatar->mImpostor.getHeight())
             {
-                avatar->mImpostor.allocate(resX, resY, GL_RGBA8, true);
+                // sRGB, matching deferredScreen. renderGeomDeferred() runs the ordinary
+                // G-buffer pools into this target for the avatar's attachments, and those
+                // passes shade in linear and rely on GL_FRAMEBUFFER_SRGB to encode on store.
+                // A plain GL_RGBA8 attachment gives that enable nothing to act on, so the
+                // linear result would be stored raw and then decoded a second time when
+                // impostor.slang feeds it back into the real G-buffer -- attachments on
+                // impostored avatars rendering too dark. That was already true for PBR
+                // attachments, which enable FRAMEBUFFER_SRGB in LLDrawPoolPBROpaque.
+                avatar->mImpostor.allocate(resX, resY, GL_SRGB8_ALPHA8, true);
 
                 if (LLPipeline::sRenderDeferred)
                 {

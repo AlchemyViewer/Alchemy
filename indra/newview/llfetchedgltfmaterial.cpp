@@ -73,7 +73,18 @@ LLFetchedGLTFMaterial& LLFetchedGLTFMaterial::operator=(const LLFetchedGLTFMater
 // before through LLImageGL's defaults -- so this names existing behaviour rather than changing
 // it. SL's material subset carries no sampler fields yet; when it does, this constant becomes a
 // lookup into the material.
-static constexpr ALSampler GLTF_MAP_SAMPLER = ALSamplers::AnisoWrap;
+// glTF splits its maps into colour and data, and so does the sampler.
+//
+// Base colour and emissive hold sRGB-encoded colour; the hardware decodes them, which is
+// strictly better than the shader doing it because GL converts each texel BEFORE filtering.
+// Converting afterwards linearises an average taken in sRGB space, and those are not the
+// same -- srgb_to_linear(lerp(a,b,t)) != lerp(srgb_to_linear(a), srgb_to_linear(b), t) --
+// which is what made minified albedo read too dark. The matching srgb_to_linear() calls in
+// the PBR shaders are gone; keeping both would convert twice.
+//
+// Normal and ORM are measurements, not colour. They keep the default, which decodes nothing.
+static constexpr ALSampler GLTF_COLOR_SAMPLER = ALSamplers::AnisoWrap | ALSampler::SRGBDecode;
+static constexpr ALSampler GLTF_DATA_SAMPLER  = ALSamplers::AnisoWrap;
 
 void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
 {
@@ -98,11 +109,11 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
 
     if (baseColorTex != nullptr)
     {
-        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, baseColorTex, GLTF_MAP_SAMPLER);
+        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, baseColorTex, GLTF_COLOR_SAMPLER);
     }
     else
     {
-        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_MAP_SAMPLER);
+        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_COLOR_SAMPLER);
     }
 
     F32 base_color_packed[8];
@@ -113,29 +124,29 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
     {
         if (mNormalTexture.notNull() && mNormalTexture->getDiscardLevel() <= 4)
         {
-            shader->bindTexture(LLShaderMgr::BUMP_MAP, mNormalTexture, GLTF_MAP_SAMPLER);
+            shader->bindTexture(LLShaderMgr::BUMP_MAP, mNormalTexture, GLTF_DATA_SAMPLER);
         }
         else
         {
-            shader->bindTexture(LLShaderMgr::BUMP_MAP, LLViewerFetchedTexture::sFlatNormalImagep, GLTF_MAP_SAMPLER);
+            shader->bindTexture(LLShaderMgr::BUMP_MAP, LLViewerFetchedTexture::sFlatNormalImagep, GLTF_DATA_SAMPLER);
         }
 
         if (mMetallicRoughnessTexture.notNull())
         {
-            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, mMetallicRoughnessTexture, GLTF_MAP_SAMPLER); // PBR linear packed Occlusion, Roughness, Metal.
+            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, mMetallicRoughnessTexture, GLTF_DATA_SAMPLER); // PBR linear packed Occlusion, Roughness, Metal.
         }
         else
         {
-            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_MAP_SAMPLER);
+            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_DATA_SAMPLER);
         }
 
         if (emissiveTex != nullptr)
         {
-            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, emissiveTex, GLTF_MAP_SAMPLER);  // PBR sRGB Emissive
+            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, emissiveTex, GLTF_COLOR_SAMPLER);  // PBR sRGB Emissive
         }
         else
         {
-            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_MAP_SAMPLER);
+            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_COLOR_SAMPLER);
         }
 
         // NOTE: base color factor is baked into vertex stream

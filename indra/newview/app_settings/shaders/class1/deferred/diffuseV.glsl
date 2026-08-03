@@ -48,6 +48,22 @@ uniform mat4 projection_matrix;
 
 #endif
 
+// Linearise a prim tint for a pass that shades in linear. Defined here rather than shared
+// from environment/srgbF, which attachShaderFeatures attaches to the VERTEX stage only for
+// programs that calculate atmospherics -- not this one. starsV and meteorsV carry their own
+// sRGB math for the same reason.
+//
+// The tint arrives sRGB-encoded (an 8-bit LLColor4U attribute), and converting it in the
+// vertex stage is deliberate: CPU-side would mean storing linear in the 4xU8 attribute,
+// where steps near black are ~0.0039 against sRGB's ~0.0003, so a dark tint like (10,10,10)
+// would quantise about 30% off. Here the attribute keeps its sRGB precision, the conversion
+// is per-vertex rather than per-fragment, and the interpolation ends up linear -- which is
+// what it should always have been. Alpha is never sRGB and passes through untouched.
+vec4 linearizeVertexTint(vec4 tint)
+{
+    return vec4(pow(max(tint.rgb, vec3(0.0)), vec3(2.2)), tint.a);
+}
+
 void main()
 {
 #ifdef HAS_SKIN
@@ -67,5 +83,7 @@ void main()
 
     passTextureIndex();
 
-    vertex_color = diffuse_color;
+    // The diffuse map arrives LINEAR (decoded on the sampler); match the tint.
+    // Why the vertex stage: see linearizeVertexTint.
+    vertex_color = linearizeVertexTint(diffuse_color);
 }

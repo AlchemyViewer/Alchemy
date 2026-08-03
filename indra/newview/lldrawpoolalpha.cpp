@@ -414,15 +414,32 @@ bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material, LLGLSLShader
     // a material program at all.
     const bool material_maps = !LLPipeline::sRenderingHUDs && use_material;
 
+    // Decode the diffuse for the forward writers converted to shade in linear (see
+    // LLGLSLShader::mLinearDiffuse) -- gDeferredAlphaProgram and the BLEND material programs.
+    // The FOR_IMPOSTOR alpha program and the HUD programs leave it false and keep the sRGB
+    // texel. Normal and specular are data / read-side-decoded and stay AnisoWrap.
+    //
+    // OR the bit onto the caller's key rather than replacing it. That key already carries the
+    // addressing this draw needs -- particle groups pass AnisoClamp, because their quads span
+    // the full [0,1] and wrap filtering bleeds the opposite edge in -- and replacing it would
+    // silently cost them that clamp.
+    if (shader->mLinearDiffuse)
+    {
+        diffuse_key = diffuse_key | ALSampler::SRGBDecode;
+    }
+
     LLViewerTexture* normal_map = material_maps ? draw->mNormalMap.get() : nullptr;
     LLViewerTexture* specular_map = material_maps ? draw->mSpecularMap.get() : nullptr;
 
     shader->bindTexture(LLShaderMgr::BUMP_MAP,
                         normal_map ? normal_map : LLViewerFetchedTexture::sFlatNormalImagep.get(),
                         ALSamplers::AnisoWrap);
+    // Spec decodes too now: legacy Blinn-Phong spec is sRGB colour, so filtering it in linear
+    // is the same win as diffuse. The shader re-encodes for the deferred store; forward lights
+    // with it linear. Normal is data and stays AnisoWrap.
     shader->bindTexture(LLShaderMgr::SPECULAR_MAP,
                         specular_map ? specular_map : LLViewerFetchedTexture::sWhiteImagep.get(),
-                        ALSamplers::AnisoWrap);
+                        ALSamplers::AnisoWrap | ALSampler::SRGBDecode);
 
     if (draw->mTextureList.size() > 1)
     {

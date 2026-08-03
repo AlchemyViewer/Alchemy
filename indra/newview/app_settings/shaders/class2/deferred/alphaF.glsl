@@ -217,7 +217,12 @@ void main()
 
 #else // FOR_IMPOSTOR
 
-    vec4 diffuse_linear = vec4(srgb_to_linear(diffuse_srgb.rgb), diffuse_srgb.a);
+    // diffuse_srgb is misnamed on this path: the sampler decoded it, so it is already
+    // linear. (The FOR_IMPOSTOR branch above, where the name is accurate, keeps its own
+    // sampler and its own conversion. IS_HUD also really is sRGB here -- it samples raw and
+    // decodes below, after its raw tint multiply -- so the name misleads only for the
+    // converted world passes.)
+    vec4 diffuse_linear = diffuse_srgb;
 
     vec3 light_dir = (sun_up_factor == 1) ? sun_dir: moon_dir; // TODO -- factor out "sun_up_factor" and just send in the appropriate light vector
 
@@ -239,8 +244,16 @@ void main()
         discard;
     }
 
-    diffuse_srgb.rgb *= vertex_color.rgb;
-    diffuse_linear.rgb = srgb_to_linear(diffuse_srgb.rgb);
+    diffuse_linear.rgb *= vertex_color.rgb; // both linear now (IS_HUD: both sRGB)
+#ifdef IS_HUD
+    // The HUD permutation deliberately skips the sampler decode -- mLinearDiffuse is unset,
+    // HUDs keep pixel-exact gamma-space filtering -- and its tint stays raw in the vertex
+    // stage, so decode the tinted product here, the same order the pre-sampler-decode code
+    // used. That makes the trailing linear_to_srgb an exact round trip. Without it the
+    // encoded texel falls through the linear math and is encoded AGAIN at the end, washing
+    // out every alpha-blended HUD element.
+    diffuse_linear.rgb = srgb_to_linear(diffuse_linear.rgb);
+#endif
 #endif // USE_VERTEX_COLOR
 
     vec3 sunlit;

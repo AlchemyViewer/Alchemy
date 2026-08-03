@@ -208,6 +208,13 @@ void LLDrawPoolTerrain::renderFullShader()
 
     if (use_textures)
     {
+        // As the PBR branch below: the detail samplers decode and this re-encodes on store,
+        // so the four-way detail blend in terrain.slang happens in linear space. That blend
+        // is the same argument as texture filtering -- lerping sRGB-encoded colours darkens
+        // the middle of every transition -- so detail boundaries will read slightly
+        // differently, and correctly.
+        LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+
         // Use textures
         sShader = &gDeferredTerrainProgram;
         sShader->bind();
@@ -255,7 +262,7 @@ void LLDrawPoolTerrain::renderFullShaderTextures()
     // detail texture 0
     //
     S32 detail0 = sShader->enableTexture(LLViewerShaderMgr::TERRAIN_DETAIL0);
-    gGL.getTextureSlot(detail0)->bindSampled(detail_texture0p, ALSamplers::AnisoWrap);
+    gGL.getTextureSlot(detail0)->bindSampled(detail_texture0p, DIFFUSE_SRGB_SAMPLER);
 
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
     llassert(shader);
@@ -269,18 +276,18 @@ void LLDrawPoolTerrain::renderFullShaderTextures()
     // detail texture 1
     //
     S32 detail1 = sShader->enableTexture(LLViewerShaderMgr::TERRAIN_DETAIL1);
-    gGL.getTextureSlot(detail1)->bindSampled(detail_texture1p, ALSamplers::AnisoWrap);
+    gGL.getTextureSlot(detail1)->bindSampled(detail_texture1p, DIFFUSE_SRGB_SAMPLER);
 
     // detail texture 2
     //
     S32 detail2 = sShader->enableTexture(LLViewerShaderMgr::TERRAIN_DETAIL2);
-    gGL.getTextureSlot(detail2)->bindSampled(detail_texture2p, ALSamplers::AnisoWrap);
+    gGL.getTextureSlot(detail2)->bindSampled(detail_texture2p, DIFFUSE_SRGB_SAMPLER);
 
 
     // detail texture 3
     //
     S32 detail3 = sShader->enableTexture(LLViewerShaderMgr::TERRAIN_DETAIL3);
-    gGL.getTextureSlot(detail3)->bindSampled(detail_texture3p, ALSamplers::AnisoWrap);
+    gGL.getTextureSlot(detail3)->bindSampled(detail_texture3p, DIFFUSE_SRGB_SAMPLER);
 
     //
     // Alpha Ramp
@@ -362,10 +369,13 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
             detail_emissive_texturep = fetched_material->mEmissiveTexture;
         }
 
+        // Colour decodes, data does not -- the same split LLFetchedGLTFMaterial::bind makes,
+        // which is what these textures came from. FRAMEBUFFER_SRGB is already enabled for
+        // this branch in renderFullShader.
         detail_basecolor[i] = sShader->enableTexture(LLViewerShaderMgr::TERRAIN_DETAIL0_BASE_COLOR + i);
         gGL.getTextureSlot(detail_basecolor[i])->bindSampled(detail_basecolor_texturep ? detail_basecolor_texturep
                                                       : LLViewerFetchedTexture::sWhiteImagep.get(),
-                                                  ALSamplers::AnisoWrap);
+                                                  DIFFUSE_SRGB_SAMPLER);
 
         if (sPBRDetailMode >= TERRAIN_PBR_DETAIL_NORMAL)
         {
@@ -388,7 +398,7 @@ void LLDrawPoolTerrain::renderFullShaderPBR(bool use_local_materials)
             detail_emissive[i] = sShader->enableTexture(LLViewerShaderMgr::TERRAIN_DETAIL0_EMISSIVE + i);
             gGL.getTextureSlot(detail_emissive[i])->bindSampled(detail_emissive_texturep ? detail_emissive_texturep
                                                           : LLViewerFetchedTexture::sWhiteImagep.get(),
-                                                      ALSamplers::AnisoWrap);
+                                                      DIFFUSE_SRGB_SAMPLER);
         }
     }
 

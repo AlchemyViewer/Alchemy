@@ -23,6 +23,11 @@
  * $/LicenseInfo$
  */
 
+// NOTE: base colour and emissive are NOT converted here. Their samplers ask the hardware
+// to decode (GLTF_COLOR_SAMPLER, pushGLTFBatchIndexed), which converts each texel before
+// filtering rather than after -- converting a blend taken in sRGB space is what made
+// minified albedo read too dark. Doing it here as well would convert twice.
+
 /*[EXTRA_CODE_HERE]*/
 
 // Indexed (multi-material) PBR opaque GBuffer-write fragment shader.
@@ -79,7 +84,6 @@ uniform sampler2D basecolor7; uniform sampler2D normalmap7; uniform sampler2D or
 #endif
 
 vec3 linear_to_srgb(vec3 c);
-vec3 srgb_to_linear(vec3 c);
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
@@ -199,7 +203,6 @@ void main()
     int mi = vary_material_index;
 
     vec4 basecolor = sample_basecolor(base_color_texcoord.xy).rgba;
-    basecolor.rgb = srgb_to_linear(basecolor.rgb);
 
     basecolor *= vertex_color;
 
@@ -226,7 +229,7 @@ void main()
     spec.b *= gltf_metallic_factor[mi];
 
     vec3 emissive = gltf_emissive_color[mi];
-    emissive *= srgb_to_linear(sample_emissive(emissive_texcoord.xy));
+    emissive *= sample_emissive(emissive_texcoord.xy);
 
     tnorm *= gl_FrontFacing ? 1.0 : -1.0;
 

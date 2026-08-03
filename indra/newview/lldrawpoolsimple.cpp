@@ -127,27 +127,39 @@ void LLDrawPoolSimple::renderDeferred(S32 pass)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SIMPLE_DEFERRED);
     LLGLDisable blend(GL_BLEND);
 
+    // The diffuse sampler decodes and GL_FRAMEBUFFER_SRGB re-encodes on store, so this pass
+    // shades in linear throughout while the G-buffer keeps its sRGB storage. The two belong
+    // together: decode without the encode writes linear bits into a buffer the lighting pass
+    // will decode again. Matches what LLDrawPoolPBROpaque already does.
+    LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+
     //render static
     gDeferredDiffuseProgram.bind();
-    pushBatches(LLRenderPass::PASS_SIMPLE, true, true);
+    pushBatches(LLRenderPass::PASS_SIMPLE, true, true, DIFFUSE_SRGB_SAMPLER);
 
     //render rigged
     gDeferredDiffuseProgram.bind(true);
-    pushRiggedBatches(LLRenderPass::PASS_SIMPLE_RIGGED, true, true);
+    pushRiggedBatches(LLRenderPass::PASS_SIMPLE_RIGGED, true, true, DIFFUSE_SRGB_SAMPLER);
 }
 
 void LLDrawPoolAlphaMask::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_MASK_DEFERRED);
+    // The diffuse sampler decodes and GL_FRAMEBUFFER_SRGB re-encodes on store, so this pass
+    // shades in linear throughout while the G-buffer keeps its sRGB storage. The two belong
+    // together: decode without the encode writes linear bits into a buffer the lighting pass
+    // will decode again. Matches what LLDrawPoolPBROpaque already does.
+    LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+
     LLGLSLShader* shader = &gDeferredDiffuseAlphaMaskProgram;
 
     //render static
     shader->bind();
-    pushMaskBatches(LLRenderPass::PASS_ALPHA_MASK, true, true);
+    pushMaskBatches(LLRenderPass::PASS_ALPHA_MASK, true, true, DIFFUSE_SRGB_SAMPLER);
 
     //render rigged
     shader->bind(true);
-    pushRiggedMaskBatches(LLRenderPass::PASS_ALPHA_MASK_RIGGED, true, true);
+    pushRiggedMaskBatches(LLRenderPass::PASS_ALPHA_MASK_RIGGED, true, true, DIFFUSE_SRGB_SAMPLER);
 }
 
 // grass drawpool

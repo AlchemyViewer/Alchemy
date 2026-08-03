@@ -23,6 +23,11 @@
  * $/LicenseInfo$
  */
 
+// NOTE: base colour and emissive are NOT converted here. Their samplers ask the hardware
+// to decode (GLTF_COLOR_SAMPLER, pushGLTFBatchIndexed), which converts each texel before
+// filtering rather than after -- converting a blend taken in sRGB space is what made
+// minified albedo read too dark. Doing it here as well would convert twice.
+
 /*[EXTRA_CODE_HERE]*/
 
 // Indexed (multi-material) PBR glow/emissive fragment shader. vary_material_index
@@ -68,7 +73,6 @@ in vec2 base_color_texcoord;
 in vec2 emissive_texcoord;
 
 vec3 linear_to_srgb(vec3 c);
-vec3 srgb_to_linear(vec3 c);
 
 vec4 sample_basecolor(vec2 uv)
 {
@@ -136,7 +140,7 @@ void main()
     }
 
     vec3 emissive = gltf_emissive_color[mi];
-    emissive *= srgb_to_linear(sample_emissive(emissive_texcoord.xy));
+    emissive *= sample_emissive(emissive_texcoord.xy);
 
     float lum = max(max(emissive.r, emissive.g), emissive.b);
     lum *= vertex_emissive.a;

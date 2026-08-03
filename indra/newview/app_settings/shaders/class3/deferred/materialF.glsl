@@ -243,9 +243,12 @@ vec4 getSpecular()
 {
 #ifdef HAS_SPECULAR_MAP
     vec4 spec = texture(specularMap, vary_texcoord2.xy);
-    spec.rgb *= specular_color.rgb;
+    // The map is decoded on the sampler (filtered in linear), so linearise the tint to
+    // match. Yields LINEAR spec: the forward path lights with it directly, the deferred
+    // writer re-encodes to sRGB for the shared RGBA8 store.
+    spec.rgb *= srgb_to_linear(specular_color.rgb);
 #else
-    vec4 spec = vec4(specular_color.rgb, 1.0);
+    vec4 spec = vec4(srgb_to_linear(specular_color.rgb), 1.0);
 #endif
     return spec;
 }
@@ -311,8 +314,9 @@ void main()
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
     //forward rendering, output lit linear color
-    diffcol.rgb = srgb_to_linear(diffcol.rgb);
-    spec.rgb = srgb_to_linear(spec.rgb);
+    // diffcol arrived linear (decoded on the sampler) and its tint was linearised in the
+    // vertex stage. Spec keeps its in-shader decode below -- its map is still sampled
+    // encoded, matching the deferred writer.
     spec.a = glossiness; // pack glossiness into spec alpha for lighting functions
 
     vec3 pos = vary_position;
@@ -432,7 +436,10 @@ void main()
     float flag = GBUFFER_FLAG_HAS_ATMOS;
 
     frag_data[0] = max(vec4(diffcol.rgb, emissive), vec4(0));        // gbuffer is sRGB for legacy materials
-    frag_data[1] = max(vec4(spec.rgb, glossiness), vec4(0));           // XYZ = Specular color. W = Specular exponent.
+    // frag_data[1] is a plain RGBA8 shared with PBR's linear ORM, so it cannot be sRGB
+    // storage. The spec was FILTERED in linear (sampler decode); re-encode it here so it
+    // lands sRGB the way softenLight reads it. Storage constraint, not a filtering one.
+    frag_data[1] = max(vec4(linear_to_srgb(spec.rgb), glossiness), vec4(0));  // XYZ = Specular color. W = Specular exponent.
     frag_data[2] = encodeNormal(norm, env, flag);   // XY = Normal.  Z = Env. intensity. W = 1 skip atmos (mask off fog)
 
 #if defined(HAS_EMISSIVE)

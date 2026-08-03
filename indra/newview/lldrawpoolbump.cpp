@@ -540,6 +540,9 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_BUMP);
 
+    // Pairs with DIFFUSE_SRGB_SAMPLER below: the sampler decodes, this re-encodes on store.
+    LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+
     shiny = true;
     for (int i = 0; i < 2; ++i)
     {
@@ -594,12 +597,12 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
             {
                 if (uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
                 {
-                    pushBumpBatch(params, true, false);
+                    pushBumpBatch(params, true, false, DIFFUSE_SRGB_SAMPLER);
                 }
             }
             else
             {
-                pushBumpBatch(params, true, false);
+                pushBumpBatch(params, true, false, DIFFUSE_SRGB_SAMPLER);
             }
         }
 
@@ -1024,7 +1027,7 @@ void LLDrawPoolBump::pushBumpBatches(U32 type)
     }
 }
 
-void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_textures)
+void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_textures, ALSampler key)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     applyModelMatrix(params);
@@ -1036,7 +1039,7 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
         // Clamped to the bound program's ladder and null slots stood in for, same as every
         // other indexed pass -- a raw loop here would bind past the last declared sampler
         // whenever a batch was built at a wider ladder than the current program's.
-        bindIndexedTextures(params, LLGLSLShader::sCurBoundShaderPtr);
+        bindIndexedTextures(params, LLGLSLShader::sCurBoundShaderPtr, key);
     }
     else
     { //not batching textures or batch has only 1 texture -- might need a texture matrix
@@ -1063,7 +1066,7 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
         {
             if (params.mTexture.notNull())
             {
-                gGL.getTextureSlot(diffuse_channel)->bindFast(params.mTexture, ALSamplers::AnisoWrap);
+                gGL.getTextureSlot(diffuse_channel)->bindFast(params.mTexture, key);
             }
             else
             {

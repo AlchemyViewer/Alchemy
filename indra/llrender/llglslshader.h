@@ -386,6 +386,19 @@ public:
     U32 mBinds;
     static U32 sTotalBinds;
 
+    // This program expects its diffuse/base-colour texture already LINEAR: the bind decodes
+    // sRGB on the sampler (ALSampler::SRGBDecode), the shader has dropped its own
+    // srgb_to_linear on the diffuse, and its vertex-colour tint is linearised in the vertex
+    // stage. Set on the forward writers that were converted to filter albedo in linear space
+    // -- see the pool bind sites (bindIndexedTextures, pushBatch, LLDrawPoolAlpha::TexSetup),
+    // which read it to choose the diffuse sampler for a polymorphic per-draw shader. Left
+    // false on the HUD programs (they output sRGB) and the FOR_IMPOSTOR alpha program (it
+    // writes the sRGB sample straight to the bake).
+    //
+    // Set on each program individually, rigged variants included: those are separate program
+    // objects here, not clones of a base program, so nothing propagates it for you.
+    bool mLinearDiffuse = false;
+
     // this pointer should be set to whichever shader represents this shader's rigged variant
     LLGLSLShader* mRiggedVariant = nullptr;
 

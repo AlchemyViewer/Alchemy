@@ -198,7 +198,8 @@ vec4 getTexture2DLodAmbient(vec2 tc, float lod)
 #else
     vec4 ret = texture(projectionMap, tc);
 #endif
-    ret.rgb = srgb_to_linear(ret.rgb);
+    // projectionMap is decoded on the sampler (SRGBDecode, see setupSpotLight), so the
+    // cookie is filtered in linear -- the mipped LOD read included. Already linear here.
 
     vec2 dist = tc-vec2(0.5);
     float d = dot(dist,dist);
@@ -214,7 +215,8 @@ vec4 getTexture2DLodDiffuse(vec2 tc, float lod)
 #else
     vec4 ret = texture(projectionMap, tc);
 #endif
-    ret.rgb = srgb_to_linear(ret.rgb);
+    // projectionMap is decoded on the sampler (SRGBDecode, see setupSpotLight), so the
+    // cookie is filtered in linear -- the mipped LOD read included. Already linear here.
 
     vec2 dist = vec2(0.5) - abs(tc-vec2(0.5));
     float det = min(lod/(proj_lod*0.5), 1.0);
@@ -261,7 +263,8 @@ vec4 texture2DLodSpecular(vec2 tc, float lod)
 #else
     vec4 ret = texture(projectionMap, tc);
 #endif
-    ret.rgb = srgb_to_linear(ret.rgb);
+    // projectionMap is decoded on the sampler (SRGBDecode, see setupSpotLight), so the
+    // cookie is filtered in linear -- the mipped LOD read included. Already linear here.
 
     vec2 dist = vec2(0.5) - abs(tc-vec2(0.5));
     float det = min(lod/(proj_lod*0.5), 1.0);

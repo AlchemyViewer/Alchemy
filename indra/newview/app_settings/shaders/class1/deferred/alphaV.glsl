@@ -67,6 +67,12 @@ out vec3 vary_norm;
 
 uniform float near_clip;
 
+// See diffuseV for why this is defined per-shader rather than shared from environment/srgbF.
+vec4 linearizeVertexTint(vec4 tint)
+{
+    return vec4(pow(max(tint.rgb, vec3(0.0)), vec3(2.2)), tint.a);
+}
+
 void main()
 {
     vec4 pos;
@@ -119,7 +125,16 @@ void main()
     vary_position = pos.xyz;
 
 #ifdef USE_VERTEX_COLOR
+    // Tint arrives sRGB. This pass decodes its diffuse on the sampler and shades in linear,
+    // so linearise the tint to match. Guarded on exactly the conditions that leave
+    // LLGLSLShader::mLinearDiffuse false -- HUD outputs sRGB and keeps the encoded texel, and
+    // FOR_IMPOSTOR writes the sRGB sample straight to the bake -- so the shader and the bind
+    // cannot disagree about which space the multiply happens in.
+#if !defined(FOR_IMPOSTOR) && !defined(IS_HUD)
+    vertex_color = linearizeVertexTint(diffuse_color);
+#else
     vertex_color = diffuse_color;
+#endif
 #endif
 
 #ifdef HAS_SKIN
