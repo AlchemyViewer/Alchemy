@@ -2019,6 +2019,26 @@ function="World.EnvPreset"
             <menu_item_call.on_enable
              function="File.EnableUploadMaterial" />
           </menu_item_call>
+          <menu_item_call
+           label="Notecard..."
+           layout="topleft"
+           name="Upload Notecard">
+            <menu_item_call.on_click
+             function="File.UploadNotecard"
+             parameter="" />
+            <menu_item_call.on_enable
+             function="File.EnableUpload" />
+          </menu_item_call>
+          <menu_item_call
+           label="Script..."
+           layout="topleft"
+           name="Upload Script">
+            <menu_item_call.on_click
+             function="File.UploadScript"
+             parameter="" />
+            <menu_item_call.on_enable
+             function="File.EnableUpload" />
+          </menu_item_call>
 	   <menu_item_call
              label="Bulk..."
              layout="topleft"

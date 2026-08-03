@@ -385,6 +385,8 @@ static std::string IMAGE_EXTENSIONS = "tga bmp jpg jpeg png webp avif";
 static std::string ANIM_EXTENSIONS =  "bvh anim";
 static std::string XML_EXTENSIONS = "xml";
 static std::string SLOBJECT_EXTENSIONS = "slobject";
+static std::string SCRIPT_EXTENSIONS = "lsl lua luau";
+static std::string NOTECARD_EXTENSIONS = "txt";
 #endif
 static std::string ALL_FILE_EXTENSIONS = "*.*";
 static std::string MODEL_EXTENSIONS = "dae";
@@ -409,6 +411,10 @@ std::string build_extensions_string(LLFilePicker::ELoadFilter filter)
         return MATERIAL_EXTENSIONS;
     case LLFilePicker::FFLOAD_XML:
         return XML_EXTENSIONS;
+    case LLFilePicker::FFLOAD_SCRIPT:
+        return SCRIPT_EXTENSIONS;
+    case LLFilePicker::FFLOAD_NOTECARD:
+        return NOTECARD_EXTENSIONS;
     case LLFilePicker::FFLOAD_ALL:
     case LLFilePicker::FFLOAD_EXE:
         return ALL_FILE_EXTENSIONS;
@@ -704,6 +710,50 @@ void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLU
     }
 }
 
+// Notecards and scripts have no upload-preview floater (unlike image/sound/anim), and
+// are always free, so this uploads directly on pick -- the same path do_bulk_upload
+// already takes for these two asset types when they show up in a bulk selection.
+void upload_single_notecard_or_script(
+    const std::vector<std::string>& filenames,
+    LLFilePicker::ELoadFilter type,
+    const LLUUID& dest)
+{
+    std::string filename = filenames[0];
+    if (!check_file_extension(filename, type)) return;
+    if (filename.empty()) return;
+
+    std::string name = gDirUtilp->getBaseFileName(filename, true);
+    std::string asset_name = name;
+    LLStringUtil::replaceNonstandardASCII(asset_name, '?');
+    LLStringUtil::replaceChar(asset_name, '|', '?');
+    LLStringUtil::stripNonprintable(asset_name);
+    LLStringUtil::trim(asset_name);
+
+    std::string ext = gDirUtilp->getExtension(filename);
+    LLAssetType::EType asset_type;
+    U32 codec;
+    S32 expected_upload_cost = 0;
+
+    if (!LLResourceUploadInfo::findAssetTypeAndCodecOfExtension(ext, asset_type, codec) ||
+        !LLAgentBenefitsMgr::current().findUploadCost(asset_type, expected_upload_cost))
+    {
+        return;
+    }
+
+    LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLNewFileResourceUploadInfo>(
+        filename,
+        asset_name,
+        asset_name, 0,
+        LLFolderType::FT_NONE, LLInventoryType::IT_NONE,
+        LLFloaterPerms::getNextOwnerPerms("Uploads"),
+        LLFloaterPerms::getGroupPerms("Uploads"),
+        LLFloaterPerms::getEveryonePerms("Uploads"),
+        expected_upload_cost,
+        dest);
+
+    upload_new_resource(uploadInfo);
+}
+
 void do_bulk_upload(std::vector<std::string> filenames, bool allow_2k, const LLSD& notification, const LLSD& response, const LLUUID& dest)
 {
     S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
@@ -975,6 +1025,32 @@ class LLFileUploadBulk : public view_listener_t
             gAgentCamera.changeCameraToDefault();
         }
         LLFilePickerReplyThread::startPicker(boost::bind(&upload_bulk, _1, _2, true, LLUUID::null), LLFilePicker::FFLOAD_ALL, true);
+        return true;
+    }
+};
+
+class LLFileUploadNotecard : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        if (gAgentCamera.cameraMouselook())
+        {
+            gAgentCamera.changeCameraToDefault();
+        }
+        LLFilePickerReplyThread::startPicker(boost::bind(&upload_single_notecard_or_script, _1, _2, LLUUID::null), LLFilePicker::FFLOAD_NOTECARD, false);
+        return true;
+    }
+};
+
+class LLFileUploadScript : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        if (gAgentCamera.cameraMouselook())
+        {
+            gAgentCamera.changeCameraToDefault();
+        }
+        LLFilePickerReplyThread::startPicker(boost::bind(&upload_single_notecard_or_script, _1, _2, LLUUID::null), LLFilePicker::FFLOAD_SCRIPT, false);
         return true;
     }
 };
@@ -1480,6 +1556,8 @@ void init_menu_file()
     view_listener_t::addCommit(new LLFileUploadModel(), "File.UploadModel");
     view_listener_t::addCommit(new LLFileUploadMaterial(), "File.UploadMaterial");
     view_listener_t::addCommit(new LLFileUploadBulk(), "File.UploadBulk");
+    view_listener_t::addCommit(new LLFileUploadNotecard(), "File.UploadNotecard");
+    view_listener_t::addCommit(new LLFileUploadScript(), "File.UploadScript");
     view_listener_t::addCommit(new LLFileCloseWindow(), "File.CloseWindow");
     view_listener_t::addCommit(new LLFileCloseAllWindows(), "File.CloseAllWindows");
     view_listener_t::addEnable(new LLFileEnableCloseWindow(), "File.EnableCloseWindow");

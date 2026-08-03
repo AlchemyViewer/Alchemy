@@ -80,7 +80,8 @@ public:
         FFLOAD_MATERIAL = 15,
         FFLOAD_MATERIAL_TEXTURE = 16,
         FFLOAD_HDRI = 17,
-        FFLOAD_ZIP = 18
+        FFLOAD_ZIP = 18,
+        FFLOAD_NOTECARD = 19
     };
 
     enum ESaveFilter

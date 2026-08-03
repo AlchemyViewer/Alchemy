@@ -65,6 +65,7 @@ LLFilePicker LLFilePicker::sInstance;
 #define HDRI_FILTER L"HDRI Files (*.exr)\0*.exr\0"
 #define MATERIAL_TEXTURES_FILTER L"GLTF Import (*.gltf; *.glb; *.tga; *.bmp; *.jpg; *.jpeg; *.png)\0*.gltf;*.glb;*.tga;*.bmp;*.jpg;*.jpeg;*.png\0"
 #define SCRIPT_FILTER L"Script files (*.lsl; *.lua; *.luau)\0*.lsl;*.lua;*.luau\0"
+#define NOTECARD_FILTER L"Notecards (*.txt)\0*.txt\0"
 #define DICTIONARY_FILTER L"Dictionary files (*.dic; *.xcu)\0*.dic;*.xcu\0"
 #define ZIP_FILTER L"ZIP files (*.zip)\0*.zip\0"
 #endif
@@ -229,6 +230,9 @@ namespace
             break;
         case LLFilePicker::FFLOAD_SCRIPT:
             filter_vec.push_back({ "Script files (*.lsl; *.lua; *.luau)", "lsl;lua;luau" });
+            break;
+        case LLFilePicker::FFLOAD_NOTECARD:
+            filter_vec.push_back({ "Notecards (*.txt)", "txt" });
             break;
         case LLFilePicker::FFLOAD_DICTIONARY:
             filter_vec.push_back({ "Dictionary files (*.dic; *.xcu)", "dic;xcu" });
@@ -637,6 +641,10 @@ bool LLFilePicker::setupFilter(ELoadFilter filter)
         break;
     case FFLOAD_SCRIPT:
         mOFN.lpstrFilter = SCRIPT_FILTER \
+            L"\0";
+        break;
+    case FFLOAD_NOTECARD:
+        mOFN.lpstrFilter = NOTECARD_FILTER \
             L"\0";
         break;
     case FFLOAD_DICTIONARY:
@@ -1127,6 +1135,9 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
             allowedv->push_back("lsl");
             allowedv->push_back("lua");
             allowedv->push_back("luau");
+            break;
+        case FFLOAD_NOTECARD:
+            allowedv->push_back("txt");
             break;
         case FFLOAD_DICTIONARY:
             allowedv->push_back("dic");
