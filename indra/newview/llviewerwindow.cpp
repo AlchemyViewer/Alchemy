@@ -6401,10 +6401,6 @@ void LLViewerWindow::initFonts(F32 zoom_factor)
     // alive — so we no longer destroyAllGL unconditionally here.
     LLFontManager::initClass();
 
-    // fonts use an GL_UNSIGNED_BYTE image format,
-    // so they need convertion, init buffers if needed
-    LLImageGL::allocateConversionBuffer();
-
     // Seed dark-palette flag before initClass so the freshly-loaded faces
     // pick the right CPAL palette. The setting listener keeps it in sync
     // afterward; without seeding here the first font load runs with the

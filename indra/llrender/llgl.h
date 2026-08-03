@@ -62,6 +62,15 @@ void ll_close_fail_log();
 
 class LLSD;
 
+// Hard minimum OpenGL version. The renderer assumes this unconditionally rather than
+// degrading below it: deprecated formats are re-expressed through GL_TEXTURE_SWIZZLE_RGBA
+// instead of being repacked on the CPU, the texture upload thread is always enabled, and
+// the shader backend expects GLSL 4.10.
+//
+// Biased down by 0.01 like the other version checks in this file, because mGLVersion is
+// assembled as major + minor * 0.1f and 4.1f is not exactly representable.
+const F32 GL_MINIMUM_VERSION = 4.09f;
+
 // Manage GL extensions...
 class LLGLManager
 {
@@ -100,6 +109,10 @@ public:
     bool mHasDebugOutput = false;
     bool mHasTransformFeedback = false;
     bool mHasAnisotropic = false;
+    // Immutable texture storage (glTexStorage*). Core in 4.2, but also reachable on a
+    // 4.1 context via GL_ARB_texture_storage -- which is how macOS gets it. Only true
+    // once the entry point has actually resolved, so callers may trust it directly.
+    bool mHasTextureStorage = false;
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;
@@ -379,7 +392,7 @@ public:
     virtual void updateGL() = 0;
 };
 
-const U32 FENCE_WAIT_TIME_NANOSECONDS = 1000;  //1 ms
+const U32 FENCE_WAIT_TIME_NANOSECONDS = 1000;  //1 microsecond (despite the name's history)
 
 class LLGLFence
 {

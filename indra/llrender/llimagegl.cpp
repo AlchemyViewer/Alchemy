@@ -55,14 +55,25 @@ extern LL_COMMON_API bool on_main_thread();
 
 //----------------------------------------------------------------------------
 const F32 MIN_TEXTURE_LIFETIME = 10.f;
-const F32 CONVERSION_SCRATCH_BUFFER_GL_VERSION = 3.29f;
 
 constexpr int DELETE_DELAY = 3; // number of frames to wait before deleting textures
 static std::vector<U32> sFreeList[DELETE_DELAY+1];
 
-//which power of 2 is i?
-//assumes i is a power of 2 > 0
-U32 wpo2(U32 i);
+// Number of mip levels in a full pyramid for the given level-0 dimensions, counting
+// level 0 itself: 256x256 -> 9 (256,128,...,1). This is a COUNT. Note llvertexbuffer's
+// wpo2() returns log2, i.e. the highest mip *index*, which is one less -- it used to be
+// assigned to mMipLevels here, and must not be substituted for this.
+static S32 calcMipLevelCount(S32 width, S32 height)
+{
+    S32 levels = 1;
+    while (width > 1 || height > 1)
+    {
+        width = llmax(1, width >> 1);
+        height = llmax(1, height >> 1);
+        ++levels;
+    }
+    return levels;
+}
 
 
 U32 LLImageGL::sFrameCount = 0;
@@ -180,7 +191,6 @@ S32 LLImageGL::sMaxCategories = 1 ;
 bool LLImageGL::sSkipAnalyzeAlpha;
 U32  LLImageGL::sScratchPBO = 0;
 U32  LLImageGL::sScratchPBOSize = 0;
-U32* LLImageGL::sManualScratch = nullptr;
 
 
 //------------------------
@@ -277,24 +287,8 @@ void LLImageGL::initClass(LLWindow* window, S32 num_catagories, bool skip_analyz
     if (thread_texture_loads || thread_media_updates)
     {
         LLImageGLThread::createInstance(window);
-        LLImageGLThread::sEnabledTextures = gGLManager.mGLVersion > 3.95f ? thread_texture_loads : false;
-        LLImageGLThread::sEnabledMedia = gGLManager.mGLVersion > 3.95f ? thread_media_updates : false;
-    }
-}
-
-void LLImageGL::allocateConversionBuffer()
-{
-    if (gGLManager.mGLVersion < CONVERSION_SCRATCH_BUFFER_GL_VERSION)
-    {
-        try
-        {
-            sManualScratch = new U32[MAX_IMAGE_AREA];
-        }
-        catch (std::bad_alloc&)
-        {
-            LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS() << "Failed to allocate sManualScratch" << LL_ENDL;
-        }
+        LLImageGLThread::sEnabledTextures = thread_texture_loads;
+        LLImageGLThread::sEnabledMedia = thread_media_updates;
     }
 }
 
@@ -329,10 +323,6 @@ void LLImageGL::cleanupClass()
         }
     }
 
-    delete[] sManualScratch;
-    // Null after free so a second cleanupClass call (e.g. test fixture
-    // teardown) doesn't double-delete.
-    sManualScratch = nullptr;
 }
 
 
@@ -650,7 +640,7 @@ void LLImageGL::init(bool usemipmaps)
     mTarget = GL_TEXTURE_2D;
     mBindTarget = LLTexUnit::TT_TEXTURE;
     mHasMipMaps = false;
-    mMipLevels = -1;
+    mMipLevels = 0;
 
     mIsResident = 0;
 
@@ -874,7 +864,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                 S32 h = getHeight(d);
                 S32 gl_level = d-mCurrentDiscardLevel;
 
-                mMipLevels = llmax(mMipLevels, gl_level);
+                mMipLevels = llmax(mMipLevels, gl_level + 1);
 
                 if (d > mCurrentDiscardLevel)
                 {
@@ -932,7 +922,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                     S32 w = getWidth(mCurrentDiscardLevel);
                     S32 h = getHeight(mCurrentDiscardLevel);
 
-                    mMipLevels = wpo2(llmax(w, h));
+                    mMipLevels = calcMipLevelCount(w, h);
 
                     LLImageGL::setManualImage(mTarget, 0, mFormatInternal,
                                  w, h,
@@ -1077,7 +1067,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
     }
     else
     {
-        mMipLevels = 0;
+        mMipLevels = 1;
         S32 w = getWidth();
         S32 h = getHeight();
         if (is_compressed)
@@ -1416,134 +1406,46 @@ void LLImageGL::deleteTextures(S32 numTextures, const U32 *textures)
 }
 
 // static
+void LLImageGL::resolveUploadFormat(S32& intformat, U32& pixformat, U32& pixtype,
+                                    const void*& pixels, S32 width, S32 height)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    // The deprecated formats are re-expressed as R8 / RG8 and read back through the
+    // texture's swizzle attribute. GL_TEXTURE_SWIZZLE_RGBA is in both core and compat
+    // profiles since GL 3.3, so this works everywhere at the 4.1 floor.
+    //
+    // setManualImage does not write GL_TEXTURE_SWIZZLE_RGBA itself — overwriting it is
+    // destructive when the bound texture already has a custom swizzle (e.g. an LLImageGL
+    // whose resolveDeprecatedFormat ran and applied a specific mask in createGLTexture,
+    // or any caller that set up its own swizzle before this call). The format rewrite
+    // here still happens so the allocation gets the right backing storage; applying the
+    // swizzle is the caller's responsibility. LLImageGL's createGLTexture path handles it
+    // via mSwizzleMask. Direct callers that pass GL_ALPHA / GL_LUMINANCE /
+    // GL_LUMINANCE_ALPHA must apply the matching swizzle themselves before uploading.
+    if (pixformat == GL_ALPHA)
+    { //GL_ALPHA → R8; caller-set {0,0,0,R} swizzle is required for {0,0,0,A} sample semantics
+        pixformat = GL_RED;
+        intformat = GL_R8;
+    }
+
+    if (pixformat == GL_LUMINANCE)
+    { //GL_LUMINANCE → R8; caller-set {R,R,R,1} swizzle is required for {L,L,L,1} sample semantics
+        pixformat = GL_RED;
+        intformat = GL_R8;
+    }
+
+    if (pixformat == GL_LUMINANCE_ALPHA)
+    { //GL_LUMINANCE_ALPHA → RG8; caller-set {R,R,R,G} swizzle is required for {L,L,L,A} sample semantics
+        pixformat = GL_RG;
+        intformat = GL_RG8;
+    }
+}
+
 void LLImageGL::setManualImage(U32 target, S32 miplevel, S32 intformat, S32 width, S32 height, U32 pixformat, U32 pixtype, const void* pixels, bool has_mips)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    // Gate on GL version. GL_TEXTURE_SWIZZLE_RGBA is in both core and
-    // compat profiles since GL 3.3, and the deprecated formats are
-    // re-expressed as R8 / RG8 via the swizzle attribute on the texture.
-    // Below the 3.29 floor the manual-buffer-convert fallback below runs;
-    // it relies on sManualScratch (allocated in allocateConversionBuffer).
-    //
-    // setManualImage no longer writes GL_TEXTURE_SWIZZLE_RGBA itself —
-    // overwriting it is destructive when the bound texture already has a
-    // custom swizzle (e.g. an LLImageGL whose resolveDeprecatedFormat ran
-    // and applied a specific mask in createGLTexture, or any caller that
-    // set up its own swizzle before this call). The format rewrite below
-    // still happens so glTexImage2D allocates the right backing storage;
-    // applying the swizzle is the caller's responsibility. LLImageGL's
-    // createGLTexture path handles it via mSwizzleMask. Direct callers
-    // that pass GL_ALPHA / GL_LUMINANCE / GL_LUMINANCE_ALPHA must apply
-    // the matching swizzle themselves before binding-and-uploading.
-    if (gGLManager.mGLVersion >= CONVERSION_SCRATCH_BUFFER_GL_VERSION)
-    {
-        if (pixformat == GL_ALPHA)
-        { //GL_ALPHA → R8; caller-set {0,0,0,R} swizzle is required for {0,0,0,A} sample semantics
-            pixformat = GL_RED;
-            intformat = GL_R8;
-        }
 
-        if (pixformat == GL_LUMINANCE)
-        { //GL_LUMINANCE → R8; caller-set {R,R,R,1} swizzle is required for {L,L,L,1} sample semantics
-            pixformat = GL_RED;
-            intformat = GL_R8;
-        }
-
-        if (pixformat == GL_LUMINANCE_ALPHA)
-        { //GL_LUMINANCE_ALPHA → RG8; caller-set {R,R,R,G} swizzle is required for {L,L,L,A} sample semantics
-            pixformat = GL_RG;
-            intformat = GL_RG8;
-        }
-    }
-    else
-    {
-        // Manual-pack scratch (sManualScratch) is sized for MAX_IMAGE_AREA
-        // U32s. Images larger than that would write past the end of the
-        // buffer. Texture sizes are clamped by the loader long before they
-        // get here, but guard anyway so a bad caller can't trash the heap.
-        const bool scratch_fits =
-            ((S64)width * (S64)height) <= (S64)MAX_IMAGE_AREA
-            && sManualScratch != nullptr;
-
-        if (pixformat == GL_ALPHA && pixtype == GL_UNSIGNED_BYTE)
-        { //GL_ALPHA is deprecated, convert to RGBA via manual-pack scratch
-            if (pixels != nullptr && scratch_fits)
-            {
-                U32 pixel_count = (U32)(width * height);
-                for (U32 i = 0; i < pixel_count; i++)
-                {
-                    U8* pix = (U8*)&sManualScratch[i];
-                    pix[0] = pix[1] = pix[2] = 0;
-                    pix[3] = ((U8*)pixels)[i];
-                }
-
-                pixels = sManualScratch;
-            }
-            else if (pixels != nullptr)
-            {
-                LL_WARNS_ONCE() << "setManualImage: GL_ALPHA conversion skipped, "
-                                << width << "x" << height << " exceeds scratch buffer" << LL_ENDL;
-                pixels = nullptr;
-            }
-
-            pixformat = GL_RGBA;
-            intformat = GL_RGBA8;
-        }
-
-        if (pixformat == GL_LUMINANCE_ALPHA && pixtype == GL_UNSIGNED_BYTE)
-        { //GL_LUMINANCE_ALPHA is deprecated, convert to RGBA via manual-pack scratch
-            if (pixels != nullptr && scratch_fits)
-            {
-                U32 pixel_count = (U32)(width * height);
-                for (U32 i = 0; i < pixel_count; i++)
-                {
-                    U8 lum = ((U8*)pixels)[i * 2 + 0];
-                    U8 alpha = ((U8*)pixels)[i * 2 + 1];
-
-                    U8* pix = (U8*)&sManualScratch[i];
-                    pix[0] = pix[1] = pix[2] = lum;
-                    pix[3] = alpha;
-                }
-
-                pixels = sManualScratch;
-            }
-            else if (pixels != nullptr)
-            {
-                LL_WARNS_ONCE() << "setManualImage: GL_LUMINANCE_ALPHA conversion skipped, "
-                                << width << "x" << height << " exceeds scratch buffer" << LL_ENDL;
-                pixels = nullptr;
-            }
-
-            pixformat = GL_RGBA;
-            intformat = GL_RGBA8;
-        }
-
-        if (pixformat == GL_LUMINANCE && pixtype == GL_UNSIGNED_BYTE)
-        { //GL_LUMINANCE is deprecated, convert to RGBA via manual-pack scratch
-            if (pixels != nullptr && scratch_fits)
-            {
-                U32 pixel_count = (U32)(width * height);
-                for (U32 i = 0; i < pixel_count; i++)
-                {
-                    U8 lum = ((U8*)pixels)[i];
-
-                    U8* pix = (U8*)&sManualScratch[i];
-                    pix[0] = pix[1] = pix[2] = lum;
-                    pix[3] = 255;
-                }
-
-                pixels = sManualScratch;
-            }
-            else if (pixels != nullptr)
-            {
-                LL_WARNS_ONCE() << "setManualImage: GL_LUMINANCE conversion skipped, "
-                                << width << "x" << height << " exceeds scratch buffer" << LL_ENDL;
-                pixels = nullptr;
-            }
-            pixformat = GL_RGBA;
-            intformat = GL_RGBA8;
-        }
-    }
+    resolveUploadFormat(intformat, pixformat, pixtype, pixels, width, height);
 
     stop_glerror();
     {
@@ -2355,9 +2257,6 @@ void LLImageGL::applySwizzleForDeprecatedFormat(LLTexUnit::eTextureType type, U3
     // identify the format they originally asked for and let this routine
     // pick the matching mask. Keeps GL_TEXTURE_SWIZZLE_RGBA and the
     // mask-component constants out of the call sites.
-    if (gGLManager.mGLVersion < CONVERSION_SCRATCH_BUFFER_GL_VERSION)
-        return;
-
     LLGLint mask[4];
     switch (original_format)
     {
@@ -2392,14 +2291,6 @@ void LLImageGL::resolveDeprecatedFormat()
     // createGLTexture can apply the matching swizzle once via
     // applySwizzleForDeprecatedFormat.
     //
-    // Gate is GL version, not core profile. GL_TEXTURE_SWIZZLE_RGBA is in
-    // both profiles since GL 3.3, so the same path works for both. Below the
-    // 3.29 floor setManualImage takes its manual-buffer-convert path which
-    // keys on the deprecated names; we must NOT rewrite mFormatPrimary out
-    // from under it there.
-    if (gGLManager.mGLVersion < CONVERSION_SCRATCH_BUFFER_GL_VERSION)
-        return;
-
     switch (mFormatPrimary)
     {
     case GL_ALPHA:

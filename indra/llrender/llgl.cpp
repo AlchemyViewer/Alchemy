@@ -1244,6 +1244,18 @@ bool LLGLManager::initGL()
         parse_glsl_version(mGLSLVersionMajor, mGLSLVersionMinor);
     }
 
+    // The renderer assumes GL 4.1 unconditionally: deprecated formats are re-expressed
+    // via GL_TEXTURE_SWIZZLE_RGBA rather than repacked on the CPU, the texture upload
+    // thread is always enabled, and the shader backend expects GLSL 4.10. Below the
+    // floor those assumptions do not hold and behaviour is undefined rather than
+    // degraded. This is a diagnostic only -- refusing to launch is a separate change.
+    if (mGLVersion < GL_MINIMUM_VERSION)
+    {
+        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " is below the "
+                               << GL_MINIMUM_VERSION << " minimum this viewer requires. "
+                               << "Rendering will misbehave." << LL_ENDL;
+    }
+
     // Trailing space necessary to keep "nVidia Corpor_ati_on" cards
     // from being recognized as ATI.
     // NOTE: AMD has been pretty good about not breaking this check, do not rename without good reason
@@ -1638,6 +1650,10 @@ void LLGLManager::initExtensions()
         mHasAnisotropic = mGLExtensions.contains("GL_EXT_texture_filter_anisotropic");
     }
 
+    // Core in 4.2; on a 4.1 context (macOS) it is still reachable as an ARB extension.
+    // Downgraded below if the entry point turns out not to resolve.
+    mHasTextureStorage = mGLVersion >= 4.19f || mGLExtensions.contains("GL_ARB_texture_storage");
+
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
     mHasEXTMemoryObject  = mGLExtensions.contains("GL_EXT_memory_object");
@@ -1657,6 +1673,37 @@ void LLGLManager::initExtensions()
     LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
 
     // Init EXT and ARB extensions FIRST, because they may be used in later GL versions
+
+    // Immutable texture storage. Resolved here rather than left to the GL_VERSION_4_2
+    // block below: that ladder early-outs before 4.2, so on a 4.1 context exposing
+    // GL_ARB_texture_storage -- macOS -- these would otherwise stay null. On 4.2+ the
+    // ladder resolves the same pointers again, which is harmless.
+    if (mHasTextureStorage)
+    {
+        glTexStorage1D = (PFNGLTEXSTORAGE1DPROC)LL_GET_PROC_ADDRESS("glTexStorage1D");
+        glTexStorage2D = (PFNGLTEXSTORAGE2DPROC)LL_GET_PROC_ADDRESS("glTexStorage2D");
+        glTexStorage3D = (PFNGLTEXSTORAGE3DPROC)LL_GET_PROC_ADDRESS("glTexStorage3D");
+
+        if (!glTexStorage2D)
+        {
+            // Advertised but not resolvable. Don't let callers trust the flag.
+            mHasTextureStorage = false;
+            LL_WARNS("RenderInit") << "Immutable texture storage advertised (GL " << mGLVersion
+                                   << ") but glTexStorage2D did not resolve; using mutable textures."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Immutable texture storage available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.19f ? ", core)" : ", GL_ARB_texture_storage)")
+                                   << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_INFOS("RenderInit") << "Immutable texture storage unavailable (GL " << mGLVersion
+                               << ", no GL_ARB_texture_storage); using mutable textures." << LL_ENDL;
+    }
 
     // GL_EXT_memory_object
     if (mHasEXTMemoryObject)

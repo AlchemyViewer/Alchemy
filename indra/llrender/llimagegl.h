@@ -148,7 +148,7 @@ protected:
     // (GL_LUMINANCE / GL_ALPHA / GL_LUMINANCE_ALPHA) to their core-profile-
     // valid equivalents (GL_RED + R8 with a {R,R,R,1} swizzle, etc.). Records
     // the swizzle mask so the next createGLTexture can apply it once. No-op
-    // off core profile or for non-deprecated formats.
+    // for non-deprecated formats.
     //
     // Must run AFTER calcAlphaChannelOffsetAndStride: the alpha layout
     // calc keys on the deprecated names (GL_LUMINANCE_ALPHA stride=2 etc).
@@ -177,10 +177,7 @@ public:
     // `original_format` is one of GL_ALPHA, GL_LUMINANCE, GL_LUMINANCE_ALPHA;
     // anything else is a no-op. Centralizes the swizzle table so callers
     // outside llrender don't need to know the GL_RED/GL_GREEN/GL_ZERO/GL_ONE
-    // mask layout (or even that GL_TEXTURE_SWIZZLE_RGBA exists). Below the
-    // GL 3.29 floor (where GL_TEXTURE_SWIZZLE_RGBA isn't reliably available)
-    // this is a no-op — the caller is expected to take the manual-buffer-
-    // convert path setManualImage falls into.
+    // mask layout (or even that GL_TEXTURE_SWIZZLE_RGBA exists).
     //
     // For LLImageGL instances, createGLTexture calls this internally based
     // on the format resolved by setExplicitFormat / the auto-format switch;
@@ -295,6 +292,17 @@ public:
     mutable F32  mLastBindTime; // last time this was bound, by discard level
 
 private:
+    // Resolve the GL formats and pixel data an upload will actually use: deprecated
+    // format rewriting (GL_ALPHA/GL_LUMINANCE -> R8/RG8, read back through the
+    // texture's swizzle). In/out parameters are rewritten in place.
+    //
+    // Split out of setManualImage because allocation and upload need the resolved
+    // format independently: glTexStorage2D has to be given the internal format before
+    // any pixels are written. Resolution is deterministic, so resolving once for the
+    // allocation and again per upload yields consistent formats.
+    static void resolveUploadFormat(S32& intformat, U32& pixformat, U32& pixtype,
+                                    const void*& pixels, S32 width, S32 height);
+
     U32 createPickMask(S32 pWidth, S32 pHeight);
     void freePickMask();
     bool isCompressed();
@@ -324,6 +332,11 @@ protected:
     LLGLenum mTarget;       // Normally GL_TEXTURE2D, sometimes something else (ex. cube maps)
     LLTexUnit::eTextureType mBindTarget;    // Normally TT_TEXTURE, sometimes something else (ex. cube maps)
     bool mHasMipMaps;
+    // Number of mip levels the texture holds -- a COUNT, not a highest-index. 1 means
+    // level 0 only; 0 means no texture yet. Matches LLRenderTarget::mMipLevels, and is
+    // what glTexStorage2D takes. Computed once up front by calcMipLevelCount rather than
+    // accumulated during upload, because allocation has to know it before any level is
+    // written.
     S32 mMipLevels;
 
     LLGLboolean mIsResident;
@@ -369,7 +382,6 @@ public:
 
 public:
     static void initClass(LLWindow* window, S32 num_catagories, bool skip_analyze_alpha = false, bool thread_texture_loads = false, bool thread_media_updates = false);
-    static void allocateConversionBuffer();
     static void cleanupClass() ;
 
 private:
@@ -377,7 +389,6 @@ private:
     static bool sSkipAnalyzeAlpha;
     static U32 sScratchPBO;
     static U32 sScratchPBOSize;
-    static U32* sManualScratch;
 
     //the flag to allow to call readBackRaw(...).
     //can be removed if we do not use that function at all.
