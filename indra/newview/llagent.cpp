@@ -5179,7 +5179,7 @@ void LLAgent::renderAutoPilotTarget()
         gGL.pushMatrix();
 
         // not textured
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         // lovely green
         gGL.color4f(0.f, 1.f, 1.f, 1.f);

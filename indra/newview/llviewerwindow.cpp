@@ -682,13 +682,13 @@ public:
             // Sampler traffic. The ratio is the point: sampler objects cost a glBindSampler
             // that baked texture state did not, but only when the sampler actually changes.
             {
-                const U32 sampler_binds = LLTexUnit::sSamplerBinds;
-                const U32 tex_binds     = LLTexUnit::sTextureBinds;
+                const U32 sampler_binds = ALTextureSlot::sSamplerBinds;
+                const U32 tex_binds     = ALTextureSlot::sTextureBinds;
                 addText(xpos, ypos, llformat("%d Sampler Binds (%d flushed, %d SPLIT BATCH, %d shadow-cycle, %d skipped, %.2f per tex bind)",
-                                             sampler_binds, LLTexUnit::sSamplerBindsFlushed,
-                                             LLTexUnit::sSamplerBindsSplitBatch,
-                                             LLTexUnit::sSamplerBindsShadowCycle,
-                                             LLTexUnit::sSamplerSkips,
+                                             sampler_binds, ALTextureSlot::sSamplerBindsFlushed,
+                                             ALTextureSlot::sSamplerBindsSplitBatch,
+                                             ALTextureSlot::sSamplerBindsShadowCycle,
+                                             ALTextureSlot::sSamplerSkips,
                                              tex_binds ? (F32)sampler_binds / (F32)tex_binds : 0.f));
                 ypos += y_inc;
             }
@@ -4511,7 +4511,7 @@ void LLViewerWindow::renderSelections( bool for_gl_pick, bool pick_parcel_walls,
         // Render light for editing
         if (LLSelectMgr::sRenderLightRadius && LLToolMgr::getInstance()->inEdit())
         {
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
             LLGLEnable gls_blend(GL_BLEND);
             LLGLEnable gls_cull(GL_CULL_FACE);
             LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);

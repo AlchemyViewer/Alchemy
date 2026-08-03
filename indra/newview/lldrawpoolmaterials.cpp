@@ -151,9 +151,9 @@ static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigge
             LLViewerTexture* normal  = slot.mNormalMap.notNull() ? slot.mNormalMap.get() : LLViewerFetchedTexture::sFlatNormalImagep.get();
             LLViewerTexture* spec    = slot.mSpecularMap.notNull() ? slot.mSpecularMap.get() : LLViewerFetchedTexture::sWhiteImagep.get();
 
-            gGL.getTexUnit(s)->bindFast(diffuse, ALSamplers::AnisoWrap);
-            gGL.getTexUnit(N + s)->bindFast(normal, ALSamplers::AnisoWrap);
-            gGL.getTexUnit(2 * N + s)->bindFast(spec, ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(s)->bindFast(diffuse, ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(N + s)->bindFast(normal, ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(2 * N + s)->bindFast(spec, ALSamplers::AnisoWrap);
 
             spec_color[4 * s + 0] = slot.mSpecColor.mV[0];
             spec_color[4 * s + 1] = slot.mSpecColor.mV[1];
@@ -273,7 +273,7 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
     LLTexture* lastSpecMap = nullptr;
     LLTexture* lastDiffuse = nullptr;
 
-    gGL.getTexUnit(diffuseChannel)->unbindFast(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(diffuseChannel)->unbindFast();
 
     if (has_intensity)
     {
@@ -340,14 +340,14 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         {
             lastNormalMap = params.mNormalMap;
             llassert(lastNormalMap);
-            gGL.getTexUnit(normChannel)->bindFast(lastNormalMap, ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(normChannel)->bindFast(lastNormalMap, ALSamplers::AnisoWrap);
         }
 
         if (specChannel > -1 && params.mSpecularMap != lastSpecMap)
         {
             lastSpecMap = params.mSpecularMap;
             llassert(lastSpecMap);
-            gGL.getTexUnit(specChannel)->bindFast(lastSpecMap, ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(specChannel)->bindFast(lastSpecMap, ALSamplers::AnisoWrap);
         }
 
         if (params.mTexture != lastDiffuse)
@@ -355,11 +355,11 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
             lastDiffuse = params.mTexture;
             if (lastDiffuse)
             {
-                gGL.getTexUnit(diffuseChannel)->bindFast(lastDiffuse, ALSamplers::AnisoWrap);
+                gGL.getTextureSlot(diffuseChannel)->bindFast(lastDiffuse, ALSamplers::AnisoWrap);
             }
             else
             {
-                gGL.getTexUnit(diffuseChannel)->unbindFast(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(diffuseChannel)->unbindFast();
             }
         }
 
@@ -379,7 +379,6 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         //not batching textures or batch has only 1 texture -- might need a texture matrix
         if (params.mTextureMatrix)
         {
-            gGL.getTexUnit(0)->activate();
             gGL.matrixMode(LLRender::MM_TEXTURE0);
 
             gGL.loadMatrix((GLfloat*)params.mTextureMatrix->mMatrix);
@@ -398,7 +397,6 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
 
         if (tex_setup)
         {
-            gGL.getTexUnit(0)->activate();
             gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_MODELVIEW);
         }

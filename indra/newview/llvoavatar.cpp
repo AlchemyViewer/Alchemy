@@ -5616,7 +5616,7 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     {
         LLGLEnable blend(GL_BLEND);
         gGL.setSceneBlendType(LLRender::BT_ADD);
-        gGL.getTexUnit(diffuse_channel)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(diffuse_channel)->unbind();
 
         gGL.begin(LLRender::LINES);
         gGL.color4f(1.f,1.f,1.f,1.f);
@@ -5640,7 +5640,7 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     // TFO_POINT: an impostor is a screen-aligned billboard rendered at its own resolution,
     // so filtering it only smears the silhouette. This used to be written onto the texture
     // when the impostor was allocated.
-    gGL.getTexUnit(diffuse_channel)->bind(&mImpostor, false,
+    gGL.getTextureSlot(diffuse_channel)->bind(&mImpostor, false,
                                           gGL.getSampler(ALSamplers::PointClamp));
     gGL.begin(LLRender::TRIANGLES);
     {
@@ -5889,7 +5889,7 @@ void LLVOAvatar::updateTextures()
             {
                 // Same shape as LLLocalTextureObject's: a bind with nothing drawn after it,
                 // touching a baked layer that has not loaded. A residency nudge, not a sample.
-                gGL.getTexUnit(0)->bindSampled(getImage( mBakedTextureDatas[i].mTextureIndex, 0 ), ALSamplers::AnisoWrap);
+                gGL.getTextureSlot(0)->bindSampled(getImage( mBakedTextureDatas[i].mTextureIndex, 0 ), ALSamplers::AnisoWrap);
             }
         }
     }

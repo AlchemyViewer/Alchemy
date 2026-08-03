@@ -90,7 +90,7 @@ void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 
 {
     U32 texUnit = gGL.getCurrentTexUnitIndex();
     llassert(texUnit == 0); // allocations should always be done on tex unit 0
-    U32 texName = gGL.getTexUnit(texUnit)->getCurrTexture();
+    U32 texName = gGL.getTextureSlot(texUnit)->getCurrTexture();
     U64 size = LLImageGL::dataFormatVRAMBytes(intformat, width, height);
     if (has_mips)
     {
@@ -152,7 +152,7 @@ void LLImageGLMemory::free_cur_tex_image()
 {
     U32 texUnit = gGL.getCurrentTexUnitIndex();
     llassert(texUnit == 0); // frees should always be done on tex unit 0
-    U32 texName = gGL.getTexUnit(texUnit)->getCurrTexture();
+    U32 texName = gGL.getTextureSlot(texUnit)->getCurrTexture();
     free_tex_image(texName);
 }
 
@@ -581,12 +581,12 @@ void LLImageGL::updateStats(F32 current_time)
     sBindCount   = 0;
     sUniqueCount = 0;
 
-    LLTexUnit::sSamplerBinds = 0;
-    LLTexUnit::sSamplerSkips = 0;
-    LLTexUnit::sTextureBinds = 0;
-    LLTexUnit::sSamplerBindsFlushed = 0;
-    LLTexUnit::sSamplerBindsSplitBatch = 0;
-    LLTexUnit::sSamplerBindsShadowCycle = 0;
+    ALTextureSlot::sSamplerBinds = 0;
+    ALTextureSlot::sSamplerSkips = 0;
+    ALTextureSlot::sTextureBinds = 0;
+    ALTextureSlot::sSamplerBindsFlushed = 0;
+    ALTextureSlot::sSamplerBindsSplitBatch = 0;
+    ALTextureSlot::sSamplerBindsShadowCycle = 0;
 }
 
 //----------------------------------------------------------------------------
@@ -596,7 +596,7 @@ void LLImageGL::destroyGL()
 {
     for (S32 stage = 0; stage < gGLManager.mNumTextureImageUnits; stage++)
     {
-        gGL.getTexUnit(stage)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(stage)->unbind();
     }
 }
 
@@ -663,8 +663,7 @@ LLImageGL::LLImageGL(
     LLGLenum target,
     LLGLint  formatInternal,
     LLGLenum formatPrimary,
-    LLGLenum formatType,
-    LLTexUnit::eTextureAddressMode)
+    LLGLenum formatType)
 :   mExternalTexture(true)  // ctor previously left this uninitialized,
                             // making the dtor's `!mExternalTexture && ...`
                             // gate read indeterminate memory — could go
@@ -732,7 +731,7 @@ void LLImageGL::init(bool usemipmaps)
     mCurrentDiscardLevel = -1;
 
     mTarget = GL_TEXTURE_2D;
-    mBindTarget = LLTexUnit::TT_TEXTURE;
+    mBindTarget = ALTextureSlot::TT_TEXTURE;
     mHasMipMaps = false;
     mMipLevels = 0;
 
@@ -921,7 +920,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
     if (mUseMipMaps)
     {
         //set has mip maps to true before binding image so tex parameters get set properly
-        gGL.getTexUnit(0)->unbind(mBindTarget);
+        gGL.getTextureSlot(0)->unbind();
 
         mHasMipMaps = true;
     }
@@ -930,7 +929,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
         mHasMipMaps = false;
     }
 
-    gGL.getTexUnit(0)->bind(this, false, false, usename);
+    gGL.getTextureSlot(0)->bind(this, false, false, usename);
 
     // Allocate the whole texture up front, so every write below is a sub-image.
     // glTexStorage2D must be called exactly once for the object and needs the level count
@@ -1388,7 +1387,7 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
 
         const U8* sub_datap = datap + (y_pos * data_width + x_pos) * getComponents();
         // Update the GL texture
-        bool res = gGL.getTexUnit(0)->bindManual(mBindTarget, tex_name);
+        bool res = gGL.getTextureSlot(0)->bindManual(mBindTarget, tex_name);
         if (!res) LL_ERRS() << "LLImageGL::setSubImage(): bindTexture failed" << LL_ENDL;
         stop_glerror();
 
@@ -1407,7 +1406,7 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         }
         if (!skip_unbind)
         {
-            gGL.getTexUnit(0)->disable();
+            gGL.getTextureSlot(0)->unbind();
         }
         stop_glerror();
 
@@ -1433,7 +1432,7 @@ bool LLImageGL::setSubImage(const LLImageRaw* imageraw, S32 x_pos, S32 y_pos, S3
 // Copy sub image from frame buffer
 bool LLImageGL::setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_pos, S32 width, S32 height)
 {
-    if (gGL.getTexUnit(0)->bind(this, false, true))
+    if (gGL.getTextureSlot(0)->bind(this, false, true))
     {
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, x_pos, y_pos, fb_x, fb_y, width, height);
         mGLTextureCreated = true;
@@ -1832,9 +1831,9 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
         LLImageGL::generateTextures(1, &new_texname);
         mStorageAllocated = false; // brand-new name, no storage allocated yet
         {
-            gGL.getTexUnit(0)->bind(this, false, false, new_texname);
-            glTexParameteri(LLTexUnit::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
-            glTexParameteri(LLTexUnit::getInternalType(mBindTarget), GL_TEXTURE_MAX_LEVEL, mMaxDiscardLevel - discard_level);
+            gGL.getTextureSlot(0)->bind(this, false, false, new_texname);
+            glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_BASE_LEVEL, 0);
+            glTexParameteri(ALTextureSlot::getInternalType(mBindTarget), GL_TEXTURE_MAX_LEVEL, mMaxDiscardLevel - discard_level);
             // Apply the swizzle mask once if resolveDeprecatedFormat saved
             // an original format. Per-texture state persists across
             // glTexImage2D / scaleDown reallocations, so we never re-set it.
@@ -1868,7 +1867,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
     }
 
     // things will break if we don't unbind after creation
-    gGL.getTexUnit(0)->unbind(mBindTarget);
+    gGL.getTextureSlot(0)->unbind();
 
     //if we're on the image loading thread, be sure to delete old_texname and update mTexName on the main thread
     if (!defer_copy)
@@ -2022,11 +2021,11 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     S32 gl_discard = discard_level - mCurrentDiscardLevel;
 
     //explicitly unbind texture
-    gGL.getTexUnit(0)->unbind(mBindTarget);
+    gGL.getTextureSlot(0)->unbind();
     // llverify is debug-only; in release a failed bind would have left
     // glGetTexImage reading from whatever the previous bind was, returning
     // bytes for the wrong texture. Check the result and bail.
-    if (!gGL.getTexUnit(0)->bindManual(mBindTarget, mTexName))
+    if (!gGL.getTextureSlot(0)->bindManual(mBindTarget, mTexName))
     {
         LL_WARNS() << "readBackRaw: bindManual failed for tex " << mTexName << LL_ENDL;
         return false;
@@ -2287,7 +2286,7 @@ bool LLImageGL::getIsAlphaMask() const
     return mIsMask;
 }
 
-void LLImageGL::setTarget(const LLGLenum target, const LLTexUnit::eTextureType bind_target)
+void LLImageGL::setTarget(const LLGLenum target, const ALTextureSlot::eTextureType bind_target)
 {
     mTarget = target;
     mBindTarget = bind_target;
@@ -2386,7 +2385,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
 }
 
 // static
-void LLImageGL::applySwizzleForDeprecatedFormat(LLTexUnit::eTextureType type, U32 original_format)
+void LLImageGL::applySwizzleForDeprecatedFormat(ALTextureSlot::eTextureType type, U32 original_format)
 {
     // Swizzle table is owned here; callers (LLImageGL::createGLTexture for
     // resolved instances, llvoavatar's morph-mask upload for raw GL textures)
@@ -2411,7 +2410,7 @@ void LLImageGL::applySwizzleForDeprecatedFormat(LLTexUnit::eTextureType type, U3
     default:
         return;  // not a format we re-express via swizzle
     }
-    glTexParameteriv(LLTexUnit::getInternalType(type), GL_TEXTURE_SWIZZLE_RGBA, mask);
+    glTexParameteriv(ALTextureSlot::getInternalType(type), GL_TEXTURE_SWIZZLE_RGBA, mask);
 }
 
 void LLImageGL::resolveDeprecatedFormat()
@@ -2823,14 +2822,16 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         glViewport(0, 0, desired_width, desired_height);
 
         // draw a full screen triangle, sampling the old (larger) texture
-        if (gGL.getTexUnit(0)->bind(this, true, true))
+        if (gGL.getTextureSlot(0)->bind(this, true, true))
         {
             glDrawArrays(GL_TRIANGLES, 0, 3);
 
             // Bind the new name and give it storage, then copy the rendered result out
             // of the framebuffer into it. glCopyTexSubImage2D is a sub-image write, so
-            // it is legal on immutable storage.
-            gGL.getTexUnit(0)->bindManual(mBindTarget, new_texname);
+            // it is legal on immutable storage. Sampler 0, NOT mHasMipMaps -- the third
+            // parameter selects a sampler object now, and glGenerateMipmap below must run
+            // under the texture's own SKIP_DECODE state, not a leftover sampler's.
+            gGL.getTextureSlot(0)->bindManual(mBindTarget, new_texname);
             allocateTextureStorage(desired_width, desired_height, mHasMipMaps);
             glCopyTexSubImage2D(mTarget, 0, 0, 0, 0, 0, desired_width, desired_height);
 
@@ -2840,7 +2841,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
                 glGenerateMipmap(mTarget);
             }
 
-            gGL.getTexUnit(0)->unbind(mBindTarget);
+            gGL.getTextureSlot(0)->unbind();
         }
         else
         {
@@ -2853,7 +2854,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     { // use a PBO to downscale the texture
         U64 size = getBytes(desired_discard);
         llassert(size <= 2048 * 2048 * 4); // we shouldn't be using this method to downscale huge textures, but it'll work
-        gGL.getTexUnit(0)->bind(this, false, true);
+        gGL.getTextureSlot(0)->bind(this, false, true);
 
         if (sScratchPBO == 0)
         {
@@ -2874,8 +2875,10 @@ bool LLImageGL::scaleDown(S32 desired_discard)
 
         glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 
-        // ...and back out of the PBO into the new one
-        gGL.getTexUnit(0)->bindManual(mBindTarget, new_texname);
+        // ...and back out of the PBO into the new one. Sampler 0, NOT mHasMipMaps -- the
+        // third parameter selects a sampler object now, and glGenerateMipmap below must
+        // run under the texture's own SKIP_DECODE state, not a leftover sampler's.
+        gGL.getTextureSlot(0)->bindManual(mBindTarget, new_texname);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, sScratchPBO);
         allocateTextureStorage(desired_width, desired_height, mHasMipMaps);
         glTexSubImage2D(mTarget, 0, 0, 0, desired_width, desired_height, mFormatPrimary, mFormatType, nullptr);
@@ -2887,7 +2890,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
             glGenerateMipmap(mTarget);
         }
 
-        gGL.getTexUnit(0)->unbind(mBindTarget);
+        gGL.getTextureSlot(0)->unbind();
     }
 
     // Retire the old texture and publish the new one. Accounting for the new allocation

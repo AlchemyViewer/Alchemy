@@ -134,7 +134,7 @@ public:
     void       setGLTextureCreated (bool initialized);
     void       setCategory(S32 category) ;
     void       setTexName(LLGLuint); // for forcing w/ externally created textures only
-    void       setTarget(const LLGLenum target, const LLTexUnit::eTextureType bind_target);
+    void       setTarget(const LLGLenum target, const ALTextureSlot::eTextureType bind_target);
 
     S32        getMaxDiscardLevel() const;
     S32        getDiscardLevel() const;
@@ -143,7 +143,7 @@ public:
     S32Bytes   getTextureMemory() const ;
     LLGLenum   getPrimaryFormat() const;
     bool       getIsAlphaMask() const ;
-    LLTexUnit::eTextureType getTarget(void) const ;
+    ALTextureSlot::eTextureType getTarget(void) const ;
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
     bool       getMask(const LLVector2 &tc) const;
 // [/RLVa:KB]

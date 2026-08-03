@@ -299,7 +299,7 @@ void LLWind::renderVectors()
 
     F32 region_width_meters = LLWorld::getInstance()->getRegionWidthInMeters();
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gGL.pushMatrix();
     LLVector3 origin_agent;
     origin_agent = gAgent.getPosAgentFromGlobal(mOriginGlobal);
@@ -335,7 +335,7 @@ void LLViewerParcelMgr::renderRect(const LLVector3d &west_south_bottom_global,
                                    const LLVector3d &east_north_top_global)
 {
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest gls_depth(GL_TRUE);
 
     LLVector3 west_south_bottom_agent = gAgent.getPosAgentFromGlobal(west_south_bottom_global);
@@ -510,7 +510,7 @@ void LLViewerParcelMgr::renderHighlightSegments(const U8* segments, LLViewerRegi
     bool has_segments = false;
 
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest gls_depth(GL_TRUE);
 
     static LLCachedControl<bool> RenderParcelSelectionToMaxBuildHeight(gSavedSettings, "RenderParcelSelectionToMaxHeight", false);
@@ -605,11 +605,11 @@ void LLViewerParcelMgr::renderCollisionSegments(U8* segments, bool use_pass, LLV
 
     if (use_pass && (mCollisionBanned == BA_NOT_ON_LIST))
     {
-        gGL.getTexUnit(0)->bindSampled(mPassImage, ALSamplers::AnisoWrap);
+        gGL.getTextureSlot(0)->bindSampled(mPassImage, ALSamplers::AnisoWrap);
     }
     else
     {
-        gGL.getTexUnit(0)->bindSampled(mBlockedImage, ALSamplers::AnisoWrap);
+        gGL.getTextureSlot(0)->bindSampled(mBlockedImage, ALSamplers::AnisoWrap);
     }
 
     gGL.begin(LLRender::TRIANGLES);
@@ -765,7 +765,7 @@ void LLViewerObjectList::renderObjectBeacons()
     gUIProgram.bind();
 
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         S32 last_line_width = -1;
         // gGL.begin(LLRender::LINES); // Always happens in (line_width != last_line_width)
@@ -794,7 +794,7 @@ void LLViewerObjectList::renderObjectBeacons()
     }
 
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         LLGLDepthTest gls_depth(GL_TRUE);
 
         S32 last_line_width = -1;
@@ -849,7 +849,7 @@ void LLSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& di
 {
     LLGLSUIDefault gls_ui;
     gUIProgram.bind();
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     LLVector3 pos_end;
     for (S32 i = 0; i < 3; ++i)
@@ -897,7 +897,7 @@ class TextureHolder
 {
 public:
     TextureHolder(U32 unit, U32 size) :
-        texUnit(gGL.getTexUnit(unit)),
+        texUnit(gGL.getTextureSlot(unit)),
         source(size)            // preallocate vector
     {
         // takes (count, pointer)
@@ -910,7 +910,7 @@ public:
         // unbind
         if (texUnit)
         {
-                texUnit->unbind(LLTexUnit::TT_TEXTURE);
+                texUnit->unbind();
         }
         // ensure that we delete these textures regardless of how we exit
         LLImageGL::deleteTextures(static_cast<S32>(source.size()), &source[0]);
@@ -922,15 +922,15 @@ public:
         {
             // Point filtering with no mips is the point of the benchmark -- it forces
             // cache misses. Passed as a sampler so it applies to the sampling binds too.
-            return texUnit->bindManual(LLTexUnit::TT_TEXTURE, source[index],
+            return texUnit->bindManual(ALTextureSlot::TT_TEXTURE, source[index],
                                        gGL.getSampler(ALSamplers::PointWrap));
         }
         return false;
     }
 
 private:
-    // capture which LLTexUnit we're going to use
-    LLTexUnit* texUnit;
+    // capture which ALTextureSlot we're going to use
+    ALTextureSlot* texUnit;
 
     // use std::vector for implicit resource management
     std::vector<U32> source;
@@ -1064,7 +1064,7 @@ F32 gpu_benchmark()
 
         if (!texHolder.bind(i))
         {
-            // can use a dummy value mDummyTexUnit = new LLTexUnit(-1);
+            // can use a dummy value mDummySlot = new ALTextureSlot(-1);
             LL_WARNS("Benchmark") << "Failed to bind tex unit." << LL_ENDL;
             // abandon the benchmark test
             delete[] pixels;

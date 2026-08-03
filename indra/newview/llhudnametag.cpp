@@ -239,7 +239,6 @@ void LLHUDNameTag::renderText()
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
 
     LLColor4 shadow_color(0.f, 0.f, 0.f, 1.f);
     F32 alpha_factor = 1.f;

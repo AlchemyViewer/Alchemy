@@ -1,10 +1,17 @@
 /**
- * @file lltexunit.h
- * @brief LLTexUnit definition
+ * @file altextureslot.h
+ * @brief ALTextureSlot definition
  *
- * Split out of llrender.h so that headers describing texture *sampling* -- notably
- * alsamplerstate.h, which needs these enums -- can be included by llrender.h without a
- * cycle. Nothing about the class changed in the move.
+ * One texture binding point: what resource it holds, what target that resource has, and
+ * which sampler object it is read through. Nothing else.
+ *
+ * This was LLTexUnit, and the rename is the point. A GL "texture unit" was a bundle of state
+ * -- an enable bit per target, a texenv combiner, filtering and wrap parameters -- that a
+ * fixed-function pipeline configured and then drew through. None of that survives: filtering
+ * and wrapping moved to sampler objects (alsamplerstate.h), the combiners went with the
+ * fragment shader, and the enable bits went with them. What is left is a slot, which is also
+ * what D3D11 and Vulkan model -- a resource view bound at an index, plus a sampler bound at
+ * the same index.
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -30,6 +37,7 @@
 
 #pragma once
 
+#include "alsamplerstate.h"
 #include "llglheaders.h"
 
 class LLCubeMap;
@@ -38,15 +46,9 @@ class LLRender;
 class LLRenderTarget;
 class LLTexture;
 
-// Forward-declared rather than included: alsamplerstate.h includes THIS header (it needs the
-// filter/address enums), so including it back would close the cycle. A scoped enum can be
-// declared ahead of its definition as long as the underlying type is spelled out, and this
-// must stay in step with the definition there.
-enum class ALSampler : U16;
+constexpr U32 AL_NUM_TEXTURE_SLOTS = 32;
 
-constexpr U32 LL_NUM_TEXTURE_LAYERS = 32;
-
-class LLTexUnit
+class ALTextureSlot
 {
     friend class LLRender;
 public:
@@ -74,17 +76,28 @@ public:
     // ... of sSamplerBindsFlushed, the ones where the flush found geometry actually queued
     // (gGL.mCount > 0) and emitted a draw. An empty flush is a branch and a return; THIS is
     // the real batch-split count, and where it comes from is the question that matters --
-    // immediate-mode UI alternating glyph-atlas and image samplers on one unit is the usual
+    // immediate-mode UI alternating glyph-atlas and image samplers on one slot is the usual
     // suspect, since scene geometry draws from VBOs with nothing queued in gGL.
     static U32 sSamplerBindsSplitBatch;
 
     // ... of sSamplerBinds, the ones issued by the shadow-map compare-sampler cycle:
-    // releaseCompareSamplerUnits dropping units to sampler 0 plus bindShadowMaps putting the
+    // releaseCompareSamplerUnits dropping slots to sampler 0 plus bindShadowMaps putting the
     // compare sampler back. Scene-dependent through the alpha pass's emissive groups (each
     // costs a release + restore), which makes it the prime suspect for a large standing
     // total that UI toggles barely move.
     static U32 sSamplerBindsShadowCycle;
 
+    // What KIND of resource a slot holds. A property of the resource, not of the slot -- this
+    // is D3D11's SRV dimension, and it lives here only because the slot has to name a target
+    // to issue a classic glBindTexture.
+    //
+    // The four other enums that used to sit alongside it are gone: eTextureBlendType,
+    // eTextureBlendOp and eTextureBlendSrc described the fixed-function texture combiner and
+    // had no references anywhere in the tree, and eTextureColorSpace was likewise unused
+    // (sRGB is a format property now, plus ALSampler::SRGBDecode at the read).
+    // eTextureFilterOptions and eTextureAddressMode moved into ALSampler, which is what
+    // actually decides filtering and wrapping; eTextureMipGeneration moved to LLRenderTarget,
+    // its only consumer.
     typedef enum
     {
         TT_TEXTURE = 0,         // Standard 2D Texture
@@ -93,106 +106,22 @@ public:
         TT_CUBE_MAP_ARRAY,      // Array of cube maps
         TT_MULTISAMPLE_TEXTURE, // see GL_ARB_texture_multisample
         TT_TEXTURE_3D,          // standard 3D Texture
-        TT_NONE,                // No texture type is currently enabled
+        TT_NONE,                // Slot holds nothing
     } eTextureType;
 
-    typedef enum
-    {
-        TAM_WRAP = 0,           // Standard 2D Texture
-        TAM_MIRROR,             // Non power of 2 texture
-        TAM_CLAMP               // No texture type is currently enabled
-    } eTextureAddressMode;
+    ALTextureSlot(S32 index = -1);
 
-    typedef enum
-    {   // Note: If mipmapping or anisotropic are not enabled or supported it should fall back gracefully
-        TFO_POINT = 0,          // Equal to: min=point, mag=point, mip=none.
-        TFO_BILINEAR,           // Equal to: min=linear, mag=linear, mip=point.
-        TFO_TRILINEAR,          // Equal to: min=linear, mag=linear, mip=linear.
-        TFO_ANISOTROPIC         // Equal to: min=anisotropic, max=anisotropic, mip=linear.
-    } eTextureFilterOptions;
-
-    typedef enum
-    {
-        TMG_NONE = 0,           // Mipmaps are not automatically generated for this texture.
-        TMG_AUTO,               // Mipmaps are automatically generated for this texture.
-        TMG_MANUAL              // Mipmaps are manually generated for this texture.
-    } eTextureMipGeneration;
-
-    typedef enum
-    {
-        TB_REPLACE = 0,
-        TB_ADD,
-        TB_MULT,
-        TB_MULT_X2,
-        TB_ALPHA_BLEND,
-        TB_COMBINE          // Doesn't need to be set directly, setTexture___Blend() set TB_COMBINE automatically
-    } eTextureBlendType;
-
-    typedef enum
-    {
-        TBO_REPLACE = 0,            // Use Source 1
-        TBO_MULT,                   // Multiply: ( Source1 * Source2 )
-        TBO_MULT_X2,                // Multiply then scale by 2:  ( 2.0 * ( Source1 * Source2 ) )
-        TBO_MULT_X4,                // Multiply then scale by 4:  ( 4.0 * ( Source1 * Source2 ) )
-        TBO_ADD,                    // Add: ( Source1 + Source2 )
-        TBO_ADD_SIGNED,             // Add then subtract 0.5: ( ( Source1 + Source2 ) - 0.5 )
-        TBO_SUBTRACT,               // Subtract Source2 from Source1: ( Source1 - Source2 )
-        TBO_LERP_VERT_ALPHA,        // Interpolate based on Vertex Alpha (VA): ( Source1 * VA + Source2 * (1-VA) )
-        TBO_LERP_TEX_ALPHA,         // Interpolate based on Texture Alpha (TA): ( Source1 * TA + Source2 * (1-TA) )
-        TBO_LERP_PREV_ALPHA,        // Interpolate based on Previous Alpha (PA): ( Source1 * PA + Source2 * (1-PA) )
-        TBO_LERP_CONST_ALPHA        // Interpolate based on Const Alpha (CA): ( Source1 * CA + Source2 * (1-CA) )
-    } eTextureBlendOp;
-
-    typedef enum
-    {
-        TBS_PREV_COLOR = 0,         // Color from the previous texture stage
-        TBS_PREV_ALPHA,
-        TBS_ONE_MINUS_PREV_COLOR,
-        TBS_ONE_MINUS_PREV_ALPHA,
-        TBS_TEX_COLOR,              // Color from the texture bound to this stage
-        TBS_TEX_ALPHA,
-        TBS_ONE_MINUS_TEX_COLOR,
-        TBS_ONE_MINUS_TEX_ALPHA,
-        TBS_VERT_COLOR,             // The vertex color currently set
-        TBS_VERT_ALPHA,
-        TBS_ONE_MINUS_VERT_COLOR,
-        TBS_ONE_MINUS_VERT_ALPHA,
-        TBS_CONST_COLOR,            // The constant color value currently set
-        TBS_CONST_ALPHA,
-        TBS_ONE_MINUS_CONST_COLOR,
-        TBS_ONE_MINUS_CONST_ALPHA
-    } eTextureBlendSrc;
-
-    typedef enum
-    {
-        TCS_LINEAR = 0,
-        TCS_SRGB
-    } eTextureColorSpace;
-
-    LLTexUnit(S32 index = -1);
-
-    // Refreshes renderer state of the texture unit to the cached values
+    // Refreshes renderer state of the slot to the cached values
     // Needed when the render context has changed and invalidated the current state
     void refreshState(void);
 
-    // returns the index of this texture unit
+    // returns the index of this slot
     S32 getIndex(void) const { return mIndex; }
 
-    // Sets this tex unit to be the currently active one
-    void activate(void);
-
-    // Enables this texture unit for the given texture type
-    // (automatically disables any previously enabled texture type)
-    void enable(eTextureType type);
-
-    // Disables the current texture unit
-    void disable(void);
-
-    // Binds the LLImageGL to this texture unit WITHOUT selecting a sampler -- the unit
-    // keeps whatever sampler the previous bind left. For bind-to-edit (allocation, upload,
-    // glGenerateMipmap), where nothing samples through the unit; a bind that will be
-    // sampled goes through bindSampled/bindFast so the caller names how.
-    // (automatically enables the unit for the LLImageGL's texture type)
+    // Binds the LLImageGL to this slot WITHOUT selecting a sampler -- the slot keeps whatever
+    // sampler the previous bind left. For bind-to-edit (allocation, upload, glGenerateMipmap),
+    // where nothing samples through the slot; a bind that will be sampled goes through
+    // bindSampled/bindFast so the caller names how.
     bool bind(LLImageGL* texture, bool for_rendering = false, bool forceBind = false, S32 usename = 0);
 
     // Bind AND select the sampler in one step. The caller names the whole sampling mode;
@@ -209,35 +138,37 @@ public:
     // The CALLER names how it wants to sample; the resource contributes nothing.
     void bindFast(LLTexture* texture, ALSampler key);
 
-    // Binds a cubemap to this texture unit
-    // (automatically enables the texture unit for cubemaps)
+    // Binds a cubemap to this slot
     bool bind(LLCubeMap* cubeMap, ALSampler key);
 
-    // Binds a render target to this texture unit
-    // (automatically enables the texture unit for the RT's texture type)
-    // sampler is an ALSamplerCache name, or 0 for the texture object's own state.
+    // Binds a render target to this slot
+    // sampler is an ALSamplerCache name, or 0 for the target's own per-attachment default.
     bool bind(LLRenderTarget * renderTarget, bool bindDepth = false, U32 sampler = 0);
 
-    // Manually binds a texture to the texture unit
-    // (automatically enables the tex unit for the given texture type)
+    // Manually binds a texture to the slot
     // sampler is an ALSamplerCache name, or 0 to sample through the texture object's own
     // state. Applied even when the texture binding is unchanged -- see bindSampler.
     bool bindManual(eTextureType type, U32 texture, U32 sampler = 0);
 
-    // Unbinds the currently bound texture of the given type
-    // (only if there's a texture of the given type currently bound)
-    void unbind(eTextureType type);
+    // Release whatever this slot holds.
+    //
+    // NO TYPE ARGUMENT: the slot knows its own target. The pair this replaces --
+    // unbind(eTextureType) plus disable() -- made the caller state the target and then did
+    // nothing at all if it guessed wrong, so an unbind(TT_TEXTURE) aimed at a slot still
+    // holding a cube map silently left it bound. Callers were starting to work around it by
+    // hand (unbind(getCurrType()) guarded on TT_NONE, which is exactly this function).
+    void unbind();
 
     // Fast but unsafe version of unbind
-    void unbindFast(eTextureType type);
+    void unbindFast();
 
     // NO setTextureFilteringOption / setTextureAddressMode here.
     //
-    // Filtering and addressing are properties of a SAMPLER, not of a texture, which is the
-    // model D3D11/12 and Vulkan have and the one this renderer now uses throughout. Write the
-    // sampler to the bind call. There is no way to put sampling state on a texture at all --
-    // LLImageGL stopped carrying any, which is what makes that impossible rather than merely
-    // discouraged.
+    // Filtering and addressing are properties of a SAMPLER, not of a texture and not of a
+    // slot, which is the model D3D11/12 and Vulkan have and the one this renderer now uses
+    // throughout. Write the sampler to the bind call. There is no way to put sampling state
+    // on a texture at all -- LLImageGL stopped carrying any, which is what makes that
+    // impossible rather than merely discouraged.
     //
     // The removed pair wrote glTexParameteri onto whatever texture object was bound, and a
     // bound sampler object overrides that state wholesale -- so the call did nothing and
@@ -246,11 +177,11 @@ public:
     // correct, which made reaching for the wrong one easy. Reintroducing either means
     // reintroducing both problems.
 
-    // Select the sampler object this unit samples through, from ALSamplerCache.
+    // Select the sampler object this slot samples through, from ALSamplerCache.
     //
     // Pass 0 to fall back to the bound texture object's own filter/wrap/compare state.
     // A sampler object OVERRIDES that state wholesale while bound, so a leftover
-    // glTexParameteri on a unit with a non-zero sampler is a silent no-op -- when
+    // glTexParameteri on a slot with a non-zero sampler is a silent no-op -- when
     // converting a bind path, convert every filtering call that follows it.
     //
     // Never selects a sampler for TT_MULTISAMPLE_TEXTURE: sampling a multisample
@@ -259,9 +190,9 @@ public:
 
     static U32 getInternalType(eTextureType type);
 
-    U32 getCurrTexture(void) { return mCurrTexture; }
+    U32 getCurrTexture(void) const { return mCurrTexture; }
 
-    eTextureType getCurrType(void) { return mCurrTexType; }
+    eTextureType getCurrType(void) const { return mCurrTexType; }
 
 protected:
     friend class LLRender;
@@ -269,9 +200,23 @@ protected:
     S32                 mIndex;
     U32                 mCurrTexture;
     eTextureType        mCurrTexType;
-    // The sampler object currently bound to this unit, so a redundant selection can be
+    // The sampler object currently bound to this slot, so a redundant selection can be
     // skipped. Reset by clearSamplers() when the objects behind the names are dropped.
     U32                 mCurrSampler = 0;
+
+    // Make this the active GL texture unit, so the classic glBindTexture calls below land on
+    // it. Internal only: it is a consequence of not using glBindTextureUnit, not something a
+    // caller has a reason to ask for.
+    //
+    // It was public for a long time and had 54 external callers, none of which needed it --
+    // every bind and unbind path here activates for itself, and the rest were guarding
+    // gGL.matrixMode(MM_TEXTURE0) back when MM_TEXTURE resolved through the active unit. It
+    // stopped doing that (see LLRender::eMatrixMode) and the guards became ceremony.
+    void activate(void);
+
+    // Record the target this slot's binds will use, activating it first. Called by the bind
+    // paths; not an "enable" in any sense GL still has.
+    void setTarget(eTextureType type);
 
     void debugTextureUnit(void);
 

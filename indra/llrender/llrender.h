@@ -43,7 +43,7 @@
 #include "llglheaders.h"
 #include "llmatrix4a.h"
 #include "alsamplerstate.h"  // mSamplerCache -- this context's sampler objects
-#include "lltexunit.h"
+#include "altextureslot.h"
 #include "glm/mat4x4.hpp"
 
 #include <boost/unordered_map.hpp>
@@ -62,7 +62,7 @@ class LLVertexBufferData;
 
 #define LL_MATRIX_STACK_DEPTH 32
 
-// LL_NUM_TEXTURE_LAYERS lives in lltexunit.h alongside the units it sizes.
+// AL_NUM_TEXTURE_SLOTS lives in altextureslot.h alongside the units it sizes.
 constexpr U32 LL_NUM_LIGHT_UNITS = 8;
 
 class LLLightState
@@ -112,7 +112,7 @@ protected:
 
 class LLRender
 {
-    friend class LLTexUnit;
+    friend class ALTextureSlot;
 public:
 
     enum eTexIndex : U8
@@ -198,7 +198,7 @@ public:
     // silent trap rather than a feature: no shader in the tree declares texture_matrix1/2/3
     // (they were dropped during the Slang port), so a resolution landing anywhere but stack 0
     // wrote a matrix nothing would ever read -- the texture transform simply vanished, with no
-    // error. Call sites defended against it by issuing getTexUnit(0)->activate() first, which
+    // error. Call sites defended against it by issuing getTextureSlot(0)->activate() first, which
     // is why that call appeared next to matrixMode all over the draw paths.
     //
     // Measured before removing: 132 of 132 resolutions in a frame landed on unit 0, so the
@@ -309,7 +309,7 @@ public:
 
     void setLineWidth(F32 width);
 
-    LLTexUnit* getTexUnit(U32 index);
+    ALTextureSlot* getTextureSlot(U32 index);
 
     U32 getCurrentTexUnitIndex(void) const { return mCurrTextureUnitIndex; }
 
@@ -329,7 +329,7 @@ public:
 
     // Delete this context's sampler objects and forget the per-unit bindings that pointed
     // at them. Both halves belong together: GL unbinds a deleted sampler automatically, but
-    // LLTexUnit::mCurrSampler would still claim it is bound, and GL may hand the same name
+    // ALTextureSlot::mCurrSampler would still claim it is bound, and GL may hand the same name
     // back for the next sampler created -- at which point bindSampler's redundancy check
     // would skip a bind that is needed.
     // Drop this context's sampler objects. DROPS ONLY -- it does not rebuild, because one of
@@ -399,12 +399,12 @@ private:
     LLStrider<LLVector2>        mTexcoordsp;
     LLStrider<LLColor4U>        mColorsp;
     U32                         mDummyVAO = 0;
-    std::array<LLTexUnit, LL_NUM_TEXTURE_LAYERS> mTexUnits;
-    // This context's sampler objects. Sits beside mTexUnits deliberately: the units hold
+    std::array<ALTextureSlot, AL_NUM_TEXTURE_SLOTS> mTextureSlots;
+    // This context's sampler objects. Sits beside mTextureSlots deliberately: the units hold
     // the bindings, this holds the objects those bindings name, and the two have to be
     // torn down together and by the same thread.
     ALSamplerCache mSamplerCache;
-    LLTexUnit           mDummyTexUnit;
+    ALTextureSlot           mDummySlot;
     std::array<LLLightState, LL_NUM_LIGHT_UNITS> mLightState;
 
     eBlendFactor mCurrBlendColorSFactor;

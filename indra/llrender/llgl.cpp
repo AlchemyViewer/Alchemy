@@ -267,7 +267,7 @@ static void log_texture_unit_state()
 
     GLint max_units = 0;
     glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &max_units);
-    max_units = llmin(max_units, (GLint)LL_NUM_TEXTURE_LAYERS);
+    max_units = llmin(max_units, (GLint)AL_NUM_TEXTURE_SLOTS);
 
     GLint saved_active_unit = GL_TEXTURE0;
     glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active_unit);
@@ -3103,8 +3103,9 @@ void LLGLState::resetTextureStates()
     glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
     for (S32 j = maxTextureUnits-1; j >=0; j--)
     {
-        gGL.getTexUnit(j)->activate();
-        j == 0 ? gGL.getTexUnit(j)->enable(LLTexUnit::TT_TEXTURE) : gGL.getTexUnit(j)->disable();
+        // Slot 0 used to be spared and left "enabled for TT_TEXTURE" instead, which reset
+        // nothing -- it only set the target field. A reset releases every slot.
+        gGL.getTextureSlot(j)->unbind();
     }
 }
 

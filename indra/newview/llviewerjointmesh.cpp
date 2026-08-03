@@ -243,7 +243,7 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     LLViewerTexLayerSet *layerset = dynamic_cast<LLViewerTexLayerSet*>(mLayerSet);
     if (mTestImageName)
     {
-        gGL.getTexUnit(diffuse_channel)->bindManual(LLTexUnit::TT_TEXTURE, mTestImageName);
+        gGL.getTextureSlot(diffuse_channel)->bindManual(ALTextureSlot::TT_TEXTURE, mTestImageName);
 
         if (mIsTransparent)
         {
@@ -258,20 +258,20 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     {
         if( layerset->hasComposite() )
         {
-            gGL.getTexUnit(diffuse_channel)->bindSampled(layerset->getViewerComposite(), ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(diffuse_channel)->bindSampled(layerset->getViewerComposite(), ALSamplers::AnisoWrap);
         }
         else
         {
-            gGL.getTexUnit(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), ALSamplers::AnisoWrap);
         }
     }
     else if ( !is_dummy && mTexture.notNull() )
     {
-        gGL.getTexUnit(diffuse_channel)->bindSampled(mTexture, ALSamplers::AnisoWrap);
+        gGL.getTextureSlot(diffuse_channel)->bindSampled(mTexture, ALSamplers::AnisoWrap);
     }
     else
     {
-        gGL.getTexUnit(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), ALSamplers::AnisoWrap);
+        gGL.getTextureSlot(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), ALSamplers::AnisoWrap);
     }
 
     U32 start = mMesh->mFaceVertexOffset;

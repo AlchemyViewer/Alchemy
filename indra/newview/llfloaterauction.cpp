@@ -151,7 +151,7 @@ void LLFloaterAuction::draw()
         {
             LLRect rect = snapshot_icon->getRect();
             {
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->unbind();
                 gl_rect_2d(rect, LLColor4(0.f, 0.f, 0.f, 1.f));
                 rect.stretch(-1);
             }

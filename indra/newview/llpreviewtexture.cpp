@@ -203,7 +203,7 @@ void LLPreviewTexture::draw()
     if (!isMinimized())
     {
         LLGLSUIDefault gls_ui;
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         const LLRect& border = mClientRect;
         LLRect interior = mClientRect;

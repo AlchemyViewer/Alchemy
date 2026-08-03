@@ -415,7 +415,6 @@ void LLFontVertexBuffer::recolorBuffers(
 void LLFontVertexBuffer::renderBuffers()
 {
     gGL.flush(); // deliberately empty pending verts
-    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
     gGL.pushUIMatrix();
 
     gGL.loadUIIdentity();

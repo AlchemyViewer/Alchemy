@@ -26,10 +26,15 @@
 
 // llglheaders.h, NOT llgl.h: this header is included by llrender.h, and llgl.h pulls in
 // llglstates.h -> llimagegl.h -> llrender.h, which re-enters a half-parsed llrender.h and
-// leaves llimagegl.h looking at an undefined LLTexUnit. Only the GL enum constants are
+// leaves llimagegl.h looking at an undefined slot class. Only the GL enum constants are
 // needed here; gGLManager is used from the .cpp.
+//
+// Nothing else. This header used to include lltexunit.h for the filter/address enums it
+// encoded against -- which made the sampler description depend on the binding slot, exactly
+// backwards, and forced that header to be split out of llrender.h to break the resulting
+// cycle. ALSampler owns its encoding outright now, so this file stands alone and the slot
+// header (altextureslot.h) includes IT.
 #include "llglheaders.h"
-#include "lltexunit.h"
 
 #include <array>
 #include <utility>
@@ -56,12 +61,17 @@
 enum class ALSampler : U16
 {
     // --- minification/magnification, bits 0-1, mutually exclusive ---
+    //
+    // Ordered weakest-to-strongest on purpose: makeDesc's mip-filter ladder compares against
+    // these rather than enumerating, so a value's rank is part of its meaning.
     Point       = 0u,
     Bilinear    = 1u,
     Trilinear   = 2u,
     Anisotropic = 3u,
 
     // --- addressing, bits 2-3, mutually exclusive ---
+    //
+    // The numbering here indexes makeDesc's GL address-mode table directly.
     Wrap   = 0u << 2,
     Mirror = 1u << 2,
     Clamp  = 2u << 2,
@@ -87,20 +97,45 @@ constexpr ALSampler operator|(ALSampler a, ALSampler b)
     return static_cast<ALSampler>(static_cast<U16>(a) | static_cast<U16>(b));
 }
 
-// The bit layout above is chosen to match these enums exactly, so the bridge below is a
-// shift rather than a lookup. If either enum is ever reordered, these fire.
-static_assert((U16)LLTexUnit::TFO_POINT       == (U16)ALSampler::Point);
-static_assert((U16)LLTexUnit::TFO_BILINEAR    == (U16)ALSampler::Bilinear);
-static_assert((U16)LLTexUnit::TFO_TRILINEAR   == (U16)ALSampler::Trilinear);
-static_assert((U16)LLTexUnit::TFO_ANISOTROPIC == (U16)ALSampler::Anisotropic);
-static_assert(((U16)LLTexUnit::TAM_WRAP   << 2) == (U16)ALSampler::Wrap);
-static_assert(((U16)LLTexUnit::TAM_MIRROR << 2) == (U16)ALSampler::Mirror);
-static_assert(((U16)LLTexUnit::TAM_CLAMP  << 2) == (U16)ALSampler::Clamp);
-
 constexpr ALSampler& operator|=(ALSampler& a, ALSampler b)
 {
     a = a | b;
     return a;
+}
+
+// Field widths, for the one place that has to take the mask apart again (makeDesc, because GL
+// wants the pieces as separate parameters). Everywhere else the mask IS the interface.
+//
+// These used to be static_asserts tying the layout to LLTexUnit::eTextureFilterOptions and
+// eTextureAddressMode. That was the dependency pointing the wrong way: those enums had no
+// remaining callers of their own and survived only as the thing this file encoded against, so
+// the authoritative layout was being validated against a copy of itself. The fields are
+// declared above; these name their extents.
+inline constexpr U16 AL_SAMPLER_FILTER_BITS    = 2;
+inline constexpr U16 AL_SAMPLER_FILTER_MASK    = (1u << AL_SAMPLER_FILTER_BITS) - 1u;
+inline constexpr U16 AL_SAMPLER_ADDRESS_SHIFT  = AL_SAMPLER_FILTER_BITS;
+inline constexpr U16 AL_SAMPLER_ADDRESS_MASK   = 0x3u;
+// The largest addressing encoding that names a real mode. The fourth is what
+// ALSamplers::TargetDefault is built on -- see there.
+inline constexpr U16 AL_SAMPLER_ADDRESS_MAX    = static_cast<U16>(ALSampler::Clamp) >> AL_SAMPLER_ADDRESS_SHIFT;
+
+// Filter rank, for the ladder in makeDesc. Returned as a plain integer because it is compared
+// by magnitude; the enum class has no ordering operators and should not grow any.
+constexpr U16 alSamplerFilter(ALSampler key)
+{
+    return static_cast<U16>(key) & AL_SAMPLER_FILTER_MASK;
+}
+
+// Addressing encoding, already shifted down to index the GL address-mode table.
+constexpr U16 alSamplerAddress(ALSampler key)
+{
+    return (static_cast<U16>(key) >> AL_SAMPLER_ADDRESS_SHIFT) & AL_SAMPLER_ADDRESS_MASK;
+}
+
+// Test a single-bit field (Compare, SRGBDecode).
+constexpr bool alSamplerHas(ALSampler key, ALSampler bit)
+{
+    return (static_cast<U16>(key) & static_cast<U16>(bit)) != 0;
 }
 
 // How a texture is *sampled*, as opposed to what it contains.
@@ -185,7 +220,7 @@ namespace ALSamplers
 // with: the contexts share a namespace and the worker's context is still current at that
 // point, so the deletes succeed silently and the render thread is left binding freed names.
 //
-// Keeping the objects at the same scope as the bindings that reference them (LLTexUnit::
+// Keeping the objects at the same scope as the bindings that reference them (ALTextureSlot::
 // mCurrSampler, also per-LLRender) is what makes the lifetime work out. Reach it through
 // LLRender::getSampler() / clearSamplers() rather than constructing one.
 class ALSamplerCache

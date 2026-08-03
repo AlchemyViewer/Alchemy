@@ -53,7 +53,7 @@
     ...
 
     //use target as a texture
-    gGL.getTexUnit(INDEX)->bind(&target);
+    gGL.getTextureSlot(INDEX)->bind(&target);
     ... <issue drawing commands> ...
 
 */
@@ -76,6 +76,17 @@ public:
         DEPTH_FMT_32F,      // GL_DEPTH_COMPONENT32F / GL_DEPTH32F_STENCIL8
     };
 
+    // Whether this target's colour attachments carry a mip chain, and who fills it.
+    //
+    // Lived on the texture-unit class as eTextureMipGeneration, where it had nothing to do
+    // with binding and no other consumer. It is an allocation policy for a render target.
+    enum eMipGeneration : U32
+    {
+        MIPS_NONE = 0,      // Single level. Attachments are not mipmapped.
+        MIPS_AUTO,          // Levels allocated, and regenerated on flush().
+        MIPS_MANUAL,        // Levels allocated; the owner regenerates them when it chooses.
+    };
+
     LLRenderTarget();
     ~LLRenderTarget();
 
@@ -89,7 +100,7 @@ public:
     // stencil - if true, allocate a combined depth+stencil buffer (requires depth)
     // usage - deprecated, should always be TT_TEXTURE
     // depth_fmt - bit depth for the depth component (ignored unless depth is true)
-    bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, bool stencil = false, LLTexUnit::eTextureType usage = LLTexUnit::TT_TEXTURE, LLTexUnit::eTextureMipGeneration generateMipMaps = LLTexUnit::TMG_NONE, eDepthFormat depth_fmt = DEPTH_FMT_24);
+    bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, bool stencil = false, ALTextureSlot::eTextureType usage = ALTextureSlot::TT_TEXTURE, eMipGeneration generateMipMaps = MIPS_NONE, eDepthFormat depth_fmt = DEPTH_FMT_24);
 
     //resize existing attachments to use new resolution and color format
     // CAUTION: if the GL runs out of memory attempting to resize, this render target will be undefined
@@ -151,7 +162,7 @@ public:
     //get Y resolution
     U32 getHeight() const { return mResY; }
 
-    LLTexUnit::eTextureType getUsage(void) const { return mUsage; }
+    ALTextureSlot::eTextureType getUsage(void) const { return mUsage; }
 
     U32 getTexture(U32 attachment = 0) const;
     U32 getNumTextures() const;
@@ -166,7 +177,7 @@ public:
     // write onto the texture objects themselves -- bilinear for attachment 0, point for the
     // data attachments behind it, mirrored repeat except on rectangle textures, and point
     // with plain repeat for depth. That state was the last texture-object sampling state left
-    // in the engine, and it stayed only because LLTexUnit::bind(LLRenderTarget*) defaults its
+    // in the engine, and it stayed only because ALTextureSlot::bind(LLRenderTarget*) defaults its
     // sampler to 0, meaning "sample through whatever the texture object carries".
     //
     // Answering the question here rather than at those call sites keeps the defaults in one
@@ -227,10 +238,10 @@ protected:
     bool mUseDepth;
     bool mStencil;
     eDepthFormat mDepthFormat;
-    LLTexUnit::eTextureMipGeneration mGenerateMipMaps;
+    eMipGeneration mGenerateMipMaps;
     U32 mMipLevels;
 
-    LLTexUnit::eTextureType mUsage;
+    ALTextureSlot::eTextureType mUsage;
 };
 
 #endif

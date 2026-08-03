@@ -394,7 +394,7 @@ void ALToolAlign::render()
         LLGLSUIDefault gls_ui;
         LLGLEnable gl_blend(GL_BLEND);
         LLGLDepthTest gls_depth(GL_FALSE);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         // render box
         LLColor4 default_normal_color( 0.7f, 0.7f, 0.7f, 0.1f );

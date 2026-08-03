@@ -144,7 +144,7 @@ LLRenderTarget::LLRenderTarget() :
     mUseDepth(false),
     mStencil(false),
     mDepthFormat(DEPTH_FMT_24),
-    mUsage(LLTexUnit::TT_TEXTURE)
+    mUsage(ALTextureSlot::TT_TEXTURE)
 {
 }
 
@@ -188,8 +188,8 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
     const bool                        use_depth  = (mDepth != 0);
     const bool                        stencil    = mStencil;
     const eDepthFormat                depth_fmt  = mDepthFormat;
-    const LLTexUnit::eTextureType     usage      = mUsage;
-    const LLTexUnit::eTextureMipGeneration mips  = mGenerateMipMaps;
+    const ALTextureSlot::eTextureType     usage      = mUsage;
+    const eMipGeneration mips  = mGenerateMipMaps;
 
     // allocate() releases first, then rebuilds attachment 0 and the depth buffer with the
     // same sampler state addColorAttachment/allocateDepth apply on first creation.
@@ -201,10 +201,10 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
     }
 }
 
-bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, LLTexUnit::eTextureType usage, LLTexUnit::eTextureMipGeneration generateMipMaps, eDepthFormat depth_fmt)
+bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, ALTextureSlot::eTextureType usage, eMipGeneration generateMipMaps, eDepthFormat depth_fmt)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    llassert(usage == LLTexUnit::TT_TEXTURE);
+    llassert(usage == ALTextureSlot::TT_TEXTURE);
     llassert(!isBoundInStack());
     llassert(!stencil || depth); // stencil requires depth
 
@@ -224,7 +224,7 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
     mGenerateMipMaps = generateMipMaps;
     mMipLevels = 0;
 
-    if (mGenerateMipMaps != LLTexUnit::TMG_NONE) {
+    if (mGenerateMipMaps != MIPS_NONE) {
         // floor(log2(n)) + 1, computed with integer math to avoid the
         // precision pitfall where log10(2^N)/log10(2) rounds below N.
         mMipLevels = static_cast<U32>(std::bit_width(static_cast<U32>(llmax(mResX, mResY))));
@@ -247,7 +247,7 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
         glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
 
         GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
-        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, LLTexUnit::getInternalType(mUsage), mDepth, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), mDepth, 0);
 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
     }
@@ -287,7 +287,7 @@ void LLRenderTarget::setColorAttachment(LLImageGL* img, LLGLuint use_name)
 
     glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-            LLTexUnit::getInternalType(mUsage), use_name, 0);
+            ALTextureSlot::getInternalType(mUsage), use_name, 0);
         stop_glerror();
 
     check_framebuffer_status();
@@ -303,7 +303,7 @@ void LLRenderTarget::releaseColorAttachment()
     llassert(mFBO != 0);  // mFBO must be valid
 
     glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, LLTexUnit::getInternalType(mUsage), 0, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, ALTextureSlot::getInternalType(mUsage), 0, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
 
     mTex.clear();
@@ -335,7 +335,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
 
     U32 tex;
     LLImageGL::generateTextures(1, &tex);
-    gGL.getTexUnit(0)->bindManual(mUsage, tex);
+    gGL.getTextureSlot(0)->bindManual(mUsage, tex);
 
     stop_glerror();
 
@@ -344,10 +344,10 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
         clear_glerror();
         // The whole mip pyramid must exist at allocation: storage is immutable, so the
         // glGenerateMipmap in flush() can only fill levels that were allocated here --
-        // against a single-level texture it is a spec-defined no-op and TMG_AUTO targets
+        // against a single-level texture it is a spec-defined no-op and MIPS_AUTO targets
         // (the luminance map auto-exposure averages through) silently lose their mips.
         const S32 levels = llmax(1, (S32)mMipLevels);
-        LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(mUsage), color_fmt, mResX, mResY, GL_RGBA, GL_UNSIGNED_BYTE, NULL, levels);
+        LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(mUsage), color_fmt, mResX, mResY, GL_RGBA, GL_UNSIGNED_BYTE, NULL, levels);
         if (glGetError() != GL_NO_ERROR)
         {
             LL_WARNS() << "Could not allocate color buffer for render target." << LL_ENDL;
@@ -364,7 +364,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
     // No filter or wrap state is written onto the texture object here. It is expressed as a
     // sampler instead -- see getDefaultColorSampler, which encodes the same choices (bilinear
     // for attachment 0, point for the data attachments, mirrored repeat off rectangles) and
-    // is what LLTexUnit::bind hands out to callers that do not name a sampler.
+    // is what ALTextureSlot::bind hands out to callers that do not name a sampler.
     //
     // This was the last texture-object sampling state in the engine. Leaving it here as well
     // would not be harmless redundancy: it makes filtering a property of the resource, so two
@@ -375,7 +375,7 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0+offset,
-            LLTexUnit::getInternalType(mUsage), tex, 0);
+            ALTextureSlot::getInternalType(mUsage), tex, 0);
 
         check_framebuffer_status();
 
@@ -399,9 +399,9 @@ bool LLRenderTarget::allocateDepth()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     LLImageGL::generateTextures(1, &mDepth);
-    gGL.getTexUnit(0)->bindManual(mUsage, mDepth);
+    gGL.getTextureSlot(0)->bindManual(mUsage, mDepth);
 
-    U32 internal_type = LLTexUnit::getInternalType(mUsage);
+    U32 internal_type = ALTextureSlot::getInternalType(mUsage);
     stop_glerror();
     clear_glerror();
     const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
@@ -443,7 +443,7 @@ void LLRenderTarget::shareDepthBuffer(LLRenderTarget& target)
         glBindFramebuffer(GL_FRAMEBUFFER, target.mFBO);
 
         GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
-        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, LLTexUnit::getInternalType(mUsage), mDepth, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), mDepth, 0);
 
         check_framebuffer_status();
 
@@ -478,7 +478,7 @@ void LLRenderTarget::release()
         if (mUseDepth)
         { //detach shared depth buffer
             GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
-            glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, LLTexUnit::getInternalType(mUsage), 0, 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), 0, 0);
             mUseDepth = false;
             mStencil = false;
             mDepthFormat = DEPTH_FMT_24;
@@ -499,7 +499,7 @@ void LLRenderTarget::release()
             {
                 sBytesAllocated -= mResX * mResY * get_color_format_bytes_per_pixel(mInternalFormat[z]);
             }
-            glFramebufferTexture2D(GL_FRAMEBUFFER, static_cast<GLenum>(GL_COLOR_ATTACHMENT0+z), LLTexUnit::getInternalType(mUsage), 0, 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, static_cast<GLenum>(GL_COLOR_ATTACHMENT0+z), ALTextureSlot::getInternalType(mUsage), 0, 0);
             LLImageGL::deleteTextures(1, &mTex[z]);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
@@ -625,7 +625,7 @@ void LLRenderTarget::bindTexture(U32 index, S32 channel, ALSampler key)
     // nothing interpolated.
     const U32 sampler = (key == ALSamplers::TargetDefault) ? getDefaultColorSampler(index)
                                                            : gGL.getSampler(key);
-    gGL.getTexUnit(channel)->bindManual(mUsage, getTexture(index), sampler);
+    gGL.getTextureSlot(channel)->bindManual(mUsage, getTexture(index), sampler);
 }
 
 U32 LLRenderTarget::getDefaultColorSampler(U32 attachment) const
@@ -664,7 +664,7 @@ void LLRenderTarget::flush()
     llassert(sCurFBO == mFBO);
     llassert(sBoundTarget == this);
 
-    if (mGenerateMipMaps == LLTexUnit::TMG_AUTO)
+    if (mGenerateMipMaps == MIPS_AUTO)
     {
         LL_PROFILE_GPU_ZONE("rt generate mipmaps");
         bindTexture(0, 0, ALSamplers::TrilinearMirror);
@@ -713,12 +713,12 @@ void LLRenderTarget::copyContents(LLRenderTarget& source, S32 srcX0, S32 srcY0, 
 
         glBindFramebuffer(GL_FRAMEBUFFER, source.mFBO);
         check_framebuffer_status();
-        gGL.getTexUnit(0)->bind(this, true);
+        gGL.getTextureSlot(0)->bind(this, true);
         stop_glerror();
         // glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height):
         // xoffset/yoffset are the destination texel offset, x/y the source framebuffer
         // origin, and the last two are dimensions (not endpoints).
-        glCopyTexSubImage2D(LLTexUnit::getInternalType(mUsage), 0, dstX0, dstY0, srcX0, srcY0, srcX1 - srcX0, srcY1 - srcY0);
+        glCopyTexSubImage2D(ALTextureSlot::getInternalType(mUsage), 0, dstX0, dstY0, srcX0, srcY0, srcX1 - srcX0, srcY1 - srcY0);
         stop_glerror();
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
         stop_glerror();

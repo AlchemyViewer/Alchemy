@@ -300,7 +300,7 @@ void LLTextureBar::draw()
     LLFontGL::getFontMonospace()->renderUTF8(fetch_state_desc[state].desc, 0, title_x2, getRect().getHeight(),
                                      fetch_state_desc[state].color,
                                      LLFontGL::LEFT, LLFontGL::TOP);
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     // Draw the progress bar (column / width set in update_layout()).
     left = bar_left;

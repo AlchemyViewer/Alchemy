@@ -73,7 +73,7 @@ public:
     U32 getCount() const { return mCount; }
 
 protected:
-    friend class LLTexUnit;
+    friend class ALTextureSlot;
     ~LLCubeMapArray();
     LLPointer<LLImageGL> mImage;
     U32 mWidth = 0;

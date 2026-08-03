@@ -162,7 +162,7 @@ void display_startup()
     //
     if (!LLViewerFetchedTexture::sWhiteImagep.isNull())
     {
-    LLTexUnit::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
+    ALTextureSlot::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
     }
 
     LLGLSDefault gls_default;
@@ -784,7 +784,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         LLDrawable::incrementVisible();
 
         LLSpatialGroup::sNoDelete = true;
-        LLTexUnit::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
+        ALTextureSlot::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
 
         S32 occlusion = LLPipeline::sUseOcclusion;
         if (gDepthDirty)
@@ -942,7 +942,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         //  gGL.matrixMode(LLRender::MM_MODELVIEW);
         //  gGL.pushMatrix();
         //  {
-        //      gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        //      gGL.getTextureSlot(0)->unbind();
 
         //      glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
         //      gGL.loadIdentity();
@@ -1033,11 +1033,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Texture Unbind");
             for (S32 i = 0; i < gGLManager.mNumTextureImageUnits; i++)
             { //dummy cleanup of any currently bound textures
-                if (gGL.getTexUnit(i)->getCurrType() != LLTexUnit::TT_NONE)
-                {
-                    gGL.getTexUnit(i)->unbind(gGL.getTexUnit(i)->getCurrType());
-                    gGL.getTexUnit(i)->disable();
-                }
+                gGL.getTextureSlot(i)->unbind();
             }
         }
 
@@ -1586,7 +1582,7 @@ void swap()
 
 void renderCoordinateAxes()
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gGL.begin(LLRender::LINES);
         gGL.color3f(1.0f, 0.0f, 0.0f);   // i direction = X-Axis = red
         gGL.vertex3f(0.0f, 0.0f, 0.0f);
@@ -1637,7 +1633,7 @@ void renderCoordinateAxes()
 void draw_axes()
 {
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     // A vertical white line at origin
     LLVector3 v = gAgent.getPositionAgent();
     gGL.begin(LLRender::LINES);
@@ -1800,7 +1796,7 @@ void render_ui_2d()
         LLGLDisable blend(GL_BLEND);
         S32 width = gViewerWindow->getWindowWidthScaled();
         S32 height = gViewerWindow->getWindowHeightScaled();
-        gGL.getTexUnit(0)->bind(&gPipeline.mUIScreen);
+        gGL.getTextureSlot(0)->bind(&gPipeline.mUIScreen);
         gGL.begin(LLRender::TRIANGLE_STRIP);
         gGL.color4f(1.f,1.f,1.f,1.f);
         gGL.texCoord2f(0.f, 0.f);                 gGL.vertex2i(0, 0);
@@ -1864,7 +1860,7 @@ void render_disconnected_background()
         raw->expandToPowerOfTwo();
         gDisconnectedImagep = LLViewerTextureManager::getLocalTexture(raw.get(), false);
         gStartTexture = gDisconnectedImagep;
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
     }
 
     // Make sure the progress view always fills the entire window.
@@ -1883,10 +1879,10 @@ void render_disconnected_background()
             const LLVector2& display_scale = gViewerWindow->getDisplayScale();
             gGL.scalef(display_scale.mV[VX], display_scale.mV[VY], 1.f);
 
-            gGL.getTexUnit(0)->bindSampled(gDisconnectedImagep, ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(0)->bindSampled(gDisconnectedImagep, ALSamplers::AnisoWrap);
             gGL.color4f(1.f, 1.f, 1.f, 1.f);
             gl_rect_2d_simple_tex(width, height);
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
         }
         gGL.popMatrix();
     }

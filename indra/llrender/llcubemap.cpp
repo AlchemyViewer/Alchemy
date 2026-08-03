@@ -90,7 +90,7 @@ void LLCubeMap::initGL()
             bool immutable = false;
             if (gGLManager.mHasTextureStorage)
             {
-                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
                 glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, RESOLUTION, RESOLUTION);
                 // count of 6: alloc_tex_image's count covers cube faces. The per-face
                 // path used to account one face at a time onto the same texture name,
@@ -107,7 +107,7 @@ void LLCubeMap::initGL()
                 // Explicit either way, so each face's format matches the storage exactly
                 // rather than relying on the auto-format switch agreeing with it.
                 mImages[i]->setExplicitFormat(internal_format, GL_RGBA);
-                mImages[i]->setTarget(mTargets[i], LLTexUnit::TT_CUBE_MAP);
+                mImages[i]->setTarget(mTargets[i], ALTextureSlot::TT_CUBE_MAP);
                 if (immutable)
                 {
                     mImages[i]->markStorageAllocated();
@@ -118,10 +118,10 @@ void LLCubeMap::initGL()
                     LL_WARNS() << "Failed to create GL texture for environment cubemap face " << i << LL_ENDL;
                 }
 
-                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
                 stop_glerror();
             }
-            gGL.getTexUnit(0)->disable();
+            gGL.getTextureSlot(0)->unbind();
         }
         disable();
     }
@@ -207,8 +207,8 @@ void LLCubeMap::initReflectionMap(U32 resolution, U32 components)
 
     mImages[0] = new LLImageGL(resolution, resolution, components, true);
     mImages[0]->setTexName(texname);
-    mImages[0]->setTarget(mTargets[0], LLTexUnit::TT_CUBE_MAP);
-    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
+    mImages[0]->setTarget(mTargets[0], ALTextureSlot::TT_CUBE_MAP);
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
 }
 
 GLuint LLCubeMap::getGLName()
@@ -220,7 +220,7 @@ void LLCubeMap::bind()
 {
     // Clamp + anisotropic: what the environment map has always been sampled with, named
     // here now instead of written onto face 0 at load.
-    gGL.getTexUnit(mTextureStage)->bind(this, ALSamplers::AnisoClamp);
+    gGL.getTextureSlot(mTextureStage)->bind(this, ALSamplers::AnisoClamp);
 }
 
 void LLCubeMap::enable(S32 stage)
@@ -228,13 +228,11 @@ void LLCubeMap::enable(S32 stage)
     enableTexture(stage);
 }
 
+// Remembers which slot bind() will use. It used to also mark that slot "enabled for
+// TT_CUBE_MAP" ahead of the bind that would set the target anyway.
 void LLCubeMap::enableTexture(S32 stage)
 {
     mTextureStage = stage;
-    if (stage >= 0 && LLCubeMap::sUseCubeMaps)
-    {
-        gGL.getTexUnit(stage)->enable(LLTexUnit::TT_CUBE_MAP);
-    }
 }
 
 void LLCubeMap::disable(void)
@@ -246,11 +244,9 @@ void LLCubeMap::disableTexture(void)
 {
     if (mTextureStage >= 0 && LLCubeMap::sUseCubeMaps)
     {
-        gGL.getTexUnit(mTextureStage)->disable();
-        if (mTextureStage == 0)
-        {
-            gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
-        }
+        // Followed by re-enabling slot 0 for TT_TEXTURE when the cube map had been on it --
+        // restoring a target for the benefit of nothing, since the next bind names its own.
+        gGL.getTextureSlot(mTextureStage)->unbind();
     }
 }
 
@@ -260,10 +256,8 @@ void LLCubeMap::setMatrix(S32 stage)
 
     if (mMatrixStage < 0) return;
 
-    //if (stage > 0)
-    {
-        gGL.getTexUnit(stage)->activate();
-    }
+    // No getTextureSlot(stage)->activate() here any more: it guarded a texture matrix stack
+    // that MM_TEXTURE0 no longer selects through the active unit. See LLRender::eMatrixMode.
 
     LLVector3 x(gGLModelView+0);
     LLVector3 y(gGLModelView+4);
@@ -278,29 +272,15 @@ void LLCubeMap::setMatrix(S32 stage)
     gGL.pushMatrix();
     gGL.loadMatrix((F32 *)trans.mMatrix);
     gGL.matrixMode(LLRender::MM_MODELVIEW);
-
-    /*if (stage > 0)
-    {
-        gGL.getTexUnit(0)->activate();
-    }*/
 }
 
 void LLCubeMap::restoreMatrix()
 {
     if (mMatrixStage < 0) return;
 
-    //if (mMatrixStage > 0)
-    {
-        gGL.getTexUnit(mMatrixStage)->activate();
-    }
     gGL.matrixMode(LLRender::MM_TEXTURE0);
     gGL.popMatrix();
     gGL.matrixMode(LLRender::MM_MODELVIEW);
-
-    /*if (mMatrixStage > 0)
-    {
-        gGL.getTexUnit(0)->activate();
-    }*/
 }
 
 

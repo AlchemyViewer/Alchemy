@@ -334,15 +334,15 @@ void LLFloaterImagePreview::draw()
 
             if(mImagep.notNull())
             {
-                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mImagep->getTexName(),
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mImagep->getTexName(),
                                               gGL.getSampler(ALSamplers::BilinearClamp));
             }
             else
             {
                 mImagep = LLViewerTextureManager::getLocalTexture(mRawImagep.get(), false) ;
 
-                gGL.getTexUnit(0)->unbind(mImagep->getTarget()) ;
-                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mImagep->getTexName(),
+                gGL.getTextureSlot(0)->unbind() ;
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mImagep->getTexName(),
                                               gGL.getSampler(ALSamplers::BilinearClamp));
                 stop_glerror();
                 if (mAvatarPreview)
@@ -371,7 +371,7 @@ void LLFloaterImagePreview::draw()
             }
             gGL.end();
 
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
 
             stop_glerror();
         }
@@ -383,11 +383,11 @@ void LLFloaterImagePreview::draw()
 
                 if (selected == 9)
                 {
-                    gGL.getTexUnit(0)->bindSampled(mSculptedPreview, ALSamplers::AnisoWrap);
+                    gGL.getTextureSlot(0)->bindSampled(mSculptedPreview, ALSamplers::AnisoWrap);
                 }
                 else
                 {
-                    gGL.getTexUnit(0)->bindSampled(mAvatarPreview, ALSamplers::AnisoWrap);
+                    gGL.getTextureSlot(0)->bindSampled(mAvatarPreview, ALSamplers::AnisoWrap);
                 }
 
                 gGL.begin(LLRender::TRIANGLES);
@@ -408,7 +408,7 @@ void LLFloaterImagePreview::draw()
                 }
                 gGL.end();
 
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->unbind();
             }
         }
     }

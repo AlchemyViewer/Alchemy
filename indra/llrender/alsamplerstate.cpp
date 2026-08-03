@@ -31,8 +31,8 @@
 
 namespace
 {
-    // Same table LLTexUnit used before samplers existed; kept in the same order as
-    // LLTexUnit::eTextureAddressMode.
+    // Indexed by the addressing field, already shifted down. The enum's numbering is chosen
+    // to index this directly -- see ALSampler::Wrap/Mirror/Clamp.
     constexpr U32 sGLAddressMode[] =
     {
         GL_REPEAT,
@@ -44,39 +44,34 @@ namespace
 // static
 ALSamplerDesc ALSamplerCache::makeDesc(ALSampler key)
 {
-    // Unpack the mask back into its fields. Kept private to this function: the mask is the
+    // Unpack the mask back into its fields. This is the only place that does: the mask is the
     // interface everywhere else, and the only reason the pieces exist here is that GL wants
     // them as separate parameters.
-    const U16 bits = static_cast<U16>(key);
-
-    const LLTexUnit::eTextureFilterOptions filter =
-        static_cast<LLTexUnit::eTextureFilterOptions>(bits & 0x3u);
-    const LLTexUnit::eTextureAddressMode address =
-        static_cast<LLTexUnit::eTextureAddressMode>((bits >> 2) & 0x3u);
-    const bool compare  = (bits & static_cast<U16>(ALSampler::Compare)) != 0;
+    const U16  filter  = alSamplerFilter(key);
+    const U16  address = alSamplerAddress(key);
+    const bool compare = alSamplerHas(key, ALSampler::Compare);
 
     // The unreachable quarter of the address field. Reaching it means a mask was built by
     // arithmetic rather than by composing ALSampler values.
-    llassert(address <= LLTexUnit::TAM_CLAMP);
+    llassert(address <= AL_SAMPLER_ADDRESS_MAX);
 
     ALSamplerDesc desc;
 
-    desc.mMagFilter = (filter == LLTexUnit::TFO_POINT) ? GL_NEAREST : GL_LINEAR;
+    desc.mMagFilter = (filter == static_cast<U16>(ALSampler::Point)) ? GL_NEAREST : GL_LINEAR;
 
-    // Mirrors the old LLTexUnit::setTextureFilteringOptionFast ladder exactly, including
-    // its asymmetry: TRILINEAR and above get a linear mip filter, BILINEAR gets a nearest
-    // one, and POINT stays nearest in both.
+    // Trilinear and above get a linear mip filter, Bilinear a nearest one, Point stays nearest
+    // in both. The asymmetry at Bilinear is deliberate and long-standing.
     //
     // Unconditional now. These used to collapse to the non-mipmapped filter when the
     // resource had no mip chain, because GL calls that combination incomplete and samples
     // black. Every texture carries immutable storage, which is mipmap-complete by
     // construction, so a mip filter on a one-level texture selects level 0 and needs no
     // reconciling -- see the note where ALSampler::HasMips used to be.
-    if (filter >= LLTexUnit::TFO_TRILINEAR)
+    if (filter >= static_cast<U16>(ALSampler::Trilinear))
     {
         desc.mMinFilter = GL_LINEAR_MIPMAP_LINEAR;
     }
-    else if (filter >= LLTexUnit::TFO_BILINEAR)
+    else if (filter >= static_cast<U16>(ALSampler::Bilinear))
     {
         desc.mMinFilter = GL_LINEAR_MIPMAP_NEAREST;
     }
@@ -87,7 +82,7 @@ ALSamplerDesc ALSamplerCache::makeDesc(ALSampler key)
 
     desc.mWrapS = desc.mWrapT = desc.mWrapR = sGLAddressMode[address];
 
-    if (gGLManager.mHasAnisotropic && filter == LLTexUnit::TFO_ANISOTROPIC
+    if (gGLManager.mHasAnisotropic && filter == static_cast<U16>(ALSampler::Anisotropic)
         && LLRender::sAnisotropicFilteringLevel > 1.f)
     {
         desc.mMaxAnisotropy = llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mMaxAnisotropy);
@@ -198,7 +193,7 @@ void ALSamplerCache::warmup()
         // The address field has four encodings and only three meanings. Slots with the fourth
         // are unreachable by composing ALSampler values and stay empty; get() asserts on them,
         // which is how a mask built by arithmetic gets caught.
-        if (((i >> 2) & 0x3u) > static_cast<U32>(LLTexUnit::TAM_CLAMP))
+        if (alSamplerAddress(static_cast<ALSampler>(i)) > AL_SAMPLER_ADDRESS_MAX)
         {
             continue;
         }

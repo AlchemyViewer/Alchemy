@@ -1,8 +1,8 @@
 /**
- * @file lltexunit.cpp
- * @brief LLTexUnit implementation
+ * @file altextureslot.cpp
+ * @brief ALTextureSlot implementation
  *
- * Split out of llrender.cpp; see lltexunit.h for why.
+ * Split out of llrender.cpp; see altextureslot.h for what this models.
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -28,7 +28,7 @@
 
 #include "linden_common.h"
 
-#include "lltexunit.h"
+#include "altextureslot.h"
 
 #include "llcubemap.h"
 #include "llimagegl.h"
@@ -46,31 +46,31 @@ static const GLenum sGLTextureType[] =
     GL_TEXTURE_3D
 };
 
-U32 LLTexUnit::sSamplerBinds  = 0;
-U32 LLTexUnit::sSamplerSkips  = 0;
-U32 LLTexUnit::sTextureBinds  = 0;
-U32 LLTexUnit::sSamplerBindsFlushed = 0;
-U32 LLTexUnit::sSamplerBindsSplitBatch = 0;
-U32 LLTexUnit::sSamplerBindsShadowCycle = 0;
+U32 ALTextureSlot::sSamplerBinds  = 0;
+U32 ALTextureSlot::sSamplerSkips  = 0;
+U32 ALTextureSlot::sTextureBinds  = 0;
+U32 ALTextureSlot::sSamplerBindsFlushed = 0;
+U32 ALTextureSlot::sSamplerBindsSplitBatch = 0;
+U32 ALTextureSlot::sSamplerBindsShadowCycle = 0;
 
-LLTexUnit::LLTexUnit(S32 index)
+ALTextureSlot::ALTextureSlot(S32 index)
     : mCurrTexType(TT_NONE),
     mCurrTexture(0),
     mIndex(index)
 {
-    llassert_always(index < (S32)LL_NUM_TEXTURE_LAYERS);
+    llassert_always(index < (S32)AL_NUM_TEXTURE_SLOTS);
 }
 
 //static
-U32 LLTexUnit::getInternalType(eTextureType type)
+U32 ALTextureSlot::getInternalType(eTextureType type)
 {
     return sGLTextureType[type];
 }
 
-void LLTexUnit::refreshState(void)
+void ALTextureSlot::refreshState(void)
 {
-    // We set dirty to true so that the tex unit knows to ignore caching
-    // and we reset the cached tex unit state
+    // We set dirty to true so that the slot knows to ignore caching
+    // and we reset the cached slot state
 
     gGL.flush();
 
@@ -85,7 +85,7 @@ void LLTexUnit::refreshState(void)
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    // The sampler binding is per-unit context state like the texture binding, so it has
+    // The sampler binding is per-slot context state like the texture binding, so it has
     // to be re-asserted here too. Drop to the texture object's own state and let the next
     // bind re-select; mCurrSampler is cleared so that re-selection isn't cached away.
     if (glBindSampler)
@@ -95,7 +95,7 @@ void LLTexUnit::refreshState(void)
     mCurrSampler = 0;
 }
 
-void LLTexUnit::bindSampler(U32 sampler)
+void ALTextureSlot::bindSampler(U32 sampler)
 {
     if (mIndex < 0)
     {
@@ -130,7 +130,7 @@ void LLTexUnit::bindSampler(U32 sampler)
     mCurrSampler = sampler;
 }
 
-void LLTexUnit::activate(void)
+void ALTextureSlot::activate(void)
 {
     if (mIndex < 0) return;
 
@@ -142,7 +142,7 @@ void LLTexUnit::activate(void)
     }
 }
 
-void LLTexUnit::enable(eTextureType type)
+void ALTextureSlot::setTarget(eTextureType type)
 {
     if (mIndex < 0) return;
 
@@ -151,7 +151,7 @@ void LLTexUnit::enable(eTextureType type)
         activate();
         if (mCurrTexType != TT_NONE && !gGL.mDirty)
         {
-            disable(); // Force a disable of a previous texture type if it's enabled.
+            unbind(); // Release a resource of a different target first.
         }
         mCurrTexType = type;
 
@@ -159,30 +159,17 @@ void LLTexUnit::enable(eTextureType type)
     }
 }
 
-void LLTexUnit::disable(void)
-{
-    if (mIndex < 0) return;
-
-    if (mCurrTexType != TT_NONE)
-    {
-        unbind(mCurrTexType);
-        mCurrTexType = TT_NONE;
-    }
-}
-
-// Sampler named by the CALLER. This is the shape the migration is heading for: the bind site
-// says how it wants to read, and the texture supplies only its data (and whether it has a mip
-// chain, which GL needs to keep a mipmapped filter from selecting an incomplete texture).
-void LLTexUnit::bindFast(LLTexture* texture, ALSampler key)
+// Sampler named by the CALLER: the bind site says how it wants to read, and the texture
+// supplies only its data.
+void ALTextureSlot::bindFast(LLTexture* texture, ALSampler key)
 {
     // getGLTexture() is virtual and this is the per-draw path, so it is resolved once and the
-    // sampler is chosen from the result rather than re-fetching. LLTexUnit is a friend of
-    // LLImageGL, so the mip truth is read directly.
+    // sampler is chosen from the result rather than re-fetching.
     LLImageGL* gl_tex = texture->getGLTexture();
     bindFastImpl(texture, gl_tex, gGL.getSampler(key));
 }
 
-void LLTexUnit::bindFastImpl(LLTexture* texture, LLImageGL* gl_tex, U32 sampler)
+void ALTextureSlot::bindFastImpl(LLTexture* texture, LLImageGL* gl_tex, U32 sampler)
 {
     ++sTextureBinds;
     texture->setActive();
@@ -201,7 +188,7 @@ void LLTexUnit::bindFastImpl(LLTexture* texture, LLImageGL* gl_tex, U32 sampler)
     //
     // The DSA form issues one GL call here instead of two, but it deliberately leaves the
     // active unit alone -- and this function used to park gGL.mCurrTextureUnitIndex at its
-    // own index on every call, which let later activate() calls on the same unit skip their
+    // own index on every call, which let later activate() calls on the same slot skip their
     // glActiveTexture. Not doing that hands the saved call back at the next activate(), so
     // the win is smaller than it looks and can invert depending on the bind/activate mix.
     //
@@ -224,19 +211,19 @@ void LLTexUnit::bindFastImpl(LLTexture* texture, LLImageGL* gl_tex, U32 sampler)
 
     // Track the actual bound target so later callers that read mCurrTexType don't act on a
     // stale target left over from earlier passes. The fast path used to skip this -- the
-    // slow enable() path was the only place mCurrTexType was updated.
+    // slow setTarget() path was the only place mCurrTexType was updated.
     mCurrTexType = gl_tex->getTarget();
 }
 
 // The sampler is named by the caller and the texture's own mode is not consulted at all --
 // it has none to consult.
-bool LLTexUnit::bindSampled(LLTexture* texture, ALSampler key, bool forceBind)
+bool ALTextureSlot::bindSampled(LLTexture* texture, ALSampler key, bool forceBind)
 {
     return bindImpl(texture, forceBind, key);
 }
 
 // Same for a raw LLImageGL -- the font atlas is one, since glyph pages are not LLTextures.
-bool LLTexUnit::bindSampled(LLImageGL* texture, ALSampler key, bool forceBind)
+bool ALTextureSlot::bindSampled(LLImageGL* texture, ALSampler key, bool forceBind)
 {
     if (!bind(texture, false, forceBind))
     {
@@ -246,10 +233,10 @@ bool LLTexUnit::bindSampled(LLImageGL* texture, ALSampler key, bool forceBind)
     return true;
 }
 
-// The sampler is selected ONCE here, from the caller's mask plus the resource's mip truth. The
-// bind-then-setSampler* sequence this replaces could issue two glBindSampler calls and, worse,
-// a gGL.flush() between them, splitting the draw batch for a sampler about to change again.
-bool LLTexUnit::bindImpl(LLTexture* texture, bool forceBind, ALSampler key)
+// The sampler is selected ONCE here, from the caller's mask. The bind-then-setSampler*
+// sequence this replaces could issue two glBindSampler calls and, worse, a gGL.flush()
+// between them, splitting the draw batch for a sampler about to change again.
+bool ALTextureSlot::bindImpl(LLTexture* texture, bool forceBind, ALSampler key)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     stop_glerror();
@@ -267,16 +254,16 @@ bool LLTexUnit::bindImpl(LLTexture* texture, bool forceBind, ALSampler key)
                 if ((mCurrTexture != gl_tex->getTexName()) || forceBind)
                 {
                     activate();
-                    enable(gl_tex->getTarget());
+                    setTarget(gl_tex->getTarget());
                     mCurrTexture = gl_tex->getTexName();
                     glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
                     if(gl_tex->updateBindStats())
                     {
                         texture->setActive();
                     }
-                            }
+                }
                 // Outside the redundancy check on purpose: the same texture can be bound
-                // again after a pass that left a different sampler on this unit.
+                // again after a pass that left a different sampler on this slot.
                 // bindSampler() no-ops when nothing changes.
                 bindSampler(gGL.getSampler(key));
             }
@@ -293,11 +280,11 @@ bool LLTexUnit::bindImpl(LLTexture* texture, bool forceBind, ALSampler key)
         {
             if (texture)
             {
-                LL_DEBUGS() << "NULL LLTexUnit::bind GL image" << LL_ENDL;
+                LL_DEBUGS() << "NULL ALTextureSlot::bind GL image" << LL_ENDL;
             }
             else
             {
-                LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
+                LL_DEBUGS() << "NULL ALTextureSlot::bind texture" << LL_ENDL;
             }
             return false;
         }
@@ -310,14 +297,14 @@ bool LLTexUnit::bindImpl(LLTexture* texture, bool forceBind, ALSampler key)
     return true;
 }
 
-bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32 usename)
+bool ALTextureSlot::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32 usename)
 {
     stop_glerror();
     if (mIndex < 0) return false;
 
     if(!texture)
     {
-        LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
+        LL_DEBUGS() << "NULL ALTextureSlot::bind texture" << LL_ENDL;
         return false;
     }
 
@@ -342,7 +329,7 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
         stop_glerror();
         activate();
         stop_glerror();
-        enable(texture->getTarget());
+        setTarget(texture->getTarget());
         stop_glerror();
         mCurrTexture = texname;
         glBindTexture(sGLTextureType[texture->getTarget()], mCurrTexture);
@@ -353,7 +340,7 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
     // The sampler is deliberately LEFT ALONE.
     //
     // This overload is bind-to-edit -- allocate, upload, generate mips -- and self-binds.
-    // Nothing samples through it, so whatever sampler the unit happens to be holding is
+    // Nothing samples through it, so whatever sampler the slot happens to be holding is
     // irrelevant, and dropping it to 0 would cost a glBindSampler now plus another when the
     // next draw restores one. bindSampler() also flushes, so that pair would break the batch
     // every time a texture is uploaded mid-frame.
@@ -365,7 +352,7 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
     return true;
 }
 
-bool LLTexUnit::bind(LLCubeMap* cubeMap, ALSampler key)
+bool ALTextureSlot::bind(LLCubeMap* cubeMap, ALSampler key)
 {
     if (mIndex < 0) return false;
 
@@ -373,7 +360,7 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap, ALSampler key)
 
     if (cubeMap == NULL)
     {
-        LL_WARNS() << "NULL LLTexUnit::bind cubemap" << LL_ENDL;
+        LL_WARNS() << "NULL ALTextureSlot::bind cubemap" << LL_ENDL;
         return false;
     }
 
@@ -381,7 +368,7 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap, ALSampler key)
     // partially-constructed cubemap could have a null face here.
     if (cubeMap->mImages[0].isNull())
     {
-        LL_WARNS() << "LLTexUnit::bind cubemap with null face 0" << LL_ENDL;
+        LL_WARNS() << "ALTextureSlot::bind cubemap with null face 0" << LL_ENDL;
         return false;
     }
 
@@ -390,7 +377,7 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap, ALSampler key)
         if (LLCubeMap::sUseCubeMaps)
         {
             activate();
-            enable(LLTexUnit::TT_CUBE_MAP);
+            setTarget(ALTextureSlot::TT_CUBE_MAP);
             mCurrTexture = cubeMap->mImages[0]->getTexName();
             glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
             cubeMap->mImages[0]->updateBindStats();
@@ -411,7 +398,7 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap, ALSampler key)
 }
 
 // LLRenderTarget is unavailible on the mapserver since it uses FBOs.
-bool LLTexUnit::bind(LLRenderTarget* renderTarget, bool bindDepth, U32 sampler)
+bool ALTextureSlot::bind(LLRenderTarget* renderTarget, bool bindDepth, U32 sampler)
 {
     if (mIndex < 0) return false;
 
@@ -438,7 +425,7 @@ bool LLTexUnit::bind(LLRenderTarget* renderTarget, bool bindDepth, U32 sampler)
     return true;
 }
 
-bool LLTexUnit::bindManual(eTextureType type, U32 texture, U32 sampler)
+bool ALTextureSlot::bindManual(eTextureType type, U32 texture, U32 sampler)
 {
     if (mIndex < 0)
     {
@@ -450,7 +437,7 @@ bool LLTexUnit::bindManual(eTextureType type, U32 texture, U32 sampler)
         gGL.flush();
 
         activate();
-        enable(type);
+        setTarget(type);
         mCurrTexture = texture;
         // Classic bind rather than glBindTextureUnit even under DSA: several callers pass
         // a name straight out of glGenTextures and rely on this call to establish its
@@ -468,7 +455,7 @@ bool LLTexUnit::bindManual(eTextureType type, U32 texture, U32 sampler)
     return true;
 }
 
-void LLTexUnit::unbind(eTextureType type)
+void ALTextureSlot::unbind()
 {
     stop_glerror();
 
@@ -479,25 +466,31 @@ void LLTexUnit::unbind(eTextureType type)
     gGL.flush();
     activate();
 
-    // Disabled caching of binding state.
-    if (mCurrTexType == type)
+    if (mCurrTexType != TT_NONE)
     {
         mCurrTexture = 0;
 
-        if (type == LLTexUnit::TT_TEXTURE)
+        if (mCurrTexType == TT_TEXTURE)
         {
-            glBindTexture(sGLTextureType[type], sWhiteTexture);
+            glBindTexture(sGLTextureType[mCurrTexType], sWhiteTexture);
         }
         else
         {
-            glBindTexture(sGLTextureType[type], 0);
+            glBindTexture(sGLTextureType[mCurrTexType], 0);
         }
+
+        // TT_NONE even where the white placeholder is now bound. It means "this slot holds
+        // nothing a caller should reason about", which is true either way, and it is what
+        // makes LLGLSLShader::disableTexture's target check meaningful: a slot that was
+        // enabled but never bound reads TT_NONE and is skipped, so the check only ever
+        // compares a target something actually put there.
+        mCurrTexType = TT_NONE;
 
         // Sampler left in place. Whoever binds here next names their own, so releasing it
         // would just be a glBindSampler now and another one then -- with a flush attached.
         //
         // ONE EXCEPTION, and it is not theoretical -- it shipped as a driver warning before
-        // being caught. This leaves the WHITE PLACEHOLDER on the unit, which is sampleable,
+        // being caught. This leaves the WHITE PLACEHOLDER on the slot, which is sampleable,
         // so a leftover COMPARE sampler is read through depth comparison on a non-depth
         // texture: undefined. Whoever selects a compare sampler must therefore release it
         // itself rather than relying on this; LLPipeline::bindShadowMaps and unbindShadowMaps
@@ -510,23 +503,24 @@ void LLTexUnit::unbind(eTextureType type)
     }
 }
 
-void LLTexUnit::unbindFast(eTextureType type)
+void ALTextureSlot::unbindFast()
 {
     activate();
 
-    // Disabled caching of binding state.
-    if (mCurrTexType == type)
+    if (mCurrTexType != TT_NONE)
     {
         mCurrTexture = 0;
 
-        if (type == LLTexUnit::TT_TEXTURE)
+        if (mCurrTexType == TT_TEXTURE)
         {
-            glBindTexture(sGLTextureType[type], sWhiteTexture);
+            glBindTexture(sGLTextureType[mCurrTexType], sWhiteTexture);
         }
         else
         {
-            glBindTexture(sGLTextureType[type], 0);
+            glBindTexture(sGLTextureType[mCurrTexType], 0);
         }
+
+        mCurrTexType = TT_NONE;
 
         // Sampler left in place -- see unbind(), including the compare-sampler exception. This
         // is the per-draw unbind, so the pair of glBindSampler calls it used to cost (release
@@ -536,8 +530,8 @@ void LLTexUnit::unbindFast(eTextureType type)
 
 
 // Useful for debugging that you've manually assigned a texture operation to the correct
-// texture unit based on the currently set active texture in opengl.
-void LLTexUnit::debugTextureUnit(void)
+// slot based on the currently set active texture in opengl.
+void ALTextureSlot::debugTextureUnit(void)
 {
     if (mIndex < 0) return;
 
@@ -546,6 +540,6 @@ void LLTexUnit::debugTextureUnit(void)
     if ((GL_TEXTURE0 + mIndex) != activeTexture)
     {
         U32 set_unit = (activeTexture - GL_TEXTURE0);
-        LL_WARNS() << "Incorrect Texture Unit!  Expected: " << set_unit << " Actual: " << mIndex << LL_ENDL;
+        LL_WARNS() << "Incorrect texture slot!  Expected: " << set_unit << " Actual: " << mIndex << LL_ENDL;
     }
 }

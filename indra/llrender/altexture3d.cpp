@@ -67,9 +67,9 @@ bool ALTexture3D::allocate(U32 width, U32 height, U32 depth,
     // asked to allocate, since its allocation path is 2D.
     mImage = new LLImageGL(width, height, 4, false);
     mImage->setTexName(texname);
-    mImage->setTarget(GL_TEXTURE_3D, LLTexUnit::TT_TEXTURE_3D);
+    mImage->setTarget(GL_TEXTURE_3D, ALTextureSlot::TT_TEXTURE_3D);
 
-    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE_3D, texname);
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE_3D, texname);
 
     if (gGLManager.mHasTextureStorage)
     {
@@ -92,7 +92,7 @@ bool ALTexture3D::allocate(U32 width, U32 height, U32 depth,
     alloc_tex_image(width, height, internal_format, depth, false);
 
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
+    gGL.getTextureSlot(0)->unbind();
 
     stop_glerror();
     return true;
@@ -105,9 +105,9 @@ void ALTexture3D::setImage(U32 primary_format, U32 type, const void* data)
         return;
     }
 
-    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE_3D, mImage->getTexName());
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE_3D, mImage->getTexName());
     glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, mWidth, mHeight, mDepth, primary_format, type, data);
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
+    gGL.getTextureSlot(0)->unbind();
     stop_glerror();
 }
 
@@ -121,13 +121,13 @@ void ALTexture3D::bind(S32 stage)
     // Bound by name, so the sampler is passed explicitly -- otherwise this samples with GL's
     // defaults. Bilinear clamp: a colour-grading LUT is interpolated and must not wrap, or
     // the ends of the ramp bleed into each other.
-    gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_TEXTURE_3D, mImage->getTexName(),
+    gGL.getTextureSlot(stage)->bindManual(ALTextureSlot::TT_TEXTURE_3D, mImage->getTexName(),
                                       gGL.getSampler(ALSamplers::BilinearClamp));
 }
 
 void ALTexture3D::unbind(S32 stage)
 {
-    gGL.getTexUnit(stage)->unbind(LLTexUnit::TT_TEXTURE_3D);
+    gGL.getTextureSlot(stage)->unbind();
 }
 
 void ALTexture3D::destroyGL()

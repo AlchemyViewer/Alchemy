@@ -154,7 +154,7 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
             S32 idx = sky_shader->enableTexture(LLShaderMgr::ENVIRONMENT_MAP);
             if (idx > -1)
             {
-                gGL.getTexUnit(idx)->bindSampled(gEXRImage, ALSamplers::TrilinearClamp);
+                gGL.getTextureSlot(idx)->bindSampled(gEXRImage, ALSamplers::TrilinearClamp);
             }
 
             static LLCachedControl<F32> hdri_exposure(gSavedSettings, "RenderHDRIExposure", 0.0f);
@@ -373,8 +373,8 @@ void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 
         LLPointer<LLViewerTexture> cloud_noise      = gSky.mVOSkyp->getCloudNoiseTex();
         LLPointer<LLViewerTexture> cloud_noise_next = gSky.mVOSkyp->getCloudNoiseTexNext();
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
+        gGL.getTextureSlot(1)->unbind();
 
         F32 cloud_variance = psky ? (F32)psky->getCloudVariance() : 0.0f;
         F32 blend_factor   = psky ? (F32)psky->getBlendFactor() : 0.0f;
@@ -414,8 +414,8 @@ void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 
 
         cloudshader->unbind();
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
+        gGL.getTextureSlot(1)->unbind();
     }
 }
 
@@ -441,8 +441,8 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
         LLPointer<LLViewerTexture> tex_a = face->getTexture(LLRender::DIFFUSE_MAP);
         LLPointer<LLViewerTexture> tex_b = face->getTexture(LLRender::ALTERNATE_DIFFUSE_MAP);
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
+        gGL.getTextureSlot(1)->unbind();
 
         // if we even have sun disc textures to work with...
         if (tex_a || tex_b)
@@ -476,8 +476,8 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 
                 face->renderIndexed();
 
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-                gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->unbind();
+                gGL.getTextureSlot(1)->unbind();
 
                 sun_shader->unbind();
             }
@@ -526,8 +526,8 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 
             face->renderIndexed();
 
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-            gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
+            gGL.getTextureSlot(1)->unbind();
 
             moon_shader->unbind();
         }

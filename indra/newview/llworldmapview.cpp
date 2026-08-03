@@ -410,12 +410,12 @@ void LLWorldMapView::draw()
     S32 level = LLWorldMipmap::scaleToLevel(mMapScale);
 
     LLLocalClipRect clip(getLocalRect());
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 
     // Draw background rectangle
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gGL.color4fv(mBackgroundColor.mV);
     gl_rect_2d(0, height, width, 0);
 
@@ -468,7 +468,7 @@ void LLWorldMapView::draw()
             // Draw a transparent red square over down sims
             gGL.color4f(0.2f, 0.0f, 0.0f, 0.4f);
 
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
             gGL.begin(LLRender::TRIANGLES);
             {
                 gGL.vertex2f(left, top);
@@ -493,7 +493,7 @@ void LLWorldMapView::draw()
                 // Draw something whenever we have enough info
                 if (overlayimage->hasGLTexture())
                 {
-                    gGL.getTexUnit(0)->bindSampled(overlayimage, ALSamplers::AnisoClamp);
+                    gGL.getTextureSlot(0)->bindSampled(overlayimage, ALSamplers::AnisoClamp);
                     gGL.color4f(1.f, 1.f, 1.f, 1.f);
                     gGL.begin(LLRender::TRIANGLES);
                     {
@@ -785,7 +785,7 @@ bool LLWorldMapView::drawMipmapLevel(S32 width, S32 height, S32 level, bool load
 
                     // Draw the tile
                     LLGLSUIDefault gls_ui;
-                    gGL.getTexUnit(0)->bindSampled(simimage.get(), ALSamplers::AnisoClamp);
+                    gGL.getTextureSlot(0)->bindSampled(simimage.get(), ALSamplers::AnisoClamp);
 
                     gGL.color4f(1.f, 1.0f, 1.0f, 1.0f);
 
@@ -832,7 +832,7 @@ bool LLWorldMapView::drawMipmapLevel(S32 width, S32 height, S32 level, bool load
 // Used for debug only
 void LLWorldMapView::drawTileOutline(S32 level, F32 top, F32 left, F32 bottom, F32 right)
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     if (level == 1)
         gGL.color3f(1.f, 0.f, 0.f);     // red
     else if (level == 2)
@@ -991,7 +991,7 @@ void LLWorldMapView::drawFrustum()
     F32 ctr_x = ((getLocalRect().getWidth() * 0.5f + mPanX)  * LLUI::getScaleFactor().mV[VX]);
     F32 ctr_y = ((getLocalRect().getHeight() * 0.5f + mPanY) * LLUI::getScaleFactor().mV[VY]);
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     // Since we don't rotate the map, we have to rotate the frustum.
     gGL.pushMatrix();
@@ -1239,7 +1239,7 @@ static void drawDot(F32 x_pixels, F32 y_pixels,
         F32 top =       y_pixels + dot_radius;
         F32 bottom =    y_pixels - dot_radius;
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gGL.color4fv( color.mV );
         LLUI::setLineWidth(3.0f);
         F32 point = relative_z > HEIGHT_THRESHOLD ? top : bottom; // Y pos of the point of the V

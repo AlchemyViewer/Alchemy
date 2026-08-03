@@ -282,7 +282,6 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // pay the throttle-check overhead and risked racing eviction with
     // glyph pointers active inside the same render call.
 
-    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
 
     S32 scaled_max_pixels = max_pixels == S32_MAX ? S32_MAX : llceil((F32)max_pixels * sScaleX);
 
@@ -438,7 +437,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         const F32 y_top = y_bot + mFontFreetype->getUnderlineThickness();
 
         LLColor4U col(color);
-        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, LLTexUnit::sWhiteTexture);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, ALTextureSlot::sWhiteTexture);
         gGL.color4ubv(col.mV);
         gGL.begin(LLRender::TRIANGLES);
         gGL.vertex2f(start_x, y_bot);
@@ -565,7 +564,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         {
             if (batch_image)
             {
-                gGL.getTexUnit(0)->bindSampled(batch_image, ALSamplers::PointWrap);
+                gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
             }
             gGL.begin(LLRender::TRIANGLES);
             gGL.vertexBatchPreTransformed(vertices, uvs, colors, glyph_count * 6);
@@ -687,7 +686,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                             : nullptr;
                         if (batch_image)
                         {
-                            gGL.getTexUnit(0)->bindSampled(batch_image, ALSamplers::PointWrap);
+                            gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
                         }
                     }
 
@@ -846,7 +845,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                 : nullptr;
             if (batch_image)
             {
-                gGL.getTexUnit(0)->bindSampled(batch_image, ALSamplers::PointWrap);
+                gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
             }
         }
 
@@ -982,7 +981,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     : nullptr;
                 if (batch_image)
                 {
-                    gGL.getTexUnit(0)->bindSampled(batch_image, ALSamplers::PointWrap);
+                    gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
                 }
             }
 

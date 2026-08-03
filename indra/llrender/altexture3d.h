@@ -65,7 +65,7 @@ public:
     GLuint getGLName() const;
 
 protected:
-    friend class LLTexUnit;
+    friend class ALTextureSlot;
     ~ALTexture3D();
 
     LLPointer<LLImageGL> mImage;

@@ -3,6 +3,7 @@
 set(llrender_SOURCE_FILES
     alsamplerstate.cpp
     altexture3d.cpp
+    altextureslot.cpp
     alfontcolrv1.cpp
     alfontface.cpp
     alfontshaping.cpp
@@ -24,7 +25,6 @@ set(llrender_SOURCE_FILES
     llrendertarget.cpp
     llshadermgr.cpp
     lltexture.cpp
-    lltexunit.cpp
     lltexturemanagerbridge.cpp
     lluiimage.cpp
     llvertexbuffer.cpp
@@ -34,6 +34,7 @@ set(llrender_SOURCE_FILES
 set(llrender_HEADER_FILES
     alsamplerstate.h
     altexture3d.h
+    altextureslot.h
     alfontcolrv1.h
     alfontface.h
     alfontshaping.h
@@ -58,7 +59,6 @@ set(llrender_HEADER_FILES
     llrendertarget.h
     llshadermgr.h
     lltexture.h
-    lltexunit.h
     lltexturemanagerbridge.h
     lluiimage.h
     lluiimage.inl

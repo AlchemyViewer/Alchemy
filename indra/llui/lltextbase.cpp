@@ -589,7 +589,7 @@ void LLTextBase::drawHighlightsBackground(const highlight_list_t& highlights, co
         std::vector<LLRect> selection_rects = getSelectionRects(highlights);
 
         // Draw the selection box (we're using a box instead of reversing the colors on the selected text).
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 //      const LLColor4& color = mSelectedBGColor;
         F32 alpha = hasFocus() ? FOCUSED_SELECTION_BG_ALPHA : UNFOCUSED_SELECTION_BG_ALPHA;
         alpha *= getDrawContext().mAlpha;
@@ -655,7 +655,7 @@ void LLTextBase::drawHighlightedBackground()
         if (highlight_rects.empty())
             return;
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         LLRect content_display_rect = getVisibleDocumentRect();
 
@@ -757,7 +757,7 @@ void LLTextBase::drawCursor()
                 cursor_rect.mRight = cursor_rect.mLeft + CURSOR_THICKNESS;
             }
 
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
 
             LLColor4 cursor_color = mCursorColor.get() % alpha;
             gGL.color4fv( cursor_color.mV );

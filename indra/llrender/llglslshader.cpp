@@ -1006,18 +1006,18 @@ bool LLGLSLShader::declaresShadowSamplers() const
 // static
 void LLGLSLShader::releaseCompareSamplerUnits()
 {
-    const U32 binds_before = LLTexUnit::sSamplerBinds;
+    const U32 binds_before = ALTextureSlot::sSamplerBinds;
     U32 units = sCompareSamplerUnits;
     sCompareSamplerUnits = 0;
     for (S32 unit = 0; units != 0; ++unit, units >>= 1)
     {
         if (units & 1u)
         {
-            gGL.getTexUnit(unit)->unbind(LLTexUnit::TT_TEXTURE);
-            gGL.getTexUnit(unit)->bindSampler(0);
+            gGL.getTextureSlot(unit)->unbind();
+            gGL.getTextureSlot(unit)->bindSampler(0);
         }
     }
-    LLTexUnit::sSamplerBindsShadowCycle += LLTexUnit::sSamplerBinds - binds_before;
+    ALTextureSlot::sSamplerBindsShadowCycle += ALTextureSlot::sSamplerBinds - binds_before;
 }
 
 void LLGLSLShader::bind()
@@ -1113,7 +1113,7 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, ALSampler key)
 
     if (uniform > -1)
     {
-        gGL.getTexUnit(uniform)->bindFast(texture, key);
+        gGL.getTextureSlot(uniform)->bindFast(texture, key);
     }
 
     return uniform;
@@ -1160,13 +1160,13 @@ S32 LLGLSLShader::bindDepthTexture(S32 uniform, LLRenderTarget* texture, ALSampl
         // for any fetch that strays outside [0,1], which is geometry from the wrong place
         // rather than a merely inexact sample. These textures carried GL_REPEAT only because
         // allocateDepth never set an address mode. See LLRenderTarget::getDefaultDepthSampler.
-        gGL.getTexUnit(uniform)->bind(texture, true, gGL.getSampler(key));
+        gGL.getTextureSlot(uniform)->bind(texture, true, gGL.getSampler(key));
     }
 
     return uniform;
 }
 
-S32 LLGLSLShader::unbindTexture(S32 uniform, LLTexUnit::eTextureType mode)
+S32 LLGLSLShader::unbindTexture(S32 uniform)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
@@ -1181,7 +1181,7 @@ S32 LLGLSLShader::unbindTexture(S32 uniform, LLTexUnit::eTextureType mode)
 
     if (uniform > -1)
     {
-        gGL.getTexUnit(uniform)->unbindFast(mode);
+        gGL.getTextureSlot(uniform)->unbindFast();
     }
 
     return uniform;
@@ -1192,7 +1192,15 @@ S32 LLGLSLShader::getTextureChannel(S32 uniform) const
     return mTexture[uniform];
 }
 
-S32 LLGLSLShader::enableTexture(S32 uniform, LLTexUnit::eTextureType mode)
+// Resolve the texture channel a uniform is bound to. Nothing more: this used to also activate
+// the slot and stamp the expected target onto it, which existed only so disableTexture's check
+// below had something to compare against. A slot learns its target from whatever actually gets
+// bound, and reads TT_NONE when nothing was -- so the prediction is both unnecessary and less
+// truthful than the thing it was predicting.
+//
+// NO MODE PARAMETER for the same reason. disableTexture keeps its one, because there it names
+// the caller's expectation and is checked rather than written.
+S32 LLGLSLShader::enableTexture(S32 uniform)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
@@ -1203,17 +1211,10 @@ S32 LLGLSLShader::enableTexture(S32 uniform, LLTexUnit::eTextureType mode)
         return -1;
     }
 
-
-    S32 index = mTexture[uniform];
-    if (index != -1)
-    {
-        gGL.getTexUnit(index)->activate();
-        gGL.getTexUnit(index)->enable(mode);
-    }
-    return index;
+    return mTexture[uniform];
 }
 
-S32 LLGLSLShader::disableTexture(S32 uniform, LLTexUnit::eTextureType mode)
+S32 LLGLSLShader::disableTexture(S32 uniform, ALTextureSlot::eTextureType mode)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
@@ -1231,7 +1232,7 @@ S32 LLGLSLShader::disableTexture(S32 uniform, LLTexUnit::eTextureType mode)
         return index;
     }
 
-    LLTexUnit* tex_unit = gGL.getTexUnit(index);
+    ALTextureSlot* tex_unit = gGL.getTextureSlot(index);
     if (!tex_unit)
     {
         // Invalid texture unit
@@ -1239,8 +1240,12 @@ S32 LLGLSLShader::disableTexture(S32 uniform, LLTexUnit::eTextureType mode)
         return index;
     }
 
-    LLTexUnit::eTextureType curr_type = tex_unit->getCurrType();
-    if (curr_type != LLTexUnit::TT_NONE)
+    // TT_NONE means nothing was ever bound here (or it has already been released), so there is
+    // no target to disagree with `mode`. Everything else was put there by an actual bind, which
+    // makes this comparison a real check on what the shader is about to read rather than a
+    // check on bookkeeping the channel setup wrote itself.
+    ALTextureSlot::eTextureType curr_type = tex_unit->getCurrType();
+    if (curr_type != ALTextureSlot::TT_NONE)
     {
         if (gDebugGL && curr_type != mode)
         {
@@ -1254,7 +1259,7 @@ S32 LLGLSLShader::disableTexture(S32 uniform, LLTexUnit::eTextureType mode)
                 LL_ERRS() << "Texture channel " << index << " texture type corrupted. Expected: " << mode << ", Found: " << curr_type << LL_ENDL;
             }
         }
-        tex_unit->disable();
+        tex_unit->unbind();
     }
 
     return index;

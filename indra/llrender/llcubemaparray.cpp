@@ -125,7 +125,7 @@ LLCubeMapArray::LLCubeMapArray(LLCubeMapArray& lhs, U32 width, U32 count) : mTex
     const size_t face_bytes = (size_t)lhs.mWidth * lhs.mWidth * components;
     std::vector<U8> src_layers(face_bytes * 6 * min_count);
 
-    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP_ARRAY, lhs.getGLName());
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP_ARRAY, lhs.getGLName());
     glGetTexImage(GL_TEXTURE_CUBE_MAP_ARRAY, 0, format, GL_UNSIGNED_BYTE, src_layers.data());
 
     bind(0);
@@ -155,7 +155,7 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
 
     mImage = new LLImageGL(resolution, resolution, components, use_mips);
     mImage->setTexName(texname);
-    mImage->setTarget(sTargets[0], LLTexUnit::TT_CUBE_MAP_ARRAY);
+    mImage->setTarget(sTargets[0], ALTextureSlot::TT_CUBE_MAP_ARRAY);
 
     mImage->setUseMipMaps(use_mips);
     mImage->setHasMipMaps(use_mips);
@@ -216,13 +216,13 @@ void LLCubeMapArray::bind(S32 stage)
     // that wrapped would fetch a neighbouring face at the seams.
     const ALSampler key = mImage->getUseMipMaps() ? ALSamplers::AnisoClamp
                                                   : ALSamplers::BilinearClamp;
-    gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_CUBE_MAP_ARRAY, getGLName(),
+    gGL.getTextureSlot(stage)->bindManual(ALTextureSlot::TT_CUBE_MAP_ARRAY, getGLName(),
                                       gGL.getSampler(key));
 }
 
 void LLCubeMapArray::unbind()
 {
-    gGL.getTexUnit(mTextureStage)->unbind(LLTexUnit::TT_CUBE_MAP_ARRAY);
+    gGL.getTextureSlot(mTextureStage)->unbind();
     mTextureStage = -1;
 }
 

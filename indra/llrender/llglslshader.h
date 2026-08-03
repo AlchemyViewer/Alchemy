@@ -286,12 +286,12 @@ public:
 
     void addConstant(const LLGLSLShader::eShaderConsts shader_const);
 
-    //enable/disable texture channel for specified uniform
-    //if given texture uniform is active in the shader,
-    //the corresponding channel will be active upon return
-    //returns channel texture is enabled in from [0-MAX)
-    S32 enableTexture(S32 uniform, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
-    S32 disableTexture(S32 uniform, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
+    // Texture channel for the specified uniform, or -1 if the uniform is not used as a
+    // texture. enableTexture only resolves it; disableTexture also releases the slot, and its
+    // `mode` is the caller's expected target, checked against what was actually bound there
+    // when gDebugGL is on.
+    S32 enableTexture(S32 uniform);
+    S32 disableTexture(S32 uniform, ALTextureSlot::eTextureType mode = ALTextureSlot::TT_TEXTURE);
 
     // get the texture channel of the given uniform, or -1 if uniform is not used as a texture
     S32 getTextureChannel(S32 uniform) const;
@@ -321,7 +321,7 @@ public:
     // DEPTH_COMPONENT texture without compare mode is implementation-defined, and at
     // silhouette edges it averages foreground and background into a depth no surface has.
     S32 bindDepthTexture(S32 uniform, LLRenderTarget* texture, ALSampler key = ALSamplers::PointClamp);
-    S32 unbindTexture(S32 uniform, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
+    S32 unbindTexture(S32 uniform);
 
     bool link(bool suppress_errors = false);
     void bind();

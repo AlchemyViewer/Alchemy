@@ -271,7 +271,7 @@ void LLDrawPoolAlpha::renderDebugAlpha()
     {
         gHighlightProgram.bind();
         gGL.diffuseColor4f(1, 0, 0, 1);
-        gGL.getTexUnit(0)->bindFast(LLViewerFetchedTexture::getSmokeImage(), ALSamplers::AnisoWrap);
+        gGL.getTextureSlot(0)->bindFast(LLViewerFetchedTexture::getSmokeImage(), ALSamplers::AnisoWrap);
 
 
         renderAlphaHighlight();
@@ -395,7 +395,6 @@ bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material, LLGLSLShader
         if (draw->mTextureMatrix)
         {
             tex_setup = true;
-            gGL.getTexUnit(0)->activate();
             gGL.matrixMode(LLRender::MM_TEXTURE0);
             gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
             gPipeline.mTextureMatrixOps++;
@@ -440,13 +439,12 @@ bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material, LLGLSLShader
             }
             else
             {
-                gGL.getTexUnit(0)->bindFast(draw->mTexture, diffuse_key);
+                gGL.getTextureSlot(0)->bindFast(draw->mTexture, diffuse_key);
             }
 
             if (draw->mTextureMatrix)
             {
                 tex_setup = true;
-                gGL.getTexUnit(0)->activate();
                 gGL.matrixMode(LLRender::MM_TEXTURE0);
                 gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
                 gPipeline.mTextureMatrixOps++;
@@ -454,7 +452,7 @@ bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material, LLGLSLShader
         }
         else
         {
-            gGL.getTexUnit(0)->unbindFast(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbindFast();
         }
     }
 
@@ -465,7 +463,6 @@ void LLDrawPoolAlpha::popTextureMatrix(bool tex_setup)
 {
     if (tex_setup)
     {
-        gGL.getTexUnit(0)->activate();
         gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadIdentity();
         gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -738,7 +735,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                             S32 channel = target_shader->enableTexture(LLShaderMgr::EXPOSURE_MAP);
                             if (channel > -1)
                             {
-                                gGL.getTexUnit(channel)->bind(&gPipeline.mExposureMap);
+                                gGL.getTextureSlot(channel)->bind(&gPipeline.mExposureMap);
                             }
                         }
                     }

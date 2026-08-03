@@ -74,7 +74,7 @@ public:
     static bool sUseCubeMaps;
 
 protected:
-    friend class LLTexUnit;
+    friend class ALTextureSlot;
     ~LLCubeMap();
     LLGLenum mTargets[6];
     LLPointer<LLImageGL> mImages[6];

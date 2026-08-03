@@ -627,11 +627,11 @@ void LLVertexBufferData::drawWithMatrix()
 
     if (mTexName)
     {
-        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTexName, mTexSampler);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mTexName, mTexSampler);
     }
     else
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
     }
 
     gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -665,11 +665,11 @@ void LLVertexBufferData::draw()
 
     if (mTexName)
     {
-        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTexName, mTexSampler);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mTexName, mTexSampler);
     }
     else
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
     }
 
     mVB->setBuffer();

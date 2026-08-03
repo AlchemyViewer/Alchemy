@@ -283,7 +283,7 @@ void LLVisualParamHint::draw(F32 alpha)
     // Clamp: the hint is a full [0,1] quad, and this dynamic texture asked for clamped
     // addressing (constructor clamp=true) back when that lived on the texture object --
     // wrap would blend the opposite border into the preview's edges.
-    gGL.getTexUnit(0)->bindSampled(this, ALSamplers::AnisoClamp);
+    gGL.getTextureSlot(0)->bindSampled(this, ALSamplers::AnisoClamp);
 
     gGL.color4f(1.f, 1.f, 1.f, alpha);
 
@@ -306,7 +306,7 @@ void LLVisualParamHint::draw(F32 alpha)
     }
     gGL.end();
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 }
 
 //-----------------------------------------------------------------------------

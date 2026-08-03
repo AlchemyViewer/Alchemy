@@ -139,7 +139,7 @@ void FSManipTranslateJoint::restoreGL()
 
     // Trilinear + mips: the grid recedes to the horizon, so it needs the mip chain. Sampler
     // rather than texture state, matching the render-time binds in renderGrid's callers.
-    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, sGridTex->getTexName(),
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, sGridTex->getTexName(),
                                   gGL.getSampler(ALSamplers::TrilinearWrap));
 
     // Allocate the whole mip chain up front: immutable storage is allocated once for the
@@ -834,7 +834,7 @@ void FSManipTranslateJoint::renderTranslationHandles()
         relative_camera_dir.normVec();
 
         {
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
             LLGLDisable cull_face(GL_CULL_FACE);
 
             LLColor4 color1;
@@ -1044,7 +1044,7 @@ void FSManipTranslateJoint::renderTranslationHandles()
             }
         }
         {
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
 
             // Since we draw handles with depth testing off, we need to draw them in the
             // proper depth order.
@@ -1110,7 +1110,7 @@ void FSManipTranslateJoint::renderTranslationHandles()
 
 void FSManipTranslateJoint::renderArrow(S32 which_arrow, S32 selected_arrow, F32 box_size, F32 arrow_size, F32 handle_size, bool reverse_direction)
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLEnable gls_blend(GL_BLEND);
 
     for (S32 pass = 1; pass <= 2; pass++)

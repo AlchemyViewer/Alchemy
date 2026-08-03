@@ -231,7 +231,7 @@ bool LLGLTexture::getBoundRecently() const
     return false ;
 }
 
-LLTexUnit::eTextureType LLGLTexture::getTarget(void) const
+ALTextureSlot::eTextureType LLGLTexture::getTarget(void) const
 {
     llassert(mGLTexturep.notNull()) ;
     return mGLTexturep->getTarget() ;
@@ -273,7 +273,7 @@ void LLGLTexture::setTexName(LLGLuint texName)
     return mGLTexturep->setTexName(texName);
 }
 
-void LLGLTexture::setTarget(const LLGLenum target, const LLTexUnit::eTextureType bind_target)
+void LLGLTexture::setTarget(const LLGLenum target, const ALTextureSlot::eTextureType bind_target)
 {
     llassert(mGLTexturep.notNull());
     return mGLTexturep->setTarget(target, bind_target);

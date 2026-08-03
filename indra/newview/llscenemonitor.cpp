@@ -305,7 +305,7 @@ void LLSceneMonitor::capture()
 
         U32 old_FBO = LLRenderTarget::sCurFBO;
 
-        gGL.getTexUnit(0)->bind(&cur_target);
+        gGL.getTextureSlot(0)->bind(&cur_target);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, 0); //point to the main frame buffer.
 
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, cur_target.getWidth(), cur_target.getHeight()); //copy the content
@@ -366,24 +366,15 @@ void LLSceneMonitor::compare()
     gTwoTextureCompareProgram.uniform1f(LLShaderMgr::DITHER_SCALE_S, mDitherScaleS);
     gTwoTextureCompareProgram.uniform1f(LLShaderMgr::DITHER_SCALE_T, mDitherScaleT);
 
-    gGL.getTexUnit(0)->activate();
-    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
     // Point sampling: this is a per-pixel frame difference, so interpolation would blur
     // exactly the discrepancies it exists to measure.
-    gGL.getTexUnit(0)->bind(mFrames[0], false,
+    gGL.getTextureSlot(0)->bind(mFrames[0], false,
                             gGL.getSampler(ALSamplers::PointClamp));
-    gGL.getTexUnit(0)->activate();
 
-    gGL.getTexUnit(1)->activate();
-    gGL.getTexUnit(1)->enable(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(1)->bind(mFrames[1], false,
+    gGL.getTextureSlot(1)->bind(mFrames[1], false,
                             gGL.getSampler(ALSamplers::PointClamp));
-    gGL.getTexUnit(1)->activate();
 
-    gGL.getTexUnit(2)->activate();
-    gGL.getTexUnit(2)->enable(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(2)->bindSampled(mDitheringTexture, ALSamplers::PointWrap);
-    gGL.getTexUnit(2)->activate();
+    gGL.getTextureSlot(2)->bindSampled(mDitheringTexture, ALSamplers::PointWrap);
 
     gl_rect_2d_simple_tex(width, height);
 
@@ -391,12 +382,9 @@ void LLSceneMonitor::compare()
 
     gTwoTextureCompareProgram.unbind();
 
-    gGL.getTexUnit(0)->disable();
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(1)->disable();
-    gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(2)->disable();
-    gGL.getTexUnit(2)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
+    gGL.getTextureSlot(1)->unbind();
+    gGL.getTextureSlot(2)->unbind();
 
     if (!mDebugViewerVisible)
     {
@@ -716,7 +704,7 @@ void LLSceneMonitorView::draw()
     setRect(new_rect);
 
     //draw background
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gl_rect_2d(0, getRect().getHeight(), getRect().getWidth(), 0, LLColor4(0.f, 0.f, 0.f, 0.25f));
 
     LLSceneMonitor::getInstance()->calcDiffAggregate();

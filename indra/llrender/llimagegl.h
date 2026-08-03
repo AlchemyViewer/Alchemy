@@ -68,7 +68,7 @@ namespace LLImageGLMemory
 // any measured path.
 class LLImageGL : public LLThreadSafeRefCount
 {
-    friend class LLTexUnit;
+    friend class ALTextureSlot;
 public:
 
     // call once per frame
@@ -142,7 +142,10 @@ public:
     // The trailing address mode is accepted and ignored: sampling is named at the bind now.
     // Kept in the signature so the several call sites that pass one still compile; drop it
     // when they are cleaned up.
-    LLImageGL(LLGLuint mTexName, U32 components, LLGLenum target, LLGLint  formatInternal, LLGLenum formatPrimary, LLGLenum formatType, LLTexUnit::eTextureAddressMode addressMode);
+    // Wrap a texture object this LLImageGL does not own. No address-mode parameter: it took
+    // one, the body never read it, and callers were still passing sampling state to a class
+    // that stopped carrying any.
+    LLImageGL(LLGLuint mTexName, U32 components, LLGLenum target, LLGLint  formatInternal, LLGLenum formatPrimary, LLGLenum formatType);
 
 protected:
     virtual ~LLImageGL();
@@ -195,7 +198,7 @@ public:
     // on the format resolved by setExplicitFormat / the auto-format switch;
     // callers uploading into a raw GL texture name (e.g. llvoavatar's
     // morph-mask upload) call this themselves before/after binding.
-    static void applySwizzleForDeprecatedFormat(LLTexUnit::eTextureType type, U32 original_format);
+    static void applySwizzleForDeprecatedFormat(ALTextureSlot::eTextureType type, U32 original_format);
 
     bool createGLTexture() ;
     bool createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S32 usename = 0, bool to_create = true,
@@ -257,9 +260,9 @@ public:
 
     bool getIsResident(bool test_now = false); // not const
 
-    void setTarget(const LLGLenum target, const LLTexUnit::eTextureType bind_target);
+    void setTarget(const LLGLenum target, const ALTextureSlot::eTextureType bind_target);
 
-    LLTexUnit::eTextureType getTarget(void) const { return mBindTarget; }
+    ALTextureSlot::eTextureType getTarget(void) const { return mBindTarget; }
     bool isGLTextureCreated(void) const { return mGLTextureCreated ; }
     void setGLTextureCreated (bool initialized) { mGLTextureCreated = initialized; }
 
@@ -391,7 +394,7 @@ private:
 
 protected:
     LLGLenum mTarget;       // Normally GL_TEXTURE2D, sometimes something else (ex. cube maps)
-    LLTexUnit::eTextureType mBindTarget;    // Normally TT_TEXTURE, sometimes something else (ex. cube maps)
+    ALTextureSlot::eTextureType mBindTarget;    // Normally TT_TEXTURE, sometimes something else (ex. cube maps)
     bool mHasMipMaps;
     // Number of mip levels the texture holds -- a COUNT, not a highest-index. 1 means
     // level 0 only; 0 means no texture yet. Matches LLRenderTarget::mMipLevels, and is

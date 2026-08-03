@@ -679,7 +679,7 @@ void LLViewerParcelOverlay::renderPropertyLines()
     F32 water_z = render_water ? land.getWaterHeight() + 0.01f : 0;
 
     LLGLSUIDefault gls_ui; // called from pipeline
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest mDepthTest(GL_TRUE);
 
     // Find camera height off the ground (not from zero)
@@ -816,7 +816,7 @@ void LLViewerParcelOverlay::renderPropertyLinesOnMinimap(F32 scale_pixels_per_me
     F32       map_parcel_width = PARCEL_GRID_STEP_METERS * scale_pixels_per_meter;
     const S32 GRIDS_PER_EDGE   = mParcelGridsPerEdge;
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gGL.setLineWidth(1.0f);
     gGL.color4fv(parcel_outline_color);
     for (S32 i = 0; i <= GRIDS_PER_EDGE; i++)

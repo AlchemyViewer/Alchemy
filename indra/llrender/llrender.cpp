@@ -72,7 +72,7 @@ S32 gGLViewport[4];
 
 U32 LLRender::sUICalls = 0;
 U32 LLRender::sUIVerts = 0;
-U32 LLTexUnit::sWhiteTexture = 0;
+U32 ALTextureSlot::sWhiteTexture = 0;
 F32 LLRender::sAnisotropicFilteringLevel = 0.f;
 bool LLRender::sGLCoreProfile = false;
 bool LLRender::sNsightDebugSupport = false;
@@ -271,9 +271,9 @@ LLRender::LLRender()
     mMode(LLRender::TRIANGLES),
     mCurrTextureUnitIndex(0)
 {
-    for (U32 i = 0; i < LL_NUM_TEXTURE_LAYERS; i++)
+    for (U32 i = 0; i < AL_NUM_TEXTURE_SLOTS; i++)
     {
-        mTexUnits[i].mIndex = i;
+        mTextureSlots[i].mIndex = i;
     }
 
     for (U32 i = 0; i < LL_NUM_LIGHT_UNITS; ++i)
@@ -408,7 +408,7 @@ void LLRender::clearSamplers()
 {
     mSamplerCache.clear();
 
-    for (LLTexUnit& unit : mTexUnits)
+    for (ALTextureSlot& unit : mTextureSlots)
     {
         unit.mCurrSampler = 0;
     }
@@ -426,12 +426,12 @@ void LLRender::refreshState(void)
 
     U32 active_unit = mCurrTextureUnitIndex;
 
-    for (U32 i = 0; i < mTexUnits.size(); i++)
+    for (U32 i = 0; i < mTextureSlots.size(); i++)
     {
-        mTexUnits[i].refreshState();
+        mTextureSlots[i].refreshState();
     }
 
-    mTexUnits[active_unit].activate();
+    mTextureSlots[active_unit].activate();
 
     setColorMask(mCurrColorMask[0], mCurrColorMask[1], mCurrColorMask[2], mCurrColorMask[3]);
 
@@ -954,16 +954,16 @@ void LLRender::blendFunc(eBlendFactor color_sfactor, eBlendFactor color_dfactor,
     }
 }
 
-LLTexUnit* LLRender::getTexUnit(U32 index)
+ALTextureSlot* LLRender::getTextureSlot(U32 index)
 {
-    if (index < mTexUnits.size())
+    if (index < mTextureSlots.size())
     {
-        return &mTexUnits[index];
+        return &mTextureSlots[index];
     }
     else
     {
         LL_DEBUGS() << "Non-existing texture unit layer requested: " << index << LL_ENDL;
-        return &mDummyTexUnit;
+        return &mDummySlot;
     }
 }
 
@@ -1119,8 +1119,8 @@ void LLRender::flush()
                     vb,
                     mMode,
                     count,
-                    gGL.getTexUnit(0)->mCurrTexture,
-                    gGL.getTexUnit(0)->mCurrSampler,
+                    gGL.getTextureSlot(0)->mCurrTexture,
+                    gGL.getTextureSlot(0)->mCurrSampler,
                     mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]],
                     mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]],
                     mMatrix[MM_TEXTURE0][mMatIdx[MM_TEXTURE0]]
@@ -1534,29 +1534,29 @@ void LLRender::debugTexUnits(void)
 {
     LL_INFOS("TextureUnit") << "Active TexUnit: " << mCurrTextureUnitIndex << LL_ENDL;
     std::string active_enabled = "false";
-    for (U32 i = 0; i < mTexUnits.size(); i++)
+    for (U32 i = 0; i < mTextureSlots.size(); i++)
     {
-        if (getTexUnit(i)->mCurrTexType != LLTexUnit::TT_NONE)
+        if (getTextureSlot(i)->mCurrTexType != ALTextureSlot::TT_NONE)
         {
             if (i == mCurrTextureUnitIndex) active_enabled = "true";
             LL_INFOS("TextureUnit") << "TexUnit: " << i << " Enabled" << LL_ENDL;
             LL_INFOS("TextureUnit") << "Enabled As: " ;
-            switch (getTexUnit(i)->mCurrTexType)
+            switch (getTextureSlot(i)->mCurrTexType)
             {
-                case LLTexUnit::TT_TEXTURE:
+                case ALTextureSlot::TT_TEXTURE:
                     LL_CONT << "Texture 2D";
                     break;
-                case LLTexUnit::TT_RECT_TEXTURE:
+                case ALTextureSlot::TT_RECT_TEXTURE:
                     LL_CONT << "Texture Rectangle";
                     break;
-                case LLTexUnit::TT_CUBE_MAP:
+                case ALTextureSlot::TT_CUBE_MAP:
                     LL_CONT << "Cube Map";
                     break;
                 default:
                     LL_CONT << "ARGH!!! NONE!";
                     break;
             }
-            LL_CONT << ", Texture Bound: " << getTexUnit(i)->mCurrTexture << LL_ENDL;
+            LL_CONT << ", Texture Bound: " << getTextureSlot(i)->mCurrTexture << LL_ENDL;
         }
     }
     LL_INFOS("TextureUnit") << "Active TexUnit Enabled : " << active_enabled << LL_ENDL;

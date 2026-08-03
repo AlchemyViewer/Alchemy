@@ -118,7 +118,6 @@ void LLHUDText::renderText()
         return;
     }
 
-    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
 
     LLGLState gls_blend(GL_BLEND, true);
 

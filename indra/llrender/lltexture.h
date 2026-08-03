@@ -36,7 +36,7 @@
 #include "lltrace.h"
 
 class LLImageGL ;
-class LLTexUnit ;
+class ALTextureSlot ;
 class LLFontGL ;
 
 //
@@ -44,7 +44,7 @@ class LLFontGL ;
 //
 class LLTexture : public virtual LLRefCount
 {
-    friend class LLTexUnit ;
+    friend class ALTextureSlot ;
     friend class LLFontGL ;
 
 protected:

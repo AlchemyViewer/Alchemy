@@ -211,7 +211,7 @@ LLManipScale::~LLManipScale()
 void LLManipScale::render()
 {
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest gls_depth(GL_TRUE);
     LLGLEnable gl_blend(GL_BLEND);
     LLBBox bbox = LLSelectMgr::getInstance()->getBBoxOfSelection();
@@ -735,7 +735,7 @@ void LLManipScale::renderCorners( const LLBBox& bbox )
 
 void LLManipScale::renderBoxHandle( F32 x, F32 y, F32 z )
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLGLDepthTest gls_depth(GL_FALSE);
     //LLGLDisable gls_stencil(GL_STENCIL_TEST);
 
