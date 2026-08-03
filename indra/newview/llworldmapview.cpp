@@ -493,7 +493,7 @@ void LLWorldMapView::draw()
                 // Draw something whenever we have enough info
                 if (overlayimage->hasGLTexture())
                 {
-                    gGL.getTexUnit(0)->bind(overlayimage);
+                    gGL.getTexUnit(0)->bindSampled(overlayimage, ALSamplers::AnisoClamp);
                     gGL.color4f(1.f, 1.f, 1.f, 1.f);
                     gGL.begin(LLRender::TRIANGLES);
                     {
@@ -785,8 +785,7 @@ bool LLWorldMapView::drawMipmapLevel(S32 width, S32 height, S32 level, bool load
 
                     // Draw the tile
                     LLGLSUIDefault gls_ui;
-                    gGL.getTexUnit(0)->bind(simimage.get());
-                    simimage->setAddressMode(LLTexUnit::TAM_CLAMP);
+                    gGL.getTexUnit(0)->bindSampled(simimage.get(), ALSamplers::AnisoClamp);
 
                     gGL.color4f(1.f, 1.0f, 1.0f, 1.0f);
 

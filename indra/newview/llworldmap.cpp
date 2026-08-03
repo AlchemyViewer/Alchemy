@@ -82,7 +82,6 @@ void LLSimInfo::setLandForSaleImage (LLUUID image_id)
     if (mMapImageID.notNull())
     {
         mOverlayImage = LLViewerTextureManager::getFetchedTexture(mMapImageID, FTT_DEFAULT, MIPMAP_TRUE, LLGLTexture::BOOST_MAP, LLViewerTexture::LOD_TEXTURE);
-        mOverlayImage->setAddressMode(LLTexUnit::TAM_CLAMP);
     }
     else
     {
@@ -96,7 +95,6 @@ LLPointer<LLViewerFetchedTexture> LLSimInfo::getLandForSaleImage ()
     {
         // Fetch the image if it hasn't been done yet (unlikely but...)
         mOverlayImage = LLViewerTextureManager::getFetchedTexture(mMapImageID, FTT_DEFAULT, MIPMAP_TRUE, LLGLTexture::BOOST_MAP, LLViewerTexture::LOD_TEXTURE);
-        mOverlayImage->setAddressMode(LLTexUnit::TAM_CLAMP);
     }
     if (!mOverlayImage.isNull())
     {

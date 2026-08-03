@@ -513,7 +513,8 @@ void LLTexLayerSet::renderAlphaMaskTextures(S32 x, S32 y, S32 width, S32 height,
             if( tex )
             {
                 LLGLSUIDefault gls_ui;
-                gGL.getTexUnit(0)->bind(tex);
+                // Static layer images are loaded TAM_CLAMP; see LLTexLayerStaticImageList.
+                gGL.getTexUnit(0)->bindSampled(tex, ALSamplers::AnisoClamp);
                 gl_rect_2d_simple_tex( width, height );
             }
         }
@@ -1140,7 +1141,7 @@ bool LLTexLayer::render(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* bou
 
                     // Clamps this binding only, so the save/restore of the texture's own
                     // mode that used to bracket this draw is no longer needed.
-                    gGL.getTexUnit(0)->bindSampled(tex, LLTexUnit::TAM_CLAMP);
+                    gGL.getTexUnit(0)->bindSampled(tex, ALSamplers::AnisoClamp);
 
                     gl_rect_2d_simple_tex( width, height );
 
@@ -1164,7 +1165,7 @@ bool LLTexLayer::render(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* bou
             LLGLTexture* tex = LLTexLayerStaticImageList::getInstance()->getTexture(getInfo()->mStaticImageFileName, getInfo()->mStaticImageIsMask);
             if( tex )
             {
-                gGL.getTexUnit(0)->bind(tex, true);
+                gGL.getTexUnit(0)->bindSampled(tex, ALSamplers::AnisoClamp, true);
                 gl_rect_2d_simple_tex( width, height );
                 gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
             }
@@ -1278,7 +1279,7 @@ bool LLTexLayer::blendAlphaTexture(S32 x, S32 y, S32 width, S32 height)
         if( tex )
         {
             gAlphaMaskProgram.setMinimumAlpha(0.f);
-            gGL.getTexUnit(0)->bind(tex, true);
+            gGL.getTexUnit(0)->bindSampled(tex, ALSamplers::AnisoClamp, true);
             gl_rect_2d_simple_tex( width, height );
             gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
             gAlphaMaskProgram.setMinimumAlpha(0.004f);
@@ -1296,7 +1297,8 @@ bool LLTexLayer::blendAlphaTexture(S32 x, S32 y, S32 width, S32 height)
             if (tex)
             {
                 gAlphaMaskProgram.setMinimumAlpha(0.f);
-                gGL.getTexUnit(0)->bind(tex);
+                // A local wearable layer, not a static image: carries LLImageGL's defaults.
+                gGL.getTexUnit(0)->bindSampled(tex, ALSamplers::AnisoWrap);
                 gl_rect_2d_simple_tex( width, height );
                 gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
                 gAlphaMaskProgram.setMinimumAlpha(0.004f);
@@ -1364,7 +1366,7 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
         if( tex && (tex->getComponents() == 4) )
         {
             // Per-binding clamp; see the matching call in renderMorphMasks.
-            gGL.getTexUnit(0)->bindSampled(tex, LLTexUnit::TAM_CLAMP);
+            gGL.getTexUnit(0)->bindSampled(tex, ALSamplers::AnisoClamp);
 
             gl_rect_2d_simple_tex( width, height );
 
@@ -1379,7 +1381,7 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
         {
             if( (tex->getComponents() == 4) || (tex->getComponents() == 1) )
             {
-                gGL.getTexUnit(0)->bind(tex, true);
+                gGL.getTexUnit(0)->bindSampled(tex, ALSamplers::AnisoClamp, true);
                 gl_rect_2d_simple_tex( width, height );
                 gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
             }
@@ -1935,8 +1937,9 @@ LLGLTexture* LLTexLayerStaticImageList::getTexture(const std::string& file_name,
                 LL_WARNS() << "Failed to create GL texture for image: " << file_name << LL_ENDL;
             }
 
-            gGL.getTexUnit(0)->bind(tex);
-            tex->setAddressMode(LLTexUnit::TAM_CLAMP);
+            // Clamp is named at every bind of these images (ALSamplers::AnisoClamp), not
+            // recorded here -- a static layer image is shared, and how it is read is the
+            // compositing pass's call.
 
             mStaticImageList [ namekey ] = tex;
             mGLBytes += (S32)tex->getWidth() * tex->getHeight() * tex->getComponents();

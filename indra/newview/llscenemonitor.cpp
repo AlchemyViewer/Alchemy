@@ -155,8 +155,6 @@ void LLSceneMonitor::generateDitheringTexture(S32 width, S32 height)
     }
 
     mDitheringTexture = LLViewerTextureManager::getLocalTexture(image_raw.get(), false) ;
-    mDitheringTexture->setAddressMode(LLTexUnit::TAM_WRAP);
-    mDitheringTexture->setFilteringOption(LLTexUnit::TFO_POINT);
 
     mDitherScaleS = (F32)width / mDitherMatrixWidth;
     mDitherScaleT = (F32)height / mDitherMatrixWidth;
@@ -373,18 +371,18 @@ void LLSceneMonitor::compare()
     // Point sampling: this is a per-pixel frame difference, so interpolation would blur
     // exactly the discrepancies it exists to measure.
     gGL.getTexUnit(0)->bind(mFrames[0], false,
-                            gGL.commonSamplers().mPointClamp);
+                            gGL.getSampler(ALSamplers::PointClamp));
     gGL.getTexUnit(0)->activate();
 
     gGL.getTexUnit(1)->activate();
     gGL.getTexUnit(1)->enable(LLTexUnit::TT_TEXTURE);
     gGL.getTexUnit(1)->bind(mFrames[1], false,
-                            gGL.commonSamplers().mPointClamp);
+                            gGL.getSampler(ALSamplers::PointClamp));
     gGL.getTexUnit(1)->activate();
 
     gGL.getTexUnit(2)->activate();
     gGL.getTexUnit(2)->enable(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(2)->bind(mDitheringTexture);
+    gGL.getTexUnit(2)->bindSampled(mDitheringTexture, ALSamplers::PointWrap);
     gGL.getTexUnit(2)->activate();
 
     gl_rect_2d_simple_tex(width, height);

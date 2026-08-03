@@ -38,6 +38,12 @@ class LLRender;
 class LLRenderTarget;
 class LLTexture;
 
+// Forward-declared rather than included: alsamplerstate.h includes THIS header (it needs the
+// filter/address enums), so including it back would close the cycle. A scoped enum can be
+// declared ahead of its definition as long as the underlying type is spelled out, and this
+// must stay in step with the definition there.
+enum class ALSampler : U16;
+
 constexpr U32 LL_NUM_TEXTURE_LAYERS = 32;
 
 class LLTexUnit
@@ -45,6 +51,25 @@ class LLTexUnit
     friend class LLRender;
 public:
     static U32 sWhiteTexture;
+
+    // --- sampler traffic, per frame ---------------------------------------------------
+    //
+    // Sampler objects cost a glBindSampler that baked texture state did not: the mode used to
+    // ride along with the texture. Whether that matters depends entirely on how often the
+    // sampler actually CHANGES, which is what these measure. Reset in LLImageGL::updateStats.
+    //
+    // sSamplerBinds / sTextureBinds is the number to look at. Near zero means the redundancy
+    // check is doing its job and samplers are close to free; near one means nearly every
+    // texture bind drags a sampler bind with it.
+    static U32 sSamplerBinds;   // glBindSampler calls ISSUED
+    static U32 sSamplerSkips;   // suppressed by the mCurrSampler check
+    static U32 sTextureBinds;   // texture binds through bindFast/bindImpl, for the ratio
+
+    // ... of sSamplerBinds, the ones that went through bindSampler() and therefore forced a
+    // gGL.flush(). Those are the expensive ones by a wide margin: the call itself is a state
+    // change, but the flush SPLITS THE DRAW BATCH. bindFastImpl deliberately skips the flush,
+    // so a high total with a low flushed count is cheap and the reverse is not.
+    static U32 sSamplerBindsFlushed;
 
     typedef enum
     {
@@ -152,7 +177,7 @@ public:
     // Binds the LLImageGL to this texture unit
     // (automatically enables the unit for the LLImageGL's texture type)
     bool bind(LLImageGL* texture, bool for_rendering = false, bool forceBind = false, S32 usename = 0);
-    bool bind(LLTexture* texture, bool for_rendering = false, bool forceBind = false);
+    bool bind(LLTexture* texture, ALSampler key, bool for_rendering = false, bool forceBind = false);
 
     // Bind AND select the sampler in one step, overriding part of the texture's own
     // sampling mode for this binding only.
@@ -164,9 +189,12 @@ public:
     //
     // The one-argument form keeps the texture's own filter, which is what callers
     // overriding only the wrap mode (terrain, avatar bake masks) want.
-    bool bindSampled(LLTexture* texture, eTextureAddressMode address, bool forceBind = false);
-    bool bindSampled(LLTexture* texture, eTextureFilterOptions filter,
-                     eTextureAddressMode address, bool forceBind = false);
+
+    // Mask form: the caller names the whole sampling mode and the texture's own is ignored.
+    // Prefer this -- the enum-pair overloads above still take half their answer from the
+    // resource, which is what the migration is removing.
+    bool bindSampled(LLTexture* texture, ALSampler key, bool forceBind = false);
+    bool bindSampled(LLImageGL* texture, ALSampler key, bool forceBind = false);
 
     // bind implementation for inner loops
     // makes the following assumptions:
@@ -177,11 +205,16 @@ public:
     //  - USE_SRGB_DECODE is disabled
     //  - mTexOptionsDirty is false
     //  -
-    void bindFast(LLTexture* texture);
+    // Same, but the CALLER names how it wants to sample. The resource contributes only its
+    // mip truth, which the sampler lookup folds in (see ALSampler::HasMips).
+    //
+    // Prefer this. The overload above takes the mode from the texture, which is the model
+    // being migrated away from -- a texture cannot know how a given pass wants to read it.
+    void bindFast(LLTexture* texture, ALSampler key);
 
     // Binds a cubemap to this texture unit
     // (automatically enables the texture unit for cubemaps)
-    bool bind(LLCubeMap* cubeMap);
+    bool bind(LLCubeMap* cubeMap, ALSampler key);
 
     // Binds a render target to this texture unit
     // (automatically enables the texture unit for the RT's texture type)
@@ -201,25 +234,20 @@ public:
     // Fast but unsafe version of unbind
     void unbindFast(eTextureType type);
 
-    // Writes the addressing mode onto the TEXTURE OBJECT bound to this unit, which only
-    // takes effect while the unit samples through sampler 0 -- a bound sampler object
-    // overrides wrap state wholesale. For anything LLImageGL-backed use
-    // LLImageGL::setAddressMode, which feeds sampler selection; this is for render targets
-    // and raw GL names. Warns once if a sampler is bound.
+    // NO setTextureFilteringOption / setTextureAddressMode here.
     //
-    // Warning: this stays set for the bound texture forever,
-    // make sure you want to permanently change the address mode  for the bound texture.
-    void setTextureAddressMode(eTextureAddressMode mode);
-    // MUST already be active and bound
-    void setTextureAddressModeFast(eTextureAddressMode mode, eTextureType tex_type);
-
-    // See setTextureAddressMode: texture-object state, meaningful only under sampler 0.
+    // Filtering and addressing are properties of a SAMPLER, not of a texture, which is the
+    // model D3D11/12 and Vulkan have and the one this renderer now uses throughout. Write the
+    // sampler to the bind call. There is no way to put sampling state on a texture at all --
+    // LLImageGL stopped carrying any, which is what makes that impossible rather than merely
+    // discouraged.
     //
-    // Warning: this stays set for the bound texture forever,
-    // make sure you want to permanently change the filtering for the bound texture.
-    void setTextureFilteringOption(LLTexUnit::eTextureFilterOptions option);
-    // MUST already be active and bound
-    void setTextureFilteringOptionFast(LLTexUnit::eTextureFilterOptions option, eTextureType tex_type);
+    // The removed pair wrote glTexParameteri onto whatever texture object was bound, and a
+    // bound sampler object overrides that state wholesale -- so the call did nothing and
+    // reported nothing. That silence already cost the RLV sphere effect its point filter
+    // (402770506d). They also read almost identically to the LLImageGL setters that ARE
+    // correct, which made reaching for the wrong one easy. Reintroducing either means
+    // reintroducing both problems.
 
     // Select the sampler object this unit samples through, from ALSamplerCache.
     //
@@ -239,8 +267,6 @@ public:
     // That is the point: terrain wants its detail textures wrapped, but those are shared
     // LLViewerTextures, and writing TAM_WRAP onto the object leaked the choice into every
     // other user of the same texture.
-    void setSamplerAddressMode(eTextureAddressMode mode);
-    void setSamplerFilteringOption(eTextureFilterOptions option);
 
     static U32 getInternalType(eTextureType type);
 
@@ -261,18 +287,13 @@ protected:
     // The sampling mode the current binding was selected with, so setSampler*() can swap
     // one half and keep the other. Tracked on LLImageGL binds, where a texture carries its
     // own mode; render-target binds pass a resolved sampler and leave these at defaults.
-    eTextureFilterOptions  mCurrFilter  = TFO_ANISOTROPIC;
-    eTextureAddressMode    mCurrAddress = TAM_WRAP;
 
     void debugTextureUnit(void);
 
-    // LL_WARNS_ONCE if a sampler object is bound here, where texture-object sampling state
-    // is silently ignored. See the note on setTextureAddressMode.
-    void warnIfSamplerBound(const char* who) const;
-
     // Sentinel for bindImpl's overrides: take that half of the sampling mode from the
     // texture. Not a valid eTextureFilterOptions / eTextureAddressMode value.
-    static constexpr S32 KEEP_TEXTURE_SAMPLING = -1;
 
-    bool bindImpl(LLTexture* texture, bool forceBind, S32 filter_override, S32 address_override);
+    void bindFastImpl(LLTexture* texture, LLImageGL* gl_tex, U32 sampler);
+
+    bool bindImpl(LLTexture* texture, bool forceBind, ALSampler key);
 };

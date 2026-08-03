@@ -343,11 +343,10 @@ bool LLTexLayerParamAlpha::render(S32 x, S32 y, S32 width, S32 height)
                         LL_WARNS() << "Failed to create GL texture for image: " << mCachedProcessedTexture->getID() << LL_ENDL;
                     }
                     mNeedsCreateTexture = false;
-                    gGL.getTexUnit(0)->bind(mCachedProcessedTexture);
-                    mCachedProcessedTexture->setAddressMode(LLTexUnit::TAM_CLAMP);
+                    gGL.getTexUnit(0)->bindSampled(mCachedProcessedTexture, ALSamplers::AnisoClamp);
                 }
 
-                gGL.getTexUnit(0)->bind(mCachedProcessedTexture);
+                gGL.getTexUnit(0)->bindSampled(mCachedProcessedTexture, ALSamplers::AnisoClamp);
                 gl_rect_2d_simple_tex(width, height);
                 gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
                 stop_glerror();

@@ -1883,7 +1883,7 @@ void render_disconnected_background()
             const LLVector2& display_scale = gViewerWindow->getDisplayScale();
             gGL.scalef(display_scale.mV[VX], display_scale.mV[VY], 1.f);
 
-            gGL.getTexUnit(0)->bind(gDisconnectedImagep);
+            gGL.getTexUnit(0)->bindSampled(gDisconnectedImagep, ALSamplers::AnisoWrap);
             gGL.color4f(1.f, 1.f, 1.f, 1.f);
             gl_rect_2d_simple_tex(width, height);
             gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);

@@ -35,6 +35,87 @@
 #include <utility>
 #include <vector>
 
+// Sampling intent, as a packed bitmask.
+//
+// This is what a bind site names. It says how the caller wants to READ a texture, and it is
+// deliberately not something a texture can carry: two materials can reference one image and
+// want different wrap modes (glTF specifies sampler state per texture REFERENCE, not per
+// image), so a resource that decided its own filtering would have to pick a winner and be
+// wrong for everyone else. Samplers belong to the use, not the data -- which is also the only
+// model D3D11/12 and Vulkan offer.
+//
+// The value IS the table index. Fields sit in disjoint bit ranges, so composing with | lands
+// directly on a slot, and a constexpr composition folds to a constant at the call site --
+// there is no lookup, no hashing, and nothing to resolve per draw.
+//
+// LIMIT WORTH KNOWING: packed fields cannot catch two values from the SAME field being ORed
+// together. `Bilinear | Trilinear` is 1|2 == 3, which reads as Anisotropic rather than as an
+// error. The enum class stops every cross-type mistake (an int, a GL enum, an
+// eTextureFilterOptions), which is the class of bug that actually occurred; same-field
+// collisions are inherent to flag words and behave the same way in D3D and Vulkan.
+enum class ALSampler : U16
+{
+    // --- minification/magnification, bits 0-1, mutually exclusive ---
+    Point       = 0u,
+    Bilinear    = 1u,
+    Trilinear   = 2u,
+    Anisotropic = 3u,
+
+    // --- addressing, bits 2-3, mutually exclusive ---
+    Wrap   = 0u << 2,
+    Mirror = 1u << 2,
+    Clamp  = 2u << 2,
+
+    // --- depth compare, bit 4. Makes this a shadow sampler. ---
+    Compare = 1u << 4,
+
+    // --- bit 5: whether the RESOURCE has a mip chain ---
+    //
+    // Not sampling intent, and normally NOT set by the caller. GL makes a mipmapped
+    // minification filter on a texture with no mip chain *incomplete*, and an incomplete
+    // texture samples black -- so the bind reconciles the caller's intent against what the
+    // texture actually has. D3D11 has no such rule (a trilinear sampler on a 1-mip resource
+    // simply clamps), so this bit is GL repair and would not exist on that backend.
+    //
+    // Binds that go through an LLImageGL get it from the resource. A bind of a RAW GL name
+    // has no resource to ask, so those call sites do pass it -- see LLTexUnit::bindManual.
+    HasMips = 1u << 5,
+};
+
+constexpr ALSampler operator|(ALSampler a, ALSampler b)
+{
+    return static_cast<ALSampler>(static_cast<U16>(a) | static_cast<U16>(b));
+}
+
+// The bit layout above is chosen to match these enums exactly, so the bridge below is a
+// shift rather than a lookup. If either enum is ever reordered, these fire.
+static_assert((U16)LLTexUnit::TFO_POINT       == (U16)ALSampler::Point);
+static_assert((U16)LLTexUnit::TFO_BILINEAR    == (U16)ALSampler::Bilinear);
+static_assert((U16)LLTexUnit::TFO_TRILINEAR   == (U16)ALSampler::Trilinear);
+static_assert((U16)LLTexUnit::TFO_ANISOTROPIC == (U16)ALSampler::Anisotropic);
+static_assert(((U16)LLTexUnit::TAM_WRAP   << 2) == (U16)ALSampler::Wrap);
+static_assert(((U16)LLTexUnit::TAM_MIRROR << 2) == (U16)ALSampler::Mirror);
+static_assert(((U16)LLTexUnit::TAM_CLAMP  << 2) == (U16)ALSampler::Clamp);
+
+// Compose a mask from the legacy filter/address pair.
+//
+// TRANSITIONAL. It exists for the handful of signatures that still take the two enums as
+// parameters -- LLRenderTarget::bindTexture, LLGLSLShader::bindTexture, LLTexUnit's per-unit
+// mode tracking -- and for LLImageGL, whose stored mode is on its way out entirely. New code
+// composes ALSampler values directly; every use of this is a place the mask has not reached
+// yet, so the count going to zero is the measure of the migration.
+constexpr ALSampler al_sampler(LLTexUnit::eTextureFilterOptions filter,
+                               LLTexUnit::eTextureAddressMode   address)
+{
+    return static_cast<ALSampler>(static_cast<U16>(filter) | (static_cast<U16>(address) << 2));
+}
+
+constexpr ALSampler& operator|=(ALSampler& a, ALSampler b)
+{
+    a = a | b;
+    return a;
+}
+
 // How a texture is *sampled*, as opposed to what it contains.
 //
 // GL lets both live on the texture object, which makes filtering a property of the
@@ -67,26 +148,30 @@ struct ALSamplerDesc
     bool operator==(const ALSamplerDesc& rhs) const = default;
 };
 
-// The sampling modes used often enough, and in enough places, to be worth naming.
+// Named modes, kept as constants rather than as a struct of resolved handles.
 //
-// Reach these through gGL.commonSamplers(). They exist so a call site that wants a fixed,
-// well-known mode says which one rather than respelling filter/address/mips arguments --
-// the analogue of D3D12 static samplers or Vulkan immutable samplers, and the set the
-// eventual backend would declare up front.
-//
-// Extend as new fixed modes appear. Dynamic modes (LLRenderTarget::bindTexture, which takes
-// its filter from the caller) keep using ALSamplerCache::get() directly.
-struct ALCommonSamplers
+// These used to be ALCommonSamplers -- five hand-named U32s that had to be refreshed against
+// the cache generation, and that needed a new member (and a naming argument) every time a
+// call site wanted a combination nobody had needed yet. The mask makes that unnecessary:
+// composition IS the name, so these are just the compositions worth having a word for, and
+// anything else spells itself at the call site.
+namespace ALSamplers
 {
-    U32 mPointWrap          = 0; // tiled screen-space noise, unfiltered lookups
-    U32 mPointClamp         = 0; // data: G-buffer, depth, SMAA predication, impostors
-    U32 mBilinearClamp      = 0; // LUTs sampled with interpolation: SMAA area/search
-    U32 mTrilinearWrapMips  = 0; // tiling surfaces that recede: the manipulator grid
-    U32 mShadowCompare      = 0; // shadow maps; anisotropic + clamp, PCF via depth compare
+    inline constexpr ALSampler PointWrap      = ALSampler::Point     | ALSampler::Wrap;
+    inline constexpr ALSampler PointClamp     = ALSampler::Point     | ALSampler::Clamp;
+    inline constexpr ALSampler BilinearClamp  = ALSampler::Bilinear  | ALSampler::Clamp;
+    inline constexpr ALSampler BilinearWrap   = ALSampler::Bilinear  | ALSampler::Wrap;
+    inline constexpr ALSampler BilinearMirror = ALSampler::Bilinear  | ALSampler::Mirror;
+    inline constexpr ALSampler TrilinearWrap  = ALSampler::Trilinear | ALSampler::Wrap;
+    inline constexpr ALSampler TrilinearClamp = ALSampler::Trilinear | ALSampler::Clamp;
+    inline constexpr ALSampler AnisoWrap      = ALSampler::Anisotropic | ALSampler::Wrap;
+    inline constexpr ALSampler AnisoClamp     = ALSampler::Anisotropic | ALSampler::Clamp;
 
-    // Generation of the cache these were resolved from; 0 = not yet resolved.
-    U32 mGeneration = 0;
-};
+    // Shadow maps: anisotropic + clamp with the depth comparison enabled, which is what
+    // gives the 2x2 PCF. HasMips is deliberately absent -- shadow targets have no mip chain.
+    inline constexpr ALSampler ShadowCompare  = ALSampler::Anisotropic | ALSampler::Clamp
+                                              | ALSampler::Compare;
+}
 
 // Owns the sampler objects belonging to one GL context.
 //
@@ -109,35 +194,39 @@ struct ALCommonSamplers
 class ALSamplerCache
 {
 public:
-    // Resolve (and create on first use) the sampler for a sampling mode.
+    // Resolve (and create on first use) the sampler for a mask.
     //
-    // has_mips must be the truth about the *texture*, not a wish: a min filter with a
-    // mipmap mode selects an incomplete texture when no mip chain exists, and an
-    // incomplete texture samples black. This is the same trap that recreating a render
-    // target used to spring, and it does not get louder just because the state moved
-    // into a sampler object.
+    // The mask is the slot, so there is no arithmetic here at all: a constexpr key at the
+    // call site -- which is nearly all of them -- makes this one load and one predictable
+    // branch. Everything that can fail (entry-point checks, descriptor construction,
+    // glCreateSamplers) lives in the out-of-line createSlot(), taken once per mode.
     //
-    // Returns 0 (meaning "no sampler; use the texture object's own state") if sampler
-    // objects are unavailable, so callers never need to branch.
-    //
-    // Inline on purpose: this sits in bind paths, and the resolved case is an index
-    // computation, one load and one predictable branch. Everything that can fail -- the
-    // entry-point check, descriptor construction, glGenSamplers -- lives in the
-    // out-of-line createSlot() taken only on first use of each mode.
-    U32 get(LLTexUnit::eTextureFilterOptions filter,
-            LLTexUnit::eTextureAddressMode   address,
-            bool                             has_mips,
-            bool                             compare = false)
+    // Returns 0 if sampler objects are unavailable, so callers never need to branch.
+    U32 get(ALSampler key) const
     {
-        llassert((U32)filter < NUM_FILTERS);
-        llassert((U32)address < NUM_ADDRESS);
+        const U32 name = mSamplers[static_cast<U16>(key) & KEY_MASK];
 
-        U32& name = mSamplers[index(filter, address, has_mips, compare)];
-        if (name == 0)
-        {
-            name = createSlot(filter, address, has_mips, compare);
-        }
+        // Zero means either warmup() has not run or the key was built by arithmetic rather
+        // than by composing ALSampler values -- the address field has a fourth encoding that
+        // no named value produces, and its slots stay empty. Either way the caller would
+        // silently get GL's defaults, so say so in debug rather than render it.
+        llassert(name != 0);
         return name;
+    }
+
+    // Resolve for a specific resource: the caller's sampling intent, reconciled against
+    // whether the texture actually has a mip chain.
+    //
+    // Callers state intent only. Whether a mipmapped minification filter is *legal* is a
+    // property of the resource -- GL treats the mismatch as an incomplete texture and samples
+    // black -- so folding it in belongs here rather than at every bind site. See
+    // ALSampler::HasMips.
+    U32 get(ALSampler key, bool has_mips) const
+    {
+        // Bit insert rather than a branch: HasMips is a single bit and has_mips is already 0/1.
+        return get(static_cast<ALSampler>(static_cast<U16>(key)
+                                          | (static_cast<U16>(has_mips)
+                                             * static_cast<U16>(ALSampler::HasMips))));
     }
 
     // Drop this thread's sampler objects. Call while the owning context is still current:
@@ -154,62 +243,44 @@ public:
     // overload on anything per-draw.
     U32 get(const ALSamplerDesc& desc);
 
-    // The named fixed sampling modes for this context. Lazily resolved, and revalidated
-    // against the cache generation so a clear() cannot leave freed names behind.
-    const ALCommonSamplers& common()
-    {
-        if (mCommon.mGeneration != mGeneration)
-        {
-            refreshCommon();
-        }
-        return mCommon;
-    }
+    // Create every reachable sampler up front.
+    //
+    // The table is 64 slots of which 48 are reachable, and a sampler object is a few words of
+    // driver state -- so building them all costs less than the branch that testing for them
+    // would cost on every bind, forever. Call once the context is up, and again after clear()
+    // drops them (an anisotropy change does that).
+    void warmup();
 
     // Bumped every time clear() drops the objects, so callers that cache a resolved name
     // can tell in one compare whether theirs is still valid. Never 0, so 0 is usable as
     // "never resolved".
     U32 getGeneration() const { return mGeneration; }
 
-    // Build the GL descriptor for a sampling mode. Exposed for tests and for callers
-    // that want to inspect what get() will produce; get() is the normal entry point.
-    static ALSamplerDesc makeDesc(LLTexUnit::eTextureFilterOptions filter,
-                                  LLTexUnit::eTextureAddressMode   address,
-                                  bool                             has_mips,
-                                  bool                             compare);
+    // Build the GL descriptor for a mask. Exposed for tests and for callers that want to
+    // inspect what get() will produce; get() is the normal entry point.
+    static ALSamplerDesc makeDesc(ALSampler key);
 
 private:
-    // Cold path of get(): builds the descriptor and the GL object. Returns 0 if sampler
-    // objects are unavailable, which leaves the slot at 0 and simply retries next time --
-    // acceptable, since that only happens on a driver that cannot do samplers at all.
-    U32 createSlot(LLTexUnit::eTextureFilterOptions filter,
-                   LLTexUnit::eTextureAddressMode   address,
-                   bool                             has_mips,
-                   bool                             compare);
+    // Builds the descriptor and the GL object for one slot. Returns 0 if sampler objects are
+    // unavailable at all, which only happens on a driver that cannot do them.
+    U32 createSlot(ALSampler key);
 
     static U32 create(const ALSamplerDesc& desc);
 
-    static constexpr U32 NUM_FILTERS  = 4; // TFO_POINT .. TFO_ANISOTROPIC
-    static constexpr U32 NUM_ADDRESS  = 3; // TAM_WRAP .. TAM_CLAMP
-    static constexpr U32 NUM_MIP      = 2;
-    static constexpr U32 NUM_COMPARE  = 2;
-    static constexpr U32 NUM_SAMPLERS = NUM_FILTERS * NUM_ADDRESS * NUM_MIP * NUM_COMPARE;
-
-    static constexpr U32 index(U32 filter, U32 address, bool has_mips, bool compare)
-    {
-        return ((filter * NUM_ADDRESS + address) * NUM_MIP + (has_mips ? 1 : 0)) * NUM_COMPARE
-               + (compare ? 1 : 0);
-    }
+    // Six bits: filter(2) + address(2) + compare(1) + mips(1). 16 of the 64 slots are
+    // unreachable (address only uses 3 of its 4 values) and stay 0 -- 64 U32s is 256 bytes,
+    // and the alternative is arithmetic on every bind to compact them away.
+    static constexpr U32 KEY_BITS    = 6;
+    static constexpr U32 KEY_MASK    = (1u << KEY_BITS) - 1u;
+    static constexpr U32 NUM_SAMPLERS = 1u << KEY_BITS;
 
     // 0 means "not created yet". GL never hands out 0 as a sampler name.
     std::array<U32, NUM_SAMPLERS> mSamplers = {};
 
-    // Descriptors outside the enumerable space. Expected to hold one or two entries, so a
-    // linear scan beats hashing; clear() empties this alongside mSamplers.
+    // Descriptors outside what a mask can express -- notably a mixed min/mag pair such as the
+    // deferred lighting LUT's mag=LINEAR + min=NEAREST. Expected to hold one or two entries,
+    // so a linear scan beats hashing; clear() empties this alongside mSamplers.
     std::vector<std::pair<ALSamplerDesc, U32>> mCustomSamplers;
-
-    void refreshCommon();
-
-    ALCommonSamplers mCommon;
 
     U32 mGeneration = 1;
 };

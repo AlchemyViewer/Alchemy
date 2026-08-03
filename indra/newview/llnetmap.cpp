@@ -338,7 +338,7 @@ void LLNetMap::draw()
             }
 
             // Draw using texture.
-            gGL.getTexUnit(0)->bind(regionp->getLand().getSTexture());
+            gGL.getTexUnit(0)->bindSampled(regionp->getLand().getSTexture(), ALSamplers::AnisoWrap);
             gGL.begin(LLRender::TRIANGLES);
             {
                 gGL.texCoord2f(0.f, 1.f);
@@ -403,7 +403,7 @@ void LLNetMap::draw()
                 map_center_agent.mV[VX] *= scale_pixels_per_meter;
                 map_center_agent.mV[VY] *= scale_pixels_per_meter;
 
-                gGL.getTexUnit(0)->bind(mObjectImagep);
+                gGL.getTexUnit(0)->bindSampled(mObjectImagep, ALSamplers::AnisoWrap);
 
                 gGL.begin(LLRender::TRIANGLES);
                 {
@@ -453,7 +453,7 @@ void LLNetMap::draw()
                 map_center_agent.mV[VX] *= scale_pixels_per_meter;
                 map_center_agent.mV[VY] *= scale_pixels_per_meter;
 
-                gGL.getTexUnit(0)->bind(mParcelImagep);
+                gGL.getTexUnit(0)->bindSampled(mParcelImagep, ALSamplers::AnisoWrap);
                 gGL.begin(LLRender::TRIANGLES);
                 {
                     gGL.texCoord2f(0.f, 1.f);

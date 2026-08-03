@@ -217,8 +217,6 @@ void LLFloaterAuction::onClickSnapshot(void* data)
         j2c_file.write(j2c->getData(), j2c->getDataSize());
 
         self->mImage = LLViewerTextureManager::getLocalTexture((LLImageRaw*)raw, false);
-        gGL.getTexUnit(0)->bind(self->mImage);
-        self->mImage->setAddressMode(LLTexUnit::TAM_CLAMP);
     }
     else
     {

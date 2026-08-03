@@ -679,6 +679,18 @@ public:
             addText(xpos, ypos, llformat("%d Unique Textures", LLImageGL::sUniqueCount));
             ypos += y_inc;
 
+            // Sampler traffic. The ratio is the point: sampler objects cost a glBindSampler
+            // that baked texture state did not, but only when the sampler actually changes.
+            {
+                const U32 sampler_binds = LLTexUnit::sSamplerBinds;
+                const U32 tex_binds     = LLTexUnit::sTextureBinds;
+                addText(xpos, ypos, llformat("%d Sampler Binds (%d FLUSHED, %d skipped, %.2f per tex bind)",
+                                             sampler_binds, LLTexUnit::sSamplerBindsFlushed,
+                                             LLTexUnit::sSamplerSkips,
+                                             tex_binds ? (F32)sampler_binds / (F32)tex_binds : 0.f));
+                ypos += y_inc;
+            }
+
             addText(xpos, ypos, llformat("%d Render Calls", (U32)last_frame_recording.getSampleCount(LLPipeline::sStatBatchSize)));
             ypos += y_inc;
 

@@ -130,7 +130,7 @@ void RlvOverlayEffect::run(const LLVisualEffectParams*)
         const LLVector2& displayScale = gViewerWindow->getDisplayScale();
         gGL.scalef(displayScale.mV[VX], displayScale.mV[VY], 1.f);
 
-        gGL.getTexUnit(0)->bind(m_pImage);
+        gGL.getTexUnit(0)->bindSampled(m_pImage, ALSamplers::AnisoWrap);
         const LLColor3 col = m_Color.get();
         gGL.color4f(col.mV[0], col.mV[1], col.mV[2], llclamp(m_nAlpha.get(), 0.0f, 1.0f));
 

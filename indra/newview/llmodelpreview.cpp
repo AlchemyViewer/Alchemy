@@ -102,7 +102,7 @@ LLViewerFetchedTexture* bindMaterialDiffuseTexture(const LLImportMaterial& mater
     {
         if (texture->getDiscardLevel() > -1)
         {
-            gGL.getTexUnit(0)->bind(texture, true);
+            gGL.getTexUnit(0)->bindSampled(texture, ALSamplers::AnisoWrap, true);
             return texture;
         }
     }

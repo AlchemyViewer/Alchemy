@@ -191,16 +191,30 @@ public:
         BF_UNDEF
     };
 
+    // One texture matrix, not four, and no MM_TEXTURE.
+    //
+    // MM_TEXTURE used to resolve to MM_TEXTURE0 + getCurrentTexUnitIndex(), making the active
+    // texture unit an implicit argument that selected which stack a caller wrote. That was a
+    // silent trap rather than a feature: no shader in the tree declares texture_matrix1/2/3
+    // (they were dropped during the Slang port), so a resolution landing anywhere but stack 0
+    // wrote a matrix nothing would ever read -- the texture transform simply vanished, with no
+    // error. Call sites defended against it by issuing getTexUnit(0)->activate() first, which
+    // is why that call appeared next to matrixMode all over the draw paths.
+    //
+    // Measured before removing: 132 of 132 resolutions in a frame landed on unit 0, so the
+    // dynamic form had no users at all, and the guarding activate() calls came to 0.8% of
+    // issued glActiveTexture. So this is not a performance change -- it deletes a failure mode
+    // that could only ever cost correctness.
+    //
+    // LLShaderMgr::TEXTURE_MATRIX1/2/3 are deliberately left in place: those enum values index
+    // mReservedUniforms, and renumbering it would invalidate the on-disk shader reflection
+    // cache. They are simply never referenced now.
     enum eMatrixMode : U8
     {
         MM_MODELVIEW = 0,
         MM_PROJECTION,
         MM_TEXTURE0,
-        MM_TEXTURE1,
-        MM_TEXTURE2,
-        MM_TEXTURE3,
-        NUM_MATRIX_MODES,
-        MM_TEXTURE
+        NUM_MATRIX_MODES
     };
 
     LLRender();
@@ -302,21 +316,16 @@ public:
     // Resolve a sampler object belonging to THIS context. See ALSamplerCache -- the cache
     // is a member rather than a static precisely so it cannot outlive, or be torn down by,
     // a context other than its own.
-    U32 getSampler(LLTexUnit::eTextureFilterOptions filter,
-                   LLTexUnit::eTextureAddressMode   address,
-                   bool                             has_mips,
-                   bool                             compare = false)
-    {
-        return mSamplerCache.get(filter, address, has_mips, compare);
-    }
+    // Sampling INTENT only -- see ALSampler. Compose with |, or use one of the named
+    // compositions in namespace ALSamplers.
+    U32 getSampler(ALSampler key) { return mSamplerCache.get(key); }
 
-    // For sampling modes the filter enum cannot express; see ALSamplerCache::get(desc).
+    // Intent reconciled against a resource that may or may not have a mip chain. Prefer this
+    // wherever the texture is known; it keeps ALSampler::HasMips out of call sites.
+    U32 getSampler(ALSampler key, bool has_mips) { return mSamplerCache.get(key, has_mips); }
+
+    // For sampling modes a mask cannot express; see ALSamplerCache::get(desc).
     U32 getSampler(const ALSamplerDesc& desc) { return mSamplerCache.get(desc); }
-
-    // The named fixed sampling modes for this context -- gGL.commonSamplers().mPointClamp
-    // and friends. Prefer these over respelling a constant filter/address/mips triple at the
-    // call site; see ALCommonSamplers.
-    const ALCommonSamplers& commonSamplers() { return mSamplerCache.common(); }
 
     // Generation of this context's sampler cache; changes whenever the objects are dropped.
     // Lets a hot path cache a resolved name and revalidate it with one compare.
@@ -327,7 +336,21 @@ public:
     // LLTexUnit::mCurrSampler would still claim it is bound, and GL may hand the same name
     // back for the next sampler created -- at which point bindSampler's redundancy check
     // would skip a bind that is needed.
+    // Drop this context's sampler objects. DROPS ONLY -- it does not rebuild, because one of
+    // its callers is shutdown. ~LLRender runs during thread_local destruction, after the
+    // context is gone, and reaches this a second time; it is safe there precisely because the
+    // first pass left the table empty and the second finds nothing to do. Rebuilding here
+    // would hand that second pass a full table to delete on a dead context, which faults
+    // inside the driver rather than failing. (gGLManager.mInited does not save you: it says
+    // GL is up somewhere, not that THIS thread has a current context.)
+    //
+    // A caller that wants the objects back -- the anisotropy change in graphics preferences --
+    // calls warmupSamplers() itself, where the context is known to be live.
     void clearSamplers();
+
+    // Build every sampler object this context can hand out. get() has no lazy path, so this
+    // must run before anything binds; LLRender::init() does it.
+    void warmupSamplers();
 
     bool verifyTexUnitActive(U32 unitToVerify);
 

@@ -237,9 +237,7 @@ bool LLFontBitmapCache::nextOpenPos(S32 width, S32 height, S32& pos_x, S32& pos_
         mCurrentOffsetY[bitmap_idx] = 4;
         mCurrentRowMaxHeight[bitmap_idx] = 0;
 
-        // Attach corresponding GL texture. (*TODO: is this needed?)
-        gGL.getTexUnit(0)->bind(image_gl);
-        image_gl->setFilteringOption(LLTexUnit::TFO_POINT); // was setMipFilterNearest(true, true);
+        // Glyph pages carry no sampling mode; LLFontGL names PointWrap at every bind.
     }
 
     pos_x = mCurrentOffsetX[bitmap_idx];

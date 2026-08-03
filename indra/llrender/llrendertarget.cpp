@@ -361,28 +361,15 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
     stop_glerror();
 
 
-    if (offset == 0)
-    { //use bilinear filtering on single texture render targets that aren't multisampled
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-        stop_glerror();
-    }
-    else
-    { //don't filter data attachments
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
-        stop_glerror();
-    }
-
-    if (mUsage != LLTexUnit::TT_RECT_TEXTURE)
-    {
-        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_MIRROR);
-        stop_glerror();
-    }
-    else
-    {
-        // ATI doesn't support mirrored repeat for rectangular textures.
-        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-        stop_glerror();
-    }
+    // No filter or wrap state is written onto the texture object here. It is expressed as a
+    // sampler instead -- see getDefaultColorSampler, which encodes the same choices (bilinear
+    // for attachment 0, point for the data attachments, mirrored repeat off rectangles) and
+    // is what LLTexUnit::bind hands out to callers that do not name a sampler.
+    //
+    // This was the last texture-object sampling state in the engine. Leaving it here as well
+    // would not be harmless redundancy: it makes filtering a property of the resource, so two
+    // passes wanting different filtering off one target have to fight over it, which is the
+    // whole reason the renderer moved to sampler objects.
 
     if (mFBO)
     {
@@ -419,7 +406,7 @@ bool LLRenderTarget::allocateDepth()
     clear_glerror();
     const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
     LLImageGL::allocateTexture2D(internal_type, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL);
-    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+    // Point filtering comes from getDefaultDepthSampler now, not from the texture object.
 
     sBytesAllocated += mResX * mResY * info.bytes_per_pixel;
 
@@ -642,7 +629,44 @@ void LLRenderTarget::bindTexture(U32 index, S32 channel,
     }
 
     gGL.getTexUnit(channel)->bindManual(mUsage, getTexture(index), has_mips,
-                                        gGL.getSampler(filter_options, address_mode, has_mips));
+                                        gGL.getSampler(al_sampler(filter_options, address_mode), has_mips));
+}
+
+U32 LLRenderTarget::getDefaultColorSampler(U32 attachment) const
+{
+    // Attachment 0 is the one a pass normally reads as an image, so it filters. Everything
+    // behind it carries data -- normals, ORM, indices -- where interpolating between texels
+    // produces values that mean nothing.
+    const LLTexUnit::eTextureFilterOptions filter =
+        (attachment == 0) ? LLTexUnit::TFO_BILINEAR : LLTexUnit::TFO_POINT;
+
+    // ATI does not support mirrored repeat on rectangle textures.
+    const LLTexUnit::eTextureAddressMode address =
+        (mUsage == LLTexUnit::TT_RECT_TEXTURE) ? LLTexUnit::TAM_CLAMP : LLTexUnit::TAM_MIRROR;
+
+    // has_mips = false, matching what the replaced code produced. The old
+    // setTextureFilteringOption call read the texture unit's mHasMipMaps, and the bind that
+    // preceded it during allocation never set it -- so TFO_BILINEAR resolved to a plain
+    // GL_LINEAR minification filter, not a mipmapped one, whatever mGenerateMipMaps said. A
+    // caller that actually wants the mip chain asks for it through bindTexture.
+    return gGL.getSampler(al_sampler(filter, address), false);
+}
+
+U32 LLRenderTarget::getDefaultDepthSampler() const
+{
+    // Point + clamp, which is what a depth attachment should always have been sampled with.
+    //
+    // These textures carried GL_REPEAT for as long as they have existed, not by choice but
+    // because allocateDepth only ever set a filter and left the wrap mode at GL's default. A
+    // repeat wrap on a depth buffer is meaningless: a fetch that strays outside [0,1] -- which
+    // any reprojection, blur tap or ray march can do at the screen edge -- comes back with the
+    // depth of the OPPOSITE edge of the screen rather than the nearest one, so the sample is
+    // not merely clamped-wrong, it is geometry from somewhere else entirely.
+    //
+    // The rest of the renderer already agreed: bindShadowMaps samples with TAM_CLAMP, and the
+    // SMAA predication pass binds this very texture through commonSamplers().mPointClamp. The
+    // default was the odd one out.
+    return gGL.getSampler(ALSamplers::PointClamp);
 }
 
 void LLRenderTarget::flush()

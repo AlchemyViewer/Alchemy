@@ -116,7 +116,6 @@ LLViewerPartSourceScript::LLViewerPartSourceScript(LLViewerObject *source_objp) 
     mPosAgent = mSourceObjectp->getPositionAgent();
     mImagep = LLViewerFetchedTexture::sDefaultParticleImagep;
 
-    mImagep->setAddressMode(LLTexUnit::TAM_CLAMP);
 }
 
 

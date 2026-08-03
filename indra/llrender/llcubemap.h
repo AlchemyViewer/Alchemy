@@ -70,7 +70,6 @@ public:
 
     // generate mip maps for this Cube Map using GL
     // NOTE: Cube Map MUST already be resident in VRAM
-    void generateMipMaps();
 
     GLuint getGLName();
 

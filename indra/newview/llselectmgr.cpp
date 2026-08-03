@@ -6856,7 +6856,7 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
         return;
     }
 
-    gGL.getTexUnit(0)->bind(mSilhouetteImagep);
+    gGL.getTexUnit(0)->bindSampled(mSilhouetteImagep, ALSamplers::AnisoWrap);
     LLGLSPipelineSelection gls_select;
     LLGLEnable blend(GL_BLEND);
     LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);

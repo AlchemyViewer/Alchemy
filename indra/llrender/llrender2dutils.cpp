@@ -446,7 +446,11 @@ void gl_draw_scaled_image_with_border(S32 x, S32 y, S32 width, S32 height, LLTex
                                 ui_translation.mV[VX] + width * ui_scale.mV[VX],
                                 ui_translation.mV[VY]);
 
-        gGL.getTexUnit(0)->bind(image, true);
+        // Clamp, not the repeat these inherited from LLImageGL's defaults. UI art is atlased
+        // and drawn as 2D quads: a fetch past the edge belongs to a neighbouring sprite, so
+        // repeat bleeds it in. Skin images are MIPMAP_NO, so bilinear and anisotropic resolve
+        // to the same GL_LINEAR here -- the anisotropy was doing nothing on an unmipmapped quad.
+        gGL.getTexUnit(0)->bindSampled(image, ALSamplers::BilinearClamp);
 
         gGL.color4fv(color.mV);
 
@@ -719,7 +723,7 @@ void gl_draw_scaled_rotated_image(S32 x, S32 y, S32 width, S32 height, F32 degre
 
     if(image != NULL)
     {
-        gGL.getTexUnit(0)->bind(image, true);
+        gGL.getTexUnit(0)->bindSampled(image, ALSamplers::BilinearClamp);
     }
     else
     {
@@ -787,7 +791,7 @@ void gl_draw_scaled_rotated_image(S32 x, S32 y, S32 width, S32 height, F32 degre
 
         if(image != NULL)
         {
-            gGL.getTexUnit(0)->bind(image, true);
+            gGL.getTexUnit(0)->bindSampled(image, ALSamplers::BilinearClamp);
         }
         else
         {
@@ -978,7 +982,7 @@ void gl_rect_2d_checkerboard(const LLRect& rect, GLfloat alpha)
     LLPointer<LLUIImage> img = LLRender2D::getInstance()->getUIImage("Checker");
     // Per-binding: the Checker image is a shared UI texture, so wrap+point must not follow
     // it to other users.
-    gGL.getTexUnit(0)->bindSampled(img->getImage(), LLTexUnit::TFO_POINT, LLTexUnit::TAM_WRAP);
+    gGL.getTexUnit(0)->bindSampled(img->getImage(), ALSamplers::PointWrap);
 
     LLColor4 color(1.f, 1.f, 1.f, alpha);
     LLRectf uv_rect(0, 0, rect.getWidth()/32.f, rect.getHeight()/32.f);

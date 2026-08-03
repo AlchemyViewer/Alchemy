@@ -284,7 +284,13 @@ public:
 
     // bindTexture returns the texture unit we've bound the texture to.
     // You can reuse the return value to unbind a texture when required.
-    S32 bindTexture(S32 uniform, LLTexture* texture, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
+    //
+    // The sampler is NAMED BY THE CALLER, and there is no overload that infers it. How a pass
+    // reads an image is a property of the pass: two materials can reference one texture and
+    // want it read differently, so a texture that decided its own filtering would have to pick
+    // a winner and be wrong for the other. The inferring form existed until every call site
+    // had chosen; it was deleted once that count reached zero, so it cannot come back by habit.
+    S32 bindTexture(S32 uniform, LLTexture* texture, ALSampler key);
     S32 bindTexture(S32 uniform, LLRenderTarget* texture, bool depth = false, LLTexUnit::eTextureFilterOptions mode = LLTexUnit::TFO_BILINEAR, U32 index = 0);
     S32 unbindTexture(S32 uniform, LLTexUnit::eTextureType mode = LLTexUnit::TT_TEXTURE);
 

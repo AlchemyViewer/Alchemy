@@ -977,7 +977,7 @@ bool LLVOVolume::setMaterial(const U8 material)
 void LLVOVolume::setTexture(const S32 face)
 {
     llassert(face < getNumTEs());
-    gGL.getTexUnit(0)->bind(getTEImage(face));
+    gGL.getTexUnit(0)->bindSampled(getTEImage(face), ALSamplers::AnisoWrap);
 }
 
 void LLVOVolume::setScale(const LLVector3 &scale, bool damped)

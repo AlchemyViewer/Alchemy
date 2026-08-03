@@ -1054,7 +1054,7 @@ void LLGLSLShader::unbind(void)
     sCurBoundShaderPtr = NULL;
 }
 
-S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, LLTexUnit::eTextureType mode)
+S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, ALSampler key)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
@@ -1069,7 +1069,7 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, LLTexUnit::eTextu
 
     if (uniform > -1)
     {
-        gGL.getTexUnit(uniform)->bindFast(texture);
+        gGL.getTexUnit(uniform)->bindFast(texture, key);
     }
 
     return uniform;
@@ -1095,12 +1095,13 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLRenderTarget* texture, bool depth, 
             // Depth attachments are never mipmapped, and a shadow-compare sampler is not
             // wanted here -- this is a plain depth fetch.
             //
-            // TAM_WRAP because allocateDepth never set an address mode, so these textures
-            // have carried GL's GL_REPEAT default. Preserved rather than "fixed" to
-            // TAM_CLAMP: that would be a silent behaviour change in every depth-sampling
-            // pass, and this commit is meant to move state, not alter it.
+            // TAM_CLAMP: a repeat wrap on depth returns the opposite edge of the screen for
+            // any fetch that strays outside [0,1], which is geometry from the wrong place
+            // rather than a merely inexact sample. These textures carried GL_REPEAT only
+            // because allocateDepth never set an address mode. See
+            // LLRenderTarget::getDefaultDepthSampler.
             gGL.getTexUnit(uniform)->bind(texture, true,
-                                          gGL.getSampler(mode, LLTexUnit::TAM_WRAP, false));
+                                          gGL.getSampler(al_sampler(mode, LLTexUnit::TAM_CLAMP), false));
         }
         else
         {

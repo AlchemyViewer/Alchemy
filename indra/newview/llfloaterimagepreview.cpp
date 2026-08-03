@@ -335,7 +335,7 @@ void LLFloaterImagePreview::draw()
             if(mImagep.notNull())
             {
                 gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mImagep->getTexName(), false,
-                                              gGL.commonSamplers().mBilinearClamp);
+                                              gGL.getSampler(ALSamplers::BilinearClamp));
             }
             else
             {
@@ -343,7 +343,7 @@ void LLFloaterImagePreview::draw()
 
                 gGL.getTexUnit(0)->unbind(mImagep->getTarget()) ;
                 gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mImagep->getTexName(), false,
-                                              gGL.commonSamplers().mBilinearClamp);
+                                              gGL.getSampler(ALSamplers::BilinearClamp));
                 stop_glerror();
                 if (mAvatarPreview)
                 {
@@ -383,11 +383,11 @@ void LLFloaterImagePreview::draw()
 
                 if (selected == 9)
                 {
-                    gGL.getTexUnit(0)->bind(mSculptedPreview);
+                    gGL.getTexUnit(0)->bindSampled(mSculptedPreview, ALSamplers::AnisoWrap);
                 }
                 else
                 {
-                    gGL.getTexUnit(0)->bind(mAvatarPreview);
+                    gGL.getTexUnit(0)->bindSampled(mAvatarPreview, ALSamplers::AnisoWrap);
                 }
 
                 gGL.begin(LLRender::TRIANGLES);

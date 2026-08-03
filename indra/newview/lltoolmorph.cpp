@@ -280,7 +280,10 @@ void LLVisualParamHint::draw(F32 alpha)
 {
     if (!mIsVisible) return;
 
-    gGL.getTexUnit(0)->bind(this);
+    // Clamp: the hint is a full [0,1] quad, and this dynamic texture asked for clamped
+    // addressing (constructor clamp=true) back when that lived on the texture object --
+    // wrap would blend the opposite border into the preview's edges.
+    gGL.getTexUnit(0)->bindSampled(this, ALSamplers::AnisoClamp);
 
     gGL.color4f(1.f, 1.f, 1.f, alpha);
 

@@ -162,7 +162,14 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         light_diffuse *= (1.5f + (6.f * ground_proj_sq));
     }
 
-    LLTexUnit::eTextureFilterOptions filter_mode = has_normal_mips ? LLTexUnit::TFO_ANISOTROPIC : LLTexUnit::TFO_POINT;
+    // Named at the bind rather than written onto the normal maps.
+    //
+    // This used to call setFilteringOption on the textures themselves every frame -- which set
+    // the mode globally, for every other user of those images, and re-asserted the same value
+    // on each pass. Wrap is what these carried before (LLImageGL's default) and what tiling
+    // wave normals want.
+    const ALSampler water_normal_sampler =
+        has_normal_mips ? ALSamplers::AnisoWrap : ALSamplers::PointWrap;
 
     LLColor4      specular(sun_up ? psky->getSunlightColor() : psky->getMoonlightColor());
     F32           phase_time = (F32) LLFrameTimer::getElapsedSeconds() * 0.5f;
@@ -192,22 +199,18 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     if (tex_a && (!tex_b || (tex_a == tex_b)))
     {
-        tex_a->setFilteringOption(filter_mode);
-        shader->bindTexture(LLViewerShaderMgr::BUMP_MAP, tex_a);
+        shader->bindTexture(LLViewerShaderMgr::BUMP_MAP, tex_a, water_normal_sampler);
         blend_factor = 0; // only one tex provided, no blending
     }
     else if (tex_b && !tex_a)
     {
-        tex_b->setFilteringOption(filter_mode);
-        shader->bindTexture(LLViewerShaderMgr::BUMP_MAP, tex_b);
+        shader->bindTexture(LLViewerShaderMgr::BUMP_MAP, tex_b, water_normal_sampler);
         blend_factor = 0; // only one tex provided, no blending
     }
     else if (tex_b != tex_a)
     {
-        tex_a->setFilteringOption(filter_mode);
-        tex_b->setFilteringOption(filter_mode);
-        shader->bindTexture(LLViewerShaderMgr::BUMP_MAP, tex_a);
-        shader->bindTexture(LLViewerShaderMgr::BUMP_MAP2, tex_b);
+        shader->bindTexture(LLViewerShaderMgr::BUMP_MAP, tex_a, water_normal_sampler);
+        shader->bindTexture(LLViewerShaderMgr::BUMP_MAP2, tex_b, water_normal_sampler);
     }
 
     shader->bindTexture(LLShaderMgr::WATER_EXCLUSIONTEX, &gPipeline.mWaterExclusionMask);

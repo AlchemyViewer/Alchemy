@@ -630,6 +630,16 @@ void LLImageGL::updateStats(F32 current_time)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     sLastFrameTime = current_time;
+
+    // Per-frame counters. sBindCount/sUniqueCount are labelled per-frame and read that way by
+    // the HUD, but went years without this reset -- they were lifetime totals.
+    sBindCount   = 0;
+    sUniqueCount = 0;
+
+    LLTexUnit::sSamplerBinds = 0;
+    LLTexUnit::sSamplerSkips = 0;
+    LLTexUnit::sTextureBinds = 0;
+    LLTexUnit::sSamplerBindsFlushed = 0;
 }
 
 //----------------------------------------------------------------------------
@@ -707,7 +717,7 @@ LLImageGL::LLImageGL(
     LLGLint  formatInternal,
     LLGLenum formatPrimary,
     LLGLenum formatType,
-    LLTexUnit::eTextureAddressMode addressMode)
+    LLTexUnit::eTextureAddressMode)
 :   mExternalTexture(true)  // ctor previously left this uninitialized,
                             // making the dtor's `!mExternalTexture && ...`
                             // gate read indeterminate memory — could go
@@ -721,7 +731,6 @@ LLImageGL::LLImageGL(
     mTexName = texName;
     mTarget = target;
     mComponents = components;
-    mAddressMode = addressMode;
     mFormatType = formatType;
     mFormatInternal = formatInternal;
     mFormatPrimary = formatPrimary;
@@ -784,9 +793,6 @@ void LLImageGL::init(bool usemipmaps)
 
     mComponents = 0;
     mMaxDiscardLevel = MAX_DISCARD_LEVEL;
-
-    mAddressMode = LLTexUnit::TAM_WRAP;
-    mFilterOption = LLTexUnit::TFO_ANISOTROPIC;
 
     mFormatInternal = -1;
     mFormatPrimary = (LLGLenum) 0;
@@ -971,13 +977,10 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
         gGL.getTexUnit(0)->unbind(mBindTarget);
 
         mHasMipMaps = true;
-        setFilteringOption(LLTexUnit::TFO_ANISOTROPIC); // also invalidates the sampler memo
     }
     else
     {
         mHasMipMaps = false;
-        // mHasMipMaps feeds getSampler(), and the bind below consumes it immediately.
-        invalidateSampler();
     }
 
     gGL.getTexUnit(0)->bind(this, false, false, usename);
@@ -2065,12 +2068,8 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
         }
     }
 
-    // Set texture options to our defaults.
-    //
-    // mAddressMode/mFilterOption are NOT written to the texture object: the bind above
-    // already selected the sampler that carries them, and writing texture state under a
-    // bound sampler is ignored (it would trip warnIfSamplerBound). Only the unit's
-    // mip-map flag still needs setting here.
+    // The unit's mip-map flag is the only sampling-adjacent thing left to set: it is a fact
+    // about the resource, which the bind folds into its sampler choice.
     gGL.getTexUnit(0)->setHasMipMaps(mHasMipMaps);
 
     // things will break if we don't unbind after creation
@@ -2394,54 +2393,6 @@ void LLImageGL::forceToInvalidateGLTexture()
 }
 
 //----------------------------------------------------------------------------
-
-void LLImageGL::setAddressMode(LLTexUnit::eTextureAddressMode mode)
-{
-    mAddressMode = mode;
-    invalidateSampler();
-    refreshSamplerIfBound();
-}
-
-void LLImageGL::setFilteringOption(LLTexUnit::eTextureFilterOptions option)
-{
-    mFilterOption = option;
-    invalidateSampler();
-    refreshSamplerIfBound();
-}
-
-// The sampler object this texture wants to be sampled through.
-//
-// Cached: bindFast calls this on every draw, and re-deriving it means an index computation
-// and an array probe each time for an answer that changes only when this texture's sampling
-// mode changes or the cache is dropped. The generation compare catches the latter -- a stale
-// name would otherwise survive a clearSamplers() and GL is free to reissue it.
-U32 LLImageGL::getSampler() const
-{
-    const U32 generation = gGL.getSamplerGeneration();
-    if (mCachedSamplerGeneration != generation)
-    {
-        mCachedSampler           = gGL.getSampler(mFilterOption, mAddressMode, mHasMipMaps);
-        mCachedSamplerGeneration = generation;
-    }
-    return mCachedSampler;
-}
-
-// A sampler is chosen at bind time from mFilterOption/mAddressMode, so changing either only
-// matters at the next bind -- except when this texture is bound RIGHT NOW, in which case the
-// unit is still holding the sampler that matched the old values.
-void LLImageGL::refreshSamplerIfBound() const
-{
-    if (mTexName == 0)
-    {
-        return;
-    }
-
-    LLTexUnit* unit = gGL.getTexUnit(gGL.getCurrentTexUnitIndex());
-    if (unit && unit->getCurrTexture() == mTexName)
-    {
-        unit->bindSampler(getSampler());
-    }
-}
 
 bool LLImageGL::getIsResident(bool test_now)
 {

@@ -199,17 +199,7 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
 
     alloc_tex_image(resolution, resolution, format, count * 6, use_mips);
 
-    mImage->setAddressMode(LLTexUnit::TAM_CLAMP);
-
-    if (use_mips)
-    {
-        mImage->setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
-        //glGenerateMipmap(GL_TEXTURE_CUBE_MAP_ARRAY);  // <=== latest AMD drivers do not appreciate this method of allocating mipmaps
-    }
-    else
-    {
-        mImage->setFilteringOption(LLTexUnit::TFO_BILINEAR);
-    }
+    //glGenerateMipmap(GL_TEXTURE_CUBE_MAP_ARRAY);  // <=== latest AMD drivers do not appreciate this method of allocating mipmaps
 
     unbind();
 }
@@ -221,8 +211,14 @@ void LLCubeMapArray::bind(S32 stage)
     // are sampler inputs now, not texture-object state, and bindManual would otherwise leave
     // this unit on sampler 0 and sample the probe array with GL's defaults
     // (GL_NEAREST_MIPMAP_LINEAR: nearest within the mip, i.e. blocky reflections).
+    // Anisotropic when there is a mip chain to filter across, bilinear when there is not --
+    // the choice the allocation used to write onto the image. Clamp either way: a probe array
+    // that wrapped would fetch a neighbouring face at the seams.
+    const ALSampler key = mImage->getUseMipMaps() ? ALSamplers::AnisoClamp
+                                                  : ALSamplers::BilinearClamp;
     gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_CUBE_MAP_ARRAY, getGLName(),
-                                      mImage->getUseMipMaps(), mImage->getSampler());
+                                      mImage->getUseMipMaps(),
+                                      gGL.getSampler(key, mImage->getUseMipMaps()));
 }
 
 void LLCubeMapArray::unbind()

@@ -151,9 +151,9 @@ static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigge
             LLViewerTexture* normal  = slot.mNormalMap.notNull() ? slot.mNormalMap.get() : LLViewerFetchedTexture::sFlatNormalImagep.get();
             LLViewerTexture* spec    = slot.mSpecularMap.notNull() ? slot.mSpecularMap.get() : LLViewerFetchedTexture::sWhiteImagep.get();
 
-            gGL.getTexUnit(s)->bindFast(diffuse);
-            gGL.getTexUnit(N + s)->bindFast(normal);
-            gGL.getTexUnit(2 * N + s)->bindFast(spec);
+            gGL.getTexUnit(s)->bindFast(diffuse, ALSamplers::AnisoWrap);
+            gGL.getTexUnit(N + s)->bindFast(normal, ALSamplers::AnisoWrap);
+            gGL.getTexUnit(2 * N + s)->bindFast(spec, ALSamplers::AnisoWrap);
 
             spec_color[4 * s + 0] = slot.mSpecColor.mV[0];
             spec_color[4 * s + 1] = slot.mSpecColor.mV[1];
@@ -340,14 +340,14 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         {
             lastNormalMap = params.mNormalMap;
             llassert(lastNormalMap);
-            gGL.getTexUnit(normChannel)->bindFast(lastNormalMap);
+            gGL.getTexUnit(normChannel)->bindFast(lastNormalMap, ALSamplers::AnisoWrap);
         }
 
         if (specChannel > -1 && params.mSpecularMap != lastSpecMap)
         {
             lastSpecMap = params.mSpecularMap;
             llassert(lastSpecMap);
-            gGL.getTexUnit(specChannel)->bindFast(lastSpecMap);
+            gGL.getTexUnit(specChannel)->bindFast(lastSpecMap, ALSamplers::AnisoWrap);
         }
 
         if (params.mTexture != lastDiffuse)
@@ -355,7 +355,7 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
             lastDiffuse = params.mTexture;
             if (lastDiffuse)
             {
-                gGL.getTexUnit(diffuseChannel)->bindFast(lastDiffuse);
+                gGL.getTexUnit(diffuseChannel)->bindFast(lastDiffuse, ALSamplers::AnisoWrap);
             }
             else
             {
@@ -380,7 +380,7 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         if (params.mTextureMatrix)
         {
             gGL.getTexUnit(0)->activate();
-            gGL.matrixMode(LLRender::MM_TEXTURE);
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
 
             gGL.loadMatrix((GLfloat*)params.mTextureMatrix->mMatrix);
             gPipeline.mTextureMatrixOps++;

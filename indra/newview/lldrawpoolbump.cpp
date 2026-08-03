@@ -239,7 +239,7 @@ void LLDrawPoolBump::bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& di
                 diffuse_channel = -1;
                 cube_map->enable(cube_channel);
             }
-            gGL.getTexUnit(cube_channel)->bind(cube_map);
+            gGL.getTexUnit(cube_channel)->bind(cube_map, ALSamplers::AnisoClamp);
             gGL.getTexUnit(0)->activate();
         }
         else
@@ -249,7 +249,7 @@ void LLDrawPoolBump::bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& di
             gGL.getTexUnit(0)->disable();
             cube_map->enable(0);
             cube_map->setMatrix(0);
-            gGL.getTexUnit(0)->bind(cube_map);
+            gGL.getTexUnit(0)->bind(cube_map, ALSamplers::AnisoClamp);
         }
     }
 }
@@ -316,7 +316,7 @@ void LLDrawPoolBump::beginFullbrightShiny()
         cube_map->enableTexture(cube_channel);
         diffuse_channel = shader->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
 
-        gGL.getTexUnit(cube_channel)->bind(cube_map);
+        gGL.getTexUnit(cube_channel)->bind(cube_map, ALSamplers::AnisoClamp);
         gGL.getTexUnit(0)->activate();
     }
 
@@ -475,13 +475,13 @@ bool LLDrawPoolBump::bindBumpMap(U8 bump_code, LLViewerTexture* texture, S32 cha
     {
         if (channel == -2)
         {
-            gGL.getTexUnit(1)->bindFast(bump);
-            gGL.getTexUnit(0)->bindFast(bump);
+            gGL.getTexUnit(1)->bindFast(bump, ALSamplers::AnisoWrap);
+            gGL.getTexUnit(0)->bindFast(bump, ALSamplers::AnisoWrap);
         }
         else
         {
             // NOTE: do not use bindFast here (see SL-16222)
-            gGL.getTexUnit(channel)->bind(bump);
+            gGL.getTexUnit(channel)->bindSampled(bump, ALSamplers::AnisoWrap);
         }
 
         return true;
@@ -925,7 +925,9 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
         dst_img->setDiscardLevel(0);
         dst_img->createGLTexture();
 
-        gGL.getTexUnit(0)->bind(bump);
+        // Bind-to-edit: storage is allocated into this texture, nothing samples it here,
+        // so no sampler is named.
+        gGL.getTexUnit(0)->bind(bump, ALSamplers::AnisoWrap);
 
         // Full mip chain: storage is immutable, so the glGenerateMipmap below can only
         // fill levels allocated here -- with a single level it is a spec-defined no-op
@@ -955,7 +957,7 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
             gNormalMapGenProgram.uniform1f(LLShaderMgr::STEP_Y, 1.f / bump->getHeight());
             gNormalMapGenProgram.uniform1i(LLShaderMgr::BUMP_CODE, bump_code);
 
-            gGL.getTexUnit(0)->bind(src);
+            gGL.getTexUnit(0)->bindSampled(src, ALSamplers::AnisoWrap);
 
             gGL.begin(LLRender::TRIANGLE_STRIP);
             gGL.texCoord2f(0, 0);
@@ -983,8 +985,8 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
             }
         }
 
-        // generate mipmap
-        gGL.getTexUnit(0)->bind(bump);
+        // generate mipmap -- bind-to-edit again, glGenerateMipmap acts on the bound texture
+        gGL.getTexUnit(0)->bind(bump, ALSamplers::AnisoWrap);
         glGenerateMipmap(GL_TEXTURE_2D);
         gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     }
@@ -1039,7 +1041,7 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
         {
             if (params.mTextureList[i].notNull())
             {
-                gGL.getTexUnit(i)->bindFast(params.mTextureList[i]);
+                gGL.getTexUnit(i)->bindFast(params.mTextureList[i], ALSamplers::AnisoWrap);
             }
         }
     }
@@ -1050,12 +1052,12 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
             if (shiny)
             {
                 gGL.getTexUnit(0)->activate();
-                gGL.matrixMode(LLRender::MM_TEXTURE);
+                gGL.matrixMode(LLRender::MM_TEXTURE0);
             }
             else
             {
                 gGL.getTexUnit(0)->activate();
-                gGL.matrixMode(LLRender::MM_TEXTURE);
+                gGL.matrixMode(LLRender::MM_TEXTURE0);
                 gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
                 gPipeline.mTextureMatrixOps++;
             }
@@ -1070,7 +1072,7 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
         {
             if (params.mTexture.notNull())
             {
-                gGL.getTexUnit(diffuse_channel)->bindFast(params.mTexture);
+                gGL.getTexUnit(diffuse_channel)->bindFast(params.mTexture, ALSamplers::AnisoWrap);
             }
             else
             {
@@ -1091,7 +1093,7 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
         else
         {
             gGL.getTexUnit(0)->activate();
-            gGL.matrixMode(LLRender::MM_TEXTURE);
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
         }
         gGL.loadIdentity();
         gGL.matrixMode(LLRender::MM_MODELVIEW);

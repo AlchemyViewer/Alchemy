@@ -258,20 +258,20 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     {
         if( layerset->hasComposite() )
         {
-            gGL.getTexUnit(diffuse_channel)->bind(layerset->getViewerComposite());
+            gGL.getTexUnit(diffuse_channel)->bindSampled(layerset->getViewerComposite(), ALSamplers::AnisoWrap);
         }
         else
         {
-            gGL.getTexUnit(diffuse_channel)->bind(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT));
+            gGL.getTexUnit(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), ALSamplers::AnisoWrap);
         }
     }
     else if ( !is_dummy && mTexture.notNull() )
     {
-        gGL.getTexUnit(diffuse_channel)->bind(mTexture);
+        gGL.getTexUnit(diffuse_channel)->bindSampled(mTexture, ALSamplers::AnisoWrap);
     }
     else
     {
-        gGL.getTexUnit(diffuse_channel)->bind(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT));
+        gGL.getTexUnit(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), ALSamplers::AnisoWrap);
     }
 
     U32 start = mMesh->mFaceVertexOffset;

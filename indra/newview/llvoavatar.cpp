@@ -971,11 +971,6 @@ void LLVOAvatar::deleteLayerSetCaches(bool clearAll)
                 mBakedTextureDatas[i].mTexLayerSet->deleteCaches();
             }
         }
-        if (mBakedTextureDatas[i].mMaskTexName)
-        {
-            LLImageGL::deleteTextures(1, (GLuint*)&(mBakedTextureDatas[i].mMaskTexName));
-            mBakedTextureDatas[i].mMaskTexName = 0 ;
-        }
     }
 }
 
@@ -5646,7 +5641,7 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     // so filtering it only smears the silhouette. This used to be written onto the texture
     // when the impostor was allocated.
     gGL.getTexUnit(diffuse_channel)->bind(&mImpostor, false,
-                                          gGL.commonSamplers().mPointClamp);
+                                          gGL.getSampler(ALSamplers::PointClamp));
     gGL.begin(LLRender::TRIANGLES);
     {
         gGL.texCoord2f(0.f, 0.f);
@@ -5892,7 +5887,9 @@ void LLVOAvatar::updateTextures()
         {
             if (layer_baked[i] && !mBakedTextureDatas[i].mIsLoaded)
             {
-                gGL.getTexUnit(0)->bind(getImage( mBakedTextureDatas[i].mTextureIndex, 0 ));
+                // Same shape as LLLocalTextureObject's: a bind with nothing drawn after it,
+                // touching a baked layer that has not loaded. A residency nudge, not a sample.
+                gGL.getTexUnit(0)->bind(getImage( mBakedTextureDatas[i].mTextureIndex, 0 ), ALSamplers::AnisoWrap);
             }
         }
     }
@@ -10361,24 +10358,14 @@ void LLVOAvatar::onBakedTextureMasksLoaded( bool success, LLViewerFetchedTexture
                 return;
             }
 
-            U32 gl_name;
-            LLImageGL::generateTextures(1, &gl_name );
-            stop_glerror();
-
-            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, gl_name);
-            stop_glerror();
-
-            // allocateTexture2D rewrites GL_ALPHA8 / GL_ALPHA → GL_R8 / GL_RED
-            // for core-profile compatibility but does not write the swizzle
-            // attribute itself. Apply the matching mask via the LLImageGL
-            // helper so {0,0,0,A} sample semantics are preserved.
-            LLImageGL::applySwizzleForDeprecatedFormat(LLTexUnit::TT_TEXTURE, GL_ALPHA);
-
-            LLImageGL::allocateTexture2D(
-                GL_TEXTURE_2D, GL_ALPHA8,
-                aux_src->getWidth(), aux_src->getHeight(),
-                GL_ALPHA, GL_UNSIGNED_BYTE, aux_src->getData());
-            stop_glerror();
+            // The morph mask is consumed on the CPU, by applyMorphMask() below.
+            //
+            // It was also uploaded to a GL texture here, for the fixed-function clothing-mask
+            // pass that read it through LLAvatarJointMesh::sClothingMaskImageName. That pass
+            // went away with the fixed-function avatar renderer; the upload outlived it by
+            // years, allocating and deleting a full-size single-channel texture per bake mask
+            // per avatar that was never once bound for a read. Removed along with the static
+            // and the EAvatarRenderPass enum it belonged to.
 
             /* if( id == head_baked->getID() )
                  if (self->mBakedTextureDatas[BAKED_HEAD].mTexLayerSet)
@@ -10401,11 +10388,6 @@ void LLVOAvatar::onBakedTextureMasksLoaded( bool success, LLViewerFetchedTexture
                         const EBakedTextureIndex baked_index = texture_dict->mBakedTextureIndex;
                         self->applyMorphMask(aux_src->getData(), aux_src->getWidth(), aux_src->getHeight(), 1, baked_index);
                         maskData->mLastDiscardLevel = discard_level;
-                        if (self->mBakedTextureDatas[baked_index].mMaskTexName)
-                        {
-                            LLImageGL::deleteTextures(1, &(self->mBakedTextureDatas[baked_index].mMaskTexName));
-                        }
-                        self->mBakedTextureDatas[baked_index].mMaskTexName = gl_name;
                         found_texture_id = true;
                         break;
                     }

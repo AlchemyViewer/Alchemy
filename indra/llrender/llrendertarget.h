@@ -160,6 +160,21 @@ public:
     bool hasStencil() const { return mStencil; }
     eDepthFormat getDepthFormat() const { return mDepthFormat; }
 
+    // The sampler a caller gets when it does not name one.
+    //
+    // These reproduce, as sampler objects, the filter and wrap state that allocation used to
+    // write onto the texture objects themselves -- bilinear for attachment 0, point for the
+    // data attachments behind it, mirrored repeat except on rectangle textures, and point
+    // with plain repeat for depth. That state was the last texture-object sampling state left
+    // in the engine, and it stayed only because LLTexUnit::bind(LLRenderTarget*) defaults its
+    // sampler to 0, meaning "sample through whatever the texture object carries".
+    //
+    // Answering the question here rather than at those call sites keeps the defaults in one
+    // place, next to the allocation that used to establish them. A caller that wants
+    // something else still passes its own sampler, or uses bindTexture.
+    U32 getDefaultColorSampler(U32 attachment = 0) const;
+    U32 getDefaultDepthSampler() const;
+
     // Bind an attachment for sampling.
     //
     // filter_options and address_mode select an immutable sampler object rather than

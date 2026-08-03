@@ -326,6 +326,10 @@ bool LLRender::init(bool needs_vertex_buffer)
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
+    // Build this context's sampler objects before anything can ask for one.
+    mSamplerCache.warmup();
+
+
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
     gGL.setAmbientLightColor(LLColor4::black);
 
@@ -408,6 +412,12 @@ void LLRender::clearSamplers()
     {
         unit.mCurrSampler = 0;
     }
+
+}
+
+void LLRender::warmupSamplers()
+{
+    mSamplerCache.warmup();
 }
 
 void LLRender::refreshState(void)
@@ -491,10 +501,9 @@ void LLRender::syncMatrices()
         LLShaderMgr::MODELVIEW_MATRIX,
         LLShaderMgr::PROJECTION_MATRIX,
         LLShaderMgr::TEXTURE_MATRIX0,
-        LLShaderMgr::TEXTURE_MATRIX1,
-        LLShaderMgr::TEXTURE_MATRIX2,
-        LLShaderMgr::TEXTURE_MATRIX3,
     };
+    static_assert(LL_ARRAY_SIZE(name) == LLRender::NUM_MATRIX_MODES,
+                  "one uniform per matrix mode, indexed by mode");
 
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
@@ -736,31 +745,11 @@ void LLRender::multMatrix(const GLfloat* m)
 
 void LLRender::matrixMode(eMatrixMode mode)
 {
-    if (mode == MM_TEXTURE)
-    {
-        U32 tex_index = gGL.getCurrentTexUnitIndex();
-        // the shaders don't actually reference anything beyond texture_matrix0/1 outside of terrain rendering
-        llassert(tex_index <= 3);
-        mode = eMatrixMode(MM_TEXTURE0 + tex_index);
-        if (mode > MM_TEXTURE3)
-        {
-            // getCurrentTexUnitIndex() can go as high as 32 (LL_NUM_TEXTURE_LAYERS)
-            // Large value will result in a crash at mMatrix
-            LL_WARNS_ONCE() << "Attempted to assign matrix mode out of bounds: " << mode << LL_ENDL;
-            mode = MM_TEXTURE0;
-        }
-    }
-
     mMatrixMode = mode;
 }
 
 LLRender::eMatrixMode LLRender::getMatrixMode()
 {
-    if (mMatrixMode >= MM_TEXTURE0 && mMatrixMode <= MM_TEXTURE3)
-    { //always return MM_TEXTURE if current matrix mode points at any texture matrix
-        return MM_TEXTURE;
-    }
-
     return mMatrixMode;
 }
 
@@ -1131,6 +1120,7 @@ void LLRender::flush()
                     mMode,
                     count,
                     gGL.getTexUnit(0)->mCurrTexture,
+                    gGL.getTexUnit(0)->mCurrSampler,
                     mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]],
                     mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]],
                     mMatrix[MM_TEXTURE0][mMatIdx[MM_TEXTURE0]]

@@ -4692,7 +4692,7 @@ void LLPipeline::renderDebug()
                     {
                         //The path
                         gUIProgram.bind();
-                        gGL.getTexUnit(0)->bind(LLViewerFetchedTexture::sWhiteImagep);
+                        gGL.getTexUnit(0)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap);
                         llPathingLibInstance->renderPath();
                         gPathfindingProgram.bind();
 
@@ -4875,7 +4875,7 @@ void LLPipeline::renderDebug()
         gUIProgram.bind();
         gGL.color4f(1, 1, 1, 1);
 
-        gGL.getTexUnit(0)->bind(LLViewerFetchedTexture::sWhiteImagep, true);
+        gGL.getTexUnit(0)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap, true);
 
         glPointSize(8.f);
         LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
@@ -7898,7 +7898,7 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
             {
                 // Tiled across the screen, so GL_REPEAT as before.
                 gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap, false,
-                                                    gGL.commonSamplers().mPointWrap);
+                                                    gGL.getSampler(ALSamplers::PointWrap));
             }
             gGlowExtractProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
                                           (GLfloat)mGlow[2].getWidth(),
@@ -8306,7 +8306,7 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
                 else
                 {
                     gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASampleMap, false,
-                                                        gGL.commonSamplers().mBilinearClamp);
+                                                        gGL.getSampler(ALSamplers::BilinearClamp));
                 }
             }
 
@@ -8317,7 +8317,7 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
                 if (pred_channel > -1)
                 {
                     gGL.getTexUnit(pred_channel)->bind(&mRT->deferredScreen, true,
-                                                       gGL.commonSamplers().mPointClamp);
+                                                       gGL.getSampler(ALSamplers::PointClamp));
                 }
             }
 
@@ -8361,13 +8361,13 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             if (area_tex_channel > -1)
             {
                 gGL.getTexUnit(area_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAAAreaMap, false,
-                                                             gGL.commonSamplers().mBilinearClamp);
+                                                             gGL.getSampler(ALSamplers::BilinearClamp));
             }
             S32 search_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_SEARCH_TEX, LLTexUnit::TT_TEXTURE);
             if (search_tex_channel > -1)
             {
                 gGL.getTexUnit(search_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASearchMap, false,
-                                                               gGL.commonSamplers().mBilinearClamp);
+                                                               gGL.getSampler(ALSamplers::BilinearClamp));
             }
 
             if (use_stencil)
@@ -8988,7 +8988,7 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     //
     // Anisotropic + clamp matches what that allocation-time setup used to apply. With no mip
     // chain the filter resolves to GL_LINEAR, which is what gives the compare its 2x2 PCF.
-    const U32 shadow_sampler = gGL.commonSamplers().mShadowCompare;
+    const U32 shadow_sampler = gGL.getSampler(ALSamplers::ShadowCompare);
 
     std::array<S32, 6> channels = { -1, -1, -1, -1, -1, -1 };
 
@@ -9030,19 +9030,29 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
         if (previous >= 0 && std::find(channels.begin(), channels.end(), previous) == channels.end())
         {
             gGL.getTexUnit(previous)->unbind(LLTexUnit::TT_TEXTURE);
+            // And the compare sampler with it. unbind() leaves the sampler alone by design --
+            // the next bind names its own, so a leftover is normally unreachable. A COMPARE
+            // sampler is the exception: unbind puts the white placeholder on the unit, which
+            // IS sampleable, and reading it through depth comparison is undefined. So the
+            // release has to be explicit here, where the compare sampler was selected.
+            gGL.getTexUnit(previous)->bindSampler(0);
         }
     }
 
     mBoundShadowChannels = channels;
 }
 
-void LLPipeline::releaseShadowMaps()
+void LLPipeline::unbindShadowMaps()
 {
     for (S32& channel : mBoundShadowChannels)
     {
         if (channel >= 0)
         {
             gGL.getTexUnit(channel)->unbind(LLTexUnit::TT_TEXTURE);
+            // See bindShadowMaps: the compare sampler must go too, or it survives onto the
+            // white placeholder unbind() leaves behind and the next program to map this unit
+            // to an ordinary sampler2D reads it through depth comparison.
+            gGL.getTexUnit(channel)->bindSampler(0);
             channel = -1;
         }
     }
@@ -9129,7 +9139,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     {
         // The noise map is tiled across the screen, so it keeps GL's GL_REPEAT default.
         gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap, false,
-                                            gGL.commonSamplers().mPointWrap);
+                                            gGL.getSampler(ALSamplers::PointWrap));
     }
 
     bindLightFunc(shader);
@@ -9146,7 +9156,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
         }
         else
         {
-            gGL.getTexUnit(channel)->bindFast(LLViewerFetchedTexture::sWhiteImagep);
+            gGL.getTexUnit(channel)->bindFast(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap);
         }
     }
 
@@ -10048,7 +10058,8 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     {
         if (img)
         {
-            gGL.getTexUnit(channel)->bind(img);
+            // Projector cookie: carries LLImageGL's defaults, as it always has.
+            gGL.getTexUnit(channel)->bindSampled(img, ALSamplers::AnisoWrap);
 
             F32 lod_range = logf((F32)img->getWidth())/logf(2.f);
 
@@ -10076,7 +10087,7 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     shader.disableTexture(LLShaderMgr::DEFERRED_LIGHT, deferred_light_target->getUsage());
     shader.disableTexture(LLShaderMgr::DIFFUSE_MAP);
 
-    // Release the shadow channels this shader declares, then any unit bindShadowMaps
+    // Unbind the shadow channels this shader declares, then any unit bindShadowMaps
     // actually used -- the two are the same for the shader that bound them last, and differ
     // for every earlier program with another layout. unbind() drops the compare sampler
     // along with the texture.
@@ -10084,7 +10095,7 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     {
         shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0+i);
     }
-    releaseShadowMaps();
+    unbindShadowMaps();
 
     shader.disableTexture(LLShaderMgr::DEFERRED_NOISE);
     shader.disableTexture(LLShaderMgr::DEFERRED_LIGHTFUNC);

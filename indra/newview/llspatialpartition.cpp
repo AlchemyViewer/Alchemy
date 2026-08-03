@@ -2731,8 +2731,8 @@ void renderTexelDensity(LLDrawable* drawable)
 
         checkerboard_matrix.initScale(LLVector3((F32)texturep->getWidth(discard_level) / 8.f, (F32)texturep->getHeight(discard_level) / 8.f, 1.f));
 
-        gGL.getTexUnit(0)->bind(LLViewerTexture::sCheckerBoardImagep, true);
-        gGL.matrixMode(LLRender::MM_TEXTURE);
+        gGL.getTexUnit(0)->bindSampled(LLViewerTexture::sCheckerBoardImagep, ALSamplers::AnisoWrap, true);
+        gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadMatrix((GLfloat*)&checkerboard_matrix.mMatrix);
 
         if (buffer && (facep->getGeomCount() >= 3))
@@ -2781,10 +2781,10 @@ void renderTexelDensity(LLDrawable* drawable)
     //  glMatrixMode(GL_TEXTURE);
     //  glPushMatrix();
     //  glLoadIdentity();
-    //  //gGL.matrixMode(LLRender::MM_TEXTURE);
+    //  //gGL.matrixMode(LLRender::MM_TEXTURE0);
     //  glLoadMatrixf((GLfloat*) checkboard_matrix.mMatrix);
 
-    //  gGL.getTexUnit(i)->bind(LLViewerTexture::sCheckerBoardImagep, true);
+    //  gGL.getTexUnit(i)->bindSampled(LLViewerTexture::sCheckerBoardImagep, ALSamplers::AnisoWrap, true);
 
     //  pushVerts(params, LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_NORMAL );
 

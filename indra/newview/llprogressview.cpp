@@ -210,7 +210,7 @@ void LLProgressView::drawStartTexture(F32 alpha)
     if (gStartTexture)
     {
         LLGLSUIDefault gls_ui;
-        gGL.getTexUnit(0)->bind(gStartTexture.get());
+        gGL.getTexUnit(0)->bindSampled(gStartTexture.get(), ALSamplers::AnisoWrap);
         gGL.color4f(1.f, 1.f, 1.f, alpha);
         F32 image_aspect = (F32)gStartImageWidth / (F32)gStartImageHeight;
         S32 width = getRect().getWidth();

@@ -46,6 +46,11 @@ static const GLenum sGLTextureType[] =
     GL_TEXTURE_3D
 };
 
+U32 LLTexUnit::sSamplerBinds  = 0;
+U32 LLTexUnit::sSamplerSkips  = 0;
+U32 LLTexUnit::sTextureBinds  = 0;
+U32 LLTexUnit::sSamplerBindsFlushed = 0;
+
 static const GLint sGLAddressMode[] =
 {
     GL_REPEAT,
@@ -98,10 +103,19 @@ void LLTexUnit::refreshState(void)
 
 void LLTexUnit::bindSampler(U32 sampler)
 {
-    if (mIndex < 0 || mCurrSampler == sampler)
+    if (mIndex < 0)
     {
         return;
     }
+
+    if (mCurrSampler == sampler)
+    {
+        ++sSamplerSkips;
+        return;
+    }
+
+    ++sSamplerBinds;
+    ++sSamplerBindsFlushed;
 
     // Sampler state is consulted at sample time, not at bind time, so a change has to be
     // ordered against draws the same way a texture change is.
@@ -109,28 +123,6 @@ void LLTexUnit::bindSampler(U32 sampler)
 
     glBindSampler(mIndex, sampler);
     mCurrSampler = sampler;
-}
-
-void LLTexUnit::setSamplerAddressMode(eTextureAddressMode mode)
-{
-    if (mIndex < 0 || mCurrAddress == mode)
-    {
-        return;
-    }
-
-    mCurrAddress = mode;
-    bindSampler(gGL.getSampler(mCurrFilter, mCurrAddress, mHasMipMaps));
-}
-
-void LLTexUnit::setSamplerFilteringOption(eTextureFilterOptions option)
-{
-    if (mIndex < 0 || mCurrFilter == option)
-    {
-        return;
-    }
-
-    mCurrFilter = option;
-    bindSampler(gGL.getSampler(mCurrFilter, mCurrAddress, mHasMipMaps));
 }
 
 void LLTexUnit::activate(void)
@@ -173,9 +165,21 @@ void LLTexUnit::disable(void)
     }
 }
 
-void LLTexUnit::bindFast(LLTexture* texture)
+// Sampler named by the CALLER. This is the shape the migration is heading for: the bind site
+// says how it wants to read, and the texture supplies only its data (and whether it has a mip
+// chain, which GL needs to keep a mipmapped filter from selecting an incomplete texture).
+void LLTexUnit::bindFast(LLTexture* texture, ALSampler key)
 {
+    // getGLTexture() is virtual and this is the per-draw path, so it is resolved once and the
+    // sampler is chosen from the result rather than re-fetching. LLTexUnit is a friend of
+    // LLImageGL, so the mip truth is read directly.
     LLImageGL* gl_tex = texture->getGLTexture();
+    bindFastImpl(texture, gl_tex, gGL.getSampler(key, gl_tex->mHasMipMaps));
+}
+
+void LLTexUnit::bindFastImpl(LLTexture* texture, LLImageGL* gl_tex, U32 sampler)
+{
+    ++sTextureBinds;
     texture->setActive();
     glActiveTexture(GL_TEXTURE0 + mIndex);
     gGL.mCurrTextureUnitIndex = mIndex;
@@ -200,15 +204,17 @@ void LLTexUnit::bindFast(LLTexture* texture)
     // texture object, glBindTextureUnit raises GL_INVALID_OPERATION.)
     glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
 
-    // Select this texture's sampler. No flush, per this function's contract -- consistent
-    // with the texture binding above, which is changed the same way.
-    mCurrFilter  = gl_tex->getFilteringOption();
-    mCurrAddress = gl_tex->getAddressMode();
-    const U32 sampler = gl_tex->getSampler();
+    // Select the sampler. No flush, per this function's contract -- consistent with the
+    // texture binding above, which is changed the same way.
     if (mCurrSampler != sampler)
     {
+        ++sSamplerBinds;
         glBindSampler(mIndex, sampler);
         mCurrSampler = sampler;
+    }
+    else
+    {
+        ++sSamplerSkips;
     }
 
     // Track the actual bound target so later callers that read mCurrTexType don't act on a
@@ -218,28 +224,35 @@ void LLTexUnit::bindFast(LLTexture* texture)
     mHasMipMaps = gl_tex->mHasMipMaps;
 }
 
-bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
+bool LLTexUnit::bind(LLTexture* texture, ALSampler key, bool for_rendering, bool forceBind)
 {
-    return bindImpl(texture, forceBind, KEEP_TEXTURE_SAMPLING, KEEP_TEXTURE_SAMPLING);
+    return bindImpl(texture, forceBind, key);
 }
 
-bool LLTexUnit::bindSampled(LLTexture* texture, eTextureAddressMode address, bool forceBind)
+
+// Mask form. The sampler is named by the caller and the texture's own mode is not consulted at
+// all, which is the shape the slow path is migrating to -- the enum-pair overloads above still
+// take half their answer from the resource.
+bool LLTexUnit::bindSampled(LLTexture* texture, ALSampler key, bool forceBind)
 {
-    return bindImpl(texture, forceBind, KEEP_TEXTURE_SAMPLING, address);
+    return bindImpl(texture, forceBind, key);
 }
 
-bool LLTexUnit::bindSampled(LLTexture* texture, eTextureFilterOptions filter,
-                            eTextureAddressMode address, bool forceBind)
+// Same for a raw LLImageGL -- the font atlas is one, since glyph pages are not LLTextures.
+bool LLTexUnit::bindSampled(LLImageGL* texture, ALSampler key, bool forceBind)
 {
-    return bindImpl(texture, forceBind, filter, address);
+    if (!bind(texture, false, forceBind))
+    {
+        return false;
+    }
+    bindSampler(gGL.getSampler(key, texture->mHasMipMaps));
+    return true;
 }
 
-// filter_override / address_override are KEEP_TEXTURE_SAMPLING to take that half from the
-// texture's own mode. Resolving both here means the sampler is selected ONCE: the
+// The sampler is selected ONCE here, from the caller's mask plus the resource's mip truth. The
 // bind-then-setSampler* sequence this replaces could issue two glBindSampler calls and, worse,
-// a gGL.flush() between them, splitting the draw batch for a sampler that was about to change
-// again.
-bool LLTexUnit::bindImpl(LLTexture* texture, bool forceBind, S32 filter_override, S32 address_override)
+// a gGL.flush() between them, splitting the draw batch for a sampler about to change again.
+bool LLTexUnit::bindImpl(LLTexture* texture, bool forceBind, ALSampler key)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     stop_glerror();
@@ -269,20 +282,7 @@ bool LLTexUnit::bindImpl(LLTexture* texture, bool forceBind, S32 filter_override
                 // Outside the redundancy check on purpose: the same texture can be bound
                 // again after a pass that left a different sampler on this unit.
                 // bindSampler() no-ops when nothing changes.
-                mCurrFilter  = (filter_override  == KEEP_TEXTURE_SAMPLING)
-                                   ? gl_tex->getFilteringOption()
-                                   : (eTextureFilterOptions)filter_override;
-                mCurrAddress = (address_override == KEEP_TEXTURE_SAMPLING)
-                                   ? gl_tex->getAddressMode()
-                                   : (eTextureAddressMode)address_override;
-
-                // The un-overridden case is the hot one (every plain bind), and the texture
-                // memoises its own sampler -- so resolve through it rather than re-deriving.
-                const bool overridden = (filter_override  != KEEP_TEXTURE_SAMPLING)
-                                     || (address_override != KEEP_TEXTURE_SAMPLING);
-                bindSampler(overridden
-                                ? gGL.getSampler(mCurrFilter, mCurrAddress, gl_tex->mHasMipMaps)
-                                : gl_tex->getSampler());
+                bindSampler(gGL.getSampler(key, gl_tex->mHasMipMaps));
             }
             else
             {
@@ -355,18 +355,22 @@ bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32
         mHasMipMaps = texture->mHasMipMaps;
     }
 
-    // See bind(LLTexture*): selected outside the redundancy check so a sampler left by an
-    // earlier pass can't survive on this unit.
-    mCurrFilter  = texture->getFilteringOption();
-    mCurrAddress = texture->getAddressMode();
-    bindSampler(texture->getSampler());
-
+    // The sampler is deliberately LEFT ALONE.
+    //
+    // This overload is bind-to-edit -- allocate, upload, generate mips -- and self-binds.
+    // Nothing samples through it, so whatever sampler the unit happens to be holding is
+    // irrelevant, and dropping it to 0 would cost a glBindSampler now plus another when the
+    // next draw restores one. bindSampler() also flushes, so that pair would break the batch
+    // every time a texture is uploaded mid-frame.
+    //
+    // Safe because no bind can sample without naming a sampler, and this path binds nothing
+    // sampleable in the first place. See unbind() for the case where that is not enough.
     stop_glerror();
 
     return true;
 }
 
-bool LLTexUnit::bind(LLCubeMap* cubeMap)
+bool LLTexUnit::bind(LLCubeMap* cubeMap, ALSampler key)
 {
     if (mIndex < 0) return false;
 
@@ -396,9 +400,11 @@ bool LLTexUnit::bind(LLCubeMap* cubeMap)
             glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
             mHasMipMaps = cubeMap->mImages[0]->mHasMipMaps;
             cubeMap->mImages[0]->updateBindStats();
-            mCurrFilter  = cubeMap->mImages[0]->getFilteringOption();
-            mCurrAddress = cubeMap->mImages[0]->getAddressMode();
-            bindSampler(cubeMap->mImages[0]->getSampler());
+            // Named by the caller, not read off face 0. A cube map is as much a shared
+            // resource as any other texture -- the environment map is sampled by every
+            // shiny surface in the scene -- so which sampler a pass wants is the pass's
+            // business.
+            bindSampler(gGL.getSampler(key, mHasMipMaps));
             return true;
         }
         else
@@ -421,11 +427,18 @@ bool LLTexUnit::bind(LLRenderTarget* renderTarget, bool bindDepth, U32 sampler)
     {
         llassert(renderTarget->getDepth()); // target MUST have a depth buffer attachment
 
-        bindManual(renderTarget->getUsage(), renderTarget->getDepth(), false, sampler);
+        // Sampler 0 means "sample through the texture object's own state", and render target
+        // textures no longer carry any -- allocation expresses it as a sampler instead. So an
+        // unspecified sampler resolves to the target's default rather than to nothing, which
+        // would otherwise leave these binds on GL's defaults (nearest, repeat) and quietly
+        // unfilter every pass that reads a target without naming a sampler.
+        bindManual(renderTarget->getUsage(), renderTarget->getDepth(), false,
+                   sampler ? sampler : renderTarget->getDefaultDepthSampler());
     }
     else
     {
-        bindManual(renderTarget->getUsage(), renderTarget->getTexture(), false, sampler);
+        bindManual(renderTarget->getUsage(), renderTarget->getTexture(), false,
+                   sampler ? sampler : renderTarget->getDefaultColorSampler(0));
     }
 
     return true;
@@ -487,10 +500,19 @@ void LLTexUnit::unbind(eTextureType type)
             glBindTexture(sGLTextureType[type], 0);
         }
 
-        // The replacement binding (white texture or nothing) has no relationship to the
-        // sampler the outgoing texture wanted, so release it here rather than leaving it
-        // for whoever binds next to notice.
-        bindSampler(0);
+        // Sampler left in place. Whoever binds here next names their own, so releasing it
+        // would just be a glBindSampler now and another one then -- with a flush attached.
+        //
+        // ONE EXCEPTION, and it is not theoretical -- it shipped as a driver warning before
+        // being caught. This leaves the WHITE PLACEHOLDER on the unit, which is sampleable,
+        // so a leftover COMPARE sampler is read through depth comparison on a non-depth
+        // texture: undefined. Whoever selects a compare sampler must therefore release it
+        // itself rather than relying on this; LLPipeline::bindShadowMaps and unbindShadowMaps
+        // call bindSampler(0) on the channels they give up.
+        //
+        // It is not enough to track the channels and unbind the TEXTURE. That is what those
+        // functions already did, and it is exactly what stopped being sufficient the moment
+        // this stopped clearing the sampler as a side effect.
         stop_glerror();
     }
 }
@@ -513,123 +535,12 @@ void LLTexUnit::unbindFast(eTextureType type)
             glBindTexture(sGLTextureType[type], 0);
         }
 
-        // As unbind(), but without the flush this function exists to avoid.
-        if (mCurrSampler)
-        {
-            glBindSampler(mIndex, 0);
-            mCurrSampler = 0;
-        }
+        // Sampler left in place -- see unbind(), including the compare-sampler exception. This
+        // is the per-draw unbind, so the pair of glBindSampler calls it used to cost (release
+        // here, restore at the next bind) landed squarely in the hot loop.
     }
 }
 
-// Writes GL_TEXTURE_WRAP_* onto the TEXTURE OBJECT bound here, which only has an effect
-// while this unit samples through sampler 0 -- a bound sampler object overrides wrap state
-// wholesale. Textures that carry their own sampler (anything LLImageGL-backed) must go
-// through LLImageGL::setAddressMode instead; this is for render targets and raw GL names.
-void LLTexUnit::setTextureAddressMode(eTextureAddressMode mode)
-{
-    if (mIndex < 0 || mCurrTexture == 0) return;
-
-    warnIfSamplerBound("setTextureAddressMode");
-
-    gGL.flush();
-
-    activate();
-
-    setTextureAddressModeFast(mode, mCurrTexType);
-}
-
-void LLTexUnit::setTextureAddressModeFast(eTextureAddressMode mode, eTextureType tex_type)
-{
-    glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_S, sGLAddressMode[mode]);
-    glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_T, sGLAddressMode[mode]);
-    if (tex_type == TT_CUBE_MAP || tex_type == TT_CUBE_MAP_ARRAY || tex_type == TT_TEXTURE_3D)
-    {
-        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
-    }
-}
-
-// See setTextureAddressMode: texture-object state, meaningful only under sampler 0.
-void LLTexUnit::setTextureFilteringOption(LLTexUnit::eTextureFilterOptions option)
-{
-    if (mIndex < 0 || mCurrTexture == 0 || mCurrTexType == LLTexUnit::TT_MULTISAMPLE_TEXTURE) return;
-
-    warnIfSamplerBound("setTextureFilteringOption");
-
-    gGL.flush();
-
-    setTextureFilteringOptionFast(option, mCurrTexType);
-}
-
-// A sampler object overrides the texture object's filter/wrap/compare state entirely, so
-// writing that state while one is bound changes nothing and reports no error. That silence
-// is the trap: it already cost the RLV sphere effect its point filter (402770506d). Anything
-// landing here with a sampler bound wants the sampler path instead.
-void LLTexUnit::warnIfSamplerBound(const char* who) const
-{
-    if (mCurrSampler != 0)
-    {
-        LL_WARNS_ONCE("RenderState") << who << " on texture unit " << mIndex
-                                     << " while sampler " << mCurrSampler
-                                     << " is bound -- the write is a no-op. Set the sampling"
-                                        " mode on the texture (LLImageGL::setFilteringOption /"
-                                        " setAddressMode) or pass it to the bind call."
-                                     << LL_ENDL;
-    }
-}
-
-void LLTexUnit::setTextureFilteringOptionFast(LLTexUnit::eTextureFilterOptions option, eTextureType tex_type)
-{
-    if (option == TFO_POINT)
-    {
-        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    }
-    else
-    {
-        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
-
-    if (option >= TFO_TRILINEAR && mHasMipMaps)
-    {
-        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    }
-    else if (option >= TFO_BILINEAR)
-    {
-        if (mHasMipMaps)
-        {
-            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-        }
-        else
-        {
-            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        }
-    }
-    else
-    {
-        if (mHasMipMaps)
-        {
-            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-        }
-        else
-        {
-            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        }
-    }
-
-    if (gGLManager.mHasAnisotropic)
-    {
-        if (option == TFO_ANISOTROPIC && LLRender::sAnisotropicFilteringLevel > 1.f)
-        {
-            F32 aniso_level = llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mMaxAnisotropy);
-            glTexParameterf(sGLTextureType[tex_type], GL_TEXTURE_MAX_ANISOTROPY, aniso_level);
-
-        }
-        else
-        {
-            glTexParameterf(sGLTextureType[tex_type], GL_TEXTURE_MAX_ANISOTROPY, 1.f);
-        }
-    }
-}
 
 // Useful for debugging that you've manually assigned a texture operation to the correct
 // texture unit based on the currently set active texture in opengl.

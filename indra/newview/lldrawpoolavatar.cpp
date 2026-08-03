@@ -728,7 +728,7 @@ void LLDrawPoolAvatar::renderAvatars(LLVOAvatar* single_avatar, S32 pass)
         if (pass==0 && (!gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_PARTICLES) || LLViewerPartSim::getMaxPartCount() <= 0))
         {
             // debug code to draw a sphere in place of avatar
-            gGL.getTexUnit(0)->bind(LLViewerFetchedTexture::sWhiteImagep);
+            gGL.getTexUnit(0)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap);
             gGL.setColorMask(true, true);
             LLVector3 pos = avatarp->getPositionAgent();
             gGL.color4f(1.0f, 1.0f, 1.0f, 0.7f);

@@ -177,7 +177,7 @@ void LLManipTranslate::restoreGL()
     // Trilinear + mips: the grid recedes to the horizon, so it needs the mip chain. Sampler
     // rather than texture state, matching the render-time binds in renderGrid's callers.
     gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, sGridTex->getTexName(), true,
-                                  gGL.commonSamplers().mTrilinearWrapMips);
+                                  gGL.getSampler((ALSamplers::TrilinearWrap | ALSampler::HasMips)));
 
     // Allocate the whole mip chain up front: immutable storage is allocated once for the
     // texture, before any level is written, so it cannot happen inside the loop below.
@@ -1518,7 +1518,7 @@ void LLManipTranslate::renderSnapGuides()
         F32 sz = mGridSizeMeters;
         F32 tiles = sz;
 
-        gGL.matrixMode(LLRender::MM_TEXTURE);
+        gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.pushMatrix();
         usc = 1.0f/usc;
         vsc = 1.0f/vsc;
@@ -1546,7 +1546,7 @@ void LLManipTranslate::renderSnapGuides()
                 {
                     LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE, GL_GREATER);
                     gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, getGridTexName(), true,
-                                                  gGL.commonSamplers().mTrilinearWrapMips);
+                                                  gGL.getSampler((ALSamplers::TrilinearWrap | ALSampler::HasMips)));
                     gGL.flush();
                     gGL.blendFunc(LLRender::BF_ZERO, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
                     renderGrid(u,v,tiles,0.9f, 0.9f, 0.9f,a*0.15f);
@@ -1561,7 +1561,7 @@ void LLManipTranslate::renderSnapGuides()
 
                     //draw grid top
                     gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, getGridTexName(), true,
-                                                  gGL.commonSamplers().mTrilinearWrapMips);
+                                                  gGL.getSampler((ALSamplers::TrilinearWrap | ALSampler::HasMips)));
                     renderGrid(u,v,tiles,1,1,1,a);
 
                     gGL.popMatrix();

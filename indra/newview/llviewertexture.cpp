@@ -811,7 +811,7 @@ bool LLViewerTexture::bindDebugImage(const S32 stage)
     bool res = true;
     if (LLViewerTexture::sCheckerBoardImagep.notNull() && (this != LLViewerTexture::sCheckerBoardImagep.get()))
     {
-        res = gGL.getTexUnit(stage)->bind(LLViewerTexture::sCheckerBoardImagep);
+        res = gGL.getTexUnit(stage)->bindSampled(LLViewerTexture::sCheckerBoardImagep, ALSamplers::AnisoWrap);
     }
 
     if(!res)
@@ -831,11 +831,11 @@ bool LLViewerTexture::bindDefaultImage(S32 stage)
     if (LLViewerFetchedTexture::sDefaultImagep.notNull() && (this != LLViewerFetchedTexture::sDefaultImagep.get()))
     {
         // use default if we've got it
-        res = gGL.getTexUnit(stage)->bind(LLViewerFetchedTexture::sDefaultImagep);
+        res = gGL.getTexUnit(stage)->bindSampled(LLViewerFetchedTexture::sDefaultImagep, ALSamplers::AnisoWrap);
     }
     if (!res && LLViewerTexture::sNullImagep.notNull() && (this != LLViewerTexture::sNullImagep))
     {
-        res = gGL.getTexUnit(stage)->bind(LLViewerTexture::sNullImagep);
+        res = gGL.getTexUnit(stage)->bindSampled(LLViewerTexture::sNullImagep, ALSamplers::AnisoWrap);
     }
     if (!res)
     {

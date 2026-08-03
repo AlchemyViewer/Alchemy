@@ -343,6 +343,7 @@ static bool handleAnisotropicFilteringChanged(const LLSD& newval)
     // set is never populated. Should an upload path ever select a real sampler, this would
     // need to reach that context too.
     gGL.clearSamplers();
+    gGL.warmupSamplers();
     return true;
 }
 

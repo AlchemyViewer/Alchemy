@@ -527,7 +527,7 @@ void LLFace::renderSelected(LLViewerTexture *imagep, const LLColor4& color)
 
     if (mGeomCount > 0 && mIndicesCount > 0)
     {
-        gGL.getTexUnit(0)->bind(imagep);
+        gGL.getTexUnit(0)->bindSampled(imagep, ALSamplers::AnisoWrap);
 
         gGL.pushMatrix();
         if (mDrawablep->isActive())

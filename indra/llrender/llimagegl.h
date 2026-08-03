@@ -140,6 +140,9 @@ public:
     LLImageGL(const LLImageRaw* imageraw, bool usemipmaps = true);
 
     // For wrapping textures created via GL elsewhere with our API only. Use with caution.
+    // The trailing address mode is accepted and ignored: sampling is named at the bind now.
+    // Kept in the signature so the several call sites that pass one still compile; drop it
+    // when they are cleaned up.
     LLImageGL(LLGLuint mTexName, U32 components, LLGLenum target, LLGLint  formatInternal, LLGLenum formatPrimary, LLGLenum formatType, LLTexUnit::eTextureAddressMode addressMode);
 
 protected:
@@ -272,7 +275,7 @@ public:
 
     bool getUseMipMaps() const { return mUseMipMaps; }
     void setUseMipMaps(bool usemips) { mUseMipMaps = usemips; }
-    void setHasMipMaps(bool hasmips) { mHasMipMaps = hasmips; invalidateSampler(); }
+    void setHasMipMaps(bool hasmips) { mHasMipMaps = hasmips; }
     void updatePickMask(S32 width, S32 height, const U8* data_in);
 // [RLVa:KB] - Checked: RLVa-2.2 (@setoverlay)
     bool getMask(const LLVector2 &tc) const;
@@ -282,35 +285,17 @@ public:
     void checkTexSize(bool forced = false) const ;
 
     // Sets the addressing mode used to sample the texture
-    //  (such as wrapping, mirrored wrapping, and clamp)
-    // Note: this actually gets set the next time the texture is bound.
-    void setAddressMode(LLTexUnit::eTextureAddressMode mode);
-    LLTexUnit::eTextureAddressMode getAddressMode(void) const { return mAddressMode; }
-
-    // Sets the filtering options used to sample the texture
-    //  (such as point sampling, bilinear interpolation, mipmapping, and anisotropic filtering)
-    // Note: this actually gets set the next time the texture is bound.
-    void setFilteringOption(LLTexUnit::eTextureFilterOptions option);
-    LLTexUnit::eTextureFilterOptions getFilteringOption(void) const { return mFilterOption; }
-
-    // The sampler object this texture wants to be sampled through, resolved from
-    // mFilterOption / mAddressMode / mHasMipMaps. The bind paths use this; call it
-    // directly only when binding a texture by name outside LLTexUnit::bind.
-    U32 getSampler() const;
-
+    // NO sampling state here, and none coming back.
+    //
+    // A texture carries data plus facts about itself (dimensions, format, swizzle, whether it
+    // has a mip chain). How it is READ belongs to the pass reading it: two materials can
+    // reference one image and want different wrap modes -- glTF specifies sampler state per
+    // texture reference for exactly that reason -- so an image that decided its own filtering
+    // had to pick a winner and be wrong for everyone else. Name an ALSampler at the bind.
     LLGLenum getTexTarget()const { return mTarget; }
 
     void init(bool usemipmaps);
     virtual void cleanup(); // Clean up the LLImageGL so it can be reinitialized.  Be careful when using this in derived class destructors
-
-    // Re-select this texture's sampler on the active unit, but only if it is the texture
-    // currently bound there. Covers a setAddressMode/setFilteringOption call made while
-    // the texture is live, where the unit is still holding the sampler that matched the
-    // previous values.
-    void refreshSamplerIfBound() const;
-
-    // Force getSampler() to re-derive. Call whenever an input to it changes.
-    void invalidateSampler() { mCachedSamplerGeneration = 0; }
 
     void setNeedsAlphaAndPickMask(bool need_mask);
 
@@ -431,17 +416,6 @@ protected:
 
     S8 mComponents;
     S8 mMaxDiscardLevel;
-
-    // How this texture wants to be sampled. NOT written to the texture object -- the bind
-    // paths resolve these into a shared sampler object (see ALSamplerCache), so a change
-    // takes effect at the next bind with no GL call and no dirty flag to track.
-    LLTexUnit::eTextureAddressMode      mAddressMode;   // Defaults to TAM_WRAP
-    LLTexUnit::eTextureFilterOptions    mFilterOption;  // Defaults to TFO_ANISOTROPIC
-
-    // getSampler()'s memo, valid while mCachedSamplerGeneration matches the cache's. Mutable
-    // because getSampler() is const and callers treat it as a pure query.
-    mutable U32 mCachedSampler           = 0;
-    mutable U32 mCachedSamplerGeneration = 0;
 
     LLGLint  mFormatInternal; // = GL internalformat
     LLGLenum mFormatPrimary;  // = GL format (pixel data format)

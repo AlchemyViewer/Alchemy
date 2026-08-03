@@ -91,8 +91,6 @@ bool ALTexture3D::allocate(U32 width, U32 height, U32 depth,
     // paths account their faces.
     alloc_tex_image(width, height, internal_format, depth, false);
 
-    mImage->setAddressMode(LLTexUnit::TAM_CLAMP);
-    mImage->setFilteringOption(LLTexUnit::TFO_BILINEAR);
 
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE_3D);
 
@@ -121,10 +119,11 @@ void ALTexture3D::bind(S32 stage)
     }
 
     mTextureStage = stage;
-    // See LLCubeMapArray::bind -- bound by name, so the sampler must be passed explicitly
-    // or this samples with GL's defaults rather than mImage's clamp/bilinear.
+    // Bound by name, so the sampler is passed explicitly -- otherwise this samples with GL's
+    // defaults. Bilinear clamp: a colour-grading LUT is interpolated and must not wrap, or
+    // the ends of the ramp bleed into each other.
     gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_TEXTURE_3D, mImage->getTexName(),
-                                      false, mImage->getSampler());
+                                      false, gGL.getSampler(ALSamplers::BilinearClamp));
 }
 
 void ALTexture3D::unbind(S32 stage)

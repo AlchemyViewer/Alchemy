@@ -271,7 +271,7 @@ void LLDrawPoolAlpha::renderDebugAlpha()
     {
         gHighlightProgram.bind();
         gGL.diffuseColor4f(1, 0, 0, 1);
-        gGL.getTexUnit(0)->bindFast(LLViewerFetchedTexture::getSmokeImage());
+        gGL.getTexUnit(0)->bindFast(LLViewerFetchedTexture::getSmokeImage(), ALSamplers::AnisoWrap);
 
 
         renderAlphaHighlight();
@@ -381,88 +381,92 @@ inline void Draw(LLDrawInfo* draw, U32 mask)
     draw->mVertexBuffer->drawRange(LLRender::TRIANGLES, draw->mStart, draw->mEnd, draw->mCount, draw->mOffset);
 }
 
-bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material)
+bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material, LLGLSLShader* shader, ALSampler diffuse_key)
 {
+    llassert(shader);
+    llassert(shader == current_shader); // the caller must have bound what it is binding for
+
     bool tex_setup = false;
 
     if (draw->mGLTFMaterial)
     {
+        // A GLTF material binds its own maps through LLGLTFMaterial::bind; only the texture
+        // matrix is left to us.
         if (draw->mTextureMatrix)
         {
             tex_setup = true;
             gGL.getTexUnit(0)->activate();
-            gGL.matrixMode(LLRender::MM_TEXTURE);
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
             gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
             gPipeline.mTextureMatrixOps++;
         }
+
+        return tex_setup;
+    }
+
+    // Legacy Blinn-Phong maps. Bound unconditionally against neutral stand-ins when this draw
+    // has none, because a program that DECLARES these samplers must not be left reading
+    // whatever the previous draw put on those units.
+    //
+    // Which programs declare them is read from the program itself -- bindTexture resolves the
+    // uniform through the shader and is a no-op when the channel is absent -- rather than by
+    // testing `shader == simple_shader || shader == simple_shader->mRiggedVariant`. That
+    // comparison silently changed meaning whenever a variant was added, and it could not see
+    // a material program at all.
+    const bool material_maps = !LLPipeline::sRenderingHUDs && use_material;
+
+    LLViewerTexture* normal_map = material_maps ? draw->mNormalMap.get() : nullptr;
+    LLViewerTexture* specular_map = material_maps ? draw->mSpecularMap.get() : nullptr;
+
+    shader->bindTexture(LLShaderMgr::BUMP_MAP,
+                        normal_map ? normal_map : LLViewerFetchedTexture::sFlatNormalImagep.get(),
+                        ALSamplers::AnisoWrap);
+    shader->bindTexture(LLShaderMgr::SPECULAR_MAP,
+                        specular_map ? specular_map : LLViewerFetchedTexture::sWhiteImagep.get(),
+                        ALSamplers::AnisoWrap);
+
+    if (draw->mTextureList.size() > 1)
+    {
+        // Indexed batch: clamped to what this program declares, and null slots stood in for.
+        bindIndexedTextures(*draw, shader);
     }
     else
-    {
-        if (!LLPipeline::sRenderingHUDs && use_material && current_shader)
+    { //not batching textures or batch has only 1 texture -- might need a texture matrix
+        if (draw->mTexture.notNull())
         {
-            if (draw->mNormalMap)
+            if (use_material)
             {
-                current_shader->bindTexture(LLShaderMgr::BUMP_MAP, draw->mNormalMap);
-            }
-
-            if (draw->mSpecularMap)
-            {
-                current_shader->bindTexture(LLShaderMgr::SPECULAR_MAP, draw->mSpecularMap);
-            }
-        }
-        else if (current_shader == simple_shader || current_shader == simple_shader->mRiggedVariant)
-        {
-            current_shader->bindTexture(LLShaderMgr::BUMP_MAP, LLViewerFetchedTexture::sFlatNormalImagep);
-            current_shader->bindTexture(LLShaderMgr::SPECULAR_MAP, LLViewerFetchedTexture::sWhiteImagep);
-        }
-        if (draw->mTextureList.size() > 1)
-        {
-            for (U32 i = 0; i < draw->mTextureList.size(); ++i)
-            {
-                if (draw->mTextureList[i].notNull())
-                {
-                    gGL.getTexUnit(i)->bindFast(draw->mTextureList[i]);
-                }
-            }
-        }
-        else
-        { //not batching textures or batch has only 1 texture -- might need a texture matrix
-            if (draw->mTexture.notNull())
-            {
-                if (use_material)
-                {
-                    current_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, draw->mTexture);
-                }
-                else
-                {
-                    gGL.getTexUnit(0)->bindFast(draw->mTexture);
-                }
-
-                if (draw->mTextureMatrix)
-                {
-                    tex_setup = true;
-                    gGL.getTexUnit(0)->activate();
-                    gGL.matrixMode(LLRender::MM_TEXTURE);
-                    gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
-                    gPipeline.mTextureMatrixOps++;
-                }
+                shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, draw->mTexture, diffuse_key);
             }
             else
             {
-                gGL.getTexUnit(0)->unbindFast(LLTexUnit::TT_TEXTURE);
+                gGL.getTexUnit(0)->bindFast(draw->mTexture, diffuse_key);
             }
+
+            if (draw->mTextureMatrix)
+            {
+                tex_setup = true;
+                gGL.getTexUnit(0)->activate();
+                gGL.matrixMode(LLRender::MM_TEXTURE0);
+                gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
+                gPipeline.mTextureMatrixOps++;
+            }
+        }
+        else
+        {
+            gGL.getTexUnit(0)->unbindFast(LLTexUnit::TT_TEXTURE);
         }
     }
 
     return tex_setup;
 }
 
-void LLDrawPoolAlpha::RestoreTexSetup(bool tex_setup)
+void LLDrawPoolAlpha::popTextureMatrix(bool tex_setup)
 {
     if (tex_setup)
     {
         gGL.getTexUnit(0)->activate();
-        gGL.matrixMode(LLRender::MM_TEXTURE);
+        gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadIdentity();
         gGL.matrixMode(LLRender::MM_MODELVIEW);
     }
@@ -483,9 +487,9 @@ void LLDrawPoolAlpha::renderEmissives(std::vector<LLDrawInfo*>& emissives)
 
     for (LLDrawInfo* draw : emissives)
     {
-        bool tex_setup = TexSetup(draw, false);
+        bool tex_setup = TexSetup(draw, false, emissive_shader);
         drawEmissive(draw);
-        RestoreTexSetup(tex_setup);
+        popTextureMatrix(tex_setup);
     }
 }
 
@@ -520,9 +524,9 @@ void LLDrawPoolAlpha::renderRiggedEmissives(std::vector<LLDrawInfo*>& emissives)
 
         if (uploadMatrixPalette(draw->mAvatar, draw->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
         {
-            bool tex_setup = TexSetup(draw, false);
+            bool tex_setup = TexSetup(draw, false, shader);
             drawEmissive(draw);
-            RestoreTexSetup(tex_setup);
+            popTextureMatrix(tex_setup);
         }
     }
 }
@@ -751,12 +755,13 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                         brightness = params.mFullbright ? 1.f : 0.f;
                     }
 
-                    if (current_shader)
-                    {
-                        current_shader->uniform4f(LLShaderMgr::SPECULAR_COLOR, spec_color.mV[VRED], spec_color.mV[VGREEN], spec_color.mV[VBLUE], spec_color.mV[VALPHA]);
-                        current_shader->uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, env_intensity);
-                        current_shader->uniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, brightness);
-                    }
+                    // target_shader, not current_shader: these belong to the program this draw
+                    // was batched for. They are the same pointer here -- the branch above just
+                    // bound it -- but saying so is what keeps them the same.
+                    llassert(current_shader == target_shader);
+                    target_shader->uniform4f(LLShaderMgr::SPECULAR_COLOR, spec_color.mV[VRED], spec_color.mV[VGREEN], spec_color.mV[VBLUE], spec_color.mV[VALPHA]);
+                    target_shader->uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, env_intensity);
+                    target_shader->uniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, brightness);
                 }
 
                 if (params.mAvatar && !uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, lastAvatarShader, skipLastSkin))
@@ -764,7 +769,9 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     continue;
                 }
 
-                bool tex_setup = TexSetup(&params, (mat != nullptr));
+                bool tex_setup = TexSetup(&params, (mat != nullptr), target_shader,
+                                          is_particle_or_hud_particle ? ALSamplers::AnisoClamp
+                                                                      : ALSamplers::AnisoWrap);
 
                 {
                     gGL.blendFunc((LLRender::eBlendFactor) params.mBlendFuncSrc, (LLRender::eBlendFactor) params.mBlendFuncDst, mAlphaSFactor, mAlphaDFactor);
@@ -774,7 +781,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                         params.mBlendFuncDst != LLRender::BF_SOURCE_ALPHA &&
                         params.mBlendFuncSrc != LLRender::BF_SOURCE_ALPHA)
                     { // this draw call has a custom blend function that may require rendering of "invisible" fragments
-                        current_shader->setMinimumAlpha(0.f);
+                        target_shader->setMinimumAlpha(0.f);
                         reset_minimum_alpha = true;
                     }
 
@@ -784,7 +791,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                     if (reset_minimum_alpha)
                     {
-                        current_shader->setMinimumAlpha(MINIMUM_ALPHA);
+                        target_shader->setMinimumAlpha(MINIMUM_ALPHA);
                     }
                 }
 
@@ -816,13 +823,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     }
                 }
 
-                if (tex_setup)
-                {
-                    gGL.getTexUnit(0)->activate();
-                    gGL.matrixMode(LLRender::MM_TEXTURE);
-                    gGL.loadIdentity();
-                    gGL.matrixMode(LLRender::MM_MODELVIEW);
-                }
+                popTextureMatrix(tex_setup);
             }
 
             // render emissive faces into alpha channel for bloom effects
@@ -846,7 +847,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                                         || !rigged_emissives.empty() || !pbr_rigged_emissives.empty();
                 if (has_emissives)
                 {
-                    gPipeline.releaseShadowMaps();
+                    gPipeline.unbindShadowMaps();
                 }
 
                 if (!emissives.empty())
@@ -901,15 +902,15 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
-    // Release the shadow maps this pass bound, so they do not survive into programs that
+    // Unbind the shadow maps this pass bound, so they do not survive into programs that
     // map those units to ordinary samplers.
     //
-    // Deliberately NOT unbindDeferredShader: that releases by a single shader's channel
+    // Deliberately NOT unbindDeferredShader: that unbinds by a single shader's channel
     // layout and asserts each unit still holds the type that shader expects. By the time the
     // pass ends the bound shader may be a different one -- an emissive variant, or a restored
     // earlier shader -- so the units reflect somebody else's layout and the check trips.
-    // releaseShadowMaps tracks units directly and needs no such assumption.
-    gPipeline.releaseShadowMaps();
+    // unbindShadowMaps tracks units directly and needs no such assumption.
+    gPipeline.unbindShadowMaps();
 
     LLVertexBuffer::unbind();
 

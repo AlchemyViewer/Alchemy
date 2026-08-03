@@ -297,14 +297,16 @@ public:
     // if setup is true, wil lset texture compare mode function and filtering options
     void bindShadowMaps(LLGLSLShader& shader);
 
-    // Release the shadow maps from whichever units bindShadowMaps last put them on.
+    // Unbind the shadow maps from whichever units bindShadowMaps last put them on. Detaches
+    // only -- the render targets themselves are owned elsewhere and outlive this (contrast
+    // releaseShadowBuffers, which frees them).
     //
     // Programs do not agree on where DEFERRED_SHADOW0..5 live -- one deferred shader may map
     // them to units 6-11 and another to 26-31 -- so unbinding "this shader's" shadow channels
     // leaves the previous layout's units still holding depth textures under the compare
     // sampler. The next program to use those low units for ordinary material maps then reads
     // a depth texture through a non-shadow sampler, which is undefined behaviour.
-    void releaseShadowMaps();
+    void unbindShadowMaps();
 
     void bindDeferredShaderFast(LLGLSLShader& shader);
     void bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_target = nullptr, LLRenderTarget* depth_target = nullptr);
@@ -795,7 +797,7 @@ public:
     U32                 mNoiseMap;
     U32                 mTrueNoiseMap;
     // Texture units the shadow maps are currently bound to, -1 where unused. See
-    // releaseShadowMaps -- this exists because the unit numbers are per-program.
+    // unbindShadowMaps -- this exists because the unit numbers are per-program.
     std::array<S32, 6>  mBoundShadowChannels = { -1, -1, -1, -1, -1, -1 };
 
     U32                 mLightFunc;

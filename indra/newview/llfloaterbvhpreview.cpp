@@ -369,7 +369,7 @@ void LLFloaterBvhPreview::draw()
     {
         gGL.color3f(1.f, 1.f, 1.f);
 
-        gGL.getTexUnit(0)->bind(mAnimPreview);
+        gGL.getTexUnit(0)->bindSampled(mAnimPreview, ALSamplers::AnisoWrap);
 
         gGL.begin(LLRender::TRIANGLES);
         {

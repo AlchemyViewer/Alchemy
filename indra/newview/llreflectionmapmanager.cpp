@@ -77,7 +77,6 @@ void load_exr(const std::string& filename)
         gEXRImage = new LLImageGL(texName, 4, GL_TEXTURE_2D, GL_RGB16F, GL_RGBA, GL_FLOAT, LLTexUnit::TAM_CLAMP);
         gEXRImage->setHasMipMaps(true);
         gEXRImage->setUseMipMaps(true);
-        gEXRImage->setFilteringOption(LLTexUnit::TFO_TRILINEAR);
         gEXRImage->markStorageAllocated();
 
         gGL.getTexUnit(0)->bind(gEXRImage);

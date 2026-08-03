@@ -605,11 +605,11 @@ void LLViewerParcelMgr::renderCollisionSegments(U8* segments, bool use_pass, LLV
 
     if (use_pass && (mCollisionBanned == BA_NOT_ON_LIST))
     {
-        gGL.getTexUnit(0)->bind(mPassImage);
+        gGL.getTexUnit(0)->bindSampled(mPassImage, ALSamplers::AnisoWrap);
     }
     else
     {
-        gGL.getTexUnit(0)->bind(mBlockedImage);
+        gGL.getTexUnit(0)->bindSampled(mBlockedImage, ALSamplers::AnisoWrap);
     }
 
     gGL.begin(LLRender::TRIANGLES);
@@ -923,7 +923,7 @@ public:
             // Point filtering with no mips is the point of the benchmark -- it forces
             // cache misses. Passed as a sampler so it applies to the sampling binds too.
             return texUnit->bindManual(LLTexUnit::TT_TEXTURE, source[index], false,
-                                       gGL.commonSamplers().mPointWrap);
+                                       gGL.getSampler(ALSamplers::PointWrap));
         }
         return false;
     }

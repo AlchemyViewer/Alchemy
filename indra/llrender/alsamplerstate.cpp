@@ -42,11 +42,24 @@ namespace
 }
 
 // static
-ALSamplerDesc ALSamplerCache::makeDesc(LLTexUnit::eTextureFilterOptions filter,
-                                       LLTexUnit::eTextureAddressMode   address,
-                                       bool                             has_mips,
-                                       bool                             compare)
+ALSamplerDesc ALSamplerCache::makeDesc(ALSampler key)
 {
+    // Unpack the mask back into its fields. Kept private to this function: the mask is the
+    // interface everywhere else, and the only reason the pieces exist here is that GL wants
+    // them as separate parameters.
+    const U16 bits = static_cast<U16>(key);
+
+    const LLTexUnit::eTextureFilterOptions filter =
+        static_cast<LLTexUnit::eTextureFilterOptions>(bits & 0x3u);
+    const LLTexUnit::eTextureAddressMode address =
+        static_cast<LLTexUnit::eTextureAddressMode>((bits >> 2) & 0x3u);
+    const bool compare  = (bits & static_cast<U16>(ALSampler::Compare)) != 0;
+    const bool has_mips = (bits & static_cast<U16>(ALSampler::HasMips)) != 0;
+
+    // The unreachable quarter of the address field. Reaching it means a mask was built by
+    // arithmetic rather than by composing ALSampler values.
+    llassert(address <= LLTexUnit::TAM_CLAMP);
+
     ALSamplerDesc desc;
 
     desc.mMagFilter = (filter == LLTexUnit::TFO_POINT) ? GL_NEAREST : GL_LINEAR;
@@ -131,10 +144,7 @@ U32 ALSamplerCache::create(const ALSamplerDesc& desc)
     return name;
 }
 
-U32 ALSamplerCache::createSlot(LLTexUnit::eTextureFilterOptions filter,
-                               LLTexUnit::eTextureAddressMode   address,
-                               bool                             has_mips,
-                               bool                             compare)
+U32 ALSamplerCache::createSlot(ALSampler key)
 {
     // Samplers are GL 3.3 core and the viewer floor is 4.1, so this should never be
     // null -- but a driver that failed to resolve them would otherwise crash here
@@ -144,7 +154,7 @@ U32 ALSamplerCache::createSlot(LLTexUnit::eTextureFilterOptions filter,
         return 0;
     }
 
-    return create(makeDesc(filter, address, has_mips, compare));
+    return create(makeDesc(key));
 }
 
 U32 ALSamplerCache::get(const ALSamplerDesc& desc)
@@ -170,17 +180,31 @@ U32 ALSamplerCache::get(const ALSamplerDesc& desc)
     return name;
 }
 
-void ALSamplerCache::refreshCommon()
+void ALSamplerCache::warmup()
 {
-    mCommon.mPointWrap  = get(LLTexUnit::TFO_POINT, LLTexUnit::TAM_WRAP, false);
-    mCommon.mPointClamp = get(LLTexUnit::TFO_POINT, LLTexUnit::TAM_CLAMP, false);
-    mCommon.mBilinearClamp = get(LLTexUnit::TFO_BILINEAR, LLTexUnit::TAM_CLAMP, false);
-    mCommon.mTrilinearWrapMips = get(LLTexUnit::TFO_TRILINEAR, LLTexUnit::TAM_WRAP, true);
-    // No mip chain, so the filter resolves to GL_LINEAR -- which is what turns the depth
-    // comparison into 2x2 PCF rather than a hard test.
-    mCommon.mShadowCompare = get(LLTexUnit::TFO_ANISOTROPIC, LLTexUnit::TAM_CLAMP, false, true);
+    // Samplers are GL 3.3 core and the viewer floor is 4.1, so this should never bail -- but
+    // a driver that failed to resolve the entry points would otherwise leave every slot at 0
+    // and every bind on GL's defaults.
+    if (!glGenSamplers || !glSamplerParameteri)
+    {
+        return;
+    }
 
-    mCommon.mGeneration = mGeneration;
+    for (U32 i = 0; i < NUM_SAMPLERS; ++i)
+    {
+        // The address field has four encodings and only three meanings. Slots with the fourth
+        // are unreachable by composing ALSampler values and stay empty; get() asserts on them,
+        // which is how a mask built by arithmetic gets caught.
+        if (((i >> 2) & 0x3u) > static_cast<U32>(LLTexUnit::TAM_CLAMP))
+        {
+            continue;
+        }
+
+        if (mSamplers[i] == 0)
+        {
+            mSamplers[i] = createSlot(static_cast<ALSampler>(i));
+        }
+    }
 }
 
 void ALSamplerCache::clear()

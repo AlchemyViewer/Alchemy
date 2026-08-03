@@ -61,6 +61,20 @@ LLFetchedGLTFMaterial& LLFetchedGLTFMaterial::operator=(const LLFetchedGLTFMater
     return *this;
 }
 
+// The sampler every glTF map is read through.
+//
+// Named here, by the material, rather than inherited from whatever mode each image happened to
+// be carrying. That is the direction sampling ownership is moving: a texture is data, and how a
+// pass reads it belongs to the pass. It matters more for glTF than elsewhere -- the format
+// specifies sampler state per texture REFERENCE, so two materials may legitimately want one
+// image read two ways, which an image-owned mode cannot represent at all.
+//
+// Anisotropic + wrap with the resource's mips, which is exactly what these textures resolved to
+// before through LLImageGL's defaults -- so this names existing behaviour rather than changing
+// it. SL's material subset carries no sampler fields yet; when it does, this constant becomes a
+// lookup into the material.
+static constexpr ALSampler GLTF_MAP_SAMPLER = ALSamplers::AnisoWrap;
+
 void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
 {
     // glTF 2.0 Specification 3.9.4. Alpha Coverage
@@ -84,11 +98,11 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
 
     if (baseColorTex != nullptr)
     {
-        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, baseColorTex);
+        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, baseColorTex, GLTF_MAP_SAMPLER);
     }
     else
     {
-        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, LLViewerFetchedTexture::sWhiteImagep);
+        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_MAP_SAMPLER);
     }
 
     F32 base_color_packed[8];
@@ -99,29 +113,29 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
     {
         if (mNormalTexture.notNull() && mNormalTexture->getDiscardLevel() <= 4)
         {
-            shader->bindTexture(LLShaderMgr::BUMP_MAP, mNormalTexture);
+            shader->bindTexture(LLShaderMgr::BUMP_MAP, mNormalTexture, GLTF_MAP_SAMPLER);
         }
         else
         {
-            shader->bindTexture(LLShaderMgr::BUMP_MAP, LLViewerFetchedTexture::sFlatNormalImagep);
+            shader->bindTexture(LLShaderMgr::BUMP_MAP, LLViewerFetchedTexture::sFlatNormalImagep, GLTF_MAP_SAMPLER);
         }
 
         if (mMetallicRoughnessTexture.notNull())
         {
-            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, mMetallicRoughnessTexture); // PBR linear packed Occlusion, Roughness, Metal.
+            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, mMetallicRoughnessTexture, GLTF_MAP_SAMPLER); // PBR linear packed Occlusion, Roughness, Metal.
         }
         else
         {
-            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, LLViewerFetchedTexture::sWhiteImagep);
+            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_MAP_SAMPLER);
         }
 
         if (emissiveTex != nullptr)
         {
-            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, emissiveTex);  // PBR sRGB Emissive
+            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, emissiveTex, GLTF_MAP_SAMPLER);  // PBR sRGB Emissive
         }
         else
         {
-            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, LLViewerFetchedTexture::sWhiteImagep);
+            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_MAP_SAMPLER);
         }
 
         // NOTE: base color factor is baked into vertex stream

@@ -602,7 +602,7 @@ void LLRenderPass::pushMaskBatchesIndexed(U32 type, bool rigged)
         {
             const LLDrawInfo::MaterialSlot& slot = params.mMaterialSlotList[s];
             LLViewerTexture* diffuse = slot.mDiffuse.notNull() ? slot.mDiffuse.get() : LLViewerFetchedTexture::sWhiteImagep.get();
-            gGL.getTexUnit(s)->bindFast(diffuse);
+            gGL.getTexUnit(s)->bindFast(diffuse, ALSamplers::AnisoWrap);
             min_alpha[s] = slot.mAlphaMaskCutoff;
         }
 
@@ -684,7 +684,7 @@ void LLRenderPass::pushEmissiveBatchesIndexed(U32 type, bool rigged)
         {
             const LLDrawInfo::MaterialSlot& slot = params.mMaterialSlotList[s];
             LLViewerTexture* diffuse = slot.mDiffuse.notNull() ? slot.mDiffuse.get() : LLViewerFetchedTexture::sWhiteImagep.get();
-            gGL.getTexUnit(s)->bindFast(diffuse);
+            gGL.getTexUnit(s)->bindFast(diffuse, ALSamplers::AnisoWrap);
         }
 
         applyModelMatrix(params);
@@ -714,6 +714,22 @@ void LLRenderPass::applyModelMatrix(const LLMatrix4* model_matrix)
     }
 }
 
+void LLRenderPass::bindIndexedTextures(const LLDrawInfo& params, const LLGLSLShader* shader)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
+
+    // Never wider than the program actually declares: a batch that outran the ladder would
+    // bind past the last sampler, and the overflow vertices sample tex(N-1) regardless.
+    const U32 declared = shader ? (U32)shader->mFeatures.mIndexedTextureChannels : 0;
+    const U32 batch = llmin((U32)params.mTextureList.size(), declared);
+
+    for (U32 i = 0; i < batch; ++i)
+    {
+        LLViewerTexture* tex = params.mTextureList[i].get();
+        gGL.getTexUnit(i)->bindFast(tex ? tex : LLViewerFetchedTexture::sWhiteImagep.get(), ALSamplers::AnisoWrap);
+    }
+}
+
 void LLRenderPass::pushBatch(LLDrawInfo& params, bool texture, bool batch_textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
@@ -731,24 +747,18 @@ void LLRenderPass::pushBatch(LLDrawInfo& params, bool texture, bool batch_textur
     {
         if (batch_textures && params.mTextureList.size() > 1)
         {
-            for (U32 i = 0; i < params.mTextureList.size(); ++i)
-            {
-                if (params.mTextureList[i].notNull())
-                {
-                    gGL.getTexUnit(i)->bindFast(params.mTextureList[i]);
-                }
-            }
+            bindIndexedTextures(params, LLGLSLShader::sCurBoundShaderPtr);
         }
         else
         { //not batching textures or batch has only 1 texture -- might need a texture matrix
             if (params.mTexture.notNull())
             {
-                gGL.getTexUnit(0)->bindFast(params.mTexture);
+                gGL.getTexUnit(0)->bindFast(params.mTexture, ALSamplers::AnisoWrap);
                 if (params.mTextureMatrix)
                 {
                     tex_setup = true;
                     gGL.getTexUnit(0)->activate();
-                    gGL.matrixMode(LLRender::MM_TEXTURE);
+                    gGL.matrixMode(LLRender::MM_TEXTURE0);
                     gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
                     gPipeline.mTextureMatrixOps++;
                 }
@@ -899,7 +909,7 @@ void setup_texture_matrix(LLDrawInfo& params)
     if (params.mTextureMatrix)
     { //special case implementation of texture animation here because of special handling of textures for PBR batches
         gGL.getTexUnit(0)->activate();
-        gGL.matrixMode(LLRender::MM_TEXTURE);
+        gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadMatrix((GLfloat*)params.mTextureMatrix->mMatrix);
         gPipeline.mTextureMatrixOps++;
     }
@@ -1052,7 +1062,7 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
         double_sided = double_sided || mat->mDoubleSided;
 
         LLViewerTexture* base = mat->mBaseColorTexture.notNull() ? mat->mBaseColorTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
-        gGL.getTexUnit(s)->bindFast(base);
+        gGL.getTexUnit(s)->bindFast(base, ALSamplers::AnisoWrap);
 
         min_alpha[s] = (mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK) ? mat->mAlphaCutoff : -1.f;
 
@@ -1068,7 +1078,7 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
 
         // emissive map/color/transform -- needed by both the glow and GBuffer passes
         LLViewerTexture* em = mat->mEmissiveTexture.notNull() ? mat->mEmissiveTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
-        gGL.getTexUnit(3 * N + s)->bindFast(em);
+        gGL.getTexUnit(3 * N + s)->bindFast(em, ALSamplers::AnisoWrap);
 
         emissive[3 * s + 0] = mat->mEmissiveColor.mV[0];
         emissive[3 * s + 1] = mat->mEmissiveColor.mV[1];
@@ -1085,8 +1095,8 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
         LLViewerTexture* norm = (mat->mNormalTexture.notNull() && mat->mNormalTexture->getDiscardLevel() <= 4) ? mat->mNormalTexture.get() : LLViewerFetchedTexture::sFlatNormalImagep.get();
         LLViewerTexture* orm  = mat->mMetallicRoughnessTexture.notNull() ? mat->mMetallicRoughnessTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
 
-        gGL.getTexUnit(N + s)->bindFast(norm);
-        gGL.getTexUnit(2 * N + s)->bindFast(orm);
+        gGL.getTexUnit(N + s)->bindFast(norm, ALSamplers::AnisoWrap);
+        gGL.getTexUnit(2 * N + s)->bindFast(orm, ALSamplers::AnisoWrap);
 
         roughness[s] = mat->mRoughnessFactor;
         metallic[s]  = mat->mMetallicFactor;

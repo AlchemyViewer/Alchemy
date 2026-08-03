@@ -119,7 +119,6 @@ void LLCubeMap::initGL()
                 }
 
                 gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
-                mImages[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
                 stop_glerror();
             }
             gGL.getTexUnit(0)->disable();
@@ -210,7 +209,6 @@ void LLCubeMap::initReflectionMap(U32 resolution, U32 components)
     mImages[0]->setTexName(texname);
     mImages[0]->setTarget(mTargets[0], LLTexUnit::TT_CUBE_MAP);
     gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
-    mImages[0]->setAddressMode(LLTexUnit::TAM_CLAMP);
 }
 
 void LLCubeMap::initEnvironmentMap(const std::vector<LLPointer<LLImageRaw> >& rawimages)
@@ -239,32 +237,17 @@ void LLCubeMap::initEnvironmentMap(const std::vector<LLPointer<LLImageRaw> >& ra
         }
 
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
-        mImages[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
         stop_glerror();
 
         mImages[i]->setSubImage(mRawImages[i], 0, 0, resolution, resolution);
     }
     enableTexture(0);
+    // bind() for glGenerateMipmap's sake -- it acts on the bound texture. The
+    // setFilteringOption that used to sit here declared how the map would be SAMPLED, which
+    // is no longer the resource's call; bind() names AnisoClamp and the shiny pass names its
+    // own. glGenerateMipmap never consulted the filter anyway.
     bind();
-    mImages[0]->setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-    gGL.getTexUnit(0)->disable();
-    disable();
-}
-
-void LLCubeMap::generateMipMaps()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-
-    mImages[0]->setUseMipMaps(true);
-    mImages[0]->setHasMipMaps(true);
-    enableTexture(0);
-    bind();
-    mImages[0]->setFilteringOption(LLTexUnit::TFO_BILINEAR);
-    {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("cmgmm - glGenerateMipmap");
-        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-    }
     gGL.getTexUnit(0)->disable();
     disable();
 }
@@ -276,7 +259,9 @@ GLuint LLCubeMap::getGLName()
 
 void LLCubeMap::bind()
 {
-    gGL.getTexUnit(mTextureStage)->bind(this);
+    // Clamp + anisotropic: what the environment map has always been sampled with, named
+    // here now instead of written onto face 0 at load.
+    gGL.getTexUnit(mTextureStage)->bind(this, ALSamplers::AnisoClamp);
 }
 
 void LLCubeMap::enable(S32 stage)
@@ -330,7 +315,7 @@ void LLCubeMap::setMatrix(S32 stage)
     LLMatrix4 trans(mat3);
     trans.transpose();
 
-    gGL.matrixMode(LLRender::MM_TEXTURE);
+    gGL.matrixMode(LLRender::MM_TEXTURE0);
     gGL.pushMatrix();
     gGL.loadMatrix((F32 *)trans.mMatrix);
     gGL.matrixMode(LLRender::MM_MODELVIEW);
@@ -349,7 +334,7 @@ void LLCubeMap::restoreMatrix()
     {
         gGL.getTexUnit(mMatrixStage)->activate();
     }
-    gGL.matrixMode(LLRender::MM_TEXTURE);
+    gGL.matrixMode(LLRender::MM_TEXTURE0);
     gGL.popMatrix();
     gGL.matrixMode(LLRender::MM_MODELVIEW);
 

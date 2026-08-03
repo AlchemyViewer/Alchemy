@@ -174,16 +174,6 @@ void LLGLTexture::setExplicitFormat(LLGLint internal_format, LLGLenum primary_fo
 
     mGLTexturep->setExplicitFormat(internal_format, primary_format, type_format, swap_bytes) ;
 }
-void LLGLTexture::setAddressMode(LLTexUnit::eTextureAddressMode mode)
-{
-    llassert(mGLTexturep.notNull()) ;
-    mGLTexturep->setAddressMode(mode) ;
-}
-void LLGLTexture::setFilteringOption(LLTexUnit::eTextureFilterOptions option)
-{
-    llassert(mGLTexturep.notNull()) ;
-    mGLTexturep->setFilteringOption(option) ;
-}
 
 //virtual
 S32 LLGLTexture::getWidth(S32 discard_level) const
@@ -287,13 +277,6 @@ void LLGLTexture::setTarget(const LLGLenum target, const LLTexUnit::eTextureType
 {
     llassert(mGLTexturep.notNull());
     return mGLTexturep->setTarget(target, bind_target);
-}
-
-LLTexUnit::eTextureAddressMode LLGLTexture::getAddressMode(void) const
-{
-    llassert(mGLTexturep.notNull()) ;
-
-    return mGLTexturep->getAddressMode() ;
 }
 
 S32Bytes LLGLTexture::getTextureMemory() const

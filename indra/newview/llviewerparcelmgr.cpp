@@ -155,8 +155,7 @@ LLViewerParcelMgr::LLViewerParcelMgr()
     resetSegments(mCollisionSegments);
 
     // JC: Resolved a merge conflict here, eliminated
-    // mBlockedImage->setAddressMode(LLTexUnit::TAM_WRAP);
-    // because it is done in llviewertexturelist.cpp
+    //    // because it is done in llviewertexturelist.cpp
     mBlockedImage = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryLines.png", FTT_LOCAL_FILE, true, LLGLTexture::BOOST_UI);
     mPassImage = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryPassLines.png", FTT_LOCAL_FILE, true, LLGLTexture::BOOST_UI);
 
