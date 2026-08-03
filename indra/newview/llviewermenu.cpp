@@ -1552,7 +1552,13 @@ class LLAdvancedTerrainCreateLocalPaintMap : public view_listener_t
         dim = llclamp(dim, 16, max_resolution);
         dim = 1 << U32(std::ceil(std::log2(dim)));
         LLPointer<LLImageRaw> image_raw = new LLImageRaw(dim,dim,3);
-        LLPointer<LLViewerTexture> tex = LLViewerTextureManager::getLocalTexture(image_raw.get(), true);
+        LLPointer<LLViewerTexture> tex = LLViewerTextureManager::getLocalTexture(dim, dim, 3, true, false);
+        // Paint weights are data, not colour: pin GL_RGB8 before creating GL storage so
+        // the sRGB auto-format for 3-component textures never applies to them.
+        tex->generateGLTexture();
+        tex->setExplicitFormat(GL_RGB8, GL_RGB);
+        tex->createGLTexture(0, image_raw);
+        tex->setCategory(LLGLTexture::LOCAL);
         const bool success = LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(*region, *tex);
         // This calls gLocalTerrainMaterials.setPaintType
         gSavedSettings.setBOOL("LocalTerrainPaintEnabled", true);

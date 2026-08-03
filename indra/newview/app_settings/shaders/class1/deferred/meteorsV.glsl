@@ -84,6 +84,8 @@ void main()
 
     // Unpack: alpha channel carries width_scale / 4 (see CPU-side encoding).
     // RGB is envelope-premultiplied sRGB — linearize and pass through.
+    // As starsV: softenLight's SKIP_ATMOS branch decodes this a second time and applies
+    // sky_hdr_scale. Long-standing; meteor brightness is that chain plus the gains here.
     vary_color = vec4(srgb_to_linear(diffuse_color.rgb), diffuse_color.a * 4.0);
     vary_coord = texcoord0;
 }

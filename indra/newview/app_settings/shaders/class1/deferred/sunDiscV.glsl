@@ -33,7 +33,6 @@ in vec2 texcoord0;
 out vec2 vary_texcoord0;
 out float sun_fade;
 
-void calcAtmospherics(vec3 eye_pos);
 
 void main()
 {
@@ -48,7 +47,6 @@ void main()
     pos.z = pos.w*0.999999;
     gl_Position = pos;
 
-    calcAtmospherics(pos.xyz);
 
     vary_texcoord0 = (texture_matrix0 * vec4(texcoord0,0,1)).xy;
 }

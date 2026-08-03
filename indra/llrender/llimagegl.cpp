@@ -1042,9 +1042,13 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
 
                     {
                         LL_PROFILE_GPU_ZONE("generate mip map");
-                        // The bind() above deliberately left whatever sampler the last
-                        // draw used; generateMipmaps clears it so the reduction follows
-                        // the texture's own state rather than frame timing.
+                        // generateMipmaps clears the slot's sampler first, which matters
+                        // now that storage can be sRGB: mip generation follows the slot's
+                        // TEXTURE_SRGB_DECODE -- sampler first if one is bound, else the
+                        // texture's (EXT_texture_sRGB_decode issue 10) -- and the bind()
+                        // above deliberately left whatever the last draw used. Clearing it
+                        // lets the texture's own SKIP_DECODE govern, so sRGB-stored data
+                        // always mips as raw bytes rather than by frame timing.
                         generateMipmaps(mTarget);
                     }
                     stop_glerror();
@@ -2815,9 +2819,10 @@ void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
 // static
 void LLImageGL::generateMipmaps(U32 target)
 {
-    // See the header comment: clearing the sampler makes the texture object's own state
-    // govern the reduction, instead of whatever sampler the last draw left on the slot.
-    // bindSampler dedups, so this is free when the slot is already sampler-less.
+    // See the header comment: clearing the sampler makes the texture object's own
+    // SKIP_DECODE (written at allocation) govern the mip filter's colour space, instead of
+    // whatever sampler the last draw left on the slot. bindSampler dedups, so this is free
+    // when the slot is already sampler-less.
     gGL.getTextureSlot(0)->bindSampler(0);
     glGenerateMipmap(target);
 }
@@ -2870,6 +2875,12 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         // draw a full screen triangle, sampling the old (larger) texture
         if (gGL.getTextureSlot(0)->bind(this, true, true))
         {
+            // bind() leaves the slot's sampler alone, so the downscale draw would sample
+            // through whatever the last draw bound. That used to only wobble the filter;
+            // with sRGB storage a stray decode sampler would render LINEAR values into the
+            // copy, which then reads back as sRGB. Pin it: trilinear to pull from the
+            // source's own mip chain, clamp, and no decode.
+            gGL.getTextureSlot(0)->bindSampler(gGL.getSampler(ALSamplers::TrilinearClamp));
             glDrawArrays(GL_TRIANGLES, 0, 3);
 
             // Bind the new name and give it storage, then copy the rendered result out
