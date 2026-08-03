@@ -435,6 +435,12 @@ bool LLGLSLShader::createShader()
     }
     mLightHash = 0xFFFFFFFF;
 
+    // Derived, never hand-set: the LINEAR_DIFFUSE permutation is what the shader source
+    // itself keys its colour-space behaviour on, so deriving the engine-side flag from the
+    // same define means the two cannot disagree -- the same reason rigged-ness is expressed
+    // as the HAS_SKIN permutation rather than a parallel bool.
+    mLinearDiffuse = mDefines.contains("LINEAR_DIFFUSE");
+
     llassert_always(!mShaderFiles.empty());
 
     mShaderHash = hash();

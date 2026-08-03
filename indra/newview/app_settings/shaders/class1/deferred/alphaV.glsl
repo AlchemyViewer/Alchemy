@@ -130,7 +130,7 @@ void main()
     // LLGLSLShader::mLinearDiffuse false -- HUD outputs sRGB and keeps the encoded texel, and
     // FOR_IMPOSTOR writes the sRGB sample straight to the bake -- so the shader and the bind
     // cannot disagree about which space the multiply happens in.
-#if !defined(FOR_IMPOSTOR) && !defined(IS_HUD)
+#ifdef LINEAR_DIFFUSE
     vertex_color = linearizeVertexTint(diffuse_color);
 #else
     vertex_color = diffuse_color;

@@ -1251,6 +1251,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDiffuseProgram.mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
         gDeferredDiffuseProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredDiffuseProgram);
+        gDeferredDiffuseProgram.addPermutation("LINEAR_DIFFUSE", "1");
         success = make_rigged_variant(gDeferredDiffuseProgram, gDeferredSkinnedDiffuseProgram);
         success = success && gDeferredDiffuseProgram.createShader();
     }
@@ -1264,6 +1265,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDiffuseAlphaMaskProgram.mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
         gDeferredDiffuseAlphaMaskProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredDiffuseAlphaMaskProgram);
+        gDeferredDiffuseAlphaMaskProgram.addPermutation("LINEAR_DIFFUSE", "1");
         success = make_rigged_variant(gDeferredDiffuseAlphaMaskProgram, gDeferredSkinnedDiffuseAlphaMaskProgram);
         success = success && gDeferredDiffuseAlphaMaskProgram.createShader();
     }
@@ -1300,6 +1302,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredBumpProgram.mShaderFiles.push_back(make_pair("deferred/bumpF.glsl", GL_FRAGMENT_SHADER));
         gDeferredBumpProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredBumpProgram);
+        gDeferredBumpProgram.addPermutation("LINEAR_DIFFUSE", "1");
         success = make_rigged_variant(gDeferredBumpProgram, gDeferredSkinnedBumpProgram);
         success = success && gDeferredBumpProgram.createShader();
         llassert(success);
@@ -1384,7 +1387,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 gDeferredMaterialProgram[i].mRiggedVariant = &gDeferredMaterialProgram[i + 0x10];
             }
 
-            gDeferredMaterialProgram[i].mLinearDiffuse = true;
+            gDeferredMaterialProgram[i].addPermutation("LINEAR_DIFFUSE", "1");
             success = gDeferredMaterialProgram[i].createShader();
             llassert(success);
         }
@@ -1434,6 +1437,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             prog.mShaderFiles.push_back(make_pair("deferred/materialIndexedF.glsl", GL_FRAGMENT_SHADER));
             prog.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
             prog.clearPermutations();
+            prog.addPermutation("LINEAR_DIFFUSE", "1");
             if (has_normal) prog.addPermutation("HAS_NORMAL_MAP", "1");
             if (has_spec)   prog.addPermutation("HAS_SPECULAR_MAP", "1");
             prog.addPermutation("DIFFUSE_ALPHA_MODE", llformat("%d", alpha_mode));
@@ -1741,6 +1745,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredTreeProgram);
 
+        gDeferredTreeProgram.addPermutation("LINEAR_DIFFUSE", "1");
         success = gDeferredTreeProgram.createShader();
     }
 
@@ -1971,7 +1976,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             // the HUD path outputs sRGB and keeps the encoded texel. See mLinearDiffuse.
             // The FOR_IMPOSTOR alpha programs below stay false: they write the sRGB sample
             // straight to the bake.
-            shader->mLinearDiffuse = !hud;
+            if (!hud) shader->addPermutation("LINEAR_DIFFUSE", "1");
 
             shader->mShaderFiles.clear();
             shader->mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
@@ -2085,8 +2090,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredFullbrightProgram);
 
+        gDeferredFullbrightProgram.addPermutation("LINEAR_DIFFUSE", "1");
         success = make_rigged_variant(gDeferredFullbrightProgram, gDeferredSkinnedFullbrightProgram);
-        gDeferredFullbrightProgram.mLinearDiffuse = true;
         success = gDeferredFullbrightProgram.createShader();
         llassert(success);
     }
@@ -2129,8 +2134,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredFullbrightAlphaMaskProgram);
 
+        gDeferredFullbrightAlphaMaskProgram.addPermutation("LINEAR_DIFFUSE", "1");
         success = make_rigged_variant(gDeferredFullbrightAlphaMaskProgram, gDeferredSkinnedFullbrightAlphaMaskProgram);
-        gDeferredFullbrightAlphaMaskProgram.mLinearDiffuse = true;
         success = success && gDeferredFullbrightAlphaMaskProgram.createShader();
         llassert(success);
     }
@@ -2176,8 +2181,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredFullbrightAlphaMaskAlphaProgram);
 
         gDeferredFullbrightAlphaMaskAlphaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredFullbrightAlphaMaskAlphaProgram.addPermutation("LINEAR_DIFFUSE", "1");
         success = make_rigged_variant(gDeferredFullbrightAlphaMaskAlphaProgram, gDeferredSkinnedFullbrightAlphaMaskAlphaProgram);
-        gDeferredFullbrightAlphaMaskAlphaProgram.mLinearDiffuse = true;
         success = success && gDeferredFullbrightAlphaMaskAlphaProgram.createShader();
         llassert(success);
     }
@@ -2222,8 +2227,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredFullbrightShinyProgram);
 
+        gDeferredFullbrightShinyProgram.addPermutation("LINEAR_DIFFUSE", "1");
         success = make_rigged_variant(gDeferredFullbrightShinyProgram, gDeferredSkinnedFullbrightShinyProgram);
-        gDeferredFullbrightShinyProgram.mLinearDiffuse = true;
         success = success && gDeferredFullbrightShinyProgram.createShader();
         llassert(success);
     }
@@ -2639,7 +2644,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         // Skin composite is decoded on the sampler and the gbuffer write re-encodes; see the
         // avatar diffuse binds in llviewerjointmesh and the FRAMEBUFFER_SRGB in renderDeferred.
-        gDeferredAvatarProgram.mLinearDiffuse = true;
+        gDeferredAvatarProgram.addPermutation("LINEAR_DIFFUSE", "1");
 
         gDeferredAvatarProgram.clearPermutations();
         add_common_permutations(&gDeferredAvatarProgram);
@@ -2667,7 +2672,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarAlphaProgram.mFeatures.hasShadows = true;
         gDeferredAvatarAlphaProgram.mFeatures.hasReflectionProbes = true;
 
-        gDeferredAvatarAlphaProgram.mLinearDiffuse = true;
+        gDeferredAvatarAlphaProgram.addPermutation("LINEAR_DIFFUSE", "1");
         gDeferredAvatarAlphaProgram.mShaderFiles.clear();
         gDeferredAvatarAlphaProgram.mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
         gDeferredAvatarAlphaProgram.mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));

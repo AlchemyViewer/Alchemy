@@ -245,8 +245,9 @@ void main()
     }
 
     diffuse_linear.rgb *= vertex_color.rgb; // both linear now (IS_HUD: both sRGB)
-#ifdef IS_HUD
-    // The HUD permutation deliberately skips the sampler decode -- mLinearDiffuse is unset,
+#ifndef LINEAR_DIFFUSE
+    // The HUD permutation -- the only non-impostor variant without LINEAR_DIFFUSE --
+    // deliberately skips the sampler decode -- mLinearDiffuse is unset,
     // HUDs keep pixel-exact gamma-space filtering -- and its tint stays raw in the vertex
     // stage, so decode the tinted product here, the same order the pre-sampler-decode code
     // used. That makes the trailing linear_to_srgb an exact round trip. Without it the

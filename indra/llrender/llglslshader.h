@@ -395,8 +395,9 @@ public:
     // false on the HUD programs (they output sRGB) and the FOR_IMPOSTOR alpha program (it
     // writes the sRGB sample straight to the bake).
     //
-    // Set on each program individually, rigged variants included: those are separate program
-    // objects here, not clones of a base program, so nothing propagates it for you.
+    // DERIVED in createShader() from the LINEAR_DIFFUSE permutation -- the same define the
+    // shader source keys its colour-space guards on -- so engine and compiled code cannot
+    // disagree. Add the permutation; never assign this.
     bool mLinearDiffuse = false;
 
     // this pointer should be set to whichever shader represents this shader's rigged variant
