@@ -556,6 +556,11 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
     bool initialized_lighting = false;
     bool light_enabled = true;
 
+    // The last shader bound through bindDeferredShaderFast. Used to decide whether restoring
+    // after the emissive excursion needs the deferred path (which re-binds the shadow maps)
+    // or a plain bind().
+    LLGLSLShader* deferred_bound_shader = nullptr;
+
     const LLVOAvatar* lastAvatar = nullptr;
     U64 lastMeshId = 0;
     const LLGLSLShader* lastAvatarShader = nullptr;
@@ -664,6 +669,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     if (current_shader != target_shader)
                     {
                         gPipeline.bindDeferredShaderFast(*target_shader);
+                        deferred_bound_shader = target_shader;
                     }
 
                     params.mGLTFMaterial->bind(params.mTexture);
@@ -721,6 +727,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     {// If we need shaders, and we're not ALREADY using the proper shader, then bind it
                     // (this way we won't rebind shaders unnecessarily).
                         gPipeline.bindDeferredShaderFast(*target_shader);
+                        deferred_bound_shader = target_shader;
 
                         if (params.mFullbright)
                         { // make sure the bind the exposure map for fullbright shaders so they can cancel out exposure
@@ -829,6 +836,19 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                 bool rebind = false;
                 LLGLSLShader* lastShader = current_shader;
+
+                // The emissive programs declare the indexed-texture array (tex0..tex20) as
+                // plain sampler2D, and that range covers the units the alpha shader's shadow
+                // maps sit on -- 8..13 in practice. Sampling a depth texture that still has
+                // the compare sampler bound through a non-shadow sampler is undefined
+                // behaviour, so drop the maps for the excursion and put them back below.
+                const bool has_emissives = !emissives.empty() || !pbr_emissives.empty()
+                                        || !rigged_emissives.empty() || !pbr_rigged_emissives.empty();
+                if (has_emissives)
+                {
+                    gPipeline.releaseShadowMaps();
+                }
+
                 if (!emissives.empty())
                 {
                     light_enabled = true;
@@ -862,13 +882,34 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                 if (lastShader && rebind)
                 {
-                    lastShader->bind();
+                    // Restore through the deferred path when that is how this shader was
+                    // bound, so the shadow maps released above come back. A plain bind()
+                    // would leave them unbound and silently drop shadowing on every alpha
+                    // draw after the first emissive batch.
+                    if (lastShader == deferred_bound_shader)
+                    {
+                        gPipeline.bindDeferredShaderFast(*lastShader);
+                    }
+                    else
+                    {
+                        lastShader->bind();
+                    }
                 }
             }
         }
     }
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
+
+    // Release the shadow maps this pass bound, so they do not survive into programs that
+    // map those units to ordinary samplers.
+    //
+    // Deliberately NOT unbindDeferredShader: that releases by a single shader's channel
+    // layout and asserts each unit still holds the type that shader expects. By the time the
+    // pass ends the bound shader may be a different one -- an emissive variant, or a restored
+    // earlier shader -- so the units reflect somebody else's layout and the check trips.
+    // releaseShadowMaps tracks units directly and needs no such assumption.
+    gPipeline.releaseShadowMaps();
 
     LLVertexBuffer::unbind();
 

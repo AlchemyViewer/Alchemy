@@ -28,6 +28,7 @@
 
 #include "llrender.h"
 
+#include "alsamplerstate.h"
 #include "llvertexbuffer.h"
 #include "llcubemap.h"
 #include "llglslshader.h"
@@ -79,22 +80,6 @@ LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 bool LLRender::sClassicMode = false;
 bool LLRender::s10bitBackBuffer = false;
 
-static const GLenum sGLTextureType[] =
-{
-    GL_TEXTURE_2D,
-    GL_TEXTURE_RECTANGLE,
-    GL_TEXTURE_CUBE_MAP,
-    GL_TEXTURE_CUBE_MAP_ARRAY,
-    GL_TEXTURE_2D_MULTISAMPLE,
-    GL_TEXTURE_3D
-};
-
-static const GLint sGLAddressMode[] =
-{
-    GL_REPEAT,
-    GL_MIRRORED_REPEAT,
-    GL_CLAMP_TO_EDGE
-};
 
 const U32 immediate_mask = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_TEXCOORD0;
 
@@ -114,463 +99,6 @@ static const GLenum sGLBlendFactor[] =
     GL_ZERO // 'BF_UNDEF'
 };
 
-LLTexUnit::LLTexUnit(S32 index)
-    : mCurrTexType(TT_NONE),
-    mCurrTexture(0),
-    mHasMipMaps(false),
-    mIndex(index)
-{
-    llassert_always(index < (S32)LL_NUM_TEXTURE_LAYERS);
-}
-
-//static
-U32 LLTexUnit::getInternalType(eTextureType type)
-{
-    return sGLTextureType[type];
-}
-
-void LLTexUnit::refreshState(void)
-{
-    // We set dirty to true so that the tex unit knows to ignore caching
-    // and we reset the cached tex unit state
-
-    gGL.flush();
-
-    glActiveTexture(GL_TEXTURE0 + mIndex);
-
-    if (mCurrTexType != TT_NONE)
-    {
-        glBindTexture(sGLTextureType[mCurrTexType], mCurrTexture);
-    }
-    else
-    {
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-}
-
-void LLTexUnit::activate(void)
-{
-    if (mIndex < 0) return;
-
-    if ((S32)gGL.mCurrTextureUnitIndex != mIndex || gGL.mDirty)
-    {
-        gGL.flush();
-        glActiveTexture(GL_TEXTURE0 + mIndex);
-        gGL.mCurrTextureUnitIndex = mIndex;
-    }
-}
-
-void LLTexUnit::enable(eTextureType type)
-{
-    if (mIndex < 0) return;
-
-    if ( (mCurrTexType != type || gGL.mDirty) && (type != TT_NONE) )
-    {
-        activate();
-        if (mCurrTexType != TT_NONE && !gGL.mDirty)
-        {
-            disable(); // Force a disable of a previous texture type if it's enabled.
-        }
-        mCurrTexType = type;
-
-        gGL.flush();
-    }
-}
-
-void LLTexUnit::disable(void)
-{
-    if (mIndex < 0) return;
-
-    if (mCurrTexType != TT_NONE)
-    {
-        unbind(mCurrTexType);
-        mCurrTexType = TT_NONE;
-    }
-}
-
-void LLTexUnit::bindFast(LLTexture* texture)
-{
-    LLImageGL* gl_tex = texture->getGLTexture();
-    texture->setActive();
-    glActiveTexture(GL_TEXTURE0 + mIndex);
-    gGL.mCurrTextureUnitIndex = mIndex;
-    mCurrTexture = gl_tex->getTexName();
-    if (!mCurrTexture)
-    {
-        LL_PROFILE_ZONE_NAMED("MISSING TEXTURE");
-        //if deleted, will re-generate it immediately
-        texture->forceImmediateUpdate();
-        gl_tex->forceUpdateBindStats();
-        texture->bindDefaultImage(mIndex);
-    }
-    glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
-    // Track the actual bound target so later callers that read mCurrTexType
-    // (e.g. LLTexUnit::setTextureFilteringOption, called from
-    // LLImageGL::setFilteringOption via LLDrawPoolWater::renderPostDeferred)
-    // don't apply glTexParameteri against a stale target left over from
-    // earlier passes. The fast path used to skip this — the slow enable()
-    // path was the only place mCurrTexType was updated.
-    mCurrTexType = gl_tex->getTarget();
-    mHasMipMaps = gl_tex->mHasMipMaps;
-    if (gl_tex->mTexOptionsDirty)
-    {
-        gl_tex->mTexOptionsDirty = false;
-        setTextureAddressModeFast(gl_tex->mAddressMode, gl_tex->getTarget());
-        setTextureFilteringOptionFast(gl_tex->mFilterOption, gl_tex->getTarget());
-    }
-}
-
-bool LLTexUnit::bind(LLTexture* texture, bool for_rendering, bool forceBind)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
-    stop_glerror();
-    if (mIndex >= 0)
-    {
-        gGL.flush();
-
-        LLImageGL* gl_tex = NULL ;
-
-        if (texture != NULL && (gl_tex = texture->getGLTexture()))
-        {
-            if (gl_tex->getTexName()) //if texture exists
-            {
-                //in audit, replace the selected texture by the default one.
-                if ((mCurrTexture != gl_tex->getTexName()) || forceBind)
-                {
-                    activate();
-                    enable(gl_tex->getTarget());
-                    mCurrTexture = gl_tex->getTexName();
-                    glBindTexture(sGLTextureType[gl_tex->getTarget()], mCurrTexture);
-                    if(gl_tex->updateBindStats())
-                    {
-                        texture->setActive();
-                    }
-                    mHasMipMaps = gl_tex->mHasMipMaps;
-                    if (gl_tex->mTexOptionsDirty)
-                    {
-                        gl_tex->mTexOptionsDirty = false;
-                        setTextureAddressMode(gl_tex->mAddressMode);
-                        setTextureFilteringOption(gl_tex->mFilterOption);
-                    }
-                }
-            }
-            else
-            {
-                //if deleted, will re-generate it immediately
-                texture->forceImmediateUpdate() ;
-
-                gl_tex->forceUpdateBindStats() ;
-                return texture->bindDefaultImage(mIndex);
-            }
-        }
-        else
-        {
-            if (texture)
-            {
-                LL_DEBUGS() << "NULL LLTexUnit::bind GL image" << LL_ENDL;
-            }
-            else
-            {
-                LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
-            }
-            return false;
-        }
-    }
-    else
-    { // mIndex < 0
-        return false;
-    }
-
-    return true;
-}
-
-bool LLTexUnit::bind(LLImageGL* texture, bool for_rendering, bool forceBind, S32 usename)
-{
-    stop_glerror();
-    if (mIndex < 0) return false;
-
-    if(!texture)
-    {
-        LL_DEBUGS() << "NULL LLTexUnit::bind texture" << LL_ENDL;
-        return false;
-    }
-
-    // Resolve texname after the null-check; previously this line dereferenced
-    // `texture` when usename == 0 and texture was null, crashing before the
-    // diagnostic could fire.
-    U32 texname = usename ? usename : texture->getTexName();
-
-    if(!texname)
-    {
-        if(LLImageGL::sDefaultGLTexture && LLImageGL::sDefaultGLTexture->getTexName())
-        {
-            return bind(LLImageGL::sDefaultGLTexture) ;
-        }
-        stop_glerror();
-        return false ;
-    }
-
-    if ((mCurrTexture != texname) || forceBind)
-    {
-        gGL.flush();
-        stop_glerror();
-        activate();
-        stop_glerror();
-        enable(texture->getTarget());
-        stop_glerror();
-        mCurrTexture = texname;
-        glBindTexture(sGLTextureType[texture->getTarget()], mCurrTexture);
-        stop_glerror();
-        texture->updateBindStats();
-        mHasMipMaps = texture->mHasMipMaps;
-        if (texture->mTexOptionsDirty)
-        {
-            stop_glerror();
-            texture->mTexOptionsDirty = false;
-            setTextureAddressMode(texture->mAddressMode);
-            setTextureFilteringOption(texture->mFilterOption);
-            stop_glerror();
-        }
-    }
-
-    stop_glerror();
-
-    return true;
-}
-
-bool LLTexUnit::bind(LLCubeMap* cubeMap)
-{
-    if (mIndex < 0) return false;
-
-    gGL.flush();
-
-    if (cubeMap == NULL)
-    {
-        LL_WARNS() << "NULL LLTexUnit::bind cubemap" << LL_ENDL;
-        return false;
-    }
-
-    // mImages[0] is normally populated by LLCubeMap::initGL, but a
-    // partially-constructed cubemap could have a null face here.
-    if (cubeMap->mImages[0].isNull())
-    {
-        LL_WARNS() << "LLTexUnit::bind cubemap with null face 0" << LL_ENDL;
-        return false;
-    }
-
-    if (mCurrTexture != cubeMap->mImages[0]->getTexName())
-    {
-        if (LLCubeMap::sUseCubeMaps)
-        {
-            activate();
-            enable(LLTexUnit::TT_CUBE_MAP);
-            mCurrTexture = cubeMap->mImages[0]->getTexName();
-            glBindTexture(GL_TEXTURE_CUBE_MAP, mCurrTexture);
-            mHasMipMaps = cubeMap->mImages[0]->mHasMipMaps;
-            cubeMap->mImages[0]->updateBindStats();
-            if (cubeMap->mImages[0]->mTexOptionsDirty)
-            {
-                cubeMap->mImages[0]->mTexOptionsDirty = false;
-                setTextureAddressMode(cubeMap->mImages[0]->mAddressMode);
-                setTextureFilteringOption(cubeMap->mImages[0]->mFilterOption);
-            }
-            return true;
-        }
-        else
-        {
-            LL_WARNS() << "Using cube map without extension!" << LL_ENDL;
-            return false;
-        }
-    }
-    return true;
-}
-
-// LLRenderTarget is unavailible on the mapserver since it uses FBOs.
-bool LLTexUnit::bind(LLRenderTarget* renderTarget, bool bindDepth)
-{
-    if (mIndex < 0) return false;
-
-    gGL.flush();
-
-    if (bindDepth)
-    {
-        llassert(renderTarget->getDepth()); // target MUST have a depth buffer attachment
-
-        bindManual(renderTarget->getUsage(), renderTarget->getDepth());
-    }
-    else
-    {
-        bindManual(renderTarget->getUsage(), renderTarget->getTexture());
-    }
-
-    return true;
-}
-
-bool LLTexUnit::bindManual(eTextureType type, U32 texture, bool hasMips)
-{
-    if (mIndex < 0)
-    {
-        return false;
-    }
-
-    if(mCurrTexture != texture)
-    {
-        gGL.flush();
-
-        activate();
-        enable(type);
-        mCurrTexture = texture;
-        glBindTexture(sGLTextureType[type], texture);
-        mHasMipMaps = hasMips;
-    }
-    return true;
-}
-
-void LLTexUnit::unbind(eTextureType type)
-{
-    stop_glerror();
-
-    if (mIndex < 0) return;
-
-    //always flush and activate for consistency
-    //   some code paths assume unbind always flushes and sets the active texture
-    gGL.flush();
-    activate();
-
-    // Disabled caching of binding state.
-    if (mCurrTexType == type)
-    {
-        mCurrTexture = 0;
-
-        if (type == LLTexUnit::TT_TEXTURE)
-        {
-            glBindTexture(sGLTextureType[type], sWhiteTexture);
-        }
-        else
-        {
-            glBindTexture(sGLTextureType[type], 0);
-        }
-        stop_glerror();
-    }
-}
-
-void LLTexUnit::unbindFast(eTextureType type)
-{
-    activate();
-
-    // Disabled caching of binding state.
-    if (mCurrTexType == type)
-    {
-        mCurrTexture = 0;
-
-        if (type == LLTexUnit::TT_TEXTURE)
-        {
-            glBindTexture(sGLTextureType[type], sWhiteTexture);
-        }
-        else
-        {
-            glBindTexture(sGLTextureType[type], 0);
-        }
-    }
-}
-
-void LLTexUnit::setTextureAddressMode(eTextureAddressMode mode)
-{
-    if (mIndex < 0 || mCurrTexture == 0) return;
-
-    gGL.flush();
-
-    activate();
-
-    setTextureAddressModeFast(mode, mCurrTexType);
-}
-
-void LLTexUnit::setTextureAddressModeFast(eTextureAddressMode mode, eTextureType tex_type)
-{
-    glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_S, sGLAddressMode[mode]);
-    glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_T, sGLAddressMode[mode]);
-    if (tex_type == TT_CUBE_MAP || tex_type == TT_CUBE_MAP_ARRAY || tex_type == TT_TEXTURE_3D)
-    {
-        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_WRAP_R, sGLAddressMode[mode]);
-    }
-}
-
-void LLTexUnit::setTextureFilteringOption(LLTexUnit::eTextureFilterOptions option)
-{
-    if (mIndex < 0 || mCurrTexture == 0 || mCurrTexType == LLTexUnit::TT_MULTISAMPLE_TEXTURE) return;
-
-    gGL.flush();
-
-    setTextureFilteringOptionFast(option, mCurrTexType);
-}
-
-void LLTexUnit::setTextureFilteringOptionFast(LLTexUnit::eTextureFilterOptions option, eTextureType tex_type)
-{
-    if (option == TFO_POINT)
-    {
-        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    }
-    else
-    {
-        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
-
-    if (option >= TFO_TRILINEAR && mHasMipMaps)
-    {
-        glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    }
-    else if (option >= TFO_BILINEAR)
-    {
-        if (mHasMipMaps)
-        {
-            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-        }
-        else
-        {
-            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        }
-    }
-    else
-    {
-        if (mHasMipMaps)
-        {
-            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-        }
-        else
-        {
-            glTexParameteri(sGLTextureType[tex_type], GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        }
-    }
-
-    if (gGLManager.mHasAnisotropic)
-    {
-        if (option == TFO_ANISOTROPIC && LLRender::sAnisotropicFilteringLevel > 1.f)
-        {
-            F32 aniso_level = llclamp(LLRender::sAnisotropicFilteringLevel, 1.f, gGLManager.mMaxAnisotropy);
-            glTexParameterf(sGLTextureType[tex_type], GL_TEXTURE_MAX_ANISOTROPY, aniso_level);
-
-        }
-        else
-        {
-            glTexParameterf(sGLTextureType[tex_type], GL_TEXTURE_MAX_ANISOTROPY, 1.f);
-        }
-    }
-}
-
-// Useful for debugging that you've manually assigned a texture operation to the correct
-// texture unit based on the currently set active texture in opengl.
-void LLTexUnit::debugTextureUnit(void)
-{
-    if (mIndex < 0) return;
-
-    GLint activeTexture;
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &activeTexture);
-    if ((GL_TEXTURE0 + mIndex) != activeTexture)
-    {
-        U32 set_unit = (activeTexture - GL_TEXTURE0);
-        LL_WARNS() << "Incorrect Texture Unit!  Expected: " << set_unit << " Actual: " << mIndex << LL_ENDL;
-    }
-}
 
 LLLightState::LLLightState(S32 index)
 : mIndex(index),
@@ -846,12 +374,39 @@ void LLRender::resetVertexBuffer()
 
 void LLRender::shutdown()
 {
+    // NOTE: gGL is thread_local, so this runs once per thread that ever touched it --
+    // including the texture upload thread, which owns a second shared context. Everything
+    // released here must therefore belong to THIS thread's context and no other. That is
+    // why mSamplerCache is a member: a static one would have the upload thread deleting
+    // the render thread's samplers. mDummyVAO and mLightsUBO stay zero on worker threads.
+    clearSamplers();
+
     resetVertexBuffer();
     if (mDummyVAO)
     {
-        glBindVertexArray(0);
-        glDeleteVertexArrays(1, &mDummyVAO);
+        // ~LLRender calls shutdown() again during thread_local destruction, after the
+        // context is gone. Normally the explicit gGL.shutdown() during teardown got here
+        // first and zeroed this, but an abnormal exit skips it and leaves a live handle
+        // with a dead context -- deleting the VAO then faults inside the driver. The name
+        // dies with the context regardless, so skipping the delete costs nothing.
+        //
+        // Same gate LLUniformBuffer::release() and LLVertexBuffer already use.
+        if (gGLManager.mInited)
+        {
+            glBindVertexArray(0);
+            glDeleteVertexArrays(1, &mDummyVAO);
+        }
         mDummyVAO = 0;
+    }
+}
+
+void LLRender::clearSamplers()
+{
+    mSamplerCache.clear();
+
+    for (LLTexUnit& unit : mTexUnits)
+    {
+        unit.mCurrSampler = 0;
     }
 }
 

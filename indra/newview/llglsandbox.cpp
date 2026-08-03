@@ -920,7 +920,10 @@ public:
     {
         if (texUnit) // should always be there with dummy (-1), but just in case
         {
-            return texUnit->bindManual(LLTexUnit::TT_TEXTURE, source[index]);
+            // Point filtering with no mips is the point of the benchmark -- it forces
+            // cache misses. Passed as a sampler so it applies to the sampling binds too.
+            return texUnit->bindManual(LLTexUnit::TT_TEXTURE, source[index], false,
+                                       gGL.commonSamplers().mPointWrap);
         }
         return false;
     }
@@ -1068,9 +1071,9 @@ F32 gpu_benchmark()
             return -1.f;
         }
         LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, res, res, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-        // disable mipmaps and use point filtering to cause cache misses
+        // Mipless point filtering (to cause cache misses) comes from the sampler
+        // TexHolder::bind selects; nothing to set on the texture object.
         gGL.getTexUnit(0)->setHasMipMaps(false);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 
         if (alloc_timer.getElapsedTimeF32() > time_limit)
         {

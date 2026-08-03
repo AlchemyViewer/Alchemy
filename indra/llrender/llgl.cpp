@@ -47,6 +47,7 @@
 
 #include "llglheaders.h"
 #include "llglslshader.h"
+#include "llshadermgr.h"
 
 #include "glm/glm.hpp"
 #include <glm/gtc/matrix_access.hpp>
@@ -88,6 +89,398 @@ llofstream gFailLog;
 #ifndef APIENTRY
 #define APIENTRY
 #endif
+
+// ---------------------------------------------------------------------------------------
+// Program sampler introspection, shared by the debug dump and the draw-time validator.
+//
+// What a program DECLARES is the missing half of every sampler/texture diagnostic: the
+// driver reports object names, and the engine's reserved-uniform table only knows engine
+// names -- which for a reflection-driven Slang program leaves the interesting channels
+// anonymous. GL_ACTIVE_UNIFORMS knows all of them, including the sampler TYPE, which is the
+// actual discriminator between correct and undefined.
+// ---------------------------------------------------------------------------------------
+namespace
+{
+    struct ProgramSampler
+    {
+        std::string mName;
+        GLenum      mType     = 0;
+        GLint       mUnit     = -1;
+        GLenum      mTarget   = 0;
+        GLenum      mBinding  = 0;
+        bool        mIsShadow = false;
+    };
+
+    struct ProgramSamplerCache
+    {
+        // Revalidation key: a relinked program can reuse its name, and GL is free to hand a
+        // deleted name back out. Cheap enough to re-check every call.
+        GLint                      mUniformCount = -1;
+        std::vector<ProgramSampler> mSamplers;
+    };
+
+    std::map<GLuint, ProgramSamplerCache> sProgramSamplerCache;
+
+    bool sampler_target_for_type(GLenum type, GLenum& target, GLenum& binding, bool& is_shadow)
+    {
+        switch (type)
+        {
+            case GL_SAMPLER_2D:
+            case GL_INT_SAMPLER_2D:
+            case GL_UNSIGNED_INT_SAMPLER_2D:
+                target = GL_TEXTURE_2D;             binding = GL_TEXTURE_BINDING_2D;             is_shadow = false; return true;
+            case GL_SAMPLER_2D_SHADOW:
+                target = GL_TEXTURE_2D;             binding = GL_TEXTURE_BINDING_2D;             is_shadow = true;  return true;
+            case GL_SAMPLER_3D:
+                target = GL_TEXTURE_3D;             binding = GL_TEXTURE_BINDING_3D;             is_shadow = false; return true;
+            case GL_SAMPLER_CUBE:
+                target = GL_TEXTURE_CUBE_MAP;       binding = GL_TEXTURE_BINDING_CUBE_MAP;       is_shadow = false; return true;
+            case GL_SAMPLER_CUBE_SHADOW:
+                target = GL_TEXTURE_CUBE_MAP;       binding = GL_TEXTURE_BINDING_CUBE_MAP;       is_shadow = true;  return true;
+            case GL_SAMPLER_CUBE_MAP_ARRAY:
+                target = GL_TEXTURE_CUBE_MAP_ARRAY; binding = GL_TEXTURE_BINDING_CUBE_MAP_ARRAY; is_shadow = false; return true;
+            case GL_SAMPLER_2D_ARRAY:
+                target = GL_TEXTURE_2D_ARRAY;       binding = GL_TEXTURE_BINDING_2D_ARRAY;       is_shadow = false; return true;
+            case GL_SAMPLER_2D_ARRAY_SHADOW:
+                target = GL_TEXTURE_2D_ARRAY;       binding = GL_TEXTURE_BINDING_2D_ARRAY;       is_shadow = true;  return true;
+            case GL_SAMPLER_2D_RECT:
+                target = GL_TEXTURE_RECTANGLE;      binding = GL_TEXTURE_BINDING_RECTANGLE;      is_shadow = false; return true;
+            case GL_SAMPLER_2D_MULTISAMPLE:
+                target = GL_TEXTURE_2D_MULTISAMPLE; binding = GL_TEXTURE_BINDING_2D_MULTISAMPLE; is_shadow = false; return true;
+            default:
+                return false;
+        }
+    }
+
+    bool is_depth_format(GLint internal_format)
+    {
+        return internal_format == GL_DEPTH_COMPONENT16
+            || internal_format == GL_DEPTH_COMPONENT24
+            || internal_format == GL_DEPTH_COMPONENT32
+            || internal_format == GL_DEPTH_COMPONENT32F
+            || internal_format == GL_DEPTH24_STENCIL8
+            || internal_format == GL_DEPTH32F_STENCIL8;
+    }
+
+    const std::vector<ProgramSampler>& get_program_samplers(GLuint program)
+    {
+        static const std::vector<ProgramSampler> empty;
+
+        GLint uniform_count = 0;
+        glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &uniform_count);
+
+        ProgramSamplerCache& cached = sProgramSamplerCache[program];
+        if (cached.mUniformCount == uniform_count)
+        {
+            return cached.mSamplers;
+        }
+
+        cached.mUniformCount = uniform_count;
+        cached.mSamplers.clear();
+
+        GLint max_name_len = 0;
+        glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_len);
+        if (max_name_len <= 0)
+        {
+            return cached.mSamplers;
+        }
+        std::vector<GLchar> name_buf((size_t)max_name_len);
+
+        for (GLint i = 0; i < uniform_count; ++i)
+        {
+            GLsizei written = 0;
+            GLint   size    = 0;
+            GLenum  type    = 0;
+            glGetActiveUniform(program, (GLuint)i, (GLsizei)name_buf.size(), &written, &size, &type, name_buf.data());
+            if (written <= 0)
+            {
+                continue;
+            }
+
+            ProgramSampler sampler;
+            if (!sampler_target_for_type(type, sampler.mTarget, sampler.mBinding, sampler.mIsShadow))
+            {
+                continue;
+            }
+
+            sampler.mName = std::string(name_buf.data(), (size_t)written);
+            sampler.mType = type;
+
+            const GLint location = glGetUniformLocation(program, sampler.mName.c_str());
+            if (location < 0)
+            {
+                continue;
+            }
+            glGetUniformiv(program, location, &sampler.mUnit);
+
+            cached.mSamplers.push_back(sampler);
+        }
+
+        return cached.mSamplers;
+    }
+}
+
+void forget_program_samplers(U32 program)
+{
+    sProgramSamplerCache.erase(program);
+}
+
+// Dump per-unit texture and sampler state.
+//
+// The driver's message names a sampler and a texture object but not the UNIT or the
+// UNIFORM, which is the part you need: a mismatch between what a program declares and what
+// is bound is nearly always one specific channel, and hunting it from two bare object names
+// means guessing. Correlating unit -> uniform -> texture -> sampler turns that into reading.
+//
+// Only reports units with something bound, and restores the active unit -- a debug callback
+// must not perturb the state it is describing.
+static void log_texture_unit_state()
+{
+    if (!glGetSamplerParameteriv || !glGetTexLevelParameteriv)
+    {
+        return;
+    }
+
+    GLint max_units = 0;
+    glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &max_units);
+    max_units = llmin(max_units, (GLint)LL_NUM_TEXTURE_LAYERS);
+
+    GLint saved_active_unit = GL_TEXTURE0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active_unit);
+
+    // What the PROGRAM declares, per unit. See get_program_samplers.
+    struct UnitUniform
+    {
+        std::string mName;
+        GLenum      mType     = 0;
+        bool        mIsShadow = false;
+    };
+    std::vector<UnitUniform> channel_uniform((size_t)max_units);
+
+    GLint program = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    if (program != 0 && glGetActiveUniform && glGetUniformiv)
+    {
+        for (const ProgramSampler& sampler : get_program_samplers((GLuint)program))
+        {
+            if (sampler.mUnit >= 0 && sampler.mUnit < max_units)
+            {
+                channel_uniform[(size_t)sampler.mUnit] = { sampler.mName, sampler.mType, sampler.mIsShadow };
+            }
+        }
+    }
+
+    static const struct { GLenum mTarget; GLenum mBinding; const char* mName; } targets[] =
+    {
+        { GL_TEXTURE_2D,               GL_TEXTURE_BINDING_2D,               "2D"         },
+        { GL_TEXTURE_3D,               GL_TEXTURE_BINDING_3D,               "3D"         },
+        { GL_TEXTURE_CUBE_MAP,         GL_TEXTURE_BINDING_CUBE_MAP,         "CUBE"       },
+        { GL_TEXTURE_CUBE_MAP_ARRAY,   GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,   "CUBE_ARRAY" },
+        { GL_TEXTURE_RECTANGLE,        GL_TEXTURE_BINDING_RECTANGLE,        "RECT"       },
+        { GL_TEXTURE_2D_MULTISAMPLE,   GL_TEXTURE_BINDING_2D_MULTISAMPLE,   "2D_MS"      },
+    };
+
+    LL_WARNS() << "Texture units:" << LL_ENDL;
+
+    for (GLint unit = 0; unit < max_units; ++unit)
+    {
+        glActiveTexture(GL_TEXTURE0 + unit);
+
+        GLint sampler = 0;
+        glGetIntegerv(GL_SAMPLER_BINDING, &sampler);
+
+        for (const auto& target : targets)
+        {
+            GLint texture = 0;
+            glGetIntegerv(target.mBinding, &texture);
+            if (texture == 0)
+            {
+                continue;
+            }
+
+            // GL_TEXTURE_COMPARE_MODE on the texture and on the sampler are separate state;
+            // a bound sampler wins, so print both -- disagreement is the usual culprit.
+            GLint internal_format = 0;
+            GLint tex_compare     = GL_NONE;
+            if (target.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+            {
+                glGetTexLevelParameteriv(target.mTarget, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
+                glGetTexParameteriv(target.mTarget, GL_TEXTURE_COMPARE_MODE, &tex_compare);
+            }
+
+            const bool is_depth = is_depth_format(internal_format);
+
+            const UnitUniform& declared = channel_uniform[(size_t)unit];
+
+            std::ostringstream line;
+            line << "  unit " << unit;
+            if (!declared.mName.empty())
+            {
+                line << " (" << declared.mName
+                     << (declared.mIsShadow ? " : shadow" : " : non-shadow")
+                     << " type=0x" << std::hex << declared.mType << std::dec << ")";
+            }
+            line << " " << target.mName << " tex=" << texture
+                 << " format=0x" << std::hex << internal_format << std::dec
+                 << (is_depth ? " DEPTH" : "")
+                 << " tex_compare=" << (tex_compare == GL_NONE ? "none" : "REF_TO_TEXTURE")
+                 << " sampler=" << sampler;
+
+            if (sampler != 0)
+            {
+                GLint smp_compare = GL_NONE;
+                GLint min_filter  = 0;
+                GLint mag_filter  = 0;
+                GLint wrap_s      = 0;
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_COMPARE_MODE, &smp_compare);
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_MIN_FILTER, &min_filter);
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_MAG_FILTER, &mag_filter);
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_WRAP_S, &wrap_s);
+
+                line << " [compare=" << (smp_compare == GL_NONE ? "none" : "REF_TO_TEXTURE")
+                     << " min=0x" << std::hex << min_filter
+                     << " mag=0x" << mag_filter
+                     << " wrap=0x" << wrap_s << std::dec << "]";
+
+                // The exact pairing the driver calls undefined behaviour -- but ONLY when
+                // the program reads that unit with a non-shadow sampler. The same state
+                // under a sampler2DShadow is correct and expected.
+                if (is_depth && smp_compare != GL_NONE)
+                {
+                    if (!declared.mName.empty() && !declared.mIsShadow)
+                    {
+                        line << "  <-- UB: '" << declared.mName
+                             << "' is non-shadow over a depth texture + compare sampler";
+                    }
+                    else if (declared.mName.empty())
+                    {
+                        line << "  (stale: depth + compare, program declares nothing here)";
+                    }
+                }
+            }
+
+            LL_WARNS() << line.str() << LL_ENDL;
+        }
+    }
+
+    glActiveTexture(saved_active_unit);
+}
+
+
+// Check every sampler the bound program declares against what is actually bound.
+//
+// Catches the mismatch AT THE DRAW THAT CAUSES IT, naming the uniform -- rather than via a
+// driver warning that reports two object names and leaves you inferring which bind site was
+// responsible. That inference is expensive: the depth-texture-under-a-compare-sampler bug
+// this was written for took five wrong diagnoses before the state was made visible.
+//
+// Reports only what GL actually calls undefined, so an assertion here means a real defect.
+// In particular an EMPTY unit is fine: reading one is defined, and declaring more samplers
+// than a draw fills is normal.
+//
+// gDebugGL only, and hooked through llassert() like LLVertexBuffer::validateRange, so it
+// compiles out entirely otherwise. Enumerating a program's uniforms is cached per program.
+bool validate_bound_samplers()
+{
+    if (!gDebugGL || !glGetSamplerParameteriv || !glGetTexLevelParameteriv)
+    {
+        return true;
+    }
+
+    GLint program = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    if (program == 0)
+    {
+        return true;
+    }
+
+    GLint saved_active_unit = GL_TEXTURE0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active_unit);
+
+    const char* shader_name = LLGLSLShader::sCurBoundShaderPtr
+                                  ? LLGLSLShader::sCurBoundShaderPtr->mName.c_str()
+                                  : "<unknown>";
+    std::string failure;
+
+    for (const ProgramSampler& sampler : get_program_samplers((GLuint)program))
+    {
+        if (sampler.mUnit < 0)
+        {
+            continue;
+        }
+
+        glActiveTexture(GL_TEXTURE0 + sampler.mUnit);
+
+        GLint texture = 0;
+        glGetIntegerv((GLenum)sampler.mBinding, &texture);
+        if (texture == 0)
+        {
+            // NOT an error. Reading an unbound unit is defined -- it yields (0,0,0,1) -- and
+            // programs routinely declare more samplers than a given draw fills: the indexed
+            // batching array is tex0..tex20 whatever the batch size. Nothing to validate.
+            continue;
+        }
+
+        // A bound sampler object overrides the texture's own compare state, so it decides.
+        GLint bound_sampler = 0;
+        glGetIntegerv(GL_SAMPLER_BINDING, &bound_sampler);
+
+        GLint compare_mode = GL_NONE;
+        if (bound_sampler != 0)
+        {
+            glGetSamplerParameteriv((GLuint)bound_sampler, GL_TEXTURE_COMPARE_MODE, &compare_mode);
+        }
+        else if (sampler.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+        {
+            glGetTexParameteriv(sampler.mTarget, GL_TEXTURE_COMPARE_MODE, &compare_mode);
+        }
+
+        GLint internal_format = 0;
+        if (sampler.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+        {
+            glGetTexLevelParameteriv(sampler.mTarget, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
+        }
+        const bool is_depth = is_depth_format(internal_format);
+
+        // The two pairings GL calls undefined, in both directions.
+        if (!sampler.mIsShadow && is_depth && compare_mode != GL_NONE)
+        {
+            failure = llformat("'%s' (unit %d) is a non-shadow sampler over depth texture %d "
+                               "with comparisons enabled on sampler %d",
+                               sampler.mName.c_str(), sampler.mUnit, texture, bound_sampler);
+            break;
+        }
+        if (sampler.mIsShadow && compare_mode == GL_NONE)
+        {
+            failure = llformat("'%s' (unit %d) is a shadow sampler over texture %d with "
+                               "comparisons DISABLED (sampler %d)",
+                               sampler.mName.c_str(), sampler.mUnit, texture, bound_sampler);
+            break;
+        }
+        if (sampler.mIsShadow && !is_depth)
+        {
+            failure = llformat("'%s' (unit %d) is a shadow sampler over non-depth texture %d "
+                               "(format 0x%x)",
+                               sampler.mName.c_str(), sampler.mUnit, texture, internal_format);
+            break;
+        }
+    }
+
+    glActiveTexture(saved_active_unit);
+
+    if (failure.empty())
+    {
+        return true;
+    }
+
+    LL_WARNS() << "----- SAMPLER BINDING INVALID -------" << LL_ENDL;
+    LL_WARNS() << "Shader: " << shader_name << LL_ENDL;
+    LL_WARNS() << failure << LL_ENDL;
+    LL_WARNS() << "-------------------------------------" << LL_ENDL;
+    log_texture_unit_state();
+
+    return false;
+}
 
 void APIENTRY gl_debug_callback(GLenum source,
                                 GLenum type,
@@ -145,6 +538,15 @@ void APIENTRY gl_debug_callback(GLenum source,
     LL_WARNS() << "Message: " << message << LL_ENDL;
     LL_WARNS() << "-----------------------" << LL_ENDL;
 
+    // The buffer and texture-unit dump below is a few hundred synchronous glGet round
+    // trips. Worth it for anything that might be a defect; not for the notification-level
+    // chatter some drivers emit constantly (buffer migration notes and the like), which
+    // would turn a debug session into a slideshow and bury the messages that matter.
+    if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+    {
+        return;
+    }
+
     GLint vao = 0;
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
     GLint vbo = 0;
@@ -170,6 +572,19 @@ void APIENTRY gl_debug_callback(GLenum source,
         glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_SIZE, &ubo_size);
         glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_IMMUTABLE_STORAGE, &ubo_immutable);
     }
+
+    if (LLGLSLShader::sCurBoundShaderPtr)
+    {
+        LL_WARNS() << "Bound shader: " << LLGLSLShader::sCurBoundShaderPtr->mName << LL_ENDL;
+    }
+
+    LL_WARNS() << "Bound buffers: VAO=" << vao
+               << " ARRAY_BUFFER=" << vbo << " (size " << vbo_size << ")"
+               << " ELEMENT_ARRAY=" << ibo << " (size " << ibo_size << ")"
+               << " UNIFORM_BUFFER=" << ubo << " (size " << ubo_size << ", immutable " << ubo_immutable << ")"
+               << LL_ENDL;
+
+    log_texture_unit_state();
 
     // No needs to halt when is called from LLViewerWindow::stopGL()
     if (severity == GL_DEBUG_SEVERITY_HIGH && !gGLManager.mIsDisabled)
@@ -1654,6 +2069,9 @@ void LLGLManager::initExtensions()
     // Downgraded below if the entry point turns out not to resolve.
     mHasTextureStorage = mGLVersion >= 4.19f || mGLExtensions.contains("GL_ARB_texture_storage");
 
+    // Core in 4.5; also an ARB extension. Downgraded below if the entry points don't resolve.
+    mHasDirectStateAccess = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_direct_state_access");
+
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
     mHasEXTMemoryObject  = mGLExtensions.contains("GL_EXT_memory_object");
@@ -1703,6 +2121,35 @@ void LLGLManager::initExtensions()
     {
         LL_INFOS("RenderInit") << "Immutable texture storage unavailable (GL " << mGLVersion
                                << ", no GL_ARB_texture_storage); using mutable textures." << LL_ENDL;
+    }
+
+    // Direct state access. Resolved here for the same reason as glTexStorage above: the
+    // GL_VERSION_4_5 ladder early-outs on a lower context, so a 4.1/4.4 driver exposing
+    // GL_ARB_direct_state_access would otherwise leave these null. Only the entry points
+    // actually used are checked -- add to the check when more are adopted.
+    if (mHasDirectStateAccess)
+    {
+        glBindTextureUnit = (PFNGLBINDTEXTUREUNITPROC)LL_GET_PROC_ADDRESS("glBindTextureUnit");
+        glCreateSamplers  = (PFNGLCREATESAMPLERSPROC)LL_GET_PROC_ADDRESS("glCreateSamplers");
+
+        if (!glBindTextureUnit || !glCreateSamplers)
+        {
+            mHasDirectStateAccess = false;
+            LL_WARNS("RenderInit") << "Direct state access advertised (GL " << mGLVersion
+                                   << ") but its entry points did not resolve; using bind-to-edit."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Direct state access available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.49f ? ", core)" : ", GL_ARB_direct_state_access)")
+                                   << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_INFOS("RenderInit") << "Direct state access unavailable (GL " << mGLVersion
+                               << ", no GL_ARB_direct_state_access); using bind-to-edit." << LL_ENDL;
     }
 
     // GL_EXT_memory_object

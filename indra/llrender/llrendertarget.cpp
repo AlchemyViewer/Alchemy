@@ -30,6 +30,7 @@
 #include "linden_common.h"
 
 #include "llrendertarget.h"
+#include "alsamplerstate.h"
 #include "llrender.h"
 #include "llgl.h"
 
@@ -624,10 +625,24 @@ U32 LLRenderTarget::getNumTextures() const
     return static_cast<U32>(mTex.size());
 }
 
-void LLRenderTarget::bindTexture(U32 index, S32 channel, LLTexUnit::eTextureFilterOptions filter_options)
+void LLRenderTarget::bindTexture(U32 index, S32 channel,
+                                 LLTexUnit::eTextureFilterOptions filter_options,
+                                 LLTexUnit::eTextureAddressMode   address_mode)
 {
-    gGL.getTexUnit(channel)->bindManual(mUsage, getTexture(index), filter_options == LLTexUnit::TFO_TRILINEAR || filter_options == LLTexUnit::TFO_ANISOTROPIC);
-    gGL.getTexUnit(channel)->setTextureFilteringOption(filter_options);
+    // Only mipmapped when this target generates mips; asking for a mipmapping filter on
+    // a target without them makes the texture incomplete, which samples black.
+    const bool has_mips = mGenerateMipMaps != LLTexUnit::TMG_NONE
+                          && (filter_options == LLTexUnit::TFO_TRILINEAR
+                              || filter_options == LLTexUnit::TFO_ANISOTROPIC);
+
+    // Rectangle textures have neither mips nor mirrored repeat.
+    if (mUsage == LLTexUnit::TT_RECT_TEXTURE && address_mode == LLTexUnit::TAM_MIRROR)
+    {
+        address_mode = LLTexUnit::TAM_CLAMP;
+    }
+
+    gGL.getTexUnit(channel)->bindManual(mUsage, getTexture(index), has_mips,
+                                        gGL.getSampler(filter_options, address_mode, has_mips));
 }
 
 void LLRenderTarget::flush()

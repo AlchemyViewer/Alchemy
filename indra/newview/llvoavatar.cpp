@@ -5642,7 +5642,11 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     gGL.flush();
 
     gGL.color4ubv(color.mV);
-    gGL.getTexUnit(diffuse_channel)->bind(&mImpostor);
+    // TFO_POINT: an impostor is a screen-aligned billboard rendered at its own resolution,
+    // so filtering it only smears the silhouette. This used to be written onto the texture
+    // when the impostor was allocated.
+    gGL.getTexUnit(diffuse_channel)->bind(&mImpostor, false,
+                                          gGL.commonSamplers().mPointClamp);
     gGL.begin(LLRender::TRIANGLES);
     {
         gGL.texCoord2f(0.f, 0.f);
@@ -10375,8 +10379,6 @@ void LLVOAvatar::onBakedTextureMasksLoaded( bool success, LLViewerFetchedTexture
                 aux_src->getWidth(), aux_src->getHeight(),
                 GL_ALPHA, GL_UNSIGNED_BYTE, aux_src->getData());
             stop_glerror();
-
-            gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
 
             /* if( id == head_baked->getID() )
                  if (self->mBakedTextureDatas[BAKED_HEAD].mTexLayerSet)

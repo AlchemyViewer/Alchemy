@@ -976,9 +976,9 @@ void gl_rect_2d_checkerboard(const LLRect& rect, GLfloat alpha)
 {
     //polygon stipple is deprecated, use "Checker" texture
     LLPointer<LLUIImage> img = LLRender2D::getInstance()->getUIImage("Checker");
-    gGL.getTexUnit(0)->bind(img->getImage());
-    gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_WRAP);
-    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+    // Per-binding: the Checker image is a shared UI texture, so wrap+point must not follow
+    // it to other users.
+    gGL.getTexUnit(0)->bindSampled(img->getImage(), LLTexUnit::TFO_POINT, LLTexUnit::TAM_WRAP);
 
     LLColor4 color(1.f, 1.f, 1.f, alpha);
     LLRectf uv_rect(0, 0, rect.getWidth()/32.f, rect.getHeight()/32.f);

@@ -137,8 +137,10 @@ void FSManipTranslateJoint::restoreGL()
 
     GLuint* d = new GLuint[rez * rez];
 
-    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, sGridTex->getTexName(), true);
-    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_TRILINEAR);
+    // Trilinear + mips: the grid recedes to the horizon, so it needs the mip chain. Sampler
+    // rather than texture state, matching the render-time binds in renderGrid's callers.
+    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, sGridTex->getTexName(), true,
+                                  gGL.commonSamplers().mTrilinearWrapMips);
 
     // Allocate the whole mip chain up front: immutable storage is allocated once for the
     // texture, before any level is written, so it cannot happen inside the loop below.

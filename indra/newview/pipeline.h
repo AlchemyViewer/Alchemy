@@ -45,6 +45,7 @@
 #include "llreflectionmapmanager.h"
 #include "llheroprobemanager.h"
 
+#include <array>
 #include <stack>
 
 class LLViewerTexture;
@@ -295,6 +296,16 @@ public:
     // bind shadow maps
     // if setup is true, wil lset texture compare mode function and filtering options
     void bindShadowMaps(LLGLSLShader& shader);
+
+    // Release the shadow maps from whichever units bindShadowMaps last put them on.
+    //
+    // Programs do not agree on where DEFERRED_SHADOW0..5 live -- one deferred shader may map
+    // them to units 6-11 and another to 26-31 -- so unbinding "this shader's" shadow channels
+    // leaves the previous layout's units still holding depth textures under the compare
+    // sampler. The next program to use those low units for ordinary material maps then reads
+    // a depth texture through a non-shadow sampler, which is undefined behaviour.
+    void releaseShadowMaps();
+
     void bindDeferredShaderFast(LLGLSLShader& shader);
     void bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_target = nullptr, LLRenderTarget* depth_target = nullptr);
     void setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep);
@@ -783,7 +794,18 @@ public:
     //noise map
     U32                 mNoiseMap;
     U32                 mTrueNoiseMap;
+    // Texture units the shadow maps are currently bound to, -1 where unused. See
+    // releaseShadowMaps -- this exists because the unit numbers are per-program.
+    std::array<S32, 6>  mBoundShadowChannels = { -1, -1, -1, -1, -1, -1 };
+
     U32                 mLightFunc;
+    // The deferred lighting LUT wants mag=LINEAR + min=NEAREST, which no
+    // LLTexUnit::eTextureFilterOptions value covers, so it resolves through ALSamplerCache's
+    // descriptor path -- a linear scan, kept out of every deferred shader bind by memoising
+    // it here and revalidating against the cache generation (0 = unresolved). Every other
+    // fixed mode comes from gGL.commonSamplers().
+    U32                 mLightFuncSampler = 0;
+    U32                 mLightFuncSamplerGeneration = 0;
 
     //smaa
     U32                 mSMAAAreaMap = 0;

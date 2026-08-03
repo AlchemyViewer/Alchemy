@@ -30,6 +30,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "pipeline.h"
+#include <algorithm>
 
 // library includes
 #include "llimagebmp.h"
@@ -51,6 +52,7 @@
 #include "v3color.h"
 #include "llui.h"
 #include "llglheaders.h"
+#include "alsamplerstate.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -1051,40 +1053,11 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     }
 
 
-    // set up shadow map filtering and compare modes
-    if (shadow_detail > 0)
-    {
-        for (U32 i = 0; i < 4; i++)
-        {
-            LLRenderTarget* shadow_target = getSunShadowTarget(i);
-            if (shadow_target)
-            {
-                gGL.getTexUnit(0)->bind(getSunShadowTarget(i), true);
-                gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
-                gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-            }
-        }
-    }
-
-    if (shadow_detail > 1 && !gCubeSnapshot)
-    {
-        for (U32 i = 0; i < 2; i++)
-        {
-            LLRenderTarget* shadow_target = getSpotShadowTarget(i);
-            if (shadow_target)
-            {
-                gGL.getTexUnit(0)->bind(shadow_target, true);
-                gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
-                gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-            }
-        }
-    }
+    // Shadow map filtering and depth comparison are properties of the sampler these are read
+    // through, not of the textures -- see LLPipeline::bindShadowMaps, which selects one
+    // compare sampler for all six. This function used to bind each target and write filter,
+    // wrap and GL_TEXTURE_COMPARE_MODE onto the texture object; none of that survives a
+    // sampler being bound, and there is no longer any path that reads these uncompared.
 
     return true;
 }
@@ -1398,7 +1371,6 @@ void LLPipeline::createGLBuffers()
 
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap);
         LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
     }
 
     if (!mTrueNoiseMap)
@@ -1413,7 +1385,6 @@ void LLPipeline::createGLBuffers()
         LLImageGL::generateTextures(1, &mTrueNoiseMap);
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap);
         LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_RGB16F, noiseRes, noiseRes, GL_RGB, GL_FLOAT, noise);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
     }
 
     if (!mSMAAAreaMap)
@@ -1430,8 +1401,6 @@ void LLPipeline::createGLBuffers()
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSMAAAreaMap);
         LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_RG8, AREATEX_WIDTH, AREATEX_HEIGHT, GL_RG,
             GL_UNSIGNED_BYTE, tempBuffer.data());
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
     }
 
     if (!mSMAASearchMap)
@@ -1448,8 +1417,6 @@ void LLPipeline::createGLBuffers()
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASearchMap);
         LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_R8, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT,
             GL_RED, GL_UNSIGNED_BYTE, tempBuffer.data());
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
     }
 
     if (!mSMAASampleMap)
@@ -1482,8 +1449,6 @@ void LLPipeline::createGLBuffers()
             LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), GL_RGB8, raw_image->getWidth(),
                 raw_image->getHeight(), format, GL_UNSIGNED_BYTE, raw_image->getData());
             stop_glerror();
-            gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-            gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
         }
     }
 
@@ -1554,10 +1519,6 @@ void LLPipeline::createLUTBuffers()
         LLImageGL::generateTextures(1, &mLightFunc);
         gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc);
         LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(LLTexUnit::TT_TEXTURE), pix_format, lightResX, lightResY, GL_RED, GL_FLOAT, ls);
-        gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_TRILINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
         delete [] ls;
     }
@@ -7935,8 +7896,9 @@ void LLPipeline::generateGlow(LLRenderTarget* src)
             S32 channel = gGlowExtractProgram.enableTexture(LLShaderMgr::GLOW_NOISE_MAP);
             if (channel > -1)
             {
-                gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap);
-                gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+                // Tiled across the screen, so GL_REPEAT as before.
+                gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mTrueNoiseMap, false,
+                                                    gGL.commonSamplers().mPointWrap);
             }
             gGlowExtractProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
                                           (GLfloat)mGlow[2].getWidth(),
@@ -8339,14 +8301,13 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             {
                 if (!use_sample)
                 {
-                    src->bindTexture(0, channel, LLTexUnit::TFO_BILINEAR);
+                    src->bindTexture(0, channel, LLTexUnit::TFO_BILINEAR, LLTexUnit::TAM_CLAMP);
                 }
                 else
                 {
-                    gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASampleMap);
-                    gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+                    gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASampleMap, false,
+                                                        gGL.commonSamplers().mBilinearClamp);
                 }
-                gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
             }
 
             S32 pred_channel = -1;
@@ -8355,9 +8316,8 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
                 pred_channel = edge_shader.enableTexture(LLShaderMgr::SMAA_PREDICATION_TEX, mRT->deferredScreen.getUsage());
                 if (pred_channel > -1)
                 {
-                    gGL.getTexUnit(pred_channel)->bind(&mRT->deferredScreen, true);
-                    gGL.getTexUnit(pred_channel)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
-                    gGL.getTexUnit(pred_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                    gGL.getTexUnit(pred_channel)->bind(&mRT->deferredScreen, true,
+                                                       gGL.commonSamplers().mPointClamp);
                 }
             }
 
@@ -8395,22 +8355,19 @@ void LLPipeline::generateSMAABuffers(LLRenderTarget* src)
             S32 edge_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_EDGE_TEX, mFXAAMap.getUsage());
             if (edge_tex_channel > -1)
             {
-                mFXAAMap.bindTexture(0, edge_tex_channel, LLTexUnit::TFO_BILINEAR);
-                gGL.getTexUnit(edge_tex_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                mFXAAMap.bindTexture(0, edge_tex_channel, LLTexUnit::TFO_BILINEAR, LLTexUnit::TAM_CLAMP);
             }
             S32 area_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_AREA_TEX, LLTexUnit::TT_TEXTURE);
             if (area_tex_channel > -1)
             {
-                gGL.getTexUnit(area_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAAAreaMap);
-                gGL.getTexUnit(area_tex_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-                gGL.getTexUnit(area_tex_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                gGL.getTexUnit(area_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAAAreaMap, false,
+                                                             gGL.commonSamplers().mBilinearClamp);
             }
             S32 search_tex_channel = blend_weights_shader.enableTexture(LLShaderMgr::SMAA_SEARCH_TEX, LLTexUnit::TT_TEXTURE);
             if (search_tex_channel > -1)
             {
-                gGL.getTexUnit(search_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASearchMap);
-                gGL.getTexUnit(search_tex_channel)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
-                gGL.getTexUnit(search_tex_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                gGL.getTexUnit(search_tex_channel)->bindManual(LLTexUnit::TT_TEXTURE, mSMAASearchMap, false,
+                                                               gGL.commonSamplers().mBilinearClamp);
             }
 
             if (use_stencil)
@@ -8469,8 +8426,7 @@ void LLPipeline::applySMAA(LLRenderTarget* src, LLRenderTarget* dst)
             S32 diffuse_channel = blend_shader.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
             if(diffuse_channel > -1)
             {
-                src->bindTexture(0, diffuse_channel, LLTexUnit::TFO_BILINEAR);
-                gGL.getTexUnit(diffuse_channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                src->bindTexture(0, diffuse_channel, LLTexUnit::TFO_BILINEAR, LLTexUnit::TAM_CLAMP);
             }
 
             S32 blend_channel = blend_shader.enableTexture(LLShaderMgr::SMAA_BLEND_TEX);
@@ -9000,7 +8956,20 @@ void LLPipeline::bindLightFunc(LLGLSLShader& shader)
     S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_LIGHTFUNC);
     if (channel > -1)
     {
-        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc);
+        // Bespoke descriptor (mag LINEAR, min NEAREST); see mLightFuncSampler.
+        const U32 generation = gGL.getSamplerGeneration();
+        if (mLightFuncSamplerGeneration != generation)
+        {
+            ALSamplerDesc desc;
+            desc.mMinFilter = GL_NEAREST;
+            desc.mMagFilter = GL_LINEAR;
+            desc.mWrapS = desc.mWrapT = desc.mWrapR = GL_CLAMP_TO_EDGE;
+
+            mLightFuncSampler           = gGL.getSampler(desc);
+            mLightFuncSamplerGeneration = generation;
+        }
+        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mLightFunc, false,
+                                            mLightFuncSampler);
     }
 
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_BRDF_LUT, LLTexUnit::TT_TEXTURE);
@@ -9012,6 +8981,17 @@ void LLPipeline::bindLightFunc(LLGLSLShader& shader)
 
 void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
 {
+    // Depth comparison is a sampler property, not a texture one. Every shader samples these
+    // as Sampler2DShadow (deferred/shadowutil.slang), so the compare sampler is the only way
+    // they are ever read -- allocateShadowBuffer no longer writes GL_TEXTURE_COMPARE_MODE
+    // onto the texture objects.
+    //
+    // Anisotropic + clamp matches what that allocation-time setup used to apply. With no mip
+    // chain the filter resolves to GL_LINEAR, which is what gives the compare its 2x2 PCF.
+    const U32 shadow_sampler = gGL.commonSamplers().mShadowCompare;
+
+    std::array<S32, 6> channels = { -1, -1, -1, -1, -1, -1 };
+
     for (U32 i = 0; i < 4; i++)
     {
         LLRenderTarget* shadow_target = getSunShadowTarget(i);
@@ -9020,7 +9000,8 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
             S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_SHADOW0 + i, LLTexUnit::TT_TEXTURE);
             if (channel > -1)
             {
-                gGL.getTexUnit(channel)->bind(getSunShadowTarget(i), true);
+                gGL.getTexUnit(channel)->bind(shadow_target, true, shadow_sampler);
+                channels[i] = channel;
             }
         }
     }
@@ -9033,8 +9014,36 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
             LLRenderTarget* shadow_target = getSpotShadowTarget(i - 4);
             if (shadow_target)
             {
-                gGL.getTexUnit(channel)->bind(shadow_target, true);
+                gGL.getTexUnit(channel)->bind(shadow_target, true, shadow_sampler);
+                channels[i] = channel;
             }
+        }
+    }
+
+    // Drop any unit the PREVIOUS program had a shadow map on that this one does not reuse.
+    // Those units are about to be handed to a program that maps them to ordinary material
+    // samplers, and a depth texture left under the compare sampler there is undefined
+    // behaviour. Only fires when the layout actually changes, so the common case of
+    // rebinding the same channels costs nothing.
+    for (S32 previous : mBoundShadowChannels)
+    {
+        if (previous >= 0 && std::find(channels.begin(), channels.end(), previous) == channels.end())
+        {
+            gGL.getTexUnit(previous)->unbind(LLTexUnit::TT_TEXTURE);
+        }
+    }
+
+    mBoundShadowChannels = channels;
+}
+
+void LLPipeline::releaseShadowMaps()
+{
+    for (S32& channel : mBoundShadowChannels)
+    {
+        if (channel >= 0)
+        {
+            gGL.getTexUnit(channel)->unbind(LLTexUnit::TT_TEXTURE);
+            channel = -1;
         }
     }
 }
@@ -9066,29 +9075,25 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, deferred_target->getUsage());
     if (channel > -1)
     {
-        deferred_target->bindTexture(0,channel, LLTexUnit::TFO_POINT); // frag_data[0]
-        gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        deferred_target->bindTexture(0, channel, LLTexUnit::TFO_POINT, LLTexUnit::TAM_CLAMP); // frag_data[0]
     }
 
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_SPECULAR, deferred_target->getUsage());
     if (channel > -1)
     {
-        deferred_target->bindTexture(1, channel, LLTexUnit::TFO_POINT); // frag_data[1]
-        gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        deferred_target->bindTexture(1, channel, LLTexUnit::TFO_POINT, LLTexUnit::TAM_CLAMP); // frag_data[1]
     }
 
     channel = shader.enableTexture(LLShaderMgr::NORMAL_MAP, deferred_target->getUsage());
     if (channel > -1)
     {
-        deferred_target->bindTexture(2, channel, LLTexUnit::TFO_POINT); // frag_data[2]
-        gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        deferred_target->bindTexture(2, channel, LLTexUnit::TFO_POINT, LLTexUnit::TAM_CLAMP); // frag_data[2]
     }
 
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_EMISSIVE, deferred_target->getUsage());
     if (channel > -1)
     {
-        deferred_target->bindTexture(3, channel, LLTexUnit::TFO_POINT); // frag_data[3]
-        gGL.getTexUnit(channel)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        deferred_target->bindTexture(3, channel, LLTexUnit::TFO_POINT, LLTexUnit::TAM_CLAMP); // frag_data[3]
     }
 
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_DEPTH, deferred_target->getUsage());
@@ -9122,8 +9127,9 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_NOISE);
     if (channel > -1)
     {
-        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap);
-        gGL.getTexUnit(channel)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+        // The noise map is tiled across the screen, so it keeps GL's GL_REPEAT default.
+        gGL.getTexUnit(channel)->bindManual(LLTexUnit::TT_TEXTURE, mNoiseMap, false,
+                                            gGL.commonSamplers().mPointWrap);
     }
 
     bindLightFunc(shader);
@@ -10070,21 +10076,15 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     shader.disableTexture(LLShaderMgr::DEFERRED_LIGHT, deferred_light_target->getUsage());
     shader.disableTexture(LLShaderMgr::DIFFUSE_MAP);
 
-    for (U32 i = 0; i < 4; i++)
+    // Release the shadow channels this shader declares, then any unit bindShadowMaps
+    // actually used -- the two are the same for the shader that bound them last, and differ
+    // for every earlier program with another layout. unbind() drops the compare sampler
+    // along with the texture.
+    for (U32 i = 0; i < 6; i++)
     {
-        if (shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0+i) > -1)
-        {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        }
+        shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0+i);
     }
-
-    for (U32 i = 4; i < 6; i++)
-    {
-        if (shader.disableTexture(LLShaderMgr::DEFERRED_SHADOW0+i) > -1)
-        {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        }
-    }
+    releaseShadowMaps();
 
     shader.disableTexture(LLShaderMgr::DEFERRED_NOISE);
     shader.disableTexture(LLShaderMgr::DEFERRED_LIGHTFUNC);
@@ -10106,6 +10106,14 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
 
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     gGL.getTexUnit(0)->activate();
+
+    // mCanBindFast asserts that this shader's deferred textures are STILL BOUND from an
+    // earlier full bind, which is what lets bindDeferredShaderFast skip re-binding them.
+    // We have just released them, so that promise no longer holds -- leaving the flag set
+    // sends the next bind down the fast path onto channels holding whatever came after,
+    // which is how a depth texture ends up under a uniform declared sampler2D.
+    shader.mCanBindFast = false;
+
     shader.unbind();
 }
 
@@ -11989,9 +11997,8 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
                     addDeferredAttachments(avatar->mImpostor, true);
                 }
 
-                gGL.getTexUnit(0)->bind(&avatar->mImpostor);
-                gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                // Point filtering is applied where the impostor is sampled
+                // (LLVOAvatar::renderImpostor), not written onto the texture here.
             }
 
             avatar->mImpostor.bindTarget();

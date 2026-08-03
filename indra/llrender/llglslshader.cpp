@@ -30,6 +30,7 @@
 
 #include "llshadermgr.h"
 #include "llfile.h"
+#include "alsamplerstate.h"
 #include "llrender.h"
 #include "llvertexbuffer.h"
 #include "llrendertarget.h"
@@ -392,6 +393,11 @@ void LLGLSLShader::unloadInternal()
 #endif
             }
         }
+
+        // GL may hand this name straight back out, and the debug validator's per-program
+        // sampler cache revalidates only on active-uniform count -- a recreated program
+        // matching both would be checked against this one's samplers.
+        forget_program_samplers(mProgramObject);
 
         glDeleteProgram(mProgramObject);
 
@@ -1084,15 +1090,22 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLRenderTarget* texture, bool depth, 
 
     if (uniform > -1)
     {
-        if (depth) {
-            gGL.getTexUnit(uniform)->bind(texture, true);
+        if (depth)
+        {
+            // Depth attachments are never mipmapped, and a shadow-compare sampler is not
+            // wanted here -- this is a plain depth fetch.
+            //
+            // TAM_WRAP because allocateDepth never set an address mode, so these textures
+            // have carried GL's GL_REPEAT default. Preserved rather than "fixed" to
+            // TAM_CLAMP: that would be a silent behaviour change in every depth-sampling
+            // pass, and this commit is meant to move state, not alter it.
+            gGL.getTexUnit(uniform)->bind(texture, true,
+                                          gGL.getSampler(mode, LLTexUnit::TAM_WRAP, false));
         }
-        else {
-            bool has_mips = mode == LLTexUnit::TFO_TRILINEAR || mode == LLTexUnit::TFO_ANISOTROPIC;
-            gGL.getTexUnit(uniform)->bindManual(texture->getUsage(), texture->getTexture(index), has_mips);
+        else
+        {
+            texture->bindTexture(index, uniform, mode);
         }
-
-        gGL.getTexUnit(uniform)->setTextureFilteringOption(mode);
     }
 
     return uniform;

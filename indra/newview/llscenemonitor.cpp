@@ -178,9 +178,6 @@ LLRenderTarget& LLSceneMonitor::getCaptureTarget()
     {
         mFrames[0] = new LLRenderTarget();
         mFrames[0]->allocate(width, height, GL_RGB8);
-        gGL.getTexUnit(0)->bind(mFrames[0]);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
         cur_target = mFrames[0];
     }
@@ -188,9 +185,6 @@ LLRenderTarget& LLSceneMonitor::getCaptureTarget()
     {
         mFrames[1] = new LLRenderTarget();
         mFrames[1]->allocate(width, height, GL_RGB8);
-        gGL.getTexUnit(0)->bind(mFrames[1]);
-        gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
 
         cur_target = mFrames[1];
     }
@@ -376,12 +370,16 @@ void LLSceneMonitor::compare()
 
     gGL.getTexUnit(0)->activate();
     gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(0)->bind(mFrames[0]);
+    // Point sampling: this is a per-pixel frame difference, so interpolation would blur
+    // exactly the discrepancies it exists to measure.
+    gGL.getTexUnit(0)->bind(mFrames[0], false,
+                            gGL.commonSamplers().mPointClamp);
     gGL.getTexUnit(0)->activate();
 
     gGL.getTexUnit(1)->activate();
     gGL.getTexUnit(1)->enable(LLTexUnit::TT_TEXTURE);
-    gGL.getTexUnit(1)->bind(mFrames[1]);
+    gGL.getTexUnit(1)->bind(mFrames[1], false,
+                            gGL.commonSamplers().mPointClamp);
     gGL.getTexUnit(1)->activate();
 
     gGL.getTexUnit(2)->activate();

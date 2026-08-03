@@ -1138,14 +1138,12 @@ bool LLTexLayer::render(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* bou
                         gAlphaMaskProgram.setMinimumAlpha(0.f);
                     }
 
-                    LLTexUnit::eTextureAddressMode old_mode = tex->getAddressMode();
-
-                    gGL.getTexUnit(0)->bind(tex, true);
-                    gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+                    // Clamps this binding only, so the save/restore of the texture's own
+                    // mode that used to bracket this draw is no longer needed.
+                    gGL.getTexUnit(0)->bindSampled(tex, LLTexUnit::TAM_CLAMP);
 
                     gl_rect_2d_simple_tex( width, height );
 
-                    gGL.getTexUnit(0)->setTextureAddressMode(old_mode);
                     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
                     if (no_alpha_test)
                     {
@@ -1365,14 +1363,11 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
         LLGLTexture* tex = mLocalTextureObject->getImage();
         if( tex && (tex->getComponents() == 4) )
         {
-            LLTexUnit::eTextureAddressMode old_mode = tex->getAddressMode();
-
-            gGL.getTexUnit(0)->bind(tex, true);
-            gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+            // Per-binding clamp; see the matching call in renderMorphMasks.
+            gGL.getTexUnit(0)->bindSampled(tex, LLTexUnit::TAM_CLAMP);
 
             gl_rect_2d_simple_tex( width, height );
 
-            gGL.getTexUnit(0)->setTextureAddressMode(old_mode);
             gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
         }
     }

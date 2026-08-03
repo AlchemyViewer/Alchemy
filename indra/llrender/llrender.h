@@ -42,6 +42,8 @@
 #include "llpointer.h"
 #include "llglheaders.h"
 #include "llmatrix4a.h"
+#include "alsamplerstate.h"  // mSamplerCache -- this context's sampler objects
+#include "lltexunit.h"
 #include "glm/mat4x4.hpp"
 
 #include <boost/unordered_map.hpp>
@@ -60,185 +62,8 @@ class LLVertexBufferData;
 
 #define LL_MATRIX_STACK_DEPTH 32
 
-constexpr U32 LL_NUM_TEXTURE_LAYERS = 32;
+// LL_NUM_TEXTURE_LAYERS lives in lltexunit.h alongside the units it sizes.
 constexpr U32 LL_NUM_LIGHT_UNITS = 8;
-
-class LLTexUnit
-{
-    friend class LLRender;
-public:
-    static U32 sWhiteTexture;
-
-    typedef enum
-    {
-        TT_TEXTURE = 0,         // Standard 2D Texture
-        TT_RECT_TEXTURE,        // Non power of 2 texture
-        TT_CUBE_MAP,            // 6-sided cube map texture
-        TT_CUBE_MAP_ARRAY,      // Array of cube maps
-        TT_MULTISAMPLE_TEXTURE, // see GL_ARB_texture_multisample
-        TT_TEXTURE_3D,          // standard 3D Texture
-        TT_NONE,                // No texture type is currently enabled
-    } eTextureType;
-
-    typedef enum
-    {
-        TAM_WRAP = 0,           // Standard 2D Texture
-        TAM_MIRROR,             // Non power of 2 texture
-        TAM_CLAMP               // No texture type is currently enabled
-    } eTextureAddressMode;
-
-    typedef enum
-    {   // Note: If mipmapping or anisotropic are not enabled or supported it should fall back gracefully
-        TFO_POINT = 0,          // Equal to: min=point, mag=point, mip=none.
-        TFO_BILINEAR,           // Equal to: min=linear, mag=linear, mip=point.
-        TFO_TRILINEAR,          // Equal to: min=linear, mag=linear, mip=linear.
-        TFO_ANISOTROPIC         // Equal to: min=anisotropic, max=anisotropic, mip=linear.
-    } eTextureFilterOptions;
-
-    typedef enum
-    {
-        TMG_NONE = 0,           // Mipmaps are not automatically generated for this texture.
-        TMG_AUTO,               // Mipmaps are automatically generated for this texture.
-        TMG_MANUAL              // Mipmaps are manually generated for this texture.
-    } eTextureMipGeneration;
-
-    typedef enum
-    {
-        TB_REPLACE = 0,
-        TB_ADD,
-        TB_MULT,
-        TB_MULT_X2,
-        TB_ALPHA_BLEND,
-        TB_COMBINE          // Doesn't need to be set directly, setTexture___Blend() set TB_COMBINE automatically
-    } eTextureBlendType;
-
-    typedef enum
-    {
-        TBO_REPLACE = 0,            // Use Source 1
-        TBO_MULT,                   // Multiply: ( Source1 * Source2 )
-        TBO_MULT_X2,                // Multiply then scale by 2:  ( 2.0 * ( Source1 * Source2 ) )
-        TBO_MULT_X4,                // Multiply then scale by 4:  ( 4.0 * ( Source1 * Source2 ) )
-        TBO_ADD,                    // Add: ( Source1 + Source2 )
-        TBO_ADD_SIGNED,             // Add then subtract 0.5: ( ( Source1 + Source2 ) - 0.5 )
-        TBO_SUBTRACT,               // Subtract Source2 from Source1: ( Source1 - Source2 )
-        TBO_LERP_VERT_ALPHA,        // Interpolate based on Vertex Alpha (VA): ( Source1 * VA + Source2 * (1-VA) )
-        TBO_LERP_TEX_ALPHA,         // Interpolate based on Texture Alpha (TA): ( Source1 * TA + Source2 * (1-TA) )
-        TBO_LERP_PREV_ALPHA,        // Interpolate based on Previous Alpha (PA): ( Source1 * PA + Source2 * (1-PA) )
-        TBO_LERP_CONST_ALPHA        // Interpolate based on Const Alpha (CA): ( Source1 * CA + Source2 * (1-CA) )
-    } eTextureBlendOp;
-
-    typedef enum
-    {
-        TBS_PREV_COLOR = 0,         // Color from the previous texture stage
-        TBS_PREV_ALPHA,
-        TBS_ONE_MINUS_PREV_COLOR,
-        TBS_ONE_MINUS_PREV_ALPHA,
-        TBS_TEX_COLOR,              // Color from the texture bound to this stage
-        TBS_TEX_ALPHA,
-        TBS_ONE_MINUS_TEX_COLOR,
-        TBS_ONE_MINUS_TEX_ALPHA,
-        TBS_VERT_COLOR,             // The vertex color currently set
-        TBS_VERT_ALPHA,
-        TBS_ONE_MINUS_VERT_COLOR,
-        TBS_ONE_MINUS_VERT_ALPHA,
-        TBS_CONST_COLOR,            // The constant color value currently set
-        TBS_CONST_ALPHA,
-        TBS_ONE_MINUS_CONST_COLOR,
-        TBS_ONE_MINUS_CONST_ALPHA
-    } eTextureBlendSrc;
-
-    typedef enum
-    {
-        TCS_LINEAR = 0,
-        TCS_SRGB
-    } eTextureColorSpace;
-
-    LLTexUnit(S32 index = -1);
-
-    // Refreshes renderer state of the texture unit to the cached values
-    // Needed when the render context has changed and invalidated the current state
-    void refreshState(void);
-
-    // returns the index of this texture unit
-    S32 getIndex(void) const { return mIndex; }
-
-    // Sets this tex unit to be the currently active one
-    void activate(void);
-
-    // Enables this texture unit for the given texture type
-    // (automatically disables any previously enabled texture type)
-    void enable(eTextureType type);
-
-    // Disables the current texture unit
-    void disable(void);
-
-    // Binds the LLImageGL to this texture unit
-    // (automatically enables the unit for the LLImageGL's texture type)
-    bool bind(LLImageGL* texture, bool for_rendering = false, bool forceBind = false, S32 usename = 0);
-    bool bind(LLTexture* texture, bool for_rendering = false, bool forceBind = false);
-
-    // bind implementation for inner loops
-    // makes the following assumptions:
-    //  - No need for gGL.flush()
-    //  - texture is not null
-    //  - gl_tex->getTexName() is not zero
-    //  - This texture is not being bound redundantly
-    //  - USE_SRGB_DECODE is disabled
-    //  - mTexOptionsDirty is false
-    //  -
-    void bindFast(LLTexture* texture);
-
-    // Binds a cubemap to this texture unit
-    // (automatically enables the texture unit for cubemaps)
-    bool bind(LLCubeMap* cubeMap);
-
-    // Binds a render target to this texture unit
-    // (automatically enables the texture unit for the RT's texture type)
-    bool bind(LLRenderTarget * renderTarget, bool bindDepth = false);
-
-    // Manually binds a texture to the texture unit
-    // (automatically enables the tex unit for the given texture type)
-    bool bindManual(eTextureType type, U32 texture, bool hasMips = false);
-
-    // Unbinds the currently bound texture of the given type
-    // (only if there's a texture of the given type currently bound)
-    void unbind(eTextureType type);
-
-    // Fast but unsafe version of unbind
-    void unbindFast(eTextureType type);
-
-    // Sets the addressing mode used to sample the texture
-    // Warning: this stays set for the bound texture forever,
-    // make sure you want to permanently change the address mode  for the bound texture.
-    void setTextureAddressMode(eTextureAddressMode mode);
-    // MUST already be active and bound
-    void setTextureAddressModeFast(eTextureAddressMode mode, eTextureType tex_type);
-
-    // Sets the filtering options used to sample the texture
-    // Warning: this stays set for the bound texture forever,
-    // make sure you want to permanently change the filtering for the bound texture.
-    void setTextureFilteringOption(LLTexUnit::eTextureFilterOptions option);
-    // MUST already be active and bound
-    void setTextureFilteringOptionFast(LLTexUnit::eTextureFilterOptions option, eTextureType tex_type);
-
-    static U32 getInternalType(eTextureType type);
-
-    U32 getCurrTexture(void) { return mCurrTexture; }
-
-    eTextureType getCurrType(void) { return mCurrTexType; }
-
-    void setHasMipMaps(bool hasMips) { mHasMipMaps = hasMips; }
-
-protected:
-    friend class LLRender;
-
-    S32                 mIndex;
-    U32                 mCurrTexture;
-    eTextureType        mCurrTexType;
-    bool                mHasMipMaps;
-
-    void debugTextureUnit(void);
-};
 
 class LLLightState
 {
@@ -474,6 +299,36 @@ public:
 
     U32 getCurrentTexUnitIndex(void) const { return mCurrTextureUnitIndex; }
 
+    // Resolve a sampler object belonging to THIS context. See ALSamplerCache -- the cache
+    // is a member rather than a static precisely so it cannot outlive, or be torn down by,
+    // a context other than its own.
+    U32 getSampler(LLTexUnit::eTextureFilterOptions filter,
+                   LLTexUnit::eTextureAddressMode   address,
+                   bool                             has_mips,
+                   bool                             compare = false)
+    {
+        return mSamplerCache.get(filter, address, has_mips, compare);
+    }
+
+    // For sampling modes the filter enum cannot express; see ALSamplerCache::get(desc).
+    U32 getSampler(const ALSamplerDesc& desc) { return mSamplerCache.get(desc); }
+
+    // The named fixed sampling modes for this context -- gGL.commonSamplers().mPointClamp
+    // and friends. Prefer these over respelling a constant filter/address/mips triple at the
+    // call site; see ALCommonSamplers.
+    const ALCommonSamplers& commonSamplers() { return mSamplerCache.common(); }
+
+    // Generation of this context's sampler cache; changes whenever the objects are dropped.
+    // Lets a hot path cache a resolved name and revalidate it with one compare.
+    U32 getSamplerGeneration() const { return mSamplerCache.getGeneration(); }
+
+    // Delete this context's sampler objects and forget the per-unit bindings that pointed
+    // at them. Both halves belong together: GL unbinds a deleted sampler automatically, but
+    // LLTexUnit::mCurrSampler would still claim it is bound, and GL may hand the same name
+    // back for the next sampler created -- at which point bindSampler's redundancy check
+    // would skip a bind that is needed.
+    void clearSamplers();
+
     bool verifyTexUnitActive(U32 unitToVerify);
 
     void debugTexUnits(void);
@@ -526,6 +381,10 @@ private:
     LLStrider<LLColor4U>        mColorsp;
     U32                         mDummyVAO = 0;
     std::array<LLTexUnit, LL_NUM_TEXTURE_LAYERS> mTexUnits;
+    // This context's sampler objects. Sits beside mTexUnits deliberately: the units hold
+    // the bindings, this holds the objects those bindings name, and the two have to be
+    // torn down together and by the same thread.
+    ALSamplerCache mSamplerCache;
     LLTexUnit           mDummyTexUnit;
     std::array<LLLightState, LL_NUM_LIGHT_UNITS> mLightState;
 

@@ -73,6 +73,7 @@
 #include "llappviewer.h"
 #include "llvosurfacepatch.h"
 #include "llvowlsky.h"
+#include "alsamplerstate.h"
 #include "llrender.h"
 #include "llnavigationbar.h"
 #include "llnotificationsutil.h"
@@ -332,7 +333,16 @@ static bool handleAnisotropicFilteringChanged(const LLSD& newval)
         val = llclamp(val, 0.f, gGLManager.mMaxAnisotropy);
     }
     LLRender::sAnisotropicFilteringLevel = val;
-    LLImageGL::dirtyTexOptions();
+    // Sampler objects are immutable, so the anisotropy baked into existing ones can't be
+    // edited -- drop them and let the next bind rebuild at the new level. This is the whole
+    // update now: since LLImageGL sampling resolves through the cache, there is no
+    // per-texture state left to dirty.
+    //
+    // Clears the main thread's set only, since the cache is per-context. That is complete
+    // rather than lucky: the texture upload thread binds with sampler 0 throughout, so its
+    // set is never populated. Should an upload path ever select a real sampler, this would
+    // need to reach that context too.
+    gGL.clearSamplers();
     return true;
 }
 

@@ -217,7 +217,12 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
 void LLCubeMapArray::bind(S32 stage)
 {
     mTextureStage = stage;
-    gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_CUBE_MAP_ARRAY, getGLName(), mImage->getUseMipMaps());
+    // Bound by name, so the sampler has to be passed explicitly -- mImage's filter/address
+    // are sampler inputs now, not texture-object state, and bindManual would otherwise leave
+    // this unit on sampler 0 and sample the probe array with GL's defaults
+    // (GL_NEAREST_MIPMAP_LINEAR: nearest within the mip, i.e. blocky reflections).
+    gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_CUBE_MAP_ARRAY, getGLName(),
+                                      mImage->getUseMipMaps(), mImage->getSampler());
 }
 
 void LLCubeMapArray::unbind()

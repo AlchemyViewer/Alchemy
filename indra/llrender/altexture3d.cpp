@@ -121,7 +121,10 @@ void ALTexture3D::bind(S32 stage)
     }
 
     mTextureStage = stage;
-    gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_TEXTURE_3D, mImage->getTexName());
+    // See LLCubeMapArray::bind -- bound by name, so the sampler must be passed explicitly
+    // or this samples with GL's defaults rather than mImage's clamp/bilinear.
+    gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_TEXTURE_3D, mImage->getTexName(),
+                                      false, mImage->getSampler());
 }
 
 void ALTexture3D::unbind(S32 stage)

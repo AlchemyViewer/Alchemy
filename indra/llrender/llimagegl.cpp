@@ -644,15 +644,6 @@ void LLImageGL::destroyGL()
 }
 
 //static
-void LLImageGL::dirtyTexOptions()
-{
-    for (auto& glimage : sImageList)
-    {
-        glimage->mTexOptionsDirty = true;
-        stop_glerror();
-    }
-
-}
 //----------------------------------------------------------------------------
 
 //for server side use only.
@@ -794,7 +785,6 @@ void LLImageGL::init(bool usemipmaps)
     mComponents = 0;
     mMaxDiscardLevel = MAX_DISCARD_LEVEL;
 
-    mTexOptionsDirty = true;
     mAddressMode = LLTexUnit::TAM_WRAP;
     mFilterOption = LLTexUnit::TFO_ANISOTROPIC;
 
@@ -981,12 +971,13 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
         gGL.getTexUnit(0)->unbind(mBindTarget);
 
         mHasMipMaps = true;
-        mTexOptionsDirty = true;
-        setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
+        setFilteringOption(LLTexUnit::TFO_ANISOTROPIC); // also invalidates the sampler memo
     }
     else
     {
         mHasMipMaps = false;
+        // mHasMipMaps feeds getSampler(), and the bind below consumes it immediately.
+        invalidateSampler();
     }
 
     gGL.getTexUnit(0)->bind(this, false, false, usename);
@@ -2075,9 +2066,12 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
     }
 
     // Set texture options to our defaults.
+    //
+    // mAddressMode/mFilterOption are NOT written to the texture object: the bind above
+    // already selected the sampler that carries them, and writing texture state under a
+    // bound sampler is ignored (it would trip warnIfSamplerBound). Only the unit's
+    // mip-map flag still needs setting here.
     gGL.getTexUnit(0)->setHasMipMaps(mHasMipMaps);
-    gGL.getTexUnit(0)->setTextureAddressMode(mAddressMode);
-    gGL.getTexUnit(0)->setTextureFilteringOption(mFilterOption);
 
     // things will break if we don't unbind after creation
     gGL.getTexUnit(0)->unbind(mBindTarget);
@@ -2403,32 +2397,49 @@ void LLImageGL::forceToInvalidateGLTexture()
 
 void LLImageGL::setAddressMode(LLTexUnit::eTextureAddressMode mode)
 {
-    if (mAddressMode != mode)
-    {
-        mTexOptionsDirty = true;
-        mAddressMode = mode;
-    }
-
-    if (gGL.getTexUnit(gGL.getCurrentTexUnitIndex())->getCurrTexture() == mTexName)
-    {
-        gGL.getTexUnit(gGL.getCurrentTexUnitIndex())->setTextureAddressMode(mode);
-        mTexOptionsDirty = false;
-    }
+    mAddressMode = mode;
+    invalidateSampler();
+    refreshSamplerIfBound();
 }
 
 void LLImageGL::setFilteringOption(LLTexUnit::eTextureFilterOptions option)
 {
-    if (mFilterOption != option)
+    mFilterOption = option;
+    invalidateSampler();
+    refreshSamplerIfBound();
+}
+
+// The sampler object this texture wants to be sampled through.
+//
+// Cached: bindFast calls this on every draw, and re-deriving it means an index computation
+// and an array probe each time for an answer that changes only when this texture's sampling
+// mode changes or the cache is dropped. The generation compare catches the latter -- a stale
+// name would otherwise survive a clearSamplers() and GL is free to reissue it.
+U32 LLImageGL::getSampler() const
+{
+    const U32 generation = gGL.getSamplerGeneration();
+    if (mCachedSamplerGeneration != generation)
     {
-        mTexOptionsDirty = true;
-        mFilterOption = option;
+        mCachedSampler           = gGL.getSampler(mFilterOption, mAddressMode, mHasMipMaps);
+        mCachedSamplerGeneration = generation;
+    }
+    return mCachedSampler;
+}
+
+// A sampler is chosen at bind time from mFilterOption/mAddressMode, so changing either only
+// matters at the next bind -- except when this texture is bound RIGHT NOW, in which case the
+// unit is still holding the sampler that matched the old values.
+void LLImageGL::refreshSamplerIfBound() const
+{
+    if (mTexName == 0)
+    {
+        return;
     }
 
-    if (mTexName != 0 && gGL.getTexUnit(gGL.getCurrentTexUnitIndex())->getCurrTexture() == mTexName)
+    LLTexUnit* unit = gGL.getTexUnit(gGL.getCurrentTexUnitIndex());
+    if (unit && unit->getCurrTexture() == mTexName)
     {
-        gGL.getTexUnit(gGL.getCurrentTexUnitIndex())->setTextureFilteringOption(option);
-        mTexOptionsDirty = false;
-        stop_glerror();
+        unit->bindSampler(getSampler());
     }
 }
 
@@ -3152,7 +3163,6 @@ bool LLImageGL::scaleDown(S32 desired_discard)
     free_tex_image(old_texname);
     deleteTextures(1, &old_texname);
     mTexName = new_texname;
-    mTexOptionsDirty = true;
 
     mCurrentDiscardLevel = desired_discard;
 
