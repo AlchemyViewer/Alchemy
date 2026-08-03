@@ -2206,7 +2206,7 @@ add_custom_command(
   COMMAND ${Python3_EXECUTABLE}
   ARGS
     ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-    "--actions=\"copy package\""
+    "--actions=copy package"
     --arch=${ARCH}
     --artwork=${ARTWORK_DIR}
     "--bugsplat=${BUGSPLAT_DB}"
@@ -2240,7 +2240,7 @@ if(IS_DIRECTORY ${LOCAL_DIST_DIR})
       COMMAND ${Python3_EXECUTABLE}
       ARGS
       ${CMAKE_CURRENT_SOURCE_DIR}/viewer_manifest.py
-      "--actions=\"copy package unpacked\""
+      "--actions=copy package unpacked"
       --arch=${ARCH}
       --artwork=${ARTWORK_DIR}
       "--bugsplat=${BUGSPLAT_DB}"
