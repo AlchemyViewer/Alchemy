@@ -585,6 +585,8 @@ void LLImageGL::updateStats(F32 current_time)
     LLTexUnit::sSamplerSkips = 0;
     LLTexUnit::sTextureBinds = 0;
     LLTexUnit::sSamplerBindsFlushed = 0;
+    LLTexUnit::sSamplerBindsSplitBatch = 0;
+    LLTexUnit::sSamplerBindsShadowCycle = 0;
 }
 
 //----------------------------------------------------------------------------

@@ -8990,6 +8990,7 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     // chain the filter resolves to GL_LINEAR, which is what gives the compare its 2x2 PCF.
     const U32 shadow_sampler = gGL.getSampler(ALSamplers::ShadowCompare);
 
+    const U32 sampler_binds_before = LLTexUnit::sSamplerBinds;
     U32 bound_units = 0;
 
     for (U32 i = 0; i < 4; i++)
@@ -9045,6 +9046,7 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     }
 
     LLGLSLShader::sCompareSamplerUnits = bound_units;
+    LLTexUnit::sSamplerBindsShadowCycle += LLTexUnit::sSamplerBinds - sampler_binds_before;
 }
 
 void LLPipeline::unbindShadowMaps()

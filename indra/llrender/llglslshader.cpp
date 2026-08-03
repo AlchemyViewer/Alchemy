@@ -1006,6 +1006,7 @@ bool LLGLSLShader::declaresShadowSamplers() const
 // static
 void LLGLSLShader::releaseCompareSamplerUnits()
 {
+    const U32 binds_before = LLTexUnit::sSamplerBinds;
     U32 units = sCompareSamplerUnits;
     sCompareSamplerUnits = 0;
     for (S32 unit = 0; units != 0; ++unit, units >>= 1)
@@ -1016,6 +1017,7 @@ void LLGLSLShader::releaseCompareSamplerUnits()
             gGL.getTexUnit(unit)->bindSampler(0);
         }
     }
+    LLTexUnit::sSamplerBindsShadowCycle += LLTexUnit::sSamplerBinds - binds_before;
 }
 
 void LLGLSLShader::bind()

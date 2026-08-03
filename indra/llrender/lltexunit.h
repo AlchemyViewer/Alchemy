@@ -71,6 +71,20 @@ public:
     // so a high total with a low flushed count is cheap and the reverse is not.
     static U32 sSamplerBindsFlushed;
 
+    // ... of sSamplerBindsFlushed, the ones where the flush found geometry actually queued
+    // (gGL.mCount > 0) and emitted a draw. An empty flush is a branch and a return; THIS is
+    // the real batch-split count, and where it comes from is the question that matters --
+    // immediate-mode UI alternating glyph-atlas and image samplers on one unit is the usual
+    // suspect, since scene geometry draws from VBOs with nothing queued in gGL.
+    static U32 sSamplerBindsSplitBatch;
+
+    // ... of sSamplerBinds, the ones issued by the shadow-map compare-sampler cycle:
+    // releaseCompareSamplerUnits dropping units to sampler 0 plus bindShadowMaps putting the
+    // compare sampler back. Scene-dependent through the alpha pass's emissive groups (each
+    // costs a release + restore), which makes it the prime suspect for a large standing
+    // total that UI toggles barely move.
+    static U32 sSamplerBindsShadowCycle;
+
     typedef enum
     {
         TT_TEXTURE = 0,         // Standard 2D Texture

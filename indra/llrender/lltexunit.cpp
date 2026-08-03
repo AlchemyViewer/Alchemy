@@ -50,6 +50,8 @@ U32 LLTexUnit::sSamplerBinds  = 0;
 U32 LLTexUnit::sSamplerSkips  = 0;
 U32 LLTexUnit::sTextureBinds  = 0;
 U32 LLTexUnit::sSamplerBindsFlushed = 0;
+U32 LLTexUnit::sSamplerBindsSplitBatch = 0;
+U32 LLTexUnit::sSamplerBindsShadowCycle = 0;
 
 LLTexUnit::LLTexUnit(S32 index)
     : mCurrTexType(TT_NONE),
@@ -106,8 +108,19 @@ void LLTexUnit::bindSampler(U32 sampler)
         return;
     }
 
+    // Zone only on the ISSUED path (a couple thousand per frame, not tens of thousands of
+    // skips), so a Tracy capture attributes the standing sampler-bind total by enclosing
+    // zone -- which pass, which pool, which bind chain -- without per-suspect counters.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    LL_PROFILE_ZONE_NUM(mIndex);
+
     ++sSamplerBinds;
     ++sSamplerBindsFlushed;
+    if (gGL.mCount > 0)
+    {
+        // The flush below will emit a draw: this sampler change genuinely split a batch.
+        ++sSamplerBindsSplitBatch;
+    }
 
     // Sampler state is consulted at sample time, not at bind time, so a change has to be
     // ordered against draws the same way a texture change is.

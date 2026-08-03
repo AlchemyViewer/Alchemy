@@ -684,8 +684,10 @@ public:
             {
                 const U32 sampler_binds = LLTexUnit::sSamplerBinds;
                 const U32 tex_binds     = LLTexUnit::sTextureBinds;
-                addText(xpos, ypos, llformat("%d Sampler Binds (%d FLUSHED, %d skipped, %.2f per tex bind)",
+                addText(xpos, ypos, llformat("%d Sampler Binds (%d flushed, %d SPLIT BATCH, %d shadow-cycle, %d skipped, %.2f per tex bind)",
                                              sampler_binds, LLTexUnit::sSamplerBindsFlushed,
+                                             LLTexUnit::sSamplerBindsSplitBatch,
+                                             LLTexUnit::sSamplerBindsShadowCycle,
                                              LLTexUnit::sSamplerSkips,
                                              tex_binds ? (F32)sampler_binds / (F32)tex_binds : 0.f));
                 ypos += y_inc;
