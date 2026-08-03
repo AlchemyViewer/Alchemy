@@ -61,7 +61,12 @@ namespace LLImageGLMemory
 }
 
 //============================================================================
-class LLImageGL : public LLRefCount
+// NOTE: thread-safe refcount rather than plain LLRefCount because syncToMainThread()
+// takes a reference on the LLImageGL thread which is released on the main thread.
+// Refcount traffic here is per-texture-lifetime (LLImageGL lives in member slots like
+// LLGLTexture::mGLTexturep, it isn't copied through hot loops), so the atomic is not on
+// any measured path.
+class LLImageGL : public LLThreadSafeRefCount
 {
     friend class LLTexUnit;
 public:

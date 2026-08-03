@@ -303,6 +303,7 @@ void LLImageGL::cleanupClass()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     LLImageGLThread::deleteSingleton();
+
     if (sScratchPBO != 0)
     {
         glDeleteBuffers(1, &sScratchPBO);
@@ -1859,51 +1860,69 @@ void LLImageGL::syncToMainThread(LLGLuint new_tex_name)
     LL_PROFILE_ZONE_SCOPED;
     llassert(!on_main_thread());
 
+    GLsync sync;
     {
         LL_PROFILE_ZONE_NAMED("cglt - sync");
-        if (gGLManager.mIsNVIDIA)
+        // No flush before the fence: glFenceSync already orders after every command
+        // issued on this context, so the flush below submits those too.
+        sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        // REQUIRED, and NOT replaceable by GL_SYNC_FLUSH_COMMANDS_BIT on the waiter:
+        // that bit flushes the command stream of whichever context calls
+        // glClientWaitSync, which is the main thread's context, not this one. Only a
+        // flush here submits the fence, so without it the main thread polls forever.
+        glFlush();
+    }
+
+    // Block here until the upload has actually completed, then let the main thread swap
+    // the name in. This costs this thread's throughput, but publishing mTexName must not
+    // outrun the metadata that createGLTexture already wrote (mWidth/mHeight/mComponents
+    // via setSize, mCurrentDiscardLevel, the format fields) -- consumers read those
+    // through LLGLTexture::getWidth()/getDiscardLevel() and pair them with mTexName.
+    // Deferring the name publish past this point widens that mismatch into something
+    // sculpt reproducibly trips over (LLVOVolume::sculpt reads back from GL at the new
+    // dimensions and gets the old texture).
+    //
+    // Do NOT be tempted to turn this into a glWaitSync on the main thread: that is a
+    // GPU-timeline wait only and gives the main thread's context no CPU-side sync point,
+    // so the driver is not obliged to have observed this context's changes to the shared
+    // texture by the time the main thread binds it. That was the original implementation
+    // and it had to be special-cased for NVIDIA (SL-17284). glClientWaitSync *is* a
+    // CPU-side sync point in whichever context calls it, which is the guarantee we need,
+    // and it is now taken uniformly on every vendor.
+    {
+        LL_PROFILE_ZONE_NAMED("cglt - wait sync");
+        // One second per iteration so we actually block in the driver rather than
+        // spinning. Note FENCE_WAIT_TIME_NANOSECONDS is 1000ns despite its "1 ms"
+        // comment, which would busy-wait.
+        constexpr U64 WAIT_SLICE_NS = 1000000000ull;
+        GLenum res = glClientWaitSync(sync, 0, WAIT_SLICE_NS);
+        while (res == GL_TIMEOUT_EXPIRED)
         {
-            // wait for texture upload to finish before notifying main thread
-            // upload is complete
-            auto sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-            glFlush();
-            glClientWaitSync(sync, 0, GL_TIMEOUT_IGNORED);
-            glDeleteSync(sync);
+            res = glClientWaitSync(sync, 0, WAIT_SLICE_NS);
         }
-        else
+        if (res == GL_WAIT_FAILED)
         {
-            // post a sync to the main thread (will execute before tex name swap lambda below)
-            // glFlush calls here are partly superstitious and partly backed by observation
-            // on AMD hardware
-            glFlush();
-            auto sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-            glFlush();
-            LL::WorkQueue::postMaybe(
-                mMainQueue,
-                [=]()
-                {
-                    LL_PROFILE_ZONE_NAMED("cglt - wait sync");
-                    {
-                        LL_PROFILE_ZONE_NAMED("glWaitSync");
-                        glWaitSync(sync, 0, GL_TIMEOUT_IGNORED);
-                    }
-                    {
-                        LL_PROFILE_ZONE_NAMED("glDeleteSync");
-                        glDeleteSync(sync);
-                    }
-                });
+            // Not a valid sync object -- we have no completion guarantee to offer, so
+            // say so rather than silently handing over a texture that may not be ready.
+            LL_WARNS_ONCE() << "glClientWaitSync failed waiting on a texture upload fence." << LL_ENDL;
         }
+        glDeleteSync(sync);
     }
 
     ref();
-    LL::WorkQueue::postMaybe(
-        mMainQueue,
-        [=, this]()
-        {
-            LL_PROFILE_ZONE_NAMED("cglt - delete callback");
-            syncTexName(new_tex_name);
-            unref();
-        });
+    if (!LL::WorkQueue::postMaybe(
+            mMainQueue,
+            [=, this]()
+            {
+                LL_PROFILE_ZONE_NAMED("cglt - delete callback");
+                syncTexName(new_tex_name);
+                unref();
+            }))
+    {
+        // main queue is gone (shutdown); nothing will run the lambda, so don't strand
+        // the reference we just took
+        unref();
+    }
 
     LL_PROFILER_GPU_COLLECT;
 }
