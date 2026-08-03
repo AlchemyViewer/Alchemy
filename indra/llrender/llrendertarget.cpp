@@ -154,32 +154,51 @@ LLRenderTarget::~LLRenderTarget()
 
 void LLRenderTarget::resize(U32 resx, U32 resy)
 {
-    //for accounting, get the number of pixels added/subtracted
-    S64 pix_diff = static_cast<S64>(resx) * resy - static_cast<S64>(mResX) * mResY;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    llassert(!isBoundInStack());
 
-    mResX = resx;
-    mResY = resy;
-
-    llassert(mInternalFormat.size() == mTex.size());
-
-    for (U32 i = 0; i < mTex.size(); ++i)
-    { //resize color attachments
-        gGL.getTexUnit(0)->bindManual(mUsage, mTex[i]);
-        LLImageGL::setManualImage(LLTexUnit::getInternalType(mUsage), 0, mInternalFormat[i], mResX, mResY, GL_RGBA, GL_UNSIGNED_BYTE, NULL, false);
-        sBytesAllocated += static_cast<S32>(pix_diff * get_color_format_bytes_per_pixel(mInternalFormat[i]));
+    if (resx == mResX && resy == mResY)
+    {
+        return;
     }
 
-    if (mDepth)
+    // Rebuild rather than re-specifying storage underneath the live FBO.
+    //
+    // The old implementation called glTexImage2D on each attachment while it was still
+    // attached to mFBO. That makes the driver free and reallocate storage which in-flight
+    // command buffers may still reference, so it either blocks until they retire or forces
+    // a pipeline sync, and it dirties the framebuffer's completeness state as well. Doing
+    // that per attachment, for several targets in a frame, is enough to cost whole frames.
+    //
+    // Fresh textures have no in-flight references, and the old ones go out through
+    // LLImageGL's deferred delete rather than being freed under the GPU. It is also the
+    // only form immutable storage allows, since glTexStorage2D cannot re-specify.
+    if (mUseDepth && mDepth == 0)
     {
-        gGL.getTexUnit(0)->bindManual(mUsage, mDepth);
-        U32 internal_type = LLTexUnit::getInternalType(mUsage);
-        const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
-        LLImageGL::setManualImage(internal_type, 0, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL, false);
+        // Depth is shared from another target (see shareDepthBuffer). Rebuilding here
+        // would silently unshare it, so leave this to the owner instead of guessing.
+        LL_WARNS_ONCE() << "Refusing to resize a render target using a shared depth buffer; "
+                        << "reallocate it from the target that owns the depth instead." << LL_ENDL;
+        return;
+    }
 
-        sBytesAllocated += static_cast<S32>(pix_diff * info.bytes_per_pixel);
+    // release() clears these, so capture the configuration before allocate() runs it.
+    const std::vector<U32> formats = mInternalFormat;
+    const bool                        use_depth  = (mDepth != 0);
+    const bool                        stencil    = mStencil;
+    const eDepthFormat                depth_fmt  = mDepthFormat;
+    const LLTexUnit::eTextureType     usage      = mUsage;
+    const LLTexUnit::eTextureMipGeneration mips  = mGenerateMipMaps;
+
+    // allocate() releases first, then rebuilds attachment 0 and the depth buffer with the
+    // same sampler state addColorAttachment/allocateDepth apply on first creation.
+    allocate(resx, resy, formats.empty() ? 0 : formats[0], use_depth, stencil, usage, mips, depth_fmt);
+
+    for (size_t i = 1; i < formats.size(); ++i)
+    {
+        addColorAttachment(formats[i]);
     }
 }
-
 
 bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, LLTexUnit::eTextureType usage, LLTexUnit::eTextureMipGeneration generateMipMaps, eDepthFormat depth_fmt)
 {
@@ -322,7 +341,12 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
 
     {
         clear_glerror();
-        LLImageGL::setManualImage(LLTexUnit::getInternalType(mUsage), 0, color_fmt, mResX, mResY, GL_RGBA, GL_UNSIGNED_BYTE, NULL, false);
+        // The whole mip pyramid must exist at allocation: storage is immutable, so the
+        // glGenerateMipmap in flush() can only fill levels that were allocated here --
+        // against a single-level texture it is a spec-defined no-op and TMG_AUTO targets
+        // (the luminance map auto-exposure averages through) silently lose their mips.
+        const S32 levels = llmax(1, (S32)mMipLevels);
+        LLImageGL::allocateTexture2D(LLTexUnit::getInternalType(mUsage), color_fmt, mResX, mResY, GL_RGBA, GL_UNSIGNED_BYTE, NULL, levels);
         if (glGetError() != GL_NO_ERROR)
         {
             LL_WARNS() << "Could not allocate color buffer for render target." << LL_ENDL;
@@ -393,7 +417,7 @@ bool LLRenderTarget::allocateDepth()
     stop_glerror();
     clear_glerror();
     const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
-    LLImageGL::setManualImage(internal_type, 0, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL, false);
+    LLImageGL::allocateTexture2D(internal_type, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL);
     gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
 
     sBytesAllocated += mResX * mResY * info.bytes_per_pixel;

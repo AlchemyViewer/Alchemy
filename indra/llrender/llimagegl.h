@@ -230,8 +230,12 @@ public:
     void setExplicitFormat(LLGLint internal_format, LLGLenum primary_format, LLGLenum type_format = 0, bool swap_bytes = false);
     void setComponents(S8 ncomponents) { mComponents = ncomponents; }
 
-    S32  getDiscardLevel() const        { return mCurrentDiscardLevel; }
-    S32  getMaxDiscardLevel() const     { return mMaxDiscardLevel; }
+    // While an off-thread upload is in flight the members below describe the texture
+    // being built, not the one mTexName still names. Consumers pair these getters with
+    // getTexName() -- LLVOVolume::sculpt reads back from GL at getWidth() -- so they must
+    // report what mTexName actually holds until both flip together in syncTexName.
+    S32  getDiscardLevel() const        { return mUploadInFlight ? mPublished.mCurrentDiscardLevel : mCurrentDiscardLevel; }
+    S32  getMaxDiscardLevel() const     { return mUploadInFlight ? mPublished.mMaxDiscardLevel : mMaxDiscardLevel; }
 
     // override the current discard level
     // should only be used for local textures where you know exactly what you're doing
@@ -241,7 +245,7 @@ public:
     S32  getCurrentHeight() const { return mHeight ;}
     S32  getWidth(S32 discard_level = -1) const;
     S32  getHeight(S32 discard_level = -1) const;
-    U8   getComponents() const { return mComponents; }
+    U8   getComponents() const { return (U8)(mUploadInFlight ? mPublished.mComponents : mComponents); }
     S64  getBytes(S32 discard_level = -1) const;
     S64  getMipBytes(S32 discard_level = -1) const;
     bool getBoundRecently() const;
@@ -249,6 +253,10 @@ public:
     bool getHasExplicitFormat() const { return mHasExplicitFormat; }
     LLGLenum getPrimaryFormat() const { return mFormatPrimary; }
     LLGLenum getFormatType() const { return mFormatType; }
+
+    // Internal format to hand glTexStorage*. Block-compressed textures keep their sized
+    // compressed format in mFormatPrimary rather than mFormatInternal.
+    S32 getStorageInternalFormat() const;
 
     bool getHasGLTexture() const { return mTexName != 0; }
     LLGLuint getTexName() const { return mTexName; }
@@ -333,10 +341,6 @@ private:
     // cannot drift. Returns EMutableCause::None when immutable storage is usable.
     enum class EMutableCause classifyImmutableStorage() const;
 
-    // Internal format to hand glTexStorage*. Block-compressed textures keep their sized
-    // compressed format in mFormatPrimary rather than mFormatInternal.
-    S32 getStorageInternalFormat() const;
-
     U32 createPickMask(S32 pWidth, S32 pHeight);
     void freePickMask();
     bool isCompressed() const;
@@ -354,6 +358,39 @@ private:
     bool mNeedsAlphaAndPickMask;
     S8   mAlphaStride ;
     S8   mAlphaOffset ;
+
+    // Geometry of the texture mTexName currently names, captured when an off-thread
+    // upload begins overwriting the members with the *next* texture's geometry.
+    //
+    // createGLTexture runs on the LLImageGL thread and writes mWidth/mHeight/mComponents
+    // (via setSize) and mCurrentDiscardLevel long before syncTexName publishes the new
+    // mTexName on the main thread. Without this the image advertises the new texture's
+    // dimensions while still naming the old one for the whole upload, and anything
+    // pairing the two -- sculpt reading back from GL at the advertised size -- gets
+    // garbage. Only consulted while mUploadInFlight; the members are the truth otherwise.
+    struct PublishedGeom
+    {
+        S32 mWidth = 0;
+        S32 mHeight = 0;
+        S8  mComponents = 0;
+        S8  mCurrentDiscardLevel = -1;
+        S8  mMaxDiscardLevel = 0;
+    };
+    PublishedGeom mPublished;
+    bool     mUploadInFlight = false;
+
+    // Live geometry for the UPLOAD path. setImage runs while mUploadInFlight is set (the
+    // off-thread createGLTexture), and it describes the texture being BUILT -- the getters
+    // above keep answering for the texture mTexName still names, so sizing storage or the
+    // per-level writes through them would build the new texture at the old texture's size.
+    S32 liveWidth(S32 discard_level) const
+    {
+        return llmax(mWidth >> llmax(discard_level, 0), 1);
+    }
+    S32 liveHeight(S32 discard_level) const
+    {
+        return llmax(mHeight >> llmax(discard_level, 0), 1);
+    }
 
     bool     mGLTextureCreated ;
     LLGLuint mTexName;
@@ -452,6 +489,13 @@ public:
 
     //similar to setTexName, but will call deleteTextures on mTexName if mTexName is not 0 or texname
     void syncTexName(LLGLuint texname);
+
+    // Snapshot the currently-published geometry before an off-thread upload starts
+    // overwriting it. Idempotent: both createGLTexture overloads call it, and the outer
+    // one delegates to the inner. endUpload() drops the snapshot once the members and
+    // mTexName agree again, or after a failed upload.
+    void beginUpload();
+    void endUpload() { mUploadInFlight = false; }
 
     //for debug use: show texture size distribution
     //----------------------------------------

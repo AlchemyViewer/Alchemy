@@ -430,6 +430,14 @@ static bool isSizedInternalFormat(S32 intformat)
     case GL_RG32F:
     case GL_RGB32F:
     case GL_RGBA32F:
+    // Depth and depth-stencil, as used by render target attachments. GL_DEPTH_COMPONENT
+    // on its own is unsized and is correctly rejected below.
+    case GL_DEPTH_COMPONENT16:
+    case GL_DEPTH_COMPONENT24:
+    case GL_DEPTH_COMPONENT32:
+    case GL_DEPTH_COMPONENT32F:
+    case GL_DEPTH24_STENCIL8:
+    case GL_DEPTH32F_STENCIL8:
     // Block-compressed formats are sized and glTexStorage2D accepts them; their uploads
     // just have to go through glCompressedTexSubImage2D rather than glTexSubImage2D.
     case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
@@ -954,9 +962,9 @@ void LLImageGL::setExplicitFormat( LLGLint internal_format, LLGLenum primary_for
 void LLImageGL::setImage(const LLImageRaw* imageraw)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    llassert((imageraw->getWidth() == getWidth(mCurrentDiscardLevel)) &&
-             (imageraw->getHeight() == getHeight(mCurrentDiscardLevel)) &&
-             (imageraw->getComponents() == getComponents()));
+    llassert((imageraw->getWidth() == liveWidth(mCurrentDiscardLevel)) &&
+             (imageraw->getHeight() == liveHeight(mCurrentDiscardLevel)) &&
+             (imageraw->getComponents() == mComponents));
     const U8* rawdata = imageraw->getData();
     setImage(rawdata, false);
 }
@@ -1004,7 +1012,7 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
     else if (cause == EMutableCause::None)
     {
         free_cur_tex_image();
-        allocateTextureStorage(getWidth(), getHeight(), mUseMipMaps);
+        allocateTextureStorage(liveWidth(mCurrentDiscardLevel), liveHeight(mCurrentDiscardLevel), mUseMipMaps);
     }
     else
     {
@@ -1017,8 +1025,8 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
 
     if (data_in == nullptr)
     {
-        S32 w = getWidth();
-        S32 h = getHeight();
+        S32 w = liveWidth(mCurrentDiscardLevel);
+        S32 h = liveHeight(mCurrentDiscardLevel);
         if (mImmutableStorage)
         {
             // storage is the whole point here; there are no pixels to write
@@ -1038,8 +1046,8 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
             for (S32 d=mCurrentDiscardLevel; d<=mMaxDiscardLevel; d++)
             {
 
-                S32 w = getWidth(d);
-                S32 h = getHeight(d);
+                S32 w = liveWidth(d);
+                S32 h = liveHeight(d);
                 S32 gl_level = d-mCurrentDiscardLevel;
 
                 mMipLevels = llmax(mMipLevels, gl_level + 1);
@@ -1111,8 +1119,8 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
                         stop_glerror();
                     }
 
-                    S32 w = getWidth(mCurrentDiscardLevel);
-                    S32 h = getHeight(mCurrentDiscardLevel);
+                    S32 w = liveWidth(mCurrentDiscardLevel);
+                    S32 h = liveHeight(mCurrentDiscardLevel);
 
                     mMipLevels = calcMipLevelCount(w, h);
 
@@ -1149,8 +1157,8 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
             {
                 // Create mips by hand
                 // ~4x faster than gluBuild2DMipmaps
-                S32 width = getWidth(mCurrentDiscardLevel);
-                S32 height = getHeight(mCurrentDiscardLevel);
+                S32 width = liveWidth(mCurrentDiscardLevel);
+                S32 height = liveHeight(mCurrentDiscardLevel);
                 S32 nummips = mMaxDiscardLevel - mCurrentDiscardLevel + 1;
                 S32 w = width, h = height;
 
@@ -1274,8 +1282,8 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
     else
     {
         mMipLevels = 1;
-        S32 w = getWidth();
-        S32 h = getHeight();
+        S32 w = liveWidth(mCurrentDiscardLevel);
+        S32 h = liveHeight(mCurrentDiscardLevel);
         if (is_compressed)
         {
             GLsizei tex_size = (GLsizei)dataFormatBytes(mFormatPrimary, w, h);
@@ -1891,11 +1899,20 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
     S32 w = raw_w << discard_level;
     S32 h = raw_h << discard_level;
 
+    // Everything from setSize onward describes the texture being built, not the one
+    // mTexName still names. Off-thread that gap lasts until syncTexName publishes on the
+    // main thread, so snapshot what consumers should keep seeing until then.
+    if (!on_main_thread())
+    {
+        beginUpload();
+    }
+
     // setSize may call destroyGLTexture if the size does not match
     if (!setSize(w, h, imageraw->getComponents(), discard_level))
     {
         LL_WARNS() << "Trying to create a texture with incorrect dimensions!" << LL_ENDL;
         mGLTextureCreated = false;
+        endUpload(); // nothing will publish; don't leave the getters on a stale snapshot
         return false;
     }
 
@@ -1954,6 +1971,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
         mCurrentDiscardLevel = discard_level;
         mLastBindTime = sLastFrameTime;
         mGLTextureCreated = false;
+        endUpload(); // no texture left to disagree with the members
         return true ;
     }
 
@@ -1970,6 +1988,12 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
     checkActiveThread();
 
     bool main_thread = on_main_thread();
+
+    if (!main_thread)
+    {
+        // No-op when the imageraw overload above already captured.
+        beginUpload();
+    }
 
     if (defer_copy)
     {
@@ -2045,6 +2069,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
         LL_PROFILE_ZONE_NAMED("cglt - late setImage");
         if (!setImage(data_in, data_hasmips, new_texname))
         {
+            endUpload(); // nothing will publish; don't leave the getters on a stale snapshot
             return false;
         }
     }
@@ -2072,6 +2097,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
                 LLImageGL::deleteTextures(1, &old_texname);
             }
             mTexName = new_texname;
+            endUpload();
         }
     }
 
@@ -2158,6 +2184,24 @@ void LLImageGL::syncToMainThread(LLGLuint new_tex_name)
 }
 
 
+// Capture what mTexName currently holds, before createGLTexture starts overwriting the
+// members with the geometry of the texture it is about to build. Idempotent, because the
+// imageraw overload calls it and then delegates to the data overload which calls it too.
+void LLImageGL::beginUpload()
+{
+    if (mUploadInFlight)
+    {
+        return;
+    }
+
+    mPublished.mWidth               = mWidth;
+    mPublished.mHeight              = mHeight;
+    mPublished.mComponents          = mComponents;
+    mPublished.mCurrentDiscardLevel = mCurrentDiscardLevel;
+    mPublished.mMaxDiscardLevel     = mMaxDiscardLevel;
+    mUploadInFlight = true;
+}
+
 void LLImageGL::syncTexName(LLGLuint texname)
 {
     if (texname != 0)
@@ -2168,6 +2212,9 @@ void LLImageGL::syncTexName(LLGLuint texname)
         }
         mTexName = texname;
     }
+
+    // Members and mTexName describe the same texture again.
+    endUpload();
 }
 
 bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const
@@ -2404,24 +2451,28 @@ bool LLImageGL::getIsResident(bool test_now)
 
 S32 LLImageGL::getHeight(S32 discard_level) const
 {
+    const S32 base = mUploadInFlight ? mPublished.mHeight : mHeight;
     if (discard_level < 0)
     {
         // mCurrentDiscardLevel can still be -1 if no discard has been set;
         // treat that as "full resolution" rather than shifting by a negative.
-        discard_level = llmax<S32>(mCurrentDiscardLevel, 0);
+        discard_level = llmax<S32>(mUploadInFlight ? mPublished.mCurrentDiscardLevel
+                                                   : mCurrentDiscardLevel, 0);
     }
-    S32 height = mHeight >> discard_level;
+    S32 height = base >> discard_level;
     if (height < 1) height = 1;
     return height;
 }
 
 S32 LLImageGL::getWidth(S32 discard_level) const
 {
+    const S32 base = mUploadInFlight ? mPublished.mWidth : mWidth;
     if (discard_level < 0)
     {
-        discard_level = llmax<S32>(mCurrentDiscardLevel, 0);
+        discard_level = llmax<S32>(mUploadInFlight ? mPublished.mCurrentDiscardLevel
+                                                   : mCurrentDiscardLevel, 0);
     }
-    S32 width = mWidth >> discard_level;
+    S32 width = base >> discard_level;
     if (width < 1) width = 1;
     return width;
 }

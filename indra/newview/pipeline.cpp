@@ -329,7 +329,7 @@ void validate_framebuffer_object();
 // target -- RenderTarget to add attachments to
 bool addDeferredAttachments(LLRenderTarget& target, bool for_impostor = false)
 {
-    U32 orm = GL_RGBA;
+    U32 orm = GL_RGBA8;
     U32 norm = GL_RGBA16;
     U32 emissive = GL_RGB16F;
 
@@ -340,7 +340,7 @@ bool addDeferredAttachments(LLRenderTarget& target, bool for_impostor = false)
     if (!hdr)
     {
         norm = GL_RGB10_A2;
-        emissive = GL_RGB;
+        emissive = GL_RGB8;
     }
 
     bool valid = true;
@@ -864,7 +864,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     if (!mRT->deferredScreen.allocate(resX, resY, GL_SRGB8_ALPHA8, true)) return false;
     if (!addDeferredAttachments(mRT->deferredScreen)) return false;
 
-    GLuint screenFormat = hdr ? GL_RGBA16F : GL_RGBA;
+    GLuint screenFormat = hdr ? GL_RGBA16F : GL_RGBA8;
 
     if (!mRT->screen.allocate(resX, resY, GL_RGBA16F)) return false;
 
@@ -879,7 +879,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         mRT->deferredLight.release();
     }
 
-    U32 post_color_fmt = hdr ? GL_RGB10_A2 : GL_RGBA;
+    U32 post_color_fmt = hdr ? GL_RGB10_A2 : GL_RGBA8;
     if(mRT != &mHeroProbeRT)
     {
         if (hdr)
@@ -930,7 +930,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     {
         if (RenderUIBuffer)
         {
-            if (!mUIScreen.allocate(resX, resY, GL_RGBA))
+            if (!mUIScreen.allocate(resX, resY, GL_RGBA8))
             {
                 return false;
             }
@@ -980,9 +980,9 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
         // used to scale down textures
         // See LLViwerTextureList::updateImagesCreateTextures and LLImageGL::scaleDown
-        mDownResMap.allocate(1024, 1024, GL_RGBA);
+        mDownResMap.allocate(1024, 1024, GL_RGBA8);
 
-        mBakeMap.allocate(LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH, LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT, GL_RGBA);
+        mBakeMap.allocate(LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH, LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT, GL_RGBA8);
     }
     //HACK make screenbuffer allocations start failing after 30 seconds
     if (gSavedSettings.getBOOL("SimulateFBOFailure"))
@@ -1366,7 +1366,7 @@ void LLPipeline::createGLBuffers()
         // allocate screen space glow buffers
         const U32 glow_res = llmax(1, llmin(512, 1 << gSavedSettings.getS32("RenderGlowResolutionPow")));
         const bool glow_hdr = gSavedSettings.getBOOL("RenderGlowHDR");
-        const U32 glow_color_fmt = glow_hdr ? GL_RGBA16F : GL_RGBA;
+        const U32 glow_color_fmt = glow_hdr ? GL_RGBA16F : GL_RGBA8;
         for (U32 i = 0; i < 3; i++)
         {
             mGlow[i].allocate(512, glow_res, glow_color_fmt);
@@ -11974,9 +11974,15 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
         if (!for_profile)
         {
-            if (!avatar->mImpostor.isComplete())
+            // A resolution change rebuilds rather than resizing in place. allocate()
+            // releases first, so this is the same path as first creation and keeps the
+            // deferred attachments and TFO_POINT filtering that a resize would not have
+            // re-applied to fresh textures.
+            if (!avatar->mImpostor.isComplete()
+                || resX != avatar->mImpostor.getWidth()
+                || resY != avatar->mImpostor.getHeight())
             {
-                avatar->mImpostor.allocate(resX, resY, GL_RGBA, true);
+                avatar->mImpostor.allocate(resX, resY, GL_RGBA8, true);
 
                 if (LLPipeline::sRenderDeferred)
                 {
@@ -11986,10 +11992,6 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
                 gGL.getTexUnit(0)->bind(&avatar->mImpostor);
                 gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
                 gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-            }
-            else if (resX != avatar->mImpostor.getWidth() || resY != avatar->mImpostor.getHeight())
-            {
-                avatar->mImpostor.resize(resX, resY);
             }
 
             avatar->mImpostor.bindTarget();

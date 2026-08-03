@@ -74,16 +74,18 @@ void load_exr(const std::string& filename)
         U32 texName = 0;
         LLImageGL::generateTextures(1, &texName);
 
-        gEXRImage = new LLImageGL(texName, 4, GL_TEXTURE_2D, GL_RGB16F, GL_RGB16F, GL_FLOAT, LLTexUnit::TAM_CLAMP);
+        gEXRImage = new LLImageGL(texName, 4, GL_TEXTURE_2D, GL_RGB16F, GL_RGBA, GL_FLOAT, LLTexUnit::TAM_CLAMP);
         gEXRImage->setHasMipMaps(true);
         gEXRImage->setUseMipMaps(true);
         gEXRImage->setFilteringOption(LLTexUnit::TFO_TRILINEAR);
+        gEXRImage->markStorageAllocated();
 
         gGL.getTexUnit(0)->bind(gEXRImage);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_FLOAT, out);
-
-        LLImageGLMemory::alloc_tex_image(width, height, GL_RGB16F, 1, /*has_mips=*/true);
+        // Immutable storage with the full mip chain, upload and VRAM accounting in one
+        // call -- this used to be a raw mutable glTexImage2D bypassing the allocator.
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGB16F, width, height, GL_RGBA, GL_FLOAT, out,
+                                     LLImageGL::calcMipLevelCount(width, height));
 
         free(out); // release memory of image data
 

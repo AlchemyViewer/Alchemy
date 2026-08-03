@@ -914,7 +914,7 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
         //convert to normal map
         LL_PROFILE_ZONE_NAMED("bil - create normal map");
 
-        bump->setExplicitFormat(GL_RGBA, GL_RGBA);
+        bump->setExplicitFormat(GL_RGBA8, GL_RGBA);
 
         LLImageGL* dst_img = bump->getGLTexture();
         if (!dst_img->setSize(src->getWidth(), src->getHeight(), 4, 0))
@@ -927,7 +927,12 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
 
         gGL.getTexUnit(0)->bind(bump);
 
-        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, dst_img->getPrimaryFormat(), dst_img->getWidth(), dst_img->getHeight(), GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        // Full mip chain: storage is immutable, so the glGenerateMipmap below can only
+        // fill levels allocated here -- with a single level it is a spec-defined no-op
+        // and the normal map aliases under the trilinear/aniso samplers that read it.
+        const S32 levels = LLImageGL::calcMipLevelCount(dst_img->getWidth(), dst_img->getHeight());
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, dst_img->getStorageInternalFormat(), dst_img->getWidth(), dst_img->getHeight(), GL_RGBA, GL_UNSIGNED_BYTE, nullptr, levels);
+        dst_img->markStorageAllocated();
 
         LLGLuint tex_name = dst_img->getTexName();
         // point render target at empty buffer
