@@ -272,7 +272,9 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     {
         LL_WARNS() << "Failed to copy framebuffer to paintmap" << LL_ENDL;
     }
-    glGenerateMipmap(GL_TEXTURE_2D);
+    // setSubImageFromFrameBuffer left the paintmap bound on unit 0 under the last draw's
+    // sampler; generateMipmaps clears that so mip generation follows the texture's own state.
+    LLImageGL::generateMipmaps(GL_TEXTURE_2D);
     stop_glerror();
 
     scratch_target.flush();

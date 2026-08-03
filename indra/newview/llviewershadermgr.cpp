@@ -192,7 +192,6 @@ LLGLSLShader            gHUDAlphaProgram;
 LLGLSLShader            gDeferredSkinnedAlphaProgram;
 LLGLSLShader            gDeferredAlphaImpostorProgram;
 LLGLSLShader            gDeferredSkinnedAlphaImpostorProgram;
-LLGLSLShader            gDeferredAvatarEyesProgram;
 LLGLSLShader            gDeferredFullbrightProgram;
 LLGLSLShader            gHUDFullbrightProgram;
 LLGLSLShader            gDeferredFullbrightAlphaMaskProgram;
@@ -402,7 +401,6 @@ void LLViewerShaderMgr::finalizeShaderList()
     mShaderList.push_back(&gDeferredFullbrightShinyProgram);
     mShaderList.push_back(&gHUDFullbrightShinyProgram);
     mShaderList.push_back(&gDeferredEmissiveProgram);
-    mShaderList.push_back(&gDeferredAvatarEyesProgram);
     mShaderList.push_back(&gDeferredAvatarAlphaProgram);
     mShaderList.push_back(&gEnvironmentMapProgram);
     mShaderList.push_back(&gDeferredWLSkyProgram);
@@ -1165,7 +1163,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredSkinnedEmissiveProgram.unload();
         gDeferredEmissiveIndexedProgram.unload();
         gDeferredSkinnedEmissiveIndexedProgram.unload();
-        gDeferredAvatarEyesProgram.unload();
         gDeferredPostProgram.unload();
         gDeferredCoFProgram.unload();
         gDeferredDoFCombineProgram.unload();
@@ -2062,26 +2059,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->mFeatures.calculatesLighting = true;
             shader->mFeatures.hasLighting = true;
         }
-    }
-
-    if (success)
-    {
-        gDeferredAvatarEyesProgram.mName = "Deferred Avatar Eyes Shader";
-        gDeferredAvatarEyesProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredAvatarEyesProgram.mFeatures.hasGamma = true;
-        gDeferredAvatarEyesProgram.mFeatures.hasAtmospherics = true;
-        gDeferredAvatarEyesProgram.mFeatures.hasSrgb = true;
-        gDeferredAvatarEyesProgram.mFeatures.hasShadows = true;
-
-        gDeferredAvatarEyesProgram.mShaderFiles.clear();
-        gDeferredAvatarEyesProgram.mShaderFiles.push_back(make_pair("deferred/avatarEyesV.glsl", GL_VERTEX_SHADER));
-        gDeferredAvatarEyesProgram.mShaderFiles.push_back(make_pair("deferred/diffuseF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredAvatarEyesProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-
-        add_common_permutations(&gDeferredAvatarEyesProgram);
-
-        success = gDeferredAvatarEyesProgram.createShader();
-        llassert(success);
     }
 
     if (success)

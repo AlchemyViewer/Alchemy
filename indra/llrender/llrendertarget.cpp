@@ -668,7 +668,7 @@ void LLRenderTarget::flush()
     {
         LL_PROFILE_GPU_ZONE("rt generate mipmaps");
         bindTexture(0, 0, ALSamplers::TrilinearMirror);
-        glGenerateMipmap(GL_TEXTURE_2D);
+        LLImageGL::generateMipmaps(GL_TEXTURE_2D);
     }
 
     if (mPreviousRT)

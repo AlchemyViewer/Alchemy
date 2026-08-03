@@ -540,7 +540,7 @@ void LLVOSky::initCubeMap()
 
     if (!mCubeMap && gSavedSettings.getBOOL("RenderWater") && LLCubeMap::sUseCubeMaps)
     {
-        mCubeMap = new LLCubeMap(false);
+        mCubeMap = new LLCubeMap();
     }
 
     if (mCubeMap)

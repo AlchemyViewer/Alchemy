@@ -88,7 +88,7 @@ void load_exr(const std::string& filename)
 
         free(out); // release memory of image data
 
-        glGenerateMipmap(GL_TEXTURE_2D);
+        LLImageGL::generateMipmaps(GL_TEXTURE_2D);
 
         gGL.getTextureSlot(0)->unbind();
 

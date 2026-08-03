@@ -36,15 +36,9 @@ class LLVector3;
 // Environment map hack!
 class LLCubeMap : public LLRefCount
 {
-    bool mIssRGB;
 public:
-    LLCubeMap(bool init_as_srgb);
+    LLCubeMap();
     void init(const std::vector<LLPointer<LLImageRaw> >& rawimages);
-
-    // initialize as an undefined cubemap at the given resolution
-    //  used for render-to-cubemap operations
-    //  avoids usage of LLImageRaw
-    void initReflectionMap(U32 resolution, U32 components = 3);
 
     void initGL();
     void initRawData(const std::vector<LLPointer<LLImageRaw> >& rawimages);

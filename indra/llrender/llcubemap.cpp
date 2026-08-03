@@ -46,10 +46,9 @@ namespace {
 
 bool LLCubeMap::sUseCubeMaps = true;
 
-LLCubeMap::LLCubeMap(bool init_as_srgb)
+LLCubeMap::LLCubeMap()
     : mTextureStage(0),
-      mMatrixStage(0),
-      mIssRGB(init_as_srgb)
+      mMatrixStage(0)
 {
     mTargets[0] = GL_TEXTURE_CUBE_MAP_NEGATIVE_X;
     mTargets[1] = GL_TEXTURE_CUBE_MAP_POSITIVE_X;
@@ -76,11 +75,10 @@ void LLCubeMap::initGL()
 
             LLImageGL::generateTextures(1, &texname);
 
-        #if USE_SRGB_DECODE
-            const S32 internal_format = mIssRGB ? GL_SRGB8_ALPHA8 : GL_RGBA8;
-        #else
+            // Linear RGBA8, not sRGB: the faces are copies of the sky textures, whose
+            // pixels have always been stored and sampled raw. Were a decode ever wanted,
+            // it is a sampler decision now (ALSampler::SRGBDecode), not a storage one.
             const S32 internal_format = GL_RGBA8;
-        #endif
 
             // Allocate the whole cube up front. glTexStorage2D on GL_TEXTURE_CUBE_MAP
             // allocates all six faces in a single call, and may only be called once for
@@ -199,17 +197,10 @@ void LLCubeMap::init(const std::vector<LLPointer<LLImageRaw> >& rawimages)
     }
 }
 
-void LLCubeMap::initReflectionMap(U32 resolution, U32 components)
-{
-    U32 texname = 0;
-
-    LLImageGL::generateTextures(1, &texname);
-
-    mImages[0] = new LLImageGL(resolution, resolution, components, true);
-    mImages[0]->setTexName(texname);
-    mImages[0]->setTarget(mTargets[0], ALTextureSlot::TT_CUBE_MAP);
-    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
-}
+// initReflectionMap and initEnvironmentMap were deleted here: no callers, and both
+// bodies had gone illegal under immutable storage -- their per-face createGLTexture
+// path would hand a cube FACE target to glTexStorage2D, which only accepts the
+// GL_TEXTURE_CUBE_MAP target (allocating all six faces at once; see initGL).
 
 GLuint LLCubeMap::getGLName()
 {

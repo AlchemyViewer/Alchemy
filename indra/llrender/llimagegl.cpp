@@ -1039,7 +1039,10 @@ bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32
 
                     {
                         LL_PROFILE_GPU_ZONE("generate mip map");
-                        glGenerateMipmap(mTarget);
+                        // The bind() above deliberately left whatever sampler the last
+                        // draw used; generateMipmaps clears it so the reduction follows
+                        // the texture's own state rather than frame timing.
+                        generateMipmaps(mTarget);
                     }
                     stop_glerror();
                 }
@@ -2776,6 +2779,16 @@ void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
     alloc_tex_image(width, height, mFormatInternal, 1, has_mips);
 }
 
+// static
+void LLImageGL::generateMipmaps(U32 target)
+{
+    // See the header comment: clearing the sampler makes the texture object's own state
+    // govern the reduction, instead of whatever sampler the last draw left on the slot.
+    // bindSampler dedups, so this is free when the slot is already sampler-less.
+    gGL.getTextureSlot(0)->bindSampler(0);
+    glGenerateMipmap(target);
+}
+
 bool LLImageGL::scaleDown(S32 desired_discard)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -2838,7 +2851,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
             if (mHasMipMaps)
             { // generate mipmaps if needed
                 LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("scaleDown - glGenerateMipmap");
-                glGenerateMipmap(mTarget);
+                generateMipmaps(mTarget);
             }
 
             gGL.getTextureSlot(0)->unbind();
@@ -2887,7 +2900,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         if (mHasMipMaps)
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("scaleDown - glGenerateMipmap");
-            glGenerateMipmap(mTarget);
+            generateMipmaps(mTarget);
         }
 
         gGL.getTextureSlot(0)->unbind();

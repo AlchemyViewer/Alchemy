@@ -981,9 +981,9 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
             }
         }
 
-        // generate mipmap -- bind-to-edit again, glGenerateMipmap acts on the bound texture
+        // generate mipmap -- bind-to-edit again, mip generation acts on the bound texture
         gGL.getTextureSlot(0)->bindSampled(bump, ALSamplers::AnisoWrap);
-        glGenerateMipmap(GL_TEXTURE_2D);
+        LLImageGL::generateMipmaps(GL_TEXTURE_2D);
         gGL.getTextureSlot(0)->unbind();
     }
 

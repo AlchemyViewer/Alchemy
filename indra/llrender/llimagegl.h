@@ -187,6 +187,13 @@ public:
     // must have allocated with a compatible format and size.
     static void setManualSubImage(U32 target, S32 miplevel, S32 width, S32 height, U32 pixformat, U32 pixtype, const void *pixels);
 
+    // Generate the mip chain of the texture bound on UNIT 0. Always use this instead of a
+    // bare glGenerateMipmap: the unit still carries whatever sampler the last draw bound,
+    // and mip generation consults the sampler before the texture's own state, so a bare
+    // call reduces under a sampler nobody chose for it. This clears the unit's sampler
+    // first, giving one owner and a deterministic result.
+    static void generateMipmaps(U32 target);
+
     // Apply the GL_TEXTURE_SWIZZLE_RGBA mask that re-expresses a deprecated
     // source format on the currently-bound texture as samplable RGBA.
     // `original_format` is one of GL_ALPHA, GL_LUMINANCE, GL_LUMINANCE_ALPHA;
