@@ -2040,56 +2040,68 @@ void LLPreviewLSL::onSave(void* userdata, bool close_after_save)
     self->saveIfNeeded();
 }
 
-/*static*/
+// static
 void LLPreviewLSL::finishedLSLUpload(LLUUID itemId, LLSD response)
 {
-    // Find our window and close it if requested.
-    LLPreviewLSL* preview = LLFloaterReg::findTypedInstance<LLPreviewLSL>("preview_script", LLSD(itemId));
-    if (preview)
-    {
-        // Bytecode save completed
-        if (response["compiled"])
+    // This callback runs on the upload coprocedure fiber, not the main coro.
+    // UI work downstream (selectFirstError -> reflow -> LLMutex::lock) asserts
+    // if called off the main coro, so shuttle everything back first.
+    LLAppViewer::instance()->postToMainCoro(
+        [itemId, response]() mutable
         {
-            preview->callbackLSLCompileSucceeded();
-        }
-        else
-        {
-            preview->callbackLSLCompileFailed(response["errors"]);
-        }
-        preview->sendCompileResults(response);
-    }
+            LLPreviewLSL* preview = LLFloaterReg::findTypedInstance<LLPreviewLSL>("preview_script", LLSD(itemId));
+            if (preview)
+            {
+                if (response["compiled"])
+                {
+                    preview->callbackLSLCompileSucceeded();
+                }
+                else
+                {
+                    preview->callbackLSLCompileFailed(response["errors"]);
+                }
+                preview->sendCompileResults(response);
+            }
+        });
 }
 
+// static
 bool LLPreviewLSL::failedLSLUpload(LLUUID itemId, LLUUID taskId, LLSD response, std::string reason)
 {
-    LLSD floater_key;
-    if (taskId.notNull())
-    {
-        floater_key["taskid"] = taskId;
-        floater_key["itemid"] = itemId;
-    }
-    else
-    {
-        floater_key = LLSD(itemId);
-    }
+    // Same issue: this fires on the upload fiber, not the main coro.
+    // Note: return value is lost when posting async, but the original callers
+    // ignore it in the upload path anyway.
+    LLAppViewer::instance()->postToMainCoro(
+        [itemId, taskId, response, reason]() mutable
+        {
+            LLSD floater_key;
+            if (taskId.notNull())
+            {
+                floater_key["taskid"] = taskId;
+                floater_key["itemid"] = itemId;
+            }
+            else
+            {
+                floater_key = LLSD(itemId);
+            }
 
-    LLPreviewLSL* preview = LLFloaterReg::findTypedInstance<LLPreviewLSL>("preview_script", floater_key);
-    if (preview)
-    {
-        // unfreeze floater
-        LLSD errors;
-        errors.append(LLTrans::getString("UploadFailed") + reason);
-        preview->callbackLSLCompileFailed(errors);
+            LLPreviewLSL* preview = LLFloaterReg::findTypedInstance<LLPreviewLSL>("preview_script", floater_key);
+            if (preview)
+            {
+                LLSD errors;
+                errors.append(LLTrans::getString("UploadFailed") + reason);
+                preview->callbackLSLCompileFailed(errors);
 
-        LLSD message;
-        message["compiled"] = false;
-        message["errors"]   = errors;
-        preview->sendCompileResults(message);
+                LLSD message;
+                message["compiled"] = false;
+                message["errors"]   = errors;
+                preview->sendCompileResults(message);
+            }
+        });
 
-        return true;
-    }
-
-    return false;
+    // Return value is meaningless now that we're async, but the signature
+    // requires it. The upload infrastructure doesn't use it either.
+    return true;
 }
 
 // Save needs to compile the text in the buffer. If the compile
