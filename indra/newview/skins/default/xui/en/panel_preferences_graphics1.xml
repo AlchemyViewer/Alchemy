@@ -430,7 +430,7 @@
     layout="topleft"
     left="10"
     name="PrefSaveButton"
-    top="310"
+    top_pad="14"
     width="200">
     <button.commit_callback
       function="Pref.PrefSave"
