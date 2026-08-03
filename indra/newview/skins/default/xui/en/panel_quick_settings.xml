@@ -228,33 +228,60 @@
    top_pad="6"
    width="280"
    layout="topleft"
-   value="Environment:"
+   value="Environment"
    name="environment_label" />
+  <text
+   follows="left|top"
+   height="15"
+   left="10"
+   top_pad="4"
+   width="60"
+   layout="topleft"
+   value="Sky:"
+   name="sky_preset_label" />
   <combo_box
    allow_text_entry="false"
    follows="left|top|right"
    height="23"
    layout="topleft"
-   left="10"
-   top_pad="2"
+   left="70"
+   top_pad="-16"
    right="-10"
    name="sky_preset_combo" />
+  <text
+   follows="left|top"
+   height="15"
+   left="10"
+   top_pad="6"
+   width="60"
+   layout="topleft"
+   value="Water:"
+   name="water_preset_label" />
   <combo_box
    allow_text_entry="false"
    follows="left|top|right"
    height="23"
    layout="topleft"
-   left="10"
-   top_pad="4"
+   left="70"
+   top_pad="-16"
    right="-10"
    name="water_preset_combo" />
+  <text
+   follows="left|top"
+   height="15"
+   left="10"
+   top_pad="6"
+   width="60"
+   layout="topleft"
+   value="Day Cycle:"
+   name="day_preset_label" />
   <combo_box
    allow_text_entry="false"
    follows="left|top|right"
    height="23"
    layout="topleft"
-   left="10"
-   top_pad="4"
+   left="70"
+   top_pad="-16"
    right="-10"
    name="day_preset_combo" />
   <button
@@ -263,7 +290,7 @@
    label="Reset to Region Default"
    layout="topleft"
    left="10"
-   top_pad="6"
+   top_pad="10"
    width="280"
    name="reset_environment_btn" />
 </panel>
