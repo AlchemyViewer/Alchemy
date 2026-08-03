@@ -75,6 +75,30 @@ vec4 cloudNoise(vec2 uv)
    return cloud_noise_sample;
 }
 
+// Interleaved gradient noise (Jimenez 2014). Screen-stable: no temporal term, so the
+// pattern does not shimmer frame to frame.
+float screenNoise(vec2 frag_px)
+{
+    return fract(52.9829189 * fract(dot(frag_px, vec2(0.06711056, 0.00583715))));
+}
+
+// Break quantization banding at the emissive store. R11F_G11F_B10F keeps 6/6/5 explicit
+// mantissa bits, so a value quantizes at roughly 2^-7/2^-7/2^-6 of its own magnitude --
+// coarse enough to band in this writer's smooth gradients, and coarsest in blue, which is
+// exactly where a sky lives. Adding ~1 ulp of screen-stable noise before the ROP rounds
+// trades the bands for imperceptible grain. Multiplicative, so black stays black and the
+// amplitude tracks the format's scale-relative precision; on the non-HDR GL_RGB8 emissive
+// it lands near a single 8-bit step, harmless.
+//
+// Defined per-writer rather than shared: the aurora program attaches no shared fragment
+// objects at all, and sky and clouds share only srgbF, so there is no common home. Same
+// reason linearizeVertexTint is defined per vertex shader.
+vec3 ditherEmissive(vec3 v, vec2 frag_px)
+{
+    float n = screenNoise(frag_px) - 0.5;
+    return v * (1.0 + n * vec3(1.0 / 64.0, 1.0 / 64.0, 1.0 / 32.0));
+}
+
 void main()
 {
     if (cloud_scale < 0.001)
@@ -229,7 +253,7 @@ void main()
 
 #if defined(HAS_EMISSIVE)
     frag_data[0] = vec4(0);
-    frag_data[3] = vec4(color.rgb, alpha1);
+    frag_data[3] = vec4(ditherEmissive(color.rgb, gl_FragCoord.xy), alpha1);
 #else
     frag_data[0] = vec4(color.rgb, alpha1);
 #endif

@@ -333,7 +333,12 @@ bool addDeferredAttachments(LLRenderTarget& target, bool for_impostor = false)
 {
     U32 orm = GL_RGBA8;
     U32 norm = GL_RGBA16;
-    U32 emissive = GL_RGB16F;
+    // R11F_G11F_B10F rather than RGB16F: half the bandwidth (RGB16F pads to RGBA16F in
+    // VRAM), still float so it filters linearly and holds the sky writers' >1 boosts, and
+    // unsigned is fine -- the writers clamp emissive at zero. No alpha semantics lost;
+    // RGB16F had no alpha either. The 6/6/5 mantissa bits band in smooth gradients, which
+    // is what the sky, cloud and aurora writers' ditherEmissive covers for.
+    U32 emissive = GL_R11F_G11F_B10F;
 
     static LLCachedControl<bool> has_emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
     static LLCachedControl<bool> has_hdr(gSavedSettings, "RenderHDREnabled", true);

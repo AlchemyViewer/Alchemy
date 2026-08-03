@@ -95,7 +95,7 @@ The deferred rendering pipeline is orchestrated by `LLPipeline` (`indra/newview/
 - frag_data[0]: Base color (GL_RGBA)
 - frag_data[1]: Specular/ORM — PBR occlusion/roughness/metallic (GL_RGBA)
 - frag_data[2]: Normals (GL_RGBA16 or GL_RGB10_A2)
-- frag_data[3]: Emissive (GL_RGB16F, optional via `RenderEnableEmissiveBuffer`)
+- frag_data[3]: Emissive (GL_R11F_G11F_B10F, optional via `RenderEnableEmissiveBuffer`)
 
 **Render target packs** (`RenderTargetPack` in pipeline.h):
 - `mMainRT` — Full resolution for main scene
