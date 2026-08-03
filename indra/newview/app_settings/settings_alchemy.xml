@@ -909,6 +909,28 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyMouselookDecoupleVehicleTilt</key>
+        <map>
+            <key>Comment</key>
+            <string>Keep the mouselook view level instead of tilting with a vehicle's roll and pitch while seated</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyMouselookEyeHeightOffset</key>
+        <map>
+            <key>Comment</key>
+            <string>Vertical offset in meters applied to the mouselook camera eye position</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
         <key>AlchemyMouselookIFF</key>
         <map>
             <key>Comment</key>

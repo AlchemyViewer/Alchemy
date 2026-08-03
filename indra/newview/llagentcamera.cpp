@@ -1604,9 +1604,14 @@ void LLAgentCamera::updateCamera()
                 }
             }
 
-            LLViewerCamera::getInstance()->updateCameraLocation(head_pos,
+            // Apply the same vertical eye-height offset used by calcCameraPositionTargetGlobal()
+            // to both the camera origin and the look-at target, so it doesn't introduce pitch.
+            static LLCachedControl<F32> mouselook_eye_height_offset(gSavedSettings, "AlchemyMouselookEyeHeightOffset", 0.f);
+            LLVector3 eye_height_offset(0.f, 0.f, mouselook_eye_height_offset);
+
+            LLViewerCamera::getInstance()->updateCameraLocation(head_pos + eye_height_offset,
                                                                mCameraUpVector,
-                                                               gAgentAvatarp->mHeadp->getWorldPosition() +
+                                                               gAgentAvatarp->mHeadp->getWorldPosition() + eye_height_offset +
                                                                    LLVector3(1.0, 0.0, 0.0) * agent_rot);
         }
         else
@@ -1702,7 +1707,8 @@ LLVector3d LLAgentCamera::calcFocusPositionTargetGlobal()
         if (isAgentAvatarValid() && gAgentAvatarp->getParent())
         {
             LLViewerObject* root_object = (LLViewerObject*)gAgentAvatarp->getRoot();
-            if (!root_object->flagCameraDecoupled())
+            static LLCachedControl<bool> decouple_vehicle_tilt(gSavedSettings, "AlchemyMouselookDecoupleVehicleTilt", false);
+            if (!root_object->flagCameraDecoupled() && !decouple_vehicle_tilt)
             {
                 agent_rot *= ((LLViewerObject*)(gAgentAvatarp->getParent()))->getRenderRotation();
             }
@@ -1884,6 +1890,10 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(bool *hit_limit)
         }
 
         head_offset.clearVec();
+
+        static LLCachedControl<F32> mouselook_eye_height_offset(gSavedSettings, "AlchemyMouselookEyeHeightOffset", 0.f);
+        head_offset[VZ] += mouselook_eye_height_offset;
+
         F32 fixup;
         if (gAgentAvatarp->hasPelvisFixup(fixup) && !gAgentAvatarp->isSitting())
         {

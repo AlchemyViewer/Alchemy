@@ -222,4 +222,56 @@
    increment="16"
    name="iff_range_spinner"
    control_name="AlchemyMouselookIFFRange"/>
+  <check_box
+   control_name="AlchemyMouselookDecoupleVehicleTilt"
+   follows="left|top"
+   height="20"
+   label="Keep mouselook level while seated on a vehicle"
+   layout="topleft"
+   left="80"
+   name="alchemy_mlook_decouple_vehicle_tilt"
+   tool_tip="Prevents the mouselook view from tilting with a vehicle's roll and pitch while you're seated on it."
+   top_pad="15"
+   width="330" />
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="15"
+   layout="topleft"
+   left="83"
+   name="mlook_eye_height_offset_lbl"
+   top_pad="10"
+   width="170"
+   wrap="true">
+    Eye height offset:
+  </text>
+  <slider
+   control_name="AlchemyMouselookEyeHeightOffset"
+   follows="left|top"
+   height="15"
+   layout="topleft"
+   show_text="false"
+   left_pad="0"
+   max_val="0.3"
+   min_val="-0.3"
+   increment="0.01"
+   name="mlook_eye_height_offset_slider"
+   top_delta="0"
+   width="115" />
+  <spinner
+   top_delta="-3"
+   height="20"
+   label=""
+   label_width="0"
+   left_pad="3"
+   decimal_digits="2"
+   follows="top|right"
+   layout="topleft"
+   max_val="0.3"
+   min_val="-0.3"
+   width="60"
+   increment="0.01"
+   name="mlook_eye_height_offset_spinner"
+   control_name="AlchemyMouselookEyeHeightOffset"/>
 </panel>
