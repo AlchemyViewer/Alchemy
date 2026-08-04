@@ -2,9 +2,9 @@ set(VCPKG_POLICY_EMPTY_INCLUDE_FOLDER enabled)
 
 vcpkg_download_distfile(
     LSL_ARCHIVE
-    URLS "https://github.com/secondlife/lsl-definitions/releases/download/v${VERSION}/lsl_definitions-${VERSION}-common-25461772657.tar.zst"
+    URLS "https://github.com/secondlife/lsl-definitions/releases/download/v${VERSION}/lsl_definitions-${VERSION}-common-29281156609.tar.zst"
     FILENAME lsl-definitions.${VERSION}.tar.zst
-    SHA512 80bacb56ddebf8816ce6a8f30e9d1deedaba48e68bc2a71e5ca2ffea2ee9edcbfca8dc2c24bb97d982634b5dd6da982e12af25515e5002da941746212ebcfd95
+    SHA512 81e0784e20f7b21a8e23cd0dc4c64e19a8306a03826b70bbeade133b764e6247ee59d66845e8d0515ea6740f64f5fe0f3b1f2f45f87e620a0b47e214f2da762a
 )
 
 vcpkg_extract_source_archive(LSL_DIR ARCHIVE ${LSL_ARCHIVE} NO_REMOVE_ONE_LEVEL)
