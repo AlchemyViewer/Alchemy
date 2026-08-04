@@ -80,6 +80,41 @@ S32 clamp_terrain_mapping(S32 mapping)
     return mapping;
 }
 
+S32 clamp_terrain_detail(S32 detail)
+{
+    const S32 requested = llclamp(detail, TERRAIN_PBR_DETAIL_MIN, TERRAIN_PBR_DETAIL_MAX);
+    detail = requested;
+
+    // The PBR terrain fragment shader declares one paint/ramp sampler (alpha_ramp or
+    // paint_map) plus, per detail level, 4 maps for each of the 4 materials. At full
+    // detail that is 17 samplers -- over the 16-per-stage floor that Apple's GL 4.1
+    // (every macOS context) and some older desktop GPUs report, where the program then
+    // fails to link. Drop detail until the count fits.
+    //
+    // The arithmetic mirrors pbrterrainF.glsl's #if guards exactly (detail 0 -> 17,
+    // -1 and -2 -> 13, -3 -> 9, -4 -> 5); if those guards change, this must too.
+    while (detail > TERRAIN_PBR_DETAIL_MIN)
+    {
+        S32 samplers = 1 + 4 * (1 + (detail >= TERRAIN_PBR_DETAIL_NORMAL)
+                                  + (detail >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
+                                  + (detail >= TERRAIN_PBR_DETAIL_EMISSIVE));
+        if (samplers <= gGLManager.mNumTextureImageUnits)
+        {
+            break;
+        }
+        --detail;
+    }
+
+    if (detail < requested)
+    {
+        LL_INFOS_ONCE("ShaderLoading") << "RenderTerrainPBRDetail " << requested << " clamped to " << detail
+                                       << ": full detail needs more fragment texture units than the "
+                                       << gGLManager.mNumTextureImageUnits
+                                       << " this GL implementation provides." << LL_ENDL;
+    }
+    return detail;
+}
+
 //utility shaders
 LLGLSLShader    gOcclusionProgram;
 LLGLSLShader    gOcclusionCubeProgram;
@@ -837,8 +872,7 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT"] = llformat("%d", mapping);
         const F32 triplanar_factor = gSavedSettings.getF32("RenderTerrainPBRTriplanarBlendFactor");
         attribs["TERRAIN_TRIPLANAR_BLEND_FACTOR"] = llformat("%.2f", triplanar_factor);
-        S32 detail = gSavedSettings.getS32("RenderTerrainPBRDetail");
-        detail = llclamp(detail, TERRAIN_PBR_DETAIL_MIN, TERRAIN_PBR_DETAIL_MAX);
+        const S32 detail = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
         attribs["TERRAIN_PBR_DETAIL"] = llformat("%d", detail);
     }
 
@@ -1682,8 +1716,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        S32 detail = gSavedSettings.getS32("RenderTerrainPBRDetail");
-        detail = llclamp(detail, TERRAIN_PBR_DETAIL_MIN, TERRAIN_PBR_DETAIL_MAX);
+        const S32 detail = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
         const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
         for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
         {

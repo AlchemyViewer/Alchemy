@@ -66,7 +66,7 @@ LLDrawPoolTerrain::LLDrawPoolTerrain(LLViewerTexture *texturep) :
     // Hack!
     sDetailScale = 1.f/gSavedSettings.getF32("RenderTerrainScale");
     sPBRDetailScale = 1.f/gSavedSettings.getF32("RenderTerrainPBRScale");
-    sPBRDetailMode = gSavedSettings.getS32("RenderTerrainPBRDetail");
+    sPBRDetailMode = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
     mAlphaRampImagep = LLViewerTextureManager::getFetchedTexture(IMG_ALPHA_GRAD);
 
     //gGL.getTextureSlot(0)->bind(mAlphaRampImagep.get());
@@ -104,7 +104,7 @@ U32 LLDrawPoolTerrain::getVertexDataMask()
 void LLDrawPoolTerrain::prerender()
 {
     static LLCachedControl<S32> render_terrain_pbr_detail(gSavedSettings, "RenderTerrainPBRDetail");
-    sPBRDetailMode = render_terrain_pbr_detail;
+    sPBRDetailMode = clamp_terrain_detail(render_terrain_pbr_detail);
 }
 
 void LLDrawPoolTerrain::boostTerrainDetailTextures()
