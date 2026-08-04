@@ -723,11 +723,12 @@ void LLRenderPass::bindIndexedTextures(const LLDrawInfo& params, const LLGLSLSha
     const U32 batch = llmin((U32)params.mTextureList.size(), declared);
 
     // The indexed ladder is all diffuse, so a program that shades in linear wants it decoded.
-    // Overrides the caller's key rather than being passed one, because these callers -- the
-    // fullbright pools -- take the AnisoWrap default while the program is what knows.
+    // Set rather than passed, because these callers -- the fullbright pools -- take the
+    // AnisoWrap default while the program is what knows. Only the decode bit: the caller still
+    // owns the filter and the address mode, which are its business and not the colour space's.
     if (shader && shader->mLinearDiffuse)
     {
-        key = DIFFUSE_SRGB_SAMPLER;
+        key |= ALSampler::SRGBDecode;
     }
 
     for (U32 i = 0; i < batch; ++i)
@@ -749,12 +750,13 @@ void LLRenderPass::pushBatch(LLDrawInfo& params, bool texture, bool batch_textur
 
     applyModelMatrix(params);
 
-    // A program that shades in linear wants its diffuse decoded, whichever bind path it
-    // takes below. bindIndexedTextures does the same override for the ladder.
+    // A program that shades in linear wants its diffuse decoded, whichever bind path it takes
+    // below. Only the decode bit, leaving the caller's filter and address mode alone;
+    // bindIndexedTextures does the same for the ladder.
     const LLGLSLShader* bound = LLGLSLShader::sCurBoundShaderPtr;
     if (bound && bound->mLinearDiffuse)
     {
-        key = DIFFUSE_SRGB_SAMPLER;
+        key |= ALSampler::SRGBDecode;
     }
 
     bool tex_setup = false;
