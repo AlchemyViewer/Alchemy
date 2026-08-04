@@ -80,7 +80,6 @@ S32 clamp_terrain_mapping(S32 mapping)
 
 //utility shaders
 LLGLSLShader    gOcclusionProgram;
-LLGLSLShader    gSkinnedOcclusionProgram;
 LLGLSLShader    gOcclusionCubeProgram;
 LLGLSLShader    gGlowCombineProgram;
 LLGLSLShader    gReflectionMipProgram;
@@ -148,7 +147,6 @@ LLGLSLShader            gDeferredBumpProgram;
 LLGLSLShader            gDeferredTerrainProgram;
 LLGLSLShader            gDeferredTreeProgram;
 LLGLSLShader            gDeferredTreeShadowProgram;
-LLGLSLShader            gDeferredSkinnedTreeShadowProgram;
 LLGLSLShader            gDeferredAvatarProgram;
 LLGLSLShader            gDeferredAvatarAlphaProgram;
 LLGLSLShader            gDeferredLightProgram;
@@ -162,7 +160,6 @@ LLGLSLShader            gHazeWaterProgram;
 LLGLSLShader            gDeferredBlurLightProgram;
 LLGLSLShader            gDeferredSoftenProgram;
 LLGLSLShader            gDeferredShadowProgram;
-LLGLSLShader            gDeferredSkinnedShadowProgram;
 LLGLSLShader            gDeferredShadowCubeProgram;
 LLGLSLShader            gDeferredShadowAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaMaskProgram;
@@ -175,9 +172,7 @@ LLGLSLShader            gDeferredAvatarAlphaShadowProgram;
 LLGLSLShader            gDeferredAvatarAlphaMaskShadowProgram;
 LLGLSLShader            gDeferredAlphaProgram;
 LLGLSLShader            gHUDAlphaProgram;
-LLGLSLShader            gDeferredSkinnedAlphaProgram;
 LLGLSLShader            gDeferredAlphaImpostorProgram;
-LLGLSLShader            gDeferredSkinnedAlphaImpostorProgram;
 LLGLSLShader            gDeferredFullbrightProgram;
 LLGLSLShader            gHUDFullbrightProgram;
 LLGLSLShader            gDeferredFullbrightAlphaMaskProgram;
@@ -995,7 +990,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     {
         gDeferredTreeProgram.unload();
         gDeferredTreeShadowProgram.unload();
-        gDeferredSkinnedTreeShadowProgram.unload();
         gDeferredDiffuseProgram.unload();
         gDeferredDiffuseAlphaMaskProgram.unload();
         gDeferredNonIndexedDiffuseAlphaMaskProgram.unload();
@@ -1014,7 +1008,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredBlurLightProgram.unload();
         gDeferredSoftenProgram.unload();
         gDeferredShadowProgram.unload();
-        gDeferredSkinnedShadowProgram.unload();
         gDeferredShadowCubeProgram.unload();
         gDeferredShadowAlphaMaskProgram.unload();
         gDeferredShadowGLTFAlphaMaskProgram.unload();
@@ -1028,7 +1021,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarAlphaProgram.unload();
         gDeferredAlphaProgram.unload();
         gHUDAlphaProgram.unload();
-        gDeferredSkinnedAlphaProgram.unload();
         gDeferredFullbrightProgram.unload();
         gHUDFullbrightProgram.unload();
         gDeferredFullbrightAlphaMaskProgram.unload();
@@ -1593,20 +1585,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredTreeShadowProgram.mShaderFiles.push_back(make_pair("deferred/treeShadowV.glsl", GL_VERTEX_SHADER));
         gDeferredTreeShadowProgram.mShaderFiles.push_back(make_pair("deferred/treeShadowF.glsl", GL_FRAGMENT_SHADER));
         gDeferredTreeShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredTreeShadowProgram.mRiggedVariant = &gDeferredSkinnedTreeShadowProgram;
-        success = gDeferredTreeShadowProgram.createShader();
-        llassert(success);
-    }
-
-    if (success)
-    {
-        gDeferredSkinnedTreeShadowProgram.mName = "Deferred Skinned Tree Shadow Shader";
-        gDeferredSkinnedTreeShadowProgram.mShaderFiles.clear();
-        gDeferredSkinnedTreeShadowProgram.mFeatures.hasObjectSkinning = true;
-        gDeferredSkinnedTreeShadowProgram.mShaderFiles.push_back(make_pair("deferred/treeShadowSkinnedV.glsl", GL_VERTEX_SHADER));
-        gDeferredSkinnedTreeShadowProgram.mShaderFiles.push_back(make_pair("deferred/treeShadowF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredSkinnedTreeShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = gDeferredSkinnedTreeShadowProgram.createShader();
+        success = gDeferredTreeShadowProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -1775,29 +1754,11 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        for (int i = 0; i < 3 && success; ++i)
+        for (int i = 0; i < 2 && success; ++i)
         {
-            LLGLSLShader* shader = nullptr;
-            bool rigged = (i == 1);
-            bool hud = (i == 2);
-
-            if (hud)
-            {
-                shader = &gHUDAlphaProgram;
-                shader->mName = "HUD Alpha Shader";
-            }
-            else if (!rigged)
-            {
-                shader = &gDeferredAlphaProgram;
-                shader->mName = "Deferred Alpha Shader";
-                shader->mRiggedVariant = &gDeferredSkinnedAlphaProgram;
-            }
-            else
-            {
-                shader = &gDeferredSkinnedAlphaProgram;
-                shader->mName = "Skinned Deferred Alpha Shader";
-                shader->mFeatures.hasObjectSkinning = true;
-            }
+            bool hud = (i == 1);
+            LLGLSLShader* shader = hud ? &gHUDAlphaProgram : &gDeferredAlphaProgram;
+            shader->mName = hud ? "HUD Alpha Shader" : "Deferred Alpha Shader";
 
             shader->mFeatures.calculatesLighting = false;
             shader->mFeatures.hasLighting = false;
@@ -1831,11 +1792,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             add_common_permutations(shader);
 
-            if (rigged)
-            {
-                shader->addPermutation("HAS_SKIN", "1");
-            }
-
             if (hud)
             {
                 shader->addPermutation("IS_HUD", "1");
@@ -1843,74 +1799,62 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
-            success = shader->createShader();
+            // the deferred alpha pass draws rigged geometry; the HUD pass never does
+            success = shader->createShader(hud ? 0 : LLGLSLShader::VARIANT_RIGGED);
             llassert(success);
 
             // Hack
-            shader->mFeatures.calculatesLighting = true;
-            shader->mFeatures.hasLighting = true;
+            shader->forEachVariant([](LLGLSLShader& s)
+            {
+                s.mFeatures.calculatesLighting = true;
+                s.mFeatures.hasLighting = true;
+            });
         }
     }
 
     if (success)
     {
-        LLGLSLShader* shaders[] = {
-            &gDeferredAlphaImpostorProgram,
-            &gDeferredSkinnedAlphaImpostorProgram
-        };
+        LLGLSLShader* shader = &gDeferredAlphaImpostorProgram;
 
-        for (int i = 0; i < 2 && success; ++i)
+        shader->mName = "Deferred Alpha Impostor Shader";
+
+        // Begin Hack
+        shader->mFeatures.calculatesLighting = false;
+        shader->mFeatures.hasLighting = false;
+
+        shader->mFeatures.hasSrgb = true;
+        shader->mFeatures.isAlphaLighting = true;
+        shader->mFeatures.hasShadows = use_sun_shadow;
+        shader->mFeatures.hasReflectionProbes = true;
+        shader->mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
+
+        shader->mShaderFiles.clear();
+        shader->mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
+        shader->mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));
+
+        shader->clearPermutations();
+        shader->addPermutation("USE_INDEXED_TEX", "1");
+        shader->addPermutation("FOR_IMPOSTOR", "1");
+        shader->addPermutation("HAS_ALPHA_MASK", "1");
+        shader->addPermutation("USE_VERTEX_COLOR", "1");
+
+        if (use_sun_shadow)
         {
-            bool rigged = i == 1;
-            LLGLSLShader* shader = shaders[i];
-
-            shader->mName = rigged ? "Skinned Deferred Alpha Impostor Shader" : "Deferred Alpha Impostor Shader";
-
-            // Begin Hack
-            shader->mFeatures.calculatesLighting = false;
-            shader->mFeatures.hasLighting = false;
-
-            shader->mFeatures.hasSrgb = true;
-            shader->mFeatures.isAlphaLighting = true;
-            shader->mFeatures.hasShadows = use_sun_shadow;
-            shader->mFeatures.hasReflectionProbes = true;
-            shader->mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
-
-            shader->mShaderFiles.clear();
-            shader->mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
-            shader->mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));
-
-            shader->clearPermutations();
-            shader->addPermutation("USE_INDEXED_TEX", "1");
-            shader->addPermutation("FOR_IMPOSTOR", "1");
-            shader->addPermutation("HAS_ALPHA_MASK", "1");
-            shader->addPermutation("USE_VERTEX_COLOR", "1");
-            if (rigged)
-            {
-                shader->mFeatures.hasObjectSkinning = true;
-                shader->addPermutation("HAS_SKIN", "1");
-            }
-
-            if (use_sun_shadow)
-            {
-                shader->addPermutation("HAS_SUN_SHADOW", "1");
-            }
-
-            add_common_permutations(shader);
-
-            shader->mRiggedVariant = &gDeferredSkinnedAlphaImpostorProgram;
-            shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            if (!rigged)
-            {
-                shader->mRiggedVariant = shaders[1];
-            }
-            success = shader->createShader();
-            llassert(success);
-
-            // End Hack
-            shader->mFeatures.calculatesLighting = true;
-            shader->mFeatures.hasLighting = true;
+            shader->addPermutation("HAS_SUN_SHADOW", "1");
         }
+
+        add_common_permutations(shader);
+
+        shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED);
+        llassert(success);
+
+        // End Hack
+        shader->forEachVariant([](LLGLSLShader& s)
+        {
+            s.mFeatures.calculatesLighting = true;
+            s.mFeatures.hasLighting = true;
+        });
     }
 
     if (success)
@@ -2229,26 +2173,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowV.glsl", GL_VERTEX_SHADER));
         gDeferredShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowF.glsl", GL_FRAGMENT_SHADER));
         gDeferredShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredShadowProgram.mRiggedVariant = &gDeferredSkinnedShadowProgram;
-        success = gDeferredShadowProgram.createShader();
-        llassert(success);
-    }
-
-    if (success)
-    {
-        gDeferredSkinnedShadowProgram.mName = "Deferred Skinned Shadow Shader";
-        gDeferredSkinnedShadowProgram.mFeatures.isDeferred = true;
-        gDeferredSkinnedShadowProgram.mFeatures.hasShadows = true;
-        gDeferredSkinnedShadowProgram.mFeatures.hasObjectSkinning = true;
-        gDeferredSkinnedShadowProgram.mShaderFiles.clear();
-        gDeferredSkinnedShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowSkinnedV.glsl", GL_VERTEX_SHADER));
-        gDeferredSkinnedShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredSkinnedShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-
-        add_common_permutations(&gDeferredSkinnedShadowProgram);
-
-        // gDeferredSkinnedShadowProgram.addPermutation("DEPTH_CLAMP", "1"); // disable depth clamp for now
-        success = gDeferredSkinnedShadowProgram.createShader();
+        success = gDeferredShadowProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -3584,19 +3509,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionV.glsl", GL_VERTEX_SHADER));
         gOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionF.glsl", GL_FRAGMENT_SHADER));
         gOcclusionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        gOcclusionProgram.mRiggedVariant = &gSkinnedOcclusionProgram;
-        success = gOcclusionProgram.createShader();
-    }
-
-    if (success)
-    {
-        gSkinnedOcclusionProgram.mName = "Skinned Occlusion Shader";
-        gSkinnedOcclusionProgram.mFeatures.hasObjectSkinning = true;
-        gSkinnedOcclusionProgram.mShaderFiles.clear();
-        gSkinnedOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionSkinnedV.glsl", GL_VERTEX_SHADER));
-        gSkinnedOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionF.glsl", GL_FRAGMENT_SHADER));
-        gSkinnedOcclusionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gSkinnedOcclusionProgram.createShader();
+        success = gOcclusionProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
     }
 
     if (success)
