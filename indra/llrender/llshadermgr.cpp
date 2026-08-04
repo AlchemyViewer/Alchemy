@@ -1328,21 +1328,17 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("normal_matrix");
     mReservedUniforms.push_back("texture_matrix0");
     mReservedUniforms.push_back("texture_matrix1");
-    mReservedUniforms.push_back("texture_matrix2");
-    mReservedUniforms.push_back("texture_matrix3");
     mReservedUniforms.push_back("object_plane_s");
     mReservedUniforms.push_back("object_plane_t");
 
     mReservedUniforms.push_back("texture_base_color_transform"); // (GLTF)
     mReservedUniforms.push_back("texture_normal_transform"); // (GLTF)
     mReservedUniforms.push_back("texture_metallic_roughness_transform"); // (GLTF)
-    mReservedUniforms.push_back("texture_occlusion_transform"); // (GLTF)
     mReservedUniforms.push_back("texture_emissive_transform"); // (GLTF)
     mReservedUniforms.push_back("base_color_texcoord"); // (GLTF)
     mReservedUniforms.push_back("emissive_texcoord"); // (GLTF)
     mReservedUniforms.push_back("normal_texcoord"); // (GLTF)
     mReservedUniforms.push_back("metallic_roughness_texcoord"); // (GLTF)
-    mReservedUniforms.push_back("occlusion_texcoord"); // (GLTF)
 
     mReservedUniforms.push_back("terrain_texture_transforms"); // (GLTF)
 
@@ -1391,7 +1387,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("specularMap");
     mReservedUniforms.push_back("metallicRoughnessMap");
     mReservedUniforms.push_back("normalMap");
-    mReservedUniforms.push_back("occlusionMap");
     mReservedUniforms.push_back("emissiveMap");
     mReservedUniforms.push_back("bumpMap");
     mReservedUniforms.push_back("bumpMap2");
@@ -1453,7 +1448,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("bloom_strength");
     mReservedUniforms.push_back("alpha_glow_boost");
     mReservedUniforms.push_back("bloomMap");
-    mReservedUniforms.push_back("halationMap");
     mReservedUniforms.push_back("halation_strength");
     mReservedUniforms.push_back("halation_tint");
     mReservedUniforms.push_back("halation_lum_weights");
@@ -1527,7 +1521,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SHADOW5+1);
 
-    mReservedUniforms.push_back("positionMap");
     mReservedUniforms.push_back("diffuseRect");
     mReservedUniforms.push_back("specularRect");
     mReservedUniforms.push_back("emissiveRect");
@@ -1543,12 +1536,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("env_intensity");
 
     mReservedUniforms.push_back("matrixPalette");
-    mReservedUniforms.push_back("translationPalette");
     mReservedUniforms.push_back("skin_origin");
 
     mReservedUniforms.push_back("screenTex");
-    mReservedUniforms.push_back("screenDepth");
-    mReservedUniforms.push_back("refTex");
     mReservedUniforms.push_back("exclusionTex");
     mReservedUniforms.push_back("eyeVec");
     mReservedUniforms.push_back("time");
@@ -1569,9 +1559,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("fresnelScale");
     mReservedUniforms.push_back("fresnelOffset");
     mReservedUniforms.push_back("blurMultiplier");
-    mReservedUniforms.push_back("sunAngle");
-    mReservedUniforms.push_back("scaledAngle");
-    mReservedUniforms.push_back("sunAngle2");
     mReservedUniforms.push_back("above_water");
     llassert(mReservedUniforms.size() == LLShaderMgr::WATER_ABOVE_WATER + 1);
 
@@ -1640,14 +1627,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("origin");
     mReservedUniforms.push_back("display_gamma");
 
-    mReservedUniforms.push_back("inscatter");
-    mReservedUniforms.push_back("sun_size");
-    mReservedUniforms.push_back("fog_color");
 
-    mReservedUniforms.push_back("transmittance_texture");
-    mReservedUniforms.push_back("scattering_texture");
-    mReservedUniforms.push_back("single_mie_scattering_texture");
-    mReservedUniforms.push_back("irradiance_texture");
     mReservedUniforms.push_back("blend_factor");
     mReservedUniforms.push_back("moisture_level");
     mReservedUniforms.push_back("droplet_radius");
@@ -1669,12 +1649,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("roughness");
     mReservedUniforms.push_back("u_width");
 
-    mReservedUniforms.push_back("sh_input_r");
-    mReservedUniforms.push_back("sh_input_g");
-    mReservedUniforms.push_back("sh_input_b");
 
     mReservedUniforms.push_back("sun_moon_glow_factor");
-    mReservedUniforms.push_back("water_edge");
     mReservedUniforms.push_back("sun_up_factor");
     mReservedUniforms.push_back("moonlight_color");
 

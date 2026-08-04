@@ -1,5 +1,5 @@
 /**
- * @file postDeferredTonemap.glsl
+ * @file tonemapUtilF.glsl
  *
  * $LicenseInfo:firstyear=2024&license=viewerlgpl$
  * Second Life Viewer Source Code

@@ -53,21 +53,17 @@ public:
         NORMAL_MATRIX,                      //  "normal_matrix"
         TEXTURE_MATRIX0,                    //  "texture_matrix0"
         TEXTURE_MATRIX1,                    //  "texture_matrix1"
-        TEXTURE_MATRIX2,                    //  "texture_matrix2"
-        TEXTURE_MATRIX3,                    //  "texture_matrix3"
         OBJECT_PLANE_S,                     //  "object_plane_s"
         OBJECT_PLANE_T,                     //  "object_plane_t"
 
         TEXTURE_BASE_COLOR_TRANSFORM,         //  "texture_base_color_transform" (GLTF)
         TEXTURE_NORMAL_TRANSFORM,             //  "texture_normal_transform" (GLTF)
         TEXTURE_METALLIC_ROUGHNESS_TRANSFORM, //  "texture_metallic_roughness_transform" (GLTF)
-        TEXTURE_OCCLUSION_TRANSFORM,          //  "texture_occlusion_transform" (GLTF)
         TEXTURE_EMISSIVE_TRANSFORM,           //  "texture_emissive_transform" (GLTF)
         BASE_COLOR_TEXCOORD,                  //  "base_color_texcoord" (GLTF)
         EMISSIVE_TEXCOORD,                    //  "emissive_texcoord" (GLTF)
         NORMAL_TEXCOORD,                      //  "normal_texcoord" (GLTF)
         METALLIC_ROUGHNESS_TEXCOORD,          //  "metallic_roughness_texcoord" (GLTF)
-        OCCLUSION_TEXCOORD,                   //  "occlusion_texcoord" (GLTF)
 
         TERRAIN_TEXTURE_TRANSFORMS,           //  "terrain_texture_transforms" (GLTF)
 
@@ -105,7 +101,6 @@ public:
         SPECULAR_MAP,                       //  "specularMap"
         METALLIC_ROUGHNESS_MAP,             //  "metallicRoughnessMap"
         NORMAL_MAP,                         //  "normalMap"
-        OCCLUSION_MAP,                      //  "occlusionMap"
         EMISSIVE_MAP,                       //  "emissiveMap"
         BUMP_MAP,                           //  "bumpMap"
         BUMP_MAP2,                          //  "bumpMap2"
@@ -160,7 +155,6 @@ public:
         BLOOM_STRENGTH,                     //  "bloom_strength"
         BLOOM_ALPHA_GLOW_BOOST,             //  "alpha_glow_boost"
         BLOOM_SAMPLER,                      //  "bloomMap"
-        HALATION_SAMPLER,                   //  "halationMap"
         HALATION_STRENGTH,                  //  "halation_strength"
         HALATION_TINT,                      //  "halation_tint"
         HALATION_LUM_WEIGHTS,               //  "halation_lum_weights"
@@ -225,7 +219,6 @@ public:
         DEFERRED_SHADOW3,                   //  "shadowMap3"
         DEFERRED_SHADOW4,                   //  "shadowMap4"
         DEFERRED_SHADOW5,                   //  "shadowMap5"
-        DEFERRED_POSITION,                  //  "positionMap"
         DEFERRED_DIFFUSE,                   //  "diffuseRect"
         DEFERRED_SPECULAR,                  //  "specularRect"
         DEFERRED_EMISSIVE,                  //  "emissiveRect"
@@ -240,12 +233,9 @@ public:
         ENVIRONMENT_INTENSITY,              //  "env_intensity"
 
         AVATAR_MATRIX,                      //  "matrixPalette"
-        AVATAR_TRANSLATION,                 //  "translationPalette"
         SKIN_ORIGIN,                        //  "skin_origin" (rigged path: agent-space rebase origin the palette translations were made relative to)
 
         WATER_SCREENTEX,                    //  "screenTex"
-        WATER_SCREENDEPTH,                  //  "screenDepth"
-        WATER_REFTEX,                       //  "refTex"
         WATER_EXCLUSIONTEX,                 //  "exclusionTex"
         WATER_EYEVEC,                       //  "eyeVec"
         WATER_TIME,                         //  "time"
@@ -266,9 +256,6 @@ public:
         WATER_FRESNEL_SCALE,                //  "fresnelScale"
         WATER_FRESNEL_OFFSET,               //  "fresnelOffset"
         WATER_BLUR_MULTIPLIER,              //  "blurMultiplier"
-        WATER_SUN_ANGLE,                    //  "sunAngle"
-        WATER_SCALED_ANGLE,                 //  "scaledAngle"
-        WATER_SUN_ANGLE2,                   //  "sunAngle2"
         WATER_ABOVE_WATER,                  //  "above_water"
 
         WL_CAMPOSLOCAL,                     //  "camPosLocal"
@@ -335,15 +322,8 @@ public:
         SHINY_ORIGIN,                       //  "origin"
         DISPLAY_GAMMA,                      //  "display_gamma"
 
-        INSCATTER_RT,                       //  "inscatter"
-        SUN_SIZE,                           //  "sun_size"
-        FOG_COLOR,                          //  "fog_color"
 
         // precomputed textures
-        TRANSMITTANCE_TEX,                  //  "transmittance_texture"
-        SCATTER_TEX,                        //  "scattering_texture"
-        SINGLE_MIE_SCATTER_TEX,             //  "single_mie_scattering_texture"
-        ILLUMINANCE_TEX,                    //  "irradiance_texture"
         BLEND_FACTOR,                       //  "blend_factor"
 
         MOISTURE_LEVEL,                     //  "moisture_level"
@@ -369,12 +349,8 @@ public:
         ROUGHNESS,                          //  "roughness"
         U_WIDTH,                            //  "u_width"
 
-        SH_INPUT_L1R,                       //  "sh_input_r"
-        SH_INPUT_L1G,                       //  "sh_input_g"
-        SH_INPUT_L1B,                       //  "sh_input_b"
 
         SUN_MOON_GLOW_FACTOR,               //  "sun_moon_glow_factor"
-        WATER_EDGE_FACTOR,                  //  "water_edge"
         SUN_UP_FACTOR,                      //  "sun_up_factor"
         MOONLIGHT_COLOR,                    //  "moonlight_color"
 
