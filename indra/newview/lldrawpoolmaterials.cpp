@@ -140,10 +140,11 @@ static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigge
         const S32 n = llmin((S32)params.mMaterialSlotList.size(), N);
         LL_PROFILE_ZONE_NUM(n);
 
-        F32 spec_color[4 * 8] = { 0.f };
-        F32 env[8] = { 0.f };
-        F32 min_alpha[8] = { 0.f };
-        F32 fullbright[8] = { 0.f };
+        constexpr S32 kSlots = LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS;
+        F32 spec_color[4 * kSlots] = { 0.f }; // 4 == vec4 stride, distinct from the slot count
+        F32 env[kSlots] = { 0.f };
+        F32 min_alpha[kSlots] = { 0.f };
+        F32 fullbright[kSlots] = { 0.f };
 
         for (S32 s = 0; s < n; ++s)
         {

@@ -556,7 +556,7 @@ public:
     bool attachShaderFeatures(LLGLSLShader * shader);
     void dumpObjectLog(GLuint ret, bool warns = true, const std::string& filename = "");
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
-    bool    linkProgramObject(GLuint obj, bool suppress_errors = false);
+    bool    linkProgramObject(GLuint obj, bool suppress_errors = false, const std::string& shader_name = "unknown");
     bool    validateProgramObject(GLuint obj);
     // `cache_key` overrides the map key the compiled object is stored under; empty means the
     // path. Shared objects are compiled once and attached by name, so a source that keys on a

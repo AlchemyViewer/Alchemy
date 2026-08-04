@@ -6640,7 +6640,10 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
         LLFace** i = face_iter;
         ++i;
 
-        const U32 MAX_TEXTURE_COUNT = 32;
+        // Ladder-width ceiling: must match what the indexed sources declare and what
+        // sIndexedTextureChannels is clamped to, so the batch can never carry an index
+        // the shader has no sampler for.
+        constexpr U32 MAX_TEXTURE_COUNT = (U32)LLGLSLShader::MAX_BATCH_TEXTURE_COUNT;
         LLViewerTexture* texture_list[MAX_TEXTURE_COUNT];
 
         U32 texture_count = 0;
@@ -6653,8 +6656,8 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 // sIndexedGLTFChannels distinct materials into one batch, assigning
                 // each face a material slot via setTextureIndex. The shader selects
                 // per-vertex by that slot. See LLRenderPass::pushGLTFBatchIndexed.
-                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, 8);
-                const LLGLTFMaterial* mat_slots[8];
+                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS);
+                const LLGLTFMaterial* mat_slots[LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS];
                 U32 slot_count = 0;
 
                 const LLGLTFMaterial* anchor_mat = facep->getTextureEntry()->getGLTFRenderMaterial();
@@ -6748,10 +6751,10 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 // (diffuse, material) pairs into one batch. Faces must share the same
                 // shader mask (== gDeferredMaterialProgram index, i.e. the bound
                 // program), so the mask is a hard batch-break key.
-                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, 8);
-                LLViewerTexture* diffuse_slots[8];
-                LLMaterial* mat_slots[8];
-                U8 shiny_slots[8];
+                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS);
+                LLViewerTexture* diffuse_slots[LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS];
+                LLMaterial* mat_slots[LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS];
+                U8 shiny_slots[LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS];
                 U32 slot_count = 0;
 
                 // A slot's spec color / env intensity come from the TE shiny value when

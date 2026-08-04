@@ -591,14 +591,14 @@ void LLRenderPass::pushMaskBatchesIndexed(U32 type, bool rigged)
             }
         }
 
-        // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a
-        // stale/over-long list can never overrun the 8-slot array or N sampler units.
+        // Slot count is capped at N (<= MAX_INDEXED_GLTF_CHANNELS) by genDrawInfo; clamp
+        // defensively so a stale/over-long list can never overrun the array or N sampler units.
         const S32 N = LLGLSLShader::sIndexedGLTFChannels;
         llassert((S32)params.mMaterialSlotList.size() <= N);
         const S32 n = llmin((S32)params.mMaterialSlotList.size(), N);
         LL_PROFILE_ZONE_NUM(n);
 
-        F32 min_alpha[8] = { 0.f };
+        F32 min_alpha[LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS] = { 0.f };
         for (S32 s = 0; s < n; ++s)
         {
             const LLDrawInfo::MaterialSlot& slot = params.mMaterialSlotList[s];
@@ -1050,23 +1050,28 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
     const bool want_full     = (maps == GLTF_MAPS_FULL); // normal + ORM
 
     const S32 N = LLGLSLShader::sIndexedGLTFChannels; // shader sampler-array stride
-    // Slot count is capped at N (<= 8) by genDrawInfo; clamp defensively so a stale
-    // or over-long list can never overrun the fixed 8-slot arrays / N sampler units.
+    // Slot count is capped at N (<= MAX_INDEXED_GLTF_CHANNELS) by genDrawInfo; clamp
+    // defensively so a stale or over-long list can never overrun the fixed per-slot
+    // arrays / N sampler units.
     llassert((S32)params.mGLTFMaterialList.size() <= N);
     const S32 n = llmin((S32)params.mGLTFMaterialList.size(), N); // materials in this batch
     LL_PROFILE_ZONE_NUM(n);
 
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
-    // gathered per-slot uniform data (max 8 slots; see sIndexedGLTFChannels clamp)
-    F32 roughness[8] = { 0.f };
-    F32 metallic[8]  = { 0.f };
-    F32 min_alpha[8] = { 0.f };
-    F32 emissive[3 * 8] = { 0.f };
-    F32 bc_xform[8 * 8] = { 0.f }; // 2 vec4 (8 floats) per slot
-    F32 nm_xform[8 * 8] = { 0.f };
-    F32 mr_xform[8 * 8] = { 0.f };
-    F32 em_xform[8 * 8] = { 0.f };
+    // Fixed per-slot scratch sized to the channel-count ceiling (n <= N <= kSlots bounds the
+    // fill). kXf == floats per packed texture transform (2 vec4) -- a DIFFERENT quantity from
+    // the slot count that happens to share the value 8; keeping them separate lets either move.
+    constexpr S32 kSlots = LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS;
+    constexpr S32 kXf    = (S32)LLGLTFMaterial::TextureTransform::PACK_SIZE;
+    F32 roughness[kSlots] = { 0.f };
+    F32 metallic[kSlots]  = { 0.f };
+    F32 min_alpha[kSlots] = { 0.f };
+    F32 emissive[3 * kSlots] = { 0.f };
+    F32 bc_xform[kSlots * kXf] = { 0.f }; // kXf floats (2 vec4) per slot
+    F32 nm_xform[kSlots * kXf] = { 0.f };
+    F32 mr_xform[kSlots * kXf] = { 0.f };
+    F32 em_xform[kSlots * kXf] = { 0.f };
 
     bool double_sided = false;
 
@@ -1093,7 +1098,7 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
         // getPacked() takes F32(&)[8]; copy each transform into its slot stride.
         LLGLTFMaterial::TextureTransform::Pack packed;
         mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(packed);
-        memcpy(&bc_xform[8 * s], packed, sizeof(packed));
+        memcpy(&bc_xform[kXf * s], packed, sizeof(packed));
 
         if (!want_emissive)
         { // shadow alpha-mask samples only base color
@@ -1109,7 +1114,7 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
         emissive[3 * s + 2] = mat->mEmissiveColor.mV[2];
 
         mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE].getPacked(packed);
-        memcpy(&em_xform[8 * s], packed, sizeof(packed));
+        memcpy(&em_xform[kXf * s], packed, sizeof(packed));
 
         if (!want_full)
         { // glow needs base color + emissive only
@@ -1126,9 +1131,9 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
         metallic[s]  = mat->mMetallicFactor;
 
         mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL].getPacked(packed);
-        memcpy(&nm_xform[8 * s], packed, sizeof(packed));
+        memcpy(&nm_xform[kXf * s], packed, sizeof(packed));
         mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS].getPacked(packed);
-        memcpy(&mr_xform[8 * s], packed, sizeof(packed));
+        memcpy(&mr_xform[kXf * s], packed, sizeof(packed));
     }
 
     shader->uniform1fv(LLShaderMgr::GLTF_MINIMUM_ALPHA, n, min_alpha);

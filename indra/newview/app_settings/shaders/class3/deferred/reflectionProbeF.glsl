@@ -157,6 +157,14 @@ int getStartIndex(vec3 pos)
 // populate "probeIndex" with N probe indices that influence pos where N is REF_SAMPLE_COUNT
 void preProbeSample(vec3 pos)
 {
+    // Start the populate from empty here rather than relying on probeInfluences'
+    // global initializer. That initializer runs once per invocation, so this function
+    // only produces a correct list because nothing currently calls it twice -- the
+    // three entry points that do are all mutually exclusive. Resetting here makes the
+    // populate self-contained instead of correct by coincidence; it is a no-op on
+    // every existing call path.
+    probeInfluences = 0;
+
 #if REFMAP_LEVEL > 0
 
     int start = getStartIndex(pos);

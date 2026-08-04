@@ -483,20 +483,30 @@ void LLShaderMgr::dumpShaderSource(U32 shader_code_count, GLchar** shader_code_t
 
 void LLShaderMgr::dumpObjectLog(GLuint ret, bool warns, const std::string& filename)
 {
-    std::string log;
-    log = get_object_log(ret);
-    std::string fname = filename;
-    if (filename.empty())
+    std::string log = get_object_log(ret);
+    if (log.empty())
     {
-        fname = "unknown shader file";
+        // Nothing the driver wanted to tell us -- a clean compile/link on a modern
+        // core-profile driver returns an empty info log, so there is nothing to show.
+        return;
     }
 
-    if (log.length() > 0)
+    const std::string fname = filename.empty() ? "unknown shader file" : filename;
+
+    // warns == true  -> the compile / link / validate FAILED: this is the error log.
+    // warns == false -> the object built successfully but the driver still emitted a
+    //                   non-empty info log, i.e. these are compiler *warnings*. Surface
+    //                   them either way (both at WARNS so they are actually visible)
+    //                   but frame them so a warning isn't mistaken for a hard failure.
+    if (warns)
     {
-        LL_SHADER_LOADING_WARNS() << "Shader loading from " << fname << LL_ENDL;
-        LL_SHADER_LOADING_WARNS() << "\n" << log << LL_ENDL;
+        LL_SHADER_LOADING_WARNS() << "Shader compiler error log for " << fname << ":\n" << log << LL_ENDL;
     }
- }
+    else
+    {
+        LL_WARNS("ShaderLoading") << "Shader compiler warning log for " << fname << ":\n" << log << LL_ENDL;
+    }
+}
 
 GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, const std::string& cache_key)
 {
@@ -944,6 +954,13 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             glDeleteShader(ret); //no longer need handle
             ret = 0;
         }
+        else
+        {
+            // Compiled OK, but the driver may still have emitted warnings into the
+            // info log (deprecated usage, precision mismatches, unused varyings...).
+            // dumpObjectLog() no-ops on an empty log, so this is free on clean builds.
+            dumpObjectLog(ret, false, open_file_name);
+        }
     }
     else
     {
@@ -987,7 +1004,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     return ret;
 }
 
-bool LLShaderMgr::linkProgramObject(GLuint obj, bool suppress_errors)
+bool LLShaderMgr::linkProgramObject(GLuint obj, bool suppress_errors, const std::string& shader_name)
 {
     //check for errors
     {
@@ -1004,8 +1021,18 @@ bool LLShaderMgr::linkProgramObject(GLuint obj, bool suppress_errors)
         {
             //an error occured, print log
             LL_SHADER_LOADING_WARNS() << "GLSL Linker Error:" << LL_ENDL;
-            dumpObjectLog(obj, true, "linker");
+            dumpObjectLog(obj, true, "linker: " + shader_name);
             return success;
+        }
+        else if (success == GL_TRUE)
+        {
+            // Linked OK -- surface any non-fatal linker warnings the driver produced.
+            // Skipped while suppress_errors is set (a probe/fallback link the caller
+            // expects may fail and doesn't want narrated). No-ops on an empty log.
+            if (!suppress_errors)
+            {
+                dumpObjectLog(obj, false, "linker: " + shader_name);
+            }
         }
     }
 
@@ -1037,6 +1064,31 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
     LL_INFOS("ShaderMgr") << "Initializing shader cache" << LL_ENDL;
 
     mShaderCacheEnabled = gGLManager.mGLVersion >= 4.09 && enabled;
+
+    // A 4.1 version string (or ARB_get_program_binary) is necessary but NOT
+    // sufficient to actually retrieve/restore program binaries, and assuming it is
+    // is a crash: the entry points have to have resolved AND the driver has to
+    // expose at least one program binary format. Real drivers violate this --
+    // Apple's GL reports GL_NUM_PROGRAM_BINARY_FORMATS == 0, and some virtualized /
+    // remote GPUs advertise 4.1 yet return null entry points -- in which case
+    // glProgramParameteri / glGetProgramBinary / glProgramBinary are unusable and
+    // touching them (as loadCachedProgramBinary / saveCachedProgramBinary do on
+    // every program) faults. Verify capability once here and disable the cache
+    // rather than crash later. glGetProgramiv stays valid regardless, but with no
+    // format it can only ever report a 0-length binary, so the cache is pointless.
+    if (mShaderCacheEnabled)
+    {
+        GLint num_binary_formats = 0;
+        glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &num_binary_formats);
+        const bool have_entry_points = glProgramParameteri && glGetProgramBinary && glProgramBinary;
+        if (!have_entry_points || num_binary_formats <= 0)
+        {
+            LL_INFOS("ShaderMgr") << "Program binary cache disabled: "
+                                  << (have_entry_points ? "driver exposes " : "missing GL entry points; ")
+                                  << num_binary_formats << " program binary format(s)." << LL_ENDL;
+            mShaderCacheEnabled = false;
+        }
+    }
 
     if(!mShaderCacheEnabled || mShaderCacheVersion.notNull())
         return;
@@ -1149,6 +1201,14 @@ bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
 {
     if (!mShaderCacheEnabled) return false;
 
+    // Don't touch a program that failed to allocate: the recreate paths in
+    // createShader() call glCreateProgram() and land here without re-checking for 0,
+    // and glProgramParameteri on a non-program name is undefined.
+    if (shader->mProgramObject == 0)
+    {
+        return false;
+    }
+
     glProgramParameteri(shader->mProgramObject, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
 
     auto binary_iter = mShaderBinaryCache.find(shader->mShaderHash);
@@ -1196,31 +1256,44 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
 {
     if (!mShaderCacheEnabled) return true;
 
-    ProgramBinaryData binary_info = ProgramBinaryData();
-    glGetProgramiv(shader->mProgramObject, GL_PROGRAM_BINARY_LENGTH, &binary_info.mBinaryLength);
-    if (binary_info.mBinaryLength > 0)
+    // mShaderCacheEnabled guarantees the entry points resolved and the driver
+    // reports >=1 binary format (see initShaderCache). A program we never created /
+    // linked is still off-limits: glGetProgramiv on 0 or a non-program name is
+    // undefined and faults on some drivers, which is the crash this guard prevents.
+    if (shader->mProgramObject == 0)
     {
-        std::vector<U8> program_binary;
-        program_binary.resize(binary_info.mBinaryLength);
+        return false;
+    }
 
-        GLenum error = glGetError(); // Clear current error
-        glGetProgramBinary(shader->mProgramObject, static_cast<GLsizei>(program_binary.size() * sizeof(U8)), nullptr, &binary_info.mBinaryFormat, program_binary.data());
-        error = glGetError();
-        if (error == GL_NO_ERROR)
+    ProgramBinaryData binary_info = ProgramBinaryData();
+
+    glGetError(); // flush any stale error so the check below reflects this query
+    glGetProgramiv(shader->mProgramObject, GL_PROGRAM_BINARY_LENGTH, &binary_info.mBinaryLength);
+    if (glGetError() != GL_NO_ERROR || binary_info.mBinaryLength <= 0)
+    {
+        // Query failed (e.g. the retrievable hint wasn't honored) or the driver has
+        // no binary to hand back -- either way there's nothing safe to store.
+        return false;
+    }
+
+    std::vector<U8> program_binary;
+    program_binary.resize(binary_info.mBinaryLength);
+
+    glGetProgramBinary(shader->mProgramObject, static_cast<GLsizei>(program_binary.size() * sizeof(U8)), nullptr, &binary_info.mBinaryFormat, program_binary.data());
+    if (glGetError() == GL_NO_ERROR)
+    {
+        std::string out_path = gDirUtilp->add(mShaderCacheDir, shader->mShaderHash.asString() + ".shaderbin");
+        std::error_code ec;
+        LLFile filep = LLFile(out_path, LLFile::out | LLFile::binary, ec);
+        if (filep)
         {
-            std::string out_path = gDirUtilp->add(mShaderCacheDir, shader->mShaderHash.asString() + ".shaderbin");
-            std::error_code ec;
-            LLFile filep = LLFile(out_path, LLFile::out | LLFile::binary, ec);
-            if (filep)
-            {
-                filep.write(program_binary.data(), program_binary.size(), ec);
-                filep.close();
+            filep.write(program_binary.data(), program_binary.size(), ec);
+            filep.close();
 
-                binary_info.mLastUsedTime = (F32)LLTimer::getTotalSeconds();
+            binary_info.mLastUsedTime = (F32)LLTimer::getTotalSeconds();
 
-                mShaderBinaryCache.insert_or_assign(shader->mShaderHash, binary_info);
-                return true;
-            }
+            mShaderBinaryCache.insert_or_assign(shader->mShaderHash, binary_info);
+            return true;
         }
     }
     return false;

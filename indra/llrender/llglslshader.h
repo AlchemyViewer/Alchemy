@@ -205,10 +205,26 @@ public:
     // Does this program declare any of the shadow-map samplers (shadowMap0..5)? Computed once
     // in mapUniforms(); bind() asks on every program switch while the maps are bound.
     bool declaresShadowSamplers() const { return mDeclaresShadowSamplers; }
+    // Hard ceiling on the indexed-GLTF slot count. setShaders() clamps
+    // sIndexedGLTFChannels to this, and every fixed per-slot array that walks a batch is
+    // sized from it. Those two things MUST agree: the arrays are indexed by slot up to
+    // sIndexedGLTFChannels, so a clamp raised past the array width overruns them. One
+    // constant so raising the ceiling moves both together instead of relying on matching
+    // literals in four files.
+    static constexpr S32 MAX_INDEXED_GLTF_CHANNELS = 8;
+
+    // Hard ceiling on the indexed-texture ladder width (tex0..texN). Three things must
+    // agree on this number: the tex%d samplers the indexed sources declare, the
+    // texture_list[] genDrawInfo batches into, and sIndexedTextureChannels. It is a
+    // declaration ceiling, not a budget -- the affordable width is a device+shader
+    // property computed in setShaders().
+    static constexpr S32 MAX_BATCH_TEXTURE_COUNT = 32;
+
     // Number of GLTF PBR materials that can be batched into one indexed draw call.
     // Each material consumes four texture units (base color, normal, ORM, emissive),
-    // so this is roughly (available fragment texture units) / 4. See
-    // PASS_GLTF_PBR_INDEXED and LLVolumeGeometryManager::genDrawInfo.
+    // so this is roughly (available fragment texture units) / 4, clamped to
+    // MAX_INDEXED_GLTF_CHANNELS. See PASS_GLTF_PBR_INDEXED and
+    // LLVolumeGeometryManager::genDrawInfo.
     static S32 sIndexedGLTFChannels;
 
     // True once the indexed legacy (Blinn-Phong) material programs have loaded.

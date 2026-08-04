@@ -536,7 +536,8 @@ void LLViewerShaderMgr::setShaders()
     // shadow/reflection maps, so the full fragment texture-unit budget is
     // available here -- unlike sIndexedTextureChannels above, no units are
     // reserved. Capped at 8 to bound shader sampler declarations.
-    LLGLSLShader::sIndexedGLTFChannels = llclamp(gGLManager.mNumTextureImageUnits / 4, 1, 8);
+    LLGLSLShader::sIndexedGLTFChannels = llclamp(gGLManager.mNumTextureImageUnits / 4, 1,
+                                                LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS);
 
     reentrance = true;
 
