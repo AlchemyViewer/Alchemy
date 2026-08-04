@@ -1809,17 +1809,18 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->mFeatures.hasShadows = use_sun_shadow;
             shader->mFeatures.hasReflectionProbes = true;
             shader->mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
+            shader->mShaderFiles.clear();
+            shader->mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
+            shader->mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));
+
+            shader->clearPermutations();
+
             // Forward (non-HUD) decodes its diffuse on the sampler and filters in linear;
             // the HUD path outputs sRGB and keeps the encoded texel. See mLinearDiffuse.
             // The FOR_IMPOSTOR alpha programs below stay false: they write the sRGB sample
             // straight to the bake.
             if (!hud) shader->addPermutation("LINEAR_DIFFUSE", "1");
 
-            shader->mShaderFiles.clear();
-            shader->mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
-            shader->mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));
-
-            shader->clearPermutations();
             shader->addPermutation("USE_VERTEX_COLOR", "1");
             shader->addPermutation("HAS_ALPHA_MASK", "1");
             shader->addPermutation("USE_INDEXED_TEX", "1");
@@ -2452,11 +2453,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarProgram.mShaderFiles.push_back(make_pair("deferred/avatarV.glsl", GL_VERTEX_SHADER));
         gDeferredAvatarProgram.mShaderFiles.push_back(make_pair("deferred/avatarF.glsl", GL_FRAGMENT_SHADER));
         gDeferredAvatarProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredAvatarProgram.clearPermutations();
+
         // Skin composite is decoded on the sampler and the gbuffer write re-encodes; see the
         // avatar diffuse binds in llviewerjointmesh and the FRAMEBUFFER_SRGB in renderDeferred.
         gDeferredAvatarProgram.addPermutation("LINEAR_DIFFUSE", "1");
 
-        gDeferredAvatarProgram.clearPermutations();
         add_common_permutations(&gDeferredAvatarProgram);
         if (gSavedSettings.getBOOL("RenderAvatarCloth"))
         {
@@ -2482,12 +2484,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarAlphaProgram.mFeatures.hasShadows = true;
         gDeferredAvatarAlphaProgram.mFeatures.hasReflectionProbes = true;
 
-        gDeferredAvatarAlphaProgram.addPermutation("LINEAR_DIFFUSE", "1");
         gDeferredAvatarAlphaProgram.mShaderFiles.clear();
         gDeferredAvatarAlphaProgram.mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
         gDeferredAvatarAlphaProgram.mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));
 
         gDeferredAvatarAlphaProgram.clearPermutations();
+        gDeferredAvatarAlphaProgram.addPermutation("LINEAR_DIFFUSE", "1");
         gDeferredAvatarAlphaProgram.addPermutation("USE_DIFFUSE_TEX", "1");
         gDeferredAvatarAlphaProgram.addPermutation("IS_AVATAR_SKIN", "1");
         if (use_sun_shadow)
