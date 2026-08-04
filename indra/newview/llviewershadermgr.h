@@ -111,7 +111,6 @@ enum NormalDebugShaderVariant : S32
     NORMAL_DEBUG_SHADER_COUNT
 };
 extern LLGLSLShader         gNormalDebugProgram[NORMAL_DEBUG_SHADER_COUNT];
-extern LLGLSLShader         gSkinnedNormalDebugProgram[NORMAL_DEBUG_SHADER_COUNT];
 extern LLGLSLShader         gClipProgram;
 extern LLGLSLShader         gBenchmarkProgram;
 extern LLGLSLShader         gReflectionProbeDisplayProgram;
@@ -129,7 +128,6 @@ extern LLGLSLShader         gOneTextureFilterProgram;
 extern LLGLSLShader     gObjectPreviewProgram;
 extern LLGLSLShader        gPhysicsPreviewProgram;
 extern LLGLSLShader     gObjectBumpProgram;
-extern LLGLSLShader        gSkinnedObjectBumpProgram;
 extern LLGLSLShader     gObjectAlphaMaskNoColorProgram;
 
 //environment shaders
