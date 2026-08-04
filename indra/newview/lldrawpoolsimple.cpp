@@ -173,12 +173,21 @@ void LLDrawPoolGrass::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     {
+        // The diffuse sampler decodes and GL_FRAMEBUFFER_SRGB re-encodes on store, so this pass
+        // shades in linear throughout while the G-buffer keeps its sRGB storage. The two belong
+        // together: decode without the encode writes linear bits into a buffer the lighting pass
+        // will decode again. Matches what LLDrawPoolPBROpaque already does.
+        LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+
         LLGLSLShader* shader = gDeferredNonIndexedDiffuseAlphaMaskProgram.selectVariant();
         shader->bind();
         shader->setMinimumAlpha(0.5f);
 
         //render grass
-        LLRenderPass::pushBatches(LLRenderPass::PASS_GRASS, getVertexDataMask());
+        // NB the second argument is `bool texture`, not a vertex mask -- this call read
+        // pushBatches(PASS_GRASS, getVertexDataMask()) against the old signature, which
+        // converted the mask to true and left batch_textures at its default.
+        LLRenderPass::pushBatches(LLRenderPass::PASS_GRASS, true, false, DIFFUSE_SRGB_SAMPLER);
     }
 }
 

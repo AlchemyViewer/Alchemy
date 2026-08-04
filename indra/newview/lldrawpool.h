@@ -134,9 +134,14 @@ public:
 // vertex stage, and GL_FRAMEBUFFER_SRGB re-encodes on store -- all three together, or the
 // pass renders at the wrong gamma.
 //
-// Converted so far: diffuse, diffusealphamask, bump, tree, terrain (the texture path; the
-// PBR terrain branch already enabled FRAMEBUFFER_SRGB on its own). The rest still write the
-// sRGB texel through unchanged and take the AnisoWrap default.
+// Converted so far: diffuse, diffusealphamask, grass, bump, tree, terrain (the texture path;
+// the PBR terrain branch already enabled FRAMEBUFFER_SRGB on its own). The rest still write
+// the sRGB texel through unchanged and take the AnisoWrap default.
+//
+// A pass gets the first of the three for free if its vertex shader is shared with a converted
+// pass, which is how grass came to linearise its tint while sampling and storing sRGB. The
+// linearisation is keyed on LINEAR_DIFFUSE for that reason -- the same define mLinearDiffuse
+// is derived from -- so a program that has not opted in cannot pick up half a conversion.
 //
 // Data textures never take this even in a converted pass -- terrain's alpha_ramp is a mask
 // read through .a, and alpha is not part of the sRGB transfer function anyway.
