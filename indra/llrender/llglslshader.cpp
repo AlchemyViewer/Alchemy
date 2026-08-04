@@ -64,6 +64,7 @@ bool LLGLSLShader::sProfileEnabled = false;
 bool LLGLSLShader::sCanProfile = true;
 std::set<LLGLSLShader*> LLGLSLShader::sInstances;
 LLGLSLShader::defines_map_t LLGLSLShader::sGlobalDefines;
+U32 LLGLSLShader::sEnvironmentGeneration = 1;   // 0 is the per-program "never applied" sentinel
 U64 LLGLSLShader::sTotalTimeElapsed = 0;
 U32 LLGLSLShader::sTotalTrianglesDrawn = 0;
 U64 LLGLSLShader::sTotalSamplesDrawn = 0;
@@ -337,7 +338,6 @@ LLGLSLShader::LLGLSLShader()
     mShaderLevel(0),
     mShaderGroup(SG_DEFAULT),
     mFeatures(),
-    mUniformsDirty(false),
     mTimerQuery(0),
     mSamplesQuery(0),
     mPrimitivesQuery(0)
@@ -347,6 +347,23 @@ LLGLSLShader::LLGLSLShader()
 
 LLGLSLShader::~LLGLSLShader()
 {
+}
+
+// static
+// Invalidate the shared environment (sky/water) uniform set for EVERY program: each re-applies it
+// on its next bind, when it notices its own generation is behind. Bumping one counter keeps this
+// O(1) instead of walking every live program every frame, and it reaches programs that no list
+// happens to hold -- the indexed writers, avatar rigid and the deferred lighting programs were
+// never in mShaderList, so they never saw a change of sky at all. A program with no environment
+// uniforms resolves them to -1 and skips, so re-applying is cheap.
+void LLGLSLShader::dirtyEnvironmentUniforms()
+{
+    // 0 is reserved as the "never applied" sentinel that createShader() resets to, so skip it on
+    // wrap -- otherwise a wrapped counter would make freshly built programs look up to date.
+    if (++sEnvironmentGeneration == 0)
+    {
+        sEnvironmentGeneration = 1;
+    }
 }
 
 void LLGLSLShader::unload()
@@ -423,6 +440,10 @@ void LLGLSLShader::unloadInternal()
 bool LLGLSLShader::createShader()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    // Back to "never applied" so the rebuilt program re-applies the environment uniform set on
+    // its first bind rather than inheriting the old program object's generation.
+    mEnvUniformsGeneration = 0;
 
     unloadInternal();
 
@@ -1058,10 +1079,10 @@ void LLGLSLShader::bind()
         }
     }
 
-    if (mUniformsDirty)
+    if (mEnvUniformsGeneration != sEnvironmentGeneration)
     {
         LLShaderMgr::instance()->updateShaderUniforms(this);
-        mUniformsDirty = false;
+        mEnvUniformsGeneration = sEnvironmentGeneration;
     }
 
     llassert_always(sCurBoundShaderPtr != nullptr);

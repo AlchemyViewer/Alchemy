@@ -361,7 +361,8 @@ public:
     S32 mActiveTextureChannels;
     S32 mShaderLevel;
     S32 mShaderGroup; // see LLGLSLShader::eGroup
-    bool mUniformsDirty;
+    // environment-uniform generation this program last applied; see sEnvironmentGeneration
+    U32 mEnvUniformsGeneration = 0;
     LLShaderFeatures mFeatures;
     std::vector< std::pair< std::string, GLenum > > mShaderFiles;
     std::string mName;
@@ -402,6 +403,17 @@ public:
 
     // this pointer should be set to whichever shader represents this shader's rigged variant
     LLGLSLShader* mRiggedVariant = nullptr;
+
+    // Invalidate the shared environment (sky/water) uniform set for every live program; each
+    // re-applies on its next bind -- see the definition
+    static void dirtyEnvironmentUniforms();
+
+    // Generation of the shared environment uniform set. LLEnvironment bumps it via
+    // dirtyEnvironmentUniforms(); a program re-applies on bind when its own generation is
+    // behind. A counter rather than a per-program dirty flag so the per-frame environment
+    // update stays O(1) and reaches programs no list happens to hold. 0 is the "never applied"
+    // sentinel (the bump skips it), so a freshly created program always applies on first bind.
+    static U32 sEnvironmentGeneration;
 
     // variants for use by GLTF renderer
     // bit 0 = alpha mode blend (1) or opaque (0)

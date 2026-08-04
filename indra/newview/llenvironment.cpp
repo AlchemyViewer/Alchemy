@@ -1652,21 +1652,7 @@ void LLEnvironment::update(const LLViewerCamera * cam)
 
     updateSettingsUniforms();
 
-    LLViewerShaderMgr::shader_iter shaders_iter, end_shaders;
-    end_shaders = LLViewerShaderMgr::instance()->endShaders();
-    for (shaders_iter = LLViewerShaderMgr::instance()->beginShaders(); shaders_iter != end_shaders; ++shaders_iter)
-    {
-        shaders_iter->mUniformsDirty = true;
-        if (shaders_iter->mRiggedVariant)
-        {
-            shaders_iter->mRiggedVariant->mUniformsDirty = true;
-        }
-
-        for (auto& variant : shaders_iter->mGLTFVariants)
-        {
-            variant.mUniformsDirty = true;
-        }
-    }
+    LLGLSLShader::dirtyEnvironmentUniforms();
 }
 
 void LLEnvironment::updateCloudScroll()
