@@ -124,10 +124,11 @@ void main()
 
 #ifdef USE_VERTEX_COLOR
     // Tint arrives sRGB. This pass decodes its diffuse on the sampler and shades in linear,
-    // so linearise the tint to match. Guarded on exactly the conditions that leave
-    // LLGLSLShader::mLinearDiffuse false -- HUD outputs sRGB and keeps the encoded texel, and
-    // FOR_IMPOSTOR writes the sRGB sample straight to the bake -- so the shader and the bind
-    // cannot disagree about which space the multiply happens in.
+    // so the tint has to be linearized to match -- FOR_IMPOSTOR included, since the impostor
+    // bake joined that convention. IS_HUD is the remaining exception: it samples raw and
+    // decodes the tinted product in the fragment stage, staying pixel-exact. Guarded on
+    // exactly the condition that leaves LLGLSLShader::mLinearDiffuse false, so the shader and
+    // the bind cannot disagree about which space the multiply happens in.
 #ifdef LINEAR_DIFFUSE
     vertex_color = linearizeVertexTint(diffuse_color);
 #else

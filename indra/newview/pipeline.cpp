@@ -12191,6 +12191,17 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         LLDrawPoolAvatar::sMinimumAlpha = 0.f;
     }
 
+    // The bake target is sRGB (GL_SRGB8_ALPHA8, see the allocate above), so its contract is
+    // "store display-encoded". renderGeomDeferred hoists this enable for the G-buffer pools
+    // itself; renderGeomPostDeferred never did, because in an ordinary frame it targets the
+    // RGBA16F screen where linear output is right. Into the impostor that left every forward
+    // writer -- fullbright alpha, PBR alpha, the material programs, the avatar-alpha eyeball
+    // pass -- storing linear values that the composite then decoded a second time, so those
+    // parts of an impostored avatar came out roughly v^2.2 too dark while the opaque parts
+    // were correct. Every writer into this target shades in linear now, including the
+    // impostor alpha program, which was the last one still sampling encoded and writing raw.
+    LLGLEnable impostor_srgb(GL_FRAMEBUFFER_SRGB);
+
     if (preview_avatar || for_profile)
     {
         // previews and profiles don't care about imposters

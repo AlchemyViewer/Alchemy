@@ -1975,8 +1975,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             // Forward (non-HUD) decodes its diffuse on the sampler and filters in linear;
             // the HUD path outputs sRGB and keeps the encoded texel. See mLinearDiffuse.
-            // The FOR_IMPOSTOR alpha programs below stay false: they write the sRGB sample
-            // straight to the bake.
+            // The FOR_IMPOSTOR alpha program below takes it too -- the bake target is sRGB
+            // and generateImpostor encodes on store, so it shades in linear like the rest.
             if (!hud) shader->addPermutation("LINEAR_DIFFUSE", "1");
 
             shader->addPermutation("USE_VERTEX_COLOR", "1");
@@ -2040,6 +2040,13 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         shader->addPermutation("FOR_IMPOSTOR", "1");
         shader->addPermutation("HAS_ALPHA_MASK", "1");
         shader->addPermutation("USE_VERTEX_COLOR", "1");
+        // Shades in linear like every other forward writer: the bind paths decode the
+        // diffuse on the sampler off the derived mLinearDiffuse, and generateImpostor
+        // enables GL_FRAMEBUFFER_SRGB so the store re-encodes into the sRGB bake target.
+        // This program was the one hole left in that conversion -- it sampled encoded,
+        // tinted in gamma space, and wrote raw, which only worked because the pass it
+        // ran in did not encode either.
+        shader->addPermutation("LINEAR_DIFFUSE", "1");
 
         if (use_sun_shadow)
         {

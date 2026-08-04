@@ -206,12 +206,11 @@ void main()
     vec4 diffuse_srgb = diffuse_tap;
 
 #ifdef FOR_IMPOSTOR
-    vec4 color;
-    color.rgb = diffuse_srgb.rgb;
-    color.a = 1.0;
+    // Misnamed here too, for the same reason as the branch below: LINEAR_DIFFUSE decodes on
+    // the sampler, so this is already linear.
+    vec4 diffuse_linear = diffuse_srgb;
 
-    float final_alpha = diffuse_srgb.a * vertex_color.a;
-    diffuse_srgb.rgb *= vertex_color.rgb;
+    float final_alpha = diffuse_linear.a * vertex_color.a;
 
     // Insure we don't pollute depth with invis pixels in impostor rendering
     //
@@ -220,16 +219,23 @@ void main()
         discard;
     }
 
-    color.rgb = diffuse_srgb.rgb;
+    // Linear in, linear out. The sampler decodes, the tint was linearized in the vertex
+    // stage, and generateImpostor enables GL_FRAMEBUFFER_SRGB so the store encodes -- the
+    // same convention every other forward writer into the bake target follows.
+    //
+    // This used to be the exception: sample encoded, tint in gamma space, write raw. It
+    // survived only because the impostor's post-deferred pass did not encode either, which
+    // is the same gap that left fullbright and PBR alpha too dark in the bake. Tinting now
+    // happens in linear, which is a real (and correct) change for vertex-coloured alpha.
+    vec4 color;
+    color.rgb = diffuse_linear.rgb * vertex_color.rgb;
     color.a = final_alpha;
 
 #else // FOR_IMPOSTOR
 
     // diffuse_srgb is misnamed on this path: the sampler decoded it, so it is already
-    // linear. (The FOR_IMPOSTOR branch above, where the name is accurate, keeps its own
-    // sampler and its own conversion. IS_HUD also really is sRGB here -- it samples raw and
-    // decodes below, after its raw tint multiply -- so the name misleads only for the
-    // converted world passes.)
+    // linear. (Same for the FOR_IMPOSTOR branch above. IS_HUD is the one place the name is
+    // still accurate -- it samples raw and decodes below, after its raw tint multiply.)
     vec4 diffuse_linear = diffuse_srgb;
 
     vec3 light_dir = (sun_up_factor == 1) ? sun_dir: moon_dir; // TODO -- factor out "sun_up_factor" and just send in the appropriate light vector
