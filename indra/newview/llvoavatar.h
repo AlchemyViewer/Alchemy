@@ -838,7 +838,10 @@ public:
         // List of Matrix4a's for this entry
         LLMeshSkinInfo::matrix_list_t mMatrixPalette;
 
-        // Float array ready to be sent to GL
+        // Float array ready to be sent to GL: one vec4 rebase origin (agent space)
+        // followed by count mat3x4 lines whose translations are relative to it. The
+        // upload splits the two -- AVATAR_MATRIX takes the palette tail, SKIN_ORIGIN
+        // the origin (see apply_matrix_palette).
         std::vector<F32> mGLMp;
 
         MatrixPaletteCache() :

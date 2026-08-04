@@ -1474,6 +1474,7 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("matrixPalette");
     mReservedUniforms.push_back("translationPalette");
+    mReservedUniforms.push_back("skin_origin");
 
     mReservedUniforms.push_back("screenTex");
     mReservedUniforms.push_back("screenDepth");

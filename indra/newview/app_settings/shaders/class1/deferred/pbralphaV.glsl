@@ -31,7 +31,9 @@
 #ifdef HAS_SKIN
 uniform mat4 modelview_matrix;
 uniform mat4 projection_matrix;
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec3 skinDirection(mat3x4 b, vec3 dir);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 uniform mat3 normal_matrix;
 uniform mat4 modelview_projection_matrix;
@@ -75,9 +77,8 @@ vec4 tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] kh
 void main()
 {
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
-    vec3 pos = (mat*vec4(position.xyz,1.0)).xyz;
+    mat3x4 skin = getSkinBlend();
+    vec3 pos = skinTransformH(skin, position.xyz, modelview_matrix).xyz;
     vary_position = pos;
     vec4 vert = projection_matrix * vec4(pos,1.0);
 #else
@@ -94,8 +95,8 @@ void main()
     emissive_texcoord = texture_transform(texcoord0, texture_emissive_transform, texture_matrix0);
 
 #ifdef HAS_SKIN
-    vec3 n = (mat*vec4(normal.xyz+position.xyz,1.0)).xyz-pos.xyz;
-    vec3 t = (mat*vec4(tangent.xyz+position.xyz,1.0)).xyz-pos.xyz;
+    vec3 n = mat3(modelview_matrix) * skinDirection(skin, normal.xyz);
+    vec3 t = mat3(modelview_matrix) * skinDirection(skin, tangent.xyz);
 #else //HAS_SKIN
     vec3 n = normal_matrix * normal;
     vec3 t = normal_matrix * tangent.xyz;

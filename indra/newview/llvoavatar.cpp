@@ -10274,9 +10274,25 @@ const LLVOAvatar::MatrixPaletteCache& LLVOAvatar::updateSkinInfoMatrixPalette(co
 
         const LLMatrix4a* mat = &(entry.mMatrixPalette[0]);
 
-        entry.mGLMp.resize(count * 12);
+        entry.mGLMp.resize(4 + count * 12);
 
         F32* mp = &(entry.mGLMp[0]);
+
+        // Rebase origin, packed ahead of the palette (uploaded as the SKIN_ORIGIN uniform)
+        // and subtracted from every joint translation below so per-vertex GPU skinning math
+        // stays avatar-local. Joint world matrices carry the avatar's agent-space position
+        // (Z up to ~4096 m); pushing that through the per-vertex fp32 transform chain leaves
+        // normals and positions at the mercy of the driver compiler keeping two
+        // region-magnitude evaluations rounding-identical -- newer AMD compilers don't, which
+        // reads as altitude-scaled normal noise and vertex wiggle. The shader adds this exact
+        // value back as a uniform (rigid) term, so any point near the joints works; the
+        // skeleton root always is.
+        const LLVector3 origin = mRoot->getWorldPosition();
+        mp[0] = origin.mV[VX];
+        mp[1] = origin.mV[VY];
+        mp[2] = origin.mV[VZ];
+        mp[3] = 0.f;
+        mp += 4;
 
         for (U32 i = 0; i < count; ++i)
         {
@@ -10287,17 +10303,17 @@ const LLVOAvatar::MatrixPaletteCache& LLVOAvatar::updateSkinInfoMatrixPalette(co
             mp[idx + 0] = m[0];
             mp[idx + 1] = m[1];
             mp[idx + 2] = m[2];
-            mp[idx + 3] = m[12];
+            mp[idx + 3] = m[12] - origin.mV[VX];
 
             mp[idx + 4] = m[4];
             mp[idx + 5] = m[5];
             mp[idx + 6] = m[6];
-            mp[idx + 7] = m[13];
+            mp[idx + 7] = m[13] - origin.mV[VY];
 
             mp[idx + 8] = m[8];
             mp[idx + 9] = m[9];
             mp[idx + 10] = m[10];
-            mp[idx + 11] = m[14];
+            mp[idx + 11] = m[14] - origin.mV[VZ];
         }
     }
 

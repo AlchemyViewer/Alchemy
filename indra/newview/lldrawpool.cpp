@@ -814,6 +814,18 @@ void LLRenderPass::pushUntexturedBatch(LLDrawInfo& params)
     params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
 }
 
+// Route a computed palette to the bound shader. mGLMp is [origin vec4 | count mat3x4]:
+// the array upload starts PAST the origin, and the origin rides as its own uniform, which
+// the shader adds back (skinTransformH / getObjectSkinnedTransform). The split is what keeps
+// the palette translations -- and so every per-vertex operand -- avatar-local; see
+// LLVOAvatar::updateSkinInfoMatrixPalette for why that matters.
+static void apply_matrix_palette(const LLVOAvatar::MatrixPaletteCache& mpc, U32 count)
+{
+    LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+    shader->uniformMatrix3x4fv(LLViewerShaderMgr::AVATAR_MATRIX, count, false, (GLfloat*)&(mpc.mGLMp[4]));
+    shader->uniform3fv(LLViewerShaderMgr::SKIN_ORIGIN, 1, (GLfloat*)&(mpc.mGLMp[0]));
+}
+
 // static
 bool LLRenderPass::uploadMatrixPalette(LLDrawInfo& params)
 {
@@ -839,10 +851,7 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinI
         return false;
     }
 
-    LLGLSLShader::sCurBoundShaderPtr->uniformMatrix3x4fv(LLViewerShaderMgr::AVATAR_MATRIX,
-        count,
-        false,
-        (GLfloat*)&(mpc.mGLMp[0]));
+    apply_matrix_palette(mpc, count);
 
     return true;
 }
@@ -875,10 +884,7 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinI
 
     if (!skipLastSkin)
     {
-        LLGLSLShader::sCurBoundShaderPtr->uniformMatrix3x4fv(LLViewerShaderMgr::AVATAR_MATRIX,
-            count,
-            false,
-            (GLfloat*)&(mpc.mGLMp[0]));
+        apply_matrix_palette(mpc, count);
     }
 
     return !skipLastSkin;
@@ -913,10 +919,7 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinI
 
     if (!skipLastSkin)
     {
-        LLGLSLShader::sCurBoundShaderPtr->uniformMatrix3x4fv(LLViewerShaderMgr::AVATAR_MATRIX,
-            count,
-            false,
-            (GLfloat*)&(mpc.mGLMp[0]));
+        apply_matrix_palette(mpc, count);
     }
 
     return !skipLastSkin;

@@ -244,6 +244,7 @@ public:
 
         AVATAR_MATRIX,                      //  "matrixPalette"
         AVATAR_TRANSLATION,                 //  "translationPalette"
+        SKIN_ORIGIN,                        //  "skin_origin" (rigged path: agent-space rebase origin the palette translations were made relative to)
 
         WATER_SCREENTEX,                    //  "screenTex"
         WATER_SCREENDEPTH,                  //  "screenDepth"

@@ -33,7 +33,9 @@ uniform mat4 projection_matrix;
 uniform mat4 modelview_projection_matrix;
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec3 skinDirection(mat3x4 b, vec3 dir);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 uniform mat3 normal_matrix;
 #endif
@@ -74,9 +76,8 @@ vec4 linearizeVertexTint(vec4 tint);
 void main()
 {
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
-    vec3 pos = (mat * vec4(position.xyz, 1.0)).xyz;
+    mat3x4 skin = getSkinBlend();
+    vec3 pos = skinTransformH(skin, position.xyz, modelview_matrix).xyz;
     vary_position = pos;
     gl_Position = projection_matrix * vec4(pos, 1.0);
 #else
@@ -94,9 +95,9 @@ void main()
 #endif
 
 #ifdef HAS_SKIN
-    vec3 n = normalize((mat * vec4(normal.xyz + position.xyz, 1.0)).xyz - pos.xyz);
+    vec3 n = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
 #ifdef HAS_NORMAL_MAP
-    vec3 t = normalize((mat * vec4(tangent.xyz + position.xyz, 1.0)).xyz - pos.xyz);
+    vec3 t = normalize(mat3(modelview_matrix) * skinDirection(skin, tangent.xyz));
     vary_tangent = t;
     vary_sign = tangent.w;
     vary_normal = n;
