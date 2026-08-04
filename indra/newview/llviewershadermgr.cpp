@@ -797,6 +797,24 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         {
             attribs["SPOT_SHADOW"] = "1";
         }
+
+        // PCF filter kernel width (texels) from the quality tier, overriding the shader's own
+        // default (deferred/shadowUtil.glsl SHADOW_PCF_KERNEL == 4). Even values only: the
+        // gather path tiles the kernel in 2x2 blocks, so K/2 gather-compare fetches per axis.
+        static const S32 pcf_kernel[] = { 2, 4, 6, 4 }; // Low / Medium / High / Ultra(PCSS)
+        const S32 quality = llclamp((S32)gSavedSettings.getU32("AlchemyRenderShadowFilterQuality"), 0, 3);
+        attribs["SHADOW_PCF_KERNEL"] = std::to_string(pcf_kernel[quality]);
+
+        if (quality >= 3)
+        {
+            // Ultra: contact-hardening PCSS. This ALSO switches the shadow maps from
+            // depth-compare samplers to plain sampler2D reads (a blocker search needs the
+            // raw depth), so LLPipeline::bindShadowMaps must bind a matching non-compare
+            // sampler -- it reads this same setting. Keep the two in step.
+            attribs["SHADOW_PCSS"] = "1";
+            const F32 pcss_scale = gSavedSettings.getF32("AlchemyRenderShadowPCSSScale");
+            attribs["SHADOW_PCSS_SCALE"] = llformat("%.2f", pcss_scale);
+        }
     }
 
     if (ssr)

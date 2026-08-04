@@ -1016,11 +1016,19 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     U32 sun_shadow_map_width = BlurHappySize(resX, scale);
     U32 sun_shadow_map_height = BlurHappySize(resY, scale);
 
+    // 32-bit float depth is the same 4 bytes/texel as DEPTH24 here but distributes precision
+    // differently (float, denser near the near plane). Opt-in; toggling it re-runs this via
+    // handleShadowsResized. The compare sampler and PCF read it the same either way.
+    static LLCachedControl<bool> shadow_depth_32f(gSavedSettings, "AlchemyRenderShadowDepth32F", false);
+    const LLRenderTarget::eDepthFormat depth_fmt =
+        shadow_depth_32f ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
+
     if (shadow_detail > 0)
     { //allocate 4 sun shadow maps
         for (U32 i = 0; i < 4; i++)
         {
-            if (!mRT->shadow[i].allocate(sun_shadow_map_width, sun_shadow_map_height, 0, true))
+            if (!mRT->shadow[i].allocate(sun_shadow_map_width, sun_shadow_map_height, 0, true, false,
+                                         ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth_fmt))
             {
                 return false;
             }
@@ -1045,7 +1053,8 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
             U32 spot_shadow_map_height = height;
             for (U32 i = 0; i < 2; i++)
             {
-                if (!mSpotShadow[i].allocate(spot_shadow_map_width, spot_shadow_map_height, 0, true))
+                if (!mSpotShadow[i].allocate(spot_shadow_map_width, spot_shadow_map_height, 0, true, false,
+                                             ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, depth_fmt))
                 {
                     return false;
                 }
@@ -9006,9 +9015,21 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     // they are ever read -- allocateShadowBuffer no longer writes GL_TEXTURE_COMPARE_MODE
     // onto the texture objects.
     //
-    // Anisotropic + clamp matches what that allocation-time setup used to apply. With no mip
-    // chain the filter resolves to GL_LINEAR, which is what gives the compare its 2x2 PCF.
-    const U32 shadow_sampler = gGL.getSampler(ALSamplers::ShadowCompare);
+    // Bilinear + clamp: the LINEAR filter is what gives a depth-compare tap its hardware 2x2
+    // PCF; a gather-compare (the default filter path in shadowUtil.glsl) ignores the filter
+    // and fetches the four texels directly. The depth targets are single-level, so anisotropy
+    // had nothing to act on -- see ALSamplers::ShadowCompare.
+    //
+    // The Ultra tier (PCSS) is the exception: a blocker search needs the RAW depth, which a
+    // compare sampler can never return, so shadowUtil.glsl declares the maps as plain
+    // sampler2D there and does the compare in-shader. The sampler has to match the declared
+    // type -- reading a depth texture through a compare sampler as sampler2D (or the reverse)
+    // is undefined -- so this selects on the SAME setting that injects SHADOW_PCSS in
+    // LLViewerShaderMgr::buildGlobalDefines(). Both must move together. Point filtering
+    // because that path filters manually; textureGather ignores the filter regardless.
+    static LLCachedControl<U32> shadow_filter_quality(gSavedSettings, "AlchemyRenderShadowFilterQuality", 1);
+    const bool pcss = (shadow_filter_quality() >= 3);
+    const U32 shadow_sampler = gGL.getSampler(pcss ? ALSamplers::PointClamp : ALSamplers::ShadowCompare);
 
     const U32 sampler_binds_before = ALTextureSlot::sSamplerBinds;
     U32 bound_units = 0;
