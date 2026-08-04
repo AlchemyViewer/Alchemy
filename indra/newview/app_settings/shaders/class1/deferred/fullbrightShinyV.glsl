@@ -51,11 +51,9 @@ mat4 getObjectSkinnedTransform();
 uniform mat4 projection_matrix;
 #endif
 
-// See diffuseV for why this is defined per-shader rather than shared from environment/srgbF.
-vec4 linearizeVertexTint(vec4 tint)
-{
-    return vec4(pow(max(tint.rgb, vec3(0.0)), vec3(2.2)), tint.a);
-}
+// Linearises an sRGB prim tint for a pass that shades in linear. Defined in
+// deferred/textureUtilV.glsl, which every vertex stage attaches.
+vec4 linearizeVertexTint(vec4 tint);
 
 void main()
 {
