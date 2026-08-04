@@ -427,7 +427,7 @@ void LLFloaterColorPicker::onClickPipette( )
     if (pipette_active)
     {
         LLToolMgr::getInstance()->clearTransientTool();
-        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1, _3));
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
     }
     else

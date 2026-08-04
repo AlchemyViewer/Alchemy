@@ -47,8 +47,8 @@
 //
 
 LLToolPipette::LLToolPipette()
-:   LLTool(std::string("Pipette")),
-    mSuccess(true)
+:   LLTool(std::string("Pipette"))
+,   mSuccess(true)
 {
 }
 
@@ -109,12 +109,12 @@ void LLToolPipette::handleDeselect()
     mTextureEntry = {};
     if (!mSignal.empty())
     {
-        mSignal(false, mHitObj, mTextureEntry);
+        mSignal(false, mHitObj, -1, mTextureEntry);
     }
     mSignal.disconnect_all_slots();
 }
 
-void LLToolPipette::signalCallback(LLViewerObject* hit_obj, const LLTextureEntry* entry)
+void LLToolPipette::signalCallback(LLViewerObject* hit_obj, S32 te_index, const LLTextureEntry* entry)
 {
     if (hit_obj)
     {
@@ -124,12 +124,11 @@ void LLToolPipette::signalCallback(LLViewerObject* hit_obj, const LLTextureEntry
     if (entry)
     {
         mTextureEntry = *entry;
-        mSignal(true, mHitObj, mTextureEntry);
     }
 
-    if(mHitObj || entry)
+    if (mHitObj || entry)
     {
-        mSignal(true, mHitObj, mTextureEntry);
+        mSignal(true, mHitObj, te_index, mTextureEntry);
     }
 }
 
@@ -141,12 +140,13 @@ void LLToolPipette::pickCallback(const LLPickInfo& pick_info)
     // if we clicked on a face of a valid prim, save off texture entry data
     if (hit_obj &&
         hit_obj->getPCode() == LL_PCODE_VOLUME &&
-        pick_info.mObjectFace != -1)
+        pick_info.mObjectFace != -1 &&
+        hit_obj->getNumTEs() > pick_info.mObjectFace)
     {
         //TODO: this should highlight the selected face only
         LLSelectMgr::getInstance()->highlightObjectOnly(hit_obj);
         const LLTextureEntry* entry = hit_obj->getTE(pick_info.mObjectFace);
-        LLToolPipette::getInstance()->signalCallback(hit_obj, entry);
+        LLToolPipette::getInstance()->signalCallback(hit_obj, pick_info.mObjectFace, entry);
     }
 }
 

@@ -54,12 +54,13 @@ public:
     void    handleDeselect() override;
 
     // Note: Don't return connection; all signals disconnected on tool deselect
-    typedef boost::signals2::signal<void (bool success, LLViewerObject* obj, const LLTextureEntry& te)> signal_t;
+    // te_index is the picked face, or -1 when no face is selected.
+    typedef boost::signals2::signal<void (bool success, LLViewerObject* obj, S32 te_index, const LLTextureEntry& te)> signal_t;
     void setToolSelectCallback(const signal_t::slot_type& cb) { mSignal.connect(cb); }
     void setResult(bool success, const std::string& msg);
 
 protected:
-    void signalCallback(LLViewerObject* obj, const LLTextureEntry* entry);
+    void signalCallback(LLViewerObject* obj, S32 te_index, const LLTextureEntry* entry);
     static void pickCallback(const LLPickInfo& pick_info);
 
     LLTextureEntry  mTextureEntry;
