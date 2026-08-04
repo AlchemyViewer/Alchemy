@@ -221,8 +221,8 @@ LLGLSLShader            gRlvSphereProgram;
 // [/RLVa:KB]
 
 // Deferred materials shaders
-LLGLSLShader            gDeferredMaterialProgram[LLMaterial::SHADER_COUNT*2];
-LLGLSLShader            gDeferredMaterialIndexedProgram[LLMaterial::SHADER_COUNT*2]; // multi-material indexed (GBuffer masks only)
+LLGLSLShader            gDeferredMaterialProgram[LLMaterial::SHADER_COUNT];
+LLGLSLShader            gDeferredMaterialIndexedProgram[LLMaterial::SHADER_COUNT]; // multi-material indexed (GBuffer masks only)
 LLGLSLShader            gHUDPBROpaqueProgram;
 LLGLSLShader            gPBRGlowProgram;
 LLGLSLShader            gPBRGlowIndexedProgram; // multi-material indexed PBR glow
@@ -1061,7 +1061,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredGenBrdfLutProgram.unload();
         gDeferredBufferVisualProgram.unload();
 
-        for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+        for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
         {
             gDeferredMaterialProgram[i].unload();
             gDeferredMaterialIndexedProgram[i].unload();
@@ -1167,25 +1167,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     gDeferredMaterialProgram[5].mFeatures.hasLighting = false;
     gDeferredMaterialProgram[9].mFeatures.hasLighting = false;
     gDeferredMaterialProgram[13].mFeatures.hasLighting = false;
-    gDeferredMaterialProgram[1+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = false;
-    gDeferredMaterialProgram[5+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = false;
-    gDeferredMaterialProgram[9+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = false;
-    gDeferredMaterialProgram[13+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = false;
 
-    for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+    for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
     {
         if (success)
         {
-            bool has_skin = i & 0x10;
-
-            if (!has_skin)
-            {
-                gDeferredMaterialProgram[i].mName = llformat("Material Shader %d", i);
-            }
-            else
-            {
-                gDeferredMaterialProgram[i].mName = llformat("Skinned Material Shader %d", i);
-            }
+            gDeferredMaterialProgram[i].mName = llformat("Material Shader %d", i);
 
             U32 alpha_mode = i & 0x3;
 
@@ -1231,30 +1218,16 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredMaterialProgram[i].mFeatures.hasShadows = use_sun_shadow;
             gDeferredMaterialProgram[i].mFeatures.hasReflectionProbes = true;
 
-            if (has_skin)
-            {
-                gDeferredMaterialProgram[i].addPermutation("HAS_SKIN", "1");
-                gDeferredMaterialProgram[i].mFeatures.hasObjectSkinning = true;
-            }
-            else
-            {
-                gDeferredMaterialProgram[i].mRiggedVariant = &gDeferredMaterialProgram[i + 0x10];
-            }
-
             gDeferredMaterialProgram[i].addPermutation("LINEAR_DIFFUSE", "1");
-            success = gDeferredMaterialProgram[i].createShader();
+            success = gDeferredMaterialProgram[i].createShader(LLGLSLShader::VARIANT_RIGGED);
             llassert(success);
         }
     }
 
-    gDeferredMaterialProgram[1].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[5].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[9].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[13].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[1+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[5+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[9+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[13+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
+    for (U32 i : { 1u, 5u, 9u, 13u })
+    {
+        gDeferredMaterialProgram[i].forEachVariant([](LLGLSLShader& s) { s.mFeatures.hasLighting = true; });
+    }
 
     // Clear any stale value from a previous load before (re)deciding legacy indexed
     // eligibility -- if the block below is skipped or fails partway, the flag must
@@ -1269,7 +1242,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         // sIndexedLegacyMaterials false so legacy batching is skipped (the pool falls
         // back to scalar). Kept out of the `success` chain.
         bool material_indexed_ok = true;
-        for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2 && material_indexed_ok; ++i)
+        for (U32 i = 0; i < LLMaterial::SHADER_COUNT && material_indexed_ok; ++i)
         {
             U32 alpha_mode = i & 0x3;
             if (alpha_mode == 1) // DIFFUSE_ALPHA_MODE_BLEND -- forward/alpha pool, not indexed
@@ -1277,7 +1250,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 continue;
             }
 
-            bool has_skin   = (i & 0x10) != 0;
             bool has_spec   = (i & 0x4) != 0;
             bool has_normal = (i & 0x8) != 0;
 
@@ -1298,20 +1270,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             prog.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
             add_common_permutations(&prog);
 
-            if (has_skin)
-            {
-                prog.addPermutation("HAS_SKIN", "1");
-                prog.mFeatures.hasObjectSkinning = true;
-            }
-            else
-            {
-                prog.mRiggedVariant = &gDeferredMaterialIndexedProgram[i + 0x10];
-            }
-
-            material_indexed_ok = prog.createShader();
+            material_indexed_ok = prog.createShader(LLGLSLShader::VARIANT_RIGGED);
             if (material_indexed_ok)
             {
-                setup_material_indexed_samplers(prog, LLGLSLShader::sIndexedGLTFChannels, has_normal, has_spec);
+                const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+                prog.forEachVariant([n, has_normal, has_spec](LLGLSLShader& s)
+                { setup_material_indexed_samplers(s, n, has_normal, has_spec); });
             }
         }
 
@@ -1322,7 +1286,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         else
         {
             LL_WARNS("ShaderLoading") << "Indexed legacy material shaders failed to load; legacy batching disabled." << LL_ENDL;
-            for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+            for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
             {
                 gDeferredMaterialIndexedProgram[i].unload();
             }
@@ -1382,7 +1346,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             // the invariant sIndexedLegacyMaterials => sIndexedGLTFChannels >= 2 holds.
             if (LLGLSLShader::sIndexedLegacyMaterials)
             {
-                for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+                for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
                 {
                     gDeferredMaterialIndexedProgram[i].unload();
                 }

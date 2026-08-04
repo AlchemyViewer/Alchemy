@@ -179,10 +179,11 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
 
     prepare_alpha_shader(simple_shader, true, water_sign); //prime simple shader (loads shadow relevant uniforms)
 
-    LLGLSLShader* materialShader = gDeferredMaterialProgram;
-    for (int i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+    // prepare_alpha_shader() recurses into the rigged variant, so priming the bases
+    // covers every corner
+    for (int i = 0; i < LLMaterial::SHADER_COUNT; ++i)
     {
-        prepare_alpha_shader(&materialShader[i], true, water_sign);
+        prepare_alpha_shader(&gDeferredMaterialProgram[i], true, water_sign);
     }
 
     pbr_shader =
