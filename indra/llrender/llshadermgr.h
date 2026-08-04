@@ -578,8 +578,11 @@ public:
 
     // Key of the copy of `path` matching `shader`'s defines, considering only `axes`: a program
     // carrying CLASSIC_MODE must attach the object compiled with it, since the define cannot
-    // reach an object that was compiled once for everyone.
-    static std::string variantObjectKey(const std::string& path, U32 axes, const LLGLSLShader* shader);
+    // reach an object that was compiled once for everyone. Falls back to the plain path when no
+    // copy was compiled for the axis, which is how a source that does not vary at the class
+    // level in use costs one object rather than two -- see the definition. `stage` picks which
+    // object map to look in and must match the attach the result is passed to.
+    std::string variantObjectKey(const std::string& path, U32 axes, const LLGLSLShader* shader, GLenum stage) const;
 
     // Implemented in the application to actually point to the shader directory.
     virtual std::string getShaderDirPrefix(void) = 0; // Pure Virtual

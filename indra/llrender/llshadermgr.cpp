@@ -67,18 +67,31 @@ LLShaderMgr * LLShaderMgr::instance()
     return sInstance;
 }
 
-// static
-std::string LLShaderMgr::variantObjectKey(const std::string& path, U32 axes, const LLGLSLShader* shader)
+std::string LLShaderMgr::variantObjectKey(const std::string& path, U32 axes, const LLGLSLShader* shader, GLenum stage) const
 {
+    const char* suffix = nullptr;
     if ((axes & OBJ_AXIS_CLASSIC) && shader->mDefines.count("CLASSIC_MODE"))
     {
-        return path + CLASSIC_OBJECT_SUFFIX;
+        suffix = CLASSIC_OBJECT_SUFFIX;
     }
-    if ((axes & OBJ_AXIS_MIRROR) && shader->mDefines.count("MIRROR_CLIP"))
+    else if ((axes & OBJ_AXIS_MIRROR) && shader->mDefines.count("MIRROR_CLIP"))
     {
-        return path + MIRROR_OBJECT_SUFFIX;
+        suffix = MIRROR_OBJECT_SUFFIX;
     }
-    return path;
+
+    if (!suffix)
+    {
+        return path;
+    }
+
+    // No object under the variant key means the loader decided this source could not vary on
+    // the axis at the class level it resolved to -- deferred/reflectionProbeF.glsl reads
+    // CLASSIC_MODE at class3 and not at class2 -- so the base object already IS the right one
+    // and no second copy was compiled. Absence is always that decision and never a failure:
+    // loadBasicShaders aborts the whole load if a copy it did want fails to build.
+    const std::string key = path + suffix;
+    const auto& objects = (stage == GL_VERTEX_SHADER) ? mVertexShaderObjects : mFragmentShaderObjects;
+    return objects.count(key) ? key : path;
 }
 
 bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
@@ -163,7 +176,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
             return false;
         }
 
-        if (!shader->attachVertexObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", OBJ_AXIS_CLASSIC, shader))) {
+        if (!shader->attachVertexObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", OBJ_AXIS_CLASSIC, shader, GL_VERTEX_SHADER))) {
             return false;
         }
 
@@ -201,7 +214,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     // NOTE order of shader object attaching is VERY IMPORTANT!!!
 
-    if (!shader->attachFragmentObject(variantObjectKey("deferred/globalF.glsl", OBJ_AXIS_MIRROR, shader)))
+    if (!shader->attachFragmentObject(variantObjectKey("deferred/globalF.glsl", OBJ_AXIS_MIRROR, shader, GL_FRAGMENT_SHADER)))
     {
         return false;
     }
@@ -233,7 +246,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
     // we want this BEFORE shadows and AO because those facilities use pos/norm access
     if (features->isDeferred || features->hasReflectionProbes)
     {
-        if (!shader->attachFragmentObject(variantObjectKey("deferred/deferredUtil.glsl", OBJ_AXIS_CLASSIC, shader)))
+        if (!shader->attachFragmentObject(variantObjectKey("deferred/deferredUtil.glsl", OBJ_AXIS_CLASSIC, shader, GL_FRAGMENT_SHADER)))
         {
             return false;
         }
@@ -265,7 +278,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasReflectionProbes)
     {
-        if (!shader->attachFragmentObject(variantObjectKey("deferred/reflectionProbeF.glsl", OBJ_AXIS_CLASSIC, shader)))
+        if (!shader->attachFragmentObject(variantObjectKey("deferred/reflectionProbeF.glsl", OBJ_AXIS_CLASSIC, shader, GL_FRAGMENT_SHADER)))
         {
             return false;
         }
@@ -289,7 +302,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasAtmospherics || features->isDeferred)
     {
-        if (!shader->attachFragmentObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", OBJ_AXIS_CLASSIC, shader))) {
+        if (!shader->attachFragmentObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", OBJ_AXIS_CLASSIC, shader, GL_FRAGMENT_SHADER))) {
             return false;
         }
 

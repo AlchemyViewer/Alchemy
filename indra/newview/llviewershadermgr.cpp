@@ -299,6 +299,60 @@ static std::string hash_shader_sources()
     return hash_obj.digest().asString();
 }
 
+// Compile a second copy of a shared object under `suffix`, for programs carrying `define`.
+//
+// Two things this does not do naively. It uses the level the BASE copy RESOLVED to rather than
+// the level that was asked for -- loadShaderFile walks down the class directories when a level
+// is missing, and a copy built from a different class file than the base would link mismatched
+// declarations into one program. And it skips the compile entirely when the file that level
+// selects does not mention `define`: deferred/reflectionProbeF.glsl reads CLASSIC_MODE at class3
+// and not at class2, so below class3 the second compile yields a byte-identical object under a
+// different key -- a full compile of a large source at every setShaders().
+// LLShaderMgr::variantObjectKey falls back to the base object when no copy exists, so the skip
+// is invisible to attach.
+//
+// The single-file test is sound because the loader has no #include: a shared source cannot pull
+// the define in from anywhere else.
+static bool load_axis_copy(LLViewerShaderMgr& mgr,
+                           const std::vector<std::pair<std::string, S32> >& loaded,
+                           const std::string& path, GLenum stage,
+                           std::map<std::string, std::string>& defines,
+                           const char* define, const char* suffix)
+{
+    auto it = std::find_if(loaded.begin(), loaded.end(),
+                           [&path](const std::pair<std::string, S32>& e) { return e.first == path; });
+    if (it == loaded.end())
+    {   // the base pass must have loaded it, or there is nothing for this to be a copy OF
+        LL_WARNS("Shader") << "No base object for " << path << "; cannot build its " << suffix
+                           << " copy" << LL_ENDL;
+        return false;
+    }
+
+    S32 level = it->second;
+
+    bool varies = false;
+    for (S32 gpu_class = level; gpu_class > 0; --gpu_class)
+    {
+        const std::string full = mgr.getShaderDirPrefix() + std::to_string(gpu_class)
+                               + gDirUtilp->getDirDelimiter() + path;
+        llifstream in(full, std::ios::binary);
+        if (!in.is_open())
+        {
+            continue;
+        }
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        varies = text.find(define) != std::string::npos;
+        break;  // the first file that exists is the one loadShaderFile picked
+    }
+
+    if (!varies)
+    {
+        return true;
+    }
+
+    return mgr.loadShaderFile(path, level, stage, &defines, -1, path + suffix) != 0;
+}
+
 static void add_common_permutations(LLGLSLShader* shader)
 {
     static LLCachedControl<bool> emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
@@ -791,15 +845,10 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         }
     }
 
+    if (!load_axis_copy(*this, shaders, "windlight/atmosphericsFuncs.glsl", GL_VERTEX_SHADER,
+                        classic_attribs, "CLASSIC_MODE", LLShaderMgr::CLASSIC_OBJECT_SUFFIX))
     {
-        const std::string path = "windlight/atmosphericsFuncs.glsl";
-        S32 level = mShaderLevel[SHADER_WINDLIGHT];
-        if (loadShaderFile(path, level, GL_VERTEX_SHADER, &classic_attribs, -1,
-                           path + LLShaderMgr::CLASSIC_OBJECT_SUFFIX) == 0)
-        {
-            LL_WARNS("Shader") << "Failed to load classic vertex shader " << path << LL_ENDL;
-            return path;
-        }
+        return "windlight/atmosphericsFuncs.glsl";
     }
 
     // Load the Basic Fragment Shaders at the appropriate level.
@@ -848,38 +897,29 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         }
     }
 
+    if (mirrors)
     {
-        if (mirrors)
-        {
-            // globalF's mirrorClip() is the only shared source that varies on MIRROR_CLIP.
-            // Only compiled when RenderMirrors is on, matching the gate on the variants
-            // themselves -- nothing can attach this copy otherwise.
-            std::map<std::string, std::string> mirror_attribs = attribs;
-            mirror_attribs["MIRROR_CLIP"] = "1";
+        // globalF's mirrorClip() is the only shared source that varies on MIRROR_CLIP. Only
+        // compiled when RenderMirrors is on, matching the gate on the variants themselves --
+        // nothing can attach this copy otherwise.
+        std::map<std::string, std::string> mirror_attribs = attribs;
+        mirror_attribs["MIRROR_CLIP"] = "1";
 
-            const std::string path = "deferred/globalF.glsl";
-            S32 level = 1;
-            if (loadShaderFile(path, level, GL_FRAGMENT_SHADER, &mirror_attribs, -1,
-                               path + LLShaderMgr::MIRROR_OBJECT_SUFFIX) == 0)
-            {
-                LL_WARNS("Shader") << "Failed to load mirror fragment shader " << path << LL_ENDL;
-                return path;
-            }
+        if (!load_axis_copy(*this, shaders, "deferred/globalF.glsl", GL_FRAGMENT_SHADER,
+                            mirror_attribs, "MIRROR_CLIP", LLShaderMgr::MIRROR_OBJECT_SUFFIX))
+        {
+            return "deferred/globalF.glsl";
         }
+    }
 
-        std::pair<std::string, S32> classic_shared[] = {
-            { "windlight/atmosphericsFuncs.glsl", mShaderLevel[SHADER_WINDLIGHT] },
-            { "deferred/deferredUtil.glsl",       1 },
-            { "deferred/reflectionProbeF.glsl",   has_reflection_probes ? 3 : 2 },
-        };
-        for (auto& entry : classic_shared)
+    for (const char* path : { "windlight/atmosphericsFuncs.glsl",
+                              "deferred/deferredUtil.glsl",
+                              "deferred/reflectionProbeF.glsl" })
+    {
+        if (!load_axis_copy(*this, shaders, path, GL_FRAGMENT_SHADER,
+                            classic_attribs, "CLASSIC_MODE", LLShaderMgr::CLASSIC_OBJECT_SUFFIX))
         {
-            if (loadShaderFile(entry.first, entry.second, GL_FRAGMENT_SHADER, &classic_attribs, -1,
-                               entry.first + LLShaderMgr::CLASSIC_OBJECT_SUFFIX) == 0)
-            {
-                LL_WARNS("Shader") << "Failed to load classic fragment shader " << entry.first << LL_ENDL;
-                return entry.first;
-            }
+            return path;
         }
     }
 
@@ -1893,7 +1933,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
-            // the deferred alpha pass draws rigged geometry; the HUD pass never does
             // the deferred alpha pass draws rigged geometry and can appear in a mirror; the
             // HUD pass never does either (HUDs are not drawn into the probe)
             U32 variants = LLGLSLShader::VARIANT_CLASSIC;
