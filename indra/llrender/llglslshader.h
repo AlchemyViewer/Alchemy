@@ -229,7 +229,17 @@ public:
     // If force_read is true, will force an immediate readback (severe performance penalty)
     bool readProfileQuery(bool for_runtime = false, bool force_read = false);
 
-    bool createShader();
+    // Compile-time variant axes, passed to createShader() as a mask.
+    enum EVariant : U32
+    {
+        VARIANT_RIGGED = 1 << 0, // HAS_SKIN=1 -- skinned/animesh (per-DRAW, via bind(rigged))
+    };
+
+    // Compile this program and, on success, build the requested variant subtrees (owned by this
+    // program; freed by unload()). Any previously built variants are dropped first, since
+    // recreating the program invalidates them. Returns false if the program OR any requested
+    // variant fails; a failed axis leaves its pointer null.
+    bool createShader(U32 variants = 0);
     bool attachFragmentObject(std::string object);
     bool attachVertexObject(std::string object);
     void attachObject(GLuint object);
@@ -401,8 +411,37 @@ public:
     // disagree. Add the permutation; never assign this.
     bool mLinearDiffuse = false;
 
-    // this pointer should be set to whichever shader represents this shader's rigged variant
+    // This shader's HAS_SKIN=1 variant, chosen per-draw via bind(rigged).
+    //
+    // OWNERSHIP: createShader()'s variant mask is the only thing that allocates one, and it
+    // heap-allocates, so a program owns its whole variant subtree -- unload() frees it via
+    // freeVariant(). mOwnedVariant records that; it exists because this member is public, so
+    // pointing it at a global instead would make freeVariant() delete a static object. A
+    // skinned program is its own rigged variant (a self-edge set by createShader), which
+    // freeVariant() and forEachVariant() must not traverse.
     LLGLSLShader* mRiggedVariant = nullptr;
+
+    // true when this program was heap-allocated as a variant and is owned by its parent
+    bool mOwnedVariant = false;
+
+    // Release a variant reference held by this program: unload + delete it when this program
+    // owns it, otherwise just clear the pointer. Idempotent, and recurses through the subtree
+    // (see unload()). Never frees through a self-edge.
+    void freeVariant(LLGLSLShader*& variant);
+
+    // drop this program's whole owned variant subtree (see unload() / createShader())
+    void freeOwnedVariants();
+
+    // Apply `fn` to this program and every owned variant, depth-first. The subtree is a tree
+    // (no corner is shared), so each program is visited exactly once -- use this for anything
+    // that must reach every corner, e.g. post-createShader feature tweaks or sampler unit maps.
+    // NOTE: skips a self-referencing child; recursing into that edge would never terminate.
+    template <typename FUNC>
+    void forEachVariant(FUNC fn)
+    {
+        fn(*this);
+        if (mRiggedVariant && mRiggedVariant != this) { mRiggedVariant->forEachVariant(fn); }
+    }
 
     // Invalidate the shared environment (sky/water) uniform set for every live program; each
     // re-applies on its next bind -- see the definition
@@ -444,6 +483,13 @@ public:
 
 private:
     void unloadInternal();
+
+    // ---- compile-time variant construction (see EVariant / createShader) ----
+    // build this program's HAS_SKIN=1 corner into mRiggedVariant; see the definition
+    bool createRiggedVariant();
+    // copy this program's whole configuration into `dst` under `name` (no defines added)
+    void configureVariantClone(LLGLSLShader& dst, const std::string& name) const;
+
     // This must be static because finishProfile() is called at least once
     // within a __try block. If we default its stats parameter to a temporary
     // LLSD, that temporary must be destroyed when the stack is unwound,

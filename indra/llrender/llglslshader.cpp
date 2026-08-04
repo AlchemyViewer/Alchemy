@@ -366,11 +366,74 @@ void LLGLSLShader::dirtyEnvironmentUniforms()
     }
 }
 
+void LLGLSLShader::freeVariant(LLGLSLShader*& variant)
+{
+    if (variant)
+    {
+        // Two things must never be freed through:
+        //  - a SELF-edge: a skinned program is its own rigged variant (see createShader), so
+        //    freeing here would recurse forever and delete this mid-unload;
+        //  - a pointer aimed at a global rather than a createShader() allocation, which would
+        //    free a static object (mOwnedVariant marks the ones we allocated).
+        if (variant != this && variant->mOwnedVariant)
+        {
+            variant->unload();
+            delete variant;
+        }
+        variant = nullptr;
+    }
+}
+
+void LLGLSLShader::freeOwnedVariants()
+{
+    freeVariant(mRiggedVariant);
+}
+
+void LLGLSLShader::configureVariantClone(LLGLSLShader& dst, const std::string& name) const
+{
+    dst.mName        = name;
+    dst.mFeatures    = mFeatures;
+    dst.mDefines     = mDefines;    // NOTE: must come before the caller's addPermutation()s
+    dst.mShaderFiles = mShaderFiles;
+    dst.mShaderLevel = mShaderLevel;
+    dst.mShaderGroup = mShaderGroup;
+}
+
+// Build this program's rigged corner: the same configuration plus HAS_SKIN, compiled. Deriving
+// it from this program rather than from a hand-configured sibling is what makes construction
+// independent of the order a caller happens to build its programs in, and it puts the
+// permutation after every addPermutation() the caller made -- the ordering that hand-wiring got
+// wrong whenever a define was added after the clone was configured.
+bool LLGLSLShader::createRiggedVariant()
+{
+    freeVariant(mRiggedVariant);
+
+    LLGLSLShader* corner = new LLGLSLShader();
+    corner->mOwnedVariant = true;   // this program frees it in unload(); see freeVariant()
+    configureVariantClone(*corner, llformat("Skinned %s", mName.c_str()));
+
+    // HAS_SKIN=1 selects the skinned path in the vertex source; hasObjectSkinning is the
+    // matching feature flag, which is what attaches the objectSkin module.
+    corner->addPermutation("HAS_SKIN", "1");
+    corner->mFeatures.hasObjectSkinning = true;
+
+    if (!corner->createShader())
+    {
+        delete corner;
+        return false;
+    }
+
+    mRiggedVariant = corner;
+    return true;
+}
+
 void LLGLSLShader::unload()
 {
     mShaderFiles.clear();
     mDefines.clear();
     mFeatures = LLShaderFeatures();
+
+    freeOwnedVariants();
 
     unloadInternal();
 }
@@ -437,9 +500,12 @@ void LLGLSLShader::unloadInternal()
     stop_glerror();
 }
 
-bool LLGLSLShader::createShader()
+bool LLGLSLShader::createShader(U32 variants)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    // Recreating the program invalidates any variants built from the previous configuration.
+    freeOwnedVariants();
 
     // Back to "never applied" so the rebuilt program re-applies the environment uniform set on
     // its first bind rather than inheriting the old program object's generation.
@@ -527,7 +593,7 @@ bool LLGLSLShader::createShader()
         {
             LL_SHADER_LOADING_WARNS() << "Failed to link using shader level " << mShaderLevel << " trying again using shader level " << (mShaderLevel - 1) << LL_ENDL;
             mShaderLevel--;
-            return createShader();
+            return createShader(variants);
         }
         else
         {
@@ -551,6 +617,21 @@ bool LLGLSLShader::createShader()
 #if LL_PROFILER_ENABLE_RENDER_DOC
     setLabel(mName.c_str());
 #endif
+
+    // A skinned program IS its own rigged variant, so bind(true) on one returns itself rather
+    // than asserting. Set here rather than in attachShaderFeatures() so createShader() is the
+    // one owner of every mRiggedVariant edge. NB this makes mRiggedVariant a self-edge --
+    // freeVariant()/forEachVariant() must not traverse it -- and a program that also asks for
+    // VARIANT_RIGGED overwrites it with the real corner just below.
+    if (success && mFeatures.hasObjectSkinning)
+    {
+        mRiggedVariant = this;
+    }
+
+    if (success && (variants & VARIANT_RIGGED))
+    {
+        success = createRiggedVariant();
+    }
 
     return success;
 }

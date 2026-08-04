@@ -169,7 +169,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasObjectSkinning)
     {
-        shader->mRiggedVariant = shader;
+        // NOTE: the matching `mRiggedVariant = this` self-edge is set by createShader().
         if (!shader->attachVertexObject("avatar/objectSkinV.glsl"))
         {
             return false;
