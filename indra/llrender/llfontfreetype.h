@@ -40,6 +40,7 @@
 #include <array>
 #include <boost/functional/hash.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <boost/unordered_map.hpp>
 
 // ALFT_Face / hb_font_t / EFontHinting come in via alfontface.h.
@@ -160,7 +161,7 @@ public:
     static S32 getNumFaces(const std::string& filename);
 
     typedef std::function<bool(llwchar)> char_functor_t;
-    void addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font, const char_functor_t& functor = nullptr);
+    void addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font, const char_functor_t& functor = nullptr) const;
     typedef std::pair<LLPointer<LLFontFreetype>, char_functor_t> fallback_font_t;
     typedef std::vector<fallback_font_t> fallback_font_vector_t;
     const fallback_font_vector_t& getFallbackFonts() const { return mFallbackFonts; }
@@ -322,6 +323,12 @@ private:
     // FreeType actually delivered (which can differ from the requested one —
     // e.g. color requested but mono returned).
     LLFontGlyphInfo* renderAndCreateGlyph(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type, EFontGlyphType& out_bitmap_glyph_type) const;
+    bool hasFallbackPath(const std::string& path) const; // Is a fallback font with this file path already attached?
+    // Last resort for a codepoint no face in the chain covers: ask the OS
+    // for a font that does, load it and append it to the fallback chain.
+    // Returns the (face, glyph index) it resolved to, or (nullptr, 0) when
+    // the OS has no match. Each codepoint is queried at most once.
+    std::pair<const LLFontFreetype*, U32> attachOsFallbackFor(llwchar wch) const;
     void renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, llwchar wch) const;
     // COLRv1 paint-walker entry point. Loads the glyph in outline mode to
     // populate metrics, then runs ALFontColrV1Painter to rasterize the paint
@@ -360,7 +367,17 @@ private:
     ALFontVarAxes mVarAxes;
     bool mAllowMonospaceLigatures = false;
     bool mUseSubpixelPen = false;
-    fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)
+    S32 mFaceIndex = 0; // Face index within the (possibly collection) font file
+    F32 mVertDPI = 0.f; // Kept so lazily-discovered fallback faces can be
+    F32 mHorzDPI = 0.f; // opened at this font's size (see attachOsFallbackFor)
+    // mutable: fallback fonts are also discovered lazily during glyph lookup (const)
+    mutable fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)
+    // Codepoints we've already asked the OS about, so we only query once each
+    mutable boost::unordered_flat_set<llwchar> mAttemptedFallbackChars;
+    // The subset of mFallbackFonts this head discovered through the OS. The
+    // registry never sees these, so LLFontRegistry::reloadForDpiChange can't
+    // re-resolve them — resetSelf drives them itself.
+    mutable std::vector<LLPointer<LLFontFreetype>> mLazyFallbacks;
 
     // Per-head shaping-face resolution cache: codepoint -> (winning face,
     // glyph index in that face). Replaces an O(fallbacks)-deep walk for

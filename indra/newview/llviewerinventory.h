@@ -155,6 +155,10 @@ public:
     };
     LLTransactionID getTransactionID() const { return mTransactionID; }
 
+    // Script runtime state (from task inventory cap)
+    bool getIsRunning() const { return mIsRunning; }
+    bool getIsFaulted() const { return mIsFaulted; }
+
     bool getIsBrokenLink() const; // true if the baseitem this points to doesn't exist in memory.
     LLViewerInventoryItem *getLinkedItem() const;
     LLViewerInventoryCategory *getLinkedCategory() const;
@@ -172,6 +176,10 @@ public:
 public:
     bool mIsComplete;
     LLTransactionID mTransactionID;
+
+    // Script runtime state (only valid for task inventory scripts)
+    bool mIsRunning = false;
+    bool mIsFaulted = false;
 };
 
 

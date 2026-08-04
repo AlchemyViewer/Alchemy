@@ -58,6 +58,7 @@
 //#include "imdebug.h"
 #include "llfontbitmapcache.h"
 #include "llgl.h"
+#include "llwindow.h"
 
 #define ENABLE_OT_SVG_SUPPORT
 
@@ -297,6 +298,10 @@ const LLFontFreetype* LLFontFreetype::selectShapingFace(llwchar base, U32& out_g
         {
             return hit;
         }
+        if (auto hit = attachOsFallbackFor(base); hit.first)
+        {
+            return hit;
+        }
         // No face has a glyph; caller will end up rendering a tofu via `this`.
         return { this, 0u };
     };
@@ -358,6 +363,9 @@ bool LLFontFreetype::loadFace(const std::string& filename, F32 point_size, F32 v
     mFontFlags  = flags;
     mVarAxes    = var_axes;
     mUseSubpixelPen = mFace->useSubpixelPen();
+    mFaceIndex  = face_n;
+    mVertDPI    = vert_dpi;
+    mHorzDPI    = horz_dpi;
 
     // FreeType's size->metrics is populated by FT_Set_Char_Size (run inside
     // ALFontFace::load) with scaled, 26.6 fractional-pixel ascender /
@@ -460,7 +468,7 @@ S32 LLFontFreetype::getNumFaces(const std::string& filename)
 }
 
 void LLFontFreetype::addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font,
-                                     const char_functor_t& functor)
+                                     const char_functor_t& functor) const
 {
     mFallbackFonts.emplace_back(fallback_font, functor);
     // Both caches encode the previous fallback list; the new fallback may win
@@ -473,12 +481,72 @@ void LLFontFreetype::addFallbackFont(const LLPointer<LLFontFreetype>& fallback_f
     //    the OLD itemization (e.g. CJK codepoints rendered as the head's
     //    notdef before the CJK fallback was attached) and must be discarded
     //    so the next shape() re-itemizes through the new chain.
-    // Production today only calls addFallbackFont from LLFontRegistry::createFont
-    // before any shaping happens, so neither cache typically holds entries at
-    // this point — but clearing them defensively prevents a future runtime
-    // fallback-mutation path from silently returning stale shape results.
+    // LLFontRegistry::createFont attaches the configured chain before any
+    // shaping happens, so neither cache holds entries on that path — but
+    // attachOsFallbackFor mutates the chain mid-run, after both caches are
+    // warm, and relies on this clearing to avoid stale shape results.
     mShapingFaceResolution.clear();
     ALFontShaping::clearCacheForFace(this);
+}
+
+bool LLFontFreetype::hasFallbackPath(const std::string& path) const
+{
+    for (const fallback_font_t& pair : mFallbackFonts)
+    {
+        if (pair.first->getName() == path)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::pair<const LLFontFreetype*, U32> LLFontFreetype::attachOsFallbackFor(llwchar wch) const
+{
+    // Only the head grows a fallback chain. Fallback faces are reached
+    // through their head's chain and must not sprout chains of their own;
+    // selectShapingFace is also driven directly against fallback-flagged
+    // faces by the unit tests, which pin the "nothing covers this, expect
+    // notdef" outcome.
+    if (mIsFallback)
+        return { nullptr, 0u };
+
+    // One OS query per codepoint, hit or miss. A miss is the common case
+    // (genuinely uncovered codepoints, and every char on platforms with no
+    // implementation) and costs as much to re-derive as a hit, so the
+    // attempted-set is recorded before the outcome is known.
+    if (!mAttemptedFallbackChars.insert(wch).second)
+        return { nullptr, 0u };
+
+    LLFontFallbackMatch match = LLWindow::findFallbackFontForChar(wch);
+    if (match.mPath.empty() || hasFallbackPath(match.mPath))
+        return { nullptr, 0u };
+
+    // Open at this font's size and DPI so the lazily-discovered face lines
+    // up with the head's metrics.
+    LLPointer<LLFontFreetype> fallback = new LLFontFreetype;
+    if (!fallback->loadFace(match.mPath, mPointSize, mVertDPI, mHorzDPI,
+                            /*is_fallback*/ true, match.mFaceIndex,
+                            mHinting, mFontFlags))
+    {
+        return { nullptr, 0u };
+    }
+
+    U32 glyph_index = fallback->getCharGlyphIndex(wch);
+    if (!glyph_index)
+    {
+        // The OS matched a font that doesn't actually cover wch: discard it
+        // rather than lengthening the chain with a face that can never hit.
+        return { nullptr, 0u };
+    }
+
+    LL_DEBUGS("Font") << "Lazy OS fallback for U+" << std::hex << (U32)wch << std::dec
+                      << ": " << match.mPath << " (face " << match.mFaceIndex << ")" << LL_ENDL;
+    // Note: this clears mShapingFaceResolution, so callers must not hold a
+    // cached resolution across this point.
+    addFallbackFont(fallback, nullptr);
+    mLazyFallbacks.push_back(fallback);
+    return { fallback.get(), glyph_index };
 }
 
 F32 LLFontFreetype::getLineHeight() const
@@ -901,6 +969,14 @@ LLFontGlyphInfo* LLFontFreetype::getGlyphInfo(llwchar wch, EFontGlyphType glyph_
         return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
     }
 
+    // Nothing in the configured chain covers this codepoint: ask the OS for
+    // a face that does and attach it. Keeps scripts the static fallback list
+    // never named (CJK, Thai, Indic) from rendering as tofu.
+    if (auto hit = attachOsFallbackFor(wch); hit.first)
+    {
+        return getGlyphInfoByIndex(hit.first, hit.second, glyph_type);
+    }
+
     // No face in our chain has this codepoint. Use the head face's
     // notdef (glyph_index=0) — pre-warmed during loadFace.
     return getGlyphInfoByIndex(this, 0, glyph_type);
@@ -1103,7 +1179,16 @@ void LLFontFreetype::resetSelf(F32 vert_dpi, F32 horz_dpi)
     // once by whoever owns the shared cache
     // (LLFontRegistry::reloadForDpiChange).
     resetBitmapCache();
-    loadFace(mName, mPointSize, vert_dpi, horz_dpi, mIsFallback, 0, mHinting, mFontFlags, mVarAxes);
+    loadFace(mName, mPointSize, vert_dpi, horz_dpi, mIsFallback, mFaceIndex, mHinting, mFontFlags, mVarAxes);
+
+    // Fallbacks we discovered through the OS are owned solely by this head,
+    // so the registry's cache-driven pass never reaches them. Without this
+    // they keep the old DPI while the head re-resolves, and
+    // mAttemptedFallbackChars stops them from ever being re-queried.
+    for (LLPointer<LLFontFreetype>& lazy : mLazyFallbacks)
+    {
+        lazy->resetSelf(vert_dpi, horz_dpi);
+    }
 }
 
 void LLFontFreetype::reset(F32 vert_dpi, F32 horz_dpi)

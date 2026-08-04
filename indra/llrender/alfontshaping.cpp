@@ -835,8 +835,9 @@ void ALFontShaping::clearCacheForFace(const LLFontFreetype* face)
             // pointer to the fallback that owns its glyph_id. Sweep those
             // too so a dying face can't leave sibling-rooted entries whose
             // sg.face dangles — see the header note on clearCacheForFace.
-            // O(glyphs) per surviving entry, but this only runs on face
-            // teardown / reload, never on the shape or render hot path.
+            // O(glyphs) per surviving entry. This runs on face teardown /
+            // reload, and once per codepoint that first resolves through a
+            // lazily-attached OS fallback — never per shape or per render.
             for (const ALShapedGlyph& sg : it->second.glyphs)
             {
                 if (sg.face == face)
