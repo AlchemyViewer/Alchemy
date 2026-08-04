@@ -332,28 +332,19 @@ static void setup_material_indexed_samplers(LLGLSLShader& shader, S32 n, bool ha
 }
 
 #ifdef SHOW_ASSERT
-// return true if there are no redundant shaders in the given vector
-// also checks for redundant variants
-static bool no_redundant_shaders(const std::vector<LLGLSLShader*>& shaders)
+// Return true if no two live programs share a name. sInstances tracks every program that
+// created successfully, so this covers the whole population without a registration list --
+// including the rigged variants, which the old list-walk only reached through the bases
+// someone had remembered to register.
+static bool no_redundant_shaders()
 {
     std::set<std::string> names;
-    for (LLGLSLShader* shader : shaders)
+    for (LLGLSLShader* shader : LLGLSLShader::sInstances)
     {
-        if (names.find(shader->mName) != names.end())
+        if (!names.insert(shader->mName).second)
         {
             LL_WARNS("Shader") << "Redundant shader: " << shader->mName << LL_ENDL;
             return false;
-        }
-        names.insert(shader->mName);
-
-        if (shader->mRiggedVariant)
-        {
-            if (names.find(shader->mRiggedVariant->mName) != names.end())
-            {
-                LL_WARNS("Shader") << "Redundant shader: " << shader->mRiggedVariant->mName << LL_ENDL;
-                return false;
-            }
-            names.insert(shader->mRiggedVariant->mName);
         }
     }
     return true;
@@ -370,75 +361,12 @@ LLViewerShaderMgr::LLViewerShaderMgr() :
 LLViewerShaderMgr::~LLViewerShaderMgr()
 {
     mShaderLevel.clear();
-    mShaderList.clear();
 }
 
 void LLViewerShaderMgr::finalizeShaderList()
 {
-    //ONLY shaders that need WL Param management should be added here
-    mShaderList.push_back(&gAvatarProgram);
-    mShaderList.push_back(&gWaterProgram);
-    mShaderList.push_back(&gAvatarEyeballProgram);
-    mShaderList.push_back(&gImpostorProgram);
-    mShaderList.push_back(&gObjectBumpProgram);
-    mShaderList.push_back(&gObjectFullbrightAlphaMaskProgram);
-    mShaderList.push_back(&gObjectAlphaMaskNoColorProgram);
-    mShaderList.push_back(&gUnderWaterProgram);
-    mShaderList.push_back(&gDeferredSunProgram);
-    mShaderList.push_back(&gDeferredSunProbeProgram);
-    mShaderList.push_back(&gHazeProgram);
-    mShaderList.push_back(&gHazeWaterProgram);
-    mShaderList.push_back(&gDeferredSoftenProgram);
-    mShaderList.push_back(&gDeferredAlphaProgram);
-    mShaderList.push_back(&gHUDAlphaProgram);
-    mShaderList.push_back(&gDeferredAlphaImpostorProgram);
-    mShaderList.push_back(&gDeferredFullbrightProgram);
-    mShaderList.push_back(&gHUDFullbrightProgram);
-    mShaderList.push_back(&gDeferredFullbrightAlphaMaskProgram);
-    mShaderList.push_back(&gHUDFullbrightAlphaMaskProgram);
-    mShaderList.push_back(&gDeferredFullbrightAlphaMaskAlphaProgram);
-    mShaderList.push_back(&gHUDFullbrightAlphaMaskAlphaProgram);
-    mShaderList.push_back(&gDeferredFullbrightShinyProgram);
-    mShaderList.push_back(&gHUDFullbrightShinyProgram);
-    mShaderList.push_back(&gDeferredEmissiveProgram);
-    mShaderList.push_back(&gDeferredAvatarAlphaProgram);
-    mShaderList.push_back(&gEnvironmentMapProgram);
-    mShaderList.push_back(&gDeferredWLSkyProgram);
-    mShaderList.push_back(&gDeferredWLCloudProgram);
-    mShaderList.push_back(&gDeferredWLMoonProgram);
-    mShaderList.push_back(&gDeferredWLSunProgram);
-// [RLVa:KB] - @setsphere
-    mShaderList.push_back(&gRlvSphereProgram);
-// [/RLVa:KB]
-    mShaderList.push_back(&gDeferredPBRAlphaProgram);
-    mShaderList.push_back(&gHUDPBRAlphaProgram);
-    mShaderList.push_back(&gDeferredDiffuseProgram);
-    mShaderList.push_back(&gDeferredBumpProgram);
-    mShaderList.push_back(&gDeferredPBROpaqueProgram);
-
-    mShaderList.push_back(&gDeferredAvatarProgram);
-    mShaderList.push_back(&gDeferredTerrainProgram);
-
-    for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
-    {
-        mShaderList.push_back(&gDeferredPBRTerrainProgram[paint_type]);
-    }
-
-    mShaderList.push_back(&gDeferredDiffuseAlphaMaskProgram);
-    mShaderList.push_back(&gDeferredNonIndexedDiffuseAlphaMaskProgram);
-    mShaderList.push_back(&gDeferredTreeProgram);
-
-    mShaderList.push_back(&gCGGammaProgram);
-    mShaderList.push_back(&gCGLegacyGammaProgram);
-    mShaderList.push_back(&gCGColorgradeGammaProgram);
-    mShaderList.push_back(&gCGColorgradeLegacyGammaProgram);
-    mShaderList.push_back(&gCGTonemapProgram);
-    mShaderList.push_back(&gCGTonemapLegacyGammaProgram);
-    mShaderList.push_back(&gCGTonemapColorgradeProgram);
-    mShaderList.push_back(&gCGTonemapColorgradeLegacyGammaProgram);
-
     // make sure there are no redundancies
-    llassert(no_redundant_shaders(mShaderList));
+    llassert(no_redundant_shaders());
 }
 
 // static
@@ -492,8 +420,6 @@ void LLViewerShaderMgr::setShaders()
     {
         return;
     }
-
-    mShaderList.clear();
 
     if (!gGLManager.mHasRequirements)
     {
@@ -1325,7 +1251,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             if (!has_skin)
             {
-                mShaderList.push_back(&gDeferredMaterialProgram[i]);
                 gDeferredMaterialProgram[i].mName = llformat("Material Shader %d", i);
             }
             else
@@ -3820,7 +3745,10 @@ bool LLViewerShaderMgr::loadShadersInterface()
         {
             LLGLSLShader& shader = gNormalDebugProgram[variant];
             LLGLSLShader& skinned_shader = gSkinnedNormalDebugProgram[variant];
-            shader.mName = "Normal Debug Shader";
+            // Distinct per variant: both entries are live at once, and each also has a
+            // "Skinned <name>" pair, so a shared name collides twice over.
+            shader.mName = llformat("Normal Debug Shader%s",
+                                    variant == NORMAL_DEBUG_SHADER_WITH_TANGENTS ? " (Tangents)" : "");
             shader.mShaderFiles.clear();
             shader.mShaderFiles.push_back(make_pair("interface/normaldebugV.glsl", GL_VERTEX_SHADER));
             // *NOTE: Geometry shaders have a reputation for being slow.
@@ -3953,7 +3881,8 @@ bool LLViewerShaderMgr::loadShadersInterface()
 
     if (success)
     {
-        gGaussianProgram.mName = "Reflection Mip Shader";
+        // Program names must be unique; finalizeShaderList() asserts over every live program.
+        gGaussianProgram.mName = "Gaussian Blur Shader";
         gGaussianProgram.mFeatures.isDeferred = true;
         gGaussianProgram.mFeatures.hasGamma = true;
         gGaussianProgram.mFeatures.hasAtmospherics = true;
@@ -4016,15 +3945,5 @@ std::string LLViewerShaderMgr::getShaderDirPrefix(void)
 void LLViewerShaderMgr::updateShaderUniforms(LLGLSLShader * shader)
 {
     LLEnvironment::instance().updateShaderUniforms(shader);
-}
-
-LLViewerShaderMgr::shader_iter LLViewerShaderMgr::beginShaders() const
-{
-    return mShaderList.begin();
-}
-
-LLViewerShaderMgr::shader_iter LLViewerShaderMgr::endShaders() const
-{
-    return mShaderList.end();
 }
 

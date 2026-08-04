@@ -44,8 +44,8 @@ public:
     LLViewerShaderMgr();
     /* virtual */ ~LLViewerShaderMgr();
 
-    // Add shaders to mShaderList for later uniform propagation
-    // Will assert on redundant shader entries in debug builds
+    // Post-load sanity pass; asserts on duplicate program names in debug builds
+    // (checked over LLGLSLShader::sInstances -- no registration needed).
     void finalizeShaderList();
 
     // singleton pattern implementation
@@ -85,71 +85,11 @@ public:
         SHADER_COUNT
     };
 
-    // simple model of forward iterator
-    // http://www.sgi.com/tech/stl/ForwardIterator.html
-    class shader_iter
-    {
-    private:
-        friend bool operator == (shader_iter const & a, shader_iter const & b);
-        friend bool operator != (shader_iter const & a, shader_iter const & b);
-
-        typedef std::vector<LLGLSLShader *>::const_iterator base_iter_t;
-    public:
-        shader_iter()
-        {
-        }
-
-        shader_iter(base_iter_t iter) : mIter(iter)
-        {
-        }
-
-        LLGLSLShader & operator * () const
-        {
-            return **mIter;
-        }
-
-        LLGLSLShader * operator -> () const
-        {
-            return *mIter;
-        }
-
-        shader_iter & operator++ ()
-        {
-            ++mIter;
-            return *this;
-        }
-
-        shader_iter operator++ (int)
-        {
-            return mIter++;
-        }
-
-    private:
-        base_iter_t mIter;
-    };
-
-    shader_iter beginShaders() const;
-    shader_iter endShaders() const;
-
     /* virtual */ std::string getShaderDirPrefix(void);
 
     /* virtual */ void updateShaderUniforms(LLGLSLShader * shader);
 
-private:
-    // the list of shaders we need to propagate parameters to.
-    std::vector<LLGLSLShader *> mShaderList;
-
 }; //LLViewerShaderMgr
-
-inline bool operator == (LLViewerShaderMgr::shader_iter const & a, LLViewerShaderMgr::shader_iter const & b)
-{
-    return a.mIter == b.mIter;
-}
-
-inline bool operator != (LLViewerShaderMgr::shader_iter const & a, LLViewerShaderMgr::shader_iter const & b)
-{
-    return a.mIter != b.mIter;
-}
 
 extern LLVector4            gShinyOrigin;
 

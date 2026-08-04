@@ -71,9 +71,10 @@
 // stay geometrically correct regardless of window size.
 uniform vec2 uResolution;
 
-// Atmospheric HDR scale. Provided by LLSettingsSky::applyToShader via
-// mShaderList. Effects that emulate sun-lit phenomena (glow, starburst) scale
-// by this so they read at the same relative brightness as the sky itself.
+// Atmospheric HDR scale. Provided by LLSettingsSky::applyToShader with the rest
+// of the environment uniform set. Effects that emulate sun-lit phenomena (glow,
+// starburst) scale by this so they read at the same relative brightness as the
+// sky itself.
 uniform float sky_hdr_scale;
 
 // Frame counter, wraps at 2^32. Used by temporally-decorrelated noise
