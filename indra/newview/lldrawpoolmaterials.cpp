@@ -152,13 +152,14 @@ static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigge
             LLViewerTexture* spec    = slot.mSpecularMap.notNull() ? slot.mSpecularMap.get() : LLViewerFetchedTexture::sWhiteImagep.get();
 
             // Diffuse and spec are sRGB colour and decode -- both filter in linear. Diffuse
-            // lands in the sRGB albedo attachment (FRAMEBUFFER_SRGB re-encodes on store); spec's
-            // attachment (frag_data1) is a plain RGBA8 shared with PBR's linear ORM and cannot be
-            // sRGB storage, so material.slang re-encodes the filtered spec to sRGB in-shader,
-            // which softenLight decodes on read. Normal is data and stays AnisoWrap.
-            gGL.getTextureSlot(s)->bindFast(diffuse, DIFFUSE_SRGB_SAMPLER);
+            // lands in the sRGB albedo attachment (the hoisted FRAMEBUFFER_SRGB re-encodes on
+            // store); spec's attachment (frag_data1) is a plain RGBA8 shared with PBR's linear
+            // ORM and cannot be sRGB storage, so the material writer re-encodes the filtered
+            // spec to sRGB in-shader, which softenLight decodes on read. Normal is data and
+            // stays AnisoWrap.
+            gGL.getTextureSlot(s)->bindFast(diffuse, ALSamplers::AnisoWrapSRGB);
             gGL.getTextureSlot(N + s)->bindFast(normal, ALSamplers::AnisoWrap);
-            gGL.getTextureSlot(2 * N + s)->bindFast(spec, ALSamplers::AnisoWrap | ALSampler::SRGBDecode);
+            gGL.getTextureSlot(2 * N + s)->bindFast(spec, ALSamplers::AnisoWrapSRGB);
 
             spec_color[4 * s + 0] = slot.mSpecColor.mV[0];
             spec_color[4 * s + 1] = slot.mSpecColor.mV[1];
@@ -242,12 +243,10 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         return;
     }
 
-    // Pairs with DIFFUSE_SRGB_SAMPLER on the diffuse binds below (both the scalar loop here
-    // and pushMaterialBatchIndexed, both reached from this method): the sampler decodes, this
-    // re-encodes the linear albedo on store into the sRGB attachment 0. This pool draws only
-    // the opaque/mask/emissive material passes -- never alpha-blend -- so the enable is safe
-    // pool-wide.
-    LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+    // Pairs with ALSamplers::AnisoWrapSRGB on the diffuse binds below (both the scalar loop
+    // here and pushMaterialBatchIndexed, both reached from this method): the sampler decodes,
+    // and the deferred pass's hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes the
+    // linear albedo on store into the sRGB attachment 0.
 
     bool rigged = false;
     if (pass >= 12)
@@ -359,7 +358,7 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         {
             lastSpecMap = params.mSpecularMap;
             llassert(lastSpecMap);
-            gGL.getTextureSlot(specChannel)->bindFast(lastSpecMap, ALSamplers::AnisoWrap | ALSampler::SRGBDecode);
+            gGL.getTextureSlot(specChannel)->bindFast(lastSpecMap, ALSamplers::AnisoWrapSRGB);
         }
 
         if (params.mTexture != lastDiffuse)
@@ -367,7 +366,7 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
             lastDiffuse = params.mTexture;
             if (lastDiffuse)
             {
-                gGL.getTextureSlot(diffuseChannel)->bindFast(lastDiffuse, DIFFUSE_SRGB_SAMPLER);
+                gGL.getTextureSlot(diffuseChannel)->bindFast(lastDiffuse, ALSamplers::AnisoWrapSRGB);
             }
             else
             {

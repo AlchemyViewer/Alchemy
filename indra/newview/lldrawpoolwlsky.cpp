@@ -544,6 +544,13 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
         return;
     }
 
+    // Opt out of the deferred pass's hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred): the
+    // sky writers store display-encoded values into the albedo attachment raw and the
+    // lighting pass's decoded read round-trips them -- the pass-through convention. An
+    // encode here would double-transform the non-emissive sky path. Inert for the
+    // HAS_EMISSIVE path, which writes the sky to the float emissive attachment instead.
+    LLGLDisable srgb(GL_FRAMEBUFFER_SRGB);
+
     // TODO: remove gSky.mVOSkyp and fold sun/moon into LLVOWLSky
     gSky.mVOSkyp->updateGeometry(gSky.mVOSkyp->mDrawable);
 

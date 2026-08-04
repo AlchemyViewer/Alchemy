@@ -83,7 +83,7 @@ LLFetchedGLTFMaterial& LLFetchedGLTFMaterial::operator=(const LLFetchedGLTFMater
 // the PBR shaders are gone; keeping both would convert twice.
 //
 // Normal and ORM are measurements, not colour. They keep the default, which decodes nothing.
-static constexpr ALSampler GLTF_COLOR_SAMPLER = ALSamplers::AnisoWrap | ALSampler::SRGBDecode;
+static constexpr ALSampler GLTF_COLOR_SAMPLER = ALSamplers::AnisoWrapSRGB;
 static constexpr ALSampler GLTF_DATA_SAMPLER  = ALSamplers::AnisoWrap;
 
 void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)

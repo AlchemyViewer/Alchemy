@@ -85,18 +85,19 @@ void LLCubeMap::initGL()
             // the object -- so it has to happen here rather than inside the per-face
             // loop. The faces are then told storage exists, which makes their uploads
             // sub-image writes instead of allocations.
-            //
-            // Unconditional: immutable storage is a hard requirement of this renderer (see
-            // LLGLManager::mHasTextureStorage, which errors at init without it). Branching on
-            // it here would only produce a path that lets each face allocate for itself --
-            // six glTexStorage2D calls on ONE object, five of them GL_INVALID_OPERATION.
-            gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
-            glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, RESOLUTION, RESOLUTION);
-            // count of 6: alloc_tex_image's count covers cube faces. The per-face path used
-            // to account one face at a time onto the same texture name, each call releasing
-            // the last, so only one face's worth was ever recorded for the whole cube.
-            LLImageGLMemory::alloc_tex_image(RESOLUTION, RESOLUTION, internal_format, 6, false);
-            stop_glerror();
+            bool immutable = false;
+            if (gGLManager.mHasTextureStorage)
+            {
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
+                glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, RESOLUTION, RESOLUTION);
+                // count of 6: alloc_tex_image's count covers cube faces. The per-face
+                // path used to account one face at a time onto the same texture name,
+                // each call releasing the last, so only one face's worth was ever
+                // recorded for the whole cube.
+                LLImageGLMemory::alloc_tex_image(RESOLUTION, RESOLUTION, internal_format, 6, false);
+                immutable = true;
+                stop_glerror();
+            }
 
             for (int i = 0; i < 6; i++)
             {
@@ -105,7 +106,10 @@ void LLCubeMap::initGL()
                 // rather than relying on the auto-format switch agreeing with it.
                 mImages[i]->setExplicitFormat(internal_format, GL_RGBA);
                 mImages[i]->setTarget(mTargets[i], ALTextureSlot::TT_CUBE_MAP);
-                mImages[i]->markStorageAllocated();
+                if (immutable)
+                {
+                    mImages[i]->markStorageAllocated();
+                }
                 mRawImages[i] = new LLImageRaw(RESOLUTION, RESOLUTION, 4);
                 if (!mImages[i]->createGLTexture(0, mRawImages[i], texname))
                 {

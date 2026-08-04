@@ -447,7 +447,7 @@ bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material, LLGLSLShader
     // with it linear. Normal is data and stays AnisoWrap.
     shader->bindTexture(LLShaderMgr::SPECULAR_MAP,
                         specular_map ? specular_map : LLViewerFetchedTexture::sWhiteImagep.get(),
-                        ALSamplers::AnisoWrap | ALSampler::SRGBDecode);
+                        ALSamplers::AnisoWrapSRGB);
 
     if (draw->mTextureList.size() > 1)
     {

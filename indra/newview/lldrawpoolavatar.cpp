@@ -217,12 +217,12 @@ void LLDrawPoolAvatar::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
-    // The deferred skin writer (avatar.slang) decodes its composite on the sampler and shades
-    // in linear, so its gbuffer albedo store re-encodes into the sRGB attachment. Gated on the
-    // same flag that turns the decode on (see the avatar diffuse binds in llviewerjointmesh),
-    // so the impostor billboard and rigid passes -- which write sRGB directly -- are left
-    // alone. beginDeferredPass has already bound sVertexProgram for this pass.
-    LLGLEnable srgb((sVertexProgram && sVertexProgram->mLinearDiffuse) ? GL_FRAMEBUFFER_SRGB : 0);
+    // The deferred pass enables GL_FRAMEBUFFER_SRGB once (renderGeomDeferred), which is what
+    // the linear-shading skin writer wants. The impostor billboard and rigid passes write
+    // sRGB directly, so they opt back OUT -- gated on the same flag that turns the sampler
+    // decode on (see the avatar diffuse binds in llviewerjointmesh).
+    // beginDeferredPass has already bound sVertexProgram for this pass.
+    LLGLDisable srgb((sVertexProgram && sVertexProgram->mLinearDiffuse) ? 0 : GL_FRAMEBUFFER_SRGB);
 
     if (LLPipeline::sImpostorRender)
     {
@@ -601,7 +601,7 @@ void LLDrawPoolAvatar::beginDeferredRigid()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
-    sVertexProgram = &gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram;
+    sVertexProgram = gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.selectVariant();
     sDiffuseChannel = sVertexProgram->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
     sVertexProgram->bind();
     sVertexProgram->setMinimumAlpha(LLDrawPoolAvatar::sMinimumAlpha);

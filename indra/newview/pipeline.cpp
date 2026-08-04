@@ -4204,6 +4204,17 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
 
         LLGLEnable cull(GL_CULL_FACE);
 
+        // The G-buffer writers shade in linear (colour textures decode on the sampler) and
+        // rely on this to re-encode into the sRGB albedo attachment; it is inert on the
+        // other attachments and on depth-only targets. Enabled ONCE here rather than per
+        // pool -- each real FRAMEBUFFER_SRGB toggle costs a gGL.flush() plus a GL state
+        // change, and the per-pool scopes toggled it off and on again at every pool
+        // boundary. The writers that still store display-encoded values raw opt OUT
+        // locally: the WL sky family (LLDrawPoolWLSky::renderDeferred), the avatar pool's
+        // impostor/rigid passes (LLDrawPoolAvatar::renderDeferred), and the parcel-owner
+        // overlay (LLDrawPoolTerrain::hilightParcelOwners).
+        LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+
         for (pool_set_t::iterator iter = mPools.begin(); iter != mPools.end(); ++iter)
         {
             LLDrawPool *poolp = *iter;
@@ -8991,7 +9002,7 @@ void LLPipeline::bindLightFunc(LLGLSLShader& shader)
 void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
 {
     // Depth comparison is a sampler property, not a texture one. Every shader samples these
-    // as Sampler2DShadow (deferred/shadowutil.slang), so the compare sampler is the only way
+    // as sampler2DShadow (deferred/shadowUtil.glsl), so the compare sampler is the only way
     // they are ever read -- allocateShadowBuffer no longer writes GL_TEXTURE_COMPARE_MODE
     // onto the texture objects.
     //
@@ -9097,7 +9108,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
         // reads it straight into GBufferInfo::albedo with no conversion of its own -- the
         // hardware decode is what makes that value linear. Now that samplers skip the decode
         // by default, this pass has to ask for it. The alternative is srgb_to_linear() in
-        // gbufferread.slang, which would make the dependency shader-visible rather than
+        // deferred/gbufferUtil.glsl, which would make the dependency shader-visible rather than
         // bind-visible; either is defensible, this one preserves the pixels exactly.
         deferred_target->bindTexture(0, channel, ALSamplers::PointClamp | ALSampler::SRGBDecode); // frag_data[0]
     }
@@ -10074,7 +10085,7 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
         {
             // Projector cookie: an sRGB colour texture, decoded on the sampler so the
             // projected light filters in linear -- deferredUtil no longer decodes it in-shader.
-            gGL.getTextureSlot(channel)->bindSampled(img, ALSamplers::AnisoWrap | ALSampler::SRGBDecode);
+            gGL.getTextureSlot(channel)->bindSampled(img, ALSamplers::AnisoWrapSRGB);
 
             F32 lod_range = logf((F32)img->getWidth())/logf(2.f);
 
@@ -12014,12 +12025,11 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
             {
                 // sRGB, matching deferredScreen. renderGeomDeferred() runs the ordinary
                 // G-buffer pools into this target for the avatar's attachments, and those
-                // passes shade in linear and rely on GL_FRAMEBUFFER_SRGB to encode on store.
-                // A plain GL_RGBA8 attachment gives that enable nothing to act on, so the
-                // linear result would be stored raw and then decoded a second time when
-                // impostor.slang feeds it back into the real G-buffer -- attachments on
-                // impostored avatars rendering too dark. That was already true for PBR
-                // attachments, which enable FRAMEBUFFER_SRGB in LLDrawPoolPBROpaque.
+                // passes shade in linear and rely on the pass's hoisted GL_FRAMEBUFFER_SRGB
+                // (renderGeomDeferred) to encode on store. A plain GL_RGBA8 attachment gives
+                // that enable nothing to act on, so the linear result would be stored raw
+                // and then decoded a second time when the impostor writer feeds it back into
+                // the real G-buffer -- attachments on impostored avatars rendering too dark.
                 avatar->mImpostor.allocate(resX, resY, GL_SRGB8_ALPHA8, true);
 
                 if (LLPipeline::sRenderDeferred)

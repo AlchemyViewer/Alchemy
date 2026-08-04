@@ -1308,7 +1308,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.mShaderFiles.push_back(make_pair("deferred/diffuseAlphaMaskNoColorF.glsl", GL_FRAGMENT_SHADER));
         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram);
-        success = gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.createShader();
+        success = gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -1693,7 +1693,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             add_common_permutations(shader);
 
-            success = success && shader->createShader();
+            success = success && shader->createShader(mirror_variant());
             llassert(success);
         }
     }
@@ -2521,7 +2521,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarProgram.clearPermutations();
 
         // Skin composite is decoded on the sampler and the gbuffer write re-encodes; see the
-        // avatar diffuse binds in llviewerjointmesh and the FRAMEBUFFER_SRGB in renderDeferred.
+        // avatar diffuse binds in llviewerjointmesh and the hoisted FRAMEBUFFER_SRGB.
         gDeferredAvatarProgram.addPermutation("LINEAR_DIFFUSE", "1");
 
         add_common_permutations(&gDeferredAvatarProgram);

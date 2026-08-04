@@ -53,7 +53,7 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
 {
     llassert(!LLPipeline::sRenderingHUDs);
 
-    LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+    // GL_FRAMEBUFFER_SRGB is enabled for the whole deferred pass in renderGeomDeferred.
 
     // Indexed (multi-material) batching applies to the static opaque and alpha-mask
     // passes. The indexed program writes the GBuffer the same way for both; the

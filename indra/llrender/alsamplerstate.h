@@ -4,7 +4,7 @@
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
- * Copyright (C) 2026, Alchemy Viewer Project.
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -213,9 +213,17 @@ namespace ALSamplers
     inline constexpr ALSampler AnisoWrap      = ALSampler::Anisotropic | ALSampler::Wrap;
     inline constexpr ALSampler AnisoClamp     = ALSampler::Anisotropic | ALSampler::Clamp;
 
-    // Shadow maps: anisotropic + clamp with the depth comparison enabled, which is what
-    // gives the 2x2 PCF.
-    inline constexpr ALSampler ShadowCompare  = ALSampler::Anisotropic | ALSampler::Clamp
+    // AnisoWrap with the hardware sRGB->linear decode: the sampler for any COLOUR texture a
+    // linear-shading pass reads (diffuse, legacy spec, glTF base/emissive, projector
+    // cookies), so each texel is linearised BEFORE the filter averages. One name so the
+    // policy has one spelling; data textures (normal/ORM/masks) never take it.
+    inline constexpr ALSampler AnisoWrapSRGB  = AnisoWrap | ALSampler::SRGBDecode;
+
+    // Shadow maps: bilinear + clamp with the depth comparison enabled. The LINEAR filter is
+    // what gives the hardware its 2x2 PCF on a compare sampler. Anisotropy was inert here --
+    // the depth targets are single-level, so there is no mip chain for it to act on -- and
+    // only cost the driver a max-anisotropy it could never use; dropped.
+    inline constexpr ALSampler ShadowCompare  = ALSampler::Bilinear | ALSampler::Clamp
                                               | ALSampler::Compare;
 
     // NOT a sampling mode: "resolve from the render target's per-attachment policy"

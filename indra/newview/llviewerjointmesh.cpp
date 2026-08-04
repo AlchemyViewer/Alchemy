@@ -249,7 +249,7 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     // deferred writer's gbuffer store re-encodes via FRAMEBUFFER_SRGB (see LLDrawPoolAvatar).
     const LLGLSLShader* bound = LLGLSLShader::sCurBoundShaderPtr;
     const ALSampler skin_key = (bound && bound->mLinearDiffuse)
-                             ? (ALSamplers::AnisoWrap | ALSampler::SRGBDecode)
+                             ? ALSamplers::AnisoWrapSRGB
                              : ALSamplers::AnisoWrap;
 
     if (mTestImageName)

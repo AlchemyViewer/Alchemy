@@ -540,8 +540,8 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_BUMP);
 
-    // Pairs with DIFFUSE_SRGB_SAMPLER below: the sampler decodes, this re-encodes on store.
-    LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+    // The program's LINEAR_DIFFUSE makes pushBumpBatch decode the diffuse on the sampler;
+    // the hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes on store.
 
     shiny = true;
     for (int i = 0; i < 2; ++i)
@@ -597,12 +597,12 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
             {
                 if (uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
                 {
-                    pushBumpBatch(params, true, false, DIFFUSE_SRGB_SAMPLER);
+                    pushBumpBatch(params, true, false);
                 }
             }
             else
             {
-                pushBumpBatch(params, true, false, DIFFUSE_SRGB_SAMPLER);
+                pushBumpBatch(params, true, false);
             }
         }
 
@@ -1027,10 +1027,20 @@ void LLDrawPoolBump::pushBumpBatches(U32 type)
     }
 }
 
-void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_textures, ALSampler key)
+void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     applyModelMatrix(params);
+
+    // Same derivation as pushBatch: the bound program knows whether its diffuse wants the
+    // hardware decode. The shadow pass reaches this too with an unflagged program, so its
+    // binds stay plain AnisoWrap.
+    const LLGLSLShader* bound = LLGLSLShader::sCurBoundShaderPtr;
+    ALSampler key = ALSamplers::AnisoWrap;
+    if (bound && bound->mLinearDiffuse)
+    {
+        key |= ALSampler::SRGBDecode;
+    }
 
     bool tex_setup = false;
 
@@ -1039,23 +1049,15 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
         // Clamped to the bound program's ladder and null slots stood in for, same as every
         // other indexed pass -- a raw loop here would bind past the last declared sampler
         // whenever a batch was built at a wider ladder than the current program's.
-        bindIndexedTextures(params, LLGLSLShader::sCurBoundShaderPtr, key);
+        bindIndexedTextures(params, bound);
     }
     else
     { //not batching textures or batch has only 1 texture -- might need a texture matrix
         if (params.mTextureMatrix)
         {
-            if (shiny)
-            {
-                gGL.matrixMode(LLRender::MM_TEXTURE0);
-            }
-            else
-            {
-                gGL.matrixMode(LLRender::MM_TEXTURE0);
-                gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
-                gPipeline.mTextureMatrixOps++;
-            }
-
+            // the non-shiny path used to load this twice -- a leftover from when the
+            // second (bump) texture unit carried its own copy of the matrix
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
             gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
             gPipeline.mTextureMatrixOps++;
 

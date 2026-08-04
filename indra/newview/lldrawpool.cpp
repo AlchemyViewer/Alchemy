@@ -429,7 +429,7 @@ void LLRenderPass::renderRiggedGroup(LLSpatialGroup* group, U32 type, bool textu
     }
 }
 
-void LLRenderPass::pushBatches(U32 type, bool texture, bool batch_textures, ALSampler key)
+void LLRenderPass::pushBatches(U32 type, bool texture, bool batch_textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     if (texture)
@@ -441,7 +441,7 @@ void LLRenderPass::pushBatches(U32 type, bool texture, bool batch_textures, ALSa
             LLDrawInfo* pparams = *i;
             LLCullResult::increment_iterator(i, end);
 
-            pushBatch(*pparams, texture, batch_textures, key);
+            pushBatch(*pparams, texture, batch_textures);
         }
     }
     else
@@ -464,7 +464,7 @@ void LLRenderPass::pushUntexturedBatches(U32 type)
     }
 }
 
-void LLRenderPass::pushRiggedBatches(U32 type, bool texture, bool batch_textures, ALSampler key)
+void LLRenderPass::pushRiggedBatches(U32 type, bool texture, bool batch_textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
@@ -482,7 +482,7 @@ void LLRenderPass::pushRiggedBatches(U32 type, bool texture, bool batch_textures
 
             if (uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
             {
-                pushBatch(*pparams, texture, batch_textures, key);
+                pushBatch(*pparams, texture, batch_textures);
             }
         }
     }
@@ -512,7 +512,7 @@ void LLRenderPass::pushUntexturedRiggedBatches(U32 type)
     }
 }
 
-void LLRenderPass::pushMaskBatches(U32 type, bool texture, bool batch_textures, ALSampler key)
+void LLRenderPass::pushMaskBatches(U32 type, bool texture, bool batch_textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     auto* begin = gPipeline.beginRenderMap(type);
@@ -526,11 +526,11 @@ void LLRenderPass::pushMaskBatches(U32 type, bool texture, bool batch_textures, 
             continue;
         }
         LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
-        pushBatch(*pparams, texture, batch_textures, key);
+        pushBatch(*pparams, texture, batch_textures);
     }
 }
 
-void LLRenderPass::pushRiggedMaskBatches(U32 type, bool texture, bool batch_textures, ALSampler key)
+void LLRenderPass::pushRiggedMaskBatches(U32 type, bool texture, bool batch_textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     const LLVOAvatar* lastAvatar = nullptr;
@@ -555,7 +555,7 @@ void LLRenderPass::pushRiggedMaskBatches(U32 type, bool texture, bool batch_text
 
         if (uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
         {
-            pushBatch(*pparams, texture, batch_textures, key);
+            pushBatch(*pparams, texture, batch_textures);
         }
     }
 }
@@ -713,7 +713,7 @@ void LLRenderPass::applyModelMatrix(const LLMatrix4* model_matrix)
     }
 }
 
-void LLRenderPass::bindIndexedTextures(const LLDrawInfo& params, const LLGLSLShader* shader, ALSampler key)
+void LLRenderPass::bindIndexedTextures(const LLDrawInfo& params, const LLGLSLShader* shader)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
@@ -722,10 +722,9 @@ void LLRenderPass::bindIndexedTextures(const LLDrawInfo& params, const LLGLSLSha
     const U32 declared = shader ? (U32)shader->mFeatures.mIndexedTextureChannels : 0;
     const U32 batch = llmin((U32)params.mTextureList.size(), declared);
 
-    // The indexed ladder is all diffuse, so a program that shades in linear wants it decoded.
-    // Set rather than passed, because these callers -- the fullbright pools -- take the
-    // AnisoWrap default while the program is what knows. Only the decode bit: the caller still
-    // owns the filter and the address mode, which are its business and not the colour space's.
+    // The indexed ladder is all diffuse; the program is what knows whether it shades in
+    // linear and wants the ladder decoded (mLinearDiffuse, from LINEAR_DIFFUSE).
+    ALSampler key = ALSamplers::AnisoWrap;
     if (shader && shader->mLinearDiffuse)
     {
         key |= ALSampler::SRGBDecode;
@@ -738,7 +737,7 @@ void LLRenderPass::bindIndexedTextures(const LLDrawInfo& params, const LLGLSLSha
     }
 }
 
-void LLRenderPass::pushBatch(LLDrawInfo& params, bool texture, bool batch_textures, ALSampler key)
+void LLRenderPass::pushBatch(LLDrawInfo& params, bool texture, bool batch_textures)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     llassert(texture);
@@ -750,10 +749,11 @@ void LLRenderPass::pushBatch(LLDrawInfo& params, bool texture, bool batch_textur
 
     applyModelMatrix(params);
 
-    // A program that shades in linear wants its diffuse decoded, whichever bind path it takes
-    // below. Only the decode bit, leaving the caller's filter and address mode alone;
-    // bindIndexedTextures does the same for the ladder.
+    // The bound program is what knows whether its diffuse wants the hardware decode
+    // (mLinearDiffuse, from the LINEAR_DIFFUSE permutation), whichever bind path it takes
+    // below. bindIndexedTextures derives the same key for the ladder.
     const LLGLSLShader* bound = LLGLSLShader::sCurBoundShaderPtr;
+    ALSampler key = ALSamplers::AnisoWrap;
     if (bound && bound->mLinearDiffuse)
     {
         key |= ALSampler::SRGBDecode;
@@ -764,7 +764,7 @@ void LLRenderPass::pushBatch(LLDrawInfo& params, bool texture, bool batch_textur
     {
         if (batch_textures && params.mTextureList.size() > 1)
         {
-            bindIndexedTextures(params, LLGLSLShader::sCurBoundShaderPtr, key);
+            bindIndexedTextures(params, bound);
         }
         else
         { //not batching textures or batch has only 1 texture -- might need a texture matrix
@@ -1081,7 +1081,7 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
         // an unbatched copy of the same material must sample identically, or they shade
         // differently for no reason the content author can see.
         LLViewerTexture* base = mat->mBaseColorTexture.notNull() ? mat->mBaseColorTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
-        gGL.getTextureSlot(s)->bindFast(base, ALSamplers::AnisoWrap | ALSampler::SRGBDecode);
+        gGL.getTextureSlot(s)->bindFast(base, ALSamplers::AnisoWrapSRGB);
 
         min_alpha[s] = (mat->mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK) ? mat->mAlphaCutoff : -1.f;
 
@@ -1097,7 +1097,7 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
 
         // emissive map/color/transform -- needed by both the glow and GBuffer passes
         LLViewerTexture* em = mat->mEmissiveTexture.notNull() ? mat->mEmissiveTexture.get() : LLViewerFetchedTexture::sWhiteImagep.get();
-        gGL.getTextureSlot(3 * N + s)->bindFast(em, ALSamplers::AnisoWrap | ALSampler::SRGBDecode);
+        gGL.getTextureSlot(3 * N + s)->bindFast(em, ALSamplers::AnisoWrapSRGB);
 
         emissive[3 * s + 0] = mat->mEmissiveColor.mV[0];
         emissive[3 * s + 1] = mat->mEmissiveColor.mV[1];

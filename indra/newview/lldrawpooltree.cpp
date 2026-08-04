@@ -70,17 +70,16 @@ void LLDrawPoolTree::renderDeferred(S32 pass)
         return;
     }
 
-    // Decode on the sampler, re-encode on store -- tree.slang writes its sampled colour
-    // straight to albedo, so both halves are needed for it to shade in linear.
+    // Decode on the sampler; the store re-encodes via the deferred pass's hoisted
+    // GL_FRAMEBUFFER_SRGB (renderGeomDeferred), so the tree writer shades in linear.
     //
-    // renderShadow() calls this function too, with the shadow program bound. Both are inert
-    // there: a shadow target has no colour attachment for FRAMEBUFFER_SRGB to act on, and
-    // the shadow shader only alpha-tests, which sRGB decode never touches.
-    LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
+    // renderShadow() calls this function too, with the shadow program bound. The decode is
+    // inert there: the shadow shader only alpha-tests, which sRGB decode never touches, and
+    // a shadow target has no colour attachment for FRAMEBUFFER_SRGB to act on anyway.
 
 // [SL:KB] - Patch: Render-TextureToggle (Catznip-4.0)
     LLViewerTexture* pTexture = (LLPipeline::sRenderTextures) ? mTexturep.get() : LLViewerFetchedTexture::sDefaultDiffuseImagep.get();
-    gGL.getTextureSlot(sDiffTex)->bindFast(pTexture, DIFFUSE_SRGB_SAMPLER);
+    gGL.getTextureSlot(sDiffTex)->bindFast(pTexture, ALSamplers::AnisoWrapSRGB);
 // [/SL:KB]
 //  gGL.getTextureSlot(sDiffTex)->bindFast(mTexturep, ALSamplers::AnisoWrap);
     mTexturep->addTextureStats(1024.f * 1024.f); // <=== keep Linden tree textures at full res
