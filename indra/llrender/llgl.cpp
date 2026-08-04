@@ -1692,6 +1692,16 @@ bool LLGLManager::initGL()
 
     mGLVersion = mDriverVersionMajor + mDriverVersionMinor * .1f;
 
+    // Every Mesa driver stamps "Mesa" into the GL_VERSION string
+    // (e.g. "4.6 (Core Profile) Mesa 26.1.4"), regardless of the underlying
+    // hardware backend. Detect it here so driver-specific workarounds can key
+    // off mIsMesa. mGLVersionString is the raw (mixed-case) version string.
+    {
+        std::string ver_upper = mGLVersionString;
+        LLStringUtil::toUpper(ver_upper);
+        mIsMesa = ver_upper.find("MESA") != std::string::npos;
+    }
+
     if (mGLVersion >= 2.f)
     {
         parse_glsl_version(mGLSLVersionMajor, mGLSLVersionMinor);

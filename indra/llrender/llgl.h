@@ -143,6 +143,9 @@ public:
     bool mIsNVIDIA;
     bool mIsIntel;
     bool mIsApple = false;
+    // True for any Mesa driver (radeonsi, iris, llvmpipe, zink, ...). Detected
+    // from the GL_VERSION string; used to gate Mesa-specific workarounds.
+    bool mIsMesa = false;
 
     // hints to the render pipe
     U32 mDownScaleMethod = 0; // see settings.xml RenderDownScaleMethod
@@ -198,11 +201,6 @@ void rotate_quat(LLQuaternion& rotation);
 void flush_glerror(); // Flush GL errors when we know we're handling them correctly.
 
 void log_glerror();
-// Drop the cached sampler enumeration for a program about to be deleted. GL is free to hand
-// the name back out, and the cache revalidates only on active-uniform COUNT -- a recreated
-// program with the same name and count would be validated against the old program's
-// samplers. Call before glDeleteProgram; harmless when the program was never cached.
-void forget_program_samplers(U32 program);
 // Validate every sampler the currently bound program declares against the state actually
 // bound to its texture unit: something bound at all, and no depth/compare mismatch in either
 // direction (non-shadow sampler over a compare-enabled depth texture, or a shadow sampler
@@ -212,6 +210,12 @@ void forget_program_samplers(U32 program);
 // sites, the way LLVertexBuffer::validateRange is used, so it fails at the draw responsible
 // and names the uniform instead of leaving a driver warning to be traced back by hand.
 bool validate_bound_samplers();
+
+// Drop the cached sampler enumeration for a program about to be deleted. GL is free to hand
+// the name back out, and the cache revalidates only on active-uniform COUNT -- a recreated
+// program with the same name and count would be validated against the old program's
+// samplers. Call before glDeleteProgram; harmless when the program was never cached.
+void forget_program_samplers(U32 program);
 
 void assert_glerror();
 

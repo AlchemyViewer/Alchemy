@@ -30,6 +30,7 @@
 #include "stdtypes.h"
 #include "llthread.h"
 
+#include <chrono>
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
@@ -146,6 +147,31 @@ public:
     void wait();        // blocks
     void signal();
     void broadcast();
+
+    // Predicate form: sleep until pred() returns true, atomically re-checking it
+    // under this condition's mutex on every wakeup. Unlike the bare wait() above,
+    // this closes the classic lost-wakeup window (state change + signal landing
+    // between a caller's own predicate check and its wait() call would otherwise
+    // sleep forever), so use it whenever the condition is one-shot. Call WITHOUT
+    // holding this mutex; pred runs with it held, so it may read state guarded by
+    // lock()/unlock() on this same object.
+    template <typename PRED>
+    void wait(PRED&& pred)
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mCond.wait(lock, std::forward<PRED>(pred));
+    }
+
+    // Timed predicate form: returns true once pred() holds, false if the timeout
+    // elapsed first (pred re-checked under this condition's mutex either way).
+    // Same lost-wakeup-safe contract as wait(pred) above -- callers typically loop
+    // on a false return to keep waiting while emitting periodic diagnostics.
+    template <typename REP, typename PERIOD, typename PRED>
+    bool waitFor(const std::chrono::duration<REP, PERIOD>& timeout, PRED&& pred)
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        return mCond.wait_for(lock, timeout, std::forward<PRED>(pred));
+    }
 
 protected:
     std::condition_variable mCond;
