@@ -35,6 +35,8 @@
 #include "llviewertexture.h"
 #include "llspatialpartition.h"
 
+extern bool gCubeSnapshot;
+
 LLDrawPoolMaterials::LLDrawPoolMaterials()
 :  LLRenderPass(LLDrawPool::POOL_MATERIALS)
 {
@@ -298,7 +300,10 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
 
     if (has_minAlpha)
     {
-        mShader->fastUniform1f(LLShaderMgr::MINIMUM_ALPHA, lastMinimumAlpha);
+        // setMinimumAlpha, not fastUniform1f: MINIMUM_ALPHA writes must go through the
+        // per-program value cache it owns (see its declaration). The pool-local
+        // lastMinimumAlpha tracking stays as the first-level skip.
+        mShader->setMinimumAlpha(lastMinimumAlpha);
     }
 
     if (has_specular)
@@ -337,7 +342,7 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         if (has_minAlpha && lastMinimumAlpha != params.mAlphaMaskCutoff)
         {
             lastMinimumAlpha = params.mAlphaMaskCutoff;
-            mShader->fastUniform1f(LLShaderMgr::MINIMUM_ALPHA, lastMinimumAlpha);
+            mShader->setMinimumAlpha(lastMinimumAlpha); // cache-owning writer; see pass setup above
         }
 
         F32 fullbright = params.mFullbright ? 1.f : 0.f;
@@ -388,12 +393,12 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         bool tex_setup = false;
 
         //not batching textures or batch has only 1 texture -- might need a texture matrix
-        if (params.mTextureMatrix)
+        if (params.mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
         {
             gGL.matrixMode(LLRender::MM_TEXTURE0);
 
             gGL.loadMatrix((GLfloat*)params.mTextureMatrix->mMatrix);
-            gPipeline.mTextureMatrixOps++;
+            gPipeline.countTextureMatrixOp(*params.mTextureMatrix);
 
             tex_setup = true;
         }

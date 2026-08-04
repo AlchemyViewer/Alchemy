@@ -104,7 +104,9 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
         {
             min_alpha = mAlphaCutoff;
         }
-        shader->uniform1f(LLShaderMgr::MINIMUM_ALPHA, min_alpha);
+        // setMinimumAlpha, not uniform1f: it owns the per-program value cache, and a run of
+        // non-masked materials (all writing -1) collapses to a float compare per bind.
+        shader->setMinimumAlpha(min_alpha);
     }
 
     if (baseColorTex != nullptr)

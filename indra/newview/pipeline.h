@@ -640,6 +640,12 @@ public:
     bool                     mBackfaceCull;
     S32                      mMatrixOpCount;
     S32                      mTextureMatrixOps;
+    S32                      mTextureMatrixOpsShadow;   // portion of mTextureMatrixOps issued during shadow passes
+    S32                      mTextureMatrixOpsProbe;    // portion issued during reflection/hero probe updates
+    S32                      mTextureMatrixOpsIdentity; // portion whose matrix was exactly identity (degenerate anims)
+    // Classify and count one texture-matrix load; draw pools call this instead of
+    // bumping mTextureMatrixOps directly so the debug display can attribute the total.
+    void countTextureMatrixOp(const LLMatrix4& mat);
     S32                      mNumVisibleNodes;
 
     S32                      mDebugTextureUploadCost;

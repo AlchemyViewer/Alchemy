@@ -214,8 +214,17 @@ void display_update_camera()
     F32 final_far = gAgentCamera.mDrawDistance;
     if (gCubeSnapshot)
     {
-        static LLCachedControl<F32> reflection_probe_draw_distance(gSavedSettings, "RenderReflectionProbeDrawDistance", 64.f);
-        final_far = reflection_probe_draw_distance();
+        if (gPipeline.mHeroProbeManager.isMirrorPass())
+        {
+            // mirrors are literal reflections and get their own render distance
+            static LLCachedControl<F32> hero_probe_distance(gSavedSettings, "RenderHeroProbeDistance", 8.f);
+            final_far = hero_probe_distance();
+        }
+        else
+        {
+            static LLCachedControl<F32> reflection_probe_draw_distance(gSavedSettings, "RenderReflectionProbeDrawDistance", 64.f);
+            final_far = reflection_probe_draw_distance();
+        }
     }
     else if (CAMERA_MODE_CUSTOMIZE_AVATAR == gAgentCamera.getCameraMode())
     {

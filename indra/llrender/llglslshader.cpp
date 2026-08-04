@@ -535,6 +535,7 @@ void LLGLSLShader::unloadInternal()
     mAttribute.clear();
     mTexture.clear();
     mUniform.clear();
+    mMinimumAlpha = MINIMUM_ALPHA_UNSET; // program state is going away with the program
 
     if (mProgramObject)
     {
@@ -1065,6 +1066,7 @@ bool LLGLSLShader::mapUniforms()
     mUniformMap.clear();
     mTexture.clear();
     mValue.clear();
+    mMinimumAlpha = MINIMUM_ALPHA_UNSET; // fresh mapping: GPU-side value is the default again
     //initialize arrays
     mUniform.resize(LLShaderMgr::instance()->mReservedUniforms.size(), -1);
     mTexture.resize(LLShaderMgr::instance()->mReservedUniforms.size(), -1);
@@ -2050,8 +2052,17 @@ void LLGLSLShader::vertexAttrib4fv(U32 index, GLfloat* v)
 void LLGLSLShader::setMinimumAlpha(F32 minimum)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+    if (mMinimumAlpha == minimum)
+    {
+        // Unchanged: skip the immediate-mode flush (which would pointlessly split any
+        // pending batch) and the whole uniform routing below. mMinimumAlpha is the
+        // single authority because every writer of MINIMUM_ALPHA comes through here
+        // (see its declaration).
+        return;
+    }
     gGL.flush();
     uniform1f(LLShaderMgr::MINIMUM_ALPHA, minimum);
+    mMinimumAlpha = minimum;
 }
 
 void LLShaderUniforms::apply(LLGLSLShader* shader)

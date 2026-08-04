@@ -9598,7 +9598,7 @@
 	<key>RenderHeroProbeDistance</key>
 	<map>
 		<key>Comment</key>
-		<string>Distance in meters for hero probes to render out to.</string>
+		<string>Camera far clip in meters for hero probe (mirror) render passes.</string>
 		<key>Persist</key>
 		<integer>1</integer>
 		<key>Type</key>

@@ -400,12 +400,12 @@ bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material, LLGLSLShader
     {
         // A GLTF material binds its own maps through LLGLTFMaterial::bind; only the texture
         // matrix is left to us.
-        if (draw->mTextureMatrix)
+        if (draw->mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
         {
             tex_setup = true;
             gGL.matrixMode(LLRender::MM_TEXTURE0);
             gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
-            gPipeline.mTextureMatrixOps++;
+            gPipeline.countTextureMatrixOp(*draw->mTextureMatrix);
         }
 
         return tex_setup;
@@ -467,12 +467,12 @@ bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material, LLGLSLShader
                 gGL.getTextureSlot(0)->bindFast(draw->mTexture, diffuse_key);
             }
 
-            if (draw->mTextureMatrix)
+            if (draw->mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
             {
                 tex_setup = true;
                 gGL.matrixMode(LLRender::MM_TEXTURE0);
                 gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
-                gPipeline.mTextureMatrixOps++;
+                gPipeline.countTextureMatrixOp(*draw->mTextureMatrix);
             }
         }
         else

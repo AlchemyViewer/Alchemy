@@ -365,6 +365,9 @@ LLPipeline::LLPipeline() :
     mBackfaceCull(false),
     mMatrixOpCount(0),
     mTextureMatrixOps(0),
+    mTextureMatrixOpsShadow(0),
+    mTextureMatrixOpsProbe(0),
+    mTextureMatrixOpsIdentity(0),
     mNumVisibleNodes(0),
     mNumVisibleFaces(0),
     mPoissonOffset(0),
@@ -3248,6 +3251,23 @@ void LLPipeline::markTextured(LLDrawable *drawablep)
     if (drawablep && !drawablep->isDead() && assertInitialized())
     {
         mRetexturedList.insert(drawablep);
+    }
+}
+
+void LLPipeline::countTextureMatrixOp(const LLMatrix4& mat)
+{
+    ++mTextureMatrixOps;
+    if (sShadowRender)
+    {
+        ++mTextureMatrixOpsShadow;
+    }
+    else if (gCubeSnapshot)
+    {
+        ++mTextureMatrixOpsProbe;
+    }
+    if (mat.isIdentity())
+    {
+        ++mTextureMatrixOpsIdentity;
     }
 }
 

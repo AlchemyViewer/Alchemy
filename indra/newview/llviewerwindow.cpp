@@ -702,10 +702,15 @@ public:
             addText(xpos, ypos, llformat("%d Matrix Ops", gPipeline.mMatrixOpCount));
             ypos += y_inc;
 
-            addText(xpos, ypos, llformat("%d Texture Matrix Ops", gPipeline.mTextureMatrixOps));
+            addText(xpos, ypos, llformat("%d Texture Matrix Ops (%d shadow, %d probe, %d identity)",
+                gPipeline.mTextureMatrixOps, gPipeline.mTextureMatrixOpsShadow,
+                gPipeline.mTextureMatrixOpsProbe, gPipeline.mTextureMatrixOpsIdentity));
             ypos += y_inc;
 
             gPipeline.mTextureMatrixOps = 0;
+            gPipeline.mTextureMatrixOpsShadow = 0;
+            gPipeline.mTextureMatrixOpsProbe = 0;
+            gPipeline.mTextureMatrixOpsIdentity = 0;
             gPipeline.mMatrixOpCount = 0;
 
             if (last_frame_recording.getSampleCount(LLPipeline::sStatBatchSize) > 0)

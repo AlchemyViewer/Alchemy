@@ -384,6 +384,16 @@ public:
     typedef boost::unordered_map<GLint, LLVector4>  uniform_value_map_t;
     uniform_value_map_t mValue; //lookup map of uniform location to last known value
     std::vector<GLint> mTexture;
+    // Last value routed to MINIMUM_ALPHA on this program, so setMinimumAlpha can skip the
+    // batch flush and the whole uniform path when unchanged (the alpha pool re-applies it
+    // per batch; GLTF material binds re-push it per material). EVERY writer of that
+    // uniform must go through setMinimumAlpha to keep this authoritative -- do not write
+    // it via uniform1f/fastUniform1f directly. -1 is a live value (GLTF "no masking"),
+    // so the unset sentinel sits far outside the usable range; reset alongside mValue
+    // (mapUniforms/unloadInternal), since both shadow GPU-side program state.
+    static constexpr F32 MINIMUM_ALPHA_UNSET = -1e30f;
+    F32 mMinimumAlpha = MINIMUM_ALPHA_UNSET;
+
     S32 mTotalUniformSize;
     S32 mActiveTextureChannels;
     S32 mShaderLevel;

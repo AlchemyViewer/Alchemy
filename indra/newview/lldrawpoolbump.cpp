@@ -50,6 +50,8 @@
 #include "llviewershadermgr.h"
 #include "llmodel.h"
 
+extern bool gCubeSnapshot;
+
 //#include "llimagebmp.h"
 //#include "../tools/imdebug/imdebug.h"
 
@@ -1053,13 +1055,13 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
     }
     else
     { //not batching textures or batch has only 1 texture -- might need a texture matrix
-        if (params.mTextureMatrix)
+        if (params.mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
         {
             // the non-shiny path used to load this twice -- a leftover from when the
             // second (bump) texture unit carried its own copy of the matrix
             gGL.matrixMode(LLRender::MM_TEXTURE0);
             gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
-            gPipeline.mTextureMatrixOps++;
+            gPipeline.countTextureMatrixOp(*params.mTextureMatrix);
 
             tex_setup = true;
         }

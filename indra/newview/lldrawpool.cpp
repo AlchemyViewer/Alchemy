@@ -56,6 +56,8 @@
 #include "llfetchedgltfmaterial.h"
 #include "llviewertexture.h"
 
+extern bool gCubeSnapshot;
+
 S32 LLDrawPool::sNumDrawPools = 0;
 
 //=============================
@@ -771,12 +773,12 @@ void LLRenderPass::pushBatch(LLDrawInfo& params, bool texture, bool batch_textur
             if (params.mTexture.notNull())
             {
                 gGL.getTextureSlot(0)->bindFast(params.mTexture, key);
-                if (params.mTextureMatrix)
+                if (params.mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
                 {
                     tex_setup = true;
                     gGL.matrixMode(LLRender::MM_TEXTURE0);
                     gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
-                    gPipeline.mTextureMatrixOps++;
+                    gPipeline.countTextureMatrixOp(*params.mTextureMatrix);
                 }
             }
             else
@@ -922,17 +924,17 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinI
 
 void setup_texture_matrix(LLDrawInfo& params)
 {
-    if (params.mTextureMatrix)
+    if (params.mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
     { //special case implementation of texture animation here because of special handling of textures for PBR batches
         gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadMatrix((GLfloat*)params.mTextureMatrix->mMatrix);
-        gPipeline.mTextureMatrixOps++;
+        gPipeline.countTextureMatrixOp(*params.mTextureMatrix);
     }
 }
 
 void teardown_texture_matrix(LLDrawInfo& params)
 {
-    if (params.mTextureMatrix)
+    if (params.mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
     {
         gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadIdentity();
