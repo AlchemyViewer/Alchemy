@@ -170,6 +170,7 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
         (LLPipeline::sImpostorRender) ? &gDeferredFullbrightAlphaMaskProgram :
         (LLPipeline::sRenderingHUDs) ? &gHUDFullbrightAlphaMaskAlphaProgram :
         &gDeferredFullbrightAlphaMaskAlphaProgram;
+    fullbright_shader = fullbright_shader->selectVariant();
     prepare_alpha_shader(fullbright_shader, true, water_sign);
 
     simple_shader   =
@@ -215,7 +216,7 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
     if (!LLPipeline::sImpostorRender && LLPipeline::RenderDepthOfField && !gCubeSnapshot && !LLPipeline::sRenderingHUDs && getType() == LLDrawPool::POOL_ALPHA_POST_WATER)
     {
         //update depth buffer sampler
-        simple_shader = fullbright_shader = &gDeferredFullbrightAlphaMaskProgram;
+        simple_shader = fullbright_shader = gDeferredFullbrightAlphaMaskProgram.selectVariant();
 
         simple_shader->bind();
         simple_shader->setMinimumAlpha(0.33f);

@@ -496,7 +496,7 @@ void LLDrawPoolBump::beginBump()
     // Optional second pass: emboss bump map
     stop_glerror();
 
-    shader = &gObjectBumpProgram;
+    shader = gObjectBumpProgram.selectVariant();
 
     if (mRigged)
     {
@@ -556,7 +556,7 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
             continue;
         }
 
-        gDeferredBumpProgram.bind(rigged);
+        gDeferredBumpProgram.selectVariant()->bind(rigged);
         diffuse_channel = LLGLSLShader::sCurBoundShaderPtr->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
         bump_channel = LLGLSLShader::sCurBoundShaderPtr->enableTexture(LLViewerShaderMgr::BUMP_MAP);
         gGL.getTextureSlot(diffuse_channel)->unbind();

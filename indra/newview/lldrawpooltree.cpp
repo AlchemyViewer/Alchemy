@@ -56,7 +56,7 @@ void LLDrawPoolTree::beginDeferredPass(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
-    shader = &gDeferredTreeProgram;
+    shader = gDeferredTreeProgram.selectVariant();
     shader->bind();
     shader->setMinimumAlpha(0.5f);
 }

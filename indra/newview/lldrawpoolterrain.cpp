@@ -216,7 +216,7 @@ void LLDrawPoolTerrain::renderFullShader()
         LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
 
         // Use textures
-        sShader = &gDeferredTerrainProgram;
+        sShader = gDeferredTerrainProgram.selectVariant();
         sShader->bind();
         renderFullShaderTextures();
     }

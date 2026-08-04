@@ -28,19 +28,23 @@
  // DO NOT declare sampler uniforms here as OS X doesn't compile
  // them out
 
-uniform float mirror_flag;
+// clipPlane stays a runtime uniform: the MIRROR_CLIP copy reads it for the actual clip, and it
+// is also consumed independently of the mirror pass by the hero-probe tap in reflectionProbeF.
 uniform vec4 clipPlane;
 uniform float clipSign;
 
+// Clips geometry behind the mirror plane, and only ever applies during the hero-probe mirror
+// pass. That makes it a compile-time variant rather than a runtime test: the base copy of this
+// object compiles the clip -- and its clipPlane read -- away entirely, and the pass binds the
+// MIRROR_CLIP copy instead. See LLGLSLShader::VARIANT_MIRROR.
 void mirrorClip(vec3 pos)
 {
-    if (mirror_flag > 0)
+#ifdef MIRROR_CLIP
+    if ((dot(pos.xyz, clipPlane.xyz) + clipPlane.w) < 0.0)
     {
-        if ((dot(pos.xyz, clipPlane.xyz) + clipPlane.w) < 0.0)
-        {
-                discard;
-        }
+        discard;
     }
+#endif
 }
 
  // Octahedron normal vector encoding

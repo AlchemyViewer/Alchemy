@@ -68,9 +68,17 @@ LLShaderMgr * LLShaderMgr::instance()
 }
 
 // static
-std::string LLShaderMgr::variantObjectKey(const std::string& path, const LLGLSLShader* shader)
+std::string LLShaderMgr::variantObjectKey(const std::string& path, U32 axes, const LLGLSLShader* shader)
 {
-    return shader->mDefines.count("CLASSIC_MODE") ? path + CLASSIC_OBJECT_SUFFIX : path;
+    if ((axes & OBJ_AXIS_CLASSIC) && shader->mDefines.count("CLASSIC_MODE"))
+    {
+        return path + CLASSIC_OBJECT_SUFFIX;
+    }
+    if ((axes & OBJ_AXIS_MIRROR) && shader->mDefines.count("MIRROR_CLIP"))
+    {
+        return path + MIRROR_OBJECT_SUFFIX;
+    }
+    return path;
 }
 
 bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
@@ -155,7 +163,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
             return false;
         }
 
-        if (!shader->attachVertexObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", shader))) {
+        if (!shader->attachVertexObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", OBJ_AXIS_CLASSIC, shader))) {
             return false;
         }
 
@@ -193,7 +201,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     // NOTE order of shader object attaching is VERY IMPORTANT!!!
 
-    if (!shader->attachFragmentObject("deferred/globalF.glsl"))
+    if (!shader->attachFragmentObject(variantObjectKey("deferred/globalF.glsl", OBJ_AXIS_MIRROR, shader)))
     {
         return false;
     }
@@ -225,7 +233,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
     // we want this BEFORE shadows and AO because those facilities use pos/norm access
     if (features->isDeferred || features->hasReflectionProbes)
     {
-        if (!shader->attachFragmentObject(variantObjectKey("deferred/deferredUtil.glsl", shader)))
+        if (!shader->attachFragmentObject(variantObjectKey("deferred/deferredUtil.glsl", OBJ_AXIS_CLASSIC, shader)))
         {
             return false;
         }
@@ -257,7 +265,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasReflectionProbes)
     {
-        if (!shader->attachFragmentObject(variantObjectKey("deferred/reflectionProbeF.glsl", shader)))
+        if (!shader->attachFragmentObject(variantObjectKey("deferred/reflectionProbeF.glsl", OBJ_AXIS_CLASSIC, shader)))
         {
             return false;
         }
@@ -281,7 +289,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasAtmospherics || features->isDeferred)
     {
-        if (!shader->attachFragmentObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", shader))) {
+        if (!shader->attachFragmentObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", OBJ_AXIS_CLASSIC, shader))) {
             return false;
         }
 
@@ -1289,7 +1297,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("emissiveColor");
     mReservedUniforms.push_back("metallicFactor");
     mReservedUniforms.push_back("roughnessFactor");
-    mReservedUniforms.push_back("mirror_flag");
     mReservedUniforms.push_back("clipPlane");
     mReservedUniforms.push_back("clipSign");
 
@@ -1316,7 +1323,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("sky_hdr_scale");
     mReservedUniforms.push_back("sky_sunlight_scale");
     mReservedUniforms.push_back("sky_ambient_scale");
-    mReservedUniforms.push_back("classic_mode");
     mReservedUniforms.push_back("blue_horizon");
     mReservedUniforms.push_back("blue_density");
     mReservedUniforms.push_back("haze_horizon");

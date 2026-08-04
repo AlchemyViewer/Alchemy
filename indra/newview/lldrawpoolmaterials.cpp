@@ -210,7 +210,7 @@ void LLDrawPoolMaterials::beginDeferredPass(S32 pass)
     }
     U32 idx = sMaterialShaderIdx[pass];
 
-    mShader = &(gDeferredMaterialProgram[idx]);
+    mShader = gDeferredMaterialProgram[idx].selectVariant();
 
     if (rigged)
     {
@@ -418,8 +418,8 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
     // program (its rigged variant for the rigged passes).
     if (LLGLSLShader::sIndexedLegacyMaterials)
     {
-        LLGLSLShader& indexed = gDeferredMaterialIndexedProgram[sMaterialShaderIdx[pass]];
-        LLGLSLShader* prog = rigged ? indexed.mRiggedVariant : &indexed;
+        LLGLSLShader* indexed = gDeferredMaterialIndexedProgram[sMaterialShaderIdx[pass]].selectVariant();
+        LLGLSLShader* prog = rigged ? indexed->mRiggedVariant : indexed;
         if (prog && prog->isComplete())
         {
             pushMaterialBatchIndexed(*prog, type, rigged);

@@ -98,7 +98,6 @@ public:
         EMISSIVE_COLOR,                     //  "emissiveColor"
         METALLIC_FACTOR,                    //  "metallicFactor"
         ROUGHNESS_FACTOR,                   //  "roughnessFactor"
-        MIRROR_FLAG,                        //  "mirror_flag"
         CLIP_PLANE,                         //  "clipPlane"
         CLIP_SIGN,                          //  "clipSign"
         DIFFUSE_MAP,                        //  "diffuseMap"
@@ -124,7 +123,6 @@ public:
         SKY_HDR_SCALE,                      //  "sky_hdr_scale"
         SKY_SUNLIGHT_SCALE,                 //  "sky_sunlight_scale"
         SKY_AMBIENT_SCALE,                  //  "sky_ambient_scale"
-        CLASSIC_MODE,                       //  "classic_mode"
         BLUE_HORIZON,                       //  "blue_horizon"
         BLUE_DENSITY,                       //  "blue_density"
         HAZE_HORIZON,                       //  "haze_horizon"
@@ -564,14 +562,24 @@ public:
     // compile-time variant axis is compiled once per axis value under distinct keys.
     GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string());
 
-    // Suffix marking the CLASSIC_MODE=1 copy of a shared object. Not a legal path character
-    // sequence, so it cannot collide with a real file.
+    // Suffixes marking the axis copies of a shared object. Not legal path character sequences,
+    // so they cannot collide with a real file.
     static constexpr const char* CLASSIC_OBJECT_SUFFIX = "|CLASSIC_MODE";
+    static constexpr const char* MIRROR_OBJECT_SUFFIX  = "|MIRROR_CLIP";
 
-    // Key of the copy of `path` that matches `shader`'s compile-time axes: a program carrying
-    // CLASSIC_MODE must attach the object compiled with it, since the define cannot reach an
-    // object that was compiled once for everyone.
-    static std::string variantObjectKey(const std::string& path, const LLGLSLShader* shader);
+    // Which compile-time axes a shared object's own source varies on. Passed explicitly at each
+    // attach so a program cannot ask for a copy that was never compiled: no shared source keys
+    // on more than one axis, and a key naming an axis its file ignores has no entry.
+    enum ObjectVariantAxis : U32
+    {
+        OBJ_AXIS_CLASSIC = 1 << 0,
+        OBJ_AXIS_MIRROR  = 1 << 1,
+    };
+
+    // Key of the copy of `path` matching `shader`'s defines, considering only `axes`: a program
+    // carrying CLASSIC_MODE must attach the object compiled with it, since the define cannot
+    // reach an object that was compiled once for everyone.
+    static std::string variantObjectKey(const std::string& path, U32 axes, const LLGLSLShader* shader);
 
     // Implemented in the application to actually point to the shader directory.
     virtual std::string getShaderDirPrefix(void) = 0; // Pure Virtual

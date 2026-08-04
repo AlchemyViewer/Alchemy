@@ -134,11 +134,11 @@ void LLDrawPoolSimple::renderDeferred(S32 pass)
     LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
 
     //render static
-    gDeferredDiffuseProgram.bind();
+    gDeferredDiffuseProgram.selectVariant()->bind();
     pushBatches(LLRenderPass::PASS_SIMPLE, true, true, DIFFUSE_SRGB_SAMPLER);
 
     //render rigged
-    gDeferredDiffuseProgram.bind(true);
+    gDeferredDiffuseProgram.selectVariant()->bind(true);
     pushRiggedBatches(LLRenderPass::PASS_SIMPLE_RIGGED, true, true, DIFFUSE_SRGB_SAMPLER);
 }
 
@@ -151,7 +151,7 @@ void LLDrawPoolAlphaMask::renderDeferred(S32 pass)
     // will decode again. Matches what LLDrawPoolPBROpaque already does.
     LLGLEnable srgb(GL_FRAMEBUFFER_SRGB);
 
-    LLGLSLShader* shader = &gDeferredDiffuseAlphaMaskProgram;
+    LLGLSLShader* shader = gDeferredDiffuseAlphaMaskProgram.selectVariant();
 
     //render static
     shader->bind();
@@ -173,8 +173,9 @@ void LLDrawPoolGrass::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     {
-        gDeferredNonIndexedDiffuseAlphaMaskProgram.bind();
-        gDeferredNonIndexedDiffuseAlphaMaskProgram.setMinimumAlpha(0.5f);
+        LLGLSLShader* shader = gDeferredNonIndexedDiffuseAlphaMaskProgram.selectVariant();
+        shader->bind();
+        shader->setMinimumAlpha(0.5f);
 
         //render grass
         LLRenderPass::pushBatches(LLRenderPass::PASS_GRASS, getVertexDataMask());
@@ -199,7 +200,7 @@ void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
     }
     else
     {
-        shader = &gDeferredFullbrightProgram;
+        shader = gDeferredFullbrightProgram.selectVariant();
     }
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -227,7 +228,7 @@ void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
     }
     else
     {
-        shader = &gDeferredFullbrightAlphaMaskProgram;
+        shader = gDeferredFullbrightAlphaMaskProgram.selectVariant();
     }
 
     LLGLDisable blend(GL_BLEND);

@@ -232,6 +232,14 @@ LLGLSLShader            gHUDPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
 
+// Mirror corners are only reachable during the hero-probe mirror pass, which RenderMirrors
+// gates entirely; toggling it re-runs setShaders (handleReflectionProbeDetailChanged), so
+// building them while it is off would be dozens of programs nothing can bind.
+static U32 mirror_variant()
+{
+    return gSavedSettings.getBOOL("RenderMirrors") ? (U32)LLGLSLShader::VARIANT_MIRROR : 0u;
+}
+
 static void add_common_permutations(LLGLSLShader* shader)
 {
     static LLCachedControl<bool> emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
@@ -781,6 +789,24 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     }
 
     {
+        if (mirrors)
+        {
+            // globalF's mirrorClip() is the only shared source that varies on MIRROR_CLIP.
+            // Only compiled when RenderMirrors is on, matching the gate on the variants
+            // themselves -- nothing can attach this copy otherwise.
+            std::map<std::string, std::string> mirror_attribs = attribs;
+            mirror_attribs["MIRROR_CLIP"] = "1";
+
+            const std::string path = "deferred/globalF.glsl";
+            S32 level = 1;
+            if (loadShaderFile(path, level, GL_FRAGMENT_SHADER, &mirror_attribs, -1,
+                               path + LLShaderMgr::MIRROR_OBJECT_SUFFIX) == 0)
+            {
+                LL_WARNS("Shader") << "Failed to load mirror fragment shader " << path << LL_ENDL;
+                return path;
+            }
+        }
+
         std::pair<std::string, S32> classic_shared[] = {
             { "windlight/atmosphericsFuncs.glsl", mShaderLevel[SHADER_WINDLIGHT] },
             { "deferred/deferredUtil.glsl",       1 },
@@ -843,7 +869,7 @@ bool LLViewerShaderMgr::loadShadersWater()
 
         gWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
         gWaterProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
-        success = gWaterProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
+        success = gWaterProgram.createShader(LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
     }
 
@@ -863,7 +889,7 @@ bool LLViewerShaderMgr::loadShadersWater()
         {
             gUnderWaterProgram.addPermutation("TRANSPARENT_WATER", "1");
         }
-        success = gUnderWaterProgram.createShader();
+        success = gUnderWaterProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -1145,7 +1171,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDiffuseProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredDiffuseProgram);
         gDeferredDiffuseProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredDiffuseProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = gDeferredDiffuseProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
     }
 
     if (success)
@@ -1158,7 +1184,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDiffuseAlphaMaskProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredDiffuseAlphaMaskProgram);
         gDeferredDiffuseAlphaMaskProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredDiffuseAlphaMaskProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = gDeferredDiffuseAlphaMaskProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
     }
 
     if (success)
@@ -1169,7 +1195,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredNonIndexedDiffuseAlphaMaskProgram.mShaderFiles.push_back(make_pair("deferred/diffuseAlphaMaskF.glsl", GL_FRAGMENT_SHADER));
         gDeferredNonIndexedDiffuseAlphaMaskProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredNonIndexedDiffuseAlphaMaskProgram);
-        success = gDeferredNonIndexedDiffuseAlphaMaskProgram.createShader();
+        success = gDeferredNonIndexedDiffuseAlphaMaskProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -1194,7 +1220,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredBumpProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredBumpProgram);
         gDeferredBumpProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredBumpProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = gDeferredBumpProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -1257,7 +1283,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             // Only the forward alpha-blend mask compiles the classic_mode branches in
             // class3/materialF.glsl; every other mask is a GBuffer writer.
-            U32 variants = LLGLSLShader::VARIANT_RIGGED;
+            U32 variants = LLGLSLShader::VARIANT_RIGGED | mirror_variant();
             if (alpha_mode == 1)
             {
                 variants |= LLGLSLShader::VARIANT_CLASSIC;
@@ -1313,7 +1339,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             prog.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
             add_common_permutations(&prog);
 
-            material_indexed_ok = prog.createShader(LLGLSLShader::VARIANT_RIGGED);
+            material_indexed_ok = prog.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
             if (material_indexed_ok)
             {
                 const S32 n = LLGLSLShader::sIndexedGLTFChannels;
@@ -1349,7 +1375,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredPBROpaqueProgram);
 
-        success = gDeferredPBROpaqueProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = gDeferredPBROpaqueProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -1369,7 +1395,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredPBROpaqueIndexedProgram);
 
         // rigged (skinned) variant for animesh / avatar attachments
-        bool indexed_ok = gDeferredPBROpaqueIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        bool indexed_ok = gDeferredPBROpaqueIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
 
         if (indexed_ok)
         {
@@ -1502,7 +1528,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
 
         shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC);
+        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
 
         // Alpha Shader Hack
@@ -1582,7 +1608,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredTreeProgram);
 
         gDeferredTreeProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredTreeProgram.createShader();
+        success = gDeferredTreeProgram.createShader(mirror_variant());
     }
 
     if (success)
@@ -1807,10 +1833,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
             // the deferred alpha pass draws rigged geometry; the HUD pass never does
+            // the deferred alpha pass draws rigged geometry and can appear in a mirror; the
+            // HUD pass never does either (HUDs are not drawn into the probe)
             U32 variants = LLGLSLShader::VARIANT_CLASSIC;
             if (!hud)
             {
-                variants |= LLGLSLShader::VARIANT_RIGGED;
+                variants |= LLGLSLShader::VARIANT_RIGGED | mirror_variant();
             }
             success = shader->createShader(variants);
             llassert(success);
@@ -1858,7 +1886,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(shader);
 
         shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC);
+        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
 
         // End Hack
@@ -1885,7 +1913,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredFullbrightProgram);
 
         gDeferredFullbrightProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredFullbrightProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = gDeferredFullbrightProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -1928,7 +1956,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredFullbrightAlphaMaskProgram);
 
         gDeferredFullbrightAlphaMaskProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredFullbrightAlphaMaskProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = gDeferredFullbrightAlphaMaskProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -1974,7 +2002,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         gDeferredFullbrightAlphaMaskAlphaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredFullbrightAlphaMaskAlphaProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredFullbrightAlphaMaskAlphaProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = gDeferredFullbrightAlphaMaskAlphaProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -2019,7 +2047,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredFullbrightShinyProgram);
 
         gDeferredFullbrightShinyProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredFullbrightShinyProgram.createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC);
+        success = gDeferredFullbrightShinyProgram.createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
     }
 
@@ -2378,7 +2406,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredTerrainProgram);
 
         gDeferredTerrainProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = gDeferredTerrainProgram.createShader();
+        success = gDeferredTerrainProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -2402,7 +2430,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredAvatarProgram.addPermutation("AVATAR_CLOTH", "1");
         }
 
-        success = gDeferredAvatarProgram.createShader();
+        success = gDeferredAvatarProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -2438,7 +2466,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredAvatarAlphaProgram);
 
-        success = gDeferredAvatarAlphaProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
+        success = gDeferredAvatarAlphaProgram.createShader(LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
 
         gDeferredAvatarAlphaProgram.mFeatures.calculatesLighting = true;
@@ -3228,7 +3256,7 @@ bool LLViewerShaderMgr::loadShadersObject()
         gObjectBumpProgram.mShaderFiles.push_back(make_pair("objects/bumpV.glsl", GL_VERTEX_SHADER));
         gObjectBumpProgram.mShaderFiles.push_back(make_pair("objects/bumpF.glsl", GL_FRAGMENT_SHADER));
         gObjectBumpProgram.mShaderLevel = mShaderLevel[SHADER_OBJECT];
-        success = gObjectBumpProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = gObjectBumpProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         if (success)
         { //lldrawpoolbump assumes "texture0" has channel 0 and "texture1" has channel 1
             gObjectBumpProgram.forEachVariant([](LLGLSLShader& s)

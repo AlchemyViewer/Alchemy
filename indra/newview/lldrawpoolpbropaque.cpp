@@ -68,7 +68,9 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
                    gDeferredPBROpaqueIndexedProgram.mRiggedVariant &&
                    gDeferredPBROpaqueIndexedProgram.mRiggedVariant->isComplete();
 
-    gDeferredPBROpaqueProgram.bind();
+    LLGLSLShader* opaque = gDeferredPBROpaqueProgram.selectVariant();
+
+    opaque->bind();
     if (indexed)
     { // multi-material infos are drawn separately below; render only scalar here
         pushGLTFBatchesScalar(mRenderType);
@@ -78,7 +80,7 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
         pushGLTFBatches(mRenderType);
     }
 
-    gDeferredPBROpaqueProgram.bind(true);
+    opaque->bind(true);
     if (indexed)
     {
         pushRiggedGLTFBatchesScalar(mRenderType + 1);
@@ -90,10 +92,11 @@ void LLDrawPoolGLTFPBR::renderDeferred(S32 pass)
 
     if (indexed)
     {
-        gDeferredPBROpaqueIndexedProgram.bind();
+        LLGLSLShader* opaque_indexed = gDeferredPBROpaqueIndexedProgram.selectVariant();
+        opaque_indexed->bind();
         pushGLTFBatchesIndexed(mRenderType);
 
-        gDeferredPBROpaqueIndexedProgram.bind(true); // rigged variant
+        opaque_indexed->bind(true); // rigged variant
         pushRiggedGLTFBatchesIndexed(mRenderType + 1);
     }
 }

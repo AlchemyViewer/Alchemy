@@ -1112,15 +1112,6 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         shader->uniform4fv(LLShaderMgr::CLIP_PLANE, glm::value_ptr(mirrorPlane));
         LLVector4 light_direction = env.getClampedLightNorm();
 
-        if (gPipeline.mHeroProbeManager.isMirrorPass())
-        {
-            shader->uniform1f(LLShaderMgr::MIRROR_FLAG, 1);
-        }
-        else
-        {
-            shader->uniform1f(LLShaderMgr::MIRROR_FLAG, 0);
-        }
-
         F32 waterFogKS = 1.f / llmax(light_direction.mV[2], WATER_FOG_LIGHT_CLAMP);
 
         shader->uniform1f(LLShaderMgr::WATER_FOGKS, waterFogKS);

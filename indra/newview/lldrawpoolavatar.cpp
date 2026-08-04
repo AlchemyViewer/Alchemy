@@ -660,7 +660,7 @@ void LLDrawPoolAvatar::beginDeferredSkinned()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
 
     sShaderLevel = mShaderLevel;
-    sVertexProgram = &gDeferredAvatarProgram;
+    sVertexProgram = gDeferredAvatarProgram.selectVariant();
     sRenderingSkinned = true;
 
     sVertexProgram->bind();

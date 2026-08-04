@@ -183,7 +183,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     // select shader
     if (underwater)
     {
-        shader = &gUnderWaterProgram;
+        shader = gUnderWaterProgram.selectVariant();
     }
     else
     {
