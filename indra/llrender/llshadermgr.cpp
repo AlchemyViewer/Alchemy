@@ -1763,7 +1763,16 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     // End Alchemy Effects Stack
 
-    llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);
+    // The enum and this list are parallel, and an entry added or removed on one side only
+    // shifts every later uniform index for every shader in the viewer -- silently, since a
+    // wrong index still resolves to some other real uniform. Fatal, like the duplicate check
+    // below: there is no partial recovery from it.
+    if (mReservedUniforms.size() != END_RESERVED_UNIFORMS)
+    {
+        LL_ERRS() << "Reserved uniform table has " << mReservedUniforms.size()
+                  << " entries but eGLSLReservedUniforms declares " << (U32)END_RESERVED_UNIFORMS
+                  << " -- the enum and the table are out of sync" << LL_ENDL;
+    }
 
     std::set<std::string> dupe_check;
 

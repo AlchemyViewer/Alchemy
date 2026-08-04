@@ -47,6 +47,8 @@
 #include "pipeline.h"
 
 #include "llfile.h"
+
+#include <filesystem>
 #include "llviewerwindow.h"
 #include "llwindow.h"
 
@@ -240,6 +242,63 @@ static U32 mirror_variant()
     return gSavedSettings.getBOOL("RenderMirrors") ? (U32)LLGLSLShader::VARIANT_MIRROR : 0u;
 }
 
+// Digest of every shader source on disk, folded into the binary cache version.
+//
+// A program's own hash() covers its file PATHS, its defines and its features -- not the CONTENT
+// of anything. Shared objects are worse off still: they are compiled once and attached by name,
+// so nothing about them reaches the hash at all. Editing a shader therefore leaves every cached
+// binary looking valid, and the only other input to the cache version is the viewer version,
+// which does not move between local builds.
+//
+// Reading the tree costs one pass over a few hundred small files at startup, against reading
+// them all again to compile anyway.
+static std::string hash_shader_sources()
+{
+    LL_PROFILE_ZONE_SCOPED;
+
+    std::vector<std::filesystem::path> files;
+    std::error_code ec;
+    const std::string root = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "shaders");
+
+    for (std::filesystem::recursive_directory_iterator it(root, ec), end;
+         !ec && it != end;
+         it.increment(ec))
+    {
+        if (it->is_regular_file(ec))
+        {
+            files.push_back(it->path());
+        }
+    }
+
+    if (ec || files.empty())
+    {   // no digest is better than a wrong one: fall back to invalidating every run
+        LL_WARNS("Shader") << "Could not enumerate " << root
+                           << " to version the shader cache; treating it as stale" << LL_ENDL;
+        return LLUUID::generateNewID().asString();
+    }
+
+    std::sort(files.begin(), files.end());  // directory iteration order is unspecified
+
+    HBXXH128 hash_obj;
+    for (const auto& file : files)
+    {
+        // relative, not absolute: the digest must not change with the install location
+        hash_obj.update(file.lexically_relative(root).generic_string());
+
+        llifstream in(file.string(), std::ios::binary);
+        if (!in.is_open())
+        {
+            LL_WARNS("Shader") << "Could not read " << file.string()
+                               << " to version the shader cache; treating it as stale" << LL_ENDL;
+            return LLUUID::generateNewID().asString();
+        }
+
+        std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        hash_obj.update(text);
+    }
+    return hash_obj.digest().asString();
+}
+
 static void add_common_permutations(LLGLSLShader* shader)
 {
     static LLCachedControl<bool> emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
@@ -397,6 +456,7 @@ void LLViewerShaderMgr::setShaders()
         {
             HBXXH128 hash_obj;
             hash_obj.update(LLVersionInfo::instance().getVersion());
+            hash_obj.update(hash_shader_sources());
             current_cache_version = hash_obj.digest();
 
             old_cache_version = LLUUID(gSavedSettings.getString("RenderShaderCacheVersion"));

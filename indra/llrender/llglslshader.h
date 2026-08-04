@@ -297,6 +297,7 @@ public:
     void addPermutations(const std::map<std::string, std::string>& defines)
     {
         mDefines.insert(defines.begin(), defines.end());
+        mPermutationsAdded = true;
     }
     void removePermutation(std::string name);
 
@@ -384,6 +385,8 @@ public:
     std::string mName;
     typedef std::map<std::string, std::string> defines_map_t; //NOTE: this must be an ordered map to maintain hash consistency
     defines_map_t mDefines;
+    // set by addPermutation(s) and cleared by createShader()/unload(); see clearPermutations()
+    bool mPermutationsAdded = false;
     static defines_map_t sGlobalDefines;
     LLUUID mShaderHash;
     bool mUsingBinaryProgram = false;
@@ -499,10 +502,8 @@ public:
 
     constexpr static U8 NUM_GLTF_VARIANTS = 16;
 
-    std::vector<LLGLSLShader> mGLTFVariants;
 
     //helper to bind GLTF variant
-    void bind(U8 variant);
 
     // hacky flag used for optimization in LLDrawPoolAlpha
     bool mCanBindFast = false;

@@ -347,6 +347,18 @@ LLGLSLShader::LLGLSLShader()
 
 LLGLSLShader::~LLGLSLShader()
 {
+    // Free the owned subtree's OBJECTS, so a program destroyed without unload() does not leak
+    // them. Deliberately not unload(): a global program's destructor runs at static destruction
+    // with no GL context, where deleting program objects is undefined -- and the driver reclaims
+    // them with the context anyway. unload() remains the way to release GL.
+    for (LLGLSLShader** v : { &mRiggedVariant, &mClassicVariant, &mMirrorVariant })
+    {
+        if (*v && *v != this && (*v)->mOwnedVariant)
+        {
+            delete *v;  // recurses through the subtree; touches no GL
+        }
+        *v = nullptr;
+    }
 }
 
 // static
@@ -497,6 +509,7 @@ void LLGLSLShader::unload()
 {
     mShaderFiles.clear();
     mDefines.clear();
+    mPermutationsAdded = false;
     mFeatures = LLShaderFeatures();
 
     freeOwnedVariants();
@@ -600,6 +613,10 @@ bool LLGLSLShader::createShader(U32 variants)
     llassert_always(!mShaderFiles.empty());
 
     mShaderHash = hash();
+
+    // this program's configuration is settled; a permutation added after this point belongs to
+    // the NEXT build, and clearPermutations() will say so if one is then discarded
+    mPermutationsAdded = false;
 
     // Create program
     mProgramObject = glCreateProgram();
@@ -966,12 +983,22 @@ void LLGLSLShader::mapUniform(const gl_uniform_data_t& gl_uniform)
 
 void LLGLSLShader::clearPermutations()
 {
+    // Clearing permutations the caller just added silently drops them: the define never reaches
+    // the compiled program, and anything derived from it (mLinearDiffuse) reads false. Three
+    // programs lost LINEAR_DIFFUSE exactly this way. Configuration must clear first, then add.
+    if (mPermutationsAdded)
+    {
+        LL_WARNS("Shader") << "clearPermutations() on " << mName
+                           << " discarded permutations added since the last createShader()" << LL_ENDL;
+    }
     mDefines.clear();
+    mPermutationsAdded = false;
 }
 
 void LLGLSLShader::addPermutation(std::string name, std::string value)
 {
     mDefines[name] = value;
+    mPermutationsAdded = true;
 }
 
 void LLGLSLShader::addConstant(const LLGLSLShader::eShaderConsts shader_const)
@@ -1258,13 +1285,6 @@ void LLGLSLShader::bind()
 
     llassert_always(sCurBoundShaderPtr != nullptr);
     llassert_always(sCurBoundShader == mProgramObject);
-}
-
-void LLGLSLShader::bind(U8 variant)
-{
-    llassert_always(mGLTFVariants.size() == LLGLSLShader::NUM_GLTF_VARIANTS);
-    llassert_always(variant < LLGLSLShader::NUM_GLTF_VARIANTS);
-    mGLTFVariants[variant].bind();
 }
 
 void LLGLSLShader::bind(bool rigged)
