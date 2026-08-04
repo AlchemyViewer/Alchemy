@@ -3509,6 +3509,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionV.glsl", GL_VERTEX_SHADER));
         gOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionF.glsl", GL_FRAGMENT_SHADER));
         gOcclusionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        add_common_permutations(&gOcclusionProgram);
         success = gOcclusionProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
     }
 
@@ -3519,6 +3520,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gOcclusionCubeProgram.mShaderFiles.push_back(make_pair("interface/occlusionCubeV.glsl", GL_VERTEX_SHADER));
         gOcclusionCubeProgram.mShaderFiles.push_back(make_pair("interface/occlusionF.glsl", GL_FRAGMENT_SHADER));
         gOcclusionCubeProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        add_common_permutations(&gOcclusionCubeProgram);
         success = gOcclusionCubeProgram.createShader();
     }
 
