@@ -170,7 +170,16 @@ public:
     };
 
 
-    static std::set<LLGLSLShader*> sInstances;
+    // Every program that created successfully. Walked for name uniqueness and by unloadShaders();
+    // entries are removed by unloadInternal() and by the destructor.
+    //
+    // A reference to a deliberately leaked set rather than a set. Programs are non-local statics
+    // in other translation units and leave this registry from their destructors, and destruction
+    // order across translation units is unspecified -- a registry that destroyed itself could be
+    // gone before the last program left it. One empty set at process exit is the cheaper half of
+    // that trade. Nothing touches this before dynamic initialisation finishes: entries only ever
+    // arrive from createShader(), which needs a GL context.
+    static std::set<LLGLSLShader*>& sInstances;
     static bool sProfileEnabled;
     static bool sCanProfile;
 
@@ -193,8 +202,9 @@ public:
     // too: unbind() leaves the white placeholder on the unit, which IS sampleable, and
     // reading it through depth comparison is undefined.
     static void releaseCompareSamplerUnits();
-    // Does this program declare any of the shadow-map samplers (shadowMap0..5)?
-    bool declaresShadowSamplers() const;
+    // Does this program declare any of the shadow-map samplers (shadowMap0..5)? Computed once
+    // in mapUniforms(); bind() asks on every program switch while the maps are bound.
+    bool declaresShadowSamplers() const { return mDeclaresShadowSamplers; }
     // Number of GLTF PBR materials that can be batched into one indexed draw call.
     // Each material consumes four texture units (base color, normal, ORM, emissive),
     // so this is roughly (available fragment texture units) / 4. See
@@ -378,8 +388,12 @@ public:
     S32 mActiveTextureChannels;
     S32 mShaderLevel;
     S32 mShaderGroup; // see LLGLSLShader::eGroup
-    // environment-uniform generation this program last applied; see sEnvironmentGeneration
+    // environment-uniform generation this program last applied; see sEnvironmentGeneration.
+    // Starts LEVEL with it, never behind -- a program built before LLEnvironment exists must
+    // not try to apply an environment on its first bind.
     U32 mEnvUniformsGeneration = 1;
+    // cached in mapUniforms(); see declaresShadowSamplers()
+    bool mDeclaresShadowSamplers = false;
     LLShaderFeatures mFeatures;
     std::vector< std::pair< std::string, GLenum > > mShaderFiles;
     std::string mName;
@@ -507,6 +521,9 @@ private:
                                     bool add_classic, bool add_rigged) const;
     // copy this program's whole configuration into `dst` under `name` (no defines added)
     void configureVariantClone(LLGLSLShader& dst, const std::string& name) const;
+
+    // gDebugGL-only: warn when an active per-pass axis had a corner this bind did not select
+    void warnIfVariantMissed() const;
 
     // This must be static because finishProfile() is called at least once
     // within a __try block. If we default its stats parameter to a temporary

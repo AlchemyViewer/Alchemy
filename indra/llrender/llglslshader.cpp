@@ -62,9 +62,12 @@ U32 LLGLSLShader::sMaxGLTFMaterials = 0;
 U32 LLGLSLShader::sMaxGLTFNodes = 0;
 bool LLGLSLShader::sProfileEnabled = false;
 bool LLGLSLShader::sCanProfile = true;
-std::set<LLGLSLShader*> LLGLSLShader::sInstances;
+std::set<LLGLSLShader*>& LLGLSLShader::sInstances = *(new std::set<LLGLSLShader*>());
 LLGLSLShader::defines_map_t LLGLSLShader::sGlobalDefines;
-U32 LLGLSLShader::sEnvironmentGeneration = 1;   // 0 is the per-program "never applied" sentinel
+// Starts at 1, and a default-constructed program starts level with it (see the member's
+// initialiser) rather than behind: a program must not apply the environment uniform set before
+// there is an environment. Wrapping is harmless -- this is only ever compared for equality.
+U32 LLGLSLShader::sEnvironmentGeneration = 1;
 U64 LLGLSLShader::sTotalTimeElapsed = 0;
 U32 LLGLSLShader::sTotalTrianglesDrawn = 0;
 U64 LLGLSLShader::sTotalSamplesDrawn = 0;
@@ -347,6 +350,13 @@ LLGLSLShader::LLGLSLShader()
 
 LLGLSLShader::~LLGLSLShader()
 {
+    // Leave the registry, which needs no GL context. unloadInternal() is the usual way out of
+    // it, but a program can be destroyed without ever being unloaded -- and this one is about
+    // to delete its children the same way -- so every pointer sInstances holds would otherwise
+    // dangle. It is walked for name uniqueness, so a stale entry is a use-after-free rather
+    // than a leak. Recursion covers the subtree: each child erases itself on the way out.
+    sInstances.erase(this);
+
     // Free the owned subtree's OBJECTS, so a program destroyed without unload() does not leak
     // them. Deliberately not unload(): a global program's destructor runs at static destruction
     // with no GL context, where deleting program objects is undefined -- and the driver reclaims
@@ -1166,6 +1176,21 @@ bool LLGLSLShader::mapUniforms()
 
     unbind();
 
+    // Cached here rather than recomputed per bind: this is read on every program switch for as
+    // long as the shadow maps are bound, and mTexture only changes at link.
+    mDeclaresShadowSamplers = false;
+    if (mTexture.size() > (size_t)LLShaderMgr::DEFERRED_SHADOW5)
+    {
+        for (S32 i = LLShaderMgr::DEFERRED_SHADOW0; i <= LLShaderMgr::DEFERRED_SHADOW5; ++i)
+        {
+            if (mTexture[i] > -1)
+            {
+                mDeclaresShadowSamplers = true;
+                break;
+            }
+        }
+    }
+
     LL_DEBUGS("ShaderUniform") << "Total Uniform Size: " << mTotalUniformSize << LL_ENDL;
     return res;
 }
@@ -1192,22 +1217,6 @@ bool LLGLSLShader::link(bool suppress_errors)
     }
 
     return success;
-}
-
-bool LLGLSLShader::declaresShadowSamplers() const
-{
-    if (mTexture.size() <= (size_t)LLShaderMgr::DEFERRED_SHADOW5)
-    {
-        return false;
-    }
-    for (S32 i = LLShaderMgr::DEFERRED_SHADOW0; i <= LLShaderMgr::DEFERRED_SHADOW5; ++i)
-    {
-        if (mTexture[i] > -1)
-        {
-            return true;
-        }
-    }
-    return false;
 }
 
 // static
@@ -1265,26 +1274,33 @@ void LLGLSLShader::bind()
         mEnvUniformsGeneration = sEnvironmentGeneration;
     }
 
-    // A per-PASS axis only applies if the caller routed through selectVariant() before binding.
-    // Holding a variant for an axis that is ACTIVE means this program is the base and its corner
-    // was never selected -- the pass silently runs at the wrong gamma, or stops clipping. Both
-    // are invisible in a normal frame, so this names the program instead of leaving it to be
-    // noticed. A corner has no variant of its own axis, so it passes. Gated on gDebugGL rather
-    // than SHOW_ASSERT: the builds that ship are the ones where a missed site would go unseen.
-    if (LL_UNLIKELY(gDebugGL))
-    {
-        if (LLRender::sMirrorPass && mMirrorVariant)
-        {
-            LL_WARNS("Shader") << mName << " bound during the mirror pass without selectVariant()" << LL_ENDL;
-        }
-        if (LLRender::sClassicMode && mClassicVariant)
-        {
-            LL_WARNS("Shader") << mName << " bound under classic lighting without selectVariant()" << LL_ENDL;
-        }
-    }
+    warnIfVariantMissed();
 
     llassert_always(sCurBoundShaderPtr != nullptr);
     llassert_always(sCurBoundShader == mProgramObject);
+}
+
+// A per-PASS axis only applies if the caller routed through selectVariant() before binding.
+// Holding a variant for an axis that is ACTIVE means this program is the base and its corner was
+// never selected -- the pass silently runs at the wrong gamma, or stops clipping. Both are
+// invisible in a normal frame, so this names the program instead of leaving it to be noticed. A
+// corner has no variant of its own axis, so it passes. Gated on gDebugGL rather than SHOW_ASSERT:
+// the builds that ship are the ones where a missed site would go unseen.
+void LLGLSLShader::warnIfVariantMissed() const
+{
+    if (LL_LIKELY(!gDebugGL))
+    {
+        return;
+    }
+
+    if (LLRender::sMirrorPass && mMirrorVariant)
+    {
+        LL_WARNS("Shader") << mName << " bound during the mirror pass without selectVariant()" << LL_ENDL;
+    }
+    if (LLRender::sClassicMode && mClassicVariant)
+    {
+        LL_WARNS("Shader") << mName << " bound under classic lighting without selectVariant()" << LL_ENDL;
+    }
 }
 
 void LLGLSLShader::bind(bool rigged)
@@ -1292,6 +1308,11 @@ void LLGLSLShader::bind(bool rigged)
     if (rigged)
     {
         llassert_always(mRiggedVariant);
+        // Checked on THIS program, not on the corner about to be bound. A rigged corner carries
+        // no per-pass variants of its own, so the check inside its bind() can never fire -- which
+        // would let base.bind(true) skip a classic or mirror corner silently, the one route the
+        // check would otherwise miss entirely.
+        warnIfVariantMissed();
         mRiggedVariant->bind();
     }
     else
