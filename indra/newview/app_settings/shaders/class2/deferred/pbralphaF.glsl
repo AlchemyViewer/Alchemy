@@ -156,6 +156,23 @@ void main()
 
     vec3 col = vertex_color.rgb * basecolor.rgb;
 
+#ifdef FOR_IMPOSTOR
+    // Flat, unlit base colour -- the impostor bake wants ALBEDO, not a shaded result.
+    //
+    // An impostor is a G-buffer capture that gets replayed into the scene G-buffer and lit
+    // once at composite time. Shading here and then handing that result over as albedo lights
+    // it twice: sun, shadow, probe irradiance and fog all applied at bake, then applied again
+    // to the billboard. deferred/alphaF has had a FOR_IMPOSTOR branch for exactly this
+    // reason; the PBR and legacy-material alpha paths never got one, so they were the two
+    // still double-lighting. Matches that branch: base colour times vertex colour, nothing
+    // else, with coverage in alpha for the bake's premultiplied compositing.
+    //
+    // The material response is genuinely lost for blended surfaces in an impostor. It cannot
+    // be kept: a G-buffer has one normal and one ORM per texel and blended layers have no
+    // single value for either, which is why the flat path is the convention here.
+    frag_color = max(vec4(col, basecolor.a * vertex_color.a), vec4(0));
+#else
+
     vec3 vNt = texture(bumpMap, normal_texcoord.xy).xyz*2.0-1.0;
     float sign = vary_sign;
     vec3 vN = vary_normal;
@@ -229,6 +246,7 @@ void main()
     if (classic_mode > 0)
         final_scale = 1.1;
     frag_color = max(vec4(color.rgb * final_scale,a), vec4(0));
+#endif // FOR_IMPOSTOR
 }
 
 #else

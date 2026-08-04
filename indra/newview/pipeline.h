@@ -681,7 +681,6 @@ public:
     static bool             sDynamicLOD;
     static bool             sPickAvatar;
     static bool             sImpostorRender;
-    static bool             sImpostorRenderAlphaDepthPass;
     static bool             sUnderWaterRender;
     static bool             sRenderGlow;
     static bool             sTextureBindTest;

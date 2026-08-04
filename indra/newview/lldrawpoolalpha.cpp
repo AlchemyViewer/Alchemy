@@ -61,9 +61,6 @@ LLVector4 LLDrawPoolAlpha::sWaterPlane;
 // minimum alpha before discarding a fragment
 static const F32 MINIMUM_ALPHA = 0.004f; // ~ 1/255
 
-// minimum alpha before discarding a fragment when rendering impostors
-static const F32 MINIMUM_IMPOSTOR_ALPHA = 0.1f;
-
 LLDrawPoolAlpha::LLDrawPoolAlpha(U32 type) :
         LLRenderPass(type), target_shader(NULL),
         mColorSFactor(LLRender::BF_UNDEF), mColorDFactor(LLRender::BF_UNDEF),
@@ -124,14 +121,15 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
     }
 
-    if (LLPipeline::sImpostorRender)
-    {
-        shader->setMinimumAlpha(MINIMUM_IMPOSTOR_ALPHA);
-    }
-    else
-    {
-        shader->setMinimumAlpha(MINIMUM_ALPHA);
-    }
+    // Same cutoff in a bake as anywhere else.
+    //
+    // The 10% impostor threshold existed because the coverage mask used to flatten every
+    // covered texel to fully opaque: a 5%-opacity fragment would have been promoted to solid,
+    // so discarding it early was the lesser evil. Now that the bake accumulates real coverage
+    // and the composite divides it back out, that fragment contributes 0.05 and composites
+    // correctly -- and the threshold is just a rule that deletes faint glass, veils and gauze
+    // the moment an avatar impostors, then restores them when it stops.
+    shader->setMinimumAlpha(MINIMUM_ALPHA);
 
     //also prepare rigged variant
     if (shader->mRiggedVariant && shader->mRiggedVariant != shader)
@@ -200,6 +198,7 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
 
     pbr_shader =
         (LLPipeline::sRenderingHUDs) ? &gHUDPBRAlphaProgram :
+        (LLPipeline::sImpostorRender) ? &gDeferredPBRAlphaImpostorProgram :
         &gDeferredPBRAlphaProgram;
 
     pbr_shader = pbr_shader->selectVariant();
@@ -251,17 +250,29 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
 
     bool write_depth = rigged ||
         LLDrawPoolWater::sSkipScreenCopy
-        // we want depth written so that rendered alpha will
-        // contribute to the alpha mask used for impostors
-        || LLPipeline::sImpostorRenderAlphaDepthPass
         || getType() == LLDrawPoolAlpha::POOL_ALPHA_PRE_WATER; // needed for accurate water fog
 
 
     LLGLDepthTest depth(GL_TRUE, write_depth ? GL_TRUE : GL_FALSE);
 
+    // In a bake, the destination alpha accumulates COVERAGE -- src.a + (1-src.a)*dst.a -- so
+    // the impostor stores colour premultiplied by coverage and the composite recovers the
+    // surface colour by dividing it back out (deferred/impostorF.glsl). Blending over the
+    // cleared black background is what darkened hair and translucent edges, and treating them
+    // as opaque afterwards is what froze that darkening into a halo.
+    //
+    // The accumulation starts from what generateImpostor's coverage stamp left: 1 wherever
+    // opaque geometry sits (so it stays 1, correctly), 0 over background (so it becomes this
+    // surface's coverage). Depth writing is untouched by any of that -- the stamp runs before
+    // this pass, so blended geometry occludes normally again.
+    //
+    // Everywhere else the alpha channel carries glow, and this suppresses source alpha so a
+    // blended surface does not erase the glow already accumulated behind it.
     mColorSFactor = LLRender::BF_SOURCE_ALPHA;           // } regular alpha blend
     mColorDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA; // }
-    mAlphaSFactor = LLRender::BF_ZERO;                         // } glow suppression
+    mAlphaSFactor = LLPipeline::sImpostorRender                 // } glow suppression /
+                        ? LLRender::BF_ONE                      // } bake coverage
+                        : LLRender::BF_ZERO;                    // }
     mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;       // }
     gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
 
@@ -709,6 +720,27 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                 }
                 else
                 {
+                    // NOT flattened for impostors, unlike the GLTF path, however much the two
+                    // look like they should match.
+                    //
+                    // A legacy BLEND material derives its OPACITY from lighting:
+                    // materialF ends with al = max(diffcol.a, glare) * vertex_color.a,
+                    // where glare accumulates reflection-probe environment and per-light
+                    // specular. A shiny surface is opaque because it is shiny. Routing it to
+                    // the flat impostor program -- which has no glare term and cannot have one
+                    // without doing the lighting it exists to avoid -- drops those surfaces to
+                    // their bare diffuse alpha, so they turn patchily see-through and blend
+                    // against their own back faces.
+                    //
+                    // GLTF alpha has no such coupling (pbralphaF: a = basecolor.a *
+                    // vertex_color.a), which is why FOR_IMPOSTOR is safe there and not here.
+                    // The asymmetry is in the content model, not in the impostor code. Fixing
+                    // it properly means a materialF FOR_IMPOSTOR variant that still runs
+                    // the lighting for glare but emits flat albedo -- correct on both counts,
+                    // at the cost of a permutation across the material program set.
+                    //
+                    // So legacy BLEND stays double-lit in a bake, which is a colour error we
+                    // have always had, rather than a transparency error we would be adding.
                     mat = LLPipeline::sRenderingHUDs ? nullptr : params.mMaterial;
 
                     if (params.mFullbright)
@@ -856,7 +888,14 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
             }
 
             // render emissive faces into alpha channel for bloom effects
-            if (!depth_only)
+            //
+            // Skipped in an impostor bake. These batches write ONLY alpha (their blend mode
+            // leaves colour untouched), and in a bake that channel is coverage -- glow
+            // accumulated into it would read back as extra opacity. Nothing is lost: the
+            // coverage stamp overwrote this glow before the impostor was ever sampled, so it
+            // has never reached the screen. It also saves the whole excursion, including the
+            // shader rebind that follows it.
+            if (!depth_only && !LLPipeline::sImpostorRender)
             {
                 gPipeline.enableLightsDynamic();
 

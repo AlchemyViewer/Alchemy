@@ -263,6 +263,7 @@ LLGLSLShader            gDeferredPBROpaqueProgram;
 LLGLSLShader            gDeferredPBROpaqueIndexedProgram;
 LLGLSLShader            gHUDPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRAlphaProgram;
+LLGLSLShader            gDeferredPBRAlphaImpostorProgram;
 LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
 
 // Mirror corners are only reachable during the hero-probe mirror pass, which RenderMirrors
@@ -1299,6 +1300,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredPBROpaqueProgram.unload();
         gDeferredPBROpaqueIndexedProgram.unload();
         gDeferredPBRAlphaProgram.unload();
+        gDeferredPBRAlphaImpostorProgram.unload();
         for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
         {
             gDeferredPBRTerrainProgram[paint_type].unload();
@@ -1703,6 +1705,51 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             s.mFeatures.calculatesLighting = true;
             s.mFeatures.hasLighting = true;
         });
+    }
+
+    if (success)
+    {
+        // The impostor bake's variant: flat base colour, no lighting. A bake captures ALBEDO
+        // for a G-buffer that is lit once at composite time, so the fully lit program above
+        // would light blended PBR twice. gDeferredAlphaImpostorProgram is the same idea for
+        // the legacy path; this closes the PBR half.
+        //
+        // Same feature set as the program above, deliberately, even though the FOR_IMPOSTOR
+        // branch never reaches the lighting. Features select which shared objects get
+        // ATTACHED, and pbralphaF's prologue calls mirrorClip() and waterClip() before the
+        // branch -- waterClip lives in deferredUtil.glsl, which only isDeferred or
+        // hasReflectionProbes attaches. Trimming the set to what the branch appears to need
+        // links against an undefined waterClip. It is the same fragment source, so it wants
+        // the same attachments; the permutations are what make this program flat.
+        LLGLSLShader* shader = &gDeferredPBRAlphaImpostorProgram;
+        shader->mName = "Deferred PBR Alpha Impostor Shader";
+
+        shader->mFeatures.calculatesLighting = false;
+        shader->mFeatures.hasLighting = false;
+        shader->mFeatures.isAlphaLighting = true;
+        shader->mFeatures.hasSrgb = true;
+        shader->mFeatures.calculatesAtmospherics = true;
+        shader->mFeatures.hasAtmospherics = true;
+        shader->mFeatures.hasGamma = true;
+        shader->mFeatures.isDeferred = true; // include deferredUtils
+        shader->mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED];
+
+        shader->mShaderFiles.clear();
+        shader->mShaderFiles.push_back(make_pair("deferred/pbralphaV.glsl", GL_VERTEX_SHADER));
+        shader->mShaderFiles.push_back(make_pair("deferred/pbralphaF.glsl", GL_FRAGMENT_SHADER));
+
+        shader->clearPermutations();
+
+        U32 alpha_mode = LLMaterial::DIFFUSE_ALPHA_MODE_BLEND;
+        shader->addPermutation("DIFFUSE_ALPHA_MODE", llformat("%d", alpha_mode));
+        shader->addPermutation("FOR_IMPOSTOR", "1");
+        shader->addPermutation("USE_VERTEX_COLOR", "1");
+
+        add_common_permutations(shader);
+
+        shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED);
+        llassert(success);
     }
 
     if (success)

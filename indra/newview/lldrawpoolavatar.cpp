@@ -241,6 +241,23 @@ void LLDrawPoolAvatar::renderDeferred(S32 pass)
 
 S32 LLDrawPoolAvatar::getNumPostDeferredPasses()
 {
+    if (LLPipeline::sImpostorRender)
+    {
+        // Nothing left for this pass to do in a bake, and what it did was wrong.
+        //
+        // With sImpostorRender the ++pass hack resolved render(0) to renderRigid() -- the
+        // eyeballs -- which the DEFERRED rigid pass has already written into the impostor's
+        // G-buffer. Drawing them a second time through gDeferredAvatarAlphaProgram composited
+        // a fully lit copy on top of the albedo capture, so they were lit at bake and again
+        // at composite, and shaded with the main camera's sun direction and shadow matrices
+        // rather than the bake camera's. The avatar's transparent parts do not need this pass
+        // either: LLVOAvatar::renderSkinned forces renderTransparent on for impostors, so
+        // hair and skirts are captured by the deferred pass too.
+        //
+        // Returning zero skips begin/render/end entirely, including the deferred shader bind.
+        return 0;
+    }
+
     return 1;
 }
 

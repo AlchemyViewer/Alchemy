@@ -303,7 +303,6 @@ bool    LLPipeline::sUseFarClip = true;
 bool    LLPipeline::sShadowRender = false;
 bool    LLPipeline::sRenderGlow = false;
 bool    LLPipeline::sImpostorRender = false;
-bool    LLPipeline::sImpostorRenderAlphaDepthPass = false;
 bool    LLPipeline::sUnderWaterRender = false;
 bool    LLPipeline::sTextureBindTest = false;
 bool    LLPipeline::sRenderAttachedLights = true;
@@ -11915,6 +11914,22 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
 
     LLGLSLShader* cur_shader = LLGLSLShader::sCurBoundShaderPtr;
 
+    // Scissoring OFF for the duration. This is reached from LLFloaterPerformance::draw(),
+    // i.e. from inside gViewerWindow->draw(), where the UI has the scissor test enabled and
+    // clipped to its dirty rectangle. Inherited, that rectangle clips the avatar render AND
+    // the target clear below -- so the GPU timing this function exists to measure was taken
+    // on a partially clipped draw, which is the one thing it must not be.
+    LLGLDisable no_scissor(GL_SCISSOR_TEST);
+
+    // The globals generateImpostor overwrites are saved here rather than there, because the
+    // display() path repairs them itself immediately afterwards and this path does not: it
+    // returns into the middle of a UI draw. sCull in particular is left pointing at
+    // generateImpostor's function-static cull result, which the next updateCull would
+    // otherwise be the first thing to notice.
+    LLCullResult* saved_cull = sCull;
+    const glm::mat4 saved_modelview = get_current_modelview();
+    const glm::mat4 saved_projection = get_current_projection();
+
     mRT->deferredScreen.bindTarget();
     mRT->deferredScreen.clear();
 
@@ -11964,6 +11979,15 @@ void LLPipeline::profileAvatar(LLVOAvatar* avatar, bool profile_attachments)
     }
 
     mRT->deferredScreen.flush();
+
+    sCull = saved_cull;
+    set_current_modelview(saved_modelview);
+    set_current_projection(saved_projection);
+
+    // generateImpostor's clear colour is its own business everywhere else, because display()
+    // sets one before each clear it cares about. Nothing does that on the way back into a UI
+    // draw, so put it back to the ambient here.
+    glClearColor(0.f, 0.f, 0.f, 0.f);
 
     if (cur_shader)
     {
@@ -12173,7 +12197,23 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         F32 distance = (pos-camera.getOrigin()).length();
         F32 fov = atanf(tdim.mV[1]/distance)*2.f*RAD_TO_DEG;
         F32 aspect = tdim.mV[0]/tdim.mV[1];
-        glm::mat4 persp = al_perspective(glm::radians(fov), aspect, 1.f, 256.f);
+
+        // Clip planes bracketing the subject instead of a hardcoded 1..256.
+        //
+        // Impostoring is chosen by rank, not distance (LLVOAvatar::shouldImpostor), so an
+        // avatar beyond 256 m is a normal thing to be asked to bake -- and the old far plane
+        // clipped it out of its own capture, leaving a fully transparent billboard. The near
+        // plane was equally arbitrary in the other direction: at any real impostor distance
+        // it threw away most of the depth range, which is what the coverage stamp's depth test
+        // and any depth-sorted content inside the bake have to resolve against.
+        //
+        // The bounding sphere of the extents is what has to fit, and 10cm of slack keeps a
+        // caster exactly on the plane from being clipped by rounding.
+        const F32 radius = half_height.getLength3().getF32() + 0.1f;
+        const F32 near_clip = llmax(0.1f, distance - radius);
+        const F32 far_clip  = distance + radius;
+
+        glm::mat4 persp = al_perspective(glm::radians(fov), aspect, near_clip, far_clip);
         set_current_projection(persp);
         gGL.loadMatrix(glm::value_ptr(persp));
 
@@ -12282,10 +12322,98 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         }
     };
 
+    // Stamp full coverage over everything the OPAQUE pass laid down, BEFORE the forward
+    // passes run.
+    //
+    // Order is load-bearing. This marks every texel the depth buffer covers as fully opaque,
+    // so it has to see only opaque geometry -- run after the alpha pass, it flattened blended
+    // coverage to 1 and threw away the very thing the coverage scheme exists to keep. That is
+    // why blended geometry was excluded from the impostor's depth buffer, and excluding it is
+    // what cost alpha its self-occlusion: layers that used to depth-reject each other all
+    // blended together instead, so a mostly-opaque blended surface showed itself through
+    // itself. Stamping first lets alpha write depth again and occlude normally, while the
+    // coverage accumulation behind it still starts from 1 where opaque geometry sits (a' =
+    // src.a + (1-src.a)*1 == 1) and from 0 over background.
+    auto stamp_opaque_coverage = [&]()
+    {
+        if (!for_profile)
+        { //create alpha mask based on depth buffer (grey out if muted)
+            if (LLPipeline::sRenderDeferred)
+            {
+                // This pass writes one output too, and it now runs BEFORE the forward
+                // passes narrow the draw buffers, so it has to state the requirement for
+                // itself. Through the target that owns the attachment list rather than by
+                // hand, so the restore at the end can put back however many it actually has.
+                forward_only_attachments();
+            }
+
+            LLGLDisable blend(GL_BLEND);
+
+            // Scoped, like the blend and depth guards around it. Set loose, this was the one bit
+            // of state generateImpostor never put back: the function returned with colour writes
+            // DISABLED on the ordinary path, and the frame survived only because display()
+            // re-asserts a mask before the world render. The dynamic-texture path has no such
+            // caller, so every morph preview after the first in a frame lost its background.
+            LLGLSColorMask mask(visually_muted || too_complex, true);
+
+            gGL.getTextureSlot(0)->unbind();
+
+            // GL_GREATER auto-translates to LESS under reverse-Z (via LLGLDepthTest::remap), and
+            // the background fill sits at the reverse-Z far plane (~0) instead of ~1.
+            LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
+
+            gGL.flush();
+
+            gGL.pushMatrix();
+            gGL.loadIdentity();
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.pushMatrix();
+            gGL.loadIdentity();
+
+            // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
+            // consistent with the sunDisc/moon far pins.
+            const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
+
+            gDebugProgram.bind();
+
+            if (visually_muted)
+            {   // Visually muted avatar
+                LLColor4 muted_color(avatar->getMutedAVColor());
+                LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set solid color " << muted_color << LL_ENDL;
+                gGL.diffuseColor4fv( muted_color.mV );
+            }
+            else if (!preview_avatar)
+            { //grey muted avatar
+                LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set grey" << LL_ENDL;
+                gGL.diffuseColor4fv(LLColor4::pink.mV );
+            }
+
+            gGL.begin(LLRender::TRIANGLES);
+            {
+                gGL.vertex3f(-1.f, -1.f, clip_plane);
+                gGL.vertex3f(1.f, -1.f, clip_plane);
+                gGL.vertex3f(1.f, 1.f, clip_plane);
+
+                gGL.vertex3f(-1.f, -1.f, clip_plane);
+                gGL.vertex3f(1.f, 1.f, clip_plane);
+                gGL.vertex3f(-1.f, 1.f, clip_plane);
+            }
+            gGL.end();
+            gGL.flush();
+
+            gDebugProgram.unbind();
+
+            gGL.popMatrix();
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+            gGL.popMatrix();
+        }
+    };
+
     if (preview_avatar || for_profile)
     {
         // previews and profiles don't care about imposters
         renderGeomDeferred(camera);
+        stamp_opaque_coverage();
         forward_only_attachments();
         renderGeomPostDeferred(camera);
     }
@@ -12294,97 +12422,20 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         avatar->mImpostor.clear();
         renderGeomDeferred(camera);
 
+        stamp_opaque_coverage();
         forward_only_attachments();
         renderGeomPostDeferred(camera);
 
-        // Shameless hack time: render it all again,
-        // this time writing the depth
-        // values we need to generate the alpha mask below
-        // while preserving the alpha-sorted color rendering
-        // from the previous pass
-        //
-        sImpostorRenderAlphaDepthPass = true;
-        // depth-only here...
-        //
-        gGL.setColorMask(false,false);
-        renderGeomPostDeferred(camera);
-
-        sImpostorRenderAlphaDepthPass = false;
-
+        // The scene used to be rendered a THIRD time here, colour-masked off, purely so
+        // that blended geometry would lay down depth for a coverage mask that ran afterwards
+        // -- the "shameless hack" the old comment named. Both are gone: the mask stamps
+        // opaque coverage before the forward passes instead, and the alpha channel carries
+        // real coverage from there (LLDrawPoolAlpha::forwardRender). One fewer full scene
+        // render per impostor, and partial coverage survives to the composite instead of
+        // being flattened to opaque, which is what produced the dark halo around hair.
     }
 
     LLDrawPoolAvatar::sMinimumAlpha = old_alpha;
-
-    if (!for_profile)
-    { //create alpha mask based on depth buffer (grey out if muted)
-        if (LLPipeline::sRenderDeferred)
-        {
-            // Already narrowed for the forward passes; this states the same requirement
-            // through the target that owns the attachment list rather than by hand, so the
-            // restore below can put back however many it actually has.
-            forward_only_attachments();
-        }
-
-        LLGLDisable blend(GL_BLEND);
-
-        // Scoped, like the blend and depth guards around it. Set loose, this was the one bit
-        // of state generateImpostor never put back: the function returned with colour writes
-        // DISABLED on the ordinary path, and the frame survived only because display()
-        // re-asserts a mask before the world render. The dynamic-texture path has no such
-        // caller, so every morph preview after the first in a frame lost its background.
-        LLGLSColorMask mask(visually_muted || too_complex, true);
-
-        gGL.getTextureSlot(0)->unbind();
-
-        // GL_GREATER auto-translates to LESS under reverse-Z (via LLGLDepthTest::remap), and
-        // the background fill sits at the reverse-Z far plane (~0) instead of ~1.
-        LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
-
-        gGL.flush();
-
-        gGL.pushMatrix();
-        gGL.loadIdentity();
-        gGL.matrixMode(LLRender::MM_PROJECTION);
-        gGL.pushMatrix();
-        gGL.loadIdentity();
-
-        // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
-        // consistent with the sunDisc/moon far pins.
-        const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
-
-        gDebugProgram.bind();
-
-        if (visually_muted)
-        {   // Visually muted avatar
-            LLColor4 muted_color(avatar->getMutedAVColor());
-            LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set solid color " << muted_color << LL_ENDL;
-            gGL.diffuseColor4fv( muted_color.mV );
-        }
-        else if (!preview_avatar)
-        { //grey muted avatar
-            LL_DEBUGS_ONCE("AvatarRenderPipeline") << "Avatar " << avatar->getID() << " MUTED set grey" << LL_ENDL;
-            gGL.diffuseColor4fv(LLColor4::pink.mV );
-        }
-
-        gGL.begin(LLRender::TRIANGLES);
-        {
-            gGL.vertex3f(-1.f, -1.f, clip_plane);
-            gGL.vertex3f(1.f, -1.f, clip_plane);
-            gGL.vertex3f(1.f, 1.f, clip_plane);
-
-            gGL.vertex3f(-1.f, -1.f, clip_plane);
-            gGL.vertex3f(1.f, 1.f, clip_plane);
-            gGL.vertex3f(-1.f, 1.f, clip_plane);
-        }
-        gGL.end();
-        gGL.flush();
-
-        gDebugProgram.unbind();
-
-        gGL.popMatrix();
-        gGL.matrixMode(LLRender::MM_MODELVIEW);
-        gGL.popMatrix();
-    }
 
     if (!preview_avatar && !for_profile)
     {

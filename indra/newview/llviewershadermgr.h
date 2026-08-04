@@ -248,6 +248,7 @@ extern LLGLSLShader         gPBRGlowIndexedProgram; // multi-material indexed PB
 extern LLGLSLShader         gDeferredPBROpaqueProgram;
 extern LLGLSLShader         gDeferredPBROpaqueIndexedProgram; // multi-material indexed PBR opaque
 extern LLGLSLShader         gDeferredPBRAlphaProgram;
+extern LLGLSLShader         gDeferredPBRAlphaImpostorProgram;
 extern LLGLSLShader         gHUDPBRAlphaProgram;
 
 // Encodes detail level for dropping textures, in accordance with the GLTF spec where possible
