@@ -387,6 +387,8 @@ void LLGLSLShader::freeVariant(LLGLSLShader*& variant)
 void LLGLSLShader::freeOwnedVariants()
 {
     freeVariant(mRiggedVariant);
+    freeVariant(mClassicVariant);
+    freeVariant(mMirrorVariant);
 }
 
 void LLGLSLShader::configureVariantClone(LLGLSLShader& dst, const std::string& name) const
@@ -399,31 +401,100 @@ void LLGLSLShader::configureVariantClone(LLGLSLShader& dst, const std::string& n
     dst.mShaderGroup = mShaderGroup;
 }
 
-// Build this program's rigged corner: the same configuration plus HAS_SKIN, compiled. Deriving
-// it from this program rather than from a hand-configured sibling is what makes construction
-// independent of the order a caller happens to build its programs in, and it puts the
-// permutation after every addPermutation() the caller made -- the ordering that hand-wiring got
-// wrong whenever a define was added after the clone was configured.
-bool LLGLSLShader::createRiggedVariant()
+// Build one corner: this program's config plus the requested defines, compiled. Deriving every
+// corner from this program (rather than from a hand-configured sibling) is what makes
+// construction independent of the order a caller happens to build its programs in, and it puts
+// the axis defines after every addPermutation() the caller made -- the ordering that hand-wiring
+// got wrong whenever a define was added after the clone was configured.
+LLGLSLShader* LLGLSLShader::makeVariantCorner(const std::string& name, const char* perm_key,
+                                             bool add_classic, bool add_rigged) const
 {
-    freeVariant(mRiggedVariant);
-
     LLGLSLShader* corner = new LLGLSLShader();
-    corner->mOwnedVariant = true;   // this program frees it in unload(); see freeVariant()
-    configureVariantClone(*corner, llformat("Skinned %s", mName.c_str()));
+    corner->mOwnedVariant = true;   // parent frees it in unload(); see freeVariant()
+    configureVariantClone(*corner, name);
 
-    // HAS_SKIN=1 selects the skinned path in the vertex source; hasObjectSkinning is the
-    // matching feature flag, which is what attaches the objectSkin module.
-    corner->addPermutation("HAS_SKIN", "1");
-    corner->mFeatures.hasObjectSkinning = true;
-
-    if (!corner->createShader())
+    if (perm_key)
     {
-        delete corner;
+        corner->addPermutation(perm_key, "1");
+    }
+    if (add_classic)
+    {
+        corner->addPermutation("CLASSIC_MODE", "1");
+    }
+    if (add_rigged)
+    {   // HAS_SKIN=1 selects the skinned path in the vertex source; hasObjectSkinning is the
+        // matching feature flag, which is what attaches the objectSkin module.
+        corner->addPermutation("HAS_SKIN", "1");
+        corner->mFeatures.hasObjectSkinning = true;
+    }
+
+    if (corner->createShader())
+    {
+        return corner;
+    }
+    delete corner;
+    return nullptr;
+}
+
+// Build `axis`'s corner set into the matching member. RIGGED is the innermost axis: one corner,
+// nothing to compose over. Each per-PASS axis gets one corner per rigged x classic combination
+// already present, so a program asking for all three ends up with every corner reachable by
+// selectVariant()->bind(rigged). On any corner failure the partial subtree is dropped so the
+// base is used.
+bool LLGLSLShader::createVariant(EVariant axis)
+{
+    LLGLSLShader* LLGLSLShader::* member =
+        (axis == VARIANT_RIGGED)  ? &LLGLSLShader::mRiggedVariant  :
+        (axis == VARIANT_CLASSIC) ? &LLGLSLShader::mClassicVariant :
+                                    &LLGLSLShader::mMirrorVariant;
+    freeVariant(this->*member);
+
+    if (axis == VARIANT_RIGGED)
+    {
+        mRiggedVariant = makeVariantCorner(llformat("Skinned %s", mName.c_str()), nullptr, false, true);
+        return mRiggedVariant != nullptr;
+    }
+
+    const char* perm   = (axis == VARIANT_CLASSIC) ? "CLASSIC_MODE" : "MIRROR_CLIP";
+    const char* suffix = (axis == VARIANT_CLASSIC) ? "(Classic)"    : "(Mirror)";
+
+    // classic never composes over itself (the member was just cleared, and classic is built
+    // before mirror), so a classic sibling only exists when the axis being added is mirror.
+    const bool has_rigged  = mRiggedVariant  != nullptr;
+    const bool has_classic = mClassicVariant != nullptr;
+
+    LLGLSLShader* v = makeVariantCorner(llformat("%s %s", mName.c_str(), suffix), perm, false, false);
+    if (!v)
+    {
         return false;
     }
 
-    mRiggedVariant = corner;
+    bool ok = true;
+    if (has_rigged)
+    {
+        v->mRiggedVariant = makeVariantCorner(llformat("Skinned %s %s", mName.c_str(), suffix), perm, false, true);
+        ok = ok && v->mRiggedVariant != nullptr;
+    }
+    if (ok && has_classic)
+    {
+        v->mClassicVariant = makeVariantCorner(llformat("%s (Classic) %s", mName.c_str(), suffix), perm, true, false);
+        ok = ok && v->mClassicVariant != nullptr;
+
+        if (ok && mClassicVariant->mRiggedVariant)
+        {
+            v->mClassicVariant->mRiggedVariant =
+                makeVariantCorner(llformat("Skinned %s (Classic) %s", mName.c_str(), suffix), perm, true, true);
+            ok = ok && v->mClassicVariant->mRiggedVariant != nullptr;
+        }
+    }
+
+    if (!ok)
+    {   // drop the partial subtree; selectVariant() falls back to this program
+        freeVariant(v);
+        return false;
+    }
+
+    this->*member = v;
     return true;
 }
 
@@ -628,9 +699,12 @@ bool LLGLSLShader::createShader(U32 variants)
         mRiggedVariant = this;
     }
 
-    if (success && (variants & VARIANT_RIGGED))
+    for (EVariant axis : { VARIANT_RIGGED, VARIANT_CLASSIC, VARIANT_MIRROR })
     {
-        success = createRiggedVariant();
+        if (success && (variants & axis))
+        {
+            success = createVariant(axis);
+        }
     }
 
     return success;
@@ -1164,6 +1238,24 @@ void LLGLSLShader::bind()
     {
         LLShaderMgr::instance()->updateShaderUniforms(this);
         mEnvUniformsGeneration = sEnvironmentGeneration;
+    }
+
+    // A per-PASS axis only applies if the caller routed through selectVariant() before binding.
+    // Holding a variant for an axis that is ACTIVE means this program is the base and its corner
+    // was never selected -- the pass silently runs at the wrong gamma, or stops clipping. Both
+    // are invisible in a normal frame, so this names the program instead of leaving it to be
+    // noticed. A corner has no variant of its own axis, so it passes. Gated on gDebugGL rather
+    // than SHOW_ASSERT: the builds that ship are the ones where a missed site would go unseen.
+    if (LL_UNLIKELY(gDebugGL))
+    {
+        if (LLRender::sMirrorPass && mMirrorVariant)
+        {
+            LL_WARNS("Shader") << mName << " bound during the mirror pass without selectVariant()" << LL_ENDL;
+        }
+        if (LLRender::sClassicMode && mClassicVariant)
+        {
+            LL_WARNS("Shader") << mName << " bound under classic lighting without selectVariant()" << LL_ENDL;
+        }
     }
 
     llassert_always(sCurBoundShaderPtr != nullptr);

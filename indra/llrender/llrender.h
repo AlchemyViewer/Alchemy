@@ -369,6 +369,7 @@ public:
     static bool sNsightDebugSupport;
     static LLVector2 sUIGLScaleFactor;
     static bool sClassicMode; // classic sky mode active
+    static bool sMirrorPass;  // hero-probe planar-reflection (mirror clip) pass active
     static bool s10bitBackBuffer;
 
 private:

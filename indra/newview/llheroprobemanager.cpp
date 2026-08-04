@@ -243,6 +243,9 @@ void LLHeroProbeManager::renderProbes()
 
         gPipeline.mReflectionMapManager.mRadiancePass = true;
         mRenderingMirror = true;
+        // Mirrors isMirrorPass() down into llrender, which cannot reach gPipeline. This is
+        // the window in which the mirror-clip shader variants apply.
+        LLRender::sMirrorPass = true;
 
         S32 rate = sUpdateRate;
 
@@ -276,6 +279,7 @@ void LLHeroProbeManager::renderProbes()
         }
 
         mRenderingMirror = false;
+        LLRender::sMirrorPass = false;
 
         gPipeline.mReflectionMapManager.mRadiancePass = radiance_pass;
 

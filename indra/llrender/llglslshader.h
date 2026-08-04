@@ -229,10 +229,16 @@ public:
     // If force_read is true, will force an immediate readback (severe performance penalty)
     bool readProfileQuery(bool for_runtime = false, bool force_read = false);
 
-    // Compile-time variant axes, passed to createShader() as a mask.
+    // Compile-time variant axes, passed to createShader() as a mask. They are built in this
+    // order because each composes over the ones before it: a program asking for all three gets
+    // the full rigged x classic x mirror corner set, every corner reachable via
+    // selectVariant()->bind(rigged). Each corner is derived from this program's config plus the
+    // axis defines, so nothing depends on a sibling program being compiled first.
     enum EVariant : U32
     {
-        VARIANT_RIGGED = 1 << 0, // HAS_SKIN=1 -- skinned/animesh (per-DRAW, via bind(rigged))
+        VARIANT_RIGGED  = 1 << 0, // HAS_SKIN=1     -- skinned/animesh  (per-DRAW, via bind(rigged))
+        VARIANT_CLASSIC = 1 << 1, // CLASSIC_MODE=1 -- classic sky lighting     (per-PASS)
+        VARIANT_MIRROR  = 1 << 2, // MIRROR_CLIP=1  -- hero-probe mirror clip   (per-PASS)
     };
 
     // Compile this program and, on success, build the requested variant subtrees (owned by this
@@ -411,15 +417,22 @@ public:
     // disagree. Add the permutation; never assign this.
     bool mLinearDiffuse = false;
 
-    // This shader's HAS_SKIN=1 variant, chosen per-draw via bind(rigged).
+    // Compile-time variant axes:
+    //   mRiggedVariant  -- HAS_SKIN=1     (per-DRAW; chosen via bind(rigged))
+    //   mClassicVariant -- CLASSIC_MODE=1 (per-PASS; classic sky lighting active)
+    //   mMirrorVariant  -- MIRROR_CLIP=1  (per-PASS; hero-probe mirror clip active)
+    // The per-pass variants carry their own rigged (and each other's) sub-variants, so a single
+    // selectVariant() walk reaches any rigged x classic x mirror corner.
     //
     // OWNERSHIP: createShader()'s variant mask is the only thing that allocates one, and it
     // heap-allocates, so a program owns its whole variant subtree -- unload() frees it via
-    // freeVariant(). mOwnedVariant records that; it exists because this member is public, so
-    // pointing it at a global instead would make freeVariant() delete a static object. A
+    // freeVariant(). mOwnedVariant records that; it exists because these members are public, so
+    // pointing one at a global instead would make freeVariant() delete a static object. A
     // skinned program is its own rigged variant (a self-edge set by createShader), which
     // freeVariant() and forEachVariant() must not traverse.
     LLGLSLShader* mRiggedVariant = nullptr;
+    LLGLSLShader* mClassicVariant = nullptr;
+    LLGLSLShader* mMirrorVariant = nullptr;
 
     // true when this program was heap-allocated as a variant and is owned by its parent
     bool mOwnedVariant = false;
@@ -440,7 +453,24 @@ public:
     void forEachVariant(FUNC fn)
     {
         fn(*this);
-        if (mRiggedVariant && mRiggedVariant != this) { mRiggedVariant->forEachVariant(fn); }
+        if (mRiggedVariant  && mRiggedVariant  != this) { mRiggedVariant->forEachVariant(fn); }
+        if (mClassicVariant && mClassicVariant != this) { mClassicVariant->forEachVariant(fn); }
+        if (mMirrorVariant  && mMirrorVariant  != this) { mMirrorVariant->forEachVariant(fn); }
+    }
+
+    // Returns the variant to bind for the current global render-pass state, composing the
+    // per-PASS compile-time axes in a fixed order: the MIRROR_CLIP clone during the mirror
+    // pass, then the CLASSIC_MODE clone under classic sky lighting. An axis that is inactive
+    // or has no variant is a no-op, so this is safe on every program (including those with no
+    // variants at all). The per-DRAW rigged axis is applied afterward on the returned pointer
+    // via bind(rigged) / ->mRiggedVariant. Call before bind(); route all subsequent
+    // uniform*/bindTexture calls through the returned pointer.
+    LLGLSLShader* selectVariant()
+    {
+        LLGLSLShader* s = this;
+        if (LLRender::sMirrorPass  && s->mMirrorVariant)  s = s->mMirrorVariant;
+        if (LLRender::sClassicMode && s->mClassicVariant) s = s->mClassicVariant;
+        return s;
     }
 
     // Invalidate the shared environment (sky/water) uniform set for every live program; each
@@ -485,8 +515,11 @@ private:
     void unloadInternal();
 
     // ---- compile-time variant construction (see EVariant / createShader) ----
-    // build this program's HAS_SKIN=1 corner into mRiggedVariant; see the definition
-    bool createRiggedVariant();
+    // build one axis's corner set into the matching member; see the definition
+    bool createVariant(EVariant axis);
+    // heap-allocate one corner: this program's config plus the requested defines, compiled
+    LLGLSLShader* makeVariantCorner(const std::string& name, const char* perm_key,
+                                    bool add_classic, bool add_rigged) const;
     // copy this program's whole configuration into `dst` under `name` (no defines added)
     void configureVariantClone(LLGLSLShader& dst, const std::string& name) const;
 

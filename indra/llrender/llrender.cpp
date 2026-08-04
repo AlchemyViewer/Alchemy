@@ -78,6 +78,7 @@ bool LLRender::sGLCoreProfile = false;
 bool LLRender::sNsightDebugSupport = false;
 LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 bool LLRender::sClassicMode = false;
+bool LLRender::sMirrorPass = false;
 bool LLRender::s10bitBackBuffer = false;
 
 
