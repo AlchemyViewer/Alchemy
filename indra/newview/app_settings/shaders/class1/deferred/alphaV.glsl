@@ -135,15 +135,30 @@ void main()
 #endif
 #endif
 
+// The FS derives a screen UV as vary_fragcoord.xy / vary_fragcoord.z. Forward-Z abuses the
+// view-space z plus near_clip as a stand-in for clip w; under reverse-Z that pseudo-w is
+// meaningless (and clip.z tends to 0 at the far plane), so carry the true clip w instead.
 #ifdef HAS_SKIN
+#ifdef REVERSE_Z
+    vary_fragcoord.xyz = vec3(frag_pos.xy, frag_pos.w);
+#else
     vary_fragcoord.xyz = frag_pos.xyz + vec3(0,0,near_clip);
+#endif
 #else
 
 #ifdef IS_AVATAR_SKIN
+#ifdef REVERSE_Z
+    vary_fragcoord.xyz = vec3(frag_pos.xy, frag_pos.w);
+#else
     vary_fragcoord.xyz = pos.xyz + vec3(0,0,near_clip);
+#endif
 #else
     pos = modelview_projection_matrix * vert;
+#ifdef REVERSE_Z
+    vary_fragcoord.xyz = vec3(pos.xy, pos.w);
+#else
     vary_fragcoord.xyz = pos.xyz + vec3(0,0,near_clip);
+#endif
 #endif
 
 #endif

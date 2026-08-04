@@ -42,12 +42,23 @@ public:
 
     void checkState();
 
+    // Reverse-Z depth-func translation. The tracked state (sDepthFunc) and every call
+    // site stay in the forward/semantic convention; the physical glDepthFunc is fed the
+    // translated func so a call site asking for "nearer wins" keeps that meaning under
+    // reverse-Z. Identity unless LLRender::sReverseZ. LESS<->GREATER, LEQUAL<->GEQUAL;
+    // EQUAL/NOTEQUAL/ALWAYS/NEVER pass through unchanged.
+    static GLenum remap(GLenum func);
+    // Re-issue the physical depth func for the current translation. Call after
+    // LLRender::sReverseZ changes so the GL state agrees with the (unchanged) semantic
+    // static -- the ambient func was issued under the old translation.
+    static void rebase();
+
     GLboolean mPrevDepthEnabled;
     GLenum mPrevDepthFunc;
     GLboolean mPrevWriteEnabled;
 private:
     static GLboolean sDepthEnabled; // defaults to GL_FALSE
-    static GLenum sDepthFunc; // defaults to GL_LESS
+    static GLenum sDepthFunc; // defaults to GL_LESS (semantic/forward convention)
     static GLboolean sWriteEnabled; // defaults to GL_TRUE
 };
 

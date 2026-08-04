@@ -50,7 +50,14 @@ vec4 getPositionAo(vec2 pos_screen)
 {
     float depth = getDepthAo(pos_screen);
     vec2 sc = getScreenCoordinateAo(pos_screen);
+    // Reverse-Z stores ndc z directly (ZERO_TO_ONE clip control); legacy needs the remap.
+    // Inlined rather than calling deferredUtil's ndcZFromScreenDepth: this object keeps its
+    // own copies of the depth/screen helpers so it never depends on that attachment.
+#ifdef REVERSE_Z
+    vec4 ndc = vec4(sc.x, sc.y, depth, 1.0);
+#else
     vec4 ndc = vec4(sc.x, sc.y, 2.0*depth-1.0, 1.0);
+#endif
     vec4 pos = inv_proj * ndc;
     pos /= pos.w;
     pos.w = 1.0;

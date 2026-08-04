@@ -31,6 +31,13 @@ out vec2 vary_texcoord0;
 
 void main()
 {
+    // Depth is irrelevant to this color-only bump->normal bake, but the vertex must lie
+    // inside the clip volume. Under reverse-Z clip control the range is [0,w]; z=-1 would
+    // clip the whole quad, so emit the near plane (1.0) there instead.
+#ifdef REVERSE_Z
+    gl_Position = vec4(position.x*2.0-1.0, position.y*2.0-1.0, 1.0, 1.0);
+#else
     gl_Position = vec4(position.x*2.0-1.0, position.y*2.0-1.0, -1.0, 1.0);
+#endif
     vary_texcoord0 = texcoord0;
 }

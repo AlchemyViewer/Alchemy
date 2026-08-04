@@ -41,6 +41,8 @@ uniform float max_cof;
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
 
+float ndcZFromScreenDepth(float d);   // deferredUtil.glsl -- depth-convention aware
+
 in vec2 vary_fragcoord;
 
 float calc_cof(float depth)
@@ -62,8 +64,7 @@ void main()
 {
     vec2 tc = vary_fragcoord.xy;
 
-    float z = texture(depthMap, tc).r;
-    z = z*2.0-1.0;
+    float z = ndcZFromScreenDepth(texture(depthMap, tc).r);
     vec4 ndc = vec4(0.0, 0.0, z, 1.0);
     vec4 p = inv_proj*ndc;
     float depth = p.z/p.w;

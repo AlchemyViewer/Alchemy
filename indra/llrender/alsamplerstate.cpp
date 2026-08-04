@@ -92,7 +92,10 @@ ALSamplerDesc ALSamplerCache::makeDesc(ALSampler key)
     if (compare)
     {
         desc.mCompareMode = GL_COMPARE_REF_TO_TEXTURE;
-        desc.mCompareFunc = GL_LEQUAL;
+        // Reverse-Z shadow maps store reversed depth, so the shadow compare passes when the
+        // receiver is GEQUAL the stored occluder. The latch clears the sampler cache on
+        // toggle so this re-derives (see LLPipeline::updateReverseZ).
+        desc.mCompareFunc = LLRender::sReverseZ ? GL_GEQUAL : GL_LEQUAL;
     }
 
     desc.mSRGBDecode = decode ? GL_DECODE_EXT : GL_SKIP_DECODE_EXT;

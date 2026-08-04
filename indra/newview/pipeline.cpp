@@ -871,7 +871,9 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
     bool ssao = RenderDeferredSSAO;
 
     //allocate deferred rendering color buffers
-    if (!mRT->deferredScreen.allocate(resX, resY, GL_SRGB8_ALPHA8, true)) return false;
+    // Main scene depth flips to float32 under reverse-Z (mRT->screen inherits it below via
+    // shareDepthBuffer); same 4 bytes/px as DEPTH24 on desktop GPUs.
+    if (!mRT->deferredScreen.allocate(resX, resY, GL_SRGB8_ALPHA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat())) return false;
     if (!addDeferredAttachments(mRT->deferredScreen)) return false;
 
     GLuint screenFormat = hdr ? GL_RGBA16F : GL_RGBA8;
@@ -950,6 +952,9 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         {
             // SMAA benefits from a stencil buffer shared across its passes so the
             // blend-weights pass can skip non-edge pixels marked during edge detect.
+            // Deliberately DEPTH_FMT_24 even under reverse-Z: this depth-stencil is a pure
+            // SMAA stencil carrier, never receives scene depth nor blit-pairs with it, and
+            // DEPTH32F_STENCIL8 would double it to 8 bytes/px for no benefit.
             bool smaa_stencil = (RenderFSAAType == 2) && gSavedSettings.getBOOL("RenderSMAAUseStencil");
             if (!mFXAAMap.allocate(resX, resY, post_color_fmt, smaa_stencil, smaa_stencil)) return false;
             if (RenderFSAAType == 2)
@@ -968,11 +973,13 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         }
 
         //water reflection texture (always needed as scratch space whether or not transparent water is enabled)
-        mWaterDis.allocate(resX, resY, screenFormat, true);
+        // mWaterDis and mSceneMap receive depth blits from mRT->screen, so their depth format
+        // must match it -- flip together via mainDepthFormat().
+        mWaterDis.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
 
         if(RenderScreenSpaceReflections)
         {
-            mSceneMap.allocate(resX, resY, screenFormat, true);
+            mSceneMap.allocate(resX, resY, screenFormat, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
         }
         else
         {
@@ -984,7 +991,7 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
         // Why do we do this? Because it saves us some janky logic in the exclusion shader when we generate the mask.
         // Regardless, this should always only be an R8 texture unless we choose to start having multiple kinds of exclusion that 8 bits can't handle.
         // - Geenz 2025-02-06
-        bool success = mWaterExclusionMask.allocate(resX, resY, GL_R8, true);
+        bool success = mWaterExclusionMask.allocate(resX, resY, GL_R8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
 
         assert(success);
 
@@ -1022,9 +1029,13 @@ bool LLPipeline::allocateShadowBuffer(U32 resX, U32 resY)
     // 32-bit float depth is the same 4 bytes/texel as DEPTH24 here but distributes precision
     // differently (float, denser near the near plane). Opt-in; toggling it re-runs this via
     // handleShadowsResized. The compare sampler and PCF read it the same either way.
+    //
+    // Reverse-Z forces it on regardless of the setting: reversed depth puts the dense end of
+    // the float mantissa where the perspective spot cascades need it, and it is memory-free
+    // (DEPTH24 pads to 4 bytes anyway).
     static LLCachedControl<bool> shadow_depth_32f(gSavedSettings, "AlchemyRenderShadowDepth32F", false);
     const LLRenderTarget::eDepthFormat depth_fmt =
-        shadow_depth_32f ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
+        (shadow_depth_32f || LLRender::sReverseZ) ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
 
     if (shadow_detail > 0)
     { //allocate 4 sun shadow maps
@@ -2705,6 +2716,58 @@ bool LLPipeline::isWaterClip()
 {
     // We always pretend that we're not clipping water when rendering mirrors.
     return (gPipeline.mHeroProbeManager.isMirrorPass()) ? false : (!sRenderTransparentWater || gCubeSnapshot) && !sRenderingHUDs;
+}
+
+// static
+LLRenderTarget::eDepthFormat LLPipeline::mainDepthFormat()
+{
+    return LLRender::sReverseZ ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24;
+}
+
+// static
+void LLPipeline::updateReverseZ()
+{
+    // Effective state = setting AND the driver capability. On a GPU without clip control the
+    // setting can stay on but is inert, and every branch below then resolves to the forward
+    // constants, so the forward path is never perturbed.
+    const bool setting   = gSavedSettings.getBOOL("AlchemyRenderReverseZ");
+    const bool effective = gGLManager.mHasClipControl && setting;
+    const bool changed   = (effective != LLRender::sReverseZ);
+
+    LLRender::sReverseZ = effective;
+
+    // Issued unconditionally, not just on a change. These are the only writers of clip control
+    // and clear depth in the tree, so if GL is ever reset underneath us -- a context restore,
+    // an external state reset -- a change-gated latch would have no path back and would leave
+    // reversed projections rasterizing against a [-1,1] clip volume. Four GL calls once per
+    // setShaders() is not worth gating. Safe when the cap is absent: sReverseZ is then false,
+    // the forward constants are what GL already has, and glClipControl is only reached with
+    // mHasClipControl true (which guarantees the entry point resolved).
+    if (gGLManager.mHasClipControl)
+    {
+        glClipControl(GL_LOWER_LEFT, effective ? GL_ZERO_TO_ONE : GL_NEGATIVE_ONE_TO_ONE);
+    }
+    glClearDepth(effective ? 0.0 : 1.0);
+
+    // The ambient depth func and polygon offset are tracked in the semantic convention, so the
+    // physical state has to be re-derived through the current translation.
+    LLGLDepthTest::rebase();
+    gGL.rebasePolygonOffset();
+
+    if (changed)
+    {
+        // Rebuild the sampler objects so the shadow compare func (LEQUAL<->GEQUAL) re-derives.
+        // clearSamplers() MUST be followed by warmupSamplers(): the enum overload of
+        // ALSamplerCache::get() indexes a flat table with no lazy path, so a cleared cache
+        // hands out name 0 (asserting in debug) until warmup refills it. Only on a real flip --
+        // rebuilding all 48 objects is not free.
+        gGL.clearSamplers();
+        gGL.warmupSamplers();
+
+        LL_INFOS("RenderInit") << "Reverse-Z depth " << (effective ? "ENABLED" : "disabled")
+                               << " (setting=" << setting
+                               << ", clip control=" << gGLManager.mHasClipControl << ")" << LL_ENDL;
+    }
 }
 
 void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result)
@@ -4578,7 +4641,7 @@ void LLPipeline::renderPhysicsDisplay()
     gDebugProgram.bind();
 
     LLGLEnable polygon_offset_line(GL_POLYGON_OFFSET_LINE);
-    glPolygonOffset(3.f, 3.f);
+    gGL.setPolygonOffset(3.f, 3.f);
     gGL.setLineWidth(3.f);
     LLGLEnable blend(GL_BLEND);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -4789,7 +4852,7 @@ void LLPipeline::renderDebug()
 
                             //get rid of some z-fighting
                             LLGLEnable polyOffset(GL_POLYGON_OFFSET_FILL);
-                            glPolygonOffset(1.0f, 1.0f);
+                            gGL.setPolygonOffset(1.0f, 1.0f);
 
                             //render to depth first to avoid blending artifacts
                             gGL.setColorMask(false, false);
@@ -4797,7 +4860,7 @@ void LLPipeline::renderDebug()
                             gGL.setColorMask(true, false);
 
                             //get rid of some z-fighting
-                            glPolygonOffset(0.f, 0.f);
+                            gGL.setPolygonOffset(0.f, 0.f);
 
                             LLGLEnable blend(GL_BLEND);
 
@@ -4822,7 +4885,7 @@ void LLPipeline::renderDebug()
                                     LLGLEnable blend(GL_BLEND);
                                     LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
 
-                                    glPolygonOffset(offset, -offset);
+                                    gGL.setPolygonOffset(offset, -offset);
 
                                     if (gSavedSettings.getBOOL("PathfindingXRayWireframe"))
                                     { //draw hidden wireframe as darker and less opaque
@@ -4839,7 +4902,7 @@ void LLPipeline::renderDebug()
                                 }
 
                                 { //draw visible wireframe as brighter, thicker and more opaque
-                                    glPolygonOffset(offset, offset);
+                                    gGL.setPolygonOffset(offset, offset);
                                     gPathfindingProgram.uniform1f(LLShaderMgr::AMBIANCE, 1.f);
                                     gPathfindingProgram.uniform1f(LLShaderMgr::TINT, 1.f);
                                     gPathfindingProgram.uniform1f(LLShaderMgr::ALPHA_SCALE, 1.f);
@@ -4856,7 +4919,7 @@ void LLPipeline::renderDebug()
                         }
                     }
 
-                    glPolygonOffset(0.f, 0.f);
+                    gGL.setPolygonOffset(0.f, 0.f);
 
                     if ( pathfindingConsole->isRenderNavMesh() && pathfindingConsole->isRenderXRay() )
                     {   //render navmesh xray
@@ -4866,7 +4929,7 @@ void LLPipeline::renderDebug()
                         LLGLEnable polyOffset(GL_POLYGON_OFFSET_FILL);
 
                         F32 offset = gSavedSettings.getF32("PathfindingLineOffset");
-                        glPolygonOffset(offset, -offset);
+                        gGL.setPolygonOffset(offset, -offset);
 
                         LLGLEnable blend(GL_BLEND);
                         LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
@@ -4901,7 +4964,7 @@ void LLPipeline::renderDebug()
                         gGL.setLineWidth(1.0f);
                     }
 
-                    glPolygonOffset(0.f, 0.f);
+                    gGL.setPolygonOffset(0.f, 0.f);
 
                     gGL.flush();
                     gPathfindingProgram.unbind();
@@ -7567,9 +7630,12 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 glm::vec4 sun_clip = get_current_projection() * get_current_modelview() * glm::vec4(light_dir.mV[0], light_dir.mV[1], light_dir.mV[2], 0.0f);
 
                 F32 target_visibility = 0.f;
-                if (sun_clip.z > 0.f)
+                // Gate/divide on clip w, not z: w is convention-independent (reverse-Z rewrites
+                // only the projection's z row), so w > 0 == "sun in front" and xy/w == ndc under
+                // both forward and reverse-Z. (z would flip sign under reverse-Z and hide the flare.)
+                if (sun_clip.w > 0.f)
                 {
-                    glm::vec2 sun_ndc = glm::vec2(sun_clip.x, sun_clip.y) / sun_clip.z;
+                    glm::vec2 sun_ndc = glm::vec2(sun_clip.x, sun_clip.y) / sun_clip.w;
                     glm::vec2 sun_uv = sun_ndc * 0.5f + 0.5f;
 
                     // Soft fade as sun approaches screen edges — generous margin
@@ -9299,14 +9365,18 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
     //F32 shadow_offset_error = 1.f + RenderShadowOffsetError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2]);
     F32 shadow_bias_error = RenderShadowBiasError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2])/3000.f;
-    F32 shadow_bias       = RenderShadowBias + shadow_bias_error;
+    // Reverse-Z shadow maps store reversed depth and sample with GEQUAL, so the receiver
+    // reference is pushed the other way: negate the bias (incl. the camera-error term) at
+    // this single assembly site. shadowUtil.glsl stays byte-identical. Offsets keep sign.
+    const F32 bias_sign   = LLRender::sReverseZ ? -1.f : 1.f;
+    F32 shadow_bias       = bias_sign * (RenderShadowBias + shadow_bias_error);
 
     shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)deferred_target->getWidth(), (GLfloat)deferred_target->getHeight());
     shader.uniform1f(LLShaderMgr::DEFERRED_NEAR_CLIP, LLViewerCamera::getInstance()->getNear()*2.f);
     shader.uniform1f (LLShaderMgr::DEFERRED_SHADOW_OFFSET, RenderShadowOffset); //*shadow_offset_error);
     shader.uniform1f(LLShaderMgr::DEFERRED_SHADOW_BIAS, shadow_bias);
     shader.uniform1f(LLShaderMgr::DEFERRED_SPOT_SHADOW_OFFSET, RenderSpotShadowOffset);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SPOT_SHADOW_BIAS, RenderSpotShadowBias);
+    shader.uniform1f(LLShaderMgr::DEFERRED_SPOT_SHADOW_BIAS, bias_sign * RenderSpotShadowBias);
 
     shader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, mTransformedSunDir.mV);
     shader.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, mTransformedMoonDir.mV);
@@ -9957,6 +10027,8 @@ void LLPipeline::doWaterHaze()
         else
         {
             //render water patches like LLDrawPoolWater does
+            // Default LEQUAL auto-translates to GEQUAL under reverse-Z, mirroring the manual
+            // above-water depth test in waterHazeF.glsl (which flips its compare direction).
             LLGLDepthTest depth(GL_TRUE, GL_FALSE);
             LLGLDisable   cull(GL_CULL_FACE);
 
@@ -10047,6 +10119,12 @@ void LLPipeline::setupSpotLight(LLGLSLShader& shader, LLDrawable* drawablep)
     n = glm::normalize(n);
 
     F32 proj_range = far_clip - near_clip;
+    // Deliberately FORWARD glm::perspective (not al_perspective), paired with the forward
+    // [-1,1]->[0,1] `trans` above: this projector matrix produces cookie-texture UVs and a
+    // self-consistent front/behind test (proj_tc.z > 0 in spotLightF/alphaF); it never
+    // rasterizes into or samples the reverse-Z depth buffer. Spot SHADOWS use the separately
+    // reversed shadow_matrix. Converting this to al_perspective would flip proj_tc.z against
+    // the forward trans and silently break projector cookies under reverse-Z.
     glm::mat4 light_proj = glm::perspective(fovy, aspect, near_clip, far_clip);
     screen_to_light = trans * light_proj * screen_to_light;
     shader.uniformMatrix4fv(LLShaderMgr::PROJECTOR_MATRIX, 1, false, glm::value_ptr(screen_to_light));
@@ -11148,7 +11226,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 // replaced by shadow_near_clip below and the far only needs to clear the
                 // receivers, so widening the depth range is always safe.
                 F32 zpad = llmax(mx.mV[0] - mn.mV[0], mx.mV[1] - mn.mV[1]) * 0.5f + 1.f;
-                glm::mat4 uproj = glm::ortho(mn.mV[0], mx.mV[0], mn.mV[1], mx.mV[1], -mx.mV[2] - zpad, -mn.mV[2] + zpad);
+                // al_ortho so the cull frustum matches the active convention (this feeds
+                // updateFrustumPlanes, which unprojects with the same convention).
+                glm::mat4 uproj = al_ortho(mn.mV[0], mx.mV[0], mn.mV[1], mx.mV[1], -mx.mV[2] - zpad, -mn.mV[2] + zpad);
 
                 ucam.setOriginAndLookAt(ueye, up, ucenter);
                 ucam.setOrigin(0, 0, 0);
@@ -11378,7 +11458,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 { //just use ortho projection
                     mShadowFOV.mV[j] = -1.f;
                     origin.clearVec();
-                    proj[j] = glm::ortho(min.mV[0], max.mV[0],
+                    proj[j] = al_ortho(min.mV[0], max.mV[0],
                                         min.mV[1], max.mV[1],
                                         -max.mV[2], -min.mV[2]);
                 }
@@ -11469,7 +11549,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                     { //just use ortho projection
                         origin.clearVec();
                         mShadowError.mV[j] = -1.f;
-                        proj[j] = glm::ortho(min.mV[0], max.mV[0],
+                        proj[j] = al_ortho(min.mV[0], max.mV[0],
                                 min.mV[1], max.mV[1],
                                 -max.mV[2], -min.mV[2]);
                     }
@@ -11500,6 +11580,13 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                             0, (yfar + ynear) / (ynear - yfar), 0, -1.0f,
                             0, 0, -fz, 0,
                             0, (2.f * yfar * ynear) / (ynear - yfar), 0, 0);
+                        // Depth rides clip.w (= -view.y, row 3 here); al_reverse_z_transform
+                        // rewrites row 2 to (1 - ndc_z)/2 using that same w row, so it
+                        // reverses this non-standard perspective correctly. Do not hand-derive.
+                        if (LLRender::sReverseZ)
+                        {
+                            proj[j] = al_reverse_z_transform(proj[j]);
+                        }
                     }
                 }
             }
@@ -11517,11 +11604,18 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             //shadow_cam.ignoreAgentFrustumPlane(LLCamera::AGENT_PLANE_NEAR);
             shadow_cam.getAgentPlane(LLCamera::AGENT_PLANE_NEAR).set(shadow_near_clip);
 
-            //translate and scale to from [-1, 1] to [0, 1]
+            // translate and scale from [-1,1] to [0,1]. Under reverse-Z the projection
+            // already yields [0,1] shadow-map z, so z passes through (no 0.5*z+0.5); only
+            // xy are remapped. shadow_matrix then lands the receiver in the reversed depth.
             glm::mat4 trans(0.5f, 0.0f, 0.0f, 0.0f,
                             0.0f, 0.5f, 0.0f, 0.0f,
                             0.0f, 0.0f, 0.5f, 0.0f,
                             0.5f, 0.5f, 0.5f, 1.0f);
+            if (LLRender::sReverseZ)
+            {
+                trans[2][2] = 1.0f; // z passes through, already reversed [0,1]
+                trans[3][2] = 0.0f;
+            }
 
             set_current_modelview(view[j]);
             set_current_projection(proj[j]);
@@ -11659,13 +11753,20 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             F32 fovy = fov; // radians
             F32 aspect = width / height;
 
-            proj[i + 4] = glm::perspective(fovy, aspect, near_clip, far_clip);
+            proj[i + 4] = al_perspective(fovy, aspect, near_clip, far_clip);
 
-            //translate and scale to from [-1, 1] to [0, 1]
+            // translate and scale from [-1,1] to [0,1]. Under reverse-Z the projection
+            // already yields [0,1] shadow-map z, so z passes through (no 0.5*z+0.5); only
+            // xy are remapped. shadow_matrix then lands the receiver in the reversed depth.
             glm::mat4 trans(0.5f, 0.0f, 0.0f, 0.0f,
                             0.0f, 0.5f, 0.0f, 0.0f,
                             0.0f, 0.0f, 0.5f, 0.0f,
                             0.5f, 0.5f, 0.5f, 1.0f);
+            if (LLRender::sReverseZ)
+            {
+                trans[2][2] = 1.0f; // z passes through, already reversed [0,1]
+                trans[3][2] = 0.0f;
+            }
 
             set_current_modelview(view[i + 4]);
             set_current_projection(proj[i + 4]);
@@ -12027,7 +12128,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         F32 distance = (pos-camera.getOrigin()).length();
         F32 fov = atanf(tdim.mV[1]/distance)*2.f*RAD_TO_DEG;
         F32 aspect = tdim.mV[0]/tdim.mV[1];
-        glm::mat4 persp = glm::perspective(glm::radians(fov), aspect, 1.f, 256.f);
+        glm::mat4 persp = al_perspective(glm::radians(fov), aspect, 1.f, 256.f);
         set_current_projection(persp);
         gGL.loadMatrix(glm::value_ptr(persp));
 
@@ -12068,7 +12169,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
                 // that enable nothing to act on, so the linear result would be stored raw
                 // and then decoded a second time when the impostor writer feeds it back into
                 // the real G-buffer -- attachments on impostored avatars rendering too dark.
-                avatar->mImpostor.allocate(resX, resY, GL_SRGB8_ALPHA8, true);
+                avatar->mImpostor.allocate(resX, resY, GL_SRGB8_ALPHA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
 
                 if (LLPipeline::sRenderDeferred)
                 {
@@ -12142,6 +12243,8 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
         gGL.getTextureSlot(0)->unbind();
 
+        // GL_GREATER auto-translates to LESS under reverse-Z (via LLGLDepthTest::remap), and
+        // the background fill sits at the reverse-Z far plane (~0) instead of ~1.
         LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
 
         gGL.flush();
@@ -12152,7 +12255,9 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         gGL.pushMatrix();
         gGL.loadIdentity();
 
-        static const F32 clip_plane = 0.99999f;
+        // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
+        // consistent with the sunDisc/moon far pins.
+        const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
 
         gDebugProgram.bind();
 

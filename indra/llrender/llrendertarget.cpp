@@ -743,6 +743,10 @@ void LLRenderTarget::copyContents(LLRenderTarget& source, S32 srcX0, S32 srcY0, 
 }
 
 // static
+// WARNING: passing GL_DEPTH_BUFFER_BIT here blits into the default framebuffer's 24-bit
+// depth. Under reverse-Z the scene depth targets are DEPTH_COMPONENT32F, and glBlitFramebuffer
+// requires matching depth formats -- a 32F->24 depth blit is invalid. There is currently no
+// live depth caller (the only one is commented out), so this is a latent hazard, not a bug.
 void LLRenderTarget::copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0,
                                                S32 dstX1, S32 dstY1, U32 mask, U32 filter)
 {

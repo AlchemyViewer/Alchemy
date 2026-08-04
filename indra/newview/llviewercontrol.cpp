@@ -296,6 +296,15 @@ static bool handleEnableEmissiveChanged(const LLSD& newvalue)
     return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
 }
 
+static bool handleReverseZChanged(const LLSD& newvalue)
+{
+    // setShaders() latches the reverse-Z state (LLPipeline::updateReverseZ) and then
+    // releases + recreates the GL buffers at the new depth format itself, so -- unlike the
+    // emissive case -- do NOT release buffers up front (that would rebuild them at the old
+    // format only to have setShaders rebuild them again).
+    return handleSetShaderChanged(newvalue);
+}
+
 static bool handleHalationChanged(const LLSD& newvalue)
 {
     return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
@@ -1015,6 +1024,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderBloomResolutionScale", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleHalationChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleEnableEmissiveChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderReverseZ", handleReverseZChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDisableVintageMode", handleDisableVintageMode);
     setting_setup_signal_listener(gSavedSettings, "RenderHDREnabled", handleEnableHDR);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowNoise", handleSetShaderChanged);

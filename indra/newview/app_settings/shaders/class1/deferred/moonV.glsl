@@ -40,7 +40,13 @@ void main()
 
     // smash to *almost* far clip plane -- stars are still behind
     // SL-19283 - finagle the moon position to be between clouds and stars.
+    // Reverse-Z mirrors the stored depth (far=0): 1 - 0.9999955 window == 0.0000045 ndc,
+    // which stays nearer than the sun (0.0000005) under GREATER, matching forward order.
+#ifdef REVERSE_Z
+    pos.z = pos.w*0.0000045;
+#else
     pos.z = pos.w*0.999991;
+#endif
     gl_Position = pos;
 
     vary_texcoord0 = (texture_matrix0 * vec4(texcoord0,0,1)).xy;

@@ -309,8 +309,13 @@ vec3 computeLensFlare(sampler2D diffuse, sampler2D depth, vec2 uv)
         {
             vec2  tap_uv = sun_uv + taps[i] * uLensFlareOcclusionRadius;
             float d      = texture(depth, tap_uv).r;
-            // smoothstep against near-far plane — only sky counts as visible.
+            // smoothstep against near-far plane — only sky counts as visible. Mirror the far
+            // end under reverse-Z (far=0): smoothstep(0.9999,1,1-d) == 1-smoothstep(0,1e-4,d).
+#ifdef REVERSE_Z
+            occluded += smoothstep(0.9999, 1.0, 1.0 - d);
+#else
             occluded += smoothstep(0.9999, 1.0, d);
+#endif
         }
         vis *= occluded / float(num_taps);
     }

@@ -2144,6 +2144,10 @@ void LLGLManager::initExtensions()
     // Core in 4.5; also an ARB extension. Downgraded below if the entry points don't resolve.
     mHasDirectStateAccess = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_direct_state_access");
 
+    // Core in 4.5; also GL_ARB_clip_control. Gates reverse-Z. Downgraded below if glClipControl
+    // does not resolve. macOS GL 4.1 lacks it entirely and stays forward-Z.
+    mHasClipControl = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_clip_control");
+
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
     mHasEXTMemoryObject  = mGLExtensions.contains("GL_EXT_memory_object");
@@ -2222,6 +2226,33 @@ void LLGLManager::initExtensions()
     {
         LL_INFOS("RenderInit") << "Direct state access unavailable (GL " << mGLVersion
                                << ", no GL_ARB_direct_state_access); using bind-to-edit." << LL_ENDL;
+    }
+
+    // Clip control. Resolved here for the same reason as glTexStorage/DSA above: the
+    // GL_VERSION_4_5 ladder early-outs on a lower context, so a 4.1/4.4 driver exposing
+    // GL_ARB_clip_control would otherwise leave glClipControl null.
+    if (mHasClipControl)
+    {
+        glClipControl = (PFNGLCLIPCONTROLPROC)LL_GET_PROC_ADDRESS("glClipControl");
+
+        if (!glClipControl)
+        {
+            mHasClipControl = false;
+            LL_WARNS("RenderInit") << "Clip control advertised (GL " << mGLVersion
+                                   << ") but glClipControl did not resolve; reverse-Z unavailable."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Clip control available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.49f ? ", core)" : ", GL_ARB_clip_control)")
+                                   << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_INFOS("RenderInit") << "Clip control unavailable (GL " << mGLVersion
+                               << ", no GL_ARB_clip_control); reverse-Z depth disabled." << LL_ENDL;
     }
 
     // GL_EXT_memory_object
@@ -3423,6 +3454,10 @@ void LLGLUserClipPlane::disable()
     mApply = false;
 }
 
+// NOTE: dead code -- LLGLUserClipPlane is not constructed anywhere in the tree (water/
+// mirror clipping is done by shader discard). The oblique-clip math below hardcodes the
+// [-1,1] NDC convention (cplane[3] -= 1). If this is ever revived it MUST be made
+// reverse-Z aware (the ZERO_TO_ONE near-plane constant differs) before use.
 void LLGLUserClipPlane::setPlane(F32 a, F32 b, F32 c, F32 d)
 {
     const glm::mat4& P = mProjection;
@@ -3453,6 +3488,33 @@ LLGLUserClipPlane::~LLGLUserClipPlane()
     disable();
 }
 
+GLenum LLGLDepthTest::remap(GLenum func)
+{
+    if (!LLRender::sReverseZ)
+    {
+        return func;
+    }
+    switch (func)
+    {
+        case GL_LESS:     return GL_GREATER;
+        case GL_GREATER:  return GL_LESS;
+        case GL_LEQUAL:   return GL_GEQUAL;
+        case GL_GEQUAL:   return GL_LEQUAL;
+        // EQUAL/NOTEQUAL/ALWAYS/NEVER are direction-independent under a monotone
+        // depth remap and must NOT flip.
+        default:          return func;
+    }
+}
+
+void LLGLDepthTest::rebase()
+{
+    // Force the physical depth func to agree with the current translation of the tracked
+    // (semantic) func. Used by the reverse-Z latch after LLRender::sReverseZ toggles.
+    gGL.flush();
+    glDepthFunc(remap(sDepthFunc));
+    stop_glerror();
+}
+
 LLGLDepthTest::LLGLDepthTest(GLboolean depth_enabled, GLboolean write_enabled, GLenum depth_func)
 : mPrevDepthEnabled(sDepthEnabled), mPrevDepthFunc(sDepthFunc), mPrevWriteEnabled(sWriteEnabled)
 {
@@ -3477,7 +3539,7 @@ LLGLDepthTest::LLGLDepthTest(GLboolean depth_enabled, GLboolean write_enabled, G
     if (depth_func != sDepthFunc)
     {
         gGL.flush();
-        glDepthFunc(depth_func);
+        glDepthFunc(remap(depth_func));
         sDepthFunc = depth_func;
     }
     if (write_enabled != sWriteEnabled)
@@ -3502,7 +3564,7 @@ LLGLDepthTest::~LLGLDepthTest()
     if (sDepthFunc != mPrevDepthFunc)
     {
         gGL.flush();
-        glDepthFunc(mPrevDepthFunc);
+        glDepthFunc(remap(mPrevDepthFunc));
         sDepthFunc = mPrevDepthFunc;
     }
     if (sWriteEnabled != mPrevWriteEnabled )
@@ -3525,7 +3587,7 @@ void LLGLDepthTest::checkState()
 
         if (glIsEnabled(GL_DEPTH_TEST) != sDepthEnabled ||
             sWriteEnabled != mask ||
-            sDepthFunc != func)
+            remap(sDepthFunc) != (GLenum)func)
         {
             if (gDebugSession)
             {
@@ -3552,7 +3614,12 @@ LLGLSquashToFarClip::LLGLSquashToFarClip(const glm::mat4& P, U32 layer)
 
 void LLGLSquashToFarClip::setProjectionMatrix(glm::mat4 projection, U32 layer)
 {
-    F32 depth = 0.99999f - 0.0001f * layer;
+    // Replacing row 2 with row 3 * depth forces ndc z = depth for every vertex regardless
+    // of projection, so only the far-plane constant mirrors under reverse-Z (far = 0).
+    // Under ZERO_TO_ONE ndc==window, so mirror the forward WINDOW depth (0.999995 - 5e-5*layer,
+    // i.e. ndc*0.5+0.5), not the raw ndc distance -- matching the sundisc/moon pins.
+    F32 depth = LLRender::sReverseZ ? (0.000005f + 0.00005f * layer)
+                                    : (0.99999f - 0.0001f * layer);
 
     glm::vec4 P_row_3 = glm::row(projection, 3) * depth;
     projection = glm::row(projection, 2, P_row_3);

@@ -393,6 +393,16 @@ public:
 
     static bool isWaterClip();
 
+    // Depth format for the main scene / non-shadow depth targets: float32 under reverse-Z
+    // (same 4 bytes/px as DEPTH24 on desktop GPUs), fixed 24-bit otherwise.
+    static LLRenderTarget::eDepthFormat mainDepthFormat();
+
+    // Latch reverse-Z on/off to match (setting && clip-control cap): flips LLRender::sReverseZ,
+    // sets glClipControl + clear depth, re-bases the ambient depth func, and clears the sampler
+    // cache. Idempotent; requires a current GL context. Called from setShaders() so the whole
+    // convention flip (clip control, clear depth, RT formats, shader define) is atomic.
+    static void updateReverseZ();
+
     void setRenderTypeMask(U32 type, ...);
     // This is equivalent to 'setRenderTypeMask'
     //void orRenderTypeMask(U32 type, ...);

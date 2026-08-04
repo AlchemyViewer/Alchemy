@@ -1536,6 +1536,11 @@ void LLReflectionMapManager::initReflectionMaps()
 
         buff->getVertexStrider(v);
 
+        // NOTE: z=-1 is load-bearing. radianceGenV/irradianceGenV use this position for BOTH
+        // the clip-space gl_Position AND (rotated by modelview) the cubemap SAMPLE DIRECTION,
+        // so z is the forward axis of the convolution -- do NOT flatten it. The clip-volume
+        // conflict under reverse-Z (z=-1 is outside ZERO_TO_ONE) is resolved in the shaders,
+        // which remap only the output clip z while keeping the direction from this raw z=-1.
         v[0] = LLVector3(-1, -1, -1);
         v[1] = LLVector3(1, -1, -1);
         v[2] = LLVector3(-1, 1, -1);

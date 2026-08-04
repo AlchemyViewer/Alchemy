@@ -584,6 +584,10 @@ void LLHeroProbeManager::initReflectionMaps()
 
         buff->getVertexStrider(v);
 
+        // NOTE: z=-1 is load-bearing -- radianceGenV uses this position as BOTH clip-space
+        // gl_Position AND (rotated) the cubemap sample direction. The reverse-Z clip-volume
+        // conflict is resolved in the shader (remaps only the output clip z), not here.
+        // Mirrors LLReflectionMapManager::initReflectionMaps.
         v[0] = LLVector3(-1, -1, -1);
         v[1] = LLVector3(1, -1, -1);
         v[2] = LLVector3(-1, 1, -1);

@@ -106,7 +106,7 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
     LLRect world_view_rect = gViewerWindow->getWorldViewRectRaw();
     glm::ivec4 viewport(world_view_rect.mLeft, world_view_rect.mBottom, world_view_rect.getWidth(), world_view_rect.getHeight());
 
-    glm::vec3 win_coord = glm::project(glm::vec3(render_pos), get_current_modelview(), get_current_projection(), viewport);
+    glm::vec3 win_coord = al_project(glm::vec3(render_pos), get_current_modelview(), get_current_projection(), viewport);
 
     //fonts all render orthographically, set up projection``
     gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -137,7 +137,12 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
 
     LLUI::loadIdentity();
     gGL.loadIdentity();
-    LLUI::translate(int_x, int_y, -((win_coord.z * 2.f) - 1.f));
+    // Place the text at the 3D point's window depth so it occludes against the scene.
+    // The 2D ortho (gl_state_for_2d) becomes reversed-ZO under reverse-Z and win_coord.z
+    // is the reversed window depth, so the required translate-z is the exact negation.
+    const F32 hud_text_z = LLRender::sReverseZ ? ((win_coord.z * 2.f) - 1.f)
+                                               : -((win_coord.z * 2.f) - 1.f);
+    LLUI::translate(int_x, int_y, hud_text_z);
     F32 right_x;
 
     font.render(wstr, 0, frac_x, 1.f + frac_y, color, LLFontGL::LEFT, LLFontGL::BASELINE, style, shadow, static_cast<S32>(wstr.length()), 1000, &right_x, /*use_ellipses*/false, /*use_color*/true);

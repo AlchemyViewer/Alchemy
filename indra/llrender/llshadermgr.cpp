@@ -292,14 +292,6 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
-    if (features->hasGamma || features->isDeferred)
-    {
-        if (!shader->attachFragmentObject("windlight/gammaF.glsl"))
-        {
-            return false;
-        }
-    }
-
     if (features->hasAtmospherics || features->isDeferred)
     {
         if (!shader->attachFragmentObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", OBJ_AXIS_CLASSIC, shader, GL_FRAGMENT_SHADER))) {

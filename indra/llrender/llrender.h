@@ -309,6 +309,17 @@ public:
 
     void setLineWidth(F32 width);
 
+    // Depth offset applied to polygons while GL_POLYGON_OFFSET_FILL/LINE is enabled.
+    // Stated in the forward/semantic convention: a negative factor/units pulls a fragment
+    // toward the viewer. Under reverse-Z both terms are negated on the way to GL so that
+    // intent survives the flipped depth mapping -- the cache holds what the caller asked
+    // for, not what was issued. Redundant sets are dropped without a flush.
+    void setPolygonOffset(F32 factor, F32 units);
+    // Re-issue the physical offset for the current convention. Call after LLRender::sReverseZ
+    // changes: the cached semantic values are unchanged, but the translation they were issued
+    // under is not. Mirrors LLGLDepthTest::rebase().
+    void rebasePolygonOffset();
+
     ALTextureSlot* getTextureSlot(U32 index);
 
     U32 getCurrentTexUnitIndex(void) const { return mCurrTextureUnitIndex; }
@@ -371,6 +382,11 @@ public:
     static bool sClassicMode; // classic sky mode active
     static bool sMirrorPass;  // hero-probe planar-reflection (mirror clip) pass active
     static bool s10bitBackBuffer;
+    // Reverse-Z depth active this session: clip control ZERO_TO_ONE, reversed projections
+    // (near=1, far=0), depth cleared to 0, default depth func GREATER. Latched by
+    // LLPipeline::updateReverseZ() (newview) from the setting AND gGLManager.mHasClipControl;
+    // llrender cannot read settings, so newview owns the decision and writes it here.
+    static bool sReverseZ;
 
 private:
     friend class LLLightState;
@@ -394,6 +410,9 @@ private:
     U32             mCurrTextureUnitIndex;
     bool            mCurrColorMask[4];
     F32             mLineWidth = 1.f;
+    // Semantic (forward-convention) polygon offset; GL's own defaults are 0, 0.
+    F32             mPolygonOffsetFactor = 0.f;
+    F32             mPolygonOffsetUnits = 0.f;
 
     LLPointer<LLVertexBuffer>   mBuffer;
     LLStrider<LLVector4a>       mVerticesp;
@@ -454,6 +473,24 @@ void set_current_modelview(const glm::mat4& mat);
 void set_current_projection(const glm::mat4& mat);
 void set_last_modelview(const glm::mat4& mat);
 void set_last_projection(const glm::mat4& mat);
+
+// --- Reverse-Z projection helpers (gated on LLRender::sReverseZ) --------------
+// Rewrite a forward [-1,1] projection into reversed zero-to-one (near->1, far->0):
+// z_ndc' = (1 - z_ndc)/2, i.e. row2' = 0.5*(row3 - row2). Unconditional math; valid
+// for any forward projection, including the hand-rolled shadow perspective whose
+// depth rides an off-diagonal clip component.
+glm::mat4 al_reverse_z_transform(const glm::mat4& forward_proj);
+// Perspective / ortho that emit reversed-ZO when sReverseZ, else the plain forward
+// glm matrix. Drop-in replacements for glm::perspective / glm::ortho at the builders.
+glm::mat4 al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far);
+glm::mat4 al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far);
+// project / unproject honoring the active convention: glm::*ZO under reverse-Z, since
+// the projection already outputs [0,1] and glm must not remap the window z again.
+glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
+glm::vec3 al_unproject(const glm::vec3& win, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
+// Window depth of the near / far plane under the active convention.
+inline F32 al_window_near() { return LLRender::sReverseZ ? 1.f : 0.f; }
+inline F32 al_window_far()  { return LLRender::sReverseZ ? 0.f : 1.f; }
 
 // glh compat
 glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec);

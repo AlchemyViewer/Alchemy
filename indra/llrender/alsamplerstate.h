@@ -239,9 +239,11 @@ namespace ALSamplers
 //
 // The descriptor space the renderer actually uses is small and enumerable -- filter x
 // address mode x compare x srgb-decode -- so the common path is a flat array index rather
-// than a hash lookup, which matters because it runs per bind. Objects are created lazily
-// on first use and then live until the context goes away; they are immutable, so sharing
-// one between unrelated call sites is safe by construction.
+// than a hash lookup, which matters because it runs per bind. That table is built up front
+// by warmup(), NOT lazily -- the enum get() below only indexes it -- and lives until the
+// context goes away. The objects are immutable, so sharing one between unrelated call sites
+// is safe by construction. Anything that calls clear() owes a matching warmup() before the
+// next bind; see LLRender::clearSamplers().
 //
 // ONE INSTANCE PER GL CONTEXT, owned by LLRender (which is itself thread_local -- the
 // viewer runs a second shared context on the texture upload thread). That is not an
@@ -256,12 +258,12 @@ namespace ALSamplers
 class ALSamplerCache
 {
 public:
-    // Resolve (and create on first use) the sampler for a mask.
+    // Resolve the sampler for a mask. Pure lookup -- warmup() must already have run.
     //
     // The mask is the slot, so there is no arithmetic here at all: a constexpr key at the
     // call site -- which is nearly all of them -- makes this one load and one predictable
     // branch. Everything that can fail (entry-point checks, descriptor construction,
-    // glCreateSamplers) lives in the out-of-line createSlot(), taken once per mode.
+    // glCreateSamplers) lives in createSlot(), which only warmup() reaches.
     //
     // Returns 0 if sampler objects are unavailable, so callers never need to branch.
     U32 get(ALSampler key) const

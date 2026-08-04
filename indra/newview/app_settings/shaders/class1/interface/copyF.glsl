@@ -37,6 +37,7 @@ void main()
 {
     frag_color = texture(diffuseMap, tc);
 #if defined(COPY_DEPTH)
+    // Reverse-Z neutral: copies the raw stored depth value verbatim, no convention math.
     gl_FragDepth = texture(depthMap, tc).r;
 #endif
 }

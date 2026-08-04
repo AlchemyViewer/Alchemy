@@ -1129,6 +1129,17 @@
             <key>Value</key>
             <integer>30</integer>
         </map>
+        <key>AlchemyRenderReverseZ</key>
+        <map>
+            <key>Comment</key>
+            <string>Reverse-Z depth buffering for greater depth precision at distance (float32 depth, near=1/far=0). Requires GL 4.5 or GL_ARB_clip_control; ignored (forward-Z) where unavailable, e.g. macOS GL 4.1. Change triggers a shader rebuild and GL buffer reallocation.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderShadowDepth32F</key>
         <map>
             <key>Comment</key>

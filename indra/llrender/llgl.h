@@ -128,6 +128,11 @@ public:
     // is INVALID_OPERATION. Allocation paths that bind-to-create must keep using
     // glBindTexture until they are ported to glCreateTextures.
     bool mHasDirectStateAccess = false;
+    // Clip control (glClipControl for GL_ZERO_TO_ONE depth range). Core in 4.5, also
+    // reachable as GL_ARB_clip_control. Gates the reverse-Z depth path; only true once
+    // the entry point has actually resolved, so callers may trust it directly. Absent on
+    // macOS GL 4.1, which stays forward-Z.
+    bool mHasClipControl = false;
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;

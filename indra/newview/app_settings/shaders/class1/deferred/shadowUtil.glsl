@@ -51,6 +51,17 @@
  * would be undefined -- then transformed into each cascade's light space by plain matrix
  * math (legal in a branch; it is not a derivative). The normal-offset push and constant bias
  * are retained; with RPDB active the constant (RenderShadowBias) can be tuned down.
+ *
+ * DEPTH CONVENTION. The hardware-compare paths (gather and SampleCmp) are byte-identical
+ * across conventions: under reverse-Z the C++ side (a) sets the shadow sampler compare func
+ * to GEQUAL, (b) feeds reversed zero-to-one shadow_matrix (its bias sub-matrix drops the z
+ * remap since ZO clip already yields [0,1] shadow-map z), and (c) NEGATES shadow_bias /
+ * spot_shadow_bias at their single assembly site (pipeline.cpp), so `uvz.z += const_bias`
+ * needs no #ifdef -- the sign rides in on the uniform. Cascade selection (spos.z vs
+ * shadow_clip) is view-space and convention-independent, and RPDB's dz_texel is measured in
+ * whichever z space shadow_matrix produced, so it follows automatically. Only PCSS, which
+ * reads raw depth and does its own comparisons, has to branch: see compareDepth4,
+ * findBlockerDepth and the penumbra-radius gap below.
  */
 
 // ---- filter configuration (override from the global defines to retune without editing) ----
@@ -197,12 +208,21 @@ float pcssRotation(vec2 pos_screen)
     return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))) * 6.2831853;
 }
 
-// In-shader replacement for the hardware depth compare (GL_LEQUAL): lit where ref <= depth.
-// The ref is saturated because a fixed-point (DEPTH24) hardware compare clamps it to [0,1],
-// and the PCSS path has to behave the same at the edges of the depth range.
+// In-shader replacement for the hardware depth compare: lit where ref <= depth (GL_LEQUAL),
+// or ref >= depth under reverse-Z (GL_GEQUAL -- the func ALSamplerCache::makeDesc selects for
+// the compare samplers the non-PCSS paths use, mirrored here so both tiers agree).
+// The ref is saturated so a receiver pushed past either end of the depth range by its bias
+// resolves to a definite answer instead of drifting outside what the map can store. Do not
+// justify this by the fixed-point hardware clamp: reverse-Z forces DEPTH_FMT_32F, where the
+// hardware compare does not clamp at all. The saturation is symmetric under both conventions
+// (forward pushes ref past 1 near the far plane, reverse-Z past 0), so the two tiers agree.
 vec4 compareDepth4(vec4 depth, float ref)
 {
+#ifdef REVERSE_Z
+    return step(depth, vec4(clamp(ref, 0.0, 1.0)));
+#else
     return step(vec4(clamp(ref, 0.0, 1.0)), depth);
+#endif
 }
 
 // Rotate a disc offset by the per-pixel angle. cs = (cos phi, sin phi).
@@ -227,7 +247,13 @@ float findBlockerDepth(sampler2D shadowMap, vec3 uvz, vec2 texel, vec2 dz_texel,
         // receiver is not mistaken for its own blocker.
         float ref = uvz.z + dot(off, dz_texel);
 
-        vec4 isBlocker = step(d, vec4(ref)); // 1 where the texel is closer to the light
+        // 1 where the texel is closer to the light: smaller depth forward, larger under
+        // reverse-Z (near=1, far=0).
+#ifdef REVERSE_Z
+        vec4 isBlocker = step(vec4(ref), d);
+#else
+        vec4 isBlocker = step(d, vec4(ref));
+#endif
         sum   += dot(d, isBlocker);
         count += dot(isBlocker, vec4(1.0));
     }
@@ -251,10 +277,17 @@ float filterShadowPCSS(sampler2D shadowMap, vec3 uvz, vec2 res, vec2 dz_texel, v
         return 1.0; // no occluder found -- fully lit
     }
 
-    // Penumbra radius in texels. The scale folds the light's angular size and the cascade's
-    // depth range into one tunable; clamped below at one texel so the filter never degenerates
-    // to a single point sample, and above to bound the sparse taps' spacing.
+    // Penumbra radius in texels, from the receiver-blocker depth gap. The scale folds the
+    // light's angular size and the cascade's depth range into one tunable; clamped below at
+    // one texel so the filter never degenerates to a single point sample, and above to bound
+    // the sparse taps' spacing. The receiver is the FARTHER of the two, so it holds the larger
+    // depth forward and the smaller one under reverse-Z -- swap the operands so the gap stays
+    // positive (a negative gap would clamp to the 1-texel floor and kill contact hardening).
+#ifdef REVERSE_Z
+    float radius = clamp((blocker - uvz.z) * SHADOW_PCSS_SCALE, 1.0, SHADOW_PCSS_MAX_RADIUS);
+#else
     float radius = clamp((uvz.z - blocker) * SHADOW_PCSS_SCALE, 1.0, SHADOW_PCSS_MAX_RADIUS);
+#endif
 
     float shadow = 0.0;
     float wsum   = 0.0;

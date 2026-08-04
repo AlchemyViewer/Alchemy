@@ -83,5 +83,6 @@ void main()
     diff.rgb = clampHDRRange(diff.rgb);
     frag_color = diff;
 
+    // Reverse-Z neutral: copies the raw stored depth value verbatim, no convention math.
     gl_FragDepth = texture(depthMap, vary_fragcoord.xy).r;
 }

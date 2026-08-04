@@ -5571,8 +5571,25 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
 
     S32 output_buffer_offset_y = 0;
 
-    F32 depth_conversion_factor_1 = (LLViewerCamera::getInstance()->getFar() + LLViewerCamera::getInstance()->getNear()) / (2.f * LLViewerCamera::getInstance()->getFar() * LLViewerCamera::getInstance()->getNear());
-    F32 depth_conversion_factor_2 = (LLViewerCamera::getInstance()->getFar() - LLViewerCamera::getInstance()->getNear()) / (2.f * LLViewerCamera::getInstance()->getFar() * LLViewerCamera::getInstance()->getNear());
+    // Depth-buffer sample -> linear eye distance.
+    //
+    // glReadPixels(GL_DEPTH_COMPONENT) yields WINDOW depth in [0,1], not NDC. Inverting a
+    // perspective projection from a forward window depth W gives
+    //
+    //     d_eye = f*n / (f - W*(f - n))            (W=0 -> near, W=1 -> far)
+    //
+    // Reverse-Z stores 1-W, so normalising the sample to a forward window depth first lets
+    // both conventions share the one expression. near/far are hoisted out of the per-pixel
+    // body; the subtraction is exact at both ends and the denominator cannot cancel, since
+    // W*(f-n) <= f-n < f for any W in range.
+    const bool reverse_z_snapshot = LLRender::sReverseZ;
+    const F32 snap_near = LLViewerCamera::getInstance()->getNear();
+    const F32 snap_far  = LLViewerCamera::getInstance()->getFar();
+    auto linearize_snapshot_depth = [&](F32 d) -> F32
+    {
+        const F32 window_depth = reverse_z_snapshot ? (1.f - d) : d;
+        return (snap_far * snap_near) / (snap_far - window_depth * (snap_far - snap_near));
+    };
 
     // Subimages are in fact partial rendering of the final view. This happens when the final view is bigger than the screen.
     // In most common cases, scale_factor is 1 and there's no more than 1 iteration on x and y
@@ -5649,7 +5666,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                             {
                                 F32 depth_float = *(F32*)(depth_line_buffer->getData() + (i * sizeof(F32)));
 
-                                F32 linear_depth_float = 1.f / (depth_conversion_factor_1 - (depth_float * depth_conversion_factor_2));
+                                F32 linear_depth_float = linearize_snapshot_depth(depth_float);
                                 U32 RGB24 = F32_to_U32(linear_depth_float, LLViewerCamera::instance().getNear(), LLViewerCamera::instance().getFar());
                                 //A max value of 16777215 for RGB24 evaluates to black when it shold be white.  The clamp assures that the divisions do not somehow become >=256.
                                 U8 depth_byteR = (U8)(llclamp(llfloor(RGB24 / 65536.f), 0, 255));
@@ -5679,7 +5696,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                             {
                                 F32 depth_float = *(F32*)(depth_line_buffer->getData() + (i * sizeof(F32)));
 
-                                F32 linear_depth_float = 1.f / (depth_conversion_factor_1 - (depth_float * depth_conversion_factor_2));
+                                F32 linear_depth_float = linearize_snapshot_depth(depth_float);
                                 U8 depth_byte = F32_to_U8(linear_depth_float, LLViewerCamera::getInstance()->getNear(), LLViewerCamera::getInstance()->getFar());
                                 // write converted scanline out to result image
                                 for (S32 j = 0; j < raw->getComponents(); j++)

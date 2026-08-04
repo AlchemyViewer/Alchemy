@@ -521,7 +521,7 @@ void LLDrawPoolBump::renderBump(U32 pass)
     gGL.diffuseColor4f(1,1,1,1);
     /// Get rid of z-fighting with non-bump pass.
     LLGLEnable polyOffset(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-1.0f, -1.0f);
+    gGL.setPolygonOffset(-1.0f, -1.0f);
     pushBumpBatches(pass);
 }
 

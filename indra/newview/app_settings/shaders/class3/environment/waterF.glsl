@@ -143,6 +143,7 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 
 
 vec3 getPositionWithNDC(vec3 ndc);
+float ndcZFromScreenDepth(float d);   // deferredUtil.glsl -- depth-convention aware
 
 void generateWaveNormals(out vec3 wave1, out vec3 wave2, out vec3 wave3)
 {
@@ -263,7 +264,7 @@ void main()
 #ifdef TRANSPARENT_WATER
     float depth = texture(depthMap, distort).r;
 
-    vec3 refPos = getPositionWithNDC(vec3(distort*2.0-vec2(1.0), depth*2.0-1.0));
+    vec3 refPos = getPositionWithNDC(vec3(distort*2.0-vec2(1.0), ndcZFromScreenDepth(depth)));
 
     // Calculate some distance fade in the water to better assist with refraction blending and reducing the refraction texture's "disconnect".
 #ifdef SHORELINE_FADE
@@ -275,7 +276,7 @@ void main()
     distort2 = mix(distort, distort2, min(1, fade * 10));
     depth = texture(depthMap, distort2).r;
 
-    refPos = getPositionWithNDC(vec3(distort2 * 2.0 - vec2(1.0), depth * 2.0 - 1.0));
+    refPos = getPositionWithNDC(vec3(distort2 * 2.0 - vec2(1.0), ndcZFromScreenDepth(depth)));
 
     if (pos.z < refPos.z - 0.05)
     {

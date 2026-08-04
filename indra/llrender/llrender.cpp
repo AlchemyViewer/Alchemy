@@ -39,6 +39,8 @@
 #include "hbxxh.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/gtc/matrix_inverse.hpp" // glm::affineInverse
+#include "glm/ext/matrix_clip_space.hpp" // glm::perspective / glm::ortho
+#include "glm/ext/matrix_projection.hpp" // glm::project(ZO) / glm::unProject(ZO)
 
 #if GL_ARB_debug_output
 #ifndef APIENTRY
@@ -79,6 +81,7 @@ bool LLRender::sNsightDebugSupport = false;
 LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 bool LLRender::sClassicMode = false;
 bool LLRender::sMirrorPass = false;
+bool LLRender::sReverseZ = false;
 bool LLRender::s10bitBackBuffer = false;
 
 
@@ -436,6 +439,10 @@ void LLRender::refreshState(void)
 
     setColorMask(mCurrColorMask[0], mCurrColorMask[1], mCurrColorMask[2], mCurrColorMask[3]);
 
+    // Unconditional re-issue: setPolygonOffset would see the cache already agreeing with the
+    // requested value and skip the GL call, leaving the fresh context at its 0,0 default.
+    rebasePolygonOffset();
+
     flush();
 
     mDirty = false;
@@ -678,7 +685,10 @@ void LLRender::ortho(F32 left, F32 right, F32 bottom, F32 top, F32 zNear, F32 zF
     flush();
 
     {
-        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] *= glm::ortho(left, right, bottom, top, zNear, zFar);
+        // al_ortho emits reversed-ZO under reverse-Z (mapping legacy z in [-1,1] fully
+        // inside the [0,1] clip volume, so 2D/UI content at z in [-1,0) is not clipped),
+        // and plain glm::ortho otherwise. Converts all gGL.ortho() callers at once.
+        mMatrix[mMatrixMode][mMatIdx[mMatrixMode]] *= al_ortho(left, right, bottom, top, zNear, zFar);
         mMatHash[mMatrixMode]++;
     }
 }
@@ -1531,6 +1541,27 @@ void LLRender::setLineWidth(F32 width)
     }
 }
 
+void LLRender::setPolygonOffset(F32 factor, F32 units)
+{
+    if (mPolygonOffsetFactor != factor || mPolygonOffsetUnits != units)
+    {
+        mPolygonOffsetFactor = factor;
+        mPolygonOffsetUnits = units;
+        flush();
+
+        const F32 sign = sReverseZ ? -1.f : 1.f;
+        glPolygonOffset(sign * factor, sign * units);
+    }
+}
+
+void LLRender::rebasePolygonOffset()
+{
+    flush();
+
+    const F32 sign = sReverseZ ? -1.f : 1.f;
+    glPolygonOffset(sign * mPolygonOffsetFactor, sign * mPolygonOffsetUnits);
+}
+
 void LLRender::debugTexUnits(void)
 {
     LL_INFOS("TextureUnit") << "Active TexUnit: " << mCurrTextureUnitIndex << LL_ENDL;
@@ -1610,6 +1641,45 @@ void set_last_modelview(const glm::mat4& mat)
 void set_last_projection(const glm::mat4& mat)
 {
     copy_matrix(mat, gGLLastProjection);
+}
+
+glm::mat4 al_reverse_z_transform(const glm::mat4& p)
+{
+    // z_ndc' = (1 - z_ndc)/2  =>  row2' = 0.5*(row3 - row2). glm is column-major, so
+    // row i is spread across mat[c][i]. Leaves xy and w rows untouched.
+    glm::mat4 r = p;
+    for (int c = 0; c < 4; ++c)
+    {
+        r[c][2] = 0.5f * (p[c][3] - p[c][2]);
+    }
+    return r;
+}
+
+glm::mat4 al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far)
+{
+    // Forward branch is exactly glm::perspective (byte-identical to pre-reverse-Z callers).
+    glm::mat4 p = glm::perspective(fovy_rad, aspect, z_near, z_far);
+    return LLRender::sReverseZ ? al_reverse_z_transform(p) : p;
+}
+
+glm::mat4 al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far)
+{
+    glm::mat4 p = glm::ortho(left, right, bottom, top, z_near, z_far);
+    return LLRender::sReverseZ ? al_reverse_z_transform(p) : p;
+}
+
+glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport)
+{
+    // Under reverse-Z the projection already yields [0,1] window z, so use the ZO variant
+    // that does not re-apply the [-1,1]->[0,1] remap.
+    return LLRender::sReverseZ ? glm::projectZO(obj, modelview, proj, viewport)
+                               : glm::project(obj, modelview, proj, viewport);
+}
+
+glm::vec3 al_unproject(const glm::vec3& win, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport)
+{
+    return LLRender::sReverseZ ? glm::unProjectZO(win, modelview, proj, viewport)
+                               : glm::unProject(win, modelview, proj, viewport);
 }
 
 glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec)

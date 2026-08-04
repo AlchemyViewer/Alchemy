@@ -181,11 +181,40 @@ vec4 getNormRaw(vec2 screenpos)
     return norm;
 }
 
+// Convert a stored screen-depth sample to its NDC z under the active depth convention.
+// Under reverse-Z the C++ side sets glClipControl(GL_ZERO_TO_ONE) and feeds reversed
+// zero-to-one projections, so the buffer already holds ndc z; the legacy convention needs
+// the [0,1]->[-1,1] remap. Callers that also attach aoUtil.glsl must not redefine this.
+float ndcZFromScreenDepth(float d)
+{
+#ifdef REVERSE_Z
+    return d;
+#else
+    return 2.0 * d - 1.0;
+#endif
+}
+
+// True when a stored depth sample lies on the far plane (an unwritten sky pixel). The far
+// plane is 0 under reverse-Z and 1 otherwise.
+bool isFarDepth(float d)
+{
+#ifdef REVERSE_Z
+    return d <= 0.0;
+#else
+    return d >= 1.0;
+#endif
+}
+
 // get linear depth value given a depth buffer sample d and znear and zfar values
 float linearDepth(float d, float znear, float zfar)
 {
+#ifdef REVERSE_Z
+    // Reversed zero-to-one: d=1 -> znear, d=0 -> zfar. No cancellation (all-positive denom).
+    return znear * zfar / (znear + d * (zfar - znear));
+#else
     d = d * 2.0 - 1.0;
     return znear * 2.0 * zfar / (zfar + znear - d * (zfar - znear));
+#endif
 }
 
 float linearDepth01(float d, float znear, float zfar)
@@ -320,7 +349,7 @@ vec4 getPosition(vec2 pos_screen)
 {
     float depth = getDepth(pos_screen);
     vec2 sc = getScreenCoordinate(pos_screen);
-    vec4 ndc = vec4(sc.x, sc.y, 2.0*depth-1.0, 1.0);
+    vec4 ndc = vec4(sc.x, sc.y, ndcZFromScreenDepth(depth), 1.0);
     vec4 pos = inv_proj * ndc;
     pos /= pos.w;
     pos.w = 1.0;
@@ -337,7 +366,7 @@ vec3 getPositionWithNDC(vec3 ndc)
 vec4 getPositionWithDepth(vec2 pos_screen, float depth)
 {
     vec2 sc = getScreenCoordinate(pos_screen);
-    vec3 ndc = vec3(sc.x, sc.y, 2.0*depth-1.0);
+    vec3 ndc = vec3(sc.x, sc.y, ndcZFromScreenDepth(depth));
     return vec4(getPositionWithNDC(ndc), 1.0);
 }
 

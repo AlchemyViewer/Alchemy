@@ -533,6 +533,13 @@ void LLViewerShaderMgr::setShaders()
         return;
     }
 
+    // Latch reverse-Z before anything downstream reads it: this same call releases and
+    // reallocates GL buffers (mainDepthFormat), loadBasicShaders() emits REVERSE_Z into
+    // sGlobalDefines, and the compiles/cache key fold it in -- all within this one blocking
+    // call, so clip control, clear depth, depth format and the shader define agree for the
+    // whole next frame.
+    LLPipeline::updateReverseZ();
+
     {
         static LLCachedControl<bool> shader_cache_enabled(gSavedSettings, "RenderShaderCacheEnabled", true);
         static LLUUID old_cache_version;
@@ -863,6 +870,15 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     if (mirrors)
     {
         attribs["HERO_PROBES"] = "1";
+    }
+
+    // Reverse-Z depth: reaches every program (including the shared objects attached by name)
+    // and folds into the binary-cache hash, so a toggle auto-invalidates stale binaries. Reads
+    // the state LLPipeline::updateReverseZ() latched at the top of setShaders(), so the define
+    // and the glClipControl state always agree.
+    if (LLRender::sReverseZ)
+    {
+        attribs["REVERSE_Z"] = "1";
     }
 
     { // PBR terrain

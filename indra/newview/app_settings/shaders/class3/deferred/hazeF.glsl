@@ -36,6 +36,7 @@ vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 
 float getDepth(vec2 pos_screen);
+bool isFarDepth(float d);             // deferredUtil.glsl -- depth-convention aware
 
 vec3 linear_to_srgb(vec3 c);
 vec3 srgb_to_linear(vec3 c);
@@ -76,7 +77,7 @@ void main()
     vec3  irradiance = vec3(0);
     vec3  radiance  = vec3(0);
 
-    if (depth >= 1.0)
+    if (isFarDepth(depth))
     {
         //should only be true of sky, clouds, sun/moon, and stars
         discard;

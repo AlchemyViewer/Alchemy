@@ -1427,8 +1427,11 @@ bool get_hud_matrices(const LLRect& screen_region, glm::mat4 &proj, glm::mat4&mo
         LLBBox hud_bbox = gAgentAvatarp->getHUDBBox();
 
         F32 hud_depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-        proj = glm::ortho(-0.5f * LLViewerCamera::getInstance()->getAspect(), 0.5f * LLViewerCamera::getInstance()->getAspect(), -0.5f, 0.5f, 0.f, hud_depth);
-        proj[2][2] = -0.01f;
+        // al_ortho reverses the depth row under reverse-Z (its [3][2] becomes +1), so only
+        // the flatten-hack [2][2] constant mirrors: window = 1 + 0.005*z == 1 - window_fwd,
+        // same per-unit spacing and clip budget, reversed direction.
+        proj = al_ortho(-0.5f * LLViewerCamera::getInstance()->getAspect(), 0.5f * LLViewerCamera::getInstance()->getAspect(), -0.5f, 0.5f, 0.f, hud_depth);
+        proj[2][2] = LLRender::sReverseZ ? 0.005f : -0.01f;
 
         F32 aspect_ratio = LLViewerCamera::getInstance()->getAspect();
 
