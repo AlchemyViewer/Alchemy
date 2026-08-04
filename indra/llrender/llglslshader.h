@@ -378,7 +378,7 @@ public:
     S32 mShaderLevel;
     S32 mShaderGroup; // see LLGLSLShader::eGroup
     // environment-uniform generation this program last applied; see sEnvironmentGeneration
-    U32 mEnvUniformsGeneration = 0;
+    U32 mEnvUniformsGeneration = 1;
     LLShaderFeatures mFeatures;
     std::vector< std::pair< std::string, GLenum > > mShaderFiles;
     std::string mName;
@@ -480,8 +480,8 @@ public:
     // Generation of the shared environment uniform set. LLEnvironment bumps it via
     // dirtyEnvironmentUniforms(); a program re-applies on bind when its own generation is
     // behind. A counter rather than a per-program dirty flag so the per-frame environment
-    // update stays O(1) and reaches programs no list happens to hold. 0 is the "never applied"
-    // sentinel (the bump skips it), so a freshly created program always applies on first bind.
+    // update stays O(1) and reaches programs no list happens to hold. A new program starts
+    // level with it, never behind -- see createShader().
     static U32 sEnvironmentGeneration;
 
     // variants for use by GLTF renderer

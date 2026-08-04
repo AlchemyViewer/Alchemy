@@ -358,12 +358,7 @@ LLGLSLShader::~LLGLSLShader()
 // uniforms resolves them to -1 and skips, so re-applying is cheap.
 void LLGLSLShader::dirtyEnvironmentUniforms()
 {
-    // 0 is reserved as the "never applied" sentinel that createShader() resets to, so skip it on
-    // wrap -- otherwise a wrapped counter would make freshly built programs look up to date.
-    if (++sEnvironmentGeneration == 0)
-    {
-        sEnvironmentGeneration = 1;
-    }
+    ++sEnvironmentGeneration;
 }
 
 void LLGLSLShader::freeVariant(LLGLSLShader*& variant)
@@ -578,9 +573,12 @@ bool LLGLSLShader::createShader(U32 variants)
     // Recreating the program invalidates any variants built from the previous configuration.
     freeOwnedVariants();
 
-    // Back to "never applied" so the rebuilt program re-applies the environment uniform set on
-    // its first bind rather than inheriting the old program object's generation.
-    mEnvUniformsGeneration = 0;
+    // Start level with the current generation rather than behind it: a program must not apply
+    // the environment uniform set before there IS an environment. gpu_benchmark() builds and
+    // binds a program during feature detection, which runs from LLViewerWindow's constructor,
+    // long before LLEnvironment exists. Nothing is lost by waiting -- LLEnvironment::update()
+    // bumps the generation every frame, so a program built mid-session applies on the next one.
+    mEnvUniformsGeneration = sEnvironmentGeneration;
 
     unloadInternal();
 
