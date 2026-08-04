@@ -67,6 +67,12 @@ LLShaderMgr * LLShaderMgr::instance()
     return sInstance;
 }
 
+// static
+std::string LLShaderMgr::variantObjectKey(const std::string& path, const LLGLSLShader* shader)
+{
+    return shader->mDefines.count("CLASSIC_MODE") ? path + CLASSIC_OBJECT_SUFFIX : path;
+}
+
 bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 {
     llassert_always(shader != NULL);
@@ -149,7 +155,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
             return false;
         }
 
-        if (!shader->attachVertexObject("windlight/atmosphericsFuncs.glsl")) {
+        if (!shader->attachVertexObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", shader))) {
             return false;
         }
 
@@ -219,7 +225,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
     // we want this BEFORE shadows and AO because those facilities use pos/norm access
     if (features->isDeferred || features->hasReflectionProbes)
     {
-        if (!shader->attachFragmentObject("deferred/deferredUtil.glsl"))
+        if (!shader->attachFragmentObject(variantObjectKey("deferred/deferredUtil.glsl", shader)))
         {
             return false;
         }
@@ -251,7 +257,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasReflectionProbes)
     {
-        if (!shader->attachFragmentObject("deferred/reflectionProbeF.glsl"))
+        if (!shader->attachFragmentObject(variantObjectKey("deferred/reflectionProbeF.glsl", shader)))
         {
             return false;
         }
@@ -275,7 +281,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasAtmospherics || features->isDeferred)
     {
-        if (!shader->attachFragmentObject("windlight/atmosphericsFuncs.glsl")) {
+        if (!shader->attachFragmentObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", shader))) {
             return false;
         }
 
@@ -471,7 +477,7 @@ void LLShaderMgr::dumpObjectLog(GLuint ret, bool warns, const std::string& filen
     }
  }
 
-GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels)
+GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, const std::string& cache_key)
 {
     GLenum error = GL_NO_ERROR;
 
@@ -934,12 +940,15 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     //successfully loaded, save results
     if (ret)
     {
-        // Add shader file to map
+        // Add shader file to map. The key is the path unless the caller asked for a distinct
+        // one -- a shared object compiled a second time under different defines needs its own
+        // entry, since attach is by key (see variantObjectKey).
+        const std::string& key = cache_key.empty() ? filename : cache_key;
         if (type == GL_VERTEX_SHADER) {
-            mVertexShaderObjects[filename] = ret;
+            mVertexShaderObjects[key] = ret;
         }
         else if (type == GL_FRAGMENT_SHADER) {
-            mFragmentShaderObjects[filename] = ret;
+            mFragmentShaderObjects[key] = ret;
         }
         shader_level = try_gpu_class;
     }
@@ -948,7 +957,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         if (shader_level > 1)
         {
             shader_level--;
-            return loadShaderFile(filename, shader_level, type, defines, texture_index_channels);
+            return loadShaderFile(filename, shader_level, type, defines, texture_index_channels, cache_key);
         }
         LL_WARNS("ShaderLoading") << "Failed to load " << filename << LL_ENDL;
     }

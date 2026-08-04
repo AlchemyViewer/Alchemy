@@ -705,6 +705,13 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 
     LLGLSLShader::sGlobalDefines = attribs;
 
+    // Shared objects are compiled once and attached by name, so a per-program permutation
+    // cannot reach them. Sources that read classic_mode therefore get a second copy compiled
+    // with CLASSIC_MODE=1, stored under a suffixed key; attachShaderFeatures() picks the copy
+    // matching each program's own defines (see LLShaderMgr::variantObjectKey).
+    std::map<std::string, std::string> classic_attribs = attribs;
+    classic_attribs["CLASSIC_MODE"] = "1";
+
     // We no longer have to bind the shaders to global glhandles, they are automatically added to a map now.
     for (U32 i = 0; i < shaders.size(); i++)
     {
@@ -713,6 +720,17 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         {
             LL_WARNS("Shader") << "Failed to load basic vertex shader " << i << ": " << shaders[i].first << LL_ENDL;
             return shaders[i].first;
+        }
+    }
+
+    {
+        const std::string path = "windlight/atmosphericsFuncs.glsl";
+        S32 level = mShaderLevel[SHADER_WINDLIGHT];
+        if (loadShaderFile(path, level, GL_VERTEX_SHADER, &classic_attribs, -1,
+                           path + LLShaderMgr::CLASSIC_OBJECT_SUFFIX) == 0)
+        {
+            LL_WARNS("Shader") << "Failed to load classic vertex shader " << path << LL_ENDL;
+            return path;
         }
     }
 
@@ -762,6 +780,23 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         }
     }
 
+    {
+        std::pair<std::string, S32> classic_shared[] = {
+            { "windlight/atmosphericsFuncs.glsl", mShaderLevel[SHADER_WINDLIGHT] },
+            { "deferred/deferredUtil.glsl",       1 },
+            { "deferred/reflectionProbeF.glsl",   has_reflection_probes ? 3 : 2 },
+        };
+        for (auto& entry : classic_shared)
+        {
+            if (loadShaderFile(entry.first, entry.second, GL_FRAGMENT_SHADER, &classic_attribs, -1,
+                               entry.first + LLShaderMgr::CLASSIC_OBJECT_SUFFIX) == 0)
+            {
+                LL_WARNS("Shader") << "Failed to load classic fragment shader " << entry.first << LL_ENDL;
+                return entry.first;
+            }
+        }
+    }
+
     return std::string();
 }
 
@@ -808,7 +843,7 @@ bool LLViewerShaderMgr::loadShadersWater()
 
         gWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
         gWaterProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
-        success = gWaterProgram.createShader();
+        success = gWaterProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -1219,7 +1254,15 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredMaterialProgram[i].mFeatures.hasReflectionProbes = true;
 
             gDeferredMaterialProgram[i].addPermutation("LINEAR_DIFFUSE", "1");
-            success = gDeferredMaterialProgram[i].createShader(LLGLSLShader::VARIANT_RIGGED);
+
+            // Only the forward alpha-blend mask compiles the classic_mode branches in
+            // class3/materialF.glsl; every other mask is a GBuffer writer.
+            U32 variants = LLGLSLShader::VARIANT_RIGGED;
+            if (alpha_mode == 1)
+            {
+                variants |= LLGLSLShader::VARIANT_CLASSIC;
+            }
+            success = gDeferredMaterialProgram[i].createShader(variants);
             llassert(success);
         }
     }
@@ -1459,7 +1502,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
 
         shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
 
         // Alpha Shader Hack
@@ -1489,7 +1532,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(shader);
 
         shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = shader->createShader();
+        success = shader->createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -1585,7 +1628,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredLightProgram);
 
-        success = gDeferredLightProgram.createShader();
+        success = gDeferredLightProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -1608,7 +1651,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             add_common_permutations(&gDeferredMultiLightProgram[i]);
 
-            success = gDeferredMultiLightProgram[i].createShader();
+            success = gDeferredMultiLightProgram[i].createShader(LLGLSLShader::VARIANT_CLASSIC);
             llassert(success);
         }
     }
@@ -1629,7 +1672,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredSpotLightProgram);
 
-        success = gDeferredSpotLightProgram.createShader();
+        success = gDeferredSpotLightProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -1650,7 +1693,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredMultiSpotLightProgram);
 
-        success = gDeferredMultiSpotLightProgram.createShader();
+        success = gDeferredMultiSpotLightProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -1764,7 +1807,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
             // the deferred alpha pass draws rigged geometry; the HUD pass never does
-            success = shader->createShader(hud ? 0 : LLGLSLShader::VARIANT_RIGGED);
+            U32 variants = LLGLSLShader::VARIANT_CLASSIC;
+            if (!hud)
+            {
+                variants |= LLGLSLShader::VARIANT_RIGGED;
+            }
+            success = shader->createShader(variants);
             llassert(success);
 
             // Hack
@@ -1810,7 +1858,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(shader);
 
         shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
 
         // End Hack
@@ -1971,7 +2019,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredFullbrightShinyProgram);
 
         gDeferredFullbrightShinyProgram.addPermutation("LINEAR_DIFFUSE", "1");
-        success = gDeferredFullbrightShinyProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        success = gDeferredFullbrightShinyProgram.createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -1993,7 +2041,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gHUDFullbrightShinyProgram);
 
-        success = gHUDFullbrightShinyProgram.createShader();
+        success = gHUDFullbrightShinyProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -2075,7 +2123,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredSoftenProgram.addPermutation("HAS_SSAO", "1");
         }
 
-        success = gDeferredSoftenProgram.createShader();
+        success = gDeferredSoftenProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -2099,7 +2147,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         gHazeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
-        success = gHazeProgram.createShader();
+        success = gHazeProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -2390,7 +2438,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredAvatarAlphaProgram);
 
-        success = gDeferredAvatarAlphaProgram.createShader();
+        success = gDeferredAvatarAlphaProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
 
         gDeferredAvatarAlphaProgram.mFeatures.calculatesLighting = true;

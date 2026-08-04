@@ -187,7 +187,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     }
     else
     {
-        shader = &gWaterProgram;
+        shader = gWaterProgram.selectVariant();
     }
 
     gPipeline.bindDeferredShader(*shader, nullptr, &gPipeline.mWaterDis);

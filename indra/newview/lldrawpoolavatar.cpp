@@ -249,7 +249,7 @@ void LLDrawPoolAvatar::beginPostDeferredPass(S32 pass)
 
     sSkipOpaque = true;
     sShaderLevel = mShaderLevel;
-    sVertexProgram = &gDeferredAvatarAlphaProgram;
+    sVertexProgram = gDeferredAvatarAlphaProgram.selectVariant();
     sRenderingSkinned = true;
 
     gPipeline.bindDeferredShader(*sVertexProgram);

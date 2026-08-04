@@ -559,7 +559,19 @@ public:
     void dumpShaderSource(U32 shader_code_count, GLchar** shader_code_text);
     bool    linkProgramObject(GLuint obj, bool suppress_errors = false);
     bool    validateProgramObject(GLuint obj);
-    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1);
+    // `cache_key` overrides the map key the compiled object is stored under; empty means the
+    // path. Shared objects are compiled once and attached by name, so a source that keys on a
+    // compile-time variant axis is compiled once per axis value under distinct keys.
+    GLuint loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines = NULL, S32 texture_index_channels = -1, const std::string& cache_key = std::string());
+
+    // Suffix marking the CLASSIC_MODE=1 copy of a shared object. Not a legal path character
+    // sequence, so it cannot collide with a real file.
+    static constexpr const char* CLASSIC_OBJECT_SUFFIX = "|CLASSIC_MODE";
+
+    // Key of the copy of `path` that matches `shader`'s compile-time axes: a program carrying
+    // CLASSIC_MODE must attach the object compiled with it, since the define cannot reach an
+    // object that was compiled once for everyone.
+    static std::string variantObjectKey(const std::string& path, const LLGLSLShader* shader);
 
     // Implemented in the application to actually point to the shader directory.
     virtual std::string getShaderDirPrefix(void) = 0; // Pure Virtual

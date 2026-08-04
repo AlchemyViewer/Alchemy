@@ -38,7 +38,15 @@ uniform vec4  light_col[LIGHT_COUNT]; // .a = falloff
 uniform vec2  screen_res;
 uniform float far_z;
 uniform mat4  inv_proj;
-uniform int classic_mode;
+// Classic (legacy pre-PBR) sky lighting is a per-program compile-time variant, not a runtime
+// uniform: the two paths differ by whole blocks of maths and a probe sample, and only one of
+// them is ever live for a given sky. A macro rather than a const global -- these sources are
+// separately compiled units linked into one program, and several of them declare this.
+#ifdef CLASSIC_MODE
+#define classic_mode 1
+#else
+#define classic_mode 0
+#endif
 
 in vec4 vary_fragcoord;
 

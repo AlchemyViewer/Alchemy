@@ -9463,7 +9463,7 @@ void LLPipeline::renderDeferredLighting()
 
         if (RenderDeferredAtmospheric)
         {  // apply sunlight contribution
-            LLGLSLShader &soften_shader = gDeferredSoftenProgram;
+            LLGLSLShader &soften_shader = *gDeferredSoftenProgram.selectVariant();
 
             LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - atmospherics");
             LL_PROFILE_GPU_ZONE("atmospherics");
@@ -9490,7 +9490,7 @@ void LLPipeline::renderDeferredLighting()
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
 
-            unbindDeferredShader(gDeferredSoftenProgram);
+            unbindDeferredShader(soften_shader);
         }
 
         static LLCachedControl<S32> local_light_count(gSavedSettings, "RenderLocalLightCount", 256);
@@ -9519,7 +9519,8 @@ void LLPipeline::renderDeferredLighting()
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - local lights");
                 LL_PROFILE_GPU_ZONE("local lights");
-                bindDeferredShader(gDeferredLightProgram);
+                LLGLSLShader& light_shader = *gDeferredLightProgram.selectVariant();
+                bindDeferredShader(light_shader);
 
                 if (mCubeVB.isNull())
                 {
@@ -9594,11 +9595,10 @@ void LLPipeline::renderDeferredLighting()
                             continue;
                         }
 
-                        gDeferredLightProgram.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, c);
-                        gDeferredLightProgram.uniform1f(LLShaderMgr::LIGHT_SIZE, s);
-                        gDeferredLightProgram.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, col.mV);
-                        gDeferredLightProgram.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
-                        gDeferredLightProgram.uniform1i(LLShaderMgr::CLASSIC_MODE, (psky->canAutoAdjust()) ? 1 : 0);
+                        light_shader.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, c);
+                        light_shader.uniform1f(LLShaderMgr::LIGHT_SIZE, s);
+                        light_shader.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, col.mV);
+                        light_shader.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
 
                         gGL.syncMatrices();
 
@@ -9624,7 +9624,7 @@ void LLPipeline::renderDeferredLighting()
                 // Bookmark comment to allow searching for mSpecialRenderMode == 3 (avatar edit mode),
                 // prev site of appended deferred character light, removed by SL-13522 09/20
 
-                unbindDeferredShader(gDeferredLightProgram);
+                unbindDeferredShader(light_shader);
             }
 
             if (!spot_lights.empty())
@@ -9632,11 +9632,12 @@ void LLPipeline::renderDeferredLighting()
                 LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderDeferredLighting - projectors");
                 LL_PROFILE_GPU_ZONE("projectors");
                 LLGLDepthTest depth(GL_TRUE, GL_FALSE);
-                bindDeferredShader(gDeferredSpotLightProgram);
+                LLGLSLShader& spot_shader = *gDeferredSpotLightProgram.selectVariant();
+                bindDeferredShader(spot_shader);
 
                 mCubeVB->setBuffer();
 
-                gDeferredSpotLightProgram.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+                spot_shader.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
 
                 for (LLDrawable* drawablep : spot_lights)
                 {
@@ -9649,23 +9650,22 @@ void LLPipeline::renderDeferredLighting()
 
                     sVisibleLightCount++;
 
-                    setupSpotLight(gDeferredSpotLightProgram, drawablep);
+                    setupSpotLight(spot_shader, drawablep);
 
                     // send light color to shader in linear space
                     LLColor3 col = volume->getLightLinearColor() * light_scale;
 
-                    gDeferredSpotLightProgram.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, c);
-                    gDeferredSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_SIZE, s);
-                    gDeferredSpotLightProgram.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, col.mV);
-                    gDeferredSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
-                    gDeferredSpotLightProgram.uniform1i(LLShaderMgr::CLASSIC_MODE, (psky->canAutoAdjust()) ? 1 : 0);
+                    spot_shader.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, c);
+                    spot_shader.uniform1f(LLShaderMgr::LIGHT_SIZE, s);
+                    spot_shader.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, col.mV);
+                    spot_shader.uniform1f(LLShaderMgr::LIGHT_FALLOFF, volume->getLightFalloff(DEFERRED_LIGHT_FALLOFF));
 
                     gGL.syncMatrices();
 
                     mCubeVB->drawRange(LLRender::TRIANGLE_FAN, 0, 7, 8, get_box_fan_indices(camera, center));
                 }
-                gDeferredSpotLightProgram.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
-                unbindDeferredShader(gDeferredSpotLightProgram);
+                spot_shader.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+                unbindDeferredShader(spot_shader);
             }
 
             {
@@ -9693,23 +9693,24 @@ void LLPipeline::renderDeferredLighting()
                     if (count == max_count || total_count == num_fullscreen_lights)
                     {
                         U32 idx = count - 1;
-                        bindDeferredShader(gDeferredMultiLightProgram[idx]);
-                        gDeferredMultiLightProgram[idx].uniform1i(LLShaderMgr::MULTI_LIGHT_COUNT, count);
-                        gDeferredMultiLightProgram[idx].uniform4fv(LLShaderMgr::MULTI_LIGHT, count, light[0].mV);
-                        gDeferredMultiLightProgram[idx].uniform4fv(LLShaderMgr::MULTI_LIGHT_COL, count, col[0].mV);
-                        gDeferredMultiLightProgram[idx].uniform1f(LLShaderMgr::MULTI_LIGHT_FAR_Z, far_z);
-                        gDeferredMultiLightProgram[idx].uniform1i(LLShaderMgr::CLASSIC_MODE, (psky->canAutoAdjust()) ? 1 : 0);
+                        LLGLSLShader& multi_light_shader = *gDeferredMultiLightProgram[idx].selectVariant();
+                        bindDeferredShader(multi_light_shader);
+                        multi_light_shader.uniform1i(LLShaderMgr::MULTI_LIGHT_COUNT, count);
+                        multi_light_shader.uniform4fv(LLShaderMgr::MULTI_LIGHT, count, light[0].mV);
+                        multi_light_shader.uniform4fv(LLShaderMgr::MULTI_LIGHT_COL, count, col[0].mV);
+                        multi_light_shader.uniform1f(LLShaderMgr::MULTI_LIGHT_FAR_Z, far_z);
                         far_z = 0.f;
                         count = 0;
                         mScreenTriangleVB->setBuffer();
                         mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-                        unbindDeferredShader(gDeferredMultiLightProgram[idx]);
+                        unbindDeferredShader(multi_light_shader);
                     }
                 }
 
-                bindDeferredShader(gDeferredMultiSpotLightProgram);
+                LLGLSLShader& multi_spot_shader = *gDeferredMultiSpotLightProgram.selectVariant();
+                bindDeferredShader(multi_spot_shader);
 
-                gDeferredMultiSpotLightProgram.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+                multi_spot_shader.enableTexture(LLShaderMgr::DEFERRED_PROJECTION);
 
                 mScreenTriangleVB->setBuffer();
 
@@ -9725,22 +9726,21 @@ void LLPipeline::renderDeferredLighting()
                     glm::vec3 tc(center);
                     tc = mul_mat4_vec3(mat, tc);
 
-                    setupSpotLight(gDeferredMultiSpotLightProgram, drawablep);
+                    setupSpotLight(multi_spot_shader, drawablep);
 
                     // send light color to shader in linear space
                     LLColor3 col = volume->getLightLinearColor() * light_scale;
 
-                    gDeferredMultiSpotLightProgram.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, glm::value_ptr(tc));
-                    gDeferredMultiSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_SIZE, light_size_final);
-                    gDeferredMultiSpotLightProgram.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, col.mV);
-                    gDeferredMultiSpotLightProgram.uniform1f(LLShaderMgr::LIGHT_FALLOFF, light_falloff_final);
-                    gDeferredMultiSpotLightProgram.uniform1i(LLShaderMgr::CLASSIC_MODE, (psky->canAutoAdjust()) ? 1 : 0);
+                    multi_spot_shader.uniform3fv(LLShaderMgr::LIGHT_CENTER, 1, glm::value_ptr(tc));
+                    multi_spot_shader.uniform1f(LLShaderMgr::LIGHT_SIZE, light_size_final);
+                    multi_spot_shader.uniform3fv(LLShaderMgr::DIFFUSE_COLOR, 1, col.mV);
+                    multi_spot_shader.uniform1f(LLShaderMgr::LIGHT_FALLOFF, light_falloff_final);
 
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 }
 
-                gDeferredMultiSpotLightProgram.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
-                unbindDeferredShader(gDeferredMultiSpotLightProgram);
+                multi_spot_shader.disableTexture(LLShaderMgr::DEFERRED_PROJECTION);
+                unbindDeferredShader(multi_spot_shader);
             }
 
             // Clear does not free internal vector storage, so this is more efficient than creating new vectors each frame
@@ -9836,7 +9836,7 @@ void LLPipeline::doAtmospherics()
         gGL.setColorMask(true, true);
 
         // apply haze
-        LLGLSLShader& haze_shader = gHazeProgram;
+        LLGLSLShader& haze_shader = *gHazeProgram.selectVariant();
 
         LL_PROFILE_GPU_ZONE("haze");
         bindDeferredShader(haze_shader, nullptr, &mWaterDis);

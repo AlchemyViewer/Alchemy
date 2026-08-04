@@ -177,18 +177,24 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
         (LLPipeline::sRenderingHUDs) ? &gHUDAlphaProgram :
         &gDeferredAlphaProgram;
 
+    // select the classic-lighting clone before preparation so the water plane and minimum
+    // alpha uniforms land on the program that actually binds
+    simple_shader = simple_shader->selectVariant();
+
     prepare_alpha_shader(simple_shader, true, water_sign); //prime simple shader (loads shadow relevant uniforms)
 
     // prepare_alpha_shader() recurses into the rigged variant, so priming the bases
     // covers every corner
     for (int i = 0; i < LLMaterial::SHADER_COUNT; ++i)
     {
-        prepare_alpha_shader(&gDeferredMaterialProgram[i], true, water_sign);
+        prepare_alpha_shader(gDeferredMaterialProgram[i].selectVariant(), true, water_sign);
     }
 
     pbr_shader =
         (LLPipeline::sRenderingHUDs) ? &gHUDPBRAlphaProgram :
         &gDeferredPBRAlphaProgram;
+
+    pbr_shader = pbr_shader->selectVariant();
 
     prepare_alpha_shader(pbr_shader, true, water_sign);
 
@@ -725,7 +731,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                         U32 mask = params.mShaderMask;
 
                         llassert(mask < LLMaterial::SHADER_COUNT);
-                        target_shader = &(gDeferredMaterialProgram[mask]);
+                        target_shader = gDeferredMaterialProgram[mask].selectVariant();
                     }
                     else if (!params.mFullbright)
                     {

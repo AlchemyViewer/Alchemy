@@ -285,10 +285,10 @@ void LLDrawPoolBump::beginFullbrightShiny()
     sVertexMask = VERTEX_MASK_SHINY | LLVertexBuffer::MAP_TEXCOORD0;
 
     // Second pass: environment map
-    shader = &gDeferredFullbrightShinyProgram;
+    shader = gDeferredFullbrightShinyProgram.selectVariant();
     if (LLPipeline::sRenderingHUDs)
     {
-        shader = &gHUDFullbrightShinyProgram;
+        shader = gHUDFullbrightShinyProgram.selectVariant();
     }
 
     if (mRigged)
