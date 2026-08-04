@@ -742,7 +742,19 @@ public:
     const LLVector3*  getLastAnimExtents() const { return mLastAnimExtents; }
     void        setNeedsExtentUpdate(bool val) { mNeedsExtentUpdate = val; }
 
+public:
+    // The rotation of the view basis the impostor was baked in.
+    //
+    // generateImpostor aims its camera AT the avatar, so the G-buffer normals it captures are
+    // encoded in that basis -- not the main camera's. The billboard replays them into the
+    // scene G-buffer, where the lighting pass reads them as main-view-space, so they need
+    // rebasing by (main view) * inverse(bake view) at composite time. Stored per avatar
+    // because an impostor outlives the frame it was baked in and the camera keeps moving.
+    void        setImpostorViewRotation(const LLMatrix3& rot) { mImpostorViewRot = rot; }
+    const LLMatrix3& getImpostorViewRotation() const { return mImpostorViewRot; }
+
 private:
+    LLMatrix3   mImpostorViewRot;
     LLVector3   mImpostorOffset;
     LLVector2   mImpostorDim;
     // This becomes true in the constructor and false after the first

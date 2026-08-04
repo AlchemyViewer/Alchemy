@@ -296,6 +296,15 @@ public:
 
     void setColorMask(bool writeColor, bool writeAlpha);
     void setColorMask(bool writeColorR, bool writeColorG, bool writeColorB, bool writeAlpha);
+    // The mask currently in force, so a caller can restore what it found instead of
+    // assuming a convention. Channels are R, G, B, A. See LLGLSColorMask.
+    void getColorMask(bool (&mask)[4]) const
+    {
+        mask[0] = mCurrColorMask[0];
+        mask[1] = mCurrColorMask[1];
+        mask[2] = mCurrColorMask[2];
+        mask[3] = mCurrColorMask[3];
+    }
     void setSceneBlendType(eBlendType type);
 
     // applies blend func to both color and alpha

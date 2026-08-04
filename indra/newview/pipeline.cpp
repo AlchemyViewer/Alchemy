@@ -329,7 +329,7 @@ void validate_framebuffer_object();
 
 // Add color attachments for deferred rendering
 // target -- RenderTarget to add attachments to
-bool addDeferredAttachments(LLRenderTarget& target, bool for_impostor = false)
+bool addDeferredAttachments(LLRenderTarget& target)
 {
     U32 orm = GL_RGBA8;
     U32 norm = GL_RGBA16;
@@ -3982,7 +3982,11 @@ void LLPipeline::postSort(LLCamera &camera)
 
     mMeshDirtyGroup.clear();
 
-    if (!sShadowRender)
+    // An impostor bake sets sShadowRender too, but it draws blended alpha for real and
+    // therefore needs it sorted -- a depth-only shadow pass is the only thing that does not.
+    // Skipping the sort here left layered transparents on an impostored avatar (hair over a
+    // visor, a skirt over stockings) blending in octree order instead of back-to-front.
+    if (!sShadowRender || sImpostorRender)
     {
         // order alpha groups by distance
         std::sort(sCull->beginAlphaGroups(), sCull->endAlphaGroups(), LLSpatialGroup::CompareDepthGreater());
@@ -4535,7 +4539,11 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.loadMatrix(gGLModelView);
 
-    if (!gCubeSnapshot)
+    // An impostor is a billboard: baking selection highlights or debug geometry into its
+    // texture freezes them there for the life of the impostor and replays them into the scene
+    // G-buffer, which is not what either is for. They belong to the frame that draws the
+    // billboard, where they are already drawn.
+    if (!gCubeSnapshot && !sImpostorRender)
     {
         // debug displays
         renderHighlights();
@@ -10050,6 +10058,15 @@ void LLPipeline::doWaterHaze()
 
 void LLPipeline::doWaterExclusionMask()
 {
+    if (sImpostorRender)
+    {   // No water in an impostor bake -- generateImpostor clears every water render type --
+        // so there is nothing to exclude. Rebuilding the mask here regenerated a full-screen
+        // target from the impostor camera, once per post-deferred pass, and left the result
+        // behind for the main render to find. doAtmospherics and doWaterHaze already bail for
+        // the same reason; this one was simply missed.
+        return;
+    }
+
     mWaterExclusionMask.bindTarget();
     glClearColor(1, 1, 1, 1);
     mWaterExclusionMask.clear();
@@ -11034,6 +11051,15 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     glm::mat4 saved_view = get_current_modelview();
     glm::mat4 inv_view = glm::inverse(saved_view);
 
+    // gGLViewport is saved alongside them because the cascade and spot loops below overwrite
+    // it with each shadow map's rect (getViewport(gGLViewport)) and never put it back. It is
+    // not a scratch variable: LLRenderTarget::flush() restores glViewport FROM it whenever it
+    // unbinds to the default framebuffer, and stamps sCurResX/Y from it too. So a stale value
+    // here silently gives the next such flush the shadow map's viewport and resolution --
+    // which is how the impostor bake, later in the same frame, was handing the default
+    // framebuffer a shadow-sized viewport on its way out.
+    S32 saved_gl_viewport[4] = { gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3] };
+
     glm::mat4 view[6];
     glm::mat4 proj[6];
 
@@ -11829,6 +11855,11 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
     }
     gGL.setColorMask(true, true);
 
+    gGLViewport[0] = saved_gl_viewport[0];
+    gGLViewport[1] = saved_gl_viewport[1];
+    gGLViewport[2] = saved_gl_viewport[2];
+    gGLViewport[3] = saved_gl_viewport[3];
+
     set_last_modelview(last_modelview);
     set_last_projection(last_projection);
 
@@ -12008,6 +12039,13 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
     S32 occlusion = sUseOcclusion;
     sUseOcclusion = 0;
 
+    // Saved, not assumed. These were put back as literal `false`, which is only correct while
+    // no caller has them set -- true today, but it makes the function silently non-reentrant
+    // into any shadow or probe context, and it is the same hardcoded-restore habit the rest of
+    // this work has been removing. sUseOcclusion right above already does it properly.
+    const bool saved_shadow_render   = sShadowRender;
+    const bool saved_impostor_render = sImpostorRender;
+
     sShadowRender = true;
     sImpostorRender = true;
 
@@ -12107,20 +12145,27 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         half_height.setSub(ext[1], ext[0]);
         half_height.mul(0.5f);
 
+        // The half-extent of a box projected onto a direction is sum(half_i * |d_i|) -- the
+        // component-wise ABSOLUTE value of the axis, dotted with the half extents.
+        //
+        // This used to square the axis and renormalize, which computes
+        // sum(half_i * d_i^2) / sqrt(sum(d_i^4)). That agrees with the real answer only when
+        // the axis is aligned to a box axis or has equal components, and is otherwise too
+        // small -- so the captured frame was tighter than the avatar at oblique camera
+        // angles, clipping outstretched arms, tall hair and wide attachments at the edge of
+        // the impostor. The axes are already unit length, and taking absolute values does not
+        // change that, so the renormalize goes with it.
         LLVector4a left;
         left.load3(camera.getLeftAxis().mV);
-        left.mul(left);
-        llassert(left.dot3(left).getF32() > F_APPROXIMATELY_ZERO);
-        left.normalize3fast();
+        left.setAbs(left);
 
         LLVector4a up;
         up.load3(camera.getUpAxis().mV);
-        up.mul(up);
-        llassert(up.dot3(up).getF32() > F_APPROXIMATELY_ZERO);
-        up.normalize3fast();
+        up.setAbs(up);
 
-        tdim.mV[0] = fabsf(half_height.dot3(left).getF32());
-        tdim.mV[1] = fabsf(half_height.dot3(up).getF32());
+        // No fabsf needed now: both operands are non-negative by construction.
+        tdim.mV[0] = half_height.dot3(left).getF32();
+        tdim.mV[1] = half_height.dot3(up).getF32();
 
         gGL.matrixMode(LLRender::MM_PROJECTION);
         gGL.pushMatrix();
@@ -12141,6 +12186,25 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
         gGL.loadMatrix(glm::value_ptr(mat));
         set_current_modelview(mat);
+
+        // Remember the basis the G-buffer normals about to be captured are encoded in. The
+        // billboard replays them into the scene G-buffer verbatim, where the lighting pass
+        // reads normals as MAIN-view-space -- and this camera is aimed at the avatar, not
+        // along the main camera's forward axis, so the two differ by the avatar's angular
+        // offset from screen centre. Left unrebased, an impostor is lit from a direction that
+        // slides as it crosses the screen.
+        {
+            const glm::mat3 rot(mat);
+            LLMatrix3 bake_rot;
+            for (U32 r = 0; r < 3; ++r)
+            {
+                for (U32 c = 0; c < 3; ++c)
+                {   // glm is column-major, LLMatrix3 is row-major
+                    bake_rot.mMatrix[r][c] = rot[c][r];
+                }
+            }
+            avatar->setImpostorViewRotation(bake_rot);
+        }
 
         glClearColor(0.0f,0.0f,0.0f,0.0f);
         gGL.setColorMask(true, true);
@@ -12173,7 +12237,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
                 if (LLPipeline::sRenderDeferred)
                 {
-                    addDeferredAttachments(avatar->mImpostor, true);
+                    addDeferredAttachments(avatar->mImpostor);
                 }
 
                 // Point filtering is applied where the impostor is sampled
@@ -12202,10 +12266,27 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
     // impostor alpha program, which was the last one still sampling encoded and writing raw.
     LLGLEnable impostor_srgb(GL_FRAMEBUFFER_SRGB);
 
+    // The forward passes declare a single fragment output, and here they run into a
+    // multi-attachment G-buffer -- unlike an ordinary frame, where renderGeomPostDeferred
+    // draws into the single-attachment screen target. Leaving every attachment selected lets
+    // the driver blend undefined values into the normal and ORM buffers wherever alpha drew,
+    // and those are exactly what light the billboard afterwards. Narrowed AFTER the G-buffer
+    // pass, which needs all of them, and restored at the end of the function because the
+    // preview path draws into a target its caller still owns.
+    LLRenderTarget* bake_target = LLRenderTarget::getCurrentBoundTarget();
+    auto forward_only_attachments = [bake_target]()
+    {
+        if (bake_target)
+        {
+            bake_target->setDrawBuffers(1);
+        }
+    };
+
     if (preview_avatar || for_profile)
     {
         // previews and profiles don't care about imposters
         renderGeomDeferred(camera);
+        forward_only_attachments();
         renderGeomPostDeferred(camera);
     }
     else
@@ -12213,6 +12294,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         avatar->mImpostor.clear();
         renderGeomDeferred(camera);
 
+        forward_only_attachments();
         renderGeomPostDeferred(camera);
 
         // Shameless hack time: render it all again,
@@ -12237,20 +12319,20 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
     { //create alpha mask based on depth buffer (grey out if muted)
         if (LLPipeline::sRenderDeferred)
         {
-            GLuint buff = GL_COLOR_ATTACHMENT0;
-            glDrawBuffers(1, &buff);
+            // Already narrowed for the forward passes; this states the same requirement
+            // through the target that owns the attachment list rather than by hand, so the
+            // restore below can put back however many it actually has.
+            forward_only_attachments();
         }
 
         LLGLDisable blend(GL_BLEND);
 
-        if (visually_muted || too_complex)
-        {
-            gGL.setColorMask(true, true);
-        }
-        else
-        {
-            gGL.setColorMask(false, true);
-        }
+        // Scoped, like the blend and depth guards around it. Set loose, this was the one bit
+        // of state generateImpostor never put back: the function returned with colour writes
+        // DISABLED on the ordinary path, and the frame survived only because display()
+        // re-asserts a mask before the world render. The dynamic-texture path has no such
+        // caller, so every morph preview after the first in a frame lost its background.
+        LLGLSColorMask mask(visually_muted || too_complex, true);
 
         gGL.getTextureSlot(0)->unbind();
 
@@ -12310,9 +12392,19 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         avatar->setImpostorDim(tdim);
     }
 
+    // Put the attachment selection back. On the impostor path the flush above has already
+    // rebound whatever was underneath (bindTarget re-issues its own draw buffers), but the
+    // PREVIEW path never bound a target of its own -- it has been drawing into one the
+    // dynamic-texture system owns and will keep using, so leaving it narrowed dropped
+    // attachments 1..3 for every preview rendered after this one in the same frame.
+    if (bake_target && bake_target == LLRenderTarget::getCurrentBoundTarget())
+    {
+        bake_target->setDrawBuffers();
+    }
+
     sUseOcclusion = occlusion;
-    sImpostorRender = false;
-    sShadowRender = false;
+    sImpostorRender = saved_impostor_render;
+    sShadowRender = saved_shadow_render;
     popRenderTypeMask();
 
     if (!preview_avatar)

@@ -98,7 +98,14 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
     LLViewerTexture* baseColorTex = media_tex ? media_tex : mBaseColorTexture;
     LLViewerTexture* emissiveTex = media_tex ? media_tex : mEmissiveTexture;
 
-    if (!LLPipeline::sShadowRender || (mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK))
+    // sImpostorRender is checked alongside sShadowRender throughout this function because
+    // generateImpostor sets BOTH, and only one of them means "depth-only". An impostor bake
+    // runs the full G-buffer pools into a target with real ORM and normal attachments, which
+    // impostorF then replays into the scene G-buffer, so everything a shadow pass is right
+    // to skip is exactly what the bake needs.
+    const bool depth_only_pass = LLPipeline::sShadowRender && !LLPipeline::sImpostorRender;
+
+    if (!depth_only_pass || (mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK))
     {
         if (mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK)
         {
@@ -122,7 +129,7 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
     mTextureTransform[GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(base_color_packed);
     shader->uniform4fv(LLShaderMgr::TEXTURE_BASE_COLOR_TRANSFORM, 2, (F32*)base_color_packed);
 
-    if (!LLPipeline::sShadowRender)
+    if (!depth_only_pass)
     {
         if (mNormalTexture.notNull() && mNormalTexture->getDiscardLevel() <= 4)
         {

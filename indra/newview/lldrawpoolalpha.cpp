@@ -105,8 +105,15 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
     shader->bind();
     shader->uniform1f(LLShaderMgr::DISPLAY_GAMMA, (gamma > 0.1f) ? 1.0f / gamma : (1.0f / 2.2f));
 
-    if (LLPipeline::sRenderingHUDs)
+    if (LLPipeline::sRenderingHUDs || LLPipeline::sImpostorRender)
     { // for HUD attachments, only the pre-water pass is executed and we never want to clip anything
+      //
+      // An impostor bake is in the same position for the opposite reason: generateImpostor
+      // clears RENDER_TYPE_ALPHA_PRE_WATER, so only the post-water pool runs and it clips
+      // everything below the plane -- with the pre-water pool disabled, nothing draws it
+      // back. An impostored avatar standing waist-deep lost every blended attachment below
+      // the waterline in a clean horizontal cut, while its opaque parts (which never clip)
+      // stayed. The bake has no water in it to sort against, so clipping has nothing to do.
         LLVector4 near_clip(0, 0, -1, 0);
         shader->uniform1f(LLShaderMgr::WATER_WATERSIGN, 1.f);
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, near_clip.mV);

@@ -229,6 +229,7 @@ public:
         DEFERRED_LIGHT,                     //  "lightMap"
         DEFERRED_PROJECTION,                //  "projectionMap"
         DEFERRED_NORM_MATRIX,               //  "norm_mat"
+        IMPOSTOR_NORM_ROTATION,             //  "impostor_norm_rot"
         SPECULAR_COLOR,                     //  "specular_color"
         ENVIRONMENT_INTENSITY,              //  "env_intensity"
 

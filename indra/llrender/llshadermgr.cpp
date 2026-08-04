@@ -1538,6 +1538,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("lightMap");
     mReservedUniforms.push_back("projectionMap");
     mReservedUniforms.push_back("norm_mat");
+    mReservedUniforms.push_back("impostor_norm_rot");
 
     mReservedUniforms.push_back("specular_color");
     mReservedUniforms.push_back("env_intensity");

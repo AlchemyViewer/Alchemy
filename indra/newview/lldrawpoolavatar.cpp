@@ -97,6 +97,7 @@ bool gAvatarEmbossBumpMap = false;
 static bool sRenderingSkinned = false;
 S32 normal_channel = -1;
 S32 specular_channel = -1;
+S32 emissive_channel = -1;
 S32 cube_channel = -1;
 
 LLDrawPoolAvatar::LLDrawPoolAvatar(U32 type) :
@@ -579,6 +580,9 @@ void LLDrawPoolAvatar::beginDeferredImpostor()
     sVertexProgram = &gDeferredImpostorProgram;
     specular_channel = sVertexProgram->enableTexture(LLViewerShaderMgr::SPECULAR_MAP);
     normal_channel = sVertexProgram->enableTexture(LLViewerShaderMgr::NORMAL_MAP);
+    // -1 when the program has no emissive sampler (RenderEnableEmissiveBuffer off), which is
+    // also exactly when the impostor target has no attachment 3 to bind.
+    emissive_channel = sVertexProgram->enableTexture(LLViewerShaderMgr::EMISSIVE_MAP);
     sDiffuseChannel = sVertexProgram->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
     sVertexProgram->bind();
     sVertexProgram->setMinimumAlpha(0.01f);
@@ -799,6 +803,10 @@ void LLDrawPoolAvatar::renderAvatars(LLVOAvatar* single_avatar, S32 pass)
                 if (specular_channel > -1)
                 {
                     avatarp->mImpostor.bindTexture(1, specular_channel);
+                }
+                if (emissive_channel > -1)
+                {
+                    avatarp->mImpostor.bindTexture(3, emissive_channel);
                 }
             }
             avatarp->renderImpostor(avatarp->getMutedAVColor(), sDiffuseChannel);

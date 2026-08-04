@@ -156,6 +156,17 @@ public:
     //get applied viewport
     void getViewport(S32* viewport);
 
+    // Restrict draw output to the first `count` colour attachments; 0 restores all of them.
+    // Asserts that this target is currently bound.
+    //
+    // A fragment shader that declares a single output leaves every OTHER attachment of the
+    // bound FBO undefined, and with blending enabled the driver mixes that undefined value
+    // into targets the pass never meant to touch. Narrowing is how a multi-attachment target
+    // hosts a single-output pass -- the impostor bake runs the forward alpha passes into its
+    // own G-buffer, so without this its normal and ORM attachments are corrupted wherever
+    // blended geometry drew, and those are what light the billboard afterwards.
+    void setDrawBuffers(U32 count = 0);
+
     //get X resolution
     U32 getWidth() const { return mResX; }
 

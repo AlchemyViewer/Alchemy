@@ -788,6 +788,29 @@ void LLRenderTarget::getViewport(S32* viewport)
     viewport[3] = mResY;
 }
 
+void LLRenderTarget::setDrawBuffers(U32 count)
+{
+    llassert(sBoundTarget == this);
+
+    if (mTex.empty())
+    {   // no colour buffer to narrow -- bindTarget already selected GL_NONE
+        return;
+    }
+
+    // Same table bindTarget uses; kept in step by the assert below rather than by hope.
+    static const GLenum drawbuffers[] = {GL_COLOR_ATTACHMENT0,
+                                         GL_COLOR_ATTACHMENT1,
+                                         GL_COLOR_ATTACHMENT2,
+                                         GL_COLOR_ATTACHMENT3};
+
+    const U32 attachments = (U32)mTex.size();
+    llassert(attachments <= LL_ARRAY_SIZE(drawbuffers));
+
+    const U32 wanted = (count == 0) ? attachments : llmin(count, attachments);
+
+    glDrawBuffers(static_cast<GLsizei>(wanted), drawbuffers);
+}
+
 bool LLRenderTarget::isBoundInStack() const
 {
     LLRenderTarget* cur = sBoundTarget;

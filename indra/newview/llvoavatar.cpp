@@ -5609,6 +5609,17 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     LLVector3 left = LLViewerCamera::getInstance()->getUpAxis() % at;
     LLVector3 up = at%left;
 
+    // Both cross products carry the magnitude sin(angle between the camera up axis and the
+    // direction to the avatar), not 1: |camUp x at| = sin(theta), and |at x left| inherits it.
+    // mImpostorDim is a half-extent in world units, so scaling an unnormalized basis by it
+    // shrank the billboard by that factor -- exact at screen centre, ~13% small at 30 degrees
+    // of vertical offset, worse toward the top and bottom of the screen. The bake side builds
+    // an exact orthonormal frame (camera.lookAt) and sizes its projection so the half-extent
+    // exactly fills the image, so this was a pure mismatch: impostored avatars read as
+    // slightly too small, and popped in size as the camera pitched.
+    left.normalize();
+    up.normalize();
+
     left *= mImpostorDim.mV[0];
     up *= mImpostorDim.mV[1];
 
@@ -5635,6 +5646,32 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     }
     {
     gGL.flush();
+
+    // Rebase the baked normals into the CURRENT view basis: main_view * inverse(bake_view).
+    // Both are pure rotations sharing an origin, so the inverse is the transpose. Uploaded
+    // per avatar because each impostor was baked aiming at its own subject, and re-derived
+    // every frame because the impostor outlives the camera position that produced it.
+    if (LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr)
+    {
+        if (shader->hasUniform(LLShaderMgr::IMPOSTOR_NORM_ROTATION))
+        {
+            const glm::mat3 main_view(get_current_modelview());
+            const LLMatrix3& baked = getImpostorViewRotation();
+
+            glm::mat3 bake_view;
+            for (U32 r = 0; r < 3; ++r)
+            {
+                for (U32 c = 0; c < 3; ++c)
+                {   // LLMatrix3 is row-major, glm is column-major
+                    bake_view[c][r] = baked.mMatrix[r][c];
+                }
+            }
+
+            const glm::mat3 rebase = main_view * glm::transpose(bake_view);
+            shader->uniformMatrix3fv(LLShaderMgr::IMPOSTOR_NORM_ROTATION, 1, GL_FALSE,
+                                     glm::value_ptr(rebase));
+        }
+    }
 
     gGL.color4ubv(color.mV);
     // TFO_POINT: an impostor is a screen-aligned billboard rendered at its own resolution,
