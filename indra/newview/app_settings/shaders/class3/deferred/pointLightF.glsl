@@ -30,7 +30,6 @@ out vec4 frag_color;
 uniform sampler2D lightFunc;
 
 uniform vec3 env_mat[3];
-uniform float sun_wash;
 
 // light params
 uniform vec3 color;
