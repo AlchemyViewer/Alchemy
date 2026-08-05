@@ -36,10 +36,9 @@ uniform vec4 color;
 out vec4 vertex_color;
 out vec2 vary_texcoord0;
 
-uniform vec4 light_position[8];
-uniform vec3 light_direction[8];
-uniform vec3 light_attenuation[8];
-uniform vec3 light_diffuse[8];
+// Shared forward-light arrays, spliced from class1/deferred/lightsBlock.glsl and
+// bound at UB_LIGHTS. Members are read by bare name.
+//[ENGINE_BLOCK Lights]
 
 //===================================================================================================
 //declare these here explicitly to separate them from atmospheric lighting elsewhere to work around

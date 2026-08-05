@@ -44,6 +44,7 @@
 #include "llmatrix4a.h"
 #include "alsamplerstate.h"  // mSamplerCache -- this context's sampler objects
 #include "altextureslot.h"
+#include "aluniformbuffer.h"
 #include "glm/mat4x4.hpp"
 
 #include <boost/unordered_map.hpp>
@@ -247,6 +248,31 @@ public:
     void syncMatrices();
     void syncLightState();
 
+    // ---- Shared forward-lighting uniform block (UB_LIGHTS) --------------------------------
+    // The fixed-function light arrays every forward/alpha program reads. They used to be
+    // pushed as LOOSE uniforms into each program on its first bind after mLightHash moved --
+    // the same ~672 bytes re-derived and re-written once per program. Packed once and bound at
+    // a fixed engine point instead, so a light-state change costs one upload total.
+    //
+    // Holds ONLY what LLRender owns exclusively. sun_up_factor and the sClassicMode
+    // ambient/sunlight/moonlight overrides stay LOOSE: those names have other writers
+    // (LLPipeline::bindDeferredShader pushes an auto-adjusted sunlight_color, and
+    // sun_up_factor is written from many sites across the pipeline, draw pools and
+    // LLSettingsVO), and a shared block would let one writer silently stomp another's value.
+    //
+    // std140 pads every array element to 16 bytes regardless of the element type, hence the
+    // float[4] rows for the vec3/vec2 arrays -- the C++ mirror carries that padding explicitly
+    // so the struct IS the layout. Public so the debug layout registration can offsetof it.
+    struct alignas(16) LightsUBOData
+    {
+        F32 light_position[LL_NUM_LIGHT_UNITS][4];
+        F32 light_direction[LL_NUM_LIGHT_UNITS][4];             // .xyz used, .w padding
+        F32 light_attenuation[LL_NUM_LIGHT_UNITS][4];
+        F32 light_deferred_attenuation[LL_NUM_LIGHT_UNITS][4];  // .xy used (size, falloff)
+        F32 light_diffuse[LL_NUM_LIGHT_UNITS][4];               // .rgb used, .a padding
+        F32 light_ambient[3];  F32 _tail_pad;
+    };
+
     void translateUI(F32 x, F32 y, F32 z);
     void scaleUI(F32 x, F32 y, F32 z);
     void pushUIMatrix();
@@ -412,6 +438,17 @@ private:
     U32 mCurMatHash[NUM_MATRIX_MODES];
     U32 mLightHash;
     LLColor4 mAmbientLightColor;
+
+    // Pack the light state into mLightsUBOData. Returns true if the bytes actually changed
+    // (so the caller uploads). mLightHash is a conservative trigger -- setPosition and
+    // setSpotDirection bump it unconditionally because the modelview may have moved, so a
+    // frame's worth of "changes" are frequently byte-identical -- hence the compare.
+    bool packLightsUBO();
+
+    LightsUBOData   mLightsUBOData{};
+    ALUniformBuffer mLightsUBO;
+    U32             mLightsUBOHash  = 0xFFFFFFFFu;
+    bool            mLightsUBOBound = false;
 
     bool            mDirty;
     U32             mCount;

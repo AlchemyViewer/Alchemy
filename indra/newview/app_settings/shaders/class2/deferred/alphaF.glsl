@@ -65,10 +65,9 @@ uniform mat4 proj_mat;
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
 uniform int sun_up_factor;
-uniform vec4 light_position[8];
-uniform vec3 light_direction[8];
-uniform vec4 light_attenuation[8];
-uniform vec3 light_diffuse[8];
+// Shared forward-light arrays, spliced from class1/deferred/lightsBlock.glsl and
+// bound at UB_LIGHTS. Members are read by bare name.
+//[ENGINE_BLOCK Lights]
 
 void waterClip(vec3 pos);
 

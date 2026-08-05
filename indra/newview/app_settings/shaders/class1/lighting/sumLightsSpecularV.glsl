@@ -31,8 +31,9 @@ vec3 atmosAffectDirectionalLight(float lightIntensity);
 vec3 atmosGetDiffuseSunlightColor();
 vec3 scaleDownLight(vec3 light);
 
-uniform vec4 light_position[8];
-uniform vec3 light_diffuse[8];
+// Shared forward-light arrays, spliced from class1/deferred/lightsBlock.glsl and
+// bound at UB_LIGHTS. Members are read by bare name.
+//[ENGINE_BLOCK Lights]
 
 vec4 sumLightsSpecular(vec3 pos, vec3 norm, vec4 color, inout vec4 specularColor)
 {

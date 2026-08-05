@@ -162,6 +162,7 @@ public:
         UB_GLTF_MATERIALS,      // "GLTFMaterials"
         UB_ENVIRONMENT,         // "Environment" (sky/water constants)
         UB_DEFERRED,            // "Deferred" (shadow/SSAO constants)
+        UB_LIGHTS,              // "Lights" (forward fixed-function light array state)
         NUM_UNIFORM_BLOCKS
     };
 
@@ -176,6 +177,7 @@ public:
         "GLTFMaterials",    // UB_GLTF_MATERIALS
         "Environment",      // UB_ENVIRONMENT
         "Deferred",         // UB_DEFERRED
+        "Lights",           // UB_LIGHTS
     };
 
     // Expected std140 layout of an engine UBO block, registered by the module that owns the

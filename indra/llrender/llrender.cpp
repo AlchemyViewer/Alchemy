@@ -59,6 +59,32 @@ extern void APIENTRY gl_debug_callback(GLenum source,
 
 thread_local LLRender gGL;
 
+#if !LL_RELEASE_FOR_DOWNLOAD
+namespace
+{
+    // Register the "Lights" block's expected std140 layout for the debug-build validator
+    // (LLGLSLShader::registerEngineBlockLayout), derived from offsetof() on the very struct
+    // packLightsUBO() writes -- so the check can never drift from the pack. Array members
+    // introspect under their "[0]" element name, hence the explicit mName overrides; the
+    // scalar-name member resolves from the reserved-uniform table.
+    const bool s_lights_layout_registered = []
+    {
+        using D = LLRender::LightsUBOData;
+        std::vector<LLGLSLShader::EngineBlockLayoutMember> members =
+        {
+            { -1, "light_position[0]",             (U32)offsetof(D, light_position),             false },
+            { -1, "light_direction[0]",            (U32)offsetof(D, light_direction),            false },
+            { -1, "light_attenuation[0]",          (U32)offsetof(D, light_attenuation),          false },
+            { -1, "light_deferred_attenuation[0]", (U32)offsetof(D, light_deferred_attenuation), false },
+            { -1, "light_diffuse[0]",              (U32)offsetof(D, light_diffuse),              false },
+            { LLShaderMgr::LIGHT_AMBIENT, nullptr, (U32)offsetof(D, light_ambient),              false },
+        };
+        LLGLSLShader::registerEngineBlockLayout("Lights", std::move(members));
+        return true;
+    }();
+}
+#endif // !LL_RELEASE_FOR_DOWNLOAD
+
 // Handy copies of last good GL matrices
 F32 gGLModelView[16];
 F32 gGLLastModelView[16];
@@ -330,6 +356,9 @@ bool LLRender::init(bool needs_vertex_buffer)
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
+    // Fresh context: nothing is bound at UB_LIGHTS yet, whatever a previous one had.
+    mLightsUBOBound = false;
+
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
 
@@ -406,6 +435,13 @@ void LLRender::shutdown()
         }
         mDummyVAO = 0;
     }
+
+    // Drop the shared light block with the context that owns it. Forcing a re-pack (rather
+    // than just clearing mLightsUBOBound) means a restarted context can never rebind a
+    // buffer name from the dead one.
+    mLightsUBO.release();
+    mLightsUBOHash  = 0xFFFFFFFFu;
+    mLightsUBOBound = false;
 }
 
 void LLRender::clearSamplers()
@@ -428,6 +464,10 @@ void LLRender::refreshState(void)
 {
     mDirty = true;
 
+    // Called when GL state may have been changed behind our back, so re-assert the shared
+    // light block's binding along with the texture units and colour mask.
+    mLightsUBOBound = false;
+
     U32 active_unit = mCurrTextureUnitIndex;
 
     for (U32 i = 0; i < mTextureSlots.size(); i++)
@@ -448,54 +488,94 @@ void LLRender::refreshState(void)
     mDirty = false;
 }
 
+// Pack the light arrays into the shared block. Returns true when the bytes moved.
+bool LLRender::packLightsUBO()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+
+    // Must match the std140 layout the shaders declare: five 16-byte-strided [8] arrays
+    // (128 bytes each) then a float3 rounded up to the block's 16-byte multiple.
+    static_assert(sizeof(LightsUBOData) == 656, "LightsUBOData must match std140 (656 bytes)");
+
+    LightsUBOData d{};
+
+    for (U32 i = 0; i < LL_NUM_LIGHT_UNITS; i++)
+    {
+        const LLLightState* light = &mLightState[i];
+
+        // std140 pads every array element to 16 bytes whatever the element type, so each
+        // row below is float[4] and the unused tail components stay zero.
+        memcpy(d.light_position[i], light->mPosition.mV, sizeof(F32) * 4);
+        memcpy(d.light_direction[i], light->mSpotDirection.mV, sizeof(F32) * 3);
+
+        d.light_attenuation[i][0] = light->mLinearAtten;
+        d.light_attenuation[i][1] = light->mQuadraticAtten;
+        d.light_attenuation[i][2] = light->mSpecular.mV[2];
+        d.light_attenuation[i][3] = light->mSpecular.mV[3];
+
+        d.light_deferred_attenuation[i][0] = light->mSize;
+        d.light_deferred_attenuation[i][1] = light->mFalloff;
+
+        memcpy(d.light_diffuse[i], light->mDiffuse.mV, sizeof(F32) * 3);
+    }
+
+    memcpy(d.light_ambient, mAmbientLightColor.mV, sizeof(F32) * 3);
+
+    if (memcmp(&d, &mLightsUBOData, sizeof(LightsUBOData)) == 0)
+    {
+        return false;
+    }
+
+    mLightsUBOData = d;
+    return true;
+}
+
 void LLRender::syncLightState()
 {
-    LLGLSLShader *shader = LLGLSLShader::sCurBoundShaderPtr;
+    // The light ARRAYS live in the shared UB_LIGHTS block: packed once when the light state
+    // actually moves, not once per program. mLightHash is only a cheap trigger -- setPosition
+    // and setSpotDirection bump it unconditionally (the modelview may have changed), so the
+    // pack still byte-compares before spending an upload.
+    if (mLightsUBOHash != mLightHash || !mLightsUBO.allocated())
+    {
+        mLightsUBOHash = mLightHash;
+        if (packLightsUBO() || !mLightsUBO.allocated())
+        {
+            mLightsUBO.update(&mLightsUBOData, sizeof(LightsUBOData));
+            mLightsUBOBound = false; // re-assert the binding against the new store
+        }
+    }
 
-    if (!shader)
+    if (!mLightsUBOBound)
+    {
+        mLightsUBO.bind(LLGLSLShader::UB_LIGHTS);
+        mLightsUBOBound = true;
+    }
+
+    // Everything below is still a LOOSE per-program uniform, so it keeps the per-shader hash
+    // gate. These names have writers outside LLRender (LLPipeline::bindDeferredShader pushes
+    // an auto-adjusted sunlight_color; sun_up_factor is written from the pipeline, the draw
+    // pools and LLSettingsVO), so folding them into the shared block would let one writer
+    // stomp another.
+    LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+
+    if (!shader || shader->mLightHash == mLightHash)
     {
         return;
     }
 
-    if (shader->mLightHash != mLightHash)
+    shader->mLightHash = mLightHash;
+
+    shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, mLightState[0].mSunIsPrimary ? 1 : 0);
+
+    if (sClassicMode)
     {
-        shader->mLightHash = mLightHash;
+        LLVector3 diffuse(mLightState[0].mDiffuse.mV);
+        LLVector3 diffuse_b(mLightState[0].mDiffuseB.mV);
 
-        LLVector4 position[LL_NUM_LIGHT_UNITS];
-        LLVector3 direction[LL_NUM_LIGHT_UNITS];
-        LLVector4 attenuation[LL_NUM_LIGHT_UNITS];
-        LLVector3 diffuse[LL_NUM_LIGHT_UNITS];
-        LLVector3 diffuse_b[LL_NUM_LIGHT_UNITS];
-        bool      sun_primary[LL_NUM_LIGHT_UNITS];
-        LLVector2 size[LL_NUM_LIGHT_UNITS];
-
-        for (U32 i = 0; i < LL_NUM_LIGHT_UNITS; i++)
-        {
-            LLLightState *light = &mLightState[i];
-
-            position[i]  = light->mPosition;
-            direction[i] = light->mSpotDirection;
-            attenuation[i].set(light->mLinearAtten, light->mQuadraticAtten, light->mSpecular.mV[2], light->mSpecular.mV[3]);
-            diffuse[i].set(light->mDiffuse.mV);
-            diffuse_b[i].set(light->mDiffuseB.mV);
-            sun_primary[i] = light->mSunIsPrimary;
-            size[i].set(light->mSize, light->mFalloff);
-        }
-
-        shader->uniform4fv(LLShaderMgr::LIGHT_POSITION, LL_NUM_LIGHT_UNITS, position[0].mV);
-        shader->uniform3fv(LLShaderMgr::LIGHT_DIRECTION, LL_NUM_LIGHT_UNITS, direction[0].mV);
-        shader->uniform4fv(LLShaderMgr::LIGHT_ATTENUATION, LL_NUM_LIGHT_UNITS, attenuation[0].mV);
-        shader->uniform2fv(LLShaderMgr::LIGHT_DEFERRED_ATTENUATION, LL_NUM_LIGHT_UNITS, size[0].mV);
-        shader->uniform3fv(LLShaderMgr::LIGHT_DIFFUSE, LL_NUM_LIGHT_UNITS, diffuse[0].mV);
-        shader->uniform3fv(LLShaderMgr::LIGHT_AMBIENT, 1, mAmbientLightColor.mV);
-        shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, sun_primary[0] ? 1 : 0);
-
-        if (sClassicMode)
-        {
-            shader->uniform3fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
-            shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, diffuse[0].mV);
-            shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, diffuse_b[0].mV);
-        }
+        shader->uniform3fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
+        shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, diffuse.mV);
+        shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, diffuse_b.mV);
     }
 }
 

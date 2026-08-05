@@ -86,11 +86,9 @@ uniform float minimum_alpha; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlpha
 
 // Lights
 // See: LLRender::syncLightState()
-uniform vec4 light_position[8];
-uniform vec3 light_direction[8]; // spot direction
-uniform vec4 light_attenuation[8]; // linear, quadratic, is omni, unused, See: LLPipeline::setupHWLights() and syncLightState()
-uniform vec3 light_diffuse[8];
-uniform vec2 light_deferred_attenuation[8]; // light size and falloff
+// Shared forward-light arrays, spliced from class1/deferred/lightsBlock.glsl and
+// bound at UB_LIGHTS. Members are read by bare name.
+//[ENGINE_BLOCK Lights]
 
 vec3 linear_to_srgb(vec3 c);
 
