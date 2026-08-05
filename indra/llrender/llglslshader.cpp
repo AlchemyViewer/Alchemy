@@ -2222,6 +2222,10 @@ LLUUID LLGLSLShader::hash()
         hash_obj.update(define_pair.second);
 
     }
+    // Injected by loadShaderFile() rather than carried in either defines map, so it has to be
+    // folded in by hand -- otherwise a reverse-Z toggle would hand back binaries compiled under
+    // the other depth convention.
+    hash_obj.update(&LLRender::sReverseZ, sizeof(LLRender::sReverseZ));
     hash_obj.update(&mFeatures, sizeof(LLShaderFeatures));
     hash_obj.update(gGLManager.mGLVendor);
     hash_obj.update(gGLManager.mGLRenderer);

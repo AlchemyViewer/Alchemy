@@ -538,8 +538,8 @@ void LLViewerShaderMgr::setShaders()
     ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(gSavedSettings.getS32("AlchemyRenderUBOUpdateMode"));
 
     // Latch reverse-Z before anything downstream reads it: this same call releases and
-    // reallocates GL buffers (mainDepthFormat), loadBasicShaders() emits REVERSE_Z into
-    // sGlobalDefines, and the compiles/cache key fold it in -- all within this one blocking
+    // reallocates GL buffers (mainDepthFormat), every shader compile below injects REVERSE_Z
+    // from the latched state, and the cache key folds it in -- all within this one blocking
     // call, so clip control, clear depth, depth format and the shader define agree for the
     // whole next frame.
     LLPipeline::updateReverseZ();
@@ -876,14 +876,11 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["HERO_PROBES"] = "1";
     }
 
-    // Reverse-Z depth: reaches every program (including the shared objects attached by name)
-    // and folds into the binary-cache hash, so a toggle auto-invalidates stale binaries. Reads
-    // the state LLPipeline::updateReverseZ() latched at the top of setShaders(), so the define
-    // and the glClipControl state always agree.
-    if (LLRender::sReverseZ)
-    {
-        attribs["REVERSE_Z"] = "1";
-    }
+    // NOTE: REVERSE_Z is deliberately NOT here. This map reaches only the shared objects
+    // compiled below -- a program's own mShaderFiles carry their permutations and nothing else
+    // -- and reverse-Z is read by program-owned sources too. LLShaderMgr::loadShaderFile()
+    // injects it for every compile instead, and LLGLSLShader::hash() folds LLRender::sReverseZ
+    // in directly so a toggle still invalidates cached binaries.
 
     { // PBR terrain
         const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));

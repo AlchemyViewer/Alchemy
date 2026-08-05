@@ -671,6 +671,17 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_HDRI      1.0\n");  // bit 2
     extra_code_text[extra_code_count++] = strdup("#define GET_GBUFFER_FLAG(data, flag)    (abs(data-flag)< 0.1)\n");
 
+    // Reverse-Z is a property of the depth convention the whole tree rasterizes against, not of
+    // any one program, so it is injected here instead of riding a defines map. The map
+    // loadBasicShaders() passes reaches only the shared objects it compiles; a program's own
+    // mShaderFiles are compiled with nothing but their permutations, so a source like
+    // environment/waterV.glsl would otherwise take its forward branch against a reversed buffer
+    // while the deferredUtil.glsl it links against took the reversed one.
+    if (LLRender::sReverseZ)
+    {
+        extra_code_text[extra_code_count++] = strdup("#define REVERSE_Z 1\n");
+    }
+
     if (defines)
     {
         for (auto iter = defines->begin(); iter != defines->end(); ++iter)
