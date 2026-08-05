@@ -239,6 +239,6 @@ void main()
     frag_data[2] = encodeNormal(tnorm, 0, GBUFFER_FLAG_HAS_PBR); // normal, environment intensity, flags
 
 #if defined(HAS_EMISSIVE)
-    frag_data[3] = max(vec4(emissive, 0), vec4(0));             // PBR sRGB Emissive
+    frag_data[3] = max(vec4(emissive, 0), vec4(0));             // PBR linear Emissive (sampler-decoded, float attachment stores it verbatim)
 #endif
 }
