@@ -41,9 +41,9 @@ in vec2 vary_texcoord3;
 uniform sampler2D cloud_noise_texture;
 uniform sampler2D cloud_noise_texture_next;
 uniform float blend_factor;
-uniform vec3 cloud_pos_density1;
-uniform vec3 cloud_pos_density2;
-uniform float cloud_scale;
+// Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
+// and bound at UB_ENVIRONMENT. Members are read by bare name.
+//[ENGINE_BLOCK Environment]
 uniform float cloud_variance;
 
 uniform vec3 camPosLocal;
@@ -53,19 +53,11 @@ uniform vec3 sunlight_color;
 uniform vec3 moonlight_color;
 uniform int sun_up_factor;
 uniform vec3 ambient_color;
-uniform vec3 blue_horizon;
-uniform vec3 blue_density;
-uniform float haze_horizon;
-uniform float haze_density;
 
-uniform float cloud_shadow;
 uniform float density_multiplier;
-uniform float max_y;
 
-uniform vec3 glow;
 uniform float sun_moon_glow_factor;
 
-uniform vec3 cloud_color;
 
 vec4 cloudNoise(vec2 uv)
 {

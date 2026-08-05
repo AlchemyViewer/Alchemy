@@ -98,6 +98,124 @@ bool shouldChange(const LLVector4& v1, const LLVector4& v2)
     return v1 != v2;
 }
 
+#if !LL_RELEASE_FOR_DOWNLOAD
+namespace
+{
+    // Expected engine-block layouts, registered by the modules that own the C++ mirror
+    // structs (offsetof-derived -- see registerEngineBlockLayout in llglslshader.h).
+    // Construct-on-first-use so cross-TU static-initializer registration is order-safe.
+    std::map<std::string, std::vector<LLGLSLShader::EngineBlockLayoutMember>>& engine_block_layouts()
+    {
+        static std::map<std::string, std::vector<LLGLSLShader::EngineBlockLayoutMember>> s_layouts;
+        return s_layouts;
+    }
+}
+
+// static
+void LLGLSLShader::registerEngineBlockLayout(const char* block_name, std::vector<EngineBlockLayoutMember> members)
+{
+    engine_block_layouts()[block_name] = std::move(members);
+}
+
+// Debug-only: assert the driver laid each registered engine block out at the std140 byte
+// offsets the C++ upload expects and, where flagged, that matrix members introspect
+// row-major (a pack that uploads transposed to match a row-major block would silently
+// transpose every lookup against a column-major one). Expected offsets come from
+// registerEngineBlockLayout -- offsetof() on the very structs the pack code writes -- so
+// there is no hand-copied table here to drift. A mismatch means std140 drift (a member
+// reordered in one of the C++/GLSL mirrors) or a driver packing bug -- classically Apple
+// with vec3 members -- and is caught at shader load instead of surfacing as silently wrong
+// shading.
+//
+// Blocks and members are matched by NAME: GLSL is compiled from source here, so the names
+// the shader declares are the names GL introspection reports.
+static void validateEngineBlockLayouts(GLuint program)
+{
+    const auto& reserved = LLShaderMgr::instance()->mReservedUniforms;
+    const auto& layouts = engine_block_layouts();
+
+    GLint block_count = 0;
+    glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCKS, &block_count);
+    for (GLint b = 0; b < block_count; ++b)
+    {
+        char block_name_buf[256] = {0};
+        glGetActiveUniformBlockName(program, (GLuint)b, sizeof(block_name_buf) - 1, nullptr, block_name_buf);
+
+        auto it = layouts.find(block_name_buf);
+        if (it == layouts.end())
+        {
+            continue; // engine block with no registered C++ mirror (probes, GLTF*), or not one
+        }
+        const std::string& block_name = it->first;
+        const auto& members = it->second;
+
+        // Walk the block's ACTIVE members (a member GL eliminated keeps its std140 offset,
+        // so skipping it loses nothing) and validate every one we can identify.
+        GLint member_count = 0;
+        glGetActiveUniformBlockiv(program, (GLuint)b, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, &member_count);
+        std::vector<GLint> indices((size_t)llmax(member_count, 0));
+        if (indices.empty())
+        {
+            continue;
+        }
+        glGetActiveUniformBlockiv(program, (GLuint)b, GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES, indices.data());
+
+        for (GLint raw_idx : indices)
+        {
+            GLuint idx = (GLuint)raw_idx;
+            char name_buf[256] = {0};
+            GLint size = 0;
+            GLenum type = 0;
+            glGetActiveUniform(program, idx, sizeof(name_buf) - 1, nullptr, &size, &type, name_buf);
+            const std::string name = name_buf;
+
+            const LLGLSLShader::EngineBlockLayoutMember* expected = nullptr;
+            for (const auto& m : members)
+            {
+                const char* nm = m.mName;
+                if (!nm)
+                {
+                    if (m.mReservedUniform < 0 || m.mReservedUniform >= (S32)reserved.size())
+                    {
+                        continue;
+                    }
+                    nm = reserved[m.mReservedUniform].c_str();
+                }
+                if (name == nm)
+                {
+                    expected = &m;
+                    break;
+                }
+            }
+            if (!expected)
+            {
+                continue; // member this block's registration doesn't track
+            }
+
+            GLint off = -1;
+            glGetActiveUniformsiv(program, 1, &idx, GL_UNIFORM_OFFSET, &off);
+            if (off != (GLint)expected->mOffset)
+            {
+                LL_ERRS() << block_name << " UBO std140 layout mismatch: '" << name
+                          << "' at offset " << off << ", expected " << expected->mOffset
+                          << " -- C++ mirror struct drift or driver std140 packing bug." << LL_ENDL;
+            }
+            if (expected->mMatrix)
+            {
+                GLint row_major = 0;
+                glGetActiveUniformsiv(program, 1, &idx, GL_UNIFORM_IS_ROW_MAJOR, &row_major);
+                if (!row_major)
+                {
+                    LL_ERRS() << block_name << " UBO matrix '" << name
+                              << "' is column-major; the C++ upload writes it transposed."
+                              << LL_ENDL;
+                }
+            }
+        }
+    }
+}
+#endif // !LL_RELEASE_FOR_DOWNLOAD
+
 //===============================
 // LLGLSL Shader implementation
 //===============================
@@ -1157,24 +1275,20 @@ bool LLGLSLShader::mapUniforms()
 
     // Set up block binding, in a way supported by Apple (rather than binding = 1 in .glsl).
     // See slide 35 and more of https://docs.huihoo.com/apple/wwdc/2011/session_420__advances_in_opengl_for_mac_os_x_lion.pdf
-    const char* ubo_names[] =
-    {
-        "ReflectionProbes", // UB_REFLECTION_PROBES
-        "GLTFJoints",       // UB_GLTF_JOINTS
-        "GLTFNodes",        // UB_GLTF_NODES
-        "GLTFMaterials",    // UB_GLTF_MATERIALS
-    };
-
-    llassert(LL_ARRAY_SIZE(ubo_names) == NUM_UNIFORM_BLOCKS);
-
     for (U32 i = 0; i < NUM_UNIFORM_BLOCKS; ++i)
     {
-        GLuint UBOBlockIndex = glGetUniformBlockIndex(mProgramObject, ubo_names[i]);
+        GLuint UBOBlockIndex = glGetUniformBlockIndex(mProgramObject, UNIFORM_BLOCK_NAMES[i]);
         if (UBOBlockIndex != GL_INVALID_INDEX)
         {
             glUniformBlockBinding(mProgramObject, UBOBlockIndex, i);
         }
     }
+
+#if !LL_RELEASE_FOR_DOWNLOAD
+    // Bindings are live now, so the block a mismatch would be reported against is the one
+    // the engine will actually upload to.
+    validateEngineBlockLayouts(mProgramObject);
+#endif
 
     unbind();
 

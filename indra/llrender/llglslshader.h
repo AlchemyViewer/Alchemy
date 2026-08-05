@@ -150,14 +150,54 @@ public:
         SG_COUNT
     } eGroup;
 
+    // Indexed uniform-buffer binding points the engine attaches its shared constant blocks to
+    // (glBindBufferBase); every consumer program references the block at the SAME point, so they
+    // are a fixed cross-program contract. Programs are remapped onto them by NAME after link
+    // (mapUniforms) rather than by an in-source `layout(binding=)`, which needs GLSL 4.20.
     enum UniformBlock : GLuint
     {
         UB_REFLECTION_PROBES,   // "ReflectionProbes"
         UB_GLTF_JOINTS,         // "GLTFJoints"
         UB_GLTF_NODES,          // "GLTFNodes"
         UB_GLTF_MATERIALS,      // "GLTFMaterials"
+        UB_ENVIRONMENT,         // "Environment" (sky/water constants)
         NUM_UNIFORM_BLOCKS
     };
+
+    // GL block names for the engine uniform blocks, in UniformBlock enum order (index ==
+    // binding). The single source of these names: read by the post-link remap in mapUniforms
+    // and by the debug layout validator. Keep in lockstep with the enum and the GLSL blocks.
+    static constexpr const char* UNIFORM_BLOCK_NAMES[NUM_UNIFORM_BLOCKS] =
+    {
+        "ReflectionProbes", // UB_REFLECTION_PROBES
+        "GLTFJoints",       // UB_GLTF_JOINTS
+        "GLTFNodes",        // UB_GLTF_NODES
+        "GLTFMaterials",    // UB_GLTF_MATERIALS
+        "Environment",      // UB_ENVIRONMENT
+    };
+
+    // Expected std140 layout of an engine UBO block, registered by the module that owns the
+    // C++ mirror struct with offsetof-derived offsets -- so the debug validator and the pack
+    // code can never drift apart. mReservedUniform indexes LLShaderMgr::mReservedUniforms for
+    // the GLSL member name; mName overrides it for members that aren't reserved uniforms.
+    // mMatrix additionally requires the member to introspect ROW-major.
+#if !LL_RELEASE_FOR_DOWNLOAD
+    struct EngineBlockLayoutMember
+    {
+        S32         mReservedUniform;
+        const char* mName;
+        U32         mOffset;
+        bool        mMatrix;
+    };
+    // Called from the owning module's static initializer to describe what the C++ upload
+    // expects; validated against every linked program at load.
+    //
+    // Debug-only, declaration included: the registered layouts are read by exactly one
+    // consumer (validateEngineBlockLayouts), which is itself debug-only, so in a release build
+    // the registrations were pure cost. The CALL SITES are gated to match; adding another
+    // engine block means gating its registration too.
+    static void registerEngineBlockLayout(const char* block_name, std::vector<EngineBlockLayoutMember> members);
+#endif // !LL_RELEASE_FOR_DOWNLOAD
 
     // An active uniform read back from the linked program, plus the texture-unit
     // ordering used to assign sampler channels deterministically (see mapUniforms).

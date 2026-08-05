@@ -42,7 +42,9 @@ out vec2 vary_texcoord3;
 
 // Inputs
 uniform vec3 lightnorm;
-uniform float cloud_scale;
+// Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
+// and bound at UB_ENVIRONMENT. Members are read by bare name.
+//[ENGINE_BLOCK Environment]
 
 // NOTE: Keep these in sync!
 //       indra\newview\app_settings\shaders\class1\deferred\skyV.glsl

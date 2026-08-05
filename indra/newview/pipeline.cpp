@@ -1261,6 +1261,11 @@ void LLPipeline::releaseGLBuffers()
 
     mHeroProbeManager.cleanup(); // release hero probes
 
+    if (LLEnvironment::instanceExists())
+    {   // shared environment block (UB_ENVIRONMENT); re-created lazily on next bind
+        LLEnvironment::instance().releaseGLBuffers();
+    }
+
     releaseScreenBuffers();
     releaseShadowBuffers();
 
@@ -4333,6 +4338,10 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
             //update reflection probe uniform
             mReflectionMapManager.updateUniforms();
             mHeroProbeManager.updateUniforms();
+
+            // Upload (if changed) and bind the shared sky/water constant block (UB_ENVIRONMENT)
+            // for this pass, same cadence as the reflection-probe UBO.
+            LLEnvironment::instance().bindEnvironmentUBO();
         }
 
         U32 cur_type = 0;

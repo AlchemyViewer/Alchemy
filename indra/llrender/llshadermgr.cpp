@@ -800,12 +800,38 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     bool touched = false;
 #endif
 
+    auto append_line = [&](const char* line)
+    {
+        if (shader_code_count >= (LL_ARRAY_SIZE(shader_code_text) - LL_ARRAY_SIZE(extra_code_text)))
+        {
+            return;
+        }
+
+        shader_code_text[shader_code_count] = (GLchar *)strdup(line);
+
+        if(flag_write_to_out_of_extra_block_area & flags)
+        {
+            shader_code_text[extra_code_count + start_shader_code + out_of_extra_block_counter]
+                = shader_code_text[shader_code_count];
+            out_of_extra_block_counter++;
+
+            if(out_of_extra_block_counter == extra_code_count)
+            {
+                shader_code_count += extra_code_count;
+                flags &= ~flag_write_to_out_of_extra_block_area;
+            }
+        }
+
+        ++shader_code_count;
+    };
+
     while(NULL != fgets((char *)buff, 1024, file)
           && shader_code_count < (LL_ARRAY_SIZE(shader_code_text) - LL_ARRAY_SIZE(extra_code_text)))
     {
         file_lines_count++;
 
         bool extra_block_area_found = NULL != strstr((const char*)buff, "[EXTRA_CODE_HERE]");
+        const char* engine_block_marker = strstr((const char*)buff, "[ENGINE_BLOCK ");
 
 #if TOUCH_SHADERS
         if (NULL != strstr((const char*)buff, marker))
@@ -840,24 +866,63 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             flags &= ~flag_write_to_out_of_extra_block_area;
             flags |= flag_extra_block_marker_was_found;
         }
-        else
+        else if (engine_block_marker)
         {
-            shader_code_text[shader_code_count] = (GLchar *)strdup((char *)buff);
-
-            if(flag_write_to_out_of_extra_block_area & flags)
+            // Shared engine-block declaration splice: a "//[ENGINE_BLOCK <Name>]" line
+            // expands to the ONE canonical std140 declaration for that block
+            // (class1/deferred/<name>Block.glsl). Every file that reads the block gets a
+            // byte-identical copy -- required, since helper sources are separate compilation
+            // units whose matching blocks must unify at link -- and none of them can drift
+            // from each other or from the C++ mirror struct.
+            std::string block_name(engine_block_marker + strlen("[ENGINE_BLOCK "));
+            const size_t close = block_name.find(']');
+            std::string snippet;
+            if (close != std::string::npos)
             {
-                shader_code_text[extra_code_count + start_shader_code + out_of_extra_block_counter]
-                    = shader_code_text[shader_code_count];
-                out_of_extra_block_counter++;
-
-                if(out_of_extra_block_counter == extra_code_count)
+                block_name.resize(close);
+                std::string snippet_rel = block_name;
+                if (!snippet_rel.empty())
                 {
-                    shader_code_count += extra_code_count;
-                    flags &= ~flag_write_to_out_of_extra_block_area;
+                    snippet_rel[0] = (char)tolower((unsigned char)snippet_rel[0]);
+                }
+                const std::string snippet_path = getShaderDirPrefix() + "1" + gDirUtilp->getDirDelimiter()
+                    + "deferred" + gDirUtilp->getDirDelimiter() + snippet_rel + "Block.glsl";
+                std::error_code ec;
+                snippet = LLFile::getContents(snippet_path, ec);
+                if (ec)
+                {
+                    snippet.clear();
                 }
             }
 
-            ++shader_code_count;
+            if (snippet.empty())
+            {
+                // Loud but non-fatal: the compile that follows fails with
+                // undefined-member errors right next to this warning.
+                LL_WARNS("ShaderLoading") << "Engine block snippet missing for marker '"
+                                          << (const char*)buff << "' in " << open_file_name << LL_ENDL;
+                append_line((const char*)buff);
+            }
+            else
+            {
+                size_t start = 0;
+                while (start < snippet.size())
+                {
+                    size_t nl = snippet.find('\n', start);
+                    std::string line = (nl == std::string::npos) ? snippet.substr(start) + "\n"
+                                                                 : snippet.substr(start, nl - start + 1);
+                    append_line(line.c_str());
+                    if (nl == std::string::npos)
+                    {
+                        break;
+                    }
+                    start = nl + 1;
+                }
+            }
+        }
+        else
+        {
+            append_line((const char*)buff);
         }
     } //while
 

@@ -26,9 +26,9 @@
 
 
 uniform vec4 waterPlane;
-uniform vec4 waterFogColor;
-uniform float waterFogDensity;
-uniform float waterFogKS;
+// Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
+// and bound at UB_ENVIRONMENT. Members are read by bare name.
+//[ENGINE_BLOCK Environment]
 
 vec3 srgb_to_linear(vec3 col);
 vec3 linear_to_srgb(vec3 col);
