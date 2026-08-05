@@ -30,6 +30,7 @@
 #include "llrendertarget.h"
 #include "llcubemaparray.h"
 #include "llcubemap.h"
+#include "aluniformbuffer.h"
 
 class LLSpatialGroup;
 class LLViewerObject;
@@ -227,8 +228,8 @@ private:
     // list of reflection maps to create
     std::vector<LLPointer<LLReflectionMap> > mCreateList;
 
-    // handle to UBO
-    U32 mUBO = 0;
+    // reflection-probe constant block (bound to LLGLSLShader::UB_REFLECTION_PROBES)
+    ALUniformBuffer mUBO;
 
     // list of maps being used for rendering
     std::vector<LLReflectionMap*> mReflectionMaps;

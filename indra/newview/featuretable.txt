@@ -86,6 +86,7 @@ RenderDisableVintageMode           1   1
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  1   256
 RenderReflectionProbeIrradianceResolution 1 16
+AlchemyRenderUBOUpdateMode 1 4
 
 //
 // Low Graphics Settings

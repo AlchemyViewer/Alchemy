@@ -177,14 +177,7 @@ void Asset::uploadTransforms()
         mp[idx + 11] = m[14];
     }
 
-    if (mNodesUBO == 0)
-    {
-        glGenBuffers(1, &mNodesUBO);
-    }
-
-    glBindBuffer(GL_UNIFORM_BUFFER, mNodesUBO);
-    glBufferData(GL_UNIFORM_BUFFER, glmp.size() * sizeof(F32), glmp.data(), GL_STREAM_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    mNodesUBO.update(glmp.data(), glmp.size() * sizeof(F32));
 }
 
 void Asset::uploadMaterials()
@@ -226,14 +219,7 @@ void Asset::uploadMaterials()
             min_alpha);
     }
 
-    if (mMaterialsUBO == 0)
-    {
-        glGenBuffers(1, &mMaterialsUBO);
-    }
-
-    glBindBuffer(GL_UNIFORM_BUFFER, mMaterialsUBO);
-    glBufferData(GL_UNIFORM_BUFFER, md.size() * sizeof(vec4), md.data(), GL_STREAM_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    mMaterialsUBO.update(md.data(), md.size() * sizeof(vec4));
 }
 
 S32 Asset::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,

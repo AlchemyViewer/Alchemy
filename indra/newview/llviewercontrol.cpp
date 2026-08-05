@@ -33,6 +33,7 @@
 #include "llviewercontrol.h"
 
 // Library includes
+#include "aluniformbuffer.h"
 #include "llwindow.h"   // getGamma()
 
 // For Listeners
@@ -683,6 +684,14 @@ static bool handleRenderResolutionDivisorChanged(const LLSD&)
     return true;
 }
 
+static bool handleRenderUBOUpdateModeChanged(const LLSD& newvalue)
+{
+    // Applies live: the shadow always holds current contents, so the next
+    // flush/bind under the new mode uploads correctly in any direction.
+    ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(newvalue.asInteger());
+    return true;
+}
+
 static bool handleDebugViewsChanged(const LLSD& newvalue)
 {
     LLView::sDebugRects = newvalue.asBoolean();
@@ -1044,6 +1053,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderUBOUpdateMode", handleRenderUBOUpdateModeChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeCount", handleReflectionProbeCountChanged);

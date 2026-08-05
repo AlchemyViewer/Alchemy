@@ -1184,6 +1184,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderUBOUpdateMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Upload strategy for the engine's shared uniform blocks: 0 = direct sub-updates per write, 1 = orphan and re-upload whole block per draw, 2 = stream through a shared ring buffer (unsynchronized map/unmap), 3 = stream through a persistently-mapped coherent ring (no per-draw map/orphan; falls back to 1 if buffer-storage is unavailable), 4 = persistently-mapped NON-coherent ring with explicit flush (often faster than 3 where coherent mappings are write-combined). Applies live; 2-4 avoid GPU sync stalls on drivers where buffer sub-updates are expensive (macOS).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRevokeObjectPerms</key>
         <map>
             <key>Comment</key>

@@ -51,6 +51,7 @@
 #include "llxmltree.h"
 #include "llslurl.h"
 #include "llrender.h"
+#include "aluniformbuffer.h"
 
 #include "stringize.h"
 
@@ -2757,6 +2758,7 @@ void LLViewerWindow::shutdownGL()
     gGL.shutdown();
 
     SUBSYSTEM_CLEANUP(LLVertexBuffer);
+    ALUniformBuffer::cleanupClass();
 
     LL_INFOS() << "LLVertexBuffer cleaned." << LL_ENDL ;
 }

@@ -27,6 +27,7 @@
  */
 
 #include "llvertexbuffer.h"
+#include "aluniformbuffer.h"
 #include "llvolumeoctree.h"
 #include "accessor.h"
 #include "primitive.h"
@@ -231,12 +232,11 @@ namespace LL
         class Skin
         {
         public:
-            ~Skin();
-
             S32 mInverseBindMatrices = INVALID_INDEX;
             S32 mSkeleton = INVALID_INDEX;
 
-            U32 mUBO = 0;
+            // joint matrix-palette constant block (deleted with the Skin via RAII)
+            ALUniformBuffer mUBO;
             std::vector<S32> mJoints;
             std::string mName;
             std::vector<mat4> mInverseBindMatricesData;
@@ -362,10 +362,10 @@ namespace LL
             F32 mLastUpdateTime = gFrameTimeSeconds;
 
             // UBO for storing node transforms
-            U32 mNodesUBO = 0;
+            ALUniformBuffer mNodesUBO;
 
             // UBO for storing material data
-            U32 mMaterialsUBO = 0;
+            ALUniformBuffer mMaterialsUBO;
             bool mLoadIntoVRAM = false;
 
             std::vector<std::string> mUnsupportedExtensions;

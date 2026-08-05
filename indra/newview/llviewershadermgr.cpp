@@ -32,6 +32,7 @@
 
 #include <boost/lexical_cast.hpp>
 
+#include "aluniformbuffer.h"
 #include "hbxxh.h"
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
@@ -533,6 +534,8 @@ void LLViewerShaderMgr::setShaders()
         LL_INFOS("ShaderLoading") << "Not supported hardware/software" << LL_ENDL;
         return;
     }
+
+    ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(gSavedSettings.getS32("AlchemyRenderUBOUpdateMode"));
 
     // Latch reverse-Z before anything downstream reads it: this same call releases and
     // reallocates GL buffers (mainDepthFormat), loadBasicShaders() emits REVERSE_Z into

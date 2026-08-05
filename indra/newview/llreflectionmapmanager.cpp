@@ -1295,17 +1295,7 @@ void LLReflectionMapManager::updateUniforms()
     mProbeData.heroProbeCount = gPipeline.mHeroProbeManager.mHeroData.heroProbeCount;
 
     //copy mProbeData into uniform buffer object
-    if (mUBO == 0)
-    {
-        glGenBuffers(1, &mUBO);
-    }
-
-    {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("rmmsu - update buffer");
-        glBindBuffer(GL_UNIFORM_BUFFER, mUBO);
-        glBufferData(GL_UNIFORM_BUFFER, sizeof(ReflectionProbeData), &mProbeData, GL_STREAM_DRAW);
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    }
+    mUBO.update(&mProbeData, sizeof(ReflectionProbeData));
 
 #if 0
     if (!gCubeSnapshot)
@@ -1330,11 +1320,11 @@ void LLReflectionMapManager::setUniforms()
         return;
     }
 
-    if (mUBO == 0)
+    if (!mUBO.allocated())
     {
         updateUniforms();
     }
-    glBindBufferBase(GL_UNIFORM_BUFFER, LLGLSLShader::UB_REFLECTION_PROBES, mUBO);
+    mUBO.bind(LLGLSLShader::UB_REFLECTION_PROBES);
 }
 
 
@@ -1572,8 +1562,7 @@ void LLReflectionMapManager::cleanup()
     mDefaultProbe = nullptr;
     mUpdatingProbe = nullptr;
 
-    glDeleteBuffers(1, &mUBO);
-    mUBO = 0;
+    mUBO.release();
 
     cleanupQueryPool();
 

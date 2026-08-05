@@ -53,6 +53,7 @@
 #include "llui.h"
 #include "llglheaders.h"
 #include "alsamplerstate.h"
+#include "aluniformbuffer.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -2248,6 +2249,10 @@ void LLPipeline::resetFrameStats()
 
     sCompiles        = 0;
     mNumVisibleFaces = 0;
+
+    // Close out the UBO streaming ring's per-frame counters (slices, wraps, GPU stalls).
+    // Warns when the ring lapped or blocked -- see ALUniformBuffer::RingStats.
+    ALUniformBuffer::endFrame();
 
     if (mOldRenderDebugMask != mRenderDebugMask)
     {
