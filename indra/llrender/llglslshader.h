@@ -163,6 +163,7 @@ public:
         UB_ENVIRONMENT,         // "Environment" (sky/water constants)
         UB_DEFERRED,            // "Deferred" (shadow/SSAO constants)
         UB_LIGHTS,              // "Lights" (forward fixed-function light array state)
+        UB_MATRICES,            // "Matrices" (modelview/projection/derived matrix stack state)
         NUM_UNIFORM_BLOCKS
     };
 
@@ -178,6 +179,7 @@ public:
         "Environment",      // UB_ENVIRONMENT
         "Deferred",         // UB_DEFERRED
         "Lights",           // UB_LIGHTS
+        "Matrices",         // UB_MATRICES
     };
 
     // Expected std140 layout of an engine UBO block, registered by the module that owns the
@@ -424,7 +426,6 @@ public:
     // Unbinds any previously bound shader by explicitly binding no shader.
     static void unbind();
 
-    U32 mMatHash[LLRender::NUM_MATRIX_MODES];
     U32 mLightHash;
 
     GLuint mProgramObject;

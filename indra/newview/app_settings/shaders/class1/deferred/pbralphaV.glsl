@@ -24,24 +24,21 @@
  */
 
 
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 #ifndef IS_HUD
 
 // default alpha implementation
 
 #ifdef HAS_SKIN
-uniform mat4 modelview_matrix;
-uniform mat4 projection_matrix;
 mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
-uniform mat3 normal_matrix;
-uniform mat4 modelview_projection_matrix;
 #endif
-uniform mat4 texture_matrix0;
 
 #if !defined(HAS_SKIN)
-uniform mat4 modelview_matrix;
 #endif
 
 out vec3 vary_position;
@@ -126,11 +123,8 @@ void main()
 
 // fullbright HUD alpha implementation
 
-uniform mat4 modelview_projection_matrix;
 
-uniform mat4 texture_matrix0;
 
-uniform mat4 modelview_matrix;
 
 out vec3 vary_position;
 

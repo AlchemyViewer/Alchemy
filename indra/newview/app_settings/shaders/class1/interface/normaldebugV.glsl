@@ -38,10 +38,10 @@ mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
-uniform mat3 normal_matrix;
 #endif
-uniform mat4 projection_matrix;
-uniform mat4 modelview_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 // *NOTE: Should use the modelview_projection_matrix here in the non-skinned
 // case for efficiency, but opting for the simplier implementation for now as

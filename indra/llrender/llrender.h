@@ -273,6 +273,26 @@ public:
         F32 light_ambient[3];  F32 _tail_pad;
     };
 
+    // ---- Shared matrix uniform block (UB_MATRICES) ----------------------------------------
+    // The matrix stack plus the matrices derived from it. Like the Lights block above, these
+    // used to be LOOSE uniforms re-pushed per program -- and they were the worst offenders:
+    // every (modelview, projection) epoch (camera set, shadow cascade, probe face, mirror
+    // pass, each UI translate/scale) re-taxed every program bound after it with up to six
+    // matrix writes. Packed once per epoch and bound at a fixed engine point, a matrix change
+    // costs one upload total and a program bind costs no matrix work at all.
+    //
+    // Matrices are COLUMN-major, std140's default: glm's own storage goes up untouched.
+    // normal is a mat3, which std140 strides at 16 bytes per column, hence float[3][4].
+    struct alignas(16) MatricesUBOData
+    {
+        F32 modelview[16];
+        F32 projection[16];
+        F32 modelview_projection[16];
+        F32 inv_proj[16];
+        F32 texture0[16];
+        F32 normal[3][4];   // .xyz used per column, .w std140 padding
+    };
+
     void translateUI(F32 x, F32 y, F32 z);
     void scaleUI(F32 x, F32 y, F32 z);
     void pushUIMatrix();
@@ -449,6 +469,21 @@ private:
     ALUniformBuffer mLightsUBO;
     U32             mLightsUBOHash  = 0xFFFFFFFFu;
     bool            mLightsUBOBound = false;
+
+    // Rebuild the matrix block from the current stacks into the buffer's shadow. The derived
+    // matrices are recomputed only for the stack that actually moved.
+    void packMatricesUBO();
+
+    ALUniformBuffer mMatricesUBO;
+    U32             mMatricesUBOHash[NUM_MATRIX_MODES] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
+    bool            mMatricesUBOBound = false;
+
+    // Derived matrices, cached across epochs so a stack that did not move is not re-derived.
+    // Members rather than function statics: they belong to this context, and shutdown() has to
+    // be able to invalidate them along with the block.
+    glm::mat4       mCachedInvMdv{ 1.f };
+    glm::mat4       mCachedInvProj{ 1.f };
+    glm::mat4       mCachedMVP{ 1.f };
 
     bool            mDirty;
     U32             mCount;

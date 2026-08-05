@@ -30,7 +30,9 @@ uniform sampler2D   depthMap;
 // bound at UB_DEFERRED. Members are read by bare name.
 //[ENGINE_BLOCK Deferred]
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 
 vec2 getScreenCoordinateAo(vec2 screenpos)

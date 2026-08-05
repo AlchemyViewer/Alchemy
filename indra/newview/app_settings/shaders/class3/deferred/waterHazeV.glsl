@@ -37,7 +37,9 @@ uniform vec4 waterPlane;
 
 uniform int above_water;
 
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 void main()
 {

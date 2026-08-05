@@ -29,14 +29,14 @@
 // (indexed faces exclude texture animation), so texture_matrix0 is not applied.
 // HAS_SKIN adds rigged matrix-palette skinning.
 
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 #ifdef HAS_SKIN
-uniform mat4 modelview_matrix;
-uniform mat4 projection_matrix;
 mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
-uniform mat4 modelview_projection_matrix;
 #endif
 
 in vec3 position;

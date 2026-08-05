@@ -80,6 +80,17 @@ namespace
             { LLShaderMgr::LIGHT_AMBIENT, nullptr, (U32)offsetof(D, light_ambient),              false },
         };
         LLGLSLShader::registerEngineBlockLayout("Lights", std::move(members));
+
+        using M = LLRender::MatricesUBOData;
+        LLGLSLShader::registerEngineBlockLayout("Matrices",
+        {
+            { LLShaderMgr::MODELVIEW_MATRIX,            nullptr, (U32)offsetof(M, modelview),            true },
+            { LLShaderMgr::PROJECTION_MATRIX,           nullptr, (U32)offsetof(M, projection),           true },
+            { LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, nullptr, (U32)offsetof(M, modelview_projection), true },
+            { LLShaderMgr::INVERSE_PROJECTION_MATRIX,   nullptr, (U32)offsetof(M, inv_proj),             true },
+            { LLShaderMgr::TEXTURE_MATRIX0,             nullptr, (U32)offsetof(M, texture0),             true },
+            { LLShaderMgr::NORMAL_MATRIX,               nullptr, (U32)offsetof(M, normal),               true },
+        });
         return true;
     }();
 }
@@ -356,8 +367,9 @@ bool LLRender::init(bool needs_vertex_buffer)
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-    // Fresh context: nothing is bound at UB_LIGHTS yet, whatever a previous one had.
-    mLightsUBOBound = false;
+    // Fresh context: nothing is bound at UB_LIGHTS/UB_MATRICES yet, whatever a previous one had.
+    mLightsUBOBound   = false;
+    mMatricesUBOBound = false;
 
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
@@ -442,6 +454,15 @@ void LLRender::shutdown()
     mLightsUBO.release();
     mLightsUBOHash  = 0xFFFFFFFFu;
     mLightsUBOBound = false;
+
+    // Same for the matrix block. syncMatrices re-initialises the shadow on the next use
+    // because release() leaves it unallocated.
+    mMatricesUBO.release();
+    for (U32 i = 0; i < NUM_MATRIX_MODES; ++i)
+    {
+        mMatricesUBOHash[i] = 0xFFFFFFFFu;
+    }
+    mMatricesUBOBound = false;
 }
 
 void LLRender::clearSamplers()
@@ -465,8 +486,9 @@ void LLRender::refreshState(void)
     mDirty = true;
 
     // Called when GL state may have been changed behind our back, so re-assert the shared
-    // light block's binding along with the texture units and colour mask.
-    mLightsUBOBound = false;
+    // blocks' bindings along with the texture units and colour mask.
+    mLightsUBOBound   = false;
+    mMatricesUBOBound = false;
 
     U32 active_unit = mCurrTextureUnitIndex;
 
@@ -579,158 +601,115 @@ void LLRender::syncLightState()
     }
 }
 
+void LLRender::packMatricesUBO()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+
+    static_assert(sizeof(MatricesUBOData) == 368, "MatricesUBOData must match std140 (368 bytes)");
+
+    const glm::mat4& mdv  = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
+    const glm::mat4& proj = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
+    const glm::mat4& tex  = mMatrix[MM_TEXTURE0][mMatIdx[MM_TEXTURE0]];
+
+    const bool mdv_moved  = mMatHash[MM_MODELVIEW]  != mMatricesUBOHash[MM_MODELVIEW];
+    const bool proj_moved = mMatHash[MM_PROJECTION] != mMatricesUBOHash[MM_PROJECTION];
+
+    if (mdv_moved)
+    {
+        // The modelview is affine (view * model, no perspective), so affineInverse is exact
+        // and much cheaper than a general 4x4 inverse.
+        mCachedInvMdv = glm::affineInverse(mdv);
+    }
+    if (proj_moved)
+    {
+        // Projection is not affine -- general inverse required.
+        mCachedInvProj = glm::inverse(proj);
+    }
+    if (mdv_moved || proj_moved)
+    {
+        mCachedMVP = proj * mdv;
+    }
+
+    MatricesUBOData d;
+    memcpy(d.modelview,            glm::value_ptr(mdv),           sizeof(d.modelview));
+    memcpy(d.projection,           glm::value_ptr(proj),          sizeof(d.projection));
+    memcpy(d.modelview_projection, glm::value_ptr(mCachedMVP),    sizeof(d.modelview_projection));
+    memcpy(d.inv_proj,             glm::value_ptr(mCachedInvProj), sizeof(d.inv_proj));
+    memcpy(d.texture0,             glm::value_ptr(tex),           sizeof(d.texture0));
+
+    // normal_matrix is the upper 3x3 of transpose(inv(modelview)). Column c of that transpose
+    // is row c of the inverse, and glm stores columns contiguously -- so element k of column c
+    // is the inverse's (row c, column k), i.e. value_ptr(inv)[4*k + c]. This reproduces exactly
+    // the nine floats the loose uniformMatrix3fv used to upload.
+    const F32* inv = glm::value_ptr(mCachedInvMdv);
+    for (U32 c = 0; c < 3; ++c)
+    {
+        d.normal[c][0] = inv[0 * 4 + c];
+        d.normal[c][1] = inv[1 * 4 + c];
+        d.normal[c][2] = inv[2 * 4 + c];
+        d.normal[c][3] = 0.f;
+    }
+
+    U8* shadow = mMatricesUBO.beginWrite();
+    if (memcmp(shadow, &d, sizeof(d)) != 0)
+    {
+        memcpy(shadow, &d, sizeof(d));
+        mMatricesUBO.endWrite(0, sizeof(d));
+    }
+}
+
 void LLRender::syncMatrices()
 {
     STOP_GLERROR;
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
 
-    static const U32 name[] =
-    {
-        LLShaderMgr::MODELVIEW_MATRIX,
-        LLShaderMgr::PROJECTION_MATRIX,
-        LLShaderMgr::TEXTURE_MATRIX0,
-    };
-    static_assert(LL_ARRAY_SIZE(name) == LLRender::NUM_MATRIX_MODES,
-                  "one uniform per matrix mode, indexed by mode");
-
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-
-    static glm::mat4 cached_mvp;
-    static glm::mat4 cached_inv_mdv;
-    static U32 cached_mvp_mdv_hash = 0xFFFFFFFF;
-    static U32 cached_mvp_proj_hash = 0xFFFFFFFF;
-    static U32 cached_inv_mdv_hash = 0xFFFFFFFF;   // tracks cached_inv_mdv independently of the MVP cache
-
-    static glm::mat4 cached_inv_proj;
-    static U32 cached_inv_proj_hash = 0xFFFFFFFF;
-
-    static glm::mat4 cached_normal;
-    static U32 cached_normal_hash = 0xFFFFFFFF;
 
     if (shader)
     {
-        bool mvp_done = false;
-
-        U32 i = MM_MODELVIEW;
-        if (mMatHash[MM_MODELVIEW] != shader->mMatHash[MM_MODELVIEW])
-        { //update modelview, normal, and MVP
-            const glm::mat4& mat = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
-
-            // if MDV has changed, update the cached inverse as well. Keyed on its own hash --
-            // NOT cached_mvp_mdv_hash, which only advances for shaders that carry the MVP uniform,
-            // so a run of MVP-less shaders would otherwise re-inverse the same modelview each time.
-            // The modelview is affine (view * model, no perspective), so affineInverse is exact and
-            // much cheaper than a general 4x4 inverse.
-            if (cached_inv_mdv_hash != mMatHash[MM_MODELVIEW])
-            {
-                cached_inv_mdv = glm::affineInverse(mat);
-                cached_inv_mdv_hash = mMatHash[MM_MODELVIEW];
-            }
-
-            shader->uniformMatrix4fv(name[MM_MODELVIEW], 1, GL_FALSE, glm::value_ptr(mat));
-            shader->mMatHash[MM_MODELVIEW] = mMatHash[MM_MODELVIEW];
-
-            //update normal matrix
-            if (shader->hasUniform(LLShaderMgr::NORMAL_MATRIX))
-            {
-                if (cached_normal_hash != mMatHash[i])
-                {
-                    cached_normal = glm::transpose(cached_inv_mdv);
-                    cached_normal_hash = mMatHash[i];
-                }
-
-                auto norm = glm::value_ptr(cached_normal);
-
-                F32 norm_mat[] =
-                {
-                    norm[0], norm[1], norm[2],
-                    norm[4], norm[5], norm[6],
-                    norm[8], norm[9], norm[10]
-                };
-
-                shader->uniformMatrix3fv(LLShaderMgr::NORMAL_MATRIX, 1, GL_FALSE, norm_mat);
-            }
-
-            if (shader->hasUniform(LLShaderMgr::INVERSE_MODELVIEW_MATRIX))
-            {
-                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_MATRIX, 1, GL_FALSE, glm::value_ptr(cached_inv_mdv));
-            }
-
-            //update MVP matrix
-            mvp_done = true;
-            if (shader->hasUniform(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX))
-            {
-                U32 proj = MM_PROJECTION;
-
-                if (cached_mvp_mdv_hash != mMatHash[i] || cached_mvp_proj_hash != mMatHash[MM_PROJECTION])
-                {
-                    cached_mvp = mat;
-                    cached_mvp = mMatrix[proj][mMatIdx[proj]] * cached_mvp;
-                    cached_mvp_mdv_hash = mMatHash[i];
-                    cached_mvp_proj_hash = mMatHash[MM_PROJECTION];
-                }
-
-                shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, glm::value_ptr(cached_mvp));
-            }
-        }
-
-        i = MM_PROJECTION;
-        if (mMatHash[MM_PROJECTION] != shader->mMatHash[MM_PROJECTION])
-        { //update projection matrix, normal, and MVP
-            const glm::mat4& mat = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
-
-            // GZ: This was previously disabled seemingly due to a bug involving the deferred renderer's regular pushing and popping of mats.
-            // We're reenabling this and cleaning up the code around that - that would've been the appropriate course initially.
-            // Anything beyond the standard proj and inv proj mats are special cases.  Please setup special uniforms accordingly in the future.
-            if (shader->hasUniform(LLShaderMgr::INVERSE_PROJECTION_MATRIX))
-            {
-                // Cache by projection hash so a run of shaders synced after one projection change
-                // shares a single inverse (projection is not affine -- general inverse required).
-                if (cached_inv_proj_hash != mMatHash[MM_PROJECTION])
-                {
-                    cached_inv_proj = glm::inverse(mat);
-                    cached_inv_proj_hash = mMatHash[MM_PROJECTION];
-                }
-                shader->uniformMatrix4fv(LLShaderMgr::INVERSE_PROJECTION_MATRIX, 1, false, glm::value_ptr(cached_inv_proj));
-            }
-
-            // Used by some full screen effects - such as full screen lights, glow, etc.
-            if (shader->hasUniform(LLShaderMgr::IDENTITY_MATRIX))
-            {
-                shader->uniformMatrix4fv(LLShaderMgr::IDENTITY_MATRIX, 1, GL_FALSE, glm::value_ptr(glm::identity<glm::mat4>()));
-            }
-
-            shader->uniformMatrix4fv(name[MM_PROJECTION], 1, GL_FALSE, glm::value_ptr(mat));
-            shader->mMatHash[MM_PROJECTION] = mMatHash[MM_PROJECTION];
-
-            if (!mvp_done)
-            {
-                //update MVP matrix
-                if (shader->hasUniform(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX))
-                {
-                    if (cached_mvp_mdv_hash != mMatHash[MM_MODELVIEW] || cached_mvp_proj_hash != mMatHash[MM_PROJECTION])
-                    {
-                        U32 mdv = MM_MODELVIEW;
-                        cached_mvp = mat;
-                        cached_mvp *= mMatrix[mdv][mMatIdx[mdv]];
-                        cached_mvp_mdv_hash = mMatHash[MM_MODELVIEW];
-                        cached_mvp_proj_hash = mMatHash[MM_PROJECTION];
-                    }
-
-                    shader->uniformMatrix4fv(LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, 1, GL_FALSE, glm::value_ptr(cached_mvp));
-                }
-            }
-        }
-
-        for (i = MM_TEXTURE0; i < NUM_MATRIX_MODES; ++i)
+        // The matrices live in the shared UB_MATRICES block: packed once per matrix EPOCH (any
+        // mMatHash movement since the last pack) rather than once per program, so a program
+        // bind costs no matrix work at all. The derived matrices (inverses, normal, MVP) are
+        // recomputed per epoch under per-stack gates inside the pack, and unconditionally --
+        // any program may read them from the block, so the old hasUniform() gates are gone.
+        if (!mMatricesUBO.allocated())
         {
-            if (mMatHash[i] != shader->mMatHash[i])
+            // Fresh context (first use, or re-init after shutdown released the old block):
+            // re-pack and re-bind everything.
+            mMatricesUBO.initShadowed(sizeof(MatricesUBOData));
+            for (U32 i = 0; i < NUM_MATRIX_MODES; ++i)
             {
-                shader->uniformMatrix4fv(name[i], 1, GL_FALSE, glm::value_ptr(mMatrix[i][mMatIdx[i]]));
-                shader->mMatHash[i] = mMatHash[i];
+                mMatricesUBOHash[i] = 0xFFFFFFFFu;
+            }
+            mMatricesUBOBound = false;
+        }
+
+        if (mMatHash[MM_MODELVIEW]  != mMatricesUBOHash[MM_MODELVIEW]  ||
+            mMatHash[MM_PROJECTION] != mMatricesUBOHash[MM_PROJECTION] ||
+            mMatHash[MM_TEXTURE0]   != mMatricesUBOHash[MM_TEXTURE0])
+        {
+            packMatricesUBO();
+            for (U32 i = 0; i < NUM_MATRIX_MODES; ++i)
+            {
+                mMatricesUBOHash[i] = mMatHash[i];
             }
         }
 
+        if (!mMatricesUBOBound)
+        {
+            // First attach on this context (or a refreshState() re-assert): bindCurrent both
+            // uploads any pending bytes and (re)claims the binding point -- needed even when
+            // clean, e.g. UPDATE_DIRECT where endWrite uploads without ever dirtying.
+            mMatricesUBO.bindCurrent(LLGLSLShader::UB_MATRICES);
+            mMatricesUBOBound = true;
+        }
+        else
+        {
+            // Per-draw steady state: upload when the pack dirtied the shadow, otherwise just
+            // confirm the last flushed slice is still readable (streaming-ring reuse can
+            // invalidate it). No GL calls at all on the clean-and-live path.
+            mMatricesUBO.ensureCurrent(LLGLSLShader::UB_MATRICES);
+        }
 
         if (shader->mFeatures.hasLighting || shader->mFeatures.calculatesLighting || shader->mFeatures.calculatesAtmospherics)
         { //also sync light state

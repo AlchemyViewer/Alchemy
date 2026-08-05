@@ -26,7 +26,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 
 in vec3 position;       // star center world position (shared by all 6 verts of a star)

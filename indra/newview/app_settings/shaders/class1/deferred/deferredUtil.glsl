@@ -76,7 +76,9 @@ uniform float proj_ambiance;
 uniform vec3 color; // light_color
 uniform float size; // light_size
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 
 const float M_PI = 3.14159265;

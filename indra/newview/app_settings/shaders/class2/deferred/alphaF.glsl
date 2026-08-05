@@ -62,7 +62,9 @@ in vec4 vertex_color; //vertex color should be treated as sRGB
 uniform float minimum_alpha;
 
 uniform mat4 proj_mat;
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 uniform int sun_up_factor;
 // Shared forward-light arrays, spliced from class1/deferred/lightsBlock.glsl and

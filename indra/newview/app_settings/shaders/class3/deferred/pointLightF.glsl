@@ -41,7 +41,9 @@ in vec3 trans_center;
 
 uniform vec2 screen_res;
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec4 viewport;
 // Classic (legacy pre-PBR) sky lighting is a per-program compile-time variant, not a runtime
 // uniform: the two paths differ by whole blocks of maths and a probe sample, and only one of

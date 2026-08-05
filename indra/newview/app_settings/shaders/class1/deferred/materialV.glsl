@@ -28,21 +28,19 @@
 #define DIFFUSE_ALPHA_MODE_MASK 2
 #define DIFFUSE_ALPHA_MODE_EMISSIVE 3
 
-uniform mat4 modelview_matrix;
-uniform mat4 projection_matrix;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
-uniform mat3 normal_matrix;
 #endif
 
 out vec3 vary_position;
 
-uniform mat4 texture_matrix0;
 
 in vec3 position;
 in vec4 diffuse_color;

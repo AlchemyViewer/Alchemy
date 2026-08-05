@@ -726,11 +726,7 @@ bool LLGLSLShader::createShader(U32 variants)
 
     sInstances.insert(this);
 
-    //reloading, reset matrix hash values
-    for (U32 i = 0; i < LLRender::NUM_MATRIX_MODES; ++i)
-    {
-        mMatHash[i] = 0xFFFFFFFF;
-    }
+    //reloading, reset light hash value
     mLightHash = 0xFFFFFFFF;
 
     // Derived, never hand-set: the LINEAR_DIFFUSE permutation is what the shader source

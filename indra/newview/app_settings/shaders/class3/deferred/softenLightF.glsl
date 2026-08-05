@@ -63,7 +63,9 @@ uniform int  sun_up_factor;
 
 in vec2 vary_fragcoord;
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 
 vec4 getNorm(vec2 pos_screen);

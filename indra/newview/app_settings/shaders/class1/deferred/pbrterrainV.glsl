@@ -31,10 +31,9 @@
 #define TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE 0
 #define TERRAIN_PAINT_TYPE_PBR_PAINTMAP 1
 
-uniform mat3 normal_matrix;
-uniform mat4 texture_matrix0;
-uniform mat4 modelview_matrix;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
 uniform float region_scale;
 #endif

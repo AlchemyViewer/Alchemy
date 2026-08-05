@@ -53,8 +53,9 @@ void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
 
-uniform mat4 modelview_matrix;
-uniform mat3 normal_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 in vec3 vary_position;
 
@@ -88,7 +89,6 @@ uniform vec3 sun_dir;
 uniform vec3 moon_dir;
 
 uniform mat4 proj_mat;
-uniform mat4 inv_proj;
 uniform vec2 screen_res;
 
 // Shared forward-light arrays, spliced from class1/deferred/lightsBlock.glsl and

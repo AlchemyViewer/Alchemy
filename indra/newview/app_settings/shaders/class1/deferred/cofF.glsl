@@ -38,7 +38,9 @@ uniform float tan_pixel_angle;
 uniform float magnification;
 uniform float max_cof;
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 
 float ndcZFromScreenDepth(float d);   // deferredUtil.glsl -- depth-convention aware

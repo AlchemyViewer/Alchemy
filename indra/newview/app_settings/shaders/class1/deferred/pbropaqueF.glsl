@@ -31,6 +31,9 @@
 /*[EXTRA_CODE_HERE]*/
 
 
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 #ifndef IS_HUD
 
 // deferred opaque implementation
@@ -67,7 +70,6 @@ uniform float clipSign;
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 
-uniform mat3 normal_matrix;
 
 void main()
 {
