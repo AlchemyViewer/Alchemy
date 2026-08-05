@@ -26,10 +26,9 @@
 uniform sampler2D   noiseMap;
 uniform sampler2D   depthMap;
 
-uniform float ssao_radius;
-uniform float ssao_max_radius;
-uniform float ssao_factor;
-uniform float ssao_factor_inv;
+// Shared shadow/SSAO constants, spliced from class1/deferred/deferredBlock.glsl and
+// bound at UB_DEFERRED. Members are read by bare name.
+//[ENGINE_BLOCK Deferred]
 
 uniform mat4 inv_proj;
 uniform vec2 screen_res;

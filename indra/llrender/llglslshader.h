@@ -161,6 +161,7 @@ public:
         UB_GLTF_NODES,          // "GLTFNodes"
         UB_GLTF_MATERIALS,      // "GLTFMaterials"
         UB_ENVIRONMENT,         // "Environment" (sky/water constants)
+        UB_DEFERRED,            // "Deferred" (shadow/SSAO constants)
         NUM_UNIFORM_BLOCKS
     };
 
@@ -174,13 +175,16 @@ public:
         "GLTFNodes",        // UB_GLTF_NODES
         "GLTFMaterials",    // UB_GLTF_MATERIALS
         "Environment",      // UB_ENVIRONMENT
+        "Deferred",         // UB_DEFERRED
     };
 
     // Expected std140 layout of an engine UBO block, registered by the module that owns the
     // C++ mirror struct with offsetof-derived offsets -- so the debug validator and the pack
     // code can never drift apart. mReservedUniform indexes LLShaderMgr::mReservedUniforms for
     // the GLSL member name; mName overrides it for members that aren't reserved uniforms.
-    // mMatrix additionally requires the member to introspect ROW-major.
+    // mMatrix marks a matrix member, which is additionally required to introspect
+    // COLUMN-major: std140's default, and what the pack code writes (glm's own storage,
+    // uploaded straight through). A row-major layout would silently transpose every read.
 #if !LL_RELEASE_FOR_DOWNLOAD
     struct EngineBlockLayoutMember
     {

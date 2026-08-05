@@ -41,6 +41,7 @@
 #include "llgl.h"
 #include "lldrawable.h"
 #include "altexture3d.h"
+#include "aluniformbuffer.h"
 #include "llrendertarget.h"
 #include "llreflectionmapmanager.h"
 #include "llheroprobemanager.h"
@@ -307,6 +308,12 @@ public:
     // sampler. The next program to use those low units for ordinary material maps then reads
     // a depth texture through a non-shadow sampler, which is undefined behaviour.
     void unbindShadowMaps();
+
+    // Rebuild the shared shadow/SSAO constant block from current state (CPU only). Called once
+    // per deferred pass; every value in it is fixed for the whole pass.
+    void packDeferredUBO();
+    // Upload (if dirty) and bind that block at UB_DEFERRED.
+    void bindDeferredUBO();
 
     void bindDeferredShaderFast(LLGLSLShader& shader);
     void bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_target = nullptr, LLRenderTarget* depth_target = nullptr);
@@ -799,6 +806,38 @@ public:
     LLVector4               mSunClipPlanes;
     LLVector4               mSunOrthoClipPlanes;
     LLVector2               mScreenScale;
+
+    // ---- Shared deferred uniform block (UB_DEFERRED) --------------------------------------
+    // std140-packed shadow/SSAO constants, uploaded once per deferred pass instead of being
+    // re-pushed by every bindDeferredShader call. Holds only what is constant across a pass:
+    // screen_res is overridden per call and sun_dir/moon_dir are entangled with atmospherics,
+    // so those stay loose.
+    //
+    // shadow_matrix@0, ssao_effect_mat@384, shadow_clip@432, shadow_res@448,
+    // proj_shadow_res@456, scalars @464..492, size 496. Matrices are COLUMN-major (std140's
+    // default): glm's own storage is uploaded straight through, and ssao_effect_mat is
+    // symmetric either way. Checked against the driver at shader load by
+    // validateEngineBlockLayouts() in debug builds.
+    struct alignas(16) DeferredUBOData
+    {
+        F32 shadow_matrix[6][16];      // mat4[6]
+        F32 ssao_effect_mat[12];       // mat3 (3 vec4-strided columns)
+        F32 shadow_clip[4];            // vec4
+        F32 shadow_res[2];             // vec2
+        F32 proj_shadow_res[2];        // vec2
+        F32 shadow_bias;
+        F32 shadow_offset;
+        F32 spot_shadow_bias;
+        F32 spot_shadow_offset;
+        F32 ssao_radius;
+        F32 ssao_max_radius;
+        F32 ssao_factor;
+        F32 ssao_factor_inv;
+    };
+
+    DeferredUBOData             mDeferredUBOData{};
+    ALUniformBuffer             mDeferredUBO;
+    bool                        mDeferredUBODirty{ true };
 
     //water distortion texture (refraction)
     LLRenderTarget              mWaterDis;

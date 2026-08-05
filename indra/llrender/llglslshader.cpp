@@ -204,11 +204,11 @@ static void validateEngineBlockLayouts(GLuint program)
             {
                 GLint row_major = 0;
                 glGetActiveUniformsiv(program, 1, &idx, GL_UNIFORM_IS_ROW_MAJOR, &row_major);
-                if (!row_major)
+                if (row_major)
                 {
                     LL_ERRS() << block_name << " UBO matrix '" << name
-                              << "' is column-major; the C++ upload writes it transposed."
-                              << LL_ENDL;
+                              << "' introspects row-major; the C++ upload writes column-major"
+                              << " (std140's default), so every read would transpose." << LL_ENDL;
                 }
             }
         }

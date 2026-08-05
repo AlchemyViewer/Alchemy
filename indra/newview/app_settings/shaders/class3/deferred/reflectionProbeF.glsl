@@ -48,46 +48,9 @@ uniform bool transparent_surface;
 #define classic_mode 0
 #endif
 
-#define MAX_REFMAP_COUNT 256  // must match LL_MAX_REFLECTION_PROBE_COUNT
-
-layout (std140) uniform ReflectionProbes
-{
-    // list of OBBs for user override probes
-    // box is a set of 3 planes outward facing planes and the depth of the box along that plane
-    // for each box refBox[i]...
-    /// box[0..2] - plane 0 .. 2 in [A,B,C,D] notation
-    //  box[3][0..2] - plane thickness
-    mat4 refBox[MAX_REFMAP_COUNT];
-    mat4 heroBox;
-    // list of bounding spheres for reflection probes sorted by distance to camera (closest first)
-    vec4 refSphere[MAX_REFMAP_COUNT];
-    // extra parameters
-    //  x - irradiance scale
-    //  y - radiance scale
-    //  z - fade in
-    //  w - znear
-    vec4 refParams[MAX_REFMAP_COUNT];
-    vec4 heroSphere;
-    // index  of cube map in reflectionProbes for a corresponding reflection probe
-    // e.g. cube map channel of refSphere[2] is stored in refIndex[2]
-    // refIndex.x - cubemap channel in reflectionProbes
-    // refIndex.y - index in refNeighbor of neighbor list (index is ivec4 index, not int index)
-    // refIndex.z - number of neighbors
-    // refIndex.w - priority, if negative, this probe has a box influence
-    ivec4 refIndex[MAX_REFMAP_COUNT];
-
-    // neighbor list data (refSphere indices, not cubemap array layer)
-    ivec4 refNeighbor[1024];
-
-    ivec4 refBucket[256];
-
-    // number of reflection probes present in refSphere
-    int refmapCount;
-
-    int heroShape;
-    int heroMipCount;
-    int heroProbeCount;
-};
+// Shared reflection-probe + SSR constants, spliced from
+// class1/deferred/reflectionProbesBlock.glsl and bound at UB_REFLECTION_PROBES.
+//[ENGINE_BLOCK ReflectionProbes]
 
 // Inputs
 uniform mat3 env_mat;

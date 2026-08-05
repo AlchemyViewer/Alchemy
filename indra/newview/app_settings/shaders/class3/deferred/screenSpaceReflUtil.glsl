@@ -56,12 +56,9 @@ bool isAdaptiveStepEnabled = true;
 bool isExponentialStepEnabled = true;
 bool debugDraw = false;
 
-uniform float iterationCount;
-uniform float rayStep;
-uniform float distanceBias;
-uniform float depthRejectBias;
-uniform float glossySampleCount;
-uniform float adaptiveStepMultiplier;
+// Shared reflection-probe + SSR constants, spliced from
+// class1/deferred/reflectionProbesBlock.glsl and bound at UB_REFLECTION_PROBES.
+//[ENGINE_BLOCK ReflectionProbes]
 uniform float noiseSine;
 
 float epsilon = 0.1;

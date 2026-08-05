@@ -97,6 +97,18 @@ public:
         GLint heroShape;
         GLint heroMipCount;
         GLint heroProbeCount;
+
+        // Screen-space reflection march parameters. Frame-constant, and every SSR consumer is
+        // already reading this block, so they ride along here instead of being re-pushed as
+        // loose uniforms on every bindReflectionProbes. (noiseSine is NOT here: it advances
+        // per bind.)
+        F32 iterationCount;
+        F32 rayStep;
+        F32 distanceBias;
+        F32 depthRejectBias;
+        F32 glossySampleCount;
+        F32 adaptiveStepMultiplier;
+        F32 _ssrTailPad[2]; // round the block to a 16-byte multiple (std140)
     };
 
     // allocate an environment map of the given resolution

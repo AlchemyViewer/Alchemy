@@ -136,14 +136,9 @@ uniform AL_SHADOW_SAMPLER shadowMap5;
 
 uniform vec3 sun_dir;
 uniform vec3 moon_dir;
-uniform vec2 shadow_res;
-uniform vec2 proj_shadow_res;
-uniform mat4 shadow_matrix[6];
-uniform vec4 shadow_clip;
-uniform float shadow_bias;
-uniform float shadow_offset;
-uniform float spot_shadow_bias;
-uniform float spot_shadow_offset;
+// Shared shadow/SSAO constants, spliced from class1/deferred/deferredBlock.glsl and
+// bound at UB_DEFERRED. Members are read by bare name.
+//[ENGINE_BLOCK Deferred]
 uniform mat4 inv_proj;
 uniform vec2 screen_res;
 uniform int sun_up_factor;

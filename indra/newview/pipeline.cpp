@@ -391,6 +391,33 @@ LLPipeline::LLPipeline() :
     {
         mHWLightColors[i] = LLColor4::black;
     }
+
+#if !LL_RELEASE_FOR_DOWNLOAD
+    // Register the Deferred block's expected std140 layout for debug validation at shader
+    // load, offsetof()-derived from the very struct packDeferredUBO writes -- llrender carries
+    // no hand-copied offset table that can drift from it. shadow_matrix/ssao_effect_mat must
+    // introspect COLUMN-major (see DeferredUBOData). Registered here because gPipeline is a
+    // global: this runs during static init, before any shader load.
+#define LL_DEFERRED_LAYOUT(name_lit, m, is_matrix) \
+    { -1, name_lit, (U32)offsetof(DeferredUBOData, m), is_matrix }
+    LLGLSLShader::registerEngineBlockLayout("Deferred",
+    {
+        LL_DEFERRED_LAYOUT("shadow_matrix[0]",   shadow_matrix,      true),
+        LL_DEFERRED_LAYOUT("ssao_effect_mat",    ssao_effect_mat,    true),
+        LL_DEFERRED_LAYOUT("shadow_clip",        shadow_clip,        false),
+        LL_DEFERRED_LAYOUT("shadow_res",         shadow_res,         false),
+        LL_DEFERRED_LAYOUT("proj_shadow_res",    proj_shadow_res,    false),
+        LL_DEFERRED_LAYOUT("shadow_bias",        shadow_bias,        false),
+        LL_DEFERRED_LAYOUT("shadow_offset",      shadow_offset,      false),
+        LL_DEFERRED_LAYOUT("spot_shadow_bias",   spot_shadow_bias,   false),
+        LL_DEFERRED_LAYOUT("spot_shadow_offset", spot_shadow_offset, false),
+        LL_DEFERRED_LAYOUT("ssao_radius",        ssao_radius,        false),
+        LL_DEFERRED_LAYOUT("ssao_max_radius",    ssao_max_radius,    false),
+        LL_DEFERRED_LAYOUT("ssao_factor",        ssao_factor,        false),
+        LL_DEFERRED_LAYOUT("ssao_factor_inv",    ssao_factor_inv,    false),
+    });
+#undef LL_DEFERRED_LAYOUT
+#endif // !LL_RELEASE_FOR_DOWNLOAD
 }
 
 void LLPipeline::connectRefreshCachedSettingsSafe(const std::string name)
@@ -1260,6 +1287,9 @@ void LLPipeline::releaseGLBuffers()
     }
 
     mHeroProbeManager.cleanup(); // release hero probes
+
+    mDeferredUBO.release(); // shared shadow/SSAO block (UB_DEFERRED); re-created lazily on next use
+    mDeferredUBODirty = true;
 
     if (LLEnvironment::instanceExists())
     {   // shared environment block (UB_ENVIRONMENT); re-created lazily on next bind
@@ -9205,6 +9235,74 @@ void LLPipeline::unbindShadowMaps()
     LLGLSLShader::releaseCompareSamplerUnits();
 }
 
+void LLPipeline::packDeferredUBO()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
+    static_assert(sizeof(DeferredUBOData) == 496, "DeferredUBOData must match std140 (496 bytes)");
+
+    DeferredUBOData& d = mDeferredUBOData;
+
+    // Column-major, straight from glm's storage -- std140's default orientation, so the shader
+    // computes shadow_matrix[k] * spos exactly as the loose uniform did.
+    for (U32 i = 0; i < 6; ++i)
+    {
+        memcpy(d.shadow_matrix[i], glm::value_ptr(mSunShadowMatrix[i]), sizeof(d.shadow_matrix[i]));
+    }
+
+    // ssao_effect_mat scales the projection of colour onto <1,1,1>/sqrt(3) by the value factor
+    // and the remainder by the saturation factor. Expanded to std140's vec4-strided mat3 (the
+    // 4th float of each column is padding); the matrix is symmetric, so orientation is moot.
+    const LLVector3 ssao_effect = RenderSSAOEffect;
+    const F32 matrix_diag    = (ssao_effect[0] + 2.0f * ssao_effect[1]) / 3.0f;
+    const F32 matrix_nondiag = (ssao_effect[0] - ssao_effect[1]) / 3.0f;
+    memset(d.ssao_effect_mat, 0, sizeof(d.ssao_effect_mat));
+    d.ssao_effect_mat[0] = matrix_diag;    d.ssao_effect_mat[1] = matrix_nondiag; d.ssao_effect_mat[2]  = matrix_nondiag;
+    d.ssao_effect_mat[4] = matrix_nondiag; d.ssao_effect_mat[5] = matrix_diag;    d.ssao_effect_mat[6]  = matrix_nondiag;
+    d.ssao_effect_mat[8] = matrix_nondiag; d.ssao_effect_mat[9] = matrix_nondiag; d.ssao_effect_mat[10] = matrix_diag;
+
+    memcpy(d.shadow_clip, mSunClipPlanes.mV, sizeof(d.shadow_clip));
+
+    d.shadow_res[0]      = (F32)mRT->shadow[0].getWidth();
+    d.shadow_res[1]      = (F32)mRT->shadow[0].getHeight();
+    d.proj_shadow_res[0] = (F32)mSpotShadow[0].getWidth();
+    d.proj_shadow_res[1] = (F32)mSpotShadow[0].getHeight();
+
+    // Reverse-Z shadow maps store reversed depth and sample with GEQUAL, so the receiver
+    // reference is pushed the other way: negate the bias (incl. the camera-error term) at
+    // this single assembly site. shadowUtil.glsl stays byte-identical. Offsets keep sign.
+    const F32 shadow_bias_error = RenderShadowBiasError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2]) / 3000.f;
+    const F32 bias_sign         = LLRender::sReverseZ ? -1.f : 1.f;
+    d.shadow_bias        = bias_sign * (RenderShadowBias + shadow_bias_error);
+    d.shadow_offset      = RenderShadowOffset;
+    d.spot_shadow_bias   = bias_sign * RenderSpotShadowBias;
+    d.spot_shadow_offset = RenderSpotShadowOffset;
+
+    const F32 ssao_factor = RenderSSAOFactor;
+    d.ssao_radius        = RenderSSAOScale;
+    d.ssao_max_radius    = (F32)RenderSSAOMaxScale;
+    d.ssao_factor        = ssao_factor;
+    d.ssao_factor_inv    = 1.0f / ssao_factor;
+
+    mDeferredUBODirty = true;
+}
+
+void LLPipeline::bindDeferredUBO()
+{
+    // First use before any renderDeferredLighting this session: fill from current state so the
+    // block is never uploaded zero-filled (e.g. the reflection-probe display debug path).
+    if (!mDeferredUBO.allocated())
+    {
+        packDeferredUBO();
+    }
+    if (mDeferredUBODirty)
+    {
+        mDeferredUBO.update(&mDeferredUBOData, sizeof(DeferredUBOData));
+        mDeferredUBODirty = false;
+    }
+    mDeferredUBO.bind(LLGLSLShader::UB_DEFERRED);
+}
+
 void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
 {
     if (shader.mCanBindFast)
@@ -9213,6 +9311,7 @@ void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
         bindLightFunc(shader);
         bindShadowMaps(shader);
         bindReflectionProbes(shader);
+        bindDeferredUBO();
     }
     else
     { //wasn't previously bound, use slow path
@@ -9228,6 +9327,11 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
     LLRenderTarget* deferred_light_target = &mRT->deferredLight;
 
     shader.bind();
+
+    // Bind the shared per-pass shadow/SSAO block (UB_DEFERRED); everything in it used to be
+    // re-pushed as loose uniforms further down.
+    bindDeferredUBO();
+
     S32 channel = 0;
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
     if (channel > -1)
@@ -9319,21 +9423,6 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
     stop_glerror();
 
-    F32 mat[16*6];
-    for (U32 i = 0; i < 16; i++)
-    {
-        mat[i] = glm::value_ptr(mSunShadowMatrix[0])[i];
-        mat[i+16] = glm::value_ptr(mSunShadowMatrix[1])[i];
-        mat[i+32] = glm::value_ptr(mSunShadowMatrix[2])[i];
-        mat[i+48] = glm::value_ptr(mSunShadowMatrix[3])[i];
-        mat[i+64] = glm::value_ptr(mSunShadowMatrix[4])[i];
-        mat[i+80] = glm::value_ptr(mSunShadowMatrix[5])[i];
-    }
-
-    shader.uniformMatrix4fv(LLShaderMgr::DEFERRED_SHADOW_MATRIX, 6, false, mat);
-
-    stop_glerror();
-
     if (!LLPipeline::sReflectionProbesEnabled)
     {
         channel = shader.enableTexture(LLShaderMgr::ENVIRONMENT_MAP);
@@ -9358,53 +9447,19 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
 
     bindReflectionProbes(shader);
 
-    /*if (gCubeSnapshot)
-    { // we only really care about the first two values, but the shader needs increasing separation between clip planes
-        shader.uniform4f(LLShaderMgr::DEFERRED_SHADOW_CLIP, 1.f, 64.f, 128.f, 256.f);
-    }
-    else*/
-    {
-        shader.uniform4fv(LLShaderMgr::DEFERRED_SHADOW_CLIP, 1, mSunClipPlanes.mV);
-    }
-
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSAO_RADIUS, RenderSSAOScale);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSAO_MAX_RADIUS, (GLfloat)RenderSSAOMaxScale);
-
-    F32 ssao_factor = RenderSSAOFactor;
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSAO_FACTOR, ssao_factor);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSAO_FACTOR_INV, 1.0f/ssao_factor);
-
-    LLVector3 ssao_effect = RenderSSAOEffect;
-    F32 matrix_diag = (ssao_effect[0] + 2.0f*ssao_effect[1])/3.0f;
-    F32 matrix_nondiag = (ssao_effect[0] - ssao_effect[1])/3.0f;
-    // This matrix scales (proj of color onto <1/rt(3),1/rt(3),1/rt(3)>) by
-    // value factor, and scales remainder by saturation factor
-    F32 ssao_effect_mat[] = {   matrix_diag, matrix_nondiag, matrix_nondiag,
-                                matrix_nondiag, matrix_diag, matrix_nondiag,
-                                matrix_nondiag, matrix_nondiag, matrix_diag};
-    shader.uniformMatrix3fv(LLShaderMgr::DEFERRED_SSAO_EFFECT_MAT, 1, GL_FALSE, ssao_effect_mat);
-
-    //F32 shadow_offset_error = 1.f + RenderShadowOffsetError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2]);
-    F32 shadow_bias_error = RenderShadowBiasError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2])/3000.f;
-    // Reverse-Z shadow maps store reversed depth and sample with GEQUAL, so the receiver
-    // reference is pushed the other way: negate the bias (incl. the camera-error term) at
-    // this single assembly site. shadowUtil.glsl stays byte-identical. Offsets keep sign.
-    const F32 bias_sign   = LLRender::sReverseZ ? -1.f : 1.f;
-    F32 shadow_bias       = bias_sign * (RenderShadowBias + shadow_bias_error);
+    // shadow_matrix, shadow_clip, shadow_res, proj_shadow_res, shadow_bias/offset,
+    // spot_shadow_bias/offset, ssao_radius/max_radius/factor/factor_inv and ssao_effect_mat now
+    // live in the shared UB_DEFERRED block (packed once per pass in packDeferredUBO, bound
+    // above), so their per-bind loose setters -- and the per-bind rebuild of the 96-float
+    // shadow-matrix array, the ssao_effect_mat derivation and the camera-relative shadow bias
+    // -- are gone. Only uniforms that are NOT in the block are still pushed here.
 
     shader.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)deferred_target->getWidth(), (GLfloat)deferred_target->getHeight());
     shader.uniform1f(LLShaderMgr::DEFERRED_NEAR_CLIP, LLViewerCamera::getInstance()->getNear()*2.f);
-    shader.uniform1f (LLShaderMgr::DEFERRED_SHADOW_OFFSET, RenderShadowOffset); //*shadow_offset_error);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SHADOW_BIAS, shadow_bias);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SPOT_SHADOW_OFFSET, RenderSpotShadowOffset);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SPOT_SHADOW_BIAS, bias_sign * RenderSpotShadowBias);
 
+    // sun_dir/moon_dir stay loose (entangled with atmospherics; not in UB_DEFERRED).
     shader.uniform3fv(LLShaderMgr::DEFERRED_SUN_DIR, 1, mTransformedSunDir.mV);
     shader.uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, mTransformedMoonDir.mV);
-    shader.uniform2f(LLShaderMgr::DEFERRED_SHADOW_RES, (GLfloat)mRT->shadow[0].getWidth(), (GLfloat)mRT->shadow[0].getHeight());
-    shader.uniform2f(LLShaderMgr::DEFERRED_PROJ_SHADOW_RES, (GLfloat)mSpotShadow[0].getWidth(), (GLfloat)mSpotShadow[0].getHeight());
-    shader.uniform1f(LLShaderMgr::DEFERRED_DEPTH_CUTOFF, RenderEdgeDepthCutoff);
-    shader.uniform1f(LLShaderMgr::DEFERRED_NORM_CUTOFF, RenderEdgeNormCutoff);
 
     shader.uniformMatrix4fv(LLShaderMgr::MODELVIEW_DELTA_MATRIX, 1, GL_FALSE, glm::value_ptr(gGLDeltaModelView));
     shader.uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_DELTA_MATRIX, 1, GL_FALSE, glm::value_ptr(gGLInverseDeltaModelView));
@@ -9504,6 +9559,12 @@ void LLPipeline::renderDeferredLighting()
         glm::vec4 tc_moon(mMoonDir);
         tc_moon = mat * tc_moon;
         mTransformedMoonDir.set(tc_moon);
+
+        // Repack the shared shadow/SSAO block once for this deferred pass (per pass, so the
+        // cube-snapshot re-entry gets its own RT sizes and matrices). bindDeferredShader()
+        // uploads it on the first bind, and every deferred-lighting program then reads these
+        // ~13 constants from UB_DEFERRED instead of having them re-pushed on every bind.
+        packDeferredUBO();
 
         if ((RenderDeferredSSAO && !gCubeSnapshot) || RenderShadowDetail > 0)
         {
@@ -10358,18 +10419,15 @@ void LLPipeline::bindReflectionProbes(LLGLSLShader& shader)
     }
 
 
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSR_ITR_COUNT, (GLfloat)RenderScreenSpaceReflectionIterations);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSR_DIST_BIAS, RenderScreenSpaceReflectionDistanceBias);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSR_RAY_STEP, RenderScreenSpaceReflectionRayStep);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSR_GLOSSY_SAMPLES, (GLfloat)RenderScreenSpaceReflectionGlossySamples);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSR_REJECT_BIAS, RenderScreenSpaceReflectionDepthRejectBias);
+    // The march parameters (iteration count, ray step, biases, glossy samples, adaptive step)
+    // are frame-constant and now ride in the ReflectionProbes block, uploaded once in
+    // LLReflectionMapManager::updateUniforms(). noiseSine stays loose -- it advances per bind.
     mPoissonOffset++;
 
     if (mPoissonOffset > 128 - RenderScreenSpaceReflectionGlossySamples)
         mPoissonOffset = 0;
 
     shader.uniform1f(LLShaderMgr::DEFERRED_SSR_NOISE_SINE, (GLfloat)mPoissonOffset);
-    shader.uniform1f(LLShaderMgr::DEFERRED_SSR_ADAPTIVE_STEP_MULT, RenderScreenSpaceReflectionAdaptiveStepMultiplier);
 
     channel = shader.enableTexture(LLShaderMgr::SCENE_DEPTH);
     if (channel > -1)
