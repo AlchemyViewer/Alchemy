@@ -390,6 +390,22 @@ void LLReflectionMapManager::update()
         doProbeUpdate();
     }
 
+    // Occlusion state only means anything for as long as the queries that produce it keep
+    // running, and they stop whenever LLPipeline::sUseOcclusion drops out of its "query"
+    // level -- the UseOcclusion setting, a feature-table veto, or simply turning on wireframe.
+    // Nothing used to clear mOccluded when that happened, so every probe that was occluded at
+    // that instant stayed occluded for the rest of the session: dropped by getReflectionMaps,
+    // skipped by the neighbour packer, and unable to recover, because recovering needs a query
+    // result and no query would ever run again. The one probe that escaped was whichever one
+    // the camera stood inside, since that path answers false before issuing anything.
+    if (LLPipeline::sUseOcclusion <= 1)
+    {
+        for (auto& probe : mProbes)
+        {
+            probe->mOccluded = false;
+        }
+    }
+
     // Make probes track the viewer objects they are attached to, then work out which automatic
     // probes a manual probe has made redundant.
     //
@@ -500,6 +516,11 @@ void LLReflectionMapManager::update()
             probe->mCubeIndex = -1;
             probe->mComplete = false;
             probe->mFadeIn = 0;
+            // Cleared with the rest of the render state. A probe that gets a slot back later
+            // would otherwise start out culled by a query taken back when it still had
+            // something to show, and need two more occlusion passes to say so -- on top of the
+            // twelve it needs to regenerate.
+            probe->mOccluded = false;
         }
     }
 
@@ -728,6 +749,13 @@ void LLReflectionMapManager::getReflectionMaps(std::vector<LLReflectionMap*>& ma
     modelview.loadu(gGLModelView);
     LLVector4a oa; // scratch space for transformed origin
 
+    // Occlusion is measured from the main camera, so it says nothing about what a probe capture
+    // rendering from somewhere else can see. llviewerdisplay stops the queries for the duration
+    // of a snapshot for exactly that reason -- "don't read or write it during cube snapshots" --
+    // but only the write half was ever honoured, and this is the read. Without it every capture
+    // omits whatever the player happens not to be looking at, and bakes that into the probe.
+    const bool honor_occlusion = !gCubeSnapshot;
+
     U32 count = 0;
     U32 lastIdx = 0;
     for (U32 i = 0; count < maps.size() && i < mProbes.size(); ++i)
@@ -737,7 +765,8 @@ void LLReflectionMapManager::getReflectionMaps(std::vector<LLReflectionMap*>& ma
         // index it held on some earlier frame, and that slot now belongs to a different probe:
         // the neighbour packer rejects -1 but has no way to tell a stale index from a live one,
         // so a neighbour entry could point at an unrelated probe.
-        if (mProbes[i]->mCubeIndex != -1 && !mProbes[i]->mOccluded && mProbes[i]->mComplete)
+        if (mProbes[i]->mCubeIndex != -1 && mProbes[i]->mComplete &&
+            !(honor_occlusion && mProbes[i]->mOccluded))
         {
             maps[count++] = mProbes[i];
             modelview.affineTransform(mProbes[i]->mOrigin, oa);
@@ -1332,8 +1361,14 @@ void LLReflectionMapManager::updateUniforms()
                     break;
                 }
 
+                // mProbeIndex alone decides this. getReflectionMaps clears it on every probe it
+                // leaves out, so it already carries occlusion, completeness and the cube slot,
+                // and it is the only one of those that agrees with the list the shader will
+                // actually index. Re-testing mOccluded here would disagree with it during a
+                // cube snapshot, where occlusion measured from the main camera is ignored:
+                // the probe would be in the scan list and unreachable as a neighbour.
                 GLint idx = neighbor->mProbeIndex;
-                if (idx == -1 || neighbor->mOccluded || neighbor->mCubeIndex == -1)
+                if (idx == -1)
                 {
                     continue;
                 }
@@ -1612,6 +1647,12 @@ void LLReflectionMapManager::initReflectionMaps()
             probe->mCubeIndex = -1;
             probe->mNeighbors.clear();
             probe->mFadeIn = 0;
+            // Both of these decide whether a probe is allowed to render, so a reset that left
+            // them standing could not clear a probe that was stuck on either -- and this is the
+            // path a teleport, a sky change or a probe-count change goes through, which is
+            // exactly where someone would expect to get their probes back.
+            probe->mOccluded = false;
+            probe->mInsideManualProbe = false;
         }
 
         mCubeFree.clear();
@@ -1708,10 +1749,23 @@ void LLReflectionMapManager::doOcclusion()
 
     for (auto& probe : mProbes)
     {
-        if (probe != nullptr && probe != mDefaultProbe)
+        if (probe.isNull() || probe == mDefaultProbe)
         {
-            probe->doOcclusion(eye);
+            continue;
         }
+
+        // A probe holding no cube data, or one relevance has switched off, cannot reach the
+        // frame whatever a query says about it -- and each query costs a box draw, so this was
+        // up to a couple of hundred of them per frame spent on probes with nothing to show.
+        // Cleared rather than left to go stale: a probe that becomes eligible again should be
+        // culled by a query taken while it had something to show, not by one taken before.
+        if (probe->mCubeIndex == -1 || !probe->isRelevant())
+        {
+            probe->mOccluded = false;
+            continue;
+        }
+
+        probe->doOcclusion(eye);
     }
 }
 
