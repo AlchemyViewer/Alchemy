@@ -507,7 +507,18 @@ vec3 getSpecularDominantDir(vec3 n, vec3 r, float perceptualRoughness)
 // approaches the geometric plane, and cut it entirely once past.
 float horizonOcclusion(vec3 r, vec3 geometricNormal)
 {
-    float horizon = min(1.0 + dot(r, geometricNormal), 1.0);
+    // Both normalized here rather than trusted from the caller. The term is a dot product read
+    // as a cosine, so an unnormalized reflection vector scales it by that vector's length -- and
+    // the natural thing to hand this is an eye-space reflect(), whose length is the distance to
+    // the camera. That turns a fixed geometric relationship into a distance-dependent one.
+    vec3 rn = normalize(r);
+    vec3 gn = normalize(geometricNormal);
+
+    // Clamped low as well as high, before the square. Squaring is only a falloff shape while the
+    // value is in [0,1]; below zero it turns the sign around and grows, so a reflection further
+    // under the horizon would brighten rather than darken -- the failure is silent, and it is
+    // worst exactly where the term was supposed to bite hardest.
+    float horizon = clamp(1.0 + dot(rn, gn), 0.0, 1.0);
     return horizon * horizon;
 }
 

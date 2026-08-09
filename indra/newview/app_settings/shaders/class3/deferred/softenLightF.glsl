@@ -191,7 +191,7 @@ void main()
         // returns radiance arriving through the geometry. The forward path tests against
         // vary_normal; here the geometric normal comes out of the GBuffer channel that used to
         // hold environment intensity.
-        radiance *= horizonOcclusion(reflect(pos.xyz, gb.normal), gb.geoNormal);
+        radiance *= horizonOcclusion(reflect(normalize(pos.xyz), gb.normal), gb.geoNormal);
 
         adjustIrradiance(irradiance, ambocc);
 

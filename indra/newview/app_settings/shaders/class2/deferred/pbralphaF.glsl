@@ -230,7 +230,7 @@ void main()
     // returns radiance arriving through the geometry. vary_normal is the untouched interpolated
     // vertex normal, so it is the geometric horizon to test against -- the deferred path has no
     // equivalent, because the GBuffer only ever stored the perturbed normal.
-    radiance *= horizonOcclusion(reflect(pos.xyz, norm.xyz), normalize(vary_normal));
+    radiance *= horizonOcclusion(reflect(normalize(pos.xyz), norm.xyz), vary_normal);
 
     vec3 diffuseColor = vec3(0.0);
     vec3 specularColor = vec3(0.0);
