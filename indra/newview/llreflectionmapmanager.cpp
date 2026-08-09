@@ -834,6 +834,12 @@ LLReflectionMap* LLReflectionMapManager::registerViewerObject(LLViewerObject* vo
 
     LLReflectionMap* probe = new LLReflectionMap();
     probe->mViewerObject = vobj;
+    // A placed probe, and it is one from the moment it exists. This used to be derived inside
+    // autoAdjustOrigin, which is a placement pass and does not run on a probe until it has
+    // already won a cube slot -- so a new manual probe carried an automatic probe's priority
+    // through the sort that hands slots out, and in a region with none free it could never
+    // reach the code that would have told the sort otherwise.
+    probe->mPriority = 1;
     probe->mOrigin.load3(vobj->getPositionAgent().mV);
 
     if (gCubeSnapshot)

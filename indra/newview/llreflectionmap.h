@@ -142,6 +142,9 @@ public:
     // currently only 0 or 1
     // 0 - automatic probe
     // 1 - manual probe
+    //
+    // Set once, by whichever registration created the probe, and never derived again: it says
+    // what kind of probe this is, which is fixed the moment it exists.
     U32 mPriority = 0;
 
     // occlusion culling state
