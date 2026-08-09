@@ -1594,10 +1594,20 @@ void LLPipeline::createLUTBuffers()
         gDeferredGenBrdfLutProgram.bind();
         llassert_always(LLGLSLShader::sCurBoundShaderPtr != nullptr);
 
+        // State this draw needs, rather than inheriting whatever the caller left live. It
+        // runs outside any render pass, so nothing upstream has established it, and the
+        // failure is silent in both directions: culling would drop the quad and leave the
+        // table as whatever the allocation happened to contain, and a blend function would
+        // fold that same garbage into the integral. Every PBR surface reads this texture.
+        LLGLDisable cull_face(GL_CULL_FACE);
+        LLGLDisable blend(GL_BLEND);
+
+        // Counter-clockwise, so the quad is front-facing under the default winding. The
+        // guard above already covers it -- this is so the draw does not depend on the guard.
         gGL.begin(LLRender::TRIANGLE_STRIP);
         gGL.vertex2f(-1, -1);
-        gGL.vertex2f(-1, 1);
         gGL.vertex2f(1, -1);
+        gGL.vertex2f(-1, 1);
         gGL.vertex2f(1, 1);
         gGL.end();
         gGL.flush();
@@ -9141,7 +9151,13 @@ void LLPipeline::bindLightFunc(LLGLSLShader& shader)
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_BRDF_LUT);
     if (channel > -1)
     {
-        mPbrBrdfLut.bindTexture(0, channel);
+        // Clamp, not the render target's default mirrored repeat. This is a lookup table over
+        // (NdotV, roughness), and both axes are only meaningful on [0,1]; inside that range
+        // mirroring and clamping agree, so the distinction is invisible until a coordinate
+        // leaves it. Then they disagree in the worst direction -- a roughness past 1 mirrors
+        // back to a SMALLER roughness and the surface reads glossier the rougher it gets,
+        // where clamping saturates at the roughest entry the table holds.
+        mPbrBrdfLut.bindTexture(0, channel, ALSamplers::BilinearClamp);
     }
 }
 

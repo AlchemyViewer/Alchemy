@@ -33,8 +33,10 @@ out vec2 vary_uv;
 
 void main()
 {
-    //transform vertex
-    vec4 pos = modelview_projection_matrix * vec4(position.xyz, 1.0);
+    // The quad arrives in clip space already, so it is emitted untransformed and vary_uv is
+    // the framebuffer UV directly. That equivalence is what lets the fragment stage's
+    // 1.0 - vary_uv.t and the sampler's 1.0 - roughness cancel, putting a texel written for
+    // one roughness back under the lookup that asks for it.
     vary_uv = position.xy*0.5+0.5;
 
     gl_Position = vec4(position.xyz, 1.0);

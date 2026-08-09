@@ -757,10 +757,15 @@ void LLGLTFMaterial::applyOverrideLLSD(const LLSD& data)
         }
     }
 
+    // Both factors are clamped on the way in, as setMetallicFactor/setRoughnessFactor do for
+    // every other route into these fields -- this is the one path that reaches them straight
+    // off the wire, so it is the one that has to reject a value the glTF spec does not allow.
+    // Roughness is the sharp edge: it reaches the shaders as 1.0 - roughness, and a value past
+    // 1 turns that negative, which is off the end of the BRDF lookup table.
     const LLSD& mf = data["mf"];
     if (mf.isReal())
     {
-        mMetallicFactor = (F32)mf.asReal();
+        mMetallicFactor = llclamp((F32)mf.asReal(), 0.f, 1.f);
         if (mMetallicFactor == getDefaultMetallicFactor())
         {
             // HACK -- nudge by epsilon if we receive a default value (indicates override to default)
@@ -771,7 +776,7 @@ void LLGLTFMaterial::applyOverrideLLSD(const LLSD& data)
     const LLSD& rf = data["rf"];
     if (rf.isReal())
     {
-        mRoughnessFactor = (F32)rf.asReal();
+        mRoughnessFactor = llclamp((F32)rf.asReal(), 0.f, 1.f);
         if (mRoughnessFactor == getDefaultRoughnessFactor())
         {
             // HACK -- nudge by epsilon if we receive a default value (indicates override to default)

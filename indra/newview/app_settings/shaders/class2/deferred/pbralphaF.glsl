@@ -212,7 +212,11 @@ void main()
     float gloss      = 1.0 - perceptualRoughness;
     vec3  irradiance = amblit;
     vec3  radiance  = vec3(0);
-    sampleReflectionProbes(irradiance, radiance, vary_position.xy*0.5+0.5, pos.xyz, norm.xyz, gloss, true, amblit);
+    // frag, not a rescaled vary_position: the tc argument is a screen UV. It reaches
+    // tapScreenSpaceReflection, where it drives the screen-edge vignette and the per-pixel
+    // ray jitter, and vary_position is an eye-space metre offset -- outside [0,1] for all but
+    // a sliver of the frame, so the vignette never fades and the jitter stops decorrelating.
+    sampleReflectionProbes(irradiance, radiance, frag, pos.xyz, norm.xyz, gloss, true, amblit);
 
     vec3 diffuseColor = vec3(0.0);
     vec3 specularColor = vec3(0.0);

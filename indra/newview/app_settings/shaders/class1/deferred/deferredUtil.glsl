@@ -431,16 +431,37 @@ void pbrIbl(vec3 diffuseColor,
             out vec3 diffuseOut,
             out vec3 specularOut)
 {
+    nv = clamp(nv, 0.0, 1.0);
+
     // retrieve a scale and bias to F0. See [1], Figure 3
-    vec2 brdf = BRDF(clamp(nv, 0, 1), 1.0-perceptualRough);
-    vec3 diffuseLight = irradiance;
-    vec3 specularLight = radiance;
+    vec2 brdf = BRDF(nv, 1.0-perceptualRough);
 
-    vec3 diffuse = diffuseLight * diffuseColor;
-    vec3 specular = specularLight * (specularColor * brdf.x + brdf.y);
+    // Multiple-scattering IBL, Fdez-Aguera 2019, "A Multiple-Scattering Microfacet Model for
+    // Real-Time Image-Based Lighting".
+    //
+    // The split-sum approximation integrates one bounce off the microsurface and discards
+    // everything that leaves after a second or later one. That loss grows with roughness and
+    // with F0, so it is worst exactly where it is most visible: rough metal, which reads far
+    // too dark under a bright probe. FmsEms is the missing energy returned.
+    //
+    // It also settles how the two lobes divide the incoming light. k_D is what the specular
+    // lobe did not take, derived per-pixel from the surface's own directional albedo, which
+    // is why calcDiffuseSpecular hands the full base colour to the diffuse term instead of
+    // pre-splitting it by a constant.
+    vec3 Fr = max(vec3(1.0 - perceptualRough), specularColor) - specularColor;
+    vec3 k_S = specularColor + Fr * pow(1.0 - nv, 5.0);
+    vec3 FssEss = k_S * brdf.x + brdf.y;
 
-    diffuseOut = diffuse * ao;
-    specularOut = specular * computeSpecularAO(nv, ao, perceptualRough * perceptualRough);
+    float Ems = 1.0 - (brdf.x + brdf.y);
+    vec3 F_avg = specularColor + (1.0 - specularColor) / 21.0;
+    // The denominator is bounded away from zero for any real LUT sample; the guard costs
+    // nothing and keeps a degenerate one (a white metal against a fully absorbing tap) from
+    // reaching the rest of the frame as an inf.
+    vec3 FmsEms = Ems * FssEss * F_avg / max(vec3(1.0) - F_avg * Ems, vec3(1e-4));
+    vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms);
+
+    diffuseOut = (FmsEms + k_D) * irradiance * ao;
+    specularOut = radiance * FssEss * computeSpecularAO(nv, ao, perceptualRough * perceptualRough);
 }
 
 
@@ -478,19 +499,26 @@ vec3 specularReflection(PBRInfo pbrInputs)
     return pbrInputs.reflectance0 + (pbrInputs.reflectance90 - pbrInputs.reflectance0) * pow(clamp(1.0 - pbrInputs.VdotH, 0.0, 1.0), 5.0);
 }
 
-// This calculates the specular geometric attenuation (aka G()),
-// where rougher material will reflect less light back to the viewer.
-// This implementation is based on [1] Equation 4, and we adopt their modifications to
-// alphaRoughness as input as originally proposed in [2].
-float geometricOcclusion(PBRInfo pbrInputs)
+// Specular visibility (aka Vis), the geometric attenuation G with the microfacet BRDF's
+// 1/(4 NdotL NdotV) denominator folded in. Height-correlated Smith, per Heitz 2014
+// "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"; this is the form
+// glTF 2.0 Appendix B specifies.
+//
+// Correlating the two directions matters: a separable Smith treats masking and shadowing as
+// independent events, which double-counts occlusion and over-darkens grazing angles on rough
+// surfaces. Folding the denominator in also removes a division by a NdotL*NdotV product that
+// approaches zero at exactly those angles.
+float visibilityOcclusion(PBRInfo pbrInputs)
 {
     float NdotL = pbrInputs.NdotL;
     float NdotV = pbrInputs.NdotV;
-    float r = pbrInputs.alphaRoughness;
+    float a2 = pbrInputs.alphaRoughness * pbrInputs.alphaRoughness;
 
-    float attenuationL = 2.0 * NdotL / (NdotL + sqrt(r * r + (1.0 - r * r) * (NdotL * NdotL)));
-    float attenuationV = 2.0 * NdotV / (NdotV + sqrt(r * r + (1.0 - r * r) * (NdotV * NdotV)));
-    return attenuationL * attenuationV;
+    float lambdaV = NdotL * sqrt(NdotV * NdotV * (1.0 - a2) + a2);
+    float lambdaL = NdotV * sqrt(NdotL * NdotL * (1.0 - a2) + a2);
+
+    float v = lambdaV + lambdaL;
+    return v > 0.0 ? 0.5 / v : 0.0;
 }
 
 // The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
@@ -518,20 +546,21 @@ void pbrPunctual(vec3 diffuseColor, vec3 specularColor,
 
     float alphaRoughness = perceptualRoughness * perceptualRoughness;
 
-    // Compute reflectance.
-    float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
-
-    // For typical incident reflectance range (between 4% to 100%) set the grazing reflectance to 100% for typical fresnel effect.
-    // For very low reflectance range on highly diffuse objects (below 4%), incrementally reduce grazing reflecance to 0%.
-    float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
+    // Grazing reflectance is 1 for every material, per glTF 2.0 Appendix B: at 90 degrees a
+    // smooth surface reflects all of it regardless of what F0 says about normal incidence.
+    // Deriving f90 from F0 instead only diverges where F0 is below 4%, which for a
+    // metallic-roughness material means a metal with a near-black base colour -- and dimming
+    // its rim is the opposite of what the physics gives.
     vec3 specularEnvironmentR0 = specularColor.rgb;
-    vec3 specularEnvironmentR90 = vec3(1.0, 1.0, 1.0) * reflectance90;
+    vec3 specularEnvironmentR90 = vec3(1.0);
 
     vec3 h = normalize(l+v);                        // Half vector between both l and v
-    vec3 reflection = -normalize(reflect(v, n));
-    reflection.y *= -1.0f;
 
-    float NdotL = clamp(dot(n, l), 0.001, 1.0);
+    // Zero, not an epsilon: a surface turned away from the light receives nothing. The floor
+    // this replaces existed to keep NdotL out of a denominator, and visibilityOcclusion no
+    // longer has one -- with NdotL at zero its own denominator is carried by the NdotV term,
+    // which the guard there covers.
+    float NdotL = clamp(dot(n, l), 0.0, 1.0);
     float NdotV = clamp(abs(dot(n, v)), 0.001, 1.0);
     float NdotH = clamp(dot(n, h), 0.0, 1.0);
     float LdotH = clamp(dot(l, h), 0.0, 1.0);
@@ -554,12 +583,12 @@ void pbrPunctual(vec3 diffuseColor, vec3 specularColor,
 
     // Calculate the shading terms for the microfacet specular shading model
     vec3 F = specularReflection(pbrInputs);
-    float G = geometricOcclusion(pbrInputs);
+    float Vis = visibilityOcclusion(pbrInputs);
     float D = microfacetDistribution(pbrInputs);
 
     // Calculation of analytical lighting contribution
     vec3 diffuseContrib = (1.0 - F) * diffuse(pbrInputs);
-    vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
+    vec3 specContrib = F * Vis * D;
 
     nl = NdotL;
 
@@ -611,11 +640,18 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
     return color * final_scale;
 }
 
+// Split a glTF metallic-roughness base colour into the two lobes' albedos.
+//
+// c_diff = lerp(baseColor, black, metallic), per glTF 2.0 Appendix B. Only the metallic
+// factor takes from the diffuse lobe here. The dielectric share the specular lobe reflects is
+// not a constant 4%: it depends on the view angle, and both consumers already account for it
+// where the angle is known -- pbrPunctual weights the diffuse term by (1 - F), and pbrIbl
+// derives k_D from the surface's directional albedo. Scaling by (1 - f0) as well would charge
+// dielectrics for that reflection twice and leave every one of them ~4% dark.
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor)
 {
     vec3 f0 = vec3(0.04);
-    diffuseColor = baseColor*(vec3(1.0)-f0);
-    diffuseColor *= 1.0 - metallic;
+    diffuseColor = baseColor * (1.0 - metallic);
     specularColor = mix(f0, baseColor, metallic);
 }
 
