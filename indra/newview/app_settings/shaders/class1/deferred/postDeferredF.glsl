@@ -36,6 +36,11 @@ uniform vec2 screen_res;
 uniform float max_cof;
 uniform float res_scale;
 
+// Bokeh aperture shaping, CPU-baked in LLPipeline::renderDoF() via ALDoFBokeh::bakeKernel().
+uniform vec4  bokeh_shape;     // (2pi/N, pi/N, cos(pi/N), roundness); N = aperture blade count
+uniform vec4  bokeh_lens;      // (rotation_radians, anamorphic_x, anamorphic_y, active flag)
+uniform float bokeh_intensity; // exponent on the highlight weight (1 = classic, higher = more defined)
+
 in vec2 vary_fragcoord;
 
 void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc)
@@ -46,10 +51,15 @@ void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc)
 
     if (sc > min_sc) //sampled pixel is more "out of focus" than current sample radius
     {
-        float wg = 0.25;
-
-        // de-weight dull areas to make highlights 'pop'
-        wg += s.r+s.g+s.b;
+        // de-weight dull areas to make highlights 'pop'. bokeh_intensity is an
+        // exponent, not a scale: a scale cancels in the normalized average below,
+        // so it would saturate; an exponent changes which samples dominate and
+        // keeps working across its whole range. 1.0 is the classic linear weight
+        // (bit-exact fast path). Base is clamped for overflow safety and floored
+        // so bokeh_intensity==0 ("fully flat", a documented value) cannot hit
+        // undefined pow(0,0) on a black tap -- NaN there smears across the disc.
+        float lum = s.r+s.g+s.b;
+        float wg = 0.25 + (bokeh_intensity == 1.0 ? lum : pow(clamp(lum, 1e-5, 1024.0), bokeh_intensity));
 
         diff += wg*s;
 
@@ -61,14 +71,45 @@ void dofSampleNear(inout vec4 diff, inout float w, float min_sc, vec2 tc)
 {
     vec4 s = texture(diffuseRect, tc);
 
-    float wg = 0.25;
-
-    // de-weight dull areas to make highlights 'pop'
-    wg += s.r+s.g+s.b;
+    // de-weight dull areas to make highlights 'pop'. bokeh_intensity is an exponent
+    // (see dofSample): a scale would cancel in the normalized average and saturate,
+    // while an exponent keeps working across its range. 1.0 = classic linear weight.
+    float lum = s.r+s.g+s.b;
+    float wg = 0.25 + (bokeh_intensity == 1.0 ? lum : pow(clamp(lum, 1e-5, 1024.0), bokeh_intensity));
 
     diff += wg*s;
 
     w += wg;
+}
+
+// Aperture-shaped bokeh tap offset. Reshapes WHERE a tap lands (aperture polygon
+// and/or anamorphic squeeze); the caller's tap COUNT is unchanged, so this does
+// not affect the O(CoC^2) gather cost. When the kernel is inactive it returns the
+// exact circular offset the gather used before, so the default look and cost are
+// preserved bit-for-bit.
+vec2 bokehOffset(float r, float a)
+{
+    if (bokeh_lens.w < 0.5)
+        return vec2(sin(a), cos(a)) * r;               // fast path: unchanged circular bokeh
+
+    // Build the aperture in its own (unrotated) frame: N-gon radius, then the
+    // anamorphic per-axis squeeze.
+    float shape = 1.0;
+    if (bokeh_shape.x > 0.0)                           // polygon active (blades >= 3)
+    {
+        // Fold the angle into one blade segment and pinch the ring onto the
+        // inscribed N-gon edge, then blend back toward a circle by roundness.
+        float s = mod(a, bokeh_shape.x) - bokeh_shape.y;
+        shape = mix(bokeh_shape.z / cos(s), 1.0, bokeh_shape.w);
+    }
+    vec2 local = vec2(sin(a), cos(a)) * (r * shape) * bokeh_lens.yz;
+
+    // Rigidly rotate the whole aperture -- polygon AND anamorphic oval -- into
+    // screen space. bokeh_lens.x is a uniform, so this cos/sin is loop-invariant
+    // and gets hoisted out of the gather loop by the compiler.
+    float cs = cos(bokeh_lens.x);
+    float sn = sin(bokeh_lens.x);
+    return vec2(local.x * cs - local.y * sn, local.x * sn + local.y * cs);
 }
 
 vec3 clampHDRRange(vec3 color);
@@ -96,10 +137,9 @@ void main()
                 for (int i=0; i<its; ++i)
                 {
                     float ang = sc+i*2*PI/its; // sc is added for rotary perturbance
-                    float samp_x = sc*sin(ang);
-                    float samp_y = sc*cos(ang);
-                    // you could test sample coords against an interesting non-circular aperture shape here, if desired.
-                    dofSampleNear(diff, w, sc, vary_fragcoord.xy + (vec2(samp_x,samp_y) / screen_res));
+                    // Aperture-shaped tap offset (polygonal / anamorphic bokeh); circular when off.
+                    vec2 samp = bokehOffset(sc, ang);
+                    dofSampleNear(diff, w, sc, vary_fragcoord.xy + (samp / screen_res));
                 }
                 sc -= 1.0;
             }
@@ -116,10 +156,9 @@ void main()
                 for (int i=0; i<its; ++i)
                 {
                     float ang = sc+i*2*PI/its; // sc is added for rotary perturbance
-                    float samp_x = sc*sin(ang);
-                    float samp_y = sc*cos(ang);
-                    // you could test sample coords against an interesting non-circular aperture shape here, if desired.
-                    dofSample(diff, w, sc, vary_fragcoord.xy + (vec2(samp_x,samp_y) / screen_res));
+                    // Aperture-shaped tap offset (polygonal / anamorphic bokeh); circular when off.
+                    vec2 samp = bokehOffset(sc, ang);
+                    dofSample(diff, w, sc, vary_fragcoord.xy + (samp / screen_res));
                 }
                 sc -= 1.0;
             }

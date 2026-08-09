@@ -173,6 +173,7 @@ set(viewer_SOURCE_FILES
     alfloatersceneexplorer.cpp
     alfloatersceneexplorerfilters.cpp
     alfloatertransactionlog.cpp
+    aldofbokeh.cpp
     alsceneexplorerpredicate.cpp
     alfloaterwebprofile.cpp
     allegacynotificationwellwindow.cpp
@@ -942,6 +943,7 @@ set(viewer_HEADER_FILES
     alfloatersceneexplorer.h
     alfloatersceneexplorerfilters.h
     alfloatertransactionlog.h
+    aldofbokeh.h
     alsceneexplorerpredicate.h
     alfloaterwebprofile.h
     allegacynotificationwellwindow.h
@@ -2373,6 +2375,7 @@ if (BUILD_TESTING)
   # This creates a separate test project per file listed.
 
   SET(viewer_TEST_SOURCE_FILES
+    aldofbokeh.cpp
     alsceneexplorerpredicate.cpp
     llagentaccess.cpp
     lldateutil.cpp
