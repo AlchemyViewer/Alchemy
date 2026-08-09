@@ -33,6 +33,12 @@ uniform int sourceIdx;
 
 uniform float max_probe_lod;
 
+// Edge length of the source cube face, the same value radianceGenF takes. computeLod needs it
+// to size a texel's solid angle, so it has to be the resolution actually being sampled rather
+// than a constant that happens to be close: it enters as a square inside a log2, so being off
+// by a factor of two in width moves the chosen mip by a whole level.
+uniform int u_width;
+
 in vec3 vary_dir;
 
 // Code below is derived from the Khronos GLTF Sample viewer:
@@ -41,10 +47,17 @@ in vec3 vary_dir;
 
 #define MATH_PI 3.1415926535897932384626433832795
 
-float u_roughness = 1.0;
-int u_sampleCount = 32;
-float u_lodBias = 2.0;
-int u_width = 64;
+// Sample count carries the whole quality/noise tradeoff here, because computeLod answers noise
+// by reaching for a blurrier mip. Too few samples and it picks a mip so coarse that a single
+// tap already averages a large patch of the environment, which flattens the cosine lobe's
+// directionality -- a downward-facing normal stops seeing ground and starts seeing the
+// whole-sphere average. Outdoors that average is sky, and since calcAtmosphericVarsLinear
+// reduces the sky's own ambient to luminance, this map is the only thing carrying ambient hue.
+// A flattened one paints sky colour on every surface in every orientation.
+//
+// The target is 6 faces of the irradiance resolution, so the cost is a rounding error against
+// the radiance passes that share this probe update.
+int u_sampleCount = 1024;
 
 // Hammersley Points on the Hemisphere
 // CC BY 3.0 (Holger Dammertz)
@@ -76,9 +89,13 @@ mat3 generateTBN(vec3 normal)
 
     float NdotUp = dot(normal, vec3(0.0, 1.0, 0.0));
     float epsilon = 0.0000001;
-    /*if (1.0 - abs(NdotUp) <= epsilon)
+    if (1.0 - abs(NdotUp) <= epsilon)
     {
         // Sampling +Y or -Y, so we need a more robust bitangent.
+        // Without this the cross product below is the zero vector and normalize divides by
+        // zero, poisoning every sample direction for that texel. It is the pole texels that
+        // land here, which on a probe are the straight-up and straight-down directions -- the
+        // two that decide whether a surface reads as sky-lit or ground-lit.
         if (NdotUp > 0.0)
         {
             bitangent = vec3(0.0, 0.0, 1.0);
@@ -87,7 +104,7 @@ mat3 generateTBN(vec3 normal)
         {
             bitangent = vec3(0.0, 0.0, -1.0);
         }
-    }*/
+    }
 
     vec3 tangent = normalize(cross(bitangent, normal));
     bitangent = cross(normal, tangent);
@@ -185,10 +202,11 @@ vec4 filterColor(vec3 N)
         float pdf = importanceSample.w;
 
         // mipmap filtered samples (GPU Gems 3, 20.4)
+        // No bias on top: computeLod already matches the tap's footprint to the sample's solid
+        // angle, which is the mechanism that keeps this from sparkling. Adding to it pushed
+        // every sample past max_probe_lod, so the clamp decided the mip for the whole map and
+        // the formula's result was never used.
         float lod = computeLod(pdf);
-
-        // apply the bias to the lod
-        lod += u_lodBias;
 
         lod = clamp(lod, 0, max_probe_lod);
         // sample lambertian at a lower resolution to avoid fireflies

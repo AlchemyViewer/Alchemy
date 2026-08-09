@@ -551,7 +551,15 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
     v -= c;
     v = env_mat * v;
 
-    vec3 col = textureLod(irradianceProbes, vec4(v.xyz, refIndex[i].x), 0).rgb * refParams[i].x;
+    vec3 col = textureLod(irradianceProbes, vec4(v.xyz, refIndex[i].x), 0).rgb;
+
+    // refParams.x is an irradiance scale that may exceed 1, so it has two regimes and must be
+    // spent in exactly one of them. Above 1 it is a boost, which only the multiply can apply
+    // because the mix weight saturates. At or below 1 it is a fade toward the sky's own
+    // ambient, which the mix already applies -- multiplying as well puts the probe term on
+    // ambiance squared while the ambient term stays linear, so a half-ambiance probe
+    // contributes a quarter of its irradiance instead of half.
+    col *= max(refParams[i].x, 1.0);
 
     col = mix(amblit, col, min(refParams[i].x, 1.0));
 

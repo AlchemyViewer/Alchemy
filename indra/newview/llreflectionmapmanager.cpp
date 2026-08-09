@@ -1009,6 +1009,9 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
 
             gIrradianceGenProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
             gIrradianceGenProgram.uniform1f(LLShaderMgr::REFLECTION_PROBE_MAX_LOD, mMaxProbeLOD);
+            // Same source the radiance pass filters, so the same width. This is the mip-0 edge
+            // length of sourceIdx, not the irradiance target's resolution.
+            gIrradianceGenProgram.uniform1i(LLShaderMgr::U_WIDTH, mProbeResolution);
 
             mVertexBuffer->setBuffer();
             int start_mip = 0;
