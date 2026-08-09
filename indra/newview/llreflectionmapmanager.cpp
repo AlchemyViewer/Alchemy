@@ -564,6 +564,22 @@ void LLReflectionMapManager::update()
         {
             probe->autoAdjustOrigin();
             probe->mFadeIn = llmin((F32) (probe->mFadeIn + gFrameIntervalSeconds), 1.f);
+
+            // Rebuild the neighbour graph once the influence volume has drifted away from the
+            // one it was built against.
+            //
+            // The shader stops its scan at the first probe covering a pixel and then considers
+            // only that probe's neighbours, which is sound only while the graph is current: two
+            // probes that both contain a point necessarily intersect, so the second is reachable
+            // from the first. The graph was only ever rebuilt when a probe finished a full
+            // twelve-pass update, so a probe riding a moving object described where it used to
+            // be, and a pixel it covered could be skipped outright because whichever probe the
+            // scan started from had never heard of it. Rebuilding here also fixes the other
+            // side, since the search phase writes into both lists.
+            if (probe->neighborsAreStale())
+            {
+                updateNeighbors(probe);
+            }
         }
         if (probe->mOccluded && probe->mComplete)
         {
@@ -1189,12 +1205,26 @@ void LLReflectionMapManager::shift(const LLVector4a& offset)
     for (auto& probe : mProbes)
     {
         probe->mOrigin.add(offset);
+
+        // Carried along, because a rigid translation of every probe at once leaves the neighbour
+        // graph describing exactly the same geometry. Without this a region crossing would mark
+        // all of them stale on the same frame and rebuild the whole graph against itself.
+        if (probe->mNeighborRadius >= 0.f)
+        {
+            probe->mNeighborOrigin.add(offset);
+        }
     }
 }
 
 void LLReflectionMapManager::updateNeighbors(LLReflectionMap* probe)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+
+    // Recorded whether or not there is a list to build. The default probe never has neighbours,
+    // and without this it would report itself stale on every frame forever.
+    probe->mNeighborOrigin = probe->mOrigin;
+    probe->mNeighborRadius = probe->mRadius;
+
     if (mDefaultProbe == probe)
     {
         return;
@@ -1652,6 +1682,7 @@ void LLReflectionMapManager::initReflectionMaps()
             probe->mCubeArray = nullptr;
             probe->mCubeIndex = -1;
             probe->mNeighbors.clear();
+            probe->mNeighborRadius = -1.f; // list cleared, so it describes nothing
             probe->mFadeIn = 0;
             // Both of these decide whether a probe is allowed to render, so a reset that left
             // them standing could not clear a probe that was stuck on either -- and this is the

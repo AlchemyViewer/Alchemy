@@ -71,6 +71,10 @@ public:
     // sort order and influence volumes from these two values.
     void syncToViewerObject();
 
+    // True if this probe's influence volume has moved or resized enough since its neighbour
+    // list was built that the list may no longer describe it.
+    bool neighborsAreStale() const;
+
     // Get the ambiance value to use for this probe
     F32 getAmbiance() const;
 
@@ -131,6 +135,11 @@ public:
 
     // set of any LLReflectionMaps that intersect this map (maintained by LLReflectionMapManager
     std::vector<LLReflectionMap*> mNeighbors;
+
+    // the influence volume mNeighbors was built against, so drift away from it can be detected
+    // (negative radius means the list has never been built)
+    LLVector4a mNeighborOrigin;
+    F32 mNeighborRadius = -1.f;
 
     // spatial group this probe is tracking (if any)
     LLSpatialGroup* mGroup = nullptr;

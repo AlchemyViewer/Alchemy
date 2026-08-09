@@ -372,9 +372,27 @@ vec3 boxIntersect(vec3 origin, vec3 dir, mat4 i, out float d, float scale)
 
     d = 1.0-max(max(abs(PositionLS.x), abs(PositionLS.y)), abs(PositionLS.z));
 
+    // Keep the denominator off zero, sign intact.
+    //
+    // A ray exactly parallel to one of the box's axes zeroes that component of RayLS. On its
+    // own that is fine -- the division gives an infinity, and the max/min below discard it in
+    // favour of the axis that actually bounds the ray. But if the position also sits exactly on
+    // that face the numerator is zero too, and 0/0 is a NaN that min carries into Distance, into
+    // the intersection point, and out as a cubemap fetch direction. An axis-parallel reflection
+    // is not exotic on an axis-aligned box probe in an axis-aligned room; a reflection pointing
+    // straight up zeroes two components at once.
+    //
+    // sign() would map a zero component to zero and leave the divide in place, so the sign is
+    // taken by comparison instead, treating +0 as positive -- which is the direction the
+    // infinity pointed before.
+    vec3 raySign = vec3(RayLS.x < 0.0 ? -1.0 : 1.0,
+                        RayLS.y < 0.0 ? -1.0 : 1.0,
+                        RayLS.z < 0.0 ? -1.0 : 1.0);
+    vec3 rayDenom = raySign * max(abs(RayLS), vec3(1e-6));
+
     vec3 Unitary = vec3(scale);
-    vec3 FirstPlaneIntersect  = (Unitary - PositionLS) / RayLS;
-    vec3 SecondPlaneIntersect = (-Unitary - PositionLS) / RayLS;
+    vec3 FirstPlaneIntersect  = (Unitary - PositionLS) / rayDenom;
+    vec3 SecondPlaneIntersect = (-Unitary - PositionLS) / rayDenom;
     vec3 FurthestPlane = max(FirstPlaneIntersect, SecondPlaneIntersect);
     float Distance = min(FurthestPlane.x, min(FurthestPlane.y, FurthestPlane.z));
 
@@ -526,10 +544,13 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
     }
 
     v -= c;
-    vec3 d = normalize(v);
-
     v = env_mat * v;
 
+    // Unnormalized on purpose: a cubemap fetch takes a direction of any length. The normalize
+    // that used to sit here was assigned to a local nothing read, so it was one inverse square
+    // root per probe tap -- up to REF_SAMPLE_COUNT of them per pixel, in a function every
+    // deferred and forward lighting path calls -- and it was a normalize of a vector with no
+    // guarantee of being non-zero.
     vec4 ret = textureLod(reflectionProbes, vec4(v.xyz, refIndex[i].x), lod) * refParams[i].y;
 
     return ret.rgb;
@@ -606,7 +627,13 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
     v -= c;
     v = env_mat * v;
 
-    vec3 col = evalSHIrradiance(normalize(v), refIndex[i].x);
+    // The parallax correction can land on the probe's own origin, and normalize(0) is a NaN
+    // going straight into the SH evaluation and out into the frame. The sample direction is what
+    // the intersection is a correction of, so it is the right thing to fall back to.
+    float len2 = dot(v, v);
+    vec3 sampleDir = len2 > 1e-12 ? v * inversesqrt(len2) : env_mat * dir;
+
+    vec3 col = evalSHIrradiance(sampleDir, refIndex[i].x);
 
     // refParams.x is an irradiance scale that may exceed 1, so it has two regimes and must be
     // spent in exactly one of them. Above 1 it is a boost, which only the multiply can apply

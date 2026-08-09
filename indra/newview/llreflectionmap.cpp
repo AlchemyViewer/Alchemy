@@ -256,6 +256,31 @@ bool LLReflectionMap::eclipses(const LLReflectionMap* other, F32 margin) const
     return dist + other->mRadius <= mRadius * SPHERE_FULL_WEIGHT_FRACTION + margin;
 }
 
+bool LLReflectionMap::neighborsAreStale() const
+{
+    if (mNeighborRadius < 0.f)
+    { // never built
+        return true;
+    }
+
+    // A tenth of the radius. Drift smaller than that cannot change which probes matter by more
+    // than the sphere weight's own falloff already blends over, and the threshold is measured
+    // against the volume the list was built at rather than against the previous frame, so slow
+    // movement still accumulates until it crosses.
+    const F32 DRIFT_FRACTION = 0.1f;
+    F32 slack = llmax(mRadius * DRIFT_FRACTION, 0.1f);
+
+    if (fabsf(mRadius - mNeighborRadius) > slack)
+    {
+        return true;
+    }
+
+    LLVector4a delta;
+    delta.setSub(mOrigin, mNeighborOrigin);
+
+    return delta.getLength3().getF32() > slack;
+}
+
 bool LLReflectionMap::intersects(LLReflectionMap* other) const
 {
     LLVector4a delta;
