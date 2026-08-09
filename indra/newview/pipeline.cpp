@@ -9919,9 +9919,11 @@ void LLPipeline::renderDeferredLighting()
                     if (count == max_count || total_count == num_fullscreen_lights)
                     {
                         U32 idx = count - 1;
+                        // The program is chosen by batch size, so its LIGHT_COUNT already is the
+                        // count and both of its loops run to that; there is no light_count
+                        // uniform to feed.
                         LLGLSLShader& multi_light_shader = *gDeferredMultiLightProgram[idx].selectVariant();
                         bindDeferredShader(multi_light_shader);
-                        multi_light_shader.uniform1i(LLShaderMgr::MULTI_LIGHT_COUNT, count);
                         multi_light_shader.uniform4fv(LLShaderMgr::MULTI_LIGHT, count, light[0].mV);
                         multi_light_shader.uniform4fv(LLShaderMgr::MULTI_LIGHT_COL, count, col[0].mV);
                         multi_light_shader.uniform1f(LLShaderMgr::MULTI_LIGHT_FAR_Z, far_z);

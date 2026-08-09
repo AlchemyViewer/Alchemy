@@ -185,7 +185,11 @@ void main()
 
             lv = normalize(lv);
 
-            if (nl > 0.0)
+            // Tested against the raw dot product, not against nl. calcHalfVectors clamps nl to
+            // a positive epsilon so the legacy path can divide by it, which made this condition
+            // and pointLightF's mirror image of it constant -- there was no facing test left
+            // here at all, only pbrPunctual's own internal one further down.
+            if (dot(n.xyz, lv) > 0.0)
             {
                 amb_da += (nl*0.5 + 0.5) * proj_ambiance;
 
@@ -193,15 +197,26 @@ void main()
 
                 vec3 intensity = dist_atten * dlit * PUNCTUAL_LIGHT_SCALE * shadow; // see deferredUtil.glsl -- must match every other site
 
-                pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, normalize(lv), nl, diffPunc, specPunc);
+                pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diffPunc, specPunc);
 
                 final_color += intensity * clampRadiance(nl * (diffPunc + specPunc * energyComp));
+
+                // How much direct light this pixel already received, which is what bounds the
+                // ambiance below. Declared and passed but never assigned, so that bound never
+                // applied and the projector's fill stacked on top of its own full-strength
+                // beam. The legacy branch has always assigned it.
+                lit = clamp(nl * dist_atten, 0.0, 1.0);
             }
 
             amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * PUNCTUAL_LIGHT_SCALE; //magic number to balance with legacy ambiance
-            pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, normalize(lv), nl, diffPunc, specPunc);
 
-            final_color += amb_rgb * clampRadiance(nl * (diffPunc + specPunc * energyComp));
+            // Ambiance is the projector's non-directional fill -- it exists to reach the
+            // surfaces the cookie does not. Weighting it by the punctual lobe (a second,
+            // argument-for-argument identical pbrPunctual call, whose result was already
+            // sitting in diffPunc/specPunc) put an NdotL on it, so it fell to nothing on
+            // exactly those surfaces, and charged a full GGX evaluation per fragment to do it.
+            // Against the diffuse albedo, as the legacy branch below does it.
+            final_color += diffuseColor.rgb * amb_rgb;
         }
     }
     else

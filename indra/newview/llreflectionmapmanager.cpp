@@ -190,12 +190,27 @@ void LLReflectionMapManager::initCubeFree()
     }
 }
 
+// Order probes for the cube-slot handout below: placed probes first, then by distance.
+//
+// This order decides which probes exist in VRAM at all, so it is where artist intent has to be
+// honoured. Distance alone did the opposite: mDistance is (distance to origin - radius), so a
+// large influence volume reads as nearer than a small one the camera is equally far inside --
+// an automatic probe covering a 16m octree node has a radius of about 13.9, and a manual probe
+// on a 2m prim standing in the same spot has 1. The placed probe lost the slot every time.
+//
+// A probe's radius is not a statement about its importance when the octree chose it and is
+// exactly that when a person did, so priority leads and distance orders within each group.
+// Automatic probes are a fallback for space nobody placed a probe in; they should be what gives
+// when there is not enough room for everything.
 struct CompareProbeDistance
 {
-    LLReflectionMap* mDefaultProbe;
-
-    bool operator()(const LLPointer<LLReflectionMap>& lhs, const LLPointer<LLReflectionMap>& rhs)
+    bool operator()(const LLPointer<LLReflectionMap>& lhs, const LLPointer<LLReflectionMap>& rhs) const
     {
+        if (lhs->mPriority != rhs->mPriority)
+        {
+            return lhs->mPriority > rhs->mPriority;
+        }
+
         return lhs->mDistance < rhs->mDistance;
     }
 };
@@ -217,7 +232,11 @@ static bool check_priority(LLReflectionMap* a, LLReflectionMap* b)
         return true;
     }
     else if (!a->mComplete && !b->mComplete)
-    { //neither probe is complete, use distance
+    { //neither probe is complete, generate the placed one first, then use distance
+        if (a->mPriority != b->mPriority)
+        {
+            return a->mPriority > b->mPriority;
+        }
         return a->mDistance < b->mDistance;
     }
     else if (a->mComplete && b->mComplete)
@@ -371,7 +390,90 @@ void LLReflectionMapManager::update()
         doProbeUpdate();
     }
 
-    // update distance to camera for all probes
+    // Make probes track the viewer objects they are attached to, then work out which automatic
+    // probes a manual probe has made redundant.
+    //
+    // An automatic probe is a fallback for space nobody placed a probe in. Where a placed probe
+    // has swallowed its whole influence volume it can no longer change a single pixel -- see
+    // eclipses() for what "swallowed" has to mean for that to be true of each volume shape --
+    // so the cube slot and the place in the update queue it holds are pure waste. Only probes
+    // that are actually rendering get to evict anything, or a probe still generating would
+    // leave a hole where the one it displaced used to be.
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("rmmu - manual eclipse");
+
+        // Slack, applied in whichever direction preserves the current state: a probe sitting on
+        // the boundary of a manual probe that is moving would otherwise flip every frame, and
+        // each flip costs it a full twelve-pass regeneration.
+        const F32 ECLIPSE_HYSTERESIS = 0.5f;
+
+        std::vector<LLReflectionMap*> manual_probes;
+
+        for (auto& probe : mProbes)
+        {
+            probe->syncToViewerObject();
+
+            if (probe != mDefaultProbe && probe->mViewerObject && probe->mComplete &&
+                probe->mCubeIndex != -1 && probe->mFadeIn >= 1.f && probe->isRelevant())
+            {
+                manual_probes.push_back(probe);
+            }
+        }
+
+        for (auto& probe : mProbes)
+        {
+            if (probe == mDefaultProbe || probe->mViewerObject)
+            { // only automatic probes are ever displaced
+                continue;
+            }
+
+            F32 margin = probe->mInsideManualProbe ? ECLIPSE_HYSTERESIS : -ECLIPSE_HYSTERESIS;
+
+            bool eclipsed = false;
+            for (auto* manual : manual_probes)
+            {
+                if (manual->eclipses(probe, margin))
+                {
+                    eclipsed = true;
+                    break;
+                }
+            }
+
+            probe->mInsideManualProbe = eclipsed;
+        }
+    }
+
+    // Update distance to camera for all probes.
+    //
+    // This has to happen before the sort below, before the cube slot handout that follows it,
+    // and before check_priority's tie-break -- all three consume mDistance. It used to be done
+    // inside the scheduling loop further down, one frame after the sort that reads it, and only
+    // for probes that loop did not skip: an irrelevant probe, or any probe at all while paused,
+    // kept whatever value it last held and sorted on that. A newly created probe holds -1, which
+    // is nearer than anything real.
+    for (auto& probe : mProbes)
+    {
+        if (probe == mDefaultProbe)
+        {
+            // 64m for the purposes of prioritization once it has been generated once, and a
+            // hard boost while it has not
+            probe->mDistance = probe->mComplete ? 64.f : -4096.f;
+            continue;
+        }
+
+        if (!probe->isRelevant())
+        { // sorts to the very back, so the release pass below reclaims its cube slot -- that
+          // pass only ever looks past mReflectionProbeCount, so a probe that stopped mattering
+          // while close to the camera used to hold its slot indefinitely
+            probe->mDistance = FLT_MAX;
+            continue;
+        }
+
+        LLVector4a d;
+        d.setSub(camera_pos, probe->mOrigin);
+        probe->mDistance = d.getLength3().getF32() - probe->mRadius;
+    }
+
     std::sort(mProbes.begin()+1, mProbes.end(), CompareProbeDistance());
     llassert(mProbes[0] == mDefaultProbe);
     llassert(mProbes[0]->mCubeArray == mTexture);
@@ -379,13 +481,18 @@ void LLReflectionMapManager::update()
 
     // make sure we're assigning cube slots to the closest probes
 
-    // first free any cube indices for distant probes
-    for (U32 i = mReflectionProbeCount; i < mProbes.size(); ++i)
+    // first free any cube indices for distant probes, and for probes that can no longer affect
+    // anything. The second case was unreachable before: relevance had no bearing on the sort, so
+    // an irrelevant probe near the camera sat inside the budget and held its slot indefinitely,
+    // while still being complete enough for getReflectionMaps to keep handing it to the shader.
+    // Index 0 is the default probe and is never released.
+    for (U32 i = 1; i < mProbes.size(); ++i)
     {
         LLReflectionMap* probe = mProbes[i];
         llassert(probe != nullptr);
 
-        if (probe && probe->mCubeIndex != -1 && mUpdatingProbe != probe)
+        if (probe && probe->mCubeIndex != -1 && mUpdatingProbe != probe &&
+            (i >= mReflectionProbeCount || !probe->isRelevant()))
         { // free this index
             mCubeFree.push_back(probe->mCubeIndex);
 
@@ -404,7 +511,10 @@ void LLReflectionMapManager::update()
         // find the closest probe that needs a cube index
         LLReflectionMap* probe = mProbes[i];
 
-        if (probe->mCubeIndex == -1)
+        // Relevance checked here as well as in the release pass above. When there are fewer
+        // probes than slots every probe is inside the budget, so without this an irrelevant one
+        // would be handed a slot and have it taken back on the next frame, forever.
+        if (probe->mCubeIndex == -1 && probe->isRelevant())
         {
             S32 idx = allocateCubeIndex();
             llassert(idx > 0); //if we're still in this loop, mCubeFree should not be empty and allocateCubeIndex should be returning good indices
@@ -412,8 +522,6 @@ void LLReflectionMapManager::update()
             probe->mCubeIndex = idx;
         }
     }
-
-    mResetFade = llmin((F32)(mResetFade + gFrameIntervalSeconds * 2.f), 1.f);
 
     for (unsigned int i = 0; i < mProbes.size(); ++i)
     {
@@ -429,27 +537,6 @@ void LLReflectionMapManager::update()
             (!probe->isRelevant() || mPaused))
         { // skip irrelevant probes (or all non-default probes if paused)
             continue;
-        }
-
-        LLVector4a d;
-
-        if (probe != mDefaultProbe)
-        {
-            if (probe->mViewerObject) //make sure probes track the viewer objects they are attached to
-            {
-                probe->mOrigin.load3(probe->mViewerObject->getPositionAgent().mV);
-            }
-            d.setSub(camera_pos, probe->mOrigin);
-            probe->mDistance = d.getLength3().getF32() - probe->mRadius;
-        }
-        else if (probe->mComplete)
-        {
-            // make default probe have a distance of 64m for the purposes of prioritization (if it's already been generated once)
-            probe->mDistance = 64.f;
-        }
-        else
-        {
-            probe->mDistance = -4096.f; //boost priority of default probe when it's not complete
         }
 
         if (probe->mComplete)
@@ -645,16 +732,17 @@ void LLReflectionMapManager::getReflectionMaps(std::vector<LLReflectionMap*>& ma
     U32 lastIdx = 0;
     for (U32 i = 0; count < maps.size() && i < mProbes.size(); ++i)
     {
-        mProbes[i]->mLastBindTime = gFrameTimeSeconds; // something wants to use this probe, indicate it's been requested
-        if (mProbes[i]->mCubeIndex != -1)
+        // Every probe that does not make the list gets its index cleared, not just the ones
+        // without a cube slot. A probe that is occluded or not yet complete used to keep the
+        // index it held on some earlier frame, and that slot now belongs to a different probe:
+        // the neighbour packer rejects -1 but has no way to tell a stale index from a live one,
+        // so a neighbour entry could point at an unrelated probe.
+        if (mProbes[i]->mCubeIndex != -1 && !mProbes[i]->mOccluded && mProbes[i]->mComplete)
         {
-            if (!mProbes[i]->mOccluded && mProbes[i]->mComplete)
-            {
-                maps[count++] = mProbes[i];
-                modelview.affineTransform(mProbes[i]->mOrigin, oa);
-                mProbes[i]->mMinDepth = -oa.getF32ptr()[2] - mProbes[i]->mRadius;
-                mProbes[i]->mMaxDepth = -oa.getF32ptr()[2] + mProbes[i]->mRadius;
-            }
+            maps[count++] = mProbes[i];
+            modelview.affineTransform(mProbes[i]->mOrigin, oa);
+            mProbes[i]->mMinDepth = -oa.getF32ptr()[2] - mProbes[i]->mRadius;
+            mProbes[i]->mMaxDepth = -oa.getF32ptr()[2] + mProbes[i]->mRadius;
         }
         else
         {
@@ -1120,6 +1208,20 @@ void LLReflectionMapManager::updateUniforms()
     LL_PROFILE_GPU_ZONE("rmmu - uniforms")
 
 
+    // Have active manual probes live-track the object they're associated with, BEFORE anything
+    // derives from their origin or radius.
+    //
+    // getReflectionMaps takes mMinDepth/mMaxDepth from these values and sorts the array on
+    // mMinDepth, and refBucket -- which is the shader's lower bound for its scan -- is only
+    // valid while that sort holds. Refreshing afterwards, as this used to, described where the
+    // probe was in the bucket and uploaded where it is in refSphere, and a probe whose bucket
+    // entry no longer covers it is one the shader scans straight past. Manual probes are the
+    // only ones that get this refresh, so they were the only ones that could vanish from it.
+    for (auto& probe : mProbes)
+    {
+        probe->syncToViewerObject();
+    }
+
     mReflectionMaps.resize(mReflectionProbeCount);
     getReflectionMaps(mReflectionMaps);
 
@@ -1190,27 +1292,9 @@ void LLReflectionMapManager::updateUniforms()
 
         llassert(refmap->mCubeIndex >= 0); // should always be  true, if not, getReflectionMaps is bugged
 
-        {
-            if (refmap->mViewerObject && refmap->mViewerObject->getVolume())
-            { // have active manual probes live-track the object they're associated with
-                LLVOVolume* vobj = (LLVOVolume*)refmap->mViewerObject.get();
-
-                refmap->mOrigin.load3(vobj->getPositionAgent().mV);
-
-                if (vobj->getReflectionProbeIsBox())
-                {
-                    LLVector3 s = vobj->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
-                    refmap->mRadius = s.magVec();
-                }
-                else
-                {
-                    refmap->mRadius = refmap->mViewerObject->getScale().mV[0] * 0.5f;
-                }
-            }
-            modelview.affineTransform(refmap->mOrigin, oa);
-            mProbeData.refSphere[count].set(oa.getF32ptr());
-            mProbeData.refSphere[count].mV[3] = refmap->mRadius;
-        }
+        modelview.affineTransform(refmap->mOrigin, oa);
+        mProbeData.refSphere[count].set(oa.getF32ptr());
+        mProbeData.refSphere[count].mV[3] = refmap->mRadius;
 
         mProbeData.refIndex[count][0] = refmap->mCubeIndex;
         llassert(nc % 4 == 0);
@@ -1221,14 +1305,18 @@ void LLReflectionMapManager::updateUniforms()
         // only possibile influence volumes are boxes and spheres, so detect boxes and treat everything else as spheres
         if (refmap->getBox(mProbeData.refBox[count]))
         { // negate priority to indicate this probe has a box influence volume
-            mProbeData.refIndex[count][3] = -mProbeData.refIndex[count][3];
+            // Negated from at least 1, because -0 and 0 are the same integer: a box probe that
+            // reached here with priority 0 would be read back as an automatic SPHERE, losing
+            // both its shape and its precedence. A box influence volume only exists on a probe
+            // attached to a viewer object, which is a manual probe by definition.
+            mProbeData.refIndex[count][3] = -llmax(mProbeData.refIndex[count][3], 1);
         }
 
         mProbeData.refParams[count].set(
             llmax(minimum_ambiance, refmap->getAmbiance())*ambscale, // ambiance scale
             radscale, // radiance scale
             refmap->mFadeIn, // fade in weight
-            oa.getF32ptr()[2] - refmap->mRadius); // z near
+            0.f); // unused
 
         S32 ni = nc; // neighbor ("index") - index into refNeighbor to write indices for current reflection probe's neighbors
         {
@@ -1629,17 +1717,21 @@ void LLReflectionMapManager::doOcclusion()
 
 void LLReflectionMapManager::forceDefaultProbeAndUpdateUniforms(bool force)
 {
-    static std::vector<bool> mProbeWasOccluded;
+    // Saved against the probe itself rather than against its position in mProbes. The list can
+    // gain or lose entries between the two calls -- the create and kill lists are drained in
+    // update(), and a probe can be dropped the moment nothing outside the manager holds it --
+    // and an index-keyed restore then hands one probe's occlusion state to another. The
+    // LLPointer also keeps every saved probe alive until the restore.
+    static std::vector<std::pair<LLPointer<LLReflectionMap>, bool> > sSavedOcclusion;
 
     if (force)
     {
-        llassert(mProbeWasOccluded.empty());
+        llassert(sSavedOcclusion.empty());
 
-        for (size_t i = 0; i < mProbes.size(); ++i)
+        for (auto& probe : mProbes)
         {
-            auto& probe = mProbes[i];
-            mProbeWasOccluded.push_back(probe->mOccluded);
-            if (probe != nullptr && probe != mDefaultProbe)
+            sSavedOcclusion.emplace_back(probe, probe->mOccluded);
+            if (probe != mDefaultProbe)
             {
                 probe->mOccluded = true;
             }
@@ -1649,16 +1741,11 @@ void LLReflectionMapManager::forceDefaultProbeAndUpdateUniforms(bool force)
     }
     else
     {
-        llassert(mProbes.size() == mProbeWasOccluded.size());
-
-        const size_t n = llmin(mProbes.size(), mProbeWasOccluded.size());
-        for (size_t i = 0; i < n; ++i)
+        for (auto& saved : sSavedOcclusion)
         {
-            auto& probe = mProbes[i];
-            llassert(probe->mOccluded == (probe != mDefaultProbe));
-            probe->mOccluded = mProbeWasOccluded[i];
+            saved.first->mOccluded = saved.second;
         }
-        mProbeWasOccluded.clear();
-        mProbeWasOccluded.shrink_to_fit();
+        sSavedOcclusion.clear();
+        sSavedOcclusion.shrink_to_fit();
     }
 }

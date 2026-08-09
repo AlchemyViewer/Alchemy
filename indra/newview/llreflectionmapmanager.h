@@ -78,7 +78,7 @@ public:
         //  x - irradiance scale
         //  y - radiance scale
         //  z - fade in
-        //  w - znear
+        //  w - unused (std140 keeps this a vec4)
         LLVector4 refParams[LL_MAX_REFLECTION_PROBE_COUNT];
 
         LLVector4 heroSphere;
@@ -297,7 +297,6 @@ private:
     bool mReset = false;
 
     float mResetFade = 1.f;
-    float mGlobalFadeTarget = 1.f;
 
     // if true, only update the default probe
     bool mPaused = false;

@@ -108,6 +108,7 @@ void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
 vec3 clampRadiance(vec3 c);
+vec3 clampHDRRange(vec3 color);
 float horizonOcclusion(vec3 r, vec3 geometricNormal);
 
 vec3 pbrBaseLight(vec3 diffuseColor,
@@ -268,7 +269,11 @@ void main()
     float final_scale = 1;
     if (classic_mode > 0)
         final_scale = 1.1;
-    frag_color = max(vec4(color.rgb * final_scale,a), vec4(0));
+    // Scrubbed the same way softenLightF scrubs the opaque result. max() alone does not do it:
+    // it passes an infinity through unchanged, and its answer for a NaN is undefined. This path
+    // runs the same unbounded punctual lobe the opaque one does, so it can produce the same
+    // values -- and whatever it writes goes on to the bloom pyramid.
+    frag_color = max(vec4(clampHDRRange(color.rgb * final_scale), a), vec4(0));
 #endif // FOR_IMPOSTOR
 }
 

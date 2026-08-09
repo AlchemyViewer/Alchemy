@@ -298,13 +298,6 @@ vec3 sphereIntersect(vec3 origin, vec3 dir, vec3 center, float radius2)
         return v;
 }
 
-void swap(inout float a, inout float b)
-{
-    float t = a;
-    a = b;
-    b = a;
-}
-
 // debug implementation, make no assumptions about origin
 void sphereIntersectDebug(vec3 origin, vec3 dir, vec3 center, float radius2, float depth, inout vec4 col)
 {
@@ -458,6 +451,20 @@ void boxIntersectDebug(vec3 origin, vec3 pos, mat4 i, inout vec4 col)
 }
 
 
+// The distance-only weight of a box probe.
+//
+// tapRefMap and tapIrradianceMap return this through an out parameter that the box branch
+// used not to write at all. An out parameter is copy-out from an uninitialised local, so the
+// caller was accumulating an undefined value into dwsum -- and dwsum is what decides how far
+// a manual probe takes over from the automatic ones.
+//
+//  d  - boxIntersect's normalized depth inside the volume: 1 at the centre, 0 at the wall
+//  fade - the probe's fade-in weight, as sphereWeight also folds in
+float boxDistanceWeight(float d, float fade)
+{
+    return clamp(d, 0.0, 1.0) * fade;
+}
+
 // get the weight of a sphere probe
 //  pos - position to be weighted
 //  dir - normal to be weighted
@@ -503,6 +510,7 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
         v = boxIntersect(pos, dir, refBox[i], d);
 
         w = max(d, 0.001);
+        dw = boxDistanceWeight(d, refParams[i].z);
     }
     else
     { // sphere probe
@@ -579,6 +587,7 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
         float d = 0.0;
         v = boxIntersect(pos, dir, refBox[i], d, 3.0);
         w = max(d, 0.001);
+        dw = boxDistanceWeight(d, refParams[i].z);
     }
     else
     {
@@ -915,7 +924,12 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
     }
 
 #if defined(SSR)
-    if (cube_snapshot != 1)
+    // Gated the same way the PBR path is. Both consumers below blend by ssr.a, and ssr.a is
+    // already zero at these glossiness values -- the march's own fade reaches zero at
+    // ssrMinGlossiness(), and the transparent branch scales by glossiness directly. alphaF
+    // calls this with glossiness 0, so every legacy alpha fragment in the scene was paying for
+    // a full ray march whose result was then multiplied by nothing.
+    if (cube_snapshot != 1 && (transparent ? glossiness > 0.0 : glossiness > ssrMinGlossiness()))
     {
         vec4 ssr = vec4(0);
 
@@ -936,8 +950,6 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 
     tapHeroProbe(glossenv, pos, norm, glossiness);
     tapHeroProbe(legacyenv, pos, norm, 1.0);
-
-    glossenv = clamp(glossenv, vec3(0), vec3(10));
 }
 
 void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 norm)

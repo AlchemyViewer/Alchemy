@@ -32,7 +32,7 @@ layout (std140) uniform ReflectionProbes
     //  x - irradiance scale
     //  y - radiance scale
     //  z - fade in
-    //  w - znear
+    //  w - unused (std140 keeps this a vec4)
     vec4 refParams[MAX_REFMAP_COUNT];
     vec4 heroSphere;
     // index  of cube map in reflectionProbes for a corresponding reflection probe

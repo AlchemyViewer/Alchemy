@@ -60,6 +60,17 @@ public:
     // return true if given Reflection Map's influence volume intersect's with this one's
     bool intersects(LLReflectionMap* other) const;
 
+    // True if this probe's influence volume completely swallows other's, to the point where
+    // other cannot change any pixel this one already covers. Stricter than plain containment
+    // for sphere volumes -- see the implementation.
+    //  margin - metres of slack added to this probe's volume, for hysteresis
+    bool eclipses(const LLReflectionMap* other, F32 margin) const;
+
+    // Refresh origin and radius from the viewer object this probe is attached to, if any.
+    // Manual probes ride on objects that move and resize, and several passes derive depths,
+    // sort order and influence volumes from these two values.
+    void syncToViewerObject();
+
     // Get the ambiance value to use for this probe
     F32 getAmbiance() const;
 
@@ -100,15 +111,16 @@ public:
     // last time this probe was updated (or when its update timer got reset)
     F32 mLastUpdateTime = 0.f;
 
-    // last time this probe was bound for rendering
-    F32 mLastBindTime = 0.f;
-
     // cube map used to sample this environment map
     LLPointer<LLCubeMapArray> mCubeArray;
     S32 mCubeIndex = -1; // index into cube map array or -1 if not currently stored in cube map array
 
     // probe has had at least one full update and is ready to render
     bool mComplete = false;
+
+    // automatic probe whose influence volume a manual probe completely swallows, so it can no
+    // longer affect any pixel (maintained by LLReflectionMapManager, consulted by isRelevant)
+    bool mInsideManualProbe = false;
 
     // fade in parameter for this probe
     F32 mFadeIn = 0.f;
@@ -135,7 +147,6 @@ public:
     // occlusion culling state
     GLuint mOcclusionQuery = 0;
     bool mOccluded = false;
-    U32 mOcclusionPendingFrames = 0;
 
     ProbeType mType;
 };

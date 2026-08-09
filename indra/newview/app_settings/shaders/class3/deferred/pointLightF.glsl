@@ -136,7 +136,11 @@ void main()
     }
     else
     {
-        if (nl < 0.0)
+        // Against the raw dot product. calcHalfVectors clamps nl to a positive epsilon so the
+        // Blinn-Phong terms below can divide by it, which made this test constant -- back faces
+        // reached the whole legacy path and were only stopped by the zero-colour discard at the
+        // bottom, after doing all the work.
+        if (dot(n, l) <= 0.0)
         {
             discard;
         }
