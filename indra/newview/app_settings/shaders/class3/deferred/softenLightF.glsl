@@ -109,7 +109,6 @@ vec3 pbrBaseLight(vec3 diffuseColor,
                   vec3 irradiance,
                   vec3 colorEmissive,
                   float ao,
-                  float ssaoVis,
                   vec3 additive,
                   vec3 atten);
 
@@ -222,14 +221,22 @@ void main()
         // hold environment intensity.
         radiance *= horizonOcclusion(reflect(normalize(pos.xyz), gb.normal), gb.geoNormal);
 
-        adjustIrradiance(irradiance, ambocc);
+        // One ambient visibility for the whole shading model, rather than adjustIrradiance
+        // multiplying the screen-space half into irradiance before the fact. The two terms
+        // measure the same thing -- how much of the ambient hemisphere this fragment can see --
+        // at two different scales, so they combine by taking the stronger rather than by
+        // multiplying, which would count the overlap they share twice.
+        //
+        // adjustIrradiance stays on the legacy branch below, where its saturation matrix and
+        // absolute clamp are part of the intended look rather than an obstacle to a physical one.
+        float visibility = min(ao, ssaoVisibility(ambocc));
 
         vec3 diffuseColor = vec3(0.0);
         vec3 specularColor = vec3(0.0);
         calcDiffuseSpecular(baseColor.rgb, metallic, diffuseColor, specularColor);
 
         vec3 v = -normalize(pos.xyz);
-        color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, ao, ssaoVisibility(ambocc), additive, atten);
+        color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, visibility, additive, atten);
     }
     else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
     {
