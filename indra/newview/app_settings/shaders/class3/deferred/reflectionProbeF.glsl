@@ -27,6 +27,7 @@
 
 #if defined(SSR)
 float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, inout vec4 collectedColor, sampler2D source, float glossiness);
+float ssrMinGlossiness();
 #endif
 
 uniform samplerCubeArray   reflectionProbes;
@@ -794,7 +795,9 @@ void doProbeSample(inout vec3 ambenv, inout vec3 glossenv,
     glossenv = sampleProbes(pos, refnormpersp, lod);
 
 #if defined(SSR)
-    if (cube_snapshot != 1 && glossiness >= 0.9)
+    // Skip the march only where it would contribute nothing anyway. Asking the SSR unit for its
+    // own fade threshold keeps this from drifting away from it again.
+    if (cube_snapshot != 1 && glossiness > ssrMinGlossiness())
     {
         vec4 ssr = vec4(0);
         if (transparent)

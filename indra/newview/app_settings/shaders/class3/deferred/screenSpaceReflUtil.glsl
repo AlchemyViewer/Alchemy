@@ -317,6 +317,22 @@ vec3 getPoissonSample(int i) {
     return POISSON3D_SAMPLES[i] * 2 - 1;
 }
 
+// Roughness fade for the ray march, and the glossiness at which it reaches zero.
+//
+// The caller that decides whether to march at all lives in another compilation unit and cannot
+// see a constant declared here, so it asks for the threshold through a function. It used to
+// carry its own literal instead, and the two disagreed: this fade ramped up from 0.567 while the
+// gate rejected everything below 0.9, so the whole ramp was unreachable and screen-space
+// reflections switched on at full strength in a single step -- a hard visible edge across any
+// surface whose roughness crossed 0.1.
+#define SSR_GLOSS_FADE_SLOPE 3.0
+#define SSR_GLOSS_FADE_BIAS  1.7
+
+float ssrMinGlossiness()
+{
+    return SSR_GLOSS_FADE_BIAS / SSR_GLOSS_FADE_SLOPE;
+}
+
 float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, inout vec4 collectedColor, sampler2D source, float glossiness)
 {
 #ifdef TRANSPARENT_SURFACE
@@ -341,7 +357,7 @@ collectedColor = vec4(1, 0, 1, 1);
     float zFar = 128.0;
     vignette *= clamp(1.0+(viewPos.z/zFar), 0.0, 1.0);
 
-    vignette *= clamp(glossiness * 3 - 1.7, 0, 1);
+    vignette *= clamp(glossiness * SSR_GLOSS_FADE_SLOPE - SSR_GLOSS_FADE_BIAS, 0, 1);
 
     vec4 hitpoint;
 

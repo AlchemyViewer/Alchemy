@@ -115,7 +115,12 @@ vec3 clampHDRRange(vec3 color)
     // There are situations where the color range will go to something insane - potentially producing infs and NaNs even.
     // This is a safety measure to prevent that.
     // -Geenz 2025-03-05
-    color = mix(color, vec3(1), isinf(color));
+    // Infinity becomes the largest value the frame can carry, not 1.0. Substituting 1.0 turns
+    // the brightest pixel in a linear frame into mid grey, so an overflow reads as a dark hole
+    // exactly where something should be searing -- a failure that inverts the error rather than
+    // bounding it. NaN still goes to black, which is the only safe answer for a value that
+    // carries no magnitude at all.
+    color = mix(color, vec3(MAX_PUNCTUAL_RADIANCE), isinf(color));
     color = mix(color, vec3(0.0), isnan(color));
     return color;
 }

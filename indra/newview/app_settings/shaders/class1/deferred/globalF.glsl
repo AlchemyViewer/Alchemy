@@ -103,6 +103,42 @@ vec3 unpackGeoNormal(float v)
     return octDecode(vec2(x, y) / GEO_OCT_LEVELS);
 }
 
+// Roughness across two 8-bit channels, for the PBR half of the ORM attachment.
+//
+// A single UNORM8 channel gives roughness 1/255 steps, and the GGX lobe width goes as roughness
+// squared, so a step costs 2*(1/255)/roughness of the lobe -- 17% at the MIN_PBR_ROUGHNESS floor,
+// where highlights are narrowest and a jump in width is most visible. It also swallowed the finer
+// half of what filterSpecularRoughness computes, since those corrections land below a step.
+//
+// The room is already there: alpha of that attachment carries legacy glossiness, and the three
+// PBR writers all store a literal zero in it. Same union as the geometric normal, discriminated
+// by the same flag, and legacy never sets that flag so its glossiness is untouched.
+//
+// Split so both halves are naturally in [0,1] and the hardware's own UNORM rounding is what the
+// decode undoes. The coarse half is already an exact multiple of 1/255 and survives storage
+// unchanged; the fine half subdivides one of those steps, so the residual error is half a step of
+// the fine channel -- about 8e-6 of roughness.
+vec2 packRoughness(float r)
+{
+    r = clamp(r, 0.0, 1.0);
+    float hi = floor(r * 255.0) / 255.0;
+    return vec2(hi, (r - hi) * 255.0);
+}
+
+float unpackRoughness(vec2 p)
+{
+    return p.x + p.y / 255.0;
+}
+
+// Assemble the PBR ORM texel: occlusion and metallic keep their channels, roughness takes green
+// and alpha. Writers should use this rather than composing frag_data[1] by hand, so the split
+// stays in one place.
+vec4 packORM(vec3 orm)
+{
+    vec2 r = packRoughness(orm.g);
+    return vec4(orm.r, r.x, orm.b, r.y);
+}
+
 // Legacy writers: blue carries environment intensity.
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag)
 {

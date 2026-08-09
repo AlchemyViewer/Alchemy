@@ -84,6 +84,7 @@ void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 
 float getDepth(vec2 pos_screen);
 
 vec3 linear_to_srgb(vec3 c);
+float unpackRoughness(vec2 p);
 vec3 srgb_to_linear(vec3 c);
 
 uniform vec4 waterPlane;
@@ -176,7 +177,7 @@ void main()
     if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_PBR))
     {
         vec3 orm = spec.rgb;
-        float perceptualRoughness = orm.g;
+        float perceptualRoughness = unpackRoughness(spec.ga);
         float metallic = orm.b;
         float ao = orm.r;
 

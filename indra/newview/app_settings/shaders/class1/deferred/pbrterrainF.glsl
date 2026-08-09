@@ -166,6 +166,7 @@ in vec4[2] vary_coords;
 void mirrorClip(vec3 position);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 vec4 encodeNormalGeo(vec3 n, vec3 geometric_normal, float gbuffer_flag);
+vec4 packORM(vec3 orm);
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 float terrain_mix(TerrainMix tm, vec4 tms4);
@@ -507,7 +508,7 @@ void main()
     // Alpha is zero, as every other PBR GBuffer writer leaves it. Nothing reads this channel for
     // a fragment flagged GBUFFER_FLAG_HAS_PBR -- softenLightF and the local lights take spec.a
     // as legacy glossiness, and every one of those reads sits behind a non-PBR branch.
-    frag_data[1] = max(vec4(orm_out.rgb, 0.0), vec4(0));                                                       // PBR linear packed Occlusion, Roughness, Metal.
+    frag_data[1] = packORM(max(orm_out.rgb, vec3(0)));  // Occlusion, Roughness (green+alpha), Metal
     // geom_normal is already the un-perturbed surface normal here, and under
     // TERRAIN_FLAT_NORMALS it is the exact per-triangle one.
     frag_data[2] = encodeNormalGeo(tnorm, geom_normal * (gl_FrontFacing ? 1.0 : -1.0), GBUFFER_FLAG_HAS_PBR);
