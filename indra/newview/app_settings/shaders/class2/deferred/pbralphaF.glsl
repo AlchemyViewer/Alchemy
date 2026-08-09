@@ -183,7 +183,14 @@ void main()
     vec3 vB = sign * cross(vN, vT);
     vec3 norm = normalize( vNt.x * vT + vNt.y * vB + vNt.z * vN );
 
-    norm *= gl_FrontFacing ? 1.0 : -1.0;
+    // Held in a variable because the geometric normal below has to turn with it. Flipping only
+    // the shading normal leaves the two pointing into opposite hemispheres on a back face, and
+    // the horizon test reads that as a reflection fully underground.
+    //
+    // The tangent basis above is built from the raw vary_normal on purpose: mikktspace flips the
+    // result, not the inputs.
+    float facing = gl_FrontFacing ? 1.0 : -1.0;
+    norm *= facing;
 
     float scol = 1.0;
     vec3 sunlit;
@@ -230,7 +237,7 @@ void main()
     // returns radiance arriving through the geometry. vary_normal is the untouched interpolated
     // vertex normal, so it is the geometric horizon to test against -- the deferred path has no
     // equivalent, because the GBuffer only ever stored the perturbed normal.
-    radiance *= horizonOcclusion(reflect(normalize(pos.xyz), norm.xyz), vary_normal);
+    radiance *= horizonOcclusion(reflect(normalize(pos.xyz), norm.xyz), vary_normal * facing);
 
     vec3 diffuseColor = vec3(0.0);
     vec3 specularColor = vec3(0.0);
