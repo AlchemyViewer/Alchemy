@@ -108,7 +108,7 @@ public:
         SCENE_MAP,                          //  "sceneMap"
         SCENE_DEPTH,                        //  "sceneDepth"
         REFLECTION_PROBES,                  //  "reflectionProbes"
-        IRRADIANCE_PROBES,                  //  "irradianceProbes"
+        SH_COEFFS,                          //  "shCoeffs"
         HERO_PROBE,                         //  "heroProbes"
         CLOUD_NOISE_MAP,                    //  "cloud_noise_texture"
         CLOUD_NOISE_MAP_NEXT,               //  "cloud_noise_texture_next"

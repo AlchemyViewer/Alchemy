@@ -101,7 +101,7 @@ extern LLGLSLShader         gReflectionMipProgram;
 extern LLGLSLShader         gGaussianProgram;
 extern LLGLSLShader         gRadianceGenProgram;
 extern LLGLSLShader         gHeroRadianceGenProgram;
-extern LLGLSLShader         gIrradianceGenProgram;
+extern LLGLSLShader         gSHProjectionProgram;
 extern LLGLSLShader         gGlowCombineFXAAProgram;
 extern LLGLSLShader         gDebugProgram;
 enum NormalDebugShaderVariant : S32

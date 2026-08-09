@@ -30,7 +30,12 @@ float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, 
 #endif
 
 uniform samplerCubeArray   reflectionProbes;
-uniform samplerCubeArray   irradianceProbes;
+
+// Second-order SH irradiance, nine RGB coefficients per probe in a 9-wide strip, one row per
+// cubemap layer. See class1/interface/shProjectF.glsl -- irradiance is band-limited to these
+// nine numbers, so the cubemap this replaces was storing a nine-degree-of-freedom function in
+// sixteen thousand texels.
+uniform sampler2D          shCoeffs;
 
 uniform sampler2D sceneMap;
 uniform int cube_snapshot;
@@ -527,6 +532,43 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
 // w - weight of sample (distance and angular attenuation)
 // dw - weight of sample (distance only)
 // i - index of probe
+// Reconstruct irradiance for a normal direction from a probe's nine coefficients.
+//
+// The band scaling is the clamped-cosine convolution (Ramamoorthi and Hanrahan): pi, 2pi/3 and
+// pi/4 for bands 0, 1 and 2. They are divided through by pi here so the result is the
+// cosine-weighted AVERAGE radiance rather than irradiance proper -- that is the quantity the
+// cubemap held and the quantity pbrIbl multiplies by diffuseColor, so the units downstream are
+// unchanged.
+vec3 evalSHIrradiance(vec3 n, int layer)
+{
+    vec3 L0 = texelFetch(shCoeffs, ivec2(0, layer), 0).rgb;
+    vec3 L1 = texelFetch(shCoeffs, ivec2(1, layer), 0).rgb;
+    vec3 L2 = texelFetch(shCoeffs, ivec2(2, layer), 0).rgb;
+    vec3 L3 = texelFetch(shCoeffs, ivec2(3, layer), 0).rgb;
+    vec3 L4 = texelFetch(shCoeffs, ivec2(4, layer), 0).rgb;
+    vec3 L5 = texelFetch(shCoeffs, ivec2(5, layer), 0).rgb;
+    vec3 L6 = texelFetch(shCoeffs, ivec2(6, layer), 0).rgb;
+    vec3 L7 = texelFetch(shCoeffs, ivec2(7, layer), 0).rgb;
+    vec3 L8 = texelFetch(shCoeffs, ivec2(8, layer), 0).rgb;
+
+    const float A0 = 1.0;        // pi   / pi
+    const float A1 = 0.6666667;  // 2pi/3 / pi
+    const float A2 = 0.25;       // pi/4  / pi
+
+    vec3 e = A0 * 0.282095 * L0
+           + A1 * 0.488603 * (n.y * L1 + n.z * L2 + n.x * L3)
+           + A2 * (1.092548 * (n.x * n.y * L4 + n.y * n.z * L5 + n.x * n.z * L7)
+                 + 0.315392 * (3.0 * n.z * n.z - 1.0) * L6
+                 + 0.546274 * (n.x * n.x - n.y * n.y) * L8);
+
+    // Truncating at band 2 rings: a small bright source (the sun, in a probe capture) produces
+    // Gibbs oscillation whose negative lobe lands on the far side of the sphere. Clamping is the
+    // cheap half of the fix and the only part that matters visibly -- it cannot make a surface
+    // subtract light. The expensive half, windowing the coefficients at projection time, is worth
+    // adding only if the residual dark lobe turns out to be visible.
+    return max(e, vec3(0.0));
+}
+
 vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int i, vec3 amblit)
 {
     // parallax adjustment
@@ -554,7 +596,7 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
     v -= c;
     v = env_mat * v;
 
-    vec3 col = textureLod(irradianceProbes, vec4(v.xyz, refIndex[i].x), 0).rgb;
+    vec3 col = evalSHIrradiance(normalize(v), refIndex[i].x);
 
     // refParams.x is an irradiance scale that may exceed 1, so it has two regimes and must be
     // spent in exactly one of them. Above 1 it is a boost, which only the multiply can apply

@@ -10406,10 +10406,11 @@ void LLPipeline::bindReflectionProbes(LLGLSLShader& shader)
         bound = true;
     }
 
-    channel = shader.enableTexture(LLShaderMgr::IRRADIANCE_PROBES);
-    if (channel > -1 && mReflectionMapManager.mIrradianceMaps.notNull())
+    channel = shader.enableTexture(LLShaderMgr::SH_COEFFS);
+    if (channel > -1 && mReflectionMapManager.mSHCoeffs.isComplete())
     {
-        mReflectionMapManager.mIrradianceMaps->bind(channel);
+        // Point sampled: these are coefficients indexed by texelFetch, not a filterable image.
+        mReflectionMapManager.mSHCoeffs.bindTexture(0, channel, ALSamplers::PointClamp);
         bound = true;
     }
 

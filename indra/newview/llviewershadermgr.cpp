@@ -124,7 +124,7 @@ LLGLSLShader    gReflectionMipProgram;
 LLGLSLShader    gGaussianProgram;
 LLGLSLShader    gRadianceGenProgram;
 LLGLSLShader    gHeroRadianceGenProgram;
-LLGLSLShader    gIrradianceGenProgram;
+LLGLSLShader    gSHProjectionProgram;
 LLGLSLShader    gGlowCombineFXAAProgram;
 LLGLSLShader    gTwoTextureCompareProgram;
 LLGLSLShader    gOneTextureFilterProgram;
@@ -3949,12 +3949,14 @@ bool LLViewerShaderMgr::loadShadersInterface()
 
     if (success && gGLManager.mHasCubeMapArray)
     {
-        gIrradianceGenProgram.mName = "Irradiance Gen Shader";
-        gIrradianceGenProgram.mShaderFiles.clear();
-        gIrradianceGenProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
-        gIrradianceGenProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenF.glsl", GL_FRAGMENT_SHADER));
-        gIrradianceGenProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gIrradianceGenProgram.createShader();
+        gSHProjectionProgram.mName = "SH Irradiance Projection Shader";
+        gSHProjectionProgram.mShaderFiles.clear();
+        // Shares the radiance pass's vertex stage: it emits the same fullscreen quad, and the
+        // sample direction it also computes is simply unused here.
+        gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
+        gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/shProjectF.glsl", GL_FRAGMENT_SHADER));
+        gSHProjectionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gSHProjectionProgram.createShader();
     }
 
     if( !success )

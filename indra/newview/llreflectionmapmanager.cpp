@@ -601,7 +601,9 @@ U32 LLReflectionMapManager::probeCount()
 
 U32 LLReflectionMapManager::probeMemory()
 {
-    return (mDynamicProbeCount * 6 * (mProbeResolution * mProbeResolution) * 4) / 1024 / 1024 + (mDynamicProbeCount * 6 * (mIrradianceMapResolution * mIrradianceMapResolution) * 4) / 1024 / 1024;
+    // The SH coefficient strip is 9 x probes x RGBA16F -- tens of kilobytes, below the
+    // resolution this reports in.
+    return (mDynamicProbeCount * 6 * (mProbeResolution * mProbeResolution) * 4) / 1024 / 1024;
 }
 
 GLuint LLReflectionMapManager::allocateQuery()
@@ -953,10 +955,10 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
 
     if (face == 5)
     {
-        mMipChain[0].bindTarget();
-
         if (isRadiancePass())
         {
+            mMipChain[0].bindTarget();
+
             //generate radiance map (even if this is not the irradiance map, we need the mip chain for the irradiance map)
             gRadianceGenProgram.bind();
             mVertexBuffer->setBuffer();
@@ -999,58 +1001,47 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
             }
 
             gRadianceGenProgram.unbind();
+            mMipChain[0].flush();
         }
         else
         {
-            //generate irradiance map
-            gIrradianceGenProgram.bind();
-            S32 channel = gIrradianceGenProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
+            LL_PROFILE_GPU_ZONE("probe sh project");
+
+            // Nine coefficients replace the 16x16x6 irradiance cubemap this used to convolve.
+            // The old pass re-integrated the environment once per output texel; this integrates
+            // it once, into the only nine numbers irradiance actually has.
+            //
+            // Integrate a mip whose faces are mSHProjectionRes, not mip 0. Averaging texels
+            // before an integral does not change the integral, and the target basis cannot
+            // represent anything the finer mip would add.
+            S32 sh_mip = 0;
+            U32 sh_res = mProbeResolution;
+            while (sh_res > mSHProjectionRes && (size_t)(sh_mip + 1) < mMipChain.size())
+            {
+                sh_res >>= 1;
+                ++sh_mip;
+            }
+
+            gSHProjectionProgram.bind();
+            S32 channel = gSHProjectionProgram.enableTexture(LLShaderMgr::REFLECTION_PROBES);
             mTexture->bind(channel);
 
-            gIrradianceGenProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
-            gIrradianceGenProgram.uniform1f(LLShaderMgr::REFLECTION_PROBE_MAX_LOD, mMaxProbeLOD);
-            // Same source the radiance pass filters, so the same width. This is the mip-0 edge
-            // length of sourceIdx, not the irradiance target's resolution.
-            gIrradianceGenProgram.uniform1i(LLShaderMgr::U_WIDTH, mProbeResolution);
+            gSHProjectionProgram.uniform1i(LLShaderMgr::SOURCE_IDX, sourceIdx);
+            gSHProjectionProgram.uniform1f(LLShaderMgr::MIP_LEVEL, (GLfloat)sh_mip);
+            gSHProjectionProgram.uniform1i(LLShaderMgr::U_WIDTH, (S32)sh_res);
+
+            mSHCoeffs.bindTarget();
+            // This probe owns one row and must not disturb any other, so the viewport is the
+            // write mask -- the target is never cleared.
+            glViewport(0, probe->mCubeIndex, LL_SH_COEFF_COUNT, 1);
 
             mVertexBuffer->setBuffer();
-            int start_mip = 0;
-            // find the mip target to start with based on irradiance map resolution
-            for (start_mip = 0; start_mip < mMipChain.size(); ++start_mip)
-            {
-                if (mMipChain[start_mip].getWidth() == mIrradianceMapResolution)
-                {
-                    break;
-                }
-            }
+            mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
 
-            //for (int i = start_mip; i < mMipChain.size(); ++i)
-            {
-                int i = start_mip;
-                LL_PROFILE_GPU_ZONE("probe irradiance gen");
-                glViewport(0, 0, mMipChain[i].getWidth(), mMipChain[i].getHeight());
-                for (int cf = 0; cf < 6; ++cf)
-                { // for each cube face
-                    LLCoordFrame frame;
-                    frame.lookAt(LLVector3(0, 0, 0), LLCubeMapArray::sClipToCubeLookVecs[cf], LLCubeMapArray::sClipToCubeUpVecs[cf]);
+            mSHCoeffs.flush();
 
-                    F32 mat[16];
-                    frame.getOpenGLRotation(mat);
-                    gGL.loadMatrix(mat);
-
-                    mVertexBuffer->drawArrays(gGL.TRIANGLE_STRIP, 0, 4);
-
-                    S32 res = mMipChain[i].getWidth();
-                    mIrradianceMaps->bind(channel);
-                    mIrradianceMaps->copyFaceFromFramebuffer(i - start_mip, probe->mCubeIndex, cf, res);
-                    mTexture->bind(channel);
-                }
-            }
-
-            gIrradianceGenProgram.unbind();
+            gSHProjectionProgram.unbind();
         }
-
-        mMipChain[0].flush();
     }
 }
 
@@ -1470,11 +1461,11 @@ void LLReflectionMapManager::renderDebug()
 void LLReflectionMapManager::initReflectionMaps()
 {
     static LLCachedControl<U32> ref_probe_res(gSavedSettings, "RenderReflectionProbeResolution", 128U);
-    static LLCachedControl<U32> ref_probe_irradiance_res(gSavedSettings, "RenderReflectionProbeIrradianceResolution", 16U);
     U32 probe_resolution = nhpo2(llclamp(ref_probe_res(), (U32)64, (U32)512));
-    U32 irradiance_resolution = llmin(nhpo2(llclamp(ref_probe_irradiance_res(), (U32)16, (U32)256)), probe_resolution); // Must be equal or smaller then probe resolution
+    // No irradiance resolution to size any more: irradiance is nine SH coefficients whatever
+    // the environment looks like, so the setting that used to pick a cubemap edge length is gone.
     if (mTexture.isNull() || mReflectionProbeCount != mDynamicProbeCount || mProbeResolution != probe_resolution ||
-        mIrradianceMapResolution != irradiance_resolution || mReset)
+        !mSHCoeffs.isComplete() || mReset)
     {
         if(mProbeResolution != probe_resolution)
         {
@@ -1486,8 +1477,12 @@ void LLReflectionMapManager::initReflectionMaps()
         mReset = false;
         mReflectionProbeCount = mDynamicProbeCount;
         mProbeResolution = probe_resolution;
-        mIrradianceMapResolution = irradiance_resolution;
         mMaxProbeLOD = log2f((F32)mProbeResolution) - 1.f; // number of mips - 1
+
+        // Signed storage: the linear and quadratic bands are negative over half the sphere, so
+        // none of the unsigned float formats the radiance chain uses can hold these.
+        mSHCoeffs.release();
+        mSHCoeffs.allocate(LL_SH_COEFF_COUNT, mReflectionProbeCount + 2, GL_RGBA16F);
 
         if (mTexture.isNull() ||
             mTexture->getWidth() != mProbeResolution ||
@@ -1497,8 +1492,6 @@ void LLReflectionMapManager::initReflectionMaps()
             if (mTexture)
             {
                 mTexture = new LLCubeMapArray(*mTexture, mProbeResolution, mReflectionProbeCount + 2);
-
-                mIrradianceMaps = new LLCubeMapArray(*mIrradianceMaps, mIrradianceMapResolution, mReflectionProbeCount);
             }
             else
 #endif
@@ -1510,9 +1503,6 @@ void LLReflectionMapManager::initReflectionMaps()
                 // store mReflectionProbeCount+2 cube maps, final two cube maps are used for render target and radiance map generation
                 // source)
                 mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, render_hdr);
-
-                mIrradianceMaps = new LLCubeMapArray();
-                mIrradianceMaps->allocate(mIrradianceMapResolution, 3, mReflectionProbeCount, false, render_hdr);
             }
         }
 
@@ -1592,7 +1582,7 @@ void LLReflectionMapManager::cleanup()
     mMipChain.clear();
 
     mTexture = nullptr;
-    mIrradianceMaps = nullptr;
+    mSHCoeffs.release();
 
     mProbes.clear();
     mKillList.clear();

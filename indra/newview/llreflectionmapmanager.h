@@ -38,6 +38,9 @@ class LLViewerObject;
 // number of reflection probes to keep in vram
 #define LL_MAX_REFLECTION_PROBE_COUNT 256
 
+// Second-order SH: one DC term, three linear, five quadratic.
+#define LL_SH_COEFF_COUNT 9
+
 // reflection probe mininum scale
 #define LL_REFLECTION_PROBE_MINIMUM_SCALE 1.f;
 
@@ -220,7 +223,9 @@ private:
     LLPointer<LLVertexBuffer> mVertexBuffer;
 
     // storage for reflection probe irradiance maps
-    LLPointer<LLCubeMapArray> mIrradianceMaps;
+    // Nine RGB SH coefficients per probe, laid out 9 wide with one row per cubemap layer.
+    // Signed, so RGBA16F rather than the unsigned float the radiance chain uses.
+    LLRenderTarget mSHCoeffs;
 
     // list of free cubemap indices
     std::list<S32> mCubeFree;
@@ -277,7 +282,10 @@ private:
     U32 mProbeResolution = 128;
 
     // resolution of irradiance maps
-    U32 mIrradianceMapResolution = 16;
+    // Face edge length the SH projection integrates over. Irradiance is band-limited to nine
+    // coefficients, so this only has to be fine enough not to alias the source before the
+    // integral -- it is not an output resolution and does not bound reconstruction quality.
+    U32 mSHProjectionRes = 32;
 
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
