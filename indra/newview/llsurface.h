@@ -106,7 +106,6 @@ public:
     LLSurfacePatch *getPatch(const S32 x, const S32 y) const;
 
     // Update methods (called during idle, normally)
-    template<bool PBR>
     bool idleUpdate(F32 max_update_time);
 
     bool containsPosition(const LLVector3 &position);
@@ -208,8 +207,6 @@ private:
     LLTimer     mTimer; // timer to throttle initial requests until the mSTexture is fully fetched
 };
 
-extern template bool LLSurface::idleUpdate</*PBR=*/false>(F32 max_update_time);
-extern template bool LLSurface::idleUpdate</*PBR=*/true>(F32 max_update_time);
 
 
 

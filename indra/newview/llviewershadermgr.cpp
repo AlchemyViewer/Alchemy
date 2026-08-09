@@ -1778,13 +1778,19 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     {
         const S32 detail = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
         const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
+        // Faceted terrain shading is a fragment-stage choice, not a surface-data one: a
+        // per-triangle normal has no per-vertex representation on a mesh whose vertices are
+        // shared, so pbrterrainF derives it from position derivatives instead. See
+        // terrain_geometric_normal().
+        const bool flat_normals = gSavedSettings.getBOOL("RenderTerrainPBRNormalsEnabled");
         for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
         {
             LLGLSLShader* shader = &gDeferredPBRTerrainProgram[paint_type];
-            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s",
+            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s %s",
                     detail,
                     (paint_type == TERRAIN_PAINT_TYPE_PBR_PAINTMAP ? "paintmap" : "heightmap-with-noise"),
-                    (mapping == 1 ? "flat" : "triplanar"));
+                    (mapping == 1 ? "flat" : "triplanar"),
+                    (flat_normals ? "faceted" : "smooth"));
             shader->mFeatures.hasSrgb = true;
             shader->mFeatures.isAlphaLighting = true;
             shader->mFeatures.calculatesAtmospherics = true;
@@ -1800,6 +1806,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->addPermutation("TERRAIN_PBR_DETAIL", llformat("%d", detail));
             shader->addPermutation("TERRAIN_PAINT_TYPE", llformat("%d", paint_type));
             shader->addPermutation("TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT", llformat("%d", mapping));
+            if (flat_normals)
+            {
+                shader->addPermutation("TERRAIN_FLAT_NORMALS", "1");
+            }
 
             add_common_permutations(shader);
 

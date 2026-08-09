@@ -597,7 +597,6 @@ void LLSurface::updatePatchVisibilities(LLAgent &agent)
     }
 }
 
-template<bool PBR>
 bool LLSurface::idleUpdate(F32 max_update_time)
 {
     if (!gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_TERRAIN))
@@ -624,7 +623,7 @@ bool LLSurface::idleUpdate(F32 max_update_time)
     {
         std::set<LLSurfacePatch *>::iterator curiter = iter++;
         LLSurfacePatch *patchp = *curiter;
-        patchp->updateNormals<PBR>();
+        patchp->updateNormals();
         patchp->updateVerticalStats();
         if (max_update_time == 0.f || update_timer.getElapsedTimeF32() < max_update_time)
         {
@@ -643,8 +642,6 @@ bool LLSurface::idleUpdate(F32 max_update_time)
     return did_update;
 }
 
-template bool LLSurface::idleUpdate</*PBR=*/false>(F32 max_update_time);
-template bool LLSurface::idleUpdate</*PBR=*/true>(F32 max_update_time);
 
 void LLSurface::decompressDCTPatch(LLBitPack &bitpack, LLGroupHeader *gopp, bool b_large_patch)
 {
