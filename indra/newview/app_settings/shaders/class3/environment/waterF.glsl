@@ -43,16 +43,6 @@ vec2 BRDF(float NoV, float roughness);
 
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
 
-void pbrIbl(vec3 diffuseColor,
-    vec3 specularColor,
-    vec3 radiance, // radiance map sample
-    vec3 irradiance, // irradiance map sample
-    float ao,       // ambient occlusion factor
-    float nv,       // normal dot view vector
-    float perceptualRoughness,
-    out vec3 diffuse,
-    out vec3 specular);
-
 void pbrPunctual(vec3 diffuseColor, vec3 specularColor,
                     float perceptualRoughness,
                     float metallic,
@@ -62,22 +52,6 @@ void pbrPunctual(vec3 diffuseColor, vec3 specularColor,
                     out float nl,
                     out vec3 diff,
                     out vec3 spec);
-
-vec3 pbrBaseLight(vec3 diffuseColor,
-                  vec3 specularColor,
-                  float metallic,
-                  vec3 pos,
-                  vec3 norm,
-                  float perceptualRoughness,
-                  vec3 light_dir,
-                  vec3 sunlit,
-                  float scol,
-                  vec3 radiance,
-                  vec3 irradiance,
-                  vec3 colorEmissive,
-                  float ao,
-                  vec3 additive,
-                  vec3 atten);
 
 uniform sampler2D bumpMap;
 uniform sampler2D bumpMap2;

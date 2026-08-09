@@ -26,7 +26,7 @@
 #define FLT_MAX 3.402823466e+38
 
 #if defined(SSR)
-float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, inout vec4 collectedColor, sampler2D source, float glossiness);
+float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, vec3 rayDir, inout vec4 collectedColor, sampler2D source, float glossiness);
 float ssrMinGlossiness();
 #endif
 
@@ -809,14 +809,17 @@ void doProbeSample(inout vec3 ambenv, inout vec3 glossenv,
     if (cube_snapshot != 1 && glossiness > ssrMinGlossiness())
     {
         vec4 ssr = vec4(0);
+        // refnormpersp, not norm: the march takes the same dominant direction the probe tap
+        // above was bent to, so the two reflections being blended below agree about where they
+        // are looking.
         if (transparent)
         {
-            tapScreenSpaceReflection(1, tc, pos, norm, ssr, sceneMap, 1);
+            tapScreenSpaceReflection(1, tc, pos, norm, refnormpersp, ssr, sceneMap, 1);
             ssr.a *= glossiness;
         }
         else
         {
-            tapScreenSpaceReflection(1, tc, pos, norm, ssr, sceneMap, glossiness);
+            tapScreenSpaceReflection(1, tc, pos, norm, refnormpersp, ssr, sceneMap, glossiness);
         }
 
 
@@ -933,14 +936,16 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
     {
         vec4 ssr = vec4(0);
 
+        vec3 ssrDir = normalize(refnormpersp);
+
         if (transparent)
         {
-            tapScreenSpaceReflection(1, tc, pos, norm, ssr, sceneMap, 1);
+            tapScreenSpaceReflection(1, tc, pos, norm, ssrDir, ssr, sceneMap, 1);
             ssr.a *= glossiness;
         }
         else
         {
-            tapScreenSpaceReflection(1, tc, pos, norm, ssr, sceneMap, glossiness);
+            tapScreenSpaceReflection(1, tc, pos, norm, ssrDir, ssr, sceneMap, glossiness);
         }
 
         glossenv = mix(glossenv, ssr.rgb, ssr.a);

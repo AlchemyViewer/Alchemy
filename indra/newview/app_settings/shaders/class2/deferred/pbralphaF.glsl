@@ -124,6 +124,7 @@ vec3 pbrBaseLight(vec3 diffuseColor,
                   vec3 irradiance,
                   vec3 colorEmissive,
                   float ao,
+                  float ssaoVis,
                   vec3 additive,
                   vec3 atten);
 
@@ -246,7 +247,9 @@ void main()
 
     vec3 v = -normalize(pos.xyz);
 
-    color = pbrBaseLight(diffuseColor, specularColor, metallic, v, norm.xyz, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, ao, additive, atten);
+    // 1.0 for the screen-space term: the SSAO buffer is built from the opaque depth pass, so it
+    // describes the surface behind this one, not this one.
+    color = pbrBaseLight(diffuseColor, specularColor, metallic, v, norm.xyz, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, ao, 1.0, additive, atten);
 
     vec3 light = vec3(0);
 

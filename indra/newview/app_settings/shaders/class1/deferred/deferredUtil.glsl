@@ -453,6 +453,27 @@ float computeSpecularAO(float NoV, float ao, float roughness)
     return clamp(pow(NoV + ao, exp2(-16.0 * roughness - 1.0)) - 1.0 + ao, 0.0, 1.0);
 }
 
+// Ambient occlusion as a colour rather than a scalar (Jimenez et al. 2016, "Practical Real-Time
+// Strategies for Accurate Indirect Occlusion"; this is the polynomial fit Filament ships).
+//
+// Multiplying irradiance by a single occlusion figure models light that entered the cavity and
+// never came back out. Real light entering a cavity bounces, and every bounce is a multiply by
+// the surface's own albedo, so what leaves is tinted and there is more of it than one multiply
+// allows. The scalar form therefore drives a saturated surface toward neutral black in its own
+// creases -- red cloth goes grey in the folds instead of a deeper red -- and the error is worst
+// where the occlusion is strongest, which is where the eye is looking.
+//
+// Per channel, so a dark channel stays dark and a bright one recovers. Never darker than the
+// scalar it replaces.
+vec3 gtaoMultiBounce(float visibility, vec3 albedo)
+{
+    vec3 a =  2.0404 * albedo - 0.3324;
+    vec3 b = -4.7951 * albedo + 0.6417;
+    vec3 c =  2.7552 * albedo + 0.6903;
+
+    return max(vec3(visibility), ((visibility * a + b) * visibility + c) * visibility);
+}
+
 // Clamp radiance to a ceiling without turning it a different colour on the way.
 //
 // A per-channel clamp lets one channel saturate while the others keep climbing, so a highlight
@@ -547,7 +568,10 @@ void pbrIbl(vec3 diffuseColor,
             vec3 specularColor,
             vec3 radiance, // radiance map sample
             vec3 irradiance, // irradiance map sample
-            float ao,       // ambient occlusion factor
+            float ao,       // ambient occlusion factor, from the material
+            float ssaoVis,  // screen-space visibility, already on the caller's SSAO response
+                            // curve so both lobes answer to the same strength settings; 1.0
+                            // where there is no screen-space term at all
             float nv,       // normal dot view vector
             float perceptualRough,
             out vec3 diffuseOut,
@@ -582,8 +606,18 @@ void pbrIbl(vec3 diffuseColor,
     vec3 FmsEms = Ems * FssEss * F_avg / max(vec3(1.0) - F_avg * Ems, vec3(1e-4));
     vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms);
 
-    diffuseOut = (FmsEms + k_D) * irradiance * ao;
-    specularOut = radiance * FssEss * computeSpecularAO(nv, ao, perceptualRough * perceptualRough);
+    // The screen-space term is already folded into irradiance by the caller (adjustIrradiance),
+    // so only the material's own occlusion applies here -- but it applies through the
+    // multi-bounce fit rather than as a bare multiply.
+    diffuseOut = (FmsEms + k_D) * irradiance * gtaoMultiBounce(ao, diffuseColor);
+
+    // Specular gets both. The screen-space term never reached this lobe, so a corner darkened
+    // diffusely still returned a full-strength reflection of the sky, which is the one place a
+    // reflection is most obviously wrong. Combined by taking the stronger occlusion rather than
+    // multiplying, since the two are measuring the same geometry at different scales and
+    // multiplying would count the overlap twice.
+    float specOcclusion = min(ao, ssaoVis);
+    specularOut = radiance * FssEss * computeSpecularAO(nv, specOcclusion, perceptualRough * perceptualRough);
 }
 
 
@@ -778,7 +812,7 @@ void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor
     specularColor = mix(f0, baseColor, metallic);
 }
 
-vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, vec3 additive, vec3 atten)
+vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, float ssaoVis, vec3 additive, vec3 atten)
 {
     perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
     vec3 color = vec3(0);
@@ -786,7 +820,7 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
     float NdotV = clamp(abs(dot(norm, v)), 0.001, 1.0);
     vec3 iblDiff = vec3(0);
     vec3 iblSpec = vec3(0);
-    pbrIbl(diffuseColor, specularColor, radiance, irradiance, ao, NdotV, perceptualRoughness, iblDiff, iblSpec);
+    pbrIbl(diffuseColor, specularColor, radiance, irradiance, ao, ssaoVis, NdotV, perceptualRoughness, iblDiff, iblSpec);
 
     color += iblDiff;
 
@@ -817,7 +851,6 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
         // Multiply by PI to account for lambertian diffuse colors.  Otherwise things will be too dark when lit by the sun on legacy skies.
         sun_contrib = srgb_to_linear(linear_to_srgb(sun_contrib) * sunlit * 0.7) * M_PI;
 
-        // Manually recombine everything here.  We have to separate the shading to ensure that lighting is able to more closely match blinn-phong.
         vec3 finalAmbient = irradiance.rgb * diffuseColor.rgb; // BINGO
         vec3 finalSun = clampRadiance(sun_contrib * ((diffPunc.rgb + specPunc.rgb) * scol)); // QUESTIONABLE BINGO?
         color.rgb = srgb_to_linear(linear_to_srgb(finalAmbient) + (linear_to_srgb(finalSun) * 1.1));
