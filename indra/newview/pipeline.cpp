@@ -8174,6 +8174,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
     static LLCachedControl<F32> bloom_threshold(gSavedSettings, "RenderBloomThreshold", 1.0f);
     static LLCachedControl<F32> bloom_knee(gSavedSettings, "RenderBloomKnee", 0.5f);
+    static LLCachedControl<F32> bloom_firefly_clamp(gSavedSettings, "RenderBloomFireflyClamp", 24.f);
     static LLCachedControl<F32> bloom_scatter(gSavedSettings, "RenderBloomScatter", 0.7f);
     static LLCachedControl<F32> alpha_glow_boost(gSavedSettings, "RenderBloomAlphaGlowBoost", 2.0f);
 
@@ -8196,6 +8197,9 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         gBloomExtractProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, src);
         gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_THRESHOLD, no_post ? 99999.f :bloom_threshold());
         gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_KNEE, llmax(bloom_knee(), 0.0f));
+        // no_post already disables extraction via the threshold; keep the clamp out of its way.
+        gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_FIREFLY_CLAMP,
+                                       no_post ? 1e9f : llmax(bloom_firefly_clamp(), 0.f));
         gBloomExtractProgram.uniform1f(LLShaderMgr::BLOOM_ALPHA_GLOW_BOOST, llmax(alpha_glow_boost(), 0.0f));
 
         // Reuse the warmth weights from legacy glow so the halation red-bias

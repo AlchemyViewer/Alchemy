@@ -84,7 +84,23 @@ uniform vec2 screen_res;
 const float M_PI = 3.14159265;
 const float ONE_OVER_PI = 0.3183098861;
 
+// A floor on perceptual roughness. This is what bounds the specular peak of a punctual light,
+// which is otherwise unbounded -- a delta light has no solid angle, and D goes as
+// 1/(pi*alpha^2), so at alpha -> 0 a single pixel takes an arbitrarily large value and flickers
+// as the camera moves.
+//
+// It cannot be lowered on the strength of the specular antialiasing in globalF.glsl. That
+// measures normal VARIANCE, so it widens roughness exactly where a minified normal map lost
+// detail and not at all on a flat polished surface -- which is the case this floor exists for.
+// The two cover different surfaces; neither substitutes for the other.
+//
+// The sun is the exception and does not need it: sunDiscRoughness widens by the solar disc's
+// real angular size, which is a physical bound rather than an invented one.
 const float MIN_PBR_ROUGHNESS = 0.045;
+
+// PUNCTUAL_LIGHT_SCALE and MAX_PUNCTUAL_RADIANCE are injected by llshadermgr.cpp alongside the
+// GBuffer flags. Both have to hold across separately compiled objects, which a global const
+// cannot do.
 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
@@ -420,6 +436,84 @@ float computeSpecularAO(float NoV, float ao, float roughness)
     return clamp(pow(NoV + ao, exp2(-16.0 * roughness - 1.0)) - 1.0 + ao, 0.0, 1.0);
 }
 
+// Clamp radiance to a ceiling without turning it a different colour on the way.
+//
+// A per-channel clamp lets one channel saturate while the others keep climbing, so a highlight
+// pushed past the ceiling drifts toward whichever primary saturated first -- a bright warm
+// specular goes orange, then red. Scaling by the largest channel holds the ratios, so the
+// colour is preserved exactly and only the magnitude gives.
+vec3 clampRadiance(vec3 c)
+{
+    c = max(c, vec3(0));
+    float peak = max(max(c.r, c.g), c.b);
+    return peak > MAX_PUNCTUAL_RADIANCE ? c * (MAX_PUNCTUAL_RADIANCE / peak) : c;
+}
+
+// Multiple-scattering compensation for the punctual specular lobe (Turquin 2019, "Practical
+// multiple scattering compensation for microfacet models").
+//
+// Single-scatter GGX returns only the light that leaves the microsurface after one bounce, and
+// the rest is dropped rather than redistributed. The loss grows with roughness and with F0, so
+// it is worst on rough metal -- the same deficit pbrIbl compensates for, and it has to be
+// compensated on this side too or a rough metal brightens correctly under a probe and stays
+// dark under a lamp.
+//
+// brdf.x + brdf.y is the LUT's directional albedo at F0 = 1, which is exactly the single-
+// scatter energy the lobe did return. It reaches 1 at roughness 0, so a mirror gets a
+// compensation of 1 and nothing changes there.
+//
+// Constant across the lights hitting a fragment, so callers evaluate it once and apply it to
+// the accumulated specular rather than paying a LUT fetch per light.
+vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv)
+{
+    perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
+    vec2 brdf = BRDF(clamp(nv, 0.0, 1.0), 1.0 - perceptualRoughness);
+    float Ess = max(brdf.x + brdf.y, 1e-4);
+    return 1.0 + specularColor * (1.0 / Ess - 1.0);
+}
+
+// Bend a reflection lookup from the mirror direction toward the normal as the surface
+// roughens (Lagarde and de Rousiers 2014, "Moving Frostbite to PBR", listing 21).
+//
+// The mirror direction is where a perfectly smooth surface reflects from, but a GGX lobe on a
+// rough surface is not centred there -- it leans toward the normal, and increasingly so with
+// roughness. Sampling the prefiltered probe along the mirror direction therefore fetches from
+// slightly the wrong place on exactly the surfaces whose lobe is widest, which reads as
+// reflections sliding across curvature.
+vec3 getSpecularDominantDir(vec3 n, vec3 r, float perceptualRoughness)
+{
+    float smoothness = 1.0 - perceptualRoughness;
+    float lerpFactor = smoothness * (sqrt(smoothness) + perceptualRoughness);
+    return normalize(mix(n, r, lerpFactor));
+}
+
+// Attenuate a reflection that a normal map has aimed into the surface it sits on.
+//
+// Perturbing the shading normal can point the reflection vector below the geometric horizon,
+// where the probe still returns whatever radiance lies that way -- light arriving through the
+// ground the surface is resting on. Filament's form: fade quadratically as the reflection
+// approaches the geometric plane, and cut it entirely once past.
+float horizonOcclusion(vec3 r, vec3 geometricNormal)
+{
+    float horizon = min(1.0 + dot(r, geometricNormal), 1.0);
+    return horizon * horizon;
+}
+
+// Widen a specular lobe to account for the sun being a disc rather than a point (Karis 2013,
+// "Real Shading in Unreal Engine 4" -- the sphere-light normalization).
+//
+// A delta light gives a smooth surface an infinitely small highlight, which is why one has to
+// be floored into existence by MIN_PBR_ROUGHNESS. The sun subtends about half a degree, so its
+// highlight has a real angular size; giving it one lets the roughness floor stay low without
+// the sun's own reflection aliasing.
+float sunDiscRoughness(float perceptualRoughness)
+{
+    // Angular radius of the solar disc in radians -- about 0.27 degrees.
+    const float SUN_ANGULAR_RADIUS = 0.00465;
+    float alpha = perceptualRoughness * perceptualRoughness;
+    return sqrt(clamp(alpha + SUN_ANGULAR_RADIUS, 0.0, 1.0));
+}
+
 // set colorDiffuse and colorSpec to the results of GLTF PBR style IBL
 void pbrIbl(vec3 diffuseColor,
             vec3 specularColor,
@@ -625,14 +719,15 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
         // spot*spot => GL_SPOT_EXPONENT=2
         float spot_atten = spot*spot;
 
-        vec3 intensity = spot_atten * dist_atten * lightColor * 3.0; //magic number to balance with legacy materials
+        vec3 intensity = spot_atten * dist_atten * lightColor * PUNCTUAL_LIGHT_SCALE;
 
         float nl = 0;
         vec3 diffPunc = vec3(0);
         vec3 specPunc = vec3(0);
 
         pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diffPunc, specPunc);
-        color = intensity * clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10));
+        specPunc *= pbrEnergyCompensation(specularColor, perceptualRoughness, dot(n.xyz, v));
+        color = intensity * clampRadiance(nl * (diffPunc + specPunc));
     }
     float final_scale = 1.0;
     if (classic_mode > 0)
@@ -671,7 +766,11 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
     float nl = 0;
     vec3 diffPunc = vec3(0);
     vec3 specPunc = vec3(0);
-    pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, norm, v, normalize(light_dir), nl, diffPunc, specPunc);
+    // The sun is a disc, not a delta light. Widening its lobe by the disc's own angular size
+    // is what gives a polished surface a sun highlight with a real edge, and is why
+    // MIN_PBR_ROUGHNESS no longer has to invent one for every light at once.
+    pbrPunctual(diffuseColor, specularColor, sunDiscRoughness(perceptualRoughness), metallic, norm, v, normalize(light_dir), nl, diffPunc, specPunc);
+    specPunc *= pbrEnergyCompensation(specularColor, perceptualRoughness, NdotV);
 
     // Depending on the sky, we combine these differently.
     if (classic_mode > 0)
@@ -692,13 +791,13 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
 
         // Manually recombine everything here.  We have to separate the shading to ensure that lighting is able to more closely match blinn-phong.
         vec3 finalAmbient = irradiance.rgb * diffuseColor.rgb; // BINGO
-        vec3 finalSun = clamp(sun_contrib * ((diffPunc.rgb + specPunc.rgb) * scol), vec3(0), vec3(10)); // QUESTIONABLE BINGO?
+        vec3 finalSun = clampRadiance(sun_contrib * ((diffPunc.rgb + specPunc.rgb) * scol)); // QUESTIONABLE BINGO?
         color.rgb = srgb_to_linear(linear_to_srgb(finalAmbient) + (linear_to_srgb(finalSun) * 1.1));
         //color.rgb = sun_contrib * diffuseColor.rgb;
     }
     else
     {
-        color += clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10)) * sunlit * 3.0 * scol;
+        color += clampRadiance(nl * (diffPunc + specPunc)) * sunlit * PUNCTUAL_LIGHT_SCALE * scol;
     }
 
     color.rgb += iblSpec.rgb;

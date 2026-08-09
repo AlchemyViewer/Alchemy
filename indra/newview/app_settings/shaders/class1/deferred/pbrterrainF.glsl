@@ -165,6 +165,7 @@ in vec4[2] vary_coords;
 
 void mirrorClip(vec3 position);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 float terrain_mix(TerrainMix tm, vec4 tms4);
 
@@ -496,11 +497,16 @@ void main()
 // Matte plastic potato terrain
 #define mix_orm vec3(1.0, 1.0, 0.0)
 #endif
+    // Terrain is the worst case for this: a ground plane runs to the horizon, so its normal
+    // maps reach their minification limit within the visible frame every time.
+    vec3 orm_out = mix_orm;
+    orm_out.g = filterSpecularRoughness(orm_out.g, tnorm);
+
     frag_data[0] = max(vec4(pbr_mix.col.xyz, 0.0), vec4(0));                                                   // Diffuse
     // Alpha is zero, as every other PBR GBuffer writer leaves it. Nothing reads this channel for
     // a fragment flagged GBUFFER_FLAG_HAS_PBR -- softenLightF and the local lights take spec.a
     // as legacy glossiness, and every one of those reads sits behind a non-PBR branch.
-    frag_data[1] = max(vec4(mix_orm.rgb, 0.0), vec4(0));                                                       // PBR linear packed Occlusion, Roughness, Metal.
+    frag_data[1] = max(vec4(orm_out.rgb, 0.0), vec4(0));                                                       // PBR linear packed Occlusion, Roughness, Metal.
     frag_data[2] = encodeNormal(tnorm, 0, GBUFFER_FLAG_HAS_PBR); // normal, flags
 
 #if defined(HAS_EMISSIVE)

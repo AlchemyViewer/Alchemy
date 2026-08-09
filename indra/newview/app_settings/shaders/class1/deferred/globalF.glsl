@@ -98,3 +98,39 @@ vec3 ditherEmissive(vec3 v, vec2 frag_px)
     return v * (1.0 + n * vec3(1.0 / 64.0, 1.0 / 64.0, 1.0 / 32.0));
 }
 
+
+// Fold the sub-pixel normal variance a minified normal map has lost back into roughness
+// (Kaplanyan et al. 2016, "Filtering Distributions of Normals for Shading Antialiasing"; this
+// is the screen-space form Filament ships).
+//
+// A normal map at distance packs many normals into one pixel. Averaging them shortens the
+// normal but the shading still treats it as a single direction with the material's authored
+// roughness, so a specular lobe that should have been widened by the spread stays narrow and
+// snaps between pixels as the camera moves. That is the crawling on distant normal-mapped
+// surfaces, and it is worst on the smooth materials whose lobe is narrowest to begin with.
+//
+// Screen-space derivatives of the shading normal measure that spread per pixel, for free,
+// after the map has already been filtered by the hardware. Converting it to an equivalent
+// roughness widens the lobe by exactly the amount that pixel lost -- so the fix is proportional
+// to the error rather than a constant floor applied to every surface at every distance.
+//
+// Variance is added in alpha (roughness squared) space, which is where a Gaussian lobe width
+// composes linearly. Returns perceptual roughness, the space everything else here works in.
+//
+// Derivatives, so uniform control flow only.
+float filterSpecularRoughness(float perceptualRoughness, vec3 n)
+{
+    // Filament's defaults: how much of the measured variance to trust, and a ceiling so a
+    // silhouette or a normal-map discontinuity cannot drive a surface to fully rough.
+    const float SPEC_AA_VARIANCE  = 0.15;
+    const float SPEC_AA_THRESHOLD = 0.25;
+
+    vec3 du = dFdx(n);
+    vec3 dv = dFdy(n);
+
+    float variance = SPEC_AA_VARIANCE * (dot(du, du) + dot(dv, dv));
+    float kernel   = min(2.0 * variance, SPEC_AA_THRESHOLD);
+
+    float alpha = perceptualRoughness * perceptualRoughness;
+    return sqrt(sqrt(clamp(alpha * alpha + kernel, 0.0, 1.0)));
+}

@@ -30,6 +30,7 @@ out vec3 frag_color;
 uniform sampler2D diffuseMap;
 uniform float bloom_threshold;
 uniform float bloom_knee;
+uniform float bloom_firefly_clamp;
 uniform float alpha_glow_boost;
 #ifdef BLOOM_HALATION
 uniform vec3  halation_lum_weights;
@@ -51,6 +52,25 @@ void main()
 {
     vec4 col = texture(diffuseMap, vary_texcoord0);
     vec3 rgb = max(col.rgb, vec3(0.0));
+
+    // Firefly clamp, on bloom's input only.
+    //
+    // A punctual light has no solid angle, so its specular peak is unbounded -- D goes as
+    // 1/(pi*alpha^2), and a smooth surface can put five figures of radiance into a single
+    // pixel. That is not wrong; a real glint is that bright, and exposure and the tonemapper
+    // exist to compress it. What it cannot survive is bloom: the downsample chain spreads one
+    // sub-pixel sample across the whole pyramid, so a glint that flickers as the camera moves
+    // becomes a large soft halo that flickers with it.
+    //
+    // Clamping here rather than in the lighting is the difference between bounding the
+    // artifact and bounding the image. The main scene keeps the highlight at full intensity
+    // and full sharpness; only the amount it is allowed to contribute to the glow is capped.
+    {
+        float peak = max(max(rgb.r, rgb.g), rgb.b);
+        // Scaled by the largest channel, so a clamped highlight keeps its colour instead of
+        // sliding toward whichever primary saturated first.
+        rgb *= (peak > bloom_firefly_clamp) ? (bloom_firefly_clamp / peak) : 1.0;
+    }
 
     float lum = max(max(rgb.r, rgb.g), rgb.b);
     float factor = softThreshold(lum, bloom_threshold, bloom_knee) / max(lum, 1e-4);

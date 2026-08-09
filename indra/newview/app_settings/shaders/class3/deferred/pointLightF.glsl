@@ -56,6 +56,9 @@ uniform vec4 viewport;
 #endif
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
+void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
+vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
+vec3 clampRadiance(vec3 c);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 vec4 getNorm(vec2 screenpos);
 vec4 getPosition(vec2 pos_screen);
@@ -107,15 +110,20 @@ void main()
         vec3 orm = spec.rgb;
         float perceptualRoughness = orm.g;
         float metallic = orm.b;
-        vec3 f0 = vec3(0.04);
         vec3 baseColor = diffuse.rgb;
 
-        vec3 diffuseColor = baseColor.rgb*(vec3(1.0)-f0);
-        diffuseColor *= 1.0 - metallic;
+        // The shared split, not a copy of it. Carrying an inlined duplicate is how the
+        // deferred local lights came to disagree with the sun and IBL about a dielectric's
+        // diffuse albedo -- same surface, different answer depending on what was lighting it.
+        vec3 diffuseColor;
+        vec3 specularColor;
+        calcDiffuseSpecular(baseColor, metallic, diffuseColor, specularColor);
 
-        vec3 specularColor = mix(f0, baseColor.rgb, metallic);
+        // Hoisted: the compensation depends only on the surface and the view, so it is one LUT
+        // fetch per fragment rather than one per light or per lobe.
+        vec3 energyComp = pbrEnergyCompensation(specularColor, perceptualRoughness, dot(n.xyz, v));
 
-        vec3 intensity = dist_atten * color * 3.25; // Legacy attenuation, magic number to balance with legacy materials
+        vec3 intensity = dist_atten * color * PUNCTUAL_LIGHT_SCALE; // see deferredUtil.glsl -- must match every other site
 
         float nl = 0;
         vec3 diffPunc = vec3(0);
@@ -123,7 +131,7 @@ void main()
 
         pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, normalize(lv), nl, diffPunc, specPunc);
 
-        final_color += intensity* clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10));
+        final_color += intensity* clampRadiance(nl * (diffPunc + specPunc * energyComp));
     }
     else
     {

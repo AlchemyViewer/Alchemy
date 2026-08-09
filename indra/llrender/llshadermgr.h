@@ -150,6 +150,7 @@ public:
 
         BLOOM_THRESHOLD,                    //  "bloom_threshold"
         BLOOM_KNEE,                         //  "bloom_knee"
+        BLOOM_FIREFLY_CLAMP,                //  "bloom_firefly_clamp"
         BLOOM_TEXEL_SIZE,                   //  "bloom_texel_size"
         BLOOM_SCATTER,                      //  "bloom_scatter"
         BLOOM_STRENGTH,                     //  "bloom_strength"

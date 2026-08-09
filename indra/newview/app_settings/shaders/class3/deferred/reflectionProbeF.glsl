@@ -62,6 +62,9 @@ int probeIndex[REF_SAMPLE_COUNT];
 // number of probes stored in probeIndex
 int probeInfluences = 0;
 
+vec3 getSpecularDominantDir(vec3 n, vec3 r, float perceptualRoughness);
+float horizonOcclusion(vec3 r, vec3 geometricNormal);
+
 bool isAbove(vec3 pos, vec4 plane)
 {
     return (dot(plane.xyz, pos) + plane.w) > 0;
@@ -732,15 +735,21 @@ void doProbeSample(inout vec3 ambenv, inout vec3 glossenv,
     // TODO - don't hard code lods
     float reflection_lods = max_probe_lod;
 
-    vec3 refnormpersp = reflect(pos.xyz, norm.xyz);
+    vec3 refnormpersp = normalize(reflect(pos.xyz, norm.xyz));
+
+    // A GGX lobe is not centred on the mirror direction -- it leans toward the normal as the
+    // surface roughens. Sampling a prefiltered probe along the mirror direction therefore reads
+    // from the wrong place on exactly the surfaces whose lobe is widest.
+    float perceptualRoughness = 1.0 - glossiness;
+    refnormpersp = getSpecularDominantDir(norm.xyz, refnormpersp, perceptualRoughness);
 
     ambenv = amblit;
 
     if (classic_mode == 0)
         ambenv = sampleProbeAmbient(pos, norm, amblit);
 
-    float lod = (1.0-glossiness)*reflection_lods;
-    glossenv = sampleProbes(pos, normalize(refnormpersp), lod);
+    float lod = perceptualRoughness*reflection_lods;
+    glossenv = sampleProbes(pos, refnormpersp, lod);
 
 #if defined(SSR)
     if (cube_snapshot != 1 && glossiness >= 0.9)

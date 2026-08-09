@@ -1532,6 +1532,17 @@
             <key>Value</key>
             <real>2.5</real>
         </map>
+        <key>RenderBloomFireflyClamp</key>
+        <map>
+            <key>Comment</key>
+            <string>Maximum radiance a single pixel may contribute to bloom. Bounds sub-pixel specular glints so they cannot become large flickering halos. Does not affect the sharp highlight in the scene itself.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>24.0</real>
+        </map>
         <key>RenderBloomKnee</key>
         <map>
             <key>Comment</key>

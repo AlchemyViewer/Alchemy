@@ -105,6 +105,10 @@ void mirrorClip(vec3 pos);
 void waterClip(vec3 pos);
 
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
+vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
+vec3 clampRadiance(vec3 c);
+float horizonOcclusion(vec3 r, vec3 geometricNormal);
 
 vec3 pbrBaseLight(vec3 diffuseColor,
                   vec3 specularColor,
@@ -203,6 +207,10 @@ void main()
     float metallic = orm.b * metallicFactor;
     float ao = orm.r;
 
+    // The deferred path filters roughness once into the GBuffer; this one shades in place, so
+    // it does the same correction against its own normal here.
+    perceptualRoughness = filterSpecularRoughness(perceptualRoughness, norm);
+
     // emissiveColor is the emissive color factor from GLTF and is already in linear space
     vec3 colorEmissive = emissiveColor;
     // emissiveMap here is a vanilla RGB texture encoded as sRGB, manually convert to linear
@@ -217,6 +225,12 @@ void main()
     // ray jitter, and vary_position is an eye-space metre offset -- outside [0,1] for all but
     // a sliver of the frame, so the vignette never fades and the jitter stops decorrelating.
     sampleReflectionProbes(irradiance, radiance, frag, pos.xyz, norm.xyz, gloss, true, amblit);
+
+    // A normal map can aim the reflection below the surface it sits on, where the probe happily
+    // returns radiance arriving through the geometry. vary_normal is the untouched interpolated
+    // vertex normal, so it is the geometric horizon to test against -- the deferred path has no
+    // equivalent, because the GBuffer only ever stored the perturbed normal.
+    radiance *= horizonOcclusion(reflect(pos.xyz, norm.xyz), normalize(vary_normal));
 
     vec3 diffuseColor = vec3(0.0);
     vec3 specularColor = vec3(0.0);

@@ -69,6 +69,7 @@ uniform float clipSign;
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 
 void main()
@@ -104,6 +105,11 @@ void main()
 
     spec.g *= roughnessFactor;
     spec.b *= metallicFactor;
+
+    // Widen roughness by whatever normal detail this pixel lost to minification, before the
+    // value is frozen into the GBuffer -- every light that reads it then gets the corrected
+    // lobe, and it costs one evaluation instead of one per light.
+    spec.g = filterSpecularRoughness(spec.g, tnorm);
 
     vec3 emissive = emissiveColor;
     emissive *= texture(emissiveMap, emissive_texcoord.xy).rgb;

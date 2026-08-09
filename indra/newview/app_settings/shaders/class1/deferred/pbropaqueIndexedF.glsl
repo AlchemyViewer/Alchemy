@@ -87,6 +87,7 @@ vec3 linear_to_srgb(vec3 c);
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 vec4 sample_basecolor(vec2 uv)
 {
@@ -227,6 +228,9 @@ void main()
 
     spec.g *= gltf_roughness_factor[mi];
     spec.b *= gltf_metallic_factor[mi];
+
+    // See pbropaqueF -- same correction, same reason.
+    spec.g = filterSpecularRoughness(spec.g, tnorm);
 
     vec3 emissive = gltf_emissive_color[mi];
     emissive *= sample_emissive(emissive_texcoord.xy);

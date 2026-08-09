@@ -671,6 +671,30 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_HDRI      1.0\n");  // bit 2
     extra_code_text[extra_code_count++] = strdup("#define GET_GBUFFER_FLAG(data, flag)    (abs(data-flag)< 0.1)\n");
 
+    // Balances punctual lights against the legacy Blinn-Phong response, and has to be one value
+    // across every program that lights a PBR surface -- the deferred local lights, the forward
+    // alpha path and the sun all accumulate into the same frame. It lived as a literal in four
+    // separate compilation units, where nothing tied the copies together and they drifted: the
+    // three deferred light shaders carried 3.25 while deferredUtil carried 3.0, so a lamp lit an
+    // alpha-blended surface and the opaque one behind it about 8% apart. A global const cannot
+    // fix that -- GLSL globals do not link across objects -- so it is injected here, where the
+    // GBuffer flags already are, for the same reason.
+    //
+    // 3.0 is the value to converge on, not 3.25, because deferredUtil's copy also scales the SUN
+    // in pbrBaseLight -- which is what softenLightF lights every opaque surface with. Taking the
+    // local lights' 3.25 would have moved the sun across the whole opaque scene in order to
+    // settle a disagreement between two local-light paths. Only the deferred local lights move.
+    extra_code_text[extra_code_count++] = strdup("#define PUNCTUAL_LIGHT_SCALE      3.0\n");
+    // A guard against a divide that ran away, not a look control. At 10.0 it was neither: the
+    // peak of F*Vis*D at the roughness floor is about 776 for a dielectric and 19400 for a
+    // white metal, so a ceiling of 10 flat-topped the highlight on every dielectric below
+    // roughness 0.13 and every metal below 0.30 -- most polished material in a scene -- and did
+    // it in linear space ahead of exposure, pre-empting the tonemapper that exists to compress
+    // exactly these values. This sits above anything the roughness floor permits, so it now
+    // only catches a NaN or an infinity. Bloom's exposure to sub-pixel glints is bounded at
+    // bloomExtractF instead, which is where that artifact is actually made.
+    extra_code_text[extra_code_count++] = strdup("#define MAX_PUNCTUAL_RADIANCE     65504.0\n");
+
     // Reverse-Z is a property of the depth convention the whole tree rasterizes against, not of
     // any one program, so it is injected here instead of riding a defines map. The map
     // loadBasicShaders() passes reaches only the shared objects it compiles; a program's own
@@ -1526,6 +1550,7 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("bloom_threshold");
     mReservedUniforms.push_back("bloom_knee");
+    mReservedUniforms.push_back("bloom_firefly_clamp");
     mReservedUniforms.push_back("bloom_texel_size");
     mReservedUniforms.push_back("bloom_scatter");
     mReservedUniforms.push_back("bloom_strength");
