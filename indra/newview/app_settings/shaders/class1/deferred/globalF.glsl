@@ -56,26 +56,71 @@ vec2 OctWrap( vec2 v )
     return ( 1.0 - abs( v.yx ) ) * vec2(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0);
 }
 
-vec4 encodeNormal(vec3 n, float env, float gbuffer_flag)
+vec2 octEncode(vec3 n)
 {
     n /= ( abs( n.x ) + abs( n.y ) + abs( n.z ) );
     n.xy = n.z >= 0.0 ? n.xy : OctWrap( n.xy );
-    n.xy = n.xy * 0.5 + 0.5;
-    return vec4(n.xy, env, gbuffer_flag);
+    return n.xy * 0.5 + 0.5;
+}
+
+vec3 octDecode(vec2 f)
+{
+    f = f * 2.0 - 1.0;
+    vec3 n = vec3( f.x, f.y, 1.0 - abs( f.x ) - abs( f.y ) );
+    float t = clamp( -n.z , 0.0, 1.0);
+    n.xy += vec2(n.x >= 0.0 ? -t : t, n.y >= 0.0 ? -t : t);
+    return normalize(n);
+}
+
+// The blue channel of the normal attachment is a union, discriminated by the gbuffer flag that
+// sits beside it: envIntensity for a legacy fragment, a packed geometric normal for a PBR one.
+// PBR fragments never read envIntensity -- every consumer of it is behind a non-PBR branch -- so
+// the channel was dead weight on exactly the surfaces that want a geometric normal.
+//
+// Bit budget comes from the attachment format, which is why it is a compile-time decision rather
+// than a runtime one. GL_RGBA16 affords 8:8; GL_RGB10_A2 affords 5:5, about six degrees, which is
+// coarse for shading but ample for the horizon and occlusion tests that consume this.
+#ifdef GBUFFER_NORM_HDR
+#define GEO_OCT_LEVELS 255.0
+#define GEO_OCT_RANGE  65535.0
+#else
+#define GEO_OCT_LEVELS 31.0
+#define GEO_OCT_RANGE  1023.0
+#endif
+
+float packGeoNormal(vec3 g)
+{
+    vec2 o = clamp(octEncode(g), 0.0, 1.0);
+    vec2 q = floor(o * GEO_OCT_LEVELS + 0.5);
+    return ((q.x * (GEO_OCT_LEVELS + 1.0)) + q.y) / GEO_OCT_RANGE;
+}
+
+vec3 unpackGeoNormal(float v)
+{
+    float f = v * GEO_OCT_RANGE;
+    float x = floor(f / (GEO_OCT_LEVELS + 1.0));
+    float y = f - x * (GEO_OCT_LEVELS + 1.0);
+    return octDecode(vec2(x, y) / GEO_OCT_LEVELS);
+}
+
+// Legacy writers: blue carries environment intensity.
+vec4 encodeNormal(vec3 n, float env, float gbuffer_flag)
+{
+    return vec4(octEncode(n), env, gbuffer_flag);
+}
+
+// PBR writers: blue carries the geometric normal instead. Pass the interpolated vertex normal,
+// before any normal map has perturbed it -- the point of keeping it is to know where the real
+// surface faces when the shading normal no longer says.
+vec4 encodeNormalGeo(vec3 n, vec3 geometric_normal, float gbuffer_flag)
+{
+    return vec4(octEncode(n), packGeoNormal(geometric_normal), gbuffer_flag);
 }
 
 vec4 decodeNormal(vec4 norm)
 {
-    vec2 f = norm.xy;
-    f = f * 2.0 - 1.0;
-
     // https://twitter.com/Stubbesaurus/status/937994790553227264
-    vec4 n;
-    n.xyz = vec3( f.x, f.y, 1.0 - abs( f.x ) - abs( f.y ) );
-    float t = clamp( -n.z , 0.0, 1.0);
-    n.xy += vec2(n.x >= 0.0 ? -t : t, n.y >= 0.0 ? -t : t);
-    n.xyz = normalize(n.xyz);
-    return n;
+    return vec4(octDecode(norm.xy), 0.0);
 }
 
 // Interleaved gradient noise (Jimenez 2014). Screen-stable: no temporal term, so the

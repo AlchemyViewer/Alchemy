@@ -119,6 +119,7 @@ LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 bool LLRender::sClassicMode = false;
 bool LLRender::sMirrorPass = false;
 bool LLRender::sReverseZ = false;
+bool LLRender::sGBufferNormHDR = true;
 bool LLRender::s10bitBackBuffer = false;
 
 

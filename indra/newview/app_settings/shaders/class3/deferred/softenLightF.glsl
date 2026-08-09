@@ -112,6 +112,7 @@ vec3 pbrBaseLight(vec3 diffuseColor,
                   vec3 atten);
 
 GBufferInfo getGBuffer(vec2 screenpos);
+float horizonOcclusion(vec3 r, vec3 geometricNormal);
 vec3 clampHDRRange(vec3 color);
 
 void adjustIrradiance(inout vec3 irradiance, float ambocc)
@@ -185,6 +186,12 @@ void main()
         float gloss      = 1.0 - perceptualRoughness;
 
         sampleReflectionProbes(irradiance, radiance, tc, pos.xyz, gb.normal, gloss, false, amblit_linear);
+
+        // A normal map can aim the reflection below the surface it sits on, where the probe
+        // returns radiance arriving through the geometry. The forward path tests against
+        // vary_normal; here the geometric normal comes out of the GBuffer channel that used to
+        // hold environment intensity.
+        radiance *= horizonOcclusion(reflect(pos.xyz, gb.normal), gb.geoNormal);
 
         adjustIrradiance(irradiance, ambocc);
 

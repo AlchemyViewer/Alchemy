@@ -107,6 +107,7 @@ vec3 linear_to_srgb(vec3 cs);
 vec3 atmosFragLightingLinear(vec3 light, vec3 additive, vec3 atten);
 
 vec4 decodeNormal(vec4 norm);
+vec3 unpackGeoNormal(float v);
 
 vec3 clampHDRRange(vec3 color)
 {
@@ -197,6 +198,17 @@ vec4 getNormRaw(vec2 screenpos)
 {
     vec4 norm = texture(normalMap, screenpos.xy);
     return norm;
+}
+
+// The un-perturbed surface normal, out of the blue channel the normal attachment shares between
+// environment intensity and a packed geometric normal. A legacy fragment stored the former and
+// has no geometric normal to give, so it gets the shading normal back and any test against it
+// degenerates to a no-op rather than needing a guard at every call site.
+vec3 getGeoNorm(vec2 screenpos)
+{
+    vec4 raw = getNormRaw(screenpos);
+    return GET_GBUFFER_FLAG(raw.w, GBUFFER_FLAG_HAS_PBR) ? unpackGeoNormal(raw.b)
+                                                         : decodeNormal(raw).xyz;
 }
 
 // Convert a stored screen-depth sample to its NDC z under the active depth convention.

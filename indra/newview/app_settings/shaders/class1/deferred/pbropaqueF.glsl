@@ -69,6 +69,7 @@ uniform float clipSign;
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+vec4 encodeNormalGeo(vec3 n, vec3 geometric_normal, float gbuffer_flag);
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 
@@ -125,7 +126,10 @@ void main()
     // See: C++: addDeferredAttachments(), GLSL: softenLightF
     frag_data[0] = max(vec4(col, 0.0), vec4(0));                                                   // Diffuse
     frag_data[1] = max(vec4(spec.rgb,0.0), vec4(0));                                    // PBR linear packed Occlusion, Roughness, Metal.
-    frag_data[2] = encodeNormal(tnorm, 0, GBUFFER_FLAG_HAS_PBR); // normal, environment intensity, flags
+    // Geometric normal in place of environment intensity: PBR never reads the latter, and
+    // the deferred passes have no other way to know where the surface actually faces once a
+    // normal map has moved tnorm.
+    frag_data[2] = encodeNormalGeo(tnorm, normalize(vary_normal) * (gl_FrontFacing ? 1.0 : -1.0), GBUFFER_FLAG_HAS_PBR);
 
 #if defined(HAS_EMISSIVE)
     frag_data[3] = max(vec4(emissive,0), vec4(0));                                                // PBR linear Emissive (sampler-decoded, float attachment stores it verbatim)

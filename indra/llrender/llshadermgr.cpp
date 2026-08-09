@@ -671,6 +671,16 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_HDRI      1.0\n");  // bit 2
     extra_code_text[extra_code_count++] = strdup("#define GET_GBUFFER_FLAG(data, flag)    (abs(data-flag)< 0.1)\n");
 
+    // Bits available in the normal attachment's blue channel, which carries envIntensity for a
+    // legacy fragment and a packed geometric normal for a PBR one -- 16 under GL_RGBA16, 10
+    // under GL_RGB10_A2. Same reason as REVERSE_Z below: a property of the buffer the whole tree
+    // writes, not of any one program, and a shader compiled against the wrong assumption
+    // unpacks noise rather than degrading.
+    if (LLRender::sGBufferNormHDR)
+    {
+        extra_code_text[extra_code_count++] = strdup("#define GBUFFER_NORM_HDR 1\n");
+    }
+
     // Balances punctual lights against the legacy Blinn-Phong response, and has to be one value
     // across every program that lights a PBR surface -- the deferred local lights, the forward
     // alpha path and the sun all accumulate into the same frame. It lived as a literal in four
@@ -816,7 +826,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     }
 
     // Master definition can be found in deferredUtil.glsl
-    extra_code_text[extra_code_count++] = strdup("struct GBufferInfo { vec4 albedo; vec4 specular; vec3 normal; vec4 emissive; float gbufferFlag; float envIntensity; };\n");
+    extra_code_text[extra_code_count++] = strdup("struct GBufferInfo { vec4 albedo; vec4 specular; vec3 normal; vec3 geoNormal; vec4 emissive; float gbufferFlag; float envIntensity; };\n");
 
     //copy file into memory
     enum {

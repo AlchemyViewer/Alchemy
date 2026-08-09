@@ -350,6 +350,11 @@ bool addDeferredAttachments(LLRenderTarget& target)
         emissive = GL_RGB8;
     }
 
+    // Tell the shader compiler how much room the packed geometric normal has in the normal
+    // attachment's blue channel. Shaders rebuild when RenderHDREnabled changes (handleEnableHDR),
+    // so this is latched before anything compiles against it.
+    LLRender::sGBufferNormHDR = hdr;
+
     bool valid = true;
     valid      = valid && target.addColorAttachment(orm);    // frag-data[1] specular OR PBR ORM
     valid      = valid && target.addColorAttachment(norm);
