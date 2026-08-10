@@ -62,7 +62,7 @@ LLViewerRegion* LLAgent::getRegion() const { return nullptr; }
 LLTextureCache*      LLAppViewer::sTextureCache      = nullptr;
 LLTextureFetch*      LLAppViewer::sTextureFetch      = nullptr;
 
-U32              LLMeshRepository::sCacheReads  = 0;
+std::atomic<U32> LLMeshRepository::sCacheReads  = 0;
 std::atomic<U32> LLMeshRepository::sCacheWrites = 0;
 
 S64 LLTextureCache::sCacheMaxTexturesSize = 0; // no limit

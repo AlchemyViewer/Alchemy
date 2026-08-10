@@ -283,6 +283,14 @@ void LLSkinningUtil::getPerVertexSkinMatrix(
 
 void LLSkinningUtil::initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar)
 {
+    if (skin->mFrozen)
+    {
+        // Resolved before the skin was shared across threads; writing here now would
+        // race whichever other thread is reading it.
+        llassert(skin->mJointNumsInitialized);
+        return;
+    }
+
     if (!skin->mJointNumsInitialized)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
