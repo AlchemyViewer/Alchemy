@@ -74,6 +74,7 @@ uniform vec2 screen_res;
 //[ENGINE_BLOCK Matrices]
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
+float sampleLightFunc(sampler2D lightFunc, float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
 vec3 clampRadiance(vec3 c);
@@ -260,7 +261,7 @@ void main()
 
             if (nh > 0.0)
             {
-                float scol = fres*texture(lightFunc, vec2(nh, spec.a)).r*gt/(nh*nl);
+                float scol = fres*sampleLightFunc(lightFunc, nh, spec.a)*gt/(nh*nl);
                 vec3 speccol = dlit*scol*spec.rgb*shadow;
                 speccol = clamp(speccol, vec3(0), vec3(1));
                 final_color += speccol;

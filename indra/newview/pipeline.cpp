@@ -9141,20 +9141,15 @@ void LLPipeline::bindLightFunc(LLGLSLShader& shader)
     S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_LIGHTFUNC);
     if (channel > -1)
     {
-        // Bespoke descriptor (mag LINEAR, min NEAREST); see mLightFuncSampler.
-        const U32 generation = gGL.getSamplerGeneration();
-        if (mLightFuncSamplerGeneration != generation)
-        {
-            ALSamplerDesc desc;
-            desc.mMinFilter = GL_NEAREST;
-            desc.mMagFilter = GL_LINEAR;
-            desc.mWrapS = desc.mWrapT = desc.mWrapR = GL_CLAMP_TO_EDGE;
-
-            mLightFuncSampler           = gGL.getSampler(desc);
-            mLightFuncSamplerGeneration = generation;
-        }
+        // Bilinear both ways. This is a smooth function tabulated on a grid and read between
+        // its texels, so minification wants the interpolation as much as magnification does --
+        // and it is exactly the glossy surfaces that minify, where the lobe spans about two
+        // texels across a few pixels and point sampling quantizes the highlight into steps.
+        // There is no mip chain for anything stronger to act on.
+        //
+        // Clamp because both axes are only meaningful on [0,1]: NdotH and glossiness.
         gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, mLightFunc,
-                                            mLightFuncSampler);
+                                            gGL.getSampler(ALSamplers::BilinearClamp));
     }
 
     channel = shader.enableTexture(LLShaderMgr::DEFERRED_BRDF_LUT);

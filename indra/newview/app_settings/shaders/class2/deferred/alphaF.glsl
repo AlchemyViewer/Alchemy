@@ -90,92 +90,13 @@ void mirrorClip(vec3 pos);
 void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout vec3 legacyenv,
         vec2 tc, vec3 pos, vec3 norm, float glossiness, float envIntensity, bool transparent, vec3 amblit_linear);
 
-vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 diffuse, vec3 v, vec3 n, vec4 lp, vec3 ln, float la, float fa, float is_pointlight, float ambiance)
-{
-    // SL-14895 inverted attenuation work-around
-    // This routine is tweaked to match deferred lighting, but previously used an inverted la value. To reconstruct
-    // that previous value now that the inversion is corrected, we reverse the calculations in LLPipeline::setupHWLights()
-    // to recover the `adjusted_radius` value previously being sent as la.
-    float falloff_factor = (12.0 * fa) - 9.0;
-    float inverted_la = falloff_factor / la;
-    // Yes, it makes me want to cry as well. DJH
-
-    vec3 col = vec3(0);
-
-    //get light vector
-    vec3 lv = lp.xyz-v;
-
-    //get distance
-    float dist = length(lv);
-    float da = 1.0;
-
-    /*if (dist > inverted_la)
-    {
-        return col;
-    }
-
-    clip to projector bounds
-     vec4 proj_tc = proj_mat * lp;
-
-    if (proj_tc.z < 0
-     || proj_tc.z > 1
-     || proj_tc.x < 0
-     || proj_tc.x > 1
-     || proj_tc.y < 0
-     || proj_tc.y > 1)
-    {
-        return col;
-    }*/
-
-    if (dist > 0.0 && inverted_la > 0.0)
-    {
-        dist /= inverted_la;
-
-        //normalize light vector
-        lv = normalize(lv);
-
-        //distance attenuation
-        float dist_atten = clamp(1.0-(dist-1.0*(1.0-fa))/fa, 0.0, 1.0);
-        dist_atten *= dist_atten;
-        dist_atten *= 2.0f;
-
-        if (dist_atten <= 0.0)
-        {
-           return col;
-        }
-
-        // spotlight coefficient.
-        float spot = max(dot(-ln, lv), is_pointlight);
-        da *= spot*spot; // GL_SPOT_EXPONENT=2
-
-        //angular attenuation
-        da *= dot(n, lv);
-        da = max(0.0, da);
-
-        float lit = 0.0f;
-
-        float amb_da = 0.0;//ambiance;
-        if (da > 0)
-        {
-            lit = clamp(da * dist_atten, 0.0, 1.0);
-            col = lit * light_col * diffuse;
-            amb_da += (da*0.5+0.5) * ambiance;
-        }
-        amb_da += (da*da*0.5 + 0.5) * ambiance;
-        amb_da *= dist_atten;
-        amb_da = min(amb_da, 1.0f - lit);
-
-        // SL-10969 ... need to work out why this blows out in many setups...
-        //col.rgb += amb_da * light_col * diffuse;
-
-        // no spec for alpha shader...
-    }
-    float final_scale = 1.0;
-    if (classic_mode > 0)
-        final_scale = 0.9;
-    col = max(col * final_scale, vec3(0));
-    return col;
-}
+// The shared legacy punctual model, not a copy of it -- the same function the deferred legacy
+// branch is built from, so a blended surface is lit like the opaque one behind it. The
+// diffuse-only entry point: these objects have no specular map or colour to give one.
+vec3 calcLegacyPointLightDiffuse(vec3 diffuse,
+                    vec3 n, vec3 p, vec3 v,
+                    vec3 lp, vec3 ld, vec3 lightColor,
+                    float lightSize, float falloff, float is_pointlight);
 
 void main()
 {
@@ -188,7 +109,11 @@ void main()
     // clip against water plane unless this is a legacy avatar skin
     waterClip(pos.xyz);
 #endif
-    vec3 norm = vary_norm;
+    // Interpolation across a triangle shortens a normal that was unit-length at each vertex.
+    // Every sibling forward path normalizes here, and the deferred path always reads a unit
+    // normal out of the GBuffer, so leaving it raw made this the one surface whose NdotL was
+    // scaled by an accident of where it sat within its triangle.
+    vec3 norm = normalize(vary_norm);
 
     float shadow = 1.0f;
 
@@ -318,7 +243,11 @@ void main()
 
     vec4 light = vec4(0,0,0,0);
 
-   #define LIGHT_LOOP(i) light.rgb += calcPointLightOrSpotLight(light_diffuse[i].rgb, diffuse_linear.rgb, pos.xyz, norm, light_position[i], light_direction[i].xyz, light_attenuation[i].x, light_attenuation[i].y, light_attenuation[i].z, light_attenuation[i].w);
+    vec3 npos = normalize(-pos.xyz);
+
+// light_deferred_attenuation carries the size/falloff pair the deferred pass reads, as the PBR
+// alpha path already takes them. light_attenuation.z stays: it is the is-omni flag.
+   #define LIGHT_LOOP(i) light.rgb += calcLegacyPointLightDiffuse(diffuse_linear.rgb, norm, pos.xyz, npos, light_position[i].xyz, light_direction[i].xyz, light_diffuse[i].rgb, light_deferred_attenuation[i].x, light_deferred_attenuation[i].y, light_attenuation[i].z);
 
     LIGHT_LOOP(1)
     LIGHT_LOOP(2)
