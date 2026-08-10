@@ -9184,8 +9184,15 @@ void LLPipeline::bindShadowMaps(LLGLSLShader& shader)
     // is undefined -- so this selects on the SAME setting that injects SHADOW_PCSS in
     // LLViewerShaderMgr::buildGlobalDefines(). Both must move together. Point filtering
     // because that path filters manually; textureGather ignores the filter regardless.
-    static LLCachedControl<U32> shadow_filter_quality(gSavedSettings, "AlchemyRenderShadowFilterQuality", 1);
-    const bool pcss = (shadow_filter_quality() >= 3);
+    //
+    // NOTHING ELSE MAY ENTER THIS EXPRESSION. The declared type is fixed when the shader is
+    // compiled, so any runtime term here -- render pass, quality override, gCubeSnapshot --
+    // can only make the sampler disagree with a declaration that cannot follow it. Probe
+    // captures do run at the lowest tier, but they get there by taking a shorter path over this
+    // same sampler (shadowUtil.glsl, filterShadow's cube_snapshot branch), which is the only
+    // form that choice can take without a separate program.
+    static LLCachedControl<U32> shadow_filter_quality_cc(gSavedSettings, "AlchemyRenderShadowFilterQuality", 1);
+    const bool pcss = llclamp(shadow_filter_quality_cc(), 0u, 3u) >= 3;
     const U32 shadow_sampler = gGL.getSampler(pcss ? ALSamplers::PointClamp : ALSamplers::ShadowCompare);
 
     const U32 sampler_binds_before = ALTextureSlot::sSamplerBinds;
@@ -9328,6 +9335,10 @@ void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
     if (shader.mCanBindFast)
     { // was previously fully bound, use fast path
         shader.bind();
+        // Not carried over from the full bind: a program fully bound outside a capture and fast
+        // bound inside one would still read 0. shadowUtil.glsl selects its filter tier on this,
+        // so a stale value is a pass rendering at the wrong tier rather than a missing update.
+        shader.uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
         bindLightFunc(shader);
         bindShadowMaps(shader);
         bindReflectionProbes(shader);

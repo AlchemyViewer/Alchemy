@@ -134,6 +134,10 @@ uniform AL_SHADOW_SAMPLER shadowMap4;
 uniform AL_SHADOW_SAMPLER shadowMap5;
 #endif
 
+// Set by bindDeferredShader and bindDeferredShaderFast. Unset defaults to 0, which is the
+// full-quality path -- the safe way round for a program that never gets it written.
+uniform int cube_snapshot;
+
 uniform vec3 sun_dir;
 uniform vec3 moon_dir;
 // Shared shadow/SSAO constants, spliced from class1/deferred/deferredBlock.glsl and
@@ -424,6 +428,24 @@ float filterShadowSampleCmp(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 
 
 #endif // SHADOW_PCSS
 
+// The cheapest tap this build can make: one fetch, no kernel, no receiver-plane bias.
+//
+// Through whichever sampler the build declares, which is the whole constraint. The filter tier
+// is compile-time -- it decides the sampler TYPE -- so a pass that wants cheaper shadows can
+// only take a shorter path over the same sampler, never a different sampler over the same
+// program. On the compare tiers this is still a hardware 2x2 PCF, since the compare sampler
+// filters linearly.
+float filterShadowSingleTap(AL_SHADOW_SAMPLER shadowMap, vec3 uvz)
+{
+#if SHADOW_PCSS
+    // compareDepth4 rather than an inlined step(): the reverse-Z polarity lives there, and a
+    // second copy of it is a second thing to get backwards.
+    return compareDepth4(vec4(texture(shadowMap, uvz.xy).r), uvz.z).x;
+#else
+    return texture(shadowMap, uvz);
+#endif
+}
+
 // Common core: post-divide, apply constant + receiver-plane bias, run the selected filter.
 // lpos is the pre-divide light-clip position; dLdx/dLdy its screen-space derivatives
 // (already transformed into this map's light space by the caller, in uniform control flow).
@@ -433,6 +455,20 @@ float filterShadow(AL_SHADOW_SAMPLER shadowMap, vec4 lpos, vec4 dLdx, vec4 dLdy,
     float w   = lpos.w;
     vec3  uvz = lpos.xyz / w;
     uvz.z += const_bias;
+
+    // A reflection-probe capture runs at the lowest tier regardless of what the scene is set
+    // to. It resolves to 128x128 of prefiltered radiance and 9 SH coefficients of irradiance,
+    // so a contact-hardening penumbra or a 6x6 Gaussian is averaged away before anything lit by
+    // the probe can see it -- the capture would be paying for a shape nothing downstream can
+    // resolve, on a pass that runs six faces at a time.
+    //
+    // A uniform branch, so it costs nothing and stays coherent. This is the only place the
+    // choice can live: the tier is baked into the sampler type at compile time, so it cannot be
+    // made by binding something different for this pass.
+    if (cube_snapshot != 0)
+    {
+        return filterShadowSingleTap(shadowMap, uvz);
+    }
 
     vec2 dz_texel = vec2(0.0, 0.0);
 #if SHADOW_RPDB
