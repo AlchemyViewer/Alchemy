@@ -220,6 +220,7 @@ vec4 sample_spec(vec2 uv)
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 vec3 getNormal(int mi, inout float glossiness)
 {
@@ -282,6 +283,17 @@ void main()
     float env = mat_env_intensity[mi] * spec.a;
     float glossiness = mat_specular_color[mi].a;
     vec3 norm = getNormal(mi, glossiness);
+
+    // Widen the lobe by whatever normal detail this pixel lost to minification, as the PBR
+    // writers do. A normal map at distance packs many normals into one texel; averaging them
+    // leaves the shading with a single direction and the authored lobe width, so a narrow
+    // Blinn-Phong highlight snaps between pixels as the camera moves. Worked in the
+    // (1 - glossiness) domain, which is what this path already treats as perceptual roughness
+    // -- it is the same number that picks the probe mip in sampleReflectionProbesLegacy.
+    //
+    // Derivatives, so uniform control flow: this sits after the alpha mask, where the PBR
+    // writers put theirs.
+    glossiness = 1.0 - filterSpecularRoughness(1.0 - glossiness, norm);
 
     float emissive = getEmissive(mi, diffcol);
 

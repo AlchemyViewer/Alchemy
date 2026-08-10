@@ -943,9 +943,20 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 
     if (glossiness > 0.0)
     {
-        float lod = (1.0-glossiness)*reflection_lods;
-        glossenv = sampleProbes(pos, normalize(refnormpersp), lod);
+        // (1.0 - glossiness) is this path's perceptual roughness -- it is already what selects
+        // the prefiltered mip, so the lobe correction reads it the same way.
+        float perceptualRoughness = 1.0 - glossiness;
 
+        // Bend toward the normal with roughness, as doProbeSample does for PBR. A prefiltered
+        // probe sampled along the mirror direction fetches from slightly the wrong place on
+        // exactly the surfaces whose lobe is widest, which reads as reflections sliding across
+        // curvature. The two lookups below keep the mirror direction on purpose: legacyenv is
+        // the roughness-zero case, where the bend is the identity anyway, and the screen-space
+        // march wants the true reflection ray.
+        vec3 dominantDir = getSpecularDominantDir(norm.xyz, normalize(refnormpersp), perceptualRoughness);
+
+        float lod = perceptualRoughness*reflection_lods;
+        glossenv = sampleProbes(pos, dominantDir, lod);
     }
 
     if (envIntensity > 0.0)

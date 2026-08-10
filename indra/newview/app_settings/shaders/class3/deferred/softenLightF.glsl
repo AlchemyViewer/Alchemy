@@ -270,6 +270,16 @@ void main()
 
         adjustIrradiance(irradiance, ambocc);
 
+        // The environment lobes get the same ambient visibility the diffuse one does.
+        // adjustIrradiance spends the screen-space buffer on irradiance alone, so a legacy
+        // surface down in a crevice had its diffuse ambient occluded while its reflection
+        // carried on at full strength -- the brighter of the two terms, and the one the eye
+        // reads as contact. On the response curve the settings describe, not the raw buffer;
+        // see ssaoVisibility.
+        float envVisibility = ssaoVisibility(ambocc);
+        glossenv *= envVisibility;
+        legacyenv *= envVisibility;
+
         // apply lambertian IBL only (see pbrIbl)
         color.rgb = irradiance;
 
