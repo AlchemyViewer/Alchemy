@@ -226,7 +226,6 @@ public:
         EXPOSURE_MAP,                       //  "exposureMap"
         DEFERRED_BRDF_LUT,                  //  "brdfLut"
         DEFERRED_NOISE,                     //  "noiseMap"
-        DEFERRED_LIGHTFUNC,                 //  "lightFunc"
         DEFERRED_LIGHT,                     //  "lightMap"
         DEFERRED_PROJECTION,                //  "projectionMap"
         DEFERRED_NORM_MATRIX,               //  "norm_mat"

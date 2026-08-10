@@ -1645,7 +1645,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("exposureMap");
     mReservedUniforms.push_back("brdfLut");
     mReservedUniforms.push_back("noiseMap");
-    mReservedUniforms.push_back("lightFunc");
     mReservedUniforms.push_back("lightMap");
     mReservedUniforms.push_back("projectionMap");
     mReservedUniforms.push_back("norm_mat");

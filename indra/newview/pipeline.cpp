@@ -390,7 +390,6 @@ LLPipeline::LLPipeline() :
 {
     mNoiseMap = 0;
     mTrueNoiseMap = 0;
-    mLightFunc = 0;
 
     for(U32 i = 0; i < 8; i++)
     {
@@ -1310,12 +1309,6 @@ void LLPipeline::releaseGLBuffers()
 
 void LLPipeline::releaseLUTBuffers()
 {
-    if (mLightFunc)
-    {
-        LLImageGL::deleteTextures(1, &mLightFunc);
-        mLightFunc = 0;
-    }
-
     mPbrBrdfLut.release();
 
     mExposureMap.release();
@@ -1534,63 +1527,6 @@ F32 lerpf(F32 a, F32 b, F32 w)
 
 void LLPipeline::createLUTBuffers()
 {
-    if (!mLightFunc)
-    {
-        U32 lightResX = gSavedSettings.getU32("RenderSpecularResX");
-        U32 lightResY = gSavedSettings.getU32("RenderSpecularResY");
-        F32* ls = nullptr;
-        try
-        {
-            ls = new F32[lightResX*lightResY];
-        }
-        catch (std::bad_alloc&)
-        {
-            LLError::LLUserWarningMsg::showOutOfMemory();
-            // might be better to set the error into mFatalMessage and rethrow
-            LL_ERRS() << "Bad memory allocation in createLUTBuffers! lightResX: "
-                << lightResX << " lightResY: " << lightResY << LL_ENDL;
-        }
-        F32 specExp = gSavedSettings.getF32("RenderSpecularExponent");
-        // Calculate the (normalized) blinn-phong specular lookup texture. (with a few tweaks)
-        for (U32 y = 0; y < lightResY; ++y)
-        {
-            for (U32 x = 0; x < lightResX; ++x)
-            {
-                ls[y*lightResX+x] = 0;
-                F32 sa = (F32) x/(lightResX-1);
-                F32 spec = (F32) y/(lightResY-1);
-                F32 n = spec * spec * specExp;
-
-                // Nothing special here.  Just your typical blinn-phong term.
-                spec = powf(sa, n);
-
-                // Apply our normalization function.
-                // Note: This is the full equation that applies the full normalization curve, not an approximation.
-                // This is fine, given we only need to create our LUT once per buffer initialization.
-                spec *= (((n + 2) * (n + 4)) / (8 * F_PI * (powf(2, -n/2) + n)));
-
-                // Since we use R16F, we no longer have a dynamic range issue we need to work around here.
-                // Though some older drivers may not like this, newer drivers shouldn't have this problem.
-                ls[y*lightResX+x] = spec;
-            }
-        }
-
-        U32 pix_format = GL_R16F;
-#if LL_DARWIN
-        if(!gGLManager.mIsApple)
-        {
-            // Need to work around limited precision with 10.6.8 and older drivers
-            //
-            pix_format = GL_R32F;
-        }
-#endif
-        LLImageGL::generateTextures(1, &mLightFunc);
-        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mLightFunc);
-        LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), pix_format, lightResX, lightResY, GL_RED, GL_FLOAT, ls);
-
-        delete [] ls;
-    }
-
     mPbrBrdfLut.allocate(512, 512, GL_RG16F);
     mPbrBrdfLut.bindTarget();
 
@@ -9136,23 +9072,9 @@ void LLPipeline::renderFinalize()
     recordTrianglesDrawn();
 }
 
-void LLPipeline::bindLightFunc(LLGLSLShader& shader)
+void LLPipeline::bindBrdfLut(LLGLSLShader& shader)
 {
-    S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_LIGHTFUNC);
-    if (channel > -1)
-    {
-        // Bilinear both ways. This is a smooth function tabulated on a grid and read between
-        // its texels, so minification wants the interpolation as much as magnification does --
-        // and it is exactly the glossy surfaces that minify, where the lobe spans about two
-        // texels across a few pixels and point sampling quantizes the highlight into steps.
-        // There is no mip chain for anything stronger to act on.
-        //
-        // Clamp because both axes are only meaningful on [0,1]: NdotH and glossiness.
-        gGL.getTextureSlot(channel)->bindManual(ALTextureSlot::TT_TEXTURE, mLightFunc,
-                                            gGL.getSampler(ALSamplers::BilinearClamp));
-    }
-
-    channel = shader.enableTexture(LLShaderMgr::DEFERRED_BRDF_LUT);
+    S32 channel = shader.enableTexture(LLShaderMgr::DEFERRED_BRDF_LUT);
     if (channel > -1)
     {
         // Clamp, not the render target's default mirrored repeat. This is a lookup table over
@@ -9339,7 +9261,7 @@ void LLPipeline::bindDeferredShaderFast(LLGLSLShader& shader)
         // bound inside one would still read 0. shadowUtil.glsl selects its filter tier on this,
         // so a stale value is a pass rendering at the wrong tier rather than a missing update.
         shader.uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
-        bindLightFunc(shader);
+        bindBrdfLut(shader);
         bindShadowMaps(shader);
         bindReflectionProbes(shader);
         bindDeferredUBO();
@@ -9430,7 +9352,7 @@ void LLPipeline::bindDeferredShader(LLGLSLShader& shader, LLRenderTarget* light_
                                             gGL.getSampler(ALSamplers::PointWrap));
     }
 
-    bindLightFunc(shader);
+    bindBrdfLut(shader);
 
     stop_glerror();
 
@@ -10364,7 +10286,6 @@ void LLPipeline::unbindDeferredShader(LLGLSLShader &shader)
     unbindShadowMaps();
 
     shader.disableTexture(LLShaderMgr::DEFERRED_NOISE);
-    shader.disableTexture(LLShaderMgr::DEFERRED_LIGHTFUNC);
 
     if (!LLPipeline::sReflectionProbesEnabled)
     {

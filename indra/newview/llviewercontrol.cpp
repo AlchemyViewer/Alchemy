@@ -325,16 +325,6 @@ static bool handleEnableHDR(const LLSD& newvalue)
     return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
 }
 
-static bool handleLUTBufferChanged(const LLSD& newvalue)
-{
-    if (gPipeline.isInit())
-    {
-        gPipeline.releaseLUTBuffers();
-        gPipeline.createLUTBuffers();
-    }
-    return true;
-}
-
 static bool handleAnisotropicFilteringChanged(const LLSD& newval)
 {
     F32 val = static_cast<F32>(newval.asReal());
@@ -1020,9 +1010,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationThreshold", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationScale", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationStrength", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularResX", handleLUTBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularResY", handleLUTBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleLUTBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleShadowsResized);

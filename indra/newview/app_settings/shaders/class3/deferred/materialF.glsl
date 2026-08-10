@@ -49,7 +49,7 @@ uniform int sun_up_factor;
 vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
-float sampleLightFunc(sampler2D lightFunc, float nh, float glossiness);
+float blinnPhongLobe(float nh, float glossiness);
 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
@@ -78,7 +78,6 @@ void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 no
 void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 norm, float envIntensity);
 
 uniform samplerCube environmentMap;
-uniform sampler2D     lightFunc;
 
 // Inputs
 uniform vec4 morphFactor;
@@ -106,7 +105,6 @@ vec3 calcLegacyPointLightOrSpotLight(vec3 diffuse, vec4 spec,
                     vec3 n, vec3 p, vec3 v,
                     vec3 lp, vec3 ld, vec3 lightColor,
                     float lightSize, float falloff, float is_pointlight,
-                    sampler2D lightFunc,
                     inout float glare);
 
 #else
@@ -321,7 +319,7 @@ void main()
             float gtdenom = 2 * nh;
             float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
-            float scol = shadow*fres*sampleLightFunc(lightFunc, nh, glossiness)*gt/(nh*nl);
+            float scol = shadow*fres*blinnPhongLobe(nh, glossiness)*gt/(nh*nl);
             color.rgb += lit*scol*sunlit_linear.rgb*spec.rgb;
         }
 
@@ -346,7 +344,7 @@ void main()
 
 // light_deferred_attenuation carries the size/falloff pair the deferred pass reads, as the PBR
 // alpha path already takes them. light_attenuation.z stays: it is the is-omni flag.
-#define LIGHT_LOOP(i) light.rgb += calcLegacyPointLightOrSpotLight(diffuse.rgb, spec, norm.xyz, pos.xyz, npos, light_position[i].xyz, light_direction[i].xyz, light_diffuse[i].rgb, light_deferred_attenuation[i].x, light_deferred_attenuation[i].y, light_attenuation[i].z, lightFunc, glare);
+#define LIGHT_LOOP(i) light.rgb += calcLegacyPointLightOrSpotLight(diffuse.rgb, spec, norm.xyz, pos.xyz, npos, light_position[i].xyz, light_direction[i].xyz, light_diffuse[i].rgb, light_deferred_attenuation[i].x, light_deferred_attenuation[i].y, light_attenuation[i].z, glare);
 
     LIGHT_LOOP(1)
         LIGHT_LOOP(2)

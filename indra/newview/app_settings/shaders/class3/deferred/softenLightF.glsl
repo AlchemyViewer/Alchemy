@@ -35,8 +35,6 @@ const float M_PI = 3.14159265;
 uniform sampler2D lightMap;
 #endif
 
-uniform sampler2D     lightFunc;
-
 #if defined(HAS_SSAO)
 uniform float ssao_irradiance_scale;
 uniform float ssao_irradiance_max;
@@ -94,7 +92,7 @@ uniform int cube_snapshot;
 uniform float sky_hdr_scale;
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
-float sampleLightFunc(sampler2D lightFunc, float nh, float glossiness);
+float blinnPhongLobe(float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
 
 vec3 pbrBaseLight(vec3 diffuseColor,
@@ -319,7 +317,7 @@ void main()
                 float gtdenom = 2 * nh;
                 float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
-                scol *= fres*sampleLightFunc(lightFunc, nh, spec.a)*gt/(nh*nl);
+                scol *= fres*blinnPhongLobe(nh, spec.a)*gt/(nh*nl);
                 color.rgb += lit*scol*sunlit_linear.rgb*spec.rgb;
             }
 

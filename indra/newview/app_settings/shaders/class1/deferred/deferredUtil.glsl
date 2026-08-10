@@ -136,24 +136,26 @@ float calcLegacyDistanceAttenuation(float distance, float falloff)
     return dist_atten;
 }
 
-// Read the normalized Blinn-Phong lobe out of the specular LUT (LLPipeline::createLUTBuffers).
+// The normalized Blinn-Phong specular lobe for a legacy glossiness.
 //
-// The table holds its endpoints AT texel 0 and texel N-1, but texture() maps a coordinate c to
-// texel index c*N - 0.5, so passing the raw [0,1] value lands half a texel off. The range has to
-// be mapped onto texel centres instead. Against analytic Blinn-Phong at glossiness 1, where the
-// lobe is only about two texels wide, that is worth 21.6% worst-case error down to 1.7%.
+// SPECULAR_EXPONENT is injected alongside the GBuffer flags, from RenderSpecularExponent. The
+// square is this tree's mapping from an 8-bit material field to an exponent, and it is what
+// makes the top of the glossiness range spend most of its resolution on very tight lobes.
 //
-// Rebuilding the table on texel centres does NOT fix it: the top of the range then falls outside
-// the last texel, and CLAMP_TO_EDGE flattens the peak of every high-gloss highlight to 83% of
-// its true value. The table is right; the lookup was not.
+// The normalization keeps the lobe's integral independent of the exponent, so polishing a
+// surface concentrates its highlight rather than adding energy to it. Its 2^(-n/2) term only
+// does anything as n approaches zero, where it holds the denominator off zero; by the exponents
+// a glossy surface uses it is below 1e-6 and this is (n+2)(n+4) / 8*pi*n.
 //
-// The size comes from the texture rather than a define so it cannot drift from whatever
-// RenderSpecularResX/ResY the LUT was actually built at.
-float sampleLightFunc(sampler2D lightFunc, float nh, float glossiness)
+// Every caller takes nh from calcHalfVectors, which floors it above zero -- pow() is undefined
+// at a zero base with a zero exponent, which is reachable here only through a glossiness of
+// zero, and every call site already gates on that being positive.
+float blinnPhongLobe(float nh, float glossiness)
 {
-    vec2 res = vec2(textureSize(lightFunc, 0));
-    vec2 uv = (vec2(nh, glossiness) * (res - 1.0) + 0.5) / res;
-    return texture(lightFunc, uv).r;
+    float n = glossiness * glossiness * SPECULAR_EXPONENT;
+    float norm = ((n + 2.0) * (n + 4.0)) / (8.0 * M_PI * (exp2(-n * 0.5) + n));
+
+    return pow(nh, n) * norm;
 }
 
 // In:
@@ -928,7 +930,6 @@ vec3 calcLegacyPointLightOrSpotLight(vec3 diffuse, vec4 spec,
                     vec3 ld, // light direction (for spotlights)
                     vec3 lightColor,
                     float lightSize, float falloff, float is_pointlight,
-                    sampler2D lightFunc,
                     inout float glare)
 {
     LegacyPunctualInfo lt;
@@ -947,7 +948,7 @@ vec3 calcLegacyPointLightOrSpotLight(vec3 diffuse, vec4 spec,
         float gtdenom = 2.0 * lt.nh;
         float gt = max(0.0, min(gtdenom * lt.nv / lt.vh, gtdenom * lt.nl / lt.vh));
 
-        float scol = fres * sampleLightFunc(lightFunc, lt.nh, spec.a) * gt / (lt.nh * lt.nl);
+        float scol = fres * blinnPhongLobe(lt.nh, spec.a) * gt / (lt.nh * lt.nl);
         vec3 speccol = lit * scol * lightColor * spec.rgb;
 
         col += speccol;

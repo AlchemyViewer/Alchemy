@@ -27,7 +27,6 @@
 
 out vec4 frag_color;
 
-uniform sampler2D lightFunc;
 
 uniform vec3 env_mat[3];
 
@@ -56,7 +55,7 @@ uniform vec4 viewport;
 #endif
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
-float sampleLightFunc(sampler2D lightFunc, float nh, float glossiness);
+float blinnPhongLobe(float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
 vec3 clampRadiance(vec3 c);
@@ -162,7 +161,7 @@ void main()
 
             if (nh > 0.0)
             {
-                float scol = fres*sampleLightFunc(lightFunc, nh, spec.a)*gt/(nh*nl);
+                float scol = fres*blinnPhongLobe(nh, spec.a)*gt/(nh*nl);
                 final_color += lit*scol*color.rgb*spec.rgb;
             }
         }
