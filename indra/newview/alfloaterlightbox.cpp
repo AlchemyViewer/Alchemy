@@ -31,6 +31,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
+#include "llaccordionctrltab.h"
 #include "llcombobox.h"
 #include "llfloaterreg.h"
 #include "alcurveeditorctrl.h"
@@ -339,6 +340,19 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
         collectBoundControls(advp, keys);
     }
 
+    // A section's own header can carry a bound checkbox -- Color Grading's
+    // master switch does -- and that is part of the section however it is
+    // drawn. It is not in the panel, so nothing above would find it. Walk the
+    // control rather than reading it directly: LLCheckBoxCtrl hands
+    // control_name down to its button, so the binding is on the child.
+    if (auto* tabp = findChild<LLAccordionCtrlTab>("atab_" + section))
+    {
+        if (LLCheckBoxCtrl* checkp = tabp->getHeaderCheckBox())
+        {
+            collectBoundControls(checkp, keys);
+        }
+    }
+
     // One thing the user did, however many controls it moves: undoing a Reset
     // All eleven times would be absurd.
     ScopedHistoryGroup group(mHistory);
@@ -354,10 +368,8 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
 void ALFloaterLightBox::onToggleSection(LLUICtrl* ctrl, const LLSD& userdata)
 {
     // Section id to bit. The grouping matches Reset All's, which walks
-    // sec_<id> and sec_<id>_adv together -- so "basic" covers the
-    // Basic-Advanced rows too, and the user only has to learn one idea of what
-    // a section is. Which is also why the Basic-Advanced header carries no
-    // checkbox of its own: it is not a section, it is the tail of one.
+    // sec_<id> and sec_<id>_adv together, so a section with a long tail in an
+    // Advanced sibling is one switch and one idea of what a section is.
     static const std::map<std::string, U32> bypass_bits = {
         { "basic",     LLPipeline::GRADE_BYPASS_BASIC },
         { "primaries", LLPipeline::GRADE_BYPASS_PRIMARIES },

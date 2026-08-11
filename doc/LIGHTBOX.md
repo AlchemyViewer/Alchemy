@@ -180,7 +180,10 @@ worth knowing before you use it elsewhere:
   convert.
 - **No `control_name` for a comparison switch.** See the bypass note in
   *Architecture in brief*: a whitelisted setting toggled to compare dirties the
-  active Look.
+  active Look. A header checkbox that *is* a setting — the grading master —
+  takes `control_name` as normal, and `LightBox.ResetSection` reaches it: the
+  walker checks `atab_<section>`'s header checkbox as well as the panel, so a
+  bound switch on a header is still covered by that section's Reset All.
 
 ### 4. Rows
 
@@ -336,9 +339,9 @@ Three controls act on something other than a setting.
     geometrically is worse than none.
 
   The groups match Reset All's grouping (`sec_<id>` plus `sec_<id>_adv`
-  together), so there is only one idea of "a section" to learn — which is why
-  Basic - Advanced has no checkbox of its own: it is the tail of Basic, and
-  Basic's box switches it too.
+  together), so a section with a long tail in an Advanced sibling is one switch
+  and one idea of "a section". Put the checkbox on the essentials tab only; the
+  Advanced sibling is the tail of a section, not a section.
 
   These lived as a row of five in the Color Grading section until it turned out
   that the objection to putting them on the headers — that A/B work means
@@ -584,8 +587,15 @@ only; apply per row, not on the parent panel. Reference patterns:
   `disabled_control="RenderHDREnabled"` — greying, not visibility, so the
   layout never gets holes and both modes stay discoverable.
 - **`RenderColorGrade` is the master switch for the entire grading suite**
-  (LUT *and* Basic Grade, White Balance, Split Toning, Lift/Gamma/Gain, Tone
-  Curve). Any new grading control must gate on it or it will look inert.
+  (LUT *and* Basic, White Balance, Split Toning, Lift/Gamma/Gain, Tone Curve).
+  Any new grading control must gate on it or it will look inert. It lives on
+  the Color Grading accordion's own header, as a `header_check_box` with
+  `control_name` — so it is legible and throwable whether or not the section is
+  open, and it reads the same way as the five section switches beneath it. Note
+  what tells the two kinds apart: the master has a `control_name` because it is
+  a setting, the section switches have none because they are a viewing state.
+  That section is also the only one that opens by default, which is why its
+  body is kept to one line of text plus the reference still.
 - Int-selected modes can't gate declaratively; either leave rows enabled with
   a "(X only)" tooltip or add a small signal handler like
   `updateTonemapperRows()`.

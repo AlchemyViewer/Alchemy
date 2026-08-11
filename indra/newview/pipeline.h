@@ -787,7 +787,7 @@ public:
     /// rest of the grade rather than against nothing at all.
     enum EGradeBypass : U32
     {
-        GRADE_BYPASS_BASIC     = 1 << 0, ///< White balance, tone, presence: Basic and Basic-Advanced
+        GRADE_BYPASS_BASIC     = 1 << 0, ///< White balance, tone, presence: the Basic section
         GRADE_BYPASS_PRIMARIES = 1 << 1, ///< Lift / gamma / gain
         GRADE_BYPASS_SPLIT     = 1 << 2, ///< Split toning
         GRADE_BYPASS_LUT       = 1 << 3, ///< 3D LUT

@@ -521,63 +521,51 @@ Row conventions:
 			</panel>
 		</accordion_tab>
 		<accordion_tab
-		 expanded="false"
+		 expanded="true"
 		 layout="topleft"
-		 height="247"
+		 height="169"
 		 name="atab_sec_grading"
 		 title="Color Grading"
 		 fit_panel="true">
+			<!-- The master switch rides the header rather than sitting in the body,
+			     so it can be read and thrown with the section shut, and so it reads
+			     the same way as the five section switches below it: ticked is
+			     applied. Unlike those, this one is a real setting and says so with
+			     control_name; they are a viewing state and deliberately have none.
+			     No enabled_control either, for the obvious reason. -->
+			<accordion_tab.header_check_box
+			 name="lut_enable"
+			 control_name="RenderColorGrade"
+			 tool_tip="Master switch for ALL color grading: the 3D LUT plus every Basic, White Balance, Split Toning, Lift / Gamma / Gain and Tone Curve control. This one is a setting and is saved with the Look, unlike the per-section switches." />
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="218"
+			 height="140"
 			 left="0"
 			 top="0"
 			 right="-1"
 			 name="sec_grading">
-				<check_box
-				 follows="left|top"
+				<!-- This section opens by default, so what is in it is paid for on
+				     every look at the tab. Two paragraphs of prose were not worth
+				     that; the part you need once is on the line, and the part you
+				     want to look up is in the tooltip. -->
+				<text
+				 follows="left|top|right"
 				 layout="topleft"
-				 height="16"
 				 left="8"
 				 top="8"
-				 width="300"
-				 label="Enable color grading"
-				 tool_tip="Master switch for ALL color grading: the 3D LUT plus every Basic Grade, White Balance, Split Toning, Lift/Gamma/Gain, and Tone Curve control"
-				 name="lut_enable"
-				 control_name="RenderColorGrade" />
-				<text
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="8"
-				 right="-8"
-				 height="44"
-				 word_wrap="true"
-				 font="SansSerifSmall"
-				 name="grading_order_note"
-				 value="The sections below are ordered the way the renderer applies them. White Balance and Lift / Gamma / Gain act in linear light, between exposure and the tonemap curve; everything from Basic Grade down acts on display values after it." />
-				<!-- The five per-section switches this used to hold now sit on
-				     the accordion headers of the sections they act on, so the
-				     control is beside the thing it controls and stays in view
-				     while you work in that section. What is left here is the
-				     sentence that says they exist. -->
-				<text
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top="86"
 				 right="-8"
 				 height="30"
 				 word_wrap="true"
 				 font="SansSerifSmall"
-				 name="grading_bypass_note"
-				 value="Compare: untick the checkbox on a section's header to switch that section off while you look. Nothing is saved and the Look is not marked as changed." />
+				 name="grading_order_note"
+				 tool_tip="White Balance and Lift / Gamma / Gain act in linear light, between exposure and the tonemap curve; everything from Basic down acts on display values after it. Switching a section off saves nothing and does not mark the Look as changed, and every section comes back when the Lightbox closes."
+				 value="The sections below run in the order the renderer applies them. Untick a section's header checkbox to switch it off while you look." />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top="124"
+				 top="46"
 				 width="330"
 				 height="16"
 				 font="SansSerifSmallBold"
@@ -589,7 +577,7 @@ Row conventions:
 				 height="18"
 				 width="64"
 				 left="8"
-				 top="144"
+				 top="66"
 				 label="Grab"
 				 name="reference_grab"
 				 tool_tip="Freeze the frame as it is now and compare against it while you keep grading. The still is taken where the scopes measure: after every post pass, before the vignette and grain, which are then applied to both sides so the comparison is about the grade. Cleared when the Lightbox closes or the window is resized.">
@@ -602,7 +590,7 @@ Row conventions:
 				 height="18"
 				 width="64"
 				 left="76"
-				 top="144"
+				 top="66"
 				 label="Clear"
 				 name="reference_clear"
 				 tool_tip="Discard the reference still and return to the live image">
@@ -613,7 +601,7 @@ Row conventions:
 				 follows="left|top"
 				 layout="topleft"
 				 left="148"
-				 top="143"
+				 top="65"
 				 width="130"
 				 height="20"
 				 name="reference_mode"
@@ -636,7 +624,7 @@ Row conventions:
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="168"
+				 top="90"
 				 right="-8"
 				 height="16"
 				 label="Wipe position"
@@ -656,7 +644,7 @@ Row conventions:
 				 height="18"
 				 width="100"
 				 right="-8"
-				 top="192"
+				 top="114"
 				 label="Reset All"
 				 halign="left"
 				 scale_image="true"
@@ -673,19 +661,17 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="414"
+		 height="466"
 		 name="atab_sec_basic"
 		 title="Basic"
 		 fit_panel="true">
 			<!-- Ticked is the section switched on, which is the only way a box
-			     beside a section title reads. There is deliberately none on
-			     Basic - Advanced: that is the tail of this section, not a
-			     section, and it is switched by this box along with the rest. -->
+			     beside a section title reads. -->
 			<accordion_tab.header_check_box
 			 name="section_basic"
 			 initial_value="true"
 			 enabled_control="RenderColorGrade"
-			 tool_tip="Whether Basic, and Basic - Advanced with it, is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+			 tool_tip="Whether Basic is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
 				<commit_callback
 				 function="LightBox.ToggleSection"
 				 parameter="basic" />
@@ -693,7 +679,7 @@ Row conventions:
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="385"
+			 height="437"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1072,46 +1058,11 @@ Row conventions:
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderColorGradeSaturation" />
 				</button>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="10"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_basic_reset"
-				 tool_tip="Reset this section (including Advanced) to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_basic" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="116"
-		 name="atab_sec_basic_adv"
-		 title="Basic - Advanced"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="87"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_basic_adv">
 				<slider
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="8"
+				 top_pad="9"
 				 right="-32"
 				 height="16"
 				 label="Brightness"
@@ -1188,11 +1139,11 @@ Row conventions:
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="right"
-				 name="sec_basic_adv_reset"
+				 name="sec_basic_reset"
 				 tool_tip="Reset this section to defaults">
 					<button.commit_callback
 					 function="LightBox.ResetSection"
-					 parameter="sec_basic_adv" />
+					 parameter="sec_basic" />
 				</button>
 			</panel>
 		</accordion_tab>
