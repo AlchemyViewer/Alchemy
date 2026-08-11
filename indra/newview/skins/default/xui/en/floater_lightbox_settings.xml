@@ -136,6 +136,36 @@
 			<button.commit_callback
 			 function="LightBox.Redo" />
 		</button>
+		<!-- Set apart again, for the third kind of thing in this bar: the two
+		     groups above act on this floater's own state, and this opens
+		     another window. Command_Stats_Icon is a bar graph and is the same
+		     18px as every other overlay here; it reads as what the window
+		     opens with, since the first pane is a histogram.
+
+		     Floater.Toggle, NOT Floater.ToggleOrBringToFront. The latter is
+		     written for toolbar buttons and closes its target only in an
+		     `else if (!instance->isFrontmost())` fall-through, so pressing a
+		     button that lives in *another floater* can never reach it, because
+		     that press makes this floater the frontmost one. From here it opens
+		     and raises Scopes and nothing else, and the button has no way to
+		     shut it again. Any "open that window" button added to this bar has
+		     the same problem; reach for Floater.Toggle. -->
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="12"
+		 top="1"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Command_Stats_Icon"
+		 name="open_scopes"
+		 tool_tip="Scopes: measure the frame you are grading -- histogram, waveform, parade and vectorscope, up to four at once. Click again to close.">
+			<button.commit_callback
+			 function="Floater.Toggle"
+			 parameter="scopes" />
+		</button>
 	</panel>
 	<tab_container
 	 follows="all"

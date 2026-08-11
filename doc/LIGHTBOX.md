@@ -338,6 +338,14 @@ enum, so a mode added without one is reachable only by editing the setting.
 Keep `MODE_COUNT` last: `getPaneMode` clamps against it, and that clamp is what
 stops a stale setting from indexing off the end.
 
+**A button that opens another floater wants `Floater.Toggle`.** Not
+`Floater.ToggleOrBringToFront`, which is written for toolbar buttons: it closes
+its target only after falling through `else if (!instance->isFrontmost())`, and
+pressing a button inside a floater makes *that* floater frontmost, so the close
+branch is unreachable. The button then opens and raises its target and can never
+shut it. Both are global commit callbacks registered in `llui.cpp`, so such a
+button needs no C++ at all.
+
 **Spawn an `LLContextMenu` with `show()`, never `LLMenuGL::showPopup()`.**
 `LLContextMenu` overrides `setVisible` to ignore everything except `false`:
 
@@ -600,7 +608,21 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
 - If you added a print effect: take a snapshot with "No post-processing" ticked
   and confirm the effect is absent from the saved file, not just from the
   preview.
-- **Developer-build staging trap:** non-package builds do not restage XUI or
-  `app_settings` next to the executable. After editing, copy the changed files
-  into `build-.../newview/<config>/skins/...` and `.../app_settings/...` or
-  the viewer keeps loading the stale copies.
+- **Developer-build staging trap:** non-package builds do not reliably restage
+  XUI or `app_settings` next to the executable, and the rule is worth knowing
+  rather than guessing at, because a stale copy looks exactly like an edit that
+  did not work.
+
+  The copy is a `POST_BUILD` custom command on the **viewer binary target**
+  (`viewer_manifest.py --actions=copy`, `newview/CMakeLists.txt`). So:
+
+  - **Edited an existing XUI/settings file and nothing else?** No C++ changed,
+    so the exe does not relink, so `POST_BUILD` never runs and the staged copy
+    stays stale *however many times you build*. Copy the file into
+    `build-.../newview/<config>/skins/...` or `.../app_settings/...` yourself.
+  - **Added a new file?** The manifest's file list is built from globs at
+    **configure** time, so it is not staged at all until you re-run CMake —
+    a rebuild alone will not find it.
+  - Editing XUI alongside C++ hides both cases, because the relink drags the
+    copy along with it. That is why this bites on the one change that happened
+    to be XML-only.
