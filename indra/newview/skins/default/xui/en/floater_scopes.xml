@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater
- width="330"
- height="240"
+ width="420"
+ height="320"
  min_width="260"
  min_height="180"
  layout="topleft"
@@ -22,6 +22,18 @@
 	 name="clipping_pixel">
 		Crushed [LOW]%   Blown [HIGH]%      R [R]  G [G]  B [B]
 	</floater.string>
+	<!-- Corner labels, drawn into each pane once more than one is shown so you
+	     can tell which scope you are looking at. Kept short: the label shares
+	     the pane with the trace it names. -->
+	<floater.string name="mode_rgb">RGB</floater.string>
+	<floater.string name="mode_luma">Luminance</floater.string>
+	<floater.string name="mode_red">Red</floater.string>
+	<floater.string name="mode_green">Green</floater.string>
+	<floater.string name="mode_blue">Blue</floater.string>
+	<floater.string name="mode_vector">Vectorscope</floater.string>
+	<floater.string name="mode_wave_luma">Waveform</floater.string>
+	<floater.string name="mode_wave_rgb">Waveform RGB</floater.string>
+	<floater.string name="mode_parade">Parade</floater.string>
 	<text
 	 follows="left|top"
 	 layout="topleft"
@@ -29,8 +41,8 @@
 	 top="22"
 	 width="42"
 	 height="15"
-	 name="scope_mode_label"
-	 value="Show" />
+	 name="scope_layout_label"
+	 value="Layout" />
 	<combo_box
 	 follows="left|top"
 	 layout="topleft"
@@ -38,44 +50,25 @@
 	 top_pad="-16"
 	 width="130"
 	 height="18"
-	 name="scope_mode"
-	 tool_tip="Histogram: how much of the frame sits at each brightness. Waveform and Parade: where in the frame, keeping the image's own left-to-right axis, so a blown sky and a blown face are told apart. Vectorscope: what colour, as hue by direction and saturation by distance from the centre, on the same plane the colour wheels edit">
+	 name="scope_layout"
+	 control_name="AlchemyScopeLayout"
+	 tool_tip="How many scopes to show at once. Right-click any pane to choose which scope it shows: a histogram says how much of the frame sits at each brightness, a waveform or parade says where in the frame it is, and a vectorscope says what colour, on the same plane the colour wheels edit. Showing several costs nothing to measure -- every scope is computed from the same sample whether or not it is on screen.">
 		<combo_box.item
-		 label="RGB"
-		 name="rgb"
+		 label="Single"
+		 name="single"
 		 value="0" />
 		<combo_box.item
-		 label="Luminance"
-		 name="luma"
+		 label="Side by side"
+		 name="columns"
 		 value="1" />
 		<combo_box.item
-		 label="Red"
-		 name="red"
+		 label="Stacked"
+		 name="rows"
 		 value="2" />
 		<combo_box.item
-		 label="Green"
-		 name="green"
+		 label="Four"
+		 name="quad"
 		 value="3" />
-		<combo_box.item
-		 label="Blue"
-		 name="blue"
-		 value="4" />
-		<combo_box.item
-		 label="Vectorscope"
-		 name="vector"
-		 value="5" />
-		<combo_box.item
-		 label="Waveform: Luminance"
-		 name="wave_luma"
-		 value="6" />
-		<combo_box.item
-		 label="Waveform: RGB"
-		 name="wave_rgb"
-		 value="7" />
-		<combo_box.item
-		 label="Parade: R G B"
-		 name="parade"
-		 value="8" />
 	</combo_box>
 	<check_box
 	 follows="top|right"
@@ -94,7 +87,7 @@
 	 left="8"
 	 top_pad="9"
 	 right="-8"
-	 height="150"
+	 height="230"
 	 background_visible="false"
 	 name="scope_plot" />
 	<text

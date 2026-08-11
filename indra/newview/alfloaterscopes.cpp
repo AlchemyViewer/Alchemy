@@ -28,14 +28,18 @@
 
 #include "alcolorwheelmodel.h"
 #include "llcombobox.h"
+#include "llfontgl.h"
 #include "lllocalcliprect.h"
+#include "llmenugl.h"
 #include "llpanel.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
 #include "lltextbox.h"
 #include "lltrans.h"
 #include "lluicolortable.h"
+#include "lluictrlfactory.h"
 #include "llviewercontrol.h"
+#include "llviewermenu.h" // gMenuHolder
 #include "llviewerwindow.h"
 #include "pipeline.h"
 
@@ -54,11 +58,23 @@ const LLColor4 CHANNEL_COLOR[ALScopeData::CH_COUNT] = {
 /// the sample still draws about a fifth of the plot's height -- tall enough to
 /// see, short enough not to be mistaken for a peak.
 constexpr F32 LOG_SCALE_K = 400.f;
+
+/// Space between panes. Wide enough to read as a division rather than a drawing
+/// artefact, narrow enough not to eat a small window: at the floater's minimum
+/// size a quad layout has about sixty pixels of plot height per pane, and this
+/// takes two of them.
+constexpr S32 PANE_GAP = 4;
 }
 
 ALFloaterScopes::ALFloaterScopes(const LLSD& key)
 :   LLFloater(key)
 {
+    // Registered here rather than in postBuild because the context menu is
+    // built from XML during postBuild and resolves these names as it parses.
+    mCommitCallbackRegistrar.add("Scopes.SetPaneMode",
+                                 boost::bind(&ALFloaterScopes::onPaneModePicked, this, _2));
+    mEnableCallbackRegistrar.add("Scopes.IsPaneMode",
+                                 boost::bind(&ALFloaterScopes::isPaneModeChecked, this, _2));
 }
 
 ALFloaterScopes::~ALFloaterScopes()
@@ -66,15 +82,27 @@ ALFloaterScopes::~ALFloaterScopes()
     // Belt and braces: onClose already cleared it, but a floater destroyed
     // without closing would otherwise leave the renderer sampling forever.
     LLPipeline::sScopeCapture = false;
+
+    // The menu lives in gMenuHolder, not in this floater's view tree, so
+    // nothing else is going to take it down with us.
+    if (auto* menu = static_cast<LLMenuGL*>(mPopupMenuHandle.get()))
+    {
+        menu->die();
+        mPopupMenuHandle.markDead();
+    }
 }
 
 bool ALFloaterScopes::postBuild()
 {
     mPlotPanel = getChild<LLPanel>("scope_plot");
-    mModeCombo = getChild<LLComboBox>("scope_mode");
+    mLayoutCombo = getChild<LLComboBox>("scope_layout");
     mClipReadout = getChild<LLTextBox>("scope_clipping");
 
-    mModeCombo->selectByValue(LLSD((S32)MODE_RGB));
+    if (auto* menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
+            "menu_scopes_pane.xml", gMenuHolder, LLViewerMenuHolderGL::child_registry_t::instance()))
+    {
+        mPopupMenuHandle = menu->getHandle();
+    }
 
     return LLFloater::postBuild();
 }
@@ -91,9 +119,126 @@ void ALFloaterScopes::onClose(bool app_quitting)
     LLFloater::onClose(app_quitting);
 }
 
-ALFloaterScopes::EMode ALFloaterScopes::getMode() const
+ALFloaterScopes::ELayout ALFloaterScopes::getLayout() const
 {
-    return mModeCombo ? (EMode)mModeCombo->getValue().asInteger() : MODE_RGB;
+    static LLCachedControl<S32> layout(gSavedSettings, "AlchemyScopeLayout", LAYOUT_SINGLE);
+    // Clamped rather than trusted: the setting is user-editable and persisted,
+    // and a bad value here would index the pane table out of range.
+    return (ELayout)llclamp(layout(), (S32)LAYOUT_SINGLE, (S32)LAYOUT_COUNT - 1);
+}
+
+S32 ALFloaterScopes::getPaneCount() const
+{
+    switch (getLayout())
+    {
+    case LAYOUT_COLUMNS:
+    case LAYOUT_ROWS:
+        return 2;
+    case LAYOUT_QUAD:
+        return MAX_PANES;
+    case LAYOUT_SINGLE:
+    default:
+        return 1;
+    }
+}
+
+ALFloaterScopes::EMode ALFloaterScopes::getPaneMode(S32 pane) const
+{
+    if (pane < 0 || pane >= MAX_PANES)
+    {
+        return MODE_RGB;
+    }
+    // One control per pane rather than one packed value, so each is separately
+    // readable and editable in Debug Settings like every other scope control.
+    const std::string name = llformat("AlchemyScopePane%d", pane);
+    return (EMode)llclamp(gSavedSettings.getS32(name), (S32)MODE_RGB, (S32)MODE_COUNT - 1);
+}
+
+void ALFloaterScopes::setPaneMode(S32 pane, EMode mode)
+{
+    if (pane < 0 || pane >= MAX_PANES || mode < MODE_RGB || mode >= MODE_COUNT)
+    {
+        return;
+    }
+    gSavedSettings.setS32(llformat("AlchemyScopePane%d", pane), (S32)mode);
+}
+
+// static
+const char* ALFloaterScopes::modeStringName(EMode mode)
+{
+    switch (mode)
+    {
+    case MODE_LUMA:      return "mode_luma";
+    case MODE_RED:       return "mode_red";
+    case MODE_GREEN:     return "mode_green";
+    case MODE_BLUE:      return "mode_blue";
+    case MODE_VECTOR:    return "mode_vector";
+    case MODE_WAVE_LUMA: return "mode_wave_luma";
+    case MODE_WAVE_RGB:  return "mode_wave_rgb";
+    case MODE_PARADE:    return "mode_parade";
+    case MODE_RGB:
+    default:             return "mode_rgb";
+    }
+}
+
+S32 ALFloaterScopes::computePaneRects(LLRect (&out)[MAX_PANES]) const
+{
+    if (!mPlotPanel)
+    {
+        return 0;
+    }
+
+    const LLRect area = mPlotPanel->getRect();
+    const S32    count = getPaneCount();
+
+    // Halves are taken from the far edge rather than by adding the first half's
+    // width, so an odd number of pixels lands in one pane instead of leaving a
+    // one-pixel strip of background between them.
+    const S32 mid_x = area.mLeft + (area.getWidth() - PANE_GAP) / 2;
+    const S32 mid_y = area.mBottom + (area.getHeight() - PANE_GAP) / 2;
+
+    switch (getLayout())
+    {
+    case LAYOUT_COLUMNS:
+        out[0] = LLRect(area.mLeft, area.mTop, mid_x, area.mBottom);
+        out[1] = LLRect(mid_x + PANE_GAP, area.mTop, area.mRight, area.mBottom);
+        break;
+
+    case LAYOUT_ROWS:
+        // Pane 0 on top: panes read in the order you assign them, and the eye
+        // starts at the top of a window rather than the bottom.
+        out[0] = LLRect(area.mLeft, area.mTop, area.mRight, mid_y + PANE_GAP);
+        out[1] = LLRect(area.mLeft, mid_y, area.mRight, area.mBottom);
+        break;
+
+    case LAYOUT_QUAD:
+        out[0] = LLRect(area.mLeft, area.mTop, mid_x, mid_y + PANE_GAP);
+        out[1] = LLRect(mid_x + PANE_GAP, area.mTop, area.mRight, mid_y + PANE_GAP);
+        out[2] = LLRect(area.mLeft, mid_y, mid_x, area.mBottom);
+        out[3] = LLRect(mid_x + PANE_GAP, mid_y, area.mRight, area.mBottom);
+        break;
+
+    case LAYOUT_SINGLE:
+    default:
+        out[0] = area;
+        break;
+    }
+
+    return count;
+}
+
+S32 ALFloaterScopes::paneAt(S32 x, S32 y) const
+{
+    LLRect    rects[MAX_PANES];
+    const S32 count = computePaneRects(rects);
+    for (S32 i = 0; i < count; ++i)
+    {
+        if (rects[i].pointInRect(x, y))
+        {
+            return i;
+        }
+    }
+    return -1;
 }
 
 // static
@@ -186,10 +331,8 @@ void ALFloaterScopes::drawChannel(const ALScopeData& data, ALScopeData::EChannel
     gl_polyline_2d(outline, edge, filled ? 1.2f : 1.6f);
 }
 
-void ALFloaterScopes::drawHistogram(const ALScopeData& data) const
+void ALFloaterScopes::drawHistogram(const ALScopeData& data, EMode mode, const LLRect& plot) const
 {
-    const LLRect plot = mPlotPanel->getRect();
-
     gl_rect_2d(plot, LLUIColorTable::instance().getColor("MenuDefaultBgColor").get(), true);
 
     // Quarter-tone guides. Photographers reach for these constantly -- "is
@@ -203,7 +346,7 @@ void ALFloaterScopes::drawHistogram(const ALScopeData& data) const
 
     {
         LLLocalClipRect clip(plot);
-        switch (getMode())
+        switch (mode)
         {
         case MODE_RGB:
             // Additive so overlapping channels brighten towards white where
@@ -221,7 +364,7 @@ void ALFloaterScopes::drawHistogram(const ALScopeData& data) const
         case MODE_GREEN:
         case MODE_BLUE:
         {
-            const auto ch = (ALScopeData::EChannel)(getMode() - MODE_RED);
+            const auto ch = (ALScopeData::EChannel)(mode - MODE_RED);
             drawChannel(data, ch, CHANNEL_COLOR[ch], plot, true);
             break;
         }
@@ -293,10 +436,8 @@ void ALFloaterScopes::drawWaveChannel(const ALScopeData& data, ALScopeData::ECha
     gGL.flush();
 }
 
-void ALFloaterScopes::drawWaveform(const ALScopeData& data) const
+void ALFloaterScopes::drawWaveform(const ALScopeData& data, EMode mode, const LLRect& panel) const
 {
-    const LLRect panel = mPlotPanel->getRect();
-
     gl_rect_2d(panel, LLUIColorTable::instance().getColor("MenuDefaultBgColor").get(), true);
 
     // Guides run horizontally here, not vertically as on the histogram: on a
@@ -311,7 +452,7 @@ void ALFloaterScopes::drawWaveform(const ALScopeData& data) const
 
     {
         LLLocalClipRect clip(panel);
-        switch (getMode())
+        switch (mode)
         {
         case MODE_PARADE:
         {
@@ -442,10 +583,8 @@ const LLColor4& cellTint(S32 u, S32 v)
 }
 } // namespace
 
-void ALFloaterScopes::drawVectorscope(const ALScopeData& data) const
+void ALFloaterScopes::drawVectorscope(const ALScopeData& data, const LLRect& panel) const
 {
-    const LLRect panel = mPlotPanel->getRect();
-
     gl_rect_2d(panel, LLUIColorTable::instance().getColor("MenuDefaultBgColor").get(), true);
 
     // Square and centred. The chroma plane is isotropic -- a hue is a
@@ -546,6 +685,100 @@ void ALFloaterScopes::drawVectorscope(const ALScopeData& data) const
     gl_rect_2d(panel, LLUIColorTable::instance().getColor("DefaultShadowLight").get(), false);
 }
 
+void ALFloaterScopes::drawScope(const ALScopeData& data, EMode mode, const LLRect& rect) const
+{
+    if (rect.getWidth() <= 0 || rect.getHeight() <= 0)
+    {
+        return;
+    }
+
+    if (mode == MODE_VECTOR)
+    {
+        drawVectorscope(data, rect);
+    }
+    else if (isWaveMode(mode))
+    {
+        drawWaveform(data, mode, rect);
+    }
+    else
+    {
+        drawHistogram(data, mode, rect);
+    }
+}
+
+void ALFloaterScopes::drawPaneLabel(EMode mode, const LLRect& rect) const
+{
+    // Only when there is more than one pane. With a single scope filling the
+    // window the layout combo already says what it is, and the label would be
+    // ink on the plot for nothing.
+    if (getPaneCount() < 2)
+    {
+        return;
+    }
+
+    const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
+    if (!font)
+    {
+        return;
+    }
+
+    // Dim rather than full strength: this identifies the pane, it is not part
+    // of the measurement, and a bright label competes with the trace.
+    LLColor4 color = LLUIColorTable::instance().getColor("TextFgReadOnlyColor").get();
+    color.mV[VALPHA] = 0.65f;
+
+    // Ellipsised to the pane rather than clipped to it. These names are
+    // translated, and a longer language would otherwise run a label out of its
+    // own pane and across the trace in the one beside it.
+    font->renderUTF8(getString(modeStringName(mode)), 0,
+                     (F32)(rect.mLeft + 4), (F32)(rect.mTop - 2),
+                     color, LLFontGL::LEFT, LLFontGL::TOP, LLFontGL::NORMAL,
+                     LLFontGL::DROP_SHADOW_SOFT,
+                     S32_MAX, rect.getWidth() - 8, nullptr, true);
+}
+
+bool ALFloaterScopes::handleRightMouseDown(S32 x, S32 y, MASK mask)
+{
+    const S32 pane = paneAt(x, y);
+    if (pane < 0)
+    {
+        return LLFloater::handleRightMouseDown(x, y, mask);
+    }
+
+    auto* menu = static_cast<LLContextMenu*>(mPopupMenuHandle.get());
+    if (!menu)
+    {
+        return LLFloater::handleRightMouseDown(x, y, mask);
+    }
+
+    mMenuPane = pane;
+    menu->buildDrawLabels();
+    menu->updateParent(LLMenuGL::sMenuContainer);
+
+    // LLContextMenu::show, not LLMenuGL::showPopup. LLContextMenu overrides
+    // setVisible to ignore anything but false ("can't set visibility directly,
+    // must call show or hide"), and showPopup's only attempt to reveal a menu
+    // is setVisible(true) -- so it silently does nothing here. Everything else
+    // showPopup would have done, show() does for itself.
+    //
+    // show() takes screen coordinates; a mouse handler is given coordinates
+    // local to the view it landed on.
+    S32 screen_x, screen_y;
+    localPointToScreen(x, y, &screen_x, &screen_y);
+    menu->show(screen_x, screen_y, this);
+    return true;
+}
+
+void ALFloaterScopes::onPaneModePicked(const LLSD& userdata)
+{
+    setPaneMode(mMenuPane, (EMode)userdata.asInteger());
+}
+
+bool ALFloaterScopes::isPaneModeChecked(const LLSD& userdata) const
+{
+    return mMenuPane >= 0 && getPaneMode(mMenuPane) == (EMode)userdata.asInteger();
+}
+
 void ALFloaterScopes::draw()
 {
     if (mPlotPanel)
@@ -559,18 +792,15 @@ void ALFloaterScopes::draw()
 
     if (mPlotPanel)
     {
-        const EMode mode = getMode();
-        if (mode == MODE_VECTOR)
+        const ALScopeData& data = gPipeline.getScopeData();
+
+        LLRect    rects[MAX_PANES];
+        const S32 count = computePaneRects(rects);
+        for (S32 i = 0; i < count; ++i)
         {
-            drawVectorscope(gPipeline.getScopeData());
-        }
-        else if (isWaveMode(mode))
-        {
-            drawWaveform(gPipeline.getScopeData());
-        }
-        else
-        {
-            drawHistogram(gPipeline.getScopeData());
+            const EMode mode = getPaneMode(i);
+            drawScope(data, mode, rects[i]);
+            drawPaneLabel(mode, rects[i]);
         }
     }
 }

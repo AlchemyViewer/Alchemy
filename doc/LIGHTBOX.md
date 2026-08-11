@@ -318,6 +318,47 @@ a histogram says **how much** of the frame is at a level, a waveform says
 **where** it is (a blown sky and a blown face are the same histogram bin and
 obviously different waveforms), and a vectorscope says **what colour**.
 
+Because they answer different questions, the floater shows up to four at once.
+`AlchemyScopeLayout` picks the arrangement (single, two side by side, two
+stacked, four in a grid) and `AlchemyScopePane0` through `AlchemyScopePane3`
+say what each pane holds; right-clicking a pane sets its own. `computePaneRects`
+is the single place that divides the plot area, and it returns rects in the
+floater's coordinate space — the same space `draw()` paints in and
+`handleRightMouseDown` is handed — so the rect that drew a pane is the rect
+that hit-tests it. If those ever diverge, the menu opens on the wrong pane.
+
+The draw functions therefore take `(mode, rect)` rather than reading the mode
+and the panel themselves. Anything new must too: a scope that reaches for
+`mPlotPanel->getRect()` draws over all four panes.
+
+**Adding a scope is three edits, not one.** A new `EMode` needs an entry in
+`modeStringName`, a `floater.string` for its corner label, and an item in
+`menu_scopes_pane.xml` — the menu is hand-written rather than generated from the
+enum, so a mode added without one is reachable only by editing the setting.
+Keep `MODE_COUNT` last: `getPaneMode` clamps against it, and that clamp is what
+stops a stale setting from indexing off the end.
+
+**Spawn an `LLContextMenu` with `show()`, never `LLMenuGL::showPopup()`.**
+`LLContextMenu` overrides `setVisible` to ignore everything except `false`:
+
+```cpp
+void LLContextMenu::setVisible(bool visible) { if (!visible) hide(); }
+```
+
+`showPopup`'s only attempt to reveal a menu is `setVisible(true)`, so against a
+context menu it does nothing — silently. The menu still loads, parents,
+populates and resolves its callbacks, so there is no warning in the log and
+nothing to find at the point of failure; it simply never appears. Copying the
+spawn code from a view that uses a plain `LLMenuGL` (`llnetmap` is the obvious
+one to reach for) walks straight into this, because that call is correct
+*there*. `LLContextMenu::show` also does its own arranging and edge-flipping,
+so it replaces `showPopup` rather than joining it.
+
+Its coordinates are **screen** space — it calls `screenPointToLocal` internally
+— while `handleRightMouseDown` is handed coordinates local to the view. Convert
+with `localPointToScreen` or the menu opens in the wrong place on any window
+that is not at the screen origin, which is easy to miss when testing maximised.
+
 Two rules if you add another:
 
 - The vectorscope bins through `ALColorWheelModel::toChroma`, the same basis the
@@ -333,6 +374,14 @@ lives in a `std::vector` and not in the object — `captureScopeSample` builds a
 whole `ALScopeData` as a **stack local**, and a member array that size would put
 it on the stack every capture. It is also empty until something is measured, so
 a viewer whose scopes have never been opened pays nothing.
+
+Note what the pane layout does *not* cost. `accumulate` fills every channel, the
+chroma grid and the waveform grid on each capture whatever is displayed, so a
+fourth pane adds drawing and nothing else — no extra sampling, read-back or
+binning. Drawing is where it is lopsided: a histogram is `BIN_COUNT` bins, but a
+waveform is `WAVE_COLUMNS * WAVE_LEVELS` cells **per channel**, so a parade pane
+is worth roughly two hundred histograms. Four is the ceiling for that reason,
+not because the tiling could not go further.
 
 And capture is gated on the floater existing (`LLPipeline::sScopeCapture`), so a
 closed window costs nothing at all. That gate is worth reusing: the cursor

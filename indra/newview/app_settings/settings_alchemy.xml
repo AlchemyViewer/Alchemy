@@ -1184,6 +1184,61 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyScopeLayout</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: how many scopes are shown at once and how they are arranged. 0 = one filling the window, 1 = two side by side, 2 = two stacked, 3 = four in a grid. Which scope each pane shows is AlchemyScopePane0 through AlchemyScopePane3; right-click a pane to set it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyScopePane0</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: which scope the first pane shows. 0 = RGB histogram, 1 = luminance, 2 = red, 3 = green, 4 = blue, 5 = vectorscope, 6 = waveform luminance, 7 = waveform RGB, 8 = parade. This is the pane a single-pane layout shows.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyScopePane1</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: which scope the second pane shows. Same values as AlchemyScopePane0. Used by the two-pane and four-pane layouts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>7</integer>
+        </map>
+        <key>AlchemyScopePane2</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: which scope the third pane shows. Same values as AlchemyScopePane0. Used by the four-pane layout only.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>8</integer>
+        </map>
+        <key>AlchemyScopePane3</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: which scope the fourth pane shows. Same values as AlchemyScopePane0. Used by the four-pane layout only.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>5</integer>
+        </map>
         <key>AlchemyScopeLogScale</key>
         <map>
             <key>Comment</key>
