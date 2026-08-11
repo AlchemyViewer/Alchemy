@@ -33,16 +33,48 @@
 
 #include "llcombobox.h"
 #include "llfloaterreg.h"
+#include "alcurveeditorctrl.h"
+#include "alcurvemodel.h"
+#include "altoolscenepicker.h"
+#include "alwhitebalancesolver.h"
+#include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llpresetsmanager.h"
 #include "llspinctrl.h"
+#include "lltimer.h"
+#include "lltoolmgr.h"
 #include "llviewercontrol.h"
+#include "pipeline.h"
 
+#include <map>
 #include <set>
 #include <utility>
 
 namespace
 {
+/// Everything recorded while this lives becomes a single undo step.
+struct ScopedHistoryGroup
+{
+    explicit ScopedHistoryGroup(ALGradeHistory& history) : mHistory(history) { mHistory.beginGroup(); }
+    ~ScopedHistoryGroup() { mHistory.endGroup(); }
+    ScopedHistoryGroup(const ScopedHistoryGroup&) = delete;
+    ScopedHistoryGroup& operator=(const ScopedHistoryGroup&) = delete;
+
+    ALGradeHistory& mHistory;
+};
+
+/// Holds a flag true for a scope. Never nested here -- if it ever is, this
+/// needs to be a counter rather than a bool.
+struct ScopedTrue
+{
+    explicit ScopedTrue(bool& flag) : mFlag(flag) { mFlag = true; }
+    ~ScopedTrue() { mFlag = false; }
+    ScopedTrue(const ScopedTrue&) = delete;
+    ScopedTrue& operator=(const ScopedTrue&) = delete;
+
+    bool& mFlag;
+};
+
 // Vector-valued rows follow the widget naming contract "vec3_<Setting>_<0|1|2>";
 // setting names never contain '_', so the parse is unambiguous.
 bool parseVec3WidgetName(const std::string& name, std::string& setting, S32& component)
@@ -67,17 +99,20 @@ bool parseVec3WidgetName(const std::string& name, std::string& setting, S32& com
     return true;
 }
 
-void collectVec3Spinners(LLView* viewp, std::map<std::string, std::array<LLSpinCtrl*, 3>>& rows)
+// Any LLUICtrl will do; the name is the whole contract. Descending into
+// composites is safe because their internal children are named for their role
+// ("Slider", "value") and cannot parse as vec3_<Setting>_<n>.
+void collectVec3Spinners(LLView* viewp, std::map<std::string, std::array<LLUICtrl*, 3>>& rows)
 {
     for (LLView* childp : *viewp->getChildList())
     {
-        if (LLSpinCtrl* spinnerp = dynamic_cast<LLSpinCtrl*>(childp))
+        if (LLUICtrl* ctrlp = dynamic_cast<LLUICtrl*>(childp))
         {
             std::string setting;
             S32 component = 0;
-            if (parseVec3WidgetName(spinnerp->getName(), setting, component))
+            if (parseVec3WidgetName(ctrlp->getName(), setting, component))
             {
-                rows[setting][component] = spinnerp;
+                rows[setting][component] = ctrlp;
             }
         }
         collectVec3Spinners(childp, rows);
@@ -116,7 +151,19 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
 {
     mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.ResetSection", std::bind(&ALFloaterLightBox::onClickResetSection, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ToggleBypass", std::bind(&ALFloaterLightBox::onToggleBypass, this, std::placeholders::_1, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ReferenceGrab", std::bind(&ALFloaterLightBox::onClickReferenceGrab, this));
+    mCommitCallbackRegistrar.add("LightBox.ReferenceClear", std::bind(&ALFloaterLightBox::onClickReferenceClear, this));
+    // Lambdas rather than bind: applyHistory answers whether it did anything,
+    // and a commit callback returns nothing, so say plainly that the answer is
+    // not wanted here. The buttons are greyed when there is nothing to do.
+    mCommitCallbackRegistrar.add("LightBox.Undo", [this](LLUICtrl*, const LLSD&) { applyHistory(false); });
+    mCommitCallbackRegistrar.add("LightBox.Redo", [this](LLUICtrl*, const LLSD&) { applyHistory(true); });
     mCommitCallbackRegistrar.add("LightBox.CommitVec3", std::bind(&ALFloaterLightBox::onCommitVec3, this, std::placeholders::_1));
+    mCommitCallbackRegistrar.add("LightBox.CommitToneCurve", std::bind(&ALFloaterLightBox::onCommitToneCurve, this));
+    mCommitCallbackRegistrar.add("LightBox.RefreshToneCurve", std::bind(&ALFloaterLightBox::refreshToneCurve, this));
+    mCommitCallbackRegistrar.add("LightBox.CommitSplitToneGraph", std::bind(&ALFloaterLightBox::onCommitSplitToneGraph, this));
+    mCommitCallbackRegistrar.add("LightBox.PickWhiteBalance", std::bind(&ALFloaterLightBox::onClickWhiteBalancePicker, this));
     mCommitCallbackRegistrar.add("LightBox.LookSelected", std::bind(&ALFloaterLightBox::onLookSelected, this));
     mCommitCallbackRegistrar.add("LightBox.LookSave", std::bind(&ALFloaterLightBox::onClickLookSave, this));
     mCommitCallbackRegistrar.add("LightBox.LookSaveAs", std::bind(&ALFloaterLightBox::onClickLookSaveAs, this));
@@ -126,6 +173,27 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
 
 ALFloaterLightBox::~ALFloaterLightBox()
 {
+    // The handle in the pick callback already makes a late sample harmless, but
+    // an armed picker outliving its floater would leave the user holding an
+    // eyedropper cursor that has nothing left to tell. Put the previous tool
+    // back instead.
+    if (LLToolMgr::instanceExists() &&
+        LLToolMgr::getInstance()->getCurrentTool() == ALToolScenePicker::getInstance())
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+    }
+
+    // The bypass mask lives in the pipeline and the checkboxes that drive it
+    // live here, so closing the floater with one ticked would leave a section
+    // permanently suppressed with nothing left on screen to say so, and no
+    // setting to inspect either. The comparison ends when the tool does.
+    LLPipeline::sGradeBypassMask = 0;
+
+    // Same rule for the reference still, with a second reason: it is a
+    // full-resolution target, so leaving one behind holds real memory for a
+    // comparison nobody can see or turn off any more.
+    gSavedSettings.setS32("RenderReferenceWipeMode", 0);
+    gPipeline.clearReferenceStill();
 }
 
 bool ALFloaterLightBox::postBuild()
@@ -143,6 +211,37 @@ bool ALFloaterLightBox::postBuild()
         [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshLooksBar(); });
     refreshLooksBar();
 
+    mUndoButton = findChild<LLUICtrl>("look_undo");
+    mRedoButton = findChild<LLUICtrl>("look_redo");
+    mReferenceClear = findChild<LLUICtrl>("reference_clear");
+    mReferenceMode = findChild<LLUICtrl>("reference_mode");
+    mReferencePosition = findChild<LLUICtrl>("reference_position");
+
+    // Undo watches exactly the settings a Look carries. Sharing that list is
+    // the point: a control worth saving is a control worth undoing, so a new
+    // grading setting joins both at once instead of one and not the other.
+    //
+    // The signal hands over the old value as well as the new one, so there is
+    // no shadow copy to keep in step -- and llcontrol only fires it when the
+    // value really changed (setValue and resetToDefault both gate on
+    // llsd_compare), so a commit that rewrites the same value cannot put a
+    // do-nothing step on the stack.
+    std::vector<std::string> looks_controls;
+    LLPresetsManager::instance().getLooksControlNames(looks_controls);
+    for (const std::string& setting : looks_controls)
+    {
+        LLControlVariable* controlp = gSavedSettings.getControl(setting);
+        if (!controlp)
+        {
+            // LLPresetsManager already warns loudly about a whitelist name
+            // that has stopped existing; no need to say it twice.
+            continue;
+        }
+        mHistoryConnections.emplace_back(controlp->getSignal()->connect(
+            [this, setting](LLControlVariable*, const LLSD& new_value, const LLSD& old_value)
+            { onGradeSettingChanged(setting, old_value, new_value); }));
+    }
+
     collectVec3Spinners(this, mVec3Rows);
     for (const auto& row : mVec3Rows)
     {
@@ -157,6 +256,9 @@ bool ALFloaterLightBox::postBuild()
             [this, setting](LLControlVariable*, const LLSD&, const LLSD&) { refreshVec3Row(setting); }));
         refreshVec3Row(setting);
     }
+
+    setupToneCurve();
+    setupSplitToneGraph();
 
     return LLFloater::postBuild();
 }
@@ -237,6 +339,9 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
         collectBoundControls(advp, keys);
     }
 
+    // One thing the user did, however many controls it moves: undoing a Reset
+    // All eleven times would be absurd.
+    ScopedHistoryGroup group(mHistory);
     for (const std::string& key : keys)
     {
         if (LLControlVariable* controlp = gSavedSettings.getControl(key))
@@ -244,6 +349,192 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
             controlp->resetToDefault(true);
         }
     }
+}
+
+void ALFloaterLightBox::onToggleBypass(LLUICtrl* ctrl, const LLSD& userdata)
+{
+    // Section id to bit. The grouping matches Reset All's, which walks
+    // sec_<id> and sec_<id>_adv together -- so "basic" covers the
+    // Basic-Advanced rows too, and the user only has to learn one idea of what
+    // a section is.
+    static const std::map<std::string, U32> bypass_bits = {
+        { "basic",     LLPipeline::GRADE_BYPASS_BASIC },
+        { "primaries", LLPipeline::GRADE_BYPASS_PRIMARIES },
+        { "split",     LLPipeline::GRADE_BYPASS_SPLIT },
+        { "lut",       LLPipeline::GRADE_BYPASS_LUT },
+        { "curve",     LLPipeline::GRADE_BYPASS_CURVE },
+    };
+
+    const auto found = bypass_bits.find(userdata.asString());
+    if (!ctrl || found == bypass_bits.end())
+    {
+        return;
+    }
+
+    // Nothing is written to gSavedSettings here, deliberately: every grading
+    // control is on the Looks whitelist, so a comparison built out of one
+    // would mark the active Look dirty and could then be saved mid-comparison.
+    if (ctrl->getValue().asBoolean())
+    {
+        LLPipeline::sGradeBypassMask |= found->second;
+    }
+    else
+    {
+        LLPipeline::sGradeBypassMask &= ~found->second;
+    }
+}
+
+void ALFloaterLightBox::onClickReferenceGrab()
+{
+    // The grab is serviced on the next frame's blit, so what gets frozen is
+    // what the user is looking at as they click, not a frame already gone.
+    gPipeline.requestReferenceStill();
+
+    // Switching the wipe on is the feedback that the grab happened: a Grab
+    // button that visibly does nothing reads as broken, and a still nobody is
+    // looking at has no reason to exist yet.
+    if (gSavedSettings.getS32("RenderReferenceWipeMode") == 0)
+    {
+        gSavedSettings.setS32("RenderReferenceWipeMode", 1);
+    }
+
+    // The still does not exist until the frame renders, so the row cannot be
+    // refreshed to its final state here; the draw loop picks it up.
+    refreshReferenceRow();
+}
+
+void ALFloaterLightBox::onClickReferenceClear()
+{
+    gSavedSettings.setS32("RenderReferenceWipeMode", 0);
+    gPipeline.clearReferenceStill();
+    refreshReferenceRow();
+}
+
+void ALFloaterLightBox::refreshReferenceRow()
+{
+    // Whether a still exists is render state, not a setting, so nothing
+    // signals its arrival -- a grab is only serviced when the frame renders,
+    // and a resize drops the still without asking. Hence the poll from draw().
+    const bool have_still = gPipeline.hasReferenceStill();
+    const S32  mode = gSavedSettings.getS32("RenderReferenceWipeMode");
+
+    // Only the wipe has a movable seam; side by side is always centred.
+    const S32 state = (have_still ? 1 : 0) | ((have_still && mode == 1) ? 2 : 0);
+    if (state == mReferenceRowState)
+    {
+        return;
+    }
+    mReferenceRowState = state;
+
+    if (mReferenceClear)
+    {
+        mReferenceClear->setEnabled(have_still);
+    }
+    if (mReferenceMode)
+    {
+        mReferenceMode->setEnabled(have_still);
+    }
+    if (mReferencePosition)
+    {
+        mReferencePosition->setEnabled((state & 2) != 0);
+    }
+}
+
+void ALFloaterLightBox::refreshHistoryButtons()
+{
+    // Polled for the same reason the reference row is: the stack moves on
+    // every commit, on every undo, and on a Look being applied, and hanging a
+    // refresh off each of those is more places to forget than this costs.
+    const S32 state = (mHistory.canUndo() ? 1 : 0) | (mHistory.canRedo() ? 2 : 0);
+    if (state == mHistoryButtonState)
+    {
+        return;
+    }
+    mHistoryButtonState = state;
+
+    if (mUndoButton)
+    {
+        mUndoButton->setEnabled((state & 1) != 0);
+    }
+    if (mRedoButton)
+    {
+        mRedoButton->setEnabled((state & 2) != 0);
+    }
+}
+
+void ALFloaterLightBox::draw()
+{
+    refreshReferenceRow();
+    refreshHistoryButtons();
+    LLFloater::draw();
+}
+
+void ALFloaterLightBox::onGradeSettingChanged(const std::string& name, const LLSD& before, const LLSD& after)
+{
+    if (mApplyingHistory)
+    {
+        // Our own write, coming back round. Recording it would append the undo
+        // to the stack it was taken from, and Ctrl+Z would toggle forever
+        // between two values instead of walking backwards.
+        return;
+    }
+
+    // A monotonic clock is all the history wants: it compares two of these to
+    // decide whether one drag is still in progress, and never reads the value
+    // on its own.
+    mHistory.record(name, before, after, (F32)LLTimer::getElapsedSeconds().value());
+}
+
+bool ALFloaterLightBox::applyHistory(bool redo_direction)
+{
+    const ALGradeHistory::Transaction* stepp = redo_direction ? mHistory.redo() : mHistory.undo();
+    if (!stepp)
+    {
+        return false;
+    }
+
+    // Copied, not followed. The pointer is into the history's own stack, and
+    // while the guard below means nothing can record during the writes -- and
+    // so nothing can resize that stack -- relying on it would make this
+    // function's safety a property of code somewhere else. A transaction is a
+    // handful of LLSD.
+    const ALGradeHistory::Transaction step = *stepp;
+
+    ScopedTrue applying(mApplyingHistory);
+    for (const ALGradeHistory::Change& change : step)
+    {
+        if (LLControlVariable* controlp = gSavedSettings.getControl(change.mName))
+        {
+            controlp->setValue(redo_direction ? change.mAfter : change.mBefore);
+        }
+    }
+
+    // Deliberately no attempt to restore which Look was active. Undo restores
+    // values; the Look stays dirty, exactly as it would if the user had typed
+    // the old numbers back in. See ALGradeHistory's header.
+    return true;
+}
+
+bool ALFloaterLightBox::handleKeyHere(KEY key, MASK mask)
+{
+    // Reached only after the focus chain has declined the key, so a text field
+    // in the middle of an edit keeps Ctrl+Z for its own undo.
+    if (key == 'Z' && mask == MASK_CONTROL)
+    {
+        applyHistory(false);
+        return true;
+    }
+
+    // Both spellings: Ctrl+Y is the Windows convention and Ctrl+Shift+Z the one
+    // every grading application uses.
+    if ((key == 'Y' && mask == MASK_CONTROL) ||
+        (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT)))
+    {
+        applyHistory(true);
+        return true;
+    }
+
+    return LLFloater::handleKeyHere(key, mask);
 }
 
 void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
@@ -278,11 +569,395 @@ void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
     controlp->set(updated);
 }
 
+namespace
+{
+// The three settings the tone curve graph edits, and the order the handles
+// are built in. Kept together so the graph and the spinner rows below it can
+// never disagree about which key is which.
+const char* const TONE_CURVE_TOE      = "RenderColorGradeCurveToe";
+const char* const TONE_CURVE_SHOULDER = "RenderColorGradeCurveShoulder";
+const char* const TONE_CURVE_STRENGTH = "RenderColorGradeCurveStrength";
+
+// The split-toning settings the band graph reads. The tints colour the bands,
+// the amounts fade them, and the balance is the only one the graph writes.
+const char* const SPLIT_TONE_SHADOW         = "RenderSplitToneShadowTint";
+const char* const SPLIT_TONE_MIDTONE        = "RenderSplitToneMidtoneTint";
+const char* const SPLIT_TONE_HIGHLIGHT      = "RenderSplitToneHighlightTint";
+const char* const SPLIT_TONE_AMOUNT         = "RenderSplitToneAmount";
+const char* const SPLIT_TONE_MIDTONE_AMOUNT = "RenderSplitToneMidtoneAmount";
+const char* const SPLIT_TONE_BALANCE        = "RenderSplitToneBalance";
+
+LLColor3 getColor3(const char* key)
+{
+    return gSavedSettings.getColor3(key);
+}
+
+// Write one component, or all three when channel is negative. Rebuilds the
+// whole array the way onCommitVec3 does, so an untouched component keeps its
+// value rather than being re-derived from a rounded read-back.
+void setColor3Component(const char* key, S32 channel, F32 value)
+{
+    LLControlVariable* controlp = gSavedSettings.getControl(key);
+    if (!controlp)
+    {
+        return;
+    }
+    const LLSD current = controlp->getValue();
+    LLSD updated = LLSD::emptyArray();
+    for (S32 i = 0; i < 3; ++i)
+    {
+        const bool touched = (channel < 0) || (channel == i);
+        updated.append(LLSD::Real(touched ? value : current[i].asReal()));
+    }
+    controlp->set(updated);
+}
+
+/// Where the curve departs furthest from the identity. That is the most
+/// sensitive place to read strength back from a dragged handle -- solving
+/// k = (y - x) / (s - x) anywhere the two are close would amplify a pixel of
+/// pointer movement into a wild swing -- and it is also where the eye reads
+/// the curve's effect, so it is where the handle belongs.
+F32 findMaxDeviation(F32 toe, F32 shoulder)
+{
+    constexpr S32 SAMPLES = 64;
+    F32 best_x = 0.5f;
+    F32 best_gap = -1.f;
+    for (S32 i = 1; i < SAMPLES; ++i)
+    {
+        const F32 x = (F32)i / (F32)SAMPLES;
+        // The pure curve at full strength: the deviation the blend scales.
+        const F32 gap = fabsf(ALCurveModel::smoothstep(x, toe, shoulder, 1.f) - x);
+        if (gap > best_gap)
+        {
+            best_gap = gap;
+            best_x = x;
+        }
+    }
+    return best_x;
+}
+} // namespace
+
+S32 ALFloaterLightBox::getToneCurveChannel() const
+{
+    return mToneCurveChannel ? mToneCurveChannel->getValue().asInteger() : -1;
+}
+
+void ALFloaterLightBox::setupToneCurve()
+{
+    mToneCurve = findChild<ALCurveEditorCtrl>("tone_curve_graph");
+    if (!mToneCurve)
+    {
+        return;
+    }
+    mToneCurveChannel = findChild<LLComboBox>("tone_curve_channel");
+    if (mToneCurveChannel)
+    {
+        // Start linked. Without an explicit selection an unselected combo
+        // reads back as 0, which would silently mean "red only".
+        mToneCurveChannel->selectByValue(LLSD(-1));
+    }
+
+    for (const char* key : { TONE_CURVE_TOE, TONE_CURVE_SHOULDER, TONE_CURVE_STRENGTH })
+    {
+        if (LLControlVariable* controlp = gSavedSettings.getControl(key))
+        {
+            mToneCurveConnections.emplace_back(controlp->getSignal()->connect(
+                [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshToneCurve(); }));
+        }
+    }
+
+    refreshToneCurve();
+}
+
+void ALFloaterLightBox::refreshToneCurve()
+{
+    if (!mToneCurve || mToneCurveUpdating)
+    {
+        return;
+    }
+
+    const LLColor3 toe = getColor3(TONE_CURVE_TOE);
+    const LLColor3 shoulder = getColor3(TONE_CURVE_SHOULDER);
+    const LLColor3 strength = getColor3(TONE_CURVE_STRENGTH);
+
+    // Linked edits all three at once and shows one curve; a single channel
+    // shows its own curve solid with the other two behind it, so you can see
+    // how far apart you have pulled them.
+    const S32 channel = getToneCurveChannel();
+    const S32 plotted = (channel < 0) ? 0 : channel;
+
+    const F32 t = toe.mV[plotted];
+    const F32 s = shoulder.mV[plotted];
+    const F32 k = strength.mV[plotted];
+
+    mToneCurve->setCurve([t, s, k](F32 x) { return ALCurveModel::smoothstep(x, t, s, k); });
+
+    mToneCurve->clearGhostCurves();
+    if (channel >= 0)
+    {
+        static const LLColor4 channel_tint[3] = {
+            LLColor4(0.8f, 0.25f, 0.25f, 0.55f),
+            LLColor4(0.25f, 0.8f, 0.35f, 0.55f),
+            LLColor4(0.35f, 0.5f, 0.9f, 0.55f) };
+        for (S32 i = 0; i < 3; ++i)
+        {
+            if (i == channel)
+            {
+                continue;
+            }
+            const F32 gt = toe.mV[i];
+            const F32 gs = shoulder.mV[i];
+            const F32 gk = strength.mV[i];
+            mToneCurve->addGhostCurve(
+                [gt, gs, gk](F32 x) { return ALCurveModel::smoothstep(x, gt, gs, gk); },
+                channel_tint[i]);
+        }
+    }
+
+    const F32 strength_x = findMaxDeviation(t, s);
+
+    std::vector<ALCurveEditorCtrl::Handle> handles;
+    ALCurveEditorCtrl::Handle h;
+
+    h.mName = "toe";
+    h.mX = t;
+    h.mY = ALCurveModel::smoothstep(t, t, s, k);
+    h.mLockY = true;
+    handles.push_back(h);
+
+    h = ALCurveEditorCtrl::Handle();
+    h.mName = "shoulder";
+    h.mX = s;
+    h.mY = ALCurveModel::smoothstep(s, t, s, k);
+    h.mLockY = true;
+    handles.push_back(h);
+
+    h = ALCurveEditorCtrl::Handle();
+    h.mName = "strength";
+    h.mX = strength_x;
+    h.mY = ALCurveModel::smoothstep(strength_x, t, s, k);
+    h.mLockX = true;
+    handles.push_back(h);
+
+    mToneCurve->setHandles(std::move(handles));
+}
+
+void ALFloaterLightBox::onCommitToneCurve()
+{
+    if (!mToneCurve)
+    {
+        return;
+    }
+
+    const std::string which = mToneCurve->getActiveHandleName();
+    const S32 index = mToneCurve->getActiveHandle();
+    if (which.empty() || index < 0 || index >= (S32)mToneCurve->getHandles().size())
+    {
+        return;
+    }
+    const ALCurveEditorCtrl::Handle handle = mToneCurve->getHandles()[index];
+
+    const S32 channel = getToneCurveChannel();
+    const S32 read = (channel < 0) ? 0 : channel;
+    const F32 toe = getColor3(TONE_CURVE_TOE).mV[read];
+    const F32 shoulder = getColor3(TONE_CURVE_SHOULDER).mV[read];
+    const F32 strength = getColor3(TONE_CURVE_STRENGTH).mV[read];
+
+    // Writing a setting re-enters through its signal; let the write land, then
+    // rebuild the handles once from the values that actually stuck.
+    mToneCurveUpdating = true;
+
+    if (which == "toe")
+    {
+        // Held at or below the shoulder. The shader tolerates the inversion
+        // (its reciprocal is guarded) but it renders as a hard step with no
+        // visible cause; the spinners remain the way to ask for that.
+        setColor3Component(TONE_CURVE_TOE, channel, llmin(handle.mX, shoulder));
+    }
+    else if (which == "shoulder")
+    {
+        setColor3Component(TONE_CURVE_SHOULDER, channel, llmax(handle.mX, toe));
+    }
+    else if (which == "strength")
+    {
+        // The handle rides the curve at a fixed x, so its height is
+        // mix(x, s, k) and k falls straight out of it.
+        const F32 x = handle.mX;
+        const F32 s = ALCurveModel::smoothstep(x, toe, shoulder, 1.f);
+        const F32 gap = s - x;
+        if (fabsf(gap) > 1e-3f)
+        {
+            setColor3Component(TONE_CURVE_STRENGTH, channel, llclamp((handle.mY - x) / gap, 0.f, 1.f));
+        }
+    }
+
+    mToneCurveUpdating = false;
+    refreshToneCurve();
+}
+
+void ALFloaterLightBox::setupSplitToneGraph()
+{
+    mSplitToneGraph = findChild<ALCurveEditorCtrl>("split_tone_graph");
+    if (!mSplitToneGraph)
+    {
+        return;
+    }
+
+    // Every input, not just the balance: the tints decide what colour a band
+    // is drawn in and the amounts decide how solid, so a graph that only
+    // watched the balance would sit there showing a tint the renderer had
+    // already stopped applying.
+    for (const char* key : { SPLIT_TONE_SHADOW, SPLIT_TONE_MIDTONE, SPLIT_TONE_HIGHLIGHT,
+                             SPLIT_TONE_AMOUNT, SPLIT_TONE_MIDTONE_AMOUNT, SPLIT_TONE_BALANCE })
+    {
+        if (LLControlVariable* controlp = gSavedSettings.getControl(key))
+        {
+            mSplitToneConnections.emplace_back(controlp->getSignal()->connect(
+                [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshSplitToneGraph(); }));
+        }
+    }
+
+    refreshSplitToneGraph();
+}
+
+void ALFloaterLightBox::refreshSplitToneGraph()
+{
+    if (!mSplitToneGraph || mSplitToneUpdating)
+    {
+        return;
+    }
+
+    const F32 mid = ALCurveModel::splitToneMid(gSavedSettings.getF32(SPLIT_TONE_BALANCE));
+    const F32 amount     = llclamp(gSavedSettings.getF32(SPLIT_TONE_AMOUNT), 0.f, 1.f);
+    const F32 mid_amount = llclamp(gSavedSettings.getF32(SPLIT_TONE_MIDTONE_AMOUNT), 0.f, 1.f);
+
+    // A band wears the tint it applies. Normalised the way pipeline.cpp
+    // normalises it, so what the graph shows is the hue the renderer will
+    // actually use and a tint that is merely bright reads as neutral -- which
+    // is the truth, since the shader divides that brightness back out.
+    auto band_color = [](const char* key, F32 strength)
+    {
+        const LLColor3 tint = getColor3(key);
+        constexpr F32 LUMA_R = 0.2126f, LUMA_G = 0.7152f, LUMA_B = 0.0722f;
+        const F32 luma = llmax(tint.mV[0] * LUMA_R + tint.mV[1] * LUMA_G + tint.mV[2] * LUMA_B, 1e-4f);
+
+        // Half brightness so a neutral band is mid grey and a saturated one has
+        // room to read as itself without clipping to white.
+        constexpr F32 DISPLAY_LEVEL = 0.5f;
+        LLColor4 out(llclamp(tint.mV[0] / luma * DISPLAY_LEVEL, 0.f, 1.f),
+                     llclamp(tint.mV[1] / luma * DISPLAY_LEVEL, 0.f, 1.f),
+                     llclamp(tint.mV[2] / luma * DISPLAY_LEVEL, 0.f, 1.f),
+                     1.f);
+        // Alpha follows the amount, so a band the renderer is ignoring fades
+        // instead of sitting at full strength claiming otherwise. It never
+        // reaches zero: where the bands lie is worth seeing even when nothing
+        // is being applied, and that is what the balance handle moves.
+        out.mV[VALPHA] = 0.16f + 0.44f * strength;
+        return out;
+    };
+
+    mSplitToneGraph->clearFillCurves();
+    mSplitToneGraph->addFillCurve(
+        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mShadow; },
+        band_color(SPLIT_TONE_SHADOW, amount));
+    mSplitToneGraph->addFillCurve(
+        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mMidtone; },
+        band_color(SPLIT_TONE_MIDTONE, mid_amount));
+    mSplitToneGraph->addFillCurve(
+        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mHighlight; },
+        band_color(SPLIT_TONE_HIGHLIGHT, amount));
+
+    // The handle rides the peak of the midtone band, which is exactly where the
+    // two ramps cross and hand over -- the split point the setting names. Held
+    // to the horizontal, because moving it up or down would mean nothing.
+    ALCurveEditorCtrl::Handle handle;
+    handle.mName = "balance";
+    handle.mX = mid;
+    handle.mY = 1.f;
+    handle.mLockY = true;
+    mSplitToneGraph->setHandles({ handle });
+}
+
+void ALFloaterLightBox::onCommitSplitToneGraph()
+{
+    if (!mSplitToneGraph || mSplitToneGraph->getHandles().empty())
+    {
+        return;
+    }
+
+    // Dragged past either end, the balance clamps and the refresh below puts
+    // the handle back where the setting actually landed, rather than leaving it
+    // parked somewhere the renderer will not follow.
+    const F32 mid = mSplitToneGraph->getHandles()[0].mX;
+
+    mSplitToneUpdating = true;
+    gSavedSettings.setF32(SPLIT_TONE_BALANCE, ALCurveModel::splitToneBalance(mid));
+    mSplitToneUpdating = false;
+    refreshSplitToneGraph();
+}
+
+void ALFloaterLightBox::onClickWhiteBalancePicker()
+{
+    ALToolScenePicker* picker = ALToolScenePicker::getInstance();
+
+    // A handle, not `this`. Two gaps let this floater die first: the tool stays
+    // armed until something is clicked, and the sample itself only arrives a
+    // frame after the click. This floater declares neither single_instance nor
+    // reuse_instance, so LLFloater::closeFloater destroys it outright -- arm
+    // the picker, close the Lightbox, click the world, and a raw pointer would
+    // be a use-after-free.
+    LLHandle<ALFloaterLightBox> handle = getDerivedHandle<ALFloaterLightBox>();
+    picker->setPickCallback([handle](const LLColor3& sample)
+    {
+        if (ALFloaterLightBox* self = handle.get())
+        {
+            self->onWhiteBalancePicked(sample);
+        }
+    });
+
+    LLToolMgr::getInstance()->setTransientTool(picker);
+}
+
+void ALFloaterLightBox::onWhiteBalancePicked(const LLColor3& sample)
+{
+    // The ratios of three near-zero numbers are noise, and a sample in shadow
+    // is exactly where a click lands when someone misses. Refuse rather than
+    // swing the sliders to an answer read out of rounding error.
+    constexpr F32 MIN_LUMA = 1e-3f;
+    const F32 luma = sample.mV[0] * 0.2126f + sample.mV[1] * 0.7152f + sample.mV[2] * 0.0722f;
+    if (luma < MIN_LUMA)
+    {
+        LLNotificationsUtil::add("LightBoxWhiteBalanceTooDark");
+        return;
+    }
+
+    const ALWhiteBalanceSolver::Result solved = ALWhiteBalanceSolver::solveForColor(sample);
+
+    // Past this the sliders cannot express what was asked for -- a strongly
+    // coloured surface, not a neutral one lit by coloured light. Applying the
+    // nearest reachable balance would look like the tool misfiring, so say so
+    // and change nothing. The threshold is well clear of the ~1e-3 a genuine
+    // solve returns and well below the 0.1-plus of a saturated sample.
+    constexpr F32 MAX_RESIDUAL = 0.02f;
+    if (solved.mResidual > MAX_RESIDUAL)
+    {
+        LLNotificationsUtil::add("LightBoxWhiteBalanceUnreachable");
+        return;
+    }
+
+    gSavedSettings.setF32("RenderColorGradeWhiteBalanceCCT", solved.mCCTOffset);
+    gSavedSettings.setF32("RenderColorGradeWhiteBalanceDuv", solved.mDuv);
+}
+
 void ALFloaterLightBox::onLookSelected()
 {
     const std::string name = mLooksCombo ? mLooksCombo->getSimple() : std::string();
     if (!name.empty())
     {
+        // Applying a Look writes every whitelisted key it carries. That is one
+        // choice, so it is one undo step -- and it is the step a user most
+        // wants back, having tried a Look on top of work they liked.
+        ScopedHistoryGroup group(mHistory);
         LLPresetsManager::getInstance()->loadLooksPreset(name);
     }
 }
@@ -318,6 +993,9 @@ void ALFloaterLightBox::onClickLookRevert()
     const std::string last = gSavedSettings.getString("PresetLooksLastApplied");
     if (!last.empty())
     {
+        // Same reasoning as onLookSelected: a revert throws away every edit
+        // since the Look was applied, and that had better be one Ctrl+Z.
+        ScopedHistoryGroup group(mHistory);
         LLPresetsManager::getInstance()->loadLooksPreset(last);
     }
 }
@@ -340,9 +1018,18 @@ void ALFloaterLightBox::refreshLooksBar()
     }
     else if (!last.empty())
     {
-        mLooksCombo->setLabel(last);
+        // The modified marker rides the name rather than sitting beside it as
+        // its own widget. Attached, it says which Look has been changed; a
+        // detached asterisk only says that something somewhere has.
+        //
+        // Display only: nothing selects while modified, which is the state
+        // this branch is, and onLookSelected reads the chosen item's own text
+        // rather than the combo's label -- so the marker cannot travel into a
+        // Look name.
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = last;
+        mLooksCombo->setLabel(getString("look_name_modified", args));
     }
-    getChild<LLUICtrl>("look_modified")->setVisible(modified);
     getChild<LLUICtrl>("look_save")->setEnabled(!active.empty() || !last.empty());
     getChild<LLUICtrl>("look_delete")->setEnabled(mLooksCombo->getItemCount() > 0);
     getChild<LLUICtrl>("look_revert")->setEnabled(modified);
@@ -381,9 +1068,9 @@ void ALFloaterLightBox::refreshVec3Row(const std::string& setting_name)
     mVec3Updating = true;
     for (S32 i = 0; i < 3; ++i)
     {
-        if (LLSpinCtrl* spinnerp = row->second[i])
+        if (LLUICtrl* ctrlp = row->second[i])
         {
-            spinnerp->setValue(value[i].asReal());
+            ctrlp->setValue(value[i].asReal());
         }
     }
     mVec3Updating = false;

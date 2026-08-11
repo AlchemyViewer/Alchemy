@@ -34,10 +34,12 @@
 #include "llrect.h"
 #include "llsingleton.h"
 #include "llglslshader.h"
+#include "v2math.h"
+
+#include <vector>
 
 class LLColor4;
 class LLVector3;
-class LLVector2;
 class LLUIImage;
 class LLUUID;
 
@@ -48,6 +50,34 @@ void gl_state_for_2d(S32 width, S32 height);
 
 void gl_line_2d(S32 x1, S32 y1, S32 x2, S32 y2);
 void gl_line_2d(S32 x1, S32 y1, S32 x2, S32 y2, const LLColor4 &color );
+
+// Anti-aliased polyline through `points`, drawn as a ribbon of triangles with
+// a one-pixel alpha falloff along each edge.
+//
+// GL_LINE_SMOOTH is not used, and deliberately: it appears nowhere in this
+// tree, core profiles routinely ignore it, and LLRender::setLineWidth already
+// clamps to mAliasedLineRange -- which is [1,1] on most core drivers -- so
+// neither smoothing nor width can be relied on from the fixed pipeline. Doing
+// the coverage by hand costs a few triangles per segment and looks the same
+// everywhere.
+//
+// Joins are mitred, so a continuous curve has no notches at its vertices. The
+// mitre is clamped, so a hairpin turn is blunted rather than shooting off to
+// infinity. Fewer than two points draws nothing; coincident points are skipped.
+void gl_polyline_2d(const std::vector<LLVector2>& points, const LLColor4& color,
+                    F32 width = 1.f, bool closed = false);
+
+// The area between `points` and the horizontal line y = `baseline_y`, flat
+// filled. The companion to gl_polyline_2d for a graph whose meaning is how much
+// is under the curve rather than where the curve runs -- a weight band, an
+// occupancy plot -- where an outline alone reads as three crossing lines.
+//
+// The edge is left aliased: pass a translucent colour, as such a fill wants,
+// and the polyline's feathered skirt would double up against the fill it sits
+// on and draw a darker seam along the top. Outline it with gl_polyline_2d if a
+// crisp edge is wanted; then the two feathers sit on the same path.
+void gl_polyfill_2d(const std::vector<LLVector2>& points, F32 baseline_y,
+                    const LLColor4& color);
 void gl_triangle_2d(S32 x1, S32 y1, S32 x2, S32 y2, S32 x3, S32 y3, const LLColor4& color, bool filled);
 void gl_rect_2d_simple( S32 width, S32 height );
 
@@ -70,6 +100,21 @@ void gl_ring( F32 radius, F32 width, const LLColor4& center_color, const LLColor
 void gl_corners_2d(S32 left, S32 top, S32 right, S32 bottom, S32 length, F32 max_frac);
 void gl_washer_2d(F32 outer_radius, F32 inner_radius, S32 steps, const LLColor4& inner_color, const LLColor4& outer_color);
 void gl_washer_segment_2d(F32 outer_radius, F32 inner_radius, F32 start_radians, F32 end_radians, S32 steps, const LLColor4& inner_color, const LLColor4& outer_color);
+
+// A washer whose colour varies AROUND the sweep rather than across it: one
+// entry in `colors` per step, wrapping back to the first. The washers above
+// take a single inner and outer colour held constant along the arc, which can
+// only ever make a radial gradient -- this is the angular one, and it is what
+// a hue ring needs.
+//
+// `inner_fade` scales each colour's alpha at the inner edge, so a ring can
+// fall off toward its centre instead of ending in a hard step.
+//
+// Like its siblings and unlike gl_circle_2d, this draws around the CURRENT
+// origin and does not push the UI matrix -- wrap it in gGL.pushUIMatrix() and
+// translateUI() yourself. Fewer than three colours draws nothing.
+void gl_washer_angular_2d(F32 outer_radius, F32 inner_radius,
+                          const std::vector<LLColor4>& colors, F32 inner_fade = 1.f);
 
 void gl_draw_image(S32 x, S32 y, LLTexture* image, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));
 void gl_draw_scaled_target(S32 x, S32 y, S32 width, S32 height, LLRenderTarget* target, const LLColor4& color = UI_VERTEX_COLOR, const LLRectf& uv_rect = LLRectf(0.f, 1.f, 1.f, 0.f));

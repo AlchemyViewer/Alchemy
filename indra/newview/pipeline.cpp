@@ -54,6 +54,7 @@
 #include "llglheaders.h"
 #include "alsamplerstate.h"
 #include "aluniformbuffer.h"
+#include "alwhitebalancesolver.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -319,6 +320,9 @@ bool    LLPipeline::sRenderTextures = true;
 // [RLVa:KB] - @setsphere
 bool    LLPipeline::sUseDepthTexture = false;
 // [/RLVa:KB]
+bool    LLPipeline::sScopeCapture = false;
+bool    LLPipeline::sGradeBypass = false;
+U32     LLPipeline::sGradeBypassMask = 0;
 
 // EventHost API LLPipeline listener.
 static LLPipelineListener sPipelineListener;
@@ -1303,6 +1307,8 @@ void LLPipeline::releaseGLBuffers()
 
     releaseScreenBuffers();
     releaseShadowBuffers();
+    releaseScopeBuffers();
+    clearReferenceStill();
 
     gBumpImageList.destroyGL();
     LLVOAvatar::resetImpostors();
@@ -1661,20 +1667,37 @@ void LLPipeline::setupGradingLUT()
             if (temp_exten == "cube")
             {
                 LutCube lutCube(lut_path);
-                if (!lutCube.colorCube.empty())
+                if (lutCube.colorCube.empty())
                 {
-                    try
-                    {
-                        raw_image = new LLImageRaw(lutCube.colorCube.data(), lutCube.size * lutCube.size, lutCube.size, 4);
-                    }
-                    catch (const std::bad_alloc&)
-                    {
-                        return;
-                    }
-                    flip_green = false;
-                    swap_bluegreen = false;
-                    decode_success = true;
+                    LL_WARNS() << "Failed to decode color grading LUT: " << lut_path << LL_ENDL;
+                    return;
                 }
+
+                if (lutCube.size > gGLManager.mGLMaxTextureSize)
+                {
+                    LL_WARNS() << "Color LUT of side " << lutCube.size << " exceeds the maximum texture size at path "
+                               << lut_path << LL_ENDL;
+                    return;
+                }
+
+                // The .cube path does not go through LLImageRaw: that class is
+                // 8 bits per channel, and flattening a cube of floats to 256
+                // levels before the hardware interpolates between them is where
+                // LUT banding comes from. LutCube already lays its entries out
+                // with x varying fastest, which is the order glTexSubImage3D
+                // wants, and a cube needs neither of the axis fixups an image
+                // strip does -- hence the two zeroes below.
+                mCGLutSize = LLVector4((F32)lutCube.size, 0.f, 0.f);
+
+                mCGLut = new ALTexture3D();
+                if (!mCGLut->allocate(lutCube.size, lutCube.size, lutCube.size,
+                                      GL_RGBA16, GL_RGBA, GL_UNSIGNED_SHORT,
+                                      lutCube.colorCube.data()))
+                {
+                    LL_WARNS() << "Failed to allocate color grading LUT texture." << LL_ENDL;
+                    mCGLut = nullptr;
+                }
+                return;
             }
             else
             {
@@ -7336,6 +7359,286 @@ void LLPipeline::visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 
     dst->flush();
 }
 
+void LLPipeline::requestScenePixel(S32 x, S32 y, scene_pixel_cb_t callback)
+{
+    if (!callback)
+    {
+        return;
+    }
+    mScenePixelX = x;
+    mScenePixelY = y;
+    mScenePixelCallback = std::move(callback);
+    mScenePixelPending = true;
+}
+
+void LLPipeline::serviceScenePixelProbe(LLRenderTarget* src)
+{
+    if (!mScenePixelPending || !src || gCubeSnapshot)
+    {
+        return;
+    }
+
+    // Cleared before the callback runs, not after: the callback is free to ask
+    // for another sample, and swallowing that request would make a tool that
+    // stays armed sample exactly once.
+    mScenePixelPending = false;
+    scene_pixel_cb_t callback;
+    callback.swap(mScenePixelCallback);
+
+    // glReadPixels upsets nSight, which is why every other readback in the
+    // tree is gated the same way. Nothing to report, so nothing is reported --
+    // the caller has already been told the answer comes later, and a tool that
+    // simply does not fire beats one that fires with a lie in it.
+    if (LLRender::sNsightDebugSupport)
+    {
+        return;
+    }
+
+    // The mouse arrives in scaled window coordinates; the buffer is in raw
+    // pixels, is only the world view rather than the whole window, and may be
+    // rendered at a fraction of that again under resolution scaling. All three
+    // conversions live in worldViewUV, in one place, because the scopes'
+    // cursor readout needs exactly the same walk -- and the first version of
+    // that one skipped the scaled-to-raw step, which is invisible on a machine
+    // where the two spaces happen to match.
+    F32 u = 0.f, v = 0.f;
+    if (!worldViewUV(mScenePixelX, mScenePixelY, u, v))
+    {
+        // Clicked outside the 3D view. Nothing there to sample.
+        return;
+    }
+
+    const S32 px = llclamp((S32)(u * (F32)src->getWidth()),  0, (S32)src->getWidth()  - 1);
+    const S32 py = llclamp((S32)(v * (F32)src->getHeight()), 0, (S32)src->getHeight() - 1);
+
+    F32 texel[4] = { 0.f, 0.f, 0.f, 0.f };
+    src->bindTarget();
+    glReadPixels(px, py, 1, 1, GL_RGBA, GL_FLOAT, texel);
+    src->flush();
+
+    // A synchronous read stalls the pipe. That is the right trade here: it
+    // happens once, on a click, and a PBO round trip would mean holding the
+    // request across frames for a result no one is waiting on but the person
+    // who just clicked.
+    callback(LLColor3(texel[0], texel[1], texel[2]));
+}
+
+void LLPipeline::releaseScopeBuffers()
+{
+    if (mScopePBO[0])
+    {
+        glDeleteBuffers(2, mScopePBO);
+        mScopePBO[0] = 0;
+        mScopePBO[1] = 0;
+    }
+    mScopePBOInFlight = -1;
+    mScopeSample.release();
+    mScopeData.clear();
+}
+
+// static
+bool LLPipeline::worldViewUV(S32 scaled_x, S32 scaled_y, F32& u, F32& v)
+{
+    // Everything here stays in scaled window space, and the answer comes out as
+    // a fraction of the world view -- which is all a buffer covering that view
+    // needs, whatever resolution it happens to be rendered at.
+    //
+    // The previous version converted the mouse to raw pixels by the *window's*
+    // raw/scaled ratio and then measured it against the *world view's* raw
+    // rect. Those are two different scalings, and mixing them leaves an error
+    // proportional to the distance from the origin: dead on in one corner and
+    // visibly adrift in the far one. Staying in one space cannot express that
+    // mistake. It is also what the viewer itself does when it asks whether the
+    // cursor is over the world (llviewerwindow.cpp, getWorldViewRectScaled
+    // against mCurrentMousePoint).
+    const LLRect world = gViewerWindow->getWorldViewRectScaled();
+    if (world.getWidth() <= 0 || world.getHeight() <= 0)
+    {
+        return false;
+    }
+
+    u = (F32)(scaled_x - world.mLeft)   / (F32)world.getWidth();
+    v = (F32)(scaled_y - world.mBottom) / (F32)world.getHeight();
+    return (u >= 0.f && u <= 1.f && v >= 0.f && v <= 1.f);
+}
+
+bool LLPipeline::getScopePixel(S32 scaled_x, S32 scaled_y, LLColor4U& out) const
+{
+    const S32 width  = mScopeSample.getWidth();
+    const S32 height = mScopeSample.getHeight();
+    if (width <= 0 || height <= 0 || mScopeReadback.size() < (size_t)width * height * 4)
+    {
+        return false;
+    }
+
+    F32 u = 0.f, v = 0.f;
+    if (!worldViewUV(scaled_x, scaled_y, u, v))
+    {
+        return false;
+    }
+
+    // The sample is a point decimation of the whole world view, so this is a
+    // plain rescale with no letterboxing or crop to undo. Row 0 is the bottom:
+    // glReadPixels fills bottom-up and the world rect counts y upwards too, so
+    // v == 0 is the bottom on both sides and there is no flip.
+    const S32 sx = llclamp((S32)(u * (F32)width),  0, width  - 1);
+    const S32 sy = llclamp((S32)(v * (F32)height), 0, height - 1);
+
+    const size_t at = ((size_t)sy * width + sx) * 4;
+    out.set(mScopeReadback[at], mScopeReadback[at + 1], mScopeReadback[at + 2], 255);
+    return true;
+}
+
+void LLPipeline::clearReferenceStill()
+{
+    mReferenceStill.release();
+    mReferenceStillWanted = false;
+}
+
+void LLPipeline::captureReferenceStill(LLRenderTarget* src)
+{
+    if (!src || gCubeSnapshot)
+    {
+        return;
+    }
+
+    // A still taken at one resolution cannot honestly be compared against a
+    // frame at another: sampled by UV it would stretch, and a reference you
+    // cannot trust geometrically is worse than no reference at all. Drop it
+    // and let the user grab again -- which is what a resize does to every
+    // other full-resolution target here anyway.
+    if (mReferenceStill.getWidth() != src->getWidth() ||
+        mReferenceStill.getHeight() != src->getHeight())
+    {
+        mReferenceStill.release();
+    }
+
+    if (!mReferenceStillWanted)
+    {
+        return;
+    }
+    mReferenceStillWanted = false;
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    LL_PROFILE_GPU_ZONE("reference still");
+
+    if (mReferenceStill.getWidth() == 0)
+    {
+        // GL_RGB10_A2 whether or not HDR is on. It is what the post chain uses
+        // in HDR and the same four bytes per pixel as the GL_RGBA8 it uses
+        // otherwise, so this copy is exact in the first case and lossless in
+        // the second, without having to track which one the source was.
+        if (!mReferenceStill.allocate(src->getWidth(), src->getHeight(), GL_RGB10_A2))
+        {
+            LL_WARNS("Pipeline") << "Could not allocate the reference still target." << LL_ENDL;
+            mReferenceStill.release();
+            return;
+        }
+    }
+
+    mReferenceStill.copyContents(*src, 0, 0, src->getWidth(), src->getHeight(),
+                                 0, 0, mReferenceStill.getWidth(), mReferenceStill.getHeight(),
+                                 GL_COLOR_BUFFER_BIT, GL_NEAREST);
+}
+
+void LLPipeline::captureScopeSample(LLRenderTarget* src)
+{
+    if (!sScopeCapture || !src || gCubeSnapshot)
+    {
+        return;
+    }
+
+    // Scopes are read, not watched. Sampling every frame would multiply the
+    // cost by six for a display no one can follow that fast; hardware scopes
+    // update at about this rate for the same reason.
+    static LLCachedControl<F32> interval(gSavedSettings, "AlchemyScopeSampleInterval", 0.1f);
+    if (mScopeSampleTimer.getStarted() && mScopeSampleTimer.getElapsedTimeF32() < llmax(interval(), 0.f))
+    {
+        return;
+    }
+    mScopeSampleTimer.reset();
+    mScopeSampleTimer.start();
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+    LL_PROFILE_GPU_ZONE("scope sample");
+
+    static LLCachedControl<S32> sample_width(gSavedSettings, "AlchemyScopeSampleWidth", 320);
+    const S32 width = llclamp(sample_width(), 32, 1024);
+    const F32 aspect = (F32)llmax(1U, src->getHeight()) / (F32)llmax(1U, src->getWidth());
+    const S32 height = llclamp(ll_round((F32)width * aspect), 16, 1024);
+    const S32 pixels = width * height;
+    const size_t bytes = (size_t)pixels * 4;
+
+    if (mScopeSample.getWidth() != (U32)width || mScopeSample.getHeight() != (U32)height)
+    {
+        // Resolution changed under us (window resize, or the debug key moved).
+        // Anything in flight was measured against the old size, so drop it.
+        mScopeSample.release();
+        if (!mScopeSample.allocate(width, height, GL_RGBA8))
+        {
+            sScopeCapture = false;
+            LL_WARNS("Pipeline") << "Could not allocate the scope sample target; scopes disabled." << LL_ENDL;
+            return;
+        }
+        mScopePBOInFlight = -1;
+    }
+
+    if (!mScopePBO[0])
+    {
+        glGenBuffers(2, mScopePBO);
+        for (S32 i = 0; i < 2; ++i)
+        {
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, mScopePBO[i]);
+            glBufferData(GL_PIXEL_PACK_BUFFER, bytes, nullptr, GL_STREAM_READ);
+        }
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+        mScopePBOInFlight = -1;
+    }
+
+    // GL_NEAREST on a downscaling blit picks one source texel per destination
+    // texel: a point decimation of the frame, not an average of it. That
+    // distinction is the whole point. A box filter would pull every value
+    // toward the local mean, narrowing the histogram and erasing both tails --
+    // so a small blown highlight, the thing a photographer most wants to be
+    // warned about, would simply vanish into its neighbours.
+    mScopeSample.copyContents(*src, 0, 0, src->getWidth(), src->getHeight(),
+                              0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    const S32 next = (mScopePBOInFlight + 1) & 1;
+
+    // Collect the previous capture first. It was issued a whole sample
+    // interval ago -- many frames -- so the map finds it long since landed and
+    // never blocks. Reading the buffer we are about to write would.
+    if (mScopePBOInFlight >= 0)
+    {
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, mScopePBO[mScopePBOInFlight]);
+        if (const void* mapped = glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY))
+        {
+            mScopeReadback.resize(bytes);
+            memcpy(mScopeReadback.data(), mapped, bytes);
+            glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+
+            ALScopeData fresh;
+            fresh.accumulate(mScopeReadback.data(), width, height);
+
+            // Ease towards the new measurement. A point sample of ~57k pixels
+            // spread over 256 bins carries visible shot noise; without this
+            // the plot shimmers even on a still frame.
+            static LLCachedControl<F32> smoothing(gSavedSettings, "AlchemyScopeSmoothing", 0.5f);
+            mScopeData.blendToward(fresh, llclamp(smoothing(), 0.f, 1.f));
+        }
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    }
+
+    mScopeSample.bindTarget();
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, mScopePBO[next]);
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    mScopeSample.flush();
+
+    mScopePBOInFlight = next;
+}
+
 void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
 {
     // luminance sample and mipmap generation
@@ -7484,85 +7787,6 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     }
 }
 
-namespace
-{
-    // Port of the Kim et al. 2002 Planckian-locus polynomial used by the
-    // original white-balance shader. Valid 1667K..25000K to ~1% of the true
-    // locus. Output is CIE xy chromaticity at Y = 1.
-    inline void cg_cct_to_xy(F32 cct, F32& out_x, F32& out_y)
-    {
-        F32 t = cct, t2 = t * t, t3 = t2 * t;
-        if (t <= 4000.0f)
-            out_x = -0.2661239e9f / t3 - 0.2343589e6f / t2 + 0.8776956e3f / t + 0.179910f;
-        else
-            out_x = -3.0258469e9f / t3 + 2.1070379e6f / t2 + 0.2226347e3f / t + 0.240390f;
-
-        F32 x2 = out_x * out_x, x3 = x2 * out_x;
-        if (t <= 2222.0f)
-            out_y = -1.1063814f  * x3 - 1.34811020f * x2 + 2.18555832f * out_x - 0.20219683f;
-        else if (t <= 4000.0f)
-            out_y = -0.9549476f  * x3 - 1.37418593f * x2 + 2.09137015f * out_x - 0.16748867f;
-        else
-            out_y =  3.0817580f  * x3 - 5.87338670f * x2 + 3.75112997f * out_x - 0.37001483f;
-    }
-
-    // Apply a Duv offset perpendicular to the Planckian locus via a central-
-    // difference tangent in CIE 1960 u,v space (O(h²) accurate). Returns the
-    // new CIE xy chromaticity.
-    inline void cg_apply_duv(F32 cct, F32 duv, F32& out_x, F32& out_y)
-    {
-        F32 xA, yA, xB, yB;
-        cg_cct_to_xy(cct - 1.0f, xA, yA);
-        cg_cct_to_xy(cct + 1.0f, xB, yB);
-
-        F32 dA  = -2.0f * xA + 12.0f * yA + 3.0f;
-        F32 uA  = 4.0f * xA / dA;
-        F32 vA  = 6.0f * yA / dA;
-        F32 dB  = -2.0f * xB + 12.0f * yB + 3.0f;
-        F32 uB  = 4.0f * xB / dB;
-        F32 vB  = 6.0f * yB / dB;
-
-        F32 uMid = 0.5f * (uA + uB);
-        F32 vMid = 0.5f * (vA + vB);
-        F32 tx = uB - uA;
-        F32 ty = vB - vA;
-        F32 tlen = sqrtf(tx * tx + ty * ty);
-        if (tlen > 1e-12f) { tx /= tlen; ty /= tlen; }
-
-        F32 u = uMid + (-ty) * duv;  // perp = (-tangent.y, tangent.x)
-        F32 v = vMid + ( tx) * duv;
-
-        F32 dBack = 2.0f * u - 8.0f * v + 4.0f;
-        out_x = 3.0f * u / dBack;
-        out_y = 2.0f * v / dBack;
-    }
-
-    // Resolve the artist's (CCT offset, Duv) pair into a linear-sRGB gain,
-    // normalised so green pins to 1 (preserves luminance). Duv sign is
-    // flipped to match the tint convention: +Duv pushes green, -Duv magenta.
-    inline LLVector3 cg_compute_white_balance_gain(F32 cct_offset, F32 duv)
-    {
-        if (fabsf(cct_offset) < 1e-3f && fabsf(duv) < 1e-5f)
-            return LLVector3(1.f, 1.f, 1.f);
-
-        constexpr F32 D65_CCT = 6504.0f;
-        F32 target_cct = llclamp(D65_CCT + cct_offset, 1667.0f, 25000.0f);
-
-        F32 x, y;
-        cg_apply_duv(target_cct, -duv, x, y);
-
-        F32 X = x / y;
-        F32 Y = 1.0f;
-        F32 Z = (1.0f - x - y) / y;
-
-        F32 r =  3.2404542f * X - 1.5371385f * Y - 0.4985314f * Z;
-        F32 g = -0.9692660f * X + 1.8760108f * Y + 0.0415560f * Z;
-        F32 b =  0.0556434f * X - 0.2040259f * Y + 1.0572252f * Z;
-
-        F32 inv_g = 1.0f / llmax(g, 1e-6f);
-        return LLVector3(r * inv_g, 1.0f, b * inv_g);
-    }
-}
 
 void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool apply_tonemap, bool apply_color_grade)
 {
@@ -7579,7 +7803,19 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
         LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
-        bool color_grade = apply_color_grade && color_grade_cc;
+        // sGradeBypass is the hold-to-compare key. Both shader variants are
+        // already built and bound by this same branch, so suppressing the
+        // grade is a rebind rather than a recompile -- free, and instant on
+        // the frame the key goes down.
+        // gSnapshotNoPost is the snapshot floater's "No post-processing" box,
+        // and it only ever selected a non-tonemap variant -- leaving the grade,
+        // which is the most post-processing thing in the whole chain, running
+        // on a frame that had asked for none of it.
+        //
+        // legacy_gamma deliberately does not do this. A legacy sky drops
+        // tonemapping because it predates it, not because anybody asked for a
+        // clean plate, and the user's grade still applies there.
+        bool color_grade = apply_color_grade && color_grade_cc && !sGradeBypass && !gSnapshotNoPost;
         bool legacy_gamma = psky->getReflectionProbeAmbiance(should_auto_adjust) == 0.f;
         bool no_post = gSnapshotNoPost || legacy_gamma || (buildNoPost && gFloaterTools && gFloaterTools->isAvailable());
         LLGLSLShader* shader = nullptr;
@@ -7635,6 +7871,14 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
         shader->uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
 
+        // The other half of the "No post-processing" contract. The grade is
+        // gated where this pass's program is chosen and the print effects in
+        // the final blit are gated in renderFinalize -- but chromatic
+        // aberration and the lens flare are applied *inside* this program, in
+        // every variant including the no-post ones, so their strengths have to
+        // be silenced here or a clean plate still carries both.
+        const bool clean_plate = gSnapshotNoPost;
+
         // Chromatic aberration parameters
         static LLCachedControl<F32> chromatic_aberration_strength(gSavedSettings, "RenderChromaticAberrationStrength", 0.f);
         static LLCachedControl<F32> chromatic_aberration_falloff(gSavedSettings, "RenderChromaticAberrationFalloff", 1.f);
@@ -7648,7 +7892,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // strength (and pre-apply the 0.02 peak-offset scale), take the
         // reciprocal of falloff, and turn the angle into a (sin, cos) pair.
         // Saves one mul, one div, and one sincos per fragment.
-        F32 ca_strength = llclamp(chromatic_aberration_strength(), 0.f, 1.f);
+        F32 ca_strength = clean_plate ? 0.f : llclamp(chromatic_aberration_strength(), 0.f, 1.f);
         F32 ca_falloff  = llclamp(chromatic_aberration_falloff(),  0.5f, 4.f);
         F32 ca_angle_rad = llclamp(chromatic_aberration_angle(), 0.f, 360.f) * 0.01745329252f;
         shader->uniform1f(LLShaderMgr::CA_AMOUNT, ca_strength * ca_strength * 0.02f);
@@ -7683,7 +7927,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             static LLCachedControl<F32> lens_flare_occlusion_radius(gSavedSettings, "RenderLensFlareOcclusionRadius", 0.02f);
             static LLCachedControl<S32> lens_flare_occlusion_taps(gSavedSettings, "RenderLensFlareOcclusionTaps", 9);
 
-            F32 strength = llclamp(lens_flare_strength(), 0.f, 1.f);
+            // Zeroing the master strength both hits the shader's early-out and
+            // skips the whole detail block below, sun projection included.
+            F32 strength = clean_plate ? 0.f : llclamp(lens_flare_strength(), 0.f, 1.f);
             shader->uniform1f(LLShaderMgr::LENS_FLARE_STRENGTH, strength);
 
             if (strength > 0.f)
@@ -7878,7 +8124,22 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         S32 cglut_channel = -1;
         if (color_grade)
         {
-            if (mCGLut.notNull())
+            // Per-section bypass. Uploading a group's identity rather than its
+            // settings lands in the early-out the shader already has for that
+            // step, so a bypassed group is cheaper than an active one and no
+            // variant or recompile is involved. The settings themselves are
+            // untouched, which is the whole point -- see sGradeBypassMask.
+            const U32  bypass         = sGradeBypassMask;
+            const bool skip_basic     = (bypass & GRADE_BYPASS_BASIC)     != 0;
+            const bool skip_primaries = (bypass & GRADE_BYPASS_PRIMARIES) != 0;
+            const bool skip_split     = (bypass & GRADE_BYPASS_SPLIT)     != 0;
+            const bool skip_lut       = (bypass & GRADE_BYPASS_LUT)       != 0;
+            const bool skip_curve     = (bypass & GRADE_BYPASS_CURVE)     != 0;
+
+            static const F32 IDENTITY_ZEROS[3] = { 0.f, 0.f, 0.f };
+            static const F32 IDENTITY_ONES[3]  = { 1.f, 1.f, 1.f };
+
+            if (mCGLut.notNull() && !skip_lut)
             {
                 cglut_channel = shader->getTextureChannel(LLShaderMgr::COLOR_GRADE_LUT);
                 if (cglut_channel > -1)
@@ -7898,14 +8159,14 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
             // --- Linear-space grading (pre-tonemap) ---
             // White balance: resolve (CCT offset, Duv) into a linear-sRGB gain
-            // on the CPU. Duv is exposed to artists on a friendly [-1, 1]
-            // scale and scaled into CIE 1960 uv units (±0.02) here.
+            // on the CPU. The map lives in ALWhiteBalanceSolver so the
+            // eyedropper can invert the same function this uploads -- range
+            // clamping and the Duv-to-uv scale included, since a solver that
+            // disagreed about either would return a pair this then altered.
             static LLCachedControl<F32>       cg_wb_cct(gSavedSettings, "RenderColorGradeWhiteBalanceCCT", 0.f);
             static LLCachedControl<F32>       cg_wb_duv(gSavedSettings, "RenderColorGradeWhiteBalanceDuv", 0.f);
-            const F32 wb_cct = llclamp((F32)cg_wb_cct(), -5000.0f, 5000.0f);
-            const F32 wb_duv = llclamp((F32)cg_wb_duv(), -1.0f, 1.0f) * 0.02f;
-            const LLVector3 wb_gain = cg_compute_white_balance_gain(wb_cct, wb_duv);
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_WHITE_BALANCE_GAIN, 1, wb_gain.mV);
+            const LLVector3 wb_gain = ALWhiteBalanceSolver::gain((F32)cg_wb_cct(), (F32)cg_wb_duv());
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_WHITE_BALANCE_GAIN, 1, skip_basic ? IDENTITY_ONES : wb_gain.mV);
 
             // Lift / Gamma / Gain — gamma is inverted on the CPU.
             static LLCachedControl<LLVector3> cg_lift(gSavedSettings, "RenderColorGradeLift", LLVector3(0.f, 0.f, 0.f));
@@ -7926,9 +8187,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 1.0f / llclamp(gamma_v.mV[0], 0.5f, 1.5f),
                 1.0f / llclamp(gamma_v.mV[1], 0.5f, 1.5f),
                 1.0f / llclamp(gamma_v.mV[2], 0.5f, 1.5f) };
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_LIFT,         1, lift_arr);
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_INV_GAMMA_CC, 1, inv_gamma_arr);
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_GAIN,         1, gain_arr);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_LIFT,         1, skip_primaries ? IDENTITY_ZEROS : lift_arr);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_INV_GAMMA_CC, 1, skip_primaries ? IDENTITY_ONES  : inv_gamma_arr);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_GAIN,         1, skip_primaries ? IDENTITY_ONES  : gain_arr);
 
             // --- Split toning ---
             // Tints → ratios: `tint / max(dot(tint, LUMA), 1e-4)` precomputed.
@@ -7956,9 +8217,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             shader->uniform3fv(LLShaderMgr::SPLIT_TONE_SHADOW_RATIO,    1, shadow_ratio);
             shader->uniform3fv(LLShaderMgr::SPLIT_TONE_HIGHLIGHT_RATIO, 1, highlight_ratio);
             shader->uniform3fv(LLShaderMgr::SPLIT_TONE_MIDTONE_RATIO,   1, midtone_ratio);
-            shader->uniform1f(LLShaderMgr::SPLIT_TONE_MIDTONE_AMOUNT, llclamp(split_midtone_amount(), 0.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::SPLIT_TONE_MIDTONE_AMOUNT, skip_split ? 0.f : llclamp(split_midtone_amount(), 0.0f, 1.0f));
             shader->uniform1f(LLShaderMgr::SPLIT_TONE_MID,            0.5f + tone_balance * 0.4f);
-            shader->uniform1f(LLShaderMgr::SPLIT_TONE_AMOUNT,         llclamp(split_amount(), 0.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::SPLIT_TONE_AMOUNT,         skip_split ? 0.f : llclamp(split_amount(), 0.0f, 1.0f));
 
             // --- Display-space grading ---
             // Every slider is folded into a {scale, bias} pair on the CPU
@@ -7982,15 +8243,15 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             const F32 contrast    = llclamp(cg_contrast(),    0.0f, 2.0f);
             const F32 bc_scale    = contrast;
             const F32 bc_bias     = (brightness - 0.5f) * contrast + 0.5f;
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BWP_SCALE,         bwp_scale);
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BWP_BIAS,          bwp_bias);
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BC_SCALE,          bc_scale);
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BC_BIAS,           bc_bias);
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HIGHLIGHTS_SCALED, llclamp(cg_highlights(), -1.0f, 1.0f) * 0.3f);
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SHADOWS_SCALED,    llclamp(cg_shadows(),    -1.0f, 1.0f) * 0.3f);
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SATURATION,        llclamp(cg_saturation(),  0.0f, 2.0f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_VIBRANCE,          llclamp(cg_vibrance(),   -1.0f, 1.0f));
-            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HUE_SHIFT_NORM,    llclamp(cg_hue_shift(), -180.0f, 180.0f) / 360.0f);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BWP_SCALE,         skip_basic ? 1.f : bwp_scale);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BWP_BIAS,          skip_basic ? 0.f : bwp_bias);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BC_SCALE,          skip_basic ? 1.f : bc_scale);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_BC_BIAS,           skip_basic ? 0.f : bc_bias);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HIGHLIGHTS_SCALED, skip_basic ? 0.f : llclamp(cg_highlights(), -1.0f, 1.0f) * 0.3f);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SHADOWS_SCALED,    skip_basic ? 0.f : llclamp(cg_shadows(),    -1.0f, 1.0f) * 0.3f);
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_SATURATION,        skip_basic ? 1.f : llclamp(cg_saturation(),  0.0f, 2.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_VIBRANCE,          skip_basic ? 0.f : llclamp(cg_vibrance(),   -1.0f, 1.0f));
+            shader->uniform1f(LLShaderMgr::COLOR_GRADE_HUE_SHIFT_NORM,    skip_basic ? 0.f : llclamp(cg_hue_shift(), -180.0f, 180.0f) / 360.0f);
 
             // Per-channel filmic curves. Per-channel `(shoulder - toe)` is
             // pre-inverted on the CPU so the shader avoids three divisions.
@@ -8010,7 +8271,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 llclamp(curve_strength.mV[2], 0.0f, 1.0f) };
             shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_TOE,       1, curve_toe.mV);
             shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_INV_RANGE, 1, curve_inv_range);
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_STRENGTH,  1, curve_strength_arr);
+            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_STRENGTH,  1, skip_curve ? IDENTITY_ZEROS : curve_strength_arr);
         }
 
         mScreenTriangleVB->setBuffer();
@@ -8925,6 +9186,13 @@ void LLPipeline::renderFinalize()
         generateBloomHDR(&mRT->screen);
     }
 
+    // Read any pending scene probe here, while the buffer still holds linear
+    // radiance. One line later it has been white balanced, graded and
+    // tonemapped, and a sample taken then would describe the grade rather than
+    // the scene -- which is no use to a tool whose whole job is to decide what
+    // the grade should be.
+    serviceScenePixelProbe(&mRT->screen);
+
     // Handles tonemap, colorgrading, and gamma correction in one pass. In the HDR
     // path, this also applies eye adaptation and bloom. In the non-HDR path, this
     // is just a linear copy with color correction.
@@ -9029,6 +9297,15 @@ void LLPipeline::renderFinalize()
         }
     }
 
+    // Measure what is about to be presented. After every post pass, before
+    // the vignette/grain/dither the final blit adds -- those are print
+    // effects, deliberately outside the measurement.
+    captureScopeSample(sourceBuffer);
+
+    // Same point, same reason: a still and the scopes must agree about what a
+    // frame is, or the numbers will not describe the picture beside them.
+    captureReferenceStill(sourceBuffer);
+
     // Present the screen target.
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("renderFinalize - final blit");
@@ -9045,6 +9322,17 @@ void LLPipeline::renderFinalize()
         gBlitWithEffectsProgram.uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (F32)gViewerWindow->getWorldViewRectRaw().getWidth(),
                                           (F32)gViewerWindow->getWorldViewRectRaw().getHeight());
 
+        // The effects below had no snapshot gate at all, so "No post-processing"
+        // produced an image that was still vignetted, still grainy, still
+        // CVD-compensated and, with a preview mode on, still false-coloured.
+        // They are the print effects; a clean plate is exactly the frame
+        // without them.
+        //
+        // Dither is not in the list on purpose. It is a quantisation aid rather
+        // than a look, and an 8-bit PNG wants it whether or not the rest is
+        // wanted.
+        const bool clean_plate = gSnapshotNoPost;
+
         // Vignette
         static LLCachedControl<F32> vignette_amount(gSavedSettings, "RenderVignetteAmount", 0.0f, "[0, 1] default 0.");
         static LLCachedControl<F32> vignette_radius(gSavedSettings, "RenderVignetteRadius", 1.0f);
@@ -9056,7 +9344,7 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<LLVector3> vignette_center(gSavedSettings, "RenderVignetteCenter", LLVector3(0.0f, 0.0f, 0.0f));
         static LLCachedControl<bool>      vignette_correct_aspect(gSavedSettings, "RenderVignetteCorrectAspect", false);
         static LLCachedControl<F32>       vignette_feather(gSavedSettings, "RenderVignetteFeather", 1.0f);
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_AMOUNT, llclamp(vignette_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_AMOUNT, clean_plate ? 0.0f : llclamp(vignette_amount(), 0.0f, 1.0f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_RADIUS, llclamp(vignette_radius(), 0.25f, 1.5f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SOFT, llclamp(vignette_soft(), 0.05f, 1.0f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::VIGNETTE_SHAPE, llclamp(vignette_shape(), 0.0f, 1.0f));
@@ -9077,8 +9365,8 @@ void LLPipeline::renderFinalize()
         // CVD Compensation
         static LLCachedControl<S32> cvd_mode(gSavedSettings, "RenderCVDMode", 0);
         static LLCachedControl<F32> cvd_amount(gSavedSettings, "RenderCVDAmount", 0.0f);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::CVD_MODE, llclamp(cvd_mode(), 0, 3));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::CVD_AMOUNT, llclamp(cvd_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::CVD_MODE, clean_plate ? 0 : llclamp(cvd_mode(), 0, 3));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::CVD_AMOUNT, clean_plate ? 0.0f : llclamp(cvd_amount(), 0.0f, 1.0f));
 
         // Film Grain
         static LLCachedControl<bool>     film_grain_animated(gSavedSettings, "RenderFilmGrainAnimated", true);
@@ -9087,7 +9375,7 @@ void LLPipeline::renderFinalize()
         static LLCachedControl<F32>      film_grain_size(gSavedSettings, "RenderFilmGrainSize", 1.0f);
         static LLCachedControl<F32>      film_grain_range(gSavedSettings, "RenderFilmGrainRange", 0.5f);
         static LLCachedControl<LLColor3> film_grain_tint(gSavedSettings, "RenderFilmGrainTint", LLColor3(1.0f, 1.0f, 1.0f));
-        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_AMOUNT, llclamp(film_grain_amount(), 0.0f, 1.0f));
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_AMOUNT, clean_plate ? 0.0f : llclamp(film_grain_amount(), 0.0f, 1.0f));
         gBlitWithEffectsProgram.uniform1i(LLShaderMgr::GRAIN_STYLE, llclamp(film_grain_style(), 0, 3));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_SIZE, llclamp(film_grain_size(), 1.0f, 8.0f));
         gBlitWithEffectsProgram.uniform1f(LLShaderMgr::GRAIN_RANGE, llclamp(film_grain_range(), 0.0f, 1.0f));
@@ -9103,7 +9391,23 @@ void LLPipeline::renderFinalize()
 
         // Previews
         static LLCachedControl<S32> preview_mode(gSavedSettings, "RenderEffectPreviewMode", 0);
-        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::PREVIEW_MODE, llclamp(preview_mode(), 0, 7));
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::PREVIEW_MODE, clean_plate ? 0 : llclamp(preview_mode(), 0, 7));
+
+        // Reference still. The mode is forced off unless a still actually
+        // exists, which is what lets the shader read the sampler without
+        // checking, and means a mode left set from before a resize (which
+        // drops the still) shows the live frame rather than a stale or unbound
+        // texture. Off for a clean plate too: a snapshot of a comparison is
+        // not a snapshot of the image.
+        static LLCachedControl<S32> ref_wipe_mode(gSavedSettings, "RenderReferenceWipeMode", 0);
+        static LLCachedControl<F32> ref_wipe_pos(gSavedSettings, "RenderReferenceWipePosition", 0.5f);
+        const S32 wipe_mode = (hasReferenceStill() && !clean_plate) ? llclamp(ref_wipe_mode(), 0, 2) : 0;
+        gBlitWithEffectsProgram.uniform1i(LLShaderMgr::REFERENCE_WIPE_MODE, wipe_mode);
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::REFERENCE_WIPE_POS, llclamp(ref_wipe_pos(), 0.f, 1.f));
+        if (wipe_mode != 0)
+        {
+            gBlitWithEffectsProgram.bindTexture(LLShaderMgr::REFERENCE_STILL, &mReferenceStill);
+        }
 
         {
             LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);

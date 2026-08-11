@@ -35,11 +35,14 @@
 
 #include "llfloater.h"
 
+#include "algradehistory.h"
+
 #include <array>
 #include <map>
 #include <string>
 #include <vector>
 
+class ALCurveEditorCtrl;
 class LLComboBox;
 class LLSpinCtrl;
 
@@ -49,14 +52,55 @@ public:
     ALFloaterLightBox(const LLSD& key);
     ~ALFloaterLightBox() override;
     bool postBuild() override;
+    /// Ctrl+Z / Ctrl+Y (and Ctrl+Shift+Z) drive the grade's undo stack.
+    ///
+    /// Floater-local rather than a global action, unlike the hold-to-compare
+    /// key: a global Ctrl+Z would fire while the user is typing anywhere in
+    /// the viewer. Being handled here also means a text field that wants
+    /// Ctrl+Z for its own undo gets it first, since the focus chain is offered
+    /// the key before the floater is.
+    bool handleKeyHere(KEY key, MASK mask) override;
+    /// Only to notice the reference still appearing or going away, which is
+    /// render state and so has no signal to hang on. See refreshReferenceRow.
+    void draw() override;
 
   private:
     void onClickResetControlDefault(const LLSD& userdata);
     void onClickResetSection(const LLSD& userdata);
+    /// Set or clear one section's bit in LLPipeline::sGradeBypassMask. The
+    /// settings are never touched, so a comparison cannot dirty the Look.
+    void onToggleBypass(LLUICtrl* ctrl, const LLSD& userdata);
     void onCommitVec3(LLUICtrl* ctrl);
     void refreshVec3Row(const std::string& setting_name);
+    void setupToneCurve();
+    void refreshToneCurve();
+    void onCommitToneCurve();
+    /// Which channel the tone curve graph edits: -1 for all three, else 0..2.
+    S32  getToneCurveChannel() const;
+    void setupSplitToneGraph();
+    void refreshSplitToneGraph();
+    void onCommitSplitToneGraph();
+    /// Arm the scene picker; the click that follows sets Temperature and Tint.
+    void onClickWhiteBalancePicker();
+    void onWhiteBalancePicked(const LLColor3& sample);
     void populateLUTCombo();
     void updateTonemapperRows();
+    /// Freeze the frame about to be presented, and switch the wipe on so the
+    /// grab is visibly a grab.
+    void onClickReferenceGrab();
+    /// Drop the still and switch the wipe off.
+    void onClickReferenceClear();
+    /// Grey the wipe controls while there is nothing to wipe against.
+    void refreshReferenceRow();
+    /// Grey Undo and Redo to match what the stack can actually do.
+    void refreshHistoryButtons();
+
+    /// Record one whitelisted setting moving, unless we are the ones moving it.
+    void onGradeSettingChanged(const std::string& name, const LLSD& before, const LLSD& after);
+    /// Step the history one transaction and write the values back.
+    /// @return false when there was nothing in that direction.
+    bool applyHistory(bool redo_direction);
+
     void onLookSelected();
     void onClickLookSave();
     void onClickLookSaveAs();
@@ -67,13 +111,58 @@ public:
     // Spinner triplets named "vec3_<Setting>_<0|1|2>", keyed by setting name.
     // Rows are discovered by walking the widget tree in postBuild; adding a
     // vector-valued row is pure XUI.
-    std::map<std::string, std::array<LLSpinCtrl*, 3>> mVec3Rows;
+    /// Any LLUICtrl, not just LLSpinCtrl: the contract is the widget's *name*,
+    /// so a slider, a spinner or anything else that carries one number can
+    /// stand for a component. Sliders matter for banks of related values --
+    /// eight hue sliders read as a shape, eight spinners read as a form.
+    std::map<std::string, std::array<LLUICtrl*, 3>> mVec3Rows;
     std::vector<boost::signals2::scoped_connection> mVec3Connections;
     boost::signals2::scoped_connection mTonemapConnection;
     boost::signals2::scoped_connection mLooksListConnection;
     boost::signals2::scoped_connection mLooksActiveConnection;
     LLComboBox* mLooksCombo = nullptr;
     bool mVec3Updating = false;
+
+    // Tone curve graph. Optional: the floater builds without it, so the XUI
+    // can drop the graph and keep the spinners.
+    std::vector<boost::signals2::scoped_connection> mToneCurveConnections;
+    ALCurveEditorCtrl* mToneCurve = nullptr;
+    LLComboBox* mToneCurveChannel = nullptr;
+    bool mToneCurveUpdating = false;
+
+    // Split-tone band graph. Same contract: optional, and the sliders below it
+    // remain the full interface if the XUI drops it.
+    std::vector<boost::signals2::scoped_connection> mSplitToneConnections;
+    ALCurveEditorCtrl* mSplitToneGraph = nullptr;
+    bool mSplitToneUpdating = false;
+
+    // Undo. The history is a member, so it lives and dies with the floater:
+    // close the Lightbox and the stack is gone. That is the honest scope --
+    // the alternative is a stack that outlives the window it belongs to and
+    // silently rewrites settings a much later session is editing.
+    ALGradeHistory mHistory;
+    std::vector<boost::signals2::scoped_connection> mHistoryConnections;
+    /// Set while applyHistory writes settings. Those writes fire the same
+    /// signals a user edit does, and recording them would append the undo to
+    /// the stack it came from.
+    bool mApplyingHistory = false;
+
+    // Undo and Redo in the top bar, polled by draw() like the row below:
+    // the stack moves on every commit and every Look apply, and hanging a
+    // refresh off each of those is more places to forget.
+    LLUICtrl* mUndoButton = nullptr;
+    LLUICtrl* mRedoButton = nullptr;
+    /// Bit 0 can-undo, bit 1 can-redo; -1 until the first refresh.
+    S32 mHistoryButtonState = -1;
+
+    // Reference still row. Cached because draw() polls them, and optional
+    // because the XUI is free to drop the row.
+    LLUICtrl* mReferenceClear = nullptr;
+    LLUICtrl* mReferenceMode = nullptr;
+    LLUICtrl* mReferencePosition = nullptr;
+    /// What the row was last told, so a poll that changes nothing costs
+    /// nothing. Tri-state: -1 until the first refresh has run.
+    S32 mReferenceRowState = -1;
 };
 
 #endif // AL_FLOATERLIGHTBOX_H

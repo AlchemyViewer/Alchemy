@@ -45,6 +45,7 @@
 #include "llrendertarget.h"
 #include "llreflectionmapmanager.h"
 #include "llheroprobemanager.h"
+#include "alscopedata.h"
 
 #include <array>
 #include <stack>
@@ -151,6 +152,74 @@ public:
     void copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst);
     void combineGlow(LLRenderTarget* src, LLRenderTarget* dst);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
+
+    /// Take a point-sampled copy of the presented frame for the scopes floater
+    /// and read it back asynchronously. Does nothing unless sScopeCapture is
+    /// set and the sample interval has elapsed. See alfloaterscopes.h.
+    void captureScopeSample(LLRenderTarget* src);
+    /// Service a pending grab, and drop a still whose resolution no longer
+    /// matches the frame. Called from the same place as captureScopeSample.
+    void captureReferenceStill(LLRenderTarget* src);
+    const ALScopeData& getScopeData() const { return mScopeData; }
+
+    /// Where a point in *scaled* window coordinates -- which is what
+    /// LLViewerWindow::getCurrentMouse and the tool mouse handlers hand you --
+    /// falls inside the world view, as 0..1 across and up. False when it is
+    /// outside the view.
+    ///
+    /// Everything stays in scaled space, which is why this is the only place
+    /// that should do it: measuring a scaled point against the world view's
+    /// *raw* rect mixes two scalings and leaves an error proportional to the
+    /// distance from the origin -- dead on in one corner, adrift in the far
+    /// one, and invisible on a machine where the two spaces happen to match.
+    static bool worldViewUV(S32 scaled_x, S32 scaled_y, F32& u, F32& v);
+
+    /// Colour of the last sampled frame under a point in *scaled* window
+    /// coordinates, false if nothing has been sampled there.
+    ///
+    /// Costs nothing: it reads the copy captureScopeSample already took, so
+    /// there is no second readback and no stall. The price is that it is only
+    /// as fresh and as fine as that sample -- one sample interval old, and one
+    /// cell of a point decimation of the view, which for "what level is this"
+    /// is what you want anyway.
+    bool getScopePixel(S32 scaled_x, S32 scaled_y, LLColor4U& out) const;
+    void releaseScopeBuffers();
+
+    /// @name Reference still
+    /// Resolve's still store, in miniature: freeze the frame, then wipe the
+    /// live image against it. This is how a colourist judges a change that
+    /// took longer to make than hold-to-compare can span -- that one only ever
+    /// shows you *no* grade, whereas this shows you the grade you had.
+    ///
+    /// The still is taken from the same point the scopes sample, so the two
+    /// agree about what a frame is: after every post pass, before the print
+    /// effects the final blit adds. Those are then applied to both sides of
+    /// the seam, which is what makes the comparison about the grade rather
+    /// than about the vignette.
+    /// @{
+
+    /// Grab the next presented frame. Honoured on that frame's blit, so the
+    /// still is of what the user is looking at now, not of a frame already
+    /// gone.
+    void requestReferenceStill() { mReferenceStillWanted = true; }
+    void clearReferenceStill();
+    bool hasReferenceStill() const { return mReferenceStill.getWidth() > 0; }
+    /// @}
+
+    /// Ask for the linear scene colour under a screen pixel.
+    ///
+    /// @a x and @a y are scaled window coordinates, as a mouse handler
+    /// receives them. The answer arrives on the next rendered frame, read out
+    /// of the scene buffer before white balance, grading or tonemapping have
+    /// touched it -- so it describes the light in the scene rather than the
+    /// look currently laid over it, which is what a tool deciding on the look
+    /// needs. Colour components are linear radiance and may exceed 1.
+    ///
+    /// One request is held at a time; asking again replaces it. The callback
+    /// does not fire if the click was outside the 3D view, or under a graphics
+    /// debugger that cannot tolerate a read back.
+    typedef std::function<void(const LLColor3&)> scene_pixel_cb_t;
+    void requestScenePixel(S32 x, S32 y, scene_pixel_cb_t callback);
 
     void init();
     void cleanup();
@@ -705,6 +774,38 @@ public:
     static bool             sUseDepthTexture;
 // [/RLVa:KB]
 
+    // Set while a scopes floater is open. Nothing is sampled or read back
+    // while this is false, so the feature costs exactly nothing when closed.
+    static bool             sScopeCapture;
+    /// Hold-to-compare: suppresses colour grading for as long as it is set.
+    /// Render-time only, with nothing persistent behind it -- toggling
+    /// RenderColorGrade instead would mark the active Look dirty, and a key
+    /// released at the wrong moment could save the comparison as the look.
+    static bool             sGradeBypass;
+
+    /// One bit per grading group, for comparing a single section against the
+    /// rest of the grade rather than against nothing at all.
+    enum EGradeBypass : U32
+    {
+        GRADE_BYPASS_BASIC     = 1 << 0, ///< White balance, tone, presence: Basic and Basic-Advanced
+        GRADE_BYPASS_PRIMARIES = 1 << 1, ///< Lift / gamma / gain
+        GRADE_BYPASS_SPLIT     = 1 << 2, ///< Split toning
+        GRADE_BYPASS_LUT       = 1 << 3, ///< 3D LUT
+        GRADE_BYPASS_CURVE     = 1 << 4, ///< Tone curve
+    };
+
+    /// A set bit makes colorCorrect upload that group's identity values rather
+    /// than its settings, which lands in the early-out the shader already has
+    /// for that step -- so a bypassed group costs less than an active one, and
+    /// no shader variant is involved.
+    ///
+    /// Render-time only, and deliberately not a setting, for the same reason
+    /// sGradeBypass is not: the Looks whitelist watches every grading control,
+    /// so building a comparison out of one would mark the active Look dirty
+    /// and let the comparison itself be saved as the look. It follows that
+    /// whoever sets a bit owns clearing it -- see ~ALFloaterLightBox.
+    static U32              sGradeBypassMask;
+
     static LLTrace::EventStatHandle<S64> sStatBatchSize;
 
     class RenderTargetPack
@@ -767,6 +868,30 @@ public:
 
     // downres scratch space for GPU downscaling of textures
     LLRenderTarget          mDownResMap;
+
+    // Scopes floater sample. Point-decimated copy of the presented frame plus
+    // two pixel-pack buffers: the read-back of one capture is collected at the
+    // next one, several frames later, so glReadPixels never stalls the frame.
+    LLRenderTarget          mScopeSample;
+    U32                     mScopePBO[2] = { 0, 0 };
+    S32                     mScopePBOInFlight = -1;
+    LLFrameTimer            mScopeSampleTimer;
+    ALScopeData             mScopeData;
+    std::vector<U8>         mScopeReadback;
+
+    // Reference still: a grabbed copy of a presented frame, for wiping the
+    // live image against. Full resolution, so it is only allocated once
+    // somebody asks for one.
+    LLRenderTarget          mReferenceStill;
+    bool                    mReferenceStillWanted = false;
+
+    // One-shot scene probe, serviced in renderFinalize while the buffer is
+    // still linear. See requestScenePixel.
+    void                    serviceScenePixelProbe(LLRenderTarget* src);
+    scene_pixel_cb_t        mScenePixelCallback;
+    S32                     mScenePixelX = 0;
+    S32                     mScenePixelY = 0;
+    bool                    mScenePixelPending = false;
 
     // 2k bom scratch target
     LLRenderTarget          mBakeMap;

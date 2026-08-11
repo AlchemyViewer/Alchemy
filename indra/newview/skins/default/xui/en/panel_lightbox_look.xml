@@ -523,18 +523,18 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="137"
-		 name="atab_sec_lut"
+		 height="273"
+		 name="atab_sec_grading"
 		 title="Color Grading"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="108"
+			 height="244"
 			 left="0"
 			 top="0"
 			 right="-1"
-			 name="sec_lut">
+			 name="sec_grading">
 				<check_box
 				 follows="left|top"
 				 layout="topleft"
@@ -543,14 +543,1013 @@ Row conventions:
 				 top="8"
 				 width="300"
 				 label="Enable color grading"
-				 tool_tip="Master switch for ALL color grading: the LUT plus every Basic Grade, White Balance, Split Toning, Lift/Gamma/Gain, and Tone Curve control"
+				 tool_tip="Master switch for ALL color grading: the 3D LUT plus every Basic Grade, White Balance, Split Toning, Lift/Gamma/Gain, and Tone Curve control"
 				 name="lut_enable"
 				 control_name="RenderColorGrade" />
+				<text
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="44"
+				 word_wrap="true"
+				 font="SansSerifSmall"
+				 name="grading_order_note"
+				 value="The sections below are ordered the way the renderer applies them. White Balance and Lift / Gamma / Gain act in linear light, between exposure and the tonemap curve; everything from Basic Grade down acts on display values after it." />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
+				 top="86"
+				 width="300"
+				 height="16"
+				 font="SansSerifSmallBold"
+				 name="grading_bypass_label"
+				 value="Compare: temporarily switch a section off" />
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top="106"
+				 width="118"
+				 label="Basic"
+				 tool_tip="Bypass White Balance, Tone and Presence while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
+				 name="bypass_basic">
+					<check_box.commit_callback
+					 function="LightBox.ToggleBypass"
+					 parameter="basic" />
+				</check_box>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="130"
+				 top="106"
+				 width="118"
+				 label="Primaries"
+				 tool_tip="Bypass Lift / Gamma / Gain while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
+				 name="bypass_primaries">
+					<check_box.commit_callback
+					 function="LightBox.ToggleBypass"
+					 parameter="primaries" />
+				</check_box>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="252"
+				 top="106"
+				 width="118"
+				 label="Split Toning"
+				 tool_tip="Bypass Split Toning while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
+				 name="bypass_split">
+					<check_box.commit_callback
+					 function="LightBox.ToggleBypass"
+					 parameter="split" />
+				</check_box>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top="126"
+				 width="118"
+				 label="3D LUT"
+				 tool_tip="Bypass the 3D LUT while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
+				 name="bypass_lut">
+					<check_box.commit_callback
+					 function="LightBox.ToggleBypass"
+					 parameter="lut" />
+				</check_box>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="130"
+				 top="126"
+				 width="118"
+				 label="Tone Curve"
+				 tool_tip="Bypass the Tone Curve while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
+				 name="bypass_curve">
+					<check_box.commit_callback
+					 function="LightBox.ToggleBypass"
+					 parameter="curve" />
+				</check_box>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="150"
+				 width="330"
+				 height="16"
+				 font="SansSerifSmallBold"
+				 name="reference_label"
+				 value="Reference still: freeze a frame and compare against it" />
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 height="18"
+				 width="64"
+				 left="8"
+				 top="170"
+				 label="Grab"
+				 name="reference_grab"
+				 tool_tip="Freeze the frame as it is now and compare against it while you keep grading. The still is taken where the scopes measure: after every post pass, before the vignette and grain, which are then applied to both sides so the comparison is about the grade. Cleared when the Lightbox closes or the window is resized.">
+					<button.commit_callback
+					 function="LightBox.ReferenceGrab" />
+				</button>
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 height="18"
+				 width="64"
+				 left="76"
+				 top="170"
+				 label="Clear"
+				 name="reference_clear"
+				 tool_tip="Discard the reference still and return to the live image">
+					<button.commit_callback
+					 function="LightBox.ReferenceClear" />
+				</button>
+				<combo_box
+				 follows="left|top"
+				 layout="topleft"
+				 left="148"
+				 top="169"
+				 width="130"
+				 height="20"
+				 name="reference_mode"
+				 tool_tip="How the still is shown against the live image"
+				 control_name="RenderReferenceWipeMode">
+					<combo_box.item
+					 label="Off"
+					 name="ref_off"
+					 value="0" />
+					<combo_box.item
+					 label="Wipe"
+					 name="ref_wipe"
+					 value="1" />
+					<combo_box.item
+					 label="Side by side"
+					 name="ref_side"
+					 value="2" />
+				</combo_box>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="194"
+				 right="-8"
+				 height="16"
+				 label="Wipe position"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 text_width="56"
+				 name="reference_position"
+				 tool_tip="Where the seam sits across the frame: the still to its left, the live image to its right"
+				 control_name="RenderReferenceWipePosition" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top="218"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_grading_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_grading" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="414"
+		 name="atab_sec_basic"
+		 title="Basic"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="385"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_basic">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="basic_hdr_wb"
+				 value="White Balance" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Temperature (K)"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="50"
+				 min_val="-5000"
+				 max_val="5000"
+				 name="basic_temp"
+				 tool_tip="Temperature shift in Kelvin from neutral daylight. Negative warms, positive cools. Try -2500 tungsten, -1000 golden hour, 1500 blue hour."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeWhiteBalanceCCT" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_temp_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeWhiteBalanceCCT" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Tint"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="basic_tint"
+				 tool_tip="Green/magenta tint, perpendicular to temperature. Negative pushes magenta, positive pushes green."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeWhiteBalanceDuv" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_tint_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeWhiteBalanceDuv" />
+				</button>
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 height="20"
+				 width="140"
+				 label="Pick neutral..."
+				 name="basic_wb_pick"
+				 tool_tip="Click something in world that should look white or grey, and both sliders above are solved to make it so. Pick a well lit spot: a surface in deep shadow carries too little colour to read."
+				 enabled_control="RenderColorGrade">
+					<button.commit_callback
+					 function="LightBox.PickWhiteBalance" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="basic_hdr_tone_div" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="basic_hdr_tone"
+				 value="Tone" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Contrast"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="basic_contrast"
+				 tool_tip="S-curve around mid grey. 1 is identity; below flattens, above punches. Past 1.3 starts clipping."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeContrast" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_contrast_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeContrast" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Highlights"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="basic_highlights"
+				 tool_tip="Recovers (negative) or boosts (positive) the brightest tones without touching midtones. Use -0.3 to pull a blown sky back."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeHighlights" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_highlights_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeHighlights" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Shadows"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="basic_shadows"
+				 tool_tip="Lifts (positive) or crushes (negative) the darkest tones without touching midtones. Use +0.2 to open up a dark scene."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeShadows" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_shadows_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeShadows" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="White point"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="3"
+				 increment="0.005"
+				 min_val="0.5"
+				 max_val="1"
+				 name="basic_whites"
+				 tool_tip="The input level that becomes pure white. 1 is identity; lowering it blooms highlights and, further down, gives a bleach-bypass look."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeWhitePoint" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_whites_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeWhitePoint" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Black point"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="3"
+				 increment="0.005"
+				 min_val="0"
+				 max_val="0.5"
+				 name="basic_blacks"
+				 tool_tip="The input level that becomes pure black. 0 is identity; 0.05 deepens blacks cinematically, beyond 0.1 starts losing shadow detail."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeBlackPoint" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_blacks_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeBlackPoint" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="basic_hdr_presence_div" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="basic_hdr_presence"
+				 value="Presence" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Vibrance"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="basic_vibrance"
+				 tool_tip="Saturation that pushes muted colours harder than already-saturated ones. Kinder to skin than Saturation; 0.3 is a subtle lift."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeVibrance" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_vibrance_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeVibrance" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Saturation"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="basic_saturation"
+				 tool_tip="Uniform saturation. 1 is identity, 0 is black and white, 1.2 is punchy."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeSaturation" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_saturation_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeSaturation" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
 				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_basic_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_basic" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="116"
+		 name="atab_sec_basic_adv"
+		 title="Basic - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="87"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_basic_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Brightness"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="basic_brightness"
+				 tool_tip="Shifts the whole image lighter or darker in display space, after the tonemap. For overall exposure, use Exposure &amp; Tone instead."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeBrightness" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_brightness_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeBrightness" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Hue shift"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="-180"
+				 max_val="180"
+				 name="basic_hue_shift"
+				 tool_tip="Rotates every hue around the colour wheel, in degrees. 30 warms everything; 180 is a full complement."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeHueShift" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="basic_hue_shift_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderColorGradeHueShift" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_basic_adv_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_basic_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="248"
+		 name="atab_sec_primaries"
+		 title="Primaries"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="219"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_primaries">
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Lift"
+				 centre="0"
+				 min_value="-0.5"
+				 max_value="0.5"
+				 name="wheel_lift"
+				 tool_tip="Adds to every tone, which shows most in the shadows. Drag the puck to tint, the slider to raise or crush the black floor. Double-click the face to neutralise."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeLift" />
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="132"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Gamma"
+				 centre="1"
+				 min_value="0.5"
+				 max_value="1.5"
+				 name="wheel_gamma"
+				 tool_tip="Bends the middle of the range without moving black or white. Above 1 opens the midtones, below 1 closes them."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeGamma" />
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="256"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Gain"
+				 centre="1"
+				 min_value="0.5"
+				 max_value="1.5"
+				 name="wheel_gain"
+				 tool_tip="Multiplies every tone, which shows most in the highlights. Drag the puck to tint whites, the slider to boost or tame them."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderColorGradeGain" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_primaries_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_primaries" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="409"
+		 name="atab_sec_split"
+		 title="Split Toning"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="380"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_split">
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Shadows"
+				 centre="0.5"
+				 min_value="0"
+				 max_value="1"
+				 lock_master="true"
+				 name="wheel_split_shadow"
+				 tool_tip="Colour pushed into the darker tones. Try a cool teal against warm highlights. There is no master here: the renderer normalises tint brightness away."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneShadowTint" />
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="132"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Midtones"
+				 centre="0.5"
+				 min_value="0"
+				 max_value="1"
+				 lock_master="true"
+				 name="wheel_split_midtone"
+				 tool_tip="Colour pushed into the middle tones. Warm tints flatter skin."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneMidtoneTint" />
+				<color_wheel
+				 follows="left|top"
+				 layout="topleft"
+				 left="256"
+				 top="8"
+				 width="120"
+				 height="175"
+				 label="Highlights"
+				 centre="0.5"
+				 min_value="0"
+				 max_value="1"
+				 lock_master="true"
+				 name="wheel_split_highlight"
+				 tool_tip="Colour pushed into the brighter tones. Try warm amber against teal shadows."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneHighlightTint" />
+				<curve_editor
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 right="-8"
+				 height="72"
+				 grid_divisions="4"
+				 draw_diagonal="false"
+				 name="split_tone_graph"
+				 tool_tip="Which tones each tint reaches. Drag the handle to slide the split point between shadows and highlights -- it is the Balance slider below. Each band is drawn in the colour it applies and fades as its amount drops."
+				 enabled_control="RenderColorGrade">
+					<curve_editor.commit_callback
+					 function="LightBox.CommitSplitToneGraph" />
+				</curve_editor>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 right="-32"
+				 height="16"
+				 label="Amount"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="split_amount"
+				 tool_tip="Strength of the shadow and highlight tints. The midtone tint has its own amount below and works on its own."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="split_amount_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSplitToneAmount" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Midtone amount"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="split_midtone_amount"
+				 tool_tip="Strength of the midtone tint, separate from the shadow and highlight amount."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneMidtoneAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="split_midtone_amount_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSplitToneMidtoneAmount" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Balance"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="split_balance"
+				 tool_tip="Slides the split point between shadows and highlights. Negative widens the shadow range, positive widens the highlight range."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneBalance" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="split_balance_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSplitToneBalance" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_split_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_split" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="116"
+		 name="atab_sec_lut"
+		 title="3D LUT"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="87"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_lut">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
 				 width="140"
 				 height="15"
 				 name="lut_label"
@@ -646,1021 +1645,14 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="168"
-		 name="atab_sec_grade"
-		 title="Basic Grade"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="139"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_grade">
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
-				 label="Brightness"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-0.5"
-				 max_val="0.5"
-				 name="grade_brightness"
-				 tool_tip="Shifts the whole image lighter or darker. Small values (0.05) are already noticeable."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeBrightness" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grade_brightness_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeBrightness" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Contrast"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="2"
-				 name="grade_contrast"
-				 tool_tip="S-curve around midgray. Below 1 flattens (matte film); above 1 punches; above 1.3 starts clipping."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeContrast" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grade_contrast_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeContrast" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Saturation"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="2"
-				 name="grade_saturation"
-				 tool_tip="Uniform saturation. 1 is identity, 0 is black-and-white, 1.2 is punchy."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeSaturation" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grade_saturation_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeSaturation" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Vibrance"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-1"
-				 max_val="1"
-				 name="grade_vibrance"
-				 tool_tip="Smart saturation that pushes muted colors harder than saturated ones. Skin-friendly; 0.3 is a subtle lift."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeVibrance" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grade_vibrance_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeVibrance" />
-				</button>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="10"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_grade_reset"
-				 tool_tip="Reset this section (including Advanced) to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_grade" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="194"
-		 name="atab_sec_grade_adv"
-		 title="Basic Grade - Advanced"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="165"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_grade_adv">
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
-				 label="Highlights"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-1"
-				 max_val="1"
-				 name="grade_highlights"
-				 tool_tip="Recovers (negative) or boosts (positive) highlights without touching midtones. Try -0.3 to pull blown skies back."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeHighlights" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grade_highlights_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeHighlights" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Shadows"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-1"
-				 max_val="1"
-				 name="grade_shadows"
-				 tool_tip="Lifts (positive) or crushes (negative) shadows without touching midtones. Try 0.2 to reveal detail in dark scenes."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeShadows" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grade_shadows_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeShadows" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Black point"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="3"
-				 text_width="56"
-				 increment="0.005"
-				 min_val="0"
-				 max_val="0.5"
-				 name="grade_blackpoint"
-				 tool_tip="Crushes values at or below this level to pure black. 0.05 deepens blacks cinematically; 0.1 and up clips shadow detail."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeBlackPoint" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grade_blackpoint_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeBlackPoint" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="White point"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="3"
-				 text_width="56"
-				 increment="0.005"
-				 min_val="0.5"
-				 max_val="1.5"
-				 name="grade_whitepoint"
-				 tool_tip="Clips values at or above this level to pure white. 0.95 blooms highlights; 0.9 gives a washed bleach-bypass look."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeWhitePoint" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grade_whitepoint_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeWhitePoint" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Hue shift"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="0"
-				 increment="1"
-				 min_val="-180"
-				 max_val="180"
-				 name="grade_hueshift"
-				 tool_tip="Rotates all hues around the color wheel, in degrees. 30 warms everything; 180 inverts to complements."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeHueShift" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="grade_hueshift_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeHueShift" />
-				</button>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="10"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_grade_adv_reset"
-				 tool_tip="Reset the advanced grade settings to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_grade_adv" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="116"
-		 name="atab_sec_wb"
-		 title="White Balance"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="87"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_wb">
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
-				 label="Temperature (K)"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="0"
-				 increment="50"
-				 min_val="-5000"
-				 max_val="5000"
-				 name="wb_cct"
-				 tool_tip="Temperature shift in Kelvin from neutral daylight. Negative warms, positive cools. Try -2500 tungsten, -1000 golden hour, 1500 blue hour."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeWhiteBalanceCCT" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="wb_cct_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeWhiteBalanceCCT" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Tint"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-1"
-				 max_val="1"
-				 name="wb_duv"
-				 tool_tip="Green/magenta tint, perpendicular to temperature. Negative pushes magenta, positive pushes green."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderColorGradeWhiteBalanceDuv" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="wb_duv_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeWhiteBalanceDuv" />
-				</button>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="10"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_wb_reset"
-				 tool_tip="Reset this section to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_wb" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="232"
-		 name="atab_sec_split"
-		 title="Split Toning"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="203"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_split">
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top="8"
-				 right="-32"
-				 height="16"
-				 label="Amount"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 name="split_amount"
-				 tool_tip="Overall strength of split toning"
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderSplitToneAmount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="split_amount_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSplitToneAmount" />
-				</button>
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top_pad="12"
-				 width="140"
-				 height="15"
-				 name="split_shadow_tint_label"
-				 value="Shadow tint" />
-				<color_swatch
-				 can_apply_immediately="true"
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="140"
-				 top_pad="-18"
-				 width="60"
-				 height="24"
-				 label_height="0"
-				 name="split_shadow_tint"
-				 tool_tip="Target color for shadows. Neutral gray is identity; cool teal gives the classic teal-and-orange look."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderSplitToneShadowTint" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-21"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="split_shadow_tint_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSplitToneShadowTint" />
-				</button>
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top_pad="12"
-				 width="140"
-				 height="15"
-				 name="split_highlight_tint_label"
-				 value="Highlight tint" />
-				<color_swatch
-				 can_apply_immediately="true"
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="140"
-				 top_pad="-18"
-				 width="60"
-				 height="24"
-				 label_height="0"
-				 name="split_highlight_tint"
-				 tool_tip="Target color for highlights. Neutral gray is identity; warm amber complements teal shadows."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderSplitToneHighlightTint" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-21"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="split_highlight_tint_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSplitToneHighlightTint" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Balance"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-1"
-				 max_val="1"
-				 name="split_balance"
-				 tool_tip="Slides the midpoint between shadow and highlight tints. Negative widens shadows; positive widens highlights."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderSplitToneBalance" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="split_balance_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSplitToneBalance" />
-				</button>
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top_pad="12"
-				 width="140"
-				 height="15"
-				 name="split_midtone_tint_label"
-				 value="Midtone tint" />
-				<color_swatch
-				 can_apply_immediately="true"
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="140"
-				 top_pad="-18"
-				 width="60"
-				 height="24"
-				 label_height="0"
-				 name="split_midtone_tint"
-				 tool_tip="Target color for midtones. Neutral gray is identity; warm tints flatter skin."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderSplitToneMidtoneTint" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-21"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="split_midtone_tint_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSplitToneMidtoneTint" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Midtone amount"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 name="split_midtone_amount"
-				 tool_tip="Midtone tint strength, independent of shadows and highlights. Subtle values (0.15-0.35) add mood without muddying skin."
-				 enabled_control="RenderColorGrade"
-				 control_name="RenderSplitToneMidtoneAmount" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="split_midtone_amount_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSplitToneMidtoneAmount" />
-				</button>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="10"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_split_reset"
-				 tool_tip="Reset this section to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_split" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="143"
-		 name="atab_sec_lgg"
-		 title="Lift / Gamma / Gain"
-		 fit_panel="true">
-			<panel
-			 follows="all"
-			 layout="topleft"
-			 height="114"
-			 left="0"
-			 top="0"
-			 right="-1"
-			 name="sec_lgg">
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top="10"
-				 width="110"
-				 height="15"
-				 name="lgg_lift_label"
-				 tool_tip="Raises or lowers shadows per channel"
-				 value="Lift" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="R"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-0.5"
-				 max_val="0.5"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeLift_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="G"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-0.5"
-				 max_val="0.5"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeLift_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="B"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-0.5"
-				 max_val="0.5"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeLift_2">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lgg_lift_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeLift" />
-				</button>
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="lgg_gamma_label"
-				 tool_tip="Adjusts midtones per channel"
-				 value="Gamma" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="R"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0.5"
-				 max_val="1.5"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeGamma_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="G"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0.5"
-				 max_val="1.5"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeGamma_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="B"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0.5"
-				 max_val="1.5"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeGamma_2">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lgg_gamma_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeGamma" />
-				</button>
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="lgg_gain_label"
-				 tool_tip="Scales highlights per channel"
-				 value="Gain" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="R"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0.5"
-				 max_val="1.5"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeGain_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="G"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0.5"
-				 max_val="1.5"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeGain_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="B"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0.5"
-				 max_val="1.5"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeGain_2">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="lgg_gain_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeGain" />
-				</button>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 right="-8"
-				 top_pad="12"
-				 label="Reset All"
-				 halign="left"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="right"
-				 name="sec_lgg_reset"
-				 tool_tip="Reset this section to defaults">
-					<button.commit_callback
-					 function="LightBox.ResetSection"
-					 parameter="sec_lgg" />
-				</button>
-			</panel>
-		</accordion_tab>
-		<accordion_tab
-		 expanded="false"
-		 layout="topleft"
-		 height="143"
+		 height="296"
 		 name="atab_sec_curve"
 		 title="Tone Curve"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="114"
+			 height="267"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1669,7 +1661,58 @@ Row conventions:
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top="10"
+				 top="8"
+				 width="110"
+				 height="15"
+				 name="tone_curve_channel_label"
+				 value="Channel" />
+				<combo_box
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="120"
+				 height="18"
+				 name="tone_curve_channel"
+				 tool_tip="Which channel the graph edits. Linked moves all three together; a single channel shows the other two behind it."
+				 enabled_control="RenderColorGrade">
+					<combo_box.item
+					 label="Linked"
+					 name="linked"
+					 value="-1" />
+					<combo_box.item
+					 label="Red"
+					 name="red"
+					 value="0" />
+					<combo_box.item
+					 label="Green"
+					 name="green"
+					 value="1" />
+					<combo_box.item
+					 label="Blue"
+					 name="blue"
+					 value="2" />
+					<combo_box.commit_callback
+					 function="LightBox.RefreshToneCurve" />
+				</combo_box>
+				<curve_editor
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="120"
+				 name="tone_curve_graph"
+				 tool_tip="Drag the lower handle to set the toe, the upper one the shoulder, and the middle one to blend the curve in. The straight line is no change. Held so the toe cannot pass the shoulder; the spinners below can still ask for that."
+				 enabled_control="RenderColorGrade">
+					<curve_editor.commit_callback
+					 function="LightBox.CommitToneCurve" />
+				</curve_editor>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
 				 width="110"
 				 height="15"
 				 name="curve_toe_label"

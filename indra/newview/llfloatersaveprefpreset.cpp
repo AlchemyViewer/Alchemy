@@ -36,6 +36,42 @@
 #include "llpresetsmanager.h"
 #include "lltrans.h"
 
+#include <algorithm>
+
+namespace
+{
+    void savePresetNamed(const std::string& subdirectory, const std::string& name)
+    {
+        if (!LLPresetsManager::getInstance()->savePreset(subdirectory, name))
+        {
+            LLSD args;
+            args["NAME"] = name;
+            LLNotificationsUtil::add("PresetNotSaved", args);
+        }
+    }
+
+    bool presetExists(const std::string& subdirectory, const std::string& name)
+    {
+        std::list<std::string> names;
+        LLPresetsManager::getInstance()->loadPresetNamesFromDir(subdirectory, names, DEFAULT_HIDE);
+
+        // Case-insensitively, because the comparison stands in for the
+        // filesystem that will do the overwrite, and on Windows and macOS that
+        // filesystem does not care about case: saving "sunset" over
+        // "Sunset.xml" replaces it. Matching exactly here would let that pair
+        // slip past the confirmation. On Linux this warns for a name that
+        // would actually coexist, which errs the survivable way round.
+        std::string wanted(name);
+        LLStringUtil::toLower(wanted);
+        return std::any_of(names.begin(), names.end(),
+            [&wanted](std::string existing)
+            {
+                LLStringUtil::toLower(existing);
+                return existing == wanted;
+            });
+    }
+}
+
 LLFloaterSavePrefPreset::LLFloaterSavePrefPreset(const LLSD &key)
     : LLFloater(key)
 {
@@ -112,14 +148,47 @@ void LLFloaterSavePrefPreset::onBtnSave()
     if ((name == LLTrans::getString(PRESETS_DEFAULT)) || (upper_name == PRESETS_DEFAULT_UPPER))
     {
         LLNotificationsUtil::add("DefaultPresetNotSaved");
+        closeFloater();
+        return;
     }
-    else if (!LLPresetsManager::getInstance()->savePreset(mSubdirectory, name))
+
+    // Ask before replacing a Look. Every other kind of preset reaches this
+    // floater with the existing names already in the combo, so a collision is
+    // visible before the click is made; Looks deliberately start from an empty
+    // field (see onOpen), which is the thing that made a silent overwrite
+    // possible. Refusing outright the way the camera presets do is not an
+    // option here either -- the Lightbox's own Save button only ever
+    // overwrites the *active* Look, so this is the only route to replacing any
+    // other one.
+    if (PRESETS_LOOKS == mSubdirectory && presetExists(mSubdirectory, name))
     {
         LLSD args;
         args["NAME"] = name;
-        LLNotificationsUtil::add("PresetNotSaved", args);
+
+        // Everything the save needs is captured by value, and the floater
+        // itself by handle: the answer arrives whenever the user gets round to
+        // it, and this floater may well be gone by then.
+        LLHandle<LLFloater> handle = getHandle();
+        const std::string   subdirectory = mSubdirectory;
+        LLNotificationsUtil::add("LightBoxLookOverwrite", args, LLSD(),
+            [handle, subdirectory, name](const LLSD& notification, const LLSD& response)
+            {
+                if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+                {
+                    // Cancelled -- leave the floater up so the name can be changed.
+                    return;
+                }
+
+                savePresetNamed(subdirectory, name);
+                if (LLFloater* self = handle.get())
+                {
+                    self->closeFloater();
+                }
+            });
+        return;
     }
 
+    savePresetNamed(mSubdirectory, name);
     closeFloater();
 }
 

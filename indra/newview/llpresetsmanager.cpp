@@ -128,29 +128,93 @@ void LLPresetsManager::createCameraDefaultPresets()
 
 void LLPresetsManager::copyDefaultLooks()
 {
-    // Seed the user's looks directory from the app-bundled starters on the
-    // first run only, so users stay free to rename or delete them afterwards.
-    std::string user_dir = getPresetsDir(PRESETS_LOOKS);
+    // Seed each bundled Look once ever, and remember which ones.
+    //
+    // This used to skip the whole step as soon as the user's directory held any
+    // .xml at all. That kept the property that matters -- a Look you delete
+    // stays deleted -- but it also meant a Look bundled in a later release
+    // could never reach anybody who had ever saved one of their own, which is
+    // to say anybody who uses the feature.
+    //
+    // Recording the names instead keeps both. Nothing is ever copied over a
+    // file that already exists, so an edited starter Look is safe too.
+    const std::string user_dir = getPresetsDir(PRESETS_LOOKS);
+    const std::string app_dir  = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESETS_LOOKS);
+    const std::string record   = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, SEEDED_LOOKS_FILE);
+
+    // Deliberately not inside the looks directory: anything named *.xml in
+    // there is enumerated as a Look.
+    LLSD seeded;
+    const bool have_record = LLFile::isfile(record);
+    if (have_record)
     {
-        LLDirIterator user_iter(user_dir, "*.xml");
-        std::string existing;
-        if (user_iter.next(existing))
+        llifstream in(record);
+        if (in.is_open())
         {
-            return;
+            LLSDSerialize::fromXML(seeded, in);
         }
     }
-
-    std::string app_dir = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESETS_LOOKS);
-    LLDirIterator app_iter(app_dir, "*.xml");
-    bool found = true;
-    while (found)
+    if (!seeded.isMap())
     {
-        std::string file;
-        found = app_iter.next(file);
-        if (found)
+        seeded = LLSD::emptyMap();
+    }
+
+    // Upgrading with Looks already present means this user has been through the
+    // old first-run seeding. Adopt every bundled name as already done rather
+    // than copying: whatever they deleted back then stays deleted, and only
+    // names bundled after this point will ever seed for them.
+    bool adopt_only = false;
+    if (!have_record)
+    {
+        LLDirIterator user_iter(user_dir, "*.xml");
+        std::string   existing;
+        adopt_only = user_iter.next(existing);
+    }
+
+    bool        changed = false;
+    std::string file;
+    LLDirIterator app_iter(app_dir, "*.xml");
+    while (app_iter.next(file))
+    {
+        if (seeded.has(file))
+        {
+            continue;
+        }
+
+        if (!adopt_only && !LLFile::isfile(gDirUtilp->add(user_dir, file)))
         {
             LL_INFOS("Presets") << "Seeding bundled Look '" << file << "'" << LL_ENDL;
-            LLFile::copy(gDirUtilp->add(app_dir, file), gDirUtilp->add(user_dir, file));
+            if (!LLFile::copy(gDirUtilp->add(app_dir, file), gDirUtilp->add(user_dir, file)))
+            {
+                // Recording a copy that did not happen would burn the name
+                // forever -- seeding is once-per-name by design, so there
+                // would be no second chance. Leave it unrecorded and the next
+                // startup simply tries again.
+                LL_WARNS("Presets") << "Could not seed bundled Look '" << file
+                                    << "'; leaving it for the next run" << LL_ENDL;
+                continue;
+            }
+        }
+
+        seeded.insert(file, true);
+        changed = true;
+    }
+
+    if (changed)
+    {
+        llofstream out(record.c_str());
+        if (out.is_open())
+        {
+            LLPointer<LLSDFormatter> formatter = new LLSDXMLFormatter();
+            formatter->format(seeded, out, LLSDFormatter::OPTIONS_PRETTY);
+            out.close();
+        }
+        else
+        {
+            // Not fatal, but say so: without the record the next startup will
+            // re-adopt rather than re-seed, so a newly bundled Look is missed
+            // rather than duplicated.
+            LL_WARNS("Presets") << "Could not write the seeded-Looks record at " << record << LL_ENDL;
         }
     }
 }

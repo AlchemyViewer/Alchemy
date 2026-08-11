@@ -310,7 +310,7 @@
         <key>RenderColorGradeGamma</key>
         <map>
             <key>Comment</key>
-            <string>Midtone gamma (R,G,B): bends the middle of the tonal range without moving blacks or whites. Below 1 brightens mids, above 1 darkens them. Per-channel range 0.5 to 1.5. Default (1,1,1). Try (0.9,0.9,0.9) open mids, (1.1,1.0,0.95) warm mids.</string>
+            <string>Midtone gamma (R,G,B): bends the middle of the tonal range without moving blacks or whites. Above 1 brightens mids, below 1 darkens them. Per-channel range 0.5 to 1.5. Default (1,1,1). Try (1.1,1.1,1.1) open mids, (1.1,1.0,0.95) warm mids.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

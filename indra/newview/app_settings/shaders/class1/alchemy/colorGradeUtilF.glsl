@@ -151,7 +151,11 @@ uniform float uToneAmount;       // [0, 1] default 0 — shadow/highlight streng
 
 vec3 applySplitToning(vec3 col)
 {
-    if (uToneAmount <= 0.0)
+    // Both amounts. uMidtoneAmount drives its own mix() below, so gating on
+    // uToneAmount alone left the midtone tint unreachable unless the user also
+    // raised the shadow/highlight amount -- a setting that silently did
+    // nothing on its own.
+    if (uToneAmount <= 0.0 && uMidtoneAmount <= 0.0)
         return col;
 
     float l = dot(col, CG_LUMA);

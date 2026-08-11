@@ -5338,7 +5338,14 @@ bool LLViewerWindow::saveSnapshot(const std::string& filepath, S32 image_width, 
     LL_INFOS() << "Saving snapshot to: " << filepath << LL_ENDL;
 
     LLPointer<LLImageRaw> raw = new LLImageRaw;
-    bool success = rawSnapshot(raw, image_width, image_height, true, false, show_ui, show_hud, do_rebuild, show_balance);
+    // no_post is passed explicitly because it sits between do_rebuild and
+    // show_balance: when show_balance was added to this function the call site
+    // was not widened to match, so show_balance landed in the no_post slot and
+    // show_balance itself fell back to its default. Every snapshot saved
+    // through here has therefore been rendering with post-processing disabled,
+    // which for an HDR scene means no tonemapping at all.
+    bool success = rawSnapshot(raw, image_width, image_height, true, false, show_ui, show_hud, do_rebuild,
+                               false /* no_post */, show_balance);
 
     if (success)
     {

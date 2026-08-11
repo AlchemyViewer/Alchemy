@@ -38,6 +38,11 @@ static const std::string PRESETS_DIR = "presets";
 static const std::string PRESETS_GRAPHIC = "graphic";
 static const std::string PRESETS_CAMERA = "camera";
 static const std::string PRESETS_LOOKS = "looks";
+/// Which bundled Looks have already been copied into the user's directory, so a
+/// Look added in a later release still reaches an existing user while one they
+/// deleted stays deleted. Lives in the user settings root and NOT in the looks
+/// directory, because anything named *.xml in there is enumerated as a Look.
+static const std::string SEEDED_LOOKS_FILE = "looks_seeded.xml";
 static const std::string PRESETS_REAR = "Rear";
 static const std::string PRESETS_FRONT = "Front";
 static const std::string PRESETS_SIDE = "Side";
@@ -77,6 +82,11 @@ public:
     // Looks apply only whitelisted keys from the file (never a raw
     // loadFromFile), so shared Look files cannot carry unrelated settings.
     bool loadLooksPreset(std::string name);
+    // The single source of truth for what a Look carries. Public because the
+    // Lightbox's undo stack watches exactly this list: a setting worth saving
+    // into a Look is a setting worth undoing, and sharing the list means a new
+    // grading control joins both at once rather than one and not the other.
+    void getLooksControlNames(std::vector<std::string>& names);
     bool deletePreset(const std::string& subdirectory, std::string name);
 
     void createCameraDefaultPresets();
@@ -108,7 +118,6 @@ public:
 
     void getGraphicsControlNames(std::vector<std::string>& names);
     void getCameraControlNames(std::vector<std::string>& names);
-    void getLooksControlNames(std::vector<std::string>& names);
     void graphicsSettingChanged();
     void cameraSettingChanged();
     void looksSettingChanged();

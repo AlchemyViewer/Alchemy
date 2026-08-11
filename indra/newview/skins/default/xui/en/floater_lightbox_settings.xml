@@ -10,6 +10,13 @@
  title="Lightbox"
  save_rect="true"
  can_resize="true">
+	<!-- How a Look's name is shown once its settings have been changed. The
+	     marker rides the name rather than sitting beside it as a separate
+	     widget, so the state belongs to the thing it describes. -->
+	<floater.string
+	 name="look_name_modified">
+		[NAME] *
+	</floater.string>
 	<panel
 	 name="lightbox_topbar"
 	 follows="left|top|right"
@@ -26,32 +33,29 @@
 		 width="150"
 		 height="20"
 		 name="looks_combo"
-		 tool_tip="Apply a saved Look (a bundle of the aesthetic settings from the Look and Lens tabs)">
+		 tool_tip="Apply a saved Look (a bundle of the aesthetic settings from the Look and Lens tabs). A * after the name means the settings have been changed since that Look was applied.">
 			<combo_box.commit_callback
 			 function="LightBox.LookSelected" />
 		</combo_box>
-		<text
-		 follows="left|top"
-		 layout="topleft"
-		 left_pad="4"
-		 top="3"
-		 width="10"
-		 height="15"
-		 font="SansSerifBold"
-		 visible="false"
-		 name="look_modified"
-		 tool_tip="Settings have changed since this Look was applied"
-		 value="*" />
+		<!-- Icons rather than labels. Four words cost 192px of a bar that has
+		     412 to spend at min_width, and the room they were using is what
+		     the history pair at the end now sits in. Every overlay here is an
+		     existing 18px viewer icon, so the tooltip carries the name.
+		     Save, Undo and Redo are all from the script editor's set, which is
+		     why they sit together without looking assembled: a floppy disk,
+		     not Cam_Save, which is a camcorder and reads as one. -->
 		<button
 		 follows="left|top"
 		 layout="topleft"
-		 left_pad="2"
+		 left_pad="6"
 		 top="1"
-		 width="44"
+		 width="20"
 		 height="20"
-		 label="Save"
+		 label=""
+		 halign="center"
+		 image_overlay="Script_Save"
 		 name="look_save"
-		 tool_tip="Overwrite the current Look with the settings as they are now">
+		 tool_tip="Save: overwrite the current Look with the settings as they are now">
 			<button.commit_callback
 			 function="LightBox.LookSave" />
 		</button>
@@ -60,11 +64,13 @@
 		 layout="topleft"
 		 left_pad="4"
 		 top="1"
-		 width="60"
+		 width="20"
 		 height="20"
-		 label="Save As"
+		 label=""
+		 halign="center"
+		 image_overlay="Conv_toolbar_plus"
 		 name="look_saveas"
-		 tool_tip="Save the current settings as a new Look">
+		 tool_tip="Save As: save the current settings as a new Look">
 			<button.commit_callback
 			 function="LightBox.LookSaveAs" />
 		</button>
@@ -73,9 +79,11 @@
 		 layout="topleft"
 		 left_pad="4"
 		 top="1"
-		 width="36"
+		 width="20"
 		 height="20"
-		 label="Del"
+		 label=""
+		 halign="center"
+		 image_overlay="TrashItem_Off"
 		 name="look_delete"
 		 tool_tip="Delete a saved Look">
 			<button.commit_callback
@@ -86,13 +94,47 @@
 		 layout="topleft"
 		 left_pad="4"
 		 top="1"
-		 width="52"
+		 width="20"
 		 height="20"
-		 label="Revert"
+		 label=""
+		 halign="center"
+		 image_overlay="Refresh_Off"
 		 name="look_revert"
-		 tool_tip="Discard changes and re-apply the last applied Look">
+		 tool_tip="Revert: discard changes and re-apply the last applied Look">
 			<button.commit_callback
 			 function="LightBox.LookRevert" />
+		</button>
+		<!-- Set apart from the four above: those act on the Look, these on the
+		     grade's own history, and the gap is the only thing that says so. -->
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="12"
+		 top="1"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Script_Undo"
+		 name="look_undo"
+		 tool_tip="Undo the last grading change (Ctrl+Z). One drag of a control is one step.">
+			<button.commit_callback
+			 function="LightBox.Undo" />
+		</button>
+		<button
+		 follows="left|top"
+		 layout="topleft"
+		 left_pad="4"
+		 top="1"
+		 width="20"
+		 height="20"
+		 label=""
+		 halign="center"
+		 image_overlay="Script_Redo"
+		 name="look_redo"
+		 tool_tip="Redo the change just undone (Ctrl+Y, or Ctrl+Shift+Z)">
+			<button.commit_callback
+			 function="LightBox.Redo" />
 		</button>
 	</panel>
 	<tab_container

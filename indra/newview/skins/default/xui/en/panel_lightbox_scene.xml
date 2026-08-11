@@ -816,14 +816,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="168"
+		 height="194"
 		 name="atab_sec_shadow"
 		 title="Shadows &amp; AO"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="139"
+			 height="165"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -875,6 +875,58 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					<button.commit_callback
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderShadowDetail" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="shadow_filter_label"
+				 value="Filtering" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="shadow_filter_combo"
+				 tool_tip="How wide a kernel softens the shadow edge. Ultra switches to contact hardening: the shadow is sharp where the caster meets the ground and softens with distance from it. Higher tiers cost more texture fetches. Changing rebuilds shaders (brief hitch)."
+				 control_name="AlchemyRenderShadowFilterQuality">
+					<combo_box.item
+					 label="Low"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Medium"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="High"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Ultra (contact hardening)"
+					 name="3"
+					 value="3" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="shadow_filter_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="AlchemyRenderShadowFilterQuality" />
 				</button>
 				<text
 				 follows="left|top"
@@ -1006,14 +1058,14 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="406"
+		 height="380"
 		 name="atab_sec_shadow_adv"
 		 title="Shadows &amp; AO - Advanced"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="377"
+			 height="351"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1164,72 +1216,6 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderSpotShadowOffset" />
 				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Blur size"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="2"
-				 increment="0.05"
-				 min_val="0"
-				 max_val="3"
-				 name="shadow_blur_size"
-				 tool_tip="Softness of shadow edges"
-				 control_name="RenderShadowBlurSize" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="shadow_blur_size_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderShadowBlurSize" />
-				</button>
-				<slider
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-32"
-				 height="16"
-				 label="Blur samples"
-				 label_width="140"
-				 can_edit_text="true"
-				 decimal_digits="0"
-				 increment="1"
-				 min_val="1"
-				 max_val="16"
-				 name="shadow_blur_samples"
-				 tool_tip="Samples used for shadow blur; more is smoother but slower"
-				 control_name="RenderShadowBlurSamples" />
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-17"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="shadow_blur_samples_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderShadowBlurSamples" />
-				</button>
 				<view_border
 				 bevel_style="none"
 				 follows="left|top|right"
@@ -1254,6 +1240,40 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 layout="topleft"
 				 left="8"
 				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Blur size"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="3"
+				 name="ssao_blur_size"
+				 tool_tip="Width of the blur that softens the occlusion buffer. Despite the setting's name this no longer affects shadow edges: shadow filtering is weighted at the source, so this pass blurs ambient occlusion only."
+				 enabled_control="RenderDeferredSSAO"
+				 control_name="RenderShadowBlurSize" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssao_blur_size_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderShadowBlurSize" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
 				 right="-32"
 				 height="16"
 				 label="Scale"
