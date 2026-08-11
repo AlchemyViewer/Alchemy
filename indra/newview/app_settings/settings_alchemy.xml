@@ -46,6 +46,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALMeshNotifyBudgetMs</key>
+        <map>
+            <key>Comment</key>
+            <string>Milliseconds per frame spent handing decoded meshes to the renderer. Any left over are carried to the next frame. Zero delivers one mesh per frame.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
         <key>ALSceneExplorerActivateAction</key>
         <map>
             <key>Comment</key>

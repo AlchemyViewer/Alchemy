@@ -727,7 +727,8 @@ void LLGLTexMemBar::draw()
                     LLMeshRepository::sHTTPLargeRequestCount.load(),
                     LLMeshRepository::sHTTPRetryCount.load(), LLMeshRepository::sHTTPErrorCount.load(),
                     LLMeshRepository::sCacheReads.load(), LLMeshRepository::sCacheWrites.load(),
-                    LLMeshRepoThread::sRequestLowWater, LLMeshRepoThread::sRequestWaterLevel, LLMeshRepoThread::sRequestHighWater);
+                    LLMeshRepoThread::sRequestLowWater.load(), LLMeshRepoThread::sRequestWaterLevel.load(),
+                    LLMeshRepoThread::sRequestHighWater.load());
     widest = llmax(widest, font_mono->getWidth(text));
     font_mono->renderUTF8(text, 0, 0, v_offset + line_height*2,
                           text_color, LLFontGL::LEFT, LLFontGL::TOP);

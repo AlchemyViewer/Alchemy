@@ -164,14 +164,22 @@ public:
     LLCondition* mSignal;
     LLMutex* mMutex;
 
-    bool mInited;
-    bool mQuitting;
-    bool mDone;
+    // Cross-thread flags: mInited and mDone are read by the main thread while this thread
+    // writes them, and mQuitting is the decomposition loop's exit condition.
+    std::atomic<bool> mInited;
+    std::atomic<bool> mQuitting;
+    std::atomic<bool> mDone;
 
     LLPhysicsDecomp();
     ~LLPhysicsDecomp();
 
     void shutdown();
+
+    // Publish work and wake the thread. The counter is what makes the wake reliable:
+    // mSignal->signal() alone is lost whenever the thread is awake at that instant, and
+    // for this thread the only other signal is shutdown -- so a request submitted in that
+    // window would sit untouched until the viewer quit.
+    void wake();
 
     void submitRequest(Request* request);
     static S32 llcdCallback(const char*, S32, S32);
@@ -194,6 +202,8 @@ public:
 
     std::queue<LLPointer<Request> > mCompletedQ;
 
+private:
+    std::atomic<U32> mWakeCount{0};
 };
 
 class RequestStats
@@ -209,7 +219,14 @@ public:
 
 private:
     U32 mRetries;
-    LLFrameTimer mTimer;
+
+    // LLTimer, not LLFrameTimer: these live entirely on the repo thread, and LLFrameTimer
+    // reads a static the main thread rewrites each frame -- so backoff both raced that
+    // write and stopped advancing whenever the main thread stalled, which is exactly when
+    // requests are failing.
+    LLTimer mTimer;
+    F32 mExpiry = 0.f;
+    bool mStarted = false;
 };
 
 class MeshLoadData;
@@ -494,10 +511,13 @@ public:
     static std::atomic<S32> sActiveHeaderRequests;
     static std::atomic<S32> sActiveLODRequests;
     static std::atomic<S32> sActiveSkinRequests;
-    static U32 sMaxConcurrentRequests;
-    static S32 sRequestLowWater;
-    static S32 sRequestHighWater;
-    static S32 sRequestWaterLevel;          // Stats-use only, may read outside of thread
+
+    // Written by the main thread in LLMeshRepository::notifyLoadedMeshes(), read by this
+    // thread on every pass to decide how much work to issue.
+    static std::atomic<U32> sMaxConcurrentRequests;
+    static std::atomic<S32> sRequestLowWater;
+    static std::atomic<S32> sRequestHighWater;
+    static std::atomic<S32> sRequestWaterLevel;  // Stats-use only, may read outside of thread
 
     LLMutex*    mMutex;
     LLMutex*    mHeaderMutex;
@@ -637,7 +657,11 @@ public:
 
     virtual void run();
     void cleanup();
-    bool isShuttingDown() { return mShuttingDown; }
+    bool isShuttingDown() const { return mShuttingDown.load(std::memory_order_relaxed); }
+
+    // Publish work and wake the thread. See LLPhysicsDecomp::wake() for why the counter
+    // is needed rather than a bare signal.
+    void wake();
 
     void lockAndLoadMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
     void loadMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
@@ -703,7 +727,10 @@ private:
     U8* getDiskCacheBuffer(S32 size);
     S32 mDiskCacheBufferSize = 0;
     U8* mDiskCacheBuffer = nullptr;
-    bool mShuttingDown = false;
+
+    // Set by the main thread in cleanup(), read by this thread and by the mesh pool.
+    std::atomic<bool> mShuttingDown{false};
+    std::atomic<U32> mWakeCount{0};
 };
 
 

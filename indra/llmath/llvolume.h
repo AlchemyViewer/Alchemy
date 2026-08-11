@@ -1096,6 +1096,12 @@ public:
 
     void sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components, const U8* sculpt_data, S32 sculpt_level, bool visible_placeholder);
     void copyVolumeFaces(const LLVolume* volume);
+
+    // As copyVolumeFaces, but leaves the source empty. Only for a source about to be
+    // destroyed: copying a face reallocates and memcpys every vertex buffer it owns, and
+    // LLVolumeFace::operator= drops mJointRiggingInfoTab on the floor, so anything
+    // precomputed on the source is lost.
+    void takeVolumeFaces(LLVolume* volume);
     void copyFacesTo(std::vector<LLVolumeFace> &faces) const;
     void copyFacesFrom(const std::vector<LLVolumeFace> &faces);
 

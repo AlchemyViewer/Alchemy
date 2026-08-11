@@ -448,6 +448,27 @@ const std::string header_lod[] =
 };
 const char * const LOG_MESH = "Mesh";
 
+// Wait for a thread to leave run(), but never forever. Both mesh threads used to spin on
+// isStopped() with no ceiling, so a wake-up lost between the loop condition and the wait
+// left the viewer unable to close at all. Returns false if the deadline passed.
+static bool wait_for_thread_stop(const LLThread* thread, const char* name)
+{
+    constexpr F32 STOP_TIMEOUT_SECS = 30.f;
+
+    LLTimer timer;
+    while (!thread->isStopped())
+    {
+        if (timer.getElapsedTimeF32() > STOP_TIMEOUT_SECS)
+        {
+            LL_WARNS(LOG_MESH) << "Timed out waiting for the " << name
+                               << " thread to stop; abandoning it." << LL_ENDL;
+            return false;
+        }
+        ms_sleep(10);
+    }
+    return true;
+}
+
 // Static data and functions to measure mesh load
 // time metrics for a new region scene.
 static unsigned int metrics_teleport_start_count = 0;
@@ -550,7 +571,8 @@ void RequestStats::updateTime()
     U32 modifier = 1 << mRetries; // before ++
     mRetries++;
     mTimer.reset();
-    mTimer.setTimerExpirySec(DOWNLOAD_RETRY_DELAY * (F32)modifier); // up to 32s, 64 total wait
+    mExpiry = DOWNLOAD_RETRY_DELAY * (F32)modifier; // up to 32s, 64 total wait
+    mStarted = true;
 }
 
 bool RequestStats::canRetry() const
@@ -560,7 +582,7 @@ bool RequestStats::canRetry() const
 
 bool RequestStats::isDelayed() const
 {
-    return mTimer.getStarted() && !mTimer.hasExpired();
+    return mStarted && mTimer.getElapsedTimeF32() < mExpiry;
 }
 
 F32 calculate_score(LLVOVolume* object)
@@ -632,10 +654,10 @@ LLViewerFetchedTexture* LLMeshUploadThread::FindViewerTexture(const LLImportMate
 std::atomic<S32> LLMeshRepoThread::sActiveHeaderRequests = 0;
 std::atomic<S32> LLMeshRepoThread::sActiveLODRequests = 0;
 std::atomic<S32> LLMeshRepoThread::sActiveSkinRequests = 0;
-U32 LLMeshRepoThread::sMaxConcurrentRequests = 1;
-S32 LLMeshRepoThread::sRequestLowWater = REQUEST2_LOW_WATER_MIN;
-S32 LLMeshRepoThread::sRequestHighWater = REQUEST2_HIGH_WATER_MIN;
-S32 LLMeshRepoThread::sRequestWaterLevel = 0;
+std::atomic<U32> LLMeshRepoThread::sMaxConcurrentRequests = 1;
+std::atomic<S32> LLMeshRepoThread::sRequestLowWater = REQUEST2_LOW_WATER_MIN;
+std::atomic<S32> LLMeshRepoThread::sRequestHighWater = REQUEST2_HIGH_WATER_MIN;
+std::atomic<S32> LLMeshRepoThread::sRequestWaterLevel = 0;
 
 // Base handler class for all mesh users of llcorehttp.
 // This is roughly equivalent to a Responder class in
@@ -1030,22 +1052,27 @@ void LLMeshRepoThread::run()
         LL_WARNS(LOG_MESH) << "Convex decomposition unable to be loaded.  Expect severe problems." << LL_ENDL;
     }
 
+    // Wake-ups are tracked by count rather than by a bare condition signal: a signal that
+    // arrives while this thread is awake is simply lost, which used to mean work waited
+    // for the next frame's signal -- and, at shutdown, could mean waiting forever.
+    U32 last_wake = mWakeCount.load(std::memory_order_relaxed);
+
     while (!LLApp::isExiting())
     {
-        // *TODO:  Revise sleep/wake strategy and try to move away
-        // from polling operations in this thread.  We can sleep
-        // this thread hard when:
-        // * All Http requests are serviced
-        // * LOD request queue empty
-        // * Header request queue empty
-        // * Skin info request queue empty
-        // * Decomposition request queue empty
-        // * Physics shape request queue empty
-        // We wake the thread when any of the above become untrue.
-        // Will likely need a correctly-implemented condition variable to do this.
-        // On the other hand, this may actually be an effective and efficient scheme...
+        {
+            // libcurl completions arrive with nothing to signal us, so they have to be
+            // polled for; everything else wakes us explicitly. Sleep long when there is
+            // nothing in flight, and keep the timeout as a backstop either way so
+            // LLApp::isExiting() is always rechecked.
+            const std::chrono::milliseconds timeout(mHttpRequestSet.empty() ? 100 : 5);
+            mSignal->waitFor(timeout, [this, last_wake]()
+                {
+                    return mShuttingDown.load(std::memory_order_relaxed)
+                        || mWakeCount.load(std::memory_order_relaxed) != last_wake;
+                });
+            last_wake = mWakeCount.load(std::memory_order_relaxed);
+        }
 
-        mSignal->wait();
         LL_PROFILE_ZONE_NAMED("mesh_thread_loop")
 
         if (LLApp::isExiting())
@@ -1299,20 +1326,33 @@ void LLMeshRepoThread::run()
         // llassert_always(mHttpRequestSet.size() <= sRequestHighWater);
     }
 
-    if (mSignal->isLocked())
-    { //make sure to let go of the mutex associated with the given signal before shutting down
-        mSignal->unlock();
-    }
-
     res = LLConvexDecomposition::quitThread();
     if (res != LLCD_OK && LLConvexDecomposition::isFunctional())
     {
         LL_WARNS(LOG_MESH) << "Convex decomposition unable to be quit." << LL_ENDL;
     }
 }
+
+void LLMeshRepoThread::wake()
+{
+    {
+        // Under the condition's own mutex, which is what the waiter holds while it
+        // evaluates the predicate. Bumping outside it reopens the very window this
+        // counter exists to close: the waiter reads the old count, we bump and notify,
+        // and only then does the waiter go to sleep.
+        LLMutexLock lock(mSignal);
+        mWakeCount.fetch_add(1, std::memory_order_relaxed);
+    }
+    mSignal->signal();
+}
+
 void LLMeshRepoThread::cleanup()
 {
-    mShuttingDown = true;
+    {
+        LLMutexLock lock(mSignal);
+        mShuttingDown.store(true, std::memory_order_relaxed);
+        mWakeCount.fetch_add(1, std::memory_order_relaxed);
+    }
     mSignal->broadcast();
     mMeshThreadPool->close();
 }
@@ -3414,10 +3454,22 @@ void LLMeshRepoThread::notifyLoadedMeshes()
         gMeshRepo.noteSkinInfoPending(published.first, published.second);
     }
 
-    // Process the elements free of the lock
+    // Process the elements free of the lock.
+    //
+    // This is the only pass with an unbounded per-item cost -- each mesh takes a
+    // refVolume()/unrefVolume() round trip through LLVolumeMgr and marks every waiting
+    // object for rebuild -- and a region crossing lands hundreds at once. Spend a budget
+    // and carry the rest to the next frame. The other queues below stay unbounded; they
+    // are map inserts and callbacks.
     if (!loaded_queue.empty())
     {
         LL_PROFILE_ZONE_NAMED("notify loaded meshes");
+
+        static LLCachedControl<F32> notify_budget_ms(gSavedSettings, "ALMeshNotifyBudgetMs", 2.f);
+        const F32 budget_secs = llmax(F32(notify_budget_ms), 0.f) / 1000.f;
+
+        LLTimer notify_timer;
+        size_t notified = 0;
 
         for (const auto& mesh : loaded_queue)
         {
@@ -3429,6 +3481,24 @@ void LLMeshRepoThread::notifyLoadedMeshes()
             {
                 gMeshRepo.notifyMeshUnavailable(mesh.mMeshParams, mesh.mLOD, LLVolumeLODGroup::getVolumeDetailFromScale(mesh.mVolume->getDetail()));
             }
+            ++notified;
+
+            // Tested after the work, so one mesh always gets through however far over
+            // budget it runs on its own -- including at a budget of zero.
+            if (notify_timer.getElapsedTimeF32() >= budget_secs)
+            {
+                break;
+            }
+        }
+
+        if (notified < loaded_queue.size())
+        {
+            // Back onto the front, oldest first: these were queued before anything the
+            // background threads have pushed since we took the lock.
+            LLMutexLock lock(mLoadedMutex);
+            mLoadedQ.insert(mLoadedQ.begin(),
+                            std::make_move_iterator(loaded_queue.begin() + notified),
+                            std::make_move_iterator(loaded_queue.end()));
         }
     }
 
@@ -4214,9 +4284,23 @@ void LLMeshRepository::init()
     mDecompThread = new LLPhysicsDecomp();
     mDecompThread->start();
 
-    while (!mDecompThread->mInited)
-    { //wait for physics decomp thread to init
-        ms_sleep(100);
+    {
+        //wait for physics decomp thread to init, but not past a deadline: this runs on the
+        //way in to the session, so a thread that never reports ready must not cost the user
+        //their login. Also give up if it exited without reporting.
+        constexpr F32 DECOMP_INIT_TIMEOUT_SECS = 30.f;
+
+        LLTimer timer;
+        while (!mDecompThread->mInited && !mDecompThread->isStopped())
+        {
+            if (timer.getElapsedTimeF32() > DECOMP_INIT_TIMEOUT_SECS)
+            {
+                LL_WARNS(LOG_MESH) << "Physics decomposition thread did not initialize; "
+                                      "continuing without it." << LL_ENDL;
+                break;
+            }
+            ms_sleep(100);
+        }
     }
 
     metrics_teleport_started_signal = LLViewerMessage::getInstance()->setTeleportStartedCallback(teleport_started);
@@ -4249,11 +4333,13 @@ void LLMeshRepository::shutdown()
 
     mThread->cleanup();
 
-    while (!mThread->isStopped())
+    if (wait_for_thread_stop(mThread, "mesh repository"))
     {
-        ms_sleep(10);
+        delete mThread;
     }
-    delete mThread;
+    // else: deliberately leaked. Freeing memory a thread may still be running on is worse
+    // than losing it, and refusing to return is worse than both -- this is the last thing
+    // standing between the user and a closed window.
     mThread = NULL;
 
     for (U32 i = 0; i < mUploads.size(); ++i)
@@ -4800,7 +4886,7 @@ void LLMeshRepository::notifyLoadedMeshes()
         physics_batch.pop();
     }
 
-    mThread->mSignal->signal();
+    mThread->wake();
 }
 
 void LLMeshRepository::noteSkinInfoPending(const LLUUID& mesh_id, const LLMeshHeader& header)
@@ -4899,7 +4985,13 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
             LLVolume* sys_volume = LLPrimitive::getVolumeManager()->refVolume(mesh_params, detail);
             if (sys_volume)
             {
-                sys_volume->copyVolumeFaces(volume);
+                // Take rather than copy. The decoded volume was created by lodReceived()
+                // purely to carry this geometry across, mLoadedQ holds its only reference,
+                // and the caller drops that reference as soon as this returns -- so a copy
+                // would reallocate and memcpy every vertex buffer for nothing, and would
+                // additionally discard the per-joint bounding boxes the mesh pool thread
+                // computed, since LLVolumeFace::operator= clears mJointRiggingInfoTab.
+                sys_volume->takeVolumeFaces(volume);
                 sys_volume->setMeshAssetLoaded(true);
                 LLPrimitive::getVolumeManager()->unrefVolume(sys_volume);
             }
@@ -4910,8 +5002,15 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
             }
         }
 
+        // Walk a detached copy, and re-find the entry afterwards rather than reusing
+        // obj_iter: the callbacks below re-enter the repository through LLVOVolume, and a
+        // re-entrant loadMesh() may insert into this map or into that very volume set.
+        // The entry itself stays in place across the callbacks so re-entry still finds it
+        // and appends instead of opening a second request.
+        boost::unordered_set<LLVOVolume*> waiting(obj_iter->second.mVolumes);
+
         //notify waiting LLVOVolume instances that their requested mesh is available
-        for (LLVOVolume* vobj : obj_iter->second.mVolumes)
+        for (LLVOVolume* vobj : waiting)
         {
             if (vobj)
             {
@@ -4919,7 +5018,7 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
             }
         }
 
-        mLoadingMeshes[lod].erase(obj_iter);
+        mLoadingMeshes[lod].erase(mesh_id);
 
         LLViewerStatsRecorder::instance().meshLoaded();
     }
@@ -4941,7 +5040,13 @@ void LLMeshRepository::notifyMeshUnavailable(const LLVolumeParams& mesh_params, 
             LLPrimitive::getVolumeManager()->unrefVolume(sys_volume);
         }
 
-        for (LLVOVolume* vobj : obj_iter->second.mVolumes)
+        // As in notifyMeshLoaded(): walk a detached copy and re-find the entry to erase,
+        // because setVolume() below re-enters loadMesh(), which may insert into this map
+        // or into the volume set. The entry stays live across the loop so that re-entry
+        // appends to it rather than opening a second request for the same mesh.
+        boost::unordered_set<LLVOVolume*> waiting(obj_iter->second.mVolumes);
+
+        for (LLVOVolume* vobj : waiting)
         {
             if (vobj)
             {
@@ -4956,7 +5061,7 @@ void LLMeshRepository::notifyMeshUnavailable(const LLVolumeParams& mesh_params, 
             }
         }
 
-        mLoadingMeshes[request_lod].erase(obj_iter);
+        mLoadingMeshes[request_lod].erase(mesh_id);
     }
 }
 
@@ -5745,22 +5850,36 @@ void LLPhysicsDecomp::shutdown()
 {
     if (mSignal)
     {
-        mQuitting = true;
+        {
+            LLMutexLock lock(mSignal);
+            mQuitting = true;
+            mWakeCount.fetch_add(1, std::memory_order_relaxed);
+        }
         // There is only one wait(), but just in case 'broadcast'
         mSignal->broadcast();
 
-        while (!isStopped())
-        {
-            ms_sleep(10);
-        }
+        wait_for_thread_stop(this, "physics decomposition");
     }
+}
+
+void LLPhysicsDecomp::wake()
+{
+    {
+        // See LLMeshRepoThread::wake(): the counter must move under the condition's own
+        // mutex or the waiter can still miss it.
+        LLMutexLock lock(mSignal);
+        mWakeCount.fetch_add(1, std::memory_order_relaxed);
+    }
+    mSignal->signal();
 }
 
 void LLPhysicsDecomp::submitRequest(LLPhysicsDecomp::Request* request)
 {
-    LLMutexLock lock(mMutex);
-    mRequestQ.push(request);
-    mSignal->signal();
+    {
+        LLMutexLock lock(mMutex);
+        mRequestQ.push(request);
+    }
+    wake();
 }
 
 //static
@@ -5950,15 +6069,19 @@ void LLPhysicsDecomp::completeCurrent()
 
 void LLPhysicsDecomp::notifyCompleted()
 {
-    if (!mCompletedQ.empty())
+    // completed() runs arbitrary main-thread work -- model preview rebuilds, upload
+    // bookkeeping -- so claim the queue and let go before calling any of it, rather than
+    // holding this thread's mutex across all of them.
+    std::queue<LLPointer<Request>> completed;
     {
         LLMutexLock lock(mMutex);
-        while (!mCompletedQ.empty())
-        {
-            Request* req = mCompletedQ.front();
-            req->completed();
-            mCompletedQ.pop();
-        }
+        completed.swap(mCompletedQ);
+    }
+
+    while (!completed.empty())
+    {
+        completed.front()->completed();
+        completed.pop();
     }
 }
 
@@ -6074,13 +6197,25 @@ void LLPhysicsDecomp::run()
         mStageID[stages[i].mName] = i;
     }
 
+    U32 last_wake = mWakeCount.load(std::memory_order_relaxed);
+
     while (!mQuitting)
     {
-        mSignal->wait();
-        while (!mQuitting && !mRequestQ.empty())
+        mSignal->waitFor(std::chrono::milliseconds(250), [this, last_wake]()
+            {
+                return mQuitting.load(std::memory_order_relaxed)
+                    || mWakeCount.load(std::memory_order_relaxed) != last_wake;
+            });
+        last_wake = mWakeCount.load(std::memory_order_relaxed);
+
+        while (!mQuitting)
         {
             {
                 LLMutexLock lock(mMutex);
+                if (mRequestQ.empty())
+                {
+                    break;
+                }
                 mCurRequest = mRequestQ.front();
                 mRequestQ.pop();
             }
@@ -6104,11 +6239,6 @@ void LLPhysicsDecomp::run()
     }
 
     decomp->quitThread();
-
-    if (mSignal->isLocked())
-    { //let go of mSignal's associated mutex
-        mSignal->unlock();
-    }
 
     mDone = true;
 }
