@@ -151,7 +151,7 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
 {
     mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.ResetSection", std::bind(&ALFloaterLightBox::onClickResetSection, this, std::placeholders::_2));
-    mCommitCallbackRegistrar.add("LightBox.ToggleBypass", std::bind(&ALFloaterLightBox::onToggleBypass, this, std::placeholders::_1, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ToggleSection", std::bind(&ALFloaterLightBox::onToggleSection, this, std::placeholders::_1, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.ReferenceGrab", std::bind(&ALFloaterLightBox::onClickReferenceGrab, this));
     mCommitCallbackRegistrar.add("LightBox.ReferenceClear", std::bind(&ALFloaterLightBox::onClickReferenceClear, this));
     // Lambdas rather than bind: applyHistory answers whether it did anything,
@@ -351,12 +351,13 @@ void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
     }
 }
 
-void ALFloaterLightBox::onToggleBypass(LLUICtrl* ctrl, const LLSD& userdata)
+void ALFloaterLightBox::onToggleSection(LLUICtrl* ctrl, const LLSD& userdata)
 {
     // Section id to bit. The grouping matches Reset All's, which walks
     // sec_<id> and sec_<id>_adv together -- so "basic" covers the
     // Basic-Advanced rows too, and the user only has to learn one idea of what
-    // a section is.
+    // a section is. Which is also why the Basic-Advanced header carries no
+    // checkbox of its own: it is not a section, it is the tail of one.
     static const std::map<std::string, U32> bypass_bits = {
         { "basic",     LLPipeline::GRADE_BYPASS_BASIC },
         { "primaries", LLPipeline::GRADE_BYPASS_PRIMARIES },
@@ -371,16 +372,22 @@ void ALFloaterLightBox::onToggleBypass(LLUICtrl* ctrl, const LLSD& userdata)
         return;
     }
 
+    // Ticked is the section switched on, so the bit -- which suppresses --
+    // is set when the box is clear.
+    //
     // Nothing is written to gSavedSettings here, deliberately: every grading
     // control is on the Looks whitelist, so a comparison built out of one
     // would mark the active Look dirty and could then be saved mid-comparison.
+    // That is also why the checkboxes have no control_name: they are worth
+    // exactly one viewing session, and the floater is destroyed when it
+    // closes, which is what puts them all back on.
     if (ctrl->getValue().asBoolean())
     {
-        LLPipeline::sGradeBypassMask |= found->second;
+        LLPipeline::sGradeBypassMask &= ~found->second;
     }
     else
     {
-        LLPipeline::sGradeBypassMask &= ~found->second;
+        LLPipeline::sGradeBypassMask |= found->second;
     }
 }
 

@@ -67,9 +67,13 @@ public:
   private:
     void onClickResetControlDefault(const LLSD& userdata);
     void onClickResetSection(const LLSD& userdata);
-    /// Set or clear one section's bit in LLPipeline::sGradeBypassMask. The
-    /// settings are never touched, so a comparison cannot dirty the Look.
-    void onToggleBypass(LLUICtrl* ctrl, const LLSD& userdata);
+    /// Set or clear one section's bit in LLPipeline::sGradeBypassMask, from
+    /// the checkbox on that section's accordion header. Ticked means the
+    /// section is applied, which is the only way a checkbox beside a section
+    /// title reads; the bit it drives is a bypass bit, so the sense inverts
+    /// here. The settings are never touched, so a comparison cannot dirty
+    /// the Look.
+    void onToggleSection(LLUICtrl* ctrl, const LLSD& userdata);
     void onCommitVec3(LLUICtrl* ctrl);
     void refreshVec3Row(const std::string& setting_name);
     void setupToneCurve();

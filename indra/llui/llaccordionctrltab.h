@@ -29,6 +29,7 @@
 
 #include <string>
 #include "llrect.h"
+#include "llcheckboxctrl.h"
 #include "lluictrl.h"
 #include "lluicolor.h"
 #include "llstyle.h"
@@ -80,6 +81,19 @@ public:
                                 dropdown_bg_color;
 
         Optional<bool>          header_visible;
+
+        // An interactive checkbox at the right end of the header, for a
+        // section that can be switched off without being collapsed. Omitted
+        // by every tab that does not want one, and there is no checkbox at
+        // all in that case -- not a hidden one -- so the tabs already in the
+        // viewer keep the header they have.
+        //
+        // A full check_box params block, so control_name, enabled_control,
+        // tool_tip and commit_callback all work as they do anywhere else.
+        // Sizing is the one thing it does not take from the block: an
+        // unsized checkbox gets a default square wide enough for the box,
+        // and a header checkbox that carries a label has to say how wide.
+        Optional<LLCheckBoxCtrl::Params> header_check_box;
 
         Optional<bool>          fit_panel;
 
@@ -133,6 +147,12 @@ public:
 
     void canOpenClose(bool can_open_close) { mCanOpenClose = can_open_close; };
     bool canOpenClose() const { return mCanOpenClose; };
+
+    // The header checkbox, or null for a tab that did not ask for one --
+    // which is all of them unless header_check_box was given. Callers that
+    // want the value should reach it through this rather than getChild: the
+    // checkbox lives inside the header, not in the tab's own child list.
+    LLCheckBoxCtrl* getHeaderCheckBox() const { return mHeaderCheckBox; }
 
     virtual bool postBuild();
 
@@ -219,10 +239,18 @@ protected:
     void selectOnFocusReceived();
     void deselectOnFocusLost();
 
+    // Whether (x, y), in this tab's coordinates, lands on the header
+    // checkbox. False whenever there is no checkbox.
+    bool pointInHeaderCheckBox(S32 x, S32 y) const;
+
 private:
 
     class LLAccordionCtrlTabHeader;
     LLAccordionCtrlTabHeader* mHeader; //Header
+
+    // Owned by the header, which is where it is drawn and where its rect is
+    // kept; held here too because the tab is what the mouse reaches first.
+    LLCheckBoxCtrl* mHeaderCheckBox;
 
     bool mDisplayChildren; //Expanded/collapsed
     bool mCollapsible;

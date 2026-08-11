@@ -523,14 +523,14 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="273"
+		 height="247"
 		 name="atab_sec_grading"
 		 title="Color Grading"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="244"
+			 height="218"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -557,91 +557,27 @@ Row conventions:
 				 font="SansSerifSmall"
 				 name="grading_order_note"
 				 value="The sections below are ordered the way the renderer applies them. White Balance and Lift / Gamma / Gain act in linear light, between exposure and the tonemap curve; everything from Basic Grade down acts on display values after it." />
+				<!-- The five per-section switches this used to hold now sit on
+				     the accordion headers of the sections they act on, so the
+				     control is beside the thing it controls and stays in view
+				     while you work in that section. What is left here is the
+				     sentence that says they exist. -->
 				<text
-				 follows="left|top"
+				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
 				 top="86"
-				 width="300"
-				 height="16"
-				 font="SansSerifSmallBold"
-				 name="grading_bypass_label"
-				 value="Compare: temporarily switch a section off" />
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top="106"
-				 width="118"
-				 label="Basic"
-				 tool_tip="Bypass White Balance, Tone and Presence while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
-				 name="bypass_basic">
-					<check_box.commit_callback
-					 function="LightBox.ToggleBypass"
-					 parameter="basic" />
-				</check_box>
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="130"
-				 top="106"
-				 width="118"
-				 label="Primaries"
-				 tool_tip="Bypass Lift / Gamma / Gain while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
-				 name="bypass_primaries">
-					<check_box.commit_callback
-					 function="LightBox.ToggleBypass"
-					 parameter="primaries" />
-				</check_box>
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="252"
-				 top="106"
-				 width="118"
-				 label="Split Toning"
-				 tool_tip="Bypass Split Toning while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
-				 name="bypass_split">
-					<check_box.commit_callback
-					 function="LightBox.ToggleBypass"
-					 parameter="split" />
-				</check_box>
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top="126"
-				 width="118"
-				 label="3D LUT"
-				 tool_tip="Bypass the 3D LUT while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
-				 name="bypass_lut">
-					<check_box.commit_callback
-					 function="LightBox.ToggleBypass"
-					 parameter="lut" />
-				</check_box>
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="130"
-				 top="126"
-				 width="118"
-				 label="Tone Curve"
-				 tool_tip="Bypass the Tone Curve while you look. Nothing is saved and the Look is not marked as changed; clears when the Lightbox closes."
-				 name="bypass_curve">
-					<check_box.commit_callback
-					 function="LightBox.ToggleBypass"
-					 parameter="curve" />
-				</check_box>
+				 right="-8"
+				 height="30"
+				 word_wrap="true"
+				 font="SansSerifSmall"
+				 name="grading_bypass_note"
+				 value="Compare: untick the checkbox on a section's header to switch that section off while you look. Nothing is saved and the Look is not marked as changed." />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top="150"
+				 top="124"
 				 width="330"
 				 height="16"
 				 font="SansSerifSmallBold"
@@ -653,7 +589,7 @@ Row conventions:
 				 height="18"
 				 width="64"
 				 left="8"
-				 top="170"
+				 top="144"
 				 label="Grab"
 				 name="reference_grab"
 				 tool_tip="Freeze the frame as it is now and compare against it while you keep grading. The still is taken where the scopes measure: after every post pass, before the vignette and grain, which are then applied to both sides so the comparison is about the grade. Cleared when the Lightbox closes or the window is resized.">
@@ -666,7 +602,7 @@ Row conventions:
 				 height="18"
 				 width="64"
 				 left="76"
-				 top="170"
+				 top="144"
 				 label="Clear"
 				 name="reference_clear"
 				 tool_tip="Discard the reference still and return to the live image">
@@ -677,7 +613,7 @@ Row conventions:
 				 follows="left|top"
 				 layout="topleft"
 				 left="148"
-				 top="169"
+				 top="143"
 				 width="130"
 				 height="20"
 				 name="reference_mode"
@@ -700,7 +636,7 @@ Row conventions:
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="194"
+				 top="168"
 				 right="-8"
 				 height="16"
 				 label="Wipe position"
@@ -720,7 +656,7 @@ Row conventions:
 				 height="18"
 				 width="100"
 				 right="-8"
-				 top="218"
+				 top="192"
 				 label="Reset All"
 				 halign="left"
 				 scale_image="true"
@@ -741,6 +677,19 @@ Row conventions:
 		 name="atab_sec_basic"
 		 title="Basic"
 		 fit_panel="true">
+			<!-- Ticked is the section switched on, which is the only way a box
+			     beside a section title reads. There is deliberately none on
+			     Basic - Advanced: that is the tail of this section, not a
+			     section, and it is switched by this box along with the rest. -->
+			<accordion_tab.header_check_box
+			 name="section_basic"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether Basic, and Basic - Advanced with it, is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="basic" />
+			</accordion_tab.header_check_box>
 			<panel
 			 follows="all"
 			 layout="topleft"
@@ -1254,6 +1203,15 @@ Row conventions:
 		 name="atab_sec_primaries"
 		 title="Primaries"
 		 fit_panel="true">
+			<accordion_tab.header_check_box
+			 name="section_primaries"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether Lift / Gamma / Gain is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="primaries" />
+			</accordion_tab.header_check_box>
 			<panel
 			 follows="all"
 			 layout="topleft"
@@ -1334,6 +1292,15 @@ Row conventions:
 		 name="atab_sec_split"
 		 title="Split Toning"
 		 fit_panel="true">
+			<accordion_tab.header_check_box
+			 name="section_split"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether Split Toning is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="split" />
+			</accordion_tab.header_check_box>
 			<panel
 			 follows="all"
 			 layout="topleft"
@@ -1537,6 +1504,15 @@ Row conventions:
 		 name="atab_sec_lut"
 		 title="3D LUT"
 		 fit_panel="true">
+			<accordion_tab.header_check_box
+			 name="section_lut"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether the 3D LUT is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="lut" />
+			</accordion_tab.header_check_box>
 			<panel
 			 follows="all"
 			 layout="topleft"
@@ -1649,6 +1625,15 @@ Row conventions:
 		 name="atab_sec_curve"
 		 title="Tone Curve"
 		 fit_panel="true">
+			<accordion_tab.header_check_box
+			 name="section_curve"
+			 initial_value="true"
+			 enabled_control="RenderColorGrade"
+			 tool_tip="Whether the Tone Curve is applied. Untick to switch the section off while you compare: nothing is saved, the Look is not marked as changed, and it comes back when the Lightbox closes.">
+				<commit_callback
+				 function="LightBox.ToggleSection"
+				 parameter="curve" />
+			</accordion_tab.header_check_box>
 			<panel
 			 follows="all"
 			 layout="topleft"

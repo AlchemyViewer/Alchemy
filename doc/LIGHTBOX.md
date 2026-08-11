@@ -134,6 +134,54 @@ persist — declare everything you expose).
 The essentials section's Reset All resets the Advanced sibling too (the walker
 includes `sec_<id>_adv`); the sibling's own button uses `parameter="sec_myfx_adv"`.
 
+### 3b. A switch on the section header (optional)
+
+`accordion_tab` takes an optional `header_check_box`, drawn at the right end of
+the header. It is a full `check_box` params block, so `control_name`,
+`enabled_control`, `tool_tip` and `commit_callback` all behave as they do
+anywhere else:
+
+```xml
+<accordion_tab name="atab_sec_myfx" title="My Effect" ...>
+    <accordion_tab.header_check_box
+     name="section_myfx"
+     initial_value="true"
+     enabled_control="RenderColorGrade"
+     tool_tip="Whether My Effect is applied.">
+        <commit_callback function="LightBox.ToggleSection" parameter="myfx" />
+    </accordion_tab.header_check_box>
+    <panel ...>
+```
+
+Note `<commit_callback>` and not `<check_box.commit_callback>`: inside a nested
+params block the dotted prefix has to be the *block's* name, so plain
+`<commit_callback>` is what resolves. `<header_check_box.commit_callback>` works
+too, and `<check_box.commit_callback>` is silently ignored.
+
+Omit the block and there is no checkbox — not a hidden one, none at all — which
+is what keeps every other accordion in the viewer exactly as it was. Four things
+worth knowing before you use it elsewhere:
+
+- **Size.** It defaults to a bare 24×16 box. A header checkbox carrying a
+  `label` has to state its own `width`, because nothing measures the text for
+  you. The title ellipses at the checkbox's left edge either way. The area that
+  actually takes the click is `LLCheckBoxCtrl`'s bounding rect — the box and
+  label, not the full rect — so a press inside the rect can still be refused;
+  the tab falls through to expand/collapse when that happens rather than
+  leaving a dead ring of pixels.
+- **The tab eats mouse-downs.** `LLAccordionCtrlTab::handleMouseDown` claims the
+  whole header band and toggles expand/collapse *before* any child is offered
+  the press, so a control living there is unreachable by default.
+  `pointInHeaderCheckBox` is the exemption; anything else you add to a header
+  needs the same treatment.
+- **The tab eats tooltips too**, and worse: `handleToolTip` forwards the header
+  band to `mHeader` without converting coordinates, so a header child's own
+  tooltip is never found once the tab is expanded. Same exemption, and it does
+  convert.
+- **No `control_name` for a comparison switch.** See the bypass note in
+  *Architecture in brief*: a whitelisted setting toggled to compare dirties the
+  active Look.
+
 ### 4. Rows
 
 First row uses `top="8"`; later rows chain with `top_pad`. Every value row gets
@@ -260,8 +308,10 @@ Three controls act on something other than a setting.
   fire while a text field has focus too. Bind it to a function key or a mouse
   button; a letter would flash the grade every time that letter is typed.
 - **Per-section bypass.** `LLPipeline::sGradeBypassMask`, one bit per group,
-  driven by the `LightBox.ToggleBypass` checkboxes in the Color Grading section.
-  A set bit makes `colorCorrect` upload that group's **identity** values instead
+  driven by the `LightBox.ToggleSection` checkbox on each section's accordion
+  header. Ticked is the section switched **on**, because that is the only way a
+  box beside a section title reads; `onToggleSection` inverts, since the bit it
+  drives suppresses. A set bit makes `colorCorrect` upload that group's **identity** values instead
   of its settings, which lands in the early-out the shader already has for that
   step — so this needed no new uniform, no new variant and no recompile, and a
   bypassed section costs slightly *less* than an active one. If you add a
@@ -286,10 +336,24 @@ Three controls act on something other than a setting.
     geometrically is worse than none.
 
   The groups match Reset All's grouping (`sec_<id>` plus `sec_<id>_adv`
-  together), so there is only one idea of "a section" to learn. The toggles sit
-  together rather than one per section header, because A/B work means flipping
-  between them and hunting through collapsed accordions to do that is worse than
-  a row in the one section that is about the chain as a whole.
+  together), so there is only one idea of "a section" to learn — which is why
+  Basic - Advanced has no checkbox of its own: it is the tail of Basic, and
+  Basic's box switches it too.
+
+  These lived as a row of five in the Color Grading section until it turned out
+  that the objection to putting them on the headers — that A/B work means
+  flipping between them, and hunting through collapsed accordions is worse than
+  one row — was answered by the header itself. A collapsed accordion still shows
+  its header, so a header checkbox is visible in every state the section has,
+  and it is beside the controls it suppresses instead of a scroll away from
+  them. All five headers are in view at once whenever their sections are shut,
+  which is the state A/B work is done in anyway.
+
+  They carry no `control_name` on purpose. Every grading setting is on the Looks
+  whitelist, so a comparison built out of one would dirty the active Look and
+  could then be saved mid-comparison; and since the floater is destroyed on
+  close (see below), a fresh one comes back with all five ticked, which is what
+  makes "clears when the Lightbox closes" true without any code to do it.
 
 The first two reach across a frame or a click; the third outlives the floater
 outright. **Anything deferred like that must capture an `LLHandle`, never
@@ -608,21 +672,26 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
 - If you added a print effect: take a snapshot with "No post-processing" ticked
   and confirm the effect is absent from the saved file, not just from the
   preview.
-- **Developer-build staging trap:** non-package builds do not reliably restage
-  XUI or `app_settings` next to the executable, and the rule is worth knowing
-  rather than guessing at, because a stale copy looks exactly like an edit that
-  did not work.
+- **Developer-build staging trap: a build never stages XUI at all.** Not
+  "unreliably" — never. This is worth knowing rather than guessing at, because a
+  stale copy looks exactly like an edit that did not work.
 
-  The copy is a `POST_BUILD` custom command on the **viewer binary target**
-  (`viewer_manifest.py --actions=copy`, `newview/CMakeLists.txt`). So:
+  The `POST_BUILD` custom command on the viewer binary target does run
+  (`viewer_manifest.py --actions=copy`, `newview/CMakeLists.txt`), but the
+  manifest's entire `skins` / `app_settings` / `character` / `fonts` block sits
+  behind `if self.is_packaging_viewer():`, which is `'package' in actions` — and
+  the build passes `--actions=copy`. So the copy stage refreshes the exe, the
+  DLLs and the plugins, and nothing else.
 
-  - **Edited an existing XUI/settings file and nothing else?** No C++ changed,
-    so the exe does not relink, so `POST_BUILD` never runs and the staged copy
-    stays stale *however many times you build*. Copy the file into
-    `build-.../newview/<config>/skins/...` or `.../app_settings/...` yourself.
-  - **Added a new file?** The manifest's file list is built from globs at
-    **configure** time, so it is not staged at all until you re-run CMake —
-    a rebuild alone will not find it.
-  - Editing XUI alongside C++ hides both cases, because the relink drags the
-    copy along with it. That is why this bites on the one change that happened
-    to be XML-only.
+  - Relinking does **not** help. Neither does changing C++ alongside the XML,
+    neither does re-running CMake, and it makes no difference whether the file
+    is new or existing.
+  - Copy changed files into `build-.../newview/<config>/skins/...` yourself, and
+    check the result by **hash**: the staged tree has files of many different
+    ages, so a timestamp tells you nothing.
+  - To find drift across the whole tree, walk `indra/newview/skins/**/*.xml` and
+    compare each against its counterpart under
+    `build-.../newview/<config>/skins/`.
+
+  An earlier revision of this file blamed the relink. It was wrong, and it cost
+  a debugging round each of the three times it was believed.
