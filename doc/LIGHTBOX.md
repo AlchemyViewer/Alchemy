@@ -5,10 +5,10 @@ so that exposing a new post-processing effect through the usual rows is
 (almost always) a pure XUI change: no new C++, no layout mathematics beyond the
 rules below, resets and live preview for free.
 
-Richer controls — colour wheels, graphs, the eyedropper, the scopes — do have
-C++ behind them, written once each and then reused from XUI like any other row.
-Sections 4b to 4d cover those; if you only need sliders and checkboxes you can
-skip them.
+Richer controls — colour wheels, graphs, the eyedropper, the scopes, a switch on
+a section header — do have C++ behind them, written once each and then reused
+from XUI like any other row. Sections 3b and 4b to 4d cover those; if you only
+need sliders and checkboxes you can skip them.
 
 ## Architecture in brief
 
@@ -29,8 +29,40 @@ statics), so edits preview live with no glue code.
 | Colour wheel widget + its maths | `indra/newview/alcolorwheel{ctrl,model}.{h,cpp}` |
 | Curve/band graph widget + its maths | `indra/newview/alcurve{editorctrl,model}.{h,cpp}` |
 | Scopes floater + measurement | `indra/newview/alfloaterscopes.{h,cpp}`, `alscopedata.{h,cpp}` |
+| Scope pane assignment menu | `.../menu_scopes_pane.xml` |
+| Undo/redo stack | `indra/newview/algradehistory.{h,cpp}` |
 | White-balance map and its inverse | `indra/newview/alwhitebalancesolver.{h,cpp}` |
 | Scene colour picker tool | `indra/newview/altoolscenepicker.{h,cpp}` |
+| Header checkbox on `accordion_tab` | `indra/llui/llaccordionctrltab.{h,cpp}` |
+| Anti-aliased 2D polyline and fill | `indra/llrender/llrender2dutils.{h,cpp}` |
+
+Five of those have unit tests, and the tests are the reason the maths in them can
+be trusted: `alcolorwheelmodel_test`, `alcurvemodel_test`, `algradehistory_test`,
+`alscopedata_test`, `alwhitebalancesolver_test`. Anything with arithmetic in it
+belongs on that list.
+
+### What v2 added, and what it altered
+
+Two of these are new XUI tags, one is a new param on a stock widget, and one is a
+new pair of drawing primitives everything else is painted with. Nothing else in
+the viewer's widget set was touched.
+
+| Thing | Written as | Where |
+|---|---|---|
+| Colour wheel | `<color_wheel>` | §4b |
+| Curve / band graph | `<curve_editor>` | §4b |
+| Checkbox on an accordion header | `<accordion_tab.header_check_box>` | §3b |
+| Anti-aliased polyline and area fill | `gl_polyline_2d`, `gl_polyfill_2d` | §4b |
+| Floater top bar (Looks, history, scopes) | ordinary buttons, `Floater.Toggle` | §4g |
+| Scopes window | its own floater | §4d |
+
+`accordion_tab` is the only **stock** widget altered, and the change is additive:
+a tab that does not ask for `header_check_box` gets exactly the header it always
+had. That mattered rather a lot — 26 other files in the English skin alone
+declare accordion tabs, 75 of them, and every one is outfit editing, profiles,
+preferences or the About box. Which is the standard to hold anything else here
+to: if the Lightbox needs something from a shared widget, it asks for it by an
+optional param and leaves the default behaviour alone.
 
 **The C++ does not grow per effect. It does grow per new *kind of control*.**
 That is the real contract, and the distinction matters when you plan work:
@@ -240,7 +272,9 @@ involved either way.
 
 ### 4b. The richer widgets
 
-Three widgets exist beyond the standard rows. Each is one XUI tag.
+Two widgets exist beyond the standard rows, and each is one XUI tag. (The third
+richer control, the switch on a section header, is §3b — it is a param on
+`accordion_tab` rather than a tag of its own.)
 
 **`color_wheel`** — a hue ring with a draggable puck, a master slider and three
 editable channel fields, all driving one Vector3 setting.
@@ -263,6 +297,11 @@ editable channel fields, all driving one Vector3 setting.
   a control that does nothing.
 - A bank of three at 120px wide with a 4px gap fits the accordion at the
   floater's minimum width. Lefts 8 / 132 / 256.
+- The rest of its params are appearance and have working defaults you should
+  need to override only for a genuinely different control: `ring_thickness`,
+  `ring_steps` (segments the ring is drawn in), `puck_radius`, `decimal_digits`
+  for the three channel fields, and `border_color` / `face_color` /
+  `crosshair_color`. `label` names the wheel above the ring.
 
 **`curve_editor`** — a graph with draggable handles, used for the tone curve and
 the split-tone bands. It owns no curve: a consumer hands it a sampling function
@@ -283,15 +322,36 @@ and a handle list, which is why one widget serves both.
   A handle that slides horizontally to set a value locks *Y*.
 - `draw_diagonal="true"` draws the identity, which is meaningful for a tone
   curve and meaningless for anything else.
+- `grid_divisions` sets the backing grid; `curve_samples` how finely the
+  sampling function is evaluated across the width; `handle_radius` and
+  `curve_width` the hit target and the stroke. Colours are `background_color`,
+  `border_color`, `grid_color`, `curve_color`, `handle_color`.
 
 **Graph maths belongs in the model, next to a test.** `ALCurveModel` mirrors the
 shader's own functions, and `alcurvemodel_test` transcribes the GLSL
 independently and compares. A graph that merely illustrates the shader is worse
 than none: it will be believed. If you plot something new, transcribe it.
 
+**The two of them draw with `gl_polyline_2d` and `gl_polyfill_2d`**
+(`llrender2dutils`), added for this work and available to anything else that
+plots. Use them rather than reaching for `LLRender::setLineWidth` and
+`GL_LINE_SMOOTH`: smoothing appears nowhere else in this tree, core profiles
+routinely ignore it, and `setLineWidth` clamps to `mAliasedLineRange`, which is
+`[1,1]` on most core drivers — so neither width nor smoothing can be relied on
+from the fixed pipeline. The polyline lays a ribbon of triangles with a
+one-pixel alpha falloff and mitred, clamped joins, so a curve has no notches at
+its vertices and a hairpin is blunted rather than shot off to infinity.
+
+The fill's edge is deliberately left aliased. Pass it the translucent colour
+such a fill wants and outline it separately if you need a crisp edge; a feathered
+fill under a feathered outline doubles the coverage along the shared path and
+draws a darker seam.
+
 ### 4c. Tools
 
-Three controls act on something other than a setting.
+Four controls act on something other than a setting. None of them writes to
+`gSavedSettings`, and that is the point of grouping them: each parks state
+somewhere else, which is a liability the ordinary rows do not have.
 
 - **Eyedropper.** A `button` calling `LightBox.PickWhiteBalance` installs
   `ALToolScenePicker` as a transient tool. On mouse-up it asks
@@ -314,29 +374,12 @@ Three controls act on something other than a setting.
   driven by the `LightBox.ToggleSection` checkbox on each section's accordion
   header. Ticked is the section switched **on**, because that is the only way a
   box beside a section title reads; `onToggleSection` inverts, since the bit it
-  drives suppresses. A set bit makes `colorCorrect` upload that group's **identity** values instead
-  of its settings, which lands in the early-out the shader already has for that
-  step — so this needed no new uniform, no new variant and no recompile, and a
-  bypassed section costs slightly *less* than an active one. If you add a
-  grading step, add its identity to that block or the bypass will quietly skip
-  it.
-- **Reference still.** `LLPipeline::requestReferenceStill` grabs the frame about
-  to be presented; `RenderReferenceWipeMode` then wipes the live image against
-  it. Where hold-to-compare shows you *no* grade, this shows you the grade you
-  had ten minutes ago, which is the comparison that matters once a look has
-  taken more than a moment to build.
-  - Grabbed at the same point the scopes sample — after every post pass, before
-    the print effects — and substituted **before** those effects in
-    `blitWithEffectsF.glsl`, so vignette and grain land on both sides of the
-    seam. The comparison is then about the grade rather than the print
-    treatment.
-  - The mode is forced to zero unless a still exists, which is what lets the
-    shader sample the reference without checking.
-  - Both settings are `Persist=0`: a still cannot outlive the session, so a
-    mode that did would come back pointing at nothing.
-  - A resize drops the still. Sampling a still of one resolution against a
-    frame of another would stretch it, and a reference you cannot trust
-    geometrically is worse than none.
+  drives suppresses. A set bit makes `colorCorrect` upload that group's
+  **identity** values instead of its settings, which lands in the early-out the
+  shader already has for that step — so this needed no new uniform, no new
+  variant and no recompile, and a bypassed section costs slightly *less* than an
+  active one. If you add a grading step, add its identity to that block or the
+  bypass will quietly skip it.
 
   The groups match Reset All's grouping (`sec_<id>` plus `sec_<id>_adv`
   together), so a section with a long tail in an Advanced sibling is one switch
@@ -357,12 +400,29 @@ Three controls act on something other than a setting.
   could then be saved mid-comparison; and since the floater is destroyed on
   close (see below), a fresh one comes back with all five ticked, which is what
   makes "clears when the Lightbox closes" true without any code to do it.
+- **Reference still.** `LLPipeline::requestReferenceStill` grabs the frame about
+  to be presented; `RenderReferenceWipeMode` then wipes the live image against
+  it. Where hold-to-compare shows you *no* grade, this shows you the grade you
+  had ten minutes ago, which is the comparison that matters once a look has
+  taken more than a moment to build.
+  - Grabbed at the same point the scopes sample — after every post pass, before
+    the print effects — and substituted **before** those effects in
+    `blitWithEffectsF.glsl`, so vignette and grain land on both sides of the
+    seam. The comparison is then about the grade rather than the print
+    treatment.
+  - The mode is forced to zero unless a still exists, which is what lets the
+    shader sample the reference without checking.
+  - Both settings are `Persist=0`: a still cannot outlive the session, so a
+    mode that did would come back pointing at nothing.
+  - A resize drops the still. Sampling a still of one resolution against a
+    frame of another would stretch it, and a reference you cannot trust
+    geometrically is worse than none.
 
-The first two reach across a frame or a click; the third outlives the floater
-outright. **Anything deferred like that must capture an `LLHandle`, never
-`this`** — the Lightbox declares neither `single_instance` nor `reuse_instance`,
-so closing it *destroys* it, and an armed picker holding a raw pointer is a
-use-after-free with no window of luck involved.
+The first two reach across a frame or a keypress; the last two park state that
+outlives the floater. **Anything deferred like that must capture an `LLHandle`,
+never `this`** — the Lightbox declares neither `single_instance` nor
+`reuse_instance`, so closing it *destroys* it, and an armed picker holding a raw
+pointer is a use-after-free with no window of luck involved.
 
 **And anything that parks state outside the floater must clear it in the
 destructor.** The bypass mask lives in the pipeline; left set, a closed Lightbox
@@ -370,7 +430,13 @@ would leave a section suppressed with nothing on screen to say so and no setting
 to inspect. That is harder to diagnose than a crash. The reference still is the
 same rule with a second reason — it is a full-resolution target, so leaving one
 behind holds real memory for a comparison nobody can see or switch off any more.
-`~ALFloaterLightBox` clears all three.
+`~ALFloaterLightBox` clears all three: the armed picker, the bypass mask, and
+the still along with its wipe mode.
+
+That the destructor is enough turns on the floater being destroyed on close, so
+do not "tidy up" by declaring `single_instance` on it without moving this
+cleanup to `onClose` first. It would keep every one of these switched on behind
+a closed window.
 
 ### 4d. Scopes
 
@@ -397,6 +463,14 @@ that hit-tests it. If those ever diverge, the menu opens on the wrong pane.
 The draw functions therefore take `(mode, rect)` rather than reading the mode
 and the panel themselves. Anything new must too: a scope that reaches for
 `mPlotPanel->getRect()` draws over all four panes.
+
+Its XUI is deliberately thin, because almost none of that window is widgets. A
+`combo_box` bound to `AlchemyScopeLayout`, a `check_box` on
+`AlchemyScopeLogScale`, an empty `panel` named `scope_plot` that the scopes are
+painted into, and a `text` for the clipping readout. Everything else is drawn.
+The nine pane labels are `floater.string` entries named `mode_*` rather than
+literals, so they translate, and `menu_scopes_pane.xml` is a `context_menu` of
+`menu_item_check` rows wired to `Scopes.SetPaneMode` / `Scopes.IsPaneMode`.
 
 **Adding a scope is three edits, not one.** A new `EMode` needs an entry in
 `modeStringName`, a `floater.string` for its corner label, and an item in
@@ -541,15 +615,39 @@ opposite reason: a global Ctrl+Z fires while the user is typing anywhere in the
 viewer. Being handled there also means a focused text field keeps Ctrl+Z for its
 own undo, since the focus chain is offered the key first.
 
-The Undo and Redo buttons in the top bar are the visible half of that, and they
-exist because **the Looks buttons were turned into icons to pay for them**: four
-labels cost 192px of a bar with 412 to spend at `min_width`, the same four icons
-cost 80px, and the pair fits in the change with room over (36px of slack became
-92px). Icons also sidestep §5's silent clipping if this floater is ever
-translated, where "Save As" becomes "Speichern unter". Both buttons, and the
-reference row below, are greyed from `draw()` rather than from a signal — the
-undo stack moves on every commit, every undo and every Look apply, and hanging a
+The Undo and Redo buttons in the top bar are the visible half of that. Both, and
+the reference row, are greyed from `draw()` rather than from a signal — the undo
+stack moves on every commit, every undo and every Look apply, and hanging a
 refresh off each of those is more places to forget than a polled compare costs.
+
+### 4g. The top bar
+
+`lightbox_topbar` in `floater_lightbox_settings.xml` is an ordinary `panel` of
+ordinary widgets, and worth reading before you add to it, because it is the one
+part of this floater with a fixed width budget: **412px at `min_width`**, of
+which it currently spends 342.
+
+Left to right: the Looks `combo_box`, then Save / Save As / Delete / Revert,
+then Undo / Redo, then Scopes. Three groups, separated by 12px where the
+adjacent buttons inside a group are separated by 4. **That gap is the only thing
+that says they are different kinds of thing** — the first group acts on the
+Look, the second on the grade's own history, the third opens another window — so
+keep it if you add a fourth kind, and use 4px if you are extending a group.
+
+Everything after the combo is an **18px icon with an empty label**, and the
+tooltip carries the name. That is not decoration. Four text labels cost 192px of
+the 412; the same four icons cost 80. It also sidesteps §5's silent clipping the
+day this floater is translated and "Save As" becomes "Speichern unter" — a bar
+of labels has no reflow and no scrollbar to save it. Take the overlays from the
+viewer's existing set (`Script_Save`, `Conv_toolbar_plus`, `TrashItem_Off`,
+`Refresh_Off`, `Script_Undo`, `Script_Redo`, `Command_Stats_Icon`) rather than
+adding art; picking a glyph that already means the right thing elsewhere is most
+of the work.
+
+**A button that opens another floater needs no C++ at all** — `Floater.Toggle`
+is a global commit callback in `llui.cpp`, with the floater's registered name as
+`parameter`. Use that one and not `Floater.ToggleOrBringToFront`; §4d explains
+why the second can only ever open.
 
 ### 5. Height math (the part everyone gets wrong)
 
@@ -576,6 +674,12 @@ refresh off each of those is more places to forget than a polled compare costs.
 - `min_width` is the only declarative way to widen an existing user's floater
   (`LLFloater::applyRectControl` prefers a saved rect over the XUI width), and
   it force-widens everyone permanently. Design to the current width instead.
+- **All of this is checkable without launching**, and worth checking that way
+  because the failure is silent: walk each `sec_*` panel's children, track
+  `top = prev_bottom + top_pad` (or the absolute `top`), and assert the panel's
+  declared height is the lowest bottom + 8 and the tab's is the panel's + 29.
+  Thirty lines of Python over the XUI, and it catches the arithmetic slip that
+  otherwise shows up as a row you cannot see.
 
 ### 6. Gating
 
@@ -675,10 +779,16 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
   the handle is put back where the setting actually landed.
 - For anything measured (scopes, vectorscope): change the thing it measures and
   confirm the readout moves the way the control says it should.
-- For a bypass: tick it and confirm the image changes **and the Looks `*` does
-  not appear**. Then close the Lightbox with it still ticked and confirm the
-  render comes back — state parked outside the floater is the failure mode here,
-  and it looks like a renderer bug rather than a UI one.
+- For a section switch: **untick** it (ticked is on) and confirm the image
+  changes **and the Looks `*` does not appear**. Then close the Lightbox with it
+  still unticked and confirm the render comes back — state parked outside the
+  floater is the failure mode here, and it looks like a renderer bug rather than
+  a UI one.
+- For anything on an accordion header: click it and confirm the section does
+  **not** expand or collapse, then hover it with the section expanded and
+  confirm its own tooltip appears rather than the title's. Those are the two
+  interceptions in §3b, and the tooltip one only shows up when expanded — test
+  it collapsed and it will look fine.
 - If you added a print effect: take a snapshot with "No post-processing" ticked
   and confirm the effect is absent from the saved file, not just from the
   preview.
