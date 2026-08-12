@@ -38,14 +38,18 @@
 #include "alcurvemodel.h"
 #include "altoolscenepicker.h"
 #include "alwhitebalancesolver.h"
+#include "llagent.h"
+#include "llenvironment.h"
 #include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llpresetsmanager.h"
+#include "llsettingsvo.h"
 #include "llspinctrl.h"
 #include "lltimer.h"
 #include "lltoolmgr.h"
 #include "llviewercontrol.h"
 #include "pipeline.h"
+#include "rlvactions.h"
 
 #include <map>
 #include <set>
@@ -155,6 +159,11 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.ToggleSection", std::bind(&ALFloaterLightBox::onToggleSection, this, std::placeholders::_1, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.ReferenceGrab", std::bind(&ALFloaterLightBox::onClickReferenceGrab, this));
     mCommitCallbackRegistrar.add("LightBox.ReferenceClear", std::bind(&ALFloaterLightBox::onClickReferenceClear, this));
+    mCommitCallbackRegistrar.add("LightBox.ToggleDayFreeze", std::bind(&ALFloaterLightBox::onToggleDayFreeze, this, std::placeholders::_1));
+    mCommitCallbackRegistrar.add("LightBox.CommitDayTime", std::bind(&ALFloaterLightBox::onCommitDayTime, this, std::placeholders::_1));
+    mCommitCallbackRegistrar.add("LightBox.DayPreset", std::bind(&ALFloaterLightBox::onClickDayPreset, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ToggleCloudScroll", std::bind(&ALFloaterLightBox::onToggleCloudScroll, this, std::placeholders::_1));
+    mCommitCallbackRegistrar.add("LightBox.RestoreEnvironment", std::bind(&ALFloaterLightBox::onClickRestoreEnvironment, this));
     // Lambdas rather than bind: applyHistory answers whether it did anything,
     // and a commit callback returns nothing, so say plainly that the answer is
     // not wanted here. The buttons are greyed when there is nothing to do.
@@ -217,6 +226,13 @@ bool ALFloaterLightBox::postBuild()
     mReferenceClear = findChild<LLUICtrl>("reference_clear");
     mReferenceMode = findChild<LLUICtrl>("reference_mode");
     mReferencePosition = findChild<LLUICtrl>("reference_position");
+
+    mDayFreeze = findChild<LLUICtrl>("day_freeze");
+    mDayTime = findChild<LLUICtrl>("day_time");
+    mCloudScroll = findChild<LLUICtrl>("day_pause_clouds");
+    mRestoreEnvironment = findChild<LLUICtrl>("day_restore_environment");
+    mDayPresets = { findChild<LLUICtrl>("day_sunrise"), findChild<LLUICtrl>("day_noon"),
+                    findChild<LLUICtrl>("day_sunset"), findChild<LLUICtrl>("day_midnight") };
 
     // Undo watches exactly the settings a Look carries. Sharing that list is
     // the point: a control worth saving is a control worth undoing, so a new
@@ -485,7 +501,314 @@ void ALFloaterLightBox::draw()
 {
     refreshReferenceRow();
     refreshHistoryButtons();
+    refreshDayCycleRow();
     LLFloater::draw();
+}
+
+std::shared_ptr<LLSettingsDay> ALFloaterLightBox::getScrubbableDay() const
+{
+    // The order the viewer itself resolves environments in. ENV_LOCAL leads
+    // because a day the user applied is the one they would expect to scrub;
+    // while frozen it holds a fixed sky and has no day, so the search falls
+    // through to whatever the parcel or region is running. That fall-through
+    // is also what lets scrubbing keep working after the floater has been
+    // closed and reopened, since nothing about it is remembered here.
+    static const LLEnvironment::EnvSelection_t sources[] = {
+        LLEnvironment::ENV_LOCAL, LLEnvironment::ENV_PUSH,
+        LLEnvironment::ENV_PARCEL, LLEnvironment::ENV_REGION };
+
+    for (LLEnvironment::EnvSelection_t env : sources)
+    {
+        if (LLSettingsDay::ptr_t day = LLEnvironment::instance().getEnvironmentDay(env))
+        {
+            return day;
+        }
+    }
+    return {};
+}
+
+bool ALFloaterLightBox::isSkyFrozen() const
+{
+    return (bool)LLEnvironment::instance().getEnvironmentFixedSky(LLEnvironment::ENV_LOCAL);
+}
+
+void ALFloaterLightBox::applyDayPosition(F32 position)
+{
+    LLSettingsDay::ptr_t day = getScrubbableDay();
+    if (!day)
+    {
+        return;
+    }
+
+    mDayPosition = llclamp(position, 0.f, 1.f);
+
+    // A day cycle carries up to four sky tracks and which one you see depends
+    // on how high you are, so sample the one the agent is actually in. Track 0
+    // is water, always, and it gets sampled too: the day cycle editor blends
+    // both and a frozen sky over a moving sea is not frozen.
+    const S32 track = LLEnvironment::instance().calculateSkyTrackForAltitude(
+        gAgent.getPositionAgent().mV[VZ]);
+
+    LLSettingsSky::ptr_t sky = LLSettingsVOSky::buildDefaultSky();
+    LLSettingsWater::ptr_t water = LLSettingsVOWater::buildDefaultWater();
+
+    // make_shared rather than a temporary: LLSettingsBlender is held by shared
+    // pointer internally, which is how the day cycle editor and @setenv_daytime
+    // both spell this.
+    std::make_shared<LLTrackBlenderLoopingManual>(sky, day, track)->setPosition(mDayPosition);
+    std::make_shared<LLTrackBlenderLoopingManual>(water, day, (S32)LLSettingsDay::TRACK_WATER)
+        ->setPosition(mDayPosition);
+
+    LLEnvironment::instance().setEnvironment(LLEnvironment::ENV_LOCAL, sky, water);
+    LLEnvironment::instance().setSelectedEnvironment(LLEnvironment::ENV_LOCAL, LLEnvironment::TRANSITION_INSTANT);
+    LLEnvironment::instance().updateEnvironment(LLEnvironment::TRANSITION_INSTANT);
+}
+
+void ALFloaterLightBox::freezeSkyAt(F32 position)
+{
+    if (!mDayFreezeIsOurs)
+    {
+        // Whatever is here now is about to be covered up, and unticking Freeze
+        // has to give it back. Without this, freezing over a Personal Lighting
+        // sky and unfreezing again would quietly drop the user back to the
+        // region default and lose their sky.
+        LLEnvironment& env = LLEnvironment::instance();
+        mPreFreezeDay = env.getEnvironmentDay(LLEnvironment::ENV_LOCAL);
+        if (mPreFreezeDay)
+        {
+            mPreFreezeDayLength = env.getEnvironmentDayLength(LLEnvironment::ENV_LOCAL).value();
+            mPreFreezeDayOffset = env.getEnvironmentDayOffset(LLEnvironment::ENV_LOCAL).value();
+        }
+        const LLEnvironment::fixedEnvironment_t fixed = env.getEnvironmentFixed(LLEnvironment::ENV_LOCAL);
+        mPreFreezeSky = fixed.first;
+        mPreFreezeWater = fixed.second;
+        mDayFreezeIsOurs = true;
+    }
+
+    applyDayPosition(position);
+}
+
+void ALFloaterLightBox::thawSky()
+{
+    LLEnvironment& env = LLEnvironment::instance();
+
+    // Every reflection probe in the scene was lit by the sky being replaced.
+    // The World menu's own revert does this for the same reason; without it
+    // the first frames after a thaw carry the light of the sky just left.
+    gPipeline.mReflectionMapManager.reset();
+
+    if (mDayFreezeIsOurs && mPreFreezeDay)
+    {
+        env.setEnvironment(LLEnvironment::ENV_LOCAL, mPreFreezeDay,
+                           LLSettingsDay::Seconds(mPreFreezeDayLength),
+                           LLSettingsDay::Seconds(mPreFreezeDayOffset));
+    }
+    else if (mDayFreezeIsOurs && (mPreFreezeSky || mPreFreezeWater))
+    {
+        env.setEnvironment(LLEnvironment::ENV_LOCAL, mPreFreezeSky, mPreFreezeWater);
+    }
+    else
+    {
+        // Nothing to give back, so fall through to the parcel or region.
+        env.clearEnvironment(LLEnvironment::ENV_LOCAL);
+    }
+
+    env.setSelectedEnvironment(LLEnvironment::ENV_LOCAL, LLEnvironment::TRANSITION_INSTANT);
+    env.updateEnvironment(LLEnvironment::TRANSITION_INSTANT);
+
+    mPreFreezeDay.reset();
+    mPreFreezeSky.reset();
+    mPreFreezeWater.reset();
+    mDayFreezeIsOurs = false;
+}
+
+void ALFloaterLightBox::refreshDayLandmarks()
+{
+    LLSettingsDay::ptr_t day = getScrubbableDay();
+    if (day == mLandmarkDay)
+    {
+        return;
+    }
+
+    mLandmarkDay = day;
+    mDayLandmarks = ALDayCycleLandmarks::Landmarks();
+    if (!day)
+    {
+        return;
+    }
+
+    // One scratch sky, re-blended at each sample. getSunDirection's Z is the
+    // sun's height above the horizon, which is the only thing that says where
+    // noon is in a cycle whose keyframes could be anywhere.
+    const S32 track = LLEnvironment::instance().calculateSkyTrackForAltitude(
+        gAgent.getPositionAgent().mV[VZ]);
+    LLSettingsSky::ptr_t scratch = LLSettingsVOSky::buildDefaultSky();
+    auto blender = std::make_shared<LLTrackBlenderLoopingManual>(scratch, day, track);
+
+    mDayLandmarks = ALDayCycleLandmarks::find(
+        [&blender, &scratch](F32 position)
+        {
+            blender->setPosition(position);
+            return scratch->getSunDirection().mV[VZ];
+        });
+}
+
+void ALFloaterLightBox::refreshDayCycleRow()
+{
+    if (!mDayFreeze)
+    {
+        return; // the XUI is free to drop the row
+    }
+
+    const bool can_change = RlvActions::canChangeEnvironment();
+    const bool frozen = isSkyFrozen();
+    const bool has_day = (bool)getScrubbableDay();
+
+    // While the sky is running, the slider shows where it actually is, so
+    // ticking Freeze holds the moment being looked at rather than jumping.
+    if (!frozen)
+    {
+        const F32 live = LLEnvironment::instance().getProgress();
+        if (live >= 0.f)
+        {
+            mDayPosition = live;
+            if (mDayTime)
+            {
+                mDayTime->setValue(mDayPosition);
+            }
+        }
+        // A sky frozen by something else, then cleared by it, leaves us
+        // holding a restore point for an environment that is already back.
+        mDayFreezeIsOurs = false;
+    }
+
+    // Clouds are polled alongside because the World menu can pause them too,
+    // and a checkbox that disagrees with the sky is worse than none.
+    const bool clouds_paused = LLEnvironment::instance().isCloudScrollPaused();
+
+    const S32 state = (can_change ? 1 : 0) | (frozen ? 2 : 0) | (has_day ? 4 : 0)
+                    | (clouds_paused ? 8 : 0);
+    if (state == mDayCycleRowState)
+    {
+        return;
+    }
+    mDayCycleRowState = state;
+
+    if (mCloudScroll)
+    {
+        mCloudScroll->setValue(clouds_paused);
+    }
+
+    // @setenv is enforced inside LLEnvironment, not here, so without this the
+    // controls would look live and do nothing at all under a restriction.
+    mDayFreeze->setEnabled(can_change && has_day);
+    mDayFreeze->setValue(frozen);
+    if (mDayTime)
+    {
+        mDayTime->setEnabled(can_change && frozen && has_day);
+    }
+    if (mRestoreEnvironment)
+    {
+        mRestoreEnvironment->setEnabled(can_change && frozen);
+    }
+
+    // Presets cost a search, so only look when the row is actually usable.
+    if (can_change && has_day)
+    {
+        refreshDayLandmarks();
+    }
+    const bool present[4] = { mDayLandmarks.has_sunrise, mDayLandmarks.has_noon,
+                              mDayLandmarks.has_sunset, mDayLandmarks.has_midnight };
+    for (size_t i = 0; i < mDayPresets.size(); ++i)
+    {
+        if (mDayPresets[i])
+        {
+            mDayPresets[i]->setEnabled(can_change && has_day && present[i]);
+        }
+    }
+}
+
+void ALFloaterLightBox::onToggleDayFreeze(LLUICtrl* ctrl)
+{
+    if (!ctrl)
+    {
+        return;
+    }
+
+    if (ctrl->getValue().asBoolean())
+    {
+        freezeSkyAt(mDayPosition);
+    }
+    else
+    {
+        thawSky();
+    }
+    mDayCycleRowState = -1;
+}
+
+void ALFloaterLightBox::onCommitDayTime(LLUICtrl* ctrl)
+{
+    if (ctrl)
+    {
+        applyDayPosition((F32)ctrl->getValue().asReal());
+    }
+}
+
+void ALFloaterLightBox::onClickDayPreset(const LLSD& userdata)
+{
+    refreshDayLandmarks();
+
+    const std::string& which = userdata.asString();
+    const ALDayCycleLandmarks::Landmarks& marks = mDayLandmarks;
+
+    F32 position = 0.f;
+    if (which == "sunrise" && marks.has_sunrise)        { position = marks.sunrise; }
+    else if (which == "noon" && marks.has_noon)         { position = marks.noon; }
+    else if (which == "sunset" && marks.has_sunset)     { position = marks.sunset; }
+    else if (which == "midnight" && marks.has_midnight) { position = marks.midnight; }
+    else                                                { return; }
+
+    // A preset moves the slider and freezes there; it does not install a
+    // canned sky, so the region's own idea of noon is what you get and you can
+    // keep scrubbing from it.
+    freezeSkyAt(position);
+    if (mDayTime)
+    {
+        mDayTime->setValue(mDayPosition);
+    }
+    mDayCycleRowState = -1;
+}
+
+void ALFloaterLightBox::onToggleCloudScroll(LLUICtrl* ctrl)
+{
+    if (!ctrl)
+    {
+        return;
+    }
+
+    // Clouds drift on their own timer, entirely apart from the day cycle, so a
+    // frozen sky with this off still has weather moving through it.
+    if (ctrl->getValue().asBoolean())
+    {
+        LLEnvironment::instance().pauseCloudScroll();
+    }
+    else
+    {
+        LLEnvironment::instance().resumeCloudScroll();
+    }
+}
+
+void ALFloaterLightBox::onClickRestoreEnvironment()
+{
+    // Unconditional, unlike unticking Freeze: this is the way back to the
+    // parcel or region whatever we happen to be holding, including a sky some
+    // other floater installed.
+    mDayFreezeIsOurs = false;
+    mPreFreezeDay.reset();
+    mPreFreezeSky.reset();
+    mPreFreezeWater.reset();
+    thawSky();
+    mDayCycleRowState = -1;
 }
 
 void ALFloaterLightBox::onGradeSettingChanged(const std::string& name, const LLSD& before, const LLSD& after)

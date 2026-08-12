@@ -161,6 +161,7 @@ set(viewer_SOURCE_FILES
     alcolorwheelmodel.cpp
     alcurveeditorctrl.cpp
     alcurvemodel.cpp
+    aldaycyclelandmarks.cpp
     alderenderlist.cpp
     aldroptarget.cpp
     alfloaterblocked.cpp
@@ -939,6 +940,7 @@ set(viewer_HEADER_FILES
     alcolorwheelmodel.h
     alcurveeditorctrl.h
     alcurvemodel.h
+    aldaycyclelandmarks.h
     alderenderlist.h
     aldroptarget.h
     alfloaterblocked.h
@@ -2393,6 +2395,7 @@ if (BUILD_TESTING)
   SET(viewer_TEST_SOURCE_FILES
     alcolorwheelmodel.cpp
     alcurvemodel.cpp
+    aldaycyclelandmarks.cpp
     algradehistory.cpp
     alsceneexplorerpredicate.cpp
     alscopedata.cpp

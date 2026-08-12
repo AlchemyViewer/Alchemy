@@ -192,5 +192,16 @@
 		 label="Scene"
 		 layout="topleft"
 		 name="tab_scene" />
+		<!-- Last, because it is the odd one out: the other three hold settings
+		     this floater owns, and this one also reaches out and changes the
+		     world's environment. It is the one you use first, though, before
+		     there is a grade to speak of, which is an argument for the other
+		     end; the tab strip has 452px and four tabs at tab_min_width fit in
+		     280, so the order is free to change if that reads better in use. -->
+		<panel
+		 filename="panel_lightbox_sky.xml"
+		 label="Sky"
+		 layout="topleft"
+		 name="tab_sky" />
 	</tab_container>
 </floater>

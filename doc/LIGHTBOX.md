@@ -23,6 +23,8 @@ statics), so edits preview live with no glue code.
 | Look tab (color science) | `.../panel_lightbox_look.xml` |
 | Lens tab (optical/film effects) | `.../panel_lightbox_lens.xml` |
 | Scene tab (quality/performance) | `.../panel_lightbox_scene.xml` |
+| Sky tab (environment + client-side sky effects) | `.../panel_lightbox_sky.xml` |
+| Day cycle landmark search | `indra/newview/aldaycyclelandmarks.{h,cpp}` |
 | The C++ (callbacks, Vec3 binder, section reset, Looks bar) | `indra/newview/alfloaterlightbox.{h,cpp}` |
 | Looks preset system + whitelist | `indra/newview/llpresetsmanager.{h,cpp}` |
 | Bundled starter Looks | `indra/newview/app_settings/looks/` |
@@ -36,10 +38,10 @@ statics), so edits preview live with no glue code.
 | Header checkbox on `accordion_tab` | `indra/llui/llaccordionctrltab.{h,cpp}` |
 | Anti-aliased 2D polyline and fill | `indra/llrender/llrender2dutils.{h,cpp}` |
 
-Five of those have unit tests, and the tests are the reason the maths in them can
-be trusted: `alcolorwheelmodel_test`, `alcurvemodel_test`, `algradehistory_test`,
-`alscopedata_test`, `alwhitebalancesolver_test`. Anything with arithmetic in it
-belongs on that list.
+Six of those have unit tests, and the tests are the reason the maths in them can
+be trusted: `alcolorwheelmodel_test`, `alcurvemodel_test`,
+`aldaycyclelandmarks_test`, `algradehistory_test`, `alscopedata_test`,
+`alwhitebalancesolver_test`. Anything with arithmetic in it belongs on that list.
 
 ### What v2 added, and what it altered
 
@@ -55,6 +57,7 @@ the viewer's widget set was touched.
 | Anti-aliased polyline and area fill | `gl_polyline_2d`, `gl_polyfill_2d` | §4b |
 | Floater top bar (Looks, history, scopes) | ordinary buttons, `Floater.Toggle` | §4g |
 | Scopes window | its own floater | §4d |
+| Sky tab (day cycle freeze) | ordinary rows, `LLEnvironment` behind them | §4h |
 
 `accordion_tab` is the only **stock** widget altered, and the change is additive:
 a tab that does not ask for `header_check_box` gets exactly the header it always
@@ -118,7 +121,11 @@ persist — declare everything you expose).
 ### 2. Choose the tab and shape
 
 - **Look** = color science (tone, grading). **Lens** = optical/film effects.
-  **Scene** = render quality and performance.
+  **Scene** = render quality and performance. **Sky** = the sky being shot:
+  client-side sky effects, which are ordinary settings rows, plus the day cycle
+  controls, which are the odd ones out because they reach past this floater and
+  change the world's environment. Read §4h before adding day cycle controls;
+  a sky *effect* needs nothing special.
 - Essentials (2-4 knobs) in the main section; long tail in a *sibling*
   accordion tab named `atab_sec_<id>_adv` titled `"<Section> - Advanced"`.
 - **Fold instead of splitting** when the advanced tail is small (~2-3 rows) or
@@ -649,6 +656,91 @@ is a global commit callback in `llui.cpp`, with the floater's registered name as
 `parameter`. Use that one and not `Floater.ToggleOrBringToFront`; §4d explains
 why the second can only ever open.
 
+### 4h. The Sky tab, and changing the world
+
+The Sky tab holds two kinds of thing and they do not behave alike.
+
+**Sky Effects is ordinary settings rows** and wants nothing from this section:
+`control_name`, a reset glyph, a Reset All, done. Aurora, meteors and the star
+field are drawn entirely on the client, so nothing is sent to or from the region
+and no land setting turns them on — which is what makes them safe to expose here
+at all, and why they sit beside the day cycle rather than in Scene. All three
+gate on the same star brightness the night sky uses, so they simply do not
+appear in daylight, and an HDRI sky replaces the dome and leaves nothing to draw
+into. None is on the Looks whitelist: a Look is the aesthetic settings of the
+Look and Lens tabs, and a Look that switched the aurora on would be a surprise.
+
+Two shaping decisions in that section are worth copying. It is **one** section
+rather than three because two of the effects are a single control each, and a
+section per slider reads as filing rather than grouping. And the star count is a
+**dropdown**, by §2's rule: committing it regenerates every star position and
+rebuilds the vertex buffer, so a slider — which commits on every mouse-move —
+would hitch the whole way across its own travel.
+
+**Day cycle is the odd one out.** It changes `LLEnvironment`, which is shared
+with the whole viewer, and that makes it a different kind of thing to work on.
+Six rules, all learned the hard way and all still true for anything else that
+reaches out of this floater.
+
+**There is no clock to stop.** `DayInstance::getProgress()` computes the cycle
+position from `LLDate::now()` plus the day offset, every frame, so nothing can
+be paused. "Freeze" means sampling the running cycle at one position and
+installing the result as a *fixed* local environment; the motion stops because
+there is no longer a day cycle in effect. That is also how `@setenv_daytime`
+and the day cycle editor's timeline do it — sample with
+`LLTrackBlenderLoopingManual(target, day, track)->setPosition(0..1)`.
+
+**Sample water as well as sky.** Track 0 is water and the sky tracks are 1 to 4,
+chosen by altitude via `calculateSkyTrackForAltitude`. RLVa's version freezes
+only the sky, and a frozen sky over a moving sea is not frozen.
+
+**RLVa is enforced below you, not by you.** `setSelectedEnvironment` returns
+early when `!RlvActions::canChangeEnvironment()`, inside `LLEnvironment`. A
+control that does not check it looks live and silently does nothing under
+`@setenv=n`, so the Light rows are greyed from the same `draw()` poll that reads
+their state back. There is no `enable_callback` on ordinary widgets in XUI —
+menus have `on_enable`, widgets do not — so this has to be done in C++.
+
+**Freezing covers up whatever `ENV_LOCAL` held**, which is where Personal
+Lighting and an inventory-applied sky live. Unticking Freeze puts back what was
+captured on the way in; "Restore region environment" is the unconditional way
+out and *does* discard it. Clearing without capturing first is a silent way to
+lose someone's sky.
+
+**Reverting the sky invalidates every reflection probe** that was lit by it.
+`gPipeline.mReflectionMapManager.reset()`, the same call the World menu's own
+revert makes.
+
+**Read the state from the world, not from a mirror.** Whether the sky is frozen
+is `getEnvironmentFixedSky(ENV_LOCAL) != nullptr`; the cycle to scrub is the
+first day found across `ENV_LOCAL`, `ENV_PUSH`, `ENV_PARCEL`, `ENV_REGION`.
+Deriving both means the tab stays honest when the World menu, an attachment or
+another floater changes the environment underneath it — and it is what lets
+scrubbing survive closing and reopening the floater, since nothing about the
+freeze is remembered in the floater at all.
+
+#### A cycle position is not a time
+
+Nothing in this viewer maps a cycle position to a clock. The day cycle editor
+labels its timeline as a **percentage**, and a region can put its keyframes
+wherever it likes, so "noon is 0.5" is a property of some day cycles and not
+others. Even the stock day is not what you would guess: `LLSettingsSky::defaults`
+computes sun altitude as `π × position`, and caches its result in a `static`, so
+the viewer's own default day cycle is eight identical frames.
+
+So the four preset buttons do not use fractions. `ALDayCycleLandmarks::find`
+samples the cycle, reads `getSunDirection().mV[VZ]` — the sun's height above the
+horizon — and takes noon and midnight from the extremes and sunrise and sunset
+from the horizon crossings, interpolated between samples so the answer beats the
+grid. A cycle without a given landmark reports it absent and the button greys,
+because a sun that never sets has a noon and no sunrise, and inventing one would
+be worse than offering nothing.
+
+It takes a sampler rather than a day cycle, the same shape `curve_editor` uses,
+which is what lets `aldaycyclelandmarks_test` exercise it with a sine wave and
+no viewer around it. Sampling costs ninety-six blends, so it is cached against
+the day it was computed from and never runs on the frame path.
+
 ### 5. Height math (the part everyone gets wrong)
 
 - `accordion_tab` height **must be** inner panel height **+ 29**
@@ -667,6 +759,12 @@ why the second can only ever open.
   `top="8"`, so the bank's bottom is *one* wheel's height, not three; the next
   row's `top_pad` chains from the last one declared. Get this wrong and the
   panel is either 350px too tall or clipped.
+- **A row of buttons has to be sized for `min_width`, not for the default.**
+  The arithmetic that matters is 420 − 28 for the chrome − 15 for the accordion
+  scrollbar − 16 for `left="8"`/`right="-8"`, which leaves **361px**. The Light
+  tab's four presets are 85 wide with 6px gaps and end at 366 of 369. Laid out
+  against the 460 default they looked fine and lost their last button the
+  moment the floater was narrowed.
 - Widths never reflow. Usable inner width is the floater's width − 28, and
   ~15px less again whenever the accordion's scrollbar shows. **Overflow clips
   silently, with no scrollbar and no warning**, so check the narrowest case:
@@ -714,6 +812,18 @@ only; apply per row, not on the parent panel. Reference patterns:
   first time for exactly that reason. The one deliberate exception is dither,
   which is a quantisation aid rather than a look and which an 8-bit PNG wants
   either way.
+
+Two things that only show up on screen, both of which did:
+
+- **A one-line `text` needs `height="16"`, not `height="30"` with `word_wrap`.**
+  Three lines of prose in a 30px box do not scroll or ellipse, they draw over
+  the row beneath. Count the characters: roughly 70 fit on a line at
+  `SansSerifSmall` across a section at `min_width`.
+- **A button's `width` has to fit its own label**, and an `image_overlay` eats
+  18px of it before the text starts. There is no reflow and no ellipsis; the
+  label is simply cut. Prefer a name the viewer already uses — "Use shared
+  environment" is the World menu's own wording for dropping a local environment
+  — over a longer one you invent.
 
 ### 7. Slider text width
 
@@ -784,6 +894,14 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
   still unticked and confirm the render comes back — state parked outside the
   floater is the failure mode here, and it looks like a renderer bug rather than
   a UI one.
+- For the Sky tab's day cycle: freeze, wait past the point the sky would have
+  moved, and confirm it has not. Then untick and confirm you get back *what you
+  had*, not the region default — set a Personal Lighting sky first, since that
+  is the case a missing capture loses. Fly through an altitude band while frozen
+  and confirm the sky holds; check the water stopped too, not just the sky.
+  Finally, confirm the presets land somewhere plausible on a region whose day
+  cycle is not the default one, because a hardcoded fraction would also look
+  right on a default region.
 - For anything on an accordion header: click it and confirm the section does
   **not** expand or collapse, then hover it with the section expanded and
   confirm its own tooltip appears rather than the title's. Those are the two
