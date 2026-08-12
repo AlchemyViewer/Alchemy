@@ -628,13 +628,12 @@ public:
     typedef boost::unordered_map<LLUUID, std::array<S32, LLModel::NUM_LODS> > pending_lod_map;
     pending_lod_map mPendingLOD;
 
-    // map of mesh ID to skin info (mirrors LLMeshRepository::mSkinMap)
-    /// NOTE: LLMeshRepository::mSkinMap is accessed very frequently, so maintain a copy here to avoid mutex overhead
+    // Mesh ID to skin info, for the per-joint bounding box pass in lodReceived(). Holds
+    // the same instances as LLMeshRepository::mSkinMap rather than copies of them, which
+    // is only sound for skins frozen at publication -- see LLMeshSkinInfo::mFrozen.
     typedef boost::unordered_map<LLUUID, LLPointer<LLMeshSkinInfo>> skin_map;
     skin_map mSkinMap;
 
-    // workqueue for processing generic requests
-    LL::WorkQueue mWorkQueue;
     // lods have their own thread due to costly cacheOptimize() calls
     std::unique_ptr<LL::ThreadPool> mMeshThreadPool;
 

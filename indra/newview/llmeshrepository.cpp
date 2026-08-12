@@ -965,8 +965,7 @@ LLMeshRepoThread::LLMeshRepoThread()
   mHttpLargeOptions(),
   mHttpHeaders(),
   mHttpPolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
-  mHttpLargePolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID),
-  mWorkQueue("MeshRepoThread", 1024*1024)
+  mHttpLargePolicyClass(LLCore::HttpRequest::DEFAULT_POLICY_ID)
 {
     LLAppCoreHttp & app_core_http(LLAppViewer::instance()->getAppCoreHttp());
 
@@ -1080,10 +1079,6 @@ void LLMeshRepoThread::run()
         {
             break;
         }
-
-        // run mWorkQueue for up to 8ms
-        static std::chrono::nanoseconds WorkTimeNanoSec{std::chrono::nanoseconds::rep(8 * 1000000) };
-        mWorkQueue.runFor(WorkTimeNanoSec);
 
         if (! mHttpRequestSet.empty())
         {
