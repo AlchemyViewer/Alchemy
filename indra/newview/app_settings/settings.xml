@@ -8890,30 +8890,6 @@
     <integer>0</integer>
   </map>
 
-  <key>RenderSpecularResX</key>
-  <map>
-    <key>Comment</key>
-    <string>Spec map resolution.</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>1024</integer>
-  </map>
-
-  <key>RenderSpecularResY</key>
-  <map>
-    <key>Comment</key>
-    <string>Spec map resolution.</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>256</integer>
-  </map>
-
   <key>RenderSpecularExponent</key>
   <map>
     <key>Comment</key>

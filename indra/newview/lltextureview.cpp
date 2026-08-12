@@ -723,10 +723,12 @@ void LLGLTexMemBar::draw()
 
     // Mesh status line
     text = llformat("Mesh: Reqs(Tot/Htp/Big): %u/%u/%u Rtr/Err: %u/%u Cread/Cwrite: %u/%u Low/At/High: %d/%d/%d",
-                    LLMeshRepository::sMeshRequestCount, LLMeshRepository::sHTTPRequestCount, LLMeshRepository::sHTTPLargeRequestCount,
-                    LLMeshRepository::sHTTPRetryCount, LLMeshRepository::sHTTPErrorCount,
-                    (U32)LLMeshRepository::sCacheReads, (U32)LLMeshRepository::sCacheWrites,
-                    LLMeshRepoThread::sRequestLowWater, LLMeshRepoThread::sRequestWaterLevel, LLMeshRepoThread::sRequestHighWater);
+                    LLMeshRepository::sMeshRequestCount.load(), LLMeshRepository::sHTTPRequestCount.load(),
+                    LLMeshRepository::sHTTPLargeRequestCount.load(),
+                    LLMeshRepository::sHTTPRetryCount.load(), LLMeshRepository::sHTTPErrorCount.load(),
+                    LLMeshRepository::sCacheReads.load(), LLMeshRepository::sCacheWrites.load(),
+                    LLMeshRepoThread::sRequestLowWater.load(), LLMeshRepoThread::sRequestWaterLevel.load(),
+                    LLMeshRepoThread::sRequestHighWater.load());
     widest = llmax(widest, font_mono->getWidth(text));
     font_mono->renderUTF8(text, 0, 0, v_offset + line_height*2,
                           text_color, LLFontGL::LEFT, LLFontGL::TOP);

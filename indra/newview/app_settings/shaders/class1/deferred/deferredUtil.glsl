@@ -136,6 +136,28 @@ float calcLegacyDistanceAttenuation(float distance, float falloff)
     return dist_atten;
 }
 
+// The normalized Blinn-Phong specular lobe for a legacy glossiness.
+//
+// SPECULAR_EXPONENT is injected alongside the GBuffer flags, from RenderSpecularExponent. The
+// square is this tree's mapping from an 8-bit material field to an exponent, and it is what
+// makes the top of the glossiness range spend most of its resolution on very tight lobes.
+//
+// The normalization keeps the lobe's integral independent of the exponent, so polishing a
+// surface concentrates its highlight rather than adding energy to it. Its 2^(-n/2) term only
+// does anything as n approaches zero, where it holds the denominator off zero; by the exponents
+// a glossy surface uses it is below 1e-6 and this is (n+2)(n+4) / 8*pi*n.
+//
+// Every caller takes nh from calcHalfVectors, which floors it above zero -- pow() is undefined
+// at a zero base with a zero exponent, which is reachable here only through a glossiness of
+// zero, and every call site already gates on that being positive.
+float blinnPhongLobe(float nh, float glossiness)
+{
+    float n = glossiness * glossiness * SPECULAR_EXPONENT;
+    float norm = ((n + 2.0) * (n + 4.0)) / (8.0 * M_PI * (exp2(-n * 0.5) + n));
+
+    return pow(nh, n) * norm;
+}
+
 // In:
 //   lv  unnormalized surface to light vector
 //   n   normal of the surface
@@ -798,6 +820,146 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
     if (classic_mode > 0)
         final_scale = 0.9;
     return color * final_scale;
+}
+
+// The legacy (Blinn-Phong) twin of pbrCalcPointLightOrSpotLight: one punctual light against a
+// legacy surface, in the form the forward passes need to light alpha in place. Two entry points
+// over one model -- a diffuse-only one for the surfaces that carry no specular data, and the
+// full one.
+//
+// Term for term the deferred model -- see the legacy branch of class3/deferred/pointLightF.glsl.
+// The forward passes each carried a copy of it, and both copies had drifted: they recovered the
+// light's radius by inverting the linear attenuation, ran an inlined distance falloff, fed the
+// geometry term and its own denominator the attenuated angular value rather than NdotL, took the
+// dot products without the epsilon floors those denominators need, and capped the lit factor at
+// 1 where the deferred path lets it reach 2. A blended surface was lit differently from the
+// opaque one behind it, and most differently where a local light was closest.
+//
+// lightSize and falloff are the deferred pair (light_deferred_attenuation), which LLRender fills
+// from the same mSize/mFalloff the deferred pass reads. The reconstruction they replace was
+// algebraically exact, so the distance term is unchanged by routing through it.
+//
+// The spot cone is the one term with no deferred counterpart: deferred spot lights are their own
+// pass with a projector texture that a forward pass cannot reach. Applied to the result, the way
+// pbrCalcPointLightOrSpotLight applies it, rather than folded into the angular term -- there it
+// would also land in the specular geometry term and its denominator, and partly cancel itself.
+//
+// glare is the forward paths' glow accumulator. It drives an alpha channel rather than a colour,
+// so it keeps the [0,1] scale it has always been on while the colour takes the deferred path's
+// radiance bound.
+
+// The geometry and attenuations both entry points work from, so the model lives in one place
+// while only one of them takes the specular LUT. A sampler passed to a shader that never reads
+// it still costs that program a texture channel and renumbers the ones after it, and whether it
+// did would come down to the driver folding away a branch on a constant argument -- which makes
+// the channel layout, and anything downstream that reads a unit by number, driver-dependent.
+struct LegacyPunctualInfo
+{
+    float nh;
+    float nl;
+    float nv;
+    float vh;
+    float dist_atten;
+    float spot_atten;
+};
+
+bool calcLegacyPunctual(vec3 n, vec3 p, vec3 v, vec3 lp, vec3 ld,
+                    float lightSize, float falloff, float is_pointlight,
+                    out LegacyPunctualInfo lt)
+{
+    lt = LegacyPunctualInfo(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+
+    vec3 lv = lp - p;
+    float dist = length(lv) / lightSize;
+
+    // The facing test is against the raw dot product, before calcHalfVectors floors it. That
+    // floor exists so the Blinn-Phong terms can divide by it, which would leave a test made
+    // after the call constant and let back faces through the whole light.
+    if (dist > 1.0 || dot(n, lv) <= 0.0)
+    {
+        return false;
+    }
+
+    vec3 h, l;
+    float lightDist;
+    calcHalfVectors(lv, n, v, h, l, lt.nh, lt.nl, lt.nv, lt.vh, lightDist);
+
+    lt.dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
+
+    // spot*spot => GL_SPOT_EXPONENT=2
+    float spot = max(dot(-ld, l), is_pointlight);
+    lt.spot_atten = spot * spot;
+
+    return true;
+}
+
+// The cone weight over both lobes once they are summed, then the deferred path's bound.
+vec3 finishLegacyPunctual(vec3 col, float spot_atten)
+{
+    float final_scale = 1.0;
+    if (classic_mode > 0)
+        final_scale = 0.9;
+
+    return max(clampRadiance(col * spot_atten) * final_scale, vec3(0));
+}
+
+// Diffuse only, for the legacy surfaces that carry no specular data at all.
+vec3 calcLegacyPointLightDiffuse(vec3 diffuse,
+                    vec3 n,  // normal
+                    vec3 p,  // pixel position
+                    vec3 v,  // view vector (negative normalized pixel position)
+                    vec3 lp, // light position
+                    vec3 ld, // light direction (for spotlights)
+                    vec3 lightColor,
+                    float lightSize, float falloff, float is_pointlight)
+{
+    LegacyPunctualInfo lt;
+    if (!calcLegacyPunctual(n, p, v, lp, ld, lightSize, falloff, is_pointlight, lt))
+    {
+        return vec3(0);
+    }
+
+    return finishLegacyPunctual(lightColor * (lt.nl * lt.dist_atten) * diffuse, lt.spot_atten);
+}
+
+vec3 calcLegacyPointLightOrSpotLight(vec3 diffuse, vec4 spec,
+                    vec3 n,  // normal
+                    vec3 p,  // pixel position
+                    vec3 v,  // view vector (negative normalized pixel position)
+                    vec3 lp, // light position
+                    vec3 ld, // light direction (for spotlights)
+                    vec3 lightColor,
+                    float lightSize, float falloff, float is_pointlight,
+                    inout float glare)
+{
+    LegacyPunctualInfo lt;
+    if (!calcLegacyPunctual(n, p, v, lp, ld, lightSize, falloff, is_pointlight, lt))
+    {
+        return vec3(0);
+    }
+
+    vec3 col = lightColor * (lt.nl * lt.dist_atten) * diffuse;
+
+    if (spec.a > 0.0)
+    {
+        float lit = min(lt.nl * 6.0, 1.0) * lt.dist_atten;
+
+        float fres = pow(1.0 - lt.vh, 5) * 0.4 + 0.5;
+        float gtdenom = 2.0 * lt.nh;
+        float gt = max(0.0, min(gtdenom * lt.nv / lt.vh, gtdenom * lt.nl / lt.vh));
+
+        float scol = fres * blinnPhongLobe(lt.nh, spec.a) * gt / (lt.nh * lt.nl);
+        vec3 speccol = lit * scol * lightColor * spec.rgb;
+
+        col += speccol;
+
+        vec3 glareSrc = clamp(speccol * lt.spot_atten, vec3(0), vec3(1));
+        float cur_glare = max(max(glareSrc.r, glareSrc.g), glareSrc.b);
+        glare = max(glare, glareSrc.r);
+        glare += cur_glare;
+    }
+
+    return finishLegacyPunctual(col, lt.spot_atten);
 }
 
 // Split a glTF metallic-roughness base colour into the two lobes' albedos.

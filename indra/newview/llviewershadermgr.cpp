@@ -822,6 +822,12 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["HAS_EMISSIVE"] = "1";
     }
 
+    // Blinn-Phong exponent at full glossiness, for deferredUtil's blinnPhongLobe. A define
+    // rather than a uniform because it reaches a shared object -- this map is what compiles
+    // those, and a program's own mShaderFiles never see it, which is fine: the lobe is
+    // evaluated in deferredUtil and nowhere else.
+    attribs["SPECULAR_EXPONENT"] = llformat("%.1f", gSavedSettings.getF32("RenderSpecularExponent"));
+
     bool ssr = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
 
     bool mirrors = gSavedSettings.getBOOL("RenderMirrors");

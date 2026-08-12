@@ -102,7 +102,9 @@ public:
         return *this;
     }
 
-    void ref()
+    // const, as on LLRefCount: reference counting says nothing about the logical
+    // constness of the object, and LLConstPointer<T> refcounts through a const pointer.
+    void ref() const
     {
         // Relaxed is sufficient for the increment: it only has to be atomic. The caller
         // necessarily already holds a reference, so this cannot race the count to zero,
@@ -110,7 +112,7 @@ public:
         mRef.fetch_add(1, std::memory_order_relaxed);
     }
 
-    void unref()
+    void unref() const
     {
         llassert(mRef.load(std::memory_order_relaxed) >= 1);
 
@@ -140,7 +142,7 @@ private:
     // chosen per-operation for refcounting. LLAtomicBase is seq_cst on every operation
     // and is used elsewhere for cross-thread flags that depend on that -- see the note
     // in llatomic.h.
-    std::atomic<S32> mRef;
+    mutable std::atomic<S32> mRef;
 };
 
 /**

@@ -30,6 +30,7 @@
 #include "stdtypes.h"
 #include "llthread.h"
 
+#include <atomic>
 #include <chrono>
 #include <mutex>
 #include <shared_mutex>
@@ -60,8 +61,16 @@ public:
 
 protected:
     std::mutex          mMutex;
+    // Owner-only: read and written solely by whichever thread currently holds mMutex.
     mutable U32         mCount;
-    mutable LLThread::id_t  mLockingThread;
+    // Read by every caller of lock()/trylock() before mMutex is held, and written by the
+    // owner, so it must be atomic even though relaxed ordering suffices -- see
+    // LLMutex::isSelfLocked() for why relaxed is not merely a heuristic here.
+    mutable std::atomic<LLThread::id_t> mLockingThread;
+
+    static_assert(std::atomic<LLThread::id_t>::is_always_lock_free,
+                  "LLMutex::mLockingThread is read on the lock() fast path; a locking atomic here "
+                  "would put a mutex inside the mutex");
 
 #if MUTEX_DEBUG
     std::unordered_map<LLThread::id_t, bool> mIsLocked;

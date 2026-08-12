@@ -36,7 +36,8 @@
 // LLMutex
 //
 LLMutex::LLMutex() :
- mCount(0)
+ mCount(0),
+ mLockingThread(LLThread::id_t())
 {
 }
 
@@ -73,7 +74,7 @@ void LLMutex::lock()
     mIsLocked[id] = true;
 #endif
 
-    mLockingThread = LLThread::currentID();
+    mLockingThread.store(LLThread::currentID(), std::memory_order_relaxed);
 }
 
 void LLMutex::unlock()
@@ -94,7 +95,7 @@ void LLMutex::unlock()
     mIsLocked[id] = false;
 #endif
 
-    mLockingThread = LLThread::id_t();
+    mLockingThread.store(LLThread::id_t(), std::memory_order_relaxed);
     mMutex.unlock();
 }
 
@@ -114,12 +115,16 @@ bool LLMutex::isLocked()
 
 bool LLMutex::isSelfLocked()
 {
-    return mLockingThread == LLThread::currentID();
+    // Relaxed is not just cheap, it is exact. If this thread owns the lock it is reading back
+    // its own store from lock()/trylock(). If it does not, whatever it observes is another
+    // thread's id or the empty id, and "false" is the right answer either way. Only a torn
+    // read could ever have made this wrong, and that is what the atomic rules out.
+    return mLockingThread.load(std::memory_order_relaxed) == LLThread::currentID();
 }
 
 LLThread::id_t LLMutex::lockingThread() const
 {
-    return mLockingThread;
+    return mLockingThread.load(std::memory_order_relaxed);
 }
 
 bool LLMutex::trylock()
@@ -144,7 +149,7 @@ bool LLMutex::trylock()
     mIsLocked[id] = true;
 #endif
 
-    mLockingThread = LLThread::currentID();
+    mLockingThread.store(LLThread::currentID(), std::memory_order_relaxed);
     return true;
 }
 

@@ -1228,21 +1228,18 @@ bool LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 
                 if (!mSkinInfo && !mSkinInfoUnavaliable)
                 {
-                    LLUUID mesh_id = volume_params.getSculptID();
-                    if (gMeshRepo.hasHeader(mesh_id) && !gMeshRepo.hasSkinInfo(mesh_id))
+                    const LLMeshSkinInfo* skin_info = nullptr;
+                    switch (gMeshRepo.fetchSkinInfo(volume_params.getSculptID(), this, skin_info))
                     {
-                        // If header is present but has no data about skin,
-                        // no point fetching
+                    case MESH_SKIN_LOADED:
+                        notifySkinInfoLoaded(skin_info);
+                        break;
+                    case MESH_SKIN_UNAVAILABLE:
+                        // Header is present and has no data about skin, no point fetching
                         mSkinInfoUnavaliable = true;
-                    }
-
-                    if (!mSkinInfoUnavaliable)
-                    {
-                        const LLMeshSkinInfo* skin_info = gMeshRepo.getSkinInfo(mesh_id, this);
-                        if (skin_info)
-                        {
-                            notifySkinInfoLoaded(skin_info);
-                        }
+                        break;
+                    case MESH_SKIN_PENDING:
+                        break;
                     }
                 }
             }
