@@ -55,6 +55,11 @@ public:
     /// over this; it exists separately so the parser can be exercised from a
     /// string without touching the filesystem.
     ///
+    /// One parse per object: nothing here resets the cursor, the size or the
+    /// sticky failure flag, so a second call sees the first's state (and
+    /// trips the duplicate-LUT_3D_SIZE check at best). Construct a fresh
+    /// LutCube per file, which is what every caller and test does.
+    ///
     /// A cube is only kept if it is complete: the declared @c LUT_3D_SIZE must
     /// be sane and exactly that many entries must have been read. Anything else
     /// leaves @c colorCube empty. A partial cube is worse than none -- the

@@ -63,10 +63,11 @@ freely, subject to the following restrictions:
 
 namespace
 {
-    /// Widest cube we will allocate. A side of 256 is already 64 MiB of RGBA and
-    /// far beyond anything an authoring tool emits; the point is to have an
-    /// upper bound at all, so a garbage size cannot ask for a huge allocation.
-    constexpr int MAX_LUT_SIZE = 256;
+    /// Widest cube we will allocate. Entries are RGBA at 16 bits per channel,
+    /// so a side of 128 is already 16 MiB, and authoring tools emit 17, 33 or
+    /// 65 with the odd 96 or 128; the point is to have an upper bound at all,
+    /// so a garbage size cannot ask for a huge allocation.
+    constexpr int MAX_LUT_SIZE = 128;
     constexpr int MIN_LUT_SIZE = 2;
 
     /// True if @a text begins something that could be a number, once leading
@@ -193,9 +194,17 @@ void LutCube::parseLine(std::string line)
             return;
         }
 
-        float          x, y, z;
+        float          x = 0.f, y = 0.f, z = 0.f;
         unsigned short outX, outY, outZ;
         splitTripel(line, x, y, z);
+        if (failed)
+        {
+            // splitTripel rejected the triple without writing the outputs.
+            // The cube is already condemned; carrying on would push the
+            // initialisers above -- or, unguarded, indeterminate values --
+            // through the quantiser for nothing.
+            return;
+        }
         clampTripel(x, y, z, outX, outY, outZ);
         writeColor(currentX, currentY, currentZ, outX, outY, outZ);
         ++entryCount;

@@ -290,7 +290,17 @@ void LLPresetsManager::startWatching(const std::string& subdirectory)
             if (gSavedSettings.controlExists(ctrl_name))
             {
                 LLPointer<LLControlVariable> cntrl_ptr = gSavedSettings.getControl(ctrl_name);
-                mLooksChangedSignals.push_back(cntrl_ptr->getCommitSignal()->connect(boost::bind(&LLPresetsManager::looksSettingChanged, this)));
+                if (cntrl_ptr.isNull())
+                {
+                    // Cannot happen while controlExists and getControl agree;
+                    // guarded anyway, exactly as the camera and graphics
+                    // branches above guard it.
+                    LL_WARNS("Presets") << "Unable to set signal on Looks control '" << ctrl_name << "'" << LL_ENDL;
+                }
+                else
+                {
+                    mLooksChangedSignals.push_back(cntrl_ptr->getCommitSignal()->connect(boost::bind(&LLPresetsManager::looksSettingChanged, this)));
+                }
             }
             else
             {
@@ -498,7 +508,10 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
     // or panel_lightbox_lens MUST be added here; Scene-tab keys must not be.
     // Applying a Look writes only keys on this list, so a shared Look file
     // cannot smuggle unrelated settings.
-    const std::vector<std::string> looks_controls = {
+    //
+    // Static: the list never changes, and callers include per-save and
+    // per-apply paths, so build the ~110 strings once rather than every call.
+    static const std::vector<std::string> looks_controls = {
         // Exposure & tone
         "RenderExposure",
         "AlchemyRenderTonemapType",

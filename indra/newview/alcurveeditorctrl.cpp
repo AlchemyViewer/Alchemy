@@ -149,6 +149,15 @@ S32 ALCurveEditorCtrl::hitTest(S32 px, S32 py) const
 
 bool ALCurveEditorCtrl::handleMouseDown(S32 x, S32 y, MASK mask)
 {
+    // Belt and braces: parent dispatch already skips disabled children
+    // (visibleEnabledAndContains, llview.cpp), so this cannot be reached
+    // disabled today. It is here so a drag can never commit through a greyed
+    // widget if that dispatch ever changes.
+    if (!getEnabled())
+    {
+        return LLUICtrl::handleMouseDown(x, y, mask);
+    }
+
     const S32 index = hitTest(x, y);
     if (index < 0)
     {

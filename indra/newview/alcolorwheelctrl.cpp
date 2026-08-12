@@ -389,6 +389,14 @@ bool ALColorWheelCtrl::handleMouseUp(S32 x, S32 y, MASK mask)
 
 bool ALColorWheelCtrl::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
+    // Belt and braces, as handleMouseDown's enabled test is: parent dispatch
+    // already skips disabled children, so this cannot fire disabled today,
+    // but a reset that writes the setting must never ride on that staying so.
+    if (!getEnabled())
+    {
+        return LLUICtrl::handleDoubleClick(x, y, mask);
+    }
+
     F32 cx, cy, radius;
     wheelGeometry(cx, cy, radius);
     const F32 dx = (F32)x - cx;

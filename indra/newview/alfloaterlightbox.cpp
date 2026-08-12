@@ -1159,34 +1159,37 @@ void ALFloaterLightBox::onCommitToneCurve()
     const F32 strength = getColor3(TONE_CURVE_STRENGTH).mV[read];
 
     // Writing a setting re-enters through its signal; let the write land, then
-    // rebuild the handles once from the values that actually stuck.
-    mToneCurveUpdating = true;
+    // rebuild the handles once from the values that actually stuck. Scoped so
+    // no early return can ever leave the flag stuck and the graph dead -- and
+    // the scope must close before the refresh below, which reads the same
+    // flag and would otherwise skip the rebuild it exists to do.
+    {
+        ScopedTrue updating(mToneCurveUpdating);
 
-    if (which == "toe")
-    {
-        // Held at or below the shoulder. The shader tolerates the inversion
-        // (its reciprocal is guarded) but it renders as a hard step with no
-        // visible cause; the spinners remain the way to ask for that.
-        setColor3Component(TONE_CURVE_TOE, channel, llmin(handle.mX, shoulder));
-    }
-    else if (which == "shoulder")
-    {
-        setColor3Component(TONE_CURVE_SHOULDER, channel, llmax(handle.mX, toe));
-    }
-    else if (which == "strength")
-    {
-        // The handle rides the curve at a fixed x, so its height is
-        // mix(x, s, k) and k falls straight out of it.
-        const F32 x = handle.mX;
-        const F32 s = ALCurveModel::smoothstep(x, toe, shoulder, 1.f);
-        const F32 gap = s - x;
-        if (fabsf(gap) > 1e-3f)
+        if (which == "toe")
         {
-            setColor3Component(TONE_CURVE_STRENGTH, channel, llclamp((handle.mY - x) / gap, 0.f, 1.f));
+            // Held at or below the shoulder. The shader tolerates the inversion
+            // (its reciprocal is guarded) but it renders as a hard step with no
+            // visible cause; the spinners remain the way to ask for that.
+            setColor3Component(TONE_CURVE_TOE, channel, llmin(handle.mX, shoulder));
+        }
+        else if (which == "shoulder")
+        {
+            setColor3Component(TONE_CURVE_SHOULDER, channel, llmax(handle.mX, toe));
+        }
+        else if (which == "strength")
+        {
+            // The handle rides the curve at a fixed x, so its height is
+            // mix(x, s, k) and k falls straight out of it.
+            const F32 x = handle.mX;
+            const F32 s = ALCurveModel::smoothstep(x, toe, shoulder, 1.f);
+            const F32 gap = s - x;
+            if (fabsf(gap) > 1e-3f)
+            {
+                setColor3Component(TONE_CURVE_STRENGTH, channel, llclamp((handle.mY - x) / gap, 0.f, 1.f));
+            }
         }
     }
-
-    mToneCurveUpdating = false;
     refreshToneCurve();
 }
 
@@ -1285,9 +1288,12 @@ void ALFloaterLightBox::onCommitSplitToneGraph()
     // parked somewhere the renderer will not follow.
     const F32 mid = mSplitToneGraph->getHandles()[0].mX;
 
-    mSplitToneUpdating = true;
-    gSavedSettings.setF32(SPLIT_TONE_BALANCE, ALCurveModel::splitToneBalance(mid));
-    mSplitToneUpdating = false;
+    // Scoped for the same reason onCommitToneCurve's guard is, and closed
+    // before the refresh for the same reason too.
+    {
+        ScopedTrue updating(mSplitToneUpdating);
+        gSavedSettings.setF32(SPLIT_TONE_BALANCE, ALCurveModel::splitToneBalance(mid));
+    }
     refreshSplitToneGraph();
 }
 
@@ -1460,7 +1466,7 @@ void ALFloaterLightBox::refreshVec3Row(const std::string& setting_name)
     }
 
     const LLSD value = controlp->getValue();
-    mVec3Updating = true;
+    ScopedTrue updating(mVec3Updating);
     for (S32 i = 0; i < 3; ++i)
     {
         if (LLUICtrl* ctrlp = row->second[i])
@@ -1468,5 +1474,4 @@ void ALFloaterLightBox::refreshVec3Row(const std::string& setting_name)
             ctrlp->setValue(value[i].asReal());
         }
     }
-    mVec3Updating = false;
 }

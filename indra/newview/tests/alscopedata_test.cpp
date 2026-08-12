@@ -321,7 +321,7 @@ namespace tut
         ALScopeData first;
         ALScopeData second;
         const std::vector<U8> a = ramp();
-        const std::vector<U8> b = flat(77, 77, 77, 256);
+        const std::vector<U8> b = flat(77, 77, 77, ALScopeData::BIN_COUNT);
         first.accumulate(a.data(), ALScopeData::BIN_COUNT, 1);
         second.accumulate(b.data(), ALScopeData::BIN_COUNT, 1);
 

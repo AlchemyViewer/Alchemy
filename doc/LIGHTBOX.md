@@ -35,13 +35,15 @@ statics), so edits preview live with no glue code.
 | Undo/redo stack | `indra/newview/algradehistory.{h,cpp}` |
 | White-balance map and its inverse | `indra/newview/alwhitebalancesolver.{h,cpp}` |
 | Scene colour picker tool | `indra/newview/altoolscenepicker.{h,cpp}` |
+| 3D LUT (.cube) parser | `indra/newview/lutcube.{h,cpp}` |
 | Header checkbox on `accordion_tab` | `indra/llui/llaccordionctrltab.{h,cpp}` |
 | Anti-aliased 2D polyline and fill | `indra/llrender/llrender2dutils.{h,cpp}` |
 
-Six of those have unit tests, and the tests are the reason the maths in them can
-be trusted: `alcolorwheelmodel_test`, `alcurvemodel_test`,
+Seven of those have unit tests, and the tests are the reason the maths in them
+can be trusted: `alcolorwheelmodel_test`, `alcurvemodel_test`,
 `aldaycyclelandmarks_test`, `algradehistory_test`, `alscopedata_test`,
-`alwhitebalancesolver_test`. Anything with arithmetic in it belongs on that list.
+`alwhitebalancesolver_test`, `lutcube_test`. Anything with arithmetic in it —
+including a parser fed files from the internet — belongs on that list.
 
 ### What v2 added, and what it altered
 
@@ -560,10 +562,11 @@ then fails to link the shader, binds a null program and dies on the first frame
 with an access violation in `LLGLSLShader::bind`. There is no build-time signal
 at all; this has happened.
 
-So: after touching any `*F.glsl` under `shaders/class1/alchemy/`, either launch
-the viewer or run the declaration checker (`check_glsl_decls.py` in the
-scratchpad), which cross-references every call against what the attached util
-files define. Nothing in `cmake --build` or `ctest` covers shaders.
+So: after touching any `*F.glsl` under `shaders/class1/alchemy/`, launch the
+viewer — a shader that fails to compile or link says so in the log before the
+frame dies, and that log line is the only automated check there is. Nothing in
+`cmake --build` or `ctest` covers shaders, and there is no offline checker in
+the tree; if you write one, commit it under `scripts/` and name it here.
 
 **A new uniform is the other half of this, and it fails even more quietly.**
 `LLShaderMgr::mReservedUniforms` maps an enum index to a name *string*, and
@@ -576,10 +579,10 @@ this — a long way from the cause.
 Two rules follow. **Declare an array uniform by its bare name**, with no `[0]`:
 `mapUniform` strips the subscript from whatever GL reports before matching, so a
 name carrying one can never match. (`initAttribsAndUniforms` now refuses such a
-name outright, next to the size-sync and duplicate checks.) And run
-`check_glsl_uniforms.py`, which verifies every `uCamelCase` entry in the table is
-actually declared by some shader — it catches both the subscript case and plain
-typos.
+name outright, next to the size-sync and duplicate checks.) And after adding an
+entry, **grep the shaders for the exact string you put in the table** — a name
+no shader declares produces no error anywhere, only zero-filled uniforms, so
+the grep is the whole check and there is no tool that does it for you.
 
 ### 4f. Undo
 
@@ -631,8 +634,11 @@ refresh off each of those is more places to forget than a polled compare costs.
 
 `lightbox_topbar` in `floater_lightbox_settings.xml` is an ordinary `panel` of
 ordinary widgets, and worth reading before you add to it, because it is the one
-part of this floater with a fixed width budget: **412px at `min_width`**, of
-which it currently spends 342.
+part of this floater with a fixed width budget: **412px at `min_width`** — the
+floater's 420 less its own `left="4"`/`right="-4"`, and nothing else, because
+the bar sits directly in the floater. A row inside an accordion section starts
+from the same 420 and loses far more (§5); the two budgets are different on
+purpose. The bar currently spends 342 of its 412.
 
 Left to right: the Looks `combo_box`, then Save / Save As / Delete / Revert,
 then Undo / Redo, then Scopes. Three groups, separated by 12px where the

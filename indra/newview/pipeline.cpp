@@ -7522,6 +7522,12 @@ void LLPipeline::captureScopeSample(LLRenderTarget* src)
             mScopePBO[0] = 0;
             mScopePBO[1] = 0;
         }
+        // The last readback was laid out at the old stride. getScopePixel
+        // indexes it against the target's dimensions, which are about to be
+        // the new ones, so a shrink would read the wrong pixel until the next
+        // collect. mScopeData stays: its bins are shares, still a true
+        // measurement of the same scene, and clearing it would blank the plot.
+        mScopeReadback.clear();
         if (!mScopeSample.allocate(width, height, GL_RGBA8))
         {
             sScopeCapture = false;

@@ -249,8 +249,11 @@ void ALScopeData::blendToward(const ALScopeData& other, F32 alpha)
 
     // Shapes can differ: this one may never have measured a waveform, or the
     // grid constants may have changed under a saved object. Take the other
-    // outright rather than blending mismatched grids.
-    if (mWave.size() != other.mWave.size())
+    // outright rather than blending mismatched grids. The emptiness test also
+    // keeps the fixed-size loop below off two empty-but-equal grids -- not
+    // reachable while accumulate always fills the waveform, but this must not
+    // depend on that.
+    if (mWave.size() != other.mWave.size() || other.mWave.empty())
     {
         mWave = other.mWave;
         std::copy(std::begin(other.mWavePeak), std::end(other.mWavePeak), std::begin(mWavePeak));

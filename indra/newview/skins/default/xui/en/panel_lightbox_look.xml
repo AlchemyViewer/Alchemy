@@ -534,7 +534,7 @@ Row conventions:
 			     control_name; they are a viewing state and deliberately have none.
 			     No enabled_control either, for the obvious reason. -->
 			<accordion_tab.header_check_box
-			 name="lut_enable"
+			 name="grading_enable"
 			 control_name="RenderColorGrade"
 			 tool_tip="Master switch for ALL color grading: the 3D LUT plus every Basic, White Balance, Split Toning, Lift / Gamma / Gain and Tone Curve control. This one is a setting and is saved with the Look, unlike the per-section switches." />
 			<panel

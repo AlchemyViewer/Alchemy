@@ -22,8 +22,6 @@
  * $/LicenseInfo$
  */
 
-#pragma once
-
 #ifndef AL_DAYCYCLELANDMARKS_H
 #define AL_DAYCYCLELANDMARKS_H
 
