@@ -3771,6 +3771,9 @@ void LLViewerWindow::updateUI()
 
     MASK    mask = gKeyboard->currentMask(true);
 
+    static LLCachedControl<bool> focus_point_follows_pointer(gSavedSettings, "RenderFocusPointFollowsPointer", false);
+    static LLCachedControl<bool> focus_point_locked(gSavedSettings, "RenderFocusPointLocked", false);
+
     if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_RAYCAST))
     {
         gDebugRaycastFaceHit = -1;
@@ -3784,6 +3787,18 @@ void LLViewerWindow::updateUI()
                                               &gDebugRaycastEnd);
 
         gDebugRaycastParticle = gPipeline.lineSegmentIntersectParticle(gDebugRaycastStart, gDebugRaycastEnd, &gDebugRaycastParticleIntersection, NULL);
+    }
+    else if (focus_point_follows_pointer && !focus_point_locked && LLPipeline::RenderDepthOfField)
+    { //keep the depth of field focus point under the pointer up to date. Picking is
+      //tool dependent and stops entirely while the pointer is over the UI, so the focus
+      //point needs its own raycast. cursorIntersect only writes gDebugRaycastIntersection
+      //when the ray hits something, so a miss holds the last focus point instead of
+      //throwing focus out to the far end of the ray. Rigged geometry is picked here
+      //because mesh avatars are the usual subject.
+        LLVector4a intersection;
+        intersection.clear();
+
+        cursorIntersect(-1, -1, 512.f, NULL, -1, false, true, true, false, NULL, &intersection);
     }
 
     updateMouseDelta();
@@ -4837,9 +4852,10 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
     LLVector3 mouse_world_start = mouse_point_global;
     LLVector3 mouse_world_end   = mouse_point_global + mouse_direction_global * depth;
 
-    if (!LLViewerJoystick::getInstance()->getOverrideCamera())
+    static LLCachedControl<bool> focus_point_follows_pointer(gSavedSettings, "RenderFocusPointFollowsPointer", false);
+    if (!LLViewerJoystick::getInstance()->getOverrideCamera() && !focus_point_follows_pointer)
     { //always set raycast intersection to mouse_world_end unless
-        //flycam is on (for DoF effect)
+        //flycam is on or the focus point is following the pointer (for DoF effect)
         gDebugRaycastIntersection.load3(mouse_world_end.mV);
     }
 

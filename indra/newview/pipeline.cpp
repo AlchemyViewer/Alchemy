@@ -8939,7 +8939,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
 
                 if (focus_point.isExactlyZero())
                 {
-                        if (LLViewerJoystick::getInstance()->getOverrideCamera() || RenderFocusPointFollowsPointer)
+                    if (LLViewerJoystick::getInstance()->getOverrideCamera() || RenderFocusPointFollowsPointer)
                     { // focus on point under cursor
                         focus_point.set(gDebugRaycastIntersection.getF32ptr());
                     }
@@ -8948,7 +8948,7 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
                         LLVector4a result;
                         result.clear();
 
-                        gViewerWindow->cursorIntersect(-1, -1, 512.f, nullptr, -1, false, false, true, true, nullptr, nullptr, nullptr, &result);
+                        gViewerWindow->cursorIntersect(-1, -1, 512.f, nullptr, -1, false, false, true, true, nullptr, &result);
 
                         focus_point.set(result.getF32ptr());
                     }
