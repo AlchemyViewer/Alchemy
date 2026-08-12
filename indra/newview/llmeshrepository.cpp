@@ -4979,18 +4979,13 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
             LLVolume* sys_volume = LLPrimitive::getVolumeManager()->refVolume(mesh_params, detail);
             if (sys_volume)
             {
-                // Take rather than copy. The decoded volume was created by lodReceived()
-                // purely to carry this geometry across, mLoadedQ holds its only reference,
-                // and the caller drops that reference as soon as this returns -- so a copy
-                // would reallocate and memcpy every vertex buffer for nothing, and would
-                // additionally discard the per-joint bounding boxes the mesh pool thread
-                // computed, since LLVolumeFace::operator= clears mJointRiggingInfoTab.
-                //
-                // That single reference is the whole licence for moving out of it: assert
-                // rather than assume, because a second holder would be left with an empty
-                // volume and no indication why.
-                llassert(volume->getNumRefs() == 1);
-                sys_volume->takeVolumeFaces(volume);
+                // Copy, despite the decoded volume being about to be destroyed and the
+                // copy therefore being avoidable. sys_volume is the shared system volume
+                // for this mesh and LOD -- everything rendering it holds it -- and moving
+                // into it destroys every LLVolumeFace it owns rather than assigning into
+                // them, which changes the identity of objects other code may be holding.
+                // Not worth it while heap corruption in this area is unexplained.
+                sys_volume->copyVolumeFaces(volume);
                 sys_volume->setMeshAssetLoaded(true);
                 LLPrimitive::getVolumeManager()->unrefVolume(sys_volume);
             }
