@@ -281,7 +281,8 @@
 //     mUnavailableQ            mLoadedMutex  "
 //     mLoadedQ                 mLoadedMutex  "
 //     mPendingLOD              mPendingMutex rw.repo.mPendingMutex, rw.any.mPendingMutex
-//     mSkinMap                 mSkinMapMutex rw.repo.mSkinMapMutex, rw.pool.mSkinMapMutex
+//     mSkinMap                 mSkinMapMutex rw.repo.mSkinMapMutex, rw.pool.mSkinMapMutex,
+//                                            rw.main.mSkinMapMutex [cache eviction]
 //     mGetMeshCapability       mMutex        rw.main.mMutex, ro.repo.mMutex
 //     mHttp*                   none          rw.repo.none
 //
@@ -4678,7 +4679,20 @@ void LLMeshRepository::notifyLoadedMeshes()
     {
         //// Clean up dead skin info
         //U64Bytes skinbytes(0);
-        std::vector<LLUUID> culled_ids;
+
+        // Both caches hold the same instance, so an idle skin sits at one reference per
+        // cache that holds it. Ask the mesh thread's cache directly rather than inferring
+        // its membership from anything on the skin: the two are not kept in step by
+        // construction, and a skin that reads as mirrored when it is not looks idle at two
+        // references and gets evicted out from under the objects still rendering it.
+        //
+        // Erasing the mirror here rather than posting the work to the mesh thread is safe
+        // now that LLMeshSkinInfo is atomically refcounted -- the post existed to keep
+        // reference count changes on a single thread. It also removes a race the post had
+        // with re-fetching: a queued erase carried only an id, so it could remove a fresh
+        // entry that had since been inserted under it.
+        LLMutexLock skin_lock(mThread->mSkinMapMutex);
+
         for (auto iter = mSkinMap.begin(), ender = mSkinMap.end(); iter != ender;)
         {
             auto copy_iter = iter++;
@@ -4689,39 +4703,24 @@ void LLMeshRepository::notifyLoadedMeshes()
             //skinbytes += U64Bytes(copy_iter->second->mJointNames.size() * sizeof(LLMatrix4a));
             //skinbytes += U64Bytes(copy_iter->second->mJointNames.size() * sizeof(LLMatrix4));
 
-            // The repo thread's map holds the same instance rather than a copy, so an
-            // otherwise-unused frozen skin sits at two references, not one. Getting this
-            // count wrong in the safe direction means skins are never evicted at all.
-            //
-            // The count is read while the mesh pool threads may hold a transient
-            // reference of their own in lodReceived(). That can only make this decision
-            // conservative or evict a skin someone is mid-way through using, and the
-            // atomic refcount keeps that instance alive until they are done.
-            const S32 idle_refs = copy_iter->second->mFrozen ? 2 : 1;
+            // Identity, not just presence: a re-fetch may have replaced the mirror's entry
+            // for this id with a newer skin, which holds no reference to this one.
+            auto mirror_iter = mThread->mSkinMap.find(copy_iter->first);
+            const bool mirrored = mirror_iter != mThread->mSkinMap.end()
+                                  && mirror_iter->second.get() == copy_iter->second.get();
 
-            // The repo thread's mirror is erased only for skins actually evicted
-            // here: erasing it for every iterated skin emptied the mirror within
-            // one tick of arrival -- defeating its per-joint bounding-box use for
-            // any volume loading later than that -- and posted one work item per
-            // cached skin every tick.
-            if (copy_iter->second->getNumRefs() <= idle_refs)
+            // The count is read while the mesh pool threads may hold a transient reference
+            // of their own in lodReceived(). That can only make this decision conservative
+            // or evict a skin someone is mid-way through using, and the atomic refcount
+            // keeps that instance alive until they are done.
+            if (copy_iter->second->getNumRefs() <= (mirrored ? 2 : 1))
             {
-                culled_ids.push_back(copy_iter->first);
+                if (mirrored)
+                {
+                    mThread->mSkinMap.erase(mirror_iter);
+                }
                 mSkinMap.erase(copy_iter);
             }
-        }
-
-        if (!culled_ids.empty())
-        {
-            // erase from background thread
-            mThread->mWorkQueue.post([ids = std::move(culled_ids), this]()
-                {
-                    LLMutexLock skin_lock(mThread->mSkinMapMutex);
-                    for (const LLUUID& id : ids)
-                    {
-                        mThread->mSkinMap.erase(id);
-                    }
-                });
         }
         //LL_INFOS() << "Skin info cache elements:" << mSkinMap.size() << " Memory: " << U64Kilobytes(skinbytes) << LL_ENDL;
     }

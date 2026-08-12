@@ -79,8 +79,8 @@ public:
     // and makes that function a no-op, so a frozen skin has no mutable state left and
     // the same instance can be shared instead of copied.
     //
-    // A frozen skin is also referenced by LLMeshRepoThread::mSkinMap, which the skin
-    // cache eviction check in LLMeshRepository::notifyLoadedMeshes() accounts for.
+    // It says nothing about who currently holds the skin. Do not read it as a proxy for
+    // membership of any cache.
     bool mFrozen = false;
 };
 
