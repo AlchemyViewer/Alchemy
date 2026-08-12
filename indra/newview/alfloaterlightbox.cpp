@@ -750,7 +750,15 @@ void ALFloaterLightBox::onCommitDayTime(LLUICtrl* ctrl)
 {
     if (ctrl)
     {
-        applyDayPosition((F32)ctrl->getValue().asReal());
+        // Through freezeSkyAt, not applyDayPosition, even though the slider is
+        // only live while the sky is already frozen: "frozen" can also mean a
+        // fixed sky somebody else installed -- Personal Lighting, say -- which
+        // we have not captured. The first scrub over one of those is what
+        // covers it up, so it is the moment to remember it, or unticking
+        // Freeze drops the user to the region default instead of giving their
+        // sky back. Once the freeze is ours the capture is skipped and this is
+        // applyDayPosition, so a drag costs nothing extra per tick.
+        freezeSkyAt((F32)ctrl->getValue().asReal());
     }
 }
 

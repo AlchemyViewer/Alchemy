@@ -7572,8 +7572,20 @@ void LLPipeline::captureScopeSample(LLRenderTarget* src)
     if (mScopeSample.getWidth() != (U32)width || mScopeSample.getHeight() != (U32)height)
     {
         // Resolution changed under us (window resize, or the debug key moved).
-        // Anything in flight was measured against the old size, so drop it.
+        // Anything in flight was measured against the old size, so drop it --
+        // and the pack buffers with it, since their stores were sized to that
+        // old frame. Left alone, a grown sample reads past the end of the old
+        // store on the next collect: glReadPixels into the too-small buffer is
+        // refused with GL_INVALID_OPERATION, and the memcpy out of the map
+        // then walks off its end. The block below rebuilds them at the new
+        // size, exactly as it built them the first time.
         mScopeSample.release();
+        if (mScopePBO[0])
+        {
+            glDeleteBuffers(2, mScopePBO);
+            mScopePBO[0] = 0;
+            mScopePBO[1] = 0;
+        }
         if (!mScopeSample.allocate(width, height, GL_RGBA8))
         {
             sScopeCapture = false;
