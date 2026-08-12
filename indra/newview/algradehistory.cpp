@@ -62,6 +62,10 @@ void ALGradeHistory::record(const std::string& name, const LLSD& before, const L
         // Inside a group. Extend the group's transaction, unless this control
         // is already in it -- in which case only the destination moves, so the
         // group still describes one before and one after per control.
+        //
+        // MAX_DEPTH is deliberately not enforced here: evicting the front
+        // would shift mGroupIndex out from under the group. endGroup does it,
+        // once the index is dead.
         if (mGroupIndex >= mStack.size())
         {
             mStack.emplace_back();
@@ -122,6 +126,21 @@ void ALGradeHistory::endGroup()
 {
     if (mGroupDepth > 0 && --mGroupDepth == 0)
     {
+        // The eviction that record()'s plain path does as it pushes, deferred
+        // to here, where erasing the front can no longer shift mGroupIndex
+        // out from under an open group. A group adds at most one transaction
+        // -- that is its whole point -- so one erase restores the bound. The
+        // cursor counts applied transactions and the one dropped was applied,
+        // so it comes down with the stack.
+        if (mStack.size() > MAX_DEPTH)
+        {
+            mStack.erase(mStack.begin());
+            if (mCursor > 0)
+            {
+                --mCursor;
+            }
+        }
+
         // A fresh write after the group starts its own step rather than
         // coalescing into it.
         mHaveLast = false;

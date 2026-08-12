@@ -93,6 +93,9 @@ public:
     void onClickWhiteBalancePicker();
     void onWhiteBalancePicked(const LLColor3& sample);
     void populateLUTCombo();
+    /// Open the user's LUT folder in the platform file browser, creating it
+    /// first if this is its first use.
+    void onClickOpenLUTFolder();
     void updateTonemapperRows();
     /// Freeze the frame about to be presented, and switch the wipe on so the
     /// grab is visibly a grab.

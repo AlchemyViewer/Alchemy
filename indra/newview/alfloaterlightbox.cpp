@@ -40,6 +40,7 @@
 #include "alwhitebalancesolver.h"
 #include "llagent.h"
 #include "llenvironment.h"
+#include "llfile.h"
 #include "llnotificationsutil.h"
 #include "llpanel.h"
 #include "llpresetsmanager.h"
@@ -51,6 +52,7 @@
 #include "pipeline.h"
 #include "rlvactions.h"
 
+#include <algorithm>
 #include <map>
 #include <set>
 #include <utility>
@@ -174,6 +176,7 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.RefreshToneCurve", std::bind(&ALFloaterLightBox::refreshToneCurve, this));
     mCommitCallbackRegistrar.add("LightBox.CommitSplitToneGraph", std::bind(&ALFloaterLightBox::onCommitSplitToneGraph, this));
     mCommitCallbackRegistrar.add("LightBox.PickWhiteBalance", std::bind(&ALFloaterLightBox::onClickWhiteBalancePicker, this));
+    mCommitCallbackRegistrar.add("LightBox.OpenLUTFolder", std::bind(&ALFloaterLightBox::onClickOpenLUTFolder, this));
     mCommitCallbackRegistrar.add("LightBox.LookSelected", std::bind(&ALFloaterLightBox::onLookSelected, this));
     mCommitCallbackRegistrar.add("LightBox.LookSave", std::bind(&ALFloaterLightBox::onClickLookSave, this));
     mCommitCallbackRegistrar.add("LightBox.LookSaveAs", std::bind(&ALFloaterLightBox::onClickLookSaveAs, this));
@@ -284,19 +287,36 @@ void ALFloaterLightBox::populateLUTCombo()
 {
     LLComboBox* lut_combo = getChild<LLComboBox>("colorlut_combo");
 
-    auto add_luts_from = [lut_combo](const std::string& dir_name)
+    // Only what setupGradingLUT can actually load. Anything else in the
+    // directory -- a readme, a subfolder, a stray .bak -- would become a
+    // selectable entry that fails at apply time with nothing but a log line
+    // to say why. getExtension lowercases, so a .CUBE passes here the same
+    // way it does when the renderer resolves it.
+    static const char* const LUT_EXTENSIONS[] = { "cube", "tga", "png", "jpg", "jpeg", "bmp", "webp" };
+
+    // Collected rather than added on the spot, so the caller can see whether
+    // a directory contributed anything before committing to the separator.
+    auto collect_luts_from = [](const std::string& dir_name)
     {
+        std::vector<std::pair<std::string, std::string>> found; // stem, filename
+
         std::error_code ec;
         std::filesystem::path luts_path = fsyspath(dir_name);
         if (!std::filesystem::is_directory(luts_path, ec) || ec)
         {
-            return;
+            return found;
         }
-        for (std::filesystem::directory_iterator lut(luts_path, ec); lut != std::filesystem::directory_iterator(); ++lut)
+
+        // increment(ec), not ++: the throwing increment would carry a
+        // transient filesystem error out through postBuild. On failure it
+        // parks the iterator at end instead, which is why ec is looked at
+        // again once the loop is done.
+        std::filesystem::directory_iterator end;
+        for (std::filesystem::directory_iterator lut(luts_path, ec); lut != end && !ec; lut.increment(ec))
         {
-            if (ec)
+            std::error_code entry_ec;
+            if (!lut->is_regular_file(entry_ec) || entry_ec)
             {
-                LL_WARNS() << "Error reading LUT file in " << dir_name << ": " << ec.message() << LL_ENDL;
                 continue;
             }
 #if LL_WINDOWS
@@ -306,26 +326,51 @@ void ALFloaterLightBox::populateLUTCombo()
             std::string lut_stem = lut->path().stem().native();
             std::string lut_filename = lut->path().filename().native();
 #endif
-            lut_combo->add(lut_stem, lut_filename);
+            const std::string exten = gDirUtilp->getExtension(lut_filename);
+            if (std::find(std::begin(LUT_EXTENSIONS), std::end(LUT_EXTENSIONS), exten) == std::end(LUT_EXTENSIONS))
+            {
+                continue;
+            }
+            found.emplace_back(std::move(lut_stem), std::move(lut_filename));
         }
+        if (ec)
+        {
+            LL_WARNS() << "Error reading LUT directory " << dir_name << ": " << ec.message() << LL_ENDL;
+        }
+        return found;
     };
 
     // Bundled LUTs first, then user LUTs behind a separator — the same order
     // the renderer resolves a name in, where the user dir wins.
-    add_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut"));
+    for (const auto& lut : collect_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut")))
+    {
+        lut_combo->add(lut.first, lut.second);
+    }
 
-    const std::string& user_luts = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
-    std::error_code ec;
-    std::filesystem::path user_luts_path = fsyspath(user_luts);
-    if (std::filesystem::is_directory(user_luts_path, ec) && !ec &&
-        !std::filesystem::is_empty(user_luts_path, ec) && !ec)
+    const auto user_luts = collect_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut"));
+    if (!user_luts.empty())
     {
         lut_combo->addSeparator();
-        add_luts_from(user_luts);
+        for (const auto& lut : user_luts)
+        {
+            lut_combo->add(lut.first, lut.second);
+        }
     }
 
     lut_combo->selectByValue(gSavedSettings.getString("RenderColorGradeLUT"));
     lut_combo->resetDirty();
+}
+
+void ALFloaterLightBox::onClickOpenLUTFolder()
+{
+    // The user's folder, not the bundled one: it is the half of the pair that
+    // is theirs to put files in, and the one the renderer prefers when a name
+    // exists in both. Nothing creates it until there is something to put in
+    // it, which is exactly now -- and LLFile::mkdir is quiet about a
+    // directory that already exists.
+    const std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
+    LLFile::mkdir(dir);
+    gDirUtilp->openDir(dir);
 }
 
 void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)

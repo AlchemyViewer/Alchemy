@@ -248,4 +248,38 @@ namespace tut
         ensure("clear empties it", !mHistory.canUndo() && !mHistory.canRedo());
         ensure_equals("really empty", mHistory.depth(), (size_t)0);
     }
+
+    // The cap holds for grouped steps too. Groups cannot evict as they push --
+    // that would shift the index the group is accumulating into -- so the
+    // eviction happens when the group closes, and a session of nothing but
+    // Look applies and section resets must stay bounded like any other.
+    template<> template<>
+    void history_object::test<14>()
+    {
+        for (size_t i = 0; i < ALGradeHistory::MAX_DEPTH + 20; ++i)
+        {
+            mHistory.beginGroup();
+            mHistory.record("A", LLSD((F64)i), LLSD((F64)(i + 1)), 1.f);
+            mHistory.record("B", LLSD((F64)i), LLSD((F64)(i + 1)), 1.f);
+            mHistory.endGroup();
+        }
+        ensure_equals("capped", mHistory.depth(), ALGradeHistory::MAX_DEPTH);
+        ensure_equals("everything on the stack is applied", mHistory.cursor(), mHistory.depth());
+
+        // The newest is still the newest after the drop, and still whole.
+        const auto* t = mHistory.undo();
+        ensure("got the newest", t != nullptr);
+        ensure_equals("still covering both controls", t->size(), (size_t)2);
+        ensure_equals("which is the last group recorded",
+                      t->front().mAfter.asReal(), (F64)(ALGradeHistory::MAX_DEPTH + 20));
+
+        // And the walk back stops exactly at the cap, with no phantom steps
+        // left over from the evictions.
+        size_t undone = 1;
+        while (mHistory.undo() != nullptr)
+        {
+            ++undone;
+        }
+        ensure_equals("the whole stack is walkable", undone, ALGradeHistory::MAX_DEPTH);
+    }
 }

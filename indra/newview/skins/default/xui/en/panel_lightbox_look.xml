@@ -1551,12 +1551,25 @@ Row conventions:
 					 parameter="RenderColorGradeLUTStrength" />
 				</button>
 				<button
+				 follows="left|top"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 left="8"
+				 top_pad="10"
+				 label="Open Folder"
+				 name="lut_open_folder"
+				 tool_tip="Open your LUT folder in the file browser. Drop .cube or image LUTs there; new files are listed the next time the Lightbox opens.">
+					<button.commit_callback
+					 function="LightBox.OpenLUTFolder" />
+				</button>
+				<button
 				 follows="top|right"
 				 layout="topleft"
 				 height="18"
 				 width="100"
 				 right="-8"
-				 top_pad="10"
+				 top_delta="0"
 				 label="Reset All"
 				 halign="left"
 				 scale_image="true"
