@@ -4991,6 +4991,11 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
                 // would reallocate and memcpy every vertex buffer for nothing, and would
                 // additionally discard the per-joint bounding boxes the mesh pool thread
                 // computed, since LLVolumeFace::operator= clears mJointRiggingInfoTab.
+                //
+                // That single reference is the whole licence for moving out of it: assert
+                // rather than assume, because a second holder would be left with an empty
+                // volume and no indication why.
+                llassert(volume->getNumRefs() == 1);
                 sys_volume->takeVolumeFaces(volume);
                 sys_volume->setMeshAssetLoaded(true);
                 LLPrimitive::getVolumeManager()->unrefVolume(sys_volume);
@@ -5002,15 +5007,12 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
             }
         }
 
-        // Walk a detached copy, and re-find the entry afterwards rather than reusing
-        // obj_iter: the callbacks below re-enter the repository through LLVOVolume, and a
-        // re-entrant loadMesh() may insert into this map or into that very volume set.
-        // The entry itself stays in place across the callbacks so re-entry still finds it
-        // and appends instead of opening a second request.
-        boost::unordered_set<LLVOVolume*> waiting(obj_iter->second.mVolumes);
-
+        // Iterate the live set, never a copy of it. ~LLVOVolume unregisters itself from
+        // mVolumes, so an object destroyed by a callback below drops out of the container
+        // as it dies; a detached snapshot would keep handing out pointers to freed
+        // objects and call virtuals on them.
         //notify waiting LLVOVolume instances that their requested mesh is available
-        for (LLVOVolume* vobj : waiting)
+        for (LLVOVolume* vobj : obj_iter->second.mVolumes)
         {
             if (vobj)
             {
@@ -5018,6 +5020,7 @@ void LLMeshRepository::notifyMeshLoaded(const LLVolumeParams& mesh_params, LLVol
             }
         }
 
+        // By key rather than by obj_iter, which a re-entrant loadMesh() may have rehashed.
         mLoadingMeshes[lod].erase(mesh_id);
 
         LLViewerStatsRecorder::instance().meshLoaded();
@@ -5040,13 +5043,10 @@ void LLMeshRepository::notifyMeshUnavailable(const LLVolumeParams& mesh_params, 
             LLPrimitive::getVolumeManager()->unrefVolume(sys_volume);
         }
 
-        // As in notifyMeshLoaded(): walk a detached copy and re-find the entry to erase,
-        // because setVolume() below re-enters loadMesh(), which may insert into this map
-        // or into the volume set. The entry stays live across the loop so that re-entry
-        // appends to it rather than opening a second request for the same mesh.
-        boost::unordered_set<LLVOVolume*> waiting(obj_iter->second.mVolumes);
-
-        for (LLVOVolume* vobj : waiting)
+        // As in notifyMeshLoaded(): iterate the live set. setVolume() below can destroy an
+        // LLVOVolume, and ~LLVOVolume unregisters itself from mVolumes -- so a detached
+        // snapshot would go on to call setVolume() on freed memory.
+        for (LLVOVolume* vobj : obj_iter->second.mVolumes)
         {
             if (vobj)
             {
