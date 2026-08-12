@@ -523,7 +523,7 @@ Row conventions:
 		<accordion_tab
 		 expanded="true"
 		 layout="topleft"
-		 height="169"
+		 height="155"
 		 name="atab_sec_grading"
 		 title="Color Grading"
 		 fit_panel="true">
@@ -540,32 +540,33 @@ Row conventions:
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="140"
+			 height="126"
 			 left="0"
 			 top="0"
 			 right="-1"
 			 name="sec_grading">
 				<!-- This section opens by default, so what is in it is paid for on
-				     every look at the tab. Two paragraphs of prose were not worth
-				     that; the part you need once is on the line, and the part you
-				     want to look up is in the tooltip. -->
+				     every look at the tab. All that is left is the one line that
+				     says the header checkboxes exist, since a control nobody
+				     finds may as well not. Which order the renderer applies the
+				     sections in is a maintainer's question, not a grader's, and
+				     it lives in doc/LIGHTBOX.md where the answer is useful. -->
 				<text
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
 				 top="8"
 				 right="-8"
-				 height="30"
-				 word_wrap="true"
+				 height="16"
 				 font="SansSerifSmall"
-				 name="grading_order_note"
-				 tool_tip="White Balance and Lift / Gamma / Gain act in linear light, between exposure and the tonemap curve; everything from Basic down acts on display values after it. Switching a section off saves nothing and does not mark the Look as changed, and every section comes back when the Lightbox closes."
-				 value="The sections below run in the order the renderer applies them. Untick a section's header checkbox to switch it off while you look." />
+				 name="grading_compare_note"
+				 tool_tip="Switching a section off saves nothing and does not mark the Look as changed, and every section comes back when the Lightbox closes."
+				 value="Untick a section's header checkbox to switch it off while you look." />
 				<text
 				 follows="left|top"
 				 layout="topleft"
 				 left="8"
-				 top="46"
+				 top="32"
 				 width="330"
 				 height="16"
 				 font="SansSerifSmallBold"
@@ -577,7 +578,7 @@ Row conventions:
 				 height="18"
 				 width="64"
 				 left="8"
-				 top="66"
+				 top="52"
 				 label="Grab"
 				 name="reference_grab"
 				 tool_tip="Freeze the frame as it is now and compare against it while you keep grading. The still is taken where the scopes measure: after every post pass, before the vignette and grain, which are then applied to both sides so the comparison is about the grade. Cleared when the Lightbox closes or the window is resized.">
@@ -590,7 +591,7 @@ Row conventions:
 				 height="18"
 				 width="64"
 				 left="76"
-				 top="66"
+				 top="52"
 				 label="Clear"
 				 name="reference_clear"
 				 tool_tip="Discard the reference still and return to the live image">
@@ -601,7 +602,7 @@ Row conventions:
 				 follows="left|top"
 				 layout="topleft"
 				 left="148"
-				 top="65"
+				 top="51"
 				 width="130"
 				 height="20"
 				 name="reference_mode"
@@ -624,7 +625,7 @@ Row conventions:
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top="90"
+				 top="76"
 				 right="-8"
 				 height="16"
 				 label="Wipe position"
@@ -644,7 +645,7 @@ Row conventions:
 				 height="18"
 				 width="100"
 				 right="-8"
-				 top="114"
+				 top="100"
 				 label="Reset All"
 				 halign="left"
 				 scale_image="true"
