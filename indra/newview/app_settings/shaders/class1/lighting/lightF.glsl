@@ -29,7 +29,6 @@ in vec4 vertex_color;
 in vec2 vary_texcoord0;
 
 vec3 atmosLighting(vec3 light);
-vec3 scaleSoftClip(vec3 light);
 
 void default_lighting()
 {
@@ -37,7 +36,6 @@ void default_lighting()
 
     color.rgb = atmosLighting(color.rgb);
 
-    color.rgb = scaleSoftClip(color.rgb);
 
     frag_color = max(color, vec4(0));
 }

@@ -384,7 +384,7 @@ public:
     static void     onApplyUUID(void* userdata);
     void            onSelectionChange(const std::deque<LLFolderViewItem*> &items, bool user_action);
     static void     onApplyImmediateCheck(LLUICtrl* ctrl, void* userdata);
-    void            onTextureSelect(bool success, const LLTextureEntry& te);
+    void            onTextureSelect(bool success, LLViewerObject* obj, S32 te_index, const LLTextureEntry& te);
 
     static void     onModeSelect(LLUICtrl* ctrl, void *userdata);
     static void     onBtnAdd(void* userdata);

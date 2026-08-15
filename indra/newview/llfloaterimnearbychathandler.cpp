@@ -718,7 +718,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
         if (!gSavedSettings.getBOOL("ShowScriptErrors"))
             return;
 
-        if (gSavedSettings.getBOOL("ExternalWebsocketSyncEnable") && gSavedSettings.getBOOL("ExternalWebsocketForwardDebug"))
+        if (LLScriptEditorWSServer::isEnabled() && gSavedSettings.getBOOL("ExternalWebsocketForwardDebug"))
         {
             LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
             if (server)
@@ -746,8 +746,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
             return;
         }
     }
-    else if ((chat_msg.mChatType == CHAT_TYPE_OWNER) &&
-        gSavedSettings.getBOOL("ExternalWebsocketSyncEnable") &&
+    else if ((chat_msg.mChatType == CHAT_TYPE_OWNER) && LLScriptEditorWSServer::isEnabled() &&
         gSavedSettings.getBOOL("ExternalWebsocketForwardDebug"))
     {
         LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();

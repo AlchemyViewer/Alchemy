@@ -241,9 +241,20 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     llassert( !(mTexture.notNull() && mLayerSet) );  // mutually exclusive
 
     LLViewerTexLayerSet *layerset = dynamic_cast<LLViewerTexLayerSet*>(mLayerSet);
+
+    // The avatar skin composite (and the stand-in diffuse below) is an sRGB texture. Decode
+    // it on the sampler when the bound program shades in linear -- the deferred avatar writer
+    // and the forward avatar-skin alpha both do (mLinearDiffuse), and both had their in-shader
+    // decode removed, so the decode has to happen here or the skin reads too bright. The
+    // deferred writer's gbuffer store re-encodes via FRAMEBUFFER_SRGB (see LLDrawPoolAvatar).
+    const LLGLSLShader* bound = LLGLSLShader::sCurBoundShaderPtr;
+    const ALSampler skin_key = (bound && bound->mLinearDiffuse)
+                             ? ALSamplers::AnisoWrapSRGB
+                             : ALSamplers::AnisoWrap;
+
     if (mTestImageName)
     {
-        gGL.getTexUnit(diffuse_channel)->bindManual(LLTexUnit::TT_TEXTURE, mTestImageName);
+        gGL.getTextureSlot(diffuse_channel)->bindManual(ALTextureSlot::TT_TEXTURE, mTestImageName);
 
         if (mIsTransparent)
         {
@@ -258,20 +269,20 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     {
         if( layerset->hasComposite() )
         {
-            gGL.getTexUnit(diffuse_channel)->bind(layerset->getViewerComposite());
+            gGL.getTextureSlot(diffuse_channel)->bindSampled(layerset->getViewerComposite(), skin_key);
         }
         else
         {
-            gGL.getTexUnit(diffuse_channel)->bind(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT));
+            gGL.getTextureSlot(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), skin_key);
         }
     }
     else if ( !is_dummy && mTexture.notNull() )
     {
-        gGL.getTexUnit(diffuse_channel)->bind(mTexture);
+        gGL.getTextureSlot(diffuse_channel)->bindSampled(mTexture, skin_key);
     }
     else
     {
-        gGL.getTexUnit(diffuse_channel)->bind(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT));
+        gGL.getTextureSlot(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), skin_key);
     }
 
     U32 start = mMesh->mFaceVertexOffset;

@@ -23,7 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 // Position is in the WL sky dome's local space: Y is up, origin at the viewer.
 in vec3 position;

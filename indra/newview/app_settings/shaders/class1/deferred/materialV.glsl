@@ -28,19 +28,19 @@
 #define DIFFUSE_ALPHA_MODE_MASK 2
 #define DIFFUSE_ALPHA_MODE_EMISSIVE 3
 
-uniform mat4 modelview_matrix;
-uniform mat4 projection_matrix;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec3 skinDirection(mat3x4 b, vec3 dir);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
-uniform mat3 normal_matrix;
 #endif
 
 out vec3 vary_position;
 
-uniform mat4 texture_matrix0;
 
 in vec3 position;
 in vec4 diffuse_color;
@@ -69,14 +69,17 @@ out vec2 vary_texcoord2;
 out vec4 vertex_color;
 out vec2 vary_texcoord0;
 
+// Linearises an sRGB prim tint for a pass that shades in linear. Defined in
+// deferred/textureUtilV.glsl, which every vertex stage attaches.
+vec4 linearizeVertexTint(vec4 tint);
+
 void main()
 {
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
+    mat3x4 skin = getSkinBlend();
 
-    mat = modelview_matrix * mat;
 
-    vec3 pos = (mat*vec4(position.xyz,1.0)).xyz;
+    vec3 pos = skinTransformH(skin, position.xyz, modelview_matrix).xyz;
 
     vary_position = pos;
 
@@ -99,9 +102,9 @@ void main()
 #endif
 
 #ifdef HAS_SKIN
-    vec3 n = normalize((mat*vec4(normal.xyz+position.xyz,1.0)).xyz-pos.xyz);
+    vec3 n = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
 #ifdef HAS_NORMAL_MAP
-    vec3 t = normalize((mat*vec4(tangent.xyz+position.xyz,1.0)).xyz-pos.xyz);
+    vec3 t = normalize(mat3(modelview_matrix) * skinDirection(skin, tangent.xyz));
 
     vary_tangent = t;
     vary_sign = tangent.w;
@@ -122,7 +125,15 @@ void main()
 #endif //HAS_NORMAL_MAP
 #endif //HAS_SKIN
 
+    // Tint arrives sRGB. A pass that decodes its diffuse on the sampler and shades in linear
+    // wants the tint linearised to match; one that keeps the encoded texel does not. Keyed on
+    // the same define LLGLSLShader::mLinearDiffuse is derived from, so the shader and the bind
+    // cannot disagree about which space the multiply happens in.
+#ifdef LINEAR_DIFFUSE
+    vertex_color = linearizeVertexTint(diffuse_color);
+#else
     vertex_color = diffuse_color;
+#endif
 
 #if !defined(HAS_SKIN)
     vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;

@@ -6,6 +6,9 @@
  * Second Life Viewer Source Code
  * Copyright (C) 2024, Linden Research, Inc.
  *
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation;
@@ -33,6 +36,7 @@
 #include "llglslshader.h"
 #include "llimagegl.h"
 #include "llrender.h"
+#include "llshadermgr.h"
 #include "llvertexbuffer.h"
 
 #include "llmath.h"  // clamp_rescale
@@ -293,7 +297,7 @@ void LLFontVertexBuffer::genBuffers(
     mLastUsesColorAtlas = false;
     if (const LLFontFreetype* face = fontp->getFontFreetype())
     {
-        // After the LLFontFace move, color atlases live on individual face
+        // After the ALFontFace move, color atlases live on individual face
         // wrappers — head primary, each fallback's face. Walk all of them
         // to gather the set of color atlas textures this batch might have
         // sampled from.
@@ -411,7 +415,6 @@ void LLFontVertexBuffer::recolorBuffers(
 void LLFontVertexBuffer::renderBuffers()
 {
     gGL.flush(); // deliberately empty pending verts
-    gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
     gGL.pushUIMatrix();
 
     gGL.loadUIIdentity();
@@ -427,12 +430,10 @@ void LLFontVertexBuffer::renderBuffers()
     // Shadow first (under), foreground second (over). Pass-boundary order matches
     // the original interleaved-per-glyph emission's net visual stacking — shadow
     // contributions sit beneath glyph foregrounds rather than between them.
-    static const LLStaticHashedString sShadowMode("shadowMode");
-
     if (mLastUsedShaderShadow && LLGLSLShader::sCurBoundShaderPtr)
     {
         const int mode = (mLastShadow == LLFontGL::DROP_SHADOW) ? 1 : 2; // SOFT
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, mode);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, mode);
     }
     for (LLVertexBufferData& buffer : mShadowBufferList)
     {
@@ -440,7 +441,7 @@ void LLFontVertexBuffer::renderBuffers()
     }
     if (mLastUsedShaderShadow && LLGLSLShader::sCurBoundShaderPtr)
     {
-        LLGLSLShader::sCurBoundShaderPtr->uniform1i(sShadowMode, 0);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, 0);
     }
     for (LLVertexBufferData& buffer : mForegroundBufferList)
     {

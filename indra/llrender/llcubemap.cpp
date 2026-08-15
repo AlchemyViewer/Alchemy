@@ -46,10 +46,9 @@ namespace {
 
 bool LLCubeMap::sUseCubeMaps = true;
 
-LLCubeMap::LLCubeMap(bool init_as_srgb)
+LLCubeMap::LLCubeMap()
     : mTextureStage(0),
-      mMatrixStage(0),
-      mIssRGB(init_as_srgb)
+      mMatrixStage(0)
 {
     mTargets[0] = GL_TEXTURE_CUBE_MAP_NEGATIVE_X;
     mTargets[1] = GL_TEXTURE_CUBE_MAP_POSITIVE_X;
@@ -76,26 +75,51 @@ void LLCubeMap::initGL()
 
             LLImageGL::generateTextures(1, &texname);
 
+            // Linear RGBA8, not sRGB: the faces are copies of the sky textures, whose
+            // pixels have always been stored and sampled raw. Were a decode ever wanted,
+            // it is a sampler decision now (ALSampler::SRGBDecode), not a storage one.
+            const S32 internal_format = GL_RGBA8;
+
+            // Allocate the whole cube up front. glTexStorage2D on GL_TEXTURE_CUBE_MAP
+            // allocates all six faces in a single call, and may only be called once for
+            // the object -- so it has to happen here rather than inside the per-face
+            // loop. The faces are then told storage exists, which makes their uploads
+            // sub-image writes instead of allocations.
+            bool immutable = false;
+            if (gGLManager.mHasTextureStorage)
+            {
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
+                glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, RESOLUTION, RESOLUTION);
+                // count of 6: alloc_tex_image's count covers cube faces. The per-face
+                // path used to account one face at a time onto the same texture name,
+                // each call releasing the last, so only one face's worth was ever
+                // recorded for the whole cube.
+                LLImageGLMemory::alloc_tex_image(RESOLUTION, RESOLUTION, internal_format, 6, false);
+                immutable = true;
+                stop_glerror();
+            }
+
             for (int i = 0; i < 6; i++)
             {
                 mImages[i] = new LLImageGL(RESOLUTION, RESOLUTION, 4, false);
-            #if USE_SRGB_DECODE
-                if (mIssRGB) {
-                    mImages[i]->setExplicitFormat(GL_SRGB8_ALPHA8, GL_RGBA);
+                // Explicit either way, so each face's format matches the storage exactly
+                // rather than relying on the auto-format switch agreeing with it.
+                mImages[i]->setExplicitFormat(internal_format, GL_RGBA);
+                mImages[i]->setTarget(mTargets[i], ALTextureSlot::TT_CUBE_MAP);
+                if (immutable)
+                {
+                    mImages[i]->markStorageAllocated();
                 }
-            #endif
-                mImages[i]->setTarget(mTargets[i], LLTexUnit::TT_CUBE_MAP);
                 mRawImages[i] = new LLImageRaw(RESOLUTION, RESOLUTION, 4);
                 if (!mImages[i]->createGLTexture(0, mRawImages[i], texname))
                 {
                     LL_WARNS() << "Failed to create GL texture for environment cubemap face " << i << LL_ENDL;
                 }
 
-                gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
-                mImages[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
+                gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
                 stop_glerror();
             }
-            gGL.getTexUnit(0)->disable();
+            gGL.getTextureSlot(0)->unbind();
         }
         disable();
     }
@@ -173,74 +197,10 @@ void LLCubeMap::init(const std::vector<LLPointer<LLImageRaw> >& rawimages)
     }
 }
 
-void LLCubeMap::initReflectionMap(U32 resolution, U32 components)
-{
-    U32 texname = 0;
-
-    LLImageGL::generateTextures(1, &texname);
-
-    mImages[0] = new LLImageGL(resolution, resolution, components, true);
-    mImages[0]->setTexName(texname);
-    mImages[0]->setTarget(mTargets[0], LLTexUnit::TT_CUBE_MAP);
-    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
-    mImages[0]->setAddressMode(LLTexUnit::TAM_CLAMP);
-}
-
-void LLCubeMap::initEnvironmentMap(const std::vector<LLPointer<LLImageRaw> >& rawimages)
-{
-    llassert(rawimages.size() == 6);
-
-    U32 texname = 0;
-
-    LLImageGL::generateTextures(1, &texname);
-
-    U32 resolution = rawimages[0]->getWidth();
-    U32 components = rawimages[0]->getComponents();
-
-    for (int i = 0; i < 6; i++)
-    {
-        llassert(rawimages[i]->getWidth() == resolution);
-        llassert(rawimages[i]->getHeight() == resolution);
-        llassert(rawimages[i]->getComponents() == components);
-
-        mImages[i] = new LLImageGL(resolution, resolution, components, true);
-        mImages[i]->setTarget(mTargets[i], LLTexUnit::TT_CUBE_MAP);
-        mRawImages[i] = rawimages[i];
-        if (!mImages[i]->createGLTexture(0, mRawImages[i], texname))
-        {
-            LL_WARNS() << "Failed to create GL texture for environment cubemap face " << i << LL_ENDL;
-        }
-
-        gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP, texname);
-        mImages[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
-        stop_glerror();
-
-        mImages[i]->setSubImage(mRawImages[i], 0, 0, resolution, resolution);
-    }
-    enableTexture(0);
-    bind();
-    mImages[0]->setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-    gGL.getTexUnit(0)->disable();
-    disable();
-}
-
-void LLCubeMap::generateMipMaps()
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-
-    mImages[0]->setUseMipMaps(true);
-    mImages[0]->setHasMipMaps(true);
-    enableTexture(0);
-    bind();
-    mImages[0]->setFilteringOption(LLTexUnit::TFO_BILINEAR);
-    {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("cmgmm - glGenerateMipmap");
-        glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-    }
-    gGL.getTexUnit(0)->disable();
-    disable();
-}
+// initReflectionMap and initEnvironmentMap were deleted here: no callers, and both
+// bodies had gone illegal under immutable storage -- their per-face createGLTexture
+// path would hand a cube FACE target to glTexStorage2D, which only accepts the
+// GL_TEXTURE_CUBE_MAP target (allocating all six faces at once; see initGL).
 
 GLuint LLCubeMap::getGLName()
 {
@@ -249,7 +209,9 @@ GLuint LLCubeMap::getGLName()
 
 void LLCubeMap::bind()
 {
-    gGL.getTexUnit(mTextureStage)->bind(this);
+    // Clamp + anisotropic: what the environment map has always been sampled with, named
+    // here now instead of written onto face 0 at load.
+    gGL.getTextureSlot(mTextureStage)->bind(this, ALSamplers::AnisoClamp);
 }
 
 void LLCubeMap::enable(S32 stage)
@@ -257,13 +219,11 @@ void LLCubeMap::enable(S32 stage)
     enableTexture(stage);
 }
 
+// Remembers which slot bind() will use. It used to also mark that slot "enabled for
+// TT_CUBE_MAP" ahead of the bind that would set the target anyway.
 void LLCubeMap::enableTexture(S32 stage)
 {
     mTextureStage = stage;
-    if (stage >= 0 && LLCubeMap::sUseCubeMaps)
-    {
-        gGL.getTexUnit(stage)->enable(LLTexUnit::TT_CUBE_MAP);
-    }
 }
 
 void LLCubeMap::disable(void)
@@ -275,11 +235,9 @@ void LLCubeMap::disableTexture(void)
 {
     if (mTextureStage >= 0 && LLCubeMap::sUseCubeMaps)
     {
-        gGL.getTexUnit(mTextureStage)->disable();
-        if (mTextureStage == 0)
-        {
-            gGL.getTexUnit(0)->enable(LLTexUnit::TT_TEXTURE);
-        }
+        // Followed by re-enabling slot 0 for TT_TEXTURE when the cube map had been on it --
+        // restoring a target for the benefit of nothing, since the next bind names its own.
+        gGL.getTextureSlot(mTextureStage)->unbind();
     }
 }
 
@@ -289,10 +247,8 @@ void LLCubeMap::setMatrix(S32 stage)
 
     if (mMatrixStage < 0) return;
 
-    //if (stage > 0)
-    {
-        gGL.getTexUnit(stage)->activate();
-    }
+    // No getTextureSlot(stage)->activate() here any more: it guarded a texture matrix stack
+    // that MM_TEXTURE0 no longer selects through the active unit. See LLRender::eMatrixMode.
 
     LLVector3 x(gGLModelView+0);
     LLVector3 y(gGLModelView+4);
@@ -303,33 +259,19 @@ void LLCubeMap::setMatrix(S32 stage)
     LLMatrix4 trans(mat3);
     trans.transpose();
 
-    gGL.matrixMode(LLRender::MM_TEXTURE);
+    gGL.matrixMode(LLRender::MM_TEXTURE0);
     gGL.pushMatrix();
     gGL.loadMatrix((F32 *)trans.mMatrix);
     gGL.matrixMode(LLRender::MM_MODELVIEW);
-
-    /*if (stage > 0)
-    {
-        gGL.getTexUnit(0)->activate();
-    }*/
 }
 
 void LLCubeMap::restoreMatrix()
 {
     if (mMatrixStage < 0) return;
 
-    //if (mMatrixStage > 0)
-    {
-        gGL.getTexUnit(mMatrixStage)->activate();
-    }
-    gGL.matrixMode(LLRender::MM_TEXTURE);
+    gGL.matrixMode(LLRender::MM_TEXTURE0);
     gGL.popMatrix();
     gGL.matrixMode(LLRender::MM_MODELVIEW);
-
-    /*if (mMatrixStage > 0)
-    {
-        gGL.getTexUnit(0)->activate();
-    }*/
 }
 
 

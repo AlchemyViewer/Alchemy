@@ -32,6 +32,7 @@
 
 #include <boost/lexical_cast.hpp>
 
+#include "aluniformbuffer.h"
 #include "hbxxh.h"
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
@@ -47,6 +48,8 @@
 #include "pipeline.h"
 
 #include "llfile.h"
+
+#include <filesystem>
 #include "llviewerwindow.h"
 #include "llwindow.h"
 
@@ -78,39 +81,67 @@ S32 clamp_terrain_mapping(S32 mapping)
     return mapping;
 }
 
+S32 clamp_terrain_detail(S32 detail)
+{
+    const S32 requested = llclamp(detail, TERRAIN_PBR_DETAIL_MIN, TERRAIN_PBR_DETAIL_MAX);
+    detail = requested;
+
+    // The PBR terrain fragment shader declares one paint/ramp sampler (alpha_ramp or
+    // paint_map) plus, per detail level, 4 maps for each of the 4 materials. At full
+    // detail that is 17 samplers -- over the 16-per-stage floor that Apple's GL 4.1
+    // (every macOS context) and some older desktop GPUs report, where the program then
+    // fails to link. Drop detail until the count fits.
+    //
+    // The arithmetic mirrors pbrterrainF.glsl's #if guards exactly (detail 0 -> 17,
+    // -1 and -2 -> 13, -3 -> 9, -4 -> 5); if those guards change, this must too.
+    while (detail > TERRAIN_PBR_DETAIL_MIN)
+    {
+        S32 samplers = 1 + 4 * (1 + (detail >= TERRAIN_PBR_DETAIL_NORMAL)
+                                  + (detail >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
+                                  + (detail >= TERRAIN_PBR_DETAIL_EMISSIVE));
+        if (samplers <= gGLManager.mNumTextureImageUnits)
+        {
+            break;
+        }
+        --detail;
+    }
+
+    if (detail < requested)
+    {
+        LL_INFOS_ONCE("ShaderLoading") << "RenderTerrainPBRDetail " << requested << " clamped to " << detail
+                                       << ": full detail needs more fragment texture units than the "
+                                       << gGLManager.mNumTextureImageUnits
+                                       << " this GL implementation provides." << LL_ENDL;
+    }
+    return detail;
+}
+
 //utility shaders
 LLGLSLShader    gOcclusionProgram;
-LLGLSLShader    gSkinnedOcclusionProgram;
 LLGLSLShader    gOcclusionCubeProgram;
 LLGLSLShader    gGlowCombineProgram;
 LLGLSLShader    gReflectionMipProgram;
 LLGLSLShader    gGaussianProgram;
 LLGLSLShader    gRadianceGenProgram;
 LLGLSLShader    gHeroRadianceGenProgram;
-LLGLSLShader    gIrradianceGenProgram;
+LLGLSLShader    gSHProjectionProgram;
 LLGLSLShader    gGlowCombineFXAAProgram;
 LLGLSLShader    gTwoTextureCompareProgram;
 LLGLSLShader    gOneTextureFilterProgram;
 LLGLSLShader    gDebugProgram;
-LLGLSLShader    gSkinnedDebugProgram;
 LLGLSLShader    gNormalDebugProgram[NORMAL_DEBUG_SHADER_COUNT];
-LLGLSLShader    gSkinnedNormalDebugProgram[NORMAL_DEBUG_SHADER_COUNT];
 LLGLSLShader    gClipProgram;
 LLGLSLShader    gAlphaMaskProgram;
 LLGLSLShader    gBenchmarkProgram;
 LLGLSLShader    gReflectionProbeDisplayProgram;
 LLGLSLShader    gCopyProgram;
-LLGLSLShader    gCopyDepthProgram;
 LLGLSLShader    gPBRTerrainBakeProgram;
 LLGLSLShader    gDrawColorProgram;
 
 //object shaders
 LLGLSLShader        gObjectPreviewProgram;
-LLGLSLShader        gSkinnedObjectPreviewProgram;
 LLGLSLShader        gPhysicsPreviewProgram;
-LLGLSLShader        gObjectFullbrightAlphaMaskProgram;
 LLGLSLShader        gObjectBumpProgram;
-LLGLSLShader        gSkinnedObjectBumpProgram;
 LLGLSLShader        gObjectAlphaMaskNoColorProgram;
 
 //environment shaders
@@ -119,7 +150,6 @@ LLGLSLShader        gUnderWaterProgram;
 
 //interface shaders
 LLGLSLShader        gHighlightProgram;
-LLGLSLShader        gSkinnedHighlightProgram;
 LLGLSLShader        gHighlightNormalProgram;
 LLGLSLShader        gHighlightSpecularProgram;
 
@@ -130,7 +160,6 @@ LLGLSLShader        gPathfindingNoNormalsProgram;
 
 //avatar shader handles
 LLGLSLShader        gAvatarProgram;
-LLGLSLShader        gAvatarEyeballProgram;
 LLGLSLShader        gImpostorProgram;
 
 // Effects Shaders
@@ -141,22 +170,17 @@ LLGLSLShader            gBloomDownsampleProgram;
 LLGLSLShader            gBloomDownsampleFirstProgram;
 LLGLSLShader            gBloomUpsampleProgram;
 LLGLSLShader            gBloomCompositeProgram;
-LLGLSLShader            gPostScreenSpaceReflectionProgram;
 
 // Deferred rendering shaders
 LLGLSLShader            gDeferredImpostorProgram;
 LLGLSLShader            gDeferredDiffuseProgram;
 LLGLSLShader            gDeferredDiffuseAlphaMaskProgram;
-LLGLSLShader            gDeferredSkinnedDiffuseAlphaMaskProgram;
 LLGLSLShader            gDeferredNonIndexedDiffuseAlphaMaskProgram;
 LLGLSLShader            gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram;
-LLGLSLShader            gDeferredSkinnedDiffuseProgram;
-LLGLSLShader            gDeferredSkinnedBumpProgram;
 LLGLSLShader            gDeferredBumpProgram;
 LLGLSLShader            gDeferredTerrainProgram;
 LLGLSLShader            gDeferredTreeProgram;
 LLGLSLShader            gDeferredTreeShadowProgram;
-LLGLSLShader            gDeferredSkinnedTreeShadowProgram;
 LLGLSLShader            gDeferredAvatarProgram;
 LLGLSLShader            gDeferredAvatarAlphaProgram;
 LLGLSLShader            gDeferredLightProgram;
@@ -170,29 +194,19 @@ LLGLSLShader            gHazeWaterProgram;
 LLGLSLShader            gDeferredBlurLightProgram;
 LLGLSLShader            gDeferredSoftenProgram;
 LLGLSLShader            gDeferredShadowProgram;
-LLGLSLShader            gDeferredSkinnedShadowProgram;
 LLGLSLShader            gDeferredShadowCubeProgram;
 LLGLSLShader            gDeferredShadowAlphaMaskProgram;
-LLGLSLShader            gDeferredSkinnedShadowAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaMaskIndexedProgram; // multi-material indexed
-LLGLSLShader            gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram;
-LLGLSLShader            gDeferredSkinnedShadowGLTFAlphaMaskProgram;
 LLGLSLShader            gDeferredShadowMaterialIndexedProgram; // multi-material indexed legacy mask shadow
-LLGLSLShader            gDeferredSkinnedShadowMaterialIndexedProgram;
 LLGLSLShader            gDeferredShadowGLTFAlphaBlendProgram;
-LLGLSLShader            gDeferredSkinnedShadowGLTFAlphaBlendProgram;
 LLGLSLShader            gDeferredShadowFullbrightAlphaMaskProgram;
-LLGLSLShader            gDeferredSkinnedShadowFullbrightAlphaMaskProgram;
 LLGLSLShader            gDeferredAvatarShadowProgram;
 LLGLSLShader            gDeferredAvatarAlphaShadowProgram;
 LLGLSLShader            gDeferredAvatarAlphaMaskShadowProgram;
 LLGLSLShader            gDeferredAlphaProgram;
 LLGLSLShader            gHUDAlphaProgram;
-LLGLSLShader            gDeferredSkinnedAlphaProgram;
 LLGLSLShader            gDeferredAlphaImpostorProgram;
-LLGLSLShader            gDeferredSkinnedAlphaImpostorProgram;
-LLGLSLShader            gDeferredAvatarEyesProgram;
 LLGLSLShader            gDeferredFullbrightProgram;
 LLGLSLShader            gHUDFullbrightProgram;
 LLGLSLShader            gDeferredFullbrightAlphaMaskProgram;
@@ -200,9 +214,7 @@ LLGLSLShader            gHUDFullbrightAlphaMaskProgram;
 LLGLSLShader            gDeferredFullbrightAlphaMaskAlphaProgram;
 LLGLSLShader            gHUDFullbrightAlphaMaskAlphaProgram;
 LLGLSLShader            gDeferredEmissiveProgram;
-LLGLSLShader            gDeferredSkinnedEmissiveProgram;
 LLGLSLShader            gDeferredEmissiveIndexedProgram; // multi-material indexed legacy glow
-LLGLSLShader            gDeferredSkinnedEmissiveIndexedProgram;
 LLGLSLShader            gDeferredPostProgram;
 LLGLSLShader            gDeferredPostProgramNoNear;
 LLGLSLShader            gDeferredCoFProgram;
@@ -226,10 +238,6 @@ LLGLSLShader            gDeferredMeteorProgram;
 LLGLSLShader            gDeferredAuroraProgram;
 LLGLSLShader            gDeferredFullbrightShinyProgram;
 LLGLSLShader            gHUDFullbrightShinyProgram;
-LLGLSLShader            gDeferredSkinnedFullbrightShinyProgram;
-LLGLSLShader            gDeferredSkinnedFullbrightProgram;
-LLGLSLShader            gDeferredSkinnedFullbrightAlphaMaskProgram;
-LLGLSLShader            gDeferredSkinnedFullbrightAlphaMaskAlphaProgram;
 LLGLSLShader            gNormalMapGenProgram;
 LLGLSLShader            gDeferredGenBrdfLutProgram;
 LLGLSLShader            gDeferredBufferVisualProgram;
@@ -247,37 +255,135 @@ LLGLSLShader            gRlvSphereProgram;
 // [/RLVa:KB]
 
 // Deferred materials shaders
-LLGLSLShader            gDeferredMaterialProgram[LLMaterial::SHADER_COUNT*2];
-LLGLSLShader            gDeferredMaterialIndexedProgram[LLMaterial::SHADER_COUNT*2]; // multi-material indexed (GBuffer masks only)
+LLGLSLShader            gDeferredMaterialProgram[LLMaterial::SHADER_COUNT];
+LLGLSLShader            gDeferredMaterialIndexedProgram[LLMaterial::SHADER_COUNT]; // multi-material indexed (GBuffer masks only)
 LLGLSLShader            gHUDPBROpaqueProgram;
 LLGLSLShader            gPBRGlowProgram;
-LLGLSLShader            gPBRGlowSkinnedProgram;
 LLGLSLShader            gPBRGlowIndexedProgram; // multi-material indexed PBR glow
-LLGLSLShader            gPBRGlowSkinnedIndexedProgram;
 LLGLSLShader            gDeferredPBROpaqueProgram;
 LLGLSLShader            gDeferredPBROpaqueIndexedProgram;
-LLGLSLShader            gDeferredSkinnedPBROpaqueIndexedProgram;
-LLGLSLShader            gDeferredSkinnedPBROpaqueProgram;
 LLGLSLShader            gHUDPBRAlphaProgram;
 LLGLSLShader            gDeferredPBRAlphaProgram;
-LLGLSLShader            gDeferredSkinnedPBRAlphaProgram;
+LLGLSLShader            gDeferredPBRAlphaImpostorProgram;
 LLGLSLShader            gDeferredPBRTerrainProgram[TERRAIN_PAINT_TYPE_COUNT];
 
-//helper for making a rigged variant of a given shader
-static bool make_rigged_variant(LLGLSLShader& shader, LLGLSLShader& riggedShader)
+// Mirror corners are only reachable during the hero-probe mirror pass, which RenderMirrors
+// gates entirely; toggling it re-runs setShaders (handleReflectionProbeDetailChanged), so
+// building them while it is off would be dozens of programs nothing can bind.
+static U32 mirror_variant()
 {
-    riggedShader.mName = llformat("Skinned %s", shader.mName.c_str());
-    riggedShader.mFeatures = shader.mFeatures;
-    riggedShader.mFeatures.hasObjectSkinning = true;
-    riggedShader.mDefines = shader.mDefines;    // NOTE: Must come before addPermutation
+    return gSavedSettings.getBOOL("RenderMirrors") ? (U32)LLGLSLShader::VARIANT_MIRROR : 0u;
+}
 
-    riggedShader.addPermutation("HAS_SKIN", "1");
-    riggedShader.mShaderFiles = shader.mShaderFiles;
-    riggedShader.mShaderLevel = shader.mShaderLevel;
-    riggedShader.mShaderGroup = shader.mShaderGroup;
+// Digest of every shader source on disk, folded into the binary cache version.
+//
+// A program's own hash() covers its file PATHS, its defines and its features -- not the CONTENT
+// of anything. Shared objects are worse off still: they are compiled once and attached by name,
+// so nothing about them reaches the hash at all. Editing a shader therefore leaves every cached
+// binary looking valid, and the only other input to the cache version is the viewer version,
+// which does not move between local builds.
+//
+// Reading the tree costs one pass over a few hundred small files at startup, against reading
+// them all again to compile anyway.
+static std::string hash_shader_sources()
+{
+    LL_PROFILE_ZONE_SCOPED;
 
-    shader.mRiggedVariant = &riggedShader;
-    return riggedShader.createShader();
+    std::vector<std::filesystem::path> files;
+    std::error_code ec;
+    const std::string root = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "shaders");
+
+    for (std::filesystem::recursive_directory_iterator it(root, ec), end;
+         !ec && it != end;
+         it.increment(ec))
+    {
+        if (it->is_regular_file(ec))
+        {
+            files.push_back(it->path());
+        }
+    }
+
+    if (ec || files.empty())
+    {   // no digest is better than a wrong one: fall back to invalidating every run
+        LL_WARNS("Shader") << "Could not enumerate " << root
+                           << " to version the shader cache; treating it as stale" << LL_ENDL;
+        return LLUUID::generateNewID().asString();
+    }
+
+    std::sort(files.begin(), files.end());  // directory iteration order is unspecified
+
+    HBXXH128 hash_obj;
+    for (const auto& file : files)
+    {
+        // relative, not absolute: the digest must not change with the install location
+        hash_obj.update(file.lexically_relative(root).generic_string());
+
+        llifstream in(file.string(), std::ios::binary);
+        if (!in.is_open())
+        {
+            LL_WARNS("Shader") << "Could not read " << file.string()
+                               << " to version the shader cache; treating it as stale" << LL_ENDL;
+            return LLUUID::generateNewID().asString();
+        }
+
+        std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        hash_obj.update(text);
+    }
+    return hash_obj.digest().asString();
+}
+
+// Compile a second copy of a shared object under `suffix`, for programs carrying `define`.
+//
+// Two things this does not do naively. It uses the level the BASE copy RESOLVED to rather than
+// the level that was asked for -- loadShaderFile walks down the class directories when a level
+// is missing, and a copy built from a different class file than the base would link mismatched
+// declarations into one program. And it skips the compile entirely when the file that level
+// selects does not mention `define`: deferred/reflectionProbeF.glsl reads CLASSIC_MODE at class3
+// and not at class2, so below class3 the second compile yields a byte-identical object under a
+// different key -- a full compile of a large source at every setShaders().
+// LLShaderMgr::variantObjectKey falls back to the base object when no copy exists, so the skip
+// is invisible to attach.
+//
+// The single-file test is sound because the loader has no #include: a shared source cannot pull
+// the define in from anywhere else.
+static bool load_axis_copy(LLViewerShaderMgr& mgr,
+                           const std::vector<std::pair<std::string, S32> >& loaded,
+                           const std::string& path, GLenum stage,
+                           std::map<std::string, std::string>& defines,
+                           const char* define, const char* suffix)
+{
+    auto it = std::find_if(loaded.begin(), loaded.end(),
+                           [&path](const std::pair<std::string, S32>& e) { return e.first == path; });
+    if (it == loaded.end())
+    {   // the base pass must have loaded it, or there is nothing for this to be a copy OF
+        LL_WARNS("Shader") << "No base object for " << path << "; cannot build its " << suffix
+                           << " copy" << LL_ENDL;
+        return false;
+    }
+
+    S32 level = it->second;
+
+    bool varies = false;
+    for (S32 gpu_class = level; gpu_class > 0; --gpu_class)
+    {
+        const std::string full = mgr.getShaderDirPrefix() + std::to_string(gpu_class)
+                               + gDirUtilp->getDirDelimiter() + path;
+        llifstream in(full, std::ios::binary);
+        if (!in.is_open())
+        {
+            continue;
+        }
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        varies = text.find(define) != std::string::npos;
+        break;  // the first file that exists is the one loadShaderFile picked
+    }
+
+    if (!varies)
+    {
+        return true;
+    }
+
+    return mgr.loadShaderFile(path, level, stage, &defines, -1, path + suffix) != 0;
 }
 
 static void add_common_permutations(LLGLSLShader* shader)
@@ -333,28 +439,19 @@ static void setup_material_indexed_samplers(LLGLSLShader& shader, S32 n, bool ha
 }
 
 #ifdef SHOW_ASSERT
-// return true if there are no redundant shaders in the given vector
-// also checks for redundant variants
-static bool no_redundant_shaders(const std::vector<LLGLSLShader*>& shaders)
+// Return true if no two live programs share a name. sInstances tracks every program that
+// created successfully, so this covers the whole population without a registration list --
+// including the rigged variants, which the old list-walk only reached through the bases
+// someone had remembered to register.
+static bool no_redundant_shaders()
 {
     std::set<std::string> names;
-    for (LLGLSLShader* shader : shaders)
+    for (LLGLSLShader* shader : LLGLSLShader::sInstances)
     {
-        if (names.find(shader->mName) != names.end())
+        if (!names.insert(shader->mName).second)
         {
             LL_WARNS("Shader") << "Redundant shader: " << shader->mName << LL_ENDL;
             return false;
-        }
-        names.insert(shader->mName);
-
-        if (shader->mRiggedVariant)
-        {
-            if (names.find(shader->mRiggedVariant->mName) != names.end())
-            {
-                LL_WARNS("Shader") << "Redundant shader: " << shader->mRiggedVariant->mName << LL_ENDL;
-                return false;
-            }
-            names.insert(shader->mRiggedVariant->mName);
         }
     }
     return true;
@@ -371,76 +468,12 @@ LLViewerShaderMgr::LLViewerShaderMgr() :
 LLViewerShaderMgr::~LLViewerShaderMgr()
 {
     mShaderLevel.clear();
-    mShaderList.clear();
 }
 
 void LLViewerShaderMgr::finalizeShaderList()
 {
-    //ONLY shaders that need WL Param management should be added here
-    mShaderList.push_back(&gAvatarProgram);
-    mShaderList.push_back(&gWaterProgram);
-    mShaderList.push_back(&gAvatarEyeballProgram);
-    mShaderList.push_back(&gImpostorProgram);
-    mShaderList.push_back(&gObjectBumpProgram);
-    mShaderList.push_back(&gObjectFullbrightAlphaMaskProgram);
-    mShaderList.push_back(&gObjectAlphaMaskNoColorProgram);
-    mShaderList.push_back(&gUnderWaterProgram);
-    mShaderList.push_back(&gDeferredSunProgram);
-    mShaderList.push_back(&gDeferredSunProbeProgram);
-    mShaderList.push_back(&gHazeProgram);
-    mShaderList.push_back(&gHazeWaterProgram);
-    mShaderList.push_back(&gDeferredSoftenProgram);
-    mShaderList.push_back(&gDeferredAlphaProgram);
-    mShaderList.push_back(&gHUDAlphaProgram);
-    mShaderList.push_back(&gDeferredAlphaImpostorProgram);
-    mShaderList.push_back(&gDeferredFullbrightProgram);
-    mShaderList.push_back(&gHUDFullbrightProgram);
-    mShaderList.push_back(&gDeferredFullbrightAlphaMaskProgram);
-    mShaderList.push_back(&gHUDFullbrightAlphaMaskProgram);
-    mShaderList.push_back(&gDeferredFullbrightAlphaMaskAlphaProgram);
-    mShaderList.push_back(&gHUDFullbrightAlphaMaskAlphaProgram);
-    mShaderList.push_back(&gDeferredFullbrightShinyProgram);
-    mShaderList.push_back(&gHUDFullbrightShinyProgram);
-    mShaderList.push_back(&gDeferredEmissiveProgram);
-    mShaderList.push_back(&gDeferredAvatarEyesProgram);
-    mShaderList.push_back(&gDeferredAvatarAlphaProgram);
-    mShaderList.push_back(&gEnvironmentMapProgram);
-    mShaderList.push_back(&gDeferredWLSkyProgram);
-    mShaderList.push_back(&gDeferredWLCloudProgram);
-    mShaderList.push_back(&gDeferredWLMoonProgram);
-    mShaderList.push_back(&gDeferredWLSunProgram);
-// [RLVa:KB] - @setsphere
-    mShaderList.push_back(&gRlvSphereProgram);
-// [/RLVa:KB]
-    mShaderList.push_back(&gDeferredPBRAlphaProgram);
-    mShaderList.push_back(&gHUDPBRAlphaProgram);
-    mShaderList.push_back(&gDeferredDiffuseProgram);
-    mShaderList.push_back(&gDeferredBumpProgram);
-    mShaderList.push_back(&gDeferredPBROpaqueProgram);
-
-    mShaderList.push_back(&gDeferredAvatarProgram);
-    mShaderList.push_back(&gDeferredTerrainProgram);
-
-    for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
-    {
-        mShaderList.push_back(&gDeferredPBRTerrainProgram[paint_type]);
-    }
-
-    mShaderList.push_back(&gDeferredDiffuseAlphaMaskProgram);
-    mShaderList.push_back(&gDeferredNonIndexedDiffuseAlphaMaskProgram);
-    mShaderList.push_back(&gDeferredTreeProgram);
-
-    mShaderList.push_back(&gCGGammaProgram);
-    mShaderList.push_back(&gCGLegacyGammaProgram);
-    mShaderList.push_back(&gCGColorgradeGammaProgram);
-    mShaderList.push_back(&gCGColorgradeLegacyGammaProgram);
-    mShaderList.push_back(&gCGTonemapProgram);
-    mShaderList.push_back(&gCGTonemapLegacyGammaProgram);
-    mShaderList.push_back(&gCGTonemapColorgradeProgram);
-    mShaderList.push_back(&gCGTonemapColorgradeLegacyGammaProgram);
-
     // make sure there are no redundancies
-    llassert(no_redundant_shaders(mShaderList));
+    llassert(no_redundant_shaders());
 }
 
 // static
@@ -495,14 +528,21 @@ void LLViewerShaderMgr::setShaders()
         return;
     }
 
-    mShaderList.clear();
-
     if (!gGLManager.mHasRequirements)
     {
         // Viewer will show 'hardware requirements' warning later
         LL_INFOS("ShaderLoading") << "Not supported hardware/software" << LL_ENDL;
         return;
     }
+
+    ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(gSavedSettings.getS32("AlchemyRenderUBOUpdateMode"));
+
+    // Latch reverse-Z before anything downstream reads it: this same call releases and
+    // reallocates GL buffers (mainDepthFormat), every shader compile below injects REVERSE_Z
+    // from the latched state, and the cache key folds it in -- all within this one blocking
+    // call, so clip control, clear depth, depth format and the shader define agree for the
+    // whole next frame.
+    LLPipeline::updateReverseZ();
 
     {
         static LLCachedControl<bool> shader_cache_enabled(gSavedSettings, "RenderShaderCacheEnabled", true);
@@ -512,6 +552,7 @@ void LLViewerShaderMgr::setShaders()
         {
             HBXXH128 hash_obj;
             hash_obj.update(LLVersionInfo::instance().getVersion());
+            hash_obj.update(hash_shader_sources());
             current_cache_version = hash_obj.digest();
 
             old_cache_version = LLUUID(gSavedSettings.getString("RenderShaderCacheVersion"));
@@ -539,7 +580,8 @@ void LLViewerShaderMgr::setShaders()
     // shadow/reflection maps, so the full fragment texture-unit budget is
     // available here -- unlike sIndexedTextureChannels above, no units are
     // reserved. Capped at 8 to bound shader sampler declarations.
-    LLGLSLShader::sIndexedGLTFChannels = llclamp(gGLManager.mNumTextureImageUnits / 4, 1, 8);
+    LLGLSLShader::sIndexedGLTFChannels = llclamp(gGLManager.mNumTextureImageUnits / 4, 1,
+                                                LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS);
 
     reentrance = true;
 
@@ -780,6 +822,12 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["HAS_EMISSIVE"] = "1";
     }
 
+    // Blinn-Phong exponent at full glossiness, for deferredUtil's blinnPhongLobe. A define
+    // rather than a uniform because it reaches a shared object -- this map is what compiles
+    // those, and a program's own mShaderFiles never see it, which is fine: the lobe is
+    // evaluated in deferredUtil and nowhere else.
+    attribs["SPECULAR_EXPONENT"] = llformat("%.1f", gSavedSettings.getF32("RenderSpecularExponent"));
+
     bool ssr = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
 
     bool mirrors = gSavedSettings.getBOOL("RenderMirrors");
@@ -797,6 +845,24 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         if (shadow_detail >= 2)
         {
             attribs["SPOT_SHADOW"] = "1";
+        }
+
+        // PCF filter kernel width (texels) from the quality tier, overriding the shader's own
+        // default (deferred/shadowUtil.glsl SHADOW_PCF_KERNEL == 4). Even values only: the
+        // gather path tiles the kernel in 2x2 blocks, so K/2 gather-compare fetches per axis.
+        static const S32 pcf_kernel[] = { 2, 4, 6, 4 }; // Low / Medium / High / Ultra(PCSS)
+        const S32 quality = llclamp((S32)gSavedSettings.getU32("AlchemyRenderShadowFilterQuality"), 0, 3);
+        attribs["SHADOW_PCF_KERNEL"] = std::to_string(pcf_kernel[quality]);
+
+        if (quality >= 3)
+        {
+            // Ultra: contact-hardening PCSS. This ALSO switches the shadow maps from
+            // depth-compare samplers to plain sampler2D reads (a blocker search needs the
+            // raw depth), so LLPipeline::bindShadowMaps must bind a matching non-compare
+            // sampler -- it reads this same setting. Keep the two in step.
+            attribs["SHADOW_PCSS"] = "1";
+            const F32 pcss_scale = gSavedSettings.getF32("AlchemyRenderShadowPCSSScale");
+            attribs["SHADOW_PCSS_SCALE"] = llformat("%.2f", pcss_scale);
         }
     }
 
@@ -816,17 +882,29 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         attribs["HERO_PROBES"] = "1";
     }
 
+    // NOTE: REVERSE_Z is deliberately NOT here. This map reaches only the shared objects
+    // compiled below -- a program's own mShaderFiles carry their permutations and nothing else
+    // -- and reverse-Z is read by program-owned sources too. LLShaderMgr::loadShaderFile()
+    // injects it for every compile instead, and LLGLSLShader::hash() folds LLRender::sReverseZ
+    // in directly so a toggle still invalidates cached binaries.
+
     { // PBR terrain
         const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
         attribs["TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT"] = llformat("%d", mapping);
         const F32 triplanar_factor = gSavedSettings.getF32("RenderTerrainPBRTriplanarBlendFactor");
         attribs["TERRAIN_TRIPLANAR_BLEND_FACTOR"] = llformat("%.2f", triplanar_factor);
-        S32 detail = gSavedSettings.getS32("RenderTerrainPBRDetail");
-        detail = llclamp(detail, TERRAIN_PBR_DETAIL_MIN, TERRAIN_PBR_DETAIL_MAX);
+        const S32 detail = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
         attribs["TERRAIN_PBR_DETAIL"] = llformat("%d", detail);
     }
 
     LLGLSLShader::sGlobalDefines = attribs;
+
+    // Shared objects are compiled once and attached by name, so a per-program permutation
+    // cannot reach them. Sources that read classic_mode therefore get a second copy compiled
+    // with CLASSIC_MODE=1, stored under a suffixed key; attachShaderFeatures() picks the copy
+    // matching each program's own defines (see LLShaderMgr::variantObjectKey).
+    std::map<std::string, std::string> classic_attribs = attribs;
+    classic_attribs["CLASSIC_MODE"] = "1";
 
     // We no longer have to bind the shaders to global glhandles, they are automatically added to a map now.
     for (U32 i = 0; i < shaders.size(); i++)
@@ -837,6 +915,12 @@ std::string LLViewerShaderMgr::loadBasicShaders()
             LL_WARNS("Shader") << "Failed to load basic vertex shader " << i << ": " << shaders[i].first << LL_ENDL;
             return shaders[i].first;
         }
+    }
+
+    if (!load_axis_copy(*this, shaders, "windlight/atmosphericsFuncs.glsl", GL_VERTEX_SHADER,
+                        classic_attribs, "CLASSIC_MODE", LLShaderMgr::CLASSIC_OBJECT_SUFFIX))
+    {
+        return "windlight/atmosphericsFuncs.glsl";
     }
 
     // Load the Basic Fragment Shaders at the appropriate level.
@@ -854,7 +938,6 @@ std::string LLViewerShaderMgr::loadBasicShaders()
     std::vector<S32> index_channels;
     index_channels.push_back(-1);    shaders.push_back( make_pair( "windlight/atmosphericsVarsF.glsl",      mShaderLevel[SHADER_WINDLIGHT] ) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "windlight/atmosphericsHelpersF.glsl",       mShaderLevel[SHADER_WINDLIGHT] ) );
-    index_channels.push_back(-1);    shaders.push_back( make_pair( "windlight/gammaF.glsl",                 mShaderLevel[SHADER_WINDLIGHT]) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "windlight/atmosphericsFuncs.glsl",       mShaderLevel[SHADER_WINDLIGHT] ) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "windlight/atmosphericsF.glsl",          mShaderLevel[SHADER_WINDLIGHT] ) );
     index_channels.push_back(-1);    shaders.push_back( make_pair( "environment/waterFogF.glsl",                mShaderLevel[SHADER_WATER] ) );
@@ -882,6 +965,32 @@ std::string LLViewerShaderMgr::loadBasicShaders()
         {
             LL_WARNS("Shader") << "Failed to load fragment shader " << shaders[i].first << LL_ENDL;
             return shaders[i].first;
+        }
+    }
+
+    if (mirrors)
+    {
+        // globalF's mirrorClip() is the only shared source that varies on MIRROR_CLIP. Only
+        // compiled when RenderMirrors is on, matching the gate on the variants themselves --
+        // nothing can attach this copy otherwise.
+        std::map<std::string, std::string> mirror_attribs = attribs;
+        mirror_attribs["MIRROR_CLIP"] = "1";
+
+        if (!load_axis_copy(*this, shaders, "deferred/globalF.glsl", GL_FRAGMENT_SHADER,
+                            mirror_attribs, "MIRROR_CLIP", LLShaderMgr::MIRROR_OBJECT_SUFFIX))
+        {
+            return "deferred/globalF.glsl";
+        }
+    }
+
+    for (const char* path : { "windlight/atmosphericsFuncs.glsl",
+                              "deferred/deferredUtil.glsl",
+                              "deferred/reflectionProbeF.glsl" })
+    {
+        if (!load_axis_copy(*this, shaders, path, GL_FRAGMENT_SHADER,
+                            classic_attribs, "CLASSIC_MODE", LLShaderMgr::CLASSIC_OBJECT_SUFFIX))
+        {
+            return path;
         }
     }
 
@@ -931,7 +1040,7 @@ bool LLViewerShaderMgr::loadShadersWater()
 
         gWaterProgram.mShaderGroup = LLGLSLShader::SG_WATER;
         gWaterProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
-        success = gWaterProgram.createShader();
+        success = gWaterProgram.createShader(LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
     }
 
@@ -951,7 +1060,7 @@ bool LLViewerShaderMgr::loadShadersWater()
         {
             gUnderWaterProgram.addPermutation("TRANSPARENT_WATER", "1");
         }
-        success = gUnderWaterProgram.createShader();
+        success = gUnderWaterProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -1113,15 +1222,11 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     {
         gDeferredTreeProgram.unload();
         gDeferredTreeShadowProgram.unload();
-        gDeferredSkinnedTreeShadowProgram.unload();
         gDeferredDiffuseProgram.unload();
-        gDeferredSkinnedDiffuseProgram.unload();
         gDeferredDiffuseAlphaMaskProgram.unload();
-        gDeferredSkinnedDiffuseAlphaMaskProgram.unload();
         gDeferredNonIndexedDiffuseAlphaMaskProgram.unload();
         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.unload();
         gDeferredBumpProgram.unload();
-        gDeferredSkinnedBumpProgram.unload();
         gDeferredImpostorProgram.unload();
         gDeferredTerrainProgram.unload();
         gDeferredLightProgram.unload();
@@ -1135,18 +1240,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredBlurLightProgram.unload();
         gDeferredSoftenProgram.unload();
         gDeferredShadowProgram.unload();
-        gDeferredSkinnedShadowProgram.unload();
         gDeferredShadowCubeProgram.unload();
         gDeferredShadowAlphaMaskProgram.unload();
-        gDeferredSkinnedShadowAlphaMaskProgram.unload();
         gDeferredShadowGLTFAlphaMaskProgram.unload();
         gDeferredShadowGLTFAlphaMaskIndexedProgram.unload();
-        gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram.unload();
         gDeferredShadowMaterialIndexedProgram.unload();
-        gDeferredSkinnedShadowMaterialIndexedProgram.unload();
-        gDeferredSkinnedShadowGLTFAlphaMaskProgram.unload();
         gDeferredShadowFullbrightAlphaMaskProgram.unload();
-        gDeferredSkinnedShadowFullbrightAlphaMaskProgram.unload();
         gDeferredAvatarShadowProgram.unload();
         gDeferredAvatarAlphaShadowProgram.unload();
         gDeferredAvatarAlphaMaskShadowProgram.unload();
@@ -1154,7 +1253,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarAlphaProgram.unload();
         gDeferredAlphaProgram.unload();
         gHUDAlphaProgram.unload();
-        gDeferredSkinnedAlphaProgram.unload();
         gDeferredFullbrightProgram.unload();
         gHUDFullbrightProgram.unload();
         gDeferredFullbrightAlphaMaskProgram.unload();
@@ -1162,10 +1260,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredFullbrightAlphaMaskAlphaProgram.unload();
         gHUDFullbrightAlphaMaskAlphaProgram.unload();
         gDeferredEmissiveProgram.unload();
-        gDeferredSkinnedEmissiveProgram.unload();
         gDeferredEmissiveIndexedProgram.unload();
-        gDeferredSkinnedEmissiveIndexedProgram.unload();
-        gDeferredAvatarEyesProgram.unload();
         gDeferredPostProgram.unload();
         gDeferredCoFProgram.unload();
         gDeferredDoFCombineProgram.unload();
@@ -1191,10 +1286,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAuroraProgram.unload();
         gDeferredFullbrightShinyProgram.unload();
         gHUDFullbrightShinyProgram.unload();
-        gDeferredSkinnedFullbrightShinyProgram.unload();
-        gDeferredSkinnedFullbrightProgram.unload();
-        gDeferredSkinnedFullbrightAlphaMaskProgram.unload();
-        gDeferredSkinnedFullbrightAlphaMaskAlphaProgram.unload();
 
         gDeferredHighlightProgram.unload();
 
@@ -1202,7 +1293,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredGenBrdfLutProgram.unload();
         gDeferredBufferVisualProgram.unload();
 
-        for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+        for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
         {
             gDeferredMaterialProgram[i].unload();
             gDeferredMaterialIndexedProgram[i].unload();
@@ -1212,13 +1303,10 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gHUDPBROpaqueProgram.unload();
         gPBRGlowProgram.unload();
         gPBRGlowIndexedProgram.unload();
-        gPBRGlowSkinnedIndexedProgram.unload();
         gDeferredPBROpaqueProgram.unload();
         gDeferredPBROpaqueIndexedProgram.unload();
-        gDeferredSkinnedPBROpaqueIndexedProgram.unload();
-        gDeferredSkinnedPBROpaqueProgram.unload();
         gDeferredPBRAlphaProgram.unload();
-        gDeferredSkinnedPBRAlphaProgram.unload();
+        gDeferredPBRAlphaImpostorProgram.unload();
         for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
         {
             gDeferredPBRTerrainProgram[paint_type].unload();
@@ -1254,8 +1342,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDiffuseProgram.mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
         gDeferredDiffuseProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredDiffuseProgram);
-        success = make_rigged_variant(gDeferredDiffuseProgram, gDeferredSkinnedDiffuseProgram);
-        success = success && gDeferredDiffuseProgram.createShader();
+        gDeferredDiffuseProgram.addPermutation("LINEAR_DIFFUSE", "1");
+        success = gDeferredDiffuseProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
     }
 
     if (success)
@@ -1267,8 +1355,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDiffuseAlphaMaskProgram.mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
         gDeferredDiffuseAlphaMaskProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredDiffuseAlphaMaskProgram);
-        success = make_rigged_variant(gDeferredDiffuseAlphaMaskProgram, gDeferredSkinnedDiffuseAlphaMaskProgram);
-        success = success && gDeferredDiffuseAlphaMaskProgram.createShader();
+        gDeferredDiffuseAlphaMaskProgram.addPermutation("LINEAR_DIFFUSE", "1");
+        success = gDeferredDiffuseAlphaMaskProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
     }
 
     if (success)
@@ -1279,7 +1367,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredNonIndexedDiffuseAlphaMaskProgram.mShaderFiles.push_back(make_pair("deferred/diffuseAlphaMaskF.glsl", GL_FRAGMENT_SHADER));
         gDeferredNonIndexedDiffuseAlphaMaskProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredNonIndexedDiffuseAlphaMaskProgram);
-        success = gDeferredNonIndexedDiffuseAlphaMaskProgram.createShader();
+        gDeferredNonIndexedDiffuseAlphaMaskProgram.addPermutation("LINEAR_DIFFUSE", "1");
+        success = gDeferredNonIndexedDiffuseAlphaMaskProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -1291,7 +1380,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.mShaderFiles.push_back(make_pair("deferred/diffuseAlphaMaskNoColorF.glsl", GL_FRAGMENT_SHADER));
         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram);
-        success = gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.createShader();
+        success = gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -1303,8 +1392,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredBumpProgram.mShaderFiles.push_back(make_pair("deferred/bumpF.glsl", GL_FRAGMENT_SHADER));
         gDeferredBumpProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         add_common_permutations(&gDeferredBumpProgram);
-        success = make_rigged_variant(gDeferredBumpProgram, gDeferredSkinnedBumpProgram);
-        success = success && gDeferredBumpProgram.createShader();
+        gDeferredBumpProgram.addPermutation("LINEAR_DIFFUSE", "1");
+        success = gDeferredBumpProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -1312,26 +1401,12 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     gDeferredMaterialProgram[5].mFeatures.hasLighting = false;
     gDeferredMaterialProgram[9].mFeatures.hasLighting = false;
     gDeferredMaterialProgram[13].mFeatures.hasLighting = false;
-    gDeferredMaterialProgram[1+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = false;
-    gDeferredMaterialProgram[5+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = false;
-    gDeferredMaterialProgram[9+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = false;
-    gDeferredMaterialProgram[13+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = false;
 
-    for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+    for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
     {
         if (success)
         {
-            bool has_skin = i & 0x10;
-
-            if (!has_skin)
-            {
-                mShaderList.push_back(&gDeferredMaterialProgram[i]);
-                gDeferredMaterialProgram[i].mName = llformat("Material Shader %d", i);
-            }
-            else
-            {
-                gDeferredMaterialProgram[i].mName = llformat("Skinned Material Shader %d", i);
-            }
+            gDeferredMaterialProgram[i].mName = llformat("Material Shader %d", i);
 
             U32 alpha_mode = i & 0x3;
 
@@ -1377,29 +1452,24 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredMaterialProgram[i].mFeatures.hasShadows = use_sun_shadow;
             gDeferredMaterialProgram[i].mFeatures.hasReflectionProbes = true;
 
-            if (has_skin)
-            {
-                gDeferredMaterialProgram[i].addPermutation("HAS_SKIN", "1");
-                gDeferredMaterialProgram[i].mFeatures.hasObjectSkinning = true;
-            }
-            else
-            {
-                gDeferredMaterialProgram[i].mRiggedVariant = &gDeferredMaterialProgram[i + 0x10];
-            }
+            gDeferredMaterialProgram[i].addPermutation("LINEAR_DIFFUSE", "1");
 
-            success = gDeferredMaterialProgram[i].createShader();
+            // Only the forward alpha-blend mask compiles the classic_mode branches in
+            // class3/materialF.glsl; every other mask is a GBuffer writer.
+            U32 variants = LLGLSLShader::VARIANT_RIGGED | mirror_variant();
+            if (alpha_mode == 1)
+            {
+                variants |= LLGLSLShader::VARIANT_CLASSIC;
+            }
+            success = gDeferredMaterialProgram[i].createShader(variants);
             llassert(success);
         }
     }
 
-    gDeferredMaterialProgram[1].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[5].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[9].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[13].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[1+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[5+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[9+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
-    gDeferredMaterialProgram[13+LLMaterial::SHADER_COUNT].mFeatures.hasLighting = true;
+    for (U32 i : { 1u, 5u, 9u, 13u })
+    {
+        gDeferredMaterialProgram[i].forEachVariant([](LLGLSLShader& s) { s.mFeatures.hasLighting = true; });
+    }
 
     // Clear any stale value from a previous load before (re)deciding legacy indexed
     // eligibility -- if the block below is skipped or fails partway, the flag must
@@ -1414,7 +1484,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         // sIndexedLegacyMaterials false so legacy batching is skipped (the pool falls
         // back to scalar). Kept out of the `success` chain.
         bool material_indexed_ok = true;
-        for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2 && material_indexed_ok; ++i)
+        for (U32 i = 0; i < LLMaterial::SHADER_COUNT && material_indexed_ok; ++i)
         {
             U32 alpha_mode = i & 0x3;
             if (alpha_mode == 1) // DIFFUSE_ALPHA_MODE_BLEND -- forward/alpha pool, not indexed
@@ -1422,37 +1492,32 @@ bool LLViewerShaderMgr::loadShadersDeferred()
                 continue;
             }
 
-            bool has_skin   = (i & 0x10) != 0;
             bool has_spec   = (i & 0x4) != 0;
             bool has_normal = (i & 0x8) != 0;
 
             LLGLSLShader& prog = gDeferredMaterialIndexedProgram[i];
             prog.mName = llformat("Material Indexed Shader %d", i);
+            // Converts specular between sRGB and linear in-shader, so it needs
+            // environment/srgbF attached -- see attachShaderFeatures.
+            prog.mFeatures.hasSrgb = true;
             prog.mShaderFiles.clear();
             prog.mShaderFiles.push_back(make_pair("deferred/materialIndexedV.glsl", GL_VERTEX_SHADER));
             prog.mShaderFiles.push_back(make_pair("deferred/materialIndexedF.glsl", GL_FRAGMENT_SHADER));
             prog.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
             prog.clearPermutations();
+            prog.addPermutation("LINEAR_DIFFUSE", "1");
             if (has_normal) prog.addPermutation("HAS_NORMAL_MAP", "1");
             if (has_spec)   prog.addPermutation("HAS_SPECULAR_MAP", "1");
             prog.addPermutation("DIFFUSE_ALPHA_MODE", llformat("%d", alpha_mode));
             prog.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
             add_common_permutations(&prog);
 
-            if (has_skin)
-            {
-                prog.addPermutation("HAS_SKIN", "1");
-                prog.mFeatures.hasObjectSkinning = true;
-            }
-            else
-            {
-                prog.mRiggedVariant = &gDeferredMaterialIndexedProgram[i + 0x10];
-            }
-
-            material_indexed_ok = prog.createShader();
+            material_indexed_ok = prog.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
             if (material_indexed_ok)
             {
-                setup_material_indexed_samplers(prog, LLGLSLShader::sIndexedGLTFChannels, has_normal, has_spec);
+                const S32 n = LLGLSLShader::sIndexedGLTFChannels;
+                prog.forEachVariant([n, has_normal, has_spec](LLGLSLShader& s)
+                { setup_material_indexed_samplers(s, n, has_normal, has_spec); });
             }
         }
 
@@ -1463,7 +1528,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         else
         {
             LL_WARNS("ShaderLoading") << "Indexed legacy material shaders failed to load; legacy batching disabled." << LL_ENDL;
-            for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+            for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
             {
                 gDeferredMaterialIndexedProgram[i].unload();
             }
@@ -1483,11 +1548,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredPBROpaqueProgram);
 
-        success = make_rigged_variant(gDeferredPBROpaqueProgram, gDeferredSkinnedPBROpaqueProgram);
-        if (success)
-        {
-            success = gDeferredPBROpaqueProgram.createShader();
-        }
+        success = gDeferredPBROpaqueProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -1507,26 +1568,19 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredPBROpaqueIndexedProgram);
 
         // rigged (skinned) variant for animesh / avatar attachments
-        bool indexed_ok = make_rigged_variant(gDeferredPBROpaqueIndexedProgram, gDeferredSkinnedPBROpaqueIndexedProgram);
-        if (indexed_ok)
-        {
-            indexed_ok = gDeferredPBROpaqueIndexedProgram.createShader();
-        }
+        bool indexed_ok = gDeferredPBROpaqueIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
 
         if (indexed_ok)
         {
-            // Map each slot's four material samplers to texture units, on both the
-            // static and rigged variants.
+            // Map each slot's four material samplers to texture units, on every variant.
             const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            setup_gltf_indexed_samplers(gDeferredPBROpaqueIndexedProgram, n, true);
-            setup_gltf_indexed_samplers(gDeferredSkinnedPBROpaqueIndexedProgram, n, true);
+            gDeferredPBROpaqueIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); });
         }
         else
         {
             // Degrade gracefully: route all PBR faces back to the scalar path.
             LL_WARNS("ShaderLoading") << "Indexed PBR shader failed to load; GLTF batching disabled." << LL_ENDL;
             gDeferredPBROpaqueIndexedProgram.unload();
-            gDeferredSkinnedPBROpaqueIndexedProgram.unload();
             LLGLSLShader::sIndexedGLTFChannels = 0;
 
             // The legacy material indexed programs were built earlier (above) with the
@@ -1534,7 +1588,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             // the invariant sIndexedLegacyMaterials => sIndexedGLTFChannels >= 2 holds.
             if (LLGLSLShader::sIndexedLegacyMaterials)
             {
-                for (U32 i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+                for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
                 {
                     gDeferredMaterialIndexedProgram[i].unload();
                 }
@@ -1558,11 +1612,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gPBRGlowProgram);
 
-        success = make_rigged_variant(gPBRGlowProgram, gPBRGlowSkinnedProgram);
-        if (success)
-        {
-            success = gPBRGlowProgram.createShader();
-        }
+        success = gPBRGlowProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -1583,22 +1633,16 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gPBRGlowIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
         add_common_permutations(&gPBRGlowIndexedProgram);
 
-        bool glow_indexed_ok = make_rigged_variant(gPBRGlowIndexedProgram, gPBRGlowSkinnedIndexedProgram);
-        if (glow_indexed_ok)
-        {
-            glow_indexed_ok = gPBRGlowIndexedProgram.createShader();
-        }
+        bool glow_indexed_ok = gPBRGlowIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         if (glow_indexed_ok)
         {
             S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            setup_gltf_indexed_samplers(gPBRGlowIndexedProgram, n, true);
-            setup_gltf_indexed_samplers(gPBRGlowSkinnedIndexedProgram, n, true);
+            gPBRGlowIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, true); });
         }
         else
         {
             LL_WARNS("ShaderLoading") << "Indexed PBR glow shader failed to load; multi-material glow falls back to scalar." << LL_ENDL;
             gPBRGlowIndexedProgram.unload();
-            gPBRGlowSkinnedIndexedProgram.unload();
         }
     }
 
@@ -1657,20 +1701,61 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         }
 
         shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = make_rigged_variant(*shader, gDeferredSkinnedPBRAlphaProgram);
-        if (success)
-        {
-            success = shader->createShader();
-        }
+        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
 
         // Alpha Shader Hack
         // See: LLRender::syncMatrices()
-        shader->mFeatures.calculatesLighting = true;
-        shader->mFeatures.hasLighting = true;
+        shader->forEachVariant([](LLGLSLShader& s)
+        {
+            s.mFeatures.calculatesLighting = true;
+            s.mFeatures.hasLighting = true;
+        });
+    }
 
-        shader->mRiggedVariant->mFeatures.calculatesLighting = true;
-        shader->mRiggedVariant->mFeatures.hasLighting = true;
+    if (success)
+    {
+        // The impostor bake's variant: flat base colour, no lighting. A bake captures ALBEDO
+        // for a G-buffer that is lit once at composite time, so the fully lit program above
+        // would light blended PBR twice. gDeferredAlphaImpostorProgram is the same idea for
+        // the legacy path; this closes the PBR half.
+        //
+        // Same feature set as the program above, deliberately, even though the FOR_IMPOSTOR
+        // branch never reaches the lighting. Features select which shared objects get
+        // ATTACHED, and pbralphaF's prologue calls mirrorClip() and waterClip() before the
+        // branch -- waterClip lives in deferredUtil.glsl, which only isDeferred or
+        // hasReflectionProbes attaches. Trimming the set to what the branch appears to need
+        // links against an undefined waterClip. It is the same fragment source, so it wants
+        // the same attachments; the permutations are what make this program flat.
+        LLGLSLShader* shader = &gDeferredPBRAlphaImpostorProgram;
+        shader->mName = "Deferred PBR Alpha Impostor Shader";
+
+        shader->mFeatures.calculatesLighting = false;
+        shader->mFeatures.hasLighting = false;
+        shader->mFeatures.isAlphaLighting = true;
+        shader->mFeatures.hasSrgb = true;
+        shader->mFeatures.calculatesAtmospherics = true;
+        shader->mFeatures.hasAtmospherics = true;
+        shader->mFeatures.hasGamma = true;
+        shader->mFeatures.isDeferred = true; // include deferredUtils
+        shader->mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED];
+
+        shader->mShaderFiles.clear();
+        shader->mShaderFiles.push_back(make_pair("deferred/pbralphaV.glsl", GL_VERTEX_SHADER));
+        shader->mShaderFiles.push_back(make_pair("deferred/pbralphaF.glsl", GL_FRAGMENT_SHADER));
+
+        shader->clearPermutations();
+
+        U32 alpha_mode = LLMaterial::DIFFUSE_ALPHA_MODE_BLEND;
+        shader->addPermutation("DIFFUSE_ALPHA_MODE", llformat("%d", alpha_mode));
+        shader->addPermutation("FOR_IMPOSTOR", "1");
+        shader->addPermutation("USE_VERTEX_COLOR", "1");
+
+        add_common_permutations(shader);
+
+        shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED);
+        llassert(success);
     }
 
     if (success)
@@ -1691,22 +1776,27 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(shader);
 
         shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = shader->createShader();
+        success = shader->createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
     if (success)
     {
-        S32 detail = gSavedSettings.getS32("RenderTerrainPBRDetail");
-        detail = llclamp(detail, TERRAIN_PBR_DETAIL_MIN, TERRAIN_PBR_DETAIL_MAX);
+        const S32 detail = clamp_terrain_detail(gSavedSettings.getS32("RenderTerrainPBRDetail"));
         const S32 mapping = clamp_terrain_mapping(gSavedSettings.getS32("RenderTerrainPBRPlanarSampleCount"));
+        // Faceted terrain shading is a fragment-stage choice, not a surface-data one: a
+        // per-triangle normal has no per-vertex representation on a mesh whose vertices are
+        // shared, so pbrterrainF derives it from position derivatives instead. See
+        // terrain_geometric_normal().
+        const bool flat_normals = gSavedSettings.getBOOL("RenderTerrainPBRNormalsEnabled");
         for (U32 paint_type = 0; paint_type < TERRAIN_PAINT_TYPE_COUNT; ++paint_type)
         {
             LLGLSLShader* shader = &gDeferredPBRTerrainProgram[paint_type];
-            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s",
+            shader->mName = llformat("Deferred PBR Terrain Shader %d %s %s %s",
                     detail,
                     (paint_type == TERRAIN_PAINT_TYPE_PBR_PAINTMAP ? "paintmap" : "heightmap-with-noise"),
-                    (mapping == 1 ? "flat" : "triplanar"));
+                    (mapping == 1 ? "flat" : "triplanar"),
+                    (flat_normals ? "faceted" : "smooth"));
             shader->mFeatures.hasSrgb = true;
             shader->mFeatures.isAlphaLighting = true;
             shader->mFeatures.calculatesAtmospherics = true;
@@ -1722,10 +1812,14 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->addPermutation("TERRAIN_PBR_DETAIL", llformat("%d", detail));
             shader->addPermutation("TERRAIN_PAINT_TYPE", llformat("%d", paint_type));
             shader->addPermutation("TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT", llformat("%d", mapping));
+            if (flat_normals)
+            {
+                shader->addPermutation("TERRAIN_FLAT_NORMALS", "1");
+            }
 
             add_common_permutations(shader);
 
-            success = success && shader->createShader();
+            success = success && shader->createShader(mirror_variant());
             llassert(success);
         }
     }
@@ -1740,7 +1834,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredTreeProgram);
 
-        success = gDeferredTreeProgram.createShader();
+        gDeferredTreeProgram.addPermutation("LINEAR_DIFFUSE", "1");
+        success = gDeferredTreeProgram.createShader(mirror_variant());
     }
 
     if (success)
@@ -1750,20 +1845,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredTreeShadowProgram.mShaderFiles.push_back(make_pair("deferred/treeShadowV.glsl", GL_VERTEX_SHADER));
         gDeferredTreeShadowProgram.mShaderFiles.push_back(make_pair("deferred/treeShadowF.glsl", GL_FRAGMENT_SHADER));
         gDeferredTreeShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredTreeShadowProgram.mRiggedVariant = &gDeferredSkinnedTreeShadowProgram;
-        success = gDeferredTreeShadowProgram.createShader();
-        llassert(success);
-    }
-
-    if (success)
-    {
-        gDeferredSkinnedTreeShadowProgram.mName = "Deferred Skinned Tree Shadow Shader";
-        gDeferredSkinnedTreeShadowProgram.mShaderFiles.clear();
-        gDeferredSkinnedTreeShadowProgram.mFeatures.hasObjectSkinning = true;
-        gDeferredSkinnedTreeShadowProgram.mShaderFiles.push_back(make_pair("deferred/treeShadowSkinnedV.glsl", GL_VERTEX_SHADER));
-        gDeferredSkinnedTreeShadowProgram.mShaderFiles.push_back(make_pair("deferred/treeShadowF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredSkinnedTreeShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = gDeferredSkinnedTreeShadowProgram.createShader();
+        success = gDeferredTreeShadowProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -1799,7 +1881,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredLightProgram);
 
-        success = gDeferredLightProgram.createShader();
+        success = gDeferredLightProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -1822,7 +1904,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             add_common_permutations(&gDeferredMultiLightProgram[i]);
 
-            success = gDeferredMultiLightProgram[i].createShader();
+            success = gDeferredMultiLightProgram[i].createShader(LLGLSLShader::VARIANT_CLASSIC);
             llassert(success);
         }
     }
@@ -1843,7 +1925,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredSpotLightProgram);
 
-        success = gDeferredSpotLightProgram.createShader();
+        success = gDeferredSpotLightProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -1864,7 +1946,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredMultiSpotLightProgram);
 
-        success = gDeferredMultiSpotLightProgram.createShader();
+        success = gDeferredMultiSpotLightProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -1932,29 +2014,11 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        for (int i = 0; i < 3 && success; ++i)
+        for (int i = 0; i < 2 && success; ++i)
         {
-            LLGLSLShader* shader = nullptr;
-            bool rigged = (i == 1);
-            bool hud = (i == 2);
-
-            if (hud)
-            {
-                shader = &gHUDAlphaProgram;
-                shader->mName = "HUD Alpha Shader";
-            }
-            else if (!rigged)
-            {
-                shader = &gDeferredAlphaProgram;
-                shader->mName = "Deferred Alpha Shader";
-                shader->mRiggedVariant = &gDeferredSkinnedAlphaProgram;
-            }
-            else
-            {
-                shader = &gDeferredSkinnedAlphaProgram;
-                shader->mName = "Skinned Deferred Alpha Shader";
-                shader->mFeatures.hasObjectSkinning = true;
-            }
+            bool hud = (i == 1);
+            LLGLSLShader* shader = hud ? &gHUDAlphaProgram : &gDeferredAlphaProgram;
+            shader->mName = hud ? "HUD Alpha Shader" : "Deferred Alpha Shader";
 
             shader->mFeatures.calculatesLighting = false;
             shader->mFeatures.hasLighting = false;
@@ -1966,12 +2030,18 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             shader->mFeatures.hasShadows = use_sun_shadow;
             shader->mFeatures.hasReflectionProbes = true;
             shader->mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
-
             shader->mShaderFiles.clear();
             shader->mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
             shader->mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));
 
             shader->clearPermutations();
+
+            // Forward (non-HUD) decodes its diffuse on the sampler and filters in linear;
+            // the HUD path outputs sRGB and keeps the encoded texel. See mLinearDiffuse.
+            // The FOR_IMPOSTOR alpha program below takes it too -- the bake target is sRGB
+            // and generateImpostor encodes on store, so it shades in linear like the rest.
+            if (!hud) shader->addPermutation("LINEAR_DIFFUSE", "1");
+
             shader->addPermutation("USE_VERTEX_COLOR", "1");
             shader->addPermutation("HAS_ALPHA_MASK", "1");
             shader->addPermutation("USE_INDEXED_TEX", "1");
@@ -1981,11 +2051,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             }
 
             add_common_permutations(shader);
-
-            if (rigged)
-            {
-                shader->addPermutation("HAS_SKIN", "1");
-            }
 
             if (hud)
             {
@@ -1994,94 +2059,75 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
             shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
-            success = shader->createShader();
+            // the deferred alpha pass draws rigged geometry and can appear in a mirror; the
+            // HUD pass never does either (HUDs are not drawn into the probe)
+            U32 variants = LLGLSLShader::VARIANT_CLASSIC;
+            if (!hud)
+            {
+                variants |= LLGLSLShader::VARIANT_RIGGED | mirror_variant();
+            }
+            success = shader->createShader(variants);
             llassert(success);
 
             // Hack
-            shader->mFeatures.calculatesLighting = true;
-            shader->mFeatures.hasLighting = true;
+            shader->forEachVariant([](LLGLSLShader& s)
+            {
+                s.mFeatures.calculatesLighting = true;
+                s.mFeatures.hasLighting = true;
+            });
         }
     }
 
     if (success)
     {
-        LLGLSLShader* shaders[] = {
-            &gDeferredAlphaImpostorProgram,
-            &gDeferredSkinnedAlphaImpostorProgram
-        };
+        LLGLSLShader* shader = &gDeferredAlphaImpostorProgram;
 
-        for (int i = 0; i < 2 && success; ++i)
+        shader->mName = "Deferred Alpha Impostor Shader";
+
+        // Begin Hack
+        shader->mFeatures.calculatesLighting = false;
+        shader->mFeatures.hasLighting = false;
+
+        shader->mFeatures.hasSrgb = true;
+        shader->mFeatures.isAlphaLighting = true;
+        shader->mFeatures.hasShadows = use_sun_shadow;
+        shader->mFeatures.hasReflectionProbes = true;
+        shader->mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
+
+        shader->mShaderFiles.clear();
+        shader->mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
+        shader->mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));
+
+        shader->clearPermutations();
+        shader->addPermutation("USE_INDEXED_TEX", "1");
+        shader->addPermutation("FOR_IMPOSTOR", "1");
+        shader->addPermutation("HAS_ALPHA_MASK", "1");
+        shader->addPermutation("USE_VERTEX_COLOR", "1");
+        // Shades in linear like every other forward writer: the bind paths decode the
+        // diffuse on the sampler off the derived mLinearDiffuse, and generateImpostor
+        // enables GL_FRAMEBUFFER_SRGB so the store re-encodes into the sRGB bake target.
+        // This program was the one hole left in that conversion -- it sampled encoded,
+        // tinted in gamma space, and wrote raw, which only worked because the pass it
+        // ran in did not encode either.
+        shader->addPermutation("LINEAR_DIFFUSE", "1");
+
+        if (use_sun_shadow)
         {
-            bool rigged = i == 1;
-            LLGLSLShader* shader = shaders[i];
-
-            shader->mName = rigged ? "Skinned Deferred Alpha Impostor Shader" : "Deferred Alpha Impostor Shader";
-
-            // Begin Hack
-            shader->mFeatures.calculatesLighting = false;
-            shader->mFeatures.hasLighting = false;
-
-            shader->mFeatures.hasSrgb = true;
-            shader->mFeatures.isAlphaLighting = true;
-            shader->mFeatures.hasShadows = use_sun_shadow;
-            shader->mFeatures.hasReflectionProbes = true;
-            shader->mFeatures.mIndexedTextureChannels = LLGLSLShader::sIndexedTextureChannels;
-
-            shader->mShaderFiles.clear();
-            shader->mShaderFiles.push_back(make_pair("deferred/alphaV.glsl", GL_VERTEX_SHADER));
-            shader->mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));
-
-            shader->clearPermutations();
-            shader->addPermutation("USE_INDEXED_TEX", "1");
-            shader->addPermutation("FOR_IMPOSTOR", "1");
-            shader->addPermutation("HAS_ALPHA_MASK", "1");
-            shader->addPermutation("USE_VERTEX_COLOR", "1");
-            if (rigged)
-            {
-                shader->mFeatures.hasObjectSkinning = true;
-                shader->addPermutation("HAS_SKIN", "1");
-            }
-
-            if (use_sun_shadow)
-            {
-                shader->addPermutation("HAS_SUN_SHADOW", "1");
-            }
-
-            add_common_permutations(shader);
-
-            shader->mRiggedVariant = &gDeferredSkinnedAlphaImpostorProgram;
-            shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-            if (!rigged)
-            {
-                shader->mRiggedVariant = shaders[1];
-            }
-            success = shader->createShader();
-            llassert(success);
-
-            // End Hack
-            shader->mFeatures.calculatesLighting = true;
-            shader->mFeatures.hasLighting = true;
+            shader->addPermutation("HAS_SUN_SHADOW", "1");
         }
-    }
 
-    if (success)
-    {
-        gDeferredAvatarEyesProgram.mName = "Deferred Avatar Eyes Shader";
-        gDeferredAvatarEyesProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredAvatarEyesProgram.mFeatures.hasGamma = true;
-        gDeferredAvatarEyesProgram.mFeatures.hasAtmospherics = true;
-        gDeferredAvatarEyesProgram.mFeatures.hasSrgb = true;
-        gDeferredAvatarEyesProgram.mFeatures.hasShadows = true;
+        add_common_permutations(shader);
 
-        gDeferredAvatarEyesProgram.mShaderFiles.clear();
-        gDeferredAvatarEyesProgram.mShaderFiles.push_back(make_pair("deferred/avatarEyesV.glsl", GL_VERTEX_SHADER));
-        gDeferredAvatarEyesProgram.mShaderFiles.push_back(make_pair("deferred/diffuseF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredAvatarEyesProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-
-        add_common_permutations(&gDeferredAvatarEyesProgram);
-
-        success = gDeferredAvatarEyesProgram.createShader();
+        shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = shader->createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
+
+        // End Hack
+        shader->forEachVariant([](LLGLSLShader& s)
+        {
+            s.mFeatures.calculatesLighting = true;
+            s.mFeatures.hasLighting = true;
+        });
     }
 
     if (success)
@@ -2099,8 +2145,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredFullbrightProgram);
 
-        success = make_rigged_variant(gDeferredFullbrightProgram, gDeferredSkinnedFullbrightProgram);
-        success = gDeferredFullbrightProgram.createShader();
+        gDeferredFullbrightProgram.addPermutation("LINEAR_DIFFUSE", "1");
+        success = gDeferredFullbrightProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -2142,8 +2188,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredFullbrightAlphaMaskProgram);
 
-        success = make_rigged_variant(gDeferredFullbrightAlphaMaskProgram, gDeferredSkinnedFullbrightAlphaMaskProgram);
-        success = success && gDeferredFullbrightAlphaMaskProgram.createShader();
+        gDeferredFullbrightAlphaMaskProgram.addPermutation("LINEAR_DIFFUSE", "1");
+        success = gDeferredFullbrightAlphaMaskProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -2188,8 +2234,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredFullbrightAlphaMaskAlphaProgram);
 
         gDeferredFullbrightAlphaMaskAlphaProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = make_rigged_variant(gDeferredFullbrightAlphaMaskAlphaProgram, gDeferredSkinnedFullbrightAlphaMaskAlphaProgram);
-        success = success && gDeferredFullbrightAlphaMaskAlphaProgram.createShader();
+        gDeferredFullbrightAlphaMaskAlphaProgram.addPermutation("LINEAR_DIFFUSE", "1");
+        success = gDeferredFullbrightAlphaMaskAlphaProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         llassert(success);
     }
 
@@ -2233,8 +2279,8 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredFullbrightShinyProgram);
 
-        success = make_rigged_variant(gDeferredFullbrightShinyProgram, gDeferredSkinnedFullbrightShinyProgram);
-        success = success && gDeferredFullbrightShinyProgram.createShader();
+        gDeferredFullbrightShinyProgram.addPermutation("LINEAR_DIFFUSE", "1");
+        success = gDeferredFullbrightShinyProgram.createShader(LLGLSLShader::VARIANT_RIGGED | LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
     }
 
@@ -2256,7 +2302,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gHUDFullbrightShinyProgram);
 
-        success = gHUDFullbrightShinyProgram.createShader();
+        success = gHUDFullbrightShinyProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -2274,8 +2320,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredEmissiveProgram);
 
-        success = make_rigged_variant(gDeferredEmissiveProgram, gDeferredSkinnedEmissiveProgram);
-        success = success && gDeferredEmissiveProgram.createShader();
+        success = gDeferredEmissiveProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -2295,22 +2340,16 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredEmissiveIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
         add_common_permutations(&gDeferredEmissiveIndexedProgram);
 
-        bool emissive_indexed_ok = make_rigged_variant(gDeferredEmissiveIndexedProgram, gDeferredSkinnedEmissiveIndexedProgram);
-        if (emissive_indexed_ok)
-        {
-            emissive_indexed_ok = gDeferredEmissiveIndexedProgram.createShader();
-        }
+        bool emissive_indexed_ok = gDeferredEmissiveIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         if (emissive_indexed_ok)
         {
             S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            setup_material_indexed_samplers(gDeferredEmissiveIndexedProgram, n, false, false);
-            setup_material_indexed_samplers(gDeferredSkinnedEmissiveIndexedProgram, n, false, false);
+            gDeferredEmissiveIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_material_indexed_samplers(s, n, false, false); });
         }
         else
         {
             LL_WARNS("ShaderLoading") << "Indexed legacy glow shader failed to load; multi-material glow falls back to scalar." << LL_ENDL;
             gDeferredEmissiveIndexedProgram.unload();
-            gDeferredSkinnedEmissiveIndexedProgram.unload();
         }
     }
 
@@ -2345,7 +2384,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
             gDeferredSoftenProgram.addPermutation("HAS_SSAO", "1");
         }
 
-        success = gDeferredSoftenProgram.createShader();
+        success = gDeferredSoftenProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -2369,7 +2408,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         gHazeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
-        success = gHazeProgram.createShader();
+        success = gHazeProgram.createShader(LLGLSLShader::VARIANT_CLASSIC);
         llassert(success);
     }
 
@@ -2407,26 +2446,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowV.glsl", GL_VERTEX_SHADER));
         gDeferredShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowF.glsl", GL_FRAGMENT_SHADER));
         gDeferredShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredShadowProgram.mRiggedVariant = &gDeferredSkinnedShadowProgram;
-        success = gDeferredShadowProgram.createShader();
-        llassert(success);
-    }
-
-    if (success)
-    {
-        gDeferredSkinnedShadowProgram.mName = "Deferred Skinned Shadow Shader";
-        gDeferredSkinnedShadowProgram.mFeatures.isDeferred = true;
-        gDeferredSkinnedShadowProgram.mFeatures.hasShadows = true;
-        gDeferredSkinnedShadowProgram.mFeatures.hasObjectSkinning = true;
-        gDeferredSkinnedShadowProgram.mShaderFiles.clear();
-        gDeferredSkinnedShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowSkinnedV.glsl", GL_VERTEX_SHADER));
-        gDeferredSkinnedShadowProgram.mShaderFiles.push_back(make_pair("deferred/shadowF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredSkinnedShadowProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-
-        add_common_permutations(&gDeferredSkinnedShadowProgram);
-
-        // gDeferredSkinnedShadowProgram.addPermutation("DEPTH_CLAMP", "1"); // disable depth clamp for now
-        success = gDeferredSkinnedShadowProgram.createShader();
+        success = gDeferredShadowProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -2460,8 +2480,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredShadowFullbrightAlphaMaskProgram);
 
         gDeferredShadowFullbrightAlphaMaskProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = make_rigged_variant(gDeferredShadowFullbrightAlphaMaskProgram, gDeferredSkinnedShadowFullbrightAlphaMaskProgram);
-        success = success && gDeferredShadowFullbrightAlphaMaskProgram.createShader();
+        success = gDeferredShadowFullbrightAlphaMaskProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -2474,8 +2493,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowAlphaMaskProgram.mShaderFiles.push_back(make_pair("deferred/shadowAlphaMaskV.glsl", GL_VERTEX_SHADER));
         gDeferredShadowAlphaMaskProgram.mShaderFiles.push_back(make_pair("deferred/shadowAlphaMaskF.glsl", GL_FRAGMENT_SHADER));
         gDeferredShadowAlphaMaskProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = make_rigged_variant(gDeferredShadowAlphaMaskProgram, gDeferredSkinnedShadowAlphaMaskProgram);
-        success = success && gDeferredShadowAlphaMaskProgram.createShader();
+        success = gDeferredShadowAlphaMaskProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -2491,8 +2509,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredShadowGLTFAlphaMaskProgram);
 
-        success = make_rigged_variant(gDeferredShadowGLTFAlphaMaskProgram, gDeferredSkinnedShadowGLTFAlphaMaskProgram);
-        success = success && gDeferredShadowGLTFAlphaMaskProgram.createShader();
+        success = gDeferredShadowGLTFAlphaMaskProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -2511,23 +2528,17 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowGLTFAlphaMaskIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
         add_common_permutations(&gDeferredShadowGLTFAlphaMaskIndexedProgram);
 
-        bool shadow_indexed_ok = make_rigged_variant(gDeferredShadowGLTFAlphaMaskIndexedProgram, gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram);
-        if (shadow_indexed_ok)
-        {
-            shadow_indexed_ok = gDeferredShadowGLTFAlphaMaskIndexedProgram.createShader();
-        }
+        bool shadow_indexed_ok = gDeferredShadowGLTFAlphaMaskIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
 
         if (shadow_indexed_ok)
         { // only base color is sampled for the shadow alpha test
             const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            setup_gltf_indexed_samplers(gDeferredShadowGLTFAlphaMaskIndexedProgram, n, false);
-            setup_gltf_indexed_samplers(gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram, n, false);
+            gDeferredShadowGLTFAlphaMaskIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_gltf_indexed_samplers(s, n, false); });
         }
         else
         {
             LL_WARNS("ShaderLoading") << "Indexed PBR shadow alpha mask shader failed to load." << LL_ENDL;
             gDeferredShadowGLTFAlphaMaskIndexedProgram.unload();
-            gDeferredSkinnedShadowGLTFAlphaMaskIndexedProgram.unload();
         }
     }
 
@@ -2546,23 +2557,17 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredShadowMaterialIndexedProgram.clearPermutations();
         gDeferredShadowMaterialIndexedProgram.addPermutation("GLTF_INDEXED_CHANNELS", llformat("%d", LLGLSLShader::sIndexedGLTFChannels));
 
-        bool mat_shadow_ok = make_rigged_variant(gDeferredShadowMaterialIndexedProgram, gDeferredSkinnedShadowMaterialIndexedProgram);
-        if (mat_shadow_ok)
-        {
-            mat_shadow_ok = gDeferredShadowMaterialIndexedProgram.createShader();
-        }
+        bool mat_shadow_ok = gDeferredShadowMaterialIndexedProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
 
         if (mat_shadow_ok)
         { // only diffuse is sampled for the shadow alpha test
             const S32 n = LLGLSLShader::sIndexedGLTFChannels;
-            setup_material_indexed_samplers(gDeferredShadowMaterialIndexedProgram, n, false, false);
-            setup_material_indexed_samplers(gDeferredSkinnedShadowMaterialIndexedProgram, n, false, false);
+            gDeferredShadowMaterialIndexedProgram.forEachVariant([n](LLGLSLShader& s) { setup_material_indexed_samplers(s, n, false, false); });
         }
         else
         {
             LL_WARNS("ShaderLoading") << "Indexed legacy material shadow shader failed to load; legacy batching disabled." << LL_ENDL;
             gDeferredShadowMaterialIndexedProgram.unload();
-            gDeferredSkinnedShadowMaterialIndexedProgram.unload();
             LLGLSLShader::sIndexedLegacyMaterials = false; // can't shadow indexed batches -- don't form them
         }
     }
@@ -2578,8 +2583,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredShadowGLTFAlphaBlendProgram);
 
-        success = make_rigged_variant(gDeferredShadowGLTFAlphaBlendProgram, gDeferredSkinnedShadowGLTFAlphaBlendProgram);
-        success = success && gDeferredShadowGLTFAlphaBlendProgram.createShader();
+        success = gDeferredShadowGLTFAlphaBlendProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
         llassert(success);
     }
 
@@ -2635,7 +2639,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredTerrainProgram);
 
         gDeferredTerrainProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        success = gDeferredTerrainProgram.createShader();
+        success = gDeferredTerrainProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -2647,15 +2651,19 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarProgram.mShaderFiles.push_back(make_pair("deferred/avatarV.glsl", GL_VERTEX_SHADER));
         gDeferredAvatarProgram.mShaderFiles.push_back(make_pair("deferred/avatarF.glsl", GL_FRAGMENT_SHADER));
         gDeferredAvatarProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-
         gDeferredAvatarProgram.clearPermutations();
+
+        // Skin composite is decoded on the sampler and the gbuffer write re-encodes; see the
+        // avatar diffuse binds in llviewerjointmesh and the hoisted FRAMEBUFFER_SRGB.
+        gDeferredAvatarProgram.addPermutation("LINEAR_DIFFUSE", "1");
+
         add_common_permutations(&gDeferredAvatarProgram);
         if (gSavedSettings.getBOOL("RenderAvatarCloth"))
         {
             gDeferredAvatarProgram.addPermutation("AVATAR_CLOTH", "1");
         }
 
-        success = gDeferredAvatarProgram.createShader();
+        success = gDeferredAvatarProgram.createShader(mirror_variant());
         llassert(success);
     }
 
@@ -2679,6 +2687,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredAvatarAlphaProgram.mShaderFiles.push_back(make_pair("deferred/alphaF.glsl", GL_FRAGMENT_SHADER));
 
         gDeferredAvatarAlphaProgram.clearPermutations();
+        gDeferredAvatarAlphaProgram.addPermutation("LINEAR_DIFFUSE", "1");
         gDeferredAvatarAlphaProgram.addPermutation("USE_DIFFUSE_TEX", "1");
         gDeferredAvatarAlphaProgram.addPermutation("IS_AVATAR_SKIN", "1");
         if (use_sun_shadow)
@@ -2690,7 +2699,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
         add_common_permutations(&gDeferredAvatarAlphaProgram);
 
-        success = gDeferredAvatarAlphaProgram.createShader();
+        success = gDeferredAvatarAlphaProgram.createShader(LLGLSLShader::VARIANT_CLASSIC | mirror_variant());
         llassert(success);
 
         gDeferredAvatarAlphaProgram.mFeatures.calculatesLighting = true;
@@ -3169,17 +3178,6 @@ bool LLViewerShaderMgr::loadShadersDeferred()
     }
 
     if (success) {
-        gPostScreenSpaceReflectionProgram.mName = "Screen Space Reflection Post";
-        gPostScreenSpaceReflectionProgram.mShaderFiles.clear();
-        gPostScreenSpaceReflectionProgram.mShaderFiles.push_back(make_pair("deferred/screenSpaceReflPostV.glsl", GL_VERTEX_SHADER));
-        gPostScreenSpaceReflectionProgram.mShaderFiles.push_back(make_pair("deferred/screenSpaceReflPostF.glsl", GL_FRAGMENT_SHADER));
-        gPostScreenSpaceReflectionProgram.mFeatures.hasScreenSpaceReflections = true;
-        gPostScreenSpaceReflectionProgram.mFeatures.isDeferred                = true;
-        gPostScreenSpaceReflectionProgram.mShaderLevel = 3;
-        success = gPostScreenSpaceReflectionProgram.createShader();
-    }
-
-    if (success) {
         gDeferredBufferVisualProgram.mName = "Deferred Buffer Visualization Shader";
         gDeferredBufferVisualProgram.mShaderFiles.clear();
         gDeferredBufferVisualProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
@@ -3480,18 +3478,16 @@ bool LLViewerShaderMgr::loadShadersObject()
         gObjectBumpProgram.mShaderFiles.push_back(make_pair("objects/bumpV.glsl", GL_VERTEX_SHADER));
         gObjectBumpProgram.mShaderFiles.push_back(make_pair("objects/bumpF.glsl", GL_FRAGMENT_SHADER));
         gObjectBumpProgram.mShaderLevel = mShaderLevel[SHADER_OBJECT];
-        success = make_rigged_variant(gObjectBumpProgram, gSkinnedObjectBumpProgram);
-        success = success && gObjectBumpProgram.createShader();
+        success = gObjectBumpProgram.createShader(LLGLSLShader::VARIANT_RIGGED | mirror_variant());
         if (success)
         { //lldrawpoolbump assumes "texture0" has channel 0 and "texture1" has channel 1
-            LLGLSLShader* shader[] = { &gObjectBumpProgram, &gSkinnedObjectBumpProgram };
-            for (int i = 0; i < 2; ++i)
+            gObjectBumpProgram.forEachVariant([](LLGLSLShader& s)
             {
-                shader[i]->bind();
-                shader[i]->uniform1i(sTexture0, 0);
-                shader[i]->uniform1i(sTexture1, 1);
-                shader[i]->unbind();
-            }
+                s.bind();
+                s.uniform1i(sTexture0, 0);
+                s.uniform1i(sTexture1, 1);
+                s.unbind();
+            });
         }
     }
 
@@ -3529,10 +3525,8 @@ bool LLViewerShaderMgr::loadShadersObject()
         gObjectPreviewProgram.mShaderFiles.push_back(make_pair("objects/previewV.glsl", GL_VERTEX_SHADER));
         gObjectPreviewProgram.mShaderFiles.push_back(make_pair("objects/previewF.glsl", GL_FRAGMENT_SHADER));
         gObjectPreviewProgram.mShaderLevel = mShaderLevel[SHADER_OBJECT];
-        success = make_rigged_variant(gObjectPreviewProgram, gSkinnedObjectPreviewProgram);
-        success = gObjectPreviewProgram.createShader();
-        gObjectPreviewProgram.mFeatures.hasLighting = true;
-        gSkinnedObjectPreviewProgram.mFeatures.hasLighting = true;
+        success = gObjectPreviewProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
+        gObjectPreviewProgram.forEachVariant([](LLGLSLShader& s) { s.mFeatures.hasLighting = true; });
     }
 
     if (success)
@@ -3569,7 +3563,6 @@ bool LLViewerShaderMgr::loadShadersAvatar()
     if (mShaderLevel[SHADER_AVATAR] == 0)
     {
         gAvatarProgram.unload();
-        gAvatarEyeballProgram.unload();
         return true;
     }
 
@@ -3596,23 +3589,6 @@ bool LLViewerShaderMgr::loadShadersAvatar()
         }
     }
 
-    if (success)
-    {
-        gAvatarEyeballProgram.mName = "Avatar Eyeball Program";
-        gAvatarEyeballProgram.mFeatures.calculatesLighting = true;
-        gAvatarEyeballProgram.mFeatures.isSpecular = true;
-        gAvatarEyeballProgram.mFeatures.calculatesAtmospherics = true;
-        gAvatarEyeballProgram.mFeatures.hasGamma = true;
-        gAvatarEyeballProgram.mFeatures.hasAtmospherics = true;
-        gAvatarEyeballProgram.mFeatures.hasLighting = true;
-        gAvatarEyeballProgram.mFeatures.hasAlphaMask = true;
-        gAvatarEyeballProgram.mShaderFiles.clear();
-        gAvatarEyeballProgram.mShaderFiles.push_back(make_pair("avatar/eyeballV.glsl", GL_VERTEX_SHADER));
-        gAvatarEyeballProgram.mShaderFiles.push_back(make_pair("avatar/eyeballF.glsl", GL_FRAGMENT_SHADER));
-        gAvatarEyeballProgram.mShaderLevel = mShaderLevel[SHADER_AVATAR];
-        success = gAvatarEyeballProgram.createShader();
-    }
-
     if( !success )
     {
         mShaderLevel[SHADER_AVATAR] = 0;
@@ -3635,8 +3611,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gHighlightProgram.mShaderFiles.push_back(make_pair("interface/highlightV.glsl", GL_VERTEX_SHADER));
         gHighlightProgram.mShaderFiles.push_back(make_pair("interface/highlightF.glsl", GL_FRAGMENT_SHADER));
         gHighlightProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = make_rigged_variant(gHighlightProgram, gSkinnedHighlightProgram);
-        success = success && gHighlightProgram.createShader();
+        success = gHighlightProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
     }
 
     if (success)
@@ -3673,11 +3648,10 @@ bool LLViewerShaderMgr::loadShadersInterface()
             // and NO_SHADOW text take the early-return branch in uiF.glsl. GLSL
             // already zero-initializes uniforms, but pushing an explicit default
             // documents the contract and protects against driver quirks.
-            // shadowMode is the shader's only shadow uniform — atlas texel size
+            // textShadowMode is the shader's only shadow uniform — atlas texel size
             // and channel layout derive from the bound texture in uiF.glsl.
-            static LLStaticHashedString sShadowMode("shadowMode");
             gUIProgram.bind();
-            gUIProgram.uniform1i(sShadowMode, 0);
+            gUIProgram.uniform1i(LLShaderMgr::TEXT_SHADOW_MODE, 0);
             gUIProgram.unbind();
         }
     }
@@ -3779,19 +3753,8 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionV.glsl", GL_VERTEX_SHADER));
         gOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionF.glsl", GL_FRAGMENT_SHADER));
         gOcclusionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        gOcclusionProgram.mRiggedVariant = &gSkinnedOcclusionProgram;
-        success = gOcclusionProgram.createShader();
-    }
-
-    if (success)
-    {
-        gSkinnedOcclusionProgram.mName = "Skinned Occlusion Shader";
-        gSkinnedOcclusionProgram.mFeatures.hasObjectSkinning = true;
-        gSkinnedOcclusionProgram.mShaderFiles.clear();
-        gSkinnedOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionSkinnedV.glsl", GL_VERTEX_SHADER));
-        gSkinnedOcclusionProgram.mShaderFiles.push_back(make_pair("interface/occlusionF.glsl", GL_FRAGMENT_SHADER));
-        gSkinnedOcclusionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gSkinnedOcclusionProgram.createShader();
+        add_common_permutations(&gOcclusionProgram);
+        success = gOcclusionProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
     }
 
     if (success)
@@ -3801,6 +3764,7 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gOcclusionCubeProgram.mShaderFiles.push_back(make_pair("interface/occlusionCubeV.glsl", GL_VERTEX_SHADER));
         gOcclusionCubeProgram.mShaderFiles.push_back(make_pair("interface/occlusionF.glsl", GL_FRAGMENT_SHADER));
         gOcclusionCubeProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        add_common_permutations(&gOcclusionCubeProgram);
         success = gOcclusionCubeProgram.createShader();
     }
 
@@ -3810,10 +3774,8 @@ bool LLViewerShaderMgr::loadShadersInterface()
         gDebugProgram.mShaderFiles.clear();
         gDebugProgram.mShaderFiles.push_back(make_pair("interface/debugV.glsl", GL_VERTEX_SHADER));
         gDebugProgram.mShaderFiles.push_back(make_pair("interface/debugF.glsl", GL_FRAGMENT_SHADER));
-        gDebugProgram.mRiggedVariant = &gSkinnedDebugProgram;
         gDebugProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = make_rigged_variant(gDebugProgram, gSkinnedDebugProgram);
-        success = success && gDebugProgram.createShader();
+        success = gDebugProgram.createShader(LLGLSLShader::VARIANT_RIGGED);
     }
 
     if (success)
@@ -3821,8 +3783,10 @@ bool LLViewerShaderMgr::loadShadersInterface()
         for (S32 variant = 0; variant < NORMAL_DEBUG_SHADER_COUNT; ++variant)
         {
             LLGLSLShader& shader = gNormalDebugProgram[variant];
-            LLGLSLShader& skinned_shader = gSkinnedNormalDebugProgram[variant];
-            shader.mName = "Normal Debug Shader";
+            // Distinct per variant: both entries are live at once, and each also has a
+            // "Skinned <name>" pair, so a shared name collides twice over.
+            shader.mName = llformat("Normal Debug Shader%s",
+                                    variant == NORMAL_DEBUG_SHADER_WITH_TANGENTS ? " (Tangents)" : "");
             shader.mShaderFiles.clear();
             shader.mShaderFiles.push_back(make_pair("interface/normaldebugV.glsl", GL_VERTEX_SHADER));
             // *NOTE: Geometry shaders have a reputation for being slow.
@@ -3832,14 +3796,12 @@ bool LLViewerShaderMgr::loadShadersInterface()
             // performance-critical areas.  -Cosmic,2023-09-28
             shader.mShaderFiles.push_back(make_pair("interface/normaldebugG.glsl", GL_GEOMETRY_SHADER));
             shader.mShaderFiles.push_back(make_pair("interface/normaldebugF.glsl", GL_FRAGMENT_SHADER));
-            shader.mRiggedVariant = &skinned_shader;
             shader.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
             if (variant == NORMAL_DEBUG_SHADER_WITH_TANGENTS)
             {
                 shader.addPermutation("HAS_ATTRIBUTE_TANGENT", "1");
             }
-            success = make_rigged_variant(shader, skinned_shader);
-            success = success && shader.createShader();
+            success = shader.createShader(LLGLSLShader::VARIANT_RIGGED);
         }
     }
 
@@ -3955,7 +3917,8 @@ bool LLViewerShaderMgr::loadShadersInterface()
 
     if (success)
     {
-        gGaussianProgram.mName = "Reflection Mip Shader";
+        // Program names must be unique; finalizeShaderList() asserts over every live program.
+        gGaussianProgram.mName = "Gaussian Blur Shader";
         gGaussianProgram.mFeatures.isDeferred = true;
         gGaussianProgram.mFeatures.hasGamma = true;
         gGaussianProgram.mFeatures.hasAtmospherics = true;
@@ -3992,12 +3955,14 @@ bool LLViewerShaderMgr::loadShadersInterface()
 
     if (success && gGLManager.mHasCubeMapArray)
     {
-        gIrradianceGenProgram.mName = "Irradiance Gen Shader";
-        gIrradianceGenProgram.mShaderFiles.clear();
-        gIrradianceGenProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
-        gIrradianceGenProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenF.glsl", GL_FRAGMENT_SHADER));
-        gIrradianceGenProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        success = gIrradianceGenProgram.createShader();
+        gSHProjectionProgram.mName = "SH Irradiance Projection Shader";
+        gSHProjectionProgram.mShaderFiles.clear();
+        // Shares the radiance pass's vertex stage: it emits the same fullscreen quad, and the
+        // sample direction it also computes is simply unused here.
+        gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/irradianceGenV.glsl", GL_VERTEX_SHADER));
+        gSHProjectionProgram.mShaderFiles.push_back(make_pair("interface/shProjectF.glsl", GL_FRAGMENT_SHADER));
+        gSHProjectionProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
+        success = gSHProjectionProgram.createShader();
     }
 
     if( !success )
@@ -4018,15 +3983,5 @@ std::string LLViewerShaderMgr::getShaderDirPrefix(void)
 void LLViewerShaderMgr::updateShaderUniforms(LLGLSLShader * shader)
 {
     LLEnvironment::instance().updateShaderUniforms(shader);
-}
-
-LLViewerShaderMgr::shader_iter LLViewerShaderMgr::beginShaders() const
-{
-    return mShaderList.begin();
-}
-
-LLViewerShaderMgr::shader_iter LLViewerShaderMgr::endShaders() const
-{
-    return mShaderList.end();
 }
 

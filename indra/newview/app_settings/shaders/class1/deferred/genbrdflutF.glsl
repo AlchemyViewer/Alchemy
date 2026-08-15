@@ -57,17 +57,6 @@ out vec4 outColor;
 
 const float PI = 3.1415926536;
 
-// Based omn http://byteblacksmith.com/improvements-to-the-canonical-one-liner-glsl-rand-for-opengl-es-2-0/
-float random(vec2 co)
-{
-    float a = 12.9898;
-    float b = 78.233;
-    float c = 43758.5453;
-    float dt= dot(co.xy ,vec2(a,b));
-    float sn= mod(dt,3.14);
-    return fract(sin(sn) * c);
-}
-
 vec2 hammersley2d(uint i, uint N)
 {
     // Radical inverse based on http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
@@ -85,7 +74,7 @@ vec3 importanceSample_GGX(vec2 Xi, float roughness, vec3 normal)
 {
     // Maps a 2D point to a hemisphere with spread based on roughness
     float alpha = roughness * roughness;
-    float phi = 2.0 * PI * Xi.x + random(normal.xz) * 0.1;
+    float phi = 2.0 * PI * Xi.x;
     float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (alpha*alpha - 1.0) * Xi.y));
     float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
     vec3 H = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
@@ -99,13 +88,26 @@ vec3 importanceSample_GGX(vec2 Xi, float roughness, vec3 normal)
     return normalize(tangentX * H.x + tangentY * H.y + normal * H.z);
 }
 
-// Geometric Shadowing function
-float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness)
+// Smith height-correlated visibility -- G with the microfacet BRDF's 1/(4 NdotL NdotV) folded
+// in. This is byte-for-byte the same function as visibilityOcclusion in deferredUtil.glsl,
+// expressed against perceptual roughness rather than alpha (a2 = perceptualRoughness^4 either
+// way), and it has to stay that way: the table this integrates and the analytic term the
+// punctual lights evaluate have to describe one surface, or a material's probe response and
+// its sun response disagree about how rough it is.
+//
+// It matters twice over for the multiple-scattering IBL that consumes this table. Its energy
+// term is 1 - (A + B), read as the share of light the single-scatter lobe failed to return.
+// That reading is only true if A and B were integrated from the same lobe the renderer uses;
+// against a different geometric term it measures the gap between two approximations instead.
+float V_SmithGGXCorrelated(float dotNV, float dotNL, float roughness)
 {
-    float k = (roughness * roughness) / 2.0;
-    float GL = dotNL / (dotNL * (1.0 - k) + k);
-    float GV = dotNV / (dotNV * (1.0 - k) + k);
-    return GL * GV;
+    float a2 = roughness * roughness * roughness * roughness;
+
+    float GGXV = dotNL * sqrt(dotNV * dotNV * (1.0 - a2) + a2);
+    float GGXL = dotNV * sqrt(dotNL * dotNL * (1.0 - a2) + a2);
+
+    float ggx = GGXV + GGXL;
+    return ggx > 0.0 ? 0.5 / ggx : 0.0;
 }
 
 vec2 BRDF(float NoV, float roughness)
@@ -125,14 +127,16 @@ vec2 BRDF(float NoV, float roughness)
         float dotVH = max(dot(V, H), 0.0);
         float dotNH = max(dot(H, N), 0.0);
 
-        if (dotNL > 0.0) {
-            float G = G_SchlicksmithGGX(dotNL, dotNV, roughness);
-            float G_Vis = (G * dotVH) / (dotNH * dotNV);
+        if (dotNL > 0.0 && dotNH > 0.0) {
+            // Importance sampling D cancels the distribution term against the pdf and leaves
+            // Vis * VdotH * NdotL / NdotH, short by the 4 that Vis carries in its denominator
+            // -- restored once on the way out rather than per sample.
+            float V_pdf = V_SmithGGXCorrelated(dotNV, dotNL, roughness) * dotVH * dotNL / dotNH;
             float Fc = pow(1.0 - dotVH, 5.0);
-            LUT += vec2((1.0 - Fc) * G_Vis, Fc * G_Vis);
+            LUT += vec2((1.0 - Fc) * V_pdf, Fc * V_pdf);
         }
     }
-    return LUT / float(NUM_SAMPLES);
+    return 4.0 * LUT / float(NUM_SAMPLES);
 }
 
 void main()

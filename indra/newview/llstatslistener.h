@@ -1,9 +1,10 @@
 /**
- * @file shadowSkinnedV.glsl
+ * @file llstatslistener.h
+ * @brief EventAPI interface for querying performance statistics
  *
- * $LicenseInfo:firstyear=2021&license=viewerlgpl$
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Second Life Viewer Source Code
- * Copyright (C) 2007, Linden Research, Inc.
+ * Copyright (C) 2026, Linden Research, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,21 +24,18 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 modelview_matrix;
-uniform mat4 projection_matrix;
+#ifndef LL_LLSTATSLISTENER_H
+#define LL_LLSTATSLISTENER_H
 
-in vec3 position;
+#include "lleventapi.h"
 
-mat4 getObjectSkinnedTransform();
-
-void main()
+class LLStatsListener : public LLEventAPI
 {
-    //transform vertex
-    mat4 mat = getObjectSkinnedTransform();
+public:
+    LLStatsListener();
 
-    mat = modelview_matrix * mat;
-    vec4 pos = (mat*vec4(position.xyz, 1.0));
-    pos = projection_matrix*pos;
+private:
+    void getPerfData(LLSD const & evt);
+};
 
-    gl_Position = pos;
-}
+#endif // LL_LLSTATSLISTENER_H

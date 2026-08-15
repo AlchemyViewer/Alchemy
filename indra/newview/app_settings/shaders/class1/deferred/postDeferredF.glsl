@@ -29,7 +29,9 @@ out vec4 frag_color;
 
 uniform sampler2D diffuseRect;
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 uniform float max_cof;
 uniform float res_scale;

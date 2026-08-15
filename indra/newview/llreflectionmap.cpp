@@ -45,7 +45,8 @@ LLReflectionMap::~LLReflectionMap()
 {
     if (mOcclusionQuery)
     {
-        glDeleteQueries(1, &mOcclusionQuery);
+        gPipeline.mReflectionMapManager.recycleQuery(mOcclusionQuery);
+        mOcclusionQuery = 0;
     }
 }
 
@@ -86,7 +87,6 @@ void LLReflectionMap::autoAdjustOrigin()
 
         if (part && part->mPartitionType == LLViewerRegion::PARTITION_VOLUME)
         {
-            mPriority = 0;
             // cast a ray towards 8 corners of bounding box
             // nudge origin towards center of empty space
 
@@ -174,7 +174,6 @@ void LLReflectionMap::autoAdjustOrigin()
     }
     else if (mViewerObject && !mViewerObject->isDead())
     {
-        mPriority = 1;
         mOrigin.load3(mViewerObject->getPositionAgent().mV);
 
         if (mViewerObject->getVolume() && ((LLVOVolume*)mViewerObject.get())->getReflectionProbeIsBox())
@@ -187,6 +186,99 @@ void LLReflectionMap::autoAdjustOrigin()
             mRadius = mViewerObject->getScale().mV[0] * 0.5f;
         }
     }
+}
+
+void LLReflectionMap::syncToViewerObject()
+{
+    if (!mViewerObject || mViewerObject->isDead())
+    {
+        return;
+    }
+
+    mOrigin.load3(mViewerObject->getPositionAgent().mV);
+
+    if (!mViewerObject->getVolumeConst())
+    {
+        return;
+    }
+
+    if (((LLVOVolume*)mViewerObject.get())->getReflectionProbeIsBox())
+    {
+        LLVector3 s = mViewerObject->getScale().scaledVec(LLVector3(0.5f, 0.5f, 0.5f));
+        mRadius = s.magVec();
+    }
+    else
+    {
+        mRadius = mViewerObject->getScale().mV[0] * 0.5f;
+    }
+}
+
+bool LLReflectionMap::eclipses(const LLReflectionMap* other, F32 margin) const
+{
+    if (!other || other == this || !mViewerObject || mViewerObject->isDead())
+    {
+        return false;
+    }
+
+    LLVector4a delta;
+    delta.setSub(other->mOrigin, mOrigin);
+
+    bool is_box = mViewerObject->getVolumeConst()
+               && ((LLVOVolume*)mViewerObject.get())->getReflectionProbeIsBox();
+
+    if (is_box)
+    {
+        // A box probe's own influence volume is what the shader tests against, and inside it
+        // the shader refuses to sample automatic probes at all. So containment in the box is
+        // the whole condition -- anything inside contributes exactly nothing.
+        //
+        // Measured in the probe object's frame, where the volume is an axis-aligned box of its
+        // half-scale, so the other probe's bounding sphere has to clear all three axes.
+        LLVector3 half = mViewerObject->getScale() * 0.5f;
+        LLVector3 local(delta.getF32ptr());
+        local.rotVec(~mViewerObject->getRenderRotation());
+
+        return fabsf(local.mV[0]) + other->mRadius <= half.mV[0] + margin
+            && fabsf(local.mV[1]) + other->mRadius <= half.mV[1] + margin
+            && fabsf(local.mV[2]) + other->mRadius <= half.mV[2] + margin;
+    }
+
+    // A sphere probe does not exclude automatics -- it blends against them, weighted by
+    // sphereWeight's dw. That weight saturates the blend to fully manual everywhere inside
+    // half the radius, which is where its attenuation ramp begins (r1 = r * 0.5 in
+    // class3/deferred/reflectionProbeF.glsl; the two have to agree or this culls a probe that
+    // was still contributing). Containment in that inner half is therefore the condition under
+    // which dropping the automatic provably cannot change a pixel; plain containment is not.
+    const F32 SPHERE_FULL_WEIGHT_FRACTION = 0.5f;
+
+    F32 dist = delta.getLength3().getF32();
+
+    return dist + other->mRadius <= mRadius * SPHERE_FULL_WEIGHT_FRACTION + margin;
+}
+
+bool LLReflectionMap::neighborsAreStale() const
+{
+    if (mNeighborRadius < 0.f)
+    { // never built
+        return true;
+    }
+
+    // A tenth of the radius. Drift smaller than that cannot change which probes matter by more
+    // than the sphere weight's own falloff already blends over, and the threshold is measured
+    // against the volume the list was built at rather than against the previous frame, so slow
+    // movement still accumulates until it crosses.
+    const F32 DRIFT_FRACTION = 0.1f;
+    F32 slack = llmax(mRadius * DRIFT_FRACTION, 0.1f);
+
+    if (fabsf(mRadius - mNeighborRadius) > slack)
+    {
+        return true;
+    }
+
+    LLVector4a delta;
+    delta.setSub(mOrigin, mNeighborOrigin);
+
+    return delta.getLength3().getF32() > slack;
 }
 
 bool LLReflectionMap::intersects(LLReflectionMap* other) const
@@ -298,6 +390,11 @@ bool LLReflectionMap::isRelevant() const
         return true;
     }
 
+    if (mInsideManualProbe)
+    { // a manual probe already covers everything this one could, see eclipses()
+        return false;
+    }
+
     if (RenderReflectionProbeLevel == 3)
     { // all automatics are relevant
         return true;
@@ -341,7 +438,7 @@ void LLReflectionMap::doOcclusion(const LLVector4a& eye)
     if (mOcclusionQuery == 0)
     { // no query was previously issued, allocate one and issue
         LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("rmdo - glGenQueries");
-        glGenQueries(1, &mOcclusionQuery);
+        mOcclusionQuery = gPipeline.mReflectionMapManager.allocateQuery();
         do_query = true;
     }
     else
@@ -356,11 +453,6 @@ void LLReflectionMap::doOcclusion(const LLVector4a& eye)
             do_query = true;
             glGetQueryObjectuiv(mOcclusionQuery, GL_QUERY_RESULT, &result);
             mOccluded = result == 0;
-            mOcclusionPendingFrames = 0;
-        }
-        else
-        {
-            mOcclusionPendingFrames++;
         }
     }
 

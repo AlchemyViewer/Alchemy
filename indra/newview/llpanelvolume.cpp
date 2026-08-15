@@ -1377,7 +1377,7 @@ void LLPanelVolume::onClickPipetteLight()
     if (!fEnabled)
     {
         LLToolMgr::getInstance()->clearTransientTool();
-        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelVolume::onLightSelect, this, _1, _2, _3));
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelVolume::onLightSelect, this, _1, _2, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
         mBtnPipetteLight->setToggleState(true);
     }
@@ -1467,7 +1467,7 @@ void LLPanelVolume::onClickPipetteFeatures()
     if (!fEnabled)
     {
         LLToolMgr::getInstance()->clearTransientTool();
-        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelVolume::onFeaturesSelect, this, _1, _2, _3));
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelVolume::onFeaturesSelect, this, _1, _2, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
         mBtnPipetteFeatures->setToggleState(true);
     }

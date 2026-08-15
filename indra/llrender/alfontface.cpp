@@ -1,5 +1,5 @@
 /**
- * @file llfontface.cpp
+ * @file alfontface.cpp
  * @brief Refcounted FT_Face wrapper.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -22,13 +22,12 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
  * $/LicenseInfo$
  */
 
 #include "linden_common.h"
 
-#include "llfontface.h"
+#include "alfontface.h"
 
 #include "llfontfreetype.h"   // for LLFontGlyphInfo, LLFontManager, ll::fonts::LoadedFont
 #include "llfontgl.h"         // for sUseDarkEmojiPalette
@@ -52,13 +51,13 @@
 
 extern FT_Library gFTLibrary;
 
-LLFontFace::LLFontFace()
+ALFontFace::ALFontFace()
 :   mHinting(static_cast<EFontHinting>(0)),
     mFontBitmapCachep(new LLFontBitmapCache)
 {
 }
 
-LLFontFace::~LLFontFace()
+ALFontFace::~ALFontFace()
 {
     // Free LLFontGlyphInfo entries — owned by this face's cache.
     for (auto& entry : mGlyphInfoMap)
@@ -81,12 +80,12 @@ LLFontFace::~LLFontFace()
     mFontBitmapCachep = nullptr;
 }
 
-bool LLFontFace::load(const std::string& filename, S32 face_index,
+bool ALFontFace::load(const std::string& filename, S32 face_index,
                       F32 point_size, F32 vert_dpi, F32 horz_dpi,
                       EFontHinting hinting, S32 flags,
-                      const LLFontVarAxes& var_axes)
+                      const ALFontVarAxes& var_axes)
 {
-    llassert(!mFTFace); // load() is called once per LLFontFace instance.
+    llassert(!mFTFace); // load() is called once per ALFontFace instance.
 
     mHinting = hinting;
 
@@ -100,7 +99,7 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
     int error = FT_Open_Face(gFTLibrary, &openArgs, face_index, &mFTFace);
     if (error)
     {
-        // FT_Open_Face leaves *aface undefined on failure; clear so ~LLFontFace
+        // FT_Open_Face leaves *aface undefined on failure; clear so ~ALFontFace
         // doesn't call FT_Done_Face on a garbage pointer.
         mFTFace = nullptr;
         return false;
@@ -194,13 +193,13 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
         return false;
     }
 
-    // FT_Set_Char_Size runs once per LLFontFace lifetime. The hb_font_t
+    // FT_Set_Char_Size runs once per ALFontFace lifetime. The hb_font_t
     // (lazy in getHbFont) snapshots size->metrics at creation and uses
     // its ppem/scale for subsequent shape calls; resizing the face after
     // this point would require hb_ft_font_changed(mHbFont) to resync HB.
-    // New sized state goes through a fresh LLFontFace — the registry's
+    // New sized state goes through a fresh ALFontFace — the registry's
     // face cache enforces this, since point_size/DPI are part of the
-    // LLFontFaceKey. Snapshot ppem so getHbFont can assert the invariant.
+    // ALFontFaceKey. Snapshot ppem so getHbFont can assert the invariant.
     mLoadedXPpem = mFTFace->size->metrics.x_ppem;
     mLoadedYPpem = mFTFace->size->metrics.y_ppem;
 
@@ -238,7 +237,7 @@ bool LLFontFace::load(const std::string& filename, S32 face_index,
     return true;
 }
 
-LLFontGlyphInfo* LLFontFace::findGlyphInfo(U32 glyph_index, EFontGlyphType type) const
+LLFontGlyphInfo* ALFontFace::findGlyphInfo(U32 glyph_index, EFontGlyphType type) const
 {
     auto range = mGlyphInfoMap.equal_range(glyph_index);
     auto iter = (type != EFontGlyphType::Unspecified)
@@ -248,7 +247,7 @@ LLFontGlyphInfo* LLFontFace::findGlyphInfo(U32 glyph_index, EFontGlyphType type)
     return (iter != range.second) ? iter->second : nullptr;
 }
 
-LLFontGlyphInfo* LLFontFace::insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const
+LLFontGlyphInfo* ALFontFace::insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* gi) const
 {
     llassert(gi->mGlyphType < EFontGlyphType::Count);
     auto range = mGlyphInfoMap.equal_range(glyph_index);
@@ -269,7 +268,7 @@ LLFontGlyphInfo* LLFontFace::insertGlyphInfo(U32 glyph_index, LLFontGlyphInfo* g
     return gi;
 }
 
-void LLFontFace::resetBitmapCache()
+void ALFontFace::resetBitmapCache()
 {
     for (auto& entry : mGlyphInfoMap)
         delete entry.second;
@@ -278,7 +277,7 @@ void LLFontFace::resetBitmapCache()
         mFontBitmapCachep->reset();
 }
 
-void LLFontFace::collectGarbage() const
+void ALFontFace::collectGarbage() const
 {
     if (!mFTFace || !mFontBitmapCachep)
         return;
@@ -308,7 +307,7 @@ void LLFontFace::collectGarbage() const
         return false;
     };
 
-    // Shaped runs in LLFontShaping's cache hold only metric/glyph_id data — no
+    // Shaped runs in ALFontShaping's cache hold only metric/glyph_id data — no
     // atlas references — so they survive eviction; getGlyphInfoByIndex on the
     // next frame re-rasterizes whichever glyphs were dropped here. Cache
     // generation bumps inside releaseSheet so LLFontVertexBuffer rebuilds.
@@ -342,16 +341,16 @@ void LLFontFace::collectGarbage() const
     }
 }
 
-void LLFontFace::destroyGlyphInfo(LLFontGlyphInfo* gi)
+void ALFontFace::destroyGlyphInfo(LLFontGlyphInfo* gi)
 {
     delete gi;
 }
 
-void LLFontFace::destroyGL()
+void ALFontFace::destroyGL()
 {
     // Tear down GL textures up front for prompt GPU memory release, then
     // fully reset the face so any later loadFace() that resolves back to
-    // this same LLFontFace via LLFontManager::mFaceCache (e.g. UI scale
+    // this same ALFontFace via LLFontManager::mFaceCache (e.g. UI scale
     // change whose new vert/horz DPI floor-round to the same integers as
     // before) gets back an empty face equivalent to a freshly-constructed
     // one. Without the reset, stale mGlyphInfoMap entries continue to
@@ -363,7 +362,7 @@ void LLFontFace::destroyGL()
     resetBitmapCache();
 }
 
-bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
+bool ALFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
                                  U16 width, U16 height,
                                  const U8* data, S32 stride) const
 {
@@ -409,7 +408,7 @@ bool LLFontFace::setSubImageBGRA(U32 x, U32 y, U32 bitmap_num,
     return true;
 }
 
-void LLFontFace::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
+void ALFontFace::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
                                            U32 width, U32 height,
                                            U8* data, S32 stride) const
 {
@@ -478,7 +477,7 @@ void LLFontFace::setSubImageLuminanceAlpha(U32 x, U32 y, U32 bitmap_num,
     }
 }
 
-U32 LLFontFace::getCharGlyphIndex(llwchar wch) const
+U32 ALFontFace::getCharGlyphIndex(llwchar wch) const
 {
     if (!mFTFace)
         return 0;
@@ -491,7 +490,7 @@ U32 LLFontFace::getCharGlyphIndex(llwchar wch) const
     return it->second;
 }
 
-hb_font_t* LLFontFace::getHbFont() const
+hb_font_t* ALFontFace::getHbFont() const
 {
     if (!mHbFont && mFTFace)
     {
@@ -504,7 +503,7 @@ hb_font_t* LLFontFace::getHbFont() const
 
         // hb_ft_font_create_referenced retains mFTFace for the lifetime of
         // the hb_font; the FT_Face won't be freed before the hb_font is.
-        // ~LLFontFace destroys the hb_font first then calls FT_Done_Face.
+        // ~ALFontFace destroys the hb_font first then calls FT_Done_Face.
         mHbFont = hb_ft_font_create_referenced(mFTFace);
         if (mHbFont)
         {
@@ -547,7 +546,7 @@ hb_font_t* LLFontFace::getHbFont() const
     return mHbFont;
 }
 
-bool LLFontFace::setVariationAxis(const std::string& axis_tag, F32 value)
+bool ALFontFace::setVariationAxis(const std::string& axis_tag, F32 value)
 {
     if (!mFTFace || axis_tag.size() < 4)
         return false;

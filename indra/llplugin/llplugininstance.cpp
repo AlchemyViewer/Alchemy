@@ -102,7 +102,7 @@ void LLPluginInstance::sendMessage(const std::string &message)
     if(mPluginSendMessageFunction)
     {
         LL_DEBUGS("Plugin") << "sending message to plugin: \"" << message << "\"" << LL_ENDL;
-        mPluginSendMessageFunction(message.c_str(), &mPluginUserData);
+        mPluginSendMessageFunction(message.data(), message.size(), &mPluginUserData);
     }
     else
     {
@@ -119,28 +119,31 @@ void LLPluginInstance::idle(void)
 }
 
 // static
-void LLPluginInstance::staticReceiveMessage(const char *message_string, void **user_data)
+void LLPluginInstance::staticReceiveMessage(const char *message_string, size_t message_size, void **user_data)
 {
     // TODO: validate that the user_data argument is still a valid LLPluginInstance pointer
     // we could also use a key that's looked up in a map (instead of a direct pointer) for safety, but that's probably overkill
     LLPluginInstance *self = (LLPluginInstance*)*user_data;
-    self->receiveMessage(message_string);
+    self->receiveMessage(message_string, message_size);
 }
 
 /**
  * Plugin receives message from plugin loader shell.
  *
- * @param[in] message_string Message
+ * @param[in] message_string Message bytes (binary LLSD, may contain embedded NULs)
+ * @param[in] message_size Length of message_string in bytes
  */
-void LLPluginInstance::receiveMessage(const char *message_string)
+void LLPluginInstance::receiveMessage(const char *message_string, size_t message_size)
 {
+    // Reconstruct the message with its exact length: the payload is binary and
+    // may contain embedded NULs, so it can't be treated as a C string.
+    std::string message(message_string, message_size);
     if(mOwner)
     {
-        LL_DEBUGS("Plugin") << "processing incoming message: \"" << message_string << "\"" << LL_ENDL;
-        mOwner->receivePluginMessage(message_string);
+        mOwner->receivePluginMessage(message);
     }
     else
     {
-        LL_WARNS("Plugin") << "dropping incoming message: \"" << message_string << "\"" << LL_ENDL;
+        LL_WARNS("Plugin") << "dropping incoming message: \"" << message << "\"" << LL_ENDL;
     }
 }

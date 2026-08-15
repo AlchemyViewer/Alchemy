@@ -24,22 +24,21 @@
  */
 
 
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 #ifndef IS_HUD
 
 // default alpha implementation
 
 #ifdef HAS_SKIN
-uniform mat4 modelview_matrix;
-uniform mat4 projection_matrix;
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec3 skinDirection(mat3x4 b, vec3 dir);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
-uniform mat3 normal_matrix;
-uniform mat4 modelview_projection_matrix;
 #endif
-uniform mat4 texture_matrix0;
 
 #if !defined(HAS_SKIN)
-uniform mat4 modelview_matrix;
 #endif
 
 out vec3 vary_position;
@@ -75,9 +74,8 @@ vec4 tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] kh
 void main()
 {
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
-    vec3 pos = (mat*vec4(position.xyz,1.0)).xyz;
+    mat3x4 skin = getSkinBlend();
+    vec3 pos = skinTransformH(skin, position.xyz, modelview_matrix).xyz;
     vary_position = pos;
     vec4 vert = projection_matrix * vec4(pos,1.0);
 #else
@@ -86,7 +84,13 @@ void main()
 #endif
     gl_Position = vert;
 
+    // FS derives a screen UV as vary_fragcoord.xy / .z; carry true clip w under reverse-Z
+    // so the divide stays clip.xy/clip.w == ndc.xy (clip.z -> ~0 at the far plane).
+#ifdef REVERSE_Z
+    vary_fragcoord.xyz = vec3(vert.xy, vert.w);
+#else
     vary_fragcoord.xyz = vert.xyz;
+#endif
 
     base_color_texcoord = texture_transform(texcoord0, texture_base_color_transform, texture_matrix0);
     normal_texcoord = texture_transform(texcoord0, texture_normal_transform, texture_matrix0);
@@ -94,8 +98,8 @@ void main()
     emissive_texcoord = texture_transform(texcoord0, texture_emissive_transform, texture_matrix0);
 
 #ifdef HAS_SKIN
-    vec3 n = (mat*vec4(normal.xyz+position.xyz,1.0)).xyz-pos.xyz;
-    vec3 t = (mat*vec4(tangent.xyz+position.xyz,1.0)).xyz-pos.xyz;
+    vec3 n = mat3(modelview_matrix) * skinDirection(skin, normal.xyz);
+    vec3 t = mat3(modelview_matrix) * skinDirection(skin, tangent.xyz);
 #else //HAS_SKIN
     vec3 n = normal_matrix * normal;
     vec3 t = normal_matrix * tangent.xyz;
@@ -119,11 +123,8 @@ void main()
 
 // fullbright HUD alpha implementation
 
-uniform mat4 modelview_projection_matrix;
 
-uniform mat4 texture_matrix0;
 
-uniform mat4 modelview_matrix;
 
 out vec3 vary_position;
 

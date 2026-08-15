@@ -162,7 +162,7 @@ void display_startup()
     //
     if (!LLViewerFetchedTexture::sWhiteImagep.isNull())
     {
-    LLTexUnit::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
+    ALTextureSlot::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
     }
 
     LLGLSDefault gls_default;
@@ -214,16 +214,26 @@ void display_update_camera()
     F32 final_far = gAgentCamera.mDrawDistance;
     if (gCubeSnapshot)
     {
-        static LLCachedControl<F32> reflection_probe_draw_distance(gSavedSettings, "RenderReflectionProbeDrawDistance", 64.f);
-        final_far = reflection_probe_draw_distance();
+        if (gPipeline.mHeroProbeManager.isMirrorPass())
+        {
+            // mirrors are literal reflections and get their own render distance
+            static LLCachedControl<F32> hero_probe_distance(gSavedSettings, "RenderHeroProbeDistance", 8.f);
+            final_far = hero_probe_distance();
+        }
+        else
+        {
+            static LLCachedControl<F32> reflection_probe_draw_distance(gSavedSettings, "RenderReflectionProbeDrawDistance", 64.f);
+            final_far = reflection_probe_draw_distance();
+        }
     }
     else if (CAMERA_MODE_CUSTOMIZE_AVATAR == gAgentCamera.getCameraMode())
     {
         final_far *= 0.5f;
     }
-    else if (LLViewerTexture::sDesiredDiscardBias > 2.f)
+    // When system memory is critically low or recovering, shrink draw distance.
+    else if (const F32 mem_factor = LLMemory::getSystemMemoryBudgetFactor(); mem_factor > 1.f)
     {
-        final_far = llmax(32.f, final_far / (LLViewerTexture::sDesiredDiscardBias - 1.f));
+        final_far = llmax(32.f, final_far / mem_factor);
     }
     LLViewerCamera::getInstance()->setFar(final_far);
     LLVOAvatar::sRenderDistance = llclamp(final_far, 16.f, 256.f);
@@ -784,7 +794,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         LLDrawable::incrementVisible();
 
         LLSpatialGroup::sNoDelete = true;
-        LLTexUnit::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
+        ALTextureSlot::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
 
         S32 occlusion = LLPipeline::sUseOcclusion;
         if (gDepthDirty)
@@ -942,7 +952,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         //  gGL.matrixMode(LLRender::MM_MODELVIEW);
         //  gGL.pushMatrix();
         //  {
-        //      gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        //      gGL.getTextureSlot(0)->unbind();
 
         //      glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
         //      gGL.loadIdentity();
@@ -1033,11 +1043,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Texture Unbind");
             for (S32 i = 0; i < gGLManager.mNumTextureImageUnits; i++)
             { //dummy cleanup of any currently bound textures
-                if (gGL.getTexUnit(i)->getCurrType() != LLTexUnit::TT_NONE)
-                {
-                    gGL.getTexUnit(i)->unbind(gGL.getTexUnit(i)->getCurrType());
-                    gGL.getTexUnit(i)->disable();
-                }
+                gGL.getTextureSlot(i)->unbind();
             }
         }
 
@@ -1421,8 +1427,11 @@ bool get_hud_matrices(const LLRect& screen_region, glm::mat4 &proj, glm::mat4&mo
         LLBBox hud_bbox = gAgentAvatarp->getHUDBBox();
 
         F32 hud_depth = llmax(1.f, hud_bbox.getExtentLocal().mV[VX] * 1.1f);
-        proj = glm::ortho(-0.5f * LLViewerCamera::getInstance()->getAspect(), 0.5f * LLViewerCamera::getInstance()->getAspect(), -0.5f, 0.5f, 0.f, hud_depth);
-        proj[2][2] = -0.01f;
+        // al_ortho reverses the depth row under reverse-Z (its [3][2] becomes +1), so only
+        // the flatten-hack [2][2] constant mirrors: window = 1 + 0.005*z == 1 - window_fwd,
+        // same per-unit spacing and clip budget, reversed direction.
+        proj = al_ortho(-0.5f * LLViewerCamera::getInstance()->getAspect(), 0.5f * LLViewerCamera::getInstance()->getAspect(), -0.5f, 0.5f, 0.f, hud_depth);
+        proj[2][2] = LLRender::sReverseZ ? 0.005f : -0.01f;
 
         F32 aspect_ratio = LLViewerCamera::getInstance()->getAspect();
 
@@ -1586,7 +1595,7 @@ void swap()
 
 void renderCoordinateAxes()
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gGL.begin(LLRender::LINES);
         gGL.color3f(1.0f, 0.0f, 0.0f);   // i direction = X-Axis = red
         gGL.vertex3f(0.0f, 0.0f, 0.0f);
@@ -1637,7 +1646,7 @@ void renderCoordinateAxes()
 void draw_axes()
 {
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     // A vertical white line at origin
     LLVector3 v = gAgent.getPositionAgent();
     gGL.begin(LLRender::LINES);
@@ -1800,7 +1809,7 @@ void render_ui_2d()
         LLGLDisable blend(GL_BLEND);
         S32 width = gViewerWindow->getWindowWidthScaled();
         S32 height = gViewerWindow->getWindowHeightScaled();
-        gGL.getTexUnit(0)->bind(&gPipeline.mUIScreen);
+        gGL.getTextureSlot(0)->bind(&gPipeline.mUIScreen);
         gGL.begin(LLRender::TRIANGLE_STRIP);
         gGL.color4f(1.f,1.f,1.f,1.f);
         gGL.texCoord2f(0.f, 0.f);                 gGL.vertex2i(0, 0);
@@ -1864,7 +1873,7 @@ void render_disconnected_background()
         raw->expandToPowerOfTwo();
         gDisconnectedImagep = LLViewerTextureManager::getLocalTexture(raw.get(), false);
         gStartTexture = gDisconnectedImagep;
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
     }
 
     // Make sure the progress view always fills the entire window.
@@ -1883,10 +1892,10 @@ void render_disconnected_background()
             const LLVector2& display_scale = gViewerWindow->getDisplayScale();
             gGL.scalef(display_scale.mV[VX], display_scale.mV[VY], 1.f);
 
-            gGL.getTexUnit(0)->bind(gDisconnectedImagep);
+            gGL.getTextureSlot(0)->bindSampled(gDisconnectedImagep, ALSamplers::AnisoWrap);
             gGL.color4f(1.f, 1.f, 1.f, 1.f);
             gl_rect_2d_simple_tex(width, height);
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
         }
         gGL.popMatrix();
     }

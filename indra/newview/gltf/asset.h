@@ -27,6 +27,7 @@
  */
 
 #include "llvertexbuffer.h"
+#include "aluniformbuffer.h"
 #include "llvolumeoctree.h"
 #include "accessor.h"
 #include "primitive.h"
@@ -231,12 +232,11 @@ namespace LL
         class Skin
         {
         public:
-            ~Skin();
-
             S32 mInverseBindMatrices = INVALID_INDEX;
             S32 mSkeleton = INVALID_INDEX;
 
-            U32 mUBO = 0;
+            // joint matrix-palette constant block (deleted with the Skin via RAII)
+            ALUniformBuffer mUBO;
             std::vector<S32> mJoints;
             std::string mName;
             std::vector<mat4> mInverseBindMatricesData;
@@ -323,31 +323,6 @@ namespace LL
             bool prepImpl(Asset& asset, const LLUUID& id);
         };
 
-        // Render Batch -- vertex buffer and list of primitives to render using
-        // said vertex buffer
-        class RenderBatch
-        {
-        public:
-            struct PrimitiveData
-            {
-                S32 mPrimitiveIndex = INVALID_INDEX;
-                S32 mNodeIndex = INVALID_INDEX;
-            };
-
-            LLPointer<LLVertexBuffer> mVertexBuffer;
-            std::vector<PrimitiveData> mPrimitives;
-        };
-
-        class RenderData
-        {
-        public:
-            // list of render batches
-            // indexed by [material index + 1](0 is reserved for default material)
-            // there should be exactly one render batch per material per variant
-            std::vector<RenderBatch> mBatches[LLGLSLShader::NUM_GLTF_VARIANTS];
-        };
-
-
         // C++ representation of a GLTF Asset
         class Asset
         {
@@ -386,16 +361,11 @@ namespace LL
             // the last time update() was called according to gFrameTimeSeconds
             F32 mLastUpdateTime = gFrameTimeSeconds;
 
-            // data used for rendering
-            // 0 - single sided
-            // 1 - double sided
-            RenderData mRenderData[2];
-
             // UBO for storing node transforms
-            U32 mNodesUBO = 0;
+            ALUniformBuffer mNodesUBO;
 
             // UBO for storing material data
-            U32 mMaterialsUBO = 0;
+            ALUniformBuffer mMaterialsUBO;
             bool mLoadIntoVRAM = false;
 
             std::vector<std::string> mUnsupportedExtensions;

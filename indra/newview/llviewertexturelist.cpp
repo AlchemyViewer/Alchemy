@@ -121,7 +121,7 @@ void LLViewerTextureList::doPreloadImages()
 
     // Set the "white" image
     LLViewerFetchedTexture::sWhiteImagep = LLViewerTextureManager::getFetchedTextureFromFile("white.tga", FTT_LOCAL_FILE, MIPMAP_NO, LLViewerFetchedTexture::BOOST_UI);
-    LLTexUnit::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
+    ALTextureSlot::sWhiteTexture = LLViewerFetchedTexture::sWhiteImagep->getTexName();
     LLUIImageList* image_list = LLUIImageList::getInstance();
 
     // Set default particle texture
@@ -155,46 +155,39 @@ void LLViewerTextureList::doPreloadImages()
     LLViewerFetchedTexture* image = LLViewerTextureManager::getFetchedTextureFromFile("silhouette.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
     if (image)
     {
-        image->setAddressMode(LLTexUnit::TAM_WRAP);
         mImagePreloads.insert(image);
     }
     image = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryLines.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
     if (image)
     {
-        image->setAddressMode(LLTexUnit::TAM_WRAP);
         mImagePreloads.insert(image);
     }
     image = LLViewerTextureManager::getFetchedTextureFromFile("world/NoEntryPassLines.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
     if (image)
     {
-        image->setAddressMode(LLTexUnit::TAM_WRAP);
         mImagePreloads.insert(image);
     }
     image = LLViewerTextureManager::getFetchedTextureFromFile("transparent.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI, LLViewerTexture::FETCHED_TEXTURE,
         0, 0, IMG_TRANSPARENT);
     if (image)
     {
-        image->setAddressMode(LLTexUnit::TAM_WRAP);
         mImagePreloads.insert(image);
     }
     image = LLViewerTextureManager::getFetchedTextureFromFile("alpha_gradient.tga", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI, LLViewerTexture::FETCHED_TEXTURE,
         GL_ALPHA8, GL_ALPHA, IMG_ALPHA_GRAD);
     if (image)
     {
-        image->setAddressMode(LLTexUnit::TAM_CLAMP);
         mImagePreloads.insert(image);
     }
     image = LLViewerTextureManager::getFetchedTextureFromFile("alpha_gradient_2d.j2c", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI, LLViewerTexture::FETCHED_TEXTURE,
         GL_ALPHA8, GL_ALPHA, IMG_ALPHA_GRAD_2D);
     if (image)
     {
-        image->setAddressMode(LLTexUnit::TAM_CLAMP);
         mImagePreloads.insert(image);
     }
     image = LLViewerTextureManager::getFetchedTextureFromFile("SoftDotNoBack.png", FTT_LOCAL_FILE, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
     if (image)
     {
-        image->setAddressMode(LLTexUnit::TAM_WRAP);
         mImagePreloads.insert(image);
     }
 }
@@ -229,7 +222,6 @@ void LLViewerTextureList::doPrefetchImages()
         imagep = LLViewerTextureManager::getFetchedTexture(DEFAULT_WATER_NORMAL, FTT_DEFAULT, MIPMAP_YES, LLViewerFetchedTexture::BOOST_UI);
         if (imagep)
         {
-            imagep->setAddressMode(LLTexUnit::TAM_WRAP);
             mImagePreloads.insert(imagep);
         }
     }
@@ -1206,8 +1198,18 @@ F32 LLViewerTextureList::updateImagesLoadingFastCache(F32 max_time)
     LLTimer timer;
     image_list_t::iterator enditer = mFastCacheList.begin();
     {
-        // prelock fast cache mutex to avoid waiting multiple times.
-        LLMutexLock cache_lock(LLAppViewer::getTextureCache()->getFastCacheMutex());
+        // Prelock fast cache mutex to avoid waiting multiple times.
+        LLMutexTrylock fast_cache_lock(LLAppViewer::getTextureCache()->getFastCacheMutex());
+        if (!fast_cache_lock.isLocked())
+        {
+            // Cache is busy, skip this update cycle to avoid blocking the main thread.
+            //
+            // Generally fast cache operations are brief and rare in comparison to writing
+            // main texture body, but if disk is busy, it can get stuck for multiple
+            // seconds, waiting for that long is not practical.
+            // But some variant of a timed try lock for 0.1ms or less might be optimal.
+            return 0.0f;
+        }
         for (image_list_t::iterator iter = mFastCacheList.begin();
             iter != mFastCacheList.end();)
         {
@@ -1677,10 +1679,8 @@ LLUIImagePtr LLUIImageList::loadUIImage(LLViewerFetchedTexture* imagep, std::str
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     if (!imagep) return NULL;
 
-    imagep->setAddressMode(LLTexUnit::TAM_CLAMP);
 
     //don't compress UI images
-    imagep->getGLTexture()->setAllowCompression(false);
 
     LLUIImagePtr new_imagep = new LLUIImage(std::string(name), imagep);
     new_imagep->setScaleStyle(scale_style);

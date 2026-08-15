@@ -517,7 +517,7 @@ void LLVOSurfacePatch::updateNorthGeometry(LLFace *facep,
         half_length = length / 2;
         num_vertices = length + half_length + 1;
 
-        facep->mCenterAgent = (mPatchp->getPointAgent(15, 7) + mPatchp->getPointAgent(16, 8))*0.5f;
+        facep->mCenterAgent = (mPatchp->getPointAgent(7, 15) + mPatchp->getPointAgent(8, 16))*0.5f;
 
         // Iterate through this patch's points
         for (i = 0; i < length; i+=2)
@@ -598,7 +598,7 @@ void LLVOSurfacePatch::updateEastGeometry(LLFace *facep,
     {
         num_vertices = 2 * length + 1;
 
-        facep->mCenterAgent = (mPatchp->getPointAgent(8, 15) + mPatchp->getPointAgent(8, 16))*0.5f;
+        facep->mCenterAgent = (mPatchp->getPointAgent(15, 8) + mPatchp->getPointAgent(16, 8))*0.5f;
 
         // Main patch
         for (i = 0; i < length; i++)
@@ -646,7 +646,7 @@ void LLVOSurfacePatch::updateEastGeometry(LLFace *facep,
         // East stride is longer (has less vertices)
         num_vertices = length + half_length + 1;
 
-        facep->mCenterAgent = (mPatchp->getPointAgent(7, 15) + mPatchp->getPointAgent(8, 16))*0.5f;
+        facep->mCenterAgent = (mPatchp->getPointAgent(15, 7) + mPatchp->getPointAgent(16, 8))*0.5f;
 
         // Iterate through this patch's points
         for (i = 0; i < length; i++)
@@ -1009,7 +1009,6 @@ void gen_terrain_tangents(U32                    strider_vertex_count,
         vertices[v]  = LLVector4a(vert[0], vert[1], vert[2], 1.f);
         F32 *n       = normalsp[v].mV;
         normals[v]   = LLVector4a(n[0], n[1], n[2], 1.f);
-        tangents[v]  = tangentsp[v];
 
         // Calculate texcoords on-the-fly using the terrain positions
         texcoords[v].mV[VX] = verticesp[v].mV[VX] / region_width;
@@ -1079,7 +1078,17 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
         }
     }
 
-    const bool has_tangents = tangents_start.get() != nullptr;
+    // Only the PBR terrain shader reads tangents. Generating them is a full pass over the
+    // group's geometry plus five heap allocations, on every terrain rebuild -- entirely wasted
+    // for a region painted with legacy textures, which is most of them.
+    const LLViewerRegion* regionp = mFaceList.empty() ? nullptr : mFaceList[0]->getViewerObject()->getRegion();
+    llassert(!mFaceList.empty());
+    llassert(!regionp || regionp == mFaceList.back()->getViewerObject()->getRegion()); // Assume this spatial group is confined to one region
+
+    LLVLComposition* compp = regionp ? regionp->getComposition() : nullptr;
+    const bool pbr_terrain = compp && compp->getMaterialType() == LLTerrainMaterials::Type::PBR;
+
+    const bool has_tangents = pbr_terrain && tangents_start.get() != nullptr;
     if (has_tangents)
     {
         LLStrider<LLVector3> vertices = vertices_start;
@@ -1087,17 +1096,7 @@ void LLTerrainPartition::getGeometry(LLSpatialGroup* group)
         LLStrider<LLVector4a> tangents = tangents_start;
         LLStrider<U16> indices = indices_start;
 
-        F32 region_width = 256.0f;
-        if (mFaceList.empty())
-        {
-            llassert(false);
-        }
-        else
-        {
-            const LLViewerRegion* regionp = mFaceList[0]->getViewerObject()->getRegion();
-            llassert(regionp == mFaceList.back()->getViewerObject()->getRegion()); // Assume this spatial group is confined to one region
-            region_width = regionp->getWidth();
-        }
+        const F32 region_width = regionp->getWidth();
         gen_terrain_tangents(index_offset, indices_index, vertices, normals, tangents, indices, region_width);
     }
 

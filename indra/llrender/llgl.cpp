@@ -47,6 +47,7 @@
 
 #include "llglheaders.h"
 #include "llglslshader.h"
+#include "llshadermgr.h"
 
 #include "glm/glm.hpp"
 #include <glm/gtc/matrix_access.hpp>
@@ -89,6 +90,422 @@ llofstream gFailLog;
 #define APIENTRY
 #endif
 
+// ---------------------------------------------------------------------------------------
+// Program sampler introspection, shared by the debug dump and the draw-time validator.
+//
+// What a program DECLARES is the missing half of every sampler/texture diagnostic: the
+// driver reports object names, and the engine's reserved-uniform table only knows engine
+// names -- which for a reflection-driven Slang program leaves the interesting channels
+// anonymous. GL_ACTIVE_UNIFORMS knows all of them, including the sampler TYPE, which is the
+// actual discriminator between correct and undefined.
+// ---------------------------------------------------------------------------------------
+namespace
+{
+    struct ProgramSampler
+    {
+        std::string mName;
+        GLenum      mType     = 0;
+        GLint       mUnit     = -1;
+        GLenum      mTarget   = 0;
+        GLenum      mBinding  = 0;
+        bool        mIsShadow = false;
+    };
+
+    struct ProgramSamplerCache
+    {
+        // Revalidation key: a relinked program can reuse its name, and GL is free to hand a
+        // deleted name back out. Cheap enough to re-check every call.
+        GLint                      mUniformCount = -1;
+        std::vector<ProgramSampler> mSamplers;
+    };
+
+    std::map<GLuint, ProgramSamplerCache> sProgramSamplerCache;
+
+    bool sampler_target_for_type(GLenum type, GLenum& target, GLenum& binding, bool& is_shadow)
+    {
+        switch (type)
+        {
+            case GL_SAMPLER_2D:
+            case GL_INT_SAMPLER_2D:
+            case GL_UNSIGNED_INT_SAMPLER_2D:
+                target = GL_TEXTURE_2D;             binding = GL_TEXTURE_BINDING_2D;             is_shadow = false; return true;
+            case GL_SAMPLER_2D_SHADOW:
+                target = GL_TEXTURE_2D;             binding = GL_TEXTURE_BINDING_2D;             is_shadow = true;  return true;
+            case GL_SAMPLER_3D:
+                target = GL_TEXTURE_3D;             binding = GL_TEXTURE_BINDING_3D;             is_shadow = false; return true;
+            case GL_SAMPLER_CUBE:
+                target = GL_TEXTURE_CUBE_MAP;       binding = GL_TEXTURE_BINDING_CUBE_MAP;       is_shadow = false; return true;
+            case GL_SAMPLER_CUBE_SHADOW:
+                target = GL_TEXTURE_CUBE_MAP;       binding = GL_TEXTURE_BINDING_CUBE_MAP;       is_shadow = true;  return true;
+            case GL_SAMPLER_CUBE_MAP_ARRAY:
+                target = GL_TEXTURE_CUBE_MAP_ARRAY; binding = GL_TEXTURE_BINDING_CUBE_MAP_ARRAY; is_shadow = false; return true;
+            case GL_SAMPLER_2D_ARRAY:
+                target = GL_TEXTURE_2D_ARRAY;       binding = GL_TEXTURE_BINDING_2D_ARRAY;       is_shadow = false; return true;
+            case GL_SAMPLER_2D_ARRAY_SHADOW:
+                target = GL_TEXTURE_2D_ARRAY;       binding = GL_TEXTURE_BINDING_2D_ARRAY;       is_shadow = true;  return true;
+            case GL_SAMPLER_2D_RECT:
+                target = GL_TEXTURE_RECTANGLE;      binding = GL_TEXTURE_BINDING_RECTANGLE;      is_shadow = false; return true;
+            case GL_SAMPLER_2D_MULTISAMPLE:
+                target = GL_TEXTURE_2D_MULTISAMPLE; binding = GL_TEXTURE_BINDING_2D_MULTISAMPLE; is_shadow = false; return true;
+            default:
+                return false;
+        }
+    }
+
+    // Re-entrancy latch for gl_debug_callback; see the guard there for why.
+    thread_local bool sInDebugCallback = false;
+
+    struct DebugCallbackGuard
+    {
+        DebugCallbackGuard()  { sInDebugCallback = true;  }
+        ~DebugCallbackGuard() { sInDebugCallback = false; }
+    };
+
+    // glGetTexLevelParameteriv describes one IMAGE, and a cube map is six of them -- so it
+    // takes a face target and rejects GL_TEXTURE_CUBE_MAP outright ("The cube map target is
+    // not available for specifying or querying cube map images", GL_INVALID_ENUM). Every
+    // face of every cube we build shares an internal format -- glTexStorage2D allocates all
+    // six in one call, and the per-face uploads are handed the same explicit format -- so
+    // +X answers for the whole object.
+    //
+    // Only the LEVEL query needs this. glGetTexParameteriv describes the OBJECT and does
+    // take the general target, which is why the compare-mode reads nearby are fine as they
+    // are.
+    GLenum level_query_target(GLenum target)
+    {
+        return target == GL_TEXTURE_CUBE_MAP ? GL_TEXTURE_CUBE_MAP_POSITIVE_X : target;
+    }
+
+    bool is_depth_format(GLint internal_format)
+    {
+        return internal_format == GL_DEPTH_COMPONENT16
+            || internal_format == GL_DEPTH_COMPONENT24
+            || internal_format == GL_DEPTH_COMPONENT32
+            || internal_format == GL_DEPTH_COMPONENT32F
+            || internal_format == GL_DEPTH24_STENCIL8
+            || internal_format == GL_DEPTH32F_STENCIL8;
+    }
+
+    const std::vector<ProgramSampler>& get_program_samplers(GLuint program)
+    {
+        static const std::vector<ProgramSampler> empty;
+
+        GLint uniform_count = 0;
+        glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &uniform_count);
+
+        ProgramSamplerCache& cached = sProgramSamplerCache[program];
+        if (cached.mUniformCount == uniform_count)
+        {
+            return cached.mSamplers;
+        }
+
+        cached.mUniformCount = uniform_count;
+        cached.mSamplers.clear();
+
+        GLint max_name_len = 0;
+        glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_len);
+        if (max_name_len <= 0)
+        {
+            return cached.mSamplers;
+        }
+        std::vector<GLchar> name_buf((size_t)max_name_len);
+
+        for (GLint i = 0; i < uniform_count; ++i)
+        {
+            GLsizei written = 0;
+            GLint   size    = 0;
+            GLenum  type    = 0;
+            glGetActiveUniform(program, (GLuint)i, (GLsizei)name_buf.size(), &written, &size, &type, name_buf.data());
+            if (written <= 0)
+            {
+                continue;
+            }
+
+            ProgramSampler sampler;
+            if (!sampler_target_for_type(type, sampler.mTarget, sampler.mBinding, sampler.mIsShadow))
+            {
+                continue;
+            }
+
+            sampler.mName = std::string(name_buf.data(), (size_t)written);
+            sampler.mType = type;
+
+            const GLint location = glGetUniformLocation(program, sampler.mName.c_str());
+            if (location < 0)
+            {
+                continue;
+            }
+            glGetUniformiv(program, location, &sampler.mUnit);
+
+            cached.mSamplers.push_back(sampler);
+        }
+
+        return cached.mSamplers;
+    }
+}
+
+void forget_program_samplers(U32 program)
+{
+    sProgramSamplerCache.erase(program);
+}
+
+// Dump per-unit texture and sampler state.
+//
+// The driver's message names a sampler and a texture object but not the UNIT or the
+// UNIFORM, which is the part you need: a mismatch between what a program declares and what
+// is bound is nearly always one specific channel, and hunting it from two bare object names
+// means guessing. Correlating unit -> uniform -> texture -> sampler turns that into reading.
+//
+// Only reports units with something bound, and restores the active unit -- a debug callback
+// must not perturb the state it is describing.
+static void log_texture_unit_state()
+{
+    if (!glGetSamplerParameteriv || !glGetTexLevelParameteriv)
+    {
+        return;
+    }
+
+    GLint max_units = 0;
+    glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &max_units);
+    max_units = llmin(max_units, (GLint)AL_NUM_TEXTURE_SLOTS);
+
+    GLint saved_active_unit = GL_TEXTURE0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active_unit);
+
+    // What the PROGRAM declares, per unit. See get_program_samplers.
+    struct UnitUniform
+    {
+        std::string mName;
+        GLenum      mType     = 0;
+        bool        mIsShadow = false;
+    };
+    std::vector<UnitUniform> channel_uniform((size_t)max_units);
+
+    GLint program = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    if (program != 0 && glGetActiveUniform && glGetUniformiv)
+    {
+        for (const ProgramSampler& sampler : get_program_samplers((GLuint)program))
+        {
+            if (sampler.mUnit >= 0 && sampler.mUnit < max_units)
+            {
+                channel_uniform[(size_t)sampler.mUnit] = { sampler.mName, sampler.mType, sampler.mIsShadow };
+            }
+        }
+    }
+
+    static const struct { GLenum mTarget; GLenum mBinding; const char* mName; } targets[] =
+    {
+        { GL_TEXTURE_2D,               GL_TEXTURE_BINDING_2D,               "2D"         },
+        { GL_TEXTURE_3D,               GL_TEXTURE_BINDING_3D,               "3D"         },
+        { GL_TEXTURE_CUBE_MAP,         GL_TEXTURE_BINDING_CUBE_MAP,         "CUBE"       },
+        { GL_TEXTURE_CUBE_MAP_ARRAY,   GL_TEXTURE_BINDING_CUBE_MAP_ARRAY,   "CUBE_ARRAY" },
+        { GL_TEXTURE_RECTANGLE,        GL_TEXTURE_BINDING_RECTANGLE,        "RECT"       },
+        { GL_TEXTURE_2D_MULTISAMPLE,   GL_TEXTURE_BINDING_2D_MULTISAMPLE,   "2D_MS"      },
+    };
+
+    LL_WARNS() << "Texture units:" << LL_ENDL;
+
+    for (GLint unit = 0; unit < max_units; ++unit)
+    {
+        glActiveTexture(GL_TEXTURE0 + unit);
+
+        GLint sampler = 0;
+        glGetIntegerv(GL_SAMPLER_BINDING, &sampler);
+
+        for (const auto& target : targets)
+        {
+            GLint texture = 0;
+            glGetIntegerv(target.mBinding, &texture);
+            if (texture == 0)
+            {
+                continue;
+            }
+
+            // GL_TEXTURE_COMPARE_MODE on the texture and on the sampler are separate state;
+            // a bound sampler wins, so print both -- disagreement is the usual culprit.
+            GLint internal_format = 0;
+            GLint tex_compare     = GL_NONE;
+            if (target.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+            {
+                glGetTexLevelParameteriv(level_query_target(target.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
+                glGetTexParameteriv(target.mTarget, GL_TEXTURE_COMPARE_MODE, &tex_compare);
+            }
+
+            const bool is_depth = is_depth_format(internal_format);
+
+            const UnitUniform& declared = channel_uniform[(size_t)unit];
+
+            std::ostringstream line;
+            line << "  unit " << unit;
+            if (!declared.mName.empty())
+            {
+                line << " (" << declared.mName
+                     << (declared.mIsShadow ? " : shadow" : " : non-shadow")
+                     << " type=0x" << std::hex << declared.mType << std::dec << ")";
+            }
+            line << " " << target.mName << " tex=" << texture
+                 << " format=0x" << std::hex << internal_format << std::dec
+                 << (is_depth ? " DEPTH" : "")
+                 << " tex_compare=" << (tex_compare == GL_NONE ? "none" : "REF_TO_TEXTURE")
+                 << " sampler=" << sampler;
+
+            if (sampler != 0)
+            {
+                GLint smp_compare = GL_NONE;
+                GLint min_filter  = 0;
+                GLint mag_filter  = 0;
+                GLint wrap_s      = 0;
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_COMPARE_MODE, &smp_compare);
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_MIN_FILTER, &min_filter);
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_MAG_FILTER, &mag_filter);
+                glGetSamplerParameteriv(sampler, GL_TEXTURE_WRAP_S, &wrap_s);
+
+                line << " [compare=" << (smp_compare == GL_NONE ? "none" : "REF_TO_TEXTURE")
+                     << " min=0x" << std::hex << min_filter
+                     << " mag=0x" << mag_filter
+                     << " wrap=0x" << wrap_s << std::dec << "]";
+
+                // The exact pairing the driver calls undefined behaviour -- but ONLY when
+                // the program reads that unit with a non-shadow sampler. The same state
+                // under a sampler2DShadow is correct and expected.
+                if (is_depth && smp_compare != GL_NONE)
+                {
+                    if (!declared.mName.empty() && !declared.mIsShadow)
+                    {
+                        line << "  <-- UB: '" << declared.mName
+                             << "' is non-shadow over a depth texture + compare sampler";
+                    }
+                    else if (declared.mName.empty())
+                    {
+                        line << "  (stale: depth + compare, program declares nothing here)";
+                    }
+                }
+            }
+
+            LL_WARNS() << line.str() << LL_ENDL;
+        }
+    }
+
+    glActiveTexture(saved_active_unit);
+}
+
+
+// Check every sampler the bound program declares against what is actually bound.
+//
+// Catches the mismatch AT THE DRAW THAT CAUSES IT, naming the uniform -- rather than via a
+// driver warning that reports two object names and leaves you inferring which bind site was
+// responsible. That inference is expensive: the depth-texture-under-a-compare-sampler bug
+// this was written for took five wrong diagnoses before the state was made visible.
+//
+// Reports only what GL actually calls undefined, so an assertion here means a real defect.
+// In particular an EMPTY unit is fine: reading one is defined, and declaring more samplers
+// than a draw fills is normal.
+//
+// gDebugGL only, and hooked through llassert() like LLVertexBuffer::validateRange, so it
+// compiles out entirely otherwise. Enumerating a program's uniforms is cached per program.
+bool validate_bound_samplers()
+{
+    if (!gDebugGL || !glGetSamplerParameteriv || !glGetTexLevelParameteriv)
+    {
+        return true;
+    }
+
+    GLint program = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    if (program == 0)
+    {
+        return true;
+    }
+
+    GLint saved_active_unit = GL_TEXTURE0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active_unit);
+
+    const char* shader_name = LLGLSLShader::sCurBoundShaderPtr
+                                  ? LLGLSLShader::sCurBoundShaderPtr->mName.c_str()
+                                  : "<unknown>";
+    std::string failure;
+
+    for (const ProgramSampler& sampler : get_program_samplers((GLuint)program))
+    {
+        if (sampler.mUnit < 0)
+        {
+            continue;
+        }
+
+        glActiveTexture(GL_TEXTURE0 + sampler.mUnit);
+
+        GLint texture = 0;
+        glGetIntegerv((GLenum)sampler.mBinding, &texture);
+        if (texture == 0)
+        {
+            // NOT an error. Reading an unbound unit is defined -- it yields (0,0,0,1) -- and
+            // programs routinely declare more samplers than a given draw fills: the indexed
+            // batching array is tex0..tex20 whatever the batch size. Nothing to validate.
+            continue;
+        }
+
+        // A bound sampler object overrides the texture's own compare state, so it decides.
+        GLint bound_sampler = 0;
+        glGetIntegerv(GL_SAMPLER_BINDING, &bound_sampler);
+
+        GLint compare_mode = GL_NONE;
+        if (bound_sampler != 0)
+        {
+            glGetSamplerParameteriv((GLuint)bound_sampler, GL_TEXTURE_COMPARE_MODE, &compare_mode);
+        }
+        else if (sampler.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+        {
+            glGetTexParameteriv(sampler.mTarget, GL_TEXTURE_COMPARE_MODE, &compare_mode);
+        }
+
+        GLint internal_format = 0;
+        if (sampler.mTarget != GL_TEXTURE_2D_MULTISAMPLE)
+        {
+            glGetTexLevelParameteriv(level_query_target(sampler.mTarget), 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
+        }
+        const bool is_depth = is_depth_format(internal_format);
+
+        // The two pairings GL calls undefined, in both directions.
+        if (!sampler.mIsShadow && is_depth && compare_mode != GL_NONE)
+        {
+            failure = llformat("'%s' (unit %d) is a non-shadow sampler over depth texture %d "
+                               "with comparisons enabled on sampler %d",
+                               sampler.mName.c_str(), sampler.mUnit, texture, bound_sampler);
+            break;
+        }
+        if (sampler.mIsShadow && compare_mode == GL_NONE)
+        {
+            failure = llformat("'%s' (unit %d) is a shadow sampler over texture %d with "
+                               "comparisons DISABLED (sampler %d)",
+                               sampler.mName.c_str(), sampler.mUnit, texture, bound_sampler);
+            break;
+        }
+        if (sampler.mIsShadow && !is_depth)
+        {
+            failure = llformat("'%s' (unit %d) is a shadow sampler over non-depth texture %d "
+                               "(format 0x%x)",
+                               sampler.mName.c_str(), sampler.mUnit, texture, internal_format);
+            break;
+        }
+    }
+
+    glActiveTexture(saved_active_unit);
+
+    if (failure.empty())
+    {
+        return true;
+    }
+
+    LL_WARNS() << "----- SAMPLER BINDING INVALID -------" << LL_ENDL;
+    LL_WARNS() << "Shader: " << shader_name << LL_ENDL;
+    LL_WARNS() << failure << LL_ENDL;
+    LL_WARNS() << "-------------------------------------" << LL_ENDL;
+    log_texture_unit_state();
+
+    return false;
+}
+
 void APIENTRY gl_debug_callback(GLenum source,
                                 GLenum type,
                                 GLuint id,
@@ -97,6 +514,20 @@ void APIENTRY gl_debug_callback(GLenum source,
                                 const GLchar* message,
                                 GLvoid* userParam)
 {
+    // This callback makes GL calls of its own -- the buffer/shader/texture-unit dump below.
+    // Any error one of THOSE raises comes straight back here, which reports it, dumps
+    // again, and raises it again: one real fault turns into a burst of identical messages
+    // whose true origin is buried, and every one of them re-reads the state it is meant to
+    // be describing. That is exactly how the cube-map level query above showed up.
+    //
+    // Per-thread because the texture upload thread has its own context and its own
+    // callback; a shared flag would let one thread silence the other's diagnostics.
+    if (sInDebugCallback)
+    {
+        return;
+    }
+    DebugCallbackGuard reentry_guard;
+
     /*if (severity != GL_DEBUG_SEVERITY_HIGH &&
         severity != GL_DEBUG_SEVERITY_MEDIUM &&
         severity != GL_DEBUG_SEVERITY_LOW
@@ -145,6 +576,15 @@ void APIENTRY gl_debug_callback(GLenum source,
     LL_WARNS() << "Message: " << message << LL_ENDL;
     LL_WARNS() << "-----------------------" << LL_ENDL;
 
+    // The buffer and texture-unit dump below is a few hundred synchronous glGet round
+    // trips. Worth it for anything that might be a defect; not for the notification-level
+    // chatter some drivers emit constantly (buffer migration notes and the like), which
+    // would turn a debug session into a slideshow and bury the messages that matter.
+    if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+    {
+        return;
+    }
+
     GLint vao = 0;
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
     GLint vbo = 0;
@@ -170,6 +610,19 @@ void APIENTRY gl_debug_callback(GLenum source,
         glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_SIZE, &ubo_size);
         glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_IMMUTABLE_STORAGE, &ubo_immutable);
     }
+
+    if (LLGLSLShader::sCurBoundShaderPtr)
+    {
+        LL_WARNS() << "Bound shader: " << LLGLSLShader::sCurBoundShaderPtr->mName << LL_ENDL;
+    }
+
+    LL_WARNS() << "Bound buffers: VAO=" << vao
+               << " ARRAY_BUFFER=" << vbo << " (size " << vbo_size << ")"
+               << " ELEMENT_ARRAY=" << ibo << " (size " << ibo_size << ")"
+               << " UNIFORM_BUFFER=" << ubo << " (size " << ubo_size << ", immutable " << ubo_immutable << ")"
+               << LL_ENDL;
+
+    log_texture_unit_state();
 
     // No needs to halt when is called from LLViewerWindow::stopGL()
     if (severity == GL_DEBUG_SEVERITY_HIGH && !gGLManager.mIsDisabled)
@@ -969,6 +1422,25 @@ PFNGLMULTIDRAWARRAYSINDIRECTCOUNTPROC    glMultiDrawArraysIndirectCount = nullpt
 PFNGLMULTIDRAWELEMENTSINDIRECTCOUNTPROC  glMultiDrawElementsIndirectCount = nullptr;
 PFNGLPOLYGONOFFSETCLAMPPROC              glPolygonOffsetClamp = nullptr;
 
+// GL_EXT_memory_object
+PFNGLCREATEMEMORYOBJECTSEXTPROC        glCreateMemoryObjectsEXT        = nullptr;
+PFNGLDELETEMEMORYOBJECTSEXTPROC        glDeleteMemoryObjectsEXT        = nullptr;
+PFNGLMEMORYOBJECTPARAMETERIVEXTPROC    glMemoryObjectParameterivEXT    = nullptr;
+PFNGLTEXSTORAGEMEM2DEXTPROC            glTexStorageMem2DEXT            = nullptr;
+
+// GL_EXT_semaphore
+PFNGLGENSEMAPHORESEXTPROC              glGenSemaphoresEXT              = nullptr;
+PFNGLDELETESEMAPHORESEXTPROC           glDeleteSemaphoresEXT           = nullptr;
+PFNGLSEMAPHOREPARAMETERUI64VEXTPROC    glSemaphoreParameterui64vEXT    = nullptr;
+PFNGLWAITSEMAPHOREEXTPROC              glWaitSemaphoreEXT              = nullptr;
+PFNGLSIGNALSEMAPHOREEXTPROC            glSignalSemaphoreEXT            = nullptr;
+
+// GL_EXT_memory_object_win32
+PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC    glImportMemoryWin32HandleEXT    = nullptr;
+
+// GL_EXT_semaphore_win32
+PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC glImportSemaphoreWin32HandleEXT = nullptr;
+
 #endif
 
 LLGLManager gGLManager;
@@ -1220,18 +1692,31 @@ bool LLGLManager::initGL()
 
     mGLVersion = mDriverVersionMajor + mDriverVersionMinor * .1f;
 
+    // Every Mesa driver stamps "Mesa" into the GL_VERSION string
+    // (e.g. "4.6 (Core Profile) Mesa 26.1.4"), regardless of the underlying
+    // hardware backend. Detect it here so driver-specific workarounds can key
+    // off mIsMesa. mGLVersionString is the raw (mixed-case) version string.
+    {
+        std::string ver_upper = mGLVersionString;
+        LLStringUtil::toUpper(ver_upper);
+        mIsMesa = ver_upper.find("MESA") != std::string::npos;
+    }
+
     if (mGLVersion >= 2.f)
     {
         parse_glsl_version(mGLSLVersionMajor, mGLSLVersionMinor);
     }
 
-    if (mGLVersion >= 2.1f && LLImageGL::sCompressTextures)
-    { //use texture compression
-        glHint(GL_TEXTURE_COMPRESSION_HINT, GL_NICEST);
-    }
-    else
-    { //GL version is < 3.0, always disable texture compression
-        LLImageGL::sCompressTextures = false;
+    // The renderer assumes GL 4.1 unconditionally: deprecated formats are re-expressed
+    // via GL_TEXTURE_SWIZZLE_RGBA rather than repacked on the CPU, the texture upload
+    // thread is always enabled, and the shader backend expects GLSL 4.10. Below the
+    // floor those assumptions do not hold and behaviour is undefined rather than
+    // degraded. This is a diagnostic only -- refusing to launch is a separate change.
+    if (mGLVersion < GL_MINIMUM_VERSION)
+    {
+        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " is below the "
+                               << GL_MINIMUM_VERSION << " minimum this viewer requires. "
+                               << "Rendering will misbehave." << LL_ENDL;
     }
 
     // Trailing space necessary to keep "nVidia Corpor_ati_on" cards
@@ -1628,8 +2113,47 @@ void LLGLManager::initExtensions()
         mHasAnisotropic = mGLExtensions.contains("GL_EXT_texture_filter_anisotropic");
     }
 
+    // Core in 4.2; on a 4.1 context (macOS) it is still reachable as an ARB extension.
+    // Downgraded below if the entry point turns out not to resolve.
+    //
+    // REQUIRED, alongside GL 4.1 -- not a capability the renderer adapts to. Every texture
+    // is allocated with glTexStorage2D and written by sub-image thereafter, which is the
+    // only model D3D11/12 and Vulkan have: dimensions, format and mip count fixed at
+    // creation. There is no mutable path left to fall back to. Diagnostic only, matching
+    // the GL_MINIMUM_VERSION check -- refusing to launch is a separate change.
+    mHasTextureStorage = mGLVersion >= 4.19f || mGLExtensions.contains("GL_ARB_texture_storage");
+    if (!mHasTextureStorage)
+    {
+        LL_WARNS("RenderInit") << "OpenGL " << mGLVersionString << " exposes neither GL 4.2 nor "
+                               << "GL_ARB_texture_storage, which this viewer requires. Texture "
+                               << "allocation will fail." << LL_ENDL;
+    }
+
+    // REQUIRED, like immutable storage. Never promoted to core, so it is an extension
+    // query at every version. Without it an sRGB-format texture always applies its
+    // transfer function on read and there is no way to say otherwise, which the renderer
+    // relies on being able to do -- see ALSampler::SRGBDecode.
+    mHasTextureSRGBDecode = mGLExtensions.contains("GL_EXT_texture_sRGB_decode");
+    if (!mHasTextureSRGBDecode)
+    {
+        LL_WARNS("RenderInit") << "GL_EXT_texture_sRGB_decode is missing. sRGB-format "
+                               << "textures will decode on every read regardless of what the "
+                               << "sampler asks for." << LL_ENDL;
+    }
+
+    // Core in 4.5; also an ARB extension. Downgraded below if the entry points don't resolve.
+    mHasDirectStateAccess = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_direct_state_access");
+
+    // Core in 4.5; also GL_ARB_clip_control. Gates reverse-Z. Downgraded below if glClipControl
+    // does not resolve. macOS GL 4.1 lacks it entirely and stays forward-Z.
+    mHasClipControl = mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_clip_control");
+
     mHasNVXGpuMemoryInfo = mGLExtensions.contains("GL_NVX_gpu_memory_info");
     mHasATIMemInfo = mGLExtensions.contains("GL_ATI_meminfo"); //Basic AMD method, also see mHasAMDAssociations
+    mHasEXTMemoryObject  = mGLExtensions.contains("GL_EXT_memory_object");
+    mHasEXTSemaphore     = mGLExtensions.contains("GL_EXT_semaphore");
+    mHasEXTMemoryObjectWin32 = mGLExtensions.contains("GL_EXT_memory_object_win32");
+    mHasEXTSemaphoreWin32 = mGLExtensions.contains("GL_EXT_semaphore_win32");
 
     // Misc
     glGetIntegerv(GL_MAX_ELEMENTS_VERTICES, (GLint*) &mGLMaxVertexRange);
@@ -1641,6 +2165,130 @@ void LLGLManager::initExtensions()
 #if LL_GL_FUNC_POINTER
     // Load entire OpenGL API through GetProcAddress, leaving sections beyond mGLVersion unloaded
     LL_DEBUGS("RenderInit") << "GL Probe: Getting symbols" << LL_ENDL;
+
+    // Init EXT and ARB extensions FIRST, because they may be used in later GL versions
+
+    // Immutable texture storage. Resolved here rather than left to the GL_VERSION_4_2
+    // block below: that ladder early-outs before 4.2, so on a 4.1 context exposing
+    // GL_ARB_texture_storage -- macOS -- these would otherwise stay null. On 4.2+ the
+    // ladder resolves the same pointers again, which is harmless.
+    if (mHasTextureStorage)
+    {
+        glTexStorage1D = (PFNGLTEXSTORAGE1DPROC)LL_GET_PROC_ADDRESS("glTexStorage1D");
+        glTexStorage2D = (PFNGLTEXSTORAGE2DPROC)LL_GET_PROC_ADDRESS("glTexStorage2D");
+        glTexStorage3D = (PFNGLTEXSTORAGE3DPROC)LL_GET_PROC_ADDRESS("glTexStorage3D");
+
+        if (!glTexStorage2D)
+        {
+            // Advertised but not resolvable. Don't let callers trust the flag.
+            mHasTextureStorage = false;
+            LL_WARNS("RenderInit") << "Immutable texture storage advertised (GL " << mGLVersion
+                                   << ") but glTexStorage2D did not resolve; using mutable textures."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Immutable texture storage available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.19f ? ", core)" : ", GL_ARB_texture_storage)")
+                                   << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_INFOS("RenderInit") << "Immutable texture storage unavailable (GL " << mGLVersion
+                               << ", no GL_ARB_texture_storage); using mutable textures." << LL_ENDL;
+    }
+
+    // Direct state access. Resolved here for the same reason as glTexStorage above: the
+    // GL_VERSION_4_5 ladder early-outs on a lower context, so a 4.1/4.4 driver exposing
+    // GL_ARB_direct_state_access would otherwise leave these null. Only the entry points
+    // actually used are checked -- add to the check when more are adopted.
+    if (mHasDirectStateAccess)
+    {
+        glBindTextureUnit = (PFNGLBINDTEXTUREUNITPROC)LL_GET_PROC_ADDRESS("glBindTextureUnit");
+        glCreateSamplers  = (PFNGLCREATESAMPLERSPROC)LL_GET_PROC_ADDRESS("glCreateSamplers");
+
+        if (!glBindTextureUnit || !glCreateSamplers)
+        {
+            mHasDirectStateAccess = false;
+            LL_WARNS("RenderInit") << "Direct state access advertised (GL " << mGLVersion
+                                   << ") but its entry points did not resolve; using bind-to-edit."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Direct state access available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.49f ? ", core)" : ", GL_ARB_direct_state_access)")
+                                   << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_INFOS("RenderInit") << "Direct state access unavailable (GL " << mGLVersion
+                               << ", no GL_ARB_direct_state_access); using bind-to-edit." << LL_ENDL;
+    }
+
+    // Clip control. Resolved here for the same reason as glTexStorage/DSA above: the
+    // GL_VERSION_4_5 ladder early-outs on a lower context, so a 4.1/4.4 driver exposing
+    // GL_ARB_clip_control would otherwise leave glClipControl null.
+    if (mHasClipControl)
+    {
+        glClipControl = (PFNGLCLIPCONTROLPROC)LL_GET_PROC_ADDRESS("glClipControl");
+
+        if (!glClipControl)
+        {
+            mHasClipControl = false;
+            LL_WARNS("RenderInit") << "Clip control advertised (GL " << mGLVersion
+                                   << ") but glClipControl did not resolve; reverse-Z unavailable."
+                                   << LL_ENDL;
+        }
+        else
+        {
+            LL_INFOS("RenderInit") << "Clip control available (GL " << mGLVersion
+                                   << (mGLVersion >= 4.49f ? ", core)" : ", GL_ARB_clip_control)")
+                                   << LL_ENDL;
+        }
+    }
+    else
+    {
+        LL_INFOS("RenderInit") << "Clip control unavailable (GL " << mGLVersion
+                               << ", no GL_ARB_clip_control); reverse-Z depth disabled." << LL_ENDL;
+    }
+
+    // GL_EXT_memory_object
+    if (mHasEXTMemoryObject)
+    {
+        glCreateMemoryObjectsEXT = (PFNGLCREATEMEMORYOBJECTSEXTPROC)LL_GET_PROC_ADDRESS("glCreateMemoryObjectsEXT");
+        glDeleteMemoryObjectsEXT = (PFNGLDELETEMEMORYOBJECTSEXTPROC)LL_GET_PROC_ADDRESS("glDeleteMemoryObjectsEXT");
+        glMemoryObjectParameterivEXT = (PFNGLMEMORYOBJECTPARAMETERIVEXTPROC)LL_GET_PROC_ADDRESS("glMemoryObjectParameterivEXT");
+        glTexStorageMem2DEXT = (PFNGLTEXSTORAGEMEM2DEXTPROC)LL_GET_PROC_ADDRESS("glTexStorageMem2DEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_memory_object symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_semaphore
+    if (mHasEXTSemaphore)
+    {
+        glGenSemaphoresEXT = (PFNGLGENSEMAPHORESEXTPROC)LL_GET_PROC_ADDRESS("glGenSemaphoresEXT");
+        glDeleteSemaphoresEXT = (PFNGLDELETESEMAPHORESEXTPROC)LL_GET_PROC_ADDRESS("glDeleteSemaphoresEXT");
+        glSemaphoreParameterui64vEXT = (PFNGLSEMAPHOREPARAMETERUI64VEXTPROC)LL_GET_PROC_ADDRESS("glSemaphoreParameterui64vEXT");
+        glWaitSemaphoreEXT = (PFNGLWAITSEMAPHOREEXTPROC)LL_GET_PROC_ADDRESS("glWaitSemaphoreEXT");
+        glSignalSemaphoreEXT = (PFNGLSIGNALSEMAPHOREEXTPROC)LL_GET_PROC_ADDRESS("glSignalSemaphoreEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_semaphore symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_memory_object_win32
+    if (mHasEXTMemoryObjectWin32)
+    {
+        glImportMemoryWin32HandleEXT = (PFNGLIMPORTMEMORYWIN32HANDLEEXTPROC)LL_GET_PROC_ADDRESS("glImportMemoryWin32HandleEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_memory_object_win32 symbols loaded" << LL_ENDL;
+    }
+
+    // GL_EXT_semaphore_win32
+    if (mHasEXTSemaphoreWin32)
+    {
+        glImportSemaphoreWin32HandleEXT = (PFNGLIMPORTSEMAPHOREWIN32HANDLEEXTPROC)LL_GET_PROC_ADDRESS("glImportSemaphoreWin32HandleEXT");
+        LL_INFOS("RenderInit") << "GL_EXT_semaphore_win32 symbols loaded" << LL_ENDL;
+    }
 
     // GL_VERSION_1_2
     if (mGLVersion < 1.19f)
@@ -2508,8 +3156,9 @@ void LLGLState::resetTextureStates()
     glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
     for (S32 j = maxTextureUnits-1; j >=0; j--)
     {
-        gGL.getTexUnit(j)->activate();
-        j == 0 ? gGL.getTexUnit(j)->enable(LLTexUnit::TT_TEXTURE) : gGL.getTexUnit(j)->disable();
+        // Slot 0 used to be spared and left "enabled for TT_TEXTURE" instead, which reset
+        // nothing -- it only set the target field. A reset releases every slot.
+        gGL.getTextureSlot(j)->unbind();
     }
 }
 
@@ -2805,6 +3454,10 @@ void LLGLUserClipPlane::disable()
     mApply = false;
 }
 
+// NOTE: dead code -- LLGLUserClipPlane is not constructed anywhere in the tree (water/
+// mirror clipping is done by shader discard). The oblique-clip math below hardcodes the
+// [-1,1] NDC convention (cplane[3] -= 1). If this is ever revived it MUST be made
+// reverse-Z aware (the ZERO_TO_ONE near-plane constant differs) before use.
 void LLGLUserClipPlane::setPlane(F32 a, F32 b, F32 c, F32 d)
 {
     const glm::mat4& P = mProjection;
@@ -2835,6 +3488,33 @@ LLGLUserClipPlane::~LLGLUserClipPlane()
     disable();
 }
 
+GLenum LLGLDepthTest::remap(GLenum func)
+{
+    if (!LLRender::sReverseZ)
+    {
+        return func;
+    }
+    switch (func)
+    {
+        case GL_LESS:     return GL_GREATER;
+        case GL_GREATER:  return GL_LESS;
+        case GL_LEQUAL:   return GL_GEQUAL;
+        case GL_GEQUAL:   return GL_LEQUAL;
+        // EQUAL/NOTEQUAL/ALWAYS/NEVER are direction-independent under a monotone
+        // depth remap and must NOT flip.
+        default:          return func;
+    }
+}
+
+void LLGLDepthTest::rebase()
+{
+    // Force the physical depth func to agree with the current translation of the tracked
+    // (semantic) func. Used by the reverse-Z latch after LLRender::sReverseZ toggles.
+    gGL.flush();
+    glDepthFunc(remap(sDepthFunc));
+    stop_glerror();
+}
+
 LLGLDepthTest::LLGLDepthTest(GLboolean depth_enabled, GLboolean write_enabled, GLenum depth_func)
 : mPrevDepthEnabled(sDepthEnabled), mPrevDepthFunc(sDepthFunc), mPrevWriteEnabled(sWriteEnabled)
 {
@@ -2859,7 +3539,7 @@ LLGLDepthTest::LLGLDepthTest(GLboolean depth_enabled, GLboolean write_enabled, G
     if (depth_func != sDepthFunc)
     {
         gGL.flush();
-        glDepthFunc(depth_func);
+        glDepthFunc(remap(depth_func));
         sDepthFunc = depth_func;
     }
     if (write_enabled != sWriteEnabled)
@@ -2884,7 +3564,7 @@ LLGLDepthTest::~LLGLDepthTest()
     if (sDepthFunc != mPrevDepthFunc)
     {
         gGL.flush();
-        glDepthFunc(mPrevDepthFunc);
+        glDepthFunc(remap(mPrevDepthFunc));
         sDepthFunc = mPrevDepthFunc;
     }
     if (sWriteEnabled != mPrevWriteEnabled )
@@ -2907,7 +3587,7 @@ void LLGLDepthTest::checkState()
 
         if (glIsEnabled(GL_DEPTH_TEST) != sDepthEnabled ||
             sWriteEnabled != mask ||
-            sDepthFunc != func)
+            remap(sDepthFunc) != (GLenum)func)
         {
             if (gDebugSession)
             {
@@ -2934,7 +3614,12 @@ LLGLSquashToFarClip::LLGLSquashToFarClip(const glm::mat4& P, U32 layer)
 
 void LLGLSquashToFarClip::setProjectionMatrix(glm::mat4 projection, U32 layer)
 {
-    F32 depth = 0.99999f - 0.0001f * layer;
+    // Replacing row 2 with row 3 * depth forces ndc z = depth for every vertex regardless
+    // of projection, so only the far-plane constant mirrors under reverse-Z (far = 0).
+    // Under ZERO_TO_ONE ndc==window, so mirror the forward WINDOW depth (0.999995 - 5e-5*layer,
+    // i.e. ndc*0.5+0.5), not the raw ndc distance -- matching the sundisc/moon pins.
+    F32 depth = LLRender::sReverseZ ? (0.000005f + 0.00005f * layer)
+                                    : (0.99999f - 0.0001f * layer);
 
     glm::vec4 P_row_3 = glm::row(projection, 3) * depth;
     projection = glm::row(projection, 2, P_row_3);

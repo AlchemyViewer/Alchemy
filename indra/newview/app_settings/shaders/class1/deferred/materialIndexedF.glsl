@@ -55,6 +55,9 @@ in vec2 vary_texcoord2;
 #endif
 
 uniform vec4  mat_specular_color[GLTF_INDEXED_CHANNELS]; // rgb = specular color, a = glossiness/exponent
+
+vec3 srgb_to_linear(vec3 c);
+vec3 linear_to_srgb(vec3 c);
 uniform float mat_env_intensity[GLTF_INDEXED_CHANNELS];
 uniform float mat_emissive_brightness[GLTF_INDEXED_CHANNELS]; // fullbright flag
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_MASK)
@@ -217,6 +220,7 @@ vec4 sample_spec(vec2 uv)
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 vec3 getNormal(int mi, inout float glossiness)
 {
@@ -239,9 +243,12 @@ vec4 getSpecular(int mi)
 {
 #ifdef HAS_SPECULAR_MAP
     vec4 spec = sample_spec(vary_texcoord2.xy);
-    spec.rgb *= mat_specular_color[mi].rgb;
+    // The map is decoded on the sampler (filtered in linear), so linearise the tint to
+    // match. Yields LINEAR spec: the forward path lights with it directly, the deferred
+    // writer re-encodes to sRGB for the shared RGBA8 store.
+    spec.rgb *= srgb_to_linear(mat_specular_color[mi].rgb);
 #else
-    vec4 spec = vec4(mat_specular_color[mi].rgb, 1.0);
+    vec4 spec = vec4(srgb_to_linear(mat_specular_color[mi].rgb), 1.0);
 #endif
     return spec;
 }
@@ -277,12 +284,26 @@ void main()
     float glossiness = mat_specular_color[mi].a;
     vec3 norm = getNormal(mi, glossiness);
 
+    // Widen the lobe by whatever normal detail this pixel lost to minification, as the PBR
+    // writers do. A normal map at distance packs many normals into one texel; averaging them
+    // leaves the shading with a single direction and the authored lobe width, so a narrow
+    // Blinn-Phong highlight snaps between pixels as the camera moves. Worked in the
+    // (1 - glossiness) domain, which is what this path already treats as perceptual roughness
+    // -- it is the same number that picks the probe mip in sampleReflectionProbesLegacy.
+    //
+    // Derivatives, so uniform control flow: this sits after the alpha mask, where the PBR
+    // writers put theirs.
+    glossiness = 1.0 - filterSpecularRoughness(1.0 - glossiness, norm);
+
     float emissive = getEmissive(mi, diffcol);
 
     float flag = GBUFFER_FLAG_HAS_ATMOS;
 
     frag_data[0] = max(vec4(diffcol.rgb, emissive), vec4(0)); // gbuffer is sRGB for legacy materials
-    frag_data[1] = max(vec4(spec.rgb, glossiness), vec4(0));  // XYZ = Specular color. W = Specular exponent.
+    // frag_data[1] is a plain RGBA8 shared with PBR's linear ORM, so it cannot be sRGB
+    // storage. The spec was FILTERED in linear (sampler decode); re-encode it here so it
+    // lands sRGB the way softenLight reads it. Storage constraint, not a filtering one.
+    frag_data[1] = max(vec4(linear_to_srgb(spec.rgb), glossiness), vec4(0));  // XYZ = Specular color. W = Specular exponent.
     frag_data[2] = encodeNormal(norm, env, flag);             // XY = Normal. Z = Env intensity.
 
 #if defined(HAS_EMISSIVE)

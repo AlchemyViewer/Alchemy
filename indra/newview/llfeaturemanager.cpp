@@ -806,10 +806,6 @@ void LLFeatureManager::applyBaseMasks()
     {
         maskFeatures("TexUnit16orLess");
     }
-    if (gGLManager.mVRAM > 512)
-    {
-        maskFeatures("VRAMGT512");
-    }
     if (gGLManager.mVRAM < 2048)
     {
         maskFeatures("VRAMLT2GB");

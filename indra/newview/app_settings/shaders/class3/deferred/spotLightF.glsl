@@ -29,7 +29,6 @@ out vec4 frag_color;
 
 uniform samplerCube environmentMap;
 uniform sampler2D lightMap;
-uniform sampler2D lightFunc;
 
 uniform mat4 proj_mat; //screen space to light space
 uniform float proj_near; //near clip for projection
@@ -44,10 +43,17 @@ uniform float near_clip;
 uniform float far_clip;
 
 uniform vec3 proj_origin; //origin of projection to be used for angular attenuation
-uniform float sun_wash;
 uniform int proj_shadow_idx;
 uniform float shadow_fade;
-uniform int classic_mode;
+// Classic (legacy pre-PBR) sky lighting is a per-program compile-time variant, not a runtime
+// uniform: the two paths differ by whole blocks of maths and a probe sample, and only one of
+// them is ever live for a given sky. A macro rather than a const global -- these sources are
+// separately compiled units linked into one program, and several of them declare this.
+#ifdef CLASSIC_MODE
+#define classic_mode 1
+#else
+#define classic_mode 0
+#endif
 
 // Light params
 #if defined(MULTI_SPOTLIGHT)
@@ -62,9 +68,16 @@ uniform float falloff;
 in vec4 vary_fragcoord;
 uniform vec2 screen_res;
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
+float blinnPhongLobe(float nh, float glossiness);
+void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
+vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
+vec3 clampRadiance(vec3 c);
+float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 bool clipProjectedLightVars(vec3 center, vec3 pos, out float dist, out float l_dist, out vec3 lv, out vec4 proj_tc );
 vec4 getNorm(vec2 screenpos);
@@ -146,15 +159,20 @@ void main()
     if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_PBR))
     {
         vec3 orm = spec.rgb;
-        float perceptualRoughness = orm.g;
+        float perceptualRoughness = unpackRoughness(spec.ga);
         float metallic = orm.b;
-        vec3 f0 = vec3(0.04);
         vec3 baseColor = diffuse.rgb;
 
-        vec3 diffuseColor = baseColor.rgb*(vec3(1.0)-f0);
-        diffuseColor *= 1.0 - metallic;
+        // The shared split, not a copy of it. Carrying an inlined duplicate is how the
+        // deferred local lights came to disagree with the sun and IBL about a dielectric's
+        // diffuse albedo -- same surface, different answer depending on what was lighting it.
+        vec3 diffuseColor;
+        vec3 specularColor;
+        calcDiffuseSpecular(baseColor, metallic, diffuseColor, specularColor);
 
-        vec3 specularColor = mix(f0, baseColor.rgb, metallic);
+        // Hoisted: the compensation depends only on the surface and the view, so it is one LUT
+        // fetch per fragment rather than one per light or per lobe.
+        vec3 energyComp = pbrEnergyCompensation(specularColor, perceptualRoughness, dot(n.xyz, v));
         vec3 diffPunc = vec3(0);
         vec3 specPunc = vec3(0);
 
@@ -167,23 +185,38 @@ void main()
 
             lv = normalize(lv);
 
-            if (nl > 0.0)
+            // Tested against the raw dot product, not against nl. calcHalfVectors clamps nl to
+            // a positive epsilon so the legacy path can divide by it, which made this condition
+            // and pointLightF's mirror image of it constant -- there was no facing test left
+            // here at all, only pbrPunctual's own internal one further down.
+            if (dot(n.xyz, lv) > 0.0)
             {
                 amb_da += (nl*0.5 + 0.5) * proj_ambiance;
 
                 dlit = getProjectedLightDiffuseColor( l_dist, proj_tc.xy );
 
-                vec3 intensity = dist_atten * dlit * 3.25 * shadow; // Legacy attenuation, magic number to balance with legacy materials
+                vec3 intensity = dist_atten * dlit * PUNCTUAL_LIGHT_SCALE * shadow; // see deferredUtil.glsl -- must match every other site
 
-                pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, normalize(lv), nl, diffPunc, specPunc);
+                pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diffPunc, specPunc);
 
-                final_color += intensity * clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10));
+                final_color += intensity * clampRadiance(nl * (diffPunc + specPunc * energyComp));
+
+                // How much direct light this pixel already received, which is what bounds the
+                // ambiance below. Declared and passed but never assigned, so that bound never
+                // applied and the projector's fill stacked on top of its own full-strength
+                // beam. The legacy branch has always assigned it.
+                lit = clamp(nl * dist_atten, 0.0, 1.0);
             }
 
-            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * 3.25; //magic number to balance with legacy ambiance
-            pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, normalize(lv), nl, diffPunc, specPunc);
+            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * PUNCTUAL_LIGHT_SCALE; //magic number to balance with legacy ambiance
 
-            final_color += amb_rgb * clamp(nl * (diffPunc + specPunc), vec3(0), vec3(10));
+            // Ambiance is the projector's non-directional fill -- it exists to reach the
+            // surfaces the cookie does not. Weighting it by the punctual lobe (a second,
+            // argument-for-argument identical pbrPunctual call, whose result was already
+            // sitting in diffPunc/specPunc) put an NdotL on it, so it fell to nothing on
+            // exactly those surfaces, and charged a full GGX evaluation per fragment to do it.
+            // Against the diffuse albedo, as the legacy branch below does it.
+            final_color += diffuseColor.rgb * amb_rgb;
         }
     }
     else
@@ -227,7 +260,7 @@ void main()
 
             if (nh > 0.0)
             {
-                float scol = fres*texture(lightFunc, vec2(nh, spec.a)).r*gt/(nh*nl);
+                float scol = fres*blinnPhongLobe(nh, spec.a)*gt/(nh*nl);
                 vec3 speccol = dlit*scol*spec.rgb*shadow;
                 speccol = clamp(speccol, vec3(0), vec3(1));
                 final_color += speccol;

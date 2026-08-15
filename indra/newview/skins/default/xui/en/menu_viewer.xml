@@ -1589,13 +1589,13 @@ function="World.EnvPreset"
                function="EditableSelected" />
           </menu_item_call>
           <menu_item_call
-             label="Set Scripts to Not Running"
-             name="Set Scripts to Not Running">
+              label="Set Scripts to Not Running"
+              name="Set Scripts to Not Running">
             <menu_item_call.on_click
-               function="Tools.SelectedScriptAction"
-               parameter="stop" />
+                function="Tools.SelectedScriptAction"
+                parameter="stop" />
             <menu_item_call.on_enable
-               function="EditableSelected" />
+                function="EditableSelected" />
           </menu_item_call>
           <menu_item_call
              label="Delete Scripts"
@@ -1606,6 +1606,17 @@ function="World.EnvPreset"
             <menu_item_call.on_enable
                function="EditableSelected" />
           </menu_item_call>
+          <menu_item_separator/>
+          <menu_item_check
+              label="Script Editor Server"
+              name="Script Editor Server">
+            <menu_item_check.on_check
+                function="Tools.CheckScriptEditorServer" />
+            <menu_item_check.on_click
+                function="Tools.ToggleScriptEditorServer" />
+            <menu_item_check.on_enable
+                function="Tools.EnableScriptEditorServer" />
+          </menu_item_check>
         </menu>
 
       <menu
@@ -2430,6 +2441,24 @@ function="World.EnvPreset"
             <menu_item_check.on_click
              function="ToggleControl"
              parameter="DisableCameraConstraints" />
+        </menu_item_check>
+        <!-- Lock the Depth-of-Field focus point in place. Registers the
+             Alt+Shift+X accelerator advertised by the "Lock Focus (alt+shift+X)"
+             checkbox in the Lightbox (graphics) floater; both drive the same
+             RenderFocusPointLocked setting, which is read by
+             LLPipeline::renderDoF(). Kept always-enabled (no enabled_control)
+             so the shortcut fires regardless of whether the Advanced menu is
+             visible or Depth of Field is currently on. -->
+        <menu_item_check
+         label="Lock DoF Focus Point"
+         name="Lock DoF Focus Point"
+         shortcut="alt|shift|X">
+            <menu_item_check.on_check
+             function="CheckControl"
+             parameter="RenderFocusPointLocked" />
+            <menu_item_check.on_click
+             function="ToggleControl"
+             parameter="RenderFocusPointLocked" />
         </menu_item_check>
 
         <menu_item_separator/>

@@ -154,8 +154,6 @@ void LLFloaterColorPicker::createUI ()
         }
     }
     mRGBImage = LLViewerTextureManager::getLocalTexture( (LLImageRaw*)raw, false );
-    gGL.getTexUnit(0)->bind(mRGBImage);
-    mRGBImage->setAddressMode(LLTexUnit::TAM_CLAMP);
 
     // create palette
     for ( S32 each = 0; each < numPaletteColumns * numPaletteRows; ++each )
@@ -429,7 +427,7 @@ void LLFloaterColorPicker::onClickPipette( )
     if (pipette_active)
     {
         LLToolMgr::getInstance()->clearTransientTool();
-        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1, _3));
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterColorPicker::onColorSelect, this, _1, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
     }
     else

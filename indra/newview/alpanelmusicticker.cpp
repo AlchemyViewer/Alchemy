@@ -149,7 +149,7 @@ void ALPanelMusicTicker::drawOscilloscope() //called via draw.
     F32 width = (F32)root_rect.getWidth();
     F32 width_scale = width / (F32)NUM_WAVE_DATA_VALUES;
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gGL.color4fv(mOscillatorColor.mV);
     gGL.pushMatrix();
         const auto& ui_scale = gGL.getUIScale();

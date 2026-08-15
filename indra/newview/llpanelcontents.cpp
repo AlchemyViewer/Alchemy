@@ -31,6 +31,7 @@
 
 // linden library includes
 #include "llerror.h"
+#include "llcombobox.h"
 #include "llfiltereditor.h"
 #include "llfloaterreg.h"
 #include "llfontgl.h"
@@ -55,6 +56,7 @@
 #include "lltrans.h"
 #include "llviewerassettype.h"
 #include "llviewerinventory.h"
+#include "llviewercontrol.h"
 #include "llviewerobject.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
@@ -86,8 +88,12 @@ bool LLPanelContents::postBuild()
 {
     setMouseOpaque(false);
 
-    getChild<LLUICtrl>("button new script")->setCommitCallback(boost::bind(&LLPanelContents::onClickNewScript, this, _1));
+    getChild<LLUICtrl>("button new script")->setCommitCallback(boost::bind(&LLPanelContents::onNewScriptFlyoutCommit, this, _1));
+    childSetAction("button new notecard", boost::bind(&LLPanelContents::onNewNotecardCommit, this));
     childSetAction("button permissions",&LLPanelContents::onClickPermissions, this);
+
+    mPublishButton = getChild<LLButton>("button publish");
+    mPublishButton->setClickedCallback([this](LLUICtrl*, const LLSD&) { onClickPublish(); });
 
     mFilterEditor = getChild<LLFilterEditor>("contents_filter");
     mFilterEditor->setCommitCallback([&](LLUICtrl*, const LLSD&) { onFilterEdit(); });
@@ -129,6 +135,9 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     if( !objectp )
     {
         getChildView("button new script")->setEnabled(false);
+        getChildView("button new notecard")->setEnabled(false);
+        mPublishButton->setEnabled(false);
+        mPublishButton->setToggleState(false);
         return;
     }
 
@@ -137,7 +146,10 @@ void LLPanelContents::getState(LLViewerObject *objectp )
         // Client-only local mesh preview: it has no server-side task inventory,
         // so scripts/contents/permissions don't apply.
         getChildView("button new script")->setEnabled(false);
+        getChildView("button new notecard")->setEnabled(false);
         getChildView("button permissions")->setEnabled(false);
+        mPublishButton->setEnabled(false);
+        mPublishButton->setToggleState(false);
         if (mFilterEditor)
         {
             mFilterEditor->setEnabled(false);
@@ -177,14 +189,17 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     }
 // [/RLVa:KB]
 
-    // Edit script button - ok if object is editable and there's an unambiguous destination for the object.
-    getChildView("button new script")->setEnabled(
-        editable &&
-        all_volume &&
-        ((LLSelectMgr::getInstance()->getSelection()->getRootObjectCount() == 1)
-            || (LLSelectMgr::getInstance()->getSelection()->getObjectCount() == 1)));
+    S32  object_count = LLSelectMgr::getInstance()->getSelection()->getObjectCount();
+    S32  root_count = LLSelectMgr::getInstance()->getSelection()->getRootObjectCount();
+    bool single_root  = (root_count == 1);
 
-    // Disable the "new_lua_script_item" child if editable is false
+    bool new_button_enabled = editable && all_volume && (single_root || (object_count == 1));
+
+    // Edit script button - ok if object is editable and there's an unambiguous destination for the object.
+    getChildView("button new script")->setEnabled(new_button_enabled);
+
+    // Enable the Lua script option only when the region supports it.
+    LLViewerRegion* region = objectp->getRegion();
     bool lua_enabled = isLuaEnabledForObjectRegion(objectp);
     getChild<LLComboBox>("button new script")->setEnabledByValue("lua", lua_enabled);
 
@@ -195,6 +210,24 @@ void LLPanelContents::getState(LLViewerObject *objectp )
         // Restore the filter the local-only branch above disables, so it isn't
         // left stuck disabled after selecting a normal object next.
         mFilterEditor->setEnabled(true);
+    }
+
+    // New Notecard button - requires the CreateTaskInventoryItem cap.
+    bool has_create_cap = region && !region->getCapability("CreateTaskInventoryItem").empty();
+    getChildView("button new notecard")->setEnabled(has_create_cap && new_button_enabled);
+
+    // Publish button - enabled only when WS server is configured, and a single editable root object is selected.
+    mPublishButton->setEnabled(LLScriptEditorWSServer::isEnabled() && new_button_enabled);
+
+    // Sync toggle state to reflect whether the object is currently published.
+    if (LLScriptEditorWSServer::isEnabled())
+    {
+        auto server = LLScriptEditorWSServer::getServer();
+        mPublishButton->setToggleState(server && server->isObjectPublished(objectp->getID()));
+    }
+    else
+    {
+        mPublishButton->setToggleState(false);
     }
 }
 
@@ -278,15 +311,33 @@ void LLPanelContents::clearContents()
     }
 }
 
-void LLPanelContents::onClickNewScript(LLUICtrl* ctrl)
+void LLPanelContents::onNewScriptFlyoutCommit(LLUICtrl* ctrl)
 {
     const std::string& value = ctrl->getValue().asString();
 
     const bool children_ok = true;
     LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
-    bool lua_enabled = isLuaEnabledForObjectRegion(object);
+    if (!object)
+    {
+        return;
+    }
 
-    U8 script_language = lua_enabled ? SST_LUA : SST_LSL;
+// [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c) | Modified: RLVa-1.0.5a
+    if (rlv_handler_t::isEnabled()) // Fallback code [see LLPanelContents::getState()]
+    {
+        if (gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit()))
+        {
+            return;                 // Disallow creating new scripts in a locked attachment
+        }
+        else if ( (gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (gRlvHandler.hasBehaviour(RLV_BHVR_SITTP)) )
+        {
+            if ( (isAgentAvatarValid()) && (gAgentAvatarp->isSitting()) && (gAgentAvatarp->getRoot() == object->getRootEdit()) )
+                return;             // .. or in a linkset the avie is sitting on under @unsit=n/@sittp=n
+        }
+    }
+// [/RLVa:KB]
+
+    U8 script_language = isLuaEnabledForObjectRegion(object) ? SST_LUA : SST_LSL;
     if (value == "lua")
     {
         script_language = SST_LUA;
@@ -296,68 +347,97 @@ void LLPanelContents::onClickNewScript(LLUICtrl* ctrl)
         script_language = SST_LSL;
     }
 
-    if (object)
+    // template_id is an inventory item UUID of a script in the user's
+    // inventory pulled from per account settings. The sim should fallback
+    // to the default script on an invalid uuid.
+    const char* template_setting = (script_language == SST_LUA)
+        ? "AlchemySLuaScriptTemplateID"
+        : "AlchemyLSLScriptTemplateID";
+    LLUUID template_id(gSavedPerAccountSettings.getString(template_setting));
+
+    std::string vm = (script_language == SST_LUA) ? "luau" : "mono";
+
+    LLSD params;
+    params["enabled"] = true;
+    params["vm"] = vm;
+
+    createTaskInventoryItemHelper(object,
+        LLAssetType::AT_LSL_TEXT,
+        LLInventoryType::IT_LSL,
+        script_language,
+        "New Script",
+        params,
+        template_id);
+}
+
+void LLPanelContents::createTaskInventoryItemHelper(
+    LLViewerObject* object,
+    LLAssetType::EType asset_type,
+    LLInventoryType::EType inventory_type,
+    U8 sub_type,
+    const std::string& name,
+    const LLSD& params,
+    const LLUUID& template_id)
+{
+    const char* perm_key = (asset_type == LLAssetType::AT_LSL_TEXT) ? "Scripts" : "Notecards";
+
+    LLPermissions perm;
+    perm.init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
+    perm.initMasks(
+        PERM_ALL,
+        PERM_ALL,
+        LLFloaterPerms::getEveryonePerms(perm_key),
+        LLFloaterPerms::getGroupPerms(perm_key),
+        PERM_MOVE | LLFloaterPerms::getNextOwnerPerms(perm_key));
+
+    std::string desc;
+    LLViewerAssetType::generateDescriptionFor(asset_type, desc);
+
+    // Use cap if available, fall back to saveScript for scripts
+    if (!object->getRegion()->getCapability("CreateTaskInventoryItem").empty())
     {
-// [RLVa:KB] - Checked: 2010-03-31 (RLVa-1.2.0c) | Modified: RLVa-1.0.5a
-        if (rlv_handler_t::isEnabled()) // Fallback code [see LLPanelContents::getState()]
-        {
-            if (gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit()))
+        object->createInventoryItem(asset_type, inventory_type, sub_type,
+            name, desc, perm, params,
+            [](bool success, const LLSD& response)
             {
-                return;                 // Disallow creating new scripts in a locked attachment
-            }
-            else if ( (gRlvHandler.hasBehaviour(RLV_BHVR_UNSIT)) || (gRlvHandler.hasBehaviour(RLV_BHVR_SITTP)) )
-            {
-                if ( (isAgentAvatarValid()) && (gAgentAvatarp->isSitting()) && (gAgentAvatarp->getRoot() == object->getRootEdit()) )
-                    return;             // .. or in a linkset the avie is sitting on under @unsit=n/@sittp=n
-            }
-        }
-// [/RLVa:KB]
-
-        LLPermissions perm;
-        perm.init(gAgent.getID(), gAgent.getID(), LLUUID::null, LLUUID::null);
-
-        // Parameters are base, owner, everyone, group, next
-        perm.initMasks(
-            PERM_ALL,
-            PERM_ALL,
-            LLFloaterPerms::getEveryonePerms("Scripts"),
-            LLFloaterPerms::getGroupPerms("Scripts"),
-            PERM_MOVE | LLFloaterPerms::getNextOwnerPerms("Scripts"));
-        std::string desc;
-        LLViewerAssetType::generateDescriptionFor(LLAssetType::AT_LSL_TEXT, desc);
-
-        // template_id is an inventory item UUID of a script in the user's
-        // inventory pulled from per account settings. The sim should fallback
-        // to the default script on an invalid uuid.
-        const char* template_setting = (script_language == SST_LUA)
-            ? "AlchemySLuaScriptTemplateID"
-            : "AlchemyLSLScriptTemplateID";
-        LLUUID template_id(gSavedPerAccountSettings.getString(template_setting));
-
+                if (!success)
+                {
+                    LL_WARNS() << "CreateTaskInventoryItem failed: "
+                               << response["message"].asString() << LL_ENDL;
+                }
+            });
+    }
+    else if (asset_type == LLAssetType::AT_LSL_TEXT)
+    {
+        // Fallback: use legacy RezScript UDP
         LLPointer<LLViewerInventoryItem> new_item =
             new LLViewerInventoryItem(
-                LLUUID::null,
-                LLUUID::null,
-                perm,
-                LLUUID::null,
-                LLAssetType::AT_LSL_TEXT,
-                LLInventoryType::IT_LSL,
-                "New Script",
-                desc,
-                LLSaleInfo::DEFAULT,
-                LLInventoryItemFlags::II_FLAGS_SUBTYPE_MASK & script_language,
+                LLUUID::null, LLUUID::null, perm,
+                LLUUID::null, asset_type, inventory_type,
+                name, desc, LLSaleInfo::DEFAULT,
+                LLInventoryItemFlags::II_FLAGS_SUBTYPE_MASK & sub_type,
                 time_corrected());
         object->saveScript(new_item, true, true, template_id);
-
-        std::string name = new_item->getName();
-
-        // *NOTE: In order to resolve SL-22177, we needed to create
-        // the script first, and then you have to click it in
-        // inventory to edit it.
-        // *TODO: The script creation should round-trip back to the
-        // viewer so the viewer can auto-open the script and start
-        // editing ASAP.
     }
+    else
+    {
+        LL_WARNS() << "Cannot create " << LLAssetType::lookup(asset_type)
+                   << " — capability not available" << LL_ENDL;
+    }
+}
+
+void LLPanelContents::onNewNotecardCommit()
+{
+    const bool children_ok = true;
+    LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
+    if (!object) return;
+
+    createTaskInventoryItemHelper(object,
+        LLAssetType::AT_NOTECARD,
+        LLInventoryType::IT_NOTECARD,
+        0,
+        "New Notecard",
+        LLSD());
 }
 
 // static
@@ -365,4 +445,41 @@ void LLPanelContents::onClickPermissions(void *userdata)
 {
     LLPanelContents* self = (LLPanelContents*)userdata;
     gFloaterView->getParentFloater(self)->addDependentFloater(LLFloaterReg::showInstance("bulk_perms"));
+}
+
+void LLPanelContents::onClickPublish()
+{
+    const bool children_ok = true;
+    LLViewerObject* object = LLSelectMgr::getInstance()->getSelection()->getFirstRootObject(children_ok);
+    if (!object)
+    {
+        LL_WARNS() << "No root object selected for publish/unpublish" << LL_ENDL;
+        return;
+    }
+
+    auto server = LLScriptEditorWSServer::ensureServerRunning();
+    if (!server)
+    {
+        LL_WARNS() << "Cannot publish/unpublish: WebSocket server failed to start" << LL_ENDL;
+        return;
+    }
+
+    const LLUUID object_id = object->getID();
+    if (server->getConnectionCount())
+    { // if we already have at least one connection, then we can toggle the publish state of the object
+        if (server->isObjectPublished(object_id))
+        {
+            server->unpublishObject(object_id, "user");
+        }
+        else
+        {
+            server->publishObject(object_id);
+        }
+    }
+    else
+    {   // if we don't have any connections, we need to build the url and launch vscode
+        // Launch VSCode
+        LLScriptEditorWSServer::launchVSCode(object_id);
+
+    }
 }

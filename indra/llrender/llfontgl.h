@@ -90,7 +90,7 @@ public:
 
     void destroyGL();
 
-    bool loadFace(const std::string& filename, F32 point_size, const F32 vert_dpi, const F32 horz_dpi, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags, const LLFontVarAxes& var_axes = {});
+    bool loadFace(const std::string& filename, F32 point_size, const F32 vert_dpi, const F32 horz_dpi, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags, const ALFontVarAxes& var_axes = {});
 
     S32 getNumFaces(const std::string& filename);
     // U64: the stamp is a SUM of per-face S32 generations; a 64-bit unsigned
@@ -316,10 +316,10 @@ public:
     static bool sFontsXmlDirty;
     static bool sDisplayFont ;
     // Threaded in from newview's EmojiUseDarkPalette setting. Read by
-    // LLFontFace::load when computing the CPAL palette index for COLRv1
+    // ALFontFace::load when computing the CPAL palette index for COLRv1
     // faces; non-COLRv1 faces ignore it. Toggling the setting triggers a
     // font reload via the standard schedulePendingReload mechanism, so
-    // every face re-runs LLFontFace::load and picks up the new value.
+    // every face re-runs ALFontFace::load and picks up the new value.
     static bool sUseDarkEmojiPalette;
     // Threaded in from newview's AlchemyForceMonochromeEmoji setting. When
     // true, LLFontGL::render downgrades Color → Grayscale lookups so COLRv1

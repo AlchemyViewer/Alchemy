@@ -816,8 +816,8 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 
     shader->uniform1f(LLShaderMgr::SKY_SUNLIGHT_SCALE, hdr ? sunlight_hdr_scale : sunlight_scale);
     shader->uniform1f(LLShaderMgr::SKY_AMBIENT_SCALE, ambient_scale);
-    shader->uniform1i(LLShaderMgr::CLASSIC_MODE, classic_mode);
-
+    // classic_mode is a compile-time program variant now; sClassicMode is what selectVariant()
+    // reads to pick the CLASSIC_MODE=1 clone.
     LLRender::sClassicMode = classic_mode;
 
     F32 probe_ambiance = getReflectionProbeAmbiance();
@@ -1111,15 +1111,6 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, waterPlane.mV);
         shader->uniform4fv(LLShaderMgr::CLIP_PLANE, glm::value_ptr(mirrorPlane));
         LLVector4 light_direction = env.getClampedLightNorm();
-
-        if (gPipeline.mHeroProbeManager.isMirrorPass())
-        {
-            shader->uniform1f(LLShaderMgr::MIRROR_FLAG, 1);
-        }
-        else
-        {
-            shader->uniform1f(LLShaderMgr::MIRROR_FLAG, 0);
-        }
 
         F32 waterFogKS = 1.f / llmax(light_direction.mV[2], WATER_FOG_LIGHT_CLAMP);
 

@@ -101,4 +101,3 @@ vec3 inv_toneMapACES_Hill(vec3 color)
 
     return color;
 }
-

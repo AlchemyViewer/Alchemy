@@ -46,7 +46,7 @@ void LLDrawPoolGlow::renderPostDeferred(S32 pass)
     gGL.flush();
     /// Get rid of z-fighting with non-glow pass.
     LLGLEnable polyOffset(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-1.0f, -1.0f);
+    gGL.setPolygonOffset(-1.0f, -1.0f);
     gGL.setSceneBlendType(LLRender::BT_ADD);
 
     LLGLDepthTest depth(GL_TRUE, GL_FALSE);
@@ -127,19 +127,25 @@ void LLDrawPoolSimple::renderDeferred(S32 pass)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_SIMPLE_DEFERRED);
     LLGLDisable blend(GL_BLEND);
 
+    // The diffuse sampler decodes and the deferred pass's hoisted GL_FRAMEBUFFER_SRGB
+    // (renderGeomDeferred) re-encodes on store, so this pass shades in linear throughout
+    // while the G-buffer keeps its sRGB storage.
+    LLGLSLShader* shader = gDeferredDiffuseProgram.selectVariant();
+
     //render static
-    gDeferredDiffuseProgram.bind();
+    shader->bind();
     pushBatches(LLRenderPass::PASS_SIMPLE, true, true);
 
     //render rigged
-    gDeferredDiffuseProgram.bind(true);
+    shader->bind(true);
     pushRiggedBatches(LLRenderPass::PASS_SIMPLE_RIGGED, true, true);
 }
 
 void LLDrawPoolAlphaMask::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_ALPHA_MASK_DEFERRED);
-    LLGLSLShader* shader = &gDeferredDiffuseAlphaMaskProgram;
+    // Sampler decodes, the hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes.
+    LLGLSLShader* shader = gDeferredDiffuseAlphaMaskProgram.selectVariant();
 
     //render static
     shader->bind();
@@ -161,11 +167,15 @@ void LLDrawPoolGrass::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     {
-        gDeferredNonIndexedDiffuseAlphaMaskProgram.bind();
-        gDeferredNonIndexedDiffuseAlphaMaskProgram.setMinimumAlpha(0.5f);
+        // Shades in linear like its diffusealphamask siblings: the program's mLinearDiffuse
+        // makes pushBatch decode the diffuse on the sampler, and the hoisted
+        // GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes the store.
+        LLGLSLShader* shader = gDeferredNonIndexedDiffuseAlphaMaskProgram.selectVariant();
+        shader->bind();
+        shader->setMinimumAlpha(0.5f);
 
         //render grass
-        LLRenderPass::pushBatches(LLRenderPass::PASS_GRASS, getVertexDataMask());
+        LLRenderPass::pushBatches(LLRenderPass::PASS_GRASS);
     }
 }
 
@@ -187,7 +197,7 @@ void LLDrawPoolFullbright::renderPostDeferred(S32 pass)
     }
     else
     {
-        shader = &gDeferredFullbrightProgram;
+        shader = gDeferredFullbrightProgram.selectVariant();
     }
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
@@ -215,7 +225,7 @@ void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
     }
     else
     {
-        shader = &gDeferredFullbrightAlphaMaskProgram;
+        shader = gDeferredFullbrightAlphaMaskProgram.selectVariant();
     }
 
     LLGLDisable blend(GL_BLEND);

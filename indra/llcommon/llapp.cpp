@@ -44,6 +44,7 @@
 #include "llmemory.h"
 #include "llstl.h" // for DeletePointer()
 #include "llstring.h"
+#include "llthread.h" // for on_main_thread()
 #include "lleventtimer.h"
 #include "stringize.h"
 #include "llcleanup.h"
@@ -580,6 +581,17 @@ void default_unix_signal_handler(int signum, siginfo_t *info, void *)
             {
                 clear_signals();
                 LL_WARNS() << "Fatal signal received, not handling the crash here, passing back to operating system" << LL_ENDL;
+                raise(signum);
+                return;
+            }
+
+            if (!on_main_thread())
+            {
+                // A fatal signal on a helper thread cannot be handled gracefully:
+                // setError() posts events and joins thread pools, which deadlocks
+                // if the crashing thread is one the shutdown depends on, e.g. a
+                // libdispatch worker inside the macOS GL driver. Crash instead.
+                clear_signals();
                 raise(signum);
                 return;
             }

@@ -1,6 +1,6 @@
 /**
- * @file llfontshaping_test.cpp
- * @brief Unit tests for LLFontShaping — HarfBuzz wrapper, ZWJ ligature
+ * @file alfontshaping_test.cpp
+ * @brief Unit tests for ALFontShaping — HarfBuzz wrapper, ZWJ ligature
  *        retry, VS-16 strip, monospace feature plans, LRU cache contract.
  *
  * The bulk of the tests are pure-CPU: HB shaping itself doesn't touch
@@ -12,14 +12,29 @@
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * $/LicenseInfo$
  */
 
 #include "linden_common.h"
 
-#include "../llfontshaping.h"
+#include "../alfontshaping.h"
 #include "../llfontfreetype.h"
-#include "../llfontface.h"
+#include "../alfontface.h"
 #include "../llfontregistry.h"  // EFontHinting full definition
 
 #include "../test/lltut.h"
@@ -106,34 +121,34 @@ namespace tut
     // static fontp caches that complicate llfontgl_test's fixture.
     // Clearing the shape LRU at both ends keeps cross-test bleed
     // out of the cache-hit assertions.
-    struct llfontshaping_data
+    struct alfontshaping_data
     {
-        llfontshaping_data()
+        alfontshaping_data()
         {
             LLFontManager::initClass();
-            LLFontShaping::clearCache();
+            ALFontShaping::clearCache();
         }
-        ~llfontshaping_data()
+        ~alfontshaping_data()
         {
-            LLFontShaping::clearCache();
+            ALFontShaping::clearCache();
             LLFontManager::cleanupClass();
         }
     };
 
-    typedef test_group<llfontshaping_data> llfontshaping_test;
-    typedef llfontshaping_test::object     llfontshaping_object;
-    tut::llfontshaping_test llfontshaping_testcase("LLFontShaping");
+    typedef test_group<alfontshaping_data> alfontshaping_test;
+    typedef alfontshaping_test::object     alfontshaping_object;
+    tut::alfontshaping_test alfontshaping_testcase("ALFontShaping");
 
     // Null root face and empty/inverted ranges all produce empty
     // output. The header documents these as the safe-fallback
     // contracts callers rely on for "fall back to 1:1 codepoint path."
     template<> template<>
-    void llfontshaping_object::test<1>()
+    void alfontshaping_object::test<1>()
     {
-        std::vector<LLShapedGlyph> out;
+        std::vector<ALShapedGlyph> out;
         LLWString s = wstr('a','b','c');
 
-        LLFontShaping::shapeRun(/*root_face=*/nullptr, s, 0, s.size(), out);
+        ALFontShaping::shapeRun(/*root_face=*/nullptr, s, 0, s.size(), out);
         ensure("null root face -> empty output", out.empty());
 
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
@@ -142,13 +157,13 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        LLFontShaping::shapeRun(ft, s, /*begin=*/2, /*end=*/2, out);
+        ALFontShaping::shapeRun(ft, s, /*begin=*/2, /*end=*/2, out);
         ensure("begin == end -> empty output", out.empty());
 
-        LLFontShaping::shapeRun(ft, s, /*begin=*/3, /*end=*/2, out);
+        ALFontShaping::shapeRun(ft, s, /*begin=*/3, /*end=*/2, out);
         ensure("begin > end -> empty output", out.empty());
 
-        LLFontShaping::shapeRun(ft, s, /*begin=*/0, /*end=*/99, out);
+        ALFontShaping::shapeRun(ft, s, /*begin=*/0, /*end=*/99, out);
         ensure("end > size -> empty output", out.empty());
     }
 
@@ -165,7 +180,7 @@ namespace tut
     // match below is the strongest identity check we can make without
     // rasterizing.
     template<> template<>
-    void llfontshaping_object::test<2>()
+    void alfontshaping_object::test<2>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -174,8 +189,8 @@ namespace tut
         ensure("DejaVuSans loaded", ft.notNull());
 
         LLWString s = wstr('a','b','c');
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("3 glyphs for 'abc'", out.size(), 3u);
 
         for (const auto& g : out)
@@ -199,9 +214,9 @@ namespace tut
     // shapeRun rebases cluster indices to the original wstr;
     // shapeLine returns slice-local clusters. Pin both contracts —
     // the renderer hot path branches on this distinction
-    // (llfontshaping.h:80-90).
+    // (alfontshaping.h:80-90).
     template<> template<>
-    void llfontshaping_object::test<3>()
+    void alfontshaping_object::test<3>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -210,14 +225,14 @@ namespace tut
         ensure("DejaVuSans loaded", ft.notNull());
 
         LLWString s = wstr('X','Y','a','b','c');
-        std::vector<LLShapedGlyph> shape_run_out;
-        LLFontShaping::shapeRun(ft, s, /*begin=*/2, /*end=*/5, shape_run_out);
+        std::vector<ALShapedGlyph> shape_run_out;
+        ALFontShaping::shapeRun(ft, s, /*begin=*/2, /*end=*/5, shape_run_out);
         ensure_equals("shapeRun produced 3 glyphs", shape_run_out.size(), 3u);
         // 'a' is at original position 2 (begin == 2).
         ensure_equals("shapeRun cluster[0] is original-string index 2",
                       shape_run_out[0].cluster, 2);
 
-        const auto& shape_line_out = LLFontShaping::shapeLine(ft, s, 2, 5);
+        const auto& shape_line_out = ALFontShaping::shapeLine(ft, s, 2, 5);
         ensure_equals("shapeLine produced 3 glyphs", shape_line_out.size(), 3u);
         // shapeLine clusters are slice-local: 'a' is at slice index 0.
         ensure_equals("shapeLine cluster[0] is slice-local index 0",
@@ -230,7 +245,7 @@ namespace tut
     // glyph ids must not drift), and it's the load-bearing invariant
     // for the LRU's reuse semantics.
     template<> template<>
-    void llfontshaping_object::test<4>()
+    void alfontshaping_object::test<4>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -239,11 +254,11 @@ namespace tut
         ensure("DejaVuSans loaded", ft.notNull());
 
         LLWString s = wstr('h','e','l','l','o');
-        std::vector<LLShapedGlyph> first;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), first);
+        std::vector<ALShapedGlyph> first;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), first);
 
-        std::vector<LLShapedGlyph> second;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), second);
+        std::vector<ALShapedGlyph> second;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), second);
         ensure_equals("cache hit produces same glyph count",
                       second.size(), first.size());
         for (size_t i = 0; i < first.size(); ++i)
@@ -267,7 +282,7 @@ namespace tut
     // by checking the returned reference identity from shapeLine —
     // a cleared entry rebuilds to a fresh storage location.
     template<> template<>
-    void llfontshaping_object::test<5>()
+    void alfontshaping_object::test<5>()
     {
         const std::string a_path = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string b_path = std::string(kFontDir) + "InterVariable.woff2";
@@ -279,28 +294,28 @@ namespace tut
         ensure("both faces loaded", a.notNull() && b.notNull());
 
         LLWString s = wstr('a','b');
-        const auto& a_first  = LLFontShaping::shapeLine(a, s, 0, s.size());
-        const auto& b_first  = LLFontShaping::shapeLine(b, s, 0, s.size());
+        const auto& a_first  = ALFontShaping::shapeLine(a, s, 0, s.size());
+        const auto& b_first  = ALFontShaping::shapeLine(b, s, 0, s.size());
         ensure("a shape non-empty", !a_first.empty());
         ensure("b shape non-empty", !b_first.empty());
         const void* a_addr0 = a_first.data();
         const void* b_addr0 = b_first.data();
 
         // Hit A again: cache hit returns same storage address.
-        const auto& a_second = LLFontShaping::shapeLine(a, s, 0, s.size());
+        const auto& a_second = ALFontShaping::shapeLine(a, s, 0, s.size());
         ensure_equals("A cache hit: same backing storage",
                       a_second.data(), a_addr0);
 
-        LLFontShaping::clearCacheForFace(a);
+        ALFontShaping::clearCacheForFace(a);
 
         // After clearing A: B's entry survives — its storage address
         // is unchanged. (Whether A's entry got reused at the same
         // address by the allocator after clear is implementation-
         // defined and not part of the contract.)
-        const auto& a_after = LLFontShaping::shapeLine(a, s, 0, s.size());
+        const auto& a_after = ALFontShaping::shapeLine(a, s, 0, s.size());
         ensure("A re-shape produces output", !a_after.empty());
 
-        const auto& b_after = LLFontShaping::shapeLine(b, s, 0, s.size());
+        const auto& b_after = ALFontShaping::shapeLine(b, s, 0, s.size());
         ensure_equals("B cache survived clearCacheForFace(A)",
                       b_after.data(), b_addr0);
     }
@@ -310,7 +325,7 @@ namespace tut
     // rule). Pins d4a5a4c904 — the regression that left ZWJ sequences
     // unligatured because the run was fragmenting at VS-16 and ZWJ.
     template<> template<>
-    void llfontshaping_object::test<6>()
+    void alfontshaping_object::test<6>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -320,8 +335,8 @@ namespace tut
 
         // U+2764 (heart) U+200D (ZWJ) U+1F525 (fire)
         LLWString s = wstr(0x2764, 0x200D, 0x1F525);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure("heart-on-fire shaped to non-empty output", !out.empty());
         ensure_equals("heart-on-fire ZWJ ligated to a single glyph",
                       out.size(), 1u);
@@ -330,9 +345,9 @@ namespace tut
     // VS-16 strip path: shaping U+2764 U+FE0F through Noto-COLRv1
     // (whose cmap lacks U+FE0F) must produce the same output as
     // shaping U+2764 alone — shape_sub_run pre-strips VS-16 before
-    // passing to HB. Pins llfontshaping.cpp:257-264.
+    // passing to HB. Pins alfontshaping.cpp:257-264.
     template<> template<>
-    void llfontshaping_object::test<7>()
+    void alfontshaping_object::test<7>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -349,10 +364,10 @@ namespace tut
         LLWString with_vs    = wstr(0x2764, 0xFE0F);
         LLWString without_vs = wstr(0x2764);
 
-        std::vector<LLShapedGlyph> with_out;
-        std::vector<LLShapedGlyph> without_out;
-        LLFontShaping::shapeRun(ft, with_vs,    0, with_vs.size(),    with_out);
-        LLFontShaping::shapeRun(ft, without_vs, 0, without_vs.size(), without_out);
+        std::vector<ALShapedGlyph> with_out;
+        std::vector<ALShapedGlyph> without_out;
+        ALFontShaping::shapeRun(ft, with_vs,    0, with_vs.size(),    with_out);
+        ALFontShaping::shapeRun(ft, without_vs, 0, without_vs.size(), without_out);
 
         ensure_equals("with-VS and without-VS produce same glyph count",
                       with_out.size(), without_out.size());
@@ -370,7 +385,7 @@ namespace tut
     // face. Pins gap audit #3 — multi-hop selectShapingFace was
     // untested, the existing fallback tests use a single hop only.
     template<> template<>
-    void llfontshaping_object::test<9>()
+    void alfontshaping_object::test<9>()
     {
         const std::string dejavu = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string han    = std::string(kFontDir) + "SourceHanSans-Regular.woff2";
@@ -387,8 +402,8 @@ namespace tut
 
         // 'a' (head) + U+4F60 你 (cjk) + U+1F525 fire (emoji).
         LLWString s = wstr('a', 0x4F60, 0x1F525);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure_equals("3 glyphs (one per codepoint)", out.size(), 3u);
 
         // Each glyph carries the face it came from — verify the routing.
@@ -406,9 +421,9 @@ namespace tut
     // clusters must point into ORIGINAL string positions (so a fire
     // emoji at position 3 stays cluster=3, even though it was at
     // position 2 in the post-strip buffer fed to HB). Pins
-    // cluster_back_map rebase at llfontshaping.cpp:392-403.
+    // cluster_back_map rebase at alfontshaping.cpp:392-403.
     template<> template<>
-    void llfontshaping_object::test<10>()
+    void alfontshaping_object::test<10>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -420,8 +435,8 @@ namespace tut
         // The output's clusters must still reference original positions
         // {0, 2, 3} or the ZWJ-collapse may produce a single cluster=0.
         LLWString s = wstr(0x2764, 0xFE0F, 0x200D, 0x1F525);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure("output non-empty", !out.empty());
         // Whatever the final shape (ZWJ ligature collapses to 1 glyph,
         // or 2 with VS-16 stripped), every cluster must point into the
@@ -442,10 +457,10 @@ namespace tut
     // clearCacheForFace selectivity post-multi-hop: an entry keyed on
     // face A whose glyph stream contains a fallback-face B glyph is
     // dropped by clearCacheForFace(A). The shape LRU is keyed on root
-    // face only (llfontshaping.cpp:62-64); B's own entries (if any)
+    // face only (alfontshaping.cpp:62-64); B's own entries (if any)
     // survive — we don't double-purge across heads sharing fallbacks.
     template<> template<>
-    void llfontshaping_object::test<11>()
+    void alfontshaping_object::test<11>()
     {
         const std::string a_path = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string b_path = std::string(kFontDir) + "SourceHanSans-Regular.woff2";
@@ -460,21 +475,21 @@ namespace tut
         // Shape via A — its entry's glyph stream contains a B glyph
         // for the CJK codepoint. Shape via B directly — separate entry.
         LLWString s = wstr('a', 0x4F60);
-        const auto& a_first = LLFontShaping::shapeLine(a, s, 0, s.size());
-        const auto& b_first = LLFontShaping::shapeLine(b, s, 0, s.size());
+        const auto& a_first = ALFontShaping::shapeLine(a, s, 0, s.size());
+        const auto& b_first = ALFontShaping::shapeLine(b, s, 0, s.size());
         ensure("a non-empty", !a_first.empty());
         ensure("b non-empty", !b_first.empty());
         const void* a_addr = a_first.data();
         const void* b_addr = b_first.data();
 
-        LLFontShaping::clearCacheForFace(a);
+        ALFontShaping::clearCacheForFace(a);
 
         // B's entry survives clearCacheForFace(A): its storage stays
         // at the same address. (Whether A's entry got reused by the
         // allocator at the same address is implementation-defined and
         // not load-bearing for the contract; B's survival is.)
-        const auto& a_after = LLFontShaping::shapeLine(a, s, 0, s.size());
-        const auto& b_after = LLFontShaping::shapeLine(b, s, 0, s.size());
+        const auto& a_after = ALFontShaping::shapeLine(a, s, 0, s.size());
+        const auto& b_after = ALFontShaping::shapeLine(b, s, 0, s.size());
         ensure("A re-shape produces output", !a_after.empty());
         ensure_equals("B's entry survived clearCacheForFace(A)",
                       b_after.data(), b_addr);
@@ -491,7 +506,7 @@ namespace tut
     // rectangle for missing-glyph indication; an empty output would
     // silently drop the codepoint instead.
     template<> template<>
-    void llfontshaping_object::test<12>()
+    void alfontshaping_object::test<12>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -502,8 +517,8 @@ namespace tut
         // U+1F525 (fire emoji) is not in DejaVuSans's cmap, and we
         // attached no fallback, so HB must produce notdef.
         LLWString s = wstr(0x1F525);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("uncovered codepoint produces 1 glyph", out.size(), 1u);
         ensure_equals("uncovered codepoint glyph_id == 0 (notdef)",
                       out[0].glyph_id, 0u);
@@ -520,7 +535,7 @@ namespace tut
     // (count goes to 0 then back to 1) without depending on heap
     // recycling behavior.
     template<> template<>
-    void llfontshaping_object::test<8>()
+    void alfontshaping_object::test<8>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -529,10 +544,10 @@ namespace tut
         ensure("DejaVuSans loaded", ft.notNull());
 
         LLWString s = wstr('h','i');
-        const auto& first = LLFontShaping::shapeLine(ft, s, 0, s.size());
+        const auto& first = ALFontShaping::shapeLine(ft, s, 0, s.size());
         ensure("shape produced output", !first.empty());
         ensure_equals("first shape leaves one entry",
-                      LLFontShaping::cacheSize(), 1u);
+                      ALFontShaping::cacheSize(), 1u);
         // Snapshot the size BEFORE clearCache invalidates `first` —
         // shapeLine returns a reference into the LRU, so the entry's
         // storage is gone the moment the LRU is cleared. Reading
@@ -541,22 +556,22 @@ namespace tut
         const void* addr0 = first.data();
 
         // Cache hit: same storage AND the entry count stays at one.
-        const auto& second = LLFontShaping::shapeLine(ft, s, 0, s.size());
+        const auto& second = ALFontShaping::shapeLine(ft, s, 0, s.size());
         ensure_equals("cache hit storage is stable", second.data(), addr0);
         ensure_equals("cache hit doesn't add an entry",
-                      LLFontShaping::cacheSize(), 1u);
+                      ALFontShaping::cacheSize(), 1u);
 
-        LLFontShaping::clearCache();
+        ALFontShaping::clearCache();
         ensure_equals("clearCache empties the LRU",
-                      LLFontShaping::cacheSize(), 0u);
+                      ALFontShaping::cacheSize(), 0u);
 
         // Miss: re-shape repopulates the cache. Output content is
         // identical (shaping is deterministic given the same face +
         // codepoints); the cache state is what changed.
-        const auto& after = LLFontShaping::shapeLine(ft, s, 0, s.size());
+        const auto& after = ALFontShaping::shapeLine(ft, s, 0, s.size());
         ensure("post-clear rebuild produced output", !after.empty());
         ensure_equals("post-clear miss repopulated to one entry",
-                      LLFontShaping::cacheSize(), 1u);
+                      ALFontShaping::cacheSize(), 1u);
         ensure_equals("post-clear shape is content-identical",
                       after.size(), first_size);
     }
@@ -567,9 +582,9 @@ namespace tut
     // digit lands on the head face (DejaVuSans has '9') and U+FE0F+U+20E3
     // fragment off onto Noto-COLRv1 — producing a bare '9' followed by a
     // standalone keycap mark with no base. Pins the keycap fix in
-    // shape_all_sub_runs (llfontshaping.cpp:497-546).
+    // shape_all_sub_runs (alfontshaping.cpp:497-546).
     template<> template<>
-    void llfontshaping_object::test<13>()
+    void alfontshaping_object::test<13>()
     {
         const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
@@ -582,8 +597,8 @@ namespace tut
         head->addFallbackFont(emoji);
 
         LLWString s = wstr('9', 0xFE0F, 0x20E3);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure("keycap shaped to non-empty output", !out.empty());
         // The emoji face has the GSUB rule digit + U+20E3 -> keycap glyph
         // (VS-16 stripped pre-shape). All output glyphs must come from
@@ -610,7 +625,7 @@ namespace tut
     // its GSUB can collapse the ZWJ ligature. A regression to per-cp
     // itemization would split the heart onto head, breaking the rule.
     template<> template<>
-    void llfontshaping_object::test<14>()
+    void alfontshaping_object::test<14>()
     {
         const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
@@ -629,8 +644,8 @@ namespace tut
                head->getCharGlyphIndex(0x2764) != 0u);
 
         LLWString s = wstr(0x2764, 0xFE0F, 0x200D, 0x1F525);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure("heart-on-fire shaped to non-empty output", !out.empty());
         for (const auto& g : out)
         {
@@ -656,7 +671,7 @@ namespace tut
     // collapsed against the wrong context). Each cluster must shape as
     // its own sub-run, so each rule sees only its own codepoints.
     template<> template<>
-    void llfontshaping_object::test<17>()
+    void alfontshaping_object::test<17>()
     {
         const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
@@ -672,8 +687,8 @@ namespace tut
         // VS-16 ZWJ U+1F308 (rainbow) — pride flag.
         LLWString s = wstr('3', 0xFE0F, 0x20E3,
                            0x1F3F3, 0xFE0F, 0x200D, 0x1F308);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure("adjacent clusters shaped to non-empty output", !out.empty());
         for (const auto& g : out)
         {
@@ -698,7 +713,7 @@ namespace tut
     // as the only fallback and shaping a keycap. Result must keep '#'
     // visible on root rather than tofu-ing the base on a non-covering face.
     template<> template<>
-    void llfontshaping_object::test<18>()
+    void alfontshaping_object::test<18>()
     {
         const std::string head_path     = std::string(kFontDir) + "InterVariable.woff2";
         const std::string fallback_path = std::string(kFontDir) + "DejaVuSans.woff2";
@@ -719,8 +734,8 @@ namespace tut
                           head->getCharGlyphIndex(L'#'), 0u);
 
         LLWString s = wstr('#', 0xFE0F, 0x20E3);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure("shape produced output", !out.empty());
         // The base '#' must end up on a face that has it (root). A
         // regression that routed to a non-covering face would tofu
@@ -744,7 +759,7 @@ namespace tut
     // — diagnosed by this test as either a font-rule miss or a routing
     // miss, with the existing rule-fires path through 9️⃣ as the control.
     template<> template<>
-    void llfontshaping_object::test<16>()
+    void alfontshaping_object::test<16>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -761,8 +776,8 @@ namespace tut
                           ft->getCharGlyphIndex(0x20E3), 0u);
 
         LLWString s = wstr('#', 0xFE0F, 0x20E3);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure("hash-keycap shaped to non-empty output", !out.empty());
         // If the GSUB keycap rule fires, the run collapses to a single
         // composed glyph (the same shape test 6 / test 13 expect for
@@ -775,7 +790,7 @@ namespace tut
     // cluster per the walker. Phase 1's fast path must not interfere —
     // the digit routes to head as before, one glyph, no surprises.
     template<> template<>
-    void llfontshaping_object::test<15>()
+    void alfontshaping_object::test<15>()
     {
         const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
@@ -788,8 +803,8 @@ namespace tut
         head->addFallbackFont(emoji);
 
         LLWString s = wstr('9');
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure_equals("bare '9' produces one glyph", out.size(), 1u);
         ensure_equals("bare '9' routes to head (not emoji fallback)",
                       out[0].face, head.get());
@@ -805,7 +820,7 @@ namespace tut
     // dropped tag-char support from the predicate would split the flag
     // off from its tag bytes and render the bytes as visible glyphs.
     template<> template<>
-    void llfontshaping_object::test<19>()
+    void alfontshaping_object::test<19>()
     {
         const std::string head_path  = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string emoji_path = std::string(kFontDir) + "Noto-COLRv1.ttf";
@@ -821,8 +836,8 @@ namespace tut
         LLWString s = wstr(0x1F3F4,
                            0xE0067, 0xE0062, 0xE0065, 0xE006E, 0xE0067,
                            0xE007F);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(head, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure("subdivision flag shaped to non-empty output", !out.empty());
         // Routing assertion is the load-bearing one: every cluster
         // member must land on the emoji face. A predicate regression
@@ -853,7 +868,7 @@ namespace tut
     // shape_sub_run needs more entries (and the long-form fix is a
     // cluster-aware advance snap on HB output).
     template<> template<>
-    void llfontshaping_object::test<20>()
+    void alfontshaping_object::test<20>()
     {
         const char* mono_files[] = {
             "DejaVuSansMono.woff2",
@@ -886,8 +901,8 @@ namespace tut
             ensure("font is fixed-width", ft->isFixedWidth());
             ft->setAllowMonospaceLigatures(true);  // route through HB
 
-            std::vector<LLShapedGlyph> out;
-            LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+            std::vector<ALShapedGlyph> out;
+            ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
             ensure_equals("N codepoints produce N glyphs through HB",
                           out.size(), N);
 
@@ -961,7 +976,7 @@ namespace tut
     // include programmer ligatures, and (2) catches an HB upstream
     // change that fires more lookups by default.
     template<> template<>
-    void llfontshaping_object::test<21>()
+    void alfontshaping_object::test<21>()
     {
         const char* mono_files[] = {
             "DejaVuSansMono.woff2",
@@ -993,8 +1008,8 @@ namespace tut
             for (char c : ligature_bait)
                 s.push_back((llwchar)c);
 
-            std::vector<LLShapedGlyph> out;
-            LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+            std::vector<ALShapedGlyph> out;
+            ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
             ensure_equals("strict-mono glyph_count == codepoint_count",
                           out.size(), s.size());
             ++fonts_tested;
@@ -1015,7 +1030,7 @@ namespace tut
     // cell), and the mark has non-zero positioning (offset OR cluster
     // composition through ccmp into a precomposed 'á').
     template<> template<>
-    void llfontshaping_object::test<22>()
+    void alfontshaping_object::test<22>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSansMono.woff2";
         if (!fileExists(path))
@@ -1025,8 +1040,8 @@ namespace tut
         ensure("DejaVuSansMono is fixed-width", ft->isFixedWidth());
 
         LLWString s = wstr(L'a', 0x0301);  // a + COMBINING ACUTE ACCENT
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         std::printf("combining mark probe: 'a'+U+0301 -> %zu glyphs\n",
                     out.size());
         for (size_t k = 0; k < out.size(); ++k)
@@ -1094,7 +1109,7 @@ namespace tut
     // ascender honors USE_TYPO_METRICS — so they differ by design.
     // hb_ft_font_create_referenced leaves ppem at 0 (only scale is set).
     template<> template<>
-    void llfontshaping_object::test<23>()
+    void alfontshaping_object::test<23>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -1102,7 +1117,7 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        const LLFontFace* face = ft->getFontFace();
+        const ALFontFace* face = ft->getFontFace();
         ensure("face accessible", face != nullptr);
         hb_font_t* hbf = face->getHbFont();
         ensure("hb_font accessible", hbf != nullptr);
@@ -1138,7 +1153,7 @@ namespace tut
     // kern between adjacent lowercase letters, so HB's GPOS pass is
     // a no-op and per-glyph advances come straight from FT.
     template<> template<>
-    void llfontshaping_object::test<25>()
+    void alfontshaping_object::test<25>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -1146,13 +1161,13 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        const LLFontFace* face = ft->getFontFace();
+        const ALFontFace* face = ft->getFontFace();
         FT_Face ftf = face->face();
         const FT_Int32 load_flags = static_cast<FT_Int32>(face->hinting());
 
         LLWString s = wstr('a','b','c','d','e','f');
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("6 glyphs for 'abcdef'", out.size(), 6u);
 
         for (size_t i = 0; i < out.size(); ++i)
@@ -1175,7 +1190,7 @@ namespace tut
     // codepoint advance consistency. hb_ft_font_get_load_flags has
     // existed since HB 1.7 — the codebase requires newer than that.
     template<> template<>
-    void llfontshaping_object::test<26>()
+    void alfontshaping_object::test<26>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -1183,7 +1198,7 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        const LLFontFace* face = ft->getFontFace();
+        const ALFontFace* face = ft->getFontFace();
         hb_font_t* hbf = face->getHbFont();
         ensure("hb_font accessible", hbf != nullptr);
 
@@ -1204,7 +1219,7 @@ namespace tut
     // renders varied outlines, breaking variation-aware kerning on
     // fonts like Inter at non-default weights.
     template<> template<>
-    void llfontshaping_object::test<27>()
+    void alfontshaping_object::test<27>()
     {
         const std::string path = std::string(kFontDir) + "InterVariable.woff2";
         if (!fileExists(path))
@@ -1213,7 +1228,7 @@ namespace tut
         // wght. opsz is auto-set from point_size whenever opsz_set is
         // false (load() handles both axes via the matching *_set
         // flag), so the verifier below sees a non-default opsz too.
-        LLFontVarAxes va;
+        ALFontVarAxes va;
         va.wght = 600.f; va.wght_set = true;
         LLPointer<LLFontFreetype> ft = new LLFontFreetype;
         ensure("InterVariable loaded at weight=600",
@@ -1223,7 +1238,7 @@ namespace tut
                             /*face_n=*/0, EFontHinting::DEFAULT,
                             /*flags=*/0, va));
 
-        const LLFontFace* face = ft->getFontFace();
+        const ALFontFace* face = ft->getFontFace();
         FT_Face ftf = face->face();
         hb_font_t* hbf = face->getHbFont();
         ensure("hb_font accessible", hbf != nullptr);
@@ -1264,7 +1279,7 @@ namespace tut
     // those, a CFF font with EFontHinting::DEFAULT picks up unwanted
     // stem darkening.
     template<> template<>
-    void llfontshaping_object::test<28>()
+    void alfontshaping_object::test<28>()
     {
         ensure("gFTLibrary initialized", gFTLibrary != nullptr);
 
@@ -1290,7 +1305,7 @@ namespace tut
     // FT_ENCODING_UNICODE so all FT_Get_Char_Index lookups operate on
     // the Unicode cmap subtable, not whichever subtable FT auto-picked.
     template<> template<>
-    void llfontshaping_object::test<29>()
+    void alfontshaping_object::test<29>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -1298,7 +1313,7 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        const LLFontFace* face = ft->getFontFace();
+        const ALFontFace* face = ft->getFontFace();
         FT_Face ftf = face->face();
         ensure("active charmap is set", ftf->charmap != nullptr);
         ensure_equals("active charmap encoding is FT_ENCODING_UNICODE",
@@ -1312,7 +1327,7 @@ namespace tut
     // before HB so the notdef glyph for VS-15 doesn't sit between
     // base and follow-up codepoints. Mirrors test<7>'s VS-16 proof.
     template<> template<>
-    void llfontshaping_object::test<30>()
+    void alfontshaping_object::test<30>()
     {
         const std::string path = std::string(kFontDir) + "Noto-COLRv1.ttf";
         if (!fileExists(path))
@@ -1328,10 +1343,10 @@ namespace tut
         LLWString with_vs    = wstr(0x2764, 0xFE0E);
         LLWString without_vs = wstr(0x2764);
 
-        std::vector<LLShapedGlyph> with_out;
-        std::vector<LLShapedGlyph> without_out;
-        LLFontShaping::shapeRun(ft, with_vs,    0, with_vs.size(),    with_out);
-        LLFontShaping::shapeRun(ft, without_vs, 0, without_vs.size(), without_out);
+        std::vector<ALShapedGlyph> with_out;
+        std::vector<ALShapedGlyph> without_out;
+        ALFontShaping::shapeRun(ft, with_vs,    0, with_vs.size(),    with_out);
+        ALFontShaping::shapeRun(ft, without_vs, 0, without_vs.size(), without_out);
 
         ensure_equals("with-VS15 and without-VS15 produce same glyph count",
                       with_out.size(), without_out.size());
@@ -1349,7 +1364,7 @@ namespace tut
     // limited to Unicode-cmap binding (Defect B in the audit plan) is
     // caught even when ASCII still works.
     template<> template<>
-    void llfontshaping_object::test<31>()
+    void alfontshaping_object::test<31>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -1373,8 +1388,8 @@ namespace tut
             skip("no non-ASCII codepoint covered in DejaVuSans");
 
         LLWString s; s.push_back(wch);
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("1 glyph for non-ASCII codepoint", out.size(), 1u);
         ensure_equals("shape glyph_id matches cmap lookup",
                       out[0].glyph_id, ft->getCharGlyphIndex(wch));
@@ -1389,7 +1404,7 @@ namespace tut
     // and corrupt GSUB tables can synthesize cluster values outside the
     // input range; the clamp pins them back into the slice.
     template<> template<>
-    void llfontshaping_object::test<32>()
+    void alfontshaping_object::test<32>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -1411,8 +1426,8 @@ namespace tut
         for (size_t ci = 0; ci < cases.size(); ++ci)
         {
             const auto& c = cases[ci];
-            std::vector<LLShapedGlyph> out;
-            LLFontShaping::shapeRun(ft, c.s, c.begin, c.end, out);
+            std::vector<ALShapedGlyph> out;
+            ALFontShaping::shapeRun(ft, c.s, c.begin, c.end, out);
             for (const auto& g : out)
             {
                 ensure(("cluster >= begin (case " + std::to_string(ci) + ")").c_str(),
@@ -1436,7 +1451,7 @@ namespace tut
     // the GSUB rule for the composed flag, so HB emits one glyph per
     // covered codepoint plus notdefs.
     template<> template<>
-    void llfontshaping_object::test<33>()
+    void alfontshaping_object::test<33>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -1451,8 +1466,8 @@ namespace tut
         // cluster IDs 1..5 — the bug we're pinning.
         LLWString s = wstr(L'X', 0x1F3F3, 0xFE0F, 0x200D, 0x26A7,
                            0xFE0F, L'Y');
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure("shape produced output", !out.empty());
 
         // Every glyph whose cluster falls inside [1, 6) must report 1
@@ -1478,11 +1493,11 @@ namespace tut
     // shape must route the cluster to the fallback (glyph_id != 0)
     // rather than re-using the stale notdef cache entry. Pre-fix,
     // addFallbackFont only cleared mShapingFaceResolution and left the
-    // LLFontShaping cache dirty — so the second shape call returned the
+    // ALFontShaping cache dirty — so the second shape call returned the
     // stale entry and rendered tofu through A's notdef even though the
     // CJK fallback was attached and would have covered the codepoint.
     template<> template<>
-    void llfontshaping_object::test<34>()
+    void alfontshaping_object::test<34>()
     {
         const std::string a_path = std::string(kFontDir) + "DejaVuSans.woff2";
         const std::string b_path = std::string(kFontDir) + "SourceHanSans-Regular.woff2";
@@ -1496,26 +1511,26 @@ namespace tut
         // Pre-fallback shape: U+4F60 (你) is not in DejaVuSans's cmap, so
         // HB returns one notdef glyph (glyph_id=0) on face A.
         LLWString s = wstr(0x4F60);
-        std::vector<LLShapedGlyph> pre;
-        LLFontShaping::shapeRun(a, s, 0, s.size(), pre);
+        std::vector<ALShapedGlyph> pre;
+        ALFontShaping::shapeRun(a, s, 0, s.size(), pre);
         ensure_equals("pre-fallback shape produces 1 glyph", pre.size(), 1u);
         ensure_equals("pre-fallback glyph routes to head A", pre[0].face, a.get());
         ensure_equals("pre-fallback glyph is notdef (glyph_id=0)",
                       pre[0].glyph_id, 0u);
         ensure_equals("pre-fallback shape leaves one cache entry",
-                      LLFontShaping::cacheSize(), 1u);
+                      ALFontShaping::cacheSize(), 1u);
 
         // Attach the CJK fallback. addFallbackFont must clear the cached
         // entry for `a` so the next shape() re-itemizes through the new
         // chain instead of returning the stale notdef.
         a->addFallbackFont(b);
         ensure_equals("addFallbackFont(this) drops cached entries for this",
-                      LLFontShaping::cacheSize(), 0u);
+                      ALFontShaping::cacheSize(), 0u);
 
         // Post-fallback shape: U+4F60 should now route to face B with a
         // non-zero glyph_id (B has the CJK glyph in its cmap).
-        std::vector<LLShapedGlyph> post;
-        LLFontShaping::shapeRun(a, s, 0, s.size(), post);
+        std::vector<ALShapedGlyph> post;
+        ALFontShaping::shapeRun(a, s, 0, s.size(), post);
         ensure_equals("post-fallback shape produces 1 glyph", post.size(), 1u);
         ensure_equals("post-fallback glyph routes to fallback B",
                       post[0].face, b.get());
@@ -1529,15 +1544,15 @@ namespace tut
     // the test 3 (kerning) path. Wrapped in a separate fixture that
     // pulls in the headless OSMesa context so the rasterizer can
     // satisfy the bind.
-    struct llfontshaping_gl_data
+    struct alfontshaping_gl_data
     {
         std::unique_ptr<ll_test::HeadlessGL> gl = std::make_unique<ll_test::HeadlessGL>();
         ll_test::FontStateScope font_scope;
     };
 
-    typedef test_group<llfontshaping_gl_data> llfontshaping_gl_test;
-    typedef llfontshaping_gl_test::object     llfontshaping_gl_object;
-    tut::llfontshaping_gl_test llfontshaping_gl_testcase("LLFontShapingGL");
+    typedef test_group<alfontshaping_gl_data> alfontshaping_gl_test;
+    typedef alfontshaping_gl_test::object     alfontshaping_gl_object;
+    tut::alfontshaping_gl_test alfontshaping_gl_testcase("ALFontShapingGL");
 
     // Build an LLFontFreetype as a real head face (is_fallback=false),
     // which the headless GL context can satisfy. The pre-warm of
@@ -1562,7 +1577,7 @@ namespace tut
     // zero positioning offsets — same contract the retired bypass
     // enforced. Pins the cell-alignment invariant.
     template<> template<>
-    void llfontshaping_gl_object::test<1>()
+    void alfontshaping_gl_object::test<1>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSansMono.woff2";
         if (!fileExists(path))
@@ -1574,8 +1589,8 @@ namespace tut
                !ft->getAllowMonospaceLigatures());
 
         LLWString s = wstr('A','B');
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("AB produces 2 glyphs through HB strict-mono path",
                       out.size(), 2u);
         ensure("each shaped glyph has positive advance",
@@ -1601,7 +1616,7 @@ namespace tut
     // (kern off, ligatures allowed). Cell alignment invariant on the
     // pre-ligation columns still holds.
     template<> template<>
-    void llfontshaping_gl_object::test<2>()
+    void alfontshaping_gl_object::test<2>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSansMono.woff2";
         if (!fileExists(path))
@@ -1613,8 +1628,8 @@ namespace tut
                ft->getAllowMonospaceLigatures());
 
         LLWString s = wstr('A','V'); // AV is a classic kerned pair
-        std::vector<LLShapedGlyph> out;
-        LLFontShaping::shapeRun(ft, s, 0, s.size(), out);
+        std::vector<ALShapedGlyph> out;
+        ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("AV produces 2 glyphs through HB", out.size(), 2u);
         ensure("each shaped glyph has positive advance",
                out[0].x_advance > 0.f && out[1].x_advance > 0.f);
@@ -1630,7 +1645,7 @@ namespace tut
     // make these equal. Skip if no Latin kern pair fires (test
     // verifies nothing then).
     template<> template<>
-    void llfontshaping_gl_object::test<3>()
+    void alfontshaping_gl_object::test<3>()
     {
         const std::string path = std::string(kFontDir) + "DejaVuSans.woff2";
         if (!fileExists(path))
@@ -1652,10 +1667,10 @@ namespace tut
             LLWString l    = wstr(p.l);
             LLWString r    = wstr(p.r);
             LLWString lr   = wstr(p.l, p.r);
-            std::vector<LLShapedGlyph> lg, rg, lrg;
-            LLFontShaping::shapeRun(ft, l,  0, l.size(),  lg);
-            LLFontShaping::shapeRun(ft, r,  0, r.size(),  rg);
-            LLFontShaping::shapeRun(ft, lr, 0, lr.size(), lrg);
+            std::vector<ALShapedGlyph> lg, rg, lrg;
+            ALFontShaping::shapeRun(ft, l,  0, l.size(),  lg);
+            ALFontShaping::shapeRun(ft, r,  0, r.size(),  rg);
+            ALFontShaping::shapeRun(ft, lr, 0, lr.size(), lrg);
             if (lg.size() != 1 || rg.size() != 1 || lrg.size() != 2)
                 continue;
             // Pair advance equals solo[0] + solo[1] when no kern fires.

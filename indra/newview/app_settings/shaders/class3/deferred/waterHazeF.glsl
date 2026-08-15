@@ -58,8 +58,16 @@ void main()
         // with depth testing against render targets that are bound for sampling in the same shader
         // so we do it manually here
 
+        // The matching hardware LLGLDepthTest in pipeline.cpp auto-translates its func under
+        // reverse-Z; keep this in sync. Under reverse-Z clip.z/clip.w is already the [0,1]
+        // ndc z (no *0.5+0.5), and "fragment behind stored geometry" is the smaller depth.
+#ifdef REVERSE_Z
+        float cur_depth = vary_fragcoord.z/vary_fragcoord.w;
+        if (cur_depth < depth)
+#else
         float cur_depth = vary_fragcoord.z/vary_fragcoord.w*0.5+0.5;
         if (cur_depth > depth)
+#endif
         {
             discard;
         }

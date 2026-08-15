@@ -23,6 +23,11 @@
  * $/LicenseInfo$
  */
 
+// NOTE: base colour and emissive are NOT converted here. Their samplers ask the hardware
+// to decode (GLTF_COLOR_SAMPLER, pushGLTFBatchIndexed), which converts each texel before
+// filtering rather than after -- converting a blend taken in sRGB space is what made
+// minified albedo read too dark. Doing it here as well would convert twice.
+
 /*[EXTRA_CODE_HERE]*/
 
 // Indexed (multi-material) PBR opaque GBuffer-write fragment shader.
@@ -79,10 +84,12 @@ uniform sampler2D basecolor7; uniform sampler2D normalmap7; uniform sampler2D or
 #endif
 
 vec3 linear_to_srgb(vec3 c);
-vec3 srgb_to_linear(vec3 c);
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+vec4 encodeNormalGeo(vec3 n, vec3 geometric_normal, float gbuffer_flag);
+vec4 packORM(vec3 orm);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 vec4 sample_basecolor(vec2 uv)
 {
@@ -199,7 +206,6 @@ void main()
     int mi = vary_material_index;
 
     vec4 basecolor = sample_basecolor(base_color_texcoord.xy).rgba;
-    basecolor.rgb = srgb_to_linear(basecolor.rgb);
 
     basecolor *= vertex_color;
 
@@ -225,17 +231,23 @@ void main()
     spec.g *= gltf_roughness_factor[mi];
     spec.b *= gltf_metallic_factor[mi];
 
+    // See pbropaqueF -- same correction, same reason.
+    spec.g = filterSpecularRoughness(spec.g, tnorm);
+
     vec3 emissive = gltf_emissive_color[mi];
-    emissive *= srgb_to_linear(sample_emissive(emissive_texcoord.xy));
+    emissive *= sample_emissive(emissive_texcoord.xy);
 
     tnorm *= gl_FrontFacing ? 1.0 : -1.0;
 
     // See: C++: addDeferredAttachments(), GLSL: softenLightF
     frag_data[0] = max(vec4(col, 0.0), vec4(0));                 // Diffuse
-    frag_data[1] = max(vec4(spec.rgb, 0.0), vec4(0));            // PBR linear packed Occlusion, Roughness, Metal.
-    frag_data[2] = encodeNormal(tnorm, 0, GBUFFER_FLAG_HAS_PBR); // normal, environment intensity, flags
+    frag_data[1] = packORM(max(spec.rgb, vec3(0)));  // Occlusion, Roughness (green+alpha), Metal
+    // Geometric normal in place of environment intensity: PBR never reads the latter, and
+    // the deferred passes have no other way to know where the surface actually faces once a
+    // normal map has moved tnorm.
+    frag_data[2] = encodeNormalGeo(tnorm, normalize(vary_normal) * (gl_FrontFacing ? 1.0 : -1.0), GBUFFER_FLAG_HAS_PBR);
 
 #if defined(HAS_EMISSIVE)
-    frag_data[3] = max(vec4(emissive, 0), vec4(0));             // PBR sRGB Emissive
+    frag_data[3] = max(vec4(emissive, 0), vec4(0));             // PBR linear Emissive (sampler-decoded, float attachment stores it verbatim)
 #endif
 }

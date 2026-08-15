@@ -260,6 +260,18 @@ std::vector<std::string> LLWindow::getDynamicFallbackFontList()
 }
 
 // static
+LLFontFallbackMatch LLWindow::findFallbackFontForChar(llwchar wch)
+{
+#if LL_MESA_HEADLESS
+    return LLFontFallbackMatch();
+#elif LL_WINDOWS && !LL_SDL_WINDOW
+    return LLWindowWin32::findFallbackFontForChar(wch);
+#else
+    return LLWindowSDL::findFallbackFontForChar(wch);
+#endif
+}
+
+// static
 std::vector<std::string> LLWindow::getDisplaysResolutionList()
 {
 #if LL_MESA_HEADLESS

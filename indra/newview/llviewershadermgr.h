@@ -44,15 +44,15 @@ public:
     LLViewerShaderMgr();
     /* virtual */ ~LLViewerShaderMgr();
 
-    // Add shaders to mShaderList for later uniform propagation
-    // Will assert on redundant shader entries in debug builds
+    // Post-load sanity pass; asserts on duplicate program names in debug builds
+    // (checked over LLGLSLShader::sInstances -- no registration needed).
     void finalizeShaderList();
 
     // singleton pattern implementation
     static LLViewerShaderMgr * instance();
     static void releaseInstance();
 
-    void initAttribsAndUniforms(void);
+    void initAttribsAndUniforms(void) override;
     void setShaders();
     void unloadShaders();
     S32  getShaderLevel(S32 type);
@@ -85,71 +85,11 @@ public:
         SHADER_COUNT
     };
 
-    // simple model of forward iterator
-    // http://www.sgi.com/tech/stl/ForwardIterator.html
-    class shader_iter
-    {
-    private:
-        friend bool operator == (shader_iter const & a, shader_iter const & b);
-        friend bool operator != (shader_iter const & a, shader_iter const & b);
+    std::string getShaderDirPrefix(void) override;
 
-        typedef std::vector<LLGLSLShader *>::const_iterator base_iter_t;
-    public:
-        shader_iter()
-        {
-        }
-
-        shader_iter(base_iter_t iter) : mIter(iter)
-        {
-        }
-
-        LLGLSLShader & operator * () const
-        {
-            return **mIter;
-        }
-
-        LLGLSLShader * operator -> () const
-        {
-            return *mIter;
-        }
-
-        shader_iter & operator++ ()
-        {
-            ++mIter;
-            return *this;
-        }
-
-        shader_iter operator++ (int)
-        {
-            return mIter++;
-        }
-
-    private:
-        base_iter_t mIter;
-    };
-
-    shader_iter beginShaders() const;
-    shader_iter endShaders() const;
-
-    /* virtual */ std::string getShaderDirPrefix(void);
-
-    /* virtual */ void updateShaderUniforms(LLGLSLShader * shader);
-
-private:
-    // the list of shaders we need to propagate parameters to.
-    std::vector<LLGLSLShader *> mShaderList;
+    void updateShaderUniforms(LLGLSLShader * shader) override;
 
 }; //LLViewerShaderMgr
-
-inline bool operator == (LLViewerShaderMgr::shader_iter const & a, LLViewerShaderMgr::shader_iter const & b)
-{
-    return a.mIter == b.mIter;
-}
-
-inline bool operator != (LLViewerShaderMgr::shader_iter const & a, LLViewerShaderMgr::shader_iter const & b)
-{
-    return a.mIter != b.mIter;
-}
 
 extern LLVector4            gShinyOrigin;
 
@@ -161,7 +101,7 @@ extern LLGLSLShader         gReflectionMipProgram;
 extern LLGLSLShader         gGaussianProgram;
 extern LLGLSLShader         gRadianceGenProgram;
 extern LLGLSLShader         gHeroRadianceGenProgram;
-extern LLGLSLShader         gIrradianceGenProgram;
+extern LLGLSLShader         gSHProjectionProgram;
 extern LLGLSLShader         gGlowCombineFXAAProgram;
 extern LLGLSLShader         gDebugProgram;
 enum NormalDebugShaderVariant : S32
@@ -171,7 +111,6 @@ enum NormalDebugShaderVariant : S32
     NORMAL_DEBUG_SHADER_COUNT
 };
 extern LLGLSLShader         gNormalDebugProgram[NORMAL_DEBUG_SHADER_COUNT];
-extern LLGLSLShader         gSkinnedNormalDebugProgram[NORMAL_DEBUG_SHADER_COUNT];
 extern LLGLSLShader         gClipProgram;
 extern LLGLSLShader         gBenchmarkProgram;
 extern LLGLSLShader         gReflectionProbeDisplayProgram;
@@ -189,7 +128,6 @@ extern LLGLSLShader         gOneTextureFilterProgram;
 extern LLGLSLShader     gObjectPreviewProgram;
 extern LLGLSLShader        gPhysicsPreviewProgram;
 extern LLGLSLShader     gObjectBumpProgram;
-extern LLGLSLShader        gSkinnedObjectBumpProgram;
 extern LLGLSLShader     gObjectAlphaMaskNoColorProgram;
 
 //environment shaders
@@ -215,11 +153,7 @@ extern LLGLSLShader         gPathfindingNoNormalsProgram;
 
 // avatar shader handles
 extern LLGLSLShader         gAvatarProgram;
-extern LLGLSLShader         gAvatarEyeballProgram;
 extern LLGLSLShader         gImpostorProgram;
-
-// Post Process Shaders
-extern LLGLSLShader         gPostScreenSpaceReflectionProgram;
 
 // Deferred rendering shaders
 extern LLGLSLShader         gDeferredImpostorProgram;
@@ -227,7 +161,6 @@ extern LLGLSLShader         gDeferredDiffuseProgram;
 extern LLGLSLShader         gDeferredDiffuseAlphaMaskProgram;
 extern LLGLSLShader         gDeferredNonIndexedDiffuseAlphaMaskProgram;
 extern LLGLSLShader         gDeferredNonIndexedDiffuseAlphaMaskNoColorProgram;
-extern LLGLSLShader         gDeferredNonIndexedDiffuseProgram;
 extern LLGLSLShader         gDeferredBumpProgram;
 extern LLGLSLShader         gDeferredTerrainProgram;
 extern LLGLSLShader         gDeferredTreeProgram;
@@ -278,7 +211,6 @@ extern LLGLSLShader         gDeferredFullbrightAlphaMaskAlphaProgram;
 extern LLGLSLShader         gHUDFullbrightAlphaMaskAlphaProgram;
 extern LLGLSLShader         gDeferredEmissiveProgram;
 extern LLGLSLShader         gDeferredEmissiveIndexedProgram; // multi-material indexed legacy glow
-extern LLGLSLShader         gDeferredAvatarEyesProgram;
 extern LLGLSLShader         gDeferredAvatarAlphaProgram;
 extern LLGLSLShader         gEnvironmentMapProgram;
 extern LLGLSLShader         gDeferredWLSkyProgram;
@@ -307,8 +239,8 @@ extern LLGLSLShader         gRlvSphereProgram;
 // [/RLVa:KB]
 
 // Deferred materials shaders
-extern LLGLSLShader         gDeferredMaterialProgram[LLMaterial::SHADER_COUNT*2];
-extern LLGLSLShader         gDeferredMaterialIndexedProgram[LLMaterial::SHADER_COUNT*2]; // multi-material indexed (GBuffer masks only)
+extern LLGLSLShader         gDeferredMaterialProgram[LLMaterial::SHADER_COUNT];
+extern LLGLSLShader         gDeferredMaterialIndexedProgram[LLMaterial::SHADER_COUNT]; // multi-material indexed (GBuffer masks only)
 
 extern LLGLSLShader         gHUDPBROpaqueProgram;
 extern LLGLSLShader         gPBRGlowProgram;
@@ -316,6 +248,7 @@ extern LLGLSLShader         gPBRGlowIndexedProgram; // multi-material indexed PB
 extern LLGLSLShader         gDeferredPBROpaqueProgram;
 extern LLGLSLShader         gDeferredPBROpaqueIndexedProgram; // multi-material indexed PBR opaque
 extern LLGLSLShader         gDeferredPBRAlphaProgram;
+extern LLGLSLShader         gDeferredPBRAlphaImpostorProgram;
 extern LLGLSLShader         gHUDPBRAlphaProgram;
 
 // Encodes detail level for dropping textures, in accordance with the GLTF spec where possible
@@ -332,6 +265,11 @@ enum TerrainPBRDetail : S32
     TERRAIN_PBR_DETAIL_BASE_COLOR         = -4,
     TERRAIN_PBR_DETAIL_MIN                = -4,
 };
+// Clamp a requested RenderTerrainPBRDetail to the enum range AND to what the GL
+// implementation's fragment texture-unit budget can actually link (full detail
+// needs 17 samplers; macOS GL 4.1 provides 16). Shader compilation and the
+// terrain draw pool must both use this so the maps bound match the samplers built.
+S32 clamp_terrain_detail(S32 detail);
 enum TerrainPaintType : U32
 {
     // Use LLVLComposition::mDatap (heightmap) generated by generateHeights, plus noise from TERRAIN_ALPHARAMP

@@ -177,14 +177,7 @@ void Asset::uploadTransforms()
         mp[idx + 11] = m[14];
     }
 
-    if (mNodesUBO == 0)
-    {
-        glGenBuffers(1, &mNodesUBO);
-    }
-
-    glBindBuffer(GL_UNIFORM_BUFFER, mNodesUBO);
-    glBufferData(GL_UNIFORM_BUFFER, glmp.size() * sizeof(F32), glmp.data(), GL_STREAM_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    mNodesUBO.update(glmp.data(), glmp.size() * sizeof(F32));
 }
 
 void Asset::uploadMaterials()
@@ -226,14 +219,7 @@ void Asset::uploadMaterials()
             min_alpha);
     }
 
-    if (mMaterialsUBO == 0)
-    {
-        glGenBuffers(1, &mMaterialsUBO);
-    }
-
-    glBindBuffer(GL_UNIFORM_BUFFER, mMaterialsUBO);
-    glBufferData(GL_UNIFORM_BUFFER, md.size() * sizeof(vec4), md.data(), GL_STREAM_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    mMaterialsUBO.update(md.data(), md.size() * sizeof(vec4));
 }
 
 S32 Asset::lineSegmentIntersect(const LLVector4a& start, const LLVector4a& end,
@@ -554,137 +540,6 @@ bool Asset::prep()
             return false;
         }
     }
-    if (mLoadIntoVRAM)
-    {
-        // prepare vertex buffers
-
-        // material count is number of materials + 1 for default material
-        U32 mat_count = (U32) mMaterials.size() + 1;
-
-        if (LLGLSLShader::sCurBoundShaderPtr == nullptr)
-        { // make sure a shader is bound to satisfy mVertexBuffer->setBuffer
-            gDebugProgram.bind();
-        }
-
-        for (S32 double_sided = 0; double_sided < 2; ++double_sided)
-        {
-            RenderData& rd = mRenderData[double_sided];
-            for (U32 i = 0; i < LLGLSLShader::NUM_GLTF_VARIANTS; ++i)
-            {
-                rd.mBatches[i].resize(mat_count);
-            }
-
-            // for each material
-            for (S32 mat_id = -1; mat_id < (S32)mMaterials.size(); ++mat_id)
-            {
-                // for each shader variant
-                U32 vertex_count[LLGLSLShader::NUM_GLTF_VARIANTS] = { 0 };
-                U32 index_count[LLGLSLShader::NUM_GLTF_VARIANTS] = { 0 };
-
-                S32 ds_mat = mat_id == -1 ? 0 : mMaterials[mat_id].mDoubleSided;
-                if (ds_mat != double_sided)
-                {
-                    continue;
-                }
-
-                for (U32 variant = 0; variant < LLGLSLShader::NUM_GLTF_VARIANTS; ++variant)
-                {
-#ifdef SHOW_ASSERT
-                    U32 attribute_mask = 0;
-#endif
-                    // for each mesh
-                    for (auto& mesh : mMeshes)
-                    {
-                        // for each primitive
-                        for (auto& primitive : mesh.mPrimitives)
-                        {
-                            if (primitive.mMaterial == mat_id && primitive.mShaderVariant == variant)
-                            {
-                                // accumulate vertex and index counts
-                                primitive.mVertexOffset = vertex_count[variant];
-                                primitive.mIndexOffset = index_count[variant];
-
-                                vertex_count[variant] += primitive.getVertexCount();
-                                index_count[variant] += primitive.getIndexCount();
-
-                                // all primitives of a given variant and material should all have the same attribute mask
-                                llassert(attribute_mask == 0 || primitive.mAttributeMask == attribute_mask);
-#ifdef SHOW_ASSERT
-                                attribute_mask |= primitive.mAttributeMask;
-#endif
-                            }
-                        }
-                    }
-
-                    // allocate vertex buffer and pack it
-                    if (vertex_count[variant] > 0)
-                    {
-                        U32 mat_idx = mat_id + 1;
-                        #if 0
-                        LLVertexBuffer* vb = new LLVertexBuffer(attribute_mask);
-
-                        rd.mBatches[variant][mat_idx].mVertexBuffer = vb;
-                        vb->allocateBuffer(vertex_count[variant],
-                            index_count[variant] * 2); // hack double index count... TODO: find a better way to indicate 32-bit indices will be used
-                        vb->setBuffer();
-
-                        for (auto& mesh : mMeshes)
-                        {
-                            for (auto& primitive : mesh.mPrimitives)
-                            {
-                                if (primitive.mMaterial == mat_id && primitive.mShaderVariant == variant)
-                                {
-                                    primitive.upload(vb);
-                                }
-                            }
-                        }
-
-                        vb->unmapBuffer();
-
-                        vb->unbind();
-                        #endif
-                    }
-                }
-            }
-        }
-
-        // sanity check that all primitives have a vertex buffer
-        for (auto& mesh : mMeshes)
-        {
-            for (auto& primitive : mesh.mPrimitives)
-            {
-                //llassert(primitive.mVertexBuffer.notNull());
-            }
-        }
-    }
-    #if 0
-    // build render batches
-    for (S32 node_id = 0; node_id < mNodes.size(); ++node_id)
-    {
-        Node& node = mNodes[node_id];
-
-        if (node.mMesh != INVALID_INDEX)
-        {
-            auto& mesh = mMeshes[node.mMesh];
-
-            S32 mat_idx = mesh.mPrimitives[0].mMaterial + 1;
-
-            S32 double_sided = mat_idx == 0 ? 0 : mMaterials[mat_idx - 1].mDoubleSided;
-
-            for (S32 j = 0; j < mesh.mPrimitives.size(); ++j)
-            {
-                auto& primitive = mesh.mPrimitives[j];
-
-                S32 variant = primitive.mShaderVariant;
-
-                RenderData& rd = mRenderData[double_sided];
-                RenderBatch& rb = rd.mBatches[variant][mat_idx];
-
-                rb.mPrimitives.push_back({ j, node_id });
-            }
-        }
-    }
-    #endif
     return true;
 }
 

@@ -193,7 +193,7 @@ void renderBadgeBackground(F32 centerX, F32 centerY, F32 width, F32 height, cons
     gGL.pushUIMatrix();
     gGL.loadUIIdentity();
     gGL.setSceneBlendType(LLRender::BT_REPLACE);
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     gGL.color4ubv(color.mV);
     gGL.texCoord2i(0, 0);

@@ -395,7 +395,7 @@ void LLManip::renderGuidelines(bool draw_x, bool draw_y, bool draw_z)
 
         const F32 LINE_ALPHA = 0.33f;
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         LLUI::setLineWidth(1.5f);
 
         if (draw_x)

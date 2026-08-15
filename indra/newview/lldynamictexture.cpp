@@ -50,9 +50,8 @@ S32 LLViewerDynamicTexture::sNumRenders = 0;
 //-----------------------------------------------------------------------------
 // LLViewerDynamicTexture()
 //-----------------------------------------------------------------------------
-LLViewerDynamicTexture::LLViewerDynamicTexture(S32 width, S32 height, S32 components, EOrder order, bool clamp) :
-    LLViewerTexture(width, height, components, false),
-    mClamp(clamp)
+LLViewerDynamicTexture::LLViewerDynamicTexture(S32 width, S32 height, S32 components, EOrder order) :
+    LLViewerTexture(width, height, components, false)
 {
     llassert((1 <= components) && (components <= 4));
 
@@ -101,7 +100,6 @@ void LLViewerDynamicTexture::generateGLTexture(LLGLint internal_format, LLGLenum
         setExplicitFormat(internal_format, primary_format, type_format, swap_bytes);
     }
     createGLTexture(0, raw_image, 0, true, LLGLTexture::DYNAMIC_TEX);
-    setAddressMode((mClamp) ? LLTexUnit::TAM_CLAMP : LLTexUnit::TAM_WRAP);
     mGLTexturep->setGLTextureCreated(false);
 }
 
@@ -123,7 +121,7 @@ void LLViewerDynamicTexture::preRender(bool clear_depth)
      //use the bottom left corner
     mOrigin.set(0, 0);
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     // Set up camera
     LLViewerCamera* camera = LLViewerCamera::getInstance();
     mCamera.setOrigin(*camera);

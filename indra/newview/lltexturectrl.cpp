@@ -289,7 +289,7 @@ void LLFloaterTexturePicker::setImageIDFromItem(const LLInventoryItem* itemp, bo
 
 void LLFloaterTexturePicker::setActive( bool active )
 {
-    if (!active && getChild<LLUICtrl>("Pipette")->getValue().asBoolean())
+    if (!active && mPipetteBtn->getValue().asBoolean())
     {
         stopUsingPipette();
     }
@@ -1104,12 +1104,12 @@ void LLFloaterTexturePicker::onBtnSelect(void* userdata)
 
 void LLFloaterTexturePicker::onBtnPipette()
 {
-    bool pipette_active = getChild<LLUICtrl>("Pipette")->getValue().asBoolean();
+    bool pipette_active = mPipetteBtn->getValue().asBoolean();
     pipette_active = !pipette_active;
     if (pipette_active)
     {
         LLToolMgr::getInstance()->clearTransientTool();
-        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1, _3));
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLFloaterTexturePicker::onTextureSelect, this, _1, _2, _3, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
     }
     else
@@ -1479,8 +1479,7 @@ void LLFloaterTexturePicker::changeMode()
 
     getChild<LLComboBox>("l_bake_use_texture_combo_box")->setVisible(index == PICKER_BAKE);
 
-    bool pipette_visible = (index == PICKER_INVENTORY)
-        && (mInventoryPickType != PICK_MATERIAL);
+    bool pipette_visible = (index == PICKER_INVENTORY);
     mPipetteBtn->setVisible(pipette_visible);
 
     if (index == PICKER_BAKE)
@@ -1679,15 +1678,8 @@ void LLFloaterTexturePicker::setInventoryPickType(EPickInventoryType type)
     refreshLocalList();
     refreshInventoryFilter();
 
-    if (mInventoryPickType == PICK_MATERIAL)
-    {
-        getChild<LLButton>("Pipette")->setVisible(false);
-    }
-    else
-    {
-        S32 index = mModeSelector->getValue().asInteger();
-        getChild<LLButton>("Pipette")->setVisible(index == 0);
-    }
+    S32 index = mModeSelector->getValue().asInteger();
+    mPipetteBtn->setVisible(index == 0);
 
     if (!mLabel.empty())
     {
@@ -1743,41 +1735,85 @@ void LLFloaterTexturePicker::onPickerCallback(const std::vector<std::string>& fi
     (void)handle;
 }
 
-void LLFloaterTexturePicker::onTextureSelect(bool success, const LLTextureEntry& te )
+void LLFloaterTexturePicker::onTextureSelect(bool success, LLViewerObject* obj, S32 te_index, const LLTextureEntry& te)
 {
     if (success)
     {
-        LLUUID inventory_item_id = findItemID(te.getID(), true);
-        if (inventory_item_id.notNull())
+        if (mInventoryPickType == PICK_MATERIAL)
         {
-            LLToolPipette::getInstance()->setResult(true, "");
-            if (mInventoryPickType == PICK_MATERIAL)
+            if (!obj || te_index < 0)
             {
-                // tes have no data about material ids
-                // Plus gltf materials are layered with overrides,
-                // which mean that end result might have no id.
-                LL_WARNS() << "tes have no data about material ids" << LL_ENDL;
+                return;
+            }
+
+            // Note: does not copy overrides!
+            LLUUID mat_id = obj->getRenderMaterialID((U8)te_index);
+            if (mat_id == BLANK_MATERIAL_ASSET_ID)
+            {
+                // It's fine if blank material isn't in inventory, just set it
+                LLToolPipette::getInstance()->setResult(true, "");
+                setImageID(mat_id);
+                setTentative(false);
+
+                mNoCopyTextureSelected = false;
+
+                commitIfImmediateSet();
+            }
+            else if (mat_id.isNull())
+            {
+                LLToolPipette::getInstance()->setResult(false, LLTrans::getString("InventoryNoMaterial"));
             }
             else
             {
-                setImageID(te.getID());
-                setTentative(false);
+                LLUUID inventory_item_id = findItemID(mat_id, true);
+                if (inventory_item_id.notNull())
+                {
+                    LLToolPipette::getInstance()->setResult(true, "");
+                    setImageID(mat_id);
+                    setTentative(false);
+
+                    mNoCopyTextureSelected = false;
+                    LLInventoryItem* itemp = gInventory.getItem(inventory_item_id);
+
+                    if (itemp && !itemp->getPermissions().allowCopyBy(gAgent.getID()))
+                    {
+                        // no copy texture
+                        mNoCopyTextureSelected = true;
+                    }
+
+                    commitIfImmediateSet();
+                }
+                else
+                {
+                    // Not in inventory, can't apply
+                    LLToolPipette::getInstance()->setResult(false, LLTrans::getString("InventoryNoMaterial"));
+                }
             }
-
-            mNoCopyTextureSelected = false;
-            LLInventoryItem* itemp = gInventory.getItem(inventory_item_id);
-
-            if (itemp && !itemp->getPermissions().allowCopyBy(gAgent.getID()))
-            {
-                // no copy texture
-                mNoCopyTextureSelected = true;
-            }
-
-            commitIfImmediateSet();
         }
         else
         {
-            LLToolPipette::getInstance()->setResult(false, LLTrans::getString("InventoryNoTexture"));
+            LLUUID inventory_item_id = findItemID(te.getID(), true);
+            if (inventory_item_id.notNull())
+            {
+                LLToolPipette::getInstance()->setResult(true, "");
+                setImageID(te.getID());
+                setTentative(false);
+
+                mNoCopyTextureSelected = false;
+                LLInventoryItem* itemp = gInventory.getItem(inventory_item_id);
+
+                if (itemp && !itemp->getPermissions().allowCopyBy(gAgent.getID()))
+                {
+                    // no copy texture
+                    mNoCopyTextureSelected = true;
+                }
+
+                commitIfImmediateSet();
+            }
+            else
+            {
+                LLToolPipette::getInstance()->setResult(false, LLTrans::getString("InventoryNoTexture"));
+            }
         }
     }
 }

@@ -78,7 +78,7 @@ LLVisualParamHint::LLVisualParamHint(
     F32 param_weight,
     LLJoint* jointp)
     :
-    LLViewerDynamicTexture(width, height, 3, LLViewerDynamicTexture::ORDER_MIDDLE, true ),
+    LLViewerDynamicTexture(width, height, 3, LLViewerDynamicTexture::ORDER_MIDDLE),
     mNeedsUpdate( true ),
     mIsVisible( false ),
     mJointMesh( mesh ),
@@ -280,7 +280,10 @@ void LLVisualParamHint::draw(F32 alpha)
 {
     if (!mIsVisible) return;
 
-    gGL.getTexUnit(0)->bind(this);
+    // Clamp: the hint is a full [0,1] quad, and this dynamic texture asked for clamped
+    // addressing (constructor clamp=true) back when that lived on the texture object --
+    // wrap would blend the opposite border into the preview's edges.
+    gGL.getTextureSlot(0)->bindSampled(this, ALSamplers::AnisoClamp);
 
     gGL.color4f(1.f, 1.f, 1.f, alpha);
 
@@ -303,13 +306,13 @@ void LLVisualParamHint::draw(F32 alpha)
     }
     gGL.end();
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 }
 
 //-----------------------------------------------------------------------------
 // LLVisualParamReset()
 //-----------------------------------------------------------------------------
-LLVisualParamReset::LLVisualParamReset() : LLViewerDynamicTexture(1, 1, 1, ORDER_RESET, false)
+LLVisualParamReset::LLVisualParamReset() : LLViewerDynamicTexture(1, 1, 1, ORDER_RESET)
 {
 }
 

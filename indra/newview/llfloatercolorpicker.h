@@ -197,7 +197,6 @@ class LLFloaterColorPicker
         F32       mContextConeInAlpha;
         F32       mContextConeOutAlpha;
         F32       mContextConeFadeTime;
-
 };
 
 #endif // LL_LLFLOATERCOLORPICKER_H

@@ -572,7 +572,7 @@ void LLHUDEffectLookAt::render()
         if ((isOwnHidden || isPrivate || gAgentCamera.cameraMouselook()) && static_cast<LLVOAvatar*>(mSourceObject.get())->isSelf())
             return;
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
 

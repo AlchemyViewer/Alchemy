@@ -25,7 +25,6 @@
 
 vec3 getAdditiveColor();
 vec3 getAtmosAttenuation();
-vec3 scaleSoftClipFrag(vec3 light);
 
 vec3 srgb_to_linear(vec3 col);
 vec3 linear_to_srgb(vec3 col);

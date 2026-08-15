@@ -62,6 +62,15 @@ void ll_close_fail_log();
 
 class LLSD;
 
+// Hard minimum OpenGL version. The renderer assumes this unconditionally rather than
+// degrading below it: deprecated formats are re-expressed through GL_TEXTURE_SWIZZLE_RGBA
+// instead of being repacked on the CPU, the texture upload thread is always enabled, and
+// the shader backend expects GLSL 4.10.
+//
+// Biased down by 0.01 like the other version checks in this file, because mGLVersion is
+// assembled as major + minor * 0.1f and 4.1f is not exactly representable.
+const F32 GL_MINIMUM_VERSION = 4.09f;
+
 // Manage GL extensions...
 class LLGLManager
 {
@@ -100,17 +109,48 @@ public:
     bool mHasDebugOutput = false;
     bool mHasTransformFeedback = false;
     bool mHasAnisotropic = false;
+    // Immutable texture storage (glTexStorage*). Core in 4.2, but also reachable on a
+    // 4.1 context via GL_ARB_texture_storage -- which is how macOS gets it. Only true
+    // once the entry point has actually resolved, so callers may trust it directly.
+    bool mHasTextureStorage = false;
+    // GL_EXT_texture_sRGB_decode: sampler/texture control over whether an sRGB-format
+    // texture has its transfer function applied on read. Never promoted to core, but
+    // universally supported on the hardware this viewer runs on, and REQUIRED here --
+    // the renderer decodes explicitly rather than implicitly, so it needs to be able to
+    // turn the implicit decode off. See ALSampler::SRGBDecode.
+    bool mHasTextureSRGBDecode = false;
+    // Direct state access (glBindTextureUnit, glCreateSamplers, glTextureStorage*, ...).
+    // Core in 4.5, also reachable as GL_ARB_direct_state_access. Only true once the entry
+    // points have actually resolved, so callers may trust it directly.
+    //
+    // NOTE: DSA entry points that take a texture name require the texture's target to
+    // already be established -- glBindTextureUnit on a name straight out of glGenTextures
+    // is INVALID_OPERATION. Allocation paths that bind-to-create must keep using
+    // glBindTexture until they are ported to glCreateTextures.
+    bool mHasDirectStateAccess = false;
+    // Clip control (glClipControl for GL_ZERO_TO_ONE depth range). Core in 4.5, also
+    // reachable as GL_ARB_clip_control. Gates the reverse-Z depth path; only true once
+    // the entry point has actually resolved, so callers may trust it directly. Absent on
+    // macOS GL 4.1, which stays forward-Z.
+    bool mHasClipControl = false;
 
     // Vendor-specific extensions
     bool mHasAMDAssociations = false;
     bool mHasNVXGpuMemoryInfo = false;
     bool mHasATIMemInfo = false;
     bool mHasGLXMESAQueryRenderer = false;
+    bool mHasEXTMemoryObject           = false;
+    bool mHasEXTSemaphore              = false;
+    bool mHasEXTMemoryObjectWin32      = false;
+    bool mHasEXTSemaphoreWin32         = false;
 
     bool mIsAMD;
     bool mIsNVIDIA;
     bool mIsIntel;
     bool mIsApple = false;
+    // True for any Mesa driver (radeonsi, iris, llvmpipe, zink, ...). Detected
+    // from the GL_VERSION string; used to gate Mesa-specific workarounds.
+    bool mIsMesa = false;
 
     // hints to the render pipe
     U32 mDownScaleMethod = 0; // see settings.xml RenderDownScaleMethod
@@ -166,6 +206,22 @@ void rotate_quat(LLQuaternion& rotation);
 void flush_glerror(); // Flush GL errors when we know we're handling them correctly.
 
 void log_glerror();
+// Validate every sampler the currently bound program declares against the state actually
+// bound to its texture unit: something bound at all, and no depth/compare mismatch in either
+// direction (non-shadow sampler over a compare-enabled depth texture, or a shadow sampler
+// without comparisons). Returns true when the state is sound.
+//
+// gDebugGL only -- returns true immediately otherwise. Intended for llassert() at draw
+// sites, the way LLVertexBuffer::validateRange is used, so it fails at the draw responsible
+// and names the uniform instead of leaving a driver warning to be traced back by hand.
+bool validate_bound_samplers();
+
+// Drop the cached sampler enumeration for a program about to be deleted. GL is free to hand
+// the name back out, and the cache revalidates only on active-uniform COUNT -- a recreated
+// program with the same name and count would be validated against the old program's
+// samplers. Call before glDeleteProgram; harmless when the program was never cached.
+void forget_program_samplers(U32 program);
+
 void assert_glerror();
 
 void clear_glerror();
@@ -375,7 +431,7 @@ public:
     virtual void updateGL() = 0;
 };
 
-const U32 FENCE_WAIT_TIME_NANOSECONDS = 1000;  //1 ms
+const U32 FENCE_WAIT_TIME_NANOSECONDS = 1000;  //1 microsecond (despite the name's history)
 
 class LLGLFence
 {

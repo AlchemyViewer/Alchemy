@@ -427,7 +427,7 @@ void LLStatBar::draw()
     {
         // Draw the tick marks.
         LLGLSUIDefault gls_ui;
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         F32 value_scale;
         if (mCurMaxBar == mCurMinBar)

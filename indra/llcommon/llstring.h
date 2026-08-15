@@ -667,7 +667,7 @@ using EmojiClusterList = std::vector<std::pair<size_t, size_t>>;
 // modifiers, regional indicator flag pairs, keycap sequences (digit/#/* + FE0F
 // + 20E3), and tag sequences (e.g., subdivision flags). Used by emoji-aware
 // cursor stepping and selection logic, NOT by the renderer (which now shapes
-// the entire line via LLFontShaping::shapeLine). Isolated emoji that render
+// the entire line via ALFontShaping::shapeLine). Isolated emoji that render
 // correctly through the 1:1 FT_Get_Char_Index path are intentionally skipped.
 LL_COMMON_API EmojiClusterList
 wstring_find_emoji_clusters(LLWStringView wstr);

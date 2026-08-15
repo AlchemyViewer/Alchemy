@@ -1,5 +1,5 @@
 /**
- * @file llfontface.h
+ * @file alfontface.h
  * @brief Refcounted wrapper around an FT_Face, sharable across LLFontFreetype
  *        instances that request the same (file, sized + variable axis) state.
  *
@@ -23,12 +23,10 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLFONTFACE_H
-#define LL_LLFONTFACE_H
+#pragma once
 
 #include "llpointer.h"
 #include "llrefcount.h"
@@ -44,13 +42,13 @@
 // Forward declarations — match the trick used in llfontfreetype.h to avoid
 // pulling in <ft2build.h> + FT_FREETYPE_H from this header.
 struct FT_FaceRec_;
-typedef struct FT_FaceRec_* LLFT_Face;
+typedef struct FT_FaceRec_* ALFT_Face;
 struct hb_font_t;
 struct LLFontGlyphInfo;
 class  LLFontFreetype;
 // Defined in llfontregistry.h; forward-declared here to keep this header
 // independent of the registry. Translation units that need the values
-// (e.g. llfontface.cpp) include llfontregistry.h directly.
+// (e.g. alfontface.cpp) include llfontregistry.h directly.
 enum class EFontHinting : S32;
 
 // Optional values for the OpenType variation axes the registry exposes.
@@ -63,7 +61,7 @@ enum class EFontHinting : S32;
 //   ital: 0   — 1    (0 upright, 1 italic)
 //   wdth: 50  — 200  (% of normal width; 100 = unchanged)
 //   slnt: -90 — 0    (degrees; 0 upright, negative slants forward)
-struct LLFontVarAxes
+struct ALFontVarAxes
 {
     F32  wght     = 0.f;
     F32  opsz     = 0.f;
@@ -76,7 +74,7 @@ struct LLFontVarAxes
     bool wdth_set = false;
     bool slnt_set = false;
 
-    bool operator==(const LLFontVarAxes& o) const noexcept
+    bool operator==(const ALFontVarAxes& o) const noexcept
     {
         return wght_set == o.wght_set && opsz_set == o.opsz_set
             && ital_set == o.ital_set && wdth_set == o.wdth_set && slnt_set == o.slnt_set
@@ -92,7 +90,7 @@ struct LLFontVarAxes
 // the same key share the underlying face (via LLFontManager's cache). The
 // key fields are exactly the inputs to FT_Open_Face / FT_Set_Char_Size /
 // FT_Set_Var_Design_Coordinates that determine the face's observable state.
-struct LLFontFaceKey
+struct ALFontFaceKey
 {
     std::string   filename;
     S32           face_index;
@@ -101,9 +99,9 @@ struct LLFontFaceKey
     F32           horz_dpi;
     EFontHinting  hinting;
     S32           flags;
-    LLFontVarAxes var_axes;     // wght/opsz/ital/wdth/slnt (each independently optional)
+    ALFontVarAxes var_axes;     // wght/opsz/ital/wdth/slnt (each independently optional)
 
-    bool operator==(const LLFontFaceKey& o) const noexcept
+    bool operator==(const ALFontFaceKey& o) const noexcept
     {
         return filename == o.filename
             && face_index == o.face_index
@@ -115,7 +113,7 @@ struct LLFontFaceKey
             && var_axes == o.var_axes;
     }
 
-    friend std::size_t hash_value(const LLFontFaceKey& k) noexcept
+    friend std::size_t hash_value(const ALFontFaceKey& k) noexcept
     {
         std::size_t seed = 0;
         boost::hash_combine(seed, k.filename);
@@ -142,22 +140,22 @@ struct LLFontFaceKey
     }
 };
 
-class LLFontFace : public LLRefCount
+class ALFontFace : public LLRefCount
 {
 public:
-    LLFontFace();
-    ~LLFontFace();
+    ALFontFace();
+    ~ALFontFace();
 
     // Open the underlying FT_Face, set its size/DPI, and apply variable-axis
     // values if applicable. Returns false if FreeType can't open the file or
-    // can't set the requested size; in that case the LLFontFace is left in a
+    // can't set the requested size; in that case the ALFontFace is left in a
     // dead-but-harmless state (isValid() returns false).
     bool load(const std::string& filename, S32 face_index,
               F32 point_size, F32 vert_dpi, F32 horz_dpi,
               EFontHinting hinting, S32 flags,
-              const LLFontVarAxes& var_axes = {});
+              const ALFontVarAxes& var_axes = {});
 
-    LLFT_Face face() const { return mFTFace; }
+    ALFT_Face face() const { return mFTFace; }
     bool      isValid() const { return mFTFace != nullptr; }
     EFontHinting hinting() const { return mHinting; }
 
@@ -168,7 +166,7 @@ public:
     U32 getCharGlyphIndex(llwchar wch) const;
 
     // HarfBuzz handle wrapping mFTFace. Lazily created on first call. Tied
-    // to this wrapper's lifetime; destroyed in ~LLFontFace.
+    // to this wrapper's lifetime; destroyed in ~ALFontFace.
     hb_font_t* getHbFont() const;
 
     // Pure functions of (file, hinting). Stored at load time so callers
@@ -218,7 +216,7 @@ public:
     // and the shaped path (which gets glyph_index directly from HarfBuzz).
     // One slot per (glyph_index, type), so the same glyph rasterized via
     // either path lives in one atlas slot. LLFontGlyphInfo entries are
-    // owned here and deleted in ~LLFontFace.
+    // owned here and deleted in ~ALFontFace.
     LLFontGlyphInfo* findGlyphInfo(U32 glyph_index, EFontGlyphType type) const;
     // Publish `gi` (ownership transfers to the cache) and return the
     // published entry. If a (glyph_index, type) entry already exists, the
@@ -270,13 +268,13 @@ public:
                          const U8* data, S32 stride) const;
 
 private:
-    LLFontFace(const LLFontFace&) = delete;
-    LLFontFace& operator=(const LLFontFace&) = delete;
+    ALFontFace(const ALFontFace&) = delete;
+    ALFontFace& operator=(const ALFontFace&) = delete;
 
     // Apply a single OpenType variation axis value, if the face has one.
     bool setVariationAxis(const std::string& axis_tag, F32 value);
 
-    // Out-of-line delete of an LLFontGlyphInfo*. Defined in llfontface.cpp,
+    // Out-of-line delete of an LLFontGlyphInfo*. Defined in alfontface.cpp,
     // where llfontfreetype.h provides the complete type — lets the inline
     // template below stay in the header without triggering
     // -Wdelete-incomplete (a hard error under C++26).
@@ -284,7 +282,7 @@ private:
 
     typedef boost::unordered_multimap<U32, LLFontGlyphInfo*> glyph_info_map_t;
 
-    LLFT_Face          mFTFace = nullptr;
+    ALFT_Face          mFTFace = nullptr;
     // Single source for both HB load flags (set once in getHbFont via
     // hb_ft_font_set_load_flags) and FT load flags (read by
     // LLFontFreetype::renderGlyph as (FT_Int32)mHinting). Set in load() and
@@ -329,7 +327,7 @@ private:
 // Inline template definitions — kept in the header so callers in
 // llfontfreetype.cpp can instantiate with their own predicates.
 template<typename Pred>
-void LLFontFace::erase_glyph_entries(Pred should_erase) const
+void ALFontFace::erase_glyph_entries(Pred should_erase) const
 {
     for (auto it = mGlyphInfoMap.begin(); it != mGlyphInfoMap.end(); )
     {
@@ -344,5 +342,3 @@ void LLFontFace::erase_glyph_entries(Pred should_erase) const
         }
     }
 }
-
-#endif // LL_LLFONTFACE_H

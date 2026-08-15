@@ -82,7 +82,7 @@ static void renderPulsingSphere(const LLVector3& joint_world_position, const LLC
     float currentRadius = MAX_SPHERE_RADIUS - PULSE_AMPLITUDE * pulseFactor;
 
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->bind(LLViewerFetchedTexture::sWhiteImagep);
+    gGL.getTextureSlot(0)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap);
     LLGLDepthTest gls_depth(GL_TRUE);
     LLGLEnable gl_blend(GL_BLEND);
 
@@ -127,7 +127,7 @@ static void renderPulsingSphere(const LLVector3& joint_world_position, const LLC
 static void renderStaticSphere(const LLVector3& joint_world_position, const LLColor4& color = LLColor4(1.f, 1.f, 0.f, .6f), float radius=0.01f)
 {
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->bind(LLViewerFetchedTexture::sWhiteImagep);
+    gGL.getTextureSlot(0)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap);
     LLGLDepthTest gls_depth(GL_TRUE);
     LLGLEnable gl_blend(GL_BLEND);
 
@@ -712,7 +712,7 @@ void FSManipRotateJoint::render()
 
     // Setup GL state.
     LLGLSUIDefault gls_ui;
-    gGL.getTexUnit(0)->bind(LLViewerFetchedTexture::sWhiteImagep);
+    gGL.getTextureSlot(0)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap);
     LLGLDepthTest gls_depth(GL_TRUE);
     LLGLEnable gl_blend(GL_BLEND);
 

@@ -6292,7 +6292,7 @@
       <key>Type</key>
       <string>S32</string>
       <key>Value</key>
-      <integer>110</integer>
+      <integer>127</integer>
     </map>
     <key>NotificationChannelRightMargin</key>
     <map>
@@ -7938,17 +7938,6 @@
     <key>Value</key>
     <integer>-1</integer>
   </map>
-  <key>RenderCompressTextures</key>
-  <map>
-    <key>Comment</key>
-    <string>Enable texture compression on OpenGL 3.0 and later implementations (EXPERIMENTAL, requires restart)</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
    <key>RenderHiDPI</key>
   <map>
     <key>Comment</key>
@@ -8901,30 +8890,6 @@
     <integer>0</integer>
   </map>
 
-  <key>RenderSpecularResX</key>
-  <map>
-    <key>Comment</key>
-    <string>Spec map resolution.</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>1024</integer>
-  </map>
-
-  <key>RenderSpecularResY</key>
-  <map>
-    <key>Comment</key>
-    <string>Spec map resolution.</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>U32</string>
-    <key>Value</key>
-    <integer>256</integer>
-  </map>
-
   <key>RenderSpecularExponent</key>
   <map>
     <key>Comment</key>
@@ -9609,7 +9574,7 @@
 	<key>RenderHeroProbeDistance</key>
 	<map>
 		<key>Comment</key>
-		<string>Distance in meters for hero probes to render out to.</string>
+		<string>Camera far clip in meters for hero probe (mirror) render passes.</string>
 		<key>Persist</key>
 		<integer>1</integer>
 		<key>Type</key>
@@ -11704,6 +11669,17 @@
       <string>Boolean</string>
       <key>Value</key>
       <integer>1</integer>
+    </map>
+    <key>ShowBlockedConvHistory</key>
+    <map>
+      <key>Comment</key>
+      <string>Specifies whether blocked agents will be shown in Call Log</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
     </map>
     <key>ShowMatureEvents</key>
     <map>
@@ -14532,6 +14508,17 @@
         <key>Value</key>
         <integer>1</integer>
     </map>
+    <key>ExternalEditorTightIntegration</key>
+    <map>
+        <key>Comment</key>
+        <string>When true, Edit in External Editor launches VS Code via the code CLI with a vscode:// URI instead of using the configured external editor.</string>
+        <key>Persist</key>
+        <integer>1</integer>
+        <key>Type</key>
+        <string>Boolean</string>
+        <key>Value</key>
+        <integer>0</integer>
+    </map>
     <key>ExternalWebsocketForwardDebug</key>
     <map>
         <key>Comment</key>
@@ -17136,17 +17123,6 @@
       <key>Value</key>
       <integer>0</integer>
     </map>
-  <key>ScriptEditorDisableSyntaxHighlight</key>
-  <map>
-    <key>Comment</key>
-    <string>Disable syntax highlighting in script editor for performance testing</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>Boolean</string>
-    <key>Value</key>
-    <integer>0</integer>
-  </map>
   <!-- <FSPoser> -->
   <key>FSPoserSaveExternalFileAlso</key>
   <map>

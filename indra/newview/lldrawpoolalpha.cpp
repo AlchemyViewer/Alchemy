@@ -61,9 +61,6 @@ LLVector4 LLDrawPoolAlpha::sWaterPlane;
 // minimum alpha before discarding a fragment
 static const F32 MINIMUM_ALPHA = 0.004f; // ~ 1/255
 
-// minimum alpha before discarding a fragment when rendering impostors
-static const F32 MINIMUM_IMPOSTOR_ALPHA = 0.1f;
-
 LLDrawPoolAlpha::LLDrawPoolAlpha(U32 type) :
         LLRenderPass(type), target_shader(NULL),
         mColorSFactor(LLRender::BF_UNDEF), mColorDFactor(LLRender::BF_UNDEF),
@@ -93,8 +90,6 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
     static LLCachedControl<F32> displayGamma(gSavedSettings, "RenderDeferredDisplayGamma");
     F32 gamma = displayGamma;
 
-    static LLStaticHashedString waterSign("waterSign");
-
     // Does this deferred shader need environment uniforms set such as sun_dir, etc. ?
     // NOTE: We don't actually need a gbuffer since we are doing forward rendering (for transparency) post deferred rendering
     // TODO: bindDeferredShader() probably should have the updating of the environment uniforms factored out into updateShaderEnvironmentUniforms()
@@ -107,26 +102,34 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
     shader->bind();
     shader->uniform1f(LLShaderMgr::DISPLAY_GAMMA, (gamma > 0.1f) ? 1.0f / gamma : (1.0f / 2.2f));
 
-    if (LLPipeline::sRenderingHUDs)
+    if (LLPipeline::sRenderingHUDs || LLPipeline::sImpostorRender)
     { // for HUD attachments, only the pre-water pass is executed and we never want to clip anything
+      //
+      // An impostor bake is in the same position for the opposite reason: generateImpostor
+      // clears RENDER_TYPE_ALPHA_PRE_WATER, so only the post-water pool runs and it clips
+      // everything below the plane -- with the pre-water pool disabled, nothing draws it
+      // back. An impostored avatar standing waist-deep lost every blended attachment below
+      // the waterline in a clean horizontal cut, while its opaque parts (which never clip)
+      // stayed. The bake has no water in it to sort against, so clipping has nothing to do.
         LLVector4 near_clip(0, 0, -1, 0);
-        shader->uniform1f(waterSign, 1.f);
+        shader->uniform1f(LLShaderMgr::WATER_WATERSIGN, 1.f);
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, near_clip.mV);
     }
     else
     {
-        shader->uniform1f(waterSign, water_sign);
+        shader->uniform1f(LLShaderMgr::WATER_WATERSIGN, water_sign);
         shader->uniform4fv(LLShaderMgr::WATER_WATERPLANE, 1, LLDrawPoolAlpha::sWaterPlane.mV);
     }
 
-    if (LLPipeline::sImpostorRender)
-    {
-        shader->setMinimumAlpha(MINIMUM_IMPOSTOR_ALPHA);
-    }
-    else
-    {
-        shader->setMinimumAlpha(MINIMUM_ALPHA);
-    }
+    // Same cutoff in a bake as anywhere else.
+    //
+    // The 10% impostor threshold existed because the coverage mask used to flatten every
+    // covered texel to fully opaque: a 5%-opacity fragment would have been promoted to solid,
+    // so discarding it early was the lesser evil. Now that the bake accumulates real coverage
+    // and the composite divides it back out, that fragment contributes 0.05 and composites
+    // correctly -- and the threshold is just a rule that deletes faint glass, veils and gauze
+    // the moment an avatar impostors, then restores them when it stops.
+    shader->setMinimumAlpha(MINIMUM_ALPHA);
 
     //also prepare rigged variant
     if (shader->mRiggedVariant && shader->mRiggedVariant != shader)
@@ -172,6 +175,7 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
         (LLPipeline::sImpostorRender) ? &gDeferredFullbrightAlphaMaskProgram :
         (LLPipeline::sRenderingHUDs) ? &gHUDFullbrightAlphaMaskAlphaProgram :
         &gDeferredFullbrightAlphaMaskAlphaProgram;
+    fullbright_shader = fullbright_shader->selectVariant();
     prepare_alpha_shader(fullbright_shader, true, water_sign);
 
     simple_shader   =
@@ -179,17 +183,25 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
         (LLPipeline::sRenderingHUDs) ? &gHUDAlphaProgram :
         &gDeferredAlphaProgram;
 
+    // select the classic-lighting clone before preparation so the water plane and minimum
+    // alpha uniforms land on the program that actually binds
+    simple_shader = simple_shader->selectVariant();
+
     prepare_alpha_shader(simple_shader, true, water_sign); //prime simple shader (loads shadow relevant uniforms)
 
-    LLGLSLShader* materialShader = gDeferredMaterialProgram;
-    for (int i = 0; i < LLMaterial::SHADER_COUNT*2; ++i)
+    // prepare_alpha_shader() recurses into the rigged variant, so priming the bases
+    // covers every corner
+    for (int i = 0; i < LLMaterial::SHADER_COUNT; ++i)
     {
-        prepare_alpha_shader(&materialShader[i], true, water_sign);
+        prepare_alpha_shader(gDeferredMaterialProgram[i].selectVariant(), true, water_sign);
     }
 
     pbr_shader =
         (LLPipeline::sRenderingHUDs) ? &gHUDPBRAlphaProgram :
+        (LLPipeline::sImpostorRender) ? &gDeferredPBRAlphaImpostorProgram :
         &gDeferredPBRAlphaProgram;
+
+    pbr_shader = pbr_shader->selectVariant();
 
     prepare_alpha_shader(pbr_shader, true, water_sign);
 
@@ -210,7 +222,7 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
     if (!LLPipeline::sImpostorRender && LLPipeline::RenderDepthOfField && !gCubeSnapshot && !LLPipeline::sRenderingHUDs && getType() == LLDrawPool::POOL_ALPHA_POST_WATER)
     {
         //update depth buffer sampler
-        simple_shader = fullbright_shader = &gDeferredFullbrightAlphaMaskProgram;
+        simple_shader = fullbright_shader = gDeferredFullbrightAlphaMaskProgram.selectVariant();
 
         simple_shader->bind();
         simple_shader->setMinimumAlpha(0.33f);
@@ -238,17 +250,29 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
 
     bool write_depth = rigged ||
         LLDrawPoolWater::sSkipScreenCopy
-        // we want depth written so that rendered alpha will
-        // contribute to the alpha mask used for impostors
-        || LLPipeline::sImpostorRenderAlphaDepthPass
         || getType() == LLDrawPoolAlpha::POOL_ALPHA_PRE_WATER; // needed for accurate water fog
 
 
     LLGLDepthTest depth(GL_TRUE, write_depth ? GL_TRUE : GL_FALSE);
 
+    // In a bake, the destination alpha accumulates COVERAGE -- src.a + (1-src.a)*dst.a -- so
+    // the impostor stores colour premultiplied by coverage and the composite recovers the
+    // surface colour by dividing it back out (deferred/impostorF.glsl). Blending over the
+    // cleared black background is what darkened hair and translucent edges, and treating them
+    // as opaque afterwards is what froze that darkening into a halo.
+    //
+    // The accumulation starts from what generateImpostor's coverage stamp left: 1 wherever
+    // opaque geometry sits (so it stays 1, correctly), 0 over background (so it becomes this
+    // surface's coverage). Depth writing is untouched by any of that -- the stamp runs before
+    // this pass, so blended geometry occludes normally again.
+    //
+    // Everywhere else the alpha channel carries glow, and this suppresses source alpha so a
+    // blended surface does not erase the glow already accumulated behind it.
     mColorSFactor = LLRender::BF_SOURCE_ALPHA;           // } regular alpha blend
     mColorDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA; // }
-    mAlphaSFactor = LLRender::BF_ZERO;                         // } glow suppression
+    mAlphaSFactor = LLPipeline::sImpostorRender                 // } glow suppression /
+                        ? LLRender::BF_ONE                      // } bake coverage
+                        : LLRender::BF_ZERO;                    // }
     mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;       // }
     gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
 
@@ -273,7 +297,7 @@ void LLDrawPoolAlpha::renderDebugAlpha()
     {
         gHighlightProgram.bind();
         gGL.diffuseColor4f(1, 0, 0, 1);
-        gGL.getTexUnit(0)->bindFast(LLViewerFetchedTexture::getSmokeImage());
+        gGL.getTextureSlot(0)->bindFast(LLViewerFetchedTexture::getSmokeImage(), ALSamplers::AnisoWrap);
 
 
         renderAlphaHighlight();
@@ -383,88 +407,106 @@ inline void Draw(LLDrawInfo* draw, U32 mask)
     draw->mVertexBuffer->drawRange(LLRender::TRIANGLES, draw->mStart, draw->mEnd, draw->mCount, draw->mOffset);
 }
 
-bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material)
+bool LLDrawPoolAlpha::TexSetup(LLDrawInfo* draw, bool use_material, LLGLSLShader* shader, ALSampler diffuse_key)
 {
+    llassert(shader);
+    llassert(shader == current_shader); // the caller must have bound what it is binding for
+
     bool tex_setup = false;
 
     if (draw->mGLTFMaterial)
     {
-        if (draw->mTextureMatrix)
+        // A GLTF material binds its own maps through LLGLTFMaterial::bind; only the texture
+        // matrix is left to us.
+        if (draw->mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
         {
             tex_setup = true;
-            gGL.getTexUnit(0)->activate();
-            gGL.matrixMode(LLRender::MM_TEXTURE);
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
             gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
-            gPipeline.mTextureMatrixOps++;
+            gPipeline.countTextureMatrixOp(*draw->mTextureMatrix);
         }
+
+        return tex_setup;
+    }
+
+    // Legacy Blinn-Phong maps. Bound unconditionally against neutral stand-ins when this draw
+    // has none, because a program that DECLARES these samplers must not be left reading
+    // whatever the previous draw put on those units.
+    //
+    // Which programs declare them is read from the program itself -- bindTexture resolves the
+    // uniform through the shader and is a no-op when the channel is absent -- rather than by
+    // testing `shader == simple_shader || shader == simple_shader->mRiggedVariant`. That
+    // comparison silently changed meaning whenever a variant was added, and it could not see
+    // a material program at all.
+    const bool material_maps = !LLPipeline::sRenderingHUDs && use_material;
+
+    // Decode the diffuse for the forward writers converted to shade in linear (see
+    // LLGLSLShader::mLinearDiffuse) -- gDeferredAlphaProgram and the BLEND material programs.
+    // The FOR_IMPOSTOR alpha program and the HUD programs leave it false and keep the sRGB
+    // texel. Normal and specular are data / read-side-decoded and stay AnisoWrap.
+    //
+    // OR the bit onto the caller's key rather than replacing it. That key already carries the
+    // addressing this draw needs -- particle groups pass AnisoClamp, because their quads span
+    // the full [0,1] and wrap filtering bleeds the opposite edge in -- and replacing it would
+    // silently cost them that clamp.
+    if (shader->mLinearDiffuse)
+    {
+        diffuse_key = diffuse_key | ALSampler::SRGBDecode;
+    }
+
+    LLViewerTexture* normal_map = material_maps ? draw->mNormalMap.get() : nullptr;
+    LLViewerTexture* specular_map = material_maps ? draw->mSpecularMap.get() : nullptr;
+
+    shader->bindTexture(LLShaderMgr::BUMP_MAP,
+                        normal_map ? normal_map : LLViewerFetchedTexture::sFlatNormalImagep.get(),
+                        ALSamplers::AnisoWrap);
+    // Spec decodes too now: legacy Blinn-Phong spec is sRGB colour, so filtering it in linear
+    // is the same win as diffuse. The shader re-encodes for the deferred store; forward lights
+    // with it linear. Normal is data and stays AnisoWrap.
+    shader->bindTexture(LLShaderMgr::SPECULAR_MAP,
+                        specular_map ? specular_map : LLViewerFetchedTexture::sWhiteImagep.get(),
+                        ALSamplers::AnisoWrapSRGB);
+
+    if (draw->mTextureList.size() > 1)
+    {
+        // Indexed batch: clamped to what this program declares, and null slots stood in for.
+        bindIndexedTextures(*draw, shader);
     }
     else
-    {
-        if (!LLPipeline::sRenderingHUDs && use_material && current_shader)
+    { //not batching textures or batch has only 1 texture -- might need a texture matrix
+        if (draw->mTexture.notNull())
         {
-            if (draw->mNormalMap)
+            if (use_material)
             {
-                current_shader->bindTexture(LLShaderMgr::BUMP_MAP, draw->mNormalMap);
-            }
-
-            if (draw->mSpecularMap)
-            {
-                current_shader->bindTexture(LLShaderMgr::SPECULAR_MAP, draw->mSpecularMap);
-            }
-        }
-        else if (current_shader == simple_shader || current_shader == simple_shader->mRiggedVariant)
-        {
-            current_shader->bindTexture(LLShaderMgr::BUMP_MAP, LLViewerFetchedTexture::sFlatNormalImagep);
-            current_shader->bindTexture(LLShaderMgr::SPECULAR_MAP, LLViewerFetchedTexture::sWhiteImagep);
-        }
-        if (draw->mTextureList.size() > 1)
-        {
-            for (U32 i = 0; i < draw->mTextureList.size(); ++i)
-            {
-                if (draw->mTextureList[i].notNull())
-                {
-                    gGL.getTexUnit(i)->bindFast(draw->mTextureList[i]);
-                }
-            }
-        }
-        else
-        { //not batching textures or batch has only 1 texture -- might need a texture matrix
-            if (draw->mTexture.notNull())
-            {
-                if (use_material)
-                {
-                    current_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, draw->mTexture);
-                }
-                else
-                {
-                    gGL.getTexUnit(0)->bindFast(draw->mTexture);
-                }
-
-                if (draw->mTextureMatrix)
-                {
-                    tex_setup = true;
-                    gGL.getTexUnit(0)->activate();
-                    gGL.matrixMode(LLRender::MM_TEXTURE);
-                    gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
-                    gPipeline.mTextureMatrixOps++;
-                }
+                shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, draw->mTexture, diffuse_key);
             }
             else
             {
-                gGL.getTexUnit(0)->unbindFast(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->bindFast(draw->mTexture, diffuse_key);
             }
+
+            if (draw->mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
+            {
+                tex_setup = true;
+                gGL.matrixMode(LLRender::MM_TEXTURE0);
+                gGL.loadMatrix((GLfloat*)draw->mTextureMatrix->mMatrix);
+                gPipeline.countTextureMatrixOp(*draw->mTextureMatrix);
+            }
+        }
+        else
+        {
+            gGL.getTextureSlot(0)->unbindFast();
         }
     }
 
     return tex_setup;
 }
 
-void LLDrawPoolAlpha::RestoreTexSetup(bool tex_setup)
+void LLDrawPoolAlpha::popTextureMatrix(bool tex_setup)
 {
     if (tex_setup)
     {
-        gGL.getTexUnit(0)->activate();
-        gGL.matrixMode(LLRender::MM_TEXTURE);
+        gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadIdentity();
         gGL.matrixMode(LLRender::MM_MODELVIEW);
     }
@@ -485,9 +527,9 @@ void LLDrawPoolAlpha::renderEmissives(std::vector<LLDrawInfo*>& emissives)
 
     for (LLDrawInfo* draw : emissives)
     {
-        bool tex_setup = TexSetup(draw, false);
+        bool tex_setup = TexSetup(draw, false, emissive_shader);
         drawEmissive(draw);
-        RestoreTexSetup(tex_setup);
+        popTextureMatrix(tex_setup);
     }
 }
 
@@ -522,9 +564,9 @@ void LLDrawPoolAlpha::renderRiggedEmissives(std::vector<LLDrawInfo*>& emissives)
 
         if (uploadMatrixPalette(draw->mAvatar, draw->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
         {
-            bool tex_setup = TexSetup(draw, false);
+            bool tex_setup = TexSetup(draw, false, shader);
             drawEmissive(draw);
-            RestoreTexSetup(tex_setup);
+            popTextureMatrix(tex_setup);
         }
     }
 }
@@ -557,6 +599,11 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     bool initialized_lighting = false;
     bool light_enabled = true;
+
+    // The last shader bound through bindDeferredShaderFast. Used to decide whether restoring
+    // after the emissive excursion needs the deferred path (which re-binds the shadow maps)
+    // or a plain bind().
+    LLGLSLShader* deferred_bound_shader = nullptr;
 
     const LLVOAvatar* lastAvatar = nullptr;
     U64 lastMeshId = 0;
@@ -666,12 +713,34 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     if (current_shader != target_shader)
                     {
                         gPipeline.bindDeferredShaderFast(*target_shader);
+                        deferred_bound_shader = target_shader;
                     }
 
                     params.mGLTFMaterial->bind(params.mTexture);
                 }
                 else
                 {
+                    // NOT flattened for impostors, unlike the GLTF path, however much the two
+                    // look like they should match.
+                    //
+                    // A legacy BLEND material derives its OPACITY from lighting:
+                    // materialF ends with al = max(diffcol.a, glare) * vertex_color.a,
+                    // where glare accumulates reflection-probe environment and per-light
+                    // specular. A shiny surface is opaque because it is shiny. Routing it to
+                    // the flat impostor program -- which has no glare term and cannot have one
+                    // without doing the lighting it exists to avoid -- drops those surfaces to
+                    // their bare diffuse alpha, so they turn patchily see-through and blend
+                    // against their own back faces.
+                    //
+                    // GLTF alpha has no such coupling (pbralphaF: a = basecolor.a *
+                    // vertex_color.a), which is why FOR_IMPOSTOR is safe there and not here.
+                    // The asymmetry is in the content model, not in the impostor code. Fixing
+                    // it properly means a materialF FOR_IMPOSTOR variant that still runs
+                    // the lighting for glare but emits flat albedo -- correct on both counts,
+                    // at the cost of a permutation across the material program set.
+                    //
+                    // So legacy BLEND stays double-lit in a bake, which is a colour error we
+                    // have always had, rather than a transparency error we would be adding.
                     mat = LLPipeline::sRenderingHUDs ? nullptr : params.mMaterial;
 
                     if (params.mFullbright)
@@ -702,7 +771,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                         U32 mask = params.mShaderMask;
 
                         llassert(mask < LLMaterial::SHADER_COUNT);
-                        target_shader = &(gDeferredMaterialProgram[mask]);
+                        target_shader = gDeferredMaterialProgram[mask].selectVariant();
                     }
                     else if (!params.mFullbright)
                     {
@@ -723,13 +792,14 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     {// If we need shaders, and we're not ALREADY using the proper shader, then bind it
                     // (this way we won't rebind shaders unnecessarily).
                         gPipeline.bindDeferredShaderFast(*target_shader);
+                        deferred_bound_shader = target_shader;
 
                         if (params.mFullbright)
                         { // make sure the bind the exposure map for fullbright shaders so they can cancel out exposure
                             S32 channel = target_shader->enableTexture(LLShaderMgr::EXPOSURE_MAP);
                             if (channel > -1)
                             {
-                                gGL.getTexUnit(channel)->bind(&gPipeline.mExposureMap);
+                                gGL.getTextureSlot(channel)->bind(&gPipeline.mExposureMap);
                             }
                         }
                     }
@@ -746,12 +816,13 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                         brightness = params.mFullbright ? 1.f : 0.f;
                     }
 
-                    if (current_shader)
-                    {
-                        current_shader->uniform4f(LLShaderMgr::SPECULAR_COLOR, spec_color.mV[VRED], spec_color.mV[VGREEN], spec_color.mV[VBLUE], spec_color.mV[VALPHA]);
-                        current_shader->uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, env_intensity);
-                        current_shader->uniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, brightness);
-                    }
+                    // target_shader, not current_shader: these belong to the program this draw
+                    // was batched for. They are the same pointer here -- the branch above just
+                    // bound it -- but saying so is what keeps them the same.
+                    llassert(current_shader == target_shader);
+                    target_shader->uniform4f(LLShaderMgr::SPECULAR_COLOR, spec_color.mV[VRED], spec_color.mV[VGREEN], spec_color.mV[VBLUE], spec_color.mV[VALPHA]);
+                    target_shader->uniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, env_intensity);
+                    target_shader->uniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, brightness);
                 }
 
                 if (params.mAvatar && !uploadMatrixPalette(params.mAvatar, params.mSkinInfo, lastAvatar, lastMeshId, lastAvatarShader, skipLastSkin))
@@ -759,7 +830,9 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     continue;
                 }
 
-                bool tex_setup = TexSetup(&params, (mat != nullptr));
+                bool tex_setup = TexSetup(&params, (mat != nullptr), target_shader,
+                                          is_particle_or_hud_particle ? ALSamplers::AnisoClamp
+                                                                      : ALSamplers::AnisoWrap);
 
                 {
                     gGL.blendFunc((LLRender::eBlendFactor) params.mBlendFuncSrc, (LLRender::eBlendFactor) params.mBlendFuncDst, mAlphaSFactor, mAlphaDFactor);
@@ -769,7 +842,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                         params.mBlendFuncDst != LLRender::BF_SOURCE_ALPHA &&
                         params.mBlendFuncSrc != LLRender::BF_SOURCE_ALPHA)
                     { // this draw call has a custom blend function that may require rendering of "invisible" fragments
-                        current_shader->setMinimumAlpha(0.f);
+                        target_shader->setMinimumAlpha(0.f);
                         reset_minimum_alpha = true;
                     }
 
@@ -779,7 +852,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                     if (reset_minimum_alpha)
                     {
-                        current_shader->setMinimumAlpha(MINIMUM_ALPHA);
+                        target_shader->setMinimumAlpha(MINIMUM_ALPHA);
                     }
                 }
 
@@ -811,17 +884,18 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     }
                 }
 
-                if (tex_setup)
-                {
-                    gGL.getTexUnit(0)->activate();
-                    gGL.matrixMode(LLRender::MM_TEXTURE);
-                    gGL.loadIdentity();
-                    gGL.matrixMode(LLRender::MM_MODELVIEW);
-                }
+                popTextureMatrix(tex_setup);
             }
 
             // render emissive faces into alpha channel for bloom effects
-            if (!depth_only)
+            //
+            // Skipped in an impostor bake. These batches write ONLY alpha (their blend mode
+            // leaves colour untouched), and in a bake that channel is coverage -- glow
+            // accumulated into it would read back as extra opacity. Nothing is lost: the
+            // coverage stamp overwrote this glow before the impostor was ever sampled, so it
+            // has never reached the screen. It also saves the whole excursion, including the
+            // shader rebind that follows it.
+            if (!depth_only && !LLPipeline::sImpostorRender)
             {
                 gPipeline.enableLightsDynamic();
 
@@ -831,6 +905,14 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                 bool rebind = false;
                 LLGLSLShader* lastShader = current_shader;
+
+                // The emissive programs declare the indexed-texture array (tex0..tex20) as
+                // plain sampler2D, and that range covers the units the alpha shader's shadow
+                // maps sit on -- 8..13 in practice. No explicit release is needed for the
+                // excursion: LLGLSLShader::bind() drops the compare-sampler units when it
+                // binds any program that declares no shadow samplers, emissives included.
+                // The restore below still has to come back through the deferred path.
+
                 if (!emissives.empty())
                 {
                     light_enabled = true;
@@ -864,13 +946,35 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                 if (lastShader && rebind)
                 {
-                    lastShader->bind();
+                    // Restore through the deferred path when that is how this shader was
+                    // bound, so the shadow maps released above come back. A plain bind()
+                    // would leave them unbound and silently drop shadowing on every alpha
+                    // draw after the first emissive batch.
+                    if (lastShader == deferred_bound_shader)
+                    {
+                        gPipeline.bindDeferredShaderFast(*lastShader);
+                    }
+                    else
+                    {
+                        lastShader->bind();
+                    }
                 }
             }
         }
     }
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
+
+    // Release the shadow maps at the pass boundary. LLGLSLShader::bind() would do this on
+    // the next non-declaring program switch anyway; doing it here keeps the maps from
+    // riding along to whatever runs between passes.
+    //
+    // Deliberately NOT unbindDeferredShader: that unbinds by a single shader's channel
+    // layout and asserts each unit still holds the type that shader expects. By the time the
+    // pass ends the bound shader may be a different one -- an emissive variant, or a restored
+    // earlier shader -- so the units reflect somebody else's layout and the check trips.
+    // unbindShadowMaps tracks units directly and needs no such assumption.
+    gPipeline.unbindShadowMaps();
 
     LLVertexBuffer::unbind();
 

@@ -61,6 +61,10 @@ float valueNoise3D(vec3 p)
                u.z);
 }
 
+// Hides the R11F_G11F_B10F emissive attachment's 6/6/5-mantissa banding in this writer's
+// smooth gradients. Defined in deferred/globalF.glsl, which every fragment stage attaches.
+vec3 ditherEmissive(vec3 v, vec2 frag_px);
+
 void main()
 {
     vec3  dir  = normalize(vary_local_pos - camPosLocal);
@@ -216,7 +220,7 @@ void main()
 
 #if defined(HAS_EMISSIVE)
     frag_data[0] = vec4(0.0);
-    frag_data[3] = vec4(aurora_rgb * 1.5, alpha);
+    frag_data[3] = vec4(ditherEmissive(aurora_rgb * 1.5, gl_FragCoord.xy), alpha);
 #else
     frag_data[0] = vec4(aurora_rgb, alpha);
 #endif

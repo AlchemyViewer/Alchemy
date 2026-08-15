@@ -27,15 +27,15 @@ out vec4 frag_color;
 
 uniform sampler2D diffuseMap;
 
-// Shadow shader path. The default value (shadowMode == 0) makes every
+// Shadow shader path. The default value (textShadowMode == 0) makes every
 // non-text UI surface and every NO_SHADOW text glyph hit the early-return
 // branch below — bytewise equivalent to the pre-change shader. Only text
-// rendering with active shadow geometry sets shadowMode > 0 before its
-// draw range. shadowMode is deliberately the ONLY shadow uniform: per-pass
+// rendering with active shadow geometry sets textShadowMode > 0 before its
+// draw range. textShadowMode is deliberately the ONLY shadow uniform: per-pass
 // constant, so captured vertex buffers (which replay texture binds but not
 // uniforms) stay correct. Everything that varies per batch — atlas texel
 // size, alpha channel layout — derives from the bound texture itself.
-uniform int  shadowMode;           // 0 = passthrough, 1 = drop, 2 = soft
+uniform int  textShadowMode = 0;           // 0 = passthrough, 1 = drop, 2 = soft
 
 in vec2 vary_texcoord0;
 in vec4 vertex_color;
@@ -55,7 +55,7 @@ float sampleAtlasAlpha(vec2 uv)
 
 void main()
 {
-    if (shadowMode == 0)
+    if (textShadowMode == 0)
     {
         // Default path. Byte-identical to pre-change uiF.glsl.
         frag_color = vertex_color*texture(diffuseMap, vary_texcoord0.xy);
@@ -87,7 +87,7 @@ void main()
     vec2 atlasTexelSize = 1.0 / vec2(textureSize(diffuseMap, 0));
     float vc_a = vertex_color.a;
     float p;
-    if (shadowMode == 1)
+    if (textShadowMode == 1)
     {
         // DROP_SHADOW: single tap. Multi-quad screen offset (1, −1)
         // → shader offset (−1, 1).

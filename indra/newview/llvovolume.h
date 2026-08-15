@@ -39,6 +39,7 @@
 
 
 class LLViewerTextureAnim;
+class LLTextureAnim;
 class LLDrawPool;
 class LLMaterialID;
 class LLSelectNode;
@@ -442,6 +443,12 @@ protected:
 
 private:
     bool lodOrSculptChanged(LLDrawable *drawable, bool &compiled, bool &shouldUpdateOctreeBounds);
+
+    // TextureAnim block handling for processUpdateMessage; a block without ANIM_ON
+    // is treated as no animation at all (see applyTextureAnim in llvovolume.cpp)
+    void applyTextureAnim(const LLTextureAnim &ta);
+    void clearTextureAnim();
+    void clearUntargetedTextureMatrices(S8 target_face);
 
 public:
 

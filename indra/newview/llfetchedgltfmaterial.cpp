@@ -61,6 +61,31 @@ LLFetchedGLTFMaterial& LLFetchedGLTFMaterial::operator=(const LLFetchedGLTFMater
     return *this;
 }
 
+// The sampler every glTF map is read through.
+//
+// Named here, by the material, rather than inherited from whatever mode each image happened to
+// be carrying. That is the direction sampling ownership is moving: a texture is data, and how a
+// pass reads it belongs to the pass. It matters more for glTF than elsewhere -- the format
+// specifies sampler state per texture REFERENCE, so two materials may legitimately want one
+// image read two ways, which an image-owned mode cannot represent at all.
+//
+// Anisotropic + wrap with the resource's mips, which is exactly what these textures resolved to
+// before through LLImageGL's defaults -- so this names existing behaviour rather than changing
+// it. SL's material subset carries no sampler fields yet; when it does, this constant becomes a
+// lookup into the material.
+// glTF splits its maps into colour and data, and so does the sampler.
+//
+// Base colour and emissive hold sRGB-encoded colour; the hardware decodes them, which is
+// strictly better than the shader doing it because GL converts each texel BEFORE filtering.
+// Converting afterwards linearises an average taken in sRGB space, and those are not the
+// same -- srgb_to_linear(lerp(a,b,t)) != lerp(srgb_to_linear(a), srgb_to_linear(b), t) --
+// which is what made minified albedo read too dark. The matching srgb_to_linear() calls in
+// the PBR shaders are gone; keeping both would convert twice.
+//
+// Normal and ORM are measurements, not colour. They keep the default, which decodes nothing.
+static constexpr ALSampler GLTF_COLOR_SAMPLER = ALSamplers::AnisoWrapSRGB;
+static constexpr ALSampler GLTF_DATA_SAMPLER  = ALSamplers::AnisoWrap;
+
 void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
 {
     // glTF 2.0 Specification 3.9.4. Alpha Coverage
@@ -73,55 +98,64 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
     LLViewerTexture* baseColorTex = media_tex ? media_tex : mBaseColorTexture;
     LLViewerTexture* emissiveTex = media_tex ? media_tex : mEmissiveTexture;
 
-    if (!LLPipeline::sShadowRender || (mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK))
+    // sImpostorRender is checked alongside sShadowRender throughout this function because
+    // generateImpostor sets BOTH, and only one of them means "depth-only". An impostor bake
+    // runs the full G-buffer pools into a target with real ORM and normal attachments, which
+    // impostorF then replays into the scene G-buffer, so everything a shadow pass is right
+    // to skip is exactly what the bake needs.
+    const bool depth_only_pass = LLPipeline::sShadowRender && !LLPipeline::sImpostorRender;
+
+    if (!depth_only_pass || (mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK))
     {
         if (mAlphaMode == LLGLTFMaterial::ALPHA_MODE_MASK)
         {
             min_alpha = mAlphaCutoff;
         }
-        shader->uniform1f(LLShaderMgr::MINIMUM_ALPHA, min_alpha);
+        // setMinimumAlpha, not uniform1f: it owns the per-program value cache, and a run of
+        // non-masked materials (all writing -1) collapses to a float compare per bind.
+        shader->setMinimumAlpha(min_alpha);
     }
 
     if (baseColorTex != nullptr)
     {
-        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, baseColorTex);
+        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, baseColorTex, GLTF_COLOR_SAMPLER);
     }
     else
     {
-        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, LLViewerFetchedTexture::sWhiteImagep);
+        shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_COLOR_SAMPLER);
     }
 
     F32 base_color_packed[8];
     mTextureTransform[GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(base_color_packed);
     shader->uniform4fv(LLShaderMgr::TEXTURE_BASE_COLOR_TRANSFORM, 2, (F32*)base_color_packed);
 
-    if (!LLPipeline::sShadowRender)
+    if (!depth_only_pass)
     {
         if (mNormalTexture.notNull() && mNormalTexture->getDiscardLevel() <= 4)
         {
-            shader->bindTexture(LLShaderMgr::BUMP_MAP, mNormalTexture);
+            shader->bindTexture(LLShaderMgr::BUMP_MAP, mNormalTexture, GLTF_DATA_SAMPLER);
         }
         else
         {
-            shader->bindTexture(LLShaderMgr::BUMP_MAP, LLViewerFetchedTexture::sFlatNormalImagep);
+            shader->bindTexture(LLShaderMgr::BUMP_MAP, LLViewerFetchedTexture::sFlatNormalImagep, GLTF_DATA_SAMPLER);
         }
 
         if (mMetallicRoughnessTexture.notNull())
         {
-            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, mMetallicRoughnessTexture); // PBR linear packed Occlusion, Roughness, Metal.
+            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, mMetallicRoughnessTexture, GLTF_DATA_SAMPLER); // PBR linear packed Occlusion, Roughness, Metal.
         }
         else
         {
-            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, LLViewerFetchedTexture::sWhiteImagep);
+            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_DATA_SAMPLER);
         }
 
         if (emissiveTex != nullptr)
         {
-            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, emissiveTex);  // PBR sRGB Emissive
+            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, emissiveTex, GLTF_COLOR_SAMPLER);  // PBR sRGB Emissive
         }
         else
         {
-            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, LLViewerFetchedTexture::sWhiteImagep);
+            shader->bindTexture(LLShaderMgr::EMISSIVE_MAP, LLViewerFetchedTexture::sWhiteImagep, GLTF_COLOR_SAMPLER);
         }
 
         // NOTE: base color factor is baked into vertex stream

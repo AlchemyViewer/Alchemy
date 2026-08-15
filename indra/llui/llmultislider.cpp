@@ -660,7 +660,7 @@ void LLMultiSlider::draw()
     // Draw background and thumb.
 
     // drawing solids requires texturing be disabled
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     F32 opacity = getEnabled() ? 1.f : 0.3f;
 

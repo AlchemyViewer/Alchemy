@@ -1,5 +1,5 @@
 /**
- * @file llfontcolrv1.cpp
+ * @file alfontcolrv1.cpp
  * @brief COLRv1 paint-tree rasterizer using HarfBuzz's hb-raster backend.
  *        See LLFontFreetype::renderColrV1Glyph for the call site.
  *
@@ -20,13 +20,12 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
  * $/LicenseInfo$
  */
 
 #include "linden_common.h"
 
-#include "llfontcolrv1.h"
+#include "alfontcolrv1.h"
 
 #include "llerror.h"
 
@@ -119,15 +118,15 @@ namespace
     }
 }
 
-LLFontColrV1Painter::LLFontColrV1Painter()
+ALFontColrV1Painter::ALFontColrV1Painter()
 {
 }
 
-LLFontColrV1Painter::~LLFontColrV1Painter()
+ALFontColrV1Painter::~ALFontColrV1Painter()
 {
 }
 
-bool LLFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
+bool ALFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
                                      U32              glyph_index,
                                      F32              fallback_point_size,
                                      const LLColor4U& foreground,

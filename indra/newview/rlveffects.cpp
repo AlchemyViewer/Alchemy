@@ -130,13 +130,13 @@ void RlvOverlayEffect::run(const LLVisualEffectParams*)
         const LLVector2& displayScale = gViewerWindow->getDisplayScale();
         gGL.scalef(displayScale.mV[VX], displayScale.mV[VY], 1.f);
 
-        gGL.getTexUnit(0)->bind(m_pImage);
+        gGL.getTextureSlot(0)->bindSampled(m_pImage, ALSamplers::AnisoWrap);
         const LLColor3 col = m_Color.get();
         gGL.color4f(col.mV[0], col.mV[1], col.mV[2], llclamp(m_nAlpha.get(), 0.0f, 1.0f));
 
         gl_rect_2d_simple_tex(nWidth, nHeight);
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         gGL.popMatrix();
         gGL.flush();
@@ -349,17 +349,16 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
     }
     RLV_ASSERT_DBG(pParams->m_pSrcBuffer);
 
-    S32 nDiffuseChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE, pParams->m_pSrcBuffer->getUsage());
+    S32 nDiffuseChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
     if (nDiffuseChannel > -1)
     {
-        pParams->m_pSrcBuffer->bindTexture(0, nDiffuseChannel);
-        gGL.getTexUnit(nDiffuseChannel)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+        pParams->m_pSrcBuffer->bindTexture(0, nDiffuseChannel, ALSamplers::PointMirror);
     }
 
-    S32 nDepthChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DEPTH, gPipeline.mRT->deferredScreen.getUsage());
+    S32 nDepthChannel = pShader->enableTexture(LLShaderMgr::DEFERRED_DEPTH);
     if (nDepthChannel > -1)
     {
-        gGL.getTexUnit(nDepthChannel)->bind(&gPipeline.mRT->deferredScreen, true);
+        gGL.getTextureSlot(nDepthChannel)->bind(&gPipeline.mRT->deferredScreen, true);
     }
 
     gPipeline.mScreenTriangleVB->setBuffer();

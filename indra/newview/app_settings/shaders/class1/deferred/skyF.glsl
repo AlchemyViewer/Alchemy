@@ -51,17 +51,12 @@ uniform vec3  sunlight_color;
 uniform vec3  moonlight_color;
 uniform int   sun_up_factor;
 uniform vec3  ambient_color;
-uniform vec3  blue_horizon;
-uniform vec3  blue_density;
-uniform float haze_horizon;
-uniform float haze_density;
+// Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
+// and bound at UB_ENVIRONMENT. Members are read by bare name.
+//[ENGINE_BLOCK Environment]
 
-uniform float cloud_shadow;
 uniform float density_multiplier;
-uniform float distance_multiplier;
-uniform float max_y;
 
-uniform vec3  glow;
 uniform float sun_moon_glow_factor;
 
 uniform int cube_snapshot;
@@ -101,6 +96,10 @@ vec3 halo22(float d)
     float v = sqrt(clamp(1 - (d * d), 0, 1));
     return texture(halo_map, vec2(0, v)).rgb * ice_level;
 }
+
+// Hides the R11F_G11F_B10F emissive attachment's 6/6/5-mantissa banding in this writer's
+// smooth gradients. Defined in deferred/globalF.glsl, which every fragment stage attaches.
+vec3 ditherEmissive(vec3 v, vec2 frag_px);
 
 void main()
 {
@@ -215,7 +214,7 @@ void main()
 
 #if defined(HAS_EMISSIVE)
     frag_data[0] = vec4(0);
-    frag_data[3] = vec4(color.rgb, 1.0);
+    frag_data[3] = vec4(ditherEmissive(color.rgb, gl_FragCoord.xy), 1.0);
 #else
     frag_data[0] = vec4(color.rgb, 1.0);
 #endif

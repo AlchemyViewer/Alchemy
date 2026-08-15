@@ -303,11 +303,17 @@ public:
                                                      const F32 max_attachment_complexity,
                                                      LLVOVolume::texture_cost_t& textures,
                                                      U32& cost,
-                                                     hud_complexity_list_t& hud_complexity_list,
-                                                     object_complexity_list_t& object_complexity_list);
+                                                     U32& visible_triangle_count,
+                                                     F32& est_triangle_count,
+                                                     F32& surface_area,
+                                                     LLHUDComplexity& hud_object_complexity,
+                                                     LLObjectComplexity& object_complexity);
     void            calculateUpdateRenderComplexity();
     static const U32 VISUAL_COMPLEXITY_UNKNOWN;
     void            updateVisualComplexity();
+    // Mark that an attachment needs complexity recalculation
+    void markAttachmentComplexityDirty(const LLUUID& object_id, bool force_reset_attachment = false);
+    void markBodyPartsComplexityDirty();
 
     void placeProfileQuery();
     void readProfileQuery(S32 retries);
@@ -584,12 +590,6 @@ private:
     // CPU render time in ms
     F32 mCPURenderTime = 0.f;
 
-    // the isTooComplex method uses these mutable values to avoid recalculating too frequently
-    // DEPRECATED -- obsolete avatar render cost values
-    mutable U32  mVisualComplexity;
-    mutable bool mVisualComplexityStale;
-    U32          mReportedVisualComplexity; // from other viewers through the simulator
-
     mutable bool        mCachedInMuteList;
     mutable F64         mCachedMuteListUpdateTime;
     mutable bool        mCachedInBuddyList = false;
@@ -600,6 +600,81 @@ private:
 // [/RLVa:KB]
 
     VisualMuteSettings      mVisuallyMuteSetting;           // Always or never visually mute this AV
+
+    //--------------------------------------------------------------------
+    // Complexity calculation and caching
+    //--------------------------------------------------------------------
+
+private:
+    // Structure to cache complexity metrics for individual attachments or components
+    struct ComplexityComponent
+    {
+        U32 render_cost;
+        U32 triangle_count;
+        F32 surface_area;
+        F32 est_triangle_count;
+        LLVOVolume::texture_cost_t textures;
+        F64 last_update_time;
+        bool needs_update;
+
+        // For tracking HUD and object lists
+        LLHUDComplexity hud_complexity;
+        LLObjectComplexity object_complexity;
+
+        ComplexityComponent()
+            : render_cost(0)
+            , triangle_count(0)
+            , surface_area(0.f)
+            , est_triangle_count(0.f)
+            , last_update_time(0.0)
+            , needs_update(true)
+        {
+        }
+
+        void reset()
+        {
+            render_cost = 0;
+            triangle_count = 0;
+            surface_area = 0.f;
+            est_triangle_count = 0.f;
+            textures.clear();
+            hud_complexity.reset();
+            object_complexity.reset();
+            needs_update = true;
+        }
+    };
+
+    void calculateAttachmentComplexity(LLViewerObject* attached_object,
+        const F32 max_attachment_complexity,
+        ComplexityComponent& cache);
+    void calculateBodyPartsComplexity(ComplexityComponent& cache);
+    U32 calculateBodyPartsComplexity();
+
+    // return true, if a valid control avatar.
+    bool calculateControlAvatarComplexity(ComplexityComponent& cache, const F32 max_attachment_complexity);
+
+    void accumulateComplexityComponent(const ComplexityComponent& component,
+        U32& total_cost,
+        hud_complexity_list_t& hud_list,
+        object_complexity_list_t& object_list);
+
+    bool shouldUpdateComplexityComponent(const ComplexityComponent& component) const;
+    void performPartialComplexityUpdate(const F32 max_attachment_complexity);
+
+    void processComplexityCostChange(const hud_complexity_list_t &hud_complexity_list, const object_complexity_list_t &object_complexity_list);
+
+    // Todo: probably safe to store by local instead of global id
+    // since they should be unique to this avatar, but local id might be not known.
+    typedef std::map<LLUUID, ComplexityComponent> complexity_cache_map_t;
+    complexity_cache_map_t mComplexityCache; // Cache per-attachment complexity
+    ComplexityComponent mBodyPartsComplexity; // Cache for body parts (mesh, eyes, hair, etc)
+    ComplexityComponent mControlAvatarComplexity; // Cache for animated object control avatar
+
+    // the isTooComplex method uses these mutable values to avoid recalculating too frequently
+    // DEPRECATED -- obsolete avatar render cost values
+    mutable U32  mVisualComplexity;
+    mutable bool mVisualComplexityStale;
+    U32          mReportedVisualComplexity; // from other viewers through the simulator
 
     //--------------------------------------------------------------------
     // animated object status
@@ -637,7 +712,6 @@ private:
     // Shadowing
     //--------------------------------------------------------------------
 public:
-    void        updateShadowFaces();
     LLDrawable* mShadow;
 private:
     LLFace*     mShadow0Facep;
@@ -668,7 +742,19 @@ public:
     const LLVector3*  getLastAnimExtents() const { return mLastAnimExtents; }
     void        setNeedsExtentUpdate(bool val) { mNeedsExtentUpdate = val; }
 
+public:
+    // The rotation of the view basis the impostor was baked in.
+    //
+    // generateImpostor aims its camera AT the avatar, so the G-buffer normals it captures are
+    // encoded in that basis -- not the main camera's. The billboard replays them into the
+    // scene G-buffer, where the lighting pass reads them as main-view-space, so they need
+    // rebasing by (main view) * inverse(bake view) at composite time. Stored per avatar
+    // because an impostor outlives the frame it was baked in and the camera keeps moving.
+    void        setImpostorViewRotation(const LLMatrix3& rot) { mImpostorViewRot = rot; }
+    const LLMatrix3& getImpostorViewRotation() const { return mImpostorViewRot; }
+
 private:
+    LLMatrix3   mImpostorViewRot;
     LLVector3   mImpostorOffset;
     LLVector2   mImpostorDim;
     // This becomes true in the constructor and false after the first
@@ -838,7 +924,10 @@ public:
         // List of Matrix4a's for this entry
         LLMeshSkinInfo::matrix_list_t mMatrixPalette;
 
-        // Float array ready to be sent to GL
+        // Float array ready to be sent to GL: one vec4 rebase origin (agent space)
+        // followed by count mat3x4 lines whose translations are relative to it. The
+        // upload splits the two -- AVATAR_MATRIX takes the palette tail, SKIN_ORIGIN
+        // the origin (see apply_matrix_palette).
         std::vector<F32> mGLMp;
 
         MatrixPaletteCache() :

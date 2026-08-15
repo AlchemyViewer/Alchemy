@@ -30,12 +30,16 @@
 #include "llrendertarget.h"
 #include "llcubemaparray.h"
 #include "llcubemap.h"
+#include "aluniformbuffer.h"
 
 class LLSpatialGroup;
 class LLViewerObject;
 
 // number of reflection probes to keep in vram
 #define LL_MAX_REFLECTION_PROBE_COUNT 256
+
+// Second-order SH: one DC term, three linear, five quadratic.
+#define LL_SH_COEFF_COUNT 9
 
 // reflection probe mininum scale
 #define LL_REFLECTION_PROBE_MINIMUM_SCALE 1.f;
@@ -74,7 +78,7 @@ public:
         //  x - irradiance scale
         //  y - radiance scale
         //  z - fade in
-        //  w - znear
+        //  w - unused (std140 keeps this a vec4)
         LLVector4 refParams[LL_MAX_REFLECTION_PROBE_COUNT];
 
         LLVector4 heroSphere;
@@ -96,6 +100,18 @@ public:
         GLint heroShape;
         GLint heroMipCount;
         GLint heroProbeCount;
+
+        // Screen-space reflection march parameters. Frame-constant, and every SSR consumer is
+        // already reading this block, so they ride along here instead of being re-pushed as
+        // loose uniforms on every bindReflectionProbes. (noiseSine is NOT here: it advances
+        // per bind.)
+        F32 iterationCount;
+        F32 rayStep;
+        F32 distanceBias;
+        F32 depthRejectBias;
+        F32 glossySampleCount;
+        F32 adaptiveStepMultiplier;
+        F32 _ssrTailPad[2]; // round the block to a 16-byte multiple (std140)
     };
 
     // allocate an environment map of the given resolution
@@ -103,6 +119,7 @@ public:
 
     // release any GL state
     void cleanup();
+    void cleanupQueryPool();
 
     // maintain reflection probes
     void update();
@@ -161,6 +178,10 @@ public:
     U32 probeCount();
     U32 probeMemory();
 
+    // glDeleteQueries is expensive, so we maintain a pool of queries
+    GLuint allocateQuery();
+    void recycleQuery(GLuint query);
+
 private:
     friend class LLPipeline;
     friend class LLHeroProbeManager;
@@ -187,6 +208,8 @@ private:
     // bind UBO used for rendering
     void setUniforms();
 
+    std::deque<GLuint>                                    mQueryPool;
+
     // render target for cube snapshots
     // used to generate mipmaps without doing a copy-to-texture
     LLRenderTarget mRenderTarget;
@@ -200,7 +223,9 @@ private:
     LLPointer<LLVertexBuffer> mVertexBuffer;
 
     // storage for reflection probe irradiance maps
-    LLPointer<LLCubeMapArray> mIrradianceMaps;
+    // Nine RGB SH coefficients per probe, laid out 9 wide with one row per cubemap layer.
+    // Signed, so RGBA16F rather than the unsigned float the radiance chain uses.
+    LLRenderTarget mSHCoeffs;
 
     // list of free cubemap indices
     std::list<S32> mCubeFree;
@@ -220,8 +245,8 @@ private:
     // list of reflection maps to create
     std::vector<LLPointer<LLReflectionMap> > mCreateList;
 
-    // handle to UBO
-    U32 mUBO = 0;
+    // reflection-probe constant block (bound to LLGLSLShader::UB_REFLECTION_PROBES)
+    ALUniformBuffer mUBO;
 
     // list of maps being used for rendering
     std::vector<LLReflectionMap*> mReflectionMaps;
@@ -257,7 +282,10 @@ private:
     U32 mProbeResolution = 128;
 
     // resolution of irradiance maps
-    U32 mIrradianceMapResolution = 16;
+    // Face edge length the SH projection integrates over. Irradiance is band-limited to nine
+    // coefficients, so this only has to be fine enough not to alias the source before the
+    // integral -- it is not an output resolution and does not bound reconstruction quality.
+    U32 mSHProjectionRes = 32;
 
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;
@@ -269,7 +297,6 @@ private:
     bool mReset = false;
 
     float mResetFade = 1.f;
-    float mGlobalFadeTarget = 1.f;
 
     // if true, only update the default probe
     bool mPaused = false;

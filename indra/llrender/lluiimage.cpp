@@ -101,7 +101,7 @@ void LLUIImage::draw3D(const LLVector3& origin_agent, const LLVector3& x_axis, c
         LLRender2D::translate(rect_origin.mV[VX],
                                             rect_origin.mV[VY],
                                             rect_origin.mV[VZ]);
-        gGL.getTexUnit(0)->bind(getImage());
+        gGL.getTextureSlot(0)->bindSampled(getImage(), ALSamplers::BilinearClamp);
         gGL.color4fv(color.mV);
 
         LLRectf center_uv_rect(mClipRegion.mLeft + mScaleRegion.mLeft * mClipRegion.getWidth(),

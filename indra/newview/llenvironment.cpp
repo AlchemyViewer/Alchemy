@@ -1652,21 +1652,7 @@ void LLEnvironment::update(const LLViewerCamera * cam)
 
     updateSettingsUniforms();
 
-    LLViewerShaderMgr::shader_iter shaders_iter, end_shaders;
-    end_shaders = LLViewerShaderMgr::instance()->endShaders();
-    for (shaders_iter = LLViewerShaderMgr::instance()->beginShaders(); shaders_iter != end_shaders; ++shaders_iter)
-    {
-        shaders_iter->mUniformsDirty = true;
-        if (shaders_iter->mRiggedVariant)
-        {
-            shaders_iter->mRiggedVariant->mUniformsDirty = true;
-        }
-
-        for (auto& variant : shaders_iter->mGLTFVariants)
-        {
-            variant.mUniformsDirty = true;
-        }
-    }
+    LLGLSLShader::dirtyEnvironmentUniforms();
 }
 
 void LLEnvironment::updateCloudScroll()
@@ -1691,6 +1677,79 @@ void LLEnvironment::updateCloudScroll()
         }
     }
 
+}
+
+namespace
+{
+    // The CPU block must exactly match the std140 layout the shaders declare. Each vec3 is
+    // paired with a trailing scalar (fills the vec3's std140 tail), so the C++ float[3]+float
+    // packing reproduces std140 with no manual padding; only the final 16-byte round needs it.
+    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 160,
+                  "Environment UBO layout must match std140 (160 bytes)");
+
+    // LLShaderMgr uniform enum -> (byte offset in the block, float component count). The pack
+    // walks the per-frame LLShaderUniforms buckets and writes any setting whose enum appears
+    // here; settings NOT listed (the loose/entangled uniforms) are left for the apply() path.
+    struct EnvBlockField { S32 uniform; U32 offset; U32 ncomp; };
+#define LL_ENV_FIELD(u, m) \
+    { LLShaderMgr::u, (U32)offsetof(LLEnvironment::EnvironmentUBOData, m), \
+      (U32)(sizeof(LLEnvironment::EnvironmentUBOData::m) / sizeof(F32)) }
+
+    const EnvBlockField sEnvBlockFields[] =
+    {
+        LL_ENV_FIELD(WATER_FOGCOLOR,            waterFogColor),
+        LL_ENV_FIELD(BLUE_DENSITY,              blue_density),
+        LL_ENV_FIELD(HAZE_DENSITY,              haze_density),
+        LL_ENV_FIELD(BLUE_HORIZON,              blue_horizon),
+        LL_ENV_FIELD(HAZE_HORIZON,              haze_horizon),
+        LL_ENV_FIELD(CLOUD_POS_DENSITY1,        cloud_pos_density1),
+        LL_ENV_FIELD(DISTANCE_MULTIPLIER,       distance_multiplier),
+        LL_ENV_FIELD(CLOUD_POS_DENSITY2,        cloud_pos_density2),
+        LL_ENV_FIELD(CLOUD_SCALE,               cloud_scale),
+        LL_ENV_FIELD(CLOUD_COLOR,               cloud_color),
+        LL_ENV_FIELD(CLOUD_SHADOW,              cloud_shadow),
+        LL_ENV_FIELD(GLOW,                      glow),
+        LL_ENV_FIELD(MAX_Y,                     max_y),
+        LL_ENV_FIELD(WATER_FOGCOLOR_LINEAR,     waterFogColorLinear),
+        LL_ENV_FIELD(REFLECTION_PROBE_AMBIANCE, reflection_probe_ambiance),
+        LL_ENV_FIELD(SCENE_LIGHT_STRENGTH,      scene_light_strength),
+        LL_ENV_FIELD(SKY_SUNLIGHT_SCALE,        sky_sunlight_scale),
+        LL_ENV_FIELD(SKY_AMBIENT_SCALE,         sky_ambient_scale),
+        LL_ENV_FIELD(GAMMA,                     gamma),
+        LL_ENV_FIELD(WATER_FOGKS,               waterFogKS),
+        LL_ENV_FIELD(WATER_FOGDENSITY,          waterFogDensity),
+    };
+#undef LL_ENV_FIELD
+
+    const EnvBlockField* findEnvField(S32 uniform)
+    {
+        for (const auto& f : sEnvBlockFields)
+        {
+            if (f.uniform == uniform)
+            {
+                return &f;
+            }
+        }
+        return nullptr;
+    }
+
+    // Register the block's expected std140 layout for debug validation at shader load, derived
+    // from the SAME offsetof()-based table packEnvironmentUBO writes through -- llrender carries
+    // no hand-copied offset table that can drift from this struct. (Member names resolve from
+    // the reserved-uniform table at validation time; every Environment member is a reserved
+    // uniform.)
+#if !LL_RELEASE_FOR_DOWNLOAD
+    const bool s_env_layout_registered = []
+    {
+        std::vector<LLGLSLShader::EngineBlockLayoutMember> members;
+        for (const auto& f : sEnvBlockFields)
+        {
+            members.push_back({ f.uniform, nullptr, f.offset, false });
+        }
+        LLGLSLShader::registerEngineBlockLayout("Environment", std::move(members));
+        return true;
+    }();
+#endif // !LL_RELEASE_FOR_DOWNLOAD
 }
 
 // static
@@ -1740,6 +1799,115 @@ void LLEnvironment::updateSettingsUniforms()
     {
         LL_WARNS("ENVIRONMENT") << "Failed to update GL variable for sky settings, environment is not properly set" << LL_ENDL;
     }
+
+    // Re-pack the shared Environment block from the freshly computed uniforms (CPU only; the
+    // GL upload/bind happens in bindEnvironmentUBO() on the render thread). MUST run before
+    // the compaction below, which removes exactly the entries this reads.
+    packEnvironmentUBO();
+
+    // Drop every entry the Environment UBO now owns. The collections have two consumers with
+    // different needs: packEnvironmentUBO() above wants the FULL set (it is how those values
+    // reach the GPU at all), while LLShaderUniforms::apply() only ever wants what a program
+    // can actually read as a loose uniform. Once a constant moved into the shared block, no
+    // shader declares it loose, yet every syncing program still walked them to no-op.
+    //
+    // Compacting here rather than deleting the pushes in applySpecial()/applyToUniforms()
+    // keeps the packer's input intact; removing them at the source would zero-fill those
+    // block fields and break sky/water outright. Keyed off findEnvField(), the same table the
+    // packer uses, so migrating another constant into the block removes it from the apply
+    // path automatically.
+    {
+        auto compact = [](LLShaderUniforms& u)
+        {
+            auto owned_by_block = [](auto& setting) { return findEnvField(setting.mUniform) != nullptr; };
+            auto strip = [&](auto& vec)
+            {
+                vec.erase(std::remove_if(vec.begin(), vec.end(), owned_by_block), vec.end());
+            };
+            strip(u.mIntegers);
+            strip(u.mFloats);
+            strip(u.mVectors);
+            strip(u.mVector3s);
+        };
+        for (int i = 0; i < LLGLSLShader::SG_COUNT; ++i)
+        {
+            compact(mSkyUniforms[i]);
+            compact(mWaterUniforms[i]);
+        }
+    }
+}
+
+void LLEnvironment::packEnvironmentUBO()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    // Rebuild the whole block each time: zero first so a member that ever stops being emitted
+    // reads as 0 rather than a stale value. The moved uniforms are always emitted, so in
+    // practice every field is overwritten below.
+    EnvironmentUBOData& d = mEnvUBOData;
+    memset(&d, 0, sizeof(d));
+
+    U8* base = reinterpret_cast<U8*>(&d);
+
+    // Walk every SG bucket of both settings. A moved uniform lives in exactly one bucket
+    // (sky-only members in SG_SKY, everything else in SG_ANY; water fog in mWaterUniforms),
+    // and where one appears twice within a bucket (e.g. an auto-adjust override) the later
+    // push wins -- matching the loose apply() semantics, since we write in the same order.
+    auto pack_group = [&](const LLShaderUniforms* groups)
+    {
+        for (int g = 0; g < LLGLSLShader::SG_COUNT; ++g)
+        {
+            const LLShaderUniforms& u = groups[g];
+            for (const auto& s : u.mFloats)
+            {
+                if (const EnvBlockField* f = findEnvField(s.mUniform))
+                {
+                    memcpy(base + f->offset, &s.mValue, sizeof(F32));
+                }
+            }
+            for (const auto& s : u.mVector3s)
+            {
+                if (const EnvBlockField* f = findEnvField(s.mUniform))
+                {
+                    // Clamp to the destination field's width: never write past a field into the
+                    // std140-paired scalar that fills a vec3's .w tail (e.g. haze_density, max_y).
+                    memcpy(base + f->offset, s.mValue.mV, llmin(3u, f->ncomp) * sizeof(F32));
+                }
+            }
+            for (const auto& s : u.mVectors)
+            {
+                if (const EnvBlockField* f = findEnvField(s.mUniform))
+                {
+                    memcpy(base + f->offset, s.mValue.mV, llmin(4u, f->ncomp) * sizeof(F32));
+                }
+            }
+            // mIntegers: none of the moved members are integers, so nothing to pack.
+        }
+    };
+
+    pack_group(mSkyUniforms);
+    pack_group(mWaterUniforms);
+
+    mEnvUBODirty = true;
+}
+
+void LLEnvironment::bindEnvironmentUBO()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    if (mEnvUBODirty || !mEnvUBO.allocated())
+    {
+        mEnvUBO.update(&mEnvUBOData, sizeof(EnvironmentUBOData));
+        mEnvUBODirty = false;
+    }
+
+    mEnvUBO.bind(LLGLSLShader::UB_ENVIRONMENT);
+}
+
+void LLEnvironment::releaseGLBuffers()
+{
+    mEnvUBO.release();
+    mEnvUBODirty = true; // force a re-upload before the next bind
 }
 
 void LLEnvironment::recordEnvironment(S32 parcel_id, LLEnvironment::EnvironmentInfo::ptr_t envinfo, LLSettingsBase::Seconds transition)

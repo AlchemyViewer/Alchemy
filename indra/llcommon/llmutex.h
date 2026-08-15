@@ -30,6 +30,8 @@
 #include "stdtypes.h"
 #include "llthread.h"
 
+#include <atomic>
+#include <chrono>
 #include <mutex>
 #include <shared_mutex>
 #include <unordered_map>
@@ -59,8 +61,16 @@ public:
 
 protected:
     std::mutex          mMutex;
+    // Owner-only: read and written solely by whichever thread currently holds mMutex.
     mutable U32         mCount;
-    mutable LLThread::id_t  mLockingThread;
+    // Read by every caller of lock()/trylock() before mMutex is held, and written by the
+    // owner, so it must be atomic even though relaxed ordering suffices -- see
+    // LLMutex::isSelfLocked() for why relaxed is not merely a heuristic here.
+    mutable std::atomic<LLThread::id_t> mLockingThread;
+
+    static_assert(std::atomic<LLThread::id_t>::is_always_lock_free,
+                  "LLMutex::mLockingThread is read on the lock() fast path; a locking atomic here "
+                  "would put a mutex inside the mutex");
 
 #if MUTEX_DEBUG
     std::unordered_map<LLThread::id_t, bool> mIsLocked;
@@ -146,6 +156,31 @@ public:
     void wait();        // blocks
     void signal();
     void broadcast();
+
+    // Predicate form: sleep until pred() returns true, atomically re-checking it
+    // under this condition's mutex on every wakeup. Unlike the bare wait() above,
+    // this closes the classic lost-wakeup window (state change + signal landing
+    // between a caller's own predicate check and its wait() call would otherwise
+    // sleep forever), so use it whenever the condition is one-shot. Call WITHOUT
+    // holding this mutex; pred runs with it held, so it may read state guarded by
+    // lock()/unlock() on this same object.
+    template <typename PRED>
+    void wait(PRED&& pred)
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mCond.wait(lock, std::forward<PRED>(pred));
+    }
+
+    // Timed predicate form: returns true once pred() holds, false if the timeout
+    // elapsed first (pred re-checked under this condition's mutex either way).
+    // Same lost-wakeup-safe contract as wait(pred) above -- callers typically loop
+    // on a false return to keep waiting while emitting periodic diagnostics.
+    template <typename REP, typename PERIOD, typename PRED>
+    bool waitFor(const std::chrono::duration<REP, PERIOD>& timeout, PRED&& pred)
+    {
+        std::unique_lock<std::mutex> lock(mMutex);
+        return mCond.wait_for(lock, timeout, std::forward<PRED>(pred));
+    }
 
 protected:
     std::condition_variable mCond;

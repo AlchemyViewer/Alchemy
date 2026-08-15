@@ -1644,19 +1644,10 @@ void LLViewerRegion::idleUpdate(F32 max_update_time)
 
     mLastUpdate = LLViewerOctreeEntryData::getCurrentFrame();
 
-    static LLCachedControl<bool> pbr_terrain_enabled(gSavedSettings, "RenderTerrainPBREnabled", false);
-    static LLCachedControl<bool> pbr_terrain_experimental_normals(gSavedSettings, "RenderTerrainPBRNormalsEnabled", false);
-    bool pbr_material = mImpl->mCompositionp && (mImpl->mCompositionp->getMaterialType() == LLTerrainMaterials::Type::PBR);
-    bool pbr_land = pbr_material && pbr_terrain_enabled && pbr_terrain_experimental_normals;
-
-    if (!pbr_land)
-    {
-        mImpl->mLandp->idleUpdate</*PBR=*/false>(max_update_time);
-    }
-    else
-    {
-        mImpl->mLandp->idleUpdate</*PBR=*/true>(max_update_time);
-    }
+    // One normal path for both terrain types. RenderTerrainPBRNormalsEnabled still selects
+    // faceted shading, but it does so as a pbrterrainF permutation now -- a per-triangle normal
+    // has no per-vertex representation to switch to here.
+    mImpl->mLandp->idleUpdate(max_update_time);
 
     if (mParcelOverlay)
     {
@@ -1794,6 +1785,11 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
         if(iter == mImpl->mActiveSet.end())
         {
             iter = mImpl->mActiveSet.begin();
+            if (iter == mImpl->mActiveSet.end())
+            {
+                // Set became empty
+                break;
+            }
         }
         if((*iter)->getParentID() > 0)
         {
@@ -1958,19 +1954,10 @@ void LLViewerRegion::forceUpdate()
 {
     constexpr F32 max_update_time = 0.f;
 
-    static LLCachedControl<bool> pbr_terrain_enabled(gSavedSettings, "RenderTerrainPBREnabled", false);
-    static LLCachedControl<bool> pbr_terrain_experimental_normals(gSavedSettings, "RenderTerrainPBRNormalsEnabled", false);
-    bool pbr_material = mImpl->mCompositionp && (mImpl->mCompositionp->getMaterialType() == LLTerrainMaterials::Type::PBR);
-    bool pbr_land = pbr_material && pbr_terrain_enabled && pbr_terrain_experimental_normals;
-
-    if (!pbr_land)
-    {
-        mImpl->mLandp->idleUpdate</*PBR=*/false>(max_update_time);
-    }
-    else
-    {
-        mImpl->mLandp->idleUpdate</*PBR=*/true>(max_update_time);
-    }
+    // One normal path for both terrain types. RenderTerrainPBRNormalsEnabled still selects
+    // faceted shading, but it does so as a pbrterrainF permutation now -- a per-triangle normal
+    // has no per-vertex representation to switch to here.
+    mImpl->mLandp->idleUpdate(max_update_time);
 
     if (mParcelOverlay)
     {
@@ -3333,6 +3320,7 @@ void LLViewerRegionImpl::buildCapabilityNames(LLSD& capabilityNames)
     capabilityNames.append("FetchInventory2");
     capabilityNames.append("FetchInventoryDescendents2");
     capabilityNames.append("IncrementCOFVersion");
+    capabilityNames.append("CreateTaskInventoryItem");
     capabilityNames.append("RequestTaskInventory");
     AISAPI::getCapNames(capabilityNames);
 

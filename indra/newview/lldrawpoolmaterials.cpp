@@ -35,6 +35,8 @@
 #include "llviewertexture.h"
 #include "llspatialpartition.h"
 
+extern bool gCubeSnapshot;
+
 LLDrawPoolMaterials::LLDrawPoolMaterials()
 :  LLRenderPass(LLDrawPool::POOL_MATERIALS)
 {
@@ -138,10 +140,11 @@ static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigge
         const S32 n = llmin((S32)params.mMaterialSlotList.size(), N);
         LL_PROFILE_ZONE_NUM(n);
 
-        F32 spec_color[4 * 8] = { 0.f };
-        F32 env[8] = { 0.f };
-        F32 min_alpha[8] = { 0.f };
-        F32 fullbright[8] = { 0.f };
+        constexpr S32 kSlots = LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS;
+        F32 spec_color[4 * kSlots] = { 0.f }; // 4 == vec4 stride, distinct from the slot count
+        F32 env[kSlots] = { 0.f };
+        F32 min_alpha[kSlots] = { 0.f };
+        F32 fullbright[kSlots] = { 0.f };
 
         for (S32 s = 0; s < n; ++s)
         {
@@ -151,9 +154,15 @@ static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigge
             LLViewerTexture* normal  = slot.mNormalMap.notNull() ? slot.mNormalMap.get() : LLViewerFetchedTexture::sFlatNormalImagep.get();
             LLViewerTexture* spec    = slot.mSpecularMap.notNull() ? slot.mSpecularMap.get() : LLViewerFetchedTexture::sWhiteImagep.get();
 
-            gGL.getTexUnit(s)->bindFast(diffuse);
-            gGL.getTexUnit(N + s)->bindFast(normal);
-            gGL.getTexUnit(2 * N + s)->bindFast(spec);
+            // Diffuse and spec are sRGB colour and decode -- both filter in linear. Diffuse
+            // lands in the sRGB albedo attachment (the hoisted FRAMEBUFFER_SRGB re-encodes on
+            // store); spec's attachment (frag_data1) is a plain RGBA8 shared with PBR's linear
+            // ORM and cannot be sRGB storage, so the material writer re-encodes the filtered
+            // spec to sRGB in-shader, which softenLight decodes on read. Normal is data and
+            // stays AnisoWrap.
+            gGL.getTextureSlot(s)->bindFast(diffuse, ALSamplers::AnisoWrapSRGB);
+            gGL.getTextureSlot(N + s)->bindFast(normal, ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(2 * N + s)->bindFast(spec, ALSamplers::AnisoWrapSRGB);
 
             spec_color[4 * s + 0] = slot.mSpecColor.mV[0];
             spec_color[4 * s + 1] = slot.mSpecColor.mV[1];
@@ -164,15 +173,10 @@ static void pushMaterialBatchIndexed(LLGLSLShader& program, U32 type, bool rigge
             fullbright[s] = slot.mFullbright;
         }
 
-        static const LLStaticHashedString sSpecColor("mat_specular_color");
-        static const LLStaticHashedString sEnv("mat_env_intensity");
-        static const LLStaticHashedString sMinAlpha("mat_minimum_alpha");
-        static const LLStaticHashedString sEmissive("mat_emissive_brightness");
-
-        shader->uniform4fv(sSpecColor, n, spec_color);
-        shader->uniform1fv(sEnv, n, env);
-        shader->uniform1fv(sMinAlpha, n, min_alpha); // inactive outside MASK shaders
-        shader->uniform1fv(sEmissive, n, fullbright);
+        shader->uniform4fv(LLShaderMgr::MAT_SPECULAR_COLOR, n, spec_color);
+        shader->uniform1fv(LLShaderMgr::MAT_ENV_INTENSITY, n, env);
+        shader->uniform1fv(LLShaderMgr::MAT_MINIMUM_ALPHA, n, min_alpha); // inactive outside MASK shaders
+        shader->uniform1fv(LLShaderMgr::MAT_EMISSIVE_BRIGHTNESS, n, fullbright);
 
         LLRenderPass::applyModelMatrix(params);
 
@@ -210,7 +214,7 @@ void LLDrawPoolMaterials::beginDeferredPass(S32 pass)
     }
     U32 idx = sMaterialShaderIdx[pass];
 
-    mShader = &(gDeferredMaterialProgram[idx]);
+    mShader = gDeferredMaterialProgram[idx].selectVariant();
 
     if (rigged)
     {
@@ -242,6 +246,11 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         return;
     }
 
+    // Pairs with ALSamplers::AnisoWrapSRGB on the diffuse binds below (both the scalar loop
+    // here and pushMaterialBatchIndexed, both reached from this method): the sampler decodes,
+    // and the deferred pass's hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes the
+    // linear albedo on store into the sRGB attachment 0.
+
     bool rigged = false;
     if (pass >= 12)
     {
@@ -265,10 +274,10 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
     F32 lastMinimumAlpha = 0.f;
     LLVector4 lastSpecular = LLVector4(0, 0, 0, 0);
 
-    GLint intensity = mShader->getUniformLocation(LLShaderMgr::ENVIRONMENT_INTENSITY);
-    GLint brightness = mShader->getUniformLocation(LLShaderMgr::EMISSIVE_BRIGHTNESS);
-    GLint minAlpha = mShader->getUniformLocation(LLShaderMgr::MINIMUM_ALPHA);
-    GLint specular = mShader->getUniformLocation(LLShaderMgr::SPECULAR_COLOR);
+    bool has_intensity = mShader->hasUniform(LLShaderMgr::ENVIRONMENT_INTENSITY);
+    bool has_brightness = mShader->hasUniform(LLShaderMgr::EMISSIVE_BRIGHTNESS);
+    bool has_minAlpha = mShader->hasUniform(LLShaderMgr::MINIMUM_ALPHA);
+    bool has_specular = mShader->hasUniform(LLShaderMgr::SPECULAR_COLOR);
 
     GLint diffuseChannel = mShader->enableTexture(LLShaderMgr::DIFFUSE_MAP);
     GLint specChannel = mShader->enableTexture(LLShaderMgr::SPECULAR_MAP);
@@ -278,26 +287,29 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
     LLTexture* lastSpecMap = nullptr;
     LLTexture* lastDiffuse = nullptr;
 
-    gGL.getTexUnit(diffuseChannel)->unbindFast(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(diffuseChannel)->unbindFast();
 
-    if (intensity > -1)
+    if (has_intensity)
     {
-        glUniform1f(intensity, lastIntensity);
+        mShader->fastUniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, lastIntensity);
     }
 
-    if (brightness > -1)
+    if (has_brightness)
     {
-        glUniform1f(brightness, lastFullbright);
+        mShader->fastUniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, lastFullbright);
     }
 
-    if (minAlpha > -1)
+    if (has_minAlpha)
     {
-        glUniform1f(minAlpha, lastMinimumAlpha);
+        // setMinimumAlpha, not fastUniform1f: MINIMUM_ALPHA writes must go through the
+        // per-program value cache it owns (see its declaration). The pool-local
+        // lastMinimumAlpha tracking stays as the first-level skip.
+        mShader->setMinimumAlpha(lastMinimumAlpha);
     }
 
-    if (specular > -1)
+    if (has_specular)
     {
-        glUniform4fv(specular, 1, lastSpecular.mV);
+        mShader->fastUniform4fv(LLShaderMgr::SPECULAR_COLOR, 1, lastSpecular.mV);
     }
 
     const LLVOAvatar* lastAvatar = nullptr;
@@ -316,43 +328,43 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
             continue;
         }
 
-        if (specular > -1 && params.mSpecColor != lastSpecular)
+        if (has_specular && params.mSpecColor != lastSpecular)
         {
             lastSpecular = params.mSpecColor;
-            glUniform4fv(specular, 1, lastSpecular.mV);
+            mShader->fastUniform4fv(LLShaderMgr::SPECULAR_COLOR, 1, lastSpecular.mV);
         }
 
-        if (intensity != -1 && lastIntensity != params.mEnvIntensity)
+        if (has_intensity && lastIntensity != params.mEnvIntensity)
         {
             lastIntensity = params.mEnvIntensity;
-            glUniform1f(intensity, lastIntensity);
+            mShader->fastUniform1f(LLShaderMgr::ENVIRONMENT_INTENSITY, lastIntensity);
         }
 
-        if (minAlpha > -1 && lastMinimumAlpha != params.mAlphaMaskCutoff)
+        if (has_minAlpha && lastMinimumAlpha != params.mAlphaMaskCutoff)
         {
             lastMinimumAlpha = params.mAlphaMaskCutoff;
-            glUniform1f(minAlpha, lastMinimumAlpha);
+            mShader->setMinimumAlpha(lastMinimumAlpha); // cache-owning writer; see pass setup above
         }
 
         F32 fullbright = params.mFullbright ? 1.f : 0.f;
-        if (brightness > -1 && lastFullbright != fullbright)
+        if (has_brightness && lastFullbright != fullbright)
         {
             lastFullbright = fullbright;
-            glUniform1f(brightness, lastFullbright);
+            mShader->fastUniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, lastFullbright);
         }
 
         if (normChannel > -1 && params.mNormalMap != lastNormalMap)
         {
             lastNormalMap = params.mNormalMap;
             llassert(lastNormalMap);
-            gGL.getTexUnit(normChannel)->bindFast(lastNormalMap);
+            gGL.getTextureSlot(normChannel)->bindFast(lastNormalMap, ALSamplers::AnisoWrap);
         }
 
         if (specChannel > -1 && params.mSpecularMap != lastSpecMap)
         {
             lastSpecMap = params.mSpecularMap;
             llassert(lastSpecMap);
-            gGL.getTexUnit(specChannel)->bindFast(lastSpecMap);
+            gGL.getTextureSlot(specChannel)->bindFast(lastSpecMap, ALSamplers::AnisoWrapSRGB);
         }
 
         if (params.mTexture != lastDiffuse)
@@ -360,11 +372,11 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
             lastDiffuse = params.mTexture;
             if (lastDiffuse)
             {
-                gGL.getTexUnit(diffuseChannel)->bindFast(lastDiffuse);
+                gGL.getTextureSlot(diffuseChannel)->bindFast(lastDiffuse, ALSamplers::AnisoWrapSRGB);
             }
             else
             {
-                gGL.getTexUnit(diffuseChannel)->unbindFast(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(diffuseChannel)->unbindFast();
             }
         }
 
@@ -382,13 +394,12 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
         bool tex_setup = false;
 
         //not batching textures or batch has only 1 texture -- might need a texture matrix
-        if (params.mTextureMatrix)
+        if (params.mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
         {
-            gGL.getTexUnit(0)->activate();
-            gGL.matrixMode(LLRender::MM_TEXTURE);
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
 
             gGL.loadMatrix((GLfloat*)params.mTextureMatrix->mMatrix);
-            gPipeline.mTextureMatrixOps++;
+            gPipeline.countTextureMatrixOp(*params.mTextureMatrix);
 
             tex_setup = true;
         }
@@ -403,7 +414,6 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
 
         if (tex_setup)
         {
-            gGL.getTexUnit(0)->activate();
             gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_MODELVIEW);
         }
@@ -413,8 +423,8 @@ void LLDrawPoolMaterials::renderDeferred(S32 pass)
     // program (its rigged variant for the rigged passes).
     if (LLGLSLShader::sIndexedLegacyMaterials)
     {
-        LLGLSLShader& indexed = gDeferredMaterialIndexedProgram[sMaterialShaderIdx[pass]];
-        LLGLSLShader* prog = rigged ? indexed.mRiggedVariant : &indexed;
+        LLGLSLShader* indexed = gDeferredMaterialIndexedProgram[sMaterialShaderIdx[pass]].selectVariant();
+        LLGLSLShader* prog = rigged ? indexed->mRiggedVariant : indexed;
         if (prog && prog->isComplete())
         {
             pushMaterialBatchIndexed(*prog, type, rigged);

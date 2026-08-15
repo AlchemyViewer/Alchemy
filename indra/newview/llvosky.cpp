@@ -114,7 +114,6 @@ void LLSkyTex::init(bool isShiny)
     for (S32 i = 0; i < 2; ++i)
     {
         mTexture[i] = LLViewerTextureManager::getLocalTexture(false);
-        mTexture[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
         mImageRaw[i] = new LLImageRaw((U16)SKYTEX_RESOLUTION, (U16)SKYTEX_RESOLUTION, (S8)SKYTEX_COMPONENTS);
 
         initEmpty(i);
@@ -132,7 +131,6 @@ void LLSkyTex::restoreGL()
     for (S32 i = 0; i < 2; i++)
     {
         mTexture[i] = LLViewerTextureManager::getLocalTexture(false);
-        mTexture[i]->setAddressMode(LLTexUnit::TAM_CLAMP);
     }
 }
 
@@ -216,13 +214,12 @@ void LLSkyTex::createGLImage(S32 which)
 {
     mTexture[which]->setExplicitFormat(GL_RGBA8, GL_RGBA);
     mTexture[which]->createGLTexture(0, mImageRaw[which], 0, true, LLGLTexture::LOCAL);
-    mTexture[which]->setAddressMode(LLTexUnit::TAM_CLAMP);
 }
 
 void LLSkyTex::bindTexture(bool curr)
 {
     int tex = getWhich(curr);
-    gGL.getTexUnit(0)->bind(mTexture[tex], true);
+    gGL.getTextureSlot(0)->bindSampled(mTexture[tex], ALSamplers::AnisoClamp, true);
 }
 
 LLImageRaw* LLSkyTex::getImageRaw(bool curr)
@@ -543,7 +540,7 @@ void LLVOSky::initCubeMap()
 
     if (!mCubeMap && gSavedSettings.getBOOL("RenderWater") && LLCubeMap::sUseCubeMaps)
     {
-        mCubeMap = new LLCubeMap(false);
+        mCubeMap = new LLCubeMap();
     }
 
     if (mCubeMap)
@@ -551,7 +548,7 @@ void LLVOSky::initCubeMap()
         mCubeMap->init(images);
     }
 
-    gGL.getTexUnit(0)->disable();
+    gGL.getTextureSlot(0)->unbind();
 }
 
 
@@ -882,11 +879,6 @@ void LLVOSky::setSunTextures(const LLUUID& sun_texture, const LLUUID& sun_textur
 
     if (mFace[FACE_SUN])
     {
-        if (mSunTexturep[0])
-        {
-            mSunTexturep[0]->setAddressMode(LLTexUnit::TAM_CLAMP);
-        }
-
         LLViewerTexture* current_tex0 = mFace[FACE_SUN]->getTexture(LLRender::DIFFUSE_MAP);
         LLViewerTexture* current_tex1 = mFace[FACE_SUN]->getTexture(LLRender::ALTERNATE_DIFFUSE_MAP);
 
@@ -904,10 +896,6 @@ void LLVOSky::setSunTextures(const LLUUID& sun_texture, const LLUUID& sun_textur
 
         if (can_use_wl)
         {
-            if (mSunTexturep[1])
-            {
-                mSunTexturep[1]->setAddressMode(LLTexUnit::TAM_CLAMP);
-            }
             mFace[FACE_SUN]->setTexture(LLRender::ALTERNATE_DIFFUSE_MAP, mSunTexturep[1]);
         }
     }
@@ -924,15 +912,10 @@ void LLVOSky::setMoonTextures(const LLUUID& moon_texture, const LLUUID& moon_tex
 
     if (mFace[FACE_MOON])
     {
-        if (mMoonTexturep[0])
-        {
-            mMoonTexturep[0]->setAddressMode(LLTexUnit::TAM_CLAMP);
-        }
         mFace[FACE_MOON]->setTexture(LLRender::DIFFUSE_MAP, mMoonTexturep[0]);
 
         if (mMoonTexturep[1] && can_use_wl)
         {
-            mMoonTexturep[1]->setAddressMode(LLTexUnit::TAM_CLAMP);
             mFace[FACE_MOON]->setTexture(LLRender::ALTERNATE_DIFFUSE_MAP, mMoonTexturep[1]);
         }
     }
@@ -944,16 +927,6 @@ void LLVOSky::setCloudNoiseTextures(const LLUUID& cloud_noise_texture, const LLU
 
     mCloudNoiseTexturep[0] = cloud_noise_texture.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
     mCloudNoiseTexturep[1] = cloud_noise_texture_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(cloud_noise_texture_next, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
-
-    if (mCloudNoiseTexturep[0])
-    {
-        mCloudNoiseTexturep[0]->setAddressMode(LLTexUnit::TAM_WRAP);
-    }
-
-    if (mCloudNoiseTexturep[1])
-    {
-        mCloudNoiseTexturep[1]->setAddressMode(LLTexUnit::TAM_WRAP);
-    }
 }
 
 void LLVOSky::setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_texture_next)
@@ -965,16 +938,6 @@ void LLVOSky::setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_
 
     mBloomTexturep[0] = bloom_tex.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(bloom_tex, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
     mBloomTexturep[1] = bloom_tex_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(bloom_tex_next, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
-
-    if (mBloomTexturep[0])
-    {
-        mBloomTexturep[0]->setAddressMode(LLTexUnit::TAM_CLAMP);
-    }
-
-    if (mBloomTexturep[1])
-    {
-        mBloomTexturep[1]->setAddressMode(LLTexUnit::TAM_CLAMP);
-    }
 }
 
 bool LLVOSky::updateGeometry(LLDrawable *drawable)

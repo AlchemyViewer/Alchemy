@@ -41,9 +41,9 @@ in vec2 vary_texcoord3;
 uniform sampler2D cloud_noise_texture;
 uniform sampler2D cloud_noise_texture_next;
 uniform float blend_factor;
-uniform vec3 cloud_pos_density1;
-uniform vec3 cloud_pos_density2;
-uniform float cloud_scale;
+// Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
+// and bound at UB_ENVIRONMENT. Members are read by bare name.
+//[ENGINE_BLOCK Environment]
 uniform float cloud_variance;
 
 uniform vec3 camPosLocal;
@@ -53,19 +53,11 @@ uniform vec3 sunlight_color;
 uniform vec3 moonlight_color;
 uniform int sun_up_factor;
 uniform vec3 ambient_color;
-uniform vec3 blue_horizon;
-uniform vec3 blue_density;
-uniform float haze_horizon;
-uniform float haze_density;
 
-uniform float cloud_shadow;
 uniform float density_multiplier;
-uniform float max_y;
 
-uniform vec3 glow;
 uniform float sun_moon_glow_factor;
 
-uniform vec3 cloud_color;
 
 vec4 cloudNoise(vec2 uv)
 {
@@ -74,6 +66,10 @@ vec4 cloudNoise(vec2 uv)
    vec4 cloud_noise_sample = mix(a, b, blend_factor);
    return cloud_noise_sample;
 }
+
+// Hides the R11F_G11F_B10F emissive attachment's 6/6/5-mantissa banding in this writer's
+// smooth gradients. Defined in deferred/globalF.glsl, which every fragment stage attaches.
+vec3 ditherEmissive(vec3 v, vec2 frag_px);
 
 void main()
 {
@@ -229,7 +225,7 @@ void main()
 
 #if defined(HAS_EMISSIVE)
     frag_data[0] = vec4(0);
-    frag_data[3] = vec4(color.rgb, alpha1);
+    frag_data[3] = vec4(ditherEmissive(color.rgb, gl_FragCoord.xy), alpha1);
 #else
     frag_data[0] = vec4(color.rgb, alpha1);
 #endif

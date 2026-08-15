@@ -1,5 +1,5 @@
 /**
- * @file llfontcolrv1.h
+ * @file alfontcolrv1.h
  * @brief COLRv1 paint-tree rasterizer using HarfBuzz's hb-raster backend.
  *        Publishes the result as either a BGRA bitmap (the existing color-
  *        glyph atlas path consumes unchanged) or a single-channel grayscale
@@ -23,12 +23,10 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLFONTCOLRV1_H
-#define LL_LLFONTCOLRV1_H
+#pragma once
 
 #include "stdtypes.h"
 #include "v4coloru.h"
@@ -37,7 +35,7 @@
 
 struct hb_font_t;
 
-class LLFontColrV1Painter
+class ALFontColrV1Painter
 {
 public:
     // Output pixel format requested by the caller. BGRA is hb-raster's
@@ -68,8 +66,8 @@ public:
         OutputFormat mFormat = OutputFormat::BGRA;
     };
 
-    LLFontColrV1Painter();
-    ~LLFontColrV1Painter();
+    ALFontColrV1Painter();
+    ~ALFontColrV1Painter();
 
     // Walk hb_font's paint tree for `glyph_index` and rasterize into the
     // painter's internal staging surface. `foreground` is the active text
@@ -106,8 +104,8 @@ public:
     }
 
 private:
-    LLFontColrV1Painter(const LLFontColrV1Painter&) = delete;
-    LLFontColrV1Painter& operator=(const LLFontColrV1Painter&) = delete;
+    ALFontColrV1Painter(const ALFontColrV1Painter&) = delete;
+    ALFontColrV1Painter& operator=(const ALFontColrV1Painter&) = delete;
 
     // Staging surface. Reused across paintGlyph calls; resized on demand.
     // For BGRA output: premultiplied, top-row-first, surf_w*4 bytes/row.
@@ -116,5 +114,3 @@ private:
     S32             mStagingWidth  = 0;
     S32             mStagingHeight = 0;
 };
-
-#endif // LL_LLFONTCOLRV1_H

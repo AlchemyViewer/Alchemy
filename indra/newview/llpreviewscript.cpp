@@ -1172,32 +1172,58 @@ void LLScriptEdCore::openInExternalEditor()
 
     std::string filename = mContainer->getTmpFileName(script_name);
 
-    // Save the script to a temporary file.
-    if (!writeToFile(filename))
+    if (LLScriptEditorWSServer::isTightIntegration())
     {
-        // In case some characters from script name are forbidden
-        // and not accounted for, name is too long or some other issue,
-        // try file that doesn't include script name
-        script_name.clear();
-        filename = mContainer->getTmpFileName(script_name);
-        writeToFile(filename);
-    }
+        // VS Code tight integration path.
+        // The extension opens the script as a virtual sl:// document; no temp file is needed.
+        auto server = LLScriptEditorWSServer::ensureServerRunning();
+        if (server)
+        {
+            mContainer->mWebSocketServer = server;
 
-    if (mContainer->mLiveFile && mContainer->mLiveFile->filename() != filename)
-    { // The name may have changed if we changed the type of scipt being edited.
-        delete mContainer->mLiveFile;
-        mContainer->mLiveFile = NULL;
-    }
-    // Start watching file changes.
-    if (!mContainer->mLiveFile)
-    {
-        mContainer->mLiveFile = new LLLiveLSLFile(filename, boost::bind(&LLScriptEdContainer::onExternalChange, mContainer, _1));
-        mContainer->mLiveFile->addToEventTimer();
-    }
-    mContainer->startWebsocketServer();
+            LLViewerObject* object      = gObjectList.findObject(mContainer->mObjectUUID);
+            LLViewerObject* root_object = object ? object->getRootEdit() : nullptr;
+            LLUUID          root_id     = root_object ? root_object->getID() : mContainer->mObjectUUID;
 
-    // Open it in external editor.
+            if (!LLScriptEditorWSServer::launchVSCode(root_id, mContainer->mItemUUID))
+            {
+                LLNotificationsUtil::add("GenericAlert",
+                    LLSD().with("MESSAGE", LLTrans::getString("VSCodeLaunchFailed")));
+            }
+        }
+        else
+        {
+            LLNotificationsUtil::add("GenericAlert",
+                LLSD().with("MESSAGE", LLTrans::getString("ExternalEditorFailedToStart")));
+        }
+    }
+    else
     {
+        // Legacy external editor path: write temp file, watch it, open in external editor.
+        if (!writeToFile(filename))
+        {
+            // In case some characters from script name are forbidden
+            // and not accounted for, name is too long or some other issue,
+            // try file that doesn't include script name
+            script_name.clear();
+            filename = mContainer->getTmpFileName(script_name);
+            writeToFile(filename);
+        }
+
+        if (mContainer->mLiveFile && mContainer->mLiveFile->filename() != filename)
+        { // The name may have changed if we changed the type of script being edited.
+            delete mContainer->mLiveFile;
+            mContainer->mLiveFile = NULL;
+        }
+        // Start watching file changes.
+        if (!mContainer->mLiveFile)
+        {
+            mContainer->mLiveFile = new LLLiveLSLFile(filename, boost::bind(&LLScriptEdContainer::onExternalChange, mContainer, _1));
+            mContainer->mLiveFile->addToEventTimer();
+        }
+
+        mContainer->startWebsocketServer();
+
         LLExternalEditor ed;
         LLExternalEditor::EErrorCode status;
         std::string msg;
@@ -1744,38 +1770,15 @@ bool LLScriptEdContainer::handleKeyHere(KEY key, MASK mask)
 
 void LLScriptEdContainer::startWebsocketServer()
 {
-    if (gSavedSettings.getBOOL("ExternalWebsocketSyncEnable"))
+    auto server = LLScriptEditorWSServer::ensureServerRunning();
+    if (!server)
     {
-        // Attempt to find an existing server
-        LLWebsocketMgr&               wsmgr  = LLWebsocketMgr::instance();
-        LLScriptEditorWSServer::ptr_t server =
-            std::static_pointer_cast<LLScriptEditorWSServer>(
-                wsmgr.findServerByName(LLScriptEditorWSServer::DEFAULT_SERVER_NAME));
-
-        if (!server)
-        {   // We couldn't find one, so create it
-            U16 server_port = static_cast<U16>(gSavedSettings.getS32("ExternalWebsocketSyncPort"));
-            bool server_localhost = gSavedSettings.getBOOL("ExternalWebsocketSyncLocal");
-            server = std::make_shared<LLScriptEditorWSServer>(LLScriptEditorWSServer::DEFAULT_SERVER_NAME, server_port, server_localhost);
-            wsmgr.addServer(server);
-        }
-
-        bool is_running = server->isRunning();
-        if (!is_running)
-        {   // Server isn't running, so start it
-            is_running = wsmgr.startServer(LLScriptEditorWSServer::DEFAULT_SERVER_NAME);
-        }
-
-        if (!is_running && !server->isRunning())
-        {   // Failed to start the server
-            LL_WARNS() << "Failed to start script editor websocket server" << LL_ENDL;
-            return;
-        }
-
-        std::string script_id_hash_str(getUniqueHash());
-        server->subscribeScriptEditor(mObjectUUID, mItemUUID, mScriptEd->mScriptName, getHandle(), script_id_hash_str);
-        mWebSocketServer = server;
+        return;
     }
+
+    std::string script_id_hash_str(getUniqueHash());
+    server->subscribeScriptEditor(mObjectUUID, mItemUUID, mScriptEd->mScriptName, getHandle(), script_id_hash_str);
+    mWebSocketServer = server;
 }
 
 void LLScriptEdContainer::unsubscribeScript()
@@ -2040,56 +2043,68 @@ void LLPreviewLSL::onSave(void* userdata, bool close_after_save)
     self->saveIfNeeded();
 }
 
-/*static*/
+// static
 void LLPreviewLSL::finishedLSLUpload(LLUUID itemId, LLSD response)
 {
-    // Find our window and close it if requested.
-    LLPreviewLSL* preview = LLFloaterReg::findTypedInstance<LLPreviewLSL>("preview_script", LLSD(itemId));
-    if (preview)
-    {
-        // Bytecode save completed
-        if (response["compiled"])
+    // This callback runs on the upload coprocedure fiber, not the main coro.
+    // UI work downstream (selectFirstError -> reflow -> LLMutex::lock) asserts
+    // if called off the main coro, so shuttle everything back first.
+    LLAppViewer::instance()->postToMainCoro(
+        [itemId, response]() mutable
         {
-            preview->callbackLSLCompileSucceeded();
-        }
-        else
-        {
-            preview->callbackLSLCompileFailed(response["errors"]);
-        }
-        preview->sendCompileResults(response);
-    }
+            LLPreviewLSL* preview = LLFloaterReg::findTypedInstance<LLPreviewLSL>("preview_script", LLSD(itemId));
+            if (preview)
+            {
+                if (response["compiled"])
+                {
+                    preview->callbackLSLCompileSucceeded();
+                }
+                else
+                {
+                    preview->callbackLSLCompileFailed(response["errors"]);
+                }
+                preview->sendCompileResults(response);
+            }
+        });
 }
 
+// static
 bool LLPreviewLSL::failedLSLUpload(LLUUID itemId, LLUUID taskId, LLSD response, std::string reason)
 {
-    LLSD floater_key;
-    if (taskId.notNull())
-    {
-        floater_key["taskid"] = taskId;
-        floater_key["itemid"] = itemId;
-    }
-    else
-    {
-        floater_key = LLSD(itemId);
-    }
+    // Same issue: this fires on the upload fiber, not the main coro.
+    // Note: return value is lost when posting async, but the original callers
+    // ignore it in the upload path anyway.
+    LLAppViewer::instance()->postToMainCoro(
+        [itemId, taskId, response, reason]() mutable
+        {
+            LLSD floater_key;
+            if (taskId.notNull())
+            {
+                floater_key["taskid"] = taskId;
+                floater_key["itemid"] = itemId;
+            }
+            else
+            {
+                floater_key = LLSD(itemId);
+            }
 
-    LLPreviewLSL* preview = LLFloaterReg::findTypedInstance<LLPreviewLSL>("preview_script", floater_key);
-    if (preview)
-    {
-        // unfreeze floater
-        LLSD errors;
-        errors.append(LLTrans::getString("UploadFailed") + reason);
-        preview->callbackLSLCompileFailed(errors);
+            LLPreviewLSL* preview = LLFloaterReg::findTypedInstance<LLPreviewLSL>("preview_script", floater_key);
+            if (preview)
+            {
+                LLSD errors;
+                errors.append(LLTrans::getString("UploadFailed") + reason);
+                preview->callbackLSLCompileFailed(errors);
 
-        LLSD message;
-        message["compiled"] = false;
-        message["errors"]   = errors;
-        preview->sendCompileResults(message);
+                LLSD message;
+                message["compiled"] = false;
+                message["errors"]   = errors;
+                preview->sendCompileResults(message);
+            }
+        });
 
-        return true;
-    }
-
-    return false;
+    // Return value is meaningless now that we're async, but the signature
+    // requires it. The upload infrastructure doesn't use it either.
+    return true;
 }
 
 // Save needs to compile the text in the buffer. If the compile
@@ -2707,28 +2722,39 @@ LLLiveLSLSaveData::LLLiveLSLSaveData(const LLUUID& id,
 /*static*/
 void LLLiveLSLEditor::finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response, bool isRunning)
 {
-    LLSD floater_key;
-    floater_key["taskid"] = taskId;
-    floater_key["itemid"] = itemId;
-
-    LLLiveLSLEditor* preview = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key);
-    if (preview)
-    {
-        preview->mItem->setAssetUUID(newAssetId);
-        preview->mScriptEd->setAssetID(newAssetId);
-
-        // Bytecode save completed
-        if (response["compiled"])
+    // This callback runs directly on the upload coprocedure's fiber
+    // (AssetInventoryUploadCoproc), not on the main coroutine. The work
+    // below eventually touches UI (selectFirstError() -> onErrorList() ->
+    // LLTextBase::reflow() -> LLScriptEditorSyntaxWorker::pump(), which
+    // takes an LLMutex) and LLMutex asserts/crashes if locked off the main
+    // coro. Shuttle the whole callback back to the main thread first, via
+    // LLAppViewer::postToMainCoro() (see llappviewer.h).
+    LLAppViewer::instance()->postToMainCoro(
+        [itemId, taskId, newAssetId, response, isRunning]() mutable
         {
-            preview->callbackLSLCompileSucceeded(taskId, itemId, isRunning);
-        }
-        else
-        {
-            preview->callbackLSLCompileFailed(response["errors"]);
-        }
-        response["is_running"] = isRunning;
-        preview->sendCompileResults(response);
-    }
+            LLSD floater_key;
+            floater_key["taskid"] = taskId;
+            floater_key["itemid"] = itemId;
+
+            LLLiveLSLEditor* preview = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key);
+            if (preview)
+            {
+                preview->mItem->setAssetUUID(newAssetId);
+                preview->mScriptEd->setAssetID(newAssetId);
+
+                // Bytecode save completed
+                if (response["compiled"])
+                {
+                    preview->callbackLSLCompileSucceeded(taskId, itemId, isRunning);
+                }
+                else
+                {
+                    preview->callbackLSLCompileFailed(response["errors"]);
+                }
+                response["is_running"] = isRunning;
+                preview->sendCompileResults(response);
+            }
+        });
 }
 
 // virtual

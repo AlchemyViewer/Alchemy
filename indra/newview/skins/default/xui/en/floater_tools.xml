@@ -2993,7 +2993,6 @@ even though the user gets a free copy.
              follows="left|top"
              height="23"
              label="New Script"
-             label_selected="New Script"
              layout="topleft"
              left="10"
              name="button new script"
@@ -3002,26 +3001,45 @@ even though the user gets a free copy.
              width="140">
                 <flyout_button.item
                  label="New LSL Script"
-                 name="new_lsl_script_item"
+                 name="new_lsl_script"
                  value="lsl" />
                 <flyout_button.item
                  label="New Lua Script"
-                 name="new_lua_script_item"
+                 name="new_lua_script"
                  value="lua" />
             </flyout_button>
             <button
              follows="left|top"
              height="23"
-             label="Permissions"
+             label="New Notecard"
              layout="topleft"
              left_pad="8"
+             name="button new notecard"
+             width="140" />
+            <button
+             follows="left|top"
+             height="23"
+             label="Permissions"
+             layout="topleft"
+             left="10"
+             top="37"
              name="button permissions"
+             width="140" />
+            <button
+             follows="left|top"
+             height="23"
+             is_toggle="true"
+             label="Explore in IDE"
+             label_selected="Stop Exploring"
+             layout="topleft"
+             left_pad="8"
+             name="button publish"
              width="140" />
             <filter_editor
              follows="left|top|right"
              label="Enter filter text"
              layout="topleft"
-             top="40"
+             top="67"
              left="10"
              text_pad_left="10"
              max_length_chars="300"
@@ -3034,11 +3052,11 @@ even though the user gets a free copy.
              border_visible="true"
              bevel_style="in"
              follows="left|top|right"
-             height="387"
+             height="360"
              layout="topleft"
              left="10"
              name="contents_inventory"
-             top="65"
+             top="92"
              width="280" />
 		</panel>
         </tab_container>

@@ -32,6 +32,7 @@ uniform sampler2D emissiveRect;
 
 vec4 getNormRaw(vec2 screenpos);
 vec4 decodeNormal(vec4 norm);
+vec3 unpackGeoNormal(float v);
 
 GBufferInfo getGBuffer(vec2 screenpos)
 {
@@ -51,7 +52,15 @@ GBufferInfo getGBuffer(vec2 screenpos)
     ret.albedo = diffInfo;
     ret.normal = decodeNormal(normInfo).xyz;
     ret.specular = specInfo;
+    // Blue is a union keyed on the flag beside it. Decoding both costs nothing worth counting --
+    // the branch that consumes one is the branch that ignores the other -- and it keeps every
+    // caller from having to know the channel is shared. A legacy fragment has no geometric normal
+    // to give, so it reports the shading normal, which makes a horizon test against it a no-op
+    // rather than something that needs guarding at each call site.
     ret.envIntensity = normInfo.b;
+    ret.geoNormal = GET_GBUFFER_FLAG(normInfo.w, GBUFFER_FLAG_HAS_PBR)
+                  ? unpackGeoNormal(normInfo.b)
+                  : ret.normal;
     ret.gbufferFlag = normInfo.w;
     ret.emissive = emissInfo;
 

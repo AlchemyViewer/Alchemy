@@ -31,10 +31,9 @@
 #define TERRAIN_PAINT_TYPE_HEIGHTMAP_WITH_NOISE 0
 #define TERRAIN_PAINT_TYPE_PBR_PAINTMAP 1
 
-uniform mat3 normal_matrix;
-uniform mat4 texture_matrix0;
-uniform mat4 modelview_matrix;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 #if TERRAIN_PAINT_TYPE == TERRAIN_PAINT_TYPE_PBR_PAINTMAP
 uniform float region_scale;
 #endif
@@ -92,7 +91,10 @@ void main()
 
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     {
-        vec4[2] ttt;
+        // Zero-init: the transform helpers read only [0].xyz + [1].xy; the packing's
+        // padding lanes ([0].w, [1].zw) are never written otherwise, so defining them
+        // here quiets the driver's "used before initialized" warning at no cost.
+        vec4[2] ttt = vec4[2](vec4(0.0), vec4(0.0));
         vec4 transformed_tangent;
         // material 1
         ttt[0].xyz = terrain_texture_transforms[0].xyz;
@@ -127,7 +129,9 @@ void main()
 
     // Transform and pass tex coords
     {
-        vec4[2] ttt;
+        // Zero-init the padding lanes ([0].w, [1].zw) the transform never reads;
+        // avoids the driver "used before initialized" warning. See the block above.
+        vec4[2] ttt = vec4[2](vec4(0.0), vec4(0.0));
 #define transform_xy()             terrain_texture_transform(position.xy,               ttt)
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
 // Don't care about upside-down (transform_xy_flipped())

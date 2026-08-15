@@ -796,7 +796,7 @@ bool LLMediaCtrl::ensureMediaSourceExists()
             mMediaSource->setUsedInUI(true);
             mMediaSource->setHomeURL(mHomePageUrl, mHomePageMimeType);
             mMediaSource->setTarget(mTarget);
-            mMediaSource->setVisible( getVisible() );
+            mMediaSource->setVisible( isInVisibleChain() );
             mMediaSource->addObserver( this );
             mMediaSource->setBackgroundColor( getBackgroundColor() );
             mMediaSource->setTrustedBrowser(mTrusted);
@@ -898,7 +898,7 @@ void LLMediaCtrl::draw()
             }
 
             // scale texture to fit the space using texture coords
-            gGL.getTexUnit(0)->bind(media_texture);
+            gGL.getTextureSlot(0)->bindSampled(media_texture, ALSamplers::AnisoWrap);
             LLColor4 media_color = LLColor4::white % alpha;
             gGL.color4fv( media_color.mV );
             F32 max_u = ( F32 )media_plugin->getWidth() / ( F32 )media_plugin->getTextureWidth();

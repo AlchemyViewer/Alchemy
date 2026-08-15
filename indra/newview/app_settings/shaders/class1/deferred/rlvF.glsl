@@ -119,7 +119,10 @@ void main()
     effectStrength = mix(effectStrength, mix(0.0, SPHERE_VALUEMIN, SPHERE_DISTEXTEND.x), distance < SPHERE_DISTMIN);
     effectStrength = mix(effectStrength, mix(0.0, SPHERE_VALUEMAX, SPHERE_DISTEXTEND.y), distance > SPHERE_DISTMAX);
 
-    vec3 fragColor ;
+    // fragColor must be assigned on every switch path, including an out-of-range
+    // mode -- otherwise it is used uninitialized (undefined output; the driver warns
+    // "might be used before initialized"). The default case passes the scene through.
+    vec3 fragColor;
     switch (rlvEffectMode)
     {
         case 0:     // Blend
@@ -144,6 +147,9 @@ void main()
                 fragTC = vec2(pixelWidth * floor(fragTC.x / pixelWidth), pixelHeight * floor(fragTC.y / pixelHeight));
                 fragColor = texture(diffuseRect, fragTC).rgb;
             }
+            break;
+        default:    // Unknown mode: pass the scene through unmodified.
+            fragColor = texture(diffuseRect, fragTC).rgb;
             break;
     }
 

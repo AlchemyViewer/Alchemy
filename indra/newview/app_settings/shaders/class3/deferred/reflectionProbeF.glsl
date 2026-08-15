@@ -26,11 +26,17 @@
 #define FLT_MAX 3.402823466e+38
 
 #if defined(SSR)
-float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, inout vec4 collectedColor, sampler2D source, float glossiness);
+float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, vec3 rayDir, inout vec4 collectedColor, sampler2D source, float glossiness);
+float ssrMinGlossiness();
 #endif
 
 uniform samplerCubeArray   reflectionProbes;
-uniform samplerCubeArray   irradianceProbes;
+
+// Second-order SH irradiance, nine RGB coefficients per probe in a 9-wide strip, one row per
+// cubemap layer. See class1/interface/shProjectF.glsl -- irradiance is band-limited to these
+// nine numbers, so the cubemap this replaces was storing a nine-degree-of-freedom function in
+// sixteen thousand texels.
+uniform sampler2D          shCoeffs;
 
 uniform sampler2D sceneMap;
 uniform int cube_snapshot;
@@ -38,48 +44,19 @@ uniform float max_probe_lod;
 
 uniform bool transparent_surface;
 
-uniform int classic_mode;
+// Classic (legacy pre-PBR) sky lighting is a per-program compile-time variant, not a runtime
+// uniform: the two paths differ by whole blocks of maths and a probe sample, and only one of
+// them is ever live for a given sky. A macro rather than a const global -- these sources are
+// separately compiled units linked into one program, and several of them declare this.
+#ifdef CLASSIC_MODE
+#define classic_mode 1
+#else
+#define classic_mode 0
+#endif
 
-#define MAX_REFMAP_COUNT 256  // must match LL_MAX_REFLECTION_PROBE_COUNT
-
-layout (std140) uniform ReflectionProbes
-{
-    // list of OBBs for user override probes
-    // box is a set of 3 planes outward facing planes and the depth of the box along that plane
-    // for each box refBox[i]...
-    /// box[0..2] - plane 0 .. 2 in [A,B,C,D] notation
-    //  box[3][0..2] - plane thickness
-    mat4 refBox[MAX_REFMAP_COUNT];
-    mat4 heroBox;
-    // list of bounding spheres for reflection probes sorted by distance to camera (closest first)
-    vec4 refSphere[MAX_REFMAP_COUNT];
-    // extra parameters
-    //  x - irradiance scale
-    //  y - radiance scale
-    //  z - fade in
-    //  w - znear
-    vec4 refParams[MAX_REFMAP_COUNT];
-    vec4 heroSphere;
-    // index  of cube map in reflectionProbes for a corresponding reflection probe
-    // e.g. cube map channel of refSphere[2] is stored in refIndex[2]
-    // refIndex.x - cubemap channel in reflectionProbes
-    // refIndex.y - index in refNeighbor of neighbor list (index is ivec4 index, not int index)
-    // refIndex.z - number of neighbors
-    // refIndex.w - priority, if negative, this probe has a box influence
-    ivec4 refIndex[MAX_REFMAP_COUNT];
-
-    // neighbor list data (refSphere indices, not cubemap array layer)
-    ivec4 refNeighbor[1024];
-
-    ivec4 refBucket[256];
-
-    // number of reflection probes present in refSphere
-    int refmapCount;
-
-    int heroShape;
-    int heroMipCount;
-    int heroProbeCount;
-};
+// Shared reflection-probe + SSR constants, spliced from
+// class1/deferred/reflectionProbesBlock.glsl and bound at UB_REFLECTION_PROBES.
+//[ENGINE_BLOCK ReflectionProbes]
 
 // Inputs
 uniform mat3 env_mat;
@@ -90,6 +67,9 @@ int probeIndex[REF_SAMPLE_COUNT];
 
 // number of probes stored in probeIndex
 int probeInfluences = 0;
+
+vec3 getSpecularDominantDir(vec3 n, vec3 r, float perceptualRoughness);
+float horizonOcclusion(vec3 r, vec3 geometricNormal);
 
 bool isAbove(vec3 pos, vec4 plane)
 {
@@ -149,6 +129,14 @@ int getStartIndex(vec3 pos)
 // populate "probeIndex" with N probe indices that influence pos where N is REF_SAMPLE_COUNT
 void preProbeSample(vec3 pos)
 {
+    // Start the populate from empty here rather than relying on probeInfluences'
+    // global initializer. That initializer runs once per invocation, so this function
+    // only produces a correct list because nothing currently calls it twice -- the
+    // three entry points that do are all mutually exclusive. Resetting here makes the
+    // populate self-contained instead of correct by coincidence; it is a no-op on
+    // every existing call path.
+    probeInfluences = 0;
+
 #if REFMAP_LEVEL > 0
 
     int start = getStartIndex(pos);
@@ -310,13 +298,6 @@ vec3 sphereIntersect(vec3 origin, vec3 dir, vec3 center, float radius2)
         return v;
 }
 
-void swap(inout float a, inout float b)
-{
-    float t = a;
-    a = b;
-    b = a;
-}
-
 // debug implementation, make no assumptions about origin
 void sphereIntersectDebug(vec3 origin, vec3 dir, vec3 center, float radius2, float depth, inout vec4 col)
 {
@@ -391,9 +372,27 @@ vec3 boxIntersect(vec3 origin, vec3 dir, mat4 i, out float d, float scale)
 
     d = 1.0-max(max(abs(PositionLS.x), abs(PositionLS.y)), abs(PositionLS.z));
 
+    // Keep the denominator off zero, sign intact.
+    //
+    // A ray exactly parallel to one of the box's axes zeroes that component of RayLS. On its
+    // own that is fine -- the division gives an infinity, and the max/min below discard it in
+    // favour of the axis that actually bounds the ray. But if the position also sits exactly on
+    // that face the numerator is zero too, and 0/0 is a NaN that min carries into Distance, into
+    // the intersection point, and out as a cubemap fetch direction. An axis-parallel reflection
+    // is not exotic on an axis-aligned box probe in an axis-aligned room; a reflection pointing
+    // straight up zeroes two components at once.
+    //
+    // sign() would map a zero component to zero and leave the divide in place, so the sign is
+    // taken by comparison instead, treating +0 as positive -- which is the direction the
+    // infinity pointed before.
+    vec3 raySign = vec3(RayLS.x < 0.0 ? -1.0 : 1.0,
+                        RayLS.y < 0.0 ? -1.0 : 1.0,
+                        RayLS.z < 0.0 ? -1.0 : 1.0);
+    vec3 rayDenom = raySign * max(abs(RayLS), vec3(1e-6));
+
     vec3 Unitary = vec3(scale);
-    vec3 FirstPlaneIntersect  = (Unitary - PositionLS) / RayLS;
-    vec3 SecondPlaneIntersect = (-Unitary - PositionLS) / RayLS;
+    vec3 FirstPlaneIntersect  = (Unitary - PositionLS) / rayDenom;
+    vec3 SecondPlaneIntersect = (-Unitary - PositionLS) / rayDenom;
     vec3 FurthestPlane = max(FirstPlaneIntersect, SecondPlaneIntersect);
     float Distance = min(FurthestPlane.x, min(FurthestPlane.y, FurthestPlane.z));
 
@@ -470,6 +469,20 @@ void boxIntersectDebug(vec3 origin, vec3 pos, mat4 i, inout vec4 col)
 }
 
 
+// The distance-only weight of a box probe.
+//
+// tapRefMap and tapIrradianceMap return this through an out parameter that the box branch
+// used not to write at all. An out parameter is copy-out from an uninitialised local, so the
+// caller was accumulating an undefined value into dwsum -- and dwsum is what decides how far
+// a manual probe takes over from the automatic ones.
+//
+//  d  - boxIntersect's normalized depth inside the volume: 1 at the centre, 0 at the wall
+//  fade - the probe's fade-in weight, as sphereWeight also folds in
+float boxDistanceWeight(float d, float fade)
+{
+    return clamp(d, 0.0, 1.0) * fade;
+}
+
 // get the weight of a sphere probe
 //  pos - position to be weighted
 //  dir - normal to be weighted
@@ -515,6 +528,7 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
         v = boxIntersect(pos, dir, refBox[i], d);
 
         w = max(d, 0.001);
+        dw = boxDistanceWeight(d, refParams[i].z);
     }
     else
     { // sphere probe
@@ -530,10 +544,13 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
     }
 
     v -= c;
-    vec3 d = normalize(v);
-
     v = env_mat * v;
 
+    // Unnormalized on purpose: a cubemap fetch takes a direction of any length. The normalize
+    // that used to sit here was assigned to a local nothing read, so it was one inverse square
+    // root per probe tap -- up to REF_SAMPLE_COUNT of them per pixel, in a function every
+    // deferred and forward lighting path calls -- and it was a normalize of a vector with no
+    // guarantee of being non-zero.
     vec4 ret = textureLod(reflectionProbes, vec4(v.xyz, refIndex[i].x), lod) * refParams[i].y;
 
     return ret.rgb;
@@ -545,6 +562,43 @@ vec3 tapRefMap(vec3 pos, vec3 dir, out float w, out float dw, float lod, vec3 c,
 // w - weight of sample (distance and angular attenuation)
 // dw - weight of sample (distance only)
 // i - index of probe
+// Reconstruct irradiance for a normal direction from a probe's nine coefficients.
+//
+// The band scaling is the clamped-cosine convolution (Ramamoorthi and Hanrahan): pi, 2pi/3 and
+// pi/4 for bands 0, 1 and 2. They are divided through by pi here so the result is the
+// cosine-weighted AVERAGE radiance rather than irradiance proper -- that is the quantity the
+// cubemap held and the quantity pbrIbl multiplies by diffuseColor, so the units downstream are
+// unchanged.
+vec3 evalSHIrradiance(vec3 n, int layer)
+{
+    vec3 L0 = texelFetch(shCoeffs, ivec2(0, layer), 0).rgb;
+    vec3 L1 = texelFetch(shCoeffs, ivec2(1, layer), 0).rgb;
+    vec3 L2 = texelFetch(shCoeffs, ivec2(2, layer), 0).rgb;
+    vec3 L3 = texelFetch(shCoeffs, ivec2(3, layer), 0).rgb;
+    vec3 L4 = texelFetch(shCoeffs, ivec2(4, layer), 0).rgb;
+    vec3 L5 = texelFetch(shCoeffs, ivec2(5, layer), 0).rgb;
+    vec3 L6 = texelFetch(shCoeffs, ivec2(6, layer), 0).rgb;
+    vec3 L7 = texelFetch(shCoeffs, ivec2(7, layer), 0).rgb;
+    vec3 L8 = texelFetch(shCoeffs, ivec2(8, layer), 0).rgb;
+
+    const float A0 = 1.0;        // pi   / pi
+    const float A1 = 0.6666667;  // 2pi/3 / pi
+    const float A2 = 0.25;       // pi/4  / pi
+
+    vec3 e = A0 * 0.282095 * L0
+           + A1 * 0.488603 * (n.y * L1 + n.z * L2 + n.x * L3)
+           + A2 * (1.092548 * (n.x * n.y * L4 + n.y * n.z * L5 + n.x * n.z * L7)
+                 + 0.315392 * (3.0 * n.z * n.z - 1.0) * L6
+                 + 0.546274 * (n.x * n.x - n.y * n.y) * L8);
+
+    // Truncating at band 2 rings: a small bright source (the sun, in a probe capture) produces
+    // Gibbs oscillation whose negative lobe lands on the far side of the sphere. Clamping is the
+    // cheap half of the fix and the only part that matters visibly -- it cannot make a surface
+    // subtract light. The expensive half, windowing the coefficients at projection time, is worth
+    // adding only if the residual dark lobe turns out to be visible.
+    return max(e, vec3(0.0));
+}
+
 vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int i, vec3 amblit)
 {
     // parallax adjustment
@@ -554,6 +608,7 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
         float d = 0.0;
         v = boxIntersect(pos, dir, refBox[i], d, 3.0);
         w = max(d, 0.001);
+        dw = boxDistanceWeight(d, refParams[i].z);
     }
     else
     {
@@ -572,7 +627,21 @@ vec3 tapIrradianceMap(vec3 pos, vec3 dir, out float w, out float dw, vec3 c, int
     v -= c;
     v = env_mat * v;
 
-    vec3 col = textureLod(irradianceProbes, vec4(v.xyz, refIndex[i].x), 0).rgb * refParams[i].x;
+    // The parallax correction can land on the probe's own origin, and normalize(0) is a NaN
+    // going straight into the SH evaluation and out into the frame. The sample direction is what
+    // the intersection is a correction of, so it is the right thing to fall back to.
+    float len2 = dot(v, v);
+    vec3 sampleDir = len2 > 1e-12 ? v * inversesqrt(len2) : env_mat * dir;
+
+    vec3 col = evalSHIrradiance(sampleDir, refIndex[i].x);
+
+    // refParams.x is an irradiance scale that may exceed 1, so it has two regimes and must be
+    // spent in exactly one of them. Above 1 it is a boost, which only the multiply can apply
+    // because the mix weight saturates. At or below 1 it is a fade toward the sky's own
+    // ambient, which the mix already applies -- multiplying as well puts the probe term on
+    // ambiance squared while the ambient term stays linear, so a half-ambiance probe
+    // contributes a quarter of its irradiance instead of half.
+    col *= max(refParams[i].x, 1.0);
 
     col = mix(amblit, col, min(refParams[i].x, 1.0));
 
@@ -745,28 +814,39 @@ void doProbeSample(inout vec3 ambenv, inout vec3 glossenv,
     // TODO - don't hard code lods
     float reflection_lods = max_probe_lod;
 
-    vec3 refnormpersp = reflect(pos.xyz, norm.xyz);
+    vec3 refnormpersp = normalize(reflect(pos.xyz, norm.xyz));
+
+    // A GGX lobe is not centred on the mirror direction -- it leans toward the normal as the
+    // surface roughens. Sampling a prefiltered probe along the mirror direction therefore reads
+    // from the wrong place on exactly the surfaces whose lobe is widest.
+    float perceptualRoughness = 1.0 - glossiness;
+    refnormpersp = getSpecularDominantDir(norm.xyz, refnormpersp, perceptualRoughness);
 
     ambenv = amblit;
 
     if (classic_mode == 0)
         ambenv = sampleProbeAmbient(pos, norm, amblit);
 
-    float lod = (1.0-glossiness)*reflection_lods;
-    glossenv = sampleProbes(pos, normalize(refnormpersp), lod);
+    float lod = perceptualRoughness*reflection_lods;
+    glossenv = sampleProbes(pos, refnormpersp, lod);
 
 #if defined(SSR)
-    if (cube_snapshot != 1 && glossiness >= 0.9)
+    // Skip the march only where it would contribute nothing anyway. Asking the SSR unit for its
+    // own fade threshold keeps this from drifting away from it again.
+    if (cube_snapshot != 1 && glossiness > ssrMinGlossiness())
     {
         vec4 ssr = vec4(0);
+        // refnormpersp, not norm: the march takes the same dominant direction the probe tap
+        // above was bent to, so the two reflections being blended below agree about where they
+        // are looking.
         if (transparent)
         {
-            tapScreenSpaceReflection(1, tc, pos, norm, ssr, sceneMap, 1);
+            tapScreenSpaceReflection(1, tc, pos, norm, refnormpersp, ssr, sceneMap, 1);
             ssr.a *= glossiness;
         }
         else
         {
-            tapScreenSpaceReflection(1, tc, pos, norm, ssr, sceneMap, glossiness);
+            tapScreenSpaceReflection(1, tc, pos, norm, refnormpersp, ssr, sceneMap, glossiness);
         }
 
 
@@ -863,9 +943,20 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 
     if (glossiness > 0.0)
     {
-        float lod = (1.0-glossiness)*reflection_lods;
-        glossenv = sampleProbes(pos, normalize(refnormpersp), lod);
+        // (1.0 - glossiness) is this path's perceptual roughness -- it is already what selects
+        // the prefiltered mip, so the lobe correction reads it the same way.
+        float perceptualRoughness = 1.0 - glossiness;
 
+        // Bend toward the normal with roughness, as doProbeSample does for PBR. A prefiltered
+        // probe sampled along the mirror direction fetches from slightly the wrong place on
+        // exactly the surfaces whose lobe is widest, which reads as reflections sliding across
+        // curvature. The two lookups below keep the mirror direction on purpose: legacyenv is
+        // the roughness-zero case, where the bend is the identity anyway, and the screen-space
+        // march wants the true reflection ray.
+        vec3 dominantDir = getSpecularDominantDir(norm.xyz, normalize(refnormpersp), perceptualRoughness);
+
+        float lod = perceptualRoughness*reflection_lods;
+        glossenv = sampleProbes(pos, dominantDir, lod);
     }
 
     if (envIntensity > 0.0)
@@ -874,18 +965,25 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
     }
 
 #if defined(SSR)
-    if (cube_snapshot != 1)
+    // Gated the same way the PBR path is. Both consumers below blend by ssr.a, and ssr.a is
+    // already zero at these glossiness values -- the march's own fade reaches zero at
+    // ssrMinGlossiness(), and the transparent branch scales by glossiness directly. alphaF
+    // calls this with glossiness 0, so every legacy alpha fragment in the scene was paying for
+    // a full ray march whose result was then multiplied by nothing.
+    if (cube_snapshot != 1 && (transparent ? glossiness > 0.0 : glossiness > ssrMinGlossiness()))
     {
         vec4 ssr = vec4(0);
 
+        vec3 ssrDir = normalize(refnormpersp);
+
         if (transparent)
         {
-            tapScreenSpaceReflection(1, tc, pos, norm, ssr, sceneMap, 1);
+            tapScreenSpaceReflection(1, tc, pos, norm, ssrDir, ssr, sceneMap, 1);
             ssr.a *= glossiness;
         }
         else
         {
-            tapScreenSpaceReflection(1, tc, pos, norm, ssr, sceneMap, glossiness);
+            tapScreenSpaceReflection(1, tc, pos, norm, ssrDir, ssr, sceneMap, glossiness);
         }
 
         glossenv = mix(glossenv, ssr.rgb, ssr.a);
@@ -895,8 +993,6 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
 
     tapHeroProbe(glossenv, pos, norm, glossiness);
     tapHeroProbe(legacyenv, pos, norm, 1.0);
-
-    glossenv = clamp(glossenv, vec3(0), vec3(10));
 }
 
 void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 norm)

@@ -37,6 +37,7 @@
 #include "llsettingsdaycycle.h"
 
 #include "llglslshader.h"
+#include "aluniformbuffer.h"
 
 #include <boost/signals2.hpp>
 
@@ -138,6 +139,16 @@ public:
 
     // prepare settings to be applied to shaders (call whenever settings are updated)
     void                        updateSettingsUniforms();
+
+    // Upload (if dirty) and bind the shared Environment UBO at UB_ENVIRONMENT. Needs a GL
+    // context -- call from the render loop, alongside the reflection-probe UBO bind.
+    void                        bindEnvironmentUBO();
+
+    // Release the Environment UBO's GL object on a context teardown (re-created lazily on the
+    // next bindEnvironmentUBO). Must be paired with the pipeline's GL-buffer teardown, mirroring
+    // the reflection-probe UBO: without it a GL destroy/restore cycle leaves a stale (or
+    // driver-recycled) buffer name bound at UB_ENVIRONMENT.
+    void                        releaseGLBuffers();
 
     void                        setSelectedEnvironment(EnvSelection_t env, LLSettingsBase::Seconds transition = TRANSITION_DEFAULT, bool forced = false);
     EnvSelection_t              getSelectedEnvironment() const                  { return mSelectedEnvironment; }
@@ -245,6 +256,48 @@ public:
     LLShaderUniforms mWaterUniforms[LLGLSLShader::SG_COUNT];
     LLShaderUniforms mSkyUniforms[LLGLSLShader::SG_COUNT];
     // =======================================================================================
+
+    // ---- Shared environment uniform block (UB_ENVIRONMENT) --------------------------------
+    // std140-packed sky/water constants uploaded ONCE per frame and bound at a fixed engine
+    // binding point, replacing the per-shader re-upload of these values on every bind. Holds
+    // ONLY the constants that are (a) written exclusively by the settings path and (b) uniform
+    // across every shader in a frame. Per-pass / light-state uniforms (ambient/sunlight/
+    // moonlight, lightnorm, camPosLocal, water/clip plane, mirror flag, sky_hdr_scale,
+    // sun_up_factor, moisture/droplet/ice/moon_brightness/cloud_variance/sun_moon_glow_factor,
+    // density_multiplier) are deliberately re-pushed per context and STAY on the loose apply()
+    // path. (classic_mode is a compile-time program variant -- see CLASSIC_MODE.)
+    //
+    // Field order/types/padding MUST byte-match the GLSL block. Each vec3 is paired with a
+    // trailing scalar so that scalar fills the vec3's std140 tail (the next member lands at
+    // offset+12) -- which is exactly how float[3]+float pack in C++, so this struct mirrors
+    // std140 with no manual inter-member padding. Only the final round to a 16-byte multiple
+    // needs explicit tail padding. See packEnvironmentUBO() and the sEnvBlockFields table in
+    // llenvironment.cpp.
+    struct alignas(16) EnvironmentUBOData
+    {
+        F32 waterFogColor[4];
+        F32 blue_density[3];           F32 haze_density;
+        F32 blue_horizon[3];           F32 haze_horizon;
+        F32 cloud_pos_density1[3];     F32 distance_multiplier;
+        F32 cloud_pos_density2[3];     F32 cloud_scale;
+        F32 cloud_color[3];            F32 cloud_shadow;
+        F32 glow[3];                   F32 max_y;
+        F32 waterFogColorLinear[3];    F32 reflection_probe_ambiance;
+        F32 scene_light_strength;
+        F32 sky_sunlight_scale;
+        F32 sky_ambient_scale;
+        F32 gamma;
+        F32 waterFogKS;
+        F32 waterFogDensity;
+        F32 _tail_pad[2];
+    };
+
+    // Pack mSky/mWaterUniforms into the CPU-side block and mark it for upload (no GL calls).
+    void                        packEnvironmentUBO();
+
+    EnvironmentUBOData          mEnvUBOData{};
+    ALUniformBuffer             mEnvUBO;
+    bool                        mEnvUBODirty{ true };
 
     class DayInstance: public std::enable_shared_from_this<DayInstance>
     {

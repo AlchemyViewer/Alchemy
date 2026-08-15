@@ -234,7 +234,7 @@ public:
     ~MediaPluginCEF();
 
     /*virtual*/
-    void receiveMessage(const char* message_string);
+    void receiveMessage(const std::string& message_string);
 
 private:
     bool init();
@@ -1078,7 +1078,7 @@ void MediaPluginCEF::authResponse(LLPluginMessage &message)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void MediaPluginCEF::receiveMessage(const char* message_string)
+void MediaPluginCEF::receiveMessage(const std::string& message_string)
 {
     //  std::cerr << "MediaPluginCEF::receiveMessage: received message: \"" << message_string << "\"" << std::endl;
     LLPluginMessage message_in;
@@ -1301,7 +1301,7 @@ void MediaPluginCEF::receiveMessage(const char* message_string)
                 // Accelerated paint copies the BGRA shared texture into the media
                 // texture with glCopyImageSubData, which needs matching 32-bit
                 // (RGBA8) storage; the CPU path uploads BGRA into RGB as before.
-                message.setValueU32("internalformat", mUseAcceleratedPaint ? GL_RGBA8 : GL_RGB);
+                message.setValueU32("internalformat", mUseAcceleratedPaint ? GL_RGBA8 : GL_RGB8);
                 message.setValueU32("format", GL_BGRA);
                 message.setValueU32("type", GL_UNSIGNED_BYTE);
                 message.setValueBoolean("coords_opengl", true);

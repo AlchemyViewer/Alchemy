@@ -161,6 +161,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 #include <boost/throw_exception.hpp>
+#include <chrono>
 
 #if LL_WINDOWS
 #   include <share.h> // For _SH_DENYWR in processMarkerFiles
@@ -564,7 +565,6 @@ static void settings_to_globals()
 #endif
     LLRender::sNsightDebugSupport = gSavedSettings.getBOOL("RenderNsightDebugSupport");
     LLRender::sAnisotropicFilteringLevel = static_cast<F32>(gSavedSettings.getU32("RenderAnisotropicLevel"));
-    LLImageGL::sCompressTextures        = gSavedSettings.getBOOL("RenderCompressTextures");
     LLVOVolume::sLODFactor              = llclamp(gSavedSettings.getF32("RenderVolumeLODFactor"), 0.01f, MAX_LOD_FACTOR);
     LLVOVolume::sDistanceFactor         = 1.f-LLVOVolume::sLODFactor * 0.1f;
     LLVolumeImplFlexible::sUpdateFactor = gSavedSettings.getF32("RenderFlexTimeFactor");
@@ -1335,7 +1335,11 @@ bool LLAppViewer::frame()
     {
         try
         {
+            const auto start = std::chrono::steady_clock::now();
             ret = doFrame();
+            const auto end = std::chrono::steady_clock::now();
+            const U64 doframe_time_us = (U64)std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            LLTrace::sample(LLStatViewer::DOFRAME_TIME_US, doframe_time_us);
         }
         catch (const LLContinueError&)
         {
@@ -1881,6 +1885,9 @@ bool LLAppViewer::cleanup()
     if( gViewerWindow)
         gViewerWindow->shutdownViews();
 
+    // Model previews release their decomposition handles while the UI is destroyed.
+    gMeshRepo.shutdownDecomposition();
+
     LL_INFOS() << "Cleaning up Inventory" << LL_ENDL;
 
     // Cleanup Inventory after the UI since it will delete any remaining observers
@@ -2173,6 +2180,8 @@ bool LLAppViewer::cleanup()
     // This calls every remaining LLSingleton's cleanupSingleton() and
     // deleteSingleton() methods.
     LLSingletonBase::deleteAll();
+
+    LLUICtrlFactory::deleteSingleton();
 
     LLSplashScreen::hide();
 
@@ -3001,13 +3010,20 @@ bool LLAppViewer::initConfiguration()
 
     if (mSecondInstance)
     {
-        // This is the second instance of SL. Mute voice,
-        // but make sure the setting is *not* persisted.
+        // This is the second concurrent instance of SL.
+        // Disable voice for this session only, user should
+        // be able to enable voice manually, after that it
+        // works the same way as on primary instance.
         LLControlVariable* enable_voice = gSavedSettings.getControl("EnableVoiceChat");
-        if (enable_voice)
+        if (enable_voice && enable_voice->getValue().asBoolean())
         {
+            LL_DEBUGS("AppInit") << "Disabling voice for this session only" << LL_ENDL;
+            // Will be saved as mValues[2] which does not get written to the file.
+            // This feels like a hack, but otherwise way too many controls have to
+            // be tracked manually instead of using xmls' control_name.
             const bool DO_NOT_PERSIST = false;
-            enable_voice->setValue(LLSD(false), DO_NOT_PERSIST);
+            LLSD::Boolean new_value = false;
+            enable_voice->setValue(new_value, DO_NOT_PERSIST);
         }
     }
 

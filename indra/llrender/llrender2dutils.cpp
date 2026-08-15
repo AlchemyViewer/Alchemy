@@ -78,7 +78,7 @@ void gl_state_for_2d(S32 width, S32 height)
 
 void gl_draw_x(const LLRect& rect, const LLColor4& color)
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     gGL.color4fv( color.mV );
 
@@ -117,7 +117,7 @@ void gl_rect_2d_offset_local( S32 left, S32 top, S32 right, S32 bottom, S32 pixe
 
 void gl_rect_2d(S32 left, S32 top, S32 right, S32 bottom, bool filled )
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     // Counterclockwise quad will face the viewer
     if( filled )
@@ -165,7 +165,7 @@ void gl_rect_2d( const LLRect& rect, const LLColor4& color, bool filled )
 void gl_drop_shadow(S32 left, S32 top, S32 right, S32 bottom, const LLColor4 &start_color, S32 lines)
 {
     stop_glerror();
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     // HACK: Overlap with the rectangle by a single pixel.
     right--;
@@ -246,7 +246,7 @@ void gl_drop_shadow(S32 left, S32 top, S32 right, S32 bottom, const LLColor4 &st
 
 void gl_line_2d(S32 x1, S32 y1, S32 x2, S32 y2 )
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     gGL.begin(LLRender::LINES);
         gGL.vertex2i(x1, y1);
@@ -256,7 +256,7 @@ void gl_line_2d(S32 x1, S32 y1, S32 x2, S32 y2 )
 
 void gl_line_2d(S32 x1, S32 y1, S32 x2, S32 y2, const LLColor4 &color )
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     gGL.color4fv( color.mV );
 
@@ -268,7 +268,7 @@ void gl_line_2d(S32 x1, S32 y1, S32 x2, S32 y2, const LLColor4 &color )
 
 void gl_triangle_2d(S32 x1, S32 y1, S32 x2, S32 y2, S32 x3, S32 y3, const LLColor4& color, bool filled)
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     gGL.color4fv(color.mV);
 
@@ -288,7 +288,7 @@ void gl_triangle_2d(S32 x1, S32 y1, S32 x2, S32 y2, S32 x3, S32 y3, const LLColo
 
 void gl_corners_2d(S32 left, S32 top, S32 right, S32 bottom, S32 length, F32 max_frac)
 {
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     length = llmin((S32)(max_frac*(right - left)), length);
     length = llmin((S32)(max_frac*(top - bottom)), length);
@@ -446,7 +446,11 @@ void gl_draw_scaled_image_with_border(S32 x, S32 y, S32 width, S32 height, LLTex
                                 ui_translation.mV[VX] + width * ui_scale.mV[VX],
                                 ui_translation.mV[VY]);
 
-        gGL.getTexUnit(0)->bind(image, true);
+        // Clamp, not the repeat these inherited from LLImageGL's defaults. UI art is atlased
+        // and drawn as 2D quads: a fetch past the edge belongs to a neighbouring sprite, so
+        // repeat bleeds it in. Skin images are MIPMAP_NO, so bilinear and anisotropic resolve
+        // to the same GL_LINEAR here -- the anisotropy was doing nothing on an unmipmapped quad.
+        gGL.getTextureSlot(0)->bindSampled(image, ALSamplers::BilinearClamp);
 
         gGL.color4fv(color.mV);
 
@@ -719,11 +723,11 @@ void gl_draw_scaled_rotated_image(S32 x, S32 y, S32 width, S32 height, F32 degre
 
     if(image != NULL)
     {
-        gGL.getTexUnit(0)->bind(image, true);
+        gGL.getTextureSlot(0)->bindSampled(image, ALSamplers::BilinearClamp);
     }
     else
     {
-        gGL.getTexUnit(0)->bind(target);
+        gGL.getTextureSlot(0)->bind(target);
     }
 
     gGL.color4fv(color.mV);
@@ -787,11 +791,11 @@ void gl_draw_scaled_rotated_image(S32 x, S32 y, S32 width, S32 height, F32 degre
 
         if(image != NULL)
         {
-            gGL.getTexUnit(0)->bind(image, true);
+            gGL.getTextureSlot(0)->bindSampled(image, ALSamplers::BilinearClamp);
         }
         else
         {
-            gGL.getTexUnit(0)->bind(target);
+            gGL.getTextureSlot(0)->bind(target);
         }
 
         gGL.color4fv(color.mV);
@@ -892,7 +896,7 @@ void gl_circle_2d(F32 center_x, F32 center_y, F32 radius, S32 steps, bool filled
 {
     gGL.pushUIMatrix();
     {
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gGL.translateUI(center_x, center_y, 0.f);
 
         // Inexact, but reasonably fast.
@@ -976,9 +980,9 @@ void gl_rect_2d_checkerboard(const LLRect& rect, GLfloat alpha)
 {
     //polygon stipple is deprecated, use "Checker" texture
     LLPointer<LLUIImage> img = LLRender2D::getInstance()->getUIImage("Checker");
-    gGL.getTexUnit(0)->bind(img->getImage());
-    gGL.getTexUnit(0)->setTextureAddressMode(LLTexUnit::TAM_WRAP);
-    gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_POINT);
+    // Per-binding: the Checker image is a shared UI texture, so wrap+point must not follow
+    // it to other users.
+    gGL.getTextureSlot(0)->bindSampled(img->getImage(), ALSamplers::PointWrap);
 
     LLColor4 color(1.f, 1.f, 1.f, alpha);
     LLRectf uv_rect(0, 0, rect.getWidth()/32.f, rect.getHeight()/32.f);
@@ -1002,7 +1006,7 @@ void gl_washer_2d(F32 outer_radius, F32 inner_radius, S32 steps, const LLColor4&
     F32 x2 = inner_radius;
     F32 y2 = 0.f;
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 
     gGL.begin( LLRender::TRIANGLE_STRIP  );
     {
@@ -1039,7 +1043,7 @@ void gl_washer_segment_2d(F32 outer_radius, F32 inner_radius, F32 start_radians,
     F32 x2 = inner_radius * cos( start_radians );
     F32 y2 = inner_radius * sin( start_radians );
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gGL.begin( LLRender::TRIANGLE_STRIP  );
     {
         steps += 1; // An extra step to close the circle.

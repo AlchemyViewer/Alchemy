@@ -26,12 +26,13 @@
 uniform sampler2D   noiseMap;
 uniform sampler2D   depthMap;
 
-uniform float ssao_radius;
-uniform float ssao_max_radius;
-uniform float ssao_factor;
-uniform float ssao_factor_inv;
+// Shared shadow/SSAO constants, spliced from class1/deferred/deferredBlock.glsl and
+// bound at UB_DEFERRED. Members are read by bare name.
+//[ENGINE_BLOCK Deferred]
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 
 vec2 getScreenCoordinateAo(vec2 screenpos)
@@ -50,7 +51,14 @@ vec4 getPositionAo(vec2 pos_screen)
 {
     float depth = getDepthAo(pos_screen);
     vec2 sc = getScreenCoordinateAo(pos_screen);
+    // Reverse-Z stores ndc z directly (ZERO_TO_ONE clip control); legacy needs the remap.
+    // Inlined rather than calling deferredUtil's ndcZFromScreenDepth: this object keeps its
+    // own copies of the depth/screen helpers so it never depends on that attachment.
+#ifdef REVERSE_Z
+    vec4 ndc = vec4(sc.x, sc.y, depth, 1.0);
+#else
     vec4 ndc = vec4(sc.x, sc.y, 2.0*depth-1.0, 1.0);
+#endif
     vec4 pos = inv_proj * ndc;
     pos /= pos.w;
     pos.w = 1.0;

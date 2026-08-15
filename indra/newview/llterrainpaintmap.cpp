@@ -77,15 +77,15 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     // Use a scratch render target because its dimensions may exceed the standard bake target, and this is a one-off bake
     LLRenderTarget scratch_target;
     const S32 dim = llmin(tex.getWidth(), tex.getHeight());
-    scratch_target.allocate(dim, dim, GL_RGB, false, false, LLTexUnit::eTextureType::TT_TEXTURE,
-                                   LLTexUnit::eTextureMipGeneration::TMG_NONE);
+    scratch_target.allocate(dim, dim, GL_RGB8, false, false, ALTextureSlot::eTextureType::TT_TEXTURE,
+                                   LLRenderTarget::MIPS_NONE);
     if (!scratch_target.isComplete())
     {
         llassert(false);
         LL_WARNS() << "Failed to allocate render target" << LL_ENDL;
         return false;
     }
-    gGL.getTexUnit(0)->disable();
+    gGL.getTextureSlot(0)->unbind();
     stop_glerror();
 
     scratch_target.bindTarget();
@@ -238,8 +238,7 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
 
         S32 alpha_ramp = shader.enableTexture(LLViewerShaderMgr::TERRAIN_ALPHARAMP);
         LLPointer<LLViewerTexture> alpha_ramp_texture = LLViewerTextureManager::getFetchedTexture(IMG_ALPHA_GRAD_2D);
-        gGL.getTexUnit(alpha_ramp)->bind(alpha_ramp_texture);
-        gGL.getTexUnit(alpha_ramp)->setTextureAddressMode(LLTexUnit::TAM_CLAMP);
+        gGL.getTextureSlot(alpha_ramp)->bindSampled(alpha_ramp_texture, ALSamplers::AnisoClamp);
 
         buf->setBuffer();
         for (U32 rj = 0; rj < patch_count; ++rj)
@@ -257,9 +256,7 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
 
         shader.disableTexture(LLViewerShaderMgr::TERRAIN_ALPHARAMP);
 
-        gGL.getTexUnit(alpha_ramp)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.getTexUnit(alpha_ramp)->disable();
-        gGL.getTexUnit(alpha_ramp)->activate();
+        gGL.getTextureSlot(alpha_ramp)->unbind();
 
         shader.unbind();
     }
@@ -275,7 +272,9 @@ bool LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(const LLViewerRegion& 
     {
         LL_WARNS() << "Failed to copy framebuffer to paintmap" << LL_ENDL;
     }
-    glGenerateMipmap(GL_TEXTURE_2D);
+    // setSubImageFromFrameBuffer left the paintmap bound on unit 0 under the last draw's
+    // sampler; generateMipmaps clears that so mip generation follows the texture's own state.
+    LLImageGL::generateMipmaps(GL_TEXTURE_2D);
     stop_glerror();
 
     scratch_target.flush();

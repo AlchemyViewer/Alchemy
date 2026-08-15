@@ -35,14 +35,15 @@
 
 #include "llimagegl.h"
 #include "llfontbitmapcache.h"
-#include "llfontface.h"
+#include "alfontface.h"
 
 #include <array>
 #include <boost/functional/hash.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <boost/unordered_map.hpp>
 
-// LLFT_Face / hb_font_t / EFontHinting come in via llfontface.h.
+// ALFT_Face / hb_font_t / EFontHinting come in via alfontface.h.
 struct FT_StreamRec_;
 typedef struct FT_StreamRec_ LLFT_Stream;
 
@@ -62,11 +63,11 @@ public:
 
     U8 const *loadFont( std::string const &aFilename, long &a_Size );
 
-    // Resolve a key to a refcounted, shared LLFontFace. Loads the face on
+    // Resolve a key to a refcounted, shared ALFontFace. Loads the face on
     // miss and caches it; returns null if FreeType refuses the file or the
     // requested size. Cached entries persist until cleanupClass(), or until
     // unloadAllFonts() runs at shutdown.
-    LLPointer<LLFontFace> getOrCreateFace(const LLFontFaceKey& key);
+    LLPointer<ALFontFace> getOrCreateFace(const ALFontFaceKey& key);
 
     // Drop face-cache and loaded-font entries no longer referenced by any
     // live LLFontFreetype. Intended to run after LLFontRegistry::reload()
@@ -80,7 +81,7 @@ private:
 
     void unloadAllFonts();
     std::map< std::string, std::shared_ptr<ll::fonts::LoadedFont> > m_LoadedFonts;
-    boost::unordered_map<LLFontFaceKey, LLPointer<LLFontFace>> mFaceCache;
+    boost::unordered_map<ALFontFaceKey, LLPointer<ALFontFace>> mFaceCache;
 };
 
 struct LLFontGlyphInfo
@@ -120,7 +121,7 @@ struct LLFontGlyphInfo
     // Atlas owner. mPhaseSlots[*].mBitmapEntry locates the slot within
     // mSourceFace->getBitmapCache(); the renderer follows this indirection
     // so two heads sharing a face render glyphs from the same atlas pages.
-    const LLFontFace* mSourceFace = nullptr;
+    const ALFontFace* mSourceFace = nullptr;
 
     // Glyph-level metrics. These are taken from phase 0 and used by the
     // measurement paths (getWidthF32, maxDrawableChars, etc.) that don't
@@ -152,7 +153,7 @@ public:
 
     // is_fallback should be true for fallback fonts that aren't used
     // to render directly (Unicode backup, primarily)
-    bool loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags, const LLFontVarAxes& var_axes = {});
+    bool loadFace(const std::string& filename, F32 point_size, F32 vert_dpi, F32 horz_dpi, bool is_fallback, S32 face_n, EFontHinting hinting, S32 flags, const ALFontVarAxes& var_axes = {});
 
     // Count the faces in a font file (TTC/OTC collections). Pure probe —
     // opens a temporary FT face from a locally-read buffer and closes it;
@@ -160,7 +161,7 @@ public:
     static S32 getNumFaces(const std::string& filename);
 
     typedef std::function<bool(llwchar)> char_functor_t;
-    void addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font, const char_functor_t& functor = nullptr);
+    void addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font, const char_functor_t& functor = nullptr) const;
     typedef std::pair<LLPointer<LLFontFreetype>, char_functor_t> fallback_font_t;
     typedef std::vector<fallback_font_t> fallback_font_vector_t;
     const fallback_font_vector_t& getFallbackFonts() const { return mFallbackFonts; }
@@ -284,7 +285,7 @@ public:
     // Run a maintenance pass that releases bitmap atlas sheets which haven't
     // been read or written within the idle threshold, recovering their CPU
     // and GPU memory and dropping any LLFontGlyphInfo entries that pointed
-    // into them. Forwards to LLFontFace::collectGarbage — the sweep and its
+    // into them. Forwards to ALFontFace::collectGarbage — the sweep and its
     // throttle live on the shared face wrapper, so N heads sharing one face
     // cost one sweep per interval, not N. NOT safe to call mid-render while
     // a glyph pointer is held: call only at frame boundaries / before any
@@ -294,21 +295,21 @@ public:
     // Return the FT glyph index for `wch` on this face, caching the result so
     // subsequent lookups skip the cmap binary search inside FT_Get_Char_Index.
     // Delegates to mFace's char-index cache, which is shared across every
-    // LLFontFreetype that resolved to the same LLFontFace. Public so the
+    // LLFontFreetype that resolved to the same ALFontFace. Public so the
     // shared fallback-chain walker (free helper at file scope of the cpp)
     // can probe each fallback without needing friendship.
     U32 getCharGlyphIndex(llwchar wch) const;
 
     // Tests-only accessor for the shared face wrapper. Lets the consistency
-    // tests reach LLFontFace's hb_font_t, FT_Face, hinting, and ppem snapshot
+    // tests reach ALFontFace's hb_font_t, FT_Face, hinting, and ppem snapshot
     // without friend declarations. No production caller — render and
     // measurement paths use mFace internally.
-    const LLFontFace* getFontFace() const { return mFace.get(); }
+    const ALFontFace* getFontFace() const { return mFace.get(); }
 
 private:
     // Convenience: dereference the shared face wrapper. Null when this
     // instance hasn't been loaded yet or was unloaded.
-    LLFT_Face getFTFace() const { return mFace ? mFace->face() : nullptr; }
+    ALFT_Face getFTFace() const { return mFace ? mFace->face() : nullptr; }
 
     void resetBitmapCache();
     // Render and cache a glyph for `glyph_index` on `fontp` (the source face,
@@ -322,9 +323,15 @@ private:
     // FreeType actually delivered (which can differ from the requested one —
     // e.g. color requested but mono returned).
     LLFontGlyphInfo* renderAndCreateGlyph(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type, EFontGlyphType& out_bitmap_glyph_type) const;
+    bool hasFallbackPath(const std::string& path) const; // Is a fallback font with this file path already attached?
+    // Last resort for a codepoint no face in the chain covers: ask the OS
+    // for a font that does, load it and append it to the fallback chain.
+    // Returns the (face, glyph index) it resolved to, or (nullptr, 0) when
+    // the OS has no match. Each codepoint is queried at most once.
+    std::pair<const LLFontFreetype*, U32> attachOsFallbackFor(llwchar wch) const;
     void renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, llwchar wch) const;
     // COLRv1 paint-walker entry point. Loads the glyph in outline mode to
-    // populate metrics, then runs LLFontColrV1Painter to rasterize the paint
+    // populate metrics, then runs ALFontColrV1Painter to rasterize the paint
     // tree into a staging buffer; on success, patches the FT glyph slot
     // (bitmap pointer + pixel_mode + bitmap_left/top) so the existing
     // pixel_mode switch in renderAndCreateGlyph consumes it unchanged.
@@ -346,10 +353,10 @@ private:
     F32 mLineHeight;
 
     // Shared underlying FT_Face wrapper. Multiple LLFontFreetype instances
-    // can hold pointers to the same LLFontFace when their (filename, size,
+    // can hold pointers to the same ALFontFace when their (filename, size,
     // weight, hinting, flags) all match — see LLFontManager::getOrCreateFace.
     // Per-instance state (fallback chain, atlas, glyph caches) stays here.
-    LLPointer<LLFontFace> mFace;
+    LLPointer<ALFontFace> mFace;
 
     bool mIsFallback;
     EFontHinting mHinting;
@@ -357,10 +364,20 @@ private:
     // OpenType variation axes the head was loaded with. Stored on the
     // head (not just on mFace) so reset() can round-trip the same axes
     // back through loadFace when re-resolving for a DPI change.
-    LLFontVarAxes mVarAxes;
+    ALFontVarAxes mVarAxes;
     bool mAllowMonospaceLigatures = false;
     bool mUseSubpixelPen = false;
-    fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)
+    S32 mFaceIndex = 0; // Face index within the (possibly collection) font file
+    F32 mVertDPI = 0.f; // Kept so lazily-discovered fallback faces can be
+    F32 mHorzDPI = 0.f; // opened at this font's size (see attachOsFallbackFor)
+    // mutable: fallback fonts are also discovered lazily during glyph lookup (const)
+    mutable fallback_font_vector_t mFallbackFonts; // A list of fallback fonts to look for glyphs in (for Unicode chars)
+    // Codepoints we've already asked the OS about, so we only query once each
+    mutable boost::unordered_flat_set<llwchar> mAttemptedFallbackChars;
+    // The subset of mFallbackFonts this head discovered through the OS. The
+    // registry never sees these, so LLFontRegistry::reloadForDpiChange can't
+    // re-resolve them — resetSelf drives them itself.
+    mutable std::vector<LLPointer<LLFontFreetype>> mLazyFallbacks;
 
     // Per-head shaping-face resolution cache: codepoint -> (winning face,
     // glyph index in that face). Replaces an O(fallbacks)-deep walk for
@@ -381,7 +398,7 @@ private:
     // CJK-heavy chat doesn't grow this without limit.
     mutable boost::unordered_flat_map<llwchar, std::pair<const LLFontFreetype*, U32>> mShapingFaceResolution;
 
-    // (Glyph info cache lives on LLFontFace::mGlyphInfoMap. The head used to
+    // (Glyph info cache lives on ALFontFace::mGlyphInfoMap. The head used to
     // memoize lookups in its own (fontp, glyph_index) map, but that
     // introduced a dangling-pointer hazard whenever the face's collectGarbage
     // deleted entries: sibling heads — and any head holding this face as a
@@ -392,13 +409,13 @@ private:
     // every lookup through the face cache means atlas eviction is observed
     // consistently by every freetype that ever rendered the glyph.)
     //
-    // (LLFontBitmapCache moved to LLFontFace — atlas storage is now shared
+    // (LLFontBitmapCache moved to ALFontFace — atlas storage is now shared
     // across every LLFontFreetype that wraps the same face. mCharIndexCache
-    // and mHbFont also live on LLFontFace for the same reason.)
+    // and mHbFont also live on ALFontFace for the same reason.)
 
     mutable S32 mRenderGlyphCount;
 
-    // (collectGarbage's throttle clock moved to LLFontFace::mNextGcTime —
+    // (collectGarbage's throttle clock moved to ALFontFace::mNextGcTime —
     // per-head throttles made siblings sharing a face re-sweep the same
     // atlas once per head per interval.)
 };

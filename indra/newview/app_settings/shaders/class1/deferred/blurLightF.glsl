@@ -30,7 +30,6 @@ out vec4 frag_color;
 uniform sampler2D lightMap;
 
 uniform float dist_factor;
-uniform float blur_size;
 uniform vec2 delta;
 uniform vec2 screen_res;
 uniform vec3 kern[4];
@@ -51,8 +50,14 @@ void main()
     vec2 dlt = kern_scale * delta / (1.0+norm.xy*norm.xy);
     dlt /= max(-pos.z*dist_factor, 1.0);
 
-    vec2 defined_weight = kern[0].xy; // special case the first (centre) sample's weight in the blur; we have to sample it anyway so we get it for 'free'
-    vec4 col = defined_weight.xyxx * ccol;
+    // AO uses the y weight of the kernel. The shadow term, which used the x weight, is no
+    // longer blurred here: it is a Gaussian-weighted PCF (deferred/shadowUtil.glsl) that is
+    // smooth at the source, so a second screen-space blur only widened its penumbra and let
+    // the bilateral tolerance bleed it across depth edges the PCF had already resolved. AO is
+    // still stochastic per pixel and wants the denoise, so it keeps it. This is why shadow
+    // quality no longer depends on SSAO -- the pass that hosts this blur -- being enabled.
+    float defined_weight = kern[0].y; // special case the first (centre) sample's weight in the blur; we have to sample it anyway so we get it for 'free'
+    float ao = defined_weight * ccol.g;
 
     // relax tolerance according to distance to avoid speckling artifacts, as angles and distances are a lot more abrupt within a small screen area at larger distances
     float pointplanedist_tolerance_pow2 = pos.z*pos.z*0.00005;
@@ -85,8 +90,8 @@ void main()
 
         if (d*d <= pointplanedist_tolerance_pow2)
         {
-            col += texture(lightMap, samptc)*k[i].xyxx;
-            defined_weight += k[i].xy;
+            ao += texture(lightMap, samptc).g * k[i].y;
+            defined_weight += k[i].y;
         }
     }
 
@@ -100,20 +105,14 @@ void main()
 
         if (d*d <= pointplanedist_tolerance_pow2)
         {
-            col += texture(lightMap, samptc)*k[i].xyxx;
-            defined_weight += k[i].xy;
+            ao += texture(lightMap, samptc).g * k[i].y;
+            defined_weight += k[i].y;
         }
     }
 
-    col /= defined_weight.xyxx;
-    //col.y *= col.y;
+    ao /= defined_weight;
 
-    frag_color = max(col, vec4(0));
-
-#ifdef IS_AMD_CARD
-    // If it's AMD make sure the GLSL compiler sees the arrays referenced once by static index. Otherwise it seems to optimise the storage awawy which leads to unfun crashes and artifacts.
-    vec3 dummy1 = kern[0];
-    vec3 dummy2 = kern[3];
-#endif
+    // shadow (r) and spot shadows (b, a) pass through unblurred; only AO (g) is smoothed
+    frag_color = vec4(ccol.r, max(ao, 0.0), ccol.b, ccol.a);
 }
 

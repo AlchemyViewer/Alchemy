@@ -7,7 +7,7 @@
  * Copyright (C) 2010, Linden Research, Inc.
  *
  * Alchemy Viewer Source Code
- * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -65,6 +65,33 @@ LLShaderMgr * LLShaderMgr::instance()
     }
 
     return sInstance;
+}
+
+std::string LLShaderMgr::variantObjectKey(const std::string& path, U32 axes, const LLGLSLShader* shader, GLenum stage) const
+{
+    const char* suffix = nullptr;
+    if ((axes & OBJ_AXIS_CLASSIC) && shader->mDefines.count("CLASSIC_MODE"))
+    {
+        suffix = CLASSIC_OBJECT_SUFFIX;
+    }
+    else if ((axes & OBJ_AXIS_MIRROR) && shader->mDefines.count("MIRROR_CLIP"))
+    {
+        suffix = MIRROR_OBJECT_SUFFIX;
+    }
+
+    if (!suffix)
+    {
+        return path;
+    }
+
+    // No object under the variant key means the loader decided this source could not vary on
+    // the axis at the class level it resolved to -- deferred/reflectionProbeF.glsl reads
+    // CLASSIC_MODE at class3 and not at class2 -- so the base object already IS the right one
+    // and no second copy was compiled. Absence is always that decision and never a failure:
+    // loadBasicShaders aborts the whole load if a copy it did want fails to build.
+    const std::string key = path + suffix;
+    const auto& objects = (stage == GL_VERTEX_SHADER) ? mVertexShaderObjects : mFragmentShaderObjects;
+    return objects.count(key) ? key : path;
 }
 
 bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
@@ -149,7 +176,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
             return false;
         }
 
-        if (!shader->attachVertexObject("windlight/atmosphericsFuncs.glsl")) {
+        if (!shader->attachVertexObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", OBJ_AXIS_CLASSIC, shader, GL_VERTEX_SHADER))) {
             return false;
         }
 
@@ -169,7 +196,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasObjectSkinning)
     {
-        shader->mRiggedVariant = shader;
+        // NOTE: the matching `mRiggedVariant = this` self-edge is set by createShader().
         if (!shader->attachVertexObject("avatar/objectSkinV.glsl"))
         {
             return false;
@@ -187,7 +214,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     // NOTE order of shader object attaching is VERY IMPORTANT!!!
 
-    if (!shader->attachFragmentObject("deferred/globalF.glsl"))
+    if (!shader->attachFragmentObject(variantObjectKey("deferred/globalF.glsl", OBJ_AXIS_MIRROR, shader, GL_FRAGMENT_SHADER)))
     {
         return false;
     }
@@ -219,7 +246,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
     // we want this BEFORE shadows and AO because those facilities use pos/norm access
     if (features->isDeferred || features->hasReflectionProbes)
     {
-        if (!shader->attachFragmentObject("deferred/deferredUtil.glsl"))
+        if (!shader->attachFragmentObject(variantObjectKey("deferred/deferredUtil.glsl", OBJ_AXIS_CLASSIC, shader, GL_FRAGMENT_SHADER)))
         {
             return false;
         }
@@ -251,7 +278,7 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
 
     if (features->hasReflectionProbes)
     {
-        if (!shader->attachFragmentObject("deferred/reflectionProbeF.glsl"))
+        if (!shader->attachFragmentObject(variantObjectKey("deferred/reflectionProbeF.glsl", OBJ_AXIS_CLASSIC, shader, GL_FRAGMENT_SHADER)))
         {
             return false;
         }
@@ -265,17 +292,9 @@ bool LLShaderMgr::attachShaderFeatures(LLGLSLShader * shader)
         }
     }
 
-    if (features->hasGamma || features->isDeferred)
-    {
-        if (!shader->attachFragmentObject("windlight/gammaF.glsl"))
-        {
-            return false;
-        }
-    }
-
     if (features->hasAtmospherics || features->isDeferred)
     {
-        if (!shader->attachFragmentObject("windlight/atmosphericsFuncs.glsl")) {
+        if (!shader->attachFragmentObject(variantObjectKey("windlight/atmosphericsFuncs.glsl", OBJ_AXIS_CLASSIC, shader, GL_FRAGMENT_SHADER))) {
             return false;
         }
 
@@ -456,22 +475,32 @@ void LLShaderMgr::dumpShaderSource(U32 shader_code_count, GLchar** shader_code_t
 
 void LLShaderMgr::dumpObjectLog(GLuint ret, bool warns, const std::string& filename)
 {
-    std::string log;
-    log = get_object_log(ret);
-    std::string fname = filename;
-    if (filename.empty())
+    std::string log = get_object_log(ret);
+    if (log.empty())
     {
-        fname = "unknown shader file";
+        // Nothing the driver wanted to tell us -- a clean compile/link on a modern
+        // core-profile driver returns an empty info log, so there is nothing to show.
+        return;
     }
 
-    if (log.length() > 0)
-    {
-        LL_SHADER_LOADING_WARNS() << "Shader loading from " << fname << LL_ENDL;
-        LL_SHADER_LOADING_WARNS() << "\n" << log << LL_ENDL;
-    }
- }
+    const std::string fname = filename.empty() ? "unknown shader file" : filename;
 
-GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels)
+    // warns == true  -> the compile / link / validate FAILED: this is the error log.
+    // warns == false -> the object built successfully but the driver still emitted a
+    //                   non-empty info log, i.e. these are compiler *warnings*. Surface
+    //                   them either way (both at WARNS so they are actually visible)
+    //                   but frame them so a warning isn't mistaken for a hard failure.
+    if (warns)
+    {
+        LL_SHADER_LOADING_WARNS() << "Shader compiler error log for " << fname << ":\n" << log << LL_ENDL;
+    }
+    else
+    {
+        LL_WARNS("ShaderLoading") << "Shader compiler warning log for " << fname << ":\n" << log << LL_ENDL;
+    }
+}
+
+GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_level, GLenum type, std::map<std::string, std::string>* defines, S32 texture_index_channels, const std::string& cache_key)
 {
     GLenum error = GL_NO_ERROR;
 
@@ -642,6 +671,51 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     extra_code_text[extra_code_count++] = strdup("#define GBUFFER_FLAG_HAS_HDRI      1.0\n");  // bit 2
     extra_code_text[extra_code_count++] = strdup("#define GET_GBUFFER_FLAG(data, flag)    (abs(data-flag)< 0.1)\n");
 
+    // Bits available in the normal attachment's blue channel, which carries envIntensity for a
+    // legacy fragment and a packed geometric normal for a PBR one -- 16 under GL_RGBA16, 10
+    // under GL_RGB10_A2. Same reason as REVERSE_Z below: a property of the buffer the whole tree
+    // writes, not of any one program, and a shader compiled against the wrong assumption
+    // unpacks noise rather than degrading.
+    if (LLRender::sGBufferNormHDR)
+    {
+        extra_code_text[extra_code_count++] = strdup("#define GBUFFER_NORM_HDR 1\n");
+    }
+
+    // Balances punctual lights against the legacy Blinn-Phong response, and has to be one value
+    // across every program that lights a PBR surface -- the deferred local lights, the forward
+    // alpha path and the sun all accumulate into the same frame. It lived as a literal in four
+    // separate compilation units, where nothing tied the copies together and they drifted: the
+    // three deferred light shaders carried 3.25 while deferredUtil carried 3.0, so a lamp lit an
+    // alpha-blended surface and the opaque one behind it about 8% apart. A global const cannot
+    // fix that -- GLSL globals do not link across objects -- so it is injected here, where the
+    // GBuffer flags already are, for the same reason.
+    //
+    // 3.0 is the value to converge on, not 3.25, because deferredUtil's copy also scales the SUN
+    // in pbrBaseLight -- which is what softenLightF lights every opaque surface with. Taking the
+    // local lights' 3.25 would have moved the sun across the whole opaque scene in order to
+    // settle a disagreement between two local-light paths. Only the deferred local lights move.
+    extra_code_text[extra_code_count++] = strdup("#define PUNCTUAL_LIGHT_SCALE      3.0\n");
+    // A guard against a divide that ran away, not a look control. At 10.0 it was neither: the
+    // peak of F*Vis*D at the roughness floor is about 776 for a dielectric and 19400 for a
+    // white metal, so a ceiling of 10 flat-topped the highlight on every dielectric below
+    // roughness 0.13 and every metal below 0.30 -- most polished material in a scene -- and did
+    // it in linear space ahead of exposure, pre-empting the tonemapper that exists to compress
+    // exactly these values. This sits above anything the roughness floor permits, so it now
+    // only catches a NaN or an infinity. Bloom's exposure to sub-pixel glints is bounded at
+    // bloomExtractF instead, which is where that artifact is actually made.
+    extra_code_text[extra_code_count++] = strdup("#define MAX_PUNCTUAL_RADIANCE     65504.0\n");
+
+    // Reverse-Z is a property of the depth convention the whole tree rasterizes against, not of
+    // any one program, so it is injected here instead of riding a defines map. The map
+    // loadBasicShaders() passes reaches only the shared objects it compiles; a program's own
+    // mShaderFiles are compiled with nothing but their permutations, so a source like
+    // environment/waterV.glsl would otherwise take its forward branch against a reversed buffer
+    // while the deferredUtil.glsl it links against took the reversed one.
+    if (LLRender::sReverseZ)
+    {
+        extra_code_text[extra_code_count++] = strdup("#define REVERSE_Z 1\n");
+    }
+
     if (defines)
     {
         for (auto iter = defines->begin(); iter != defines->end(); ++iter)
@@ -752,7 +826,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     }
 
     // Master definition can be found in deferredUtil.glsl
-    extra_code_text[extra_code_count++] = strdup("struct GBufferInfo { vec4 albedo; vec4 specular; vec3 normal; vec4 emissive; float gbufferFlag; float envIntensity; };\n");
+    extra_code_text[extra_code_count++] = strdup("struct GBufferInfo { vec4 albedo; vec4 specular; vec3 normal; vec3 geoNormal; vec4 emissive; float gbufferFlag; float envIntensity; };\n");
 
     //copy file into memory
     enum {
@@ -771,12 +845,38 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     bool touched = false;
 #endif
 
+    auto append_line = [&](const char* line)
+    {
+        if (shader_code_count >= (LL_ARRAY_SIZE(shader_code_text) - LL_ARRAY_SIZE(extra_code_text)))
+        {
+            return;
+        }
+
+        shader_code_text[shader_code_count] = (GLchar *)strdup(line);
+
+        if(flag_write_to_out_of_extra_block_area & flags)
+        {
+            shader_code_text[extra_code_count + start_shader_code + out_of_extra_block_counter]
+                = shader_code_text[shader_code_count];
+            out_of_extra_block_counter++;
+
+            if(out_of_extra_block_counter == extra_code_count)
+            {
+                shader_code_count += extra_code_count;
+                flags &= ~flag_write_to_out_of_extra_block_area;
+            }
+        }
+
+        ++shader_code_count;
+    };
+
     while(NULL != fgets((char *)buff, 1024, file)
           && shader_code_count < (LL_ARRAY_SIZE(shader_code_text) - LL_ARRAY_SIZE(extra_code_text)))
     {
         file_lines_count++;
 
         bool extra_block_area_found = NULL != strstr((const char*)buff, "[EXTRA_CODE_HERE]");
+        const char* engine_block_marker = strstr((const char*)buff, "[ENGINE_BLOCK ");
 
 #if TOUCH_SHADERS
         if (NULL != strstr((const char*)buff, marker))
@@ -811,24 +911,63 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             flags &= ~flag_write_to_out_of_extra_block_area;
             flags |= flag_extra_block_marker_was_found;
         }
-        else
+        else if (engine_block_marker)
         {
-            shader_code_text[shader_code_count] = (GLchar *)strdup((char *)buff);
-
-            if(flag_write_to_out_of_extra_block_area & flags)
+            // Shared engine-block declaration splice: a "//[ENGINE_BLOCK <Name>]" line
+            // expands to the ONE canonical std140 declaration for that block
+            // (class1/deferred/<name>Block.glsl). Every file that reads the block gets a
+            // byte-identical copy -- required, since helper sources are separate compilation
+            // units whose matching blocks must unify at link -- and none of them can drift
+            // from each other or from the C++ mirror struct.
+            std::string block_name(engine_block_marker + strlen("[ENGINE_BLOCK "));
+            const size_t close = block_name.find(']');
+            std::string snippet;
+            if (close != std::string::npos)
             {
-                shader_code_text[extra_code_count + start_shader_code + out_of_extra_block_counter]
-                    = shader_code_text[shader_code_count];
-                out_of_extra_block_counter++;
-
-                if(out_of_extra_block_counter == extra_code_count)
+                block_name.resize(close);
+                std::string snippet_rel = block_name;
+                if (!snippet_rel.empty())
                 {
-                    shader_code_count += extra_code_count;
-                    flags &= ~flag_write_to_out_of_extra_block_area;
+                    snippet_rel[0] = (char)tolower((unsigned char)snippet_rel[0]);
+                }
+                const std::string snippet_path = getShaderDirPrefix() + "1" + gDirUtilp->getDirDelimiter()
+                    + "deferred" + gDirUtilp->getDirDelimiter() + snippet_rel + "Block.glsl";
+                std::error_code ec;
+                snippet = LLFile::getContents(snippet_path, ec);
+                if (ec)
+                {
+                    snippet.clear();
                 }
             }
 
-            ++shader_code_count;
+            if (snippet.empty())
+            {
+                // Loud but non-fatal: the compile that follows fails with
+                // undefined-member errors right next to this warning.
+                LL_WARNS("ShaderLoading") << "Engine block snippet missing for marker '"
+                                          << (const char*)buff << "' in " << open_file_name << LL_ENDL;
+                append_line((const char*)buff);
+            }
+            else
+            {
+                size_t start = 0;
+                while (start < snippet.size())
+                {
+                    size_t nl = snippet.find('\n', start);
+                    std::string line = (nl == std::string::npos) ? snippet.substr(start) + "\n"
+                                                                 : snippet.substr(start, nl - start + 1);
+                    append_line(line.c_str());
+                    if (nl == std::string::npos)
+                    {
+                        break;
+                    }
+                    start = nl + 1;
+                }
+            }
+        }
+        else
+        {
+            append_line((const char*)buff);
         }
     } //while
 
@@ -917,6 +1056,13 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             glDeleteShader(ret); //no longer need handle
             ret = 0;
         }
+        else
+        {
+            // Compiled OK, but the driver may still have emitted warnings into the
+            // info log (deprecated usage, precision mismatches, unused varyings...).
+            // dumpObjectLog() no-ops on an empty log, so this is free on clean builds.
+            dumpObjectLog(ret, false, open_file_name);
+        }
     }
     else
     {
@@ -934,12 +1080,15 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     //successfully loaded, save results
     if (ret)
     {
-        // Add shader file to map
+        // Add shader file to map. The key is the path unless the caller asked for a distinct
+        // one -- a shared object compiled a second time under different defines needs its own
+        // entry, since attach is by key (see variantObjectKey).
+        const std::string& key = cache_key.empty() ? filename : cache_key;
         if (type == GL_VERTEX_SHADER) {
-            mVertexShaderObjects[filename] = ret;
+            mVertexShaderObjects[key] = ret;
         }
         else if (type == GL_FRAGMENT_SHADER) {
-            mFragmentShaderObjects[filename] = ret;
+            mFragmentShaderObjects[key] = ret;
         }
         shader_level = try_gpu_class;
     }
@@ -948,7 +1097,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
         if (shader_level > 1)
         {
             shader_level--;
-            return loadShaderFile(filename, shader_level, type, defines, texture_index_channels);
+            return loadShaderFile(filename, shader_level, type, defines, texture_index_channels, cache_key);
         }
         LL_WARNS("ShaderLoading") << "Failed to load " << filename << LL_ENDL;
     }
@@ -957,7 +1106,7 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
     return ret;
 }
 
-bool LLShaderMgr::linkProgramObject(GLuint obj, bool suppress_errors)
+bool LLShaderMgr::linkProgramObject(GLuint obj, bool suppress_errors, const std::string& shader_name)
 {
     //check for errors
     {
@@ -974,8 +1123,18 @@ bool LLShaderMgr::linkProgramObject(GLuint obj, bool suppress_errors)
         {
             //an error occured, print log
             LL_SHADER_LOADING_WARNS() << "GLSL Linker Error:" << LL_ENDL;
-            dumpObjectLog(obj, true, "linker");
+            dumpObjectLog(obj, true, "linker: " + shader_name);
             return success;
+        }
+        else if (success == GL_TRUE)
+        {
+            // Linked OK -- surface any non-fatal linker warnings the driver produced.
+            // Skipped while suppress_errors is set (a probe/fallback link the caller
+            // expects may fail and doesn't want narrated). No-ops on an empty log.
+            if (!suppress_errors)
+            {
+                dumpObjectLog(obj, false, "linker: " + shader_name);
+            }
         }
     }
 
@@ -1008,6 +1167,31 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
 
     mShaderCacheEnabled = gGLManager.mGLVersion >= 4.09 && enabled;
 
+    // A 4.1 version string (or ARB_get_program_binary) is necessary but NOT
+    // sufficient to actually retrieve/restore program binaries, and assuming it is
+    // is a crash: the entry points have to have resolved AND the driver has to
+    // expose at least one program binary format. Real drivers violate this --
+    // Apple's GL reports GL_NUM_PROGRAM_BINARY_FORMATS == 0, and some virtualized /
+    // remote GPUs advertise 4.1 yet return null entry points -- in which case
+    // glProgramParameteri / glGetProgramBinary / glProgramBinary are unusable and
+    // touching them (as loadCachedProgramBinary / saveCachedProgramBinary do on
+    // every program) faults. Verify capability once here and disable the cache
+    // rather than crash later. glGetProgramiv stays valid regardless, but with no
+    // format it can only ever report a 0-length binary, so the cache is pointless.
+    if (mShaderCacheEnabled)
+    {
+        GLint num_binary_formats = 0;
+        glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &num_binary_formats);
+        const bool have_entry_points = glProgramParameteri && glGetProgramBinary && glProgramBinary;
+        if (!have_entry_points || num_binary_formats <= 0)
+        {
+            LL_INFOS("ShaderMgr") << "Program binary cache disabled: "
+                                  << (have_entry_points ? "driver exposes " : "missing GL entry points; ")
+                                  << num_binary_formats << " program binary format(s)." << LL_ENDL;
+            mShaderCacheEnabled = false;
+        }
+    }
+
     if(!mShaderCacheEnabled || mShaderCacheVersion.notNull())
         return;
 
@@ -1024,8 +1208,23 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
 
             llifstream instream(meta_out_path, std::ifstream::in | std::ifstream::binary);
             LLSD in_data;
-            // todo: this is likely very expensive to parse, should use binary
-            LLSDSerialize::fromBinary(in_data, instream, LLSDSerialize::SIZE_UNLIMITED);
+            try
+            {
+                LLSDSerialize::fromBinary(in_data, instream, LLSDSerialize::SIZE_UNLIMITED);
+            }
+            catch( std::bad_alloc& )
+            {
+                // Try to get a bit more memory back before we try to clear the cache.
+                in_data.clear();
+                // Just in case it was somehow the cause, clear cache.
+                clearShaderCache();
+                // If user run out of memory this early in init,
+                // we don't want to keep going just to crash again.
+                // Notify user and close.
+                LLError::LLUserWarningMsg::showOutOfMemory();
+                LL_ERRS("ShaderMgr") << "Failed to parse shader cache metadata, potentially due to size. Purged cache." << LL_ENDL;
+                return;
+            }
             instream.close();
 
             if (old_cache_version == current_cache_version
@@ -1119,6 +1318,14 @@ bool LLShaderMgr::loadCachedProgramBinary(LLGLSLShader* shader)
 {
     if (!mShaderCacheEnabled) return false;
 
+    // Don't touch a program that failed to allocate: the recreate paths in
+    // createShader() call glCreateProgram() and land here without re-checking for 0,
+    // and glProgramParameteri on a non-program name is undefined.
+    if (shader->mProgramObject == 0)
+    {
+        return false;
+    }
+
     glProgramParameteri(shader->mProgramObject, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
 
     auto binary_iter = mShaderBinaryCache.find(shader->mShaderHash);
@@ -1166,31 +1373,44 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
 {
     if (!mShaderCacheEnabled) return true;
 
-    ProgramBinaryData binary_info = ProgramBinaryData();
-    glGetProgramiv(shader->mProgramObject, GL_PROGRAM_BINARY_LENGTH, &binary_info.mBinaryLength);
-    if (binary_info.mBinaryLength > 0)
+    // mShaderCacheEnabled guarantees the entry points resolved and the driver
+    // reports >=1 binary format (see initShaderCache). A program we never created /
+    // linked is still off-limits: glGetProgramiv on 0 or a non-program name is
+    // undefined and faults on some drivers, which is the crash this guard prevents.
+    if (shader->mProgramObject == 0)
     {
-        std::vector<U8> program_binary;
-        program_binary.resize(binary_info.mBinaryLength);
+        return false;
+    }
 
-        GLenum error = glGetError(); // Clear current error
-        glGetProgramBinary(shader->mProgramObject, static_cast<GLsizei>(program_binary.size() * sizeof(U8)), nullptr, &binary_info.mBinaryFormat, program_binary.data());
-        error = glGetError();
-        if (error == GL_NO_ERROR)
+    ProgramBinaryData binary_info = ProgramBinaryData();
+
+    glGetError(); // flush any stale error so the check below reflects this query
+    glGetProgramiv(shader->mProgramObject, GL_PROGRAM_BINARY_LENGTH, &binary_info.mBinaryLength);
+    if (glGetError() != GL_NO_ERROR || binary_info.mBinaryLength <= 0)
+    {
+        // Query failed (e.g. the retrievable hint wasn't honored) or the driver has
+        // no binary to hand back -- either way there's nothing safe to store.
+        return false;
+    }
+
+    std::vector<U8> program_binary;
+    program_binary.resize(binary_info.mBinaryLength);
+
+    glGetProgramBinary(shader->mProgramObject, static_cast<GLsizei>(program_binary.size() * sizeof(U8)), nullptr, &binary_info.mBinaryFormat, program_binary.data());
+    if (glGetError() == GL_NO_ERROR)
+    {
+        std::string out_path = gDirUtilp->add(mShaderCacheDir, shader->mShaderHash.asString() + ".shaderbin");
+        std::error_code ec;
+        LLFile filep = LLFile(out_path, LLFile::out | LLFile::binary, ec);
+        if (filep)
         {
-            std::string out_path = gDirUtilp->add(mShaderCacheDir, shader->mShaderHash.asString() + ".shaderbin");
-            std::error_code ec;
-            LLFile filep = LLFile(out_path, LLFile::out | LLFile::binary, ec);
-            if (filep)
-            {
-                filep.write(program_binary.data(), program_binary.size(), ec);
-                filep.close();
+            filep.write(program_binary.data(), program_binary.size(), ec);
+            filep.close();
 
-                binary_info.mLastUsedTime = (F32)LLTimer::getTotalSeconds();
+            binary_info.mLastUsedTime = (F32)LLTimer::getTotalSeconds();
 
-                mShaderBinaryCache.insert_or_assign(shader->mShaderHash, binary_info);
-                return true;
-            }
+            mShaderBinaryCache.insert_or_assign(shader->mShaderHash, binary_info);
+            return true;
         }
     }
     return false;
@@ -1225,21 +1445,17 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("normal_matrix");
     mReservedUniforms.push_back("texture_matrix0");
     mReservedUniforms.push_back("texture_matrix1");
-    mReservedUniforms.push_back("texture_matrix2");
-    mReservedUniforms.push_back("texture_matrix3");
     mReservedUniforms.push_back("object_plane_s");
     mReservedUniforms.push_back("object_plane_t");
 
     mReservedUniforms.push_back("texture_base_color_transform"); // (GLTF)
     mReservedUniforms.push_back("texture_normal_transform"); // (GLTF)
     mReservedUniforms.push_back("texture_metallic_roughness_transform"); // (GLTF)
-    mReservedUniforms.push_back("texture_occlusion_transform"); // (GLTF)
     mReservedUniforms.push_back("texture_emissive_transform"); // (GLTF)
     mReservedUniforms.push_back("base_color_texcoord"); // (GLTF)
     mReservedUniforms.push_back("emissive_texcoord"); // (GLTF)
     mReservedUniforms.push_back("normal_texcoord"); // (GLTF)
     mReservedUniforms.push_back("metallic_roughness_texcoord"); // (GLTF)
-    mReservedUniforms.push_back("occlusion_texcoord"); // (GLTF)
 
     mReservedUniforms.push_back("terrain_texture_transforms"); // (GLTF)
 
@@ -1280,7 +1496,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("emissiveColor");
     mReservedUniforms.push_back("metallicFactor");
     mReservedUniforms.push_back("roughnessFactor");
-    mReservedUniforms.push_back("mirror_flag");
     mReservedUniforms.push_back("clipPlane");
     mReservedUniforms.push_back("clipSign");
 
@@ -1289,7 +1504,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("specularMap");
     mReservedUniforms.push_back("metallicRoughnessMap");
     mReservedUniforms.push_back("normalMap");
-    mReservedUniforms.push_back("occlusionMap");
     mReservedUniforms.push_back("emissiveMap");
     mReservedUniforms.push_back("bumpMap");
     mReservedUniforms.push_back("bumpMap2");
@@ -1297,7 +1511,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("sceneMap");
     mReservedUniforms.push_back("sceneDepth");
     mReservedUniforms.push_back("reflectionProbes");
-    mReservedUniforms.push_back("irradianceProbes");
+    mReservedUniforms.push_back("shCoeffs");
     mReservedUniforms.push_back("heroProbes");
     mReservedUniforms.push_back("cloud_noise_texture");
     mReservedUniforms.push_back("cloud_noise_texture_next");
@@ -1307,7 +1521,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("sky_hdr_scale");
     mReservedUniforms.push_back("sky_sunlight_scale");
     mReservedUniforms.push_back("sky_ambient_scale");
-    mReservedUniforms.push_back("classic_mode");
     mReservedUniforms.push_back("blue_horizon");
     mReservedUniforms.push_back("blue_density");
     mReservedUniforms.push_back("haze_horizon");
@@ -1347,12 +1560,12 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("bloom_threshold");
     mReservedUniforms.push_back("bloom_knee");
+    mReservedUniforms.push_back("bloom_firefly_clamp");
     mReservedUniforms.push_back("bloom_texel_size");
     mReservedUniforms.push_back("bloom_scatter");
     mReservedUniforms.push_back("bloom_strength");
     mReservedUniforms.push_back("alpha_glow_boost");
     mReservedUniforms.push_back("bloomMap");
-    mReservedUniforms.push_back("halationMap");
     mReservedUniforms.push_back("halation_strength");
     mReservedUniforms.push_back("halation_tint");
     mReservedUniforms.push_back("halation_lum_weights");
@@ -1367,14 +1580,13 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("shadow_matrix");
     mReservedUniforms.push_back("env_mat");
     mReservedUniforms.push_back("shadow_clip");
-    mReservedUniforms.push_back("sun_wash");
-    mReservedUniforms.push_back("shadow_noise");
-    mReservedUniforms.push_back("blur_size");
     mReservedUniforms.push_back("ssao_radius");
     mReservedUniforms.push_back("ssao_max_radius");
     mReservedUniforms.push_back("ssao_factor");
     mReservedUniforms.push_back("ssao_factor_inv");
     mReservedUniforms.push_back("ssao_effect_mat");
+    mReservedUniforms.push_back("ssao_irradiance_scale");
+    mReservedUniforms.push_back("ssao_irradiance_max");
     mReservedUniforms.push_back("screen_res");
     mReservedUniforms.push_back("near_clip");
     mReservedUniforms.push_back("shadow_offset");
@@ -1427,27 +1639,24 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SHADOW5+1);
 
-    mReservedUniforms.push_back("positionMap");
     mReservedUniforms.push_back("diffuseRect");
     mReservedUniforms.push_back("specularRect");
     mReservedUniforms.push_back("emissiveRect");
     mReservedUniforms.push_back("exposureMap");
     mReservedUniforms.push_back("brdfLut");
     mReservedUniforms.push_back("noiseMap");
-    mReservedUniforms.push_back("lightFunc");
     mReservedUniforms.push_back("lightMap");
     mReservedUniforms.push_back("projectionMap");
     mReservedUniforms.push_back("norm_mat");
+    mReservedUniforms.push_back("impostor_norm_rot");
 
     mReservedUniforms.push_back("specular_color");
     mReservedUniforms.push_back("env_intensity");
 
     mReservedUniforms.push_back("matrixPalette");
-    mReservedUniforms.push_back("translationPalette");
+    mReservedUniforms.push_back("skin_origin");
 
     mReservedUniforms.push_back("screenTex");
-    mReservedUniforms.push_back("screenDepth");
-    mReservedUniforms.push_back("refTex");
     mReservedUniforms.push_back("exclusionTex");
     mReservedUniforms.push_back("eyeVec");
     mReservedUniforms.push_back("time");
@@ -1463,13 +1672,13 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("refScale");
     mReservedUniforms.push_back("waterHeight");
     mReservedUniforms.push_back("waterPlane");
+    mReservedUniforms.push_back("waterSign");
     mReservedUniforms.push_back("normScale");
     mReservedUniforms.push_back("fresnelScale");
     mReservedUniforms.push_back("fresnelOffset");
     mReservedUniforms.push_back("blurMultiplier");
-    mReservedUniforms.push_back("sunAngle");
-    mReservedUniforms.push_back("scaledAngle");
-    mReservedUniforms.push_back("sunAngle2");
+    mReservedUniforms.push_back("above_water");
+    llassert(mReservedUniforms.size() == LLShaderMgr::WATER_ABOVE_WATER + 1);
 
     mReservedUniforms.push_back("camPosLocal");
 // [RLVa:KB] - @setsphere
@@ -1517,18 +1726,26 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("minimum_alphas");
 
     mReservedUniforms.push_back("region_scale");
+    llassert(mReservedUniforms.size() == LLShaderMgr::REGION_SCALE + 1);
+
+    mReservedUniforms.push_back("gltf_minimum_alpha");
+    mReservedUniforms.push_back("gltf_basecolor_transform");
+    mReservedUniforms.push_back("gltf_emissive_color");
+    mReservedUniforms.push_back("gltf_emissive_transform");
+    mReservedUniforms.push_back("gltf_roughness_factor");
+    mReservedUniforms.push_back("gltf_metallic_factor");
+    mReservedUniforms.push_back("gltf_normal_transform");
+    mReservedUniforms.push_back("gltf_mr_transform");
+
+    mReservedUniforms.push_back("mat_specular_color");
+    mReservedUniforms.push_back("mat_env_intensity");
+    mReservedUniforms.push_back("mat_minimum_alpha");
+    mReservedUniforms.push_back("mat_emissive_brightness");
 
     mReservedUniforms.push_back("origin");
     mReservedUniforms.push_back("display_gamma");
 
-    mReservedUniforms.push_back("inscatter");
-    mReservedUniforms.push_back("sun_size");
-    mReservedUniforms.push_back("fog_color");
 
-    mReservedUniforms.push_back("transmittance_texture");
-    mReservedUniforms.push_back("scattering_texture");
-    mReservedUniforms.push_back("single_mie_scattering_texture");
-    mReservedUniforms.push_back("irradiance_texture");
     mReservedUniforms.push_back("blend_factor");
     mReservedUniforms.push_back("moisture_level");
     mReservedUniforms.push_back("droplet_radius");
@@ -1541,27 +1758,77 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("max_probe_lod");
     mReservedUniforms.push_back("probe_strength");
 
-    mReservedUniforms.push_back("sh_input_r");
-    mReservedUniforms.push_back("sh_input_g");
-    mReservedUniforms.push_back("sh_input_b");
+    mReservedUniforms.push_back("resScale");
+    mReservedUniforms.push_back("direction");
+    mReservedUniforms.push_back("znear");
+    mReservedUniforms.push_back("zfar");
+    mReservedUniforms.push_back("sourceIdx");
+    mReservedUniforms.push_back("mipLevel");
+    mReservedUniforms.push_back("roughness");
+    mReservedUniforms.push_back("u_width");
+
 
     mReservedUniforms.push_back("sun_moon_glow_factor");
-    mReservedUniforms.push_back("water_edge");
     mReservedUniforms.push_back("sun_up_factor");
     mReservedUniforms.push_back("moonlight_color");
 
     mReservedUniforms.push_back("debug_normal_draw_length");
+    llassert(mReservedUniforms.size() == LLShaderMgr::DEBUG_NORMAL_DRAW_LENGTH + 1);
 
+    // Pathfinding Debug
+    mReservedUniforms.push_back("tint");
+    mReservedUniforms.push_back("ambiance");
+    mReservedUniforms.push_back("alpha_scale");
+
+    // Bump mapping
+    mReservedUniforms.push_back("norm_scale");
+    mReservedUniforms.push_back("stepX");
+    mReservedUniforms.push_back("stepY");
+    mReservedUniforms.push_back("bump_code");
+
+    mReservedUniforms.push_back("delta");
+    mReservedUniforms.push_back("dist_factor");
+    mReservedUniforms.push_back("kern");
+    mReservedUniforms.push_back("kern_scale");
+
+    // Debug
+    mReservedUniforms.push_back("tolerance");
+    mReservedUniforms.push_back("dither_scale");
+    mReservedUniforms.push_back("dither_scale_s");
+    mReservedUniforms.push_back("dither_scale_t");
+
+    // SMAA
     mReservedUniforms.push_back("edgesTex");
     mReservedUniforms.push_back("areaTex");
     mReservedUniforms.push_back("searchTex");
     mReservedUniforms.push_back("blendTex");
     mReservedUniforms.push_back("predicationTex");
+    mReservedUniforms.push_back("SMAA_RT_METRICS");
+
+    // CAS
+    mReservedUniforms.push_back("cas_param_0");
+    mReservedUniforms.push_back("cas_param_1");
+    mReservedUniforms.push_back("out_screen_res");
+
+    // Tonemapping + Exposure
+    mReservedUniforms.push_back("dt");
+    mReservedUniforms.push_back("noiseVec");
+    mReservedUniforms.push_back("dynamic_exposure_params");
+    mReservedUniforms.push_back("dynamic_exposure_params2");
 
     mReservedUniforms.push_back("exposure");
     mReservedUniforms.push_back("tonemap_type");
     mReservedUniforms.push_back("tonemap_mix");
     mReservedUniforms.push_back("tonemap_params");
+    mReservedUniforms.push_back("hdri_split_screen");
+    mReservedUniforms.push_back("diffuse_luminance_scale");
+
+    // Stars/Aurora/Meteors
+    mReservedUniforms.push_back("custom_alpha");
+    mReservedUniforms.push_back("meteor_width_pixels");
+    mReservedUniforms.push_back("aurora_intensity");
+    mReservedUniforms.push_back("aurora_time");
+    llassert(mReservedUniforms.size() == LLShaderMgr::AURORA_TIME + 1);
 
     // Alchemy Effects Stack
     mReservedUniforms.push_back("uFrameId");
@@ -1669,9 +1936,21 @@ void LLShaderMgr::initAttribsAndUniforms()
     // Previews
     mReservedUniforms.push_back("uPreviewMode");
 
+    // Text Shadow
+    mReservedUniforms.push_back("textShadowMode");
+
     // End Alchemy Effects Stack
 
-    llassert(mReservedUniforms.size() == END_RESERVED_UNIFORMS);
+    // The enum and this list are parallel, and an entry added or removed on one side only
+    // shifts every later uniform index for every shader in the viewer -- silently, since a
+    // wrong index still resolves to some other real uniform. Fatal, like the duplicate check
+    // below: there is no partial recovery from it.
+    if (mReservedUniforms.size() != END_RESERVED_UNIFORMS)
+    {
+        LL_ERRS() << "Reserved uniform table has " << mReservedUniforms.size()
+                  << " entries but eGLSLReservedUniforms declares " << (U32)END_RESERVED_UNIFORMS
+                  << " -- the enum and the table are out of sync" << LL_ENDL;
+    }
 
     std::set<std::string> dupe_check;
 

@@ -51,12 +51,6 @@
 
 extern bool gCubeSnapshot;
 
-static LLStaticHashedString sCamPosLocal("camPosLocal");
-static LLStaticHashedString sCustomAlpha("custom_alpha");
-static LLStaticHashedString sMeteorWidth("meteor_width_pixels");
-static LLStaticHashedString sAuroraIntensity("aurora_intensity");
-static LLStaticHashedString sAuroraTime("aurora_time");
-
 static LLGLSLShader* cloud_shader = NULL;
 static LLGLSLShader* sky_shader   = NULL;
 static LLGLSLShader* sun_shader   = NULL;
@@ -107,11 +101,6 @@ void LLDrawPoolWLSky::renderDome(const LLVector3& camPosLocal, F32 camHeightLoca
     gGL.pushMatrix();
 
     //chop off translation
-    if (LLPipeline::sReflectionRender && camPosLocal.mV[2] > 256.f)
-    {
-        gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], 256.f-camPosLocal.mV[2]*0.5f);
-    }
-    else
     {
         gGL.translatef(camPosLocal.mV[0], camPosLocal.mV[1], camPosLocal.mV[2]);
     }
@@ -126,7 +115,7 @@ void LLDrawPoolWLSky::renderDome(const LLVector3& camPosLocal, F32 camHeightLoca
     gGL.translatef(0.f,-camHeightLocal, 0.f);
 
     // Draw WL Sky
-    shader->uniform3f(sCamPosLocal, 0.f, camHeightLocal, 0.f);
+    shader->uniform3f(LLShaderMgr::WL_CAMPOSLOCAL, 0.f, camHeightLocal, 0.f);
 
     gSky.mVOWLSkyp->drawDome();
 
@@ -165,20 +154,19 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
             S32 idx = sky_shader->enableTexture(LLShaderMgr::ENVIRONMENT_MAP);
             if (idx > -1)
             {
-                gGL.getTexUnit(idx)->bind(gEXRImage);
+                gGL.getTextureSlot(idx)->bindSampled(gEXRImage, ALSamplers::TrilinearClamp);
             }
 
             static LLCachedControl<F32> hdri_exposure(gSavedSettings, "RenderHDRIExposure", 0.0f);
             static LLCachedControl<F32> hdri_rotation(gSavedSettings, "RenderHDRIRotation", 0.f);
             static LLCachedControl<F32> hdri_split(gSavedSettings, "RenderHDRISplitScreen", 1.f);
-            static LLStaticHashedString hdri_split_screen("hdri_split_screen");
 
             LLMatrix3 rot;
             rot.setRot(0.f, hdri_rotation*DEG_TO_RAD, 0.f);
 
             sky_shader->uniform1f(LLShaderMgr::SKY_HDR_SCALE, powf(2.f, hdri_exposure));
             sky_shader->uniformMatrix3fv(LLShaderMgr::DEFERRED_ENV_MAT, 1, GL_FALSE, (F32*) rot.mMatrix);
-            sky_shader->uniform1f(hdri_split_screen, gCubeSnapshot ? 1.f : hdri_split);
+            sky_shader->uniform1f(LLShaderMgr::HDRI_SPLIT_SCREEN, gCubeSnapshot ? 1.f : hdri_split);
         }
         else
         {
@@ -194,8 +182,8 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
         LLViewerTexture* rainbow_tex = gSky.mVOSkyp->getRainbowTex();
         LLViewerTexture* halo_tex  = gSky.mVOSkyp->getHaloTex();
 
-        sky_shader->bindTexture(LLShaderMgr::RAINBOW_MAP, rainbow_tex);
-        sky_shader->bindTexture(LLShaderMgr::HALO_MAP,  halo_tex);
+        sky_shader->bindTexture(LLShaderMgr::RAINBOW_MAP, rainbow_tex, ALSamplers::AnisoWrap);
+        sky_shader->bindTexture(LLShaderMgr::HALO_MAP, halo_tex, ALSamplers::AnisoWrap);
 
         F32 moisture_level  = (float)psky->getSkyMoistureLevel();
         F32 droplet_radius  = (float)psky->getSkyDropletRadius();
@@ -253,11 +241,7 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
     // Subtle rotation so fixed patterns drift over long time scales.
     gGL.rotatef(gFrameTimeSeconds * 0.01f, 0.f, 0.f, 1.f);
 
-    if (LLPipeline::sReflectionRender)
-    {
-        star_alpha = 1.0f;
-    }
-    gDeferredStarProgram.uniform1f(sCustomAlpha, star_alpha);
+    gDeferredStarProgram.uniform1f(LLShaderMgr::CUSTOM_ALPHA, star_alpha);
 
     // Screen resolution for GPU-side pixel-sized billboarding.
     LLRenderTarget* deferred_target = &gPipeline.mRT->deferredScreen;
@@ -324,7 +308,7 @@ void LLDrawPoolWLSky::renderMeteorsDeferred(const LLVector3& camPosLocal) const
     gDeferredMeteorProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES,
                                      (GLfloat)deferred_target->getWidth(),
                                      (GLfloat)deferred_target->getHeight());
-    gDeferredMeteorProgram.uniform1f(sMeteorWidth, 1.5f);
+    gDeferredMeteorProgram.uniform1f(LLShaderMgr::METEOR_WIDTH_PIXELS, 1.5f);
 
     gSky.mVOWLSkyp->drawMeteors();
 
@@ -361,8 +345,8 @@ void LLDrawPoolWLSky::renderAuroraDeferred(const LLVector3& camPosLocal, F32 cam
     if (dt > 0.1f) dt = 0.1f;
     s_aurora_time = (F32)fmod(s_aurora_time + dt, 86400.0);
 
-    gDeferredAuroraProgram.uniform1f(sAuroraIntensity, intensity);
-    gDeferredAuroraProgram.uniform1f(sAuroraTime, s_aurora_time);
+    gDeferredAuroraProgram.uniform1f(LLShaderMgr::AURORA_INTENSITY, intensity);
+    gDeferredAuroraProgram.uniform1f(LLShaderMgr::AURORA_TIME, s_aurora_time);
 
     // Re-use the WL sky dome mesh — a ready-made hemisphere. Aurora shader
     // discards the zenith cap and below-horizon region.
@@ -389,8 +373,8 @@ void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 
         LLPointer<LLViewerTexture> cloud_noise      = gSky.mVOSkyp->getCloudNoiseTex();
         LLPointer<LLViewerTexture> cloud_noise_next = gSky.mVOSkyp->getCloudNoiseTexNext();
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
+        gGL.getTextureSlot(1)->unbind();
 
         F32 cloud_variance = psky ? (F32)psky->getCloudVariance() : 0.0f;
         F32 blend_factor   = psky ? (F32)psky->getBlendFactor() : 0.0f;
@@ -406,18 +390,18 @@ void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 
             if (cloud_noise && (!cloud_noise_next || (cloud_noise == cloud_noise_next)))
             {
                 // Bind current and next sun textures
-                cloudshader->bindTexture(LLShaderMgr::CLOUD_NOISE_MAP, cloud_noise, LLTexUnit::TT_TEXTURE);
+                cloudshader->bindTexture(LLShaderMgr::CLOUD_NOISE_MAP, cloud_noise, ALSamplers::AnisoWrap);
                 blend_factor = 0;
             }
             else if (cloud_noise_next && !cloud_noise)
             {
-                cloudshader->bindTexture(LLShaderMgr::CLOUD_NOISE_MAP, cloud_noise_next, LLTexUnit::TT_TEXTURE);
+                cloudshader->bindTexture(LLShaderMgr::CLOUD_NOISE_MAP, cloud_noise_next, ALSamplers::AnisoWrap);
                 blend_factor = 0;
             }
             else if (cloud_noise_next != cloud_noise)
             {
-                cloudshader->bindTexture(LLShaderMgr::CLOUD_NOISE_MAP, cloud_noise, LLTexUnit::TT_TEXTURE);
-                cloudshader->bindTexture(LLShaderMgr::CLOUD_NOISE_MAP_NEXT, cloud_noise_next, LLTexUnit::TT_TEXTURE);
+                cloudshader->bindTexture(LLShaderMgr::CLOUD_NOISE_MAP, cloud_noise, ALSamplers::AnisoWrap);
+                cloudshader->bindTexture(LLShaderMgr::CLOUD_NOISE_MAP_NEXT, cloud_noise_next, ALSamplers::AnisoWrap);
             }
         }
 
@@ -430,8 +414,8 @@ void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 
 
         cloudshader->unbind();
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
+        gGL.getTextureSlot(1)->unbind();
     }
 }
 
@@ -457,8 +441,8 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
         LLPointer<LLViewerTexture> tex_a = face->getTexture(LLRender::DIFFUSE_MAP);
         LLPointer<LLViewerTexture> tex_b = face->getTexture(LLRender::ALTERNATE_DIFFUSE_MAP);
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
+        gGL.getTextureSlot(1)->unbind();
 
         // if we even have sun disc textures to work with...
         if (tex_a || tex_b)
@@ -471,18 +455,18 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
                 if (tex_a && (!tex_b || (tex_a == tex_b)))
                 {
                     // Bind current and next sun textures
-                    sun_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_a, LLTexUnit::TT_TEXTURE);
+                    sun_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_a, ALSamplers::AnisoClamp);
                     blend_factor = 0;
                 }
                 else if (tex_b && !tex_a)
                 {
-                    sun_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_b, LLTexUnit::TT_TEXTURE);
+                    sun_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_b, ALSamplers::AnisoClamp);
                     blend_factor = 0;
                 }
                 else if (tex_b != tex_a)
                 {
-                    sun_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_a, LLTexUnit::TT_TEXTURE);
-                    sun_shader->bindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP, tex_b, LLTexUnit::TT_TEXTURE);
+                    sun_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_a, ALSamplers::AnisoClamp);
+                    sun_shader->bindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP, tex_b, ALSamplers::AnisoClamp);
                 }
 
                 LLColor4 color(gSky.mVOSkyp->getSun().getInterpColor());
@@ -492,8 +476,8 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 
                 face->renderIndexed();
 
-                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-                gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(0)->unbind();
+                gGL.getTextureSlot(1)->unbind();
 
                 sun_shader->unbind();
             }
@@ -516,18 +500,18 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
             if (tex_a && (!tex_b || (tex_a == tex_b)))
             {
                 // Bind current and next sun textures
-                moon_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_a, LLTexUnit::TT_TEXTURE);
+                moon_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_a, ALSamplers::AnisoClamp);
                 //blend_factor = 0;
             }
             else if (tex_b && !tex_a)
             {
-                moon_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_b, LLTexUnit::TT_TEXTURE);
+                moon_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_b, ALSamplers::AnisoClamp);
                 //blend_factor = 0;
             }
             else if (tex_b != tex_a)
             {
-                moon_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_a, LLTexUnit::TT_TEXTURE);
-                //moon_shader->bindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP, tex_b, LLTexUnit::TT_TEXTURE);
+                moon_shader->bindTexture(LLShaderMgr::DIFFUSE_MAP, tex_a, ALSamplers::AnisoClamp);
+                //moon_shader->bindTexture(LLShaderMgr::ALTERNATE_DIFFUSE_MAP, tex_b, ALSamplers::AnisoClamp);
             }
 
             LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
@@ -542,8 +526,8 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 
             face->renderIndexed();
 
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-            gGL.getTexUnit(1)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
+            gGL.getTextureSlot(1)->unbind();
 
             moon_shader->unbind();
         }
@@ -559,6 +543,13 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
     {
         return;
     }
+
+    // Opt out of the deferred pass's hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred): the
+    // sky writers store display-encoded values into the albedo attachment raw and the
+    // lighting pass's decoded read round-trips them -- the pass-through convention. An
+    // encode here would double-transform the non-emissive sky path. Inert for the
+    // HAS_EMISSIVE path, which writes the sky to the float emissive attachment instead.
+    LLGLDisable srgb(GL_FRAMEBUFFER_SRGB);
 
     // TODO: remove gSky.mVOSkyp and fold sun/moon into LLVOWLSky
     gSky.mVOSkyp->updateGeometry(gSky.mVOSkyp->mDrawable);

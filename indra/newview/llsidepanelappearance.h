@@ -81,6 +81,8 @@ private:
     void onFilterEdit(const std::string& search_string);
     void onVisibilityChanged ( const LLSD& new_visibility );
 
+    void refreshCurrentOutfitNameImpl(const std::string& name);
+
     void onOpenOutfitButtonClicked();
     void onEditAppearanceButtonClicked();
 

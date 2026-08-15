@@ -390,11 +390,8 @@ bool Primitive::prep(Asset& asset)
 
     U32 mask = LLVertexBuffer::MAP_VERTEX;
 
-    mShaderVariant = 0;
-
     if (!mWeights.empty())
     {
-        mShaderVariant |= LLGLSLShader::GLTFVariant::RIGGED;
         mask |= LLVertexBuffer::MAP_WEIGHT4;
         mask |= LLVertexBuffer::MAP_JOINT;
     }
@@ -432,13 +429,7 @@ bool Primitive::prep(Asset& asset)
 
         if (material.mUnlit.mPresent)
         { // material uses KHR_materials_unlit
-            mShaderVariant |= LLGLSLShader::GLTFVariant::UNLIT;
             unlit = true;
-        }
-
-        if (material.isMultiUV())
-        {
-            mShaderVariant |= LLGLSLShader::GLTFVariant::MULTI_UV;
         }
     }
 
@@ -449,7 +440,6 @@ bool Primitive::prep(Asset& asset)
         if (mMode == Mode::POINTS || mMode == Mode::LINES || mMode == Mode::LINE_LOOP || mMode == Mode::LINE_STRIP)
         { //no normals and no surfaces, this primitive is unlit
             mTangents.clear();
-            mShaderVariant |= LLGLSLShader::GLTFVariant::UNLIT;
             unlit = true;
         }
         else
@@ -514,15 +504,6 @@ bool Primitive::prep(Asset& asset)
     }
 
     mAttributeMask = mask;
-
-    if (mMaterial != INVALID_INDEX)
-    {
-        Material& material = asset.mMaterials[mMaterial];
-        if (material.mAlphaMode == Material::AlphaMode::BLEND)
-        {
-            mShaderVariant |= LLGLSLShader::GLTFVariant::ALPHA_BLEND;
-        }
-    }
 
     createOctree();
 

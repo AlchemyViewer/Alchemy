@@ -23,22 +23,22 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 in vec3 position;
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
-uniform mat4 projection_matrix;
-uniform mat4 modelview_matrix;
+mat3x4 getSkinBlend();
+vec3 skinDirection(mat3x4 b, vec3 dir);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #endif
 
 void main()
 {
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
-    vec4 pos = mat * vec4(position.xyz,1.0);
+    vec4 pos = skinTransformH(getSkinBlend(), position.xyz, modelview_matrix);
     gl_Position = projection_matrix * pos;
 #else
     gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);

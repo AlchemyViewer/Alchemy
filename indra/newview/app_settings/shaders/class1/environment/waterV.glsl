@@ -23,9 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 modelview_matrix;
-uniform mat3 normal_matrix;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 in vec3 position;
 
@@ -84,7 +84,15 @@ void main()
 
     oPosition = modelViewProj * oPosition;
 
+    // waterF/underWaterF derive the refraction/reflection UV as refCoord.xy / refCoord.z;
+    // the +0.2 z fudge approximates clip w for the legacy convention. Under reverse-Z carry
+    // true clip w instead (clip.z -> ~0 at far would blow the UV up). refCoord.w is reused
+    // for a wave param below, so only .xyz changes here.
+#ifdef REVERSE_Z
+    refCoord.xyz = vec3(oPosition.xy, oPosition.w);
+#else
     refCoord.xyz = oPosition.xyz + vec3(0,0,0.2);
+#endif
 
     //get wave position parameter (create sweeping horizontal waves)
     vec3 v = pos.xyz;

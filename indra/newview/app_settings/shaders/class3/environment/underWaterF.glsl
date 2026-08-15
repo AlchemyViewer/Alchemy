@@ -43,10 +43,9 @@ uniform float zfar;
 uniform float kd;
 uniform vec4 waterPlane;
 uniform vec3 eyeVec;
-uniform vec4 waterFogColor;
-uniform vec3 waterFogColorLinear;
-uniform float waterFogKS;
-uniform vec2 screenRes;
+// Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
+// and bound at UB_ENVIRONMENT. Members are read by bare name.
+//[ENGINE_BLOCK Environment]
 
 //bigWave is (refCoord.w, view.w);
 in vec4 refCoord;

@@ -41,6 +41,7 @@ in vec3 vary_position;
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 void main()
 {
@@ -60,10 +61,21 @@ void main()
             dot(norm,vary_mat1),
             dot(norm,vary_mat2));
 
-    frag_data[0] = vec4(col.rgb, 0.0);
-    frag_data[1] = vertex_color.aaaa; // spec
-    //frag_data[1] = vec4(vec3(vertex_color.a), vertex_color.a+(1.0-vertex_color.a)*vertex_color.a); // spec - from former class3 - maybe better, but not so well tested
     vec3 nvn = normalize(tnorm);
+
+    // Widen the lobe by whatever bump detail this pixel lost to minification, as the PBR
+    // writers do. The bump map at distance packs many normals into one texel; averaging them
+    // leaves the shading with a single direction and the authored lobe width, so a narrow
+    // Blinn-Phong highlight snaps between pixels as the camera moves. Worked in the
+    // (1 - glossiness) domain, which is what the legacy path treats as perceptual roughness.
+    //
+    // Only the exponent moves. vertex_color.a is also the specular tint here and the
+    // environment intensity below, and neither of those is a lobe width.
+    float glossiness = 1.0 - filterSpecularRoughness(1.0 - vertex_color.a, nvn);
+
+    frag_data[0] = vec4(col.rgb, 0.0);
+    frag_data[1] = vec4(vertex_color.aaa, glossiness); // spec
+    //frag_data[1] = vec4(vec3(vertex_color.a), vertex_color.a+(1.0-vertex_color.a)*vertex_color.a); // spec - from former class3 - maybe better, but not so well tested
     frag_data[2] = encodeNormal(nvn, vertex_color.a, GBUFFER_FLAG_HAS_ATMOS);
 
 #if defined(HAS_EMISSIVE)

@@ -130,7 +130,6 @@ LLVoiceVisualizer::LLVoiceVisualizer( const U8 type )
         mSoundSymbol.mWaveExpansion         [i] = 1.0f;
     }
 
-    mSoundSymbol.mTexture[0]->setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
 
     // The first instance loads the initial state from prefs.
     if (!sPrefsInitialized)
@@ -376,7 +375,7 @@ void LLVoiceVisualizer::render()
         //-----------------------------
         // bind texture 0 (the dot)
         //-----------------------------
-        gGL.getTexUnit(0)->bind(mSoundSymbol.mTexture[0]);
+        gGL.getTextureSlot(0)->bindSampled(mSoundSymbol.mTexture[0], ALSamplers::AnisoWrap);
 
         //-------------------------------------------------------------
         // now render the dot
@@ -501,7 +500,7 @@ void LLVoiceVisualizer::render()
                 LLVector3 topRight      = mSoundSymbol.mPosition - l + u;
 
                 gGL.color4fv( LLColor4( red, green, blue, mSoundSymbol.mWaveOpacity[i] ).mV );
-                gGL.getTexUnit(0)->bind(mSoundSymbol.mTexture[i]);
+                gGL.getTextureSlot(0)->bindSampled(mSoundSymbol.mTexture[i], ALSamplers::AnisoWrap);
 
 
                 //---------------------------------------------------

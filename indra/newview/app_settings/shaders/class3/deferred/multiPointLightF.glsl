@@ -27,22 +27,33 @@
 
 out vec4 frag_color;
 
-uniform sampler2D     lightFunc;
-
 uniform vec3  env_mat[3];
-uniform float sun_wash;
-uniform int   light_count;
 uniform vec4  light[LIGHT_COUNT];     // .w = size; see C++ fullscreen_lights.push_back()
 uniform vec4  light_col[LIGHT_COUNT]; // .a = falloff
 
 uniform vec2  screen_res;
 uniform float far_z;
-uniform mat4  inv_proj;
-uniform int classic_mode;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
+// Classic (legacy pre-PBR) sky lighting is a per-program compile-time variant, not a runtime
+// uniform: the two paths differ by whole blocks of maths and a probe sample, and only one of
+// them is ever live for a given sky. A macro rather than a const global -- these sources are
+// separately compiled units linked into one program, and several of them declare this.
+#ifdef CLASSIC_MODE
+#define classic_mode 1
+#else
+#define classic_mode 0
+#endif
 
 in vec4 vary_fragcoord;
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
+float blinnPhongLobe(float nh, float glossiness);
+void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
+vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
+vec3 clampRadiance(vec3 c);
+float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 vec4 getPosition(vec2 pos_screen);
 vec4 getNorm(vec2 screenpos);
@@ -89,15 +100,20 @@ void main()
     {
         vec3 colorEmissive = gb.emissive.rgb;
         vec3 orm = spec.rgb;
-        float perceptualRoughness = orm.g;
+        float perceptualRoughness = unpackRoughness(spec.ga);
         float metallic = orm.b;
-        vec3 f0 = vec3(0.04);
         vec3 baseColor = diffuse.rgb;
 
-        vec3 diffuseColor = baseColor.rgb*(vec3(1.0)-f0);
-        diffuseColor *= 1.0 - metallic;
+        // The shared split, not a copy of it. Carrying an inlined duplicate is how the
+        // deferred local lights came to disagree with the sun and IBL about a dielectric's
+        // diffuse albedo -- same surface, different answer depending on what was lighting it.
+        vec3 diffuseColor;
+        vec3 specularColor;
+        calcDiffuseSpecular(baseColor, metallic, diffuseColor, specularColor);
 
-        vec3 specularColor = mix(f0, baseColor.rgb, metallic);
+        // Hoisted: the compensation depends only on the surface and the view, so it is one LUT
+        // fetch per fragment rather than one per light or per lobe.
+        vec3 energyComp = pbrEnergyCompensation(specularColor, perceptualRoughness, dot(n.xyz, v));
 
         for (int light_idx = 0; light_idx < LIGHT_COUNT; ++light_idx)
         {
@@ -115,12 +131,12 @@ void main()
 
                 float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
 
-                vec3 intensity = dist_atten * lightColor * 3.25;
+                vec3 intensity = dist_atten * lightColor * PUNCTUAL_LIGHT_SCALE;
                 float nl = 0;
                 vec3 diff = vec3(0);
                 vec3 specPunc = vec3(0);
                 pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diff, specPunc);
-                final_color += intensity * clamp(nl * (diff + specPunc), vec3(0), vec3(10));
+                final_color += intensity * clampRadiance(nl * (diff + specPunc * energyComp));
             }
         }
     }
@@ -159,12 +175,18 @@ void main()
 
                         if (nh > 0.0)
                         {
-                            float scol = fres * texture(lightFunc, vec2(nh, spec.a)).r * gt / (nh * nl);
+                            float scol = fres * blinnPhongLobe(nh, spec.a) * gt / (nh * nl);
                             col += lit * scol * light_col[i].rgb * spec.rgb;
                         }
                     }
 
-                    final_color += col;
+                    // Bounded the same way the PBR branch above is. The specular term divides
+                    // by two cosines that calcHalfVectors only floors at 1e-6, and the
+                    // Blinn-Phong LUT carries a normalization of its own on top -- at grazing
+                    // angles that product runs past what a half-float target can hold, and an
+                    // inf here spreads to the whole frame through bloom. Colour-preserving, so
+                    // a highlight that hits the ceiling dims rather than changing hue.
+                    final_color += clampRadiance(col);
                 }
             }
         }
@@ -174,13 +196,4 @@ void main()
         final_scale = 0.9;
     frag_color.rgb = max(final_color * final_scale, vec3(0));
     frag_color.a   = 0.0;
-
-#ifdef IS_AMD_CARD
-    // If it's AMD make sure the GLSL compiler sees the arrays referenced once by static index. Otherwise it seems to optimise the storage
-    // away which leads to unfun crashes and artifacts.
-    vec4 dummy1 = light[0];
-    vec4 dummy2 = light_col[0];
-    vec4 dummy3 = light[LIGHT_COUNT - 1];
-    vec4 dummy4 = light_col[LIGHT_COUNT - 1];
-#endif
 }

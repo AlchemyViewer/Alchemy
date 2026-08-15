@@ -84,6 +84,7 @@ void LLRemoteParcelInfoProcessor::removeObserver(const LLUUID& parcel_id, LLRemo
 //static
 void LLRemoteParcelInfoProcessor::processParcelInfoReply(LLMessageSystem* msg, void**)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     LLParcelData parcel_data;
 
     msg->getUUIDFast(_PREHASH_Data, _PREHASH_ParcelID, parcel_data.parcel_id);

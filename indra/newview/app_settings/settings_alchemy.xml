@@ -46,6 +46,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALMeshNotifyBudgetMs</key>
+        <map>
+            <key>Comment</key>
+            <string>Milliseconds per frame spent handing decoded meshes to the renderer. Any left over are carried to the next frame. Zero delivers one mesh per frame.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
         <key>ALSceneExplorerActivateAction</key>
         <map>
             <key>Comment</key>
@@ -1184,10 +1195,65 @@
             <key>Value</key>
             <integer>30</integer>
         </map>
+        <key>AlchemyRenderReverseZ</key>
+        <map>
+            <key>Comment</key>
+            <string>Reverse-Z depth buffering for greater depth precision at distance (float32 depth, near=1/far=0). Requires GL 4.5 or GL_ARB_clip_control; ignored (forward-Z) where unavailable, e.g. macOS GL 4.1. Change triggers a shader rebuild and GL buffer reallocation.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderShadowDepth32F</key>
+        <map>
+            <key>Comment</key>
+            <string>Allocate sun/spot shadow maps as 32-bit float depth instead of 24-bit fixed. Same storage size; trades uniform quantization for float precision (denser near the light's near plane). Reallocates the shadow buffers.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyRenderShadowFilterQuality</key>
+        <map>
+            <key>Comment</key>
+            <string>Sun/spot shadow PCF filter quality: 0 = Low (2x2, 1 gather), 1 = Medium (4x4, 4 gathers), 2 = High (6x6, 9 gathers), 3 = Ultra (PCSS contact-hardening: shadows sharpen near the contact point and soften with occluder distance, 17 gathers). Higher gives a wider, smoother penumbra at more texture fetches.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderShadowPCSSScale</key>
+        <map>
+            <key>Comment</key>
+            <string>Ultra shadow tier only: converts the receiver-to-blocker depth gap into a penumbra radius in shadow texels. Higher = softer shadows further from the contact point. Requires AlchemyRenderShadowFilterQuality 3.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>200.0</real>
+        </map>
         <key>AlchemyRenderTonemapType</key>
         <map>
             <key>Comment</key>
             <string>What tonemapper to use: 0 = Khronos Neutral, 1 = ACES Hill, 2 = ACES Boosted, 3 = Reinhard, 4 = Filmic, 5 = GT, 6 = AgX</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderUBOUpdateMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Upload strategy for the engine's shared uniform blocks: 0 = direct sub-updates per write, 1 = orphan and re-upload whole block per draw, 2 = stream through a shared ring buffer (unsynchronized map/unmap), 3 = stream through a persistently-mapped coherent ring (no per-draw map/orphan; falls back to 1 if buffer-storage is unavailable), 4 = persistently-mapped NON-coherent ring with explicit flush (often faster than 3 where coherent mappings are write-combined). Applies live; 2-4 avoid GPU sync stalls on drivers where buffer sub-updates are expensive (macOS).</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -1531,6 +1597,17 @@
             <string>F32</string>
             <key>Value</key>
             <real>2.5</real>
+        </map>
+        <key>RenderBloomFireflyClamp</key>
+        <map>
+            <key>Comment</key>
+            <string>Maximum radiance a single pixel may contribute to bloom. Bounds sub-pixel specular glints so they cannot become large flickering halos. Does not affect the sharp highlight in the scene itself.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>24.0</real>
         </map>
         <key>RenderBloomKnee</key>
         <map>
@@ -2459,17 +2536,6 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
-        </map>
-        <key>RenderReflectionProbeIrradianceResolution</key>
-        <map>
-            <key>Comment</key>
-            <string>Resolution of reflection probe irrradiance maps.  Will be set to the next highest power of two clamped to [16, 256].  Note that changing this value may consume a massive amount of video memory.</string>
-            <key>Persist</key>
-            <integer>1</integer>
-            <key>Type</key>
-            <string>U32</string>
-            <key>Value</key>
-            <integer>16</integer>
         </map>
         <key>RenderTonemapACESWhite</key>
         <map>

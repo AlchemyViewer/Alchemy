@@ -34,9 +34,12 @@ out vec4 frag_color;
 // ---- Input ------------------------------------------------------------------
 uniform sampler2D diffuseRect;
 uniform sampler2D depthMap;
-#ifdef LEGACY_GAMMA
-uniform float gamma;
-#endif
+
+// Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
+// and bound at UB_ENVIRONMENT. Members are read by bare name. Declared unconditionally --
+// a block whose presence varied by define could not unify across co-attached units; only
+// the gamma USE below stays gated on LEGACY_GAMMA.
+//[ENGINE_BLOCK Environment]
 
 #ifdef BLOOM_COMPOSITE
 // Pre-tonemap bloom pyramid (top mip). Read once here so the blend no longer

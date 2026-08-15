@@ -34,41 +34,50 @@ out vec4 tangent_g;
 uniform float debug_normal_draw_length;
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
+mat3x4 getSkinBlend();
+vec3 skinDirection(mat3x4 b, vec3 dir);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
-uniform mat3 normal_matrix;
 #endif
-uniform mat4 projection_matrix;
-uniform mat4 modelview_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 // *NOTE: Should use the modelview_projection_matrix here in the non-skinned
 // case for efficiency, but opting for the simplier implementation for now as
-// this is debug code. Also, the skinned version hasn't beeen tested yet.
-// world_pos = mat * vec4(position.xyz, 1.0)
-vec4 get_screen_normal(vec3 position, vec4 world_pos, vec3 normal, mat4 mat)
+// this is debug code.
+//
+// The direction arrives already in view space, so this no longer recovers it by
+// subtracting two transformed points -- that subtraction was the ill-conditioned step
+// (see the precision contract in avatar/objectSkinV.glsl).
+vec4 get_screen_normal(vec4 view_pos, vec3 view_dir)
 {
-    vec4 world_norm = mat * vec4((position + normal), 1.0);
-    world_norm.xyz -= world_pos.xyz;
-    world_norm.xyz = debug_normal_draw_length * normalize(world_norm.xyz);
-    world_norm.xyz += world_pos.xyz;
+    vec4 world_norm = view_pos;
+    world_norm.xyz += debug_normal_draw_length * normalize(view_dir);
     return projection_matrix * world_norm;
 }
 
 void main()
 {
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
+    mat3x4 skin = getSkinBlend();
+    vec4 world_pos = skinTransformH(skin, position.xyz, modelview_matrix);
+    vec3 view_normal = mat3(modelview_matrix) * skinDirection(skin, normal.xyz);
+#ifdef HAS_ATTRIBUTE_TANGENT
+    vec3 view_tangent = mat3(modelview_matrix) * skinDirection(skin, tangent.xyz);
+#endif
 #else
-#define mat modelview_matrix
+    vec4 world_pos = modelview_matrix * vec4(position.xyz, 1.0);
+    vec3 view_normal = mat3(modelview_matrix) * normal.xyz;
+#ifdef HAS_ATTRIBUTE_TANGENT
+    vec3 view_tangent = mat3(modelview_matrix) * tangent.xyz;
+#endif
 #endif
 
-    vec4 world_pos = mat * vec4(position.xyz,1.0);
-
     gl_Position = projection_matrix * world_pos;
-    normal_g = get_screen_normal(position.xyz, world_pos, normal.xyz, mat);
+    normal_g = get_screen_normal(world_pos, view_normal);
 #ifdef HAS_ATTRIBUTE_TANGENT
-    tangent_g = get_screen_normal(position.xyz, world_pos, tangent.xyz, mat);
+    tangent_g = get_screen_normal(world_pos, view_tangent);
 #endif
 }
 

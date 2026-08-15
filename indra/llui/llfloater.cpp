@@ -623,6 +623,8 @@ void LLFloater::storeRectControl()
 
 void LLFloater::storeVisibilityControl()
 {
+    // Todo: this is a bit pricey, gets called each frame
+    // on LLAppViewer::idle(), optimize!
     if( !sQuitting && mVisibilityControl.size() > 1 )
     {
         getControlGroup()->setBOOL( mVisibilityControl, getVisible() );
@@ -2440,7 +2442,7 @@ void LLFloater::drawConeToOwner(F32 &context_cone_opacity,
         owner_view->localRectToOtherView(owner_view->getLocalRect(), &owner_rect, this);
         LLRect local_rect = getLocalRect();
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         LLGLEnable cull_face(GL_CULL_FACE);
         gGL.begin(LLRender::TRIANGLE_STRIP);
         {

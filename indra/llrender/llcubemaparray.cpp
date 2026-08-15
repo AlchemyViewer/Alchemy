@@ -125,7 +125,7 @@ LLCubeMapArray::LLCubeMapArray(LLCubeMapArray& lhs, U32 width, U32 count) : mTex
     const size_t face_bytes = (size_t)lhs.mWidth * lhs.mWidth * components;
     std::vector<U8> src_layers(face_bytes * 6 * min_count);
 
-    gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_CUBE_MAP_ARRAY, lhs.getGLName());
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP_ARRAY, lhs.getGLName());
     glGetTexImage(GL_TEXTURE_CUBE_MAP_ARRAY, 0, format, GL_UNSIGNED_BYTE, src_layers.data());
 
     bind(0);
@@ -155,7 +155,7 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
 
     mImage = new LLImageGL(resolution, resolution, components, use_mips);
     mImage->setTexName(texname);
-    mImage->setTarget(sTargets[0], LLTexUnit::TT_CUBE_MAP_ARRAY);
+    mImage->setTarget(sTargets[0], ALTextureSlot::TT_CUBE_MAP_ARRAY);
 
     mImage->setUseMipMaps(use_mips);
     mImage->setHasMipMaps(use_mips);
@@ -168,34 +168,38 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
     {
         format = components == 4 ? GL_RGBA8 : GL_RGB8;
     }
-    U32 mip = 0;
-    U32 mip_resolution = resolution;
-    while (mip_resolution >= 1)
+    // One allocation for the whole array. glTexStorage3D covers every layer and mip in a
+    // single call and may only be called once for the object, so it replaces the per-mip
+    // glTexImage3D loop rather than sitting inside it. Every format above is sized, which
+    // is what glTexStorage3D requires.
+    if (gGLManager.mHasTextureStorage)
     {
-        glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, mip, format, mip_resolution, mip_resolution, count * 6, 0,
-            GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-        if (!use_mips)
+        const S32 levels = use_mips ? LLImageGL::calcMipLevelCount(resolution, resolution) : 1;
+        glTexStorage3D(GL_TEXTURE_CUBE_MAP_ARRAY, levels, format, resolution, resolution, count * 6);
+        mImage->markStorageAllocated();
+        stop_glerror();
+    }
+    else
+    {
+        U32 mip = 0;
+        U32 mip_resolution = resolution;
+        while (mip_resolution >= 1)
         {
-            break;
+            glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, mip, format, mip_resolution, mip_resolution, count * 6, 0,
+                GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+            if (!use_mips)
+            {
+                break;
+            }
+            mip_resolution /= 2;
+            ++mip;
         }
-        mip_resolution /= 2;
-        ++mip;
     }
 
     alloc_tex_image(resolution, resolution, format, count * 6, use_mips);
 
-    mImage->setAddressMode(LLTexUnit::TAM_CLAMP);
-
-    if (use_mips)
-    {
-        mImage->setFilteringOption(LLTexUnit::TFO_ANISOTROPIC);
-        //glGenerateMipmap(GL_TEXTURE_CUBE_MAP_ARRAY);  // <=== latest AMD drivers do not appreciate this method of allocating mipmaps
-    }
-    else
-    {
-        mImage->setFilteringOption(LLTexUnit::TFO_BILINEAR);
-    }
+    //glGenerateMipmap(GL_TEXTURE_CUBE_MAP_ARRAY);  // <=== latest AMD drivers do not appreciate this method of allocating mipmaps
 
     unbind();
 }
@@ -203,13 +207,30 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
 void LLCubeMapArray::bind(S32 stage)
 {
     mTextureStage = stage;
-    gGL.getTexUnit(stage)->bindManual(LLTexUnit::TT_CUBE_MAP_ARRAY, getGLName(), mImage->getUseMipMaps());
+    // Bound by name, so the sampler has to be passed explicitly -- mImage's filter/address
+    // are sampler inputs now, not texture-object state, and bindManual would otherwise leave
+    // this unit on sampler 0 and sample the probe array with GL's defaults
+    // (GL_NEAREST_MIPMAP_LINEAR: nearest within the mip, i.e. blocky reflections).
+    // Anisotropic when there is a mip chain to filter across, bilinear when there is not --
+    // the choice the allocation used to write onto the image. Clamp either way: a probe array
+    // that wrapped would fetch a neighbouring face at the seams.
+    const ALSampler key = mImage->getUseMipMaps() ? ALSamplers::AnisoClamp
+                                                  : ALSamplers::BilinearClamp;
+    gGL.getTextureSlot(stage)->bindManual(ALTextureSlot::TT_CUBE_MAP_ARRAY, getGLName(),
+                                      gGL.getSampler(key));
 }
 
 void LLCubeMapArray::unbind()
 {
-    gGL.getTexUnit(mTextureStage)->unbind(LLTexUnit::TT_CUBE_MAP_ARRAY);
+    gGL.getTextureSlot(mTextureStage)->unbind();
     mTextureStage = -1;
+}
+
+void LLCubeMapArray::copyFaceFromFramebuffer(S32 mip, S32 cube_index, S32 face, S32 res)
+{
+    // Sub-image write, so this stays legal now that the array has immutable storage.
+    glCopyTexSubImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, cube_index * 6 + face, 0, 0, res, res);
+    stop_glerror();
 }
 
 GLuint LLCubeMapArray::getGLName()

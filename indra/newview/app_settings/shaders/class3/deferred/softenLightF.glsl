@@ -35,11 +35,6 @@ const float M_PI = 3.14159265;
 uniform sampler2D lightMap;
 #endif
 
-uniform sampler2D     lightFunc;
-
-uniform float blur_size;
-uniform float blur_fidelity;
-
 #if defined(HAS_SSAO)
 uniform float ssao_irradiance_scale;
 uniform float ssao_irradiance_max;
@@ -48,15 +43,27 @@ uniform float ssao_irradiance_max;
 // Inputs
 uniform vec4 clipPlane;
 uniform mat3 env_mat;
-uniform mat3  ssao_effect_mat;
+// Shared shadow/SSAO constants, spliced from class1/deferred/deferredBlock.glsl and
+// bound at UB_DEFERRED. Members are read by bare name.
+//[ENGINE_BLOCK Deferred]
 uniform vec3 sun_dir;
 uniform vec3 moon_dir;
 uniform int  sun_up_factor;
-uniform int classic_mode;
+// Classic (legacy pre-PBR) sky lighting is a per-program compile-time variant, not a runtime
+// uniform: the two paths differ by whole blocks of maths and a probe sample, and only one of
+// them is ever live for a given sky. A macro rather than a const global -- these sources are
+// separately compiled units linked into one program, and several of them declare this.
+#ifdef CLASSIC_MODE
+#define classic_mode 1
+#else
+#define classic_mode 0
+#endif
 
 in vec2 vary_fragcoord;
 
-uniform mat4 inv_proj;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 
 vec4 getNorm(vec2 pos_screen);
@@ -64,7 +71,6 @@ vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 vec3  atmosFragLightingLinear(vec3 l, vec3 additive, vec3 atten);
-vec3  scaleSoftClipFragLinear(vec3 l);
 
 // reflection probe interface
 void sampleReflectionProbes(inout vec3 ambenv, inout vec3 glossenv,
@@ -76,6 +82,7 @@ void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 
 float getDepth(vec2 pos_screen);
 
 vec3 linear_to_srgb(vec3 c);
+float unpackRoughness(vec2 p);
 vec3 srgb_to_linear(vec3 c);
 
 uniform vec4 waterPlane;
@@ -85,6 +92,7 @@ uniform int cube_snapshot;
 uniform float sky_hdr_scale;
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
+float blinnPhongLobe(float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, inout vec3 diffuseColor, inout vec3 specularColor);
 
 vec3 pbrBaseLight(vec3 diffuseColor,
@@ -104,6 +112,7 @@ vec3 pbrBaseLight(vec3 diffuseColor,
                   vec3 atten);
 
 GBufferInfo getGBuffer(vec2 screenpos);
+float horizonOcclusion(vec3 r, vec3 geometricNormal);
 vec3 clampHDRRange(vec3 color);
 
 void adjustIrradiance(inout vec3 irradiance, float ambocc)
@@ -113,6 +122,33 @@ void adjustIrradiance(inout vec3 irradiance, float ambocc)
 
 #if defined(HAS_SSAO)
     irradiance = mix(ssao_effect_mat * min(irradiance.rgb*ssao_irradiance_scale, vec3(ssao_irradiance_max)), irradiance.rgb, ambocc);
+#endif
+}
+
+// The screen-space occlusion as a scalar visibility, on the response curve adjustIrradiance
+// gives the diffuse lobe.
+//
+// The diffuse path spends this buffer through ssao_irradiance_scale and the value factor of
+// ssao_effect_mat, which is what "SSAO strength" means to anyone turning those knobs. Handing
+// the specular lobe the raw buffer instead left reflections at full occlusion however far down
+// the strength was dialled -- one buffer, two different curves, and only one of them responding
+// to the settings.
+//
+// The value factor is the matrix's row sum: it takes grey to grey scaled by exactly that, which
+// is the whole of what it does to magnitude. Its other factor is saturation, which is chroma and
+// has no place in a visibility scalar.
+//
+// ssao_irradiance_max is deliberately not folded in either. It bounds a radiometric quantity in
+// the diffuse expression -- there is nothing for it to bound here, and the value it would have
+// to be compared against is radiance rather than irradiance.
+float ssaoVisibility(float ambocc)
+{
+#if defined(HAS_SSAO)
+    float value_factor = dot(ssao_effect_mat * vec3(1.0), vec3(1.0 / 3.0));
+    float occluded = clamp(ssao_irradiance_scale * value_factor, 0.0, 1.0);
+    return clamp(mix(occluded, 1.0, ambocc), 0.0, 1.0);
+#else
+    return 1.0;
 #endif
 }
 
@@ -167,7 +203,7 @@ void main()
     if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_PBR))
     {
         vec3 orm = spec.rgb;
-        float perceptualRoughness = orm.g;
+        float perceptualRoughness = unpackRoughness(spec.ga);
         float metallic = orm.b;
         float ao = orm.r;
 
@@ -178,14 +214,28 @@ void main()
 
         sampleReflectionProbes(irradiance, radiance, tc, pos.xyz, gb.normal, gloss, false, amblit_linear);
 
-        adjustIrradiance(irradiance, ambocc);
+        // A normal map can aim the reflection below the surface it sits on, where the probe
+        // returns radiance arriving through the geometry. The forward path tests against
+        // vary_normal; here the geometric normal comes out of the GBuffer channel that used to
+        // hold environment intensity.
+        radiance *= horizonOcclusion(reflect(normalize(pos.xyz), gb.normal), gb.geoNormal);
+
+        // One ambient visibility for the whole shading model, rather than adjustIrradiance
+        // multiplying the screen-space half into irradiance before the fact. The two terms
+        // measure the same thing -- how much of the ambient hemisphere this fragment can see --
+        // at two different scales, so they combine by taking the stronger rather than by
+        // multiplying, which would count the overlap they share twice.
+        //
+        // adjustIrradiance stays on the legacy branch below, where its saturation matrix and
+        // absolute clamp are part of the intended look rather than an obstacle to a physical one.
+        float visibility = min(ao, ssaoVisibility(ambocc));
 
         vec3 diffuseColor = vec3(0.0);
         vec3 specularColor = vec3(0.0);
         calcDiffuseSpecular(baseColor.rgb, metallic, diffuseColor, specularColor);
 
         vec3 v = -normalize(pos.xyz);
-        color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, ao, additive, atten);
+        color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, visibility, additive, atten);
     }
     else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
     {
@@ -218,6 +268,16 @@ void main()
         sampleReflectionProbesLegacy(irradiance, glossenv, legacyenv, tc, pos.xyz, gb.normal, spec.a, envIntensity, false, amblit_linear);
 
         adjustIrradiance(irradiance, ambocc);
+
+        // The environment lobes get the same ambient visibility the diffuse one does.
+        // adjustIrradiance spends the screen-space buffer on irradiance alone, so a legacy
+        // surface down in a crevice had its diffuse ambient occluded while its reflection
+        // carried on at full strength -- the brighter of the two terms, and the one the eye
+        // reads as contact. On the response curve the settings describe, not the raw buffer;
+        // see ssaoVisibility.
+        float envVisibility = ssaoVisibility(ambocc);
+        glossenv *= envVisibility;
+        legacyenv *= envVisibility;
 
         // apply lambertian IBL only (see pbrIbl)
         color.rgb = irradiance;
@@ -257,7 +317,7 @@ void main()
                 float gtdenom = 2 * nh;
                 float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
-                scol *= fres*texture(lightFunc, vec2(nh, spec.a)).r*gt/(nh*nl);
+                scol *= fres*blinnPhongLobe(nh, spec.a)*gt/(nh*nl);
                 color.rgb += lit*scol*sunlit_linear.rgb*spec.rgb;
             }
 

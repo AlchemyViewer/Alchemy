@@ -2603,7 +2603,7 @@ void LLPanelObject::onClickPipettePos()
     if (!fEnabled)
     {
         LLToolMgr::getInstance()->clearTransientTool();
-        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onPosSelect, this, _1, _2, _3));
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onPosSelect, this, _1, _2, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
         mBtnPipettePosition->setToggleState(true);
     }
@@ -2619,7 +2619,7 @@ void LLPanelObject::onClickPipetteSize()
     if (!fEnabled)
     {
         LLToolMgr::getInstance()->clearTransientTool();
-        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onSizeSelect, this, _1, _2, _3));
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onSizeSelect, this, _1, _2, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
         mBtnPipetteSize->setToggleState(true);
     }
@@ -2635,7 +2635,7 @@ void LLPanelObject::onClickPipetteRot()
     if (!fEnabled)
     {
         LLToolMgr::getInstance()->clearTransientTool();
-        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onRotSelect, this, _1, _2, _3));
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onRotSelect, this, _1, _2, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
         mBtnPipetteRotation->setToggleState(true);
     }
@@ -2651,7 +2651,7 @@ void LLPanelObject::onClickPipetteParams()
     if (!fEnabled)
     {
         LLToolMgr::getInstance()->clearTransientTool();
-        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onParamsSelect, this, _1, _2, _3));
+        LLToolPipette::getInstance()->setToolSelectCallback(boost::bind(&LLPanelObject::onParamsSelect, this, _1, _2, _4));
         LLToolMgr::getInstance()->setTransientTool(LLToolPipette::getInstance());
         mBtnPipettePrimParams->setToggleState(true);
     }

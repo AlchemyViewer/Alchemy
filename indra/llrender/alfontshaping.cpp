@@ -1,5 +1,5 @@
 /**
- * @file llfontshaping.cpp
+ * @file alfontshaping.cpp
  * @brief HarfBuzz shaping for multi-codepoint emoji sequences.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -19,13 +19,12 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
  * $/LicenseInfo$
  */
 
 #include "linden_common.h"
 
-#include "llfontshaping.h"
+#include "alfontshaping.h"
 #include "llfontfreetype.h"
 #include "llstring.h"  // LLStringOps::isPictographBase
 #include "llthread.h"
@@ -124,7 +123,7 @@ namespace
 
     struct ShapeEntry
     {
-        std::vector<LLShapedGlyph> glyphs;
+        std::vector<ALShapedGlyph> glyphs;
         // Iterator into sShapeLru pointing at this entry's slot. List
         // iterators are stable across other-node insert/erase, so this
         // stays valid until the entry itself is erased.
@@ -160,7 +159,7 @@ namespace
                        size_t                       sub_begin_in_slice,
                        size_t                       sub_end_in_slice,
                        hb_script_t                  script,
-                       std::vector<LLShapedGlyph>&  out_glyphs)
+                       std::vector<ALShapedGlyph>&  out_glyphs)
     {
         if (!face || sub_begin_in_slice >= sub_end_in_slice)
             return;
@@ -390,7 +389,7 @@ namespace
         const S32 cluster_base = static_cast<S32>(sub_begin_in_slice);
         for (unsigned int i = 0; i < glyph_count; ++i)
         {
-            LLShapedGlyph sg;
+            ALShapedGlyph sg;
             sg.face      = shape_face;
             sg.glyph_id  = infos[i].codepoint;
             // Rebase HB's cluster index. When VS-16 stripping ran for this
@@ -494,7 +493,7 @@ namespace
     // at every comma.
     void shape_all_sub_runs(const LLFontFreetype* root_face,
                             std::u32string_view   slice,
-                            std::vector<LLShapedGlyph>& out_glyphs)
+                            std::vector<ALShapedGlyph>& out_glyphs)
     {
         const size_t n = slice.size();
         if (!root_face || n == 0)
@@ -720,7 +719,7 @@ namespace
     }
 }
 
-const std::vector<LLShapedGlyph>& LLFontShaping::shapeLine(
+const std::vector<ALShapedGlyph>& ALFontShaping::shapeLine(
     const LLFontFreetype* root_face,
     LLWStringView         wstr,
     size_t                begin,
@@ -730,7 +729,7 @@ const std::vector<LLShapedGlyph>& LLFontShaping::shapeLine(
     // a stray call from a worker thread would corrupt the cache silently.
     llassert(on_main_thread());
 
-    static const std::vector<LLShapedGlyph> sEmpty;
+    static const std::vector<ALShapedGlyph> sEmpty;
 
     if (!root_face || begin >= end || end > wstr.size())
         return sEmpty;
@@ -750,7 +749,7 @@ const std::vector<LLShapedGlyph>& LLFontShaping::shapeLine(
     // Miss: itemize the slice into per-face sub-runs, shape each on its
     // owning face, and concatenate the glyph streams. Empty results are
     // cached so repeat misses don't re-shape on every frame.
-    std::vector<LLShapedGlyph> shaped;
+    std::vector<ALShapedGlyph> shaped;
     shape_all_sub_runs(root_face, slice, shaped);
 
     ShapeCacheKey key;
@@ -777,11 +776,11 @@ const std::vector<LLShapedGlyph>& LLFontShaping::shapeLine(
     return ins->second.glyphs;
 }
 
-void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
+void ALFontShaping::shapeRun(const LLFontFreetype* root_face,
                              LLWStringView         wstr,
                              size_t                begin,
                              size_t                end,
-                             std::vector<LLShapedGlyph>& out_glyphs)
+                             std::vector<ALShapedGlyph>& out_glyphs)
 {
     out_glyphs.clear();
 
@@ -791,15 +790,15 @@ void LLFontShaping::shapeRun(const LLFontFreetype* root_face,
 
     out_glyphs.reserve(cached.size());
     const S32 base = static_cast<S32>(begin);
-    for (const LLShapedGlyph& sg : cached)
+    for (const ALShapedGlyph& sg : cached)
     {
-        LLShapedGlyph out = sg;
+        ALShapedGlyph out = sg;
         out.cluster += base;
         out_glyphs.push_back(out);
     }
 }
 
-void LLFontShaping::clearCache()
+void ALFontShaping::clearCache()
 {
     if (!sShapeIndex.empty())
         ++sShapeCacheMutations;
@@ -807,17 +806,17 @@ void LLFontShaping::clearCache()
     sShapeLru.clear();
 }
 
-size_t LLFontShaping::cacheSize()
+size_t ALFontShaping::cacheSize()
 {
     return sShapeIndex.size();
 }
 
-size_t LLFontShaping::cacheMutationCount()
+size_t ALFontShaping::cacheMutationCount()
 {
     return sShapeCacheMutations;
 }
 
-void LLFontShaping::clearCacheForFace(const LLFontFreetype* face)
+void ALFontShaping::clearCacheForFace(const LLFontFreetype* face)
 {
     if (!face)
         return;
@@ -836,9 +835,10 @@ void LLFontShaping::clearCacheForFace(const LLFontFreetype* face)
             // pointer to the fallback that owns its glyph_id. Sweep those
             // too so a dying face can't leave sibling-rooted entries whose
             // sg.face dangles — see the header note on clearCacheForFace.
-            // O(glyphs) per surviving entry, but this only runs on face
-            // teardown / reload, never on the shape or render hot path.
-            for (const LLShapedGlyph& sg : it->second.glyphs)
+            // O(glyphs) per surviving entry. This runs on face teardown /
+            // reload, and once per codepoint that first resolves through a
+            // lazily-attached OS fallback — never per shape or per render.
+            for (const ALShapedGlyph& sg : it->second.glyphs)
             {
                 if (sg.face == face)
                 {

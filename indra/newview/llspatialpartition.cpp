@@ -1039,11 +1039,6 @@ public:
 
     virtual bool earlyFail(LLViewerOctreeGroup* base_group)
     {
-        if (LLPipeline::sReflectionRender)
-        {
-            return false;
-        }
-
         LLSpatialGroup* group = (LLSpatialGroup*)base_group;
         group->checkOcclusion();
 
@@ -2041,7 +2036,7 @@ void renderNormals(LLDrawable *drawablep)
             gGL.multMatrix((F32 *) vol->getRelativeXform().mMatrix);
         }
 
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
 
         // Normals &tangent line segments get scaled along with the object. Divide by scale length
         // to keep the as-viewed lengths (relatively) constant with the debug setting length
@@ -2267,7 +2262,7 @@ void renderPhysicsShape(LLDrawable* drawable, LLVOVolume* volume, bool wireframe
         if (decomp)
         { //render a physics based mesh
 
-            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            gGL.getTextureSlot(0)->unbind();
 
             if (!decomp->mHull.empty())
             { //decomposition exists, use that
@@ -2673,7 +2668,7 @@ void renderTextureAnim(LLDrawInfo* params)
 void renderBatchSize(LLDrawInfo* params)
 {
     LLGLEnable offset(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-1.f, 1.f);
+    gGL.setPolygonOffset(-1.f, 1.f);
     LLGLSLShader* old_shader = LLGLSLShader::sCurBoundShaderPtr;
     bool bind = false;
     if (params->mAvatar)
@@ -2736,8 +2731,8 @@ void renderTexelDensity(LLDrawable* drawable)
 
         checkerboard_matrix.initScale(LLVector3((F32)texturep->getWidth(discard_level) / 8.f, (F32)texturep->getHeight(discard_level) / 8.f, 1.f));
 
-        gGL.getTexUnit(0)->bind(LLViewerTexture::sCheckerBoardImagep, true);
-        gGL.matrixMode(LLRender::MM_TEXTURE);
+        gGL.getTextureSlot(0)->bindSampled(LLViewerTexture::sCheckerBoardImagep, ALSamplers::AnisoWrap, true);
+        gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadMatrix((GLfloat*)&checkerboard_matrix.mMatrix);
 
         if (buffer && (facep->getGeomCount() >= 3))
@@ -2781,15 +2776,15 @@ void renderTexelDensity(LLDrawable* drawable)
     //  }
 
     //  checkboard_matrix.initScale(LLVector3(texturep->getWidth(discard_level) / 8, texturep->getHeight(discard_level) / 8, 1.f));
-    //  gGL.getTexUnit(i)->activate();
+    //  gGL.getTextureSlot(i)->activate();
 
     //  glMatrixMode(GL_TEXTURE);
     //  glPushMatrix();
     //  glLoadIdentity();
-    //  //gGL.matrixMode(LLRender::MM_TEXTURE);
+    //  //gGL.matrixMode(LLRender::MM_TEXTURE0);
     //  glLoadMatrixf((GLfloat*) checkboard_matrix.mMatrix);
 
-    //  gGL.getTexUnit(i)->bind(LLViewerTexture::sCheckerBoardImagep, true);
+    //  gGL.getTextureSlot(i)->bindSampled(LLViewerTexture::sCheckerBoardImagep, ALSamplers::AnisoWrap, true);
 
     //  pushVerts(params, LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_NORMAL );
 
@@ -3519,7 +3514,7 @@ void LLSpatialPartition::renderPhysicsShapes(bool wireframe)
     }
 
     gGL.flush();
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     LLOctreeRenderPhysicsShapes render_physics(camera, wireframe);
     render_physics.traverse(mOctree);
     gGL.flush();
@@ -3559,7 +3554,7 @@ void LLSpatialPartition::renderDebug()
     LLGLDisable cullface(GL_CULL_FACE);
     LLGLEnable blend(GL_BLEND);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
     gPipeline.disableLights();
 
     LLSpatialBridge* bridge = asBridge();
@@ -3587,7 +3582,7 @@ void LLSpatialPartition::renderDebug()
             gGL.diffuseColor4f(0.5f, 0.0f, 0, 0.25f);
 
             LLGLEnable offset(GL_POLYGON_OFFSET_LINE);
-            glPolygonOffset(-1.f, -1.f);
+            gGL.setPolygonOffset(-1.f, -1.f);
 
             LLOctreeRenderXRay xray(camera);
             xray.traverse(mOctree);

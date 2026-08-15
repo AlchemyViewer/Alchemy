@@ -42,6 +42,9 @@
 #include "llpointer.h"
 #include "llglheaders.h"
 #include "llmatrix4a.h"
+#include "alsamplerstate.h"  // mSamplerCache -- this context's sampler objects
+#include "altextureslot.h"
+#include "aluniformbuffer.h"
 #include "glm/mat4x4.hpp"
 
 #include <boost/unordered_map.hpp>
@@ -60,185 +63,8 @@ class LLVertexBufferData;
 
 #define LL_MATRIX_STACK_DEPTH 32
 
-constexpr U32 LL_NUM_TEXTURE_LAYERS = 32;
+// AL_NUM_TEXTURE_SLOTS lives in altextureslot.h alongside the units it sizes.
 constexpr U32 LL_NUM_LIGHT_UNITS = 8;
-
-class LLTexUnit
-{
-    friend class LLRender;
-public:
-    static U32 sWhiteTexture;
-
-    typedef enum
-    {
-        TT_TEXTURE = 0,         // Standard 2D Texture
-        TT_RECT_TEXTURE,        // Non power of 2 texture
-        TT_CUBE_MAP,            // 6-sided cube map texture
-        TT_CUBE_MAP_ARRAY,      // Array of cube maps
-        TT_MULTISAMPLE_TEXTURE, // see GL_ARB_texture_multisample
-        TT_TEXTURE_3D,          // standard 3D Texture
-        TT_NONE,                // No texture type is currently enabled
-    } eTextureType;
-
-    typedef enum
-    {
-        TAM_WRAP = 0,           // Standard 2D Texture
-        TAM_MIRROR,             // Non power of 2 texture
-        TAM_CLAMP               // No texture type is currently enabled
-    } eTextureAddressMode;
-
-    typedef enum
-    {   // Note: If mipmapping or anisotropic are not enabled or supported it should fall back gracefully
-        TFO_POINT = 0,          // Equal to: min=point, mag=point, mip=none.
-        TFO_BILINEAR,           // Equal to: min=linear, mag=linear, mip=point.
-        TFO_TRILINEAR,          // Equal to: min=linear, mag=linear, mip=linear.
-        TFO_ANISOTROPIC         // Equal to: min=anisotropic, max=anisotropic, mip=linear.
-    } eTextureFilterOptions;
-
-    typedef enum
-    {
-        TMG_NONE = 0,           // Mipmaps are not automatically generated for this texture.
-        TMG_AUTO,               // Mipmaps are automatically generated for this texture.
-        TMG_MANUAL              // Mipmaps are manually generated for this texture.
-    } eTextureMipGeneration;
-
-    typedef enum
-    {
-        TB_REPLACE = 0,
-        TB_ADD,
-        TB_MULT,
-        TB_MULT_X2,
-        TB_ALPHA_BLEND,
-        TB_COMBINE          // Doesn't need to be set directly, setTexture___Blend() set TB_COMBINE automatically
-    } eTextureBlendType;
-
-    typedef enum
-    {
-        TBO_REPLACE = 0,            // Use Source 1
-        TBO_MULT,                   // Multiply: ( Source1 * Source2 )
-        TBO_MULT_X2,                // Multiply then scale by 2:  ( 2.0 * ( Source1 * Source2 ) )
-        TBO_MULT_X4,                // Multiply then scale by 4:  ( 4.0 * ( Source1 * Source2 ) )
-        TBO_ADD,                    // Add: ( Source1 + Source2 )
-        TBO_ADD_SIGNED,             // Add then subtract 0.5: ( ( Source1 + Source2 ) - 0.5 )
-        TBO_SUBTRACT,               // Subtract Source2 from Source1: ( Source1 - Source2 )
-        TBO_LERP_VERT_ALPHA,        // Interpolate based on Vertex Alpha (VA): ( Source1 * VA + Source2 * (1-VA) )
-        TBO_LERP_TEX_ALPHA,         // Interpolate based on Texture Alpha (TA): ( Source1 * TA + Source2 * (1-TA) )
-        TBO_LERP_PREV_ALPHA,        // Interpolate based on Previous Alpha (PA): ( Source1 * PA + Source2 * (1-PA) )
-        TBO_LERP_CONST_ALPHA        // Interpolate based on Const Alpha (CA): ( Source1 * CA + Source2 * (1-CA) )
-    } eTextureBlendOp;
-
-    typedef enum
-    {
-        TBS_PREV_COLOR = 0,         // Color from the previous texture stage
-        TBS_PREV_ALPHA,
-        TBS_ONE_MINUS_PREV_COLOR,
-        TBS_ONE_MINUS_PREV_ALPHA,
-        TBS_TEX_COLOR,              // Color from the texture bound to this stage
-        TBS_TEX_ALPHA,
-        TBS_ONE_MINUS_TEX_COLOR,
-        TBS_ONE_MINUS_TEX_ALPHA,
-        TBS_VERT_COLOR,             // The vertex color currently set
-        TBS_VERT_ALPHA,
-        TBS_ONE_MINUS_VERT_COLOR,
-        TBS_ONE_MINUS_VERT_ALPHA,
-        TBS_CONST_COLOR,            // The constant color value currently set
-        TBS_CONST_ALPHA,
-        TBS_ONE_MINUS_CONST_COLOR,
-        TBS_ONE_MINUS_CONST_ALPHA
-    } eTextureBlendSrc;
-
-    typedef enum
-    {
-        TCS_LINEAR = 0,
-        TCS_SRGB
-    } eTextureColorSpace;
-
-    LLTexUnit(S32 index = -1);
-
-    // Refreshes renderer state of the texture unit to the cached values
-    // Needed when the render context has changed and invalidated the current state
-    void refreshState(void);
-
-    // returns the index of this texture unit
-    S32 getIndex(void) const { return mIndex; }
-
-    // Sets this tex unit to be the currently active one
-    void activate(void);
-
-    // Enables this texture unit for the given texture type
-    // (automatically disables any previously enabled texture type)
-    void enable(eTextureType type);
-
-    // Disables the current texture unit
-    void disable(void);
-
-    // Binds the LLImageGL to this texture unit
-    // (automatically enables the unit for the LLImageGL's texture type)
-    bool bind(LLImageGL* texture, bool for_rendering = false, bool forceBind = false, S32 usename = 0);
-    bool bind(LLTexture* texture, bool for_rendering = false, bool forceBind = false);
-
-    // bind implementation for inner loops
-    // makes the following assumptions:
-    //  - No need for gGL.flush()
-    //  - texture is not null
-    //  - gl_tex->getTexName() is not zero
-    //  - This texture is not being bound redundantly
-    //  - USE_SRGB_DECODE is disabled
-    //  - mTexOptionsDirty is false
-    //  -
-    void bindFast(LLTexture* texture);
-
-    // Binds a cubemap to this texture unit
-    // (automatically enables the texture unit for cubemaps)
-    bool bind(LLCubeMap* cubeMap);
-
-    // Binds a render target to this texture unit
-    // (automatically enables the texture unit for the RT's texture type)
-    bool bind(LLRenderTarget * renderTarget, bool bindDepth = false);
-
-    // Manually binds a texture to the texture unit
-    // (automatically enables the tex unit for the given texture type)
-    bool bindManual(eTextureType type, U32 texture, bool hasMips = false);
-
-    // Unbinds the currently bound texture of the given type
-    // (only if there's a texture of the given type currently bound)
-    void unbind(eTextureType type);
-
-    // Fast but unsafe version of unbind
-    void unbindFast(eTextureType type);
-
-    // Sets the addressing mode used to sample the texture
-    // Warning: this stays set for the bound texture forever,
-    // make sure you want to permanently change the address mode  for the bound texture.
-    void setTextureAddressMode(eTextureAddressMode mode);
-    // MUST already be active and bound
-    void setTextureAddressModeFast(eTextureAddressMode mode, eTextureType tex_type);
-
-    // Sets the filtering options used to sample the texture
-    // Warning: this stays set for the bound texture forever,
-    // make sure you want to permanently change the filtering for the bound texture.
-    void setTextureFilteringOption(LLTexUnit::eTextureFilterOptions option);
-    // MUST already be active and bound
-    void setTextureFilteringOptionFast(LLTexUnit::eTextureFilterOptions option, eTextureType tex_type);
-
-    static U32 getInternalType(eTextureType type);
-
-    U32 getCurrTexture(void) { return mCurrTexture; }
-
-    eTextureType getCurrType(void) { return mCurrTexType; }
-
-    void setHasMipMaps(bool hasMips) { mHasMipMaps = hasMips; }
-
-protected:
-    friend class LLRender;
-
-    S32                 mIndex;
-    U32                 mCurrTexture;
-    eTextureType        mCurrTexType;
-    bool                mHasMipMaps;
-
-    void debugTextureUnit(void);
-};
 
 class LLLightState
 {
@@ -287,7 +113,7 @@ protected:
 
 class LLRender
 {
-    friend class LLTexUnit;
+    friend class ALTextureSlot;
 public:
 
     enum eTexIndex : U8
@@ -366,16 +192,30 @@ public:
         BF_UNDEF
     };
 
+    // One texture matrix, not four, and no MM_TEXTURE.
+    //
+    // MM_TEXTURE used to resolve to MM_TEXTURE0 + getCurrentTexUnitIndex(), making the active
+    // texture unit an implicit argument that selected which stack a caller wrote. That was a
+    // silent trap rather than a feature: no shader in the tree declares texture_matrix1/2/3
+    // (they were dropped during the Slang port), so a resolution landing anywhere but stack 0
+    // wrote a matrix nothing would ever read -- the texture transform simply vanished, with no
+    // error. Call sites defended against it by issuing getTextureSlot(0)->activate() first, which
+    // is why that call appeared next to matrixMode all over the draw paths.
+    //
+    // Measured before removing: 132 of 132 resolutions in a frame landed on unit 0, so the
+    // dynamic form had no users at all, and the guarding activate() calls came to 0.8% of
+    // issued glActiveTexture. So this is not a performance change -- it deletes a failure mode
+    // that could only ever cost correctness.
+    //
+    // LLShaderMgr::TEXTURE_MATRIX1/2/3 are deliberately left in place: those enum values index
+    // mReservedUniforms, and renumbering it would invalidate the on-disk shader reflection
+    // cache. They are simply never referenced now.
     enum eMatrixMode : U8
     {
         MM_MODELVIEW = 0,
         MM_PROJECTION,
         MM_TEXTURE0,
-        MM_TEXTURE1,
-        MM_TEXTURE2,
-        MM_TEXTURE3,
-        NUM_MATRIX_MODES,
-        MM_TEXTURE
+        NUM_MATRIX_MODES
     };
 
     LLRender();
@@ -407,6 +247,51 @@ public:
 
     void syncMatrices();
     void syncLightState();
+
+    // ---- Shared forward-lighting uniform block (UB_LIGHTS) --------------------------------
+    // The fixed-function light arrays every forward/alpha program reads. They used to be
+    // pushed as LOOSE uniforms into each program on its first bind after mLightHash moved --
+    // the same ~672 bytes re-derived and re-written once per program. Packed once and bound at
+    // a fixed engine point instead, so a light-state change costs one upload total.
+    //
+    // Holds ONLY what LLRender owns exclusively. sun_up_factor and the sClassicMode
+    // ambient/sunlight/moonlight overrides stay LOOSE: those names have other writers
+    // (LLPipeline::bindDeferredShader pushes an auto-adjusted sunlight_color, and
+    // sun_up_factor is written from many sites across the pipeline, draw pools and
+    // LLSettingsVO), and a shared block would let one writer silently stomp another's value.
+    //
+    // std140 pads every array element to 16 bytes regardless of the element type, hence the
+    // float[4] rows for the vec3/vec2 arrays -- the C++ mirror carries that padding explicitly
+    // so the struct IS the layout. Public so the debug layout registration can offsetof it.
+    struct alignas(16) LightsUBOData
+    {
+        F32 light_position[LL_NUM_LIGHT_UNITS][4];
+        F32 light_direction[LL_NUM_LIGHT_UNITS][4];             // .xyz used, .w padding
+        F32 light_attenuation[LL_NUM_LIGHT_UNITS][4];
+        F32 light_deferred_attenuation[LL_NUM_LIGHT_UNITS][4];  // .xy used (size, falloff)
+        F32 light_diffuse[LL_NUM_LIGHT_UNITS][4];               // .rgb used, .a padding
+        F32 light_ambient[3];  F32 _tail_pad;
+    };
+
+    // ---- Shared matrix uniform block (UB_MATRICES) ----------------------------------------
+    // The matrix stack plus the matrices derived from it. Like the Lights block above, these
+    // used to be LOOSE uniforms re-pushed per program -- and they were the worst offenders:
+    // every (modelview, projection) epoch (camera set, shadow cascade, probe face, mirror
+    // pass, each UI translate/scale) re-taxed every program bound after it with up to six
+    // matrix writes. Packed once per epoch and bound at a fixed engine point, a matrix change
+    // costs one upload total and a program bind costs no matrix work at all.
+    //
+    // Matrices are COLUMN-major, std140's default: glm's own storage goes up untouched.
+    // normal is a mat3, which std140 strides at 16 bytes per column, hence float[3][4].
+    struct alignas(16) MatricesUBOData
+    {
+        F32 modelview[16];
+        F32 projection[16];
+        F32 modelview_projection[16];
+        F32 inv_proj[16];
+        F32 texture0[16];
+        F32 normal[3][4];   // .xyz used per column, .w std140 padding
+    };
 
     void translateUI(F32 x, F32 y, F32 z);
     void scaleUI(F32 x, F32 y, F32 z);
@@ -457,6 +342,15 @@ public:
 
     void setColorMask(bool writeColor, bool writeAlpha);
     void setColorMask(bool writeColorR, bool writeColorG, bool writeColorB, bool writeAlpha);
+    // The mask currently in force, so a caller can restore what it found instead of
+    // assuming a convention. Channels are R, G, B, A. See LLGLSColorMask.
+    void getColorMask(bool (&mask)[4]) const
+    {
+        mask[0] = mCurrColorMask[0];
+        mask[1] = mCurrColorMask[1];
+        mask[2] = mCurrColorMask[2];
+        mask[3] = mCurrColorMask[3];
+    }
     void setSceneBlendType(eBlendType type);
 
     // applies blend func to both color and alpha
@@ -470,9 +364,55 @@ public:
 
     void setLineWidth(F32 width);
 
-    LLTexUnit* getTexUnit(U32 index);
+    // Depth offset applied to polygons while GL_POLYGON_OFFSET_FILL/LINE is enabled.
+    // Stated in the forward/semantic convention: a negative factor/units pulls a fragment
+    // toward the viewer. Under reverse-Z both terms are negated on the way to GL so that
+    // intent survives the flipped depth mapping -- the cache holds what the caller asked
+    // for, not what was issued. Redundant sets are dropped without a flush.
+    void setPolygonOffset(F32 factor, F32 units);
+    // Re-issue the physical offset for the current convention. Call after LLRender::sReverseZ
+    // changes: the cached semantic values are unchanged, but the translation they were issued
+    // under is not. Mirrors LLGLDepthTest::rebase().
+    void rebasePolygonOffset();
+
+    ALTextureSlot* getTextureSlot(U32 index);
 
     U32 getCurrentTexUnitIndex(void) const { return mCurrTextureUnitIndex; }
+
+    // Resolve a sampler object belonging to THIS context. See ALSamplerCache -- the cache
+    // is a member rather than a static precisely so it cannot outlive, or be torn down by,
+    // a context other than its own.
+    // Sampling INTENT only -- see ALSampler. Compose with |, or use one of the named
+    // compositions in namespace ALSamplers.
+    U32 getSampler(ALSampler key) { return mSamplerCache.get(key); }
+
+    // For sampling modes a mask cannot express; see ALSamplerCache::get(desc).
+    U32 getSampler(const ALSamplerDesc& desc) { return mSamplerCache.get(desc); }
+
+    // Generation of this context's sampler cache; changes whenever the objects are dropped.
+    // Lets a hot path cache a resolved name and revalidate it with one compare.
+    U32 getSamplerGeneration() const { return mSamplerCache.getGeneration(); }
+
+    // Delete this context's sampler objects and forget the per-unit bindings that pointed
+    // at them. Both halves belong together: GL unbinds a deleted sampler automatically, but
+    // ALTextureSlot::mCurrSampler would still claim it is bound, and GL may hand the same name
+    // back for the next sampler created -- at which point bindSampler's redundancy check
+    // would skip a bind that is needed.
+    // Drop this context's sampler objects. DROPS ONLY -- it does not rebuild, because one of
+    // its callers is shutdown. ~LLRender runs during thread_local destruction, after the
+    // context is gone, and reaches this a second time; it is safe there precisely because the
+    // first pass left the table empty and the second finds nothing to do. Rebuilding here
+    // would hand that second pass a full table to delete on a dead context, which faults
+    // inside the driver rather than failing. (gGLManager.mInited does not save you: it says
+    // GL is up somewhere, not that THIS thread has a current context.)
+    //
+    // A caller that wants the objects back -- the anisotropy change in graphics preferences --
+    // calls warmupSamplers() itself, where the context is known to be live.
+    void clearSamplers();
+
+    // Build every sampler object this context can hand out. get() has no lazy path, so this
+    // must run before anything binds; LLRender::init() does it.
+    void warmupSamplers();
 
     bool verifyTexUnitActive(U32 unitToVerify);
 
@@ -495,7 +435,20 @@ public:
     static bool sNsightDebugSupport;
     static LLVector2 sUIGLScaleFactor;
     static bool sClassicMode; // classic sky mode active
+    static bool sMirrorPass;  // hero-probe planar-reflection (mirror clip) pass active
     static bool s10bitBackBuffer;
+    // Reverse-Z depth active this session: clip control ZERO_TO_ONE, reversed projections
+    // (near=1, far=0), depth cleared to 0, default depth func GREATER. Latched by
+    // LLPipeline::updateReverseZ() (newview) from the setting AND gGLManager.mHasClipControl;
+    // llrender cannot read settings, so newview owns the decision and writes it here.
+    static bool sReverseZ;
+
+    // The GBuffer normal attachment is GL_RGBA16 when the deferred targets are HDR and
+    // GL_RGB10_A2 when they are not, which changes how many bits its blue channel has to spend
+    // on the packed geometric normal -- 16 versus 10. Latched by addDeferredAttachments from the
+    // same decision that picks the format, because llrender cannot read settings and a shader
+    // compiled against the wrong assumption unpacks noise.
+    static bool sGBufferNormHDR;
 
 private:
     friend class LLLightState;
@@ -513,20 +466,53 @@ private:
     U32 mLightHash;
     LLColor4 mAmbientLightColor;
 
+    // Pack the light state into mLightsUBOData. Returns true if the bytes actually changed
+    // (so the caller uploads). mLightHash is a conservative trigger -- setPosition and
+    // setSpotDirection bump it unconditionally because the modelview may have moved, so a
+    // frame's worth of "changes" are frequently byte-identical -- hence the compare.
+    bool packLightsUBO();
+
+    LightsUBOData   mLightsUBOData{};
+    ALUniformBuffer mLightsUBO;
+    U32             mLightsUBOHash  = 0xFFFFFFFFu;
+    bool            mLightsUBOBound = false;
+
+    // Rebuild the matrix block from the current stacks into the buffer's shadow. The derived
+    // matrices are recomputed only for the stack that actually moved.
+    void packMatricesUBO();
+
+    ALUniformBuffer mMatricesUBO;
+    U32             mMatricesUBOHash[NUM_MATRIX_MODES] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
+    bool            mMatricesUBOBound = false;
+
+    // Derived matrices, cached across epochs so a stack that did not move is not re-derived.
+    // Members rather than function statics: they belong to this context, and shutdown() has to
+    // be able to invalidate them along with the block.
+    glm::mat4       mCachedInvMdv{ 1.f };
+    glm::mat4       mCachedInvProj{ 1.f };
+    glm::mat4       mCachedMVP{ 1.f };
+
     bool            mDirty;
     U32             mCount;
     U32             mMode;
     U32             mCurrTextureUnitIndex;
     bool            mCurrColorMask[4];
     F32             mLineWidth = 1.f;
+    // Semantic (forward-convention) polygon offset; GL's own defaults are 0, 0.
+    F32             mPolygonOffsetFactor = 0.f;
+    F32             mPolygonOffsetUnits = 0.f;
 
     LLPointer<LLVertexBuffer>   mBuffer;
     LLStrider<LLVector4a>       mVerticesp;
     LLStrider<LLVector2>        mTexcoordsp;
     LLStrider<LLColor4U>        mColorsp;
     U32                         mDummyVAO = 0;
-    std::array<LLTexUnit, LL_NUM_TEXTURE_LAYERS> mTexUnits;
-    LLTexUnit           mDummyTexUnit;
+    std::array<ALTextureSlot, AL_NUM_TEXTURE_SLOTS> mTextureSlots;
+    // This context's sampler objects. Sits beside mTextureSlots deliberately: the units hold
+    // the bindings, this holds the objects those bindings name, and the two have to be
+    // torn down together and by the same thread.
+    ALSamplerCache mSamplerCache;
+    ALTextureSlot           mDummySlot;
     std::array<LLLightState, LL_NUM_LIGHT_UNITS> mLightState;
 
     eBlendFactor mCurrBlendColorSFactor;
@@ -575,6 +561,24 @@ void set_current_modelview(const glm::mat4& mat);
 void set_current_projection(const glm::mat4& mat);
 void set_last_modelview(const glm::mat4& mat);
 void set_last_projection(const glm::mat4& mat);
+
+// --- Reverse-Z projection helpers (gated on LLRender::sReverseZ) --------------
+// Rewrite a forward [-1,1] projection into reversed zero-to-one (near->1, far->0):
+// z_ndc' = (1 - z_ndc)/2, i.e. row2' = 0.5*(row3 - row2). Unconditional math; valid
+// for any forward projection, including the hand-rolled shadow perspective whose
+// depth rides an off-diagonal clip component.
+glm::mat4 al_reverse_z_transform(const glm::mat4& forward_proj);
+// Perspective / ortho that emit reversed-ZO when sReverseZ, else the plain forward
+// glm matrix. Drop-in replacements for glm::perspective / glm::ortho at the builders.
+glm::mat4 al_perspective(F32 fovy_rad, F32 aspect, F32 z_near, F32 z_far);
+glm::mat4 al_ortho(F32 left, F32 right, F32 bottom, F32 top, F32 z_near, F32 z_far);
+// project / unproject honoring the active convention: glm::*ZO under reverse-Z, since
+// the projection already outputs [0,1] and glm must not remap the window z again.
+glm::vec3 al_project(const glm::vec3& obj, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
+glm::vec3 al_unproject(const glm::vec3& win, const glm::mat4& modelview, const glm::mat4& proj, const glm::ivec4& viewport);
+// Window depth of the near / far plane under the active convention.
+inline F32 al_window_near() { return LLRender::sReverseZ ? 1.f : 0.f; }
+inline F32 al_window_far()  { return LLRender::sReverseZ ? 0.f : 1.f; }
 
 // glh compat
 glm::vec3 mul_mat4_vec3(const glm::mat4& mat, const glm::vec3& vec);

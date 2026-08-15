@@ -56,7 +56,7 @@ public:
     MediaPluginLibVLC(LLPluginInstance::sendMessageFunction host_send_func, void *host_user_data);
     ~MediaPluginLibVLC();
 
-    /*virtual*/ void receiveMessage(const char* message_string);
+    /*virtual*/ void receiveMessage(const std::string& message_string);
 
 private:
     bool init();
@@ -464,7 +464,7 @@ void MediaPluginLibVLC::setVolume(const F64 volume)
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-void MediaPluginLibVLC::receiveMessage(const char* message_string)
+void MediaPluginLibVLC::receiveMessage(const std::string& message_string)
 {
     LLPluginMessage message_in;
 
@@ -559,7 +559,7 @@ void MediaPluginLibVLC::receiveMessage(const char* message_string)
                 message.setValueS32("default_width", 1024);
                 message.setValueS32("default_height", 1024);
                 message.setValueS32("depth", mDepth);
-                message.setValueU32("internalformat", GL_RGB);
+                message.setValueU32("internalformat", GL_RGB8);
                 message.setValueU32("format", GL_BGRA);
                 message.setValueU32("type", GL_UNSIGNED_BYTE);
                 message.setValueBoolean("coords_opengl", true);

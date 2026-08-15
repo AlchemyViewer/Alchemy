@@ -102,7 +102,7 @@ LLViewerFetchedTexture* bindMaterialDiffuseTexture(const LLImportMaterial& mater
     {
         if (texture->getDiscardLevel() > -1)
         {
-            gGL.getTexUnit(0)->bind(texture, true);
+            gGL.getTextureSlot(0)->bindSampled(texture, ALSamplers::AnisoWrap, true);
             return texture;
         }
     }
@@ -155,7 +155,7 @@ static bool FindModel(const LLModelLoader::scene& scene, const std::string& name
 //-----------------------------------------------------------------------------
 
 LLModelPreview::LLModelPreview(S32 width, S32 height, LLFloater* fmp)
-    : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE, false), LLMutex()
+    : LLViewerDynamicTexture(width, height, 3, ORDER_MIDDLE), LLMutex()
     , mLodsQuery()
     , mLodsWithParsingError()
     , mPelvisZOffset(0.0f)
@@ -3599,7 +3599,7 @@ bool LLModelPreview::render()
                     buffer->setBuffer();
                     buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0);
 
-                    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                    gGL.getTextureSlot(0)->unbind();
                     gGL.diffuseColor4fv(PREVIEW_EDGE_COL.mV);
                     if (show_edges)
                     {
@@ -3719,7 +3719,7 @@ bool LLModelPreview::render()
                             {
                                 for (size_t i = 0; i < num_models; ++i)
                                 {
-                                    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                                    gGL.getTextureSlot(0)->unbind();
                                     gGL.diffuseColor4fv(PREVIEW_PSYH_FILL_COL.mV);
 
                                     // Zero this variable for an obligatory buffer initialization
@@ -3902,7 +3902,7 @@ bool LLModelPreview::render()
                             model->mSkinInfo.updateHash();
                             LLRenderPass::uploadMatrixPalette(mPreviewAvatar, &model->mSkinInfo);
 
-                            gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                            gGL.getTextureSlot(0)->unbind();
 
                             if (show_textures)
                             {
@@ -3937,7 +3937,7 @@ bool LLModelPreview::render()
 
                             if (show_edges)
                             {
-                                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+                                gGL.getTextureSlot(0)->unbind();
                                 gGL.diffuseColor4fv(PREVIEW_EDGE_COL.mV);
                                 gGL.setLineWidth(PREVIEW_EDGE_WIDTH);
                                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

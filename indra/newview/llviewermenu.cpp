@@ -76,6 +76,7 @@
 #include "llfloaterreporter.h"
 #include "llfloaterscriptdebug.h"
 #include "llfloatersnapshot.h"
+#include "llscripteditorws.h"
 #include "llfloatertools.h"
 #include "llfloaterworldmap.h"
 #include "llfloaterbuildoptions.h"
@@ -1552,7 +1553,13 @@ class LLAdvancedTerrainCreateLocalPaintMap : public view_listener_t
         dim = llclamp(dim, 16, max_resolution);
         dim = 1 << U32(std::ceil(std::log2(dim)));
         LLPointer<LLImageRaw> image_raw = new LLImageRaw(dim,dim,3);
-        LLPointer<LLViewerTexture> tex = LLViewerTextureManager::getLocalTexture(image_raw.get(), true);
+        LLPointer<LLViewerTexture> tex = LLViewerTextureManager::getLocalTexture(dim, dim, 3, true, false);
+        // Paint weights are data, not colour: pin GL_RGB8 before creating GL storage so
+        // the sRGB auto-format for 3-component textures never applies to them.
+        tex->generateGLTexture();
+        tex->setExplicitFormat(GL_RGB8, GL_RGB);
+        tex->createGLTexture(0, image_raw);
+        tex->setCategory(LLGLTexture::LOCAL);
         const bool success = LLTerrainPaintMap::bakeHeightNoiseIntoPBRPaintMapRGB(*region, *tex);
         // This calls gLocalTerrainMaterials.setPaintType
         gSavedSettings.setBOOL("LocalTerrainPaintEnabled", true);
@@ -5985,6 +5992,47 @@ class LLToolsCheckSelectionLODMode : public view_listener_t
     }
 };
 
+
+class LLToolsCheckScriptEditorServer : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
+        return server && server->isRunning();
+    }
+};
+
+class LLToolsEnableScriptEditorServer : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        return LLScriptEditorWSServer::isEnabled();
+    }
+};
+
+class LLToolsToggleScriptEditorServer : public view_listener_t
+{
+    bool handleEvent(const LLSD& userdata)
+    {
+        LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
+        if (server && server->isRunning())
+        {
+            LLWebsocketMgr::instance().stopServer(LLScriptEditorWSServer::DEFAULT_SERVER_NAME);
+        }
+        else
+        {
+            if (LLScriptEditorWSServer::isTightIntegration())
+            {
+                LLScriptEditorWSServer::launchVSCode();
+            }
+            else
+            {
+                LLScriptEditorWSServer::ensureServerRunning();
+            }
+        }
+        return true;
+    }
+};
 
 // Round the position of all root objects to the grid
 class LLToolsSnapObjectXY : public view_listener_t
@@ -10515,6 +10563,10 @@ void initialize_menus()
     view_listener_t::addMenu(new LLToolsDoPathfindingRebakeRegion(), "Tools.DoPathfindingRebakeRegion");
     view_listener_t::addMenu(new LLToolsEnablePathfindingRebakeRegion(), "Tools.EnablePathfindingRebakeRegion");
     view_listener_t::addMenu(new LLToolsCheckSelectionLODMode(), "Tools.ToolsCheckSelectionLODMode");
+
+    view_listener_t::addMenu(new LLToolsCheckScriptEditorServer(), "Tools.CheckScriptEditorServer");
+    view_listener_t::addMenu(new LLToolsEnableScriptEditorServer(), "Tools.EnableScriptEditorServer");
+    view_listener_t::addMenu(new LLToolsToggleScriptEditorServer(), "Tools.ToggleScriptEditorServer");
 
     // Help menu
     // most items use the ShowFloater method

@@ -50,6 +50,8 @@
 #include "llviewershadermgr.h"
 #include "llmodel.h"
 
+extern bool gCubeSnapshot;
+
 //#include "llimagebmp.h"
 //#include "../tools/imdebug/imdebug.h"
 
@@ -228,28 +230,27 @@ void LLDrawPoolBump::bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& di
                 cube_map->setMatrix(1);
                 // Make sure that texture coord generation happens for tex unit 1, as that's the one we use for
                 // the cube map in the one pass shiny shaders
-                cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP, LLTexUnit::TT_CUBE_MAP);
+                cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP);
                 cube_map->enableTexture(cube_channel);
                 diffuse_channel = shader->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
             }
             else
             {
                 cube_map->setMatrix(0);
-                cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP, LLTexUnit::TT_CUBE_MAP);
+                cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP);
                 diffuse_channel = -1;
                 cube_map->enable(cube_channel);
             }
-            gGL.getTexUnit(cube_channel)->bind(cube_map);
-            gGL.getTexUnit(0)->activate();
+            gGL.getTextureSlot(cube_channel)->bind(cube_map, ALSamplers::AnisoClamp);
         }
         else
         {
             cube_channel = 0;
             diffuse_channel = -1;
-            gGL.getTexUnit(0)->disable();
+            gGL.getTextureSlot(0)->unbind();
             cube_map->enable(0);
             cube_map->setMatrix(0);
-            gGL.getTexUnit(0)->bind(cube_map);
+            gGL.getTextureSlot(0)->bind(cube_map, ALSamplers::AnisoClamp);
         }
     }
 }
@@ -262,7 +263,7 @@ void LLDrawPoolBump::unbindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& 
     {
         if (shader_level > 1)
         {
-            shader->disableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP, LLTexUnit::TT_CUBE_MAP);
+            shader->disableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP, ALTextureSlot::TT_CUBE_MAP);
 
             if (LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_OBJECT) > 0)
             {
@@ -286,10 +287,10 @@ void LLDrawPoolBump::beginFullbrightShiny()
     sVertexMask = VERTEX_MASK_SHINY | LLVertexBuffer::MAP_TEXCOORD0;
 
     // Second pass: environment map
-    shader = &gDeferredFullbrightShinyProgram;
+    shader = gDeferredFullbrightShinyProgram.selectVariant();
     if (LLPipeline::sRenderingHUDs)
     {
-        shader = &gHUDFullbrightShinyProgram;
+        shader = gHUDFullbrightShinyProgram.selectVariant();
     }
 
     if (mRigged)
@@ -302,7 +303,7 @@ void LLDrawPoolBump::beginFullbrightShiny()
     S32 channel = shader->enableTexture(LLShaderMgr::EXPOSURE_MAP);
     if (channel > -1)
     {
-        gGL.getTexUnit(channel)->bind(&gPipeline.mExposureMap);
+        gGL.getTextureSlot(channel)->bind(&gPipeline.mExposureMap);
     }
 
     LLCubeMap* cube_map = gSky.mVOSkyp ? gSky.mVOSkyp->getCubeMap() : NULL;
@@ -311,13 +312,12 @@ void LLDrawPoolBump::beginFullbrightShiny()
     {
         // Make sure that texture coord generation happens for tex unit 1, as that's the one we use for
         // the cube map in the one pass shiny shaders
-        gGL.getTexUnit(1)->disable();
-        cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP, LLTexUnit::TT_CUBE_MAP);
+        gGL.getTextureSlot(1)->unbind();
+        cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP);
         cube_map->enableTexture(cube_channel);
         diffuse_channel = shader->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
 
-        gGL.getTexUnit(cube_channel)->bind(cube_map);
-        gGL.getTexUnit(0)->activate();
+        gGL.getTextureSlot(cube_channel)->bind(cube_map, ALSamplers::AnisoClamp);
     }
 
     {
@@ -475,13 +475,13 @@ bool LLDrawPoolBump::bindBumpMap(U8 bump_code, LLViewerTexture* texture, S32 cha
     {
         if (channel == -2)
         {
-            gGL.getTexUnit(1)->bindFast(bump);
-            gGL.getTexUnit(0)->bindFast(bump);
+            gGL.getTextureSlot(1)->bindFast(bump, ALSamplers::AnisoWrap);
+            gGL.getTextureSlot(0)->bindFast(bump, ALSamplers::AnisoWrap);
         }
         else
         {
             // NOTE: do not use bindFast here (see SL-16222)
-            gGL.getTexUnit(channel)->bind(bump);
+            gGL.getTextureSlot(channel)->bindSampled(bump, ALSamplers::AnisoWrap);
         }
 
         return true;
@@ -498,7 +498,7 @@ void LLDrawPoolBump::beginBump()
     // Optional second pass: emboss bump map
     stop_glerror();
 
-    shader = &gObjectBumpProgram;
+    shader = gObjectBumpProgram.selectVariant();
 
     if (mRigged)
     {
@@ -521,7 +521,7 @@ void LLDrawPoolBump::renderBump(U32 pass)
     gGL.diffuseColor4f(1,1,1,1);
     /// Get rid of z-fighting with non-bump pass.
     LLGLEnable polyOffset(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-1.0f, -1.0f);
+    gGL.setPolygonOffset(-1.0f, -1.0f);
     pushBumpBatches(pass);
 }
 
@@ -542,6 +542,9 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL; //LL_RECORD_BLOCK_TIME(FTM_RENDER_BUMP);
 
+    // The program's LINEAR_DIFFUSE makes pushBumpBatch decode the diffuse on the sampler;
+    // the hoisted GL_FRAMEBUFFER_SRGB (renderGeomDeferred) re-encodes on store.
+
     shiny = true;
     for (int i = 0; i < 2; ++i)
     {
@@ -555,11 +558,11 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
             continue;
         }
 
-        gDeferredBumpProgram.bind(rigged);
+        gDeferredBumpProgram.selectVariant()->bind(rigged);
         diffuse_channel = LLGLSLShader::sCurBoundShaderPtr->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
         bump_channel = LLGLSLShader::sCurBoundShaderPtr->enableTexture(LLViewerShaderMgr::BUMP_MAP);
-        gGL.getTexUnit(diffuse_channel)->unbind(LLTexUnit::TT_TEXTURE);
-        gGL.getTexUnit(bump_channel)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(diffuse_channel)->unbind();
+        gGL.getTextureSlot(bump_channel)->unbind();
 
         const LLVOAvatar* lastAvatar = nullptr;
         U64 lastMeshId = 0;
@@ -608,7 +611,6 @@ void LLDrawPoolBump::renderDeferred(S32 pass)
         LLGLSLShader::sCurBoundShaderPtr->disableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
         LLGLSLShader::sCurBoundShaderPtr->disableTexture(LLViewerShaderMgr::BUMP_MAP);
         LLGLSLShader::sCurBoundShaderPtr->unbind();
-        gGL.getTexUnit(0)->activate();
     }
 
     shiny = false;
@@ -819,7 +821,7 @@ void LLBumpImageList::onSourceStandardLoaded( bool success, LLViewerFetchedTextu
         {
             generateNormalMapFromAlpha(src, nrm_image);
         }
-        src_vi->setExplicitFormat(GL_RGBA, GL_RGBA);
+        src_vi->setExplicitFormat(GL_RGBA8, GL_RGBA);
         {
             if (!src_vi->createGLTexture(src_vi->getDiscardLevel(), nrm_image))
             {
@@ -914,7 +916,7 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
         //convert to normal map
         LL_PROFILE_ZONE_NAMED("bil - create normal map");
 
-        bump->setExplicitFormat(GL_RGBA, GL_RGBA);
+        bump->setExplicitFormat(GL_RGBA8, GL_RGBA);
 
         LLImageGL* dst_img = bump->getGLTexture();
         if (!dst_img->setSize(src->getWidth(), src->getHeight(), 4, 0))
@@ -925,9 +927,15 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
         dst_img->setDiscardLevel(0);
         dst_img->createGLTexture();
 
-        gGL.getTexUnit(0)->bind(bump);
+        // Bind-to-edit: storage is allocated into this texture, nothing samples it here.
+        gGL.getTextureSlot(0)->bindSampled(bump, ALSamplers::AnisoWrap);
 
-        LLImageGL::setManualImage(GL_TEXTURE_2D, 0, dst_img->getPrimaryFormat(), dst_img->getWidth(), dst_img->getHeight(), GL_RGBA, GL_UNSIGNED_BYTE, nullptr, false);
+        // Full mip chain: storage is immutable, so the glGenerateMipmap below can only
+        // fill levels allocated here -- with a single level it is a spec-defined no-op
+        // and the normal map aliases under the trilinear/aniso samplers that read it.
+        const S32 levels = LLImageGL::calcMipLevelCount(dst_img->getWidth(), dst_img->getHeight());
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, dst_img->getStorageInternalFormat(), dst_img->getWidth(), dst_img->getHeight(), GL_RGBA, GL_UNSIGNED_BYTE, nullptr, levels);
+        dst_img->markStorageAllocated();
 
         LLGLuint tex_name = dst_img->getTexName();
         // point render target at empty buffer
@@ -945,17 +953,12 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
             LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
             gNormalMapGenProgram.bind();
 
-            static LLStaticHashedString sNormScale("norm_scale");
-            static LLStaticHashedString sStepX("stepX");
-            static LLStaticHashedString sStepY("stepY");
-            static LLStaticHashedString sBumpCode("bump_code");
+            gNormalMapGenProgram.uniform1f(LLShaderMgr::NORM_SCALE, gSavedSettings.getF32("RenderNormalMapScale"));
+            gNormalMapGenProgram.uniform1f(LLShaderMgr::STEP_X, 1.f / bump->getWidth());
+            gNormalMapGenProgram.uniform1f(LLShaderMgr::STEP_Y, 1.f / bump->getHeight());
+            gNormalMapGenProgram.uniform1i(LLShaderMgr::BUMP_CODE, bump_code);
 
-            gNormalMapGenProgram.uniform1f(sNormScale, gSavedSettings.getF32("RenderNormalMapScale"));
-            gNormalMapGenProgram.uniform1f(sStepX, 1.f / bump->getWidth());
-            gNormalMapGenProgram.uniform1f(sStepY, 1.f / bump->getHeight());
-            gNormalMapGenProgram.uniform1i(sBumpCode, bump_code);
-
-            gGL.getTexUnit(0)->bind(src);
+            gGL.getTextureSlot(0)->bindSampled(src, ALSamplers::AnisoWrap);
 
             gGL.begin(LLRender::TRIANGLE_STRIP);
             gGL.texCoord2f(0, 0);
@@ -983,10 +986,10 @@ void LLBumpImageList::onSourceUpdated(LLViewerTexture* src, EBumpEffect bump_cod
             }
         }
 
-        // generate mipmap
-        gGL.getTexUnit(0)->bind(bump);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        // generate mipmap -- bind-to-edit again, mip generation acts on the bound texture
+        gGL.getTextureSlot(0)->bindSampled(bump, ALSamplers::AnisoWrap);
+        LLImageGL::generateMipmaps(GL_TEXTURE_2D);
+        gGL.getTextureSlot(0)->unbind();
     }
 
     iter->second = bump; // derefs (and deletes) old image
@@ -1031,37 +1034,34 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     applyModelMatrix(params);
 
+    // Same derivation as pushBatch: the bound program knows whether its diffuse wants the
+    // hardware decode. The shadow pass reaches this too with an unflagged program, so its
+    // binds stay plain AnisoWrap.
+    const LLGLSLShader* bound = LLGLSLShader::sCurBoundShaderPtr;
+    ALSampler key = ALSamplers::AnisoWrap;
+    if (bound && bound->mLinearDiffuse)
+    {
+        key |= ALSampler::SRGBDecode;
+    }
+
     bool tex_setup = false;
 
     if (batch_textures && params.mTextureList.size() > 1)
     {
-        for (U32 i = 0; i < params.mTextureList.size(); ++i)
-        {
-            if (params.mTextureList[i].notNull())
-            {
-                gGL.getTexUnit(i)->bindFast(params.mTextureList[i]);
-            }
-        }
+        // Clamped to the bound program's ladder and null slots stood in for, same as every
+        // other indexed pass -- a raw loop here would bind past the last declared sampler
+        // whenever a batch was built at a wider ladder than the current program's.
+        bindIndexedTextures(params, bound);
     }
     else
     { //not batching textures or batch has only 1 texture -- might need a texture matrix
-        if (params.mTextureMatrix)
+        if (params.mTextureMatrix && (!gCubeSnapshot || gPipeline.mHeroProbeManager.isMirrorPass()))
         {
-            if (shiny)
-            {
-                gGL.getTexUnit(0)->activate();
-                gGL.matrixMode(LLRender::MM_TEXTURE);
-            }
-            else
-            {
-                gGL.getTexUnit(0)->activate();
-                gGL.matrixMode(LLRender::MM_TEXTURE);
-                gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
-                gPipeline.mTextureMatrixOps++;
-            }
-
+            // the non-shiny path used to load this twice -- a leftover from when the
+            // second (bump) texture unit carried its own copy of the matrix
+            gGL.matrixMode(LLRender::MM_TEXTURE0);
             gGL.loadMatrix((GLfloat*) params.mTextureMatrix->mMatrix);
-            gPipeline.mTextureMatrixOps++;
+            gPipeline.countTextureMatrixOp(*params.mTextureMatrix);
 
             tex_setup = true;
         }
@@ -1070,11 +1070,11 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
         {
             if (params.mTexture.notNull())
             {
-                gGL.getTexUnit(diffuse_channel)->bindFast(params.mTexture);
+                gGL.getTextureSlot(diffuse_channel)->bindFast(params.mTexture, key);
             }
             else
             {
-                gGL.getTexUnit(diffuse_channel)->unbind(LLTexUnit::TT_TEXTURE);
+                gGL.getTextureSlot(diffuse_channel)->unbind();
             }
         }
     }
@@ -1084,15 +1084,9 @@ void LLRenderPass::pushBumpBatch(LLDrawInfo& params, bool texture, bool batch_te
 
     if (tex_setup)
     {
-        if (shiny)
-        {
-            gGL.getTexUnit(0)->activate();
-        }
-        else
-        {
-            gGL.getTexUnit(0)->activate();
-            gGL.matrixMode(LLRender::MM_TEXTURE);
-        }
+        // Both branches selected the texture matrix stack after activating unit 0; only the
+        // activate differed, and it was doing nothing either way.
+        gGL.matrixMode(LLRender::MM_TEXTURE0);
         gGL.loadIdentity();
         gGL.matrixMode(LLRender::MM_MODELVIEW);
     }

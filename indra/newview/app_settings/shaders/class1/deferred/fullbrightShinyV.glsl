@@ -23,11 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat3 normal_matrix;
-uniform mat4 texture_matrix0;
-uniform mat4 texture_matrix1;
-uniform mat4 modelview_matrix;
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 
 void calcAtmospherics(vec3 inPositionEye);
@@ -48,9 +46,14 @@ out vec3 vary_texcoord1;
 out vec3 vary_position;
 
 #ifdef HAS_SKIN
-mat4 getObjectSkinnedTransform();
-uniform mat4 projection_matrix;
+mat3x4 getSkinBlend();
+vec3 skinDirection(mat3x4 b, vec3 dir);
+vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #endif
+
+// Linearises an sRGB prim tint for a pass that shades in linear. Defined in
+// deferred/textureUtilV.glsl, which every vertex stage attaches.
+vec4 linearizeVertexTint(vec4 tint);
 
 void main()
 {
@@ -59,11 +62,10 @@ void main()
     passTextureIndex();
 
 #ifdef HAS_SKIN
-    mat4 mat = getObjectSkinnedTransform();
-    mat = modelview_matrix * mat;
-    vec4 pos = mat * vert;
+    mat3x4 skin = getSkinBlend();
+    vec4 pos = skinTransformH(skin, vert.xyz, modelview_matrix);
     gl_Position = projection_matrix * pos;
-    vec3 norm = normalize((mat*vec4(normal.xyz+position.xyz,1.0)).xyz-pos.xyz);
+    vec3 norm = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
 #else
     vec4 pos = (modelview_matrix * vert);
     gl_Position = modelview_projection_matrix*vec4(position.xyz, 1.0);
@@ -77,5 +79,14 @@ void main()
 
     calcAtmospherics(pos.xyz);
 
+    // Tint arrives sRGB. This pass decodes its diffuse on the sampler and shades in linear,
+    // so linearise the tint to match. Guarded on exactly the conditions that leave
+    // LLGLSLShader::mLinearDiffuse false -- HUD outputs sRGB and keeps the encoded texel, and
+    // FOR_IMPOSTOR writes the sRGB sample straight to the bake -- so the shader and the bind
+    // cannot disagree about which space the multiply happens in.
+#ifdef LINEAR_DIFFUSE
+    vertex_color = linearizeVertexTint(diffuse_color);
+#else
     vertex_color = diffuse_color;
+#endif
 }

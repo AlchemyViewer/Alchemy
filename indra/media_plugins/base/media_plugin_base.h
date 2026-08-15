@@ -82,9 +82,9 @@ public:
     virtual ~MediaPluginBase() {}
 
    /** Handle received message from plugin loader shell. */
-    virtual void receiveMessage(const char *message_string) = 0;
+    virtual void receiveMessage(const std::string &message_string) = 0;
 
-    static void staticReceiveMessage(const char *message_string, void **user_data);
+    static void staticReceiveMessage(const char *message_string, size_t message_size, void **user_data);
 
 protected:
 

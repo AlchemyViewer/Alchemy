@@ -88,11 +88,17 @@ U32 LLViewerJoint::render( F32 pixelArea, bool first_pass, bool is_dummy )
         {
             triangle_count += drawShape( pixelArea, first_pass, is_dummy );
         }
-        else if (LLPipeline::sShadowRender)
+        // A real shadow pass is depth-only, so one flat pass is all it wants. An impostor
+        // bake sets the same flag but draws these meshes for real (see LLVOAvatar::
+        // renderSkinned, which forces renderTransparent on for impostors) -- taking the
+        // shortcut there rendered hair and skirts single-pass and back-face culled, so their
+        // inside surfaces vanished and the silhouette visibly changed the moment an avatar
+        // became an impostor.
+        else if (LLPipeline::sShadowRender && !LLPipeline::sImpostorRender)
         {
             triangle_count += drawShape(pixelArea, first_pass, is_dummy );
         }
-        else if ( isTransparent() && !LLPipeline::sReflectionRender)
+        else if ( isTransparent() )
         {
             // Hair and Skirt
             if ((pixelArea > MIN_PIXEL_AREA_3PASS_HAIR))
@@ -105,12 +111,16 @@ U32 LLViewerJoint::render( F32 pixelArea, bool first_pass, bool is_dummy )
                     triangle_count += drawShape( pixelArea, first_pass, is_dummy );
                 }
                 // second pass writes to z buffer only
-                gGL.setColorMask(false, false);
+                //
+                // Scoped, not set-and-put-back: the old form restored a hardcoded
+                // (colour on, alpha off), which is the post-deferred convention but NOT the
+                // G-buffer's -- and this path now runs there too, where it would have masked
+                // alpha off for every avatar draw after it in the bake.
                 {
+                    LLGLSColorMask depth_only(false, false);
                     triangle_count += drawShape( pixelArea, false, is_dummy  );
                 }
                 // third past respects z buffer and writes color
-                gGL.setColorMask(true, false);
                 {
                     LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
                     triangle_count += drawShape( pixelArea, false, is_dummy  );

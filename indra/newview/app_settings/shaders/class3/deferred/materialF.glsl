@@ -36,23 +36,33 @@
 
 uniform float emissive_brightness;  // fullbright flag, 1.0 == fullbright, 0.0 otherwise
 uniform int sun_up_factor;
-uniform int classic_mode;
+// Classic (legacy pre-PBR) sky lighting is a per-program compile-time variant, not a runtime
+// uniform: the two paths differ by whole blocks of maths and a probe sample, and only one of
+// them is ever live for a given sky. A macro rather than a const global -- these sources are
+// separately compiled units linked into one program, and several of them declare this.
+#ifdef CLASSIC_MODE
+#define classic_mode 1
+#else
+#define classic_mode 0
+#endif
 
 vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
-vec3 scaleSoftClipFragLinear(vec3 l);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
+float blinnPhongLobe(float nh, float glossiness);
 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
 
-uniform mat4 modelview_matrix;
-uniform mat3 normal_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 
 in vec3 vary_position;
 
 void mirrorClip(vec3 pos);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
+float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
 
@@ -68,7 +78,6 @@ void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 no
 void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 norm, float envIntensity);
 
 uniform samplerCube environmentMap;
-uniform sampler2D     lightFunc;
 
 // Inputs
 uniform vec4 morphFactor;
@@ -81,108 +90,22 @@ uniform vec3 sun_dir;
 uniform vec3 moon_dir;
 
 uniform mat4 proj_mat;
-uniform mat4 inv_proj;
 uniform vec2 screen_res;
 
-uniform vec4 light_position[8];
-uniform vec3 light_direction[8];
-uniform vec4 light_attenuation[8];
-uniform vec3 light_diffuse[8];
+// Shared forward-light arrays, spliced from class1/deferred/lightsBlock.glsl and
+// bound at UB_LIGHTS. Members are read by bare name.
+//[ENGINE_BLOCK Lights]
 
 float getAmbientClamp();
 void waterClip(vec3 pos);
 
-vec3 calcPointLightOrSpotLight(vec3 light_col, vec3 npos, vec3 diffuse, vec4 spec, vec3 v, vec3 n, vec4 lp, vec3 ln, float la, float fa, float is_pointlight, inout float glare, float ambiance)
-{
-    // SL-14895 inverted attenuation work-around
-    // This routine is tweaked to match deferred lighting, but previously used an inverted la value. To reconstruct
-    // that previous value now that the inversion is corrected, we reverse the calculations in LLPipeline::setupHWLights()
-    // to recover the `adjusted_radius` value previously being sent as la.
-    float falloff_factor = (12.0 * fa) - 9.0;
-    float inverted_la = falloff_factor / la;
-    // Yes, it makes me want to cry as well. DJH
-
-    vec3 col = vec3(0);
-
-    //get light vector
-    vec3 lv = lp.xyz - v;
-
-    //get distance
-    float dist = length(lv);
-    float da = 1.0;
-
-    dist /= inverted_la;
-
-    if (dist > 0.0 && inverted_la > 0.0)
-    {
-        //normalize light vector
-        lv = normalize(lv);
-
-        //distance attenuation
-        float dist_atten = clamp(1.0 - (dist - 1.0*(1.0 - fa)) / fa, 0.0, 1.0);
-        dist_atten *= dist_atten;
-        dist_atten *= 2.0f;
-
-        if (dist_atten <= 0.0)
-        {
-            return col;
-        }
-
-        // spotlight coefficient.
-        float spot = max(dot(-ln, lv), is_pointlight);
-        da *= spot*spot; // GL_SPOT_EXPONENT=2
-
-        //angular attenuation
-        da *= dot(n, lv);
-
-        float lit = 0.0f;
-
-        float amb_da = ambiance;
-        if (da >= 0)
-        {
-            lit = clamp(da * dist_atten, 0.0, 1.0);
-            col = lit * light_col * diffuse;
-            amb_da += (da*0.5 + 0.5) * ambiance;
-        }
-        amb_da += (da*da*0.5 + 0.5) * ambiance;
-        amb_da *= dist_atten;
-        amb_da = min(amb_da, 1.0f - lit);
-
-        // SL-10969 need to see why these are blown out
-        //col.rgb += amb_da * light_col * diffuse;
-
-        if (spec.a > 0.0)
-        {
-            //vec3 ref = dot(pos+lv, norm);
-            vec3 h = normalize(lv + npos);
-            float nh = dot(n, h);
-            float nv = dot(n, npos);
-            float vh = dot(npos, h);
-            float sa = nh;
-            float fres = pow(1 - dot(h, npos), 5)*0.4 + 0.5;
-
-            float gtdenom = 2 * nh;
-            float gt = max(0, min(gtdenom * nv / vh, gtdenom * da / vh));
-
-            if (nh > 0.0)
-            {
-                float scol = fres*texture(lightFunc, vec2(nh, spec.a)).r*gt / (nh*da);
-                vec3 speccol = lit*scol*light_col.rgb*spec.rgb;
-                speccol = clamp(speccol, vec3(0), vec3(1));
-                col += speccol;
-
-                float cur_glare = max(speccol.r, speccol.g);
-                cur_glare = max(cur_glare, speccol.b);
-                glare = max(glare, speccol.r);
-                glare += max(cur_glare, 0.0);
-            }
-        }
-    }
-    float final_scale = 1.0;
-    if (classic_mode > 0)
-        final_scale = 0.9;
-    return max(col * final_scale, vec3(0.0, 0.0, 0.0));
-}
+// The shared legacy punctual model, not a copy of it -- the same function the deferred legacy
+// branch is built from, so a blended surface is lit like the opaque one behind it.
+vec3 calcLegacyPointLightOrSpotLight(vec3 diffuse, vec4 spec,
+                    vec3 n, vec3 p, vec3 v,
+                    vec3 lp, vec3 ld, vec3 lightColor,
+                    float lightSize, float falloff, float is_pointlight,
+                    inout float glare);
 
 #else
 out vec4 frag_data[4];
@@ -243,9 +166,12 @@ vec4 getSpecular()
 {
 #ifdef HAS_SPECULAR_MAP
     vec4 spec = texture(specularMap, vary_texcoord2.xy);
-    spec.rgb *= specular_color.rgb;
+    // The map is decoded on the sampler (filtered in linear), so linearise the tint to
+    // match. Yields LINEAR spec: the forward path lights with it directly, the deferred
+    // writer re-encodes to sRGB for the shared RGBA8 store.
+    spec.rgb *= srgb_to_linear(specular_color.rgb);
 #else
-    vec4 spec = vec4(specular_color.rgb, 1.0);
+    vec4 spec = vec4(srgb_to_linear(specular_color.rgb), 1.0);
 #endif
     return spec;
 }
@@ -307,12 +233,24 @@ void main()
     float glossiness = specular_color.a;
     vec3 norm = getNormal(glossiness);
 
+    // Widen the lobe by whatever normal detail this pixel lost to minification, as the PBR
+    // writers do. A normal map at distance packs many normals into one texel; averaging them
+    // leaves the shading with a single direction and the authored lobe width, so a narrow
+    // Blinn-Phong highlight snaps between pixels as the camera moves. Worked in the
+    // (1 - glossiness) domain, which is what this path already treats as perceptual roughness
+    // -- it is the same number that picks the probe mip in sampleReflectionProbesLegacy.
+    //
+    // Derivatives, so uniform control flow: this sits after the alpha mask, where the PBR
+    // writers put theirs.
+    glossiness = 1.0 - filterSpecularRoughness(1.0 - glossiness, norm);
+
     float emissive = getEmissive(diffcol);
 
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
     //forward rendering, output lit linear color
-    diffcol.rgb = srgb_to_linear(diffcol.rgb);
-    spec.rgb = srgb_to_linear(spec.rgb);
+    // diffcol arrived linear (decoded on the sampler) and its tint was linearised in the
+    // vertex stage. Spec keeps its in-shader decode below -- its map is still sampled
+    // encoded, matching the deferred writer.
     spec.a = glossiness; // pack glossiness into spec alpha for lighting functions
 
     vec3 pos = vary_position;
@@ -381,7 +319,7 @@ void main()
             float gtdenom = 2 * nh;
             float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
-            float scol = shadow*fres*texture(lightFunc, vec2(nh, glossiness)).r*gt/(nh*nl);
+            float scol = shadow*fres*blinnPhongLobe(nh, glossiness)*gt/(nh*nl);
             color.rgb += lit*scol*sunlit_linear.rgb*spec.rgb;
         }
 
@@ -404,7 +342,9 @@ void main()
     vec3 npos = normalize(-pos.xyz);
     vec3 light = vec3(0, 0, 0);
 
-#define LIGHT_LOOP(i) light.rgb += calcPointLightOrSpotLight(light_diffuse[i].rgb, npos, diffuse.rgb, spec, pos.xyz, norm.xyz, light_position[i], light_direction[i].xyz, light_attenuation[i].x, light_attenuation[i].y, light_attenuation[i].z, glare, light_attenuation[i].w );
+// light_deferred_attenuation carries the size/falloff pair the deferred pass reads, as the PBR
+// alpha path already takes them. light_attenuation.z stays: it is the is-omni flag.
+#define LIGHT_LOOP(i) light.rgb += calcLegacyPointLightOrSpotLight(diffuse.rgb, spec, norm.xyz, pos.xyz, npos, light_position[i].xyz, light_direction[i].xyz, light_diffuse[i].rgb, light_deferred_attenuation[i].x, light_deferred_attenuation[i].y, light_attenuation[i].z, glare);
 
     LIGHT_LOOP(1)
         LIGHT_LOOP(2)
@@ -432,7 +372,10 @@ void main()
     float flag = GBUFFER_FLAG_HAS_ATMOS;
 
     frag_data[0] = max(vec4(diffcol.rgb, emissive), vec4(0));        // gbuffer is sRGB for legacy materials
-    frag_data[1] = max(vec4(spec.rgb, glossiness), vec4(0));           // XYZ = Specular color. W = Specular exponent.
+    // frag_data[1] is a plain RGBA8 shared with PBR's linear ORM, so it cannot be sRGB
+    // storage. The spec was FILTERED in linear (sampler decode); re-encode it here so it
+    // lands sRGB the way softenLight reads it. Storage constraint, not a filtering one.
+    frag_data[1] = max(vec4(linear_to_srgb(spec.rgb), glossiness), vec4(0));  // XYZ = Specular color. W = Specular exponent.
     frag_data[2] = encodeNormal(norm, env, flag);   // XY = Normal.  Z = Env. intensity. W = 1 skip atmos (mask off fog)
 
 #if defined(HAS_EMISSIVE)

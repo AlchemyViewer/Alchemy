@@ -1,5 +1,5 @@
 /**
- * @file llfontshaping.h
+ * @file alfontshaping.h
  * @brief HarfBuzz shaping for multi-codepoint emoji sequences.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -19,12 +19,10 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLFONTSHAPING_H
-#define LL_LLFONTSHAPING_H
+#pragma once
 
 #include "llstring.h"
 
@@ -34,7 +32,7 @@ class LLFontFreetype;
 
 // One glyph produced by HarfBuzz shaping. Metrics are in pixels (already
 // converted from HB's 26.6 fixed point).
-struct LLShapedGlyph
+struct ALShapedGlyph
 {
     const LLFontFreetype* face;       // Face that owns glyph_id; shared by every glyph in a run.
     U32                   glyph_id;   // FT glyph index in `face`, *not* a Unicode codepoint.
@@ -45,7 +43,7 @@ struct LLShapedGlyph
     F32                   y_offset;
 };
 
-namespace LLFontShaping
+namespace ALFontShaping
 {
     // Shape wstr[begin..end) using `root_face`'s fallback chain to pick a
     // single owning face for the whole run. Produces glyphs laid out LTR in
@@ -70,7 +68,7 @@ namespace LLFontShaping
                   LLWStringView         wstr,
                   size_t                begin,
                   size_t                end,
-                  std::vector<LLShapedGlyph>& out_glyphs);
+                  std::vector<ALShapedGlyph>& out_glyphs);
 
     // Like shapeRun, but returns a const reference into the LRU instead of
     // copying out. Cluster values in the returned glyphs are SLICE-LOCAL —
@@ -81,7 +79,7 @@ namespace LLFontShaping
     // or by clearCache/clearCacheForFace. Intended for renderer hot paths
     // that shape once, iterate, and discard within a single function call.
     // On failure or bad input returns a reference to a static empty vector.
-    const std::vector<LLShapedGlyph>& shapeLine(
+    const std::vector<ALShapedGlyph>& shapeLine(
         const LLFontFreetype* root_face,
         LLWStringView         wstr,
         size_t                begin,
@@ -94,7 +92,7 @@ namespace LLFontShaping
     void clearCache();
 
     // Drop every entry that references `face` — keyed on it (root_face) OR
-    // holding glyphs sourced from it (LLShapedGlyph::face stores a raw
+    // holding glyphs sourced from it (ALShapedGlyph::face stores a raw
     // pointer to whichever fallback owns each glyph_id, and those entries
     // are keyed by the HEAD that shaped them, not the fallback). Called
     // from ~LLFontFreetype and from loadFace() reload, so a face teardown
@@ -121,5 +119,3 @@ namespace LLFontShaping
     // use-after-invalidation into a debug assert instead of silent garbage.
     size_t cacheMutationCount();
 }
-
-#endif // LL_LLFONTSHAPING_H

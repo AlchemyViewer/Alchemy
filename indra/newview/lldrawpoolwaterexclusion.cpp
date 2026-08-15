@@ -65,9 +65,7 @@ void LLDrawPoolWaterExclusion::render(S32 pass)
     }
 
     gDrawColorProgram.uniform4f(LLShaderMgr::DIFFUSE_COLOR, 0, 0, 0, 1);
-
-    static LLStaticHashedString waterSign("waterSign");
-    gDrawColorProgram.uniform1f(waterSign, 1.f);
+    gDrawColorProgram.uniform1f(LLShaderMgr::WATER_WATERSIGN, 1.f);
 
     pushBatches(LLRenderPass::PASS_INVISIBLE, false, false);
 

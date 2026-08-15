@@ -971,11 +971,6 @@ void LLVOAvatar::deleteLayerSetCaches(bool clearAll)
                 mBakedTextureDatas[i].mTexLayerSet->deleteCaches();
             }
         }
-        if (mBakedTextureDatas[i].mMaskTexName)
-        {
-            LLImageGL::deleteTextures(1, (GLuint*)&(mBakedTextureDatas[i].mMaskTexName));
-            mBakedTextureDatas[i].mMaskTexName = 0 ;
-        }
     }
 }
 
@@ -5617,6 +5612,17 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     LLVector3 left = LLViewerCamera::getInstance()->getUpAxis() % at;
     LLVector3 up = at%left;
 
+    // Both cross products carry the magnitude sin(angle between the camera up axis and the
+    // direction to the avatar), not 1: |camUp x at| = sin(theta), and |at x left| inherits it.
+    // mImpostorDim is a half-extent in world units, so scaling an unnormalized basis by it
+    // shrank the billboard by that factor -- exact at screen centre, ~13% small at 30 degrees
+    // of vertical offset, worse toward the top and bottom of the screen. The bake side builds
+    // an exact orthonormal frame (camera.lookAt) and sizes its projection so the half-extent
+    // exactly fills the image, so this was a pure mismatch: impostored avatars read as
+    // slightly too small, and popped in size as the camera pitched.
+    left.normalize();
+    up.normalize();
+
     left *= mImpostorDim.mV[0];
     up *= mImpostorDim.mV[1];
 
@@ -5624,7 +5630,7 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     {
         LLGLEnable blend(GL_BLEND);
         gGL.setSceneBlendType(LLRender::BT_ADD);
-        gGL.getTexUnit(diffuse_channel)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(diffuse_channel)->unbind();
 
         gGL.begin(LLRender::LINES);
         gGL.color4f(1.f,1.f,1.f,1.f);
@@ -5644,8 +5650,38 @@ U32 LLVOAvatar::renderImpostor(LLColor4U color, S32 diffuse_channel)
     {
     gGL.flush();
 
+    // Rebase the baked normals into the CURRENT view basis: main_view * inverse(bake_view).
+    // Both are pure rotations sharing an origin, so the inverse is the transpose. Uploaded
+    // per avatar because each impostor was baked aiming at its own subject, and re-derived
+    // every frame because the impostor outlives the camera position that produced it.
+    if (LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr)
+    {
+        if (shader->hasUniform(LLShaderMgr::IMPOSTOR_NORM_ROTATION))
+        {
+            const glm::mat3 main_view(get_current_modelview());
+            const LLMatrix3& baked = getImpostorViewRotation();
+
+            glm::mat3 bake_view;
+            for (U32 r = 0; r < 3; ++r)
+            {
+                for (U32 c = 0; c < 3; ++c)
+                {   // LLMatrix3 is row-major, glm is column-major
+                    bake_view[c][r] = baked.mMatrix[r][c];
+                }
+            }
+
+            const glm::mat3 rebase = main_view * glm::transpose(bake_view);
+            shader->uniformMatrix3fv(LLShaderMgr::IMPOSTOR_NORM_ROTATION, 1, GL_FALSE,
+                                     glm::value_ptr(rebase));
+        }
+    }
+
     gGL.color4ubv(color.mV);
-    gGL.getTexUnit(diffuse_channel)->bind(&mImpostor);
+    // TFO_POINT: an impostor is a screen-aligned billboard rendered at its own resolution,
+    // so filtering it only smears the silhouette. This used to be written onto the texture
+    // when the impostor was allocated.
+    gGL.getTextureSlot(diffuse_channel)->bind(&mImpostor, false,
+                                          gGL.getSampler(ALSamplers::PointClamp));
     gGL.begin(LLRender::TRIANGLES);
     {
         gGL.texCoord2f(0.f, 0.f);
@@ -5891,7 +5927,9 @@ void LLVOAvatar::updateTextures()
         {
             if (layer_baked[i] && !mBakedTextureDatas[i].mIsLoaded)
             {
-                gGL.getTexUnit(0)->bind(getImage( mBakedTextureDatas[i].mTextureIndex, 0 ));
+                // Same shape as LLLocalTextureObject's: a bind with nothing drawn after it,
+                // touching a baked layer that has not loaded. A residency nudge, not a sample.
+                gGL.getTextureSlot(0)->bindSampled(getImage( mBakedTextureDatas[i].mTextureIndex, 0 ), ALSamplers::AnisoWrap);
             }
         }
     }
@@ -6167,6 +6205,7 @@ const LLUUID& LLVOAvatar::getStepSound() const
 //-----------------------------------------------------------------------------
 void LLVOAvatar::processAnimationStateChanges()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     if ( isAnyAnimationSignaled(AGENT_WALK_ANIMS, NUM_AGENT_WALK_ANIMS) )
     {
         startMotion(ANIM_AGENT_WALK_ADJUST);
@@ -7798,7 +7837,8 @@ const LLViewerJointAttachment *LLVOAvatar::attachObject(LLViewerObject *viewer_o
         updateAttachmentOverrides();
     }
 
-    updateVisualComplexity();
+    // Inform complexity logic to do partial update.
+    markAttachmentComplexityDirty(viewer_object->getID());
 
     if (viewer_object->isSelected())
     {
@@ -8102,7 +8142,7 @@ bool LLVOAvatar::detachObject(LLViewerObject *viewer_object)
 
         if (attachment->isObjectAttached(viewer_object))
         {
-            updateVisualComplexity();
+            markAttachmentComplexityDirty(viewer_object->getID(), true);
             bool is_animated_object = viewer_object->isAnimatedObject();
             cleanupAttachedMesh(viewer_object);
 
@@ -8569,6 +8609,7 @@ void LLVOAvatar::updateRezzedStatusTimers(S32 rez_status)
                 selfStopPhase("wear_inventory_category", false);
                 selfStopPhase("process_initial_wearables_update", false);
 
+                // Start a complexity update.
                 updateVisualComplexity();
             }
         }
@@ -8844,6 +8885,10 @@ bool LLVOAvatar::processFullyLoadedChange(bool loading)
 
     if (changed && isSelf())
     {
+        // Agent's own avatar doesn't track bakes the same way as other avatars.
+        // So just update here, on cloud removal.
+        markBodyPartsComplexityDirty();
+
         // to know about outfit switching
         LLAvatarRenderNotifier::getInstance()->updateNotificationState();
     }
@@ -9509,6 +9554,7 @@ void LLVOAvatar::releaseComponentTextures()
         {
             // Regression case of messaging system. Expected 21 textures, received 20. last texture is not valid so set to default
             setTETexture(TEX_HAIR_BAKED, IMG_DEFAULT_AVATAR);
+            markBodyPartsComplexityDirty();
         }
     }
 
@@ -9526,6 +9572,7 @@ void LLVOAvatar::releaseComponentTextures()
         {
             const U8 te = (ETextureIndex)bakedDicEntry->mLocalTextures[texture];
             setTETexture(te, IMG_DEFAULT_AVATAR);
+            markBodyPartsComplexityDirty();
         }
     }
 }
@@ -10276,9 +10323,25 @@ const LLVOAvatar::MatrixPaletteCache& LLVOAvatar::updateSkinInfoMatrixPalette(co
 
         const LLMatrix4a* mat = &(entry.mMatrixPalette[0]);
 
-        entry.mGLMp.resize(count * 12);
+        entry.mGLMp.resize(4 + count * 12);
 
         F32* mp = &(entry.mGLMp[0]);
+
+        // Rebase origin, packed ahead of the palette (uploaded as the SKIN_ORIGIN uniform)
+        // and subtracted from every joint translation below so per-vertex GPU skinning math
+        // stays avatar-local. Joint world matrices carry the avatar's agent-space position
+        // (Z up to ~4096 m); pushing that through the per-vertex fp32 transform chain leaves
+        // normals and positions at the mercy of the driver compiler keeping two
+        // region-magnitude evaluations rounding-identical -- newer AMD compilers don't, which
+        // reads as altitude-scaled normal noise and vertex wiggle. The shader adds this exact
+        // value back as a uniform (rigid) term, so any point near the joints works; the
+        // skeleton root always is.
+        const LLVector3 origin = mRoot->getWorldPosition();
+        mp[0] = origin.mV[VX];
+        mp[1] = origin.mV[VY];
+        mp[2] = origin.mV[VZ];
+        mp[3] = 0.f;
+        mp += 4;
 
         for (U32 i = 0; i < count; ++i)
         {
@@ -10289,17 +10352,17 @@ const LLVOAvatar::MatrixPaletteCache& LLVOAvatar::updateSkinInfoMatrixPalette(co
             mp[idx + 0] = m[0];
             mp[idx + 1] = m[1];
             mp[idx + 2] = m[2];
-            mp[idx + 3] = m[12];
+            mp[idx + 3] = m[12] - origin.mV[VX];
 
             mp[idx + 4] = m[4];
             mp[idx + 5] = m[5];
             mp[idx + 6] = m[6];
-            mp[idx + 7] = m[13];
+            mp[idx + 7] = m[13] - origin.mV[VY];
 
             mp[idx + 8] = m[8];
             mp[idx + 9] = m[9];
             mp[idx + 10] = m[10];
-            mp[idx + 11] = m[14];
+            mp[idx + 11] = m[14] - origin.mV[VZ];
         }
     }
 
@@ -10360,26 +10423,14 @@ void LLVOAvatar::onBakedTextureMasksLoaded( bool success, LLViewerFetchedTexture
                 return;
             }
 
-            U32 gl_name;
-            LLImageGL::generateTextures(1, &gl_name );
-            stop_glerror();
-
-            gGL.getTexUnit(0)->bindManual(LLTexUnit::TT_TEXTURE, gl_name);
-            stop_glerror();
-
-            // setManualImage rewrites GL_ALPHA8 / GL_ALPHA → GL_R8 / GL_RED
-            // for core-profile compatibility but no longer writes the
-            // swizzle attribute itself. Apply the matching mask via the
-            // LLImageGL helper so {0,0,0,A} sample semantics are preserved.
-            LLImageGL::applySwizzleForDeprecatedFormat(LLTexUnit::TT_TEXTURE, GL_ALPHA);
-
-            LLImageGL::setManualImage(
-                GL_TEXTURE_2D, 0, GL_ALPHA8,
-                aux_src->getWidth(), aux_src->getHeight(),
-                GL_ALPHA, GL_UNSIGNED_BYTE, aux_src->getData());
-            stop_glerror();
-
-            gGL.getTexUnit(0)->setTextureFilteringOption(LLTexUnit::TFO_BILINEAR);
+            // The morph mask is consumed on the CPU, by applyMorphMask() below.
+            //
+            // It was also uploaded to a GL texture here, for the fixed-function clothing-mask
+            // pass that read it through LLAvatarJointMesh::sClothingMaskImageName. That pass
+            // went away with the fixed-function avatar renderer; the upload outlived it by
+            // years, allocating and deleting a full-size single-channel texture per bake mask
+            // per avatar that was never once bound for a read. Removed along with the static
+            // and the EAvatarRenderPass enum it belonged to.
 
             /* if( id == head_baked->getID() )
                  if (self->mBakedTextureDatas[BAKED_HEAD].mTexLayerSet)
@@ -10402,11 +10453,6 @@ void LLVOAvatar::onBakedTextureMasksLoaded( bool success, LLViewerFetchedTexture
                         const EBakedTextureIndex baked_index = texture_dict->mBakedTextureIndex;
                         self->applyMorphMask(aux_src->getData(), aux_src->getWidth(), aux_src->getHeight(), 1, baked_index);
                         maskData->mLastDiscardLevel = discard_level;
-                        if (self->mBakedTextureDatas[baked_index].mMaskTexName)
-                        {
-                            LLImageGL::deleteTextures(1, &(self->mBakedTextureDatas[baked_index].mMaskTexName));
-                        }
-                        self->mBakedTextureDatas[baked_index].mMaskTexName = gl_name;
                         found_texture_id = true;
                         break;
                     }
@@ -10417,6 +10463,7 @@ void LLVOAvatar::onBakedTextureMasksLoaded( bool success, LLViewerFetchedTexture
                 LL_INFOS() << "unexpected image id: " << id << LL_ENDL;
             }
             self->dirtyMesh();
+            self->markBodyPartsComplexityDirty();
         }
         else
         {
@@ -10449,6 +10496,10 @@ void LLVOAvatar::onInitialBakedTextureLoaded( bool success, LLViewerFetchedTextu
     }
     if (final || !success )
     {
+        if (selfp)
+        {
+            selfp->markBodyPartsComplexityDirty();
+        }
         delete avatar_idp;
     }
 }
@@ -10471,6 +10522,7 @@ void LLVOAvatar::onBakedTextureLoaded(bool success,
     if (selfp && !success)
     {
         selfp->removeMissingBakedTextures();
+        selfp->markBodyPartsComplexityDirty();
     }
 
     if( final || !success )
@@ -10481,6 +10533,7 @@ void LLVOAvatar::onBakedTextureLoaded(bool success,
     if( selfp && success && final )
     {
         selfp->useBakedTexture( id );
+        selfp->markBodyPartsComplexityDirty();
     }
 }
 
@@ -11436,10 +11489,384 @@ void LLVOAvatar::idleUpdateDebugInfo()
 void LLVOAvatar::updateVisualComplexity()
 {
     LL_DEBUGS("AvatarRender") << "avatar " << getID() << " appearance changed" << LL_ENDL;
-    // Set the cache time to in the past so it's updated ASAP
+    // Trigger cache recalculation on next idle update.
+    // Will recalculate stale, missing data and control avatar.
     mVisualComplexityStale = true;
 }
 
+void LLVOAvatar::calculateAttachmentComplexity(LLViewerObject* attached_object,
+    const F32 max_attachment_complexity,
+    ComplexityComponent& cache)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
+    cache.reset();
+
+    if (!attached_object
+        || attached_object->isDead())
+    {
+        return;
+    }
+
+    accountRenderComplexityForObject(
+        attached_object,
+        max_attachment_complexity,
+        cache.textures,
+        cache.render_cost,
+        cache.triangle_count,
+        cache.est_triangle_count,
+        cache.surface_area,
+        cache.hud_complexity,
+        cache.object_complexity
+    );
+
+    cache.last_update_time = LLFrameTimer::getTotalSeconds();
+    cache.needs_update = false;
+}
+
+void LLVOAvatar::calculateBodyPartsComplexity(ComplexityComponent& cache)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
+    cache.reset();
+
+    // Body parts have a fixed cost
+    // This represents the base avatar mesh (eyes, hair, shape, skin, etc.)
+    cache.render_cost = calculateBodyPartsComplexity();
+
+    // For more accurate body part complexity, could enumerate mesh LODs here
+    // For now, using a constant cost as in the original implementation
+
+    cache.last_update_time = LLFrameTimer::getTotalSeconds();
+    cache.needs_update = false;
+}
+
+bool LLVOAvatar::shouldUpdateComplexityComponent(const ComplexityComponent& component) const
+{
+    if (component.needs_update)
+    {
+        return true;
+    }
+
+    constexpr F32 CACHE_LIFETIME_SECONDS = 30.0; // Todo: should be indefinite, until something actually changes
+    F64 current_time = LLFrameTimer::getTotalSeconds();
+    return (current_time - component.last_update_time) > CACHE_LIFETIME_SECONDS;
+}
+
+bool LLVOAvatar::calculateControlAvatarComplexity(ComplexityComponent& cache, const F32 max_attachment_complexity)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
+    cache.reset();
+
+    if (!isControlAvatar())
+    {
+        return false;
+    }
+
+    LLControlAvatar* control_av = dynamic_cast<LLControlAvatar*>(this);
+    if (!control_av)
+    {
+        return false;
+    }
+
+    LLVOVolume* volp = control_av->mRootVolp;
+    if (!volp || volp->isAttachment())
+    {
+        return false;
+    }
+
+    accountRenderComplexityForObject(
+        volp,
+        max_attachment_complexity,
+        cache.textures,
+        cache.render_cost,
+        cache.triangle_count,
+        cache.est_triangle_count,
+        cache.surface_area,
+        cache.hud_complexity,
+        cache.object_complexity
+    );
+
+    // todo: store 'expires' time instead or make it indefinite?
+    cache.last_update_time = LLFrameTimer::getTotalSeconds();
+    cache.needs_update = false;
+
+    return true;
+}
+
+void LLVOAvatar::accumulateComplexityComponent(const ComplexityComponent& component,
+    U32& total_cost,
+    hud_complexity_list_t& hud_list,
+    object_complexity_list_t& object_list)
+{
+    total_cost += component.render_cost;
+    mAttachmentSurfaceArea += component.surface_area;
+    mAttachmentVisibleTriangleCount += component.triangle_count;
+    mAttachmentEstTriangleCount += component.est_triangle_count;
+
+    // Add HUD/object complexity info if present
+    if (component.hud_complexity.objectId.notNull())
+    {
+        hud_list.push_back(component.hud_complexity);
+    }
+    if (component.object_complexity.objectId.notNull())
+    {
+        object_list.push_back(component.object_complexity);
+    }
+}
+
+void LLVOAvatar::markAttachmentComplexityDirty(const LLUUID& object_id, bool force_reset_attachment)
+{
+    // Mark the cache entry if it exists
+    complexity_cache_map_t::iterator it = mComplexityCache.find(object_id);
+    if (it != mComplexityCache.end())
+    {
+        if (force_reset_attachment)
+        {
+            // Object was detached.
+            // Force reset it in case it lingers in gObjectList for some reason (ex: dropped to world).
+            it->second.reset();
+        }
+        it->second.needs_update = true;
+    }
+
+    // Launch update process if not already scheduled
+    // It will add any missing attachments.
+    mVisualComplexityStale = true;
+}
+
+void LLVOAvatar::markBodyPartsComplexityDirty()
+{
+    mBodyPartsComplexity.needs_update = true;
+
+    // Launch update process if not already scheduled
+    mVisualComplexityStale = true;
+}
+
+void LLVOAvatar::performPartialComplexityUpdate(const F32 max_attachment_complexity)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
+    // Update any attachments marked as dirty
+    // Todo: might want to limit time or count here and defer the rest
+    // till next run. In such a case will need to make sure
+    // mVisualComplexityStale remains true.
+
+    for (attachment_map_t::iterator iter = mAttachmentPoints.begin();
+        iter != mAttachmentPoints.end(); ++iter)
+    {
+        LLViewerJointAttachment* attachment = iter->second;
+        if (!attachment || !attachment->getValid())
+        {
+            continue;
+        }
+
+        for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
+            attachment_iter != attachment->mAttachedObjects.end(); ++attachment_iter)
+        {
+            LLViewerObject* attached_object = attachment_iter->get();
+            if (attached_object && !attached_object->isDead())
+            {
+                LLUUID object_id = attached_object->getID();
+                ComplexityComponent& cache = mComplexityCache[object_id];
+
+                // Update if cache is stale or a new entry.
+                if (shouldUpdateComplexityComponent(cache))
+                {
+                    calculateAttachmentComplexity(attached_object, max_attachment_complexity, cache);
+                }
+            }
+        }
+    }
+
+    // Update body parts if stale
+    if (shouldUpdateComplexityComponent(mBodyPartsComplexity))
+    {
+        calculateBodyPartsComplexity(mBodyPartsComplexity);
+    }
+}
+
+// Calculations for mVisualComplexity value
+// Call rate is flexible, can be once in 20, can be once in 200 frames,
+// depends on priority and known cost of an avatar in question.
+void LLVOAvatar::calculateUpdateRenderComplexity()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+
+    // ****************************************************************
+    // This calculation should not be modified by third party viewers,
+    // since it is used to limit rendering and should be uniform for
+    // everyone. If you have suggested improvements, submit them to
+    // the official viewer for consideration.
+    // ****************************************************************
+
+    if (!mVisualComplexityStale)
+    {
+        return;
+    }
+
+    // Get the attachment complexity limit
+    static LLCachedControl<F32> max_complexity_setting(gSavedSettings, "MaxAttachmentComplexity");
+    F32 max_attachment_complexity = max_complexity_setting;
+    max_attachment_complexity = llmax(max_attachment_complexity, DEFAULT_MAX_ATTACHMENT_COMPLEXITY);
+
+    // Update complexity for any dirty attachments or body parts.
+    //
+    // Todo: Limit this by time or count and continue later as
+    // doing everything in one go can be very expensive (multiple ms)
+    // Note that calculateUpdateRenderComplexity() can be launched once
+    // per 200 frames. Limiting it by time or count runs the risk of
+    // already checked attachments getting stale on last_update_time,
+    // thus function will keep running indefinetely.
+    performPartialComplexityUpdate(max_attachment_complexity);
+
+    // Reset per-run counters
+    mAttachmentSurfaceArea = 0.f;
+    mAttachmentVisibleTriangleCount = 0;
+    mAttachmentEstTriangleCount = 0.f;
+
+    U32 total_cost = 0;
+    hud_complexity_list_t hud_complexity_list;
+    object_complexity_list_t object_complexity_list;
+
+    // Calculate and accumulate control avatar complexity if applicable
+    // For now this is on each run.
+    // Todo: See if mControlAvatarComplexity.needs_update is applicable here.
+    if (calculateControlAvatarComplexity(mControlAvatarComplexity, max_attachment_complexity))
+    {
+        accumulateComplexityComponent(
+            mControlAvatarComplexity,
+            total_cost,
+            hud_complexity_list,
+            object_complexity_list);
+    }
+
+    // Accumulate body parts complexity
+    accumulateComplexityComponent(mBodyPartsComplexity, total_cost, hud_complexity_list, object_complexity_list);
+
+    // Accumulate all attachment complexity from cache
+    // Clean up cache entries for attachments that no longer exist
+    std::vector<LLUUID> to_remove;
+
+    for (complexity_cache_map_t::iterator cache_iter = mComplexityCache.begin();
+        cache_iter != mComplexityCache.end(); ++cache_iter)
+    {
+        const LLUUID& object_id = cache_iter->first;
+
+        // Verify object still exists
+        LLViewerObject* obj = gObjectList.findObject(object_id);
+        if (!obj
+            || obj->isDead()
+            || !obj->isAttachment())
+        {
+            to_remove.push_back(object_id);
+            continue;
+        }
+
+        // Accumulate this attachment's complexity
+        accumulateComplexityComponent(cache_iter->second, total_cost,
+            hud_complexity_list, object_complexity_list);
+    }
+
+    // Remove stale cache entries
+    for (std::vector<LLUUID>::iterator it = to_remove.begin(); it != to_remove.end(); ++it)
+    {
+        mComplexityCache.erase(*it);
+    }
+
+    if (total_cost != mVisualComplexity)
+    {
+        LL_DEBUGS("AvatarRender") << "Avatar " << getID()
+            << " complexity updated was " << mVisualComplexity << " now " << total_cost
+            << " reported " << mReportedVisualComplexity
+            << LL_ENDL;
+    }
+    else
+    {
+        LL_DEBUGS("AvatarRender") << "Avatar " << getID()
+            << " complexity updated no change " << mVisualComplexity
+            << " reported " << mReportedVisualComplexity
+            << LL_ENDL;
+    }
+
+    // Store results
+    mVisualComplexity = total_cost;
+
+    // Call the reporting function with the aggregated lists
+    processComplexityCostChange(hud_complexity_list, object_complexity_list);
+
+    // Stop processing until something changes
+    mVisualComplexityStale = false;
+}
+
+U32 LLVOAvatar::calculateBodyPartsComplexity()
+{
+    constexpr U32 COMPLEXITY_BODY_PART_COST = 200;
+    U32 cost = 0;
+    for (U8 baked_index = 0; baked_index < BAKED_NUM_INDICES; baked_index++)
+    {
+        const LLAvatarAppearanceDictionary::BakedEntry* baked_dict
+            = LLAvatarAppearance::getDictionary()->getBakedTexture((EBakedTextureIndex)baked_index);
+        ETextureIndex tex_index = baked_dict->mTextureIndex;
+        if ((tex_index != TEX_SKIRT_BAKED) || (isWearingWearableType(LLWearableType::WT_SKIRT)))
+        {
+            // Same as isTextureVisible(), but doesn't account for isSelf to ensure identical numbers for all avatars
+            if (isIndexLocalTexture(tex_index))
+            {
+                if (isTextureDefined(tex_index, 0))
+                {
+                    cost += COMPLEXITY_BODY_PART_COST;
+                }
+            }
+            else
+            {
+                // baked textures can use TE images directly
+                if (isTextureDefined(tex_index)
+                    && (getTEImage(tex_index)->getID() != IMG_INVISIBLE || LLDrawPoolAlpha::sShowDebugAlpha))
+                {
+                    cost += COMPLEXITY_BODY_PART_COST;
+                }
+            }
+        }
+    }
+    LL_DEBUGS("ARCdetail") << "Avatar body parts complexity: " << cost << LL_ENDL;
+    return cost;
+}
+
+void LLVOAvatar::processComplexityCostChange(const hud_complexity_list_t &hud_complexity_list, const object_complexity_list_t &object_complexity_list)
+{
+    static LLCachedControl<U32> show_my_complexity_changes(gSavedSettings, "ShowMyComplexityChanges", 20);
+
+    if (isSelf() && show_my_complexity_changes)
+    {
+        // Avatar complexity
+        LLAvatarRenderNotifier::getInstance()->updateNotificationAgent(mVisualComplexity);
+        LLAvatarRenderNotifier::getInstance()->setObjectComplexityList(object_complexity_list);
+        // HUD complexity
+        LLHUDRenderNotifier::getInstance()->updateNotificationHUD(hud_complexity_list);
+    }
+
+    //schedule an update to ART next frame if needed
+    if (LLPerfStats::tunables.userAutoTuneEnabled &&
+        LLPerfStats::tunables.userFPSTuningStrategy != LLPerfStats::TUNE_SCENE_ONLY &&
+        !isVisuallyMuted())
+    {
+        const LLUUID id = getID(); // <== use id to make sure this avatar didn't get deleted between frames
+        LL::WorkQueue::getInstance("mainloop")->post([id]()
+        {
+            LLViewerObject* obj = gObjectList.findObject(id);
+            if (obj
+                && !obj->isDead()
+                && obj->isAvatar()
+                && obj->mDrawable)
+            {
+                LLVOAvatar* avatar = (LLVOAvatar*)obj;
+                gPipeline.profileAvatar(avatar);
+            }
+        });
+    }
+}
 
 // Account for the complexity of a single top-level object associated
 // with an avatar. This will be either an attached object or an animated
@@ -11449,15 +11876,18 @@ void LLVOAvatar::accountRenderComplexityForObject(
     const F32 max_attachment_complexity,
     LLVOVolume::texture_cost_t& textures,
     U32& cost,
-    hud_complexity_list_t& hud_complexity_list,
-    object_complexity_list_t& object_complexity_list)
+    U32& visible_triangle_count,
+    F32& est_triangle_count,
+    F32& surface_area,
+    LLHUDComplexity& hud_object_complexity,
+    LLObjectComplexity& object_complexity)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     if (attached_object && !attached_object->isHUDAttachment())
     {
-        mAttachmentVisibleTriangleCount += attached_object->recursiveGetTriangleCount();
-        mAttachmentEstTriangleCount += attached_object->recursiveGetEstTrianglesMax();
-        mAttachmentSurfaceArea += attached_object->recursiveGetScaledSurfaceArea();
+        visible_triangle_count += attached_object->recursiveGetTriangleCount();
+        est_triangle_count += attached_object->recursiveGetEstTrianglesMax();
+        surface_area += attached_object->recursiveGetScaledSurfaceArea();
 
         textures.clear();
         const LLDrawable* drawable = attached_object->mDrawable;
@@ -11508,11 +11938,9 @@ void LLVOAvatar::accountRenderComplexityForObject(
 
                 if (isSelf())
                 {
-                    LLObjectComplexity object_complexity;
                     object_complexity.objectName = attached_object->getAttachmentItemName();
                     object_complexity.objectId = attached_object->getAttachmentItemID();
                     object_complexity.objectCost = (U32)attachment_total_cost;
-                    object_complexity_list.push_back(object_complexity);
                 }
             }
         }
@@ -11524,13 +11952,12 @@ void LLVOAvatar::accountRenderComplexityForObject(
         && attached_object->mDrawable)
     {
         textures.clear();
-        mAttachmentSurfaceArea += attached_object->recursiveGetScaledSurfaceArea();
+        surface_area += attached_object->recursiveGetScaledSurfaceArea();
 
         const LLVOVolume* volume = attached_object->mDrawable->getVOVolume();
         if (volume)
         {
             bool is_rigged_mesh = volume->isRiggedMeshFast();
-            LLHUDComplexity hud_object_complexity;
             hud_object_complexity.objectName = attached_object->getAttachmentItemName();
             hud_object_complexity.objectId = attached_object->getAttachmentItemID();
             std::string joint_name;
@@ -11585,142 +12012,6 @@ void LLVOAvatar::accountRenderComplexityForObject(
                     }
                 }
             }
-            hud_complexity_list.push_back(hud_object_complexity);
-        }
-    }
-}
-
-// Calculations for mVisualComplexity value
-void LLVOAvatar::calculateUpdateRenderComplexity()
-{
-    /*****************************************************************
-     * This calculation should not be modified by third party viewers,
-     * since it is used to limit rendering and should be uniform for
-     * everyone. If you have suggested improvements, submit them to
-     * the official viewer for consideration.
-     *****************************************************************/
-    if (mVisualComplexityStale)
-    {
-        LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
-
-        static const U32 COMPLEXITY_BODY_PART_COST = 200;
-        static LLCachedControl<F32> max_complexity_setting(gSavedSettings, "MaxAttachmentComplexity");
-        F32 max_attachment_complexity = max_complexity_setting;
-        max_attachment_complexity = llmax(max_attachment_complexity, DEFAULT_MAX_ATTACHMENT_COMPLEXITY);
-
-        U32 cost = VISUAL_COMPLEXITY_UNKNOWN;
-        LLVOVolume::texture_cost_t textures;
-        hud_complexity_list_t hud_complexity_list;
-        object_complexity_list_t object_complexity_list;
-
-        for (U8 baked_index = 0; baked_index < BAKED_NUM_INDICES; baked_index++)
-        {
-            const LLAvatarAppearanceDictionary::BakedEntry *baked_dict
-                = LLAvatarAppearance::getDictionary()->getBakedTexture((EBakedTextureIndex)baked_index);
-            ETextureIndex tex_index = baked_dict->mTextureIndex;
-            if ((tex_index != TEX_SKIRT_BAKED) || (isWearingWearableType(LLWearableType::WT_SKIRT)))
-            {
-                // Same as isTextureVisible(), but doesn't account for isSelf to ensure identical numbers for all avatars
-                if (isIndexLocalTexture(tex_index))
-                {
-                    if (isTextureDefined(tex_index, 0))
-                    {
-                        cost += COMPLEXITY_BODY_PART_COST;
-                    }
-                }
-                else
-                {
-                    // baked textures can use TE images directly
-                    if (isTextureDefined(tex_index)
-                        && (getTEImage(tex_index)->getID() != IMG_INVISIBLE || LLDrawPoolAlpha::sShowDebugAlpha))
-                    {
-                        cost += COMPLEXITY_BODY_PART_COST;
-                    }
-                }
-            }
-        }
-        LL_DEBUGS("ARCdetail") << "Avatar body parts complexity: " << cost << LL_ENDL;
-
-        mAttachmentVisibleTriangleCount = 0;
-        mAttachmentEstTriangleCount = 0.f;
-        mAttachmentSurfaceArea = 0.f;
-
-        // A standalone animated object needs to be accounted for
-        // using its associated volume. Attached animated objects
-        // will be covered by the subsequent loop over attachments.
-        LLControlAvatar *control_av = dynamic_cast<LLControlAvatar*>(this);
-        if (control_av)
-        {
-            LLVOVolume *volp = control_av->mRootVolp;
-            if (volp && !volp->isAttachment())
-            {
-                accountRenderComplexityForObject(volp, max_attachment_complexity,
-                                                 textures, cost, hud_complexity_list, object_complexity_list);
-            }
-        }
-
-        // Account for complexity of all attachments.
-        for (attachment_map_t::const_iterator attachment_point = mAttachmentPoints.begin();
-             attachment_point != mAttachmentPoints.end();
-             ++attachment_point)
-        {
-            LLViewerJointAttachment* attachment = attachment_point->second;
-            for (LLViewerJointAttachment::attachedobjs_vec_t::iterator attachment_iter = attachment->mAttachedObjects.begin();
-                 attachment_iter != attachment->mAttachedObjects.end();
-                 ++attachment_iter)
-            {
-                LLViewerObject* attached_object = attachment_iter->get();
-                accountRenderComplexityForObject(attached_object, max_attachment_complexity,
-                                                 textures, cost, hud_complexity_list, object_complexity_list);
-            }
-        }
-
-        if ( cost != mVisualComplexity )
-        {
-            LL_DEBUGS("AvatarRender") << "Avatar "<< getID()
-                                      << " complexity updated was " << mVisualComplexity << " now " << cost
-                                      << " reported " << mReportedVisualComplexity
-                                      << LL_ENDL;
-        }
-        else
-        {
-            LL_DEBUGS("AvatarRender") << "Avatar "<< getID()
-                                      << " complexity updated no change " << mVisualComplexity
-                                      << " reported " << mReportedVisualComplexity
-                                      << LL_ENDL;
-        }
-        mVisualComplexity = cost;
-        mVisualComplexityStale = false;
-
-        static LLCachedControl<U32> show_my_complexity_changes(gSavedSettings, "ShowMyComplexityChanges", 20);
-
-        if (isSelf() && show_my_complexity_changes)
-        {
-            // Avatar complexity
-            LLAvatarRenderNotifier::getInstance()->updateNotificationAgent(mVisualComplexity);
-            LLAvatarRenderNotifier::getInstance()->setObjectComplexityList(object_complexity_list);
-            // HUD complexity
-            LLHUDRenderNotifier::getInstance()->updateNotificationHUD(hud_complexity_list);
-        }
-
-        //schedule an update to ART next frame if needed
-        if (LLPerfStats::tunables.userAutoTuneEnabled &&
-            LLPerfStats::tunables.userFPSTuningStrategy != LLPerfStats::TUNE_SCENE_ONLY &&
-            !isVisuallyMuted())
-        {
-            const LLUUID id = getID(); // <== use id to make sure this avatar didn't get deleted between frames
-            LL::WorkQueue::getInstance("mainloop")->post([id]()
-                {
-                    LLViewerObject* obj = gObjectList.findObject(id);
-                    if (obj
-                        && !obj->isDead()
-                        && obj->isAvatar()
-                        && obj->mDrawable)
-                    {
-                        LLVOAvatar* avatar = (LLVOAvatar*)obj;
-                        gPipeline.profileAvatar(avatar);
-                    }
-                });
         }
     }
 }

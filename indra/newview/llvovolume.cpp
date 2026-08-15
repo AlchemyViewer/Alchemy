@@ -379,43 +379,13 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 
             if (mesgsys->getSizeFast(_PREHASH_ObjectData, block_num, _PREHASH_TextureAnim))
             {
-                if (!mTextureAnimp)
-                {
-                    mTextureAnimp = new LLViewerTextureAnim(this);
-                }
-                else
-                {
-                    if (!(mTextureAnimp->mMode & LLTextureAnim::SMOOTH))
-                    {
-                        mTextureAnimp->reset();
-                    }
-                }
-                mTexAnimMode = 0;
-
-                mTextureAnimp->unpackTAMessage(mesgsys, block_num);
+                LLTextureAnim ta;
+                ta.unpackTAMessage(mesgsys, block_num);
+                applyTextureAnim(ta);
             }
             else
             {
-                if (mTextureAnimp)
-                {
-                    delete mTextureAnimp;
-                    mTextureAnimp = NULL;
-
-                    for (S32 i = 0; i < getNumTEs(); i++)
-                    {
-                        LLFace* facep = mDrawable->getFace(i);
-                        if (facep && facep->mTextureMatrix)
-                        {
-                            // delete or reset
-                            delete facep->mTextureMatrix;
-                            facep->mTextureMatrix = NULL;
-                        }
-                    }
-
-                    gPipeline.markTextured(mDrawable);
-                    mFaceMappingChanged = true;
-                    mTexAnimMode = 0;
-                }
+                clearTextureAnim();
             }
 
             // Unpack volume data
@@ -486,39 +456,13 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 
             if (value & 0x40)
             {
-                if (!mTextureAnimp)
-                {
-                    mTextureAnimp = new LLViewerTextureAnim(this);
-                }
-                else
-                {
-                    if (!(mTextureAnimp->mMode & LLTextureAnim::SMOOTH))
-                    {
-                        mTextureAnimp->reset();
-                    }
-                }
-                mTexAnimMode = 0;
-                mTextureAnimp->unpackTAMessage(*dp);
+                LLTextureAnim ta;
+                ta.unpackTAMessage(*dp); // always consume the block from the stream
+                applyTextureAnim(ta);
             }
-            else if (mTextureAnimp)
+            else
             {
-                delete mTextureAnimp;
-                mTextureAnimp = NULL;
-
-                for (S32 i = 0; i < getNumTEs(); i++)
-                {
-                    LLFace* facep = mDrawable->getFace(i);
-                    if (facep && facep->mTextureMatrix)
-                    {
-                        // delete or reset
-                        delete facep->mTextureMatrix;
-                        facep->mTextureMatrix = NULL;
-                    }
-                }
-
-                gPipeline.markTextured(mDrawable);
-                mFaceMappingChanged = true;
-                mTexAnimMode = 0;
+                clearTextureAnim();
             }
 
             if (value & 0x400)
@@ -593,6 +537,113 @@ void LLVOVolume::onDrawableUpdateFromServer()
     if (mDrawable && !mDrawable->isActive() && mServerDrawableUpdateCount > UPDATES_UNTIL_ACTIVE)
     {
         mDrawable->makeActive();
+    }
+}
+
+// Apply a freshly unpacked TextureAnim block. Setup is deferred until a block
+// actually carries ANIM_ON: scripts commonly set the other mode flags with ANIM_ON
+// clear as the object's permanent state (a scripting error), which keeps the block
+// on the wire forever -- allocating for those would put the object on the per-frame
+// animateTextures/shrinkWrap list for an animation that never runs. But once an
+// animation exists, a block without ANIM_ON must NOT tear it down: dropping just
+// ANIM_ON is how scripts pause an animation, freezing the current texture matrix
+// in place. Teardown only happens when the block leaves the wire entirely (mode 0).
+void LLVOVolume::applyTextureAnim(const LLTextureAnim& ta)
+{
+    if (!mTextureAnimp)
+    {
+        if (!(ta.mMode & LLTextureAnim::ON))
+        {
+            return; // never animated and still not animating: skip setup entirely
+        }
+        mTextureAnimp = new LLViewerTextureAnim(this);
+    }
+    else
+    {
+        if (!(mTextureAnimp->mMode & LLTextureAnim::SMOOTH))
+        {
+            mTextureAnimp->reset(); // restart the timer; the data fields are overwritten below
+        }
+        if ((ta.mMode & LLTextureAnim::ON) && mTextureAnimp->mFace != ta.mFace)
+        {
+            // retargeted while running: otherwise faces the animation no longer
+            // drives keep their last matrix (and TEXTURE_ANIM batch state) forever --
+            // genDrawInfo only clears that state when mTexAnimMode is 0. A paused
+            // animation's matrices are left alone.
+            clearUntargetedTextureMatrices(ta.mFace);
+        }
+    }
+    mTexAnimMode = 0;
+
+    mTextureAnimp->mMode = ta.mMode;
+    mTextureAnimp->mFace = ta.mFace;
+    mTextureAnimp->mSizeX = ta.mSizeX;
+    mTextureAnimp->mSizeY = ta.mSizeY;
+    mTextureAnimp->mStart = ta.mStart;
+    mTextureAnimp->mLength = ta.mLength;
+    mTextureAnimp->mRate = ta.mRate;
+}
+
+void LLVOVolume::clearTextureAnim()
+{
+    if (!mTextureAnimp)
+    {
+        return;
+    }
+
+    delete mTextureAnimp;
+    mTextureAnimp = NULL;
+
+    if (mDrawable)
+    {
+        for (S32 i = 0; i < getNumTEs(); i++)
+        {
+            LLFace* facep = mDrawable->getFace(i);
+            if (facep && facep->mTextureMatrix)
+            {
+                delete facep->mTextureMatrix;
+                facep->mTextureMatrix = NULL;
+            }
+        }
+    }
+
+    gPipeline.markTextured(mDrawable);
+    mFaceMappingChanged = true;
+    mTexAnimMode = 0;
+}
+
+// Free the texture matrix (and TEXTURE_ANIM batch state) of every face outside the
+// animation's new target so those faces revert to their static texcoords. Only a
+// valid single-face target needs this; -1 and out-of-range values animate every
+// face (see the range fallback in animateTextures).
+void LLVOVolume::clearUntargetedTextureMatrices(S8 target_face)
+{
+    if (!mDrawable || target_face < 0 || target_face >= getNumTEs())
+    {
+        return;
+    }
+
+    bool changed = false;
+    for (S32 i = 0; i < getNumTEs(); i++)
+    {
+        if (i == target_face)
+        {
+            continue;
+        }
+        LLFace* facep = mDrawable->getFace(i);
+        if (facep && facep->mTextureMatrix)
+        {
+            delete facep->mTextureMatrix;
+            facep->mTextureMatrix = NULL;
+            facep->clearState(LLFace::TEXTURE_ANIM);
+            changed = true;
+        }
+    }
+
+    if (changed)
+    {
+        gPipeline.markTextured(mDrawable);
+        mFaceMappingChanged = true;
     }
 }
 
@@ -854,8 +905,12 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
         // texture animation
         // Do the opposite when the face gets big enough.
         // If a face is animatable, it will always have non-null mTextureMatrix
-        // pointer defined after the first call to LLVOVolume::animateTextures,
-        // although the animation is not always turned on.
+        // pointer defined after the first call to LLVOVolume::animateTextures
+        // (the first animating pass allocates it even for faces below
+        // MIN_TEX_ANIM_SIZE), although the animation is not always running: paused
+        // (ANIM_ON dropped) and rate==0 animations keep their last matrix. Matrices
+        // are only ever created once ANIM_ON has been seen -- blocks that never
+        // carry it skip setup entirely (see applyTextureAnim).
         if (face->mTextureMatrix != NULL)
         {
             if ((vsize > MIN_TEX_ANIM_SIZE) != (old_size > MIN_TEX_ANIM_SIZE))
@@ -977,7 +1032,7 @@ bool LLVOVolume::setMaterial(const U8 material)
 void LLVOVolume::setTexture(const S32 face)
 {
     llassert(face < getNumTEs());
-    gGL.getTexUnit(0)->bind(getTEImage(face));
+    gGL.getTextureSlot(0)->bindSampled(getTEImage(face), ALSamplers::AnisoWrap);
 }
 
 void LLVOVolume::setScale(const LLVector3 &scale, bool damped)
@@ -1173,21 +1228,18 @@ bool LLVOVolume::setVolume(const LLVolumeParams &params_in, const S32 detail, bo
 
                 if (!mSkinInfo && !mSkinInfoUnavaliable)
                 {
-                    LLUUID mesh_id = volume_params.getSculptID();
-                    if (gMeshRepo.hasHeader(mesh_id) && !gMeshRepo.hasSkinInfo(mesh_id))
+                    const LLMeshSkinInfo* skin_info = nullptr;
+                    switch (gMeshRepo.fetchSkinInfo(volume_params.getSculptID(), this, skin_info))
                     {
-                        // If header is present but has no data about skin,
-                        // no point fetching
+                    case MESH_SKIN_LOADED:
+                        notifySkinInfoLoaded(skin_info);
+                        break;
+                    case MESH_SKIN_UNAVAILABLE:
+                        // Header is present and has no data about skin, no point fetching
                         mSkinInfoUnavaliable = true;
-                    }
-
-                    if (!mSkinInfoUnavaliable)
-                    {
-                        const LLMeshSkinInfo* skin_info = gMeshRepo.getSkinInfo(mesh_id, this);
-                        if (skin_info)
-                        {
-                            notifySkinInfoLoaded(skin_info);
-                        }
+                        break;
+                    case MESH_SKIN_PENDING:
+                        break;
                     }
                 }
             }
@@ -1252,7 +1304,35 @@ void LLVOVolume::updateSculptTexture()
 
 void LLVOVolume::updateVisualComplexity()
 {
-    LLVOAvatar* avatar = getAvatarAncestor();
+    LLVOAvatar* avatar = nullptr;
+    LLViewerObject* pobj = (LLViewerObject*)getParent();
+    LLViewerObject* lobj = this;
+    while (pobj)
+    {
+        avatar = pobj->asAvatar();
+        if (avatar)
+        {
+            break;
+        }
+        lobj = pobj;
+        pobj = (LLViewerObject*)pobj->getParent();
+    }
+
+    if (avatar)
+    {
+        // mark parent as dirty, complexity will be updated recursively.
+        avatar->markAttachmentComplexityDirty(lobj->getID());
+    }
+    LLVOAvatar* rigged_avatar = getAvatar();
+    if (rigged_avatar && (rigged_avatar != avatar))
+    {
+        // This might be wrong. Control avatars update each run,
+        // due to lack of dirty mechanics, and this might be
+        // where we should implement and call
+        // markControlAvatarComplexityDirty() if !isAttachment().
+        rigged_avatar->markAttachmentComplexityDirty(lobj->getID());
+    }
+    /*LLVOAvatar* avatar = getAvatarAncestor();
     if (avatar)
     {
         avatar->updateVisualComplexity();
@@ -1261,7 +1341,7 @@ void LLVOVolume::updateVisualComplexity()
     if(rigged_avatar && (rigged_avatar != avatar))
     {
         rigged_avatar->updateVisualComplexity();
-    }
+    }*/
 }
 
 void LLVOVolume::notifyMeshLoaded()
@@ -6585,7 +6665,10 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
         LLFace** i = face_iter;
         ++i;
 
-        const U32 MAX_TEXTURE_COUNT = 32;
+        // Ladder-width ceiling: must match what the indexed sources declare and what
+        // sIndexedTextureChannels is clamped to, so the batch can never carry an index
+        // the shader has no sampler for.
+        constexpr U32 MAX_TEXTURE_COUNT = (U32)LLGLSLShader::MAX_BATCH_TEXTURE_COUNT;
         LLViewerTexture* texture_list[MAX_TEXTURE_COUNT];
 
         U32 texture_count = 0;
@@ -6598,8 +6681,8 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 // sIndexedGLTFChannels distinct materials into one batch, assigning
                 // each face a material slot via setTextureIndex. The shader selects
                 // per-vertex by that slot. See LLRenderPass::pushGLTFBatchIndexed.
-                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, 8);
-                const LLGLTFMaterial* mat_slots[8];
+                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS);
+                const LLGLTFMaterial* mat_slots[LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS];
                 U32 slot_count = 0;
 
                 const LLGLTFMaterial* anchor_mat = facep->getTextureEntry()->getGLTFRenderMaterial();
@@ -6693,10 +6776,10 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 // (diffuse, material) pairs into one batch. Faces must share the same
                 // shader mask (== gDeferredMaterialProgram index, i.e. the bound
                 // program), so the mask is a hard batch-break key.
-                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, 8);
-                LLViewerTexture* diffuse_slots[8];
-                LLMaterial* mat_slots[8];
-                U8 shiny_slots[8];
+                const S32 gltf_channels = llmin((S32)LLGLSLShader::sIndexedGLTFChannels, LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS);
+                LLViewerTexture* diffuse_slots[LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS];
+                LLMaterial* mat_slots[LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS];
+                U8 shiny_slots[LLGLSLShader::MAX_INDEXED_GLTF_CHANNELS];
                 U32 slot_count = 0;
 
                 // A slot's spec color / env intensity come from the TE shiny value when

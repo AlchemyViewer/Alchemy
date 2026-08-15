@@ -188,7 +188,7 @@ namespace
 };  // namespace
 
 LLGLTFPreviewTexture::LLGLTFPreviewTexture(LLPointer<LLFetchedGLTFMaterial> material, S32 width)
-    : LLViewerDynamicTexture(width, width, 4, EOrder::ORDER_MIDDLE, false)
+    : LLViewerDynamicTexture(width, width, 4, EOrder::ORDER_MIDDLE)
     , mGLTFMaterial(material)
 {
 }
@@ -396,7 +396,7 @@ void fixup_shader_constants(LLGLSLShader& shader)
         const S32 channel = shader.getTextureChannel(LLShaderMgr::DEFERRED_SHADOW0+i);
         if (channel != -1)
         {
-            gGL.getTexUnit(channel)->bind(LLViewerFetchedTexture::sWhiteImagep, true);
+            gGL.getTextureSlot(channel)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap, true);
         }
     }
 }
@@ -505,7 +505,7 @@ bool LLGLTFPreviewTexture::render()
         screen.bindTarget();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        LLGLSLShader& shader = gDeferredPBRAlphaProgram;
+        LLGLSLShader& shader = *gDeferredPBRAlphaProgram.selectVariant();
 
         gPipeline.bindDeferredShader(shader);
         fixup_shader_constants(shader);
@@ -553,7 +553,7 @@ bool LLGLTFPreviewTexture::render()
 
     // From LLPipeline::renderFinalize: "Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems."
     gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &screen);
-    gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DEPTH, mBoundTarget, true);
+    gDeferredPostNoDoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, mBoundTarget);
 
     {
         LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);

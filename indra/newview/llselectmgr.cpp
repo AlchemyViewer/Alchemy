@@ -103,6 +103,7 @@
 #include "llglheaders.h"
 #include "llinventoryobserver.h"
 #include "lllocalmesh.h"
+#include "llscripteditorws.h"
 
 LLViewerObject* getSelectedParentObject(LLViewerObject *object) ;
 
@@ -6438,6 +6439,11 @@ void LLSelectMgr::processObjectProperties(LLMessageSystem* msg, void** user_data
             node->mInventorySerial = inv_serial;
             node->mSitName.assign(sit_name);
             node->mTouchName.assign(touch_name);
+
+            if (auto ws_server = LLScriptEditorWSServer::getServer())
+            {
+                ws_server->onObjectPropertyChanged(id, name, desc);
+            }
         }
     }
 
@@ -6534,6 +6540,11 @@ void LLSelectMgr::processObjectPropertiesFamily(LLMessageSystem* msg, void** use
     }
 
     dialog_refresh_all();
+
+    if (auto ws_server = LLScriptEditorWSServer::getServer())
+    {
+        ws_server->onObjectPropertyChanged(id, name, desc);
+    }
 }
 
 
@@ -6856,7 +6867,7 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
         return;
     }
 
-    gGL.getTexUnit(0)->bind(mSilhouetteImagep);
+    gGL.getTextureSlot(0)->bindSampled(mSilhouetteImagep, ALSamplers::AnisoWrap);
     LLGLSPipelineSelection gls_select;
     LLGLEnable blend(GL_BLEND);
     LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
@@ -7090,7 +7101,7 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
         stop_glerror();
     }
 
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.getTextureSlot(0)->unbind();
 }
 
 void LLSelectMgr::generateSilhouette(LLSelectNode* nodep, const LLVector3& view_point)

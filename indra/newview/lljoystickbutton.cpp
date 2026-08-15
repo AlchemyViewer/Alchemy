@@ -637,7 +637,7 @@ void LLJoystickCameraRotate::drawRotatedImage( LLPointer<LLUIImage> image, S32 r
         { (F32)width/texture->getWidth(), 0.f }
     };
 
-    gGL.getTexUnit(0)->bind(texture);
+    gGL.getTextureSlot(0)->bindSampled(texture, ALSamplers::AnisoWrap);
 
     gGL.color4fv(UI_VERTEX_COLOR.mV);
 
@@ -915,7 +915,7 @@ void LLJoystickQuaternion::drawRotatedImage(LLPointer<LLUIImage> image, S32 rota
         { (F32)width / texture->getWidth(), 0.f }
     };
 
-    gGL.getTexUnit(0)->bind(texture);
+    gGL.getTextureSlot(0)->bindSampled(texture, ALSamplers::AnisoWrap);
 
     gGL.color4fv(UI_VERTEX_COLOR.mV);
 

@@ -33,6 +33,7 @@
 #include "llviewercontrol.h"
 
 // Library includes
+#include "aluniformbuffer.h"
 #include "llwindow.h"   // getGamma()
 
 // For Listeners
@@ -73,6 +74,7 @@
 #include "llappviewer.h"
 #include "llvosurfacepatch.h"
 #include "llvowlsky.h"
+#include "alsamplerstate.h"
 #include "llrender.h"
 #include "llnavigationbar.h"
 #include "llnotificationsutil.h"
@@ -295,6 +297,15 @@ static bool handleEnableEmissiveChanged(const LLSD& newvalue)
     return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
 }
 
+static bool handleReverseZChanged(const LLSD& newvalue)
+{
+    // setShaders() latches the reverse-Z state (LLPipeline::updateReverseZ) and then
+    // releases + recreates the GL buffers at the new depth format itself, so -- unlike the
+    // emissive case -- do NOT release buffers up front (that would rebuild them at the old
+    // format only to have setShaders rebuild them again).
+    return handleSetShaderChanged(newvalue);
+}
+
 static bool handleHalationChanged(const LLSD& newvalue)
 {
     return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
@@ -314,16 +325,6 @@ static bool handleEnableHDR(const LLSD& newvalue)
     return handleReleaseGLBufferChanged(newvalue) && handleSetShaderChanged(newvalue);
 }
 
-static bool handleLUTBufferChanged(const LLSD& newvalue)
-{
-    if (gPipeline.isInit())
-    {
-        gPipeline.releaseLUTBuffers();
-        gPipeline.createLUTBuffers();
-    }
-    return true;
-}
-
 static bool handleAnisotropicFilteringChanged(const LLSD& newval)
 {
     F32 val = static_cast<F32>(newval.asReal());
@@ -332,7 +333,17 @@ static bool handleAnisotropicFilteringChanged(const LLSD& newval)
         val = llclamp(val, 0.f, gGLManager.mMaxAnisotropy);
     }
     LLRender::sAnisotropicFilteringLevel = val;
-    LLImageGL::dirtyTexOptions();
+    // Sampler objects are immutable, so the anisotropy baked into existing ones can't be
+    // edited -- drop them and let the next bind rebuild at the new level. This is the whole
+    // update now: since LLImageGL sampling resolves through the cache, there is no
+    // per-texture state left to dirty.
+    //
+    // Clears the main thread's set only, since the cache is per-context. That is complete
+    // rather than lucky: the texture upload thread binds with sampler 0 throughout, so its
+    // set is never populated. Should an upload path ever select a real sampler, this would
+    // need to reach that context too.
+    gGL.clearSamplers();
+    gGL.warmupSamplers();
     return true;
 }
 
@@ -455,7 +466,7 @@ static bool handleUIFontOverridesChanged(const LLSD& newvalue)
 
 static bool handleEmojiUseDarkPaletteChanged(const LLSD& newvalue)
 {
-    // Push the new value into LLFontGL's static so LLFontFace::load picks
+    // Push the new value into LLFontGL's static so ALFontFace::load picks
     // it up during the upcoming reload. A bare schedulePendingReload would
     // just re-init the font system with the same statics — without updating
     // sUseDarkEmojiPalette here the reload would stay on palette 0.
@@ -660,6 +671,14 @@ static bool handleRenderDebugPipelineChanged(const LLSD& newvalue)
 static bool handleRenderResolutionDivisorChanged(const LLSD&)
 {
     gResizeScreenTexture = true;
+    return true;
+}
+
+static bool handleRenderUBOUpdateModeChanged(const LLSD& newvalue)
+{
+    // Applies live: the shadow always holds current contents, so the next
+    // flush/bind under the new mode uploads correctly in any direction.
+    ALUniformBuffer::sUpdateMode = ALUniformBuffer::clampUpdateMode(newvalue.asInteger());
     return true;
 }
 
@@ -975,6 +994,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRScale", handlePBRTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRDetail", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRPlanarSampleCount", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRNormalsEnabled", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRTriplanarBlendFactor", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);
     setting_setup_signal_listener(gSavedSettings, "OctreeDistanceFactor", handleRepartition);
@@ -990,9 +1010,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationThreshold", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationScale", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredicationStrength", handleSetShaderChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularResX", handleLUTBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularResY", handleLUTBufferChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleLUTBufferChanged);
+    setting_setup_signal_listener(gSavedSettings, "RenderSpecularExponent", handleSetShaderChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleShadowsResized);
@@ -1004,6 +1022,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderBloomResolutionScale", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderBloomHalation", handleHalationChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderEnableEmissiveBuffer", handleEnableEmissiveChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderReverseZ", handleReverseZChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDisableVintageMode", handleDisableVintageMode);
     setting_setup_signal_listener(gSavedSettings, "RenderHDREnabled", handleEnableHDR);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowNoise", handleSetShaderChanged);
@@ -1023,6 +1042,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredNoise", handleReleaseGLBufferChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDebugPipeline", handleRenderDebugPipelineChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionDivisor", handleRenderResolutionDivisorChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderUBOUpdateMode", handleRenderUBOUpdateModeChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeLevel", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeDetail", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReflectionProbeCount", handleReflectionProbeCountChanged);
@@ -1034,6 +1054,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderMirrors", handleReflectionProbeDetailChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderHeroProbeResolution", handleHeroProbeResolutionChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShadowDetail", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowFilterQuality", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowPCSSScale", handleSetShaderChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowDepth32F", handleShadowsResized);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleSetShaderChanged);
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderResolutionDivisorChanged);

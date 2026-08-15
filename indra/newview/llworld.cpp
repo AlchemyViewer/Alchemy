@@ -108,8 +108,6 @@ LLWorld::LLWorld() :
     *(default_texture++) = MAX_WATER_COLOR.mV[3];
 
     mDefaultWaterTexturep = LLViewerTextureManager::getLocalTexture(raw.get(), false);
-    gGL.getTexUnit(0)->bind(mDefaultWaterTexturep);
-    mDefaultWaterTexturep->setAddressMode(LLTexUnit::TAM_CLAMP);
 
     LLViewerRegion::sVOCacheCullingEnabled = gSavedSettings.getBOOL("RequestFullRegionCache") && gSavedSettings.getBOOL("ObjectCacheEnabled");
 }
@@ -1217,6 +1215,7 @@ void process_disable_simulator(LLMessageSystem *mesgsys, void **user_data)
 
 void process_region_handshake(LLMessageSystem* msg, void** user_data)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     LLHost host = msg->getSender();
     LLViewerRegion* regionp = LLWorld::getInstance()->getRegion(host);
     if (!regionp)

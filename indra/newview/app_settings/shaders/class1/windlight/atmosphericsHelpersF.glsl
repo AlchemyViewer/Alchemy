@@ -25,7 +25,9 @@
 
 // Output variables
 
-uniform float scene_light_strength;
+// Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
+// and bound at UB_ENVIRONMENT. Members are read by bare name.
+//[ENGINE_BLOCK Environment]
 
 vec3 atmosFragAmbient(vec3 light, vec3 amblit)
 {

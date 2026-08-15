@@ -26,7 +26,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 
 in vec3 position;       // star center world position (shared by all 6 verts of a star)
@@ -78,13 +80,25 @@ void main()
     vec2 ndc_offset = pixel_offset * (2.0 / max(screen_res, vec2(1.0)));
     clip_center.xy += ndc_offset * clip_center.w;
 
-    // Smash Z to the far clip plane so stars never poke through the moon/sky.
+    // Smash Z to the far clip plane so stars never poke through the moon/sky. Reverse-Z
+    // (glClipControl ZERO_TO_ONE) puts the far plane at ndc z 0, not 1; the sky depth func
+    // flips to GEQUAL so it still passes against a 0-cleared buffer.
+#ifdef REVERSE_Z
+    clip_center.z = 0.0;
+#else
     clip_center.z = clip_center.w;
+#endif
 
     gl_Position = clip_center;
 
     vary_corner    = texcoord0;
     vary_world_dir = normalize(position);
+    // NB: this linearises the sRGB black-body colour, and softenLight's SKIP_ATMOS branch
+    // then srgb_to_linear's it a SECOND time and multiplies by sky_hdr_scale (the sky dome's
+    // fake-HDR boost, ~2x with HDR on -- stars inherit it via the shared SKIP_ATMOS flag).
+    // Long-standing upstream behaviour. Net star brightness balances that double-decode
+    // against the gains here (bloom_boost, the (1 + intensity) gain) and sky_hdr_scale -- if
+    // star brightness is ever retuned, this whole chain is the place to look, not one line.
     vary_color     = vec4(srgb_to_linear(diffuse_color.rgb), intensity);
     vary_intensity = intensity;
 }

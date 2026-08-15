@@ -169,7 +169,7 @@ void LLToolSelectRect::draw()
         {
             gGL.color4f(1.f, 1.f, 0.f, 1.f);
         }
-        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.getTextureSlot(0)->unbind();
         gl_rect_2d(
             llmin(mDragStartX, mDragEndX),
             llmax(mDragStartY, mDragEndY),

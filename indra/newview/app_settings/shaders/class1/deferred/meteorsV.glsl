@@ -23,7 +23,9 @@
  * $/LicenseInfo$
  */
 
-uniform mat4 modelview_projection_matrix;
+// Shared matrix stack + derived matrices, spliced from
+// class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
+//[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 uniform float meteor_width_pixels;
 
@@ -77,13 +79,20 @@ void main()
     clip.xy += streak_ndc * texcoord0.x * clip.w;
     clip.xy += perp_ndc   * texcoord0.y * clip.w;
 
-    // Pin to far plane so the moon and other geometry occlude meteors correctly.
+    // Pin to far plane so the moon and other geometry occlude meteors correctly. Reverse-Z
+    // (glClipControl ZERO_TO_ONE) puts the far plane at ndc z 0, not 1.
+#ifdef REVERSE_Z
+    clip.z = 0.0;
+#else
     clip.z = clip.w;
+#endif
 
     gl_Position = clip;
 
     // Unpack: alpha channel carries width_scale / 4 (see CPU-side encoding).
     // RGB is envelope-premultiplied sRGB — linearize and pass through.
+    // As starsV: softenLight's SKIP_ATMOS branch decodes this a second time and applies
+    // sky_hdr_scale. Long-standing; meteor brightness is that chain plus the gains here.
     vary_color = vec4(srgb_to_linear(diffuse_color.rgb), diffuse_color.a * 4.0);
     vary_coord = texcoord0;
 }

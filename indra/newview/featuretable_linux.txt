@@ -58,7 +58,6 @@ UseOcclusion				1	1
 WindLightUseAtmosShaders	1	1
 Disregard128DefaultDrawDistance	1	1
 Disregard96DefaultDrawDistance	1	1
-RenderCompressTextures		1	1
 RenderShaderLightingMaxLevel	1	3
 RenderReflectionProbeLevel  1   3
 RenderDeferred				1	1
@@ -87,6 +86,7 @@ RenderDisableVintageMode           1   1
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  1   256
 RenderReflectionProbeIrradianceResolution 1 16
+AlchemyRenderUBOUpdateMode 1 4
 
 //
 // Low Graphics Settings
@@ -385,12 +385,6 @@ RenderShadowDetail			1	0
 RenderDeferredSSAO			1	0
 RenderMirrors				1	0
 RenderDisableVintageMode           1   0
-
-//
-// VRAM > 512MB
-//
-list VRAMGT512
-RenderCompressTextures		1	0
 
 //
 // AF Missing or AF < 2
