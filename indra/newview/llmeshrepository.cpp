@@ -2578,7 +2578,7 @@ EMeshProcessingResult LLMeshRepoThread::physicsShapeReceived(const LLUUID& mesh_
     LL_PROFILE_ZONE_SCOPED;
     LLSD physics_shape;
 
-    LLModel::Decomposition* d = new LLModel::Decomposition();
+    auto d = std::make_unique<LLModel::Decomposition>();
     d->mMeshID = mesh_id;
 
     if (data == NULL)
@@ -4926,8 +4926,9 @@ void LLMeshRepository::notifyDecompositionReceived(std::unique_ptr<LLModel::Deco
     decomposition_map::iterator iter = mDecompositionMap.find(decomp_id);
     if (iter == mDecompositionMap.end())
     { //just insert decomp into map
+        mDecompositionMap[decomp_id] = decomp.get();
         sCacheBytesDecomps += decomp->sizeBytes();
-        mDecompositionMap[decomp_id] = decomp.release();
+        decomp.release();
     }
     else
     { //merge decomp with existing entry
