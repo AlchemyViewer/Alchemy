@@ -607,10 +607,10 @@ public:
     std::set<UUIDBasedRequest> mPhysicsShapeRequests;
 
     // list of completed Decomposition info requests
-    std::list<LLModel::Decomposition*> mDecompositionQ;
+    std::list<std::unique_ptr<LLModel::Decomposition>> mDecompositionQ;
 
     // list of completed Physics Mesh info requests
-    std::list<LLModel::Decomposition*> mPhysicsQ;
+    std::list<std::unique_ptr<LLModel::Decomposition>> mPhysicsQ;
 
     //queue of requested headers
     std::queue<HeaderRequest> mHeaderReqQ;
@@ -972,7 +972,7 @@ public:
     void notifyMeshUnavailable(const LLVolumeParams& mesh_params, S32 request_lod, S32 volume_lod);
     void notifySkinInfoReceived(LLMeshSkinInfo* info);
     void notifySkinInfoUnavailable(const LLUUID& info);
-    void notifyDecompositionReceived(LLModel::Decomposition* info, bool physics_mesh);
+    void notifyDecompositionReceived(std::unique_ptr<LLModel::Decomposition> info, bool physics_mesh);
 
     S32 getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod);
     // Non-const: memoises a "no usable LOD" verdict into header.m404.
