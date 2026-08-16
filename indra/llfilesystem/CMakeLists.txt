@@ -83,12 +83,12 @@ if (BUILD_TESTING)
       lldiriterator.cpp
     )
 
-    LL_ADD_PROJECT_UNIT_TESTS(llfilesystem "${llfilesystem_TEST_SOURCE_FILES}")
+    RD_ADD_UNIT_TESTS(llfilesystem "${llfilesystem_TEST_SOURCE_FILES}")
 
     # INTEGRATION TESTS
     set(test_libs llmath llcommon llfilesystem )
     set(test_project llfilesystem)
 
     # TODO: Some of these need refactoring to be proper Unit tests rather than Integration tests.
-    LL_ADD_INTEGRATION_TEST(lldir "" "${test_libs}" "${test_project}")
+    RD_ADD_INTEGRATION_TEST(lldir "" "${test_libs}" "${test_project}")
 endif ()

@@ -24,6 +24,7 @@ option(USE_VELOPACK "Use Velopack for installer packaging" OFF)
 option(BUILD_VIEWER "Build the viewer project" ON)
 option(BUILD_APPEARANCE_UTIL "Build the appearance utility project" OFF)
 option(BUILD_TESTING "Build and run unit and integration tests: disable for build timing runs to reduce variation" OFF)
+option(BUILD_BENCHMARKS "Build Google Benchmark targets" OFF)
 option(BUILD_HEADLESS "Build with support for headless mesa OSR rendering backend" OFF)
 
 # Dullahan build options
@@ -136,6 +137,14 @@ endif (NOT CMAKE_BUILD_TYPE)
 ##########################################################################
 # vcpkg feature flags MUST be set before the first project() call below  #
 ##########################################################################
+
+if (BUILD_TESTING)
+  list(APPEND VCPKG_MANIFEST_FEATURES "google-test")
+endif()
+
+if (BUILD_BENCHMARKS)
+  list(APPEND VCPKG_MANIFEST_FEATURES "google-benchmark")
+endif()
 
 if (USE_KDU)
   list(APPEND VCPKG_MANIFEST_FEATURES "kdu")
@@ -318,6 +327,11 @@ include(ZLIBNG)
 # Add our test macros
 if (BUILD_TESTING)
   include(LLAddBuildTest)
+  include(GTest)
+endif ()
+
+if (BUILD_BENCHMARKS)
+  include(Benchmark)
 endif ()
 
 # Third party system library copy step

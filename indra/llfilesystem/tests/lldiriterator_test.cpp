@@ -1,6 +1,5 @@
 /**
  * @file lldiriterator_test.cpp
- * @date 2011-06
  * @brief LLDirIterator test cases.
  *
  * $LicenseInfo:firstyear=2011&license=viewerlgpl$
@@ -26,40 +25,14 @@
  */
 
 #include "linden_common.h"
-#include "lltut.h"
+#include <gtest/gtest.h>
 #include "../lldiriterator.h"
 
-
-namespace tut
-{
-
-    struct LLDirIteratorFixture
-    {
-        LLDirIteratorFixture()
-        {
-        }
-    };
-    typedef test_group<LLDirIteratorFixture> LLDirIteratorTest_factory;
-    typedef LLDirIteratorTest_factory::object LLDirIteratorTest_t;
-    LLDirIteratorTest_factory tf("LLDirIterator");
-
-    /*
-    CHOP-662 was originally introduced to deal with crashes deleting files from
-    a directory (VWR-25500). However, this introduced a crash looking for
-    old chat logs as the glob_to_regex function in lldiriterator wasn't escaping lots of regexp characters
-    */
-    void test_chop_662(void)
-    {
-        //  Check a selection of bad group names from the crash reports
-        LLDirIterator iter(".","+bad-group-name]+?\?-??.*");
-        LLDirIterator iter1(".","))--@---bad-group-name2((?\?-??.*\\.txt");
-        LLDirIterator iter2(".","__^v--x)Cuide d sua vida(x--v^__?\?-??.*");
-    }
-
-    template<> template<>
-    void LLDirIteratorTest_t::test<1>()
-    {
-       test_chop_662();
-    }
-
+TEST(LLDirIterator, AcceptsSpecialCharactersInMask) {
+    // CHOP-662 covered group names containing regular-expression characters.
+    EXPECT_NO_THROW({
+        LLDirIterator iter(".", "+bad-group-name]+?\?-??.*");
+        LLDirIterator iter1(".", "))--@---bad-group-name2((?\?-??.*\\.txt");
+        LLDirIterator iter2(".", "__^v--x)Cuide d sua vida(x--v^__?\?-??.*");
+    });
 }

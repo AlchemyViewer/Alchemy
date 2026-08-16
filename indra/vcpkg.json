@@ -190,6 +190,18 @@
         }
       ]
     },
+    "google-benchmark": {
+      "description": "Build with support for Google Benchmark targets",
+      "dependencies": [
+        "benchmark"
+      ]
+    },
+    "google-test": {
+      "description": "Build with support for tests with GoogleTest and GoogleMock",
+      "dependencies": [
+        "gtest"
+      ]
+    },
     "faudio": {
       "description": "Build with support for the FAudio audio engine",
       "dependencies": [

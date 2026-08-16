@@ -4,6 +4,7 @@ set(cmake_SOURCE_FILES
         00-Common.cmake
         APR.cmake
         AVIF.cmake
+        Benchmark.cmake
         Boost.cmake
         BootstrapVcpkg.cmake
         bugsplat.cmake
@@ -23,6 +24,7 @@ set(cmake_SOURCE_FILES
         FontConfig.cmake
         FreeType.cmake
         GLEXT.cmake
+        GTest.cmake
         GLIB.cmake
         GLM.cmake
         GStreamer10Plugin.cmake
