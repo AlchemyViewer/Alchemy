@@ -5547,6 +5547,21 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             snapshot_width  = (S32)(ratio * image_width) ;
             snapshot_height = (S32)(ratio * image_height) ;
             scale_factor = llmax(1.0f, 1.0f / ratio) ;
+
+            // Above 1 the capture is tiled, and display() -- with the whole post chain behind
+            // it -- runs once per window-sized tile. Every screen-space effect is then computed
+            // against a tile rather than the frame and restarts at the seams, which looks like a
+            // rendering fault rather than the capacity decision it is. The single-pass path
+            // declines silently, so say so here.
+            //
+            // scale_factor cannot exceed 1 with the UI shown: image_width/height were clamped to
+            // the window above, which is what makes this a fallback notice rather than a
+            // to-be-expected one.
+            if (scale_factor > 1.f)
+            {
+                LL_WARNS("Snapshot") << "Single-Pass snapshot at " << image_width << "x" << image_height
+                                     << " ran out of memory, using Tiled Mode." << LL_ENDL;
+            }
         }
     }
 
