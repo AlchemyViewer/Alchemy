@@ -5559,8 +5559,8 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             // to-be-expected one.
             if (scale_factor > 1.f)
             {
-                LL_WARNS("Snapshot") << "Single-Pass snapshot at " << image_width << "x" << image_height
-                                     << " ran out of memory, using Tiled Mode." << LL_ENDL;
+                LL_WARNS("Snapshot") << "Single-pass snapshot at " << image_width << "x" << image_height
+                                     << " is unavailable; using tiled mode." << LL_ENDL;
             }
         }
     }
