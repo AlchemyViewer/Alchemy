@@ -1014,17 +1014,6 @@ LLMeshRepoThread::~LLMeshRepoThread()
         mSkinInfoQ.pop_front();
     }
 
-    while (!mDecompositionQ.empty())
-    {
-        delete mDecompositionQ.front();
-        mDecompositionQ.pop_front();
-    }
-
-    while (!mPhysicsQ.empty())
-    {
-        delete mPhysicsQ.front();
-        mPhysicsQ.pop_front();
-    }
 
     delete mHttpRequest;
     mHttpRequest = nullptr;
@@ -2573,11 +2562,11 @@ bool LLMeshRepoThread::decompositionReceived(const LLUUID& mesh_id, U8* data, S3
     }
 
     {
-        LLModel::Decomposition* d = new LLModel::Decomposition(decomp);
+        auto d = std::make_unique<LLModel::Decomposition>(decomp);
         d->mMeshID = mesh_id;
         {
             LLMutexLock lock(mLoadedMutex);
-            mDecompositionQ.push_back(d);
+            mDecompositionQ.push_back(std::move(d));
         }
     }
 
@@ -2589,7 +2578,7 @@ EMeshProcessingResult LLMeshRepoThread::physicsShapeReceived(const LLUUID& mesh_
     LL_PROFILE_ZONE_SCOPED;
     LLSD physics_shape;
 
-    LLModel::Decomposition* d = new LLModel::Decomposition();
+    auto d = std::make_unique<LLModel::Decomposition>();
     d->mMeshID = mesh_id;
 
     if (data == NULL)
@@ -2627,7 +2616,7 @@ EMeshProcessingResult LLMeshRepoThread::physicsShapeReceived(const LLUUID& mesh_
 
     {
         LLMutexLock lock(mLoadedMutex);
-        mPhysicsQ.push_back(d);
+        mPhysicsQ.push_back(std::move(d));
     }
     return MESH_OK;
 }
@@ -3422,8 +3411,8 @@ void LLMeshRepoThread::notifyLoadedMeshes()
     std::deque<LODRequest> unavail_queue;
     std::deque<LLPointer<LLMeshSkinInfo>> skin_info_q;
     std::deque<UUIDBasedRequest> skin_info_unavail_q;
-    std::list<LLModel::Decomposition*> decomp_q;
-    std::list<LLModel::Decomposition*> physics_q;
+    std::list<std::unique_ptr<LLModel::Decomposition>> decomp_q;
+    std::list<std::unique_ptr<LLModel::Decomposition>> physics_q;
 
     // Claim everything in one acquisition. Every producer holds mLoadedMutex only long
     // enough to push, so blocking here is cheap -- and unlike the trylock this replaces,
@@ -3525,13 +3514,13 @@ void LLMeshRepoThread::notifyLoadedMeshes()
 
         while (! decomp_q.empty())
         {
-            gMeshRepo.notifyDecompositionReceived(decomp_q.front(), false);
+            gMeshRepo.notifyDecompositionReceived(std::move(decomp_q.front()), false);
             decomp_q.pop_front();
         }
 
         while (!physics_q.empty())
         {
-            gMeshRepo.notifyDecompositionReceived(physics_q.front(), true);
+            gMeshRepo.notifyDecompositionReceived(std::move(physics_q.front()), true);
             physics_q.pop_front();
         }
     }
@@ -4931,21 +4920,21 @@ void LLMeshRepository::notifySkinInfoUnavailable(const LLUUID& mesh_id)
     }
 }
 
-void LLMeshRepository::notifyDecompositionReceived(LLModel::Decomposition* decomp, bool physics_mesh)
+void LLMeshRepository::notifyDecompositionReceived(std::unique_ptr<LLModel::Decomposition> decomp, bool physics_mesh)
 {
-    LLUUID decomp_id = decomp->mMeshID; // Copy to avoid invalidation in below deletion
+    LLUUID decomp_id = decomp->mMeshID;
     decomposition_map::iterator iter = mDecompositionMap.find(decomp_id);
     if (iter == mDecompositionMap.end())
     { //just insert decomp into map
-        mDecompositionMap[decomp_id] = decomp;
+        mDecompositionMap[decomp_id] = decomp.get();
         sCacheBytesDecomps += decomp->sizeBytes();
+        decomp.release();
     }
     else
     { //merge decomp with existing entry
         sCacheBytesDecomps -= iter->second->sizeBytes();
-        iter->second->merge(decomp);
+        iter->second->merge(decomp.get());
         sCacheBytesDecomps += iter->second->sizeBytes();
-        delete decomp;
     }
 
     if (physics_mesh)
