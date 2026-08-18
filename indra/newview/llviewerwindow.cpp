@@ -5487,11 +5487,38 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
         if ((image_width <= gGLManager.mGLMaxTextureSize && image_height <= gGLManager.mGLMaxTextureSize) &&
             (image_width > window_width || image_height > window_height) && LLPipeline::sRenderDeferred && !show_ui)
         {
-            U32 color_fmt = (type == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH || type == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH24) ? GL_DEPTH_COMPONENT : GL_RGBA;
-            if (scratch_space.allocate(image_width, image_height, color_fmt, true))
+            // GL_RGBA8, not GL_RGBA, and not GL_DEPTH_COMPONENT for the depth layers.
+            //
+            // Storage is immutable, so this format reaches glTexStorage2D, which only accepts
+            // sized ones -- an unsized format comes back GL_INVALID_ENUM and the target fails to
+            // allocate. That failure is silent here: the block below is simply skipped, the
+            // screen buffers are never widened to the requested size, and the snapshot drops to
+            // the tiled path underneath, where the whole post chain runs once per window-sized
+            // tile. Bloom, chromatic aberration, vignette and DoF are then computed against a
+            // tile rather than the frame, which is visible as each effect restarting at the tile
+            // seams past the first.
+            //
+            // The depth layers ask for depth through the `true` below, which allocates the real
+            // (sized) depth attachment that the GL_DEPTH_COMPONENT readback further down reads.
+            // This is the colour attachment, and it needs a colour format whatever the layer is.
+            if (scratch_space.allocate(image_width, image_height, GL_RGBA8, true))
             {
-                original_width = gPipeline.mRT->deferredScreen.getWidth();
-                original_height = gPipeline.mRT->deferredScreen.getHeight();
+                // mRT->width/height, not the attachment's dimensions. allocateScreenBuffer
+                // takes a LOGICAL size, records it in mRT->width/height, and only then applies
+                // RenderResolutionDivisor / RenderResolutionMultiplier to arrive at the texture
+                // size. Reading the texture size back and handing it in as a logical size
+                // therefore applies the scale a second time, squaring it: at multiplier 2.0 the
+                // viewer comes back from a snapshot rendering four times the pixels, sixteen
+                // after the second, and at divisor 2 it halves away instead.
+                //
+                // Nothing corrects it afterwards either. resizeScreenTexture() would notice,
+                // but it is gated on gResizeScreenTexture, and the restore below assigns
+                // mWorldViewRectRaw directly rather than going through updateWorldViewRect(),
+                // which is what sets that flag. The wrong size survives until a window resize.
+                //
+                // resizeShadowTexture() already reads these two for the same reason.
+                original_width = (S32)gPipeline.mRT->width;
+                original_height = (S32)gPipeline.mRT->height;
 
                 if (gPipeline.allocateScreenBuffer(image_width, image_height))
                 {
@@ -5520,6 +5547,21 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             snapshot_width  = (S32)(ratio * image_width) ;
             snapshot_height = (S32)(ratio * image_height) ;
             scale_factor = llmax(1.0f, 1.0f / ratio) ;
+
+            // Above 1 the capture is tiled, and display() -- with the whole post chain behind
+            // it -- runs once per window-sized tile. Every screen-space effect is then computed
+            // against a tile rather than the frame and restarts at the seams, which looks like a
+            // rendering fault rather than the capacity decision it is. The single-pass path
+            // declines silently, so say so here.
+            //
+            // scale_factor cannot exceed 1 with the UI shown: image_width/height were clamped to
+            // the window above, which is what makes this a fallback notice rather than a
+            // to-be-expected one.
+            if (scale_factor > 1.f)
+            {
+                LL_WARNS("Snapshot") << "Single-pass snapshot at " << image_width << "x" << image_height
+                                     << " is unavailable; using tiled mode." << LL_ENDL;
+            }
         }
     }
 
@@ -5806,12 +5848,17 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
 
     LLRect window_rect = getWorldViewRectRaw();
 
-    S32 original_width = LLPipeline::sRenderDeferred ? gPipeline.mRT->deferredScreen.getWidth() : gViewerWindow->getWorldViewWidthRaw();
-    S32 original_height = LLPipeline::sRenderDeferred ? gPipeline.mRT->deferredScreen.getHeight() : gViewerWindow->getWorldViewHeightRaw();
+    // The logical size, not the attachment's -- see rawSnapshot for why handing a scaled
+    // texture size back to allocateScreenBuffer squares the resolution scale.
+    S32 original_width = LLPipeline::sRenderDeferred ? (S32)gPipeline.mRT->width : gViewerWindow->getWorldViewWidthRaw();
+    S32 original_height = LLPipeline::sRenderDeferred ? (S32)gPipeline.mRT->height : gViewerWindow->getWorldViewHeightRaw();
 
     LLRenderTarget scratch_space;
-    U32 color_fmt = GL_RGBA;
-    if (scratch_space.allocate(image_width, image_height, color_fmt, true))
+    // Sized format, for the reason spelled out in rawSnapshot: immutable storage means
+    // glTexStorage2D sees this, and it rejects unsized formats. There is no tiled fallback on
+    // this path -- a failure here means the screen buffers are never resized and the readback
+    // below pulls image_width x image_height out of window-sized ones.
+    if (scratch_space.allocate(image_width, image_height, GL_RGBA8, true))
     {
         if (gPipeline.allocateScreenBuffer(image_width, image_height))
         {
