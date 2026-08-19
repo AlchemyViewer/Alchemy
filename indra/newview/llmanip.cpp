@@ -359,7 +359,7 @@ LLVector3 LLManip::getPivotPoint()
     LLViewerObject* object = mObjectSelection->getFirstRootObject(true);
     if (object && (mObjectSelection->getObjectCount() == 1 || editRootAxis) && mObjectSelection->getSelectType() != SELECT_TYPE_HUD)
     {
-        return mObjectSelection->getFirstObject()->getPivotPositionAgent();
+        return object->getPivotPositionAgent();
     }
     return LLSelectMgr::getInstance()->getBBoxOfSelection().getCenterAgent();
 }
