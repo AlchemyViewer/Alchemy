@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+Lightbox "Sky" tab: the sky you are shooting, rather than the grade.
+Full guide for adding sections: doc/LIGHTBOX.md.
+
+Two kinds of thing live here and they do not behave alike. Day cycle changes the
+*world's* environment through LLEnvironment, owns no settings, and reads its
+state back from the world in a draw() poll; see §4h before touching it. Sky
+Effects is ordinary settings rows like any other tab's, and follows the ordinary
+conventions: reset glyph per row, Reset All per section.
+
+Aurora, meteors and the star field are drawn entirely client side, and none of
+them was reachable from any UI before this; they were Debug Settings only.
+-->
+<panel
+ name="panel_lightbox_sky"
+ layout="topleft"
+ width="450"
+ height="490"
+ follows="all">
+	<accordion
+	 follows="all"
+	 layout="topleft"
+	 left="2"
+	 top="2"
+	 right="-2"
+	 height="484"
+	 single_expansion="false"
+	 name="sky_accordion">
+		<accordion_tab
+		 expanded="true"
+		 layout="topleft"
+		 height="190"
+		 name="atab_sec_daycycle"
+		 title="Day cycle"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="161"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_daycycle">
+				<text
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-8"
+				 height="16"
+				 font="SansSerifSmall"
+				 name="daycycle_note"
+				 tool_tip="There is no clock to stop: the viewer works out where in the cycle it is from the time of day, every frame. Freezing takes the sky and water the cycle is producing right now and installs them as a fixed local environment, which is what stops the motion. It overrides the parcel and region environment while it is on."
+				 value="Hold the sky still while you grade, overriding the region." />
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 height="16"
+				 width="300"
+				 label="Freeze the sky"
+				 name="day_freeze"
+				 tool_tip="Hold the sky and the water at one point in the day cycle. Unticking puts back whatever environment was in place before, so this is a real undo and not a drop to the region default.">
+					<check_box.commit_callback
+					 function="LightBox.ToggleDayFreeze" />
+				</check_box>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-8"
+				 height="16"
+				 label="Position"
+				 label_width="70"
+				 can_edit_text="true"
+				 decimal_digits="3"
+				 increment="0.001"
+				 min_val="0"
+				 max_val="1"
+				 text_width="56"
+				 name="day_time"
+				 tool_tip="Where in the cycle to hold, as a fraction of the whole cycle. It is not a clock: nothing in the viewer maps a cycle position to a time, and a region can put its keyframes wherever it likes. While the sky is running this tracks it, so ticking Freeze holds the moment you were looking at.">
+					<slider.commit_callback
+					 function="LightBox.CommitDayTime" />
+				</slider>
+				<!-- These find their positions by asking where the sun actually
+				     is, sampling the cycle and taking the highest point, the
+				     lowest, and the two horizon crossings. A cycle that has no
+				     such moment greys the button rather than guessing: a sun
+				     that never sets has a noon and no sunrise.
+
+				     Sized for min_width, not the default: 420 less chrome, the
+				     accordion scrollbar and the margins leaves 361, and four at
+				     85 with 6px gaps end at 366 of 369. -->
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 width="85"
+				 height="18"
+				 label="Sunrise"
+				 name="day_sunrise"
+				 tool_tip="Jump to where the sun crosses the horizon on its way up, in this region's own cycle, and hold there">
+					<button.commit_callback
+					 function="LightBox.DayPreset"
+					 parameter="sunrise" />
+				</button>
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 left="99"
+				 top_delta="0"
+				 width="85"
+				 height="18"
+				 label="Noon"
+				 name="day_noon"
+				 tool_tip="Jump to the highest the sun gets in this region's own cycle, and hold there">
+					<button.commit_callback
+					 function="LightBox.DayPreset"
+					 parameter="noon" />
+				</button>
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 left="190"
+				 top_delta="0"
+				 width="85"
+				 height="18"
+				 label="Sunset"
+				 name="day_sunset"
+				 tool_tip="Jump to where the sun crosses the horizon on its way down, in this region's own cycle, and hold there">
+					<button.commit_callback
+					 function="LightBox.DayPreset"
+					 parameter="sunset" />
+				</button>
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 left="281"
+				 top_delta="0"
+				 width="85"
+				 height="18"
+				 label="Midnight"
+				 name="day_midnight"
+				 tool_tip="Jump to the lowest the sun gets in this region's own cycle, and hold there">
+					<button.commit_callback
+					 function="LightBox.DayPreset"
+					 parameter="midnight" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 height="16"
+				 width="300"
+				 label="Pause clouds"
+				 name="day_pause_clouds"
+				 tool_tip="Clouds drift on their own timer, apart from the day cycle, so a frozen sky still has weather moving through it until this is on. The same switch as World, Environment, Pause Clouds.">
+					<check_box.commit_callback
+					 function="LightBox.ToggleCloudScroll" />
+				</check_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="170"
+				 right="-8"
+				 top_pad="10"
+				 label="Use shared environment"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="day_restore_environment"
+				 tool_tip="Drop the local environment entirely and go back to what the parcel or region is running. Unlike unticking Freeze, this does not put back a personal sky you had set before.">
+					<button.commit_callback
+					 function="LightBox.RestoreEnvironment" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<!-- One section, because two of these are a single control each and a
+		     section per slider reads as filing rather than grouping. No header
+		     checkbox either: the only boolean here belongs to meteors, and a
+		     box on a header called Sky Effects would claim to switch all three. -->
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="195"
+		 name="atab_sec_skyfx"
+		 title="Sky Effects"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="166"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_skyfx">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Aurora Intensity"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="2"
+				 text_width="56"
+				 name="aurora_intensity"
+				 tool_tip="Procedural aurora borealis, drawn on the client only. 0 switches it off entirely, which is the default; 1 is a clear display and 2 a vivid one. Night only, on the same star brightness gate as the stars, and it fades as the moon brightens because scattered moonlight would wash the emission out anyway. An HDRI sky replaces the dome and leaves nothing to draw into."
+				 control_name="RenderAuroraIntensity" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="aurora_intensity_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderAuroraIntensity" />
+				</button>
+				<!-- A dropdown and not a slider, by the rule in §2: committing
+				     this value regenerates every star position and rebuilds the
+				     vertex buffer, and a slider commits on every mouse move.
+				     The steps are proportions of the 155000 default, which is
+				     the total the renderer scales each brightness tier against. -->
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="140"
+				 height="16"
+				 name="star_count_label"
+				 value="Stars" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="star_count_combo"
+				 tool_tip="How many stars the night sky is built from. Changing it regenerates the star field and rebuilds its vertex buffer, so expect a brief hitch. The mix of bright, mid and faint stars stays the same at every step."
+				 control_name="RenderStarCount">
+					<combo_box.item
+					 label="None"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Sparse"
+					 name="40000"
+					 value="40000" />
+					<combo_box.item
+					 label="Normal"
+					 name="155000"
+					 value="155000" />
+					<combo_box.item
+					 label="Dense"
+					 name="350000"
+					 value="350000" />
+					<combo_box.item
+					 label="Maximum"
+					 name="700000"
+					 value="700000" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="star_count_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderStarCount" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 height="16"
+				 width="300"
+				 label="Meteors"
+				 name="meteors_enable"
+				 tool_tip="Procedural meteor streaks, drawn on the client only, on the same night gate as the stars they cross."
+				 control_name="RenderMeteorsEnabled" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Max Meteors"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="64"
+				 text_width="56"
+				 name="meteor_max_count"
+				 tool_tip="How many streaks may be in the sky together. 64 is the ceiling because the vertex buffer is sized for it once and never reallocated."
+				 enabled_control="RenderMeteorsEnabled"
+				 control_name="RenderMeteorMaxCount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="meteor_max_count_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderMeteorMaxCount" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Meteor Interval"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.25"
+				 min_val="0.25"
+				 max_val="20"
+				 text_width="56"
+				 name="meteor_spawn_interval"
+				 tool_tip="Mean seconds between one streak and the next, so higher is rarer. A mean and not a fixed gap: the renderer rolls for a spawn every frame, which is what makes it read as weather rather than animation."
+				 enabled_control="RenderMeteorsEnabled"
+				 control_name="RenderMeteorSpawnInterval" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="meteor_spawn_interval_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderMeteorSpawnInterval" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_skyfx_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_skyfx" />
+				</button>
+			</panel>
+		</accordion_tab>
+	</accordion>
+</panel>

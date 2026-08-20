@@ -514,6 +514,11 @@ public:
         // Previews
         PREVIEW_MODE,                       //  "uPreviewMode"
 
+        // Reference still — grab a frame, wipe the live image against it
+        REFERENCE_STILL,                    //  "uReferenceStill"
+        REFERENCE_WIPE_MODE,                //  "uRefWipeMode"
+        REFERENCE_WIPE_POS,                 //  "uRefWipePos"
+
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 

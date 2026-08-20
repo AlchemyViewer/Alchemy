@@ -1,0 +1,3223 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+Lightbox "Lens" tab: optical / film effects.
+Row and height conventions are documented in panel_lightbox_look.xml. The
+bloom/glow pair is the HDR fork: Bloom rows grey out unless RenderHDREnabled is
+on; Legacy Glow rows grey out while it is on, so both modes stay discoverable
+without layout holes. (RenderBloomHDR is currently unwired renderer-side, so
+the fork gates on RenderHDREnabled — which is deliberately NOT offered as a
+toggle here; it cascades probe resets, buffer reallocation, and a shader
+rebuild. Revisit if RenderBloomHDR gets wired.)
+-->
+<panel
+ name="panel_lightbox_lens"
+ layout="topleft"
+ width="450"
+ height="490"
+ follows="all">
+	<accordion
+	 follows="all"
+	 layout="topleft"
+	 left="2"
+	 top="2"
+	 right="-2"
+	 height="484"
+	 single_expansion="false"
+	 name="lens_accordion">
+		<accordion_tab
+		 expanded="true"
+		 layout="topleft"
+		 height="192"
+		 name="atab_sec_dof"
+		 title="Depth of Field"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="163"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_dof">
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top="8"
+				 width="300"
+				 label="Depth of field"
+				 tool_tip="Blur the scene away from the focus distance, like a camera lens. Toggling causes a brief hitch."
+				 name="dof_enable"
+				 control_name="RenderDepthOfField" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 right="-32"
+				 height="16"
+				 label="F-number"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0.7"
+				 max_val="32"
+				 name="dof_fnumber"
+				 tool_tip="Aperture f-number. Lower values give a shallower focus plane and stronger blur."
+				 enabled_control="RenderDepthOfField"
+				 control_name="CameraFNumber" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="dof_fnumber_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="CameraFNumber" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Focal length (mm)"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="5"
+				 max_val="200"
+				 name="dof_focal_length"
+				 tool_tip="Lens focal length in millimeters. Longer lenses compress and blur backgrounds more."
+				 enabled_control="RenderDepthOfField"
+				 control_name="CameraFocalLength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="dof_focal_length_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="CameraFocalLength" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="Lock focus point"
+				 tool_tip="Freeze the current focus distance in place (not saved between sessions)"
+				 name="dof_focus_locked"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderFocusPointLocked" />
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="8"
+				 width="300"
+				 label="Focus follows pointer"
+				 tool_tip="Continuously refocus on whatever is under the mouse pointer (not saved between sessions)"
+				 name="dof_focus_pointer"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderFocusPointFollowsPointer" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_dof_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_dof" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="218"
+		 name="atab_sec_dof_adv"
+		 title="Depth of Field - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="189"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_dof_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Field of view"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="10"
+				 max_val="120"
+				 name="dof_fov"
+				 tool_tip="Vertical field of view (degrees) the DoF model assumes for the virtual camera"
+				 enabled_control="RenderDepthOfField"
+				 control_name="CameraFieldOfView" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="dof_fov_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="CameraFieldOfView" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Max blur (CoC)"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.5"
+				 min_val="1"
+				 max_val="32"
+				 name="dof_max_cof"
+				 tool_tip="Maximum circle-of-confusion size, capping how strong the blur can get"
+				 enabled_control="RenderDepthOfField"
+				 control_name="CameraMaxCoF" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="dof_max_cof_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="CameraMaxCoF" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Resolution scale"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0.25"
+				 max_val="1"
+				 name="dof_res_scale"
+				 tool_tip="Resolution the blur is computed at. 1 = full resolution (sharpest, slowest); 0.25 = quarter."
+				 enabled_control="RenderDepthOfField"
+				 control_name="CameraDoFResScale" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="dof_res_scale_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="CameraDoFResScale" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Focus transition (s)"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0"
+				 max_val="5"
+				 name="dof_transition"
+				 tool_tip="Seconds the camera takes to rack focus between distances"
+				 enabled_control="RenderDepthOfField"
+				 control_name="CameraFocusTransitionTime" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="dof_transition_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="CameraFocusTransitionTime" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="Blur foreground (near blur)"
+				 tool_tip="Also blur objects closer than the focus distance"
+				 name="dof_near_blur"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderDepthOfFieldNearBlur" />
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="8"
+				 width="300"
+				 label="Keep DoF while editing"
+				 tool_tip="Leave depth of field active while build/edit tools are open"
+				 name="dof_edit_mode"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderDepthOfFieldInEditMode" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_dof_adv_reset"
+				 tool_tip="Reset the advanced depth of field settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_dof_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="142"
+		 name="atab_sec_bloom"
+		 title="Bloom (HDR)"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_bloom">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Strength"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="bloom_strength"
+				 tool_tip="How strongly the bloom is blended into the scene"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderBloomStrength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bloom_strength_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBloomStrength" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Threshold"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="8"
+				 name="bloom_threshold"
+				 tool_tip="Luminance (linear light) above which pixels bloom; 1.0 is roughly brighter-than-white"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderBloomThreshold" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bloom_threshold_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBloomThreshold" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Scatter"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="2.5"
+				 name="bloom_scatter"
+				 tool_tip="Bloom spread per octave. Above about 2.5 the filter starts to alias."
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderBloomScatter" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bloom_scatter_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBloomScatter" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_bloom_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_bloom" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="251"
+		 name="atab_sec_bloom_adv"
+		 title="Bloom (HDR) - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="222"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_bloom_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Knee"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="bloom_knee"
+				 tool_tip="Soft-knee width below the threshold; wider gives a more gradual bloom onset"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderBloomKnee" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bloom_knee_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBloomKnee" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Prim glow boost"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0"
+				 max_val="8"
+				 name="bloom_alpha_boost"
+				 tool_tip="Multiplier for legacy prim-glow when fed into HDR bloom, so glowing objects match legacy brightness"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderBloomAlphaGlowBoost" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bloom_alpha_boost_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBloomAlphaGlowBoost" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Mip count"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="3"
+				 max_val="7"
+				 name="bloom_mips"
+				 tool_tip="Bloom pyramid levels; more mips = wider, softer bloom. Changing causes a brief hitch."
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderBloomMipCount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bloom_mips_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBloomMipCount" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="bloom_res_scale_label"
+				 value="Base resolution" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="bloom_res_scale_combo"
+				 tool_tip="Resolution the bloom pyramid starts at. Lower resolutions are faster and reach wider per mip. Changing causes a brief hitch."
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderBloomResolutionScale">
+					<combo_box.item
+					 label="Full"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="3/4"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Half"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Quarter"
+					 name="3"
+					 value="3" />
+					<combo_box.item
+					 label="Eighth"
+					 name="4"
+					 value="4" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bloom_res_scale_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBloomResolutionScale" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="Halation"
+				 tool_tip="Enable the warm halo signal around bright highlights (uses a wider pyramid format). Toggling causes a brief hitch."
+				 name="bloom_halation"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderBloomHalation" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 right="-32"
+				 height="16"
+				 label="Halation strength"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="bloom_halation_strength"
+				 tool_tip="Photographic halation amount; 0.25 is a gentle cinematic feel"
+				 enabled_control="RenderBloomHalation"
+				 control_name="RenderBloomHalationStrength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bloom_halation_strength_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBloomHalationStrength" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 width="140"
+				 height="15"
+				 name="bloom_halation_tint_label"
+				 value="Halation tint" />
+				<color_swatch
+				 can_apply_immediately="true"
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-18"
+				 width="60"
+				 height="24"
+				 label_height="0"
+				 name="bloom_halation_tint"
+				 tool_tip="Color of the halation halo; default is warm amber"
+				 enabled_control="RenderBloomHalation"
+				 control_name="RenderBloomHalationTint" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-21"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bloom_halation_tint_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBloomHalationTint" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_bloom_adv_reset"
+				 tool_tip="Reset the advanced bloom settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_bloom_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="165"
+		 name="atab_sec_glow"
+		 title="Glow (Legacy)"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="136"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_glow">
+				<text
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-8"
+				 height="15"
+				 name="glow_caption">
+					Applies when HDR rendering is off.
+				</text>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="8"
+				 width="300"
+				 label="Glow"
+				 tool_tip="Legacy screen-space glow"
+				 name="glow_enable"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlow" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 right="-32"
+				 height="16"
+				 label="Strength"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="glow_strength"
+				 tool_tip="Additive strength of the glow"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlowStrength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="glow_strength_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderGlowStrength" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Width"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="4"
+				 name="glow_width"
+				 tool_tip="Glow sample size; wider is softer but eventually pixelated"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlowWidth" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="glow_width_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderGlowWidth" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_glow_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_glow" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="301"
+		 name="atab_sec_glow_adv"
+		 title="Glow (Legacy) - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="272"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_glow_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Iterations"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="1"
+				 max_val="8"
+				 name="glow_iterations"
+				 tool_tip="Blur passes; higher is wider and smoother but slower"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlowIterations" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="glow_iterations_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderGlowIterations" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Max extract alpha"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="glow_max_alpha"
+				 tool_tip="Cap on brightness-extracted auto-glow"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlowMaxExtractAlpha" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="glow_max_alpha_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderGlowMaxExtractAlpha" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Min luminance"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="100"
+				 min_val="0"
+				 max_val="10000"
+				 name="glow_min_lum"
+				 tool_tip="Minimum luminance for an object to auto-glow; 9999 effectively disables auto-glow"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlowMinLuminance" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="glow_min_lum_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderGlowMinLuminance" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Resolution (pow 2)"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="6"
+				 max_val="11"
+				 name="glow_res_pow"
+				 tool_tip="Glow map resolution as a power of two (9 = 512)"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlowResolutionPow" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="glow_res_pow_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderGlowResolutionPow" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="HDR glow map"
+				 tool_tip="Use an HDR format for the glow map"
+				 name="glow_hdr"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlowHDR" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 right="-32"
+				 height="16"
+				 label="Warmth amount"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="glow_warmth"
+				 tool_tip="Blend between luminance extraction (0) and warmth extraction (1)"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlowWarmthAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="glow_warmth_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderGlowWarmthAmount" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="110"
+				 height="15"
+				 name="glow_lum_weights_label"
+				 tool_tip="Per-channel weights for luminance extraction (should sum to 1)"
+				 value="Lum weights" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="68"
+				 height="18"
+				 label="R"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="vec3_RenderGlowLumWeights_0">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="G"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="vec3_RenderGlowLumWeights_1">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="B"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="vec3_RenderGlowLumWeights_2">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="glow_lum_weights_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderGlowLumWeights" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="110"
+				 height="15"
+				 name="glow_warmth_weights_label"
+				 tool_tip="Per-channel weights used before taking the max warmth"
+				 value="Warmth weights" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="68"
+				 height="18"
+				 label="R"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="vec3_RenderGlowWarmthWeights_0">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="G"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="vec3_RenderGlowWarmthWeights_1">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="B"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="vec3_RenderGlowWarmthWeights_2">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="glow_warmth_weights_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderGlowWarmthWeights" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="Glow noise (dither)"
+				 tool_tip="Dither the glow to reduce banding"
+				 name="glow_noise"
+				 disabled_control="RenderHDREnabled"
+				 control_name="RenderGlowNoise" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_glow_adv_reset"
+				 tool_tip="Reset the advanced glow settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_glow_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="172"
+		 name="atab_sec_flare"
+		 title="Lens Flare"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="143"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_flare">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Strength"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="flare_strength"
+				 tool_tip="Master lens flare intensity; 0 turns the effect off entirely"
+				 control_name="RenderLensFlareStrength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_strength_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStrength" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 width="140"
+				 height="15"
+				 name="flare_streak_tint_label"
+				 value="Streak tint" />
+				<color_swatch
+				 can_apply_immediately="true"
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-18"
+				 width="60"
+				 height="24"
+				 label_height="0"
+				 name="flare_streak_tint"
+				 tool_tip="Color of the anamorphic streak; the default cool blue mimics coated cinema lenses"
+				 control_name="RenderLensFlareStreakTint" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-21"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_streak_tint_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStreakTint" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Glow"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="5"
+				 name="flare_glow"
+				 tool_tip="Intensity of the soft central glow around the sun"
+				 control_name="RenderLensFlareGlow" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_glow_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareGlow" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Starburst"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="5"
+				 name="flare_starburst"
+				 tool_tip="Intensity of the diffraction-spike starburst radiating from the sun"
+				 control_name="RenderLensFlareStarburst" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_starburst_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStarburst" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_flare_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_flare" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="715"
+		 name="atab_sec_flare_adv"
+		 title="Lens Flare - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="686"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_flare_adv">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="flare_hdr_streak"
+				 value="Streak" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Length"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.01"
+				 max_val="2"
+				 name="flare_streak_length"
+				 tool_tip="How far the anamorphic streak stretches; 1.0 crosses the full screen width"
+				 control_name="RenderLensFlareStreakLength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_streak_length_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStreakLength" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Falloff"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0.1"
+				 max_val="10"
+				 name="flare_streak_falloff"
+				 tool_tip="How quickly the streak fades toward its tips; lower leaves a longer tail"
+				 control_name="RenderLensFlareStreakFalloff" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_streak_falloff_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStreakFalloff" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Thickness"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="flare_streak_thickness"
+				 tool_tip="Vertical thickness of the streak; low is a hairline, high a soft band"
+				 control_name="RenderLensFlareStreakThickness" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_streak_thickness_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStreakThickness" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Intensity"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="5"
+				 name="flare_streak_intensity"
+				 tool_tip="Brightness of just the streak, separate from the master strength"
+				 control_name="RenderLensFlareStreakIntensity" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_streak_intensity_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStreakIntensity" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Chromatic spread"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="flare_chromatic_spread"
+				 tool_tip="Red/blue separation along the streak; 1 gives a strong rainbow split"
+				 control_name="RenderLensFlareChromaticSpread" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_chromatic_spread_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareChromaticSpread" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_glow" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="flare_hdr_glow"
+				 value="Glow" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Radius"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="3"
+				 text_width="56"
+				 increment="0.005"
+				 min_val="0.01"
+				 max_val="0.5"
+				 name="flare_glow_radius"
+				 tool_tip="Size of the soft glow around the sun"
+				 control_name="RenderLensFlareGlowRadius" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_glow_radius_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareGlowRadius" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Falloff"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.5"
+				 min_val="1"
+				 max_val="30"
+				 name="flare_glow_falloff"
+				 tool_tip="Softness of the central glow; lower spreads it out, higher keeps it tight"
+				 control_name="RenderLensFlareGlowFalloff" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_glow_falloff_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareGlowFalloff" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_ghosts" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="flare_hdr_ghosts"
+				 value="Ghosts" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Intensity"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="5"
+				 name="flare_ghost"
+				 tool_tip="Intensity of the lens ghost circles; 0 disables ghosts"
+				 control_name="RenderLensFlareGhost" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_ghost_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareGhost" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Count"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="8"
+				 name="flare_ghost_count"
+				 tool_tip="Number of ghost circles along the sun-to-center line"
+				 control_name="RenderLensFlareGhostCount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_ghost_count_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareGhostCount" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Spacing"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.1"
+				 max_val="1"
+				 name="flare_ghost_spacing"
+				 tool_tip="Distance between consecutive ghosts"
+				 control_name="RenderLensFlareGhostSpacing" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_ghost_spacing_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareGhostSpacing" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_halo" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="flare_hdr_halo"
+				 value="Halo" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Intensity"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="5"
+				 name="flare_halo"
+				 tool_tip="Intensity of the halo ring opposite the sun; 0 disables the halo"
+				 control_name="RenderLensFlareHalo" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_halo_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareHalo" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Radius"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.01"
+				 max_val="1"
+				 name="flare_halo_radius"
+				 tool_tip="Radius of the halo ring"
+				 control_name="RenderLensFlareHaloRadius" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_halo_radius_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareHaloRadius" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Width"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="3"
+				 text_width="56"
+				 increment="0.005"
+				 min_val="0.01"
+				 max_val="0.5"
+				 name="flare_halo_width"
+				 tool_tip="Thickness of the halo ring; small is a crisp hoop, large a diffuse ring"
+				 control_name="RenderLensFlareHaloWidth" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_halo_width_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareHaloWidth" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_starburst" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="flare_hdr_starburst"
+				 value="Starburst" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Spikes"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="1"
+				 max_val="32"
+				 name="flare_starburst_spikes"
+				 tool_tip="Number of aperture-like spikes; real lenses show twice the blade count"
+				 control_name="RenderLensFlareStarburstSpikes" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_starburst_spikes_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStarburstSpikes" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Sharpness"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="1"
+				 max_val="256"
+				 name="flare_starburst_sharpness"
+				 tool_tip="Low values give soft wide rays; high values give thin needle-like beams"
+				 control_name="RenderLensFlareStarburstSharpness" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_starburst_sharpness_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStarburstSharpness" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Length"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="flare_starburst_length"
+				 tool_tip="Length of the starburst spikes"
+				 control_name="RenderLensFlareStarburstLength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_starburst_length_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareStarburstLength" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="flare_div_occlusion" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="flare_hdr_occlusion"
+				 value="Occlusion" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Radius"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="3"
+				 text_width="56"
+				 increment="0.001"
+				 min_val="0.005"
+				 max_val="0.1"
+				 name="flare_occlusion_radius"
+				 tool_tip="Width of the sun-occlusion depth test; larger lets thin geometry dim the flare gracefully"
+				 control_name="RenderLensFlareOcclusionRadius" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_occlusion_radius_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareOcclusionRadius" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Samples"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="1"
+				 max_val="32"
+				 name="flare_occlusion_taps"
+				 tool_tip="Depth samples for occlusion testing; more gives smoother transitions at slight cost"
+				 control_name="RenderLensFlareOcclusionTaps" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="flare_occlusion_taps_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensFlareOcclusionTaps" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_flare_adv_reset"
+				 tool_tip="Reset the advanced lens flare settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_flare_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="272"
+		 name="atab_sec_ca"
+		 title="Chromatic Aberration"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="243"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_ca">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Strength"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="ca_strength"
+				 tool_tip="Color fringe intensity. 0 disables; 0.15 is a subtle cinema lens feel."
+				 control_name="RenderChromaticAberrationStrength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ca_strength_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderChromaticAberrationStrength" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Falloff"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0.5"
+				 max_val="4"
+				 name="ca_falloff"
+				 tool_tip="How quickly fringing grows from center to edge; higher keeps the center clean"
+				 control_name="RenderChromaticAberrationFalloff" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ca_falloff_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderChromaticAberrationFalloff" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Angle"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="360"
+				 name="ca_angle"
+				 tool_tip="Rotates the red/blue split direction (degrees); only matters when anisotropy is nonzero"
+				 control_name="RenderChromaticAberrationAngle" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ca_angle_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderChromaticAberrationAngle" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Anisotropy"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="ca_anisotropy"
+				 tool_tip="Stretches the fringe along the angle axis for an anamorphic-style directional smear"
+				 control_name="RenderChromaticAberrationAnisotropy" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ca_anisotropy_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderChromaticAberrationAnisotropy" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Red offset X"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="ca_offset_rx"
+				 tool_tip="Red channel horizontal shift direction"
+				 control_name="RenderChromaticAberrationOffsetRX" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ca_offset_rx_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderChromaticAberrationOffsetRX" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Red offset Y"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="ca_offset_ry"
+				 tool_tip="Red channel vertical shift direction"
+				 control_name="RenderChromaticAberrationOffsetRY" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ca_offset_ry_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderChromaticAberrationOffsetRY" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Blue offset X"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="ca_offset_bx"
+				 tool_tip="Blue channel horizontal shift direction; typically opposite the red offset"
+				 control_name="RenderChromaticAberrationOffsetBX" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ca_offset_bx_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderChromaticAberrationOffsetBX" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Blue offset Y"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-1"
+				 max_val="1"
+				 name="ca_offset_by"
+				 tool_tip="Blue channel vertical shift direction"
+				 control_name="RenderChromaticAberrationOffsetBY" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ca_offset_by_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderChromaticAberrationOffsetBY" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_ca_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_ca" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="142"
+		 name="atab_sec_vignette"
+		 title="Vignette"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_vignette">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Amount"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="vignette_amount"
+				 tool_tip="Opacity of the vignette; 0 disables"
+				 control_name="RenderVignetteAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="vignette_amount_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVignetteAmount" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Radius"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.25"
+				 max_val="1.5"
+				 name="vignette_radius"
+				 tool_tip="Vignette size in image-height units; 1.0 reaches the top and bottom edges"
+				 control_name="RenderVignetteRadius" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="vignette_radius_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVignetteRadius" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Feather"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0.2"
+				 max_val="4"
+				 name="vignette_feather"
+				 tool_tip="Shape of the darkening curve: below 1 spreads a gentle haze inward, above 1 concentrates darkening at the corners"
+				 control_name="RenderVignetteFeather" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="vignette_feather_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVignetteFeather" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_vignette_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_vignette" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="255"
+		 name="atab_sec_vignette_adv"
+		 title="Vignette - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="226"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_vignette_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Softness"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="vignette_soft"
+				 tool_tip="Softness of the vignette edge"
+				 control_name="RenderVignetteSoft" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="vignette_soft_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVignetteSoft" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Shape"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="vignette_shape"
+				 tool_tip="0 is circular, 1 is a rounded square"
+				 control_name="RenderVignetteShape" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="vignette_shape_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVignetteShape" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Mid point"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="vignette_midpoint"
+				 tool_tip="Position of the middle color in the three-color ramp; 0 disables (two-color vignette)"
+				 control_name="RenderVignetteMidPoint" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="vignette_midpoint_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVignetteMidPoint" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 width="140"
+				 height="15"
+				 name="vignette_color_label"
+				 value="Edge color" />
+				<color_swatch
+				 can_apply_immediately="true"
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-18"
+				 width="60"
+				 height="24"
+				 label_height="0"
+				 name="vignette_color"
+				 tool_tip="Vignette edge color"
+				 control_name="RenderVignetteColor" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-21"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="vignette_color_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVignetteColor" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 width="140"
+				 height="15"
+				 name="vignette_midcolor_label"
+				 value="Mid color" />
+				<color_swatch
+				 can_apply_immediately="true"
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-18"
+				 width="60"
+				 height="24"
+				 label_height="0"
+				 name="vignette_midcolor"
+				 tool_tip="Intermediate ramp color, used when mid point is above 0"
+				 control_name="RenderVignetteMidColor" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-21"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="vignette_midcolor_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVignetteMidColor" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="110"
+				 height="15"
+				 name="vignette_center_label"
+				 tool_tip="Offset of the vignette center (X and Y; the third value is unused)"
+				 value="Center" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="68"
+				 height="18"
+				 label="X"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="vec3_RenderVignetteCenter_0">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="Y"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="vec3_RenderVignetteCenter_1">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="Z"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="vec3_RenderVignetteCenter_2">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="vignette_center_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVignetteCenter" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="Correct for aspect ratio"
+				 tool_tip="Keep the vignette circular on wide screens instead of stretching with the frame"
+				 name="vignette_aspect"
+				 control_name="RenderVignetteCorrectAspect" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_vignette_adv_reset"
+				 tool_tip="Reset the advanced vignette settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_vignette_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="224"
+		 name="atab_sec_grain"
+		 title="Film Grain"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="195"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_grain">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Amount"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="grain_amount"
+				 tool_tip="Film grain strength; 0 disables"
+				 control_name="RenderFilmGrainAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="grain_amount_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderFilmGrainAmount" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Size"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="1"
+				 max_val="8"
+				 name="grain_size"
+				 tool_tip="Size of the grain particles"
+				 control_name="RenderFilmGrainSize" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="grain_size_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderFilmGrainSize" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="grain_style_label"
+				 value="Style" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="grain_style_combo"
+				 tool_tip="Grain character: mono luma, color (digital push), coarse (16mm feel), or photon shot (CCD sensor)"
+				 control_name="RenderFilmGrainStyle">
+					<combo_box.item
+					 label="Mono (luma)"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Color (digital)"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Coarse (16mm)"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Photon shot (CCD)"
+					 name="3"
+					 value="3" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="grain_style_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderFilmGrainStyle" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Luma range"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="grain_range"
+				 tool_tip="Luma position where grain peaks: 0 shadows only, 0.5 midtones (classic film), 1 highlights only"
+				 control_name="RenderFilmGrainRange" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="grain_range_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderFilmGrainRange" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 width="140"
+				 height="15"
+				 name="grain_tint_label"
+				 value="Tint" />
+				<color_swatch
+				 can_apply_immediately="true"
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-18"
+				 width="60"
+				 height="24"
+				 label_height="0"
+				 name="grain_tint"
+				 tool_tip="Grain color; white is neutral, warm tints suggest film, cool tints suggest video noise"
+				 control_name="RenderFilmGrainTint" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-21"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="grain_tint_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderFilmGrainTint" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="Animated"
+				 tool_tip="Re-randomize the grain every frame, like real film"
+				 name="grain_animated"
+				 control_name="RenderFilmGrainAnimated" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_grain_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_grain" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="90"
+		 name="atab_sec_sharp"
+		 title="Sharpen"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="61"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_sharp">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Sharpness (CAS)"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="sharp_cas"
+				 tool_tip="Contrast Adaptive Sharpening strength"
+				 control_name="RenderCASSharpness" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="sharp_cas_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderCASSharpness" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_sharp_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_sharp" />
+				</button>
+			</panel>
+		</accordion_tab>
+	</accordion>
+</panel>

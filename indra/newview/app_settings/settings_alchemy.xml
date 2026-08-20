@@ -1195,6 +1195,105 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyScopeLayout</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: how many scopes are shown at once and how they are arranged. 0 = one filling the window, 1 = two side by side, 2 = two stacked, 3 = four in a grid. Which scope each pane shows is AlchemyScopePane0 through AlchemyScopePane3; right-click a pane to set it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyScopePane0</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: which scope the first pane shows. 0 = RGB histogram, 1 = luminance, 2 = red, 3 = green, 4 = blue, 5 = vectorscope, 6 = waveform luminance, 7 = waveform RGB, 8 = parade. This is the pane a single-pane layout shows.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyScopePane1</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: which scope the second pane shows. Same values as AlchemyScopePane0. Used by the two-pane and four-pane layouts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>7</integer>
+        </map>
+        <key>AlchemyScopePane2</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: which scope the third pane shows. Same values as AlchemyScopePane0. Used by the four-pane layout only.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>8</integer>
+        </map>
+        <key>AlchemyScopePane3</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: which scope the fourth pane shows. Same values as AlchemyScopePane0. Used by the four-pane layout only.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>5</integer>
+        </map>
+        <key>AlchemyScopeLogScale</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: plot histogram bins on a log scale so tall bins do not flatten the rest of the distribution onto the axis. 0 = linear.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyScopeSampleInterval</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: seconds between frame samples (0.1 = ten per second, which is about what hardware scopes run at). Lower costs more; 0 samples every frame. Only applies while a scopes floater is open.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.1</real>
+        </map>
+        <key>AlchemyScopeSampleWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: width in pixels of the point-sampled copy the histogram is measured from; height follows the world view's aspect. Range 32 to 1024. Raising it only reduces per-bin noise (which falls as 1/sqrt(samples)) at a linear cost in read-back and binning; 320 gives roughly 7 percent jitter per bin at 16:9.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>320</integer>
+        </map>
+        <key>AlchemyScopeSmoothing</key>
+        <map>
+            <key>Comment</key>
+            <string>Scopes floater: how far each sample moves the displayed histogram towards the new measurement, 0 to 1. 1 shows the raw sample and shimmers; lower settles but lags a change in the scene.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
         <key>AlchemyRenderUBOUpdateMode</key>
         <map>
             <key>Comment</key>
@@ -1487,6 +1586,28 @@
             <string>S32</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>PresetLooksActive</key>
+        <map>
+            <key>Comment</key>
+            <string>Name of the currently applied Lightbox Look; blank once settings drift from it</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
+        <key>PresetLooksLastApplied</key>
+        <map>
+            <key>Comment</key>
+            <string>Name of the most recently applied Lightbox Look, kept for revert</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
         </map>
         <key>RenderAvatarShadowDetail</key>
         <map>
@@ -1896,7 +2017,7 @@
         <key>RenderColorGradeGamma</key>
         <map>
             <key>Comment</key>
-            <string>Midtone gamma (R,G,B): bends the middle of the tonal range without moving blacks or whites. Below 1 brightens mids, above 1 darkens them. Per-channel range 0.5 to 1.5. Default (1,1,1). Try (0.9,0.9,0.9) open mids, (1.1,1.0,0.95) warm mids.</string>
+            <string>Midtone gamma (R,G,B): bends the middle of the tonal range without moving blacks or whites. Above 1 brightens mids, below 1 darkens them. Per-channel range 0.5 to 1.5. Default (1,1,1). Try (1.1,1.1,1.1) open mids, (1.1,1.0,0.95) warm mids.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -2121,6 +2242,28 @@
             <string>S32</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>RenderReferenceWipeMode</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 2] How a grabbed reference still is shown: 0 = off, 1 = wipe (still left of the seam, live right), 2 = side by side. Ignored unless a still has been grabbed. Session-scoped: a still does not outlive the session, so neither should the mode.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderReferenceWipePosition</key>
+        <map>
+            <key>Comment</key>
+            <string>[0, 1] Where the wipe seam sits across the frame. Session-scoped, like RenderReferenceWipeMode.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
         </map>
         <key>RenderFilmGrainAmount</key>
         <map>

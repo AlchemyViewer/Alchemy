@@ -1,0 +1,2101 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+Lightbox "Scene" tab: render quality and performance.
+Row and height conventions are documented in panel_lightbox_look.xml.
+RenderHDREnabled is deliberately not exposed here (it cascades probe resets,
+buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
+-->
+<panel
+ name="panel_lightbox_scene"
+ layout="topleft"
+ width="450"
+ height="490"
+ follows="all">
+	<accordion
+	 follows="all"
+	 layout="topleft"
+	 left="2"
+	 top="2"
+	 right="-2"
+	 height="484"
+	 single_expansion="false"
+	 name="scene_accordion">
+		<accordion_tab
+		 expanded="true"
+		 layout="topleft"
+		 height="116"
+		 name="atab_sec_aa"
+		 title="Anti-Aliasing"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="87"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_aa">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="140"
+				 height="15"
+				 name="aa_method_label"
+				 value="Method" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="aa_method_combo"
+				 tool_tip="Anti-aliasing method. Changing causes a brief hitch."
+				 control_name="RenderFSAAType">
+					<combo_box.item
+					 label="Disabled"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="FXAA"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="SMAA"
+					 name="2"
+					 value="2" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="aa_method_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderFSAAType" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="aa_quality_label"
+				 value="Quality" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="aa_quality_combo"
+				 tool_tip="Quality preset for the selected anti-aliasing method"
+				 control_name="RenderFSAASamples">
+					<combo_box.item
+					 label="Low"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Medium"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="High"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Ultra"
+					 name="3"
+					 value="3" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="aa_quality_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderFSAASamples" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_aa_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_aa" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="142"
+		 name="atab_sec_reflect"
+		 title="Reflections"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_reflect">
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top="8"
+				 width="300"
+				 label="Screen space reflections"
+				 tool_tip="Ray-marched reflections of on-screen geometry. Toggling rebuilds shaders (brief hitch)."
+				 name="reflect_ssr"
+				 control_name="RenderScreenSpaceReflections" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="140"
+				 height="15"
+				 name="reflect_detail_label"
+				 value="Probe detail" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="reflect_detail_combo"
+				 tool_tip="How reflection probes update. Changing causes a brief hitch."
+				 control_name="RenderReflectionProbeDetail">
+					<combo_box.item
+					 label="Static only"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Static + dynamic"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Realtime"
+					 name="2"
+					 value="2" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="reflect_detail_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderReflectionProbeDetail" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="reflect_level_label"
+				 value="Coverage" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="reflect_level_combo"
+				 tool_tip="How much of the scene gets probe coverage"
+				 control_name="RenderReflectionProbeLevel">
+					<combo_box.item
+					 label="None"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Manual only"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Manual + terrain"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Full scene"
+					 name="3"
+					 value="3" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="reflect_level_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderReflectionProbeLevel" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_reflect_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_reflect" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="327"
+		 name="atab_sec_reflect_adv"
+		 title="Reflections - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="298"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_reflect_adv">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="reflect_hdr_ssr"
+				 value="Screen Space Reflections" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Iterations"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="1"
+				 max_val="100"
+				 name="ssr_iterations"
+				 tool_tip="Ray-march steps to find a hit; more is more accurate but slower"
+				 enabled_control="RenderScreenSpaceReflections"
+				 control_name="RenderScreenSpaceReflectionIterations" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssr_iterations_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderScreenSpaceReflectionIterations" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Ray step"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 text_width="56"
+				 increment="0.01"
+				 min_val="0.01"
+				 max_val="0.5"
+				 name="ssr_raystep"
+				 tool_tip="Distance covered by each ray-march step"
+				 enabled_control="RenderScreenSpaceReflections"
+				 control_name="RenderScreenSpaceReflectionRayStep" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssr_raystep_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderScreenSpaceReflectionRayStep" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Distance bias"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="3"
+				 text_width="56"
+				 increment="0.001"
+				 min_val="0"
+				 max_val="0.1"
+				 name="ssr_distance_bias"
+				 tool_tip="Bias used when rejecting a potential reflection sample"
+				 enabled_control="RenderScreenSpaceReflections"
+				 control_name="RenderScreenSpaceReflectionDistanceBias" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssr_distance_bias_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderScreenSpaceReflectionDistanceBias" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Depth reject bias"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="4"
+				 text_width="56"
+				 increment="0.0005"
+				 min_val="0"
+				 max_val="0.01"
+				 name="ssr_depth_bias"
+				 tool_tip="Bias against the depth buffer before rejecting a sample"
+				 enabled_control="RenderScreenSpaceReflections"
+				 control_name="RenderScreenSpaceReflectionDepthRejectBias" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssr_depth_bias_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderScreenSpaceReflectionDepthRejectBias" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Adaptive step"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="1"
+				 max_val="4"
+				 name="ssr_adaptive_step"
+				 tool_tip="Multiplier for adaptive ray-march stepping"
+				 enabled_control="RenderScreenSpaceReflections"
+				 control_name="RenderScreenSpaceReflectionAdaptiveStepMultiplier" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssr_adaptive_step_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderScreenSpaceReflectionAdaptiveStepMultiplier" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Glossy samples"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="1"
+				 max_val="16"
+				 name="ssr_glossy_samples"
+				 tool_tip="Maximum samples for glossy (rough surface) reflections"
+				 enabled_control="RenderScreenSpaceReflections"
+				 control_name="RenderScreenSpaceReflectionGlossySamples" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssr_glossy_samples_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderScreenSpaceReflectionGlossySamples" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="reflect_div_probes" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="reflect_hdr_probes"
+				 value="Reflection Probes" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 width="140"
+				 height="15"
+				 name="reflect_count_label"
+				 value="Max probes" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="reflect_count_combo"
+				 tool_tip="Maximum number of reflection probes"
+				 control_name="RenderReflectionProbeCount">
+					<combo_box.item
+					 label="None"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Low (32)"
+					 name="32"
+					 value="32" />
+					<combo_box.item
+					 label="Medium (64)"
+					 name="64"
+					 value="64" />
+					<combo_box.item
+					 label="High (128)"
+					 name="128"
+					 value="128" />
+					<combo_box.item
+					 label="Ultra (256)"
+					 name="256"
+					 value="256" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="reflect_count_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderReflectionProbeCount" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Probe distance"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="8"
+				 min_val="16"
+				 max_val="256"
+				 name="reflect_distance"
+				 tool_tip="How far away probes are drawn and updated (meters)"
+				 control_name="RenderReflectionProbeDrawDistance" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="reflect_distance_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderReflectionProbeDrawDistance" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_reflect_adv_reset"
+				 tool_tip="Reset the advanced reflection settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_reflect_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="142"
+		 name="atab_sec_mirrors"
+		 title="Mirrors"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_mirrors">
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top="8"
+				 width="300"
+				 label="Mirrors"
+				 tool_tip="High-quality planar mirror surfaces. Toggling causes a brief hitch."
+				 name="reflect_mirrors"
+				 control_name="RenderMirrors" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="140"
+				 height="15"
+				 name="mirrors_res_label"
+				 value="Resolution" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="mirrors_res_combo"
+				 tool_tip="Resolution of mirror (hero probe) surfaces"
+				 enabled_control="RenderMirrors"
+				 control_name="RenderHeroProbeResolution">
+					<combo_box.item
+					 label="256"
+					 name="256"
+					 value="256" />
+					<combo_box.item
+					 label="512"
+					 name="512"
+					 value="512" />
+					<combo_box.item
+					 label="1024"
+					 name="1024"
+					 value="1024" />
+					<combo_box.item
+					 label="2048"
+					 name="2048"
+					 value="2048" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="mirrors_res_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderHeroProbeResolution" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="mirrors_rate_label"
+				 value="Update rate" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="mirrors_rate_combo"
+				 tool_tip="How often mirror surfaces refresh"
+				 enabled_control="RenderMirrors"
+				 control_name="RenderHeroProbeUpdateRate">
+					<combo_box.item
+					 label="Low"
+					 name="6"
+					 value="6" />
+					<combo_box.item
+					 label="Medium"
+					 name="3"
+					 value="3" />
+					<combo_box.item
+					 label="High"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Ultra"
+					 name="1"
+					 value="1" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="mirrors_rate_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderHeroProbeUpdateRate" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_mirrors_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_mirrors" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="194"
+		 name="atab_sec_shadow"
+		 title="Shadows &amp; AO"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="165"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_shadow">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="140"
+				 height="15"
+				 name="shadow_detail_label"
+				 value="Shadows" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="shadow_detail_combo"
+				 tool_tip="Which lights cast shadows. Changing rebuilds shaders (brief hitch)."
+				 control_name="RenderShadowDetail">
+					<combo_box.item
+					 label="None"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Sun/Moon"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Sun/Moon + Projectors"
+					 name="2"
+					 value="2" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="shadow_detail_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderShadowDetail" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="shadow_filter_label"
+				 value="Filtering" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="shadow_filter_combo"
+				 tool_tip="How wide a kernel softens the shadow edge. Ultra switches to contact hardening: the shadow is sharp where the caster meets the ground and softens with distance from it. Higher tiers cost more texture fetches. Changing rebuilds shaders (brief hitch)."
+				 control_name="AlchemyRenderShadowFilterQuality">
+					<combo_box.item
+					 label="Low"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Medium"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="High"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Ultra (contact hardening)"
+					 name="3"
+					 value="3" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="shadow_filter_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="AlchemyRenderShadowFilterQuality" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="shadow_res_scale_label"
+				 value="Resolution scale" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="shadow_res_scale_combo"
+				 tool_tip="Shadow map resolution multiplier. Each change reallocates the shadow maps; x2 can exhaust VRAM on limited GPUs."
+				 control_name="RenderShadowResolutionScale">
+					<combo_box.item
+					 label="x2"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="x1"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="x0.5"
+					 name="0.5"
+					 value="0.5" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="shadow_res_scale_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderShadowResolutionScale" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="shadow_avatar_label"
+				 value="Avatar shadows" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="shadow_avatar_combo"
+				 tool_tip="How much avatar geometry casts shadows"
+				 control_name="RenderAvatarShadowDetail">
+					<combo_box.item
+					 label="Opaque only"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Alpha masked"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Full"
+					 name="2"
+					 value="2" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="shadow_avatar_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderAvatarShadowDetail" />
+				</button>
+				<check_box
+				 follows="left|top"
+				 layout="topleft"
+				 height="16"
+				 left="8"
+				 top_pad="10"
+				 width="300"
+				 label="Ambient occlusion (SSAO)"
+				 tool_tip="Screen-space ambient occlusion. Toggling rebuilds shaders (brief hitch)."
+				 name="shadow_ssao"
+				 control_name="RenderDeferredSSAO" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_shadow_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_shadow" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="380"
+		 name="atab_sec_shadow_adv"
+		 title="Shadows &amp; AO - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="351"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_shadow_adv">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="shadow_hdr_tuning"
+				 value="Shadow Tuning" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Bias"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="4"
+				 text_width="56"
+				 increment="0.0005"
+				 min_val="-0.01"
+				 max_val="0"
+				 name="shadow_bias"
+				 tool_tip="Sun/moon shadow depth bias; tune to trade shadow acne against peter-panning"
+				 control_name="RenderShadowBias" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="shadow_bias_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderShadowBias" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Offset"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="3"
+				 text_width="56"
+				 increment="0.005"
+				 min_val="0"
+				 max_val="0.1"
+				 name="shadow_offset"
+				 tool_tip="Sun/moon shadow sample offset"
+				 control_name="RenderShadowOffset" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="shadow_offset_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderShadowOffset" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Projector bias"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="4"
+				 text_width="56"
+				 increment="0.0005"
+				 min_val="-0.01"
+				 max_val="0"
+				 name="shadow_spot_bias"
+				 tool_tip="Projector (spot light) shadow depth bias"
+				 control_name="RenderSpotShadowBias" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="shadow_spot_bias_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSpotShadowBias" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Projector offset"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="3"
+				 text_width="56"
+				 increment="0.005"
+				 min_val="0"
+				 max_val="0.1"
+				 name="shadow_spot_offset"
+				 tool_tip="Projector (spot light) shadow sample offset"
+				 control_name="RenderSpotShadowOffset" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="shadow_spot_offset_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSpotShadowOffset" />
+				</button>
+				<view_border
+				 bevel_style="none"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 right="-8"
+				 height="0"
+				 name="shadow_div_ssao" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="6"
+				 width="200"
+				 height="15"
+				 font="SansSerifBold"
+				 name="shadow_hdr_ssao"
+				 value="Ambient Occlusion" />
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-32"
+				 height="16"
+				 label="Blur size"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="3"
+				 name="ssao_blur_size"
+				 tool_tip="Width of the blur that softens the occlusion buffer. Despite the setting's name this no longer affects shadow edges: shadow filtering is weighted at the source, so this pass blurs ambient occlusion only."
+				 enabled_control="RenderDeferredSSAO"
+				 control_name="RenderShadowBlurSize" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssao_blur_size_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderShadowBlurSize" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Scale"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="10"
+				 min_val="0"
+				 max_val="2000"
+				 name="ssao_scale"
+				 tool_tip="Sampling radius scale for ambient occlusion"
+				 enabled_control="RenderDeferredSSAO"
+				 control_name="RenderSSAOScale" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssao_scale_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSSAOScale" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Max scale"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="5"
+				 min_val="1"
+				 max_val="500"
+				 name="ssao_max_scale"
+				 tool_tip="Cap on the screen-space sampling radius (pixels)"
+				 enabled_control="RenderDeferredSSAO"
+				 control_name="RenderSSAOMaxScale" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssao_max_scale_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSSAOMaxScale" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Factor"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.01"
+				 max_val="1"
+				 name="ssao_factor"
+				 tool_tip="Strength falloff factor for occlusion"
+				 enabled_control="RenderDeferredSSAO"
+				 control_name="RenderSSAOFactor" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssao_factor_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSSAOFactor" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="140"
+				 height="15"
+				 name="ssao_effect_value_label"
+				 value="Occluded value" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 width="80"
+				 height="18"
+				 label_width="0"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="vec3_RenderSSAOEffect_0"
+				 tool_tip="Brightness (HSV value) multiplier for fully occluded areas; partial occlusion blends toward the original color"
+				 enabled_control="RenderDeferredSSAO">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="ssao_effect_rst"
+				 tool_tip="Reset the occlusion effect (both components) to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSSAOEffect" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="ssao_effect_sat_label"
+				 value="Occluded saturation" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 width="80"
+				 height="18"
+				 label_width="0"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="vec3_RenderSSAOEffect_1"
+				 tool_tip="Saturation multiplier for fully occluded areas; partial occlusion blends toward the original color"
+				 enabled_control="RenderDeferredSSAO">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_shadow_adv_reset"
+				 tool_tip="Reset the advanced shadow and AO settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_shadow_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="168"
+		 name="atab_sec_perf"
+		 title="Performance"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="139"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_perf">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Draw distance (m)"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="8"
+				 min_val="64"
+				 max_val="512"
+				 name="perf_farclip"
+				 tool_tip="How far the world is drawn, in meters"
+				 control_name="RenderFarClip" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_farclip_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderFarClip" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Object detail"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.125"
+				 min_val="0"
+				 max_val="4"
+				 name="perf_volume_lod"
+				 tool_tip="Level-of-detail factor for objects; higher keeps detail visible farther away"
+				 control_name="RenderVolumeLODFactor" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_volume_lod_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderVolumeLODFactor" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Max avatar complexity"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="5000"
+				 min_val="0"
+				 max_val="350000"
+				 name="perf_max_complexity"
+				 tool_tip="Avatars above this rendering cost draw as solid-color JellyDolls. 0 = no limit."
+				 control_name="RenderAvatarMaxComplexity" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_max_complexity_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderAvatarMaxComplexity" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Max animated avatars"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="66"
+				 name="perf_max_nonimpostors"
+				 tool_tip="Avatars beyond this count render as cheap impostors. 0 = animate everyone."
+				 control_name="RenderAvatarMaxNonImpostors" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_max_nonimpostors_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderAvatarMaxNonImpostors" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_perf_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_perf" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="246"
+		 name="atab_sec_perf_adv"
+		 title="Performance - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="217"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_perf_adv">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="140"
+				 height="15"
+				 name="perf_complexity_mode_label"
+				 value="Avatar display" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="perf_complexity_mode_combo"
+				 tool_tip="How the avatar complexity limit is applied"
+				 control_name="RenderAvatarComplexityMode">
+					<combo_box.item
+					 label="Limit by complexity"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Always show friends"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Only show friends"
+					 name="2"
+					 value="2" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_complexity_mode_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderAvatarComplexityMode" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Avatar detail"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.125"
+				 min_val="0"
+				 max_val="1"
+				 name="perf_avatar_lod"
+				 tool_tip="Level-of-detail factor for avatar meshes"
+				 control_name="RenderAvatarLODFactor" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_avatar_lod_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderAvatarLODFactor" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Avatar physics"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="1"
+				 name="perf_physics_lod"
+				 tool_tip="Level-of-detail factor for avatar physics (jiggle)"
+				 control_name="RenderAvatarPhysicsLODFactor" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_physics_lod_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderAvatarPhysicsLODFactor" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Terrain detail"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.125"
+				 min_val="1"
+				 max_val="2"
+				 name="perf_terrain_lod"
+				 tool_tip="Level-of-detail factor for terrain"
+				 control_name="RenderTerrainLODFactor" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_terrain_lod_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderTerrainLODFactor" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Tree detail"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.125"
+				 min_val="0"
+				 max_val="1"
+				 name="perf_tree_lod"
+				 tool_tip="Level-of-detail factor for Linden trees"
+				 control_name="RenderTreeLODFactor" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_tree_lod_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderTreeLODFactor" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Flexiprim time"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="1"
+				 name="perf_flex_time"
+				 tool_tip="Update-time budget factor for flexible prims"
+				 control_name="RenderFlexTimeFactor" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_flex_time_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderFlexTimeFactor" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Max particles"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="256"
+				 min_val="0"
+				 max_val="8192"
+				 name="perf_max_particles"
+				 tool_tip="Maximum particle count on screen"
+				 control_name="RenderMaxPartCount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="perf_max_particles_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderMaxPartCount" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_perf_adv_reset"
+				 tool_tip="Reset the advanced performance settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_perf_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="142"
+		 name="atab_sec_preview"
+		 title="Preview &amp; Accessibility"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_preview">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="140"
+				 height="15"
+				 name="preview_mode_label"
+				 value="Preview mode" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="preview_mode_combo"
+				 tool_tip="Simulate color-vision deficiencies or show a false-color exposure map for checking your scene"
+				 control_name="RenderEffectPreviewMode">
+					<combo_box.item
+					 label="Off"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Protanopia"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Deuteranopia"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Tritanopia"
+					 name="3"
+					 value="3" />
+					<combo_box.item
+					 label="Achromatopsia"
+					 name="4"
+					 value="4" />
+					<combo_box.item
+					 label="Blue-cone monochromacy"
+					 name="5"
+					 value="5" />
+					<combo_box.item
+					 label="Achromatomaly"
+					 name="6"
+					 value="6" />
+					<combo_box.item
+					 label="False-color exposure"
+					 name="7"
+					 value="7" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="preview_mode_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderEffectPreviewMode" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="preview_cvd_label"
+				 value="CVD compensation" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="preview_cvd_combo"
+				 tool_tip="Daltonize the image to compensate for a color-vision deficiency"
+				 control_name="RenderCVDMode">
+					<combo_box.item
+					 label="Off"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Protanopia"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Deuteranopia"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="Tritanopia"
+					 name="3"
+					 value="3" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="preview_cvd_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderCVDMode" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Compensation amount"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="preview_cvd_amount"
+				 tool_tip="Strength of the CVD compensation"
+				 control_name="RenderCVDAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="preview_cvd_amount_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderCVDAmount" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_preview_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_preview" />
+				</button>
+			</panel>
+		</accordion_tab>
+	</accordion>
+</panel>

@@ -48,6 +48,7 @@
 #include "llfloatercamera.h"
 #include "llinitparam.h"
 #include "llselectmgr.h"
+#include "pipeline.h"
 // [RLVa:KB] - Checked: 2021-07-29 (RLVa-1.4.4a)
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -971,6 +972,26 @@ bool voice_follow_key(EKeystate s)
     return false;
 }
 
+bool grade_bypass_key(EKeystate s)
+{
+    // Hold to see the ungraded frame. Deliberately not a toggle of
+    // RenderColorGrade: that setting is on the Looks whitelist, so flipping it
+    // would mark the current Look dirty and, released at the wrong moment,
+    // save the comparison as the look. This is a render-time bypass with no
+    // persistent state behind it at all.
+    if (KEYSTATE_DOWN == s)
+    {
+        LLPipeline::sGradeBypass = true;
+        return true;
+    }
+    else if (KEYSTATE_UP == s)
+    {
+        LLPipeline::sGradeBypass = false;
+        return true;
+    }
+    return false;
+}
+
 bool script_trigger_lbutton(EKeystate s)
 {
     // Check for script overriding/expecting left mouse button.
@@ -1084,6 +1105,10 @@ REGISTER_KEYBOARD_ACTION("teleport_to", teleport_to);
 REGISTER_KEYBOARD_ACTION("walk_to", walk_to);
 REGISTER_KEYBOARD_GLOBAL_ACTION("toggle_voice", toggle_voice);
 REGISTER_KEYBOARD_GLOBAL_ACTION("voice_follow_key", voice_follow_key);
+// Global, because the hand is on the keyboard and the eye is on the scene
+// while the Lightbox itself has focus -- which is precisely when a before and
+// after is worth having.
+REGISTER_KEYBOARD_GLOBAL_ACTION("grade_bypass_key", grade_bypass_key);
 REGISTER_KEYBOARD_ACTION(script_mouse_handler_name, script_trigger_lbutton);
 REGISTER_KEYBOARD_ACTION("roll_left", camera_roll_left);
 REGISTER_KEYBOARD_ACTION("roll_right", camera_roll_right);

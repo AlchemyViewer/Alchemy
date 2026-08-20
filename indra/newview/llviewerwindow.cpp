@@ -3771,6 +3771,9 @@ void LLViewerWindow::updateUI()
 
     MASK    mask = gKeyboard->currentMask(true);
 
+    static LLCachedControl<bool> focus_point_follows_pointer(gSavedSettings, "RenderFocusPointFollowsPointer", false);
+    static LLCachedControl<bool> focus_point_locked(gSavedSettings, "RenderFocusPointLocked", false);
+
     if (gPipeline.hasRenderDebugMask(LLPipeline::RENDER_DEBUG_RAYCAST))
     {
         gDebugRaycastFaceHit = -1;
@@ -3784,6 +3787,18 @@ void LLViewerWindow::updateUI()
                                               &gDebugRaycastEnd);
 
         gDebugRaycastParticle = gPipeline.lineSegmentIntersectParticle(gDebugRaycastStart, gDebugRaycastEnd, &gDebugRaycastParticleIntersection, NULL);
+    }
+    else if (focus_point_follows_pointer && !focus_point_locked && LLPipeline::RenderDepthOfField)
+    { //keep the depth of field focus point under the pointer up to date. Picking is
+      //tool dependent and stops entirely while the pointer is over the UI, so the focus
+      //point needs its own raycast. cursorIntersect only writes gDebugRaycastIntersection
+      //when the ray hits something, so a miss holds the last focus point instead of
+      //throwing focus out to the far end of the ray. Rigged geometry is picked here
+      //because mesh avatars are the usual subject.
+        LLVector4a intersection;
+        intersection.clear();
+
+        cursorIntersect(-1, -1, 512.f, NULL, -1, false, true, true, false, NULL, &intersection);
     }
 
     updateMouseDelta();
@@ -4837,9 +4852,10 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
     LLVector3 mouse_world_start = mouse_point_global;
     LLVector3 mouse_world_end   = mouse_point_global + mouse_direction_global * depth;
 
-    if (!LLViewerJoystick::getInstance()->getOverrideCamera())
+    static LLCachedControl<bool> focus_point_follows_pointer(gSavedSettings, "RenderFocusPointFollowsPointer", false);
+    if (!LLViewerJoystick::getInstance()->getOverrideCamera() && !focus_point_follows_pointer)
     { //always set raycast intersection to mouse_world_end unless
-        //flycam is on (for DoF effect)
+        //flycam is on or the focus point is following the pointer (for DoF effect)
         gDebugRaycastIntersection.load3(mouse_world_end.mV);
     }
 
@@ -5338,7 +5354,16 @@ bool LLViewerWindow::saveSnapshot(const std::string& filepath, S32 image_width, 
     LL_INFOS() << "Saving snapshot to: " << filepath << LL_ENDL;
 
     LLPointer<LLImageRaw> raw = new LLImageRaw;
-    bool success = rawSnapshot(raw, image_width, image_height, true, false, show_ui, show_hud, do_rebuild, show_balance);
+    // no_post is passed explicitly because it sits between do_rebuild and
+    // show_balance: when show_balance was added to this function the call site
+    // was not widened to match, so show_balance landed in the no_post slot and
+    // show_balance itself fell back to its default. Every snapshot saved
+    // through here has therefore been rendering with post-processing disabled,
+    // which for an HDR scene means no tonemapping at all. The layer type was
+    // stranded the same way, one slot further along: a depth snapshot asked
+    // for through here came back as colour.
+    bool success = rawSnapshot(raw, image_width, image_height, true, false, show_ui, show_hud, do_rebuild,
+                               false /* no_post */, show_balance, type);
 
     if (success)
     {

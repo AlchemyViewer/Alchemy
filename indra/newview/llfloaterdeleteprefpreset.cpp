@@ -52,6 +52,7 @@ bool LLFloaterDeletePrefPreset::postBuild()
     getChild<LLButton>("delete")->setCommitCallback(boost::bind(&LLFloaterDeletePrefPreset::onBtnDelete, this));
     getChild<LLButton>("cancel")->setCommitCallback(boost::bind(&LLFloaterDeletePrefPreset::onBtnCancel, this));
     LLPresetsManager::instance().setPresetListChangeCallback(boost::bind(&LLFloaterDeletePrefPreset::onPresetsListChange, this));
+    LLPresetsManager::instance().setPresetListChangeLooksCallback(boost::bind(&LLFloaterDeletePrefPreset::onPresetsListChange, this));
 
     return true;
 }

@@ -9309,6 +9309,34 @@ Can not overwrite default preset.
   </notification>
 
   <notification
+    icon="notifytip.tga"
+    name="LightBoxWhiteBalanceTooDark"
+    type="notifytip">
+That spot is too dark to read a colour from. Pick something well lit that should look white or grey.
+  </notification>
+
+  <notification
+    icon="notifytip.tga"
+    name="LightBoxWhiteBalanceUnreachable"
+    type="notifytip">
+Temperature and tint cannot neutralise that. It looks like a coloured surface rather than a neutral one under coloured light.
+  </notification>
+
+  <notification
+    icon="alertmodal.tga"
+    name="LightBoxLookOverwrite"
+    type="alertmodal">
+A Look called &apos;[NAME]&apos; already exists. Replace it?
+
+This cannot be undone.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Replace"/>
+  </notification>
+
+  <notification
     icon="alertmodal.tga"
     name="PresetAlreadyExists"
     type="alertmodal">

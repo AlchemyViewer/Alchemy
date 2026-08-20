@@ -46,6 +46,19 @@ static const F32 AUTO_OPEN_TIME = 1.f;
 static const S32 VERTICAL_MULTIPLE = 16;
 static const S32 PARENT_BORDER_MARGIN = 5;
 
+// Optional header checkbox. It sits at the right end because the left is
+// already spoken for by the expand arrow and the title, and because the right
+// end is the one place a column of them lines up down an accordion.
+static const S32 HEADER_CHECKBOX_RIGHT_PAD = 6;
+// Between the checkbox and the title, which ellipses rather than run under it.
+static const S32 HEADER_CHECKBOX_TEXT_GAP = 6;
+// Default size, used when the XUI gives no width or height. Wide enough for
+// the 13px box and the slack LLCheckBoxCtrl puts around it, and no wider,
+// since a bare checkbox is what a header wants; anything with a label has to
+// state its own width.
+static const S32 HEADER_CHECKBOX_WIDTH = 24;
+static const S32 HEADER_CHECKBOX_HEIGHT = 16;
+
 static LLDefaultChildRegistry::Register<LLAccordionCtrlTab> t1("accordion_tab");
 
 class LLAccordionCtrlTab::LLAccordionCtrlTabHeader : public LLUICtrl
@@ -77,6 +90,12 @@ public:
 
     void setSelected(bool is_selected) { mIsSelected = is_selected; }
 
+    // Adopt the checkbox the tab built. Kept null otherwise, and every use of
+    // it in this file is guarded, so a header without one behaves exactly as
+    // it did before there was such a thing.
+    void setHeaderCheckBox(LLCheckBoxCtrl* checkbox);
+    LLCheckBoxCtrl* getHeaderCheckBox() const { return mHeaderCheckBox; }
+
     virtual void onMouseEnter(S32 x, S32 y, MASK mask);
     virtual void onMouseLeave(S32 x, S32 y, MASK mask);
     virtual bool handleKey(KEY key, MASK mask, bool called_from_parent);
@@ -88,6 +107,7 @@ public:
 
 private:
     LLTextBox* mHeaderTextbox;
+    LLCheckBoxCtrl* mHeaderCheckBox = nullptr;
 
     // Overlay images (arrows)
     LLPointer<LLUIImage> mImageCollapsed;
@@ -196,6 +216,16 @@ void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::setTitleColor(LLUIColor color
     }
 }
 
+void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::setHeaderCheckBox(LLCheckBoxCtrl* checkbox)
+{
+    mHeaderCheckBox = checkbox;
+    addChild(checkbox);
+
+    // Where it goes is decided in reshape, which has the header's size; this
+    // just makes sure it is somewhere reasonable if reshape has already run.
+    reshape(getRect().getWidth(), getRect().getHeight());
+}
+
 void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::draw()
 {
     S32 width = getRect().getWidth();
@@ -247,10 +277,39 @@ void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::draw()
 
 void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::reshape(S32 width, S32 height, bool called_from_parent /* = true */)
 {
+    // This override never chains to LLUICtrl::reshape, so follows flags do
+    // nothing to header children and everything in here is positioned by
+    // hand. The checkbox is placed first because the title has to stop short
+    // of it; without one, text_right stays the full width and the rest of
+    // this function is what it always was.
+    S32 text_right = width;
+    if (mHeaderCheckBox)
+    {
+        const LLRect& old_check_rect = mHeaderCheckBox->getRect();
+        LLRect check_rect;
+        check_rect.setLeftTopAndSize(width - HEADER_CHECKBOX_RIGHT_PAD - old_check_rect.getWidth(),
+                                     (height + old_check_rect.getHeight()) / 2,
+                                     old_check_rect.getWidth(),
+                                     old_check_rect.getHeight());
+        if (check_rect != old_check_rect)
+        {
+            // setRect rather than reshape: the size is not changing, only the
+            // position, and LLCheckBoxCtrl::reshape does nothing when the
+            // size is unchanged. The bounding rect is what the mouse is
+            // tested against, so it has to be told the control moved.
+            mHeaderCheckBox->setRect(check_rect);
+            mHeaderCheckBox->updateBoundingRect();
+        }
+
+        // A header narrow enough for these to cross would otherwise hand the
+        // textbox an inside-out rect.
+        text_right = llmax(check_rect.mLeft - HEADER_CHECKBOX_TEXT_GAP, HEADER_TEXT_LEFT_OFFSET);
+    }
+
     S32 header_height = mHeaderTextbox->getTextPixelHeight();
     LLRect old_header_rect = mHeaderTextbox->getRect();
 
-    LLRect textboxRect(HEADER_TEXT_LEFT_OFFSET, (height + header_height) / 2, width, (height - header_height) / 2);
+    LLRect textboxRect(HEADER_TEXT_LEFT_OFFSET, (height + header_height) / 2, text_right, (height - header_height) / 2);
     if (old_header_rect.getHeight() != textboxRect.getHeight()
         || old_header_rect.mLeft != textboxRect.mLeft
         || old_header_rect.mTop != textboxRect.mTop
@@ -351,6 +410,7 @@ LLAccordionCtrlTab::Params::Params()
     ,header_image_pressed("header_image_pressed")
     ,header_image_focused("header_image_focused")
     ,header_text_color("header_text_color")
+    ,header_check_box("header_check_box")
     ,fit_panel("fit_panel",true)
     ,selection_enabled("selection_enabled", false)
 {
@@ -373,6 +433,7 @@ LLAccordionCtrlTab::LLAccordionCtrlTab(const LLAccordionCtrlTab::Params&p)
     ,mSelectionEnabled(p.selection_enabled)
     ,mContainerPanel(NULL)
     ,mScrollbar(NULL)
+    ,mHeaderCheckBox(NULL)
 {
     mStoredOpenCloseState = false;
     mWasStateStored = false;
@@ -384,6 +445,36 @@ LLAccordionCtrlTab::LLAccordionCtrlTab(const LLAccordionCtrlTab::Params&p)
     headerParams.title(p.title);
     mHeader = LLUICtrlFactory::create<LLAccordionCtrlTabHeader>(headerParams);
     addChild(mHeader, 1);
+
+    if (p.header_check_box.isProvided())
+    {
+        LLCheckBoxCtrl::Params checkParams = p.header_check_box;
+
+        // The header decides where this goes on every reshape, so keep
+        // follows out of it: an anchored child would be dragged somewhere
+        // else first and land back here, which is at best wasted work.
+        checkParams.follows.flags(FOLLOWS_NONE);
+
+        // A checkbox is normally sized by the XUI that places it, and this
+        // one is placed by us. Default it to the bare box; anything with a
+        // label is the caller's to size, and saying so is the whole reason
+        // this reads the params rather than always overriding them.
+        if (!checkParams.rect.width.isProvided())
+        {
+            checkParams.rect.width = HEADER_CHECKBOX_WIDTH;
+        }
+        if (!checkParams.rect.height.isProvided())
+        {
+            checkParams.rect.height = HEADER_CHECKBOX_HEIGHT;
+        }
+
+        // Built here rather than in the header because create() resolves
+        // control_name and commit_callback against the registrar scope that
+        // is open now -- the floater being read from XUI -- and the header
+        // is only where it ends up living.
+        mHeaderCheckBox = LLUICtrlFactory::create<LLCheckBoxCtrl>(checkParams);
+        mHeader->setHeaderCheckBox(mHeaderCheckBox);
+    }
 
     LLFocusableElement::setFocusReceivedCallback(boost::bind(&LLAccordionCtrlTab::selectOnFocusReceived, this));
 
@@ -524,8 +615,40 @@ void LLAccordionCtrlTab::onUpdateScrollToChild(const LLUICtrl *cntrl)
     LLUICtrl::onUpdateScrollToChild(cntrl);
 }
 
+// Where the header checkbox is, in this tab's own coordinates, so the two
+// header-band branches below can ask whether a click or a hover is really
+// meant for it. Returns false when there is no checkbox, which is the answer
+// for every tab that did not ask for one.
+bool LLAccordionCtrlTab::pointInHeaderCheckBox(S32 x, S32 y) const
+{
+    if (!mHeaderCheckBox || !mHeaderCheckBox->getVisible())
+    {
+        return false;
+    }
+
+    LLRect check_rect;
+    mHeaderCheckBox->localRectToOtherView(mHeaderCheckBox->getLocalRect(), &check_rect, this);
+    return check_rect.pointInRect(x, y);
+}
+
 bool LLAccordionCtrlTab::handleMouseDown(S32 x, S32 y, MASK mask)
 {
+    // The branch below claims the whole header band and opens or closes the
+    // tab, so a checkbox living in that band would never be clicked. Send
+    // this one press down the normal child path instead, which reaches the
+    // header and then the checkbox inside it.
+    //
+    // Only when it is taken, though: LLCheckBoxCtrl hit-tests against its
+    // bounding rect, which is the box and label rather than the whole
+    // control, so a press can land inside the rect and still be refused. Left
+    // at "return", that inset would be a ring of pixels around the checkbox
+    // where clicking did nothing at all; falling through means it does what
+    // the rest of the header does.
+    if (pointInHeaderCheckBox(x, y) && LLUICtrl::handleMouseDown(x, y, mask))
+    {
+        return true;
+    }
+
     if (mCollapsible && mHeaderVisible && mCanOpenClose)
     {
         if (y >= (getRect().getHeight() - HEADER_HEIGHT))
@@ -1139,6 +1262,21 @@ void LLAccordionCtrlTab::ctrlSetLeftTopAndSize(LLView* panel, S32 left, S32 top,
 
 bool LLAccordionCtrlTab::handleToolTip(S32 x, S32 y, MASK mask)
 {
+    // Same reason as handleMouseDown: the header branch answers for the whole
+    // band, and it answers with the title's tooltip. A header checkbox is a
+    // separate control saying a separate thing, so let it speak for its own
+    // rect. Its coordinates have to be converted -- the header branch below
+    // passes this tab's, which is why its own children never match.
+    if (pointInHeaderCheckBox(x, y))
+    {
+        LLRect check_rect;
+        mHeaderCheckBox->localRectToOtherView(mHeaderCheckBox->getLocalRect(), &check_rect, this);
+        if (mHeaderCheckBox->handleToolTip(x - check_rect.mLeft, y - check_rect.mBottom, mask))
+        {
+            return true;
+        }
+    }
+
     //header may be not the first child but we need to process it first
     if (y >= (getRect().getHeight() - HEADER_HEIGHT - HEADER_HEIGHT / 2))
     {

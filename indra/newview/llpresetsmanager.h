@@ -37,6 +37,12 @@ static const std::string PRESETS_DEFAULT_UPPER = "DEFAULT";
 static const std::string PRESETS_DIR = "presets";
 static const std::string PRESETS_GRAPHIC = "graphic";
 static const std::string PRESETS_CAMERA = "camera";
+static const std::string PRESETS_LOOKS = "looks";
+/// Which bundled Looks have already been copied into the user's directory, so a
+/// Look added in a later release still reaches an existing user while one they
+/// deleted stays deleted. Lives in the user settings root and NOT in the looks
+/// directory, because anything named *.xml in there is enumerated as a Look.
+static const std::string SEEDED_LOOKS_FILE = "looks_seeded.xml";
 static const std::string PRESETS_REAR = "Rear";
 static const std::string PRESETS_FRONT = "Front";
 static const std::string PRESETS_SIDE = "Side";
@@ -67,11 +73,20 @@ public:
     void startWatching(const std::string& subdirectory);
     void triggerChangeCameraSignal();
     void triggerChangeSignal();
+    void triggerChangeLooksSignal();
     static std::string getPresetsDir(const std::string& subdirectory);
     bool setPresetNamesInComboBox(const std::string& subdirectory, LLComboBox* combo, EDefaultOptions default_option);
     void loadPresetNamesFromDir(const std::string& subdirectory, preset_name_list_t& presets, EDefaultOptions default_option);
     bool savePreset(const std::string& subdirectory, std::string name, bool createDefault = false);
     void loadPreset(const std::string& subdirectory, std::string name);
+    // Looks apply only whitelisted keys from the file (never a raw
+    // loadFromFile), so shared Look files cannot carry unrelated settings.
+    bool loadLooksPreset(std::string name);
+    // The single source of truth for what a Look carries. Public because the
+    // Lightbox's undo stack watches exactly this list: a setting worth saving
+    // into a Look is a setting worth undoing, and sharing the list means a new
+    // grading control joins both at once rather than one and not the other.
+    void getLooksControlNames(std::vector<std::string>& names);
     bool deletePreset(const std::string& subdirectory, std::string name);
 
     void createCameraDefaultPresets();
@@ -89,12 +104,14 @@ public:
     // Emitted when a preset gets loaded, deleted, or saved.
     boost::signals2::connection setPresetListChangeCameraCallback(const preset_list_signal_t::slot_type& cb);
     boost::signals2::connection setPresetListChangeCallback(const preset_list_signal_t::slot_type& cb);
+    boost::signals2::connection setPresetListChangeLooksCallback(const preset_list_signal_t::slot_type& cb);
 
     // Emitted when a preset gets loaded or saved.
     preset_name_list_t mPresetNames;
 
     preset_list_signal_t mPresetListChangeCameraSignal;
     preset_list_signal_t mPresetListChangeSignal;
+    preset_list_signal_t mPresetListChangeLooksSignal;
 
   private:
     LOG_CLASS(LLPresetsManager);
@@ -103,9 +120,12 @@ public:
     void getCameraControlNames(std::vector<std::string>& names);
     void graphicsSettingChanged();
     void cameraSettingChanged();
+    void looksSettingChanged();
+    void copyDefaultLooks();
 
     std::vector<boost::signals2::connection> mGraphicsChangedSignals;
     std::vector<boost::signals2::connection> mCameraChangedSignals;
+    std::vector<boost::signals2::connection> mLooksChangedSignals;
 
     bool mIgnoreChangedSignal = false;
 };

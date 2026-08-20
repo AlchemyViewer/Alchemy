@@ -1,6 +1,6 @@
 /**
  * @file alfloaterlightbox.cpp
- * @brief A generic text floater for dumping info (usually debug info)
+ * @brief Lightbox post-processing control floater
  *
  * Copyright (C) Rye Mutt <rye@alchemyviewer.org>
  *
@@ -31,71 +31,292 @@
 #include "llviewerprecompiledheaders.h"
 #include "alfloaterlightbox.h"
 
-//#include "alrenderutils.h"
-#include "llviewercontrol.h"
-#include "llspinctrl.h"
-#include "llsliderctrl.h"
-#include "lltextbox.h"
+#include "llaccordionctrltab.h"
 #include "llcombobox.h"
+#include "llfloaterreg.h"
+#include "alcurveeditorctrl.h"
+#include "alcurvemodel.h"
+#include "altoolscenepicker.h"
+#include "alwhitebalancesolver.h"
+#include "llagent.h"
+#include "llenvironment.h"
+#include "llfile.h"
+#include "llnotificationsutil.h"
+#include "llpanel.h"
+#include "llpresetsmanager.h"
+#include "llsettingsvo.h"
+#include "llspinctrl.h"
+#include "lltimer.h"
+#include "lltoolmgr.h"
+#include "llviewercontrol.h"
+#include "pipeline.h"
+#include "rlvactions.h"
+
+#include <algorithm>
+#include <map>
+#include <set>
+#include <utility>
+
+namespace
+{
+/// Everything recorded while this lives becomes a single undo step.
+struct ScopedHistoryGroup
+{
+    explicit ScopedHistoryGroup(ALGradeHistory& history) : mHistory(history) { mHistory.beginGroup(); }
+    ~ScopedHistoryGroup() { mHistory.endGroup(); }
+    ScopedHistoryGroup(const ScopedHistoryGroup&) = delete;
+    ScopedHistoryGroup& operator=(const ScopedHistoryGroup&) = delete;
+
+    ALGradeHistory& mHistory;
+};
+
+/// Holds a flag true for a scope. Never nested here -- if it ever is, this
+/// needs to be a counter rather than a bool.
+struct ScopedTrue
+{
+    explicit ScopedTrue(bool& flag) : mFlag(flag) { mFlag = true; }
+    ~ScopedTrue() { mFlag = false; }
+    ScopedTrue(const ScopedTrue&) = delete;
+    ScopedTrue& operator=(const ScopedTrue&) = delete;
+
+    bool& mFlag;
+};
+
+// Vector-valued rows follow the widget naming contract "vec3_<Setting>_<0|1|2>";
+// setting names never contain '_', so the parse is unambiguous.
+bool parseVec3WidgetName(const std::string& name, std::string& setting, S32& component)
+{
+    static const std::string prefix = "vec3_";
+    if (name.size() <= prefix.size() || name.compare(0, prefix.size(), prefix) != 0)
+    {
+        return false;
+    }
+    size_t sep = name.rfind('_');
+    if (sep <= prefix.size() || sep + 2 != name.size())
+    {
+        return false;
+    }
+    S32 comp = name[sep + 1] - '0';
+    if (comp < 0 || comp > 2)
+    {
+        return false;
+    }
+    setting = name.substr(prefix.size(), sep - prefix.size());
+    component = comp;
+    return true;
+}
+
+// Any LLUICtrl will do; the name is the whole contract. Descending into
+// composites is safe because their internal children are named for their role
+// ("Slider", "value") and cannot parse as vec3_<Setting>_<n>.
+void collectVec3Spinners(LLView* viewp, std::map<std::string, std::array<LLUICtrl*, 3>>& rows)
+{
+    for (LLView* childp : *viewp->getChildList())
+    {
+        if (LLUICtrl* ctrlp = dynamic_cast<LLUICtrl*>(childp))
+        {
+            std::string setting;
+            S32 component = 0;
+            if (parseVec3WidgetName(ctrlp->getName(), setting, component))
+            {
+                rows[setting][component] = ctrlp;
+            }
+        }
+        collectVec3Spinners(childp, rows);
+    }
+}
+
+void collectBoundControls(LLView* viewp, std::set<std::string>& keys)
+{
+    for (LLView* childp : *viewp->getChildList())
+    {
+        if (LLUICtrl* ctrlp = dynamic_cast<LLUICtrl*>(childp))
+        {
+            if (LLControlVariable* controlp = ctrlp->getControlVariable())
+            {
+                // Only reset controls owned by gSavedSettings; enabled/visibility
+                // bindings live in separate slots and are not touched here.
+                if (gSavedSettings.getControl(controlp->getName()) == controlp)
+                {
+                    keys.insert(controlp->getName());
+                }
+            }
+            std::string setting;
+            S32 component = 0;
+            if (parseVec3WidgetName(ctrlp->getName(), setting, component))
+            {
+                keys.insert(setting);
+            }
+        }
+        collectBoundControls(childp, keys);
+    }
+}
+} // namespace
 
 ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
 :   LLFloater(key)
 {
     mCommitCallbackRegistrar.add("LightBox.ResetControlDefault", std::bind(&ALFloaterLightBox::onClickResetControlDefault, this, std::placeholders::_2));
-    mCommitCallbackRegistrar.add("LightBox.ResetGroupDefault", std::bind(&ALFloaterLightBox::onClickResetGroupDefault, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ResetSection", std::bind(&ALFloaterLightBox::onClickResetSection, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ToggleSection", std::bind(&ALFloaterLightBox::onToggleSection, this, std::placeholders::_1, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ReferenceGrab", std::bind(&ALFloaterLightBox::onClickReferenceGrab, this));
+    mCommitCallbackRegistrar.add("LightBox.ReferenceClear", std::bind(&ALFloaterLightBox::onClickReferenceClear, this));
+    mCommitCallbackRegistrar.add("LightBox.ToggleDayFreeze", std::bind(&ALFloaterLightBox::onToggleDayFreeze, this, std::placeholders::_1));
+    mCommitCallbackRegistrar.add("LightBox.CommitDayTime", std::bind(&ALFloaterLightBox::onCommitDayTime, this, std::placeholders::_1));
+    mCommitCallbackRegistrar.add("LightBox.DayPreset", std::bind(&ALFloaterLightBox::onClickDayPreset, this, std::placeholders::_2));
+    mCommitCallbackRegistrar.add("LightBox.ToggleCloudScroll", std::bind(&ALFloaterLightBox::onToggleCloudScroll, this, std::placeholders::_1));
+    mCommitCallbackRegistrar.add("LightBox.RestoreEnvironment", std::bind(&ALFloaterLightBox::onClickRestoreEnvironment, this));
+    // Lambdas rather than bind: applyHistory answers whether it did anything,
+    // and a commit callback returns nothing, so say plainly that the answer is
+    // not wanted here. The buttons are greyed when there is nothing to do.
+    mCommitCallbackRegistrar.add("LightBox.Undo", [this](LLUICtrl*, const LLSD&) { applyHistory(false); });
+    mCommitCallbackRegistrar.add("LightBox.Redo", [this](LLUICtrl*, const LLSD&) { applyHistory(true); });
+    mCommitCallbackRegistrar.add("LightBox.CommitVec3", std::bind(&ALFloaterLightBox::onCommitVec3, this, std::placeholders::_1));
+    mCommitCallbackRegistrar.add("LightBox.CommitToneCurve", std::bind(&ALFloaterLightBox::onCommitToneCurve, this));
+    mCommitCallbackRegistrar.add("LightBox.RefreshToneCurve", std::bind(&ALFloaterLightBox::refreshToneCurve, this));
+    mCommitCallbackRegistrar.add("LightBox.CommitSplitToneGraph", std::bind(&ALFloaterLightBox::onCommitSplitToneGraph, this));
+    mCommitCallbackRegistrar.add("LightBox.PickWhiteBalance", std::bind(&ALFloaterLightBox::onClickWhiteBalancePicker, this));
+    mCommitCallbackRegistrar.add("LightBox.OpenLUTFolder", std::bind(&ALFloaterLightBox::onClickOpenLUTFolder, this));
+    mCommitCallbackRegistrar.add("LightBox.LookSelected", std::bind(&ALFloaterLightBox::onLookSelected, this));
+    mCommitCallbackRegistrar.add("LightBox.LookSave", std::bind(&ALFloaterLightBox::onClickLookSave, this));
+    mCommitCallbackRegistrar.add("LightBox.LookSaveAs", std::bind(&ALFloaterLightBox::onClickLookSaveAs, this));
+    mCommitCallbackRegistrar.add("LightBox.LookDelete", std::bind(&ALFloaterLightBox::onClickLookDelete, this));
+    mCommitCallbackRegistrar.add("LightBox.LookRevert", std::bind(&ALFloaterLightBox::onClickLookRevert, this));
 }
 
 ALFloaterLightBox::~ALFloaterLightBox()
 {
-    mTonemapConnection.disconnect();
-    mCASConnection.disconnect();
+    // The handle in the pick callback already makes a late sample harmless, but
+    // an armed picker outliving its floater would leave the user holding an
+    // eyedropper cursor that has nothing left to tell. Put the previous tool
+    // back instead.
+    if (LLToolMgr::instanceExists() &&
+        LLToolMgr::getInstance()->getCurrentTool() == ALToolScenePicker::getInstance())
+    {
+        LLToolMgr::getInstance()->clearTransientTool();
+    }
+
+    // The bypass mask lives in the pipeline and the checkboxes that drive it
+    // live here, so closing the floater with one ticked would leave a section
+    // permanently suppressed with nothing left on screen to say so, and no
+    // setting to inspect either. The comparison ends when the tool does.
+    LLPipeline::sGradeBypassMask = 0;
+
+    // Same rule for the reference still, with a second reason: it is a
+    // full-resolution target, so leaving one behind holds real memory for a
+    // comparison nobody can see or turn off any more.
+    gSavedSettings.setS32("RenderReferenceWipeMode", 0);
+    gPipeline.clearReferenceStill();
 }
 
 bool ALFloaterLightBox::postBuild()
 {
     populateLUTCombo();
-    updateTonemapper();
-    updateCAS();
 
-    mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&) { updateTonemapper(); });
-    //mCASConnection = gSavedSettings.getControl("RenderSharpenMethod")->getSignal()->connect([&](LLControlVariable* control, const LLSD&, const LLSD&) { updateCAS(); });
+    mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect(
+        [this](LLControlVariable*, const LLSD&, const LLSD&) { updateTonemapperRows(); });
+    updateTonemapperRows();
+
+    mLooksCombo = getChild<LLComboBox>("looks_combo");
+    mLooksListConnection = LLPresetsManager::instance().setPresetListChangeLooksCallback(
+        std::bind(&ALFloaterLightBox::refreshLooksBar, this));
+    mLooksActiveConnection = gSavedSettings.getControl("PresetLooksActive")->getSignal()->connect(
+        [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshLooksBar(); });
+    refreshLooksBar();
+
+    mUndoButton = findChild<LLUICtrl>("look_undo");
+    mRedoButton = findChild<LLUICtrl>("look_redo");
+    mReferenceClear = findChild<LLUICtrl>("reference_clear");
+    mReferenceMode = findChild<LLUICtrl>("reference_mode");
+    mReferencePosition = findChild<LLUICtrl>("reference_position");
+
+    mDayFreeze = findChild<LLUICtrl>("day_freeze");
+    mDayTime = findChild<LLUICtrl>("day_time");
+    mCloudScroll = findChild<LLUICtrl>("day_pause_clouds");
+    mRestoreEnvironment = findChild<LLUICtrl>("day_restore_environment");
+    mDayPresets = { findChild<LLUICtrl>("day_sunrise"), findChild<LLUICtrl>("day_noon"),
+                    findChild<LLUICtrl>("day_sunset"), findChild<LLUICtrl>("day_midnight") };
+
+    // Undo watches exactly the settings a Look carries. Sharing that list is
+    // the point: a control worth saving is a control worth undoing, so a new
+    // grading setting joins both at once instead of one and not the other.
+    //
+    // The signal hands over the old value as well as the new one, so there is
+    // no shadow copy to keep in step -- and llcontrol only fires it when the
+    // value really changed (setValue and resetToDefault both gate on
+    // llsd_compare), so a commit that rewrites the same value cannot put a
+    // do-nothing step on the stack.
+    std::vector<std::string> looks_controls;
+    LLPresetsManager::instance().getLooksControlNames(looks_controls);
+    for (const std::string& setting : looks_controls)
+    {
+        LLControlVariable* controlp = gSavedSettings.getControl(setting);
+        if (!controlp)
+        {
+            // LLPresetsManager already warns loudly about a whitelist name
+            // that has stopped existing; no need to say it twice.
+            continue;
+        }
+        mHistoryConnections.emplace_back(controlp->getSignal()->connect(
+            [this, setting](LLControlVariable*, const LLSD& new_value, const LLSD& old_value)
+            { onGradeSettingChanged(setting, old_value, new_value); }));
+    }
+
+    collectVec3Spinners(this, mVec3Rows);
+    for (const auto& row : mVec3Rows)
+    {
+        const std::string& setting = row.first;
+        LLControlVariable* controlp = gSavedSettings.getControl(setting);
+        if (!controlp)
+        {
+            LL_WARNS() << "Vec3 row bound to unknown setting: " << setting << LL_ENDL;
+            continue;
+        }
+        mVec3Connections.emplace_back(controlp->getSignal()->connect(
+            [this, setting](LLControlVariable*, const LLSD&, const LLSD&) { refreshVec3Row(setting); }));
+        refreshVec3Row(setting);
+    }
+
+    setupToneCurve();
+    setupSplitToneGraph();
 
     return LLFloater::postBuild();
-}
-
-void ALFloaterLightBox::draw()
-{
-    LLFloater::draw();
 }
 
 void ALFloaterLightBox::populateLUTCombo()
 {
     LLComboBox* lut_combo = getChild<LLComboBox>("colorlut_combo");
-    const std::string& user_luts = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
 
-    std::error_code ec;
-    std::filesystem::path user_luts_path = fsyspath(user_luts);
-    if(std::filesystem::is_directory(user_luts_path, ec))
+    // Only what setupGradingLUT can actually load. Anything else in the
+    // directory -- a readme, a subfolder, a stray .bak -- would become a
+    // selectable entry that fails at apply time with nothing but a log line
+    // to say why. getExtension lowercases, so a .CUBE passes here the same
+    // way it does when the renderer resolves it.
+    static const char* const LUT_EXTENSIONS[] = { "cube", "tga", "png", "jpg", "jpeg", "bmp", "webp" };
+
+    // Collected rather than added on the spot, so the caller can see whether
+    // a directory contributed anything before committing to the separator.
+    auto collect_luts_from = [](const std::string& dir_name)
     {
-        if(ec)
+        std::vector<std::pair<std::string, std::string>> found; // stem, filename
+
+        std::error_code ec;
+        std::filesystem::path luts_path = fsyspath(dir_name);
+        if (!std::filesystem::is_directory(luts_path, ec) || ec)
         {
-            LL_WARNS() << "Error checking user LUTs directory: " << ec.message() << LL_ENDL;
-            return;
+            return found;
         }
-        if(!std::filesystem::is_empty(user_luts_path, ec) && !ec)
+
+        // increment(ec), not ++: the throwing increment would carry a
+        // transient filesystem error out through postBuild. On failure it
+        // parks the iterator at end instead, which is why ec is looked at
+        // again once the loop is done.
+        std::filesystem::directory_iterator end;
+        for (std::filesystem::directory_iterator lut(luts_path, ec); lut != end && !ec; lut.increment(ec))
         {
-            if(ec)
+            std::error_code entry_ec;
+            if (!lut->is_regular_file(entry_ec) || entry_ec)
             {
-                LL_WARNS() << "Error checking contents of user LUTs directory: " << ec.message() << LL_ENDL;
-                return;
-            }
-            lut_combo->addSeparator();
-        }
-        for (std::filesystem::directory_iterator lut(user_luts_path, ec); lut != std::filesystem::directory_iterator(); ++lut)
-        {
-            if(ec)
-            {
-                LL_WARNS() << "Error reading user LUT file: " << ec.message() << LL_ENDL;
                 continue;
             }
 #if LL_WINDOWS
@@ -105,11 +326,51 @@ void ALFloaterLightBox::populateLUTCombo()
             std::string lut_stem = lut->path().stem().native();
             std::string lut_filename = lut->path().filename().native();
 #endif
-            lut_combo->add(lut_stem, lut_filename);
+            const std::string exten = gDirUtilp->getExtension(lut_filename);
+            if (std::find(std::begin(LUT_EXTENSIONS), std::end(LUT_EXTENSIONS), exten) == std::end(LUT_EXTENSIONS))
+            {
+                continue;
+            }
+            found.emplace_back(std::move(lut_stem), std::move(lut_filename));
         }
-        lut_combo->selectByValue(gSavedSettings.getString("RenderColorGradeLUT"));
-        lut_combo->resetDirty();
+        if (ec)
+        {
+            LL_WARNS() << "Error reading LUT directory " << dir_name << ": " << ec.message() << LL_ENDL;
+        }
+        return found;
+    };
+
+    // Bundled LUTs first, then user LUTs behind a separator — the same order
+    // the renderer resolves a name in, where the user dir wins.
+    for (const auto& lut : collect_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "colorlut")))
+    {
+        lut_combo->add(lut.first, lut.second);
     }
+
+    const auto user_luts = collect_luts_from(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut"));
+    if (!user_luts.empty())
+    {
+        lut_combo->addSeparator();
+        for (const auto& lut : user_luts)
+        {
+            lut_combo->add(lut.first, lut.second);
+        }
+    }
+
+    lut_combo->selectByValue(gSavedSettings.getString("RenderColorGradeLUT"));
+    lut_combo->resetDirty();
+}
+
+void ALFloaterLightBox::onClickOpenLUTFolder()
+{
+    // The user's folder, not the bundled one: it is the half of the pair that
+    // is theirs to put files in, and the one the renderer prefers when a name
+    // exists in both. Nothing creates it until there is something to put in
+    // it, which is exactly now -- and LLFile::mkdir is quiet about a
+    // directory that already exists.
+    const std::string dir = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "colorlut");
+    LLFile::mkdir(dir);
+    gDirUtilp->openDir(dir);
 }
 
 void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
@@ -122,537 +383,1095 @@ void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
     }
 }
 
-void ALFloaterLightBox::onClickResetGroupDefault(const LLSD& userdata)
+void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
 {
-    const std::string& setting_group = userdata.asString();
-    if (setting_group == "sharpen")
+    const std::string& section = userdata.asString();
+    if (section.empty())
     {
-        LLControlVariable* controlp = gSavedSettings.getControl("RenderSharpenMethod");
-        if (controlp)
+        return;
+    }
+
+    std::set<std::string> keys;
+    if (LLPanel* panelp = findChild<LLPanel>(section))
+    {
+        collectBoundControls(panelp, keys);
+    }
+    if (LLPanel* advp = findChild<LLPanel>(section + "_adv"))
+    {
+        collectBoundControls(advp, keys);
+    }
+
+    // A section's own header can carry a bound checkbox -- Color Grading's
+    // master switch does -- and that is part of the section however it is
+    // drawn. It is not in the panel, so nothing above would find it. Walk the
+    // control rather than reading it directly: LLCheckBoxCtrl hands
+    // control_name down to its button, so the binding is on the child.
+    if (auto* tabp = findChild<LLAccordionCtrlTab>("atab_" + section))
+    {
+        if (LLCheckBoxCtrl* checkp = tabp->getHeaderCheckBox())
         {
-            controlp->resetToDefault(true);
+            collectBoundControls(checkp, keys);
         }
-        controlp = gSavedSettings.getControl("RenderSharpenCASSharpness");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderSharpenDLSSharpness");
-        if (controlp)
-        {
-            controlp->resetToDefault(true);
-        }
-        controlp = gSavedSettings.getControl("RenderSharpenDLSDenoise");
-        if (controlp)
+    }
+
+    // One thing the user did, however many controls it moves: undoing a Reset
+    // All eleven times would be absurd.
+    ScopedHistoryGroup group(mHistory);
+    for (const std::string& key : keys)
+    {
+        if (LLControlVariable* controlp = gSavedSettings.getControl(key))
         {
             controlp->resetToDefault(true);
         }
     }
-    else if (setting_group == "tonemap")
+}
+
+void ALFloaterLightBox::onToggleSection(LLUICtrl* ctrl, const LLSD& userdata)
+{
+    // Section id to bit. The grouping matches Reset All's, which walks
+    // sec_<id> and sec_<id>_adv together, so a section with a long tail in an
+    // Advanced sibling is one switch and one idea of what a section is.
+    static const std::map<std::string, U32> bypass_bits = {
+        { "basic",     LLPipeline::GRADE_BYPASS_BASIC },
+        { "primaries", LLPipeline::GRADE_BYPASS_PRIMARIES },
+        { "split",     LLPipeline::GRADE_BYPASS_SPLIT },
+        { "lut",       LLPipeline::GRADE_BYPASS_LUT },
+        { "curve",     LLPipeline::GRADE_BYPASS_CURVE },
+    };
+
+    const auto found = bypass_bits.find(userdata.asString());
+    if (!ctrl || found == bypass_bits.end())
     {
+        return;
+    }
+
+    // Ticked is the section switched on, so the bit -- which suppresses --
+    // is set when the box is clear.
+    //
+    // Nothing is written to gSavedSettings here, deliberately: every grading
+    // control is on the Looks whitelist, so a comparison built out of one
+    // would mark the active Look dirty and could then be saved mid-comparison.
+    // That is also why the checkboxes have no control_name: they are worth
+    // exactly one viewing session, and the floater is destroyed when it
+    // closes, which is what puts them all back on.
+    if (ctrl->getValue().asBoolean())
+    {
+        LLPipeline::sGradeBypassMask &= ~found->second;
+    }
+    else
+    {
+        LLPipeline::sGradeBypassMask |= found->second;
+    }
+}
+
+void ALFloaterLightBox::onClickReferenceGrab()
+{
+    // The grab is serviced on the next frame's blit, so what gets frozen is
+    // what the user is looking at as they click, not a frame already gone.
+    gPipeline.requestReferenceStill();
+
+    // Switching the wipe on is the feedback that the grab happened: a Grab
+    // button that visibly does nothing reads as broken, and a still nobody is
+    // looking at has no reason to exist yet.
+    if (gSavedSettings.getS32("RenderReferenceWipeMode") == 0)
+    {
+        gSavedSettings.setS32("RenderReferenceWipeMode", 1);
+    }
+
+    // The still does not exist until the frame renders, so the row cannot be
+    // refreshed to its final state here; the draw loop picks it up.
+    refreshReferenceRow();
+}
+
+void ALFloaterLightBox::onClickReferenceClear()
+{
+    gSavedSettings.setS32("RenderReferenceWipeMode", 0);
+    gPipeline.clearReferenceStill();
+    refreshReferenceRow();
+}
+
+void ALFloaterLightBox::refreshReferenceRow()
+{
+    // Whether a still exists is render state, not a setting, so nothing
+    // signals its arrival -- a grab is only serviced when the frame renders,
+    // and a resize drops the still without asking. Hence the poll from draw().
+    const bool have_still = gPipeline.hasReferenceStill();
+    const S32  mode = gSavedSettings.getS32("RenderReferenceWipeMode");
+
+    // Only the wipe has a movable seam; side by side is always centred.
+    const S32 state = (have_still ? 1 : 0) | ((have_still && mode == 1) ? 2 : 0);
+    if (state == mReferenceRowState)
+    {
+        return;
+    }
+    mReferenceRowState = state;
+
+    if (mReferenceClear)
+    {
+        mReferenceClear->setEnabled(have_still);
+    }
+    if (mReferenceMode)
+    {
+        mReferenceMode->setEnabled(have_still);
+    }
+    if (mReferencePosition)
+    {
+        mReferencePosition->setEnabled((state & 2) != 0);
+    }
+}
+
+void ALFloaterLightBox::refreshHistoryButtons()
+{
+    // Polled for the same reason the reference row is: the stack moves on
+    // every commit, on every undo, and on a Look being applied, and hanging a
+    // refresh off each of those is more places to forget than this costs.
+    const S32 state = (mHistory.canUndo() ? 1 : 0) | (mHistory.canRedo() ? 2 : 0);
+    if (state == mHistoryButtonState)
+    {
+        return;
+    }
+    mHistoryButtonState = state;
+
+    if (mUndoButton)
+    {
+        mUndoButton->setEnabled((state & 1) != 0);
+    }
+    if (mRedoButton)
+    {
+        mRedoButton->setEnabled((state & 2) != 0);
+    }
+}
+
+void ALFloaterLightBox::draw()
+{
+    refreshReferenceRow();
+    refreshHistoryButtons();
+    refreshDayCycleRow();
+    LLFloater::draw();
+}
+
+std::shared_ptr<LLSettingsDay> ALFloaterLightBox::getScrubbableDay() const
+{
+    // The order the viewer itself resolves environments in. ENV_LOCAL leads
+    // because a day the user applied is the one they would expect to scrub;
+    // while frozen it holds a fixed sky and has no day, so the search falls
+    // through to whatever the parcel or region is running. That fall-through
+    // is also what lets scrubbing keep working after the floater has been
+    // closed and reopened, since nothing about it is remembered here.
+    static const LLEnvironment::EnvSelection_t sources[] = {
+        LLEnvironment::ENV_LOCAL, LLEnvironment::ENV_PUSH,
+        LLEnvironment::ENV_PARCEL, LLEnvironment::ENV_REGION };
+
+    for (LLEnvironment::EnvSelection_t env : sources)
+    {
+        if (LLSettingsDay::ptr_t day = LLEnvironment::instance().getEnvironmentDay(env))
         {
-            LLControlVariable* controlp = gSavedSettings.getControl("RenderExposure");
-            if (controlp)
+            return day;
+        }
+    }
+    return {};
+}
+
+bool ALFloaterLightBox::isSkyFrozen() const
+{
+    return (bool)LLEnvironment::instance().getEnvironmentFixedSky(LLEnvironment::ENV_LOCAL);
+}
+
+void ALFloaterLightBox::applyDayPosition(F32 position)
+{
+    LLSettingsDay::ptr_t day = getScrubbableDay();
+    if (!day)
+    {
+        return;
+    }
+
+    mDayPosition = llclamp(position, 0.f, 1.f);
+
+    // A day cycle carries up to four sky tracks and which one you see depends
+    // on how high you are, so sample the one the agent is actually in. Track 0
+    // is water, always, and it gets sampled too: the day cycle editor blends
+    // both and a frozen sky over a moving sea is not frozen.
+    const S32 track = LLEnvironment::instance().calculateSkyTrackForAltitude(
+        gAgent.getPositionAgent().mV[VZ]);
+
+    LLSettingsSky::ptr_t sky = LLSettingsVOSky::buildDefaultSky();
+    LLSettingsWater::ptr_t water = LLSettingsVOWater::buildDefaultWater();
+
+    // make_shared rather than a temporary: LLSettingsBlender is held by shared
+    // pointer internally, which is how the day cycle editor and @setenv_daytime
+    // both spell this.
+    std::make_shared<LLTrackBlenderLoopingManual>(sky, day, track)->setPosition(mDayPosition);
+    std::make_shared<LLTrackBlenderLoopingManual>(water, day, (S32)LLSettingsDay::TRACK_WATER)
+        ->setPosition(mDayPosition);
+
+    LLEnvironment::instance().setEnvironment(LLEnvironment::ENV_LOCAL, sky, water);
+    LLEnvironment::instance().setSelectedEnvironment(LLEnvironment::ENV_LOCAL, LLEnvironment::TRANSITION_INSTANT);
+    LLEnvironment::instance().updateEnvironment(LLEnvironment::TRANSITION_INSTANT);
+}
+
+void ALFloaterLightBox::freezeSkyAt(F32 position)
+{
+    if (!mDayFreezeIsOurs)
+    {
+        // Whatever is here now is about to be covered up, and unticking Freeze
+        // has to give it back. Without this, freezing over a Personal Lighting
+        // sky and unfreezing again would quietly drop the user back to the
+        // region default and lose their sky.
+        LLEnvironment& env = LLEnvironment::instance();
+        mPreFreezeDay = env.getEnvironmentDay(LLEnvironment::ENV_LOCAL);
+        if (mPreFreezeDay)
+        {
+            mPreFreezeDayLength = env.getEnvironmentDayLength(LLEnvironment::ENV_LOCAL).value();
+            mPreFreezeDayOffset = env.getEnvironmentDayOffset(LLEnvironment::ENV_LOCAL).value();
+        }
+        const LLEnvironment::fixedEnvironment_t fixed = env.getEnvironmentFixed(LLEnvironment::ENV_LOCAL);
+        mPreFreezeSky = fixed.first;
+        mPreFreezeWater = fixed.second;
+        mDayFreezeIsOurs = true;
+    }
+
+    applyDayPosition(position);
+}
+
+void ALFloaterLightBox::thawSky()
+{
+    LLEnvironment& env = LLEnvironment::instance();
+
+    // Every reflection probe in the scene was lit by the sky being replaced.
+    // The World menu's own revert does this for the same reason; without it
+    // the first frames after a thaw carry the light of the sky just left.
+    gPipeline.mReflectionMapManager.reset();
+
+    if (mDayFreezeIsOurs && mPreFreezeDay)
+    {
+        env.setEnvironment(LLEnvironment::ENV_LOCAL, mPreFreezeDay,
+                           LLSettingsDay::Seconds(mPreFreezeDayLength),
+                           LLSettingsDay::Seconds(mPreFreezeDayOffset));
+    }
+    else if (mDayFreezeIsOurs && (mPreFreezeSky || mPreFreezeWater))
+    {
+        env.setEnvironment(LLEnvironment::ENV_LOCAL, mPreFreezeSky, mPreFreezeWater);
+    }
+    else
+    {
+        // Nothing to give back, so fall through to the parcel or region.
+        env.clearEnvironment(LLEnvironment::ENV_LOCAL);
+    }
+
+    env.setSelectedEnvironment(LLEnvironment::ENV_LOCAL, LLEnvironment::TRANSITION_INSTANT);
+    env.updateEnvironment(LLEnvironment::TRANSITION_INSTANT);
+
+    mPreFreezeDay.reset();
+    mPreFreezeSky.reset();
+    mPreFreezeWater.reset();
+    mDayFreezeIsOurs = false;
+}
+
+void ALFloaterLightBox::refreshDayLandmarks()
+{
+    LLSettingsDay::ptr_t day = getScrubbableDay();
+    if (day == mLandmarkDay)
+    {
+        return;
+    }
+
+    mLandmarkDay = day;
+    mDayLandmarks = ALDayCycleLandmarks::Landmarks();
+    if (!day)
+    {
+        return;
+    }
+
+    // One scratch sky, re-blended at each sample. getSunDirection's Z is the
+    // sun's height above the horizon, which is the only thing that says where
+    // noon is in a cycle whose keyframes could be anywhere.
+    const S32 track = LLEnvironment::instance().calculateSkyTrackForAltitude(
+        gAgent.getPositionAgent().mV[VZ]);
+    LLSettingsSky::ptr_t scratch = LLSettingsVOSky::buildDefaultSky();
+    auto blender = std::make_shared<LLTrackBlenderLoopingManual>(scratch, day, track);
+
+    mDayLandmarks = ALDayCycleLandmarks::find(
+        [&blender, &scratch](F32 position)
+        {
+            blender->setPosition(position);
+            return scratch->getSunDirection().mV[VZ];
+        });
+}
+
+void ALFloaterLightBox::refreshDayCycleRow()
+{
+    if (!mDayFreeze)
+    {
+        return; // the XUI is free to drop the row
+    }
+
+    const bool can_change = RlvActions::canChangeEnvironment();
+    const bool frozen = isSkyFrozen();
+    const bool has_day = (bool)getScrubbableDay();
+
+    // While the sky is running, the slider shows where it actually is, so
+    // ticking Freeze holds the moment being looked at rather than jumping.
+    if (!frozen)
+    {
+        const F32 live = LLEnvironment::instance().getProgress();
+        if (live >= 0.f)
+        {
+            mDayPosition = live;
+            if (mDayTime)
             {
-                controlp->resetToDefault(true);
+                mDayTime->setValue(mDayPosition);
             }
         }
+        // A sky frozen by something else, then cleared by it, leaves us
+        // holding a restore point for an environment that is already back.
+        mDayFreezeIsOurs = false;
+    }
 
-        //S32 tone_map_type = gSavedSettings.getS32("AlchemyRenderTonemapType");
-        //switch (tone_map_type)
-        //{
-        //case ALRenderUtil::TONEMAP_AMD:
-        //{
-        //    LLControlVariable* controlp = gSavedSettings.getControl("AlchemyToneMapAMDHDRMax");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDExposure");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDContrast");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDSaturationR");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDSaturationG");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapAMDSaturationB");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    break;
-        //}
-        //case ALRenderUtil::TONEMAP_UCHIMURA:
-        //{
-        //    LLControlVariable* controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraMaxBrightness");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraContrast");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraLinearStart");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraLinearLength");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapUchimuraBlackLevel");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    break;
-        //}
-        //case ALRenderUtil::TONEMAP_UNCHARTED:
-        //{
-        //    LLControlVariable* controlp = gSavedSettings.getControl("AlchemyToneMapFilmicToeStr");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicToeLen");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicShoulderStr");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicShoulderLen");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicShoulderAngle");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicGamma");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    controlp = gSavedSettings.getControl("AlchemyToneMapFilmicWhitePoint");
-        //    if (controlp)
-        //    {
-        //        controlp->resetToDefault(true);
-        //    }
-        //    break;
-        //}
-        //}
+    // Clouds are polled alongside because the World menu can pause them too,
+    // and a checkbox that disagrees with the sky is worse than none.
+    const bool clouds_paused = LLEnvironment::instance().isCloudScrollPaused();
+
+    const S32 state = (can_change ? 1 : 0) | (frozen ? 2 : 0) | (has_day ? 4 : 0)
+                    | (clouds_paused ? 8 : 0);
+    if (state == mDayCycleRowState)
+    {
+        return;
+    }
+    mDayCycleRowState = state;
+
+    if (mCloudScroll)
+    {
+        mCloudScroll->setValue(clouds_paused);
+    }
+
+    // @setenv is enforced inside LLEnvironment, not here, so without this the
+    // controls would look live and do nothing at all under a restriction.
+    mDayFreeze->setEnabled(can_change && has_day);
+    mDayFreeze->setValue(frozen);
+    if (mDayTime)
+    {
+        mDayTime->setEnabled(can_change && frozen && has_day);
+    }
+    if (mRestoreEnvironment)
+    {
+        mRestoreEnvironment->setEnabled(can_change && frozen);
+    }
+
+    // Presets cost a search, so only look when the row is actually usable.
+    if (can_change && has_day)
+    {
+        refreshDayLandmarks();
+    }
+    const bool present[4] = { mDayLandmarks.has_sunrise, mDayLandmarks.has_noon,
+                              mDayLandmarks.has_sunset, mDayLandmarks.has_midnight };
+    for (size_t i = 0; i < mDayPresets.size(); ++i)
+    {
+        if (mDayPresets[i])
+        {
+            mDayPresets[i]->setEnabled(can_change && has_day && present[i]);
+        }
     }
 }
 
-void ALFloaterLightBox::updateTonemapper()
+void ALFloaterLightBox::onToggleDayFreeze(LLUICtrl* ctrl)
 {
-    //Init Text
-    LLTextBox* text1 = getChild<LLTextBox>("tonemapper_dynamic_text1");
-    LLTextBox* text2 = getChild<LLTextBox>("tonemapper_dynamic_text2");
-    LLTextBox* text3 = getChild<LLTextBox>("tonemapper_dynamic_text3");
-    LLTextBox* text4 = getChild<LLTextBox>("tonemapper_dynamic_text4");
-    LLTextBox* text5 = getChild<LLTextBox>("tonemapper_dynamic_text5");
-    LLTextBox* text6 = getChild<LLTextBox>("tonemapper_dynamic_text6");
-    LLTextBox* text7 = getChild<LLTextBox>("tonemapper_dynamic_text7");
-
-    //Init Spinners
-    LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner1");
-    LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner2");
-    LLSpinCtrl* spinner3 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner3");
-    LLSpinCtrl* spinner4 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner4");
-    LLSpinCtrl* spinner5 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner5");
-    LLSpinCtrl* spinner6 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner6");
-    LLSpinCtrl* spinner7 = getChild<LLSpinCtrl>("tonemapper_dynamic_spinner7");
-
-    // Init Sliders
-    LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider1");
-    LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider2");
-    LLSliderCtrl* slider3 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider3");
-    LLSliderCtrl* slider4 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider4");
-    LLSliderCtrl* slider5 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider5");
-    LLSliderCtrl* slider6 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider6");
-    LLSliderCtrl* slider7 = getChild<LLSliderCtrl>("tonemapper_dynamic_slider7");
-
-    // Check the state of AlchemyRenderTonemapType
-    /* switch (gSavedSettings.getS32("AlchemyRenderTonemapType"))
+    if (!ctrl)
     {
-    default:
-    {
-        text1->setVisible(false);
-        spinner1->setVisible(false);
-        slider1->setVisible(false);
-
-        text2->setVisible(false);
-        spinner2->setVisible(false);
-        slider2->setVisible(false);
-
-        text3->setVisible(false);
-        spinner3->setVisible(false);
-        slider3->setVisible(false);
-
-        text4->setVisible(false);
-        spinner4->setVisible(false);
-        slider4->setVisible(false);
-
-        text5->setVisible(false);
-        spinner5->setVisible(false);
-        slider5->setVisible(false);
-
-        text6->setVisible(false);
-        spinner6->setVisible(false);
-        slider6->setVisible(false);
-
-        text7->setVisible(false);
-        spinner7->setVisible(false);
-        slider7->setVisible(false);
-        break;
+        return;
     }
-    case ALRenderUtil::TONEMAP_UCHIMURA:
+
+    if (ctrl->getValue().asBoolean())
     {
-        text1->setVisible(true);
-        text1->setText(std::string("Max Brightness"));
-        spinner1->setVisible(true);
-        spinner1->setMinValue(0.01f);
-        spinner1->setMaxValue(8.0f);
-        spinner1->setIncrement(0.1f);
-        spinner1->setControlName("AlchemyToneMapUchimuraMaxBrightness");
-        slider1->setVisible(true);
-        slider1->setMinValue(0.01f);
-        slider1->setMaxValue(8.0f);
-        slider1->setIncrement(0.1f);
-        slider1->setControlName("AlchemyToneMapUchimuraMaxBrightness", nullptr);
-
-        text2->setVisible(true);
-        text2->setText(std::string("Contrast"));
-        spinner2->setVisible(true);
-        spinner2->setMinValue(0.01f);
-        spinner2->setMaxValue(2.0f);
-        spinner2->setIncrement(0.01f);
-        spinner2->setControlName("AlchemyToneMapUchimuraContrast");
-        slider2->setVisible(true);
-        slider2->setMinValue(0.01f);
-        slider2->setMaxValue(2.0f);
-        slider2->setIncrement(0.01f);
-        slider2->setControlName("AlchemyToneMapUchimuraContrast", nullptr);
-
-        text3->setVisible(true);
-        text3->setText(std::string("Linear Start"));
-        spinner3->setVisible(true);
-        spinner3->setMinValue(0.01f);
-        spinner3->setMaxValue(1.0f);
-        spinner3->setIncrement(0.01f);
-        spinner3->setControlName("AlchemyToneMapUchimuraLinearStart");
-        slider3->setVisible(true);
-        slider3->setMinValue(0.01f);
-        slider3->setMaxValue(1.0f);
-        slider3->setIncrement(0.01f);
-        slider3->setControlName("AlchemyToneMapUchimuraLinearStart", nullptr);
-
-        text4->setVisible(true);
-        text4->setText(std::string("Linear Length"));
-        spinner4->setVisible(true);
-        spinner4->setMinValue(0.01f);
-        spinner4->setMaxValue(1.0f);
-        spinner4->setIncrement(0.01f);
-        spinner4->setControlName("AlchemyToneMapUchimuraLinearLength");
-        slider4->setVisible(true);
-        slider4->setMinValue(0.01f);
-        slider4->setMaxValue(1.0f);
-        slider4->setIncrement(0.01f);
-        slider4->setControlName("AlchemyToneMapUchimuraLinearLength", nullptr);
-
-        text5->setVisible(true);
-        text5->setText(std::string("Black Level"));
-        spinner5->setVisible(true);
-        spinner5->setMinValue(0.01f);
-        spinner5->setMaxValue(4.0f);
-        spinner5->setIncrement(0.01f);
-        spinner5->setControlName("AlchemyToneMapUchimuraBlackLevel");
-        slider5->setVisible(true);
-        slider5->setMinValue(0.01f);
-        slider5->setMaxValue(4.0f);
-        slider5->setIncrement(0.01f);
-        slider5->setControlName("AlchemyToneMapUchimuraBlackLevel", nullptr);
-
-        text6->setVisible(false);
-        spinner6->setVisible(false);
-        slider6->setVisible(false);
-
-        text7->setVisible(false);
-        spinner7->setVisible(false);
-        slider7->setVisible(false);
-        break;
+        freezeSkyAt(mDayPosition);
     }
-    case ALRenderUtil::TONEMAP_AMD:
+    else
     {
-        text1->setVisible(true);
-        text1->setText(std::string("HDR Max"));
-        spinner1->setVisible(true);
-        spinner1->setMinValue(1.0f);
-        spinner1->setMaxValue(512.0f);
-        spinner1->setIncrement(1.f);
-        spinner1->setControlName("AlchemyToneMapAMDHDRMax");
-        slider1->setVisible(true);
-        slider1->setMinValue(1.0f);
-        slider1->setMaxValue(512.0f);
-        slider1->setIncrement(1.f);
-        slider1->setControlName("AlchemyToneMapAMDHDRMax", nullptr);
-
-        text2->setVisible(true);
-        text2->setText(std::string("Tone Exposure"));
-        spinner2->setVisible(true);
-        spinner2->setMinValue(1.0f);
-        spinner2->setMaxValue(16.0f);
-        spinner2->setIncrement(0.1f);
-        spinner2->setControlName("AlchemyToneMapAMDExposure");
-        slider2->setVisible(true);
-        slider2->setMinValue(1.0f);
-        slider2->setMaxValue(16.0f);
-        slider2->setIncrement(0.1f);
-        slider2->setControlName("AlchemyToneMapAMDExposure", nullptr);
-
-        text3->setVisible(true);
-        text3->setText(std::string("Contrast"));
-        spinner3->setVisible(true);
-        spinner3->setMinValue(0.0f);
-        spinner3->setMaxValue(1.0f);
-        spinner3->setIncrement(0.01f);
-        spinner3->setControlName("AlchemyToneMapAMDContrast");
-        slider3->setVisible(true);
-        slider3->setMinValue(0.0f);
-        slider3->setMaxValue(1.0f);
-        slider3->setIncrement(0.01f);
-        slider3->setControlName("AlchemyToneMapAMDContrast", nullptr);
-
-        text4->setVisible(true);
-        text4->setText(std::string("R Saturation"));
-        spinner4->setVisible(true);
-        spinner4->setMinValue(-2.0f);
-        spinner4->setMaxValue(2.0f);
-        spinner4->setIncrement(0.1f);
-        spinner4->setControlName("AlchemyToneMapAMDSaturationR");
-        slider4->setVisible(true);
-        slider4->setMinValue(-2.0f);
-        slider4->setMaxValue(2.0f);
-        slider4->setIncrement(0.1f);
-        slider4->setControlName("AlchemyToneMapAMDSaturationR", nullptr);
-
-        text5->setVisible(true);
-        text5->setText(std::string("G Saturation"));
-        spinner5->setVisible(true);
-        spinner5->setMinValue(-2.0f);
-        spinner5->setMaxValue(2.0f);
-        spinner5->setIncrement(0.1f);
-        spinner5->setControlName("AlchemyToneMapAMDSaturationG");
-        slider5->setVisible(true);
-        slider5->setMinValue(-2.0f);
-        slider5->setMaxValue(2.0f);
-        slider5->setIncrement(0.1f);
-        slider5->setControlName("AlchemyToneMapAMDSaturationG", nullptr);
-
-        text6->setVisible(true);
-        text6->setText(std::string("B Saturation"));
-        spinner6->setVisible(true);
-        spinner6->setMinValue(-2.0f);
-        spinner6->setMaxValue(2.0f);
-        spinner6->setIncrement(0.1f);
-        spinner6->setControlName("AlchemyToneMapAMDSaturationB");
-        slider6->setVisible(true);
-        slider6->setMinValue(-2.0f);
-        slider6->setMaxValue(2.0f);
-        slider6->setIncrement(0.1f);
-        slider6->setControlName("AlchemyToneMapAMDSaturationB", nullptr);
-
-        text7->setVisible(false);
-        spinner7->setVisible(false);
-        slider7->setVisible(false);
-        break;
+        thawSky();
     }
-    case ALRenderUtil::TONEMAP_UNCHARTED:
-    {
-        text1->setVisible(true);
-        text1->setText(std::string("Toe Strength"));
-        spinner1->setVisible(true);
-        spinner1->setMinValue(0.0f);
-        spinner1->setMaxValue(1.0f);
-        spinner1->setIncrement(0.01f);
-        spinner1->setControlName("AlchemyToneMapFilmicToeStr");
-        slider1->setVisible(true);
-        slider1->setMinValue(0.0f);
-        slider1->setMaxValue(1.0f);
-        slider1->setIncrement(0.01f);
-        slider1->setControlName("AlchemyToneMapFilmicToeStr", nullptr);
-
-        text2->setVisible(true);
-        text2->setText(std::string("Toe Length"));
-        spinner2->setVisible(true);
-        spinner2->setMinValue(0.01f);
-        spinner2->setMaxValue(1.0f);
-        spinner2->setIncrement(0.01f);
-        spinner2->setControlName("AlchemyToneMapFilmicToeLen");
-        slider2->setVisible(true);
-        slider2->setMinValue(0.01f);
-        slider2->setMaxValue(1.0f);
-        slider2->setIncrement(0.01f);
-        slider2->setControlName("AlchemyToneMapFilmicToeLen", nullptr);
-
-        text3->setVisible(true);
-        text3->setText(std::string("Shoulder Strength"));
-        spinner3->setVisible(true);
-        spinner3->setMinValue(0.0f);
-        spinner3->setMaxValue(1.0f);
-        spinner3->setIncrement(0.01f);
-        spinner3->setControlName("AlchemyToneMapFilmicShoulderStr");
-        slider3->setVisible(true);
-        slider3->setMinValue(0.0f);
-        slider3->setMaxValue(1.0f);
-        slider3->setIncrement(0.01f);
-        slider3->setControlName("AlchemyToneMapFilmicShoulderStr", nullptr);
-
-        text4->setVisible(true);
-        text4->setText(std::string("Shoulder Length"));
-        spinner4->setVisible(true);
-        spinner4->setMinValue(0.01f);
-        spinner4->setMaxValue(8.0f);
-        spinner4->setIncrement(0.01f);
-        spinner4->setControlName("AlchemyToneMapFilmicShoulderLen");
-        slider4->setVisible(true);
-        slider4->setMinValue(0.01f);
-        slider4->setMaxValue(8.0f);
-        slider4->setIncrement(0.01f);
-        slider4->setControlName("AlchemyToneMapFilmicShoulderLen", nullptr);
-
-        text5->setVisible(true);
-        text5->setText(std::string("Shoulder Angle"));
-        spinner5->setVisible(true);
-        spinner5->setMinValue(0.0f);
-        spinner5->setMaxValue(1.0f);
-        spinner5->setIncrement(0.01f);
-        spinner5->setControlName("AlchemyToneMapFilmicShoulderAngle");
-        slider5->setVisible(true);
-        slider5->setMinValue(0.0f);
-        slider5->setMaxValue(1.0f);
-        slider5->setIncrement(0.01f);
-        slider5->setControlName("AlchemyToneMapFilmicShoulderAngle", nullptr);
-
-        text6->setVisible(true);
-        text6->setText(std::string("Gamma"));
-        spinner6->setVisible(true);
-        spinner6->setMinValue(0.01f);
-        spinner6->setMaxValue(5.0f);
-        spinner6->setIncrement(0.01f);
-        spinner6->setControlName("AlchemyToneMapFilmicGamma");
-        slider6->setVisible(true);
-        slider6->setMinValue(0.01f);
-        slider6->setMaxValue(5.0f);
-        slider6->setIncrement(0.01f);
-        slider6->setControlName("AlchemyToneMapFilmicGamma", nullptr);
-
-        text7->setVisible(true);
-        text7->setText(std::string("White Point"));
-        spinner7->setVisible(true);
-        spinner7->setMinValue(1.0f);
-        spinner7->setMaxValue(16.0f);
-        spinner7->setIncrement(0.1f);
-        spinner7->setControlName("AlchemyToneMapFilmicWhitePoint");
-        slider7->setVisible(true);
-        slider7->setMinValue(1.0f);
-        slider7->setMaxValue(16.0f);
-        slider7->setIncrement(0.1f);
-        slider7->setControlName("AlchemyToneMapFilmicWhitePoint", nullptr);
-        break;
-    }
-    }*/
+    mDayCycleRowState = -1;
 }
 
-void ALFloaterLightBox::updateCAS()
+void ALFloaterLightBox::onCommitDayTime(LLUICtrl* ctrl)
 {
-    // Init UI
-    LLTextBox* text2 = getChild<LLTextBox>("sharp_dynamic_text");
-    LLSpinCtrl* spinner1 = getChild<LLSpinCtrl>("sharp_strength_spinner");
-    LLSpinCtrl* spinner2 = getChild<LLSpinCtrl>("sharp_dynamic_spinner");
-    LLSliderCtrl* slider1 = getChild<LLSliderCtrl>("sharp_strength_slider");
-    LLSliderCtrl* slider2 = getChild<LLSliderCtrl>("sharp_dynamic_slider");
+    if (ctrl)
+    {
+        // Through freezeSkyAt, not applyDayPosition, even though the slider is
+        // only live while the sky is already frozen: "frozen" can also mean a
+        // fixed sky somebody else installed -- Personal Lighting, say -- which
+        // we have not captured. The first scrub over one of those is what
+        // covers it up, so it is the moment to remember it, or unticking
+        // Freeze drops the user to the region default instead of giving their
+        // sky back. Once the freeze is ours the capture is skipped and this is
+        // applyDayPosition, so a drag costs nothing extra per tick.
+        freezeSkyAt((F32)ctrl->getValue().asReal());
+    }
+}
 
-    //switch (gSavedSettings.getU32("RenderSharpenMethod"))
-    //{
-    //default:
-    //case ALRenderUtil::SHARPEN_NONE:
-    //{
-    //    spinner1->setVisible(false);
-    //    slider1->setVisible(false);
-    //    text2->setVisible(false);
-    //    spinner2->setVisible(false);
-    //    slider2->setVisible(false);
-    //    break;
-    //}
-    //case ALRenderUtil::SHARPEN_CAS:
-    //{
-    //    spinner1->setVisible(true);
-    //    spinner1->setMinValue(0.0f);
-    //    spinner1->setMaxValue(1.0f);
-    //    spinner1->setIncrement(0.1f);
-    //    spinner1->setControlName("RenderSharpenCASSharpness");
-    //    slider1->setVisible(true);
-    //    slider1->setMinValue(0.0f);
-    //    slider1->setMaxValue(1.0f);
-    //    slider1->setIncrement(0.1f);
-    //    slider1->setControlName("RenderSharpenCASSharpness", nullptr);
+void ALFloaterLightBox::onClickDayPreset(const LLSD& userdata)
+{
+    refreshDayLandmarks();
 
-    //    text2->setVisible(false);
-    //    spinner2->setVisible(false);
-    //    slider2->setVisible(false);
-    //    break;
-    //}
-    //case ALRenderUtil::SHARPEN_DLS:
-    //{
-    //    spinner1->setVisible(true);
-    //    spinner1->setMinValue(0.0f);
-    //    spinner1->setMaxValue(1.0f);
-    //    spinner1->setIncrement(0.1f);
-    //    spinner1->setControlName("RenderSharpenDLSSharpness");
-    //    slider1->setVisible(true);
-    //    slider1->setMinValue(0.0f);
-    //    slider1->setMaxValue(1.0f);
-    //    slider1->setIncrement(0.1f);
-    //    slider1->setControlName("RenderSharpenDLSSharpness", nullptr);
+    const std::string& which = userdata.asString();
+    const ALDayCycleLandmarks::Landmarks& marks = mDayLandmarks;
 
-    //    text2->setVisible(true);
-    //    text2->setText(std::string("Denoise:"));
-    //    spinner2->setVisible(true);
-    //    spinner2->setMinValue(0.0f);
-    //    spinner2->setMaxValue(1.0f);
-    //    spinner2->setIncrement(0.1f);
-    //    spinner2->setControlName("RenderSharpenDLSDenoise");
-    //    slider2->setVisible(true);
-    //    slider2->setMinValue(0.0f);
-    //    slider2->setMaxValue(1.0f);
-    //    slider2->setIncrement(0.1f);
-    //    slider2->setControlName("RenderSharpenDLSDenoise", nullptr);
-    //    break;
-    //}
-    //}
+    F32 position = 0.f;
+    if (which == "sunrise" && marks.has_sunrise)        { position = marks.sunrise; }
+    else if (which == "noon" && marks.has_noon)         { position = marks.noon; }
+    else if (which == "sunset" && marks.has_sunset)     { position = marks.sunset; }
+    else if (which == "midnight" && marks.has_midnight) { position = marks.midnight; }
+    else                                                { return; }
+
+    // A preset moves the slider and freezes there; it does not install a
+    // canned sky, so the region's own idea of noon is what you get and you can
+    // keep scrubbing from it.
+    freezeSkyAt(position);
+    if (mDayTime)
+    {
+        mDayTime->setValue(mDayPosition);
+    }
+    mDayCycleRowState = -1;
+}
+
+void ALFloaterLightBox::onToggleCloudScroll(LLUICtrl* ctrl)
+{
+    if (!ctrl)
+    {
+        return;
+    }
+
+    // Clouds drift on their own timer, entirely apart from the day cycle, so a
+    // frozen sky with this off still has weather moving through it.
+    if (ctrl->getValue().asBoolean())
+    {
+        LLEnvironment::instance().pauseCloudScroll();
+    }
+    else
+    {
+        LLEnvironment::instance().resumeCloudScroll();
+    }
+}
+
+void ALFloaterLightBox::onClickRestoreEnvironment()
+{
+    // Unconditional, unlike unticking Freeze: this is the way back to the
+    // parcel or region whatever we happen to be holding, including a sky some
+    // other floater installed.
+    mDayFreezeIsOurs = false;
+    mPreFreezeDay.reset();
+    mPreFreezeSky.reset();
+    mPreFreezeWater.reset();
+    thawSky();
+    mDayCycleRowState = -1;
+}
+
+void ALFloaterLightBox::onGradeSettingChanged(const std::string& name, const LLSD& before, const LLSD& after)
+{
+    if (mApplyingHistory)
+    {
+        // Our own write, coming back round. Recording it would append the undo
+        // to the stack it was taken from, and Ctrl+Z would toggle forever
+        // between two values instead of walking backwards.
+        return;
+    }
+
+    // A monotonic clock is all the history wants: it compares two of these to
+    // decide whether one drag is still in progress, and never reads the value
+    // on its own.
+    mHistory.record(name, before, after, (F32)LLTimer::getElapsedSeconds().value());
+}
+
+bool ALFloaterLightBox::applyHistory(bool redo_direction)
+{
+    const ALGradeHistory::Transaction* stepp = redo_direction ? mHistory.redo() : mHistory.undo();
+    if (!stepp)
+    {
+        return false;
+    }
+
+    // Copied, not followed. The pointer is into the history's own stack, and
+    // while the guard below means nothing can record during the writes -- and
+    // so nothing can resize that stack -- relying on it would make this
+    // function's safety a property of code somewhere else. A transaction is a
+    // handful of LLSD.
+    const ALGradeHistory::Transaction step = *stepp;
+
+    ScopedTrue applying(mApplyingHistory);
+    for (const ALGradeHistory::Change& change : step)
+    {
+        if (LLControlVariable* controlp = gSavedSettings.getControl(change.mName))
+        {
+            controlp->setValue(redo_direction ? change.mAfter : change.mBefore);
+        }
+    }
+
+    // Deliberately no attempt to restore which Look was active. Undo restores
+    // values; the Look stays dirty, exactly as it would if the user had typed
+    // the old numbers back in. See ALGradeHistory's header.
+    return true;
+}
+
+bool ALFloaterLightBox::handleKeyHere(KEY key, MASK mask)
+{
+    // Reached only after the focus chain has declined the key, so a text field
+    // in the middle of an edit keeps Ctrl+Z for its own undo.
+    if (key == 'Z' && mask == MASK_CONTROL)
+    {
+        applyHistory(false);
+        return true;
+    }
+
+    // Both spellings: Ctrl+Y is the Windows convention and Ctrl+Shift+Z the one
+    // every grading application uses.
+    if ((key == 'Y' && mask == MASK_CONTROL) ||
+        (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT)))
+    {
+        applyHistory(true);
+        return true;
+    }
+
+    return LLFloater::handleKeyHere(key, mask);
+}
+
+void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
+{
+    if (mVec3Updating || !ctrl)
+    {
+        return;
+    }
+
+    std::string setting;
+    S32 component = 0;
+    if (!parseVec3WidgetName(ctrl->getName(), setting, component))
+    {
+        return;
+    }
+
+    LLControlVariable* controlp = gSavedSettings.getControl(setting);
+    if (!controlp)
+    {
+        return;
+    }
+
+    // Rebuild the full component array so a single spinner commit writes back
+    // one component without disturbing the others; works for VEC3 and COL3.
+    const LLSD current = controlp->getValue();
+    LLSD updated = LLSD::emptyArray();
+    for (S32 i = 0; i < 3; ++i)
+    {
+        updated.append(LLSD::Real(current[i].asReal()));
+    }
+    updated[component] = LLSD::Real(ctrl->getValue().asReal());
+    controlp->set(updated);
+}
+
+namespace
+{
+// The three settings the tone curve graph edits, and the order the handles
+// are built in. Kept together so the graph and the spinner rows below it can
+// never disagree about which key is which.
+const char* const TONE_CURVE_TOE      = "RenderColorGradeCurveToe";
+const char* const TONE_CURVE_SHOULDER = "RenderColorGradeCurveShoulder";
+const char* const TONE_CURVE_STRENGTH = "RenderColorGradeCurveStrength";
+
+// The split-toning settings the band graph reads. The tints colour the bands,
+// the amounts fade them, and the balance is the only one the graph writes.
+const char* const SPLIT_TONE_SHADOW         = "RenderSplitToneShadowTint";
+const char* const SPLIT_TONE_MIDTONE        = "RenderSplitToneMidtoneTint";
+const char* const SPLIT_TONE_HIGHLIGHT      = "RenderSplitToneHighlightTint";
+const char* const SPLIT_TONE_AMOUNT         = "RenderSplitToneAmount";
+const char* const SPLIT_TONE_MIDTONE_AMOUNT = "RenderSplitToneMidtoneAmount";
+const char* const SPLIT_TONE_BALANCE        = "RenderSplitToneBalance";
+
+LLColor3 getColor3(const char* key)
+{
+    return gSavedSettings.getColor3(key);
+}
+
+// Write one component, or all three when channel is negative. Rebuilds the
+// whole array the way onCommitVec3 does, so an untouched component keeps its
+// value rather than being re-derived from a rounded read-back.
+void setColor3Component(const char* key, S32 channel, F32 value)
+{
+    LLControlVariable* controlp = gSavedSettings.getControl(key);
+    if (!controlp)
+    {
+        return;
+    }
+    const LLSD current = controlp->getValue();
+    LLSD updated = LLSD::emptyArray();
+    for (S32 i = 0; i < 3; ++i)
+    {
+        const bool touched = (channel < 0) || (channel == i);
+        updated.append(LLSD::Real(touched ? value : current[i].asReal()));
+    }
+    controlp->set(updated);
+}
+
+/// Where the curve departs furthest from the identity. That is the most
+/// sensitive place to read strength back from a dragged handle -- solving
+/// k = (y - x) / (s - x) anywhere the two are close would amplify a pixel of
+/// pointer movement into a wild swing -- and it is also where the eye reads
+/// the curve's effect, so it is where the handle belongs.
+F32 findMaxDeviation(F32 toe, F32 shoulder)
+{
+    constexpr S32 SAMPLES = 64;
+    F32 best_x = 0.5f;
+    F32 best_gap = -1.f;
+    for (S32 i = 1; i < SAMPLES; ++i)
+    {
+        const F32 x = (F32)i / (F32)SAMPLES;
+        // The pure curve at full strength: the deviation the blend scales.
+        const F32 gap = fabsf(ALCurveModel::smoothstep(x, toe, shoulder, 1.f) - x);
+        if (gap > best_gap)
+        {
+            best_gap = gap;
+            best_x = x;
+        }
+    }
+    return best_x;
+}
+} // namespace
+
+S32 ALFloaterLightBox::getToneCurveChannel() const
+{
+    return mToneCurveChannel ? mToneCurveChannel->getValue().asInteger() : -1;
+}
+
+void ALFloaterLightBox::setupToneCurve()
+{
+    mToneCurve = findChild<ALCurveEditorCtrl>("tone_curve_graph");
+    if (!mToneCurve)
+    {
+        return;
+    }
+    mToneCurveChannel = findChild<LLComboBox>("tone_curve_channel");
+    if (mToneCurveChannel)
+    {
+        // Start linked. Without an explicit selection an unselected combo
+        // reads back as 0, which would silently mean "red only".
+        mToneCurveChannel->selectByValue(LLSD(-1));
+    }
+
+    for (const char* key : { TONE_CURVE_TOE, TONE_CURVE_SHOULDER, TONE_CURVE_STRENGTH })
+    {
+        if (LLControlVariable* controlp = gSavedSettings.getControl(key))
+        {
+            mToneCurveConnections.emplace_back(controlp->getSignal()->connect(
+                [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshToneCurve(); }));
+        }
+    }
+
+    refreshToneCurve();
+}
+
+void ALFloaterLightBox::refreshToneCurve()
+{
+    if (!mToneCurve || mToneCurveUpdating)
+    {
+        return;
+    }
+
+    const LLColor3 toe = getColor3(TONE_CURVE_TOE);
+    const LLColor3 shoulder = getColor3(TONE_CURVE_SHOULDER);
+    const LLColor3 strength = getColor3(TONE_CURVE_STRENGTH);
+
+    // Linked edits all three at once and shows one curve; a single channel
+    // shows its own curve solid with the other two behind it, so you can see
+    // how far apart you have pulled them.
+    const S32 channel = getToneCurveChannel();
+    const S32 plotted = (channel < 0) ? 0 : channel;
+
+    const F32 t = toe.mV[plotted];
+    const F32 s = shoulder.mV[plotted];
+    const F32 k = strength.mV[plotted];
+
+    mToneCurve->setCurve([t, s, k](F32 x) { return ALCurveModel::smoothstep(x, t, s, k); });
+
+    mToneCurve->clearGhostCurves();
+    if (channel >= 0)
+    {
+        static const LLColor4 channel_tint[3] = {
+            LLColor4(0.8f, 0.25f, 0.25f, 0.55f),
+            LLColor4(0.25f, 0.8f, 0.35f, 0.55f),
+            LLColor4(0.35f, 0.5f, 0.9f, 0.55f) };
+        for (S32 i = 0; i < 3; ++i)
+        {
+            if (i == channel)
+            {
+                continue;
+            }
+            const F32 gt = toe.mV[i];
+            const F32 gs = shoulder.mV[i];
+            const F32 gk = strength.mV[i];
+            mToneCurve->addGhostCurve(
+                [gt, gs, gk](F32 x) { return ALCurveModel::smoothstep(x, gt, gs, gk); },
+                channel_tint[i]);
+        }
+    }
+
+    const F32 strength_x = findMaxDeviation(t, s);
+
+    std::vector<ALCurveEditorCtrl::Handle> handles;
+    ALCurveEditorCtrl::Handle h;
+
+    h.mName = "toe";
+    h.mX = t;
+    h.mY = ALCurveModel::smoothstep(t, t, s, k);
+    h.mLockY = true;
+    handles.push_back(h);
+
+    h = ALCurveEditorCtrl::Handle();
+    h.mName = "shoulder";
+    h.mX = s;
+    h.mY = ALCurveModel::smoothstep(s, t, s, k);
+    h.mLockY = true;
+    handles.push_back(h);
+
+    h = ALCurveEditorCtrl::Handle();
+    h.mName = "strength";
+    h.mX = strength_x;
+    h.mY = ALCurveModel::smoothstep(strength_x, t, s, k);
+    h.mLockX = true;
+    handles.push_back(h);
+
+    mToneCurve->setHandles(std::move(handles));
+}
+
+void ALFloaterLightBox::onCommitToneCurve()
+{
+    if (!mToneCurve)
+    {
+        return;
+    }
+
+    const std::string which = mToneCurve->getActiveHandleName();
+    const S32 index = mToneCurve->getActiveHandle();
+    if (which.empty() || index < 0 || index >= (S32)mToneCurve->getHandles().size())
+    {
+        return;
+    }
+    const ALCurveEditorCtrl::Handle handle = mToneCurve->getHandles()[index];
+
+    const S32 channel = getToneCurveChannel();
+    const S32 read = (channel < 0) ? 0 : channel;
+    const F32 toe = getColor3(TONE_CURVE_TOE).mV[read];
+    const F32 shoulder = getColor3(TONE_CURVE_SHOULDER).mV[read];
+    const F32 strength = getColor3(TONE_CURVE_STRENGTH).mV[read];
+
+    // Writing a setting re-enters through its signal; let the write land, then
+    // rebuild the handles once from the values that actually stuck. Scoped so
+    // no early return can ever leave the flag stuck and the graph dead -- and
+    // the scope must close before the refresh below, which reads the same
+    // flag and would otherwise skip the rebuild it exists to do.
+    {
+        ScopedTrue updating(mToneCurveUpdating);
+
+        if (which == "toe")
+        {
+            // Held at or below the shoulder. The shader tolerates the inversion
+            // (its reciprocal is guarded) but it renders as a hard step with no
+            // visible cause; the spinners remain the way to ask for that.
+            setColor3Component(TONE_CURVE_TOE, channel, llmin(handle.mX, shoulder));
+        }
+        else if (which == "shoulder")
+        {
+            setColor3Component(TONE_CURVE_SHOULDER, channel, llmax(handle.mX, toe));
+        }
+        else if (which == "strength")
+        {
+            // The handle rides the curve at a fixed x, so its height is
+            // mix(x, s, k) and k falls straight out of it.
+            const F32 x = handle.mX;
+            const F32 s = ALCurveModel::smoothstep(x, toe, shoulder, 1.f);
+            const F32 gap = s - x;
+            if (fabsf(gap) > 1e-3f)
+            {
+                setColor3Component(TONE_CURVE_STRENGTH, channel, llclamp((handle.mY - x) / gap, 0.f, 1.f));
+            }
+        }
+    }
+    refreshToneCurve();
+}
+
+void ALFloaterLightBox::setupSplitToneGraph()
+{
+    mSplitToneGraph = findChild<ALCurveEditorCtrl>("split_tone_graph");
+    if (!mSplitToneGraph)
+    {
+        return;
+    }
+
+    // Every input, not just the balance: the tints decide what colour a band
+    // is drawn in and the amounts decide how solid, so a graph that only
+    // watched the balance would sit there showing a tint the renderer had
+    // already stopped applying.
+    for (const char* key : { SPLIT_TONE_SHADOW, SPLIT_TONE_MIDTONE, SPLIT_TONE_HIGHLIGHT,
+                             SPLIT_TONE_AMOUNT, SPLIT_TONE_MIDTONE_AMOUNT, SPLIT_TONE_BALANCE })
+    {
+        if (LLControlVariable* controlp = gSavedSettings.getControl(key))
+        {
+            mSplitToneConnections.emplace_back(controlp->getSignal()->connect(
+                [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshSplitToneGraph(); }));
+        }
+    }
+
+    refreshSplitToneGraph();
+}
+
+void ALFloaterLightBox::refreshSplitToneGraph()
+{
+    if (!mSplitToneGraph || mSplitToneUpdating)
+    {
+        return;
+    }
+
+    const F32 mid = ALCurveModel::splitToneMid(gSavedSettings.getF32(SPLIT_TONE_BALANCE));
+    const F32 amount     = llclamp(gSavedSettings.getF32(SPLIT_TONE_AMOUNT), 0.f, 1.f);
+    const F32 mid_amount = llclamp(gSavedSettings.getF32(SPLIT_TONE_MIDTONE_AMOUNT), 0.f, 1.f);
+
+    // A band wears the tint it applies. Normalised the way pipeline.cpp
+    // normalises it, so what the graph shows is the hue the renderer will
+    // actually use and a tint that is merely bright reads as neutral -- which
+    // is the truth, since the shader divides that brightness back out.
+    auto band_color = [](const char* key, F32 strength)
+    {
+        const LLColor3 tint = getColor3(key);
+        constexpr F32 LUMA_R = 0.2126f, LUMA_G = 0.7152f, LUMA_B = 0.0722f;
+        const F32 luma = llmax(tint.mV[0] * LUMA_R + tint.mV[1] * LUMA_G + tint.mV[2] * LUMA_B, 1e-4f);
+
+        // Half brightness so a neutral band is mid grey and a saturated one has
+        // room to read as itself without clipping to white.
+        constexpr F32 DISPLAY_LEVEL = 0.5f;
+        LLColor4 out(llclamp(tint.mV[0] / luma * DISPLAY_LEVEL, 0.f, 1.f),
+                     llclamp(tint.mV[1] / luma * DISPLAY_LEVEL, 0.f, 1.f),
+                     llclamp(tint.mV[2] / luma * DISPLAY_LEVEL, 0.f, 1.f),
+                     1.f);
+        // Alpha follows the amount, so a band the renderer is ignoring fades
+        // instead of sitting at full strength claiming otherwise. It never
+        // reaches zero: where the bands lie is worth seeing even when nothing
+        // is being applied, and that is what the balance handle moves.
+        out.mV[VALPHA] = 0.16f + 0.44f * strength;
+        return out;
+    };
+
+    mSplitToneGraph->clearFillCurves();
+    mSplitToneGraph->addFillCurve(
+        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mShadow; },
+        band_color(SPLIT_TONE_SHADOW, amount));
+    mSplitToneGraph->addFillCurve(
+        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mMidtone; },
+        band_color(SPLIT_TONE_MIDTONE, mid_amount));
+    mSplitToneGraph->addFillCurve(
+        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mHighlight; },
+        band_color(SPLIT_TONE_HIGHLIGHT, amount));
+
+    // The handle rides the peak of the midtone band, which is exactly where the
+    // two ramps cross and hand over -- the split point the setting names. Held
+    // to the horizontal, because moving it up or down would mean nothing.
+    ALCurveEditorCtrl::Handle handle;
+    handle.mName = "balance";
+    handle.mX = mid;
+    handle.mY = 1.f;
+    handle.mLockY = true;
+    mSplitToneGraph->setHandles({ handle });
+}
+
+void ALFloaterLightBox::onCommitSplitToneGraph()
+{
+    if (!mSplitToneGraph || mSplitToneGraph->getHandles().empty())
+    {
+        return;
+    }
+
+    // Dragged past either end, the balance clamps and the refresh below puts
+    // the handle back where the setting actually landed, rather than leaving it
+    // parked somewhere the renderer will not follow.
+    const F32 mid = mSplitToneGraph->getHandles()[0].mX;
+
+    // Scoped for the same reason onCommitToneCurve's guard is, and closed
+    // before the refresh for the same reason too.
+    {
+        ScopedTrue updating(mSplitToneUpdating);
+        gSavedSettings.setF32(SPLIT_TONE_BALANCE, ALCurveModel::splitToneBalance(mid));
+    }
+    refreshSplitToneGraph();
+}
+
+void ALFloaterLightBox::onClickWhiteBalancePicker()
+{
+    ALToolScenePicker* picker = ALToolScenePicker::getInstance();
+
+    // A handle, not `this`. Two gaps let this floater die first: the tool stays
+    // armed until something is clicked, and the sample itself only arrives a
+    // frame after the click. This floater declares neither single_instance nor
+    // reuse_instance, so LLFloater::closeFloater destroys it outright -- arm
+    // the picker, close the Lightbox, click the world, and a raw pointer would
+    // be a use-after-free.
+    LLHandle<ALFloaterLightBox> handle = getDerivedHandle<ALFloaterLightBox>();
+    picker->setPickCallback([handle](const LLColor3& sample)
+    {
+        if (ALFloaterLightBox* self = handle.get())
+        {
+            self->onWhiteBalancePicked(sample);
+        }
+    });
+
+    LLToolMgr::getInstance()->setTransientTool(picker);
+}
+
+void ALFloaterLightBox::onWhiteBalancePicked(const LLColor3& sample)
+{
+    // The ratios of three near-zero numbers are noise, and a sample in shadow
+    // is exactly where a click lands when someone misses. Refuse rather than
+    // swing the sliders to an answer read out of rounding error.
+    constexpr F32 MIN_LUMA = 1e-3f;
+    const F32 luma = sample.mV[0] * 0.2126f + sample.mV[1] * 0.7152f + sample.mV[2] * 0.0722f;
+    if (luma < MIN_LUMA)
+    {
+        LLNotificationsUtil::add("LightBoxWhiteBalanceTooDark");
+        return;
+    }
+
+    const ALWhiteBalanceSolver::Result solved = ALWhiteBalanceSolver::solveForColor(sample);
+
+    // Past this the sliders cannot express what was asked for -- a strongly
+    // coloured surface, not a neutral one lit by coloured light. Applying the
+    // nearest reachable balance would look like the tool misfiring, so say so
+    // and change nothing. The threshold is well clear of the ~1e-3 a genuine
+    // solve returns and well below the 0.1-plus of a saturated sample.
+    constexpr F32 MAX_RESIDUAL = 0.02f;
+    if (solved.mResidual > MAX_RESIDUAL)
+    {
+        LLNotificationsUtil::add("LightBoxWhiteBalanceUnreachable");
+        return;
+    }
+
+    gSavedSettings.setF32("RenderColorGradeWhiteBalanceCCT", solved.mCCTOffset);
+    gSavedSettings.setF32("RenderColorGradeWhiteBalanceDuv", solved.mDuv);
+}
+
+void ALFloaterLightBox::onLookSelected()
+{
+    const std::string name = mLooksCombo ? mLooksCombo->getSimple() : std::string();
+    if (!name.empty())
+    {
+        // Applying a Look writes every whitelisted key it carries. That is one
+        // choice, so it is one undo step -- and it is the step a user most
+        // wants back, having tried a Look on top of work they liked.
+        ScopedHistoryGroup group(mHistory);
+        LLPresetsManager::getInstance()->loadLooksPreset(name);
+    }
+}
+
+void ALFloaterLightBox::onClickLookSave()
+{
+    std::string name = gSavedSettings.getString("PresetLooksActive");
+    if (name.empty())
+    {
+        name = gSavedSettings.getString("PresetLooksLastApplied");
+    }
+    if (name.empty())
+    {
+        // Nothing to overwrite yet; fall through to the name dialog
+        onClickLookSaveAs();
+        return;
+    }
+    LLPresetsManager::getInstance()->savePreset(PRESETS_LOOKS, name);
+}
+
+void ALFloaterLightBox::onClickLookSaveAs()
+{
+    LLFloaterReg::showInstance("save_pref_preset", LLSD(PRESETS_LOOKS));
+}
+
+void ALFloaterLightBox::onClickLookDelete()
+{
+    LLFloaterReg::showInstance("delete_pref_preset", LLSD(PRESETS_LOOKS));
+}
+
+void ALFloaterLightBox::onClickLookRevert()
+{
+    const std::string last = gSavedSettings.getString("PresetLooksLastApplied");
+    if (!last.empty())
+    {
+        // Same reasoning as onLookSelected: a revert throws away every edit
+        // since the Look was applied, and that had better be one Ctrl+Z.
+        ScopedHistoryGroup group(mHistory);
+        LLPresetsManager::getInstance()->loadLooksPreset(last);
+    }
+}
+
+void ALFloaterLightBox::refreshLooksBar()
+{
+    if (!mLooksCombo)
+    {
+        return;
+    }
+
+    LLPresetsManager::getInstance()->setPresetNamesInComboBox(PRESETS_LOOKS, mLooksCombo, DEFAULT_HIDE);
+
+    const std::string active = gSavedSettings.getString("PresetLooksActive");
+    const std::string last = gSavedSettings.getString("PresetLooksLastApplied");
+    const bool modified = active.empty() && !last.empty();
+    if (!active.empty())
+    {
+        mLooksCombo->selectByValue(active);
+    }
+    else if (!last.empty())
+    {
+        // The modified marker rides the name rather than sitting beside it as
+        // its own widget. Attached, it says which Look has been changed; a
+        // detached asterisk only says that something somewhere has.
+        //
+        // Display only: nothing selects while modified, which is the state
+        // this branch is, and onLookSelected reads the chosen item's own text
+        // rather than the combo's label -- so the marker cannot travel into a
+        // Look name.
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = last;
+        mLooksCombo->setLabel(getString("look_name_modified", args));
+    }
+    getChild<LLUICtrl>("look_save")->setEnabled(!active.empty() || !last.empty());
+    getChild<LLUICtrl>("look_delete")->setEnabled(mLooksCombo->getItemCount() > 0);
+    getChild<LLUICtrl>("look_revert")->setEnabled(modified);
+}
+
+void ALFloaterLightBox::updateTonemapperRows()
+{
+    // Khronos Neutral (0), ACES (1), and GT (5) take no parameters, so their
+    // selection leaves every per-operator row disabled.
+    const S32 type = gSavedSettings.getS32("AlchemyRenderTonemapType");
+    static const std::pair<const char*, S32> param_rows[] = {
+        { "tone_aces_white", 2 },
+        { "tone_reinhard_white", 3 },
+        { "tone_filmic_white", 4 },
+        { "tone_agx_contrast", 6 },
+        { "tone_agx_white", 6 },
+    };
+    for (const auto& row : param_rows)
+    {
+        const bool active = (type == row.second);
+        getChild<LLUICtrl>(row.first)->setEnabled(active);
+        getChild<LLUICtrl>(std::string(row.first) + "_rst")->setEnabled(active);
+    }
+}
+
+void ALFloaterLightBox::refreshVec3Row(const std::string& setting_name)
+{
+    auto row = mVec3Rows.find(setting_name);
+    LLControlVariable* controlp = gSavedSettings.getControl(setting_name);
+    if (row == mVec3Rows.end() || !controlp)
+    {
+        return;
+    }
+
+    const LLSD value = controlp->getValue();
+    ScopedTrue updating(mVec3Updating);
+    for (S32 i = 0; i < 3; ++i)
+    {
+        if (LLUICtrl* ctrlp = row->second[i])
+        {
+            ctrlp->setValue(value[i].asReal());
+        }
+    }
 }

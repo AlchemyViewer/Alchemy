@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ width="420"
+ height="320"
+ min_width="260"
+ min_height="180"
+ layout="topleft"
+ name="floater_scopes"
+ positioning="cascading"
+ title="Scopes"
+ save_rect="true"
+ can_resize="true">
+	<floater.string
+	 name="waiting">
+		Measuring...
+	</floater.string>
+	<floater.string
+	 name="clipping">
+		Crushed [LOW]%   Blown [HIGH]%   ([SAMPLES] samples)
+	</floater.string>
+	<floater.string
+	 name="clipping_pixel">
+		Crushed [LOW]%   Blown [HIGH]%      R [R]  G [G]  B [B]
+	</floater.string>
+	<!-- Corner labels, drawn into each pane once more than one is shown so you
+	     can tell which scope you are looking at. Kept short: the label shares
+	     the pane with the trace it names. -->
+	<floater.string name="mode_rgb">RGB</floater.string>
+	<floater.string name="mode_luma">Luminance</floater.string>
+	<floater.string name="mode_red">Red</floater.string>
+	<floater.string name="mode_green">Green</floater.string>
+	<floater.string name="mode_blue">Blue</floater.string>
+	<floater.string name="mode_vector">Vectorscope</floater.string>
+	<floater.string name="mode_wave_luma">Waveform</floater.string>
+	<floater.string name="mode_wave_rgb">Waveform RGB</floater.string>
+	<floater.string name="mode_parade">Parade</floater.string>
+	<text
+	 follows="left|top"
+	 layout="topleft"
+	 left="8"
+	 top="22"
+	 width="42"
+	 height="15"
+	 name="scope_layout_label"
+	 value="Layout" />
+	<combo_box
+	 follows="left|top"
+	 layout="topleft"
+	 left_delta="44"
+	 top_pad="-16"
+	 width="130"
+	 height="18"
+	 name="scope_layout"
+	 control_name="AlchemyScopeLayout"
+	 tool_tip="How many scopes to show at once. Right-click any pane to choose which scope it shows: a histogram says how much of the frame sits at each brightness, a waveform or parade says where in the frame it is, and a vectorscope says what colour, on the same plane the colour wheels edit. Showing several costs nothing to measure -- every scope is computed from the same sample whether or not it is on screen.">
+		<combo_box.item
+		 label="Single"
+		 name="single"
+		 value="0" />
+		<combo_box.item
+		 label="Side by side"
+		 name="columns"
+		 value="1" />
+		<combo_box.item
+		 label="Stacked"
+		 name="rows"
+		 value="2" />
+		<combo_box.item
+		 label="Four"
+		 name="quad"
+		 value="3" />
+	</combo_box>
+	<check_box
+	 follows="top|right"
+	 layout="topleft"
+	 height="16"
+	 right="-8"
+	 top_delta="1"
+	 width="90"
+	 label="Log scale"
+	 tool_tip="Compress tall bins so the rest of the distribution stays readable. A histogram is spiky; on a linear scale one dominant tone flattens everything else onto the axis."
+	 name="scope_log"
+	 control_name="AlchemyScopeLogScale" />
+	<panel
+	 follows="all"
+	 layout="topleft"
+	 left="8"
+	 top_pad="9"
+	 right="-8"
+	 height="230"
+	 background_visible="false"
+	 name="scope_plot" />
+	<text
+	 follows="left|bottom|right"
+	 layout="topleft"
+	 left="8"
+	 top_pad="8"
+	 right="-8"
+	 height="15"
+	 font="SansSerifSmall"
+	 name="scope_clipping"
+	 tool_tip="Share of sampled pixels sitting exactly on black or exactly on white in their worst channel. Measured from a point sample of the frame, so it estimates the true share rather than counting every pixel. Point at the world and this reads the value under the cursor instead."
+	 value="" />
+</floater>

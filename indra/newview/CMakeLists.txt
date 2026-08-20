@@ -157,6 +157,11 @@ set(viewer_SOURCE_FILES
     alchatcommand.cpp
     alcheatcodes.cpp
     alclassifieditem.cpp
+    alcolorwheelctrl.cpp
+    alcolorwheelmodel.cpp
+    alcurveeditorctrl.cpp
+    alcurvemodel.cpp
+    aldaycyclelandmarks.cpp
     alderenderlist.cpp
     aldroptarget.cpp
     alfloaterblocked.cpp
@@ -172,9 +177,12 @@ set(viewer_SOURCE_FILES
     alfloaterregiontracker.cpp
     alfloatersceneexplorer.cpp
     alfloatersceneexplorerfilters.cpp
+    alfloaterscopes.cpp
     alfloatertransactionlog.cpp
     alsceneexplorerpredicate.cpp
+    alscopedata.cpp
     alfloaterwebprofile.cpp
+    algradehistory.cpp
     allegacynotificationwellwindow.cpp
     alobjectproperties.cpp
     alpanelaomini.cpp
@@ -202,8 +210,10 @@ set(viewer_SOURCE_FILES
     alsceneexplorermodel.cpp
     alstreaminfo.cpp
     altoolalign.cpp
+    altoolscenepicker.cpp
     alunzip.cpp
     alviewermenu.cpp
+    alwhitebalancesolver.cpp
     fsfloaterposer.cpp
     fsjointpose.cpp
     fsmaniprotatejoint.cpp
@@ -926,6 +936,11 @@ set(viewer_HEADER_FILES
     alchatbar.h
     alchatcommand.h
     alclassifieditem.h
+    alcolorwheelctrl.h
+    alcolorwheelmodel.h
+    alcurveeditorctrl.h
+    alcurvemodel.h
+    aldaycyclelandmarks.h
     alderenderlist.h
     aldroptarget.h
     alfloaterblocked.h
@@ -941,9 +956,12 @@ set(viewer_HEADER_FILES
     alfloaterregiontracker.h
     alfloatersceneexplorer.h
     alfloatersceneexplorerfilters.h
+    alfloaterscopes.h
     alfloatertransactionlog.h
     alsceneexplorerpredicate.h
+    alscopedata.h
     alfloaterwebprofile.h
+    algradehistory.h
     allegacynotificationwellwindow.h
     alobjectproperties.h
     alpanelaomini.h
@@ -971,8 +989,10 @@ set(viewer_HEADER_FILES
     alsceneexplorermodel.h
     alstreaminfo.h
     altoolalign.h
+    altoolscenepicker.h
     alunzip.h
     alviewermenu.h
+    alwhitebalancesolver.h
     fsfloaterposer.h
     fsjointpose.h
     fsmaniprotatejoint.h
@@ -2373,7 +2393,13 @@ if (BUILD_TESTING)
   # This creates a separate test project per file listed.
 
   SET(viewer_TEST_SOURCE_FILES
+    alcolorwheelmodel.cpp
+    alcurvemodel.cpp
+    aldaycyclelandmarks.cpp
+    algradehistory.cpp
     alsceneexplorerpredicate.cpp
+    alscopedata.cpp
+    alwhitebalancesolver.cpp
     llagentaccess.cpp
     lldateutil.cpp
 #    llmediadataclient.cpp
@@ -2384,6 +2410,7 @@ if (BUILD_TESTING)
 #    llvocache.cpp
     llworldmap.cpp
     llworldmipmap.cpp
+    lutcube.cpp
   )
 
   set_source_files_properties(
@@ -2393,6 +2420,16 @@ if (BUILD_TESTING)
     LL_TEST_ADDITIONAL_SOURCE_FILES
     tests/llviewertexture_stub.cpp
     #llviewertexturelist.cpp
+  )
+
+  # The vectorscope bins on the colour wheels' own chroma plane, so the scope
+  # data test links the model that defines it rather than keeping a second copy
+  # of the basis that could drift from it.
+  set_source_files_properties(
+    alscopedata.cpp
+    PROPERTIES
+    LL_TEST_ADDITIONAL_SOURCE_FILES
+    alcolorwheelmodel.cpp
   )
 
 #  set_source_files_properties(

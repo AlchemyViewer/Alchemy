@@ -996,6 +996,7 @@ with the same filename but different name
 
   <texture name="Script_Undo" file_name="script_editor/script_undo.png" preload="false" />
   <texture name="Script_Redo" file_name="script_editor/script_redo.png" preload="false" />
+  <texture name="Script_Save" file_name="script_editor/script_save.png" preload="false" />
 	<texture name="Poser_Visual_On"			file_name="icons/visual_pose_enabled.png" />
 	<texture name="Edit_Flip_X"			file_name="icons/visual_pose_enabled.png" />
   <texture name="Script_Running" file_name="script_editor/green_square.png" preload="false" />

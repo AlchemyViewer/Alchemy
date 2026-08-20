@@ -1,6 +1,6 @@
 /**
  * @file alfloaterlightbox.h
- * @brief A generic text floater for dumping info (usually debug info)
+ * @brief Lightbox post-processing control floater
  *
  * Copyright (c) Rye Mutt <rye@alchemyviewer.org>
  *
@@ -34,7 +34,22 @@
 #define AL_FLOATERLIGHTBOX_H
 
 #include "llfloater.h"
+
+#include "aldaycyclelandmarks.h"
+#include "algradehistory.h"
+
+#include <array>
+#include <map>
+#include <memory>
 #include <string>
+#include <vector>
+
+class ALCurveEditorCtrl;
+class LLComboBox;
+class LLSettingsDay;
+class LLSettingsSky;
+class LLSettingsWater;
+class LLSpinCtrl;
 
 class ALFloaterLightBox final : public LLFloater
 {
@@ -42,17 +57,194 @@ public:
     ALFloaterLightBox(const LLSD& key);
     ~ALFloaterLightBox() override;
     bool postBuild() override;
-    virtual void draw() override;
+    /// Ctrl+Z / Ctrl+Y (and Ctrl+Shift+Z) drive the grade's undo stack.
+    ///
+    /// Floater-local rather than a global action, unlike the hold-to-compare
+    /// key: a global Ctrl+Z would fire while the user is typing anywhere in
+    /// the viewer. Being handled here also means a text field that wants
+    /// Ctrl+Z for its own undo gets it first, since the focus chain is offered
+    /// the key before the floater is.
+    bool handleKeyHere(KEY key, MASK mask) override;
+    /// Only to notice the reference still appearing or going away, which is
+    /// render state and so has no signal to hang on. See refreshReferenceRow.
+    void draw() override;
 
   private:
     void onClickResetControlDefault(const LLSD& userdata);
-    void onClickResetGroupDefault(const LLSD& userdata);
-    void updateTonemapper();
-    void updateCAS();
+    void onClickResetSection(const LLSD& userdata);
+    /// Set or clear one section's bit in LLPipeline::sGradeBypassMask, from
+    /// the checkbox on that section's accordion header. Ticked means the
+    /// section is applied, which is the only way a checkbox beside a section
+    /// title reads; the bit it drives is a bypass bit, so the sense inverts
+    /// here. The settings are never touched, so a comparison cannot dirty
+    /// the Look.
+    void onToggleSection(LLUICtrl* ctrl, const LLSD& userdata);
+    void onCommitVec3(LLUICtrl* ctrl);
+    void refreshVec3Row(const std::string& setting_name);
+    void setupToneCurve();
+    void refreshToneCurve();
+    void onCommitToneCurve();
+    /// Which channel the tone curve graph edits: -1 for all three, else 0..2.
+    S32  getToneCurveChannel() const;
+    void setupSplitToneGraph();
+    void refreshSplitToneGraph();
+    void onCommitSplitToneGraph();
+    /// Arm the scene picker; the click that follows sets Temperature and Tint.
+    void onClickWhiteBalancePicker();
+    void onWhiteBalancePicked(const LLColor3& sample);
     void populateLUTCombo();
+    /// Open the user's LUT folder in the platform file browser, creating it
+    /// first if this is its first use.
+    void onClickOpenLUTFolder();
+    void updateTonemapperRows();
+    /// Freeze the frame about to be presented, and switch the wipe on so the
+    /// grab is visibly a grab.
+    void onClickReferenceGrab();
+    /// Drop the still and switch the wipe off.
+    void onClickReferenceClear();
+    /// Grey the wipe controls while there is nothing to wipe against.
+    void refreshReferenceRow();
+    /// Grey Undo and Redo to match what the stack can actually do.
+    void refreshHistoryButtons();
 
+    // --- Day cycle ---
+    //
+    // Nothing here pauses a clock, because there is no clock to pause: the
+    // cycle position is computed from wall time every frame. Freezing means
+    // sampling the running cycle at one position and installing the result as
+    // a *fixed* local environment, which is what stops the motion. It is the
+    // same move `@setenv_daytime` and the day cycle editor's timeline make.
+
+    /// The day cycle to scrub, from the highest-priority layer that has one.
+    /// While frozen, ENV_LOCAL holds a fixed sky and no day at all, so the
+    /// cycle has to be read from the parcel or region underneath it -- which
+    /// is also what lets scrubbing survive closing and reopening the floater.
+    std::shared_ptr<LLSettingsDay> getScrubbableDay() const;
+    /// Whether a fixed sky is installed locally. Derived from the world rather
+    /// than remembered here, so it stays true when something else changes the
+    /// environment behind our back.
+    bool isSkyFrozen() const;
+    /// Sample the day at `position` and install it as the local environment.
+    void applyDayPosition(F32 position);
+    /// Remember what we are covering, then freeze.
+    void freezeSkyAt(F32 position);
+    /// Put back whatever ENV_LOCAL held before the freeze, or clear it.
+    void thawSky();
+    /// Re-find the landmarks if the underlying day cycle has changed. Blends
+    /// ninety-six skies, so it is guarded on the day itself, not called per
+    /// frame.
+    void refreshDayLandmarks();
+    /// Track the world's state and grey what cannot act on it.
+    void refreshDayCycleRow();
+
+    void onToggleDayFreeze(LLUICtrl* ctrl);
+    void onCommitDayTime(LLUICtrl* ctrl);
+    void onClickDayPreset(const LLSD& userdata);
+    void onToggleCloudScroll(LLUICtrl* ctrl);
+    void onClickRestoreEnvironment();
+
+    /// Record one whitelisted setting moving, unless we are the ones moving it.
+    void onGradeSettingChanged(const std::string& name, const LLSD& before, const LLSD& after);
+    /// Step the history one transaction and write the values back.
+    /// @return false when there was nothing in that direction.
+    bool applyHistory(bool redo_direction);
+
+    void onLookSelected();
+    void onClickLookSave();
+    void onClickLookSaveAs();
+    void onClickLookDelete();
+    void onClickLookRevert();
+    void refreshLooksBar();
+
+    // Spinner triplets named "vec3_<Setting>_<0|1|2>", keyed by setting name.
+    // Rows are discovered by walking the widget tree in postBuild; adding a
+    // vector-valued row is pure XUI.
+    /// Any LLUICtrl, not just LLSpinCtrl: the contract is the widget's *name*,
+    /// so a slider, a spinner or anything else that carries one number can
+    /// stand for a component. Sliders matter for banks of related values --
+    /// eight hue sliders read as a shape, eight spinners read as a form.
+    std::map<std::string, std::array<LLUICtrl*, 3>> mVec3Rows;
+    std::vector<boost::signals2::scoped_connection> mVec3Connections;
     boost::signals2::scoped_connection mTonemapConnection;
-    boost::signals2::scoped_connection mCASConnection;
+    boost::signals2::scoped_connection mLooksListConnection;
+    boost::signals2::scoped_connection mLooksActiveConnection;
+    LLComboBox* mLooksCombo = nullptr;
+    bool mVec3Updating = false;
+
+    // Tone curve graph. Optional: the floater builds without it, so the XUI
+    // can drop the graph and keep the spinners.
+    std::vector<boost::signals2::scoped_connection> mToneCurveConnections;
+    ALCurveEditorCtrl* mToneCurve = nullptr;
+    LLComboBox* mToneCurveChannel = nullptr;
+    bool mToneCurveUpdating = false;
+
+    // Split-tone band graph. Same contract: optional, and the sliders below it
+    // remain the full interface if the XUI drops it.
+    std::vector<boost::signals2::scoped_connection> mSplitToneConnections;
+    ALCurveEditorCtrl* mSplitToneGraph = nullptr;
+    bool mSplitToneUpdating = false;
+
+    // Undo. The history is a member, so it lives and dies with the floater:
+    // close the Lightbox and the stack is gone. That is the honest scope --
+    // the alternative is a stack that outlives the window it belongs to and
+    // silently rewrites settings a much later session is editing.
+    ALGradeHistory mHistory;
+    std::vector<boost::signals2::scoped_connection> mHistoryConnections;
+    /// Set while applyHistory writes settings. Those writes fire the same
+    /// signals a user edit does, and recording them would append the undo to
+    /// the stack it came from.
+    bool mApplyingHistory = false;
+
+    // Undo and Redo in the top bar, polled by draw() like the row below:
+    // the stack moves on every commit and every Look apply, and hanging a
+    // refresh off each of those is more places to forget.
+    LLUICtrl* mUndoButton = nullptr;
+    LLUICtrl* mRedoButton = nullptr;
+    /// Bit 0 can-undo, bit 1 can-redo; -1 until the first refresh.
+    S32 mHistoryButtonState = -1;
+
+    // Reference still row. Cached because draw() polls them, and optional
+    // because the XUI is free to drop the row.
+    LLUICtrl* mReferenceClear = nullptr;
+    LLUICtrl* mReferenceMode = nullptr;
+    LLUICtrl* mReferencePosition = nullptr;
+    /// What the row was last told, so a poll that changes nothing costs
+    /// nothing. Tri-state: -1 until the first refresh has run.
+    S32 mReferenceRowState = -1;
+
+    // Day cycle row, cached for the same reason and equally optional.
+    LLUICtrl* mDayFreeze = nullptr;
+    LLUICtrl* mDayTime = nullptr;
+    LLUICtrl* mCloudScroll = nullptr;
+    LLUICtrl* mRestoreEnvironment = nullptr;
+    /// Sunrise, noon, sunset, midnight, in the order the landmarks are named.
+    std::array<LLUICtrl*, 4> mDayPresets = {};
+
+    /// Where the slider is. While the sky is running this tracks the live
+    /// position, so ticking Freeze holds the moment being looked at rather
+    /// than jumping somewhere else first.
+    F32 mDayPosition = 0.f;
+    /// Landmarks, and the day they were found in. Comparing the day is what
+    /// keeps the search off the frame path.
+    std::shared_ptr<LLSettingsDay> mLandmarkDay;
+    ALDayCycleLandmarks::Landmarks mDayLandmarks;
+
+    /// What ENV_LOCAL held before we froze it. Restoring this is what makes
+    /// unticking Freeze an undo instead of a drop to the region default, which
+    /// would silently discard a Personal Lighting sky.
+    std::shared_ptr<LLSettingsDay> mPreFreezeDay;
+    std::shared_ptr<LLSettingsSky> mPreFreezeSky;
+    std::shared_ptr<LLSettingsWater> mPreFreezeWater;
+    /// Whole seconds: LLSettingsDay::Seconds is S32Seconds, unlike the F64 one
+    /// on LLSettingsBase, and holding these as F32 would convert lossily on
+    /// the way back in.
+    S32 mPreFreezeDayLength = 0;
+    S32 mPreFreezeDayOffset = 0;
+    /// Whether the fixed sky in place is one we installed. False for a sky the
+    /// user set some other way, which we must not claim to be able to undo.
+    bool mDayFreezeIsOurs = false;
+    /// Bit 0 may change the environment, bit 1 frozen, bit 2 a day to scrub.
+    S32 mDayCycleRowState = -1;
 };
 
 #endif // AL_FLOATERLIGHTBOX_H

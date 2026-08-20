@@ -1936,6 +1936,11 @@ void LLShaderMgr::initAttribsAndUniforms()
     // Previews
     mReservedUniforms.push_back("uPreviewMode");
 
+    // Reference still
+    mReservedUniforms.push_back("uReferenceStill");
+    mReservedUniforms.push_back("uRefWipeMode");
+    mReservedUniforms.push_back("uRefWipePos");
+
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");
 
@@ -1961,6 +1966,18 @@ void LLShaderMgr::initAttribsAndUniforms()
             LL_ERRS() << "Duplicate reserved uniform name found: " << mReservedUniforms[i] << LL_ENDL;
         }
         dupe_check.insert(mReservedUniforms[i]);
+
+        // An array uniform belongs here under its bare name. LLGLSLShader::mapUniform
+        // chops the "[0]" off whatever GL reports before matching against this table,
+        // so a subscript here can never match anything -- and nothing complains. The
+        // location is never recorded, every upload to it silently does nothing, and the
+        // shader reads the array as all zeroes, which surfaces as a rendering fault a
+        // long way from the cause. Fatal for the same reason as the two checks above.
+        if (mReservedUniforms[i].find('[') != std::string::npos)
+        {
+            LL_ERRS() << "Reserved uniform '" << mReservedUniforms[i] << "' carries a subscript; "
+                      << "array uniforms are declared here by their bare name" << LL_ENDL;
+        }
     }
 }
 

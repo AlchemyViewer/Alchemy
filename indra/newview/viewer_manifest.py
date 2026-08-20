@@ -104,6 +104,9 @@ class ViewerManifest(LLManifest):
                 # ... and the entire color grading LUT directory
                 self.path("colorlut")
 
+                # ... and the bundled starter Looks
+                self.path("looks")
+
                 # <FS:AR> Poser Presets
                 self.path("poses")
 

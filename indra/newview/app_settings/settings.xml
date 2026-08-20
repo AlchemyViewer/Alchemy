@@ -10041,7 +10041,7 @@
     <key>Comment</key>
     <string>Use exposure sky settings instead of deriving from HDR scale.</string>
     <key>Persist</key>
-    <integer>0</integer>
+    <integer>1</integer>
     <key>Type</key>
     <string>Boolean</string>
     <key>Value</key>
@@ -10052,11 +10052,44 @@
     <key>Comment</key>
     <string>Luminance coefficient for dynamic exposure</string>
     <key>Persist</key>
-    <integer>0</integer>
+    <integer>1</integer>
     <key>Type</key>
     <string>F32</string>
     <key>Value</key>
     <real>0.5</real>
+  </map>
+  <key>RenderDynamicExposureEnabled</key>
+  <map>
+    <key>Comment</key>
+    <string>Enable dynamic exposure adjustment (auto-exposure) when HDR rendering is enabled</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>Boolean</string>
+    <key>Value</key>
+    <integer>1</integer>
+  </map>
+  <key>RenderDynamicExposureSpeedError</key>
+  <map>
+    <key>Comment</key>
+    <string>Speed at which dynamic exposure adapts while far from the target exposure</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>0.1</real>
+  </map>
+  <key>RenderDynamicExposureSpeedTarget</key>
+  <map>
+    <key>Comment</key>
+    <string>Speed at which dynamic exposure settles once near the target exposure</string>
+    <key>Persist</key>
+    <integer>1</integer>
+    <key>Type</key>
+    <string>F32</string>
+    <key>Value</key>
+    <real>2.0</real>
   </map>
   <key>RenderDiffuseLuminanceScale</key>
   <map>

@@ -11,6 +11,7 @@
 
     <string name="title_graphic">Delete Graphic Preset</string>
     <string name="title_camera">Delete Camera Preset</string>
+    <string name="title_looks">Delete Look</string>
 
     <text
      follows="top|left|right"
