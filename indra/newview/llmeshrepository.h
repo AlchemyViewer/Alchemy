@@ -438,9 +438,14 @@ public:
     S32 mPhysicsMeshSize = -1;
     bool mPhysicsMeshInCache = false;
 
-    S32 mLodOffset[LLModel::NUM_LODS] = { -1 };
-    S32 mLodSize[LLModel::NUM_LODS] = { -1 };
-    bool mLodInCache[LLModel::NUM_LODS] = { false };
+    // Every element, not just the first: `= { -1 }` leaves the rest zeroed, which reads
+    // as "this LOD exists and is empty" rather than "absent". Sized by LLModel::NUM_LODS,
+    // which counts LOD_PHYSICS -- only the first LLVolumeLODGroup::NUM_LODS entries are
+    // ever filled from a header.
+    static_assert(LLModel::NUM_LODS == 5, "LOD array initializers below are written out per element");
+    S32 mLodOffset[LLModel::NUM_LODS] = { -1, -1, -1, -1, -1 };
+    S32 mLodSize[LLModel::NUM_LODS] = { -1, -1, -1, -1, -1 };
+    bool mLodInCache[LLModel::NUM_LODS] = { false, false, false, false, false };
     S32 mHeaderSize = -1;
 
     bool m404 = false;
