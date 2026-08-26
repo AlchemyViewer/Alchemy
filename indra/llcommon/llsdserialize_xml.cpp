@@ -57,19 +57,29 @@ LLSDXMLFormatter::~LLSDXMLFormatter()
 S32 LLSDXMLFormatter::format(const LLSD& data, std::ostream& ostr,
                              EFormatterOptions options) const
 {
+    Sink sink(ostr);
     std::string post;
     if (options & LLSDFormatter::OPTIONS_PRETTY)
     {
         post = "\n";
     }
-    ostr << "<llsd>" << post;
-    S32 rv = format_impl(data, ostr, options, 1);
-    ostr << "</llsd>\n";
+    sink.put("<llsd>");
+    sink.put(post);
+    S32 rv = format_impl(data, sink, options, 1);
+    sink.put("</llsd>\n");
 
     return rv;
 }
 
+// virtual
 S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
+                                  EFormatterOptions options, U32 level) const
+{
+    Sink sink(ostr);
+    return format_impl(data, sink, options, level);
+}
+
+S32 LLSDXMLFormatter::format_impl(const LLSD& data, Sink& sink,
                                   EFormatterOptions options, U32 level) const
 {
     S32 format_count = 1;
@@ -87,99 +97,122 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
     case LLSD::TypeMap:
         if(0 == data.size())
         {
-            ostr << pre << "<map />" << post;
+            sink.put(pre); sink.put("<map />"); sink.put(post);
         }
         else
         {
-            ostr << pre << "<map>" << post;
+            sink.put(pre); sink.put("<map>"); sink.put(post);
             LLSD::map_const_iterator iter = data.beginMap();
             LLSD::map_const_iterator end = data.endMap();
             for(; iter != end; ++iter)
             {
-                ostr << pre << "<key>" << escapeString((*iter).first) << "</key>" << post;
-                format_count += format_impl((*iter).second, ostr, options, level + 1);
+                sink.put(pre); sink.put("<key>");
+                escapeStringTo(sink.buffer(), (*iter).first);
+                sink.checkFlush();
+                sink.put("</key>"); sink.put(post);
+                format_count += format_impl((*iter).second, sink, options, level + 1);
             }
-            ostr << pre <<  "</map>" << post;
+            sink.put(pre); sink.put("</map>"); sink.put(post);
         }
         break;
 
     case LLSD::TypeArray:
         if(0 == data.size())
         {
-            ostr << pre << "<array />" << post;
+            sink.put(pre); sink.put("<array />"); sink.put(post);
         }
         else
         {
-            ostr << pre << "<array>" << post;
+            sink.put(pre); sink.put("<array>"); sink.put(post);
             LLSD::array_const_iterator iter = data.beginArray();
             LLSD::array_const_iterator end = data.endArray();
             for(; iter != end; ++iter)
             {
-                format_count += format_impl(*iter, ostr, options, level + 1);
+                format_count += format_impl(*iter, sink, options, level + 1);
             }
-            ostr << pre << "</array>" << post;
+            sink.put(pre); sink.put("</array>"); sink.put(post);
         }
         break;
 
     case LLSD::TypeUndefined:
-        ostr << pre << "<undef />" << post;
+        sink.put(pre); sink.put("<undef />"); sink.put(post);
         break;
 
     case LLSD::TypeBoolean:
-        ostr << pre << "<boolean>";
+        sink.put(pre); sink.put("<boolean>");
         if(mBoolAlpha ||
-           (ostr.flags() & std::ios::boolalpha)
+           (sink.streamFlags() & std::ios::boolalpha)
            )
         {
-            ostr << (data.asBoolean() ? "true" : "false");
+            if (data.asBoolean()) sink.put("true"); else sink.put("false");
         }
         else
         {
-            ostr << (data.asBoolean() ? 1 : 0);
+            sink.put(data.asBoolean() ? '1' : '0');
         }
-        ostr << "</boolean>" << post;
+        sink.put("</boolean>"); sink.put(post);
         break;
 
     case LLSD::TypeInteger:
-        ostr << pre << "<integer>" << data.asInteger() << "</integer>" << post;
+        sink.put(pre); sink.put("<integer>");
+        sink.putInteger(data.asInteger());
+        sink.put("</integer>"); sink.put(post);
         break;
 
     case LLSD::TypeReal:
     {
-        ostr << pre << "<real>";
+        sink.put(pre); sink.put("<real>");
         if(mRealFormat.empty())
         {
-            // shortest representation that round-trips to the same double;
-            // fmt rather than std::to_chars because Apple gates the
-            // floating-point overloads behind macOS 13.3
-            char buf[32];
-            auto result = fmt::format_to_n(buf, sizeof(buf), "{}", data.asReal());
-            ostr.write(buf, result.out - buf);
+            sink.putReal(data.asReal());
         }
         else
         {
-            formatReal(data.asReal(), ostr);
+            formatReal(data.asReal(), sink.buffer());
+            sink.checkFlush();
         }
-        ostr << "</real>" << post;
+        sink.put("</real>"); sink.put(post);
         break;
     }
 
     case LLSD::TypeUUID:
-        if(data.asUUID().isNull()) ostr << pre << "<uuid />" << post;
-        else ostr << pre << "<uuid>" << data.asUUID() << "</uuid>" << post;
+        if(data.asUUID().isNull())
+        {
+            sink.put(pre); sink.put("<uuid />"); sink.put(post);
+        }
+        else
+        {
+            sink.put(pre); sink.put("<uuid>");
+            sink.putUUID(data.asUUID());
+            sink.put("</uuid>"); sink.put(post);
+        }
         break;
 
     case LLSD::TypeString:
-        if(data.asStringRef().empty()) ostr << pre << "<string />" << post;
-        else ostr << pre << "<string>" << escapeString(data.asStringRef()) <<"</string>" << post;
+        if(data.asStringRef().empty())
+        {
+            sink.put(pre); sink.put("<string />"); sink.put(post);
+        }
+        else
+        {
+            sink.put(pre); sink.put("<string>");
+            escapeStringTo(sink.buffer(), data.asStringRef());
+            sink.checkFlush();
+            sink.put("</string>"); sink.put(post);
+        }
         break;
 
     case LLSD::TypeDate:
-        ostr << pre << "<date>" << data.asDate() << "</date>" << post;
+        sink.put(pre); sink.put("<date>");
+        sink.put(data.asDate().asString());
+        sink.put("</date>"); sink.put(post);
         break;
 
     case LLSD::TypeURI:
-        ostr << pre << "<uri>" << escapeString(data.asString()) << "</uri>" << post;
+        sink.put(pre); sink.put("<uri>");
+        escapeStringTo(sink.buffer(), data.asString());
+        sink.checkFlush();
+        sink.put("</uri>"); sink.put(post);
         break;
 
     case LLSD::TypeBinary:
@@ -187,24 +220,23 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
         const LLSD::Binary& buffer = data.asBinary();
         if(buffer.empty())
         {
-            ostr << pre << "<binary />" << post;
+            sink.put(pre); sink.put("<binary />"); sink.put(post);
         }
         else
         {
-            // *FIX: memory inefficient.
-            // *TODO: convert to use LLBase64
-            ostr << pre << "<binary encoding=\"base64\">";
-            std::string output;
-            output.resize(simdutf::base64_length_from_binary(buffer.size()));
-            simdutf::binary_to_base64((const char*)buffer.data(), buffer.size(), output.data());
-            ostr.write(output.data(), output.size());
-            ostr << "</binary>" << post;
+            sink.put(pre); sink.put("<binary encoding=\"base64\">");
+            std::string& out = sink.buffer();
+            const size_t at = out.size();
+            out.resize(at + simdutf::base64_length_from_binary(buffer.size()));
+            simdutf::binary_to_base64((const char*)buffer.data(), buffer.size(), out.data() + at);
+            sink.checkFlush();
+            sink.put("</binary>"); sink.put(post);
         }
         break;
     }
     default:
         // *NOTE: This should never happen.
-        ostr << pre << "<undef />" << post;
+        sink.put(pre); sink.put("<undef />"); sink.put(post);
         break;
     }
     return format_count;
@@ -213,10 +245,17 @@ S32 LLSDXMLFormatter::format_impl(const LLSD& data, std::ostream& ostr,
 // static
 std::string LLSDXMLFormatter::escapeString(const std::string& in)
 {
+    std::string out;
+    escapeStringTo(out, in);
+    return out;
+}
+
+// static
+void LLSDXMLFormatter::escapeStringTo(std::string& out, const std::string& in)
+{
     // Append unescaped runs in bulk; only the five XML special characters
     // need an entity.
-    std::string out;
-    out.reserve(in.size());
+    out.reserve(out.size() + in.size());
     const char* start = in.data();
     const char* end = start + in.size();
     const char* run = start;
@@ -248,7 +287,6 @@ std::string LLSDXMLFormatter::escapeString(const std::string& in)
         run = p + 1;
     }
     out.append(run, end - run);
-    return out;
 }
 
 
