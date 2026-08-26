@@ -812,9 +812,9 @@ public:
         LLPointer<LLSDXMLParser> p = new LLSDXMLParser(emit_errors);
         return p->parse(str, sd, LLSDSerialize::SIZE_UNLIMITED);
     }
-    // Line oriented parser, 30% faster than fromXML(), but can
-    // only be used when you know you have the complete XML
-    // document available in the stream.
+    // Reads the whole document. Equivalent to fromXMLEmbedded() except that it
+    // clears sd before parsing, and it makes no promise about where the stream
+    // is left, so use it when nothing follows the document.
     static S32 fromXMLDocument(LLSD& sd, std::istream& str, bool emit_errors=true)
     {
         LLPointer<LLSDXMLParser> p = new LLSDXMLParser(emit_errors);

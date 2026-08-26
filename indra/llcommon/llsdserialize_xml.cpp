@@ -27,18 +27,17 @@
 #include "linden_common.h"
 #include "llsdserialize_xml.h"
 
-#include <iostream>
+#include <charconv>
 #include <deque>
+#include <iostream>
+#include <string_view>
+#include <vector>
 
 #include <fmt/format.h>
 #include <simdutf.h>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
 
-extern "C"
-{
-# include <expat.h>
-}
 
 /**
  * LLSDXMLFormatter
@@ -258,29 +257,16 @@ class LLSDXMLParser::Impl
 {
 public:
     Impl(bool emit_errors);
-    ~Impl();
+    ~Impl() = default;
 
     S32 parse(std::istream& input, LLSD& data);
     S32 parseLines(std::istream& input, LLSD& data);
 
-    void parsePart(const char *buf, llssize len);
+    void parsePart(const char* buf, llssize len);
 
     void reset();
 
 private:
-    void startElementHandler(const XML_Char* name, const XML_Char** attributes);
-    void endElementHandler(const XML_Char* name);
-    void characterDataHandler(const XML_Char* data, int length);
-
-    static void sStartElementHandler(
-        void* userData, const XML_Char* name, const XML_Char** attributes);
-    static void sEndElementHandler(
-        void* userData, const XML_Char* name);
-    static void sCharacterDataHandler(
-        void* userData, const XML_Char* data, int length);
-
-    void startSkipping();
-
     enum Element {
         ELEMENT_LLSD,
         ELEMENT_UNDEF,
@@ -297,13 +283,63 @@ private:
         ELEMENT_KEY,
         ELEMENT_UNKNOWN
     };
-    static Element readElement(const XML_Char* name);
+    static Element readElement(const char* name, size_t len);
 
-    static const XML_Char* findAttribute(const XML_Char* name, const XML_Char** pairs);
+    S32 run(std::istream& input, LLSD& data);
+
+    /// @name Source
+    /// mBuffer only ever grows, so offsets into it stay valid for the whole
+    /// parse; raw pointers and string_views do not survive a refill().
+    //@{
+    bool    refill();
+    bool    avail(size_t bytes);
+    bool    findMarker(const char* marker, size_t marker_len, size_t& found);
+    void    rewindStream();
+    //@}
+
+    /// @name Scanning
+    //@{
+    bool    scanText();
+    bool    scanMarkup();
+    bool    scanName(size_t& name_off, size_t& name_len);
+    bool    scanTagTail(size_t& attr_off, size_t& attr_len, bool& self_closing);
+    bool    scanDoctype();
+    bool    decodeEntity();
+    static bool base64Encoded(const char* attrs, size_t len);
+    //@}
+
+    /// @name Content of the element currently open
+    //@{
+    void            appendContent(size_t off, size_t len);
+    void            appendDecoded(const char* p, size_t len);
+    void            materializeContent();
+    void            clearContent();
+    std::string_view contentView() const;
+    std::string     takeContent();
+    //@}
+
+    void    startElement(Element element, size_t attr_off, size_t attr_len);
+    void    endElement(Element element);
+    void    startSkipping();
 
     bool mEmitErrors;
 
-    XML_Parser  mParser;
+    std::istream*   mInput{ nullptr };
+    std::string     mBuffer;
+    size_t          mPos{ 0 };
+    llssize         mStreamRead{ 0 };   // bytes of mBuffer that came from mInput
+    bool            mCanSeek{ false };
+    bool            mAtEOF{ false };
+
+    // One entry per element still open, innermost last. The name offset lets an
+    // end tag be matched without a second name lookup.
+    struct OpenElement
+    {
+        Element  element;
+        U32      name_off;
+        U32      name_len;
+    };
+    std::vector<OpenElement> mOpen;
 
     LLSD mResult;
     S32 mParseCount;
@@ -320,20 +356,22 @@ private:
     int mSkipThrough;
 
     std::string mCurrentKey;        // Current XML <tag>
-    std::string mCurrentContent;    // String data between <tag> and </tag>
+
+    // String data between <tag> and </tag>. While it is a single unbroken run
+    // of the source it is held as an offset into mBuffer and never copied;
+    // entities, CDATA and runs split across a refill force it into mContent.
+    size_t      mContentOff{ 0 };
+    size_t      mContentLen{ 0 };
+    bool        mContentInBuffer{ false };
+    bool        mHasContent{ false };
+    std::string mContent;
 };
 
 
 LLSDXMLParser::Impl::Impl(bool emit_errors)
     : mEmitErrors(emit_errors)
 {
-    mParser = XML_ParserCreate(NULL);
     reset();
-}
-
-LLSDXMLParser::Impl::~Impl()
-{
-    XML_ParserFree(mParser);
 }
 
 inline bool is_eol(char c)
@@ -372,162 +410,182 @@ static unsigned get_till_eol(std::istream& input, char *buf, unsigned bufsize)
     return count;
 }
 
-S32 LLSDXMLParser::Impl::parse(std::istream& input, LLSD& data)
+static bool is_xml_space(char c)
 {
-    XML_Status status;
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
 
-    static const int BUFFER_SIZE = 1024;
-    void* buffer = NULL;
-    int count = 0;
-    while (input.good() && !input.eof())
+// XML forbids NUL and the other C0 controls apart from tab, LF and CR. They are
+// rare enough to be worth a word-at-a-time filter: the arithmetic flags any
+// byte below 0x20 and only those words are examined individually.
+static bool has_invalid_xml_char(const char* p, size_t n)
+{
+    auto forbidden = [](unsigned char c)
     {
-        buffer = XML_GetBuffer(mParser, BUFFER_SIZE);
+        return c < 0x20 && c != '\t' && c != '\n' && c != '\r';
+    };
 
-        /*
-         * If we happened to end our last buffer right at the end of the llsd, but the
-         * stream is still going we will get a null buffer here.  Check for mGracefullStop.
-         */
-        if (!buffer)
+    size_t i = 0;
+    for (; i + sizeof(U64) <= n; i += sizeof(U64))
+    {
+        U64 word;
+        memcpy(&word, p + i, sizeof(word));
+        const U64 below_0x20 = (word - 0x2020202020202020ULL) & ~word & 0x8080808080808080ULL;
+        if (below_0x20)
         {
-            break;
-        }
-        count = get_till_eol(input, (char *)buffer, BUFFER_SIZE);
-        if (!count)
-        {
-            break;
-        }
-        status = XML_ParseBuffer(mParser, count, false);
-
-        if (status == XML_STATUS_ERROR)
-        {
-            break;
+            for (size_t k = i; k < i + sizeof(U64); ++k)
+            {
+                if (forbidden((unsigned char)p[k])) return true;
+            }
         }
     }
-
-    // *FIX.: This code is buggy - if the stream was empty or not
-    // good, there is not buffer to parse, both the call to
-    // XML_ParseBuffer and the buffer manipulations are illegal
-    // futhermore, it isn't clear that the expat buffer semantics are
-    // preserved
-
-    status = XML_ParseBuffer(mParser, 0, true);
-    if (status == XML_STATUS_ERROR && !mGracefullStop)
+    for (; i < n; ++i)
     {
-        if (buffer)
+        if (forbidden((unsigned char)p[i])) return true;
+    }
+    return false;
+}
+
+// Appends the UTF-8 encoding of a code point, as a numeric character reference
+// resolves to.
+static void append_utf8(std::string& out, U32 cp)
+{
+    if (cp < 0x80)
+    {
+        out.push_back((char)cp);
+    }
+    else if (cp < 0x800)
+    {
+        out.push_back((char)(0xC0 | (cp >> 6)));
+        out.push_back((char)(0x80 | (cp & 0x3F)));
+    }
+    else if (cp < 0x10000)
+    {
+        out.push_back((char)(0xE0 | (cp >> 12)));
+        out.push_back((char)(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back((char)(0x80 | (cp & 0x3F)));
+    }
+    else
+    {
+        out.push_back((char)(0xF0 | (cp >> 18)));
+        out.push_back((char)(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back((char)(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back((char)(0x80 | (cp & 0x3F)));
+    }
+}
+
+// Resolves the text between '&' and ';'. There is no DTD, so only the five
+// predefined entities and character references can appear.
+static bool resolve_entity(const char* p, size_t len, std::string& out)
+{
+    if (len == 0 || len > 10)
+    {
+        return false;
+    }
+
+    if (*p == '#')
+    {
+        U32 cp = 0;
+        if (len >= 3 && (p[1] == 'x' || p[1] == 'X'))
         {
-            ((char*) buffer)[count ? count - 1 : 0] = '\0';
-            if (mEmitErrors)
+            for (size_t i = 2; i < len; ++i)
             {
-                LL_INFOS() << "LLSDXMLParser::Impl::parse: XML_STATUS_ERROR parsing:" << (char*)buffer << LL_ENDL;
+                const char c = p[i];
+                U32 d;
+                if      (c >= '0' && c <= '9') d = (U32)(c - '0');
+                else if (c >= 'a' && c <= 'f') d = (U32)(c - 'a' + 10);
+                else if (c >= 'A' && c <= 'F') d = (U32)(c - 'A' + 10);
+                else return false;
+                cp = cp * 16 + d;
+            }
+        }
+        else if (len >= 2)
+        {
+            for (size_t i = 1; i < len; ++i)
+            {
+                if (p[i] < '0' || p[i] > '9') return false;
+                cp = cp * 10 + (U32)(p[i] - '0');
             }
         }
         else
         {
-            if (mEmitErrors)
-            {
-                LL_INFOS() << "LLSDXMLParser::Impl::parse: XML_STATUS_ERROR, null buffer" << LL_ENDL;
-            }
+            return false;
         }
-        data = LLSD();
-        return LLSDParser::PARSE_FAILURE;
+        if (cp == 0 || cp > 0x10FFFF)
+        {
+            return false;
+        }
+        append_utf8(out, cp);
+        return true;
     }
 
-    clear_eol(input);
-    if (!mSawLLSDElement)
-    {
-        // well-formed XML that never contained an <llsd> element. The old
-        // code reported this by accident: reading EOF used to deposit a
-        // bogus (char)EOF byte in the parse buffer, forcing an expat error.
-        data = LLSD();
-        return LLSDParser::PARSE_FAILURE;
-    }
-    data = mResult;
-    return mParseCount;
+    if      (len == 2 && memcmp(p, "lt", 2) == 0)   out.push_back('<');
+    else if (len == 2 && memcmp(p, "gt", 2) == 0)   out.push_back('>');
+    else if (len == 3 && memcmp(p, "amp", 3) == 0)  out.push_back('&');
+    else if (len == 4 && memcmp(p, "quot", 4) == 0) out.push_back('"');
+    else if (len == 4 && memcmp(p, "apos", 4) == 0) out.push_back('\'');
+    else return false;
+
+    return true;
 }
 
-
-S32 LLSDXMLParser::Impl::parseLines(std::istream& input, LLSD& data)
+// XML Name characters. Bytes at or above 0x80 are taken on trust: the document
+// is validated as UTF-8 as a whole, and the name ranges above ASCII are too
+// broad to be worth a per-character table here.
+static bool is_name_start_char(unsigned char c)
 {
-    XML_Status status = XML_STATUS_OK;
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+        || c == '_' || c == ':' || c >= 0x80;
+}
 
-    data = LLSD();
+static bool is_name_char(unsigned char c)
+{
+    return is_name_start_char(c) || (c >= '0' && c <= '9') || c == '-' || c == '.';
+}
 
-    static const int BUFFER_SIZE = 1024;
-
-    //static char last_buffer[ BUFFER_SIZE ];
-    //std::streamsize last_num_read;
-
-    // Must get rid of any leading \n, otherwise the stream gets into an error/eof state
-    clear_eol(input);
-
-    while( !mGracefullStop
-        && input.good()
-        && !input.eof())
+// Attributes are name="value" pairs separated by whitespace. A value may not
+// contain '<', and an '&' in one must begin a reference.
+static bool valid_attributes(const char* p, size_t len)
+{
+    const char* const end = p + len;
+    std::string scratch;
+    while (p < end)
     {
-        void* buffer = XML_GetBuffer(mParser, BUFFER_SIZE);
-        /*
-         * If we happened to end our last buffer right at the end of the llsd, but the
-         * stream is still going we will get a null buffer here.  Check for mGracefullStop.
-         * -- I don't think this is actually true - zero 2008-05-09
-         */
-        if (!buffer)
+        while (p < end && is_xml_space(*p)) ++p;
+        if (p >= end) return true;
+
+        if (!is_name_start_char((unsigned char)*p)) return false;
+        ++p;
+        while (p < end && is_name_char((unsigned char)*p)) ++p;
+
+        while (p < end && is_xml_space(*p)) ++p;
+        if (p >= end || *p != '=') return false;
+        ++p;
+        while (p < end && is_xml_space(*p)) ++p;
+        if (p >= end || (*p != '"' && *p != '\'')) return false;
+
+        const char quote = *p++;
+        const char* const value = p;
+        while (p < end && *p != quote) ++p;
+        if (p >= end) return false;
+
+        for (const char* q = value; q < p; ++q)
         {
-            break;
-        }
-
-        // Get one line
-        input.getline((char*)buffer, BUFFER_SIZE);
-        std::streamsize num_read = input.gcount();
-
-        //memcpy( last_buffer, buffer, num_read );
-        //last_num_read = num_read;
-
-        if ( num_read > 0 )
-        {
-            if (!input.good() )
-            {   // Clear state that's set when we run out of buffer
-                input.clear();
-            }
-
-            // Re-insert with the \n that was absorbed by getline()
-            char * text = (char *) buffer;
-            if ( text[num_read - 1] == 0)
+            if (*q == '<') return false;
+            if (*q == '&')
             {
-                text[num_read - 1] = '\n';
+                const char* semi = (const char*)memchr(q, ';', (size_t)(p - q));
+                if (!semi) return false;
+                scratch.clear();
+                if (!resolve_entity(q + 1, (size_t)(semi - q - 1), scratch)) return false;
+                q = semi;
             }
         }
 
-        status = XML_ParseBuffer(mParser, (int)num_read, false);
-        if (status == XML_STATUS_ERROR)
-        {
-            break;
-        }
+        ++p;
+        if (p < end && !is_xml_space(*p)) return false;
     }
-
-    if (status != XML_STATUS_ERROR
-        && !mGracefullStop)
-    {   // Parse last bit
-        status = XML_ParseBuffer(mParser, 0, true);
-    }
-
-    if (status == XML_STATUS_ERROR
-        && !mGracefullStop)
-    {
-        if (mEmitErrors)
-        {
-        LL_INFOS() << "LLSDXMLParser::Impl::parseLines: XML_STATUS_ERROR" << LL_ENDL;
-        }
-        return LLSDParser::PARSE_FAILURE;
-    }
-
-    clear_eol(input);
-    if (!mSawLLSDElement)
-    {
-        // well-formed XML that never contained an <llsd> element
-        return LLSDParser::PARSE_FAILURE;
-    }
-    data = mResult;
-    return mParseCount;
+    return true;
 }
 
 
@@ -543,15 +601,20 @@ void LLSDXMLParser::Impl::reset()
     mGracefullStop = false;
 
     mStack.clear();
+    mOpen.clear();
 
     mSkipping = false;
+    mSkipThrough = 0;
 
     mCurrentKey.clear();
+    clearContent();
 
-    XML_ParserReset(mParser, "utf-8");
-    XML_SetUserData(mParser, this);
-    XML_SetElementHandler(mParser, sStartElementHandler, sEndElementHandler);
-    XML_SetCharacterDataHandler(mParser, sCharacterDataHandler);
+    mInput = nullptr;
+    mBuffer.clear();
+    mPos = 0;
+    mStreamRead = 0;
+    mCanSeek = false;
+    mAtEOF = false;
 }
 
 
@@ -561,85 +624,526 @@ void LLSDXMLParser::Impl::startSkipping()
     mSkipThrough = mDepth;
 }
 
-const XML_Char*
-LLSDXMLParser::Impl::findAttribute(const XML_Char* name, const XML_Char** pairs)
+
+// ---------------------------------------------------------------- content
+void LLSDXMLParser::Impl::clearContent()
 {
-    while (NULL != pairs && NULL != *pairs)
-    {
-        if(0 == strcmp(name, *pairs))
-        {
-            return *(pairs + 1);
-        }
-        pairs += 2;
-    }
-    return NULL;
+    mHasContent = false;
+    mContentInBuffer = false;
+    mContentOff = 0;
+    mContentLen = 0;
+    mContent.clear();
 }
 
-void LLSDXMLParser::Impl::parsePart(const char* buf, llssize len)
+void LLSDXMLParser::Impl::materializeContent()
 {
-    if ( buf != NULL
-        && len > 0 )
+    if (mContentInBuffer)
     {
-        XML_Status status = XML_Parse(mParser, buf, (int)len, 0);
-        // A short, complete document (e.g. "<llsd><map /></llsd>") may be
-        // wholly contained in this first chunk. Reaching </llsd> calls
-        // XML_StopParser(false), which makes XML_Parse return XML_STATUS_ERROR
-        // even though the parse succeeded -- mGracefullStop distinguishes that
-        // graceful stop from a real error, matching parse()/parseLines().
-        if (status == XML_STATUS_ERROR && !mGracefullStop)
+        mContent.assign(mBuffer, mContentOff, mContentLen);
+        mContentInBuffer = false;
+    }
+    mHasContent = true;
+}
+
+void LLSDXMLParser::Impl::appendContent(size_t off, size_t len)
+{
+    // content inside skipped elements is discarded anyway; don't buffer it
+    if (!len || mSkipping)
+    {
+        return;
+    }
+    if (!mHasContent)
+    {
+        mContentOff = off;
+        mContentLen = len;
+        mContentInBuffer = true;
+        mHasContent = true;
+        return;
+    }
+    if (mContentInBuffer)
+    {
+        if (off == mContentOff + mContentLen)
+        {   // still one unbroken run of the source
+            mContentLen += len;
+            return;
+        }
+        materializeContent();
+    }
+    mContent.append(mBuffer, off, len);
+}
+
+void LLSDXMLParser::Impl::appendDecoded(const char* p, size_t len)
+{
+    if (mSkipping)
+    {
+        return;
+    }
+    materializeContent();
+    mContent.append(p, len);
+}
+
+std::string_view LLSDXMLParser::Impl::contentView() const
+{
+    if (mContentInBuffer)
+    {
+        return std::string_view(mBuffer.data() + mContentOff, mContentLen);
+    }
+    return mContent;
+}
+
+std::string LLSDXMLParser::Impl::takeContent()
+{
+    if (mContentInBuffer)
+    {
+        return std::string(mBuffer, mContentOff, mContentLen);
+    }
+    return std::move(mContent);
+}
+
+
+// ----------------------------------------------------------------- source
+bool LLSDXMLParser::Impl::refill()
+{
+    if (!mInput || mAtEOF)
+    {
+        return false;
+    }
+
+    // Growing mBuffer reallocates, so no view into it may survive this.
+    if (mContentInBuffer)
+    {
+        materializeContent();
+    }
+
+    if (mCanSeek)
+    {
+        // Overshoot is fine: whatever the document does not consume is handed
+        // back to the caller by rewindStream().
+        static const std::streamsize BLOCK = 64 * 1024;
+        const size_t old_size = mBuffer.size();
+        mBuffer.resize(old_size + (size_t)BLOCK);
+        mInput->read(&mBuffer[old_size], BLOCK);
+        const std::streamsize got = mInput->gcount();
+        mBuffer.resize(old_size + (size_t)got);
+        if (got <= 0)
         {
-            if (mEmitErrors)
+            mAtEOF = true;
+            return false;
+        }
+        mStreamRead += got;
+        return true;
+    }
+
+    // A stream we cannot seek must not be over-read, so it is pulled a line at
+    // a time and the caller is left at a line boundary, as it always was.
+    char line[1024];
+    const unsigned count = get_till_eol(*mInput, line, sizeof(line));
+    if (!count)
+    {
+        mAtEOF = true;
+        return false;
+    }
+    mBuffer.append(line, count);
+    mStreamRead += count;
+    return true;
+}
+
+bool LLSDXMLParser::Impl::avail(size_t bytes)
+{
+    while (mBuffer.size() - mPos < bytes)
+    {
+        if (!refill())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool LLSDXMLParser::Impl::findMarker(const char* marker, size_t marker_len, size_t& found)
+{
+    size_t from = mPos;
+    for (;;)
+    {
+        const size_t at = mBuffer.find(marker, from, marker_len);
+        if (at != std::string::npos)
+        {
+            found = at;
+            return true;
+        }
+        // A marker may straddle the end of what has been read so far.
+        from = (mBuffer.size() >= marker_len) ? mBuffer.size() - (marker_len - 1) : mPos;
+        if (from < mPos)
+        {
+            from = mPos;
+        }
+        if (!refill())
+        {
+            return false;
+        }
+    }
+}
+
+void LLSDXMLParser::Impl::rewindStream()
+{
+    if (!mInput || !mCanSeek)
+    {
+        return;
+    }
+    // Bytes pulled from the stream that the document did not consume. Anything
+    // handed to parsePart() never came from the stream, hence the clamp.
+    llssize unconsumed = (llssize)(mBuffer.size() - mPos);
+    if (unconsumed > mStreamRead)
+    {
+        unconsumed = mStreamRead;
+    }
+    if (unconsumed > 0)
+    {
+        mInput->clear();
+        mInput->seekg(-(std::streamoff)unconsumed, std::ios_base::cur);
+    }
+}
+
+
+// ---------------------------------------------------------------- scanning
+// LLSD XML is a closed grammar: thirteen element names, no namespaces, no DTD.
+// Length and first character identify every one of them uniquely, so the whole
+// dispatch is a switch pair plus one memcmp of a length known at that point.
+LLSDXMLParser::Impl::Element LLSDXMLParser::Impl::readElement(const char* name, size_t len)
+{
+    switch (len)
+    {
+        case 3:
+            switch (name[0])
             {
-                LL_INFOS() << "Unexpected XML parsing error at start" << LL_ENDL;
+                case 'k': if (memcmp(name, "key", 3) == 0) return ELEMENT_KEY;    break;
+                case 'm': if (memcmp(name, "map", 3) == 0) return ELEMENT_MAP;    break;
+                case 'u': if (memcmp(name, "uri", 3) == 0) return ELEMENT_URI;    break;
             }
+            break;
+        case 4:
+            switch (name[0])
+            {
+                case 'r': if (memcmp(name, "real", 4) == 0) return ELEMENT_REAL;  break;
+                case 'l': if (memcmp(name, "llsd", 4) == 0) return ELEMENT_LLSD;  break;
+                case 'u': if (memcmp(name, "uuid", 4) == 0) return ELEMENT_UUID;  break;
+                case 'd': if (memcmp(name, "date", 4) == 0) return ELEMENT_DATE;  break;
+            }
+            break;
+        case 5:
+            switch (name[0])
+            {
+                case 'a': if (memcmp(name, "array", 5) == 0) return ELEMENT_ARRAY; break;
+                case 'u': if (memcmp(name, "undef", 5) == 0) return ELEMENT_UNDEF; break;
+            }
+            break;
+        case 6:
+            switch (name[0])
+            {
+                case 'b': if (memcmp(name, "binary", 6) == 0) return ELEMENT_BINARY; break;
+                case 's': if (memcmp(name, "string", 6) == 0) return ELEMENT_STRING; break;
+            }
+            break;
+        case 7:
+            switch (name[0])
+            {
+                case 'i': if (memcmp(name, "integer", 7) == 0) return ELEMENT_INTEGER; break;
+                case 'b': if (memcmp(name, "boolean", 7) == 0) return ELEMENT_BOOL;    break;
+            }
+            break;
+    }
+    return ELEMENT_UNKNOWN;
+}
+
+// static
+bool LLSDXMLParser::Impl::base64Encoded(const char* attrs, size_t len)
+{
+    // <binary> takes one attribute. Anything other than base64 is unreadable,
+    // and an absent encoding means base64 by default.
+    const char* const end = attrs + len;
+    for (const char* p = attrs; p < end; )
+    {
+        while (p < end && is_xml_space(*p)) ++p;
+        const char* name = p;
+        while (p < end && *p != '=' && !is_xml_space(*p)) ++p;
+        const size_t name_len = (size_t)(p - name);
+        while (p < end && is_xml_space(*p)) ++p;
+        if (p >= end || *p != '=') break;
+        ++p;
+        while (p < end && is_xml_space(*p)) ++p;
+        if (p >= end) break;
+        const char quote = *p++;
+        const char* value = p;
+        while (p < end && *p != quote) ++p;
+        const size_t value_len = (size_t)(p - value);
+        if (p < end) ++p;
+
+        if (name_len == 8 && memcmp(name, "encoding", 8) == 0)
+        {
+            return value_len == 6 && memcmp(value, "base64", 6) == 0;
+        }
+    }
+    return true;
+}
+
+bool LLSDXMLParser::Impl::decodeEntity()
+{
+    // mPos is on '&'.
+    size_t semi;
+    if (!findMarker(";", 1, semi))
+    {
+        return false;
+    }
+    const size_t start = mPos + 1;
+
+    std::string decoded;
+    if (!resolve_entity(mBuffer.data() + start, semi - start, decoded))
+    {
+        return false;
+    }
+
+    appendDecoded(decoded.data(), decoded.size());
+    mPos = semi + 1;
+    return true;
+}
+
+// Consumes character data up to the next '<', which is left at mPos.
+bool LLSDXMLParser::Impl::scanText()
+{
+    for (;;)
+    {
+        // decodeEntity() can refill, so the extent of the buffer is re-read on
+        // every pass rather than hoisted.
+        while (mPos < mBuffer.size())
+        {
+            const char* const base = mBuffer.data();
+            const size_t limit = mBuffer.size();
+
+            const void* hit = memchr(base + mPos, '<', limit - mPos);
+            const size_t stop = hit ? (size_t)((const char*)hit - base) : limit;
+
+            const void* amp = memchr(base + mPos, '&', stop - mPos);
+            if (amp)
+            {
+                const size_t at = (size_t)((const char*)amp - base);
+                appendContent(mPos, at - mPos);
+                mPos = at;
+                if (!decodeEntity())
+                {
+                    return false;
+                }
+                continue;
+            }
+
+            appendContent(mPos, stop - mPos);
+            mPos = stop;
+            if (hit)
+            {
+                return true;
+            }
+            break;
+        }
+        if (!refill())
+        {
+            return false;
         }
     }
 }
 
-// Performance testing code
-//#define   XML_PARSER_PERFORMANCE_TESTS
-
-#ifdef XML_PARSER_PERFORMANCE_TESTS
-
-extern U64 totalTime();
-U64 readElementTime = 0;
-U64 startElementTime = 0;
-U64 endElementTime = 0;
-U64 charDataTime = 0;
-U64 parseTime = 0;
-
-class XML_Timer
+bool LLSDXMLParser::Impl::scanName(size_t& name_off, size_t& name_len)
 {
-public:
-    XML_Timer( U64 * sum ) : mSum( sum )
+    name_off = mPos;
+    for (;;)
     {
-        mStart = totalTime();
+        while (mPos < mBuffer.size())
+        {
+            const unsigned char c = (unsigned char)mBuffer[mPos];
+            if (is_xml_space((char)c) || c == '>' || c == '/')
+            {
+                name_len = mPos - name_off;
+                return name_len > 0;
+            }
+            const bool ok = (mPos == name_off) ? is_name_start_char(c) : is_name_char(c);
+            if (!ok)
+            {
+                return false;
+            }
+            ++mPos;
+        }
+        if (!refill())
+        {
+            return false;
+        }
     }
-    ~XML_Timer()
-    {
-        *mSum += (totalTime() - mStart);
-    }
+}
 
-    U64 * mSum;
-    U64 mStart;
-};
-#endif // XML_PARSER_PERFORMANCE_TESTS
-
-void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Char** attributes)
+bool LLSDXMLParser::Impl::scanTagTail(size_t& attr_off, size_t& attr_len, bool& self_closing)
 {
-    #ifdef XML_PARSER_PERFORMANCE_TESTS
-    XML_Timer timer( &startElementTime );
-    #endif // XML_PARSER_PERFORMANCE_TESTS
+    attr_off = mPos;
+    self_closing = false;
+    char quote = 0;
+    for (;;)
+    {
+        while (mPos < mBuffer.size())
+        {
+            const char c = mBuffer[mPos];
+            if (quote)
+            {
+                if (c == quote) quote = 0;
+            }
+            else if (c == '"' || c == '\'')
+            {
+                quote = c;
+            }
+            else if (c == '>')
+            {
+                size_t end = mPos;
+                while (end > attr_off && is_xml_space(mBuffer[end - 1])) --end;
+                if (end > attr_off && mBuffer[end - 1] == '/')
+                {
+                    self_closing = true;
+                    --end;
+                }
+                attr_len = end - attr_off;
+                ++mPos;
+                return true;
+            }
+            ++mPos;
+        }
+        if (!refill())
+        {
+            return false;
+        }
+    }
+}
 
+bool LLSDXMLParser::Impl::scanDoctype()
+{
+    // mPos is just past "<!". The internal subset may contain '>', so track it.
+    int in_subset = 0;
+    for (;;)
+    {
+        while (mPos < mBuffer.size())
+        {
+            const char c = mBuffer[mPos++];
+            if (c == '[') ++in_subset;
+            else if (c == ']') { if (in_subset) --in_subset; }
+            else if (c == '>' && !in_subset) return true;
+        }
+        if (!refill())
+        {
+            return false;
+        }
+    }
+}
+
+bool LLSDXMLParser::Impl::scanMarkup()
+{
+    // mPos is on '<'.
+    if (!avail(2))
+    {
+        return false;
+    }
+
+    const char lead = mBuffer[mPos + 1];
+
+    if (lead == '?')
+    {
+        size_t at;
+        mPos += 2;
+        if (!findMarker("?>", 2, at)) return false;
+        mPos = at + 2;
+        return true;
+    }
+
+    if (lead == '!')
+    {
+        if (avail(4) && memcmp(mBuffer.data() + mPos, "<!--", 4) == 0)
+        {
+            size_t at;
+            mPos += 4;
+            if (!findMarker("-->", 3, at)) return false;
+            mPos = at + 3;
+            return true;
+        }
+        if (avail(9) && memcmp(mBuffer.data() + mPos, "<![CDATA[", 9) == 0)
+        {
+            size_t at;
+            mPos += 9;
+            if (!findMarker("]]>", 3, at)) return false;
+            appendContent(mPos, at - mPos);
+            mPos = at + 3;
+            return true;
+        }
+        mPos += 2;
+        return scanDoctype();
+    }
+
+    if (lead == '/')
+    {
+        mPos += 2;
+        size_t name_off, name_len;
+        if (!scanName(name_off, name_len)) return false;
+
+        if (mOpen.empty())
+        {
+            return false;
+        }
+        const OpenElement open = mOpen.back();
+        if (open.name_len != name_len
+            || memcmp(mBuffer.data() + open.name_off, mBuffer.data() + name_off, name_len) != 0)
+        {   // mismatched tags are not well formed
+            return false;
+        }
+        mOpen.pop_back();
+
+        // Whatever follows the name must be optional space then '>'.
+        for (;;)
+        {
+            while (mPos < mBuffer.size())
+            {
+                const char c = mBuffer[mPos];
+                if (c == '>') { ++mPos; endElement(open.element); return true; }
+                if (!is_xml_space(c)) return false;
+                ++mPos;
+            }
+            if (!refill()) return false;
+        }
+    }
+
+    ++mPos;
+    size_t name_off, name_len;
+    if (!scanName(name_off, name_len)) return false;
+
+    size_t attr_off, attr_len;
+    bool self_closing = false;
+    if (!scanTagTail(attr_off, attr_len, self_closing)) return false;
+    if (!valid_attributes(mBuffer.data() + attr_off, attr_len)) return false;
+
+    const Element element = readElement(mBuffer.data() + name_off, name_len);
+
+    mOpen.push_back(OpenElement{ element, (U32)name_off, (U32)name_len });
+    startElement(element, attr_off, attr_len);
+
+    if (self_closing)
+    {
+        mOpen.pop_back();
+        endElement(element);
+    }
+    return true;
+}
+
+
+// ----------------------------------------------------------------- events
+void LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t attr_len)
+{
     ++mDepth;
     if (mSkipping)
     {
         return;
     }
 
-    Element element = readElement(name);
-
-    mCurrentContent.clear();
+    clearContent();
 
     switch (element)
     {
@@ -658,8 +1162,7 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
 
         case ELEMENT_BINARY:
         {
-            const XML_Char* encoding = findAttribute("encoding", attributes);
-            if(encoding && strcmp("base64", encoding) != 0) { return startSkipping(); }
+            if (!base64Encoded(mBuffer.data() + attr_off, attr_len)) { return startSkipping(); }
             break;
         }
 
@@ -714,12 +1217,8 @@ void LLSDXMLParser::Impl::startElementHandler(const XML_Char* name, const XML_Ch
     }
 }
 
-void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
+void LLSDXMLParser::Impl::endElement(Element element)
 {
-    #ifdef XML_PARSER_PERFORMANCE_TESTS
-    XML_Timer timer( &endElementTime );
-    #endif // XML_PARSER_PERFORMANCE_TESTS
-
     --mDepth;
     if (mSkipping)
     {
@@ -730,8 +1229,6 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
         return;
     }
 
-    Element element = readElement(name);
-
     switch (element)
     {
         case ELEMENT_LLSD:
@@ -739,13 +1236,12 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
             {
                 mInLLSDElement = false;
                 mGracefullStop = true;
-                XML_StopParser(mParser, false);
             }
             return;
 
         case ELEMENT_KEY:
-            mCurrentKey = std::move(mCurrentContent); // This is safe to move as we are in the end element handler
-            mCurrentContent.clear(); // Ensure mCurrentContent is empty for subsequent use
+            mCurrentKey = takeContent();
+            clearContent();
             return;
 
         default:
@@ -765,15 +1261,25 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
             break;
 
         case ELEMENT_BOOL:
-            value = (mCurrentContent == "true" || mCurrentContent == "1");
+        {
+            const std::string_view content = contentView();
+            value = (content == "true" || content == "1");
             break;
+        }
 
         case ELEMENT_INTEGER:
             {
+                const std::string_view content = contentView();
+                // Leading whitespace and a leading '+' are skipped and trailing
+                // text is ignored, so "  42  " reads as 42.
+                const char* first = content.data();
+                const char* const last = first + content.size();
+                while (first < last && (*first == ' ' || (*first >= '\t' && *first <= '\r'))) ++first;
+                if (first < last && *first == '+') ++first;
                 S32 i;
-                // sscanf okay here with different locales - ints don't change for different locale settings like floats do.
-                if ( sscanf(mCurrentContent.c_str(), "%d", &i ) == 1 )
-                {   // See if sscanf works - it's faster
+                auto [ptr, ec] = std::from_chars(first, last, i);
+                if (ec == std::errc())
+                {   // the common case: a plain decimal integer
                     value = i;
                 }
                 else
@@ -784,7 +1290,7 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
                     // ".23" portion.
 
                     // Utilizes implementation used internally by LLSD::ImplString::asInteger
-                    value = (int)llsd::string_to_real(mCurrentContent);
+                    value = (int)llsd::string_to_real(content);
                 }
             }
             break;
@@ -792,37 +1298,24 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
         case ELEMENT_REAL:
             {
                 // Utilizes implementation used internally by LLSD::ImplString::asReal
-                value = llsd::string_to_real(mCurrentContent);
-
-                // removed since this breaks when locale has decimal separator that isn't '.'
-                // investigated changing local to something compatible each time but deemed higher
-                // risk that just using LLSD.asReal() each time.
-                //F64 r;
-                //if ( sscanf(mCurrentContent.c_str(), "%lf", &r ) == 1 )
-                //{ // See if sscanf works - it's faster
-                //  value = r;
-                //}
-                //else
-                //{
-                //  value = LLSD(mCurrentContent).asReal();
-                //}
+                value = llsd::string_to_real(contentView());
             }
             break;
 
         case ELEMENT_STRING:
-            value = std::move(mCurrentContent);  // This is safe to move as we are in the end element handler and this is cleared below
+            value = takeContent();
             break;
 
         case ELEMENT_UUID:
-            value = LLUUID(mCurrentContent);
+            value = LLUUID(std::string(contentView()));
             break;
 
         case ELEMENT_DATE:
-            value = LLDate(mCurrentContent);
+            value = LLDate(std::string(contentView()));
             break;
 
         case ELEMENT_URI:
-            value = LLURI(mCurrentContent);
+            value = LLURI(std::string(contentView()));
             break;
 
         case ELEMENT_BINARY:
@@ -834,9 +1327,10 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
             // binary_length_from_base64 returns 0 for empty or
             // whitespace-only content, so <binary /> yields an empty
             // LLSD::Binary rather than leaving the value undefined.
-            std::vector<U8> data(simdutf::binary_length_from_base64(mCurrentContent.data(), mCurrentContent.size()));
+            const std::string_view content = contentView();
+            std::vector<U8> data(simdutf::binary_length_from_base64(content.data(), content.size()));
             // convert to binary and check for errors
-            simdutf::result r = simdutf::base64_to_binary(mCurrentContent.data(), mCurrentContent.size(), (char*)data.data());
+            simdutf::result r = simdutf::base64_to_binary(content.data(), content.size(), (char*)data.data());
             if(r.error == simdutf::error_code::SUCCESS)
             {
                 value = std::move(data);
@@ -853,39 +1347,7 @@ void LLSDXMLParser::Impl::endElementHandler(const XML_Char* name)
             break;
     }
 
-    mCurrentContent.clear();
-}
-
-void LLSDXMLParser::Impl::characterDataHandler(const XML_Char* data, int length)
-{
-    #ifdef XML_PARSER_PERFORMANCE_TESTS
-    XML_Timer timer( &charDataTime );
-    #endif  // XML_PARSER_PERFORMANCE_TESTS
-
-    // content inside skipped elements is discarded anyway; don't buffer it
-    if (!mSkipping)
-    {
-        mCurrentContent.append(data, length);
-    }
-}
-
-
-void LLSDXMLParser::Impl::sStartElementHandler(
-    void* userData, const XML_Char* name, const XML_Char** attributes)
-{
-    ((LLSDXMLParser::Impl*)userData)->startElementHandler(name, attributes);
-}
-
-void LLSDXMLParser::Impl::sEndElementHandler(
-    void* userData, const XML_Char* name)
-{
-    ((LLSDXMLParser::Impl*)userData)->endElementHandler(name);
-}
-
-void LLSDXMLParser::Impl::sCharacterDataHandler(
-    void* userData, const XML_Char* data, int length)
-{
-    ((LLSDXMLParser::Impl*)userData)->characterDataHandler(data, length);
+    clearContent();
 }
 
 
@@ -898,10 +1360,6 @@ void LLSDXMLParser::Impl::sCharacterDataHandler(
         key     - 2680178
         real    - 1818362
         integer -  906078
-        array   -  295682
-        map     -  191818
-        uuid    -  177903
-        binary  -  175748
         string  -   53482
         undef   -   40353
         boolean -   33874
@@ -909,50 +1367,72 @@ void LLSDXMLParser::Impl::sCharacterDataHandler(
         uri     -      38
         date    -       1
 */
-LLSDXMLParser::Impl::Element LLSDXMLParser::Impl::readElement(const XML_Char* name)
+S32 LLSDXMLParser::Impl::run(std::istream& input, LLSD& data)
 {
-    #ifdef XML_PARSER_PERFORMANCE_TESTS
-    XML_Timer timer( &readElementTime );
-    #endif // XML_PARSER_PERFORMANCE_TESTS
+    mInput = &input;
 
-    XML_Char c = *name;
-    switch (c)
+    // A stream that can seek is read in blocks and rewound to the end of the
+    // document afterwards; one that cannot is read a line at a time so that it
+    // is never advanced past the document in the first place.
+    std::streambuf* sb = input.rdbuf();
+    mCanSeek = sb
+        && sb->pubseekoff(0, std::ios_base::cur, std::ios_base::in)
+           != std::streambuf::pos_type(std::streambuf::off_type(-1));
+
+    while (!mGracefullStop)
     {
-        case 'k':
-            if (strcmp(name, "key") == 0) { return ELEMENT_KEY; }
+        if (!scanText())
+        {
             break;
-        case 'r':
-            if (strcmp(name, "real") == 0) { return ELEMENT_REAL; }
+        }
+        if (!scanMarkup())
+        {
             break;
-        case 'i':
-            if (strcmp(name, "integer") == 0) { return ELEMENT_INTEGER; }
-            break;
-        case 'a':
-            if (strcmp(name, "array") == 0) { return ELEMENT_ARRAY; }
-            break;
-        case 'm':
-            if (strcmp(name, "map") == 0) { return ELEMENT_MAP; }
-            break;
-        case 'u':
-            if (strcmp(name, "uuid") == 0) { return ELEMENT_UUID; }
-            if (strcmp(name, "undef") == 0) { return ELEMENT_UNDEF; }
-            if (strcmp(name, "uri") == 0) { return ELEMENT_URI; }
-            break;
-        case 'b':
-            if (strcmp(name, "binary") == 0) { return ELEMENT_BINARY; }
-            if (strcmp(name, "boolean") == 0) { return ELEMENT_BOOL; }
-            break;
-        case 's':
-            if (strcmp(name, "string") == 0) { return ELEMENT_STRING; }
-            break;
-        case 'l':
-            if (strcmp(name, "llsd") == 0) { return ELEMENT_LLSD; }
-            break;
-        case 'd':
-            if (strcmp(name, "date") == 0) { return ELEMENT_DATE; }
-            break;
+        }
     }
-    return ELEMENT_UNKNOWN;
+
+    // The document must be well-formed UTF-8 made of characters XML allows.
+    // Checking the consumed span once is cheaper than testing each run, and
+    // nothing has been handed to the caller yet.
+    const bool valid_chars = mGracefullStop
+        && !has_invalid_xml_char(mBuffer.data(), mPos)
+        && simdutf::validate_utf8(mBuffer.data(), mPos);
+
+    rewindStream();
+    mInput = nullptr;
+    clear_eol(input);
+
+    if (!valid_chars || !mGracefullStop || !mSawLLSDElement)
+    {
+        if (mEmitErrors)
+        {
+            LL_INFOS() << "LLSDXMLParser: parse failure" << LL_ENDL;
+        }
+        data = LLSD();
+        return LLSDParser::PARSE_FAILURE;
+    }
+
+    data = mResult;
+    return mParseCount;
+}
+
+S32 LLSDXMLParser::Impl::parse(std::istream& input, LLSD& data)
+{
+    return run(input, data);
+}
+
+S32 LLSDXMLParser::Impl::parseLines(std::istream& input, LLSD& data)
+{
+    data = LLSD();
+    return run(input, data);
+}
+
+void LLSDXMLParser::Impl::parsePart(const char* buf, llssize len)
+{
+    if (buf != NULL && len > 0)
+    {
+        mBuffer.append(buf, (size_t)len);
+    }
 }
 
 
@@ -980,10 +1460,6 @@ void LLSDXMLParser::parsePart(const char *buf, llssize len)
 S32 LLSDXMLParser::doParse(std::istream& input, LLSD& data, S32 max_depth) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-
-    #ifdef XML_PARSER_PERFORMANCE_TESTS
-    XML_Timer timer( &parseTime );
-    #endif  // XML_PARSER_PERFORMANCE_TESTS
 
     if (mParseLines)
     {

@@ -257,13 +257,12 @@ namespace tut
     template<> template<>
     void sd_xml_object::test<7>()
     {
-        // A complete, single-line legacy <llsd> document (no embedded '\n')
-        // is read entirely into the header buffer by LLSDSerialize::deserialize
-        // and handed to LLSDXMLParser::parsePart(). Reaching </llsd> within that
-        // first chunk calls XML_StopParser(false), which makes expat report
-        // XML_STATUS_ERROR even though the parse succeeded. parsePart() used to
-        // log a spurious "Unexpected XML parsing error" for that graceful stop.
-        // Empty containers are the common single-line form that triggered it.
+        // A complete, single-line legacy <llsd> document (no embedded '\n') is
+        // read entirely into the header buffer by LLSDSerialize::deserialize and
+        // handed to LLSDXMLParser::parsePart(), so the document ends inside that
+        // first chunk with nothing left for the stream to supply. That is a
+        // successful parse and must not be reported as an error. Empty
+        // containers are the common single-line form.
         auto deserialize_no_spurious_error =
             [](const std::string& xml, const LLSD& expected)
             {
