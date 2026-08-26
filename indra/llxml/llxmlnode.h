@@ -49,9 +49,9 @@ struct CompareAttributes
 {
     bool operator()(const LLStringTableEntry* const lhs, const LLStringTableEntry* const rhs) const
     {
-        if (lhs == NULL)
+        if (lhs == nullptr)
             return true;
-        if (rhs == NULL)
+        if (rhs == nullptr)
             return true;
 
         return strcmp(lhs->mString, rhs->mString) < 0;
@@ -62,10 +62,10 @@ struct CompareAttributes
 // Defines a simple node hierarchy for reading and writing task objects
 
 class LLXMLNode;
-typedef LLPointer<LLXMLNode> LLXMLNodePtr;
-typedef std::multimap<std::string, LLXMLNodePtr > LLXMLNodeList;
-typedef std::multimap<const LLStringTableEntry *, LLXMLNodePtr > LLXMLChildList;
-typedef std::map<const LLStringTableEntry *, LLXMLNodePtr, CompareAttributes> LLXMLAttribList;
+using LLXMLNodePtr = LLPointer<LLXMLNode>;
+using LLXMLNodeList = std::multimap<std::string, LLXMLNodePtr>;
+using LLXMLChildList = std::multimap<const LLStringTableEntry*, LLXMLNodePtr>;
+using LLXMLAttribList = std::map<const LLStringTableEntry*, LLXMLNodePtr, CompareAttributes>;
 
 class LLColor4;
 class LLColor4U;
@@ -81,7 +81,7 @@ struct LLXMLChildren : public LLThreadSafeRefCount
     LLXMLNodePtr head;          // Head of the double-linked list
     LLXMLNodePtr tail;          // Tail of the double-linked list
 };
-typedef LLPointer<LLXMLChildren> LLXMLChildrenPtr;
+using LLXMLChildrenPtr = LLPointer<LLXMLChildren>;
 
 class LLXMLNode : public LLThreadSafeRefCount
 {
@@ -119,7 +119,7 @@ public:
     bool isNull();
 
     bool deleteChild(LLXMLNode* child);
-    void addChild(LLXMLNodePtr& new_child);
+    void addChild(const LLXMLNodePtr& new_child);
     void setParent(LLXMLNodePtr& new_parent); // reparent if necessary
 
     // Deserialization
@@ -206,7 +206,7 @@ public:
     const std::string& getID() const { return mID; }
 
     U32 getChildCount() const;
-    // getChild returns a Null LLXMLNode (not a NULL pointer) if there is no such child.
+    // getChild returns a Null LLXMLNode (not a nullptr pointer) if there is no such child.
     // This child has no value so any getTYPEValue() calls on it will return 0.
     bool getChild(const char* name, LLXMLNodePtr& node, bool use_default_if_missing = true);
     bool getChild(const LLStringTableEntry* name, LLXMLNodePtr& node, bool use_default_if_missing = true);

@@ -384,7 +384,7 @@ LLControlGroup::LLControlGroup(const std::string& name)
     mSettingsProfile(false)
 {
 
-    if (NULL != getenv("LL_SETTINGS_PROFILE"))
+    if (nullptr != getenv("LL_SETTINGS_PROFILE"))
     {
         mSettingsProfile = true;
     }
@@ -431,17 +431,17 @@ void LLControlGroup::cleanup()
             }
             sort(getCount_v.begin(), getCount_v.end(), compareRoutine);
 
-            for (settings_vec_t::iterator iter = getCount_v.begin(); iter != getCount_v.end(); ++iter)
+            for (const auto& [setting_name, get_count] : getCount_v)
             {
                 U32 access_rate = 0;
                 if (total_seconds != 0)
                 {
-                    access_rate = iter->second / total_seconds;
+                    access_rate = get_count / total_seconds;
                 }
                 if (access_rate >= 2)
                 {
                     std::ostringstream data_msg;
-                    msg = llformat("%13d        %7d       %s", iter->second, access_rate, iter->first.c_str());
+                    msg = llformat("%13d        %7d       %s", get_count, access_rate, setting_name.c_str());
                     data_msg << msg << "\n";
                     size_t data_size = data_msg.str().size();
                     if (fwrite(data_msg.str().c_str(), 1, data_size, out) != data_size)
@@ -652,15 +652,12 @@ LLSD LLControlGroup::asLLSD(bool diffs_only)
 {
     // Dump all stored values as LLSD
     LLSD result = LLSD::emptyArray();
-    for (ctrl_name_table_t::iterator iter = mNameTable.begin();
-         iter != mNameTable.end(); iter++)
+    for (auto& [name, control] : mNameTable)
     {
-        LLControlVariable *control = iter->second;
         if (!control || control->isType(TYPE_STRING) || (diffs_only && control->isDefault()))
         {
             continue;
         }
-        const std::string& name = iter->first;
         result[name] = getLLSD(name);
     }
     return result;
@@ -1178,21 +1175,17 @@ U32 LLControlGroup::loadFromFile(const std::string& filename, bool set_default_v
 void LLControlGroup::resetToDefaults()
 {
     ctrl_name_table_t::iterator control_iter;
-    for (control_iter = mNameTable.begin();
-        control_iter != mNameTable.end();
-        ++control_iter)
+    for (auto& [name, control] : mNameTable)
     {
-        LLControlVariable* control = (*control_iter).second;
         control->resetToDefault();
     }
 }
 
 void LLControlGroup::applyToAll(ApplyFunctor* func)
 {
-    for (ctrl_name_table_t::iterator iter = mNameTable.begin();
-         iter != mNameTable.end(); iter++)
+    for (const auto& [name, control] : mNameTable)
     {
-        func->apply(iter->first, iter->second);
+        func->apply(name, control);
     }
 }
 

@@ -49,7 +49,7 @@
 LLStdStringTable LLXmlTree::sAttributeKeys(1024);
 
 LLXmlTree::LLXmlTree()
-    : mRoot( NULL ),
+    : mRoot( nullptr ),
       mNodeNames(512)
 {
 }
@@ -62,7 +62,7 @@ LLXmlTree::~LLXmlTree()
 void LLXmlTree::cleanup()
 {
     delete mRoot;
-    mRoot = NULL;
+    mRoot = nullptr;
     mNodeNames.cleanup();
 }
 
@@ -70,7 +70,7 @@ void LLXmlTree::cleanup()
 bool LLXmlTree::parseFile(const std::string &path, bool keep_contents)
 {
     delete mRoot;
-    mRoot = NULL;
+    mRoot = nullptr;
 
     LLXmlTreeParser parser(this);
     bool success = parser.parseFile( path, &mRoot, keep_contents );
@@ -133,11 +133,8 @@ void LLXmlTreeNode::dump( const std::string& prefix )
     {
         LL_CONT << " contents = \"" << mContents << "\"";
     }
-    attribute_map_t::iterator iter;
-    for (iter=mAttributes.begin(); iter != mAttributes.end(); iter++)
+    for (const auto& [key, value] : mAttributes)
     {
-        LLStdStringHandle key = iter->first;
-        const std::string* value = iter->second;
         LL_CONT << prefix << " " << key << "=" << (value->empty() ? "NULL" : *value);
     }
     LL_CONT << LL_ENDL;
@@ -181,7 +178,7 @@ LLXmlTreeNode* LLXmlTreeNode::getChildByName(const std::string& name)
 LLXmlTreeNode* LLXmlTreeNode::getNextNamedChild()
 {
     if (mChildMapIter == mChildMapEndIter)
-        return NULL;
+        return nullptr;
     else
         return (mChildMapIter++)->second;
 }
@@ -512,7 +509,7 @@ std::string LLXmlTreeNode::getTextContents()
 
 LLXmlTreeParser::LLXmlTreeParser(LLXmlTree* tree)
     : mTree(tree),
-      mRoot( NULL ),
+      mRoot( nullptr ),
       mKeepContents(false),
       mErrorLine(0)
 {
@@ -535,14 +532,14 @@ bool LLXmlTreeParser::parseFile(const std::string &path, LLXmlTreeNode** root, b
     {
         mErrorLine = document.errorLine();
         mErrorString = document.errorDescription();
-        *root = NULL;
+        *root = nullptr;
         return false;
     }
 
     buildTree(document.document().document_element());
 
     *root = mRoot;
-    mRoot = NULL;
+    mRoot = nullptr;
     return true;
 }
 

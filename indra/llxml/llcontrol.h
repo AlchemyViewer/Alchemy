@@ -48,7 +48,7 @@ class LLColor4;
 class LLColor3;
 
 // if this is changed, also modify mTypeString in llcontrol.h
-typedef enum e_control_type
+enum eControlType
 {
     TYPE_U32 = 0,
     TYPE_S32,
@@ -63,7 +63,7 @@ typedef enum e_control_type
     TYPE_COL3,
     TYPE_LLSD,
     TYPE_COUNT
-} eControlType;
+};
 
 class LLControlVariable : public LLRefCount
 {
@@ -72,8 +72,8 @@ class LLControlVariable : public LLRefCount
     friend class LLControlGroup;
 
 public:
-    typedef boost::signals2::signal<bool(LLControlVariable* control, const LLSD&), boost_boolean_combiner> validate_signal_t;
-    typedef boost::signals2::signal<void(LLControlVariable* control, const LLSD&, const LLSD&)> commit_signal_t;
+    using validate_signal_t = boost::signals2::signal<bool(LLControlVariable* control, const LLSD&), boost_boolean_combiner>;
+    using commit_signal_t = boost::signals2::signal<void(LLControlVariable* control, const LLSD&, const LLSD&)>;
 
     enum ePersist
     {
@@ -140,7 +140,7 @@ private:
     bool llsd_compare(const LLSD& a, const LLSD & b);
 };
 
-typedef LLPointer<LLControlVariable> LLControlVariablePtr;
+using LLControlVariablePtr = LLPointer<LLControlVariable>;
 
 //! Helper functions for converting between static types and LLControl values
 template <class T>
