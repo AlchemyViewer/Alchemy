@@ -27,7 +27,6 @@
 #ifndef LL_LLXMLNODE_H
 #define LL_LLXMLNODE_H
 
-#include <expat.h>
 #include <map>
 
 #include "indra_constants.h"
@@ -298,8 +297,6 @@ protected:
 
 public:
     std::string mID;                // The ID attribute of this node
-
-    XML_Parser *mParser{ nullptr };     // Temporary pointer while loading
 
     bool mIsAttribute{ false };     // Flag is only used for output formatting
     U32 mVersionMajor{ 0 };         // Version of this tag to use

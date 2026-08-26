@@ -41,7 +41,8 @@ if (BUILD_TESTING)
       )
     set_source_files_properties(llxmlnode.cpp
       PROPERTIES
-      LL_TEST_ADDITIONAL_LIBRARIES "ll::expat;ll::pugixml"
+      LL_TEST_ADDITIONAL_SOURCE_FILES alxmldocument.cpp
+      LL_TEST_ADDITIONAL_LIBRARIES "ll::pugixml"
       )
     LL_ADD_PROJECT_UNIT_TESTS(llxml "${llxml_TEST_SOURCE_FILES}")
 

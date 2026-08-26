@@ -75,8 +75,8 @@ namespace tut
         ensure_equals("unescaped value", node->getValue(), std::string("abc\"def"));
     }
 
-    // parseStream feeds expat in 1KB chunks, so a long body arrives across many
-    // character-data callbacks. Guards value accumulation (the append path).
+    // A long body taken through parseStream rather than parseBuffer. Guards the
+    // stream path and value accumulation (the append path).
     template<> template<>
     void llxmlnode_object::test<3>()
     {
@@ -152,5 +152,75 @@ namespace tut
         std::string k;
         ensure("copy attr present", copy->getAttributeString("k", k));
         ensure_equals("copy attr value", k, std::string("v"));
+    }
+
+    // A quotation inside a longer run keeps its quotes: the escaped-string
+    // strip applies to a value that is wholly quoted, and this one is not.
+    template<> template<>
+    void llxmlnode_object::test<8>()
+    {
+        const std::string xml = "<v>he said &quot;hello&quot; loudly</v>";
+        LLXMLNodePtr node;
+        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        ensure_equals("quotes preserved", node->getValue(),
+                      std::string("he said \"hello\" loudly"));
+
+        std::istringstream stream(xml);
+        LLXMLNodePtr snode;
+        ensure("parseStream", LLXMLNode::parseStream(stream, snode, nullptr));
+        ensure_equals("stream agrees", snode->getValue(), node->getValue());
+    }
+
+    // The same run with nothing either side is wholly quoted, so it is stripped.
+    template<> template<>
+    void llxmlnode_object::test<9>()
+    {
+        const std::string xml = "<v>&quot;hello&quot;</v>";
+        LLXMLNodePtr node;
+        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        ensure_equals("outer quotes stripped", node->getValue(), std::string("hello"));
+    }
+
+    // CDATA reaches the value verbatim, entities and all.
+    template<> template<>
+    void llxmlnode_object::test<10>()
+    {
+        const std::string xml = "<v><![CDATA[raw <x> &amp; y]]></v>";
+        LLXMLNodePtr node;
+        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        ensure_equals("cdata verbatim", node->getValue(), std::string("raw <x> &amp; y"));
+    }
+
+    // Text either side of a child element concatenates, including the run
+    // between two children that is nothing but whitespace.
+    template<> template<>
+    void llxmlnode_object::test<11>()
+    {
+        const std::string xml = "<a>x<b/>   <c/>y</a>";
+        LLXMLNodePtr node;
+        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        ensure_equals("interior whitespace kept", node->getValue(), std::string("x   y"));
+    }
+
+    // Line numbers are reported for elements and for their attributes.
+    template<> template<>
+    void llxmlnode_object::test<12>()
+    {
+        const std::string xml = "<a>\n  <b k=\"v\"/>\n  <c/>\n</a>";
+        LLXMLNodePtr node;
+        ensure("parse", LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        ensure_equals("root line", node->getLineNumber(), 1);
+
+        LLXMLNodePtr b;
+        ensure("getChild b", node->getChild("b", b));
+        ensure_equals("b line", b->getLineNumber(), 2);
+
+        LLXMLNodePtr attr;
+        ensure("attribute node", b->getAttribute("k", attr));
+        ensure_equals("attribute line", attr->getLineNumber(), 2);
+
+        LLXMLNodePtr c;
+        ensure("getChild c", node->getChild("c", c));
+        ensure_equals("c line", c->getLineNumber(), 3);
     }
 }
