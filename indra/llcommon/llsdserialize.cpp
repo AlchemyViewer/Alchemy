@@ -519,8 +519,20 @@ std::istream& LLSDParser::read(
     char* s,
     std::streamsize n) const
 {
-    istr.read(s, n);
-    if(mCheckLimits) mMaxBytesLeft -= istr.gcount();
+    // The binary parser calls this once per value, so it goes through the
+    // streambuf like get() does. istr.gcount() is not updated -- the count is
+    // tracked here instead, and no caller reads it after this.
+    if (!istr.good())
+    {
+        istr.setstate(std::ios::failbit);
+        return istr;
+    }
+    const std::streamsize got = istr.rdbuf()->sgetn(s, n);
+    if (got < n)
+    {
+        istr.setstate(std::ios::eofbit | std::ios::failbit);
+    }
+    if(mCheckLimits) mMaxBytesLeft -= got;
     return istr;
 }
 
@@ -1831,7 +1843,15 @@ LLSDBinaryFormatter::~LLSDBinaryFormatter()
 { }
 
 // virtual
+// virtual
 S32 LLSDBinaryFormatter::format_impl(const LLSD& data, std::ostream& ostr,
+                                     EFormatterOptions options, U32 level) const
+{
+    Sink sink(ostr);
+    return format_impl(data, sink, options, level);
+}
+
+S32 LLSDBinaryFormatter::format_impl(const LLSD& data, Sink& sink,
                                      EFormatterOptions options, U32 level) const
 {
     S32 format_count = 1;
@@ -1839,100 +1859,100 @@ S32 LLSDBinaryFormatter::format_impl(const LLSD& data, std::ostream& ostr,
     {
     case LLSD::TypeMap:
     {
-        ostr.put('{');
+        sink.put('{');
         U32 size_nbo = htonl(static_cast<u_long>(data.size()));
-        ostr.write((const char*)(&size_nbo), sizeof(U32));
+        sink.put((const char*)(&size_nbo), sizeof(U32));
         LLSD::map_const_iterator iter = data.beginMap();
         LLSD::map_const_iterator end = data.endMap();
         for(; iter != end; ++iter)
         {
-            ostr.put('k');
-            formatString((*iter).first, ostr);
-            format_count += format_impl((*iter).second, ostr, options, level+1);
+            sink.put('k');
+            formatString((*iter).first, sink);
+            format_count += format_impl((*iter).second, sink, options, level+1);
         }
-        ostr.put('}');
+        sink.put('}');
         break;
     }
 
     case LLSD::TypeArray:
     {
-        ostr.put('[');
+        sink.put('[');
         U32 size_nbo = htonl(static_cast<u_long>(data.size()));
-        ostr.write((const char*)(&size_nbo), sizeof(U32));
+        sink.put((const char*)(&size_nbo), sizeof(U32));
         LLSD::array_const_iterator iter = data.beginArray();
         LLSD::array_const_iterator end = data.endArray();
         for(; iter != end; ++iter)
         {
-            format_count += format_impl(*iter, ostr, options, level+1);
+            format_count += format_impl(*iter, sink, options, level+1);
         }
-        ostr.put(']');
+        sink.put(']');
         break;
     }
 
     case LLSD::TypeUndefined:
-        ostr.put('!');
+        sink.put('!');
         break;
 
     case LLSD::TypeBoolean:
-        if(data.asBoolean()) ostr.put(BINARY_TRUE_SERIAL);
-        else ostr.put(BINARY_FALSE_SERIAL);
+        if(data.asBoolean()) sink.put(BINARY_TRUE_SERIAL);
+        else sink.put(BINARY_FALSE_SERIAL);
         break;
 
     case LLSD::TypeInteger:
     {
-        ostr.put('i');
+        sink.put('i');
         U32 value_nbo = htonl(data.asInteger());
-        ostr.write((const char*)(&value_nbo), sizeof(U32));
+        sink.put((const char*)(&value_nbo), sizeof(U32));
         break;
     }
 
     case LLSD::TypeReal:
     {
-        ostr.put('r');
+        sink.put('r');
         F64 value_nbo = ll_htond(data.asReal());
-        ostr.write((const char*)(&value_nbo), sizeof(F64));
+        sink.put((const char*)(&value_nbo), sizeof(F64));
         break;
     }
 
     case LLSD::TypeUUID:
     {
-        ostr.put('u');
+        sink.put('u');
         LLUUID temp = data.asUUID();
-        ostr.write((const char*)(&(temp.mData)), UUID_BYTES);
+        sink.put((const char*)(&(temp.mData)), UUID_BYTES);
         break;
     }
 
     case LLSD::TypeString:
-        ostr.put('s');
-        formatString(data.asStringRef(), ostr);
+        sink.put('s');
+        formatString(data.asStringRef(), sink);
         break;
 
     case LLSD::TypeDate:
     {
-        ostr.put('d');
+        sink.put('d');
         F64 value = data.asReal();
-        ostr.write((const char*)(&value), sizeof(F64));
+        sink.put((const char*)(&value), sizeof(F64));
         break;
     }
 
     case LLSD::TypeURI:
-        ostr.put('l');
-        formatString(data.asString(), ostr);
+        sink.put('l');
+        formatString(data.asString(), sink);
         break;
 
     case LLSD::TypeBinary:
     {
-        ostr.put('b');
+        sink.put('b');
         const std::vector<U8>& buffer = data.asBinary();
         U32 size_nbo = htonl(static_cast<u_long>(buffer.size()));
-        ostr.write((const char*)(&size_nbo), sizeof(U32));
-        if(buffer.size()) ostr.write((const char*)&buffer[0], buffer.size());
+        sink.put((const char*)(&size_nbo), sizeof(U32));
+        if(buffer.size()) sink.put((const char*)&buffer[0], buffer.size());
         break;
     }
 
     default:
         // *NOTE: This should never happen.
-        ostr.put('!');
+        sink.put('!');
         break;
     }
     return format_count;
@@ -1945,6 +1965,15 @@ void LLSDBinaryFormatter::formatString(
     U32 size_nbo = htonl(static_cast<u_long>(string.size()));
     ostr.write((const char*)(&size_nbo), sizeof(U32));
     ostr.write(string.c_str(), string.size());
+}
+
+void LLSDBinaryFormatter::formatString(
+    const std::string& string,
+    Sink& sink) const
+{
+    U32 size_nbo = htonl(static_cast<u_long>(string.size()));
+    sink.put((const char*)(&size_nbo), sizeof(U32));
+    sink.put(string.data(), string.size());
 }
 
 /**

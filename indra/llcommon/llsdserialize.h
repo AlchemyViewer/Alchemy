@@ -718,6 +718,13 @@ protected:
      * @param ostr The destination stream for the data.
      */
     void formatString(const std::string& string, std::ostream& ostr) const;
+
+private:
+    /// The recursion proper. The ostream overload above exists to satisfy the
+    /// base class and wraps a Sink of its own.
+    S32 format_impl(const LLSD& data, Sink& sink, EFormatterOptions options,
+                    U32 level) const;
+    void formatString(const std::string& string, Sink& sink) const;
 };
 
 
