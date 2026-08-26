@@ -298,7 +298,6 @@ public:
     ~Impl() = default;
 
     S32 parse(std::istream& input, LLSD& data);
-    S32 parseLines(std::istream& input, LLSD& data);
 
     void parsePart(const char* buf, llssize len);
 
@@ -1459,11 +1458,6 @@ S32 LLSDXMLParser::Impl::parse(std::istream& input, LLSD& data)
     return run(input, data);
 }
 
-S32 LLSDXMLParser::Impl::parseLines(std::istream& input, LLSD& data)
-{
-    data = LLSD();
-    return run(input, data);
-}
 
 void LLSDXMLParser::Impl::parsePart(const char* buf, llssize len)
 {
@@ -1498,12 +1492,6 @@ void LLSDXMLParser::parsePart(const char *buf, llssize len)
 S32 LLSDXMLParser::doParse(std::istream& input, LLSD& data, S32 max_depth) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
-
-    if (mParseLines)
-    {
-        // Use line-based reading (faster code)
-        return impl.parseLines(input, data);
-    }
 
     return impl.parse(input, data);
 }

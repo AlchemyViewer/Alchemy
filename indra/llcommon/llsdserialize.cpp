@@ -380,7 +380,7 @@ static const char BINARY_FALSE_SERIAL = '0';
  * LLSDParser
  */
 LLSDParser::LLSDParser()
-    : mCheckLimits(true), mMaxBytesLeft(0), mParseLines(false)
+    : mCheckLimits(true), mMaxBytesLeft(0)
 {
 }
 
@@ -396,11 +396,10 @@ S32 LLSDParser::parse(std::istream& istr, LLSD& data, llssize max_bytes, S32 max
 }
 
 
-// Parse using routine to get() lines, faster than parse()
+// Parse a whole document, with no byte budget to enforce
 S32 LLSDParser::parseLines(std::istream& istr, LLSD& data)
 {
     mCheckLimits = false;
-    mParseLines = true;
     return doParse(istr, data);
 }
 
@@ -1473,7 +1472,7 @@ S32 LLSDBinaryParser::parseArray(std::istream& istr, LLSD& array, S32 max_depth)
 
     S32 parse_count = 0;
     S32 count = 0;
-    char c = istr.peek();
+    char c = (char)stream_peek(istr);
     while((c != ']') && (count < size) && istr.good())
     {
         LLSD child;
@@ -1488,7 +1487,7 @@ S32 LLSDBinaryParser::parseArray(std::istream& istr, LLSD& array, S32 max_depth)
             array.append(std::move(child));
         }
         ++count;
-        c = istr.peek();
+        c = (char)stream_peek(istr);
     }
     c = get(istr);
     if((c != ']') || (count < size))
@@ -2133,8 +2132,8 @@ llssize deserialize_string_raw(
     char buf[BUF_LEN];      /* Flawfinder: ignore */
     istr.get(buf, BUF_LEN - 1, ')');
     count += istr.gcount();
-    int c = istr.get();
-    c = istr.get();
+    int c = stream_bump(istr);
+    c = stream_bump(istr);
     count += 2;
     if(((c == '"') || (c == '\'')) && (buf[0] == '('))
     {
@@ -2149,7 +2148,7 @@ llssize deserialize_string_raw(
             value.resize(len);
             count += fullread(istr, value.data(), len);
         }
-        c = istr.get();
+        c = stream_bump(istr);
         ++count;
         if(!((c == '"') || (c == '\'')))
         {

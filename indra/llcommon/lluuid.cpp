@@ -430,11 +430,34 @@ std::ostream& operator<<(std::ostream& s, const LLUUID& uuid)
 
 std::istream& operator>>(std::istream& s, LLUUID& uuid)
 {
-    U32 i;
+    // operator>>(char&) skips whitespace ahead of each character and builds a
+    // sentry for it, which is 36 sentries per id. The whitespace skipping is
+    // kept -- callers may rely on it -- but it goes through the streambuf, and
+    // a short read no longer leaves the tail of the buffer uninitialised.
     char uuid_str[UUID_STR_LENGTH];     /* Flawfinder: ignore */
-    for (i = 0; i < UUID_STR_LENGTH - 1; i++)
+    U32 i = 0;
+    if (s.good())
     {
-        s >> uuid_str[i];
+        std::streambuf* sb = s.rdbuf();
+        for (; i < UUID_STR_LENGTH - 1; ++i)
+        {
+            int c = sb->sgetc();
+            while (c != std::istream::traits_type::eof() && isspace(c))
+            {
+                sb->sbumpc();
+                c = sb->sgetc();
+            }
+            if (c == std::istream::traits_type::eof())
+            {
+                s.setstate(std::ios::eofbit | std::ios::failbit);
+                break;
+            }
+            uuid_str[i] = (char)sb->sbumpc();
+        }
+    }
+    else
+    {
+        s.setstate(std::ios::failbit);
     }
     uuid_str[i] = '\0';
     uuid.set(std::string(uuid_str));

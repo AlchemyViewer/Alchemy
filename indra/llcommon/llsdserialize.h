@@ -79,9 +79,8 @@ public:
      */
     S32 parse(std::istream& istr, LLSD& data, llssize max_bytes, S32 max_depth = -1);
 
-    /** Like parse(), but uses a different call (istream.getline()) to read by lines
-     *  This API is better suited for XML, where the parse cannot tell
-     *  where the document actually ends.
+    /** Like parse(), but with no byte budget to enforce, for a stream that
+     *  holds one document and nothing after it.
      */
     S32 parseLines(std::istream& istr, LLSD& data);
 
@@ -207,10 +206,6 @@ protected:
      */
     mutable llssize mMaxBytesLeft;
 
-    /**
-     * @brief Use line-based reading to get text
-     */
-    bool mParseLines;
 };
 
 /**
@@ -888,7 +883,6 @@ public:
     static S32 fromXML(LLSD& sd, std::istream& str, bool emit_errors=true)
     {
         return fromXMLEmbedded(sd, str, emit_errors);
-//      return fromXMLDocument(sd, str, emit_errors);
     }
 
     /*

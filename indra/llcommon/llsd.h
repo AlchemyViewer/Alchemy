@@ -567,7 +567,6 @@ namespace llsd
     // Used by LLSD::ImplString to convert string type to real
     LLSD::Real string_to_real(std::string_view in_string);
 
-#ifdef LLSD_DEBUG_INFO
 /** @name Unit Testing Interface */
 //@{
     LL_COMMON_API void dumpStats(const LLSD&);  ///< Output information on object and usage
@@ -575,11 +574,15 @@ namespace llsd
     /// @warn THE FOLLOWING COUNTS WILL NOT BE ACCURATE IN A MULTI-THREADED
     /// ENVIRONMENT.
     ///
-    /// These counts track LLSD::Impl (hidden) objects.
+    /// These counts track LLSD::Impl (hidden) objects. They are always
+    /// maintained, so a benchmark or a leak hunt can read them without
+    /// rebuilding.
     LL_COMMON_API U32 allocationCount();    ///< how many Impls have been made
     LL_COMMON_API U32 outstandingCount();   ///< how many Impls are still alive
 
-    /// These counts track LLSD (public) objects.
+#ifdef LLSD_DEBUG_INFO
+    /// These counts track LLSD (public) objects, and cost two writes to shared
+    /// globals per construction, so they exist only when asked for.
     LL_COMMON_API extern S32 sLLSDAllocationCount;  ///< Number of LLSD objects ever created
     LL_COMMON_API extern S32 sLLSDNetObjects;       ///< Number of LLSD objects that exist
 #endif
