@@ -4,9 +4,9 @@ add_library(llxml STATIC)
 
 target_sources(llxml
     PRIVATE
+    alxmldocument.cpp
     llcontrol.cpp
     llxmlnode.cpp
-    llxmlparser.cpp
     llxmltree.cpp
     )
 
@@ -14,9 +14,9 @@ target_sources(llxml
     PUBLIC
     FILE_SET HEADERS
     FILES
+    alxmldocument.h
     llcontrol.h
     llxmlnode.h
-    llxmlparser.h
     llxmltree.h
     )
 
@@ -28,6 +28,7 @@ target_link_libraries(llxml
     llmath
     llcommon
     ll::expat
+    ll::pugixml
     )
 target_include_directories( llxml  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})
 target_precompile_headers(llxml REUSE_FROM llprecompiled)
@@ -40,7 +41,7 @@ if (BUILD_TESTING)
       )
     set_source_files_properties(llxmlnode.cpp
       PROPERTIES
-      LL_TEST_ADDITIONAL_LIBRARIES "ll::expat"
+      LL_TEST_ADDITIONAL_LIBRARIES "ll::expat;ll::pugixml"
       )
     LL_ADD_PROJECT_UNIT_TESTS(llxml "${llxml_TEST_SOURCE_FILES}")
 

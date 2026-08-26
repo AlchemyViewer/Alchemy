@@ -99,6 +99,7 @@
         "freetype"
       ]
     },
+    "pugixml",
     {
       "name": "sdl3",
       "features": [

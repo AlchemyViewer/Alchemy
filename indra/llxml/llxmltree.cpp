@@ -27,6 +27,8 @@
 #include "linden_common.h"
 
 #include "llxmltree.h"
+
+#include "alxmldocument.h"
 #include "v3color.h"
 #include "v4color.h"
 #include "v4coloru.h"
@@ -35,6 +37,10 @@
 #include "v4math.h"
 #include "llquaternion.h"
 #include "lluuid.h"
+
+#include <algorithm>
+#include <cstring>
+#include <vector>
 
 //////////////////////////////////////////////////////////////
 // LLXmlTree
@@ -70,9 +76,8 @@ bool LLXmlTree::parseFile(const std::string &path, bool keep_contents)
     bool success = parser.parseFile( path, &mRoot, keep_contents );
     if( !success )
     {
-        S32 line_number = parser.getCurrentLineNumber();
-        const char* error =  parser.getErrorString();
-        LL_WARNS() << "LLXmlTree parse failed.  Line " << line_number << ": " << error << LL_ENDL;
+        LL_WARNS() << "LLXmlTree parse failed.  Line " << parser.getCurrentLineNumber()
+                << ": " << parser.getErrorString() << LL_ENDL;
     }
     return success;
 }
@@ -508,9 +513,8 @@ std::string LLXmlTreeNode::getTextContents()
 LLXmlTreeParser::LLXmlTreeParser(LLXmlTree* tree)
     : mTree(tree),
       mRoot( NULL ),
-      mCurrent( NULL ),
-      mDump( false ),
-      mKeepContents(false)
+      mKeepContents(false),
+      mErrorLine(0)
 {
 }
 
@@ -521,175 +525,92 @@ LLXmlTreeParser::~LLXmlTreeParser()
 bool LLXmlTreeParser::parseFile(const std::string &path, LLXmlTreeNode** root, bool keep_contents)
 {
     llassert( !mRoot );
-    llassert( !mCurrent );
 
     mKeepContents = keep_contents;
+    mErrorLine = 0;
+    mErrorString.clear();
 
-    bool success = LLXmlParser::parseFile(path);
+    ALXmlDocument document;
+    if (!document.loadFile(path))
+    {
+        mErrorLine = document.errorLine();
+        mErrorString = document.errorDescription();
+        *root = NULL;
+        return false;
+    }
+
+    buildTree(document.document().document_element());
 
     *root = mRoot;
     mRoot = NULL;
-
-    if( success )
-    {
-        llassert( !mCurrent );
-    }
-    mCurrent = NULL;
-
-    return success;
+    return true;
 }
 
-
-const std::string& LLXmlTreeParser::tabs()
+void LLXmlTreeParser::buildTree(const pugi::xml_node& root_element)
 {
-    static std::string s;
-    s = "";
-    S32 num_tabs = getDepth() - 1;
-    for( S32 i = 0; i < num_tabs; i++)
-    {
-        s += "    ";
-    }
-    return s;
-}
+    // An explicit stack rather than recursion, since nothing bounds how deeply
+    // a document nests and some of them arrive over the network.
+    std::vector<std::pair<pugi::xml_node, LLXmlTreeNode*>> pending;
+    pending.emplace_back(root_element, nullptr);
 
-void LLXmlTreeParser::startElement(const char* name, const char **atts)
-{
-    if( mDump )
+    while (!pending.empty())
     {
-        LL_INFOS() << tabs() << "startElement " << name << LL_ENDL;
+        const pugi::xml_node element = pending.back().first;
+        LLXmlTreeNode* const parent = pending.back().second;
+        pending.pop_back();
 
-        S32 i = 0;
-        while( atts[i] && atts[i+1] )
+        LLXmlTreeNode* node = CreateXmlTreeNode( std::string(element.name()), parent );
+
+        for (pugi::xml_attribute attribute : element.attributes())
         {
-            LL_INFOS() << tabs() << "attribute: " << atts[i] << "=" << atts[i+1] << LL_ENDL;
-            i += 2;
+            node->addAttribute( attribute.name(), attribute.value() );
+        }
+
+        if( parent )
+        {
+            parent->addChild( node );
+        }
+        else
+        {
+            mRoot = node;
+        }
+
+        const size_t first_child = pending.size();
+        for (pugi::xml_node child : element.children())
+        {
+            switch (child.type())
+            {
+            case pugi::node_element:
+                pending.emplace_back(child, node);
+                break;
+
+            case pugi::node_pcdata:
+            case pugi::node_cdata:
+                if (mKeepContents)
+                {
+                    const char* contents = child.value();
+                    node->appendContents( contents, strlen(contents) );
+                }
+                break;
+
+            default:
+                break;
+            }
+        }
+        // Reversed, so that popping reaches the children in document order.
+        std::reverse(pending.begin() + first_child, pending.end());
+
+        if( !node->mContents.empty() )
+        {
+            LLStringUtil::trim(node->mContents);
+            LLStringUtil::removeCRLF(node->mContents);
         }
     }
-
-    LLXmlTreeNode* child = CreateXmlTreeNode( std::string(name), mCurrent );
-
-    S32 i = 0;
-    while( atts[i] && atts[i+1] )
-    {
-        child->addAttribute( atts[i], atts[i+1] );
-        i += 2;
-    }
-
-    if( mCurrent )
-    {
-        mCurrent->addChild( child );
-
-    }
-    else
-    {
-        llassert( !mRoot );
-        mRoot = child;
-    }
-    mCurrent = child;
 }
 
 LLXmlTreeNode* LLXmlTreeParser::CreateXmlTreeNode(const std::string& name, LLXmlTreeNode* parent)
 {
     return new LLXmlTreeNode(name, parent, mTree);
-}
-
-
-void LLXmlTreeParser::endElement(const char* name)
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "endElement " << name << LL_ENDL;
-    }
-
-    if( !mCurrent )
-    {
-        return;
-    }
-
-    if( !mCurrent->mContents.empty() )
-    {
-        LLStringUtil::trim(mCurrent->mContents);
-        LLStringUtil::removeCRLF(mCurrent->mContents);
-    }
-
-    mCurrent = mCurrent->getParent();
-}
-
-void LLXmlTreeParser::characterData(const char *s, int len)
-{
-    if (!s || len <= 0 || !mCurrent)
-    {
-        return;
-    }
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "CharacterData " << std::string(s, len) << LL_ENDL;
-    }
-
-    if (mKeepContents)
-    {
-        mCurrent->appendContents( s, len );
-    }
-}
-
-void LLXmlTreeParser::processingInstruction(const char *target, const char *data)
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "processingInstruction " << data << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::comment(const char *data)
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "comment " << data << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::startCdataSection()
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "startCdataSection" << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::endCdataSection()
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "endCdataSection" << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::defaultData(const char *s, int len)
-{
-    if( mDump )
-    {
-        std::string str;
-        if (s) str = std::string(s, len);
-        LL_INFOS() << tabs() << "defaultData " << str << LL_ENDL;
-    }
-}
-
-void LLXmlTreeParser::unparsedEntityDecl(
-    const char* entity_name,
-    const char* base,
-    const char* system_id,
-    const char* public_id,
-    const char* notation_name)
-{
-    if( mDump )
-    {
-        LL_INFOS() << tabs() << "unparsed entity:"          << LL_ENDL;
-        LL_INFOS() << tabs() << "    entityName "           << entity_name  << LL_ENDL;
-        LL_INFOS() << tabs() << "    base "             << base         << LL_ENDL;
-        LL_INFOS() << tabs() << "    systemId "         << system_id    << LL_ENDL;
-        LL_INFOS() << tabs() << "    publicId "         << public_id    << LL_ENDL;
-        LL_INFOS() << tabs() << "    notationName "     << notation_name<< LL_ENDL;
-    }
 }
 
 void test_llxmltree()

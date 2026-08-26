@@ -31,8 +31,9 @@
 #include <map>
 #include <list>
 #include "llstring.h"
-#include "llxmlparser.h"
 #include "llstringtable.h"
+
+namespace pugi { class xml_node; }
 
 class LLColor4;
 class LLColor4U;
@@ -193,7 +194,7 @@ private:
 //////////////////////////////////////////////////////////////
 // LLXmlTreeParser
 
-class LLXmlTreeParser : public LLXmlParser
+class LLXmlTreeParser
 {
 public:
     LLXmlTreeParser(LLXmlTree* tree);
@@ -201,24 +202,11 @@ public:
 
     bool parseFile(const std::string &path, LLXmlTreeNode** root, bool keep_contents );
 
-protected:
-    const std::string& tabs();
+    S32                 getCurrentLineNumber() const { return mErrorLine; }
+    const std::string&  getErrorString() const { return mErrorString; }
 
-    // Overrides from LLXmlParser
-    virtual void    startElement(const char *name, const char **attributes);
-    virtual void    endElement(const char *name);
-    virtual void    characterData(const char *s, int len);
-    virtual void    processingInstruction(const char *target, const char *data);
-    virtual void    comment(const char *data);
-    virtual void    startCdataSection();
-    virtual void    endCdataSection();
-    virtual void    defaultData(const char *s, int len);
-    virtual void    unparsedEntityDecl(
-        const char* entity_name,
-        const char* base,
-        const char* system_id,
-        const char* public_id,
-        const char* notation_name);
+protected:
+    void buildTree(const pugi::xml_node& root_element);
 
     //template method pattern
     virtual LLXmlTreeNode* CreateXmlTreeNode(const std::string& name, LLXmlTreeNode* parent);
@@ -226,9 +214,9 @@ protected:
 protected:
     LLXmlTree*      mTree;
     LLXmlTreeNode*  mRoot;
-    LLXmlTreeNode*  mCurrent;
-    bool            mDump;  // Dump parse tree to LL_INFOS() as it is read.
     bool            mKeepContents;
+    S32             mErrorLine;
+    std::string     mErrorString;
 };
 
 #endif  // LL_LLXMLTREE_H

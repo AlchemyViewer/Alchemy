@@ -47,6 +47,7 @@ set(cmake_SOURCE_FILES
         OpenXR.cmake
         PluginAPI.cmake
         PNG.cmake
+        PugiXML.cmake
         Python.cmake
         run_build_test.py
         SDL3.cmake
