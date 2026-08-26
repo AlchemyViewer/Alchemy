@@ -1014,7 +1014,7 @@
     <key>AvatarSex</key>
     <map>
       <key>Comment</key>
-      <string />
+      <string>Avatar sex (0 = male, 1 = female)</string>
       <key>Persist</key>
       <integer>0</integer>
       <key>Type</key>
