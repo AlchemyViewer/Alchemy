@@ -72,7 +72,6 @@ namespace LLInitParam
                                     deserialize_func_t deserialize_func,
                                     serialize_func_t serialize_func,
                                     validation_func_t validation_func,
-                                    inspect_func_t inspect_func,
                                     S32 min_count,
                                     S32 max_count)
     :   mParamHandle(p),
@@ -80,7 +79,6 @@ namespace LLInitParam
         mDeserializeFunc(deserialize_func),
         mSerializeFunc(serialize_func),
         mValidationFunc(validation_func),
-        mInspectFunc(inspect_func),
         mMinCount(min_count),
         mMaxCount(max_count)
     {}
@@ -91,7 +89,6 @@ namespace LLInitParam
         mDeserializeFunc(NULL),
         mSerializeFunc(NULL),
         mValidationFunc(NULL),
-        mInspectFunc(NULL),
         mMinCount(0),
         mMaxCount(0)
     {}
@@ -363,52 +360,6 @@ namespace LLInitParam
         }
         // was anything serialized in this block?
         return serialized;
-    }
-
-    bool BaseBlock::inspectBlock(Parser& parser, Parser::name_stack_t name_stack, S32 min_count, S32 max_count) const
-    {
-        // named param is one like LLView::Params::follows
-        // unnamed param is like LLView::Params::rect - implicit
-        const BlockDescriptor& block_data = mostDerivedBlockDescriptor();
-
-        for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
-        {
-            param_handle_t param_handle = ptr->mParamHandle;
-            const Param* param = getParamFromHandle(param_handle);
-            ParamDescriptor::inspect_func_t inspect_func = ptr->mInspectFunc;
-            if (inspect_func)
-            {
-                name_stack.emplace_back("", true);
-                inspect_func(*param, parser, name_stack, ptr->mMinCount, ptr->mMaxCount);
-                name_stack.pop_back();
-            }
-        }
-
-        // Precompute unnamed (implicit) param handles for O(1) duplicate checks.
-        std::unordered_set<param_handle_t> unnamed_handles;
-        unnamed_handles.reserve(block_data.mUnnamedParams.size());
-        for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
-        {
-            unnamed_handles.insert(ptr->mParamHandle);
-        }
-
-        for(const BlockDescriptor::param_map_t::value_type& pair : block_data.mNamedParams)
-        {
-            param_handle_t param_handle = pair.second->mParamHandle;
-            const Param* param = getParamFromHandle(param_handle);
-            ParamDescriptor::inspect_func_t inspect_func = pair.second->mInspectFunc;
-            if (inspect_func)
-            {
-                // Ensure this param has not already been inspected
-                bool duplicate = unnamed_handles.find(param_handle) != unnamed_handles.end();
-
-                name_stack.emplace_back(pair.first, !duplicate);
-                inspect_func(*param, parser, name_stack, pair.second->mMinCount, pair.second->mMaxCount);
-                name_stack.pop_back();
-            }
-        }
-
-        return true;
     }
 
     bool BaseBlock::deserializeBlock(Parser& p, Parser::name_stack_range_t& name_stack_range, bool ignored)

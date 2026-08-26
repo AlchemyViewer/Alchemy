@@ -33,14 +33,13 @@
 
 static  LLInitParam::Parser::parser_read_func_map_t sReadFuncs;
 static  LLInitParam::Parser::parser_write_func_map_t sWriteFuncs;
-static  LLInitParam::Parser::parser_inspect_func_map_t sInspectFuncs;
 static const LLSD NO_VALUE_MARKER;
 
 //
 // LLParamSDParser
 //
 LLParamSDParser::LLParamSDParser()
-: Parser(sReadFuncs, sWriteFuncs, sInspectFuncs)
+: Parser(sReadFuncs, sWriteFuncs)
 {
     if (sReadFuncs.empty())
     {

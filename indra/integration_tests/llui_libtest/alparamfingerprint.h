@@ -42,7 +42,8 @@ namespace ALParamFingerprint
     //
     // Reworking the descriptor tables, the name stack or the block layout
     // must leave this output byte-identical. Diff it across a change; do not
-    // read it.
+    // read it. Keep it out of the same stream as census(), which is meant to
+    // move -- otherwise every successful optimization reads as a failed gate.
     void collect(std::ostream& out);
 
     // What the parameter tables cost once every widget above has been built.

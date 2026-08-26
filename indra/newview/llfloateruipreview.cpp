@@ -55,7 +55,6 @@
 #include "lllayoutstack.h"
 #include "lltooltip.h"
 #include "llviewermenu.h"
-#include "llrngwriter.h"
 #include "llfloater.h"          // superclass
 #include "llfloaterreg.h"
 #include "llscrollcontainer.h"  // scroll container for overlapping elements
@@ -557,33 +556,8 @@ void LLFloaterUIPreview::onLanguageComboSelect(LLUICtrl* ctrl)
 
 void LLFloaterUIPreview::onClickExportSchema()
 {
-    //NOTE: schema generation not complete
-    //gViewerWindow->setCursor(UI_CURSOR_WAIT);
-    //std::string template_path = gDirUtilp->getExpandedFilename(LL_PATH_DEFAULT_SKIN, "xui", "schema");
-
-    //typedef LLWidgetTypeRegistry::Registrar::registry_map_t::const_iterator registry_it;
-    //registry_it end_it = LLWidgetTypeRegistry::defaultRegistrar().endItems();
-    //for(registry_it it = LLWidgetTypeRegistry::defaultRegistrar().beginItems();
-    //  it != end_it;
-    //  ++it)
-    //{
-    //  std::string widget_name = it->first;
-    //  const LLInitParam::BaseBlock& block =
-    //      (*LLDefaultParamBlockRegistry::instance().getValue(*LLWidgetTypeRegistry::instance().getValue(widget_name)))();
-    //  LLXMLNodePtr root_nodep = new LLXMLNode();
-    //  LLRNGWriter().writeRNG(widget_name, root_nodep, block, "http://www.lindenlab.com/xui");
-
-    //  std::string file_name(template_path + gDirUtilp->getDirDelimiter() + widget_name + ".rng");
-
-    //  LLFILE* rng_file = LLFile::fopen(file_name.c_str(), LLFILE_MODE("w"));
-    //  {
-    //      LLXMLNode::writeHeaderToFile(rng_file);
-    //      const bool use_type_decorations = false;
-    //      root_nodep->writeToFile(rng_file, std::string(), use_type_decorations);
-    //  }
-    //  fclose(rng_file);
-    //}
-    //gViewerWindow->setCursor(UI_CURSOR_ARROW);
+    // Schema generation was never completed, and the writers it called
+    // into are gone.
 }
 
 void LLFloaterUIPreview::onClickShowRectangles(const LLSD& data)

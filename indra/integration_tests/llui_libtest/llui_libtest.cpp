@@ -241,14 +241,23 @@ int main(int argc, char** argv)
 
 //  export_test_floaters();
 
-    // "--params" prints a fingerprint of every widget's parameter block and
-    // what the parameter tables cost, for diffing across a change to
-    // LLInitParam. Off by default so the usual run stays silent.
+    // Both are off by default so the usual run stays silent.
+    //
+    // "--params" fingerprints every widget's parameter block. Reworking
+    // LLInitParam must leave this byte-identical, so it is the gate.
+    //
+    // "--census" reports what the parameter tables cost. This is *expected*
+    // to move -- shrinking it is the point -- which is why it does not share
+    // a stream with the gate above.
     for (int i = 1; i < argc; ++i)
     {
-        if (std::string(argv[i]) == "--params")
+        const std::string arg(argv[i]);
+        if (arg == "--params")
         {
             ALParamFingerprint::collect(std::cout);
+        }
+        else if (arg == "--census")
+        {
             std::cout << ALParamFingerprint::census();
         }
     }

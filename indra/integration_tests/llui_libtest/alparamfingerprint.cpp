@@ -193,6 +193,12 @@ namespace ALParamFingerprint
 
     std::string census()
     {
+        // A block type only registers its parameters once something has
+        // constructed it, so the tables are nearly empty until the defaults
+        // have been built. Build them and throw the fingerprint away rather
+        // than report a count four times smaller than the truth.
+        std::ostringstream sink;
+        collect(sink);
         return LLInitParam::BlockDescriptor::getStatsReport();
     }
 }

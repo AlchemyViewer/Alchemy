@@ -34,7 +34,6 @@
 #include <functional>
 #include <iosfwd>
 #include <stack>
-#include <set>
 
 class LLView;
 
@@ -56,40 +55,6 @@ class LLChildRegistryRegistry
 {
     LLSINGLETON_EMPTY_CTOR(LLChildRegistryRegistry);
 };
-
-class LLXSDWriter : public LLInitParam::Parser
-{
-    LOG_CLASS(LLXSDWriter);
-public:
-    void writeXSD(const std::string& name, LLXMLNodePtr node, const LLInitParam::BaseBlock& block, const std::string& xml_namespace);
-
-    /*virtual*/ std::string getCurrentElementName() { return LLStringUtil::null; }
-    /*virtual*/ std::string getCurrentFileName() { return LLStringUtil::null; }
-    LLXSDWriter();
-    ~LLXSDWriter();
-
-protected:
-    void writeAttribute(const std::string& type, const Parser::name_stack_t&, S32 min_count, S32 max_count, const std::vector<std::string>* possible_values);
-    void addAttributeToSchema(LLXMLNodePtr nodep, const std::string& attribute_name, const std::string& type, bool mandatory, const std::vector<std::string>* possible_values);
-    LLXMLNodePtr mAttributeNode;
-    LLXMLNodePtr mElementNode;
-    LLXMLNodePtr mSchemaNode;
-
-    typedef std::set<std::string> string_set_t;
-    typedef std::map<LLXMLNodePtr, string_set_t> attributes_map_t;
-    attributes_map_t    mAttributesWritten;
-};
-
-
-
-// NOTE: DOES NOT WORK YET
-// should support child widgets for XUI
-class LLXUIXSDWriter : public LLXSDWriter
-{
-public:
-    void writeXSD(const std::string& name, const std::string& path, const LLInitParam::BaseBlock& block);
-};
-
 
 class LLXUIParserImpl;
 

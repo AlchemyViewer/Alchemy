@@ -59,7 +59,6 @@ target_sources(llui
     llresizebar.cpp
     llresizehandle.cpp
     llresmgr.cpp
-    llrngwriter.cpp
     llscrollbar.cpp
     llscrollcontainer.cpp
     llscrollingpanellist.cpp
@@ -176,7 +175,6 @@ target_sources(llui
     llresizebar.h
     llresizehandle.h
     llresmgr.h
-    llrngwriter.h
     llsearchablecontrol.h
     llsearcheditor.h
     llscrollbar.h
