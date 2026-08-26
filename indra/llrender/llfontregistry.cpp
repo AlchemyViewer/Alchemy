@@ -2036,7 +2036,10 @@ bool LLFontRegistry::reload(const LLSD& font_overrides)
             head->mFontFreetype = fresh->mFontFreetype;
             head->mFontDescriptor = desc;
             storeFont(desc, head);
-            head->generateASCIIglyphs();
+            if (mCreateGLTextures)
+            {
+                head->generateASCIIglyphs();
+            }
         }
         else
         {
@@ -2155,9 +2158,13 @@ LLFontGL *LLFontRegistry::getFont(const LLFontDescriptor& desc)
                     <<" style=[" << ((S32) desc.getStyle()) << "]"
                     << " size=[" << desc.getSize() << "]" << LL_ENDL;
         }
-        else
+        else if (mCreateGLTextures)
         {
-            //generate glyphs for ASCII chars to avoid stalls later
+            // Generate glyphs for ASCII chars to avoid stalls later. Only
+            // worth doing when there is an atlas to warm -- and only safe
+            // then: createFont marks every face a fallback when
+            // mCreateGLTextures is off, including the head, and asking a
+            // fallback for glyph info directly is an error.
             fontp->generateASCIIglyphs();
         }
         return fontp;
