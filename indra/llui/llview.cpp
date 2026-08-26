@@ -2653,82 +2653,6 @@ static S32 invert_vertical(S32 y, LLView* parent)
 
 // Assumes that input is in bottom-left coordinates, hence must call
 // _before_ convert_coords_to_top_left().
-static void convert_to_relative_layout(LLView::Params& p, LLView* parent)
-{
-    // Use setupParams to get the final widget rectangle
-    // according to our wacky layout rules.
-    LLView::Params final = p;
-    LLView::applyXUILayout(final, parent);
-    // Must actually extract the rectangle to get consistent
-    // right = left+width, top = bottom+height
-    LLRect final_rect = final.rect;
-
-    // We prefer to write out top edge instead of bottom, regardless
-    // of whether we use relative positioning
-    bool converted_top = false;
-
-    // Look for a last rectangle
-    LLRect last_rect;
-    if (get_last_child_rect(parent, &last_rect))
-    {
-        // ...we have a previous widget to compare to
-        const S32 EDGE_THRESHOLD_PIXELS = 4;
-        S32 left_pad = final_rect.mLeft - last_rect.mRight;
-        S32 left_delta = final_rect.mLeft - last_rect.mLeft;
-        S32 top_pad = final_rect.mTop - last_rect.mBottom;
-        S32 top_delta = final_rect.mTop - last_rect.mTop;
-        // If my left edge is almost the same, or my top edge is
-        // almost the same...
-        if (llabs(left_delta) <= EDGE_THRESHOLD_PIXELS
-            || llabs(top_delta) <= EDGE_THRESHOLD_PIXELS)
-        {
-            // ...use relative positioning
-            // prefer top_pad if widgets are stacking vertically
-            // (coordinate system is still bottom-left here)
-            if (top_pad < 0)
-            {
-                p.top_pad = top_pad;
-                p.top_delta.setProvided(false);
-            }
-            else
-            {
-                p.top_pad.setProvided(false);
-                p.top_delta = top_delta;
-            }
-            // null out other vertical specifiers
-            p.rect.top.setProvided(false);
-            p.rect.bottom.setProvided(false);
-            p.bottom_delta.setProvided(false);
-            converted_top = true;
-
-            // prefer left_pad if widgets are stacking horizontally
-            if (left_pad > 0)
-            {
-                p.left_pad = left_pad;
-                p.left_delta.setProvided(false);
-            }
-            else
-            {
-                p.left_pad.setProvided(false);
-                p.left_delta = left_delta;
-            }
-            p.rect.left.setProvided(false);
-            p.rect.right.setProvided(false);
-        }
-    }
-
-    if (!converted_top)
-    {
-        // ...this is the first widget, or one that wasn't aligned
-        // prefer top/left specification
-        p.rect.top = final_rect.mTop;
-        p.rect.bottom.setProvided(false);
-        p.bottom_delta.setProvided(false);
-        p.top_pad.setProvided(false);
-        p.top_delta.setProvided(false);
-    }
-}
-
 static void convert_coords_to_top_left(LLView::Params& p, LLView* parent)
 {
     // Convert the coordinate system to be top-left based.
@@ -2753,46 +2677,6 @@ static void convert_coords_to_top_left(LLView::Params& p, LLView* parent)
         p.bottom_delta = -p.bottom_delta;
     }
     p.layout = "topleft";
-}
-
-//static
-void LLView::setupParamsForExport(Params& p, LLView* parent)
-{
-    // Don't convert if already top-left based
-    if (p.layout() == "topleft")
-    {
-        return;
-    }
-
-    // heuristic:  Many of our floaters and panels were bulk-exported.
-    // These specify exactly bottom/left and height/width.
-    // Others were done by hand using bottom_delta and/or left_delta.
-    // Some rely on not specifying left to mean align with left edge.
-    // Try to convert both to use relative layout, but using top-left
-    // coordinates.
-    // Avoid rectangles where top/bottom/left/right was specified.
-    if (p.rect.height.isProvided() && p.rect.width.isProvided())
-    {
-        if (p.rect.bottom.isProvided() && p.rect.left.isProvided())
-        {
-            // standard bulk export, convert it
-            convert_to_relative_layout(p, parent);
-        }
-        else if (p.rect.bottom.isProvided() && p.left_delta.isProvided())
-        {
-            // hand layout with left_delta
-            convert_to_relative_layout(p, parent);
-        }
-        else if (p.bottom_delta.isProvided())
-        {
-            // hand layout with bottom_delta
-            // don't check for p.rect.left or p.left_delta because sometimes
-            // this layout doesn't set it for widgets that are left-aligned
-            convert_to_relative_layout(p, parent);
-        }
-    }
-
-    convert_coords_to_top_left(p, parent);
 }
 
 LLView::tree_iterator_t LLView::beginTreeDFS()

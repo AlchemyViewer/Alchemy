@@ -167,7 +167,7 @@ public:
     EnableCallbackRegistry::ScopedRegistrar& getEnableCallbackRegistrar() { return mEnableCallbackRegistrar; }
 
     void initFromParams(const Params& p);
-    bool initPanelXML(  LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node, const LLPanel::Params& default_params);
+    bool initPanelXML(  LLXMLNodePtr node, LLView *parent, const LLPanel::Params& default_params);
 
     bool hasString(std::string_view name) const;
     std::string getString(std::string_view name, const LLStringUtil::format_map_t& args) const;
@@ -211,7 +211,7 @@ public:
     void childSetAction(std::string_view id, std::function<void(void*)> function, void* value);
     void childSetAction(std::string_view id, const commit_signal_t::slot_type& function);
 
-    static LLView*  fromXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node = NULL);
+    static LLView*  fromXML(LLXMLNodePtr node, LLView *parent);
 
     //call onOpen to let panel know when it's about to be shown or activated
     virtual void    onOpen(const LLSD& key) {}

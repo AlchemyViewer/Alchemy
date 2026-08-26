@@ -59,7 +59,6 @@ public:
     LLSD getPayload() { return mPayload; }
 
     // Ensure label is in an attribute, not the contents
-    static void setupParamsForExport(Params& p, LLView* parent);
 
 protected:
     LLRadioCtrl(const LLRadioGroup::ItemParams& p);
@@ -503,19 +502,3 @@ void LLRadioCtrl::setValue(const LLSD& value)
     mButton->setTabStop(value.asBoolean());
 }
 
-// *TODO: Remove this function after the initial XUI XML re-export pass.
-// static
-void LLRadioCtrl::setupParamsForExport(Params& p, LLView* parent)
-{
-    std::string label = p.label;
-    if (label.empty())
-    {
-        // We don't have a label attribute, so move the text contents
-        // stored in "value" into the label
-        std::string initial_value = p.LLUICtrl::Params::initial_value();
-        p.label = initial_value;
-        p.LLUICtrl::Params::initial_value = LLSD();
-    }
-
-    LLCheckBoxCtrl::setupParamsForExport(p, parent);
-}

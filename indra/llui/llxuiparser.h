@@ -46,7 +46,7 @@ class LLWidgetTypeRegistry
 
 
 // global static instance for registering all widget types
-typedef std::function<LLView* (LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node)> LLWidgetCreatorFunc;
+typedef std::function<LLView* (LLXMLNodePtr node, LLView *parent)> LLWidgetCreatorFunc;
 
 typedef LLRegistry<std::string, LLWidgetCreatorFunc> widget_registry_t;
 

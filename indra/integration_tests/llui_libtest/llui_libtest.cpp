@@ -185,50 +185,6 @@ void init_llui()
     gFloaterView = LLUICtrlFactory::create<LLFloaterView> (fvparams);
 }
 
-/*==========================================================================*|
-static std::string get_xui_dir()
-{
-    std::string delim = gDirUtilp->getDirDelimiter();
-    return gDirUtilp->getSkinBaseDir() + delim + "default" + delim + "xui" + delim;
-}
-
-// buildFromFile() no longer supports generate-output-LLXMLNode
-void export_test_floaters()
-{
-    // Convert all test floaters to new XML format
-    std::string delim = gDirUtilp->getDirDelimiter();
-    std::string xui_dir = get_xui_dir() + "en" + delim;
-    std::string filename;
-
-    LLDirIterator iter(xui_dir, "floater_test_*.xml");
-    while (iter.next(filename))
-    {
-        if (filename.find("_new.xml") != std::string::npos)
-        {
-            // don't re-export other test floaters
-            continue;
-        }
-        LL_INFOS() << "Converting " << filename << LL_ENDL;
-        // Build a floater and output new attributes
-        LLXMLNodePtr output_node = new LLXMLNode();
-        LLFloater* floater = new LLFloater(LLSD());
-        floater->buildFromFile( filename,
-                                //   false, // don't open floater
-                                output_node);
-        std::string out_filename = gDirUtilp->add(xui_dir, filename);
-        std::string::size_type extension_pos = out_filename.rfind(".xml");
-        out_filename.resize(extension_pos);
-        out_filename += "_new.xml";
-
-        LL_INFOS() << "Output: " << out_filename << LL_ENDL;
-        LLFILE* floater_file = LLFile::fopen(out_filename.c_str(), "w");
-        LLXMLNode::writeHeaderToFile(floater_file);
-        output_node->writeToFile(floater_file);
-        fclose(floater_file);
-    }
-}
-|*==========================================================================*/
-
 int main(int argc, char** argv)
 {
     // Must init LLError for llerrs to actually cause errors.
@@ -238,8 +194,6 @@ int main(int argc, char** argv)
     LLError::setDefaultLevel(LLError::LEVEL_WARN);
 
     init_llui();
-
-//  export_test_floaters();
 
     // Both are off by default so the usual run stays silent.
     //

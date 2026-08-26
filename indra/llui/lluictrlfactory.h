@@ -149,7 +149,7 @@ public:
         return widget;
     }
 
-    LLView* createFromXML(LLXMLNodePtr node, LLView* parent, const std::string& filename, const widget_registry_t&, LLXMLNodePtr output_node );
+    LLView* createFromXML(LLXMLNodePtr node, LLView* parent, const std::string& filename, const widget_registry_t&);
 
     template<typename T>
     static T* createFromFile(const std::string &filename, LLView *parent, const widget_registry_t& registry)
@@ -166,7 +166,7 @@ public:
                 goto fail;
             }
 
-            LLView* view = getInstance()->createFromXML(root_node, parent, filename, registry, NULL);
+            LLView* view = getInstance()->createFromXML(root_node, parent, filename, registry);
             if (view)
             {
                 widget = dynamic_cast<T*>(view);
@@ -193,7 +193,7 @@ fail:
         return create<T>(widget_params);
     }
 
-    static void createChildren(LLView* viewp, LLXMLNodePtr node, const widget_registry_t&, LLXMLNodePtr output_node = NULL);
+    static void createChildren(LLView* viewp, LLXMLNodePtr node, const widget_registry_t&);
 
     static bool getLayeredXMLNode(const std::string &filename, LLXMLNodePtr& root,
                                   LLDir::ESkinConstraint constraint=LLDir::CURRENT_SKIN);
@@ -202,8 +202,6 @@ private:
     //NOTE: both friend declarations are necessary to keep both gcc and msvc happy
     template <typename T> friend class LLChildRegistry;
     template <typename T> template <typename U> friend class LLChildRegistry<T>::Register;
-
-    static void copyName(LLXMLNodePtr src, LLXMLNodePtr dest);
 
     // helper function for adding widget type info to various registries
     static void registerWidget(std::type_index widget_type, std::type_index param_block_type, const std::string& tag);
@@ -235,7 +233,7 @@ private:
     }
 
     template<typename T>
-    static T* defaultBuilder(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node)
+    static T* defaultBuilder(LLXMLNodePtr node, LLView *parent)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -244,15 +242,6 @@ private:
         LLXUIParser parser;
         parser.readXUI(node, params, LLUICtrlFactory::getInstance()->getCurFileName());
 
-        if (output_node)
-        {
-            // We always want to output top-left coordinates
-            typename T::Params output_params(params);
-            T::setupParamsForExport(output_params, parent);
-            copyName(node, output_node);
-            parser.writeXUI(output_node, output_params, LLInitParam::default_parse_rules(), &getDefaultParams<T>());
-        }
-
         // Apply layout transformations, usually munging rect
         params.from_xui = true;
         T::applyXUILayout(params, parent);
@@ -260,7 +249,7 @@ private:
 
         typedef typename T::child_registry_t registry_t;
 
-        createChildren(widget, node, registry_t::instance(), output_node);
+        createChildren(widget, node, registry_t::instance());
 
         if (widget && !widget->postBuild())
         {

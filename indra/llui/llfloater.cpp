@@ -3472,35 +3472,6 @@ void LLFloater::setKey(const LLSD& newkey)
     mKey = newkey;
 }
 
-//static
-void LLFloater::setupParamsForExport(Params& p, LLView* parent)
-{
-    // Do rectangle munging to topleft layout first
-    LLPanel::setupParamsForExport(p, parent);
-
-    // Copy the rectangle out to apply layout constraints
-    LLRect rect = p.rect;
-
-    // Null out other settings
-    p.rect.left.setProvided(false);
-    p.rect.top.setProvided(false);
-    p.rect.right.setProvided(false);
-    p.rect.bottom.setProvided(false);
-
-    // Explicitly set width/height
-    p.rect.width.set( rect.getWidth(), true );
-    p.rect.height.set( rect.getHeight(), true );
-
-    // If you can't resize this floater, don't export min_height
-    // and min_width
-    bool can_resize = p.can_resize;
-    if (!can_resize)
-    {
-        p.min_height.setProvided(false);
-        p.min_width.setProvided(false);
-    }
-}
-
 void LLFloater::initFromParams(const LLFloater::Params& p)
 {
     // *NOTE: We have too many classes derived from LLFloater to retrofit them
@@ -3587,7 +3558,7 @@ boost::signals2::connection LLFloater::setCloseCallback( const commit_signal_t::
     return mCloseSignal.connect(cb);
 }
 
-bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::string& filename, LLXMLNodePtr output_node)
+bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::string& filename)
 {
     LL_PROFILE_ZONE_SCOPED;
     Params default_params(LLUICtrlFactory::getDefaultParams<LLFloater>());
@@ -3601,18 +3572,6 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
     if (!xml_filename.empty())
     {
         LLXMLNodePtr referenced_xml;
-
-        if (output_node)
-        {
-            //if we are exporting, we want to export the current xml
-            //not the referenced xml
-            Params output_params;
-            parser.readXUI(node, output_params, LLUICtrlFactory::getInstance()->getCurFileName());
-            setupParamsForExport(output_params, parent);
-            output_node->setName(node->getName()->mString);
-            parser.writeXUI(output_node, output_params, LLInitParam::default_parse_rules(), &default_params);
-            return true;
-        }
 
         LLUICtrlFactory::instance().pushFileName(xml_filename);
 
@@ -3634,14 +3593,6 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
         LLUICtrlFactory::instance().popFileName();
     }
 
-
-    if (output_node)
-    {
-        Params output_params(params);
-        setupParamsForExport(output_params, parent);
-        output_node->setName(node->getName()->mString);
-        parser.writeXUI(output_node, output_params, LLInitParam::default_parse_rules(), &default_params);
-    }
 
     // Default floater position to top-left corner of screen
     // However, some legacy floaters have explicit top or bottom
@@ -3666,7 +3617,7 @@ bool LLFloater::initFloaterXML(LLXMLNodePtr node, LLView *parent, const std::str
         LLFloater::setFloaterHost((LLMultiFloater*) this);
     }
 
-    LLUICtrlFactory::createChildren(this, node, child_registry_t::instance(), output_node);
+    LLUICtrlFactory::createChildren(this, node, child_registry_t::instance());
 
     if (node->hasName("multi_floater"))
     {
@@ -3768,7 +3719,7 @@ bool LLFloater::buildFromFile(const std::string& filename)
         getCommitCallbackRegistrar().pushScope();
         getEnableCallbackRegistrar().pushScope();
 
-        res = initFloaterXML(root, getParent(), filename, NULL);
+        res = initFloaterXML(root, getParent(), filename);
 
         setXMLFilename(filename);
 

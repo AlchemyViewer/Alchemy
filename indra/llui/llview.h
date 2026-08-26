@@ -511,7 +511,6 @@ public:
 
     // For re-export of floaters and panels, convert the coordinate system
     // to be top-left based.
-    static void setupParamsForExport(Params& p, LLView* parent);
 
     //virtual bool  addChildFromParam(const LLInitParam::BaseBlock& params) { return true; }
     virtual bool    handleKeyHere(KEY key, MASK mask);

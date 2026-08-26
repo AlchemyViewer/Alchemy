@@ -360,7 +360,7 @@ void LLPanel::setBorderVisible(bool b)
     }
 }
 
-LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_node)
+LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -403,7 +403,7 @@ LLView* LLPanel::fromXML(LLXMLNodePtr node, LLView* parent, LLXMLNodePtr output_
     panelp->mCommitCallbackRegistrar.pushScope();
     panelp->mEnableCallbackRegistrar.pushScope();
 
-    panelp->initPanelXML(node, parent, output_node, LLUICtrlFactory::getDefaultParams<LLPanel>());
+    panelp->initPanelXML(node, parent, LLUICtrlFactory::getDefaultParams<LLPanel>());
 
     panelp->mCommitCallbackRegistrar.popScope();
     panelp->mEnableCallbackRegistrar.popScope();
@@ -475,7 +475,7 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
     setAcceptsBadge(p.accepts_badge);
 }
 
-bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr output_node, const LLPanel::Params& default_params)
+bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, const LLPanel::Params& default_params)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     Params params(default_params);
@@ -493,9 +493,6 @@ bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
         // Cache singleton and filename to avoid repeated calls
         LLUICtrlFactory* factory = LLUICtrlFactory::getInstance();
 
-        // Cache node name pointer to avoid repeated dereferencing
-        const LLStringTableEntry* node_name = node->getName();
-
         // Cache registry to avoid repeated singleton access
         const child_registry_t& registry = child_registry_t::instance();
 
@@ -503,18 +500,6 @@ bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
 
         if (!mXMLFilename.empty())
         {
-            if (output_node)
-            {
-                //if we are exporting, we want to export the current xml
-                //not the referenced xml
-                parser.readXUI(node, params, factory->getCurFileName());
-                Params output_params(params);
-                setupParamsForExport(output_params, parent);
-                output_node->setName(node_name->mString);
-                parser.writeXUI(output_node, output_params, LLInitParam::default_parse_rules(), &default_params);
-                return true;
-            }
-
             factory->pushFileName(mXMLFilename);
 
             LL_PROFILE_ZONE_NAMED_CATEGORY_UI("Load Extern Panel Reference");
@@ -539,14 +524,6 @@ bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
         // ask LLUICtrlFactory for filename, since xml_filename might be empty
         parser.readXUI(node, params, factory->getCurFileName());
 
-        if (output_node)
-        {
-            Params output_params(params);
-            setupParamsForExport(output_params, parent);
-            output_node->setName(node_name->mString);
-            parser.writeXUI(output_node, output_params, LLInitParam::default_parse_rules(), &default_params);
-        }
-
         params.from_xui = true;
         applyXUILayout(params, parent);
         {
@@ -555,7 +532,7 @@ bool LLPanel::initPanelXML(LLXMLNodePtr node, LLView *parent, LLXMLNodePtr outpu
         }
 
         // add children
-        LLUICtrlFactory::createChildren(this, node, registry, output_node);
+        LLUICtrlFactory::createChildren(this, node, registry);
 
         // Connect to parent after children are built, because tab containers
         // do a reshape() on their child panels, which requires that the children
@@ -816,7 +793,7 @@ bool LLPanel::buildFromFile(const std::string& filename, const LLPanel::Params& 
         getCommitCallbackRegistrar().pushScope();
         getEnableCallbackRegistrar().pushScope();
 
-        didPost = initPanelXML(root, NULL, NULL, default_params);
+        didPost = initPanelXML(root, NULL, default_params);
 
         getCommitCallbackRegistrar().popScope();
         getEnableCallbackRegistrar().popScope();

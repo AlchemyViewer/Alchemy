@@ -117,20 +117,14 @@ void LLUICtrlFactory::loadWidgetTemplate(const std::string& widget_tag, LLInitPa
 }
 
 //static
-void LLUICtrlFactory::createChildren(LLView* viewp, LLXMLNodePtr node, const widget_registry_t& registry, LLXMLNodePtr output_node)
+void LLUICtrlFactory::createChildren(LLView* viewp, LLXMLNodePtr node, const widget_registry_t& registry)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     if (node.isNull()) return;
 
     for (LLXMLNodePtr child_node = node->getFirstChild(); child_node.notNull(); child_node = child_node->getNextSibling())
     {
-        LLXMLNodePtr outputChild;
-        if (output_node)
-        {
-            outputChild = output_node->createChild("", false);
-        }
-
-        if (!instance().createFromXML(child_node, viewp, LLStringUtil::null, registry, outputChild))
+        if (!instance().createFromXML(child_node, viewp, LLStringUtil::null, registry))
         {
             // child_node is not a valid child for the current parent
             std::string child_name = std::string(child_node->getName()->mString);
@@ -146,11 +140,6 @@ void LLUICtrlFactory::createChildren(LLView* viewp, LLXMLNodePtr node, const wid
             {
                 LL_WARNS() << "Could not create widget named " << child_node->getName()->mString << LL_ENDL;
             }
-        }
-
-        if (outputChild && !outputChild->mChildren && outputChild->mAttributes.empty() && outputChild->getValue().empty())
-        {
-            output_node->deleteChild(outputChild);
         }
     }
 
@@ -187,7 +176,7 @@ S32 LLUICtrlFactory::saveToXML(LLView* viewp, const std::string& filename)
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
-LLView *LLUICtrlFactory::createFromXML(LLXMLNodePtr node, LLView* parent, const std::string& filename, const widget_registry_t& registry, LLXMLNodePtr output_node)
+LLView *LLUICtrlFactory::createFromXML(LLXMLNodePtr node, LLView* parent, const std::string& filename, const widget_registry_t& registry)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     std::string ctrl_type = node->getName()->mString;
@@ -208,7 +197,7 @@ LLView *LLUICtrlFactory::createFromXML(LLXMLNodePtr node, LLView* parent, const 
         }
         parent = mDummyPanel;
     }
-    LLView *view = (*funcp)(node, parent, output_node);
+    LLView *view = (*funcp)(node, parent);
 
     return view;
 }
@@ -236,12 +225,6 @@ void LLUICtrlFactory::setCtrlParent(LLView* view, LLView* parent, S32 tab_group)
 {
     if (tab_group == S32_MAX) tab_group = parent->getLastTabGroup();
     parent->addChild(view, tab_group);
-}
-
-//static
-void LLUICtrlFactory::copyName(LLXMLNodePtr src, LLXMLNodePtr dest)
-{
-    dest->setName(src->getName()->mString);
 }
 
 template<typename T>
