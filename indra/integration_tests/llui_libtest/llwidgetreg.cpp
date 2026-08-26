@@ -102,6 +102,8 @@ void LLWidgetReg::initClass(bool register_widgets)
         LLDefaultChildRegistry::Register<LLViewBorder> view_border("view_border");
     }
 
-    // *HACK: Usually this is registered as a viewer text editor
-    LLDefaultChildRegistry::Register<LLTextEditor> text_editor("text_editor");
+    // "text_editor" belongs to LLViewerTextEditor, which does not exist
+    // outside the viewer. Claiming it for LLTextEditor binds a second name to
+    // a Params type that lltexteditor.cpp already registered as
+    // "simple_text_editor", which registerWidget treats as fatal.
 }

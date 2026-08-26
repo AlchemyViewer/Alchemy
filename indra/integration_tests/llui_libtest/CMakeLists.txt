@@ -1,16 +1,14 @@
 # -*- cmake -*-
 
-# Only set this up for viewer builds, because the llui library is most closely
-# related to the viewer
-if (VIEWER)
-
 set(llui_libtest_SOURCE_FILES
+    alparamfingerprint.cpp
     llui_libtest.cpp
     llwidgetreg.cpp
     )
 
 set(llui_libtest_HEADER_FILES
     CMakeLists.txt
+    alparamfingerprint.h
     llui_libtest.h
     llwidgetreg.h
     )
@@ -27,35 +25,29 @@ target_link_libraries(llui_libtest
         llmessage
         llrender
         llimage
-        llkdu
         llimagej2coj
         )
+
+# The llkdu target only exists in a proprietary build.
+if (USE_KDU)
+    target_link_libraries(llui_libtest llkdu)
+endif (USE_KDU)
 
 set_target_properties(llui_libtest
                     PROPERTIES
                     FOLDER "Tests"
                     )
 
-if (WINDOWS)
-    set_target_properties(llui_libtest
-        PROPERTIES
-        LINK_FLAGS "/NODEFAULTLIB:LIBCMT"
+# The app-data directory used to be reached with a relative path guessed from
+# the executable's location, which stopped matching the build layout long ago.
+# Bake in the real one instead.
+target_compile_definitions(llui_libtest PRIVATE
+        "LLUI_LIBTEST_APP_RO_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/../../newview\""
         )
 
-    # Copy over OpenJPEG.dll
-    # *NOTE: On Windows with VS2005, only the first comment prints
-    set(OPENJPEG_RELEASE
-            "${ARCH_PREBUILT_DIRS_RELEASE}/openjpeg.dll")
-    add_custom_command( TARGET llui_libtest POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${OPENJPEG_RELEASE} ${CMAKE_CURRENT_BINARY_DIR}
-            COMMENT "Copying OpenJPEG DLLs to binary directory"
-            )
-endif (WINDOWS)
-
-# Ensure people working on the viewer don't break this library
-# *NOTE: This could be removed, or only built by Parabuild, if the build
-# and link times become too long. JC
-add_dependencies(viewer llui_libtest)
-
-endif (VIEWER)
+if (BUILD_VIEWER)
+    # Ensure people working on the viewer don't break this library
+    # *NOTE: This could be removed, or only built by Parabuild, if the build
+    # and link times become too long. JC
+    add_dependencies(viewer llui_libtest)
+endif (BUILD_VIEWER)
