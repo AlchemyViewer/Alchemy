@@ -129,6 +129,7 @@ private:
         const LLInitParam::BaseBlock* diff_block);
     bool readXUIImpl(LLXMLNodePtr node, LLInitParam::BaseBlock& block);
     bool readAttributes(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block);
+    S32  pushNameTokens(const char* name);
 
     //reader helper functions
     static bool readFlag(Parser& parser, void* val_ptr);
@@ -236,6 +237,7 @@ private:
     void startElement(const pugi::xml_node& element);
     void endElement();
     bool readAttributes(const pugi::xml_node& element);
+    S32  pushNameTokens(const char* name);
     bool processText();
 
     Parser::name_stack_t            mNameStack;

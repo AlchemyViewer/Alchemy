@@ -700,9 +700,6 @@ void LLXUIParser::readXUI(LLXMLNodePtr node, LLInitParam::BaseBlock& block, cons
 
 bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
 {
-    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-    boost::char_separator<char> sep(".");
-
     bool values_parsed = false;
     bool silent = mCurReadDepth > 0;
 
@@ -767,6 +764,8 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
         else
         {
             // parse out "dotted" name into individual tokens
+            typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+            const boost::char_separator<char> sep(".");
             tokenizer name_tokens(child_name, sep);
 
             tokenizer::iterator name_token_it = name_tokens.begin();
@@ -827,29 +826,47 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
     return values_parsed;
 }
 
+// A parameter name is a dot separated path, but almost never has a dot in it:
+// across the shipped skin, 349 of 109204 attribute names do. Splitting one that
+// holds no separator returns the name it was given, so build the tokenizer only
+// when there is something for it to separate. Returns how many names were pushed.
+S32 LLXUIParser::pushNameTokens(const char* name)
+{
+    if (name[0] == '\0')
+    {
+        return 0;
+    }
+
+    if (strchr(name, '.') == NULL)
+    {
+        mNameStack.emplace_back(name, true);
+        return 1;
+    }
+
+    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+    const boost::char_separator<char> sep(".");
+    const std::string dotted(name);
+
+    S32 pushed = 0;
+    for (const std::string& token : tokenizer(dotted, sep))
+    {
+        mNameStack.emplace_back(token, true);
+        ++pushed;
+    }
+    return pushed;
+}
+
 bool LLXUIParser::readAttributes(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
 {
-    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-    boost::char_separator<char> sep(".");
-
     bool any_parsed = false;
     bool silent = mCurReadDepth > 0;
 
-    for(LLXMLAttribList::const_iterator attribute_it = nodep->mAttributes.begin();
-        attribute_it != nodep->mAttributes.end();
-        ++attribute_it)
+    for (const auto& [name_entry, attribute_node] : nodep->mAttributes)
     {
-        S32 num_tokens_pushed = 0;
-        std::string attribute_name(attribute_it->first->mString);
-        mCurReadNode = attribute_it->second;
+        const char* const attribute_name = name_entry->mString;
+        mCurReadNode = attribute_node;
 
-        tokenizer name_tokens(attribute_name, sep);
-        // copy remaining tokens on to our running token list
-        for(tokenizer::iterator token_to_push = name_tokens.begin(); token_to_push != name_tokens.end(); ++token_to_push)
-        {
-            mNameStack.emplace_back(*token_to_push, true);
-            num_tokens_pushed++;
-        }
+        S32 num_tokens_pushed = pushNameTokens(attribute_name);
 
         // child nodes are not necessarily valid attributes, so don't complain once we've recursed
         any_parsed |= block.submitValue(mNameStack, *this, silent);
@@ -1439,9 +1456,6 @@ void LLSimpleXUIParser::startElement(const pugi::xml_node& element)
 
     const char* const name = element.name();
 
-    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-    boost::char_separator<char> sep(".");
-
     if (mElementCB)
     {
         LLInitParam::BaseBlock* blockp = mElementCB(*this, name);
@@ -1470,6 +1484,8 @@ void LLSimpleXUIParser::startElement(const pugi::xml_node& element)
         else
         {
             // parse out "dotted" name into individual tokens
+            typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+            const boost::char_separator<char> sep(".");
             tokenizer name_tokens(std::string(child_name), sep);
 
             tokenizer::iterator name_token_it = name_tokens.begin();
@@ -1538,25 +1554,41 @@ void LLSimpleXUIParser::endElement()
     mEmptyLeafNode.pop_back();
 }
 
+// As LLXUIParser::pushNameTokens, over this parser's own name stack.
+S32 LLSimpleXUIParser::pushNameTokens(const char* name)
+{
+    if (name[0] == '\0')
+    {
+        return 0;
+    }
+
+    if (strchr(name, '.') == NULL)
+    {
+        mNameStack.emplace_back(name, true);
+        return 1;
+    }
+
+    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+    const boost::char_separator<char> sep(".");
+    const std::string dotted(name);
+
+    S32 pushed = 0;
+    for (const std::string& token : tokenizer(dotted, sep))
+    {
+        mNameStack.emplace_back(token, true);
+        ++pushed;
+    }
+    return pushed;
+}
+
 bool LLSimpleXUIParser::readAttributes(const pugi::xml_node& element)
 {
-    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-    boost::char_separator<char> sep(".");
-
     bool any_parsed = false;
     for (pugi::xml_attribute attribute : element.attributes())
     {
-        std::string attribute_name(attribute.name());
         mCurAttributeValueBegin = attribute.value();
 
-        S32 num_tokens_pushed = 0;
-        tokenizer name_tokens(attribute_name, sep);
-        // copy remaining tokens on to our running token list
-        for(tokenizer::iterator token_to_push = name_tokens.begin(); token_to_push != name_tokens.end(); ++token_to_push)
-        {
-            mNameStack.emplace_back(*token_to_push, true);
-            num_tokens_pushed++;
-        }
+        S32 num_tokens_pushed = pushNameTokens(attribute.name());
 
         // child nodes are not necessarily valid attributes, so don't complain once we've recursed
         any_parsed |= mOutputStack.back().first->submitValue(mNameStack, *this, mParseSilently);
