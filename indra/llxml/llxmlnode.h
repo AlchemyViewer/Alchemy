@@ -86,7 +86,7 @@ using LLXMLChildrenPtr = LLPointer<LLXMLChildren>;
 class LLXMLNode : public LLThreadSafeRefCount
 {
 public:
-    enum ValueType
+    enum ValueType : U8
     {
         TYPE_CONTAINER,     // A node which contains nodes
         TYPE_UNKNOWN,       // A node loaded from file without a specified type
@@ -98,7 +98,7 @@ public:
         TYPE_NODEREF,       // the ID of another node in the hierarchy to reference
     };
 
-    enum Encoding
+    enum Encoding : U8
     {
         ENCODING_DEFAULT = 0,
         ENCODING_DECIMAL,
@@ -208,7 +208,9 @@ public:
     const LLStringTableEntry* getName() const { return mName; }
     bool hasName(const char* name) const { return mName == gStringTable.checkStringEntry(name); }
     bool hasName(const std::string& name) const { return mName == gStringTable.checkStringEntry(name.c_str()); }
-    const std::string& getID() const { return mID; }
+    // Reads the "id" attribute rather than keeping a second copy of it.
+    const std::string& getID() const;
+    void setID(std::string id);
 
     U32 getChildCount() const;
     // getChild returns a Null LLXMLNode (not a nullptr pointer) if there is no such child.
@@ -301,15 +303,17 @@ protected:
     bool parseXmlRpcStructValue(LLSD& target);
 
 public:
-    std::string mID;                // The ID attribute of this node
 
+    // Ordered so the single byte fields share one word rather than taking
+    // four each. A node is allocated once per element AND once per attribute,
+    // so its size is most of what parsing a document costs.
     bool mIsAttribute{ false };     // Flag is only used for output formatting
-    U32 mVersionMajor{ 0 };         // Version of this tag to use
-    U32 mVersionMinor{ 0 };
-    U32 mLength{ 0 };               // If the length is nonzero, then only return arrays of this length
-    U32 mPrecision{ 64 };           // The number of BITS per array item
     ValueType mType{ TYPE_CONTAINER };  // The value type
     Encoding mEncoding{ ENCODING_DEFAULT };     // The value encoding
+    U8 mPrecision{ 64 };            // The number of BITS per array item
+    U16 mVersionMajor{ 0 };         // Version of this tag to use
+    U16 mVersionMinor{ 0 };
+    U32 mLength{ 0 };               // If the length is nonzero, then only return arrays of this length
     S32 mLineNumber{ -1 };          // line number in source file, if applicable
 
     LLXMLNode* mParent{ nullptr };  // The parent node

@@ -75,7 +75,6 @@ LLXMLNode::LLXMLNode(LLStringTableEntry* name, bool is_attribute) :
 
 // copy constructor (except for the children)
 LLXMLNode::LLXMLNode(const LLXMLNode& rhs) :
-    mID(rhs.mID),
     mIsAttribute(rhs.mIsAttribute),
     mVersionMajor(rhs.mVersionMajor),
     mVersionMinor(rhs.mVersionMinor),
@@ -263,7 +262,6 @@ LLXMLNodePtr LLXMLNode::createChild(const char* name, bool is_attribute)
 LLXMLNodePtr LLXMLNode::createChild(LLStringTableEntry* name, bool is_attribute)
 {
     LLXMLNodePtr ret(new LLXMLNode(name, is_attribute));
-    ret->mID.clear();
 
     addChild(ret);
     return ret;
@@ -395,7 +393,6 @@ void buildNodeTree(const ALXmlDocument& document, LLXMLNode* file_node)
         pending.pop_back();
 
         LLXMLNodePtr new_node = new LLXMLNode(element.name(), false);
-        new_node->mID.clear();
 
         // The line the element opens on, which its attributes share.
         const S32 line_number = document.lineOf(element.offset_debug());
@@ -407,23 +404,24 @@ void buildNodeTree(const ALXmlDocument& document, LLXMLNode* file_node)
             const std::string_view attr_value = attribute.value();
 
             // Special cases
-            if ('i' == attr_name[0] && "id" == attr_name)
+            if ('v' == attr_name[0] && "version" == attr_name)
             {
-                new_node->mID = attr_value;
-            }
-            else if ('v' == attr_name[0] && "version" == attr_name)
-            {
+                // These are held narrow, so a value too large for the field is
+                // ignored rather than silently wrapped into a different number.
                 U32 version_major = 0;
                 const char* after_major = nullptr;
-                if (read_unsigned(attr_value, version_major, &after_major))
+                if (read_unsigned(attr_value, version_major, &after_major)
+                    && version_major <= std::numeric_limits<U16>::max())
                 {
-                    new_node->mVersionMajor = version_major;
+                    new_node->mVersionMajor = static_cast<U16>(version_major);
 
                     U32 version_minor = 0;
                     const std::string_view minor(after_major, attr_value.data() + attr_value.size() - after_major);
                     new_node->mVersionMinor =
-                        (!minor.empty() && minor.front() == '.' && read_unsigned(minor.substr(1), version_minor))
-                            ? version_minor : 0;
+                        (!minor.empty() && minor.front() == '.'
+                         && read_unsigned(minor.substr(1), version_minor)
+                         && version_minor <= std::numeric_limits<U16>::max())
+                            ? static_cast<U16>(version_minor) : 0;
                 }
             }
             else if (('s' == attr_name[0] && "size" == attr_name) || ('l' == attr_name[0] && "length" == attr_name))
@@ -437,9 +435,10 @@ void buildNodeTree(const ALXmlDocument& document, LLXMLNode* file_node)
             else if ('p' == attr_name[0] && "precision" == attr_name)
             {
                 U32 precision = 0;
-                if (read_unsigned(attr_value, precision))
+                if (read_unsigned(attr_value, precision)
+                    && precision <= std::numeric_limits<U8>::max())
                 {
-                    new_node->mPrecision = precision;
+                    new_node->mPrecision = static_cast<U8>(precision);
                 }
             }
             else if ('t' == attr_name[0] && "type" == attr_name)
@@ -836,9 +835,9 @@ void LLXMLNode::writeToOstream(std::ostream& output_stream, const std::string& i
     if (use_type_decorations)
     {
         // ID
-        if (mID != "")
+        if (const std::string& id = getID(); !id.empty())
         {
-            output_stream << indent << " id=\"" << mID << "\"\n";
+            output_stream << indent << " id=\"" << id << "\"\n";
         }
 
         // Type
@@ -893,7 +892,9 @@ void LLXMLNode::writeToOstream(std::ostream& output_stream, const std::string& i
         // Precision
         if (!has_default_precision && (mType == TYPE_INTEGER || mType == TYPE_FLOAT))
         {
-            output_stream << indent << " precision=\"" << mPrecision << "\"\n";
+            // mPrecision is a U8, and a stream writes one of those as a
+            // character rather than as the number it holds.
+            output_stream << indent << " precision=\"" << U32(mPrecision) << "\"\n";
         }
 
         // Version
@@ -999,7 +1000,7 @@ void LLXMLNode::findName(LLStringTableEntry* name, LLXMLNodeList &results)
 
 void LLXMLNode::findID(const std::string& id, LLXMLNodeList &results)
 {
-    if (id == mID)
+    if (id == getID())
     {
         results.emplace(this->mName->mString, this);
         return;
@@ -2463,9 +2464,9 @@ void LLXMLNode::setNodeRefValue(U32 length, const LLXMLNode **array)
     std::string new_value;
     for (U32 pos=0; pos<length; ++pos)
     {
-        if (array[pos]->mID != "")
+        if (!array[pos]->getID().empty())
         {
-            new_value.append(array[pos]->mID);
+            new_value.append(array[pos]->getID());
         }
         else
         {
@@ -2583,7 +2584,8 @@ void LLXMLNode::setAttributes(LLXMLNode::ValueType type, U32 precision, LLXMLNod
 {
     mType = type;
     mEncoding = encoding;
-    mPrecision = precision;
+    // Precision is a count of bits, so a byte holds every value this takes.
+    mPrecision = static_cast<U8>(llmin(precision, U32(std::numeric_limits<U8>::max())));
     mLength = length;
 }
 
@@ -2670,11 +2672,11 @@ void LLXMLNode::createUnitTest(S32 max_num_children)
         char c = 'a' + get_rand(26);
         rand_id.append(1, c);
     }
-    mID = rand_id;
+    setID(rand_id);
 
     if (max_num_children < 2)
     {
-        setStringValue(1, &mID);
+        setStringValue(1, &rand_id);
         return;
     }
 
@@ -2709,7 +2711,7 @@ void LLXMLNode::createUnitTest(S32 max_num_children)
             char c = 'a' + get_rand(26);
             child_id.append(1, c);
         }
-        new_child->mID = child_id;
+        new_child->setID(child_id);
 
         // Random Length
         U32 array_size = get_rand(28)+1;
@@ -3224,6 +3226,37 @@ std::string LLXMLNode::getXMLRPCTextContents() const
     // Convert any internal CR to LF
     msg = utf8str_removeCRLF(msg);
     return msg;
+}
+
+const std::string& LLXMLNode::getID() const
+{
+    LLXMLNodePtr id_attribute;
+    if (getAttribute("id", id_attribute, false) && id_attribute.notNull())
+    {
+        return id_attribute->getValue();
+    }
+    return LLStringUtil::null;
+}
+
+void LLXMLNode::setID(std::string id)
+{
+    LLXMLNodePtr id_attribute;
+    const bool has_id = getAttribute("id", id_attribute, false) && id_attribute.notNull();
+
+    if (id.empty())
+    {
+        if (has_id)
+        {
+            removeChild(id_attribute);
+        }
+        return;
+    }
+
+    if (!has_id)
+    {
+        id_attribute = createChild("id", true);
+    }
+    id_attribute->setValue(std::move(id));
 }
 
 void LLXMLNode::setLineNumber(S32 line_number)
