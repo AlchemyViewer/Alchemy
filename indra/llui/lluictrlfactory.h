@@ -134,6 +134,9 @@ public:
     template<typename T>
     static T* create(typename T::Params& params, LLView* parent = NULL)
     {
+        // createWidgetImpl() below carries its own zone, so this one's self
+        // time is the fillFrom merge over the block's parameter table.
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
         params.fillFrom(instance().mParamDefaultsMap.obtain<
                         ParamDefaults<typename T::Params, 0> >().get());
 

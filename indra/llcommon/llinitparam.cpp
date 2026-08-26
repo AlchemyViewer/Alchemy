@@ -30,6 +30,7 @@
 #include "llinitparam.h"
 #include "llformat.h"
 
+#include <sstream>
 #include <unordered_set>
 
 
@@ -151,11 +152,86 @@ namespace LLInitParam
         }
     }
 
+    static std::vector<BlockDescriptor*>& block_descriptor_registry()
+    {
+        // Function-local so it is built before the first descriptor that
+        // registers into it, whatever order the statics initialize in.
+        static std::vector<BlockDescriptor*> sRegistry;
+        return sRegistry;
+    }
+
     BlockDescriptor::BlockDescriptor()
     :   mMaxParamOffset(0),
         mInitializationState(UNINITIALIZED),
         mCurrentBlockPtr(NULL)
-    {}
+    {
+        block_descriptor_registry().push_back(this);
+    }
+
+    // static
+    const std::vector<BlockDescriptor*>& BlockDescriptor::getAllDescriptors()
+    {
+        return block_descriptor_registry();
+    }
+
+    // static
+    std::string BlockDescriptor::getStatsReport()
+    {
+        const std::vector<BlockDescriptor*>& all = getAllDescriptors();
+
+        size_t named_entries = 0;
+        size_t unnamed_entries = 0;
+        size_t owned_descriptors = 0;
+        size_t validated_entries = 0;
+        size_t name_bytes = 0;
+        std::unordered_set<std::string> distinct_names;
+
+        for (const BlockDescriptor* descriptor : all)
+        {
+            named_entries += descriptor->mNamedParams.size();
+            unnamed_entries += descriptor->mUnnamedParams.size();
+            owned_descriptors += descriptor->mAllParams.size();
+            validated_entries += descriptor->mValidationList.size();
+
+            for (const param_map_t::value_type& pair : descriptor->mNamedParams)
+            {
+                name_bytes += pair.first.capacity();
+                distinct_names.insert(pair.first);
+            }
+        }
+
+        // A named entry is a hash node holding a std::string and a
+        // shared_ptr; an mAllParams entry is a list node holding a
+        // shared_ptr; each descriptor carries its own control block because
+        // it is allocated with new rather than make_shared.
+        const size_t named_node_bytes = named_entries * (sizeof(void*) + sizeof(size_t) + sizeof(std::string) + sizeof(ParamDescriptorPtr));
+        const size_t list_node_bytes = owned_descriptors * (2 * sizeof(void*) + sizeof(ParamDescriptorPtr));
+        const size_t descriptor_bytes = owned_descriptors * (sizeof(ParamDescriptor) + 3 * sizeof(void*));
+
+        size_t distinct_name_bytes = 0;
+        for (const std::string& name : distinct_names)
+        {
+            distinct_name_bytes += name.capacity();
+        }
+
+        std::ostringstream out;
+        out << "LLInitParam block descriptors\n"
+            << "  block types registered : " << all.size() << "\n"
+            << "  named param entries    : " << named_entries << "\n"
+            << "  unnamed param entries  : " << unnamed_entries << "\n"
+            << "  descriptors owned      : " << owned_descriptors << "\n"
+            << "  validated params       : " << validated_entries << "\n"
+            << "  distinct param names   : " << distinct_names.size()
+            << " (of " << named_entries << " entries)\n"
+            << "  name string bytes      : " << name_bytes
+            << " (" << distinct_name_bytes << " if interned)\n"
+            << "  named map nodes        : ~" << named_node_bytes << " bytes\n"
+            << "  mAllParams list nodes  : ~" << list_node_bytes << " bytes\n"
+            << "  descriptor objects     : ~" << descriptor_bytes << " bytes\n"
+            << "  approximate total      : ~"
+            << (named_node_bytes + list_node_bytes + descriptor_bytes + name_bytes) << " bytes\n";
+        return out.str();
+    }
 
     // called by each derived class in least to most derived order
     void BaseBlock::init(BlockDescriptor& descriptor, BlockDescriptor& base_descriptor, size_t block_size)

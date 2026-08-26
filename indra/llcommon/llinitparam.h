@@ -296,8 +296,10 @@ namespace LLInitParam
             return nullptr;
         }
 
-        void assignNamedValue(const Inaccessable& name)
-        {}
+        bool assignNamedValue(const Inaccessable& name)
+        {
+            return false;
+        }
 
         operator const value_t&() const
         {
@@ -419,12 +421,14 @@ namespace LLInitParam
             *this = name;
         }
 
-        void assignNamedValue(const std::string& name)
+        bool assignNamedValue(const std::string& name)
         {
             if (getValueFromName(name, param_value_t::getValue()))
             {
                 setValueName(name);
+                return true;
             }
+            return false;
         }
 
         operator const value_t&() const
@@ -679,6 +683,19 @@ namespace LLInitParam
         size_t                          mMaxParamOffset;
         EInitializationState            mInitializationState;   // whether or not static block data has been initialized
         class BaseBlock*                mCurrentBlockPtr;       // pointer to block currently being constructed
+
+        // Every descriptor is a function-local static owned by its block type
+        // and lives for the life of the process, so the registry holds raw
+        // pointers and never prunes. A block type only appears here once it
+        // has been constructed at least once, which is what registers its
+        // parameters -- so census figures reflect the block types actually
+        // reached, not every one declared.
+        static const std::vector<BlockDescriptor*>& getAllDescriptors();
+
+        // Counts and an approximate footprint for the parameter tables.
+        // Sizes assume the current container choices, so treat the byte
+        // figures as a scale, not a measurement.
+        static std::string getStatsReport();
     };
 
     // Optional, lazily-allocated, heap-stored T with deep-copy value semantics.
@@ -1127,7 +1144,13 @@ namespace LLInitParam
 
         self_t& operator =(const typename named_value_t::name_t& name)
         {
-            named_value_t::assignNamedValue(name);
+            // Only a name that resolves counts as a value the user supplied.
+            // Without this the parameter holds the value but reads as absent,
+            // so merging and serialization both skip it.
+            if (named_value_t::assignNamedValue(name))
+            {
+                setProvided();
+            }
             return *this;
         }
 
@@ -1292,7 +1315,13 @@ namespace LLInitParam
 
         self_t& operator =(const typename named_value_t::name_t& name)
         {
-            named_value_t::assignNamedValue(name);
+            // Only a name that resolves counts as a value the user supplied.
+            // Without this the parameter holds the value but reads as absent,
+            // so merging and serialization both skip it.
+            if (named_value_t::assignNamedValue(name))
+            {
+                setProvided();
+            }
             return *this;
         }
 
@@ -1452,34 +1481,34 @@ namespace LLInitParam
                 const std::string& key = it->getValueName();
                 name_stack.emplace_back(std::string(), true);
 
+                bool element_written = false;
                 if(key.empty())
                 // not parsed via name values, write out value directly
                 {
-                    bool value_written = parser.writeValue(*it, name_stack);
-                    if (!value_written)
+                    // Hand the parser the value, not the wrapper around it:
+                    // writeValue dispatches on typeid, and the container holds
+                    // NAME_VALUE_LOOKUP::type_value_t rather than value_t.
+                    element_written = parser.writeValue(it->getValue(), name_stack);
+                    if (!element_written)
                     {
                         const std::string& calculated_key = it->calcValueName(it->getValue());
-                        if (parser.writeValue(calculated_key, name_stack))
-                        {
-                            serialized = true;
-                        }
-                        else
-                        {
-                            break;
-                        }
+                        element_written = parser.writeValue(calculated_key, name_stack);
                     }
                 }
                 else
                 {
-                    if(parser.writeValue(key, name_stack))
-                    {
-                        serialized = true;
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    element_written = parser.writeValue(key, name_stack);
                 }
+
+                // Each element owns one entry on the name stack. Leaving it
+                // behind nests every subsequent element one level deeper.
+                name_stack.pop_back();
+
+                if (!element_written)
+                {
+                    break;
+                }
+                serialized = true;
             }
 
             return serialized;
