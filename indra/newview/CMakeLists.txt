@@ -2014,6 +2014,7 @@ target_link_libraries(${VIEWER_BINARY_NAME}
         ll::tinygltf
         ll::tinyexr
         ll::minizip
+        ll::pugixml
         )
 
 if (TARGET ll::velopack)

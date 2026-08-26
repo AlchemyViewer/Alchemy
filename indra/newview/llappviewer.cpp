@@ -281,8 +281,6 @@ using namespace LL;
 // define a self-registering event API object
 #include "llappviewerlistener.h"
 
-#include <libxml/parser.h> // needed for init and cleanup
-
 #ifdef LL_DISCORD
 #define DISCORDPP_IMPLEMENTATION
 #include <discordpp.h>
@@ -791,9 +789,6 @@ bool LLAppViewer::init()
     // OK to write stuff to logs now, we've now crash reported if necessary
     //
     init_default_trans_args();
-
-    // Initalize libxml2
-    xmlInitParser();
 
     // inits from settings.xml and from strings.xml
     if (!initConfiguration())

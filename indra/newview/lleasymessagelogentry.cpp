@@ -24,11 +24,8 @@
 #include "llviewerregion.h"
 #include "message.h"
 
-#include <libxml/parser.h>
-#include <libxml/tree.h>
-#include <libxml/HTMLparser.h>
-#include <libxml/HTMLtree.h>
 #include <boost/algorithm/string.hpp>
+#include <pugixml.hpp>
 #include <utility>
 
 LLEasyMessageLogEntry::LLEasyMessageLogEntry(LogPayload entry, LLEasyMessageReader* message_reader)
@@ -196,45 +193,19 @@ std::string LLEasyMessageLogEntry::getFull(bool beautify, bool show_header) cons
                 boost::algorithm::to_lower(parsed_content_type); // convert to lowercase
                 if (beautify && (parsed_content_type == HTTP_CONTENT_LLSD_XML || parsed_content_type == HTTP_CONTENT_XML))
                 {
-                    // Use libxml2 for safety.
-                    constexpr int parse_opts = XML_PARSE_NONET | XML_PARSE_NOCDATA | XML_PARSE_NOXINCNODE | XML_PARSE_NOBLANKS;
-                    xmlDocPtr doc = xmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize,
-                        "noname.xml", nullptr, parse_opts);
-                    if (doc)
+                    // A logged body is whatever the far end sent. pugixml has
+                    // no document type definition, external entity or network
+                    // machinery at all, so formatting one cannot reach outside
+                    // the bytes being formatted.
+                    pugi::xml_document doc;
+                    if (doc.load_buffer(mEntry->mData, mEntry->mDataSize, pugi::parse_default, pugi::encoding_utf8))
                     {
-                        xmlChar *xmlbuffer = nullptr;
-                        int buffersize = 0;
-                        xmlDocDumpFormatMemory(doc, &xmlbuffer, &buffersize, 1);
-                        full << std::string(reinterpret_cast<char*>(xmlbuffer), buffersize);
-
-                        xmlFree(xmlbuffer);
-                        xmlFreeDoc(doc);
+                        doc.save(full, "  ", pugi::format_indent, pugi::encoding_utf8);
                         data_processed = true;
                     }
                     else
                     {
-                        LL_DEBUGS("EasyMessageReader") << "libxml2 failed to parse xml" << LL_ENDL;
-                    }
-                }
-                else if (beautify && parsed_content_type == HTTP_CONTENT_TEXT_HTML)
-                {
-                    constexpr int parse_opts = HTML_PARSE_NONET | HTML_PARSE_NOERROR | HTML_PARSE_NOIMPLIED | HTML_PARSE_NOBLANKS;
-                    htmlDocPtr doc = htmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize,
-                        "noname.html", nullptr, parse_opts);
-                    if (doc)
-                    {
-                        xmlChar * htmlbuffer = nullptr;
-                        int buffersize = 0;
-                        htmlDocDumpMemoryFormat(doc, &htmlbuffer, &buffersize, 1);
-                        full << std::string(reinterpret_cast<char*>(htmlbuffer), buffersize);
-
-                        xmlFree(htmlbuffer);
-                        xmlFreeDoc(doc);
-                        data_processed = true;
-                    }
-                    else
-                    {
-                        LL_DEBUGS("EasyMessageReader") << "libxml2 failed to parse html" << LL_ENDL;
+                        LL_DEBUGS("EasyMessageReader") << "failed to parse xml" << LL_ENDL;
                     }
                 }
                 else if (parsed_content_type == HTTP_CONTENT_IMAGE_X_J2C
