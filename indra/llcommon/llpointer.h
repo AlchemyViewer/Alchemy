@@ -111,11 +111,14 @@ public:
         unref();
     }
 
+    // Constness of the pointer says nothing about constness of the pointee,
+    // which is how unique_ptr and shared_ptr behave and what get() and the
+    // Type* conversion below have always done here. operator-> used to be the
+    // odd one out, handing back a pointer to const from a const LLPointer while
+    // get() on the same object handed back a mutable one.
     Type*   get() const                         { return mPointer; }
-    const Type* operator->() const              { return mPointer; }
-    Type*   operator->()                        { return mPointer; }
-    const Type& operator*() const               { return *mPointer; }
-    Type&   operator*()                         { return *mPointer; }
+    Type*   operator->() const                  { return mPointer; }
+    Type&   operator*() const                   { return *mPointer; }
 
     operator bool() const                       { return (mPointer != nullptr); }
     bool operator!() const                      { return (mPointer == nullptr); }
