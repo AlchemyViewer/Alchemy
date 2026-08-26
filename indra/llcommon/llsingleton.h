@@ -355,7 +355,7 @@ private:
     static SingletonSlot& slot()
     {
         SingletonSlot* s = sSlot.load(std::memory_order_relaxed);
-        if (LL_UNLIKELY(! s))
+        if (! s) [[unlikely]]
         {
             // first touch in this module: resolve once and cache
             s = &getSlot(typeid(DERIVED_TYPE).name());
@@ -552,7 +552,7 @@ public:
         // branch -- no lock taken, no dependency bookkeeping.
         if (void* p = s.mFastInstance.load(std::memory_order_acquire))
         {
-            if (LL_LIKELY(sInitializingDepth.load(std::memory_order_acquire) == 0))
+            if (sInitializingDepth.load(std::memory_order_acquire) == 0) [[likely]]
                 return static_cast<DERIVED_TYPE*>(p);
         }
 
@@ -813,7 +813,7 @@ public:
         // Lock-free fast path, identical in spirit to LLSingleton::getInstance().
         if (void* p = s.mFastInstance.load(std::memory_order_acquire))
         {
-            if (LL_LIKELY(LLSingletonBase::sInitializingDepth.load(std::memory_order_acquire) == 0))
+            if (LLSingletonBase::sInitializingDepth.load(std::memory_order_acquire) == 0) [[likely]]
                 return static_cast<DERIVED_TYPE*>(p);
         }
 

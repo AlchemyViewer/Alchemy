@@ -1400,7 +1400,7 @@ void LLGLSLShader::bind()
 // the builds that ship are the ones where a missed site would go unseen.
 void LLGLSLShader::warnIfVariantMissed() const
 {
-    if (LL_LIKELY(!gDebugGL))
+    if (!gDebugGL) [[likely]]
     {
         return;
     }

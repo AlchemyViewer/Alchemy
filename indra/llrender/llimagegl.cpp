@@ -2712,7 +2712,7 @@ bool LLImageGL::getMask(const LLVector2 &tc) const
     if (mPickMask)
     {
         F32 u,v;
-        if (LL_LIKELY(tc.isFinite()))
+        if (tc.isFinite()) [[likely]]
         {
             u = tc.mV[0] - floorf(tc.mV[0]);
             v = tc.mV[1] - floorf(tc.mV[1]);
@@ -2725,8 +2725,8 @@ bool LLImageGL::getMask(const LLVector2 &tc) const
             // llassert(false);
         }
 
-        if (LL_UNLIKELY(u < 0.f || u > 1.f ||
-                v < 0.f || v > 1.f))
+        if (u < 0.f || u > 1.f ||
+                v < 0.f || v > 1.f) [[unlikely]]
         {
             LL_WARNS_ONCE("render") << "Ugh, u/v out of range in image mask pick" << LL_ENDL;
             u = v = 0.f;
@@ -2741,12 +2741,12 @@ bool LLImageGL::getMask(const LLVector2 &tc) const
         // tested `> mPickMaskWidth` and clamped to `mPickMaskWidth` itself,
         // which is one past the valid range and addresses the start of the
         // next row's bits. Use `>=` and clamp to width-1 / height-1.
-        if (LL_UNLIKELY(x >= mPickMaskWidth))
+        if (x >= mPickMaskWidth) [[unlikely]]
         {
             LL_WARNS_ONCE("render") << "Ooh, width overrun on pick mask read, that coulda been bad." << LL_ENDL;
             x = mPickMaskWidth > 0 ? mPickMaskWidth - 1 : 0;
         }
-        if (LL_UNLIKELY(y >= mPickMaskHeight))
+        if (y >= mPickMaskHeight) [[unlikely]]
         {
             LL_WARNS_ONCE("render") << "Ooh, height overrun on pick mask read, that woulda been bad." << LL_ENDL;
             y = mPickMaskHeight > 0 ? mPickMaskHeight - 1 : 0;

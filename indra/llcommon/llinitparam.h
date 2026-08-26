@@ -1017,7 +1017,7 @@ namespace LLInitParam
         :   Param(block_descriptor.mCurrentBlockPtr),
             named_value_t(value)
         {
-            if (LL_UNLIKELY(block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING))
+            if (block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
             {
                 init(block_descriptor, validate_func, min_count, max_count, name);
             }
@@ -1187,7 +1187,7 @@ namespace LLInitParam
         :   Param(block_descriptor.mCurrentBlockPtr),
             named_value_t(value)
         {
-            if (LL_UNLIKELY(block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING))
+            if (block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
             {
                 init(block_descriptor, validate_func, min_count, max_count, name);
             }
@@ -1375,7 +1375,7 @@ namespace LLInitParam
         {
             mValues = value;
 
-            if (LL_UNLIKELY(block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING))
+            if (block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
             {
                 init(block_descriptor, validate_func, min_count, max_count, name);
 
@@ -1619,7 +1619,7 @@ namespace LLInitParam
         {
             mValues = value;
 
-            if (LL_UNLIKELY(block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING))
+            if (block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
             {
                 init(block_descriptor, validate_func, min_count, max_count, name);
             }
@@ -1946,7 +1946,7 @@ namespace LLInitParam
             {
                 // assign initial choice to first declared option
                 DERIVED_BLOCK* blockp = ((DERIVED_BLOCK*)DERIVED_BLOCK::getBlockDescriptor().mCurrentBlockPtr);
-                if (LL_UNLIKELY(DERIVED_BLOCK::getBlockDescriptor().mInitializationState == BlockDescriptor::INITIALIZING))
+                if (DERIVED_BLOCK::getBlockDescriptor().mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
                 {
                     if(blockp->mCurChoice == 0)
                     {
@@ -2177,7 +2177,7 @@ namespace LLInitParam
             :   Param(DERIVED_BLOCK::getBlockDescriptor().mCurrentBlockPtr)
             {
                 BlockDescriptor& block_descriptor = DERIVED_BLOCK::getBlockDescriptor();
-                if (LL_UNLIKELY(block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING))
+                if (block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
                 {
                     ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
                                                     block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),

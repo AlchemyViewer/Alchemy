@@ -605,7 +605,7 @@ bool LLFavoritesBarCtrl::handleDragAndDropToMenu(S32 x, S32 y, MASK mask, bool d
 
 void LLFavoritesBarCtrl::handleExistingFavoriteDragAndDrop(S32 x, S32 y)
 {
-    if (LL_UNLIKELY(mItems.empty()))
+    if (mItems.empty()) [[unlikely]]
         return;
 
     LLUUID target_id;
@@ -721,7 +721,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
     if (mDragToOverflowMenu)
     {
         LLView* overflow_menu = mOverflowMenuHandle.get();
-        if (LL_UNLIKELY(!overflow_menu || overflow_menu->isDead() || !overflow_menu->getVisible()))
+        if (!overflow_menu || overflow_menu->isDead() || !overflow_menu->getVisible()) [[unlikely]]
             return false;
 
         // Identify the menu item hovered and the side to drop
@@ -741,7 +741,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
                 };
             // Menu items are placed in the backward order, so the bottom goes first
             auto it = std::find_if(begin, end, check);
-            if (LL_UNLIKELY(it == end))
+            if (it == end) [[unlikely]]
                 return false;
             target_item = (LLFavoriteLandmarkMenuItem*)*it;
             insert_before = false;
@@ -760,7 +760,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
         {
             // Choose the right landmark button
             hovered_button = dynamic_cast<LLFavoriteLandmarkButton*>(mLastTab);
-            if (LL_UNLIKELY(!hovered_button))
+            if (!hovered_button) [[unlikely]]
                 return false;
 
             insert_before = false;

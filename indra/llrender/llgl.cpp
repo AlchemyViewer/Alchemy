@@ -3036,14 +3036,14 @@ const std::string getGLErrorString(GLenum error)
 //this function outputs gl error to the log file, does not crash the code.
 void log_glerror()
 {
-    if (LL_UNLIKELY(!gGLManager.mInited))
+    if (!gGLManager.mInited) [[unlikely]]
     {
         return ;
     }
     //  Create or update texture to be used with this data
     GLenum error;
     error = glGetError();
-    while (LL_UNLIKELY(error))
+    while (error) [[unlikely]]
     {
         std::string gl_error_msg = getGLErrorString(error);
         LL_WARNS() << "GL Error: 0x" << std::hex << error << std::dec << " GL Error String: " << gl_error_msg << LL_ENDL;
@@ -3057,7 +3057,7 @@ void do_assert_glerror()
     GLenum error;
     error = glGetError();
     bool quit = false;
-    if (LL_UNLIKELY(error))
+    if (error) [[unlikely]]
     {
         quit = true;
         std::string gl_error_msg = getGLErrorString(error);

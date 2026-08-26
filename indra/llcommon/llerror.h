@@ -77,7 +77,7 @@ const int LL_ERR_NOERR = 0;
 
 #endif // !_DEBUG
 
-#define llassert_always_msg(func, msg) if (LL_UNLIKELY(!(func))) LL_ERRS() << "ASSERT (" << msg << ")" << LL_ENDL
+#define llassert_always_msg(func, msg) if (!(func)) [[unlikely]] LL_ERRS() << "ASSERT (" << msg << ")" << LL_ENDL
 
 #define llassert_always(func)   llassert_always_msg(func, #func)
 
@@ -403,10 +403,10 @@ typedef LLError::NoClassInfo _LL_CLASS_TO_LOG;
         lllog_test_()
 #endif
 
-#define lllog_test_()                   \
-    if (LL_UNLIKELY(_site.shouldLog())) \
-    {                                   \
-        std::ostringstream _out;        \
+#define lllog_test_()                     \
+    if (_site.shouldLog()) [[unlikely]]   \
+    {                                     \
+        std::ostringstream _out;          \
         _out
 
 #define lllog_site_args_(level, once, tags)                 \
