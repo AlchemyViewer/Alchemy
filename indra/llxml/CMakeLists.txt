@@ -27,7 +27,6 @@ target_link_libraries(llxml
     llfilesystem
     llmath
     llcommon
-    ll::expat
     ll::pugixml
     )
 target_include_directories( llxml  INTERFACE   ${CMAKE_CURRENT_SOURCE_DIR})

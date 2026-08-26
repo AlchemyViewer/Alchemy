@@ -293,7 +293,6 @@ target_link_libraries(
         llcommon
         PUBLIC
         ll::apr
-        ll::expat
         ll::zlib-ng
         ll::boost
         ll::oslibraries

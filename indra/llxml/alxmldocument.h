@@ -59,8 +59,8 @@ public:
     S32 errorLine() const { return lineOf(mResult.offset); }
     S32 errorColumn() const { return columnOf(mResult.offset); }
 
-    // Line is one based and column is zero based, which is how expat numbered
-    // them and so how the messages built from them read.
+    // Line is one based and column is zero based, matching how the messages
+    // built from them read.
     S32 lineOf(ptrdiff_t offset) const;
     S32 columnOf(ptrdiff_t offset) const;
 

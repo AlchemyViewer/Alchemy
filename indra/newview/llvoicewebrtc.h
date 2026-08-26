@@ -44,7 +44,6 @@ class LLWebRTCProtocolParser;
 #include "llmutelist.h"
 #include <queue>
 
-#include <expat.h>
 #include "llvoiceclient.h"
 
 // WebRTC Includes

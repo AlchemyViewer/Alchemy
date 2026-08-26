@@ -9,7 +9,6 @@ add_library (llprecompiled STATIC ${llprecompiled_SOURCE_FILES})
 target_link_libraries(llprecompiled
         llcommon
         ll::apr
-        ll::expat
         ll::zlib-ng
         ll::boost
         ll::oslibraries
@@ -40,7 +39,6 @@ add_executable(llprecompiled_exe ${llprecompiled_SOURCE_FILES})
 target_link_libraries(llprecompiled_exe
         llcommon
         ll::apr
-        ll::expat
         ll::zlib-ng
         ll::boost
         ll::oslibraries

@@ -37,7 +37,6 @@
 #include "llbufferstream.h"
 #include "llfile.h"
 #include "llmenugl.h"
-#include <expat.h>
 #include "llcallbacklist.h"
 #include "llviewernetwork.h"        // for gGridChoice
 #include "llbase64.h"

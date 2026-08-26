@@ -24,7 +24,6 @@
 #include "llviewerregion.h"
 #include "message.h"
 
-#undef XMLCALL //HACK: need to find the expat.h include
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/HTMLparser.h>
@@ -197,7 +196,7 @@ std::string LLEasyMessageLogEntry::getFull(bool beautify, bool show_header) cons
                 boost::algorithm::to_lower(parsed_content_type); // convert to lowercase
                 if (beautify && (parsed_content_type == HTTP_CONTENT_LLSD_XML || parsed_content_type == HTTP_CONTENT_XML))
                 {
-                    // Use libxml2 instead of expat for safety.
+                    // Use libxml2 for safety.
                     constexpr int parse_opts = XML_PARSE_NONET | XML_PARSE_NOCDATA | XML_PARSE_NOXINCNODE | XML_PARSE_NOBLANKS;
                     xmlDocPtr doc = xmlReadMemory(reinterpret_cast<char *>(mEntry->mData), mEntry->mDataSize,
                         "noname.xml", nullptr, parse_opts);

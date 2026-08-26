@@ -16,7 +16,6 @@ set(cmake_SOURCE_FILES
         CURL.cmake
         DBUS.cmake
         Discord.cmake
-        EXPAT.cmake
         FAudio.cmake
         FindPipeWire.cmake
         FMODSTUDIO.cmake
