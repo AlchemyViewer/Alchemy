@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <charconv>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -326,6 +327,31 @@ void LLXMLNode::updateDefault()
 namespace
 {
 
+// A count or a version as sscanf's %u took one: leading whitespace, an optional
+// plus, then digits. Anything else leaves the caller's value untouched, which is
+// how size="Large" has always been ignored rather than misread as a length.
+bool read_unsigned(std::string_view text, U32& value, const char** end = nullptr)
+{
+    const char* first = text.data();
+    const char* const last = first + text.size();
+
+    while (first != last && (*first == ' ' || (*first >= '\t' && *first <= '\r')))
+    {
+        ++first;
+    }
+    if (first != last && *first == '+')
+    {
+        ++first;
+    }
+
+    const std::from_chars_result result = std::from_chars(first, last, value);
+    if (end)
+    {
+        *end = result.ptr;
+    }
+    return result.ec == std::errc();
+}
+
 void appendNodeValue(LLXMLNode* node, std::string_view text)
 {
     if (LLXMLNode::sStripEscapedStrings && !text.empty()
@@ -393,25 +419,30 @@ void buildNodeTree(const ALXmlDocument& document, LLXMLNode* file_node)
             else if ('v' == attr_name[0] && "version" == attr_name)
             {
                 U32 version_major = 0;
-                U32 version_minor = 0;
-                if (sscanf(attribute.value(), "%u.%u", &version_major, &version_minor) > 0)
+                const char* after_major = nullptr;
+                if (read_unsigned(attr_value, version_major, &after_major))
                 {
                     new_node->mVersionMajor = version_major;
-                    new_node->mVersionMinor = version_minor;
+
+                    U32 version_minor = 0;
+                    const std::string_view minor(after_major, attr_value.data() + attr_value.size() - after_major);
+                    new_node->mVersionMinor =
+                        (!minor.empty() && minor.front() == '.' && read_unsigned(minor.substr(1), version_minor))
+                            ? version_minor : 0;
                 }
             }
             else if (('s' == attr_name[0] && "size" == attr_name) || ('l' == attr_name[0] && "length" == attr_name))
             {
-                U32 length;
-                if (sscanf(attribute.value(), "%u", &length) > 0)
+                U32 length = 0;
+                if (read_unsigned(attr_value, length))
                 {
                     new_node->mLength = length;
                 }
             }
             else if ('p' == attr_name[0] && "precision" == attr_name)
             {
-                U32 precision;
-                if (sscanf(attribute.value(), "%u", &precision) > 0)
+                U32 precision = 0;
+                if (read_unsigned(attr_value, precision))
                 {
                     new_node->mPrecision = precision;
                 }
@@ -3142,11 +3173,12 @@ std::string LLXMLNode::getSanitizedValue() const
 std::string LLXMLNode::getTextContents() const
 {
     std::string msg;
-    std::string contents = mValue;
-    std::string::size_type n = contents.find_first_not_of(" \t\n");
-    if (n != std::string::npos && contents[n] == '\"')
+    std::string::size_type n = mValue.find_first_not_of(" \t\n");
+    if (n != std::string::npos && mValue[n] == '\"')
     {
-        // Case 1: node has quoted text
+        // Case 1: node has quoted text. The escape fix-up below erases from the
+        // buffer as it goes, so this is the branch that needs one of its own.
+        std::string contents = mValue;
         S32 num_lines = 0;
         while(1)
         {
