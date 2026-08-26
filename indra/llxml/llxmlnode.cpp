@@ -139,7 +139,7 @@ LLXMLNode::~LLXMLNode()
     mDefault = nullptr;
 }
 
-bool LLXMLNode::isNull()
+bool LLXMLNode::isNull() const
 {
     return (mName == nullptr);
 }
@@ -229,7 +229,7 @@ void LLXMLNode::addChild(const LLXMLNodePtr& new_child)
         {
             removeChild(found_it->second);
         }
-        mAttributes.insert(std::make_pair(child->mName, new_child));
+        mAttributes.emplace(child->mName, new_child);
     }
     else
     {
@@ -239,7 +239,7 @@ void LLXMLNode::addChild(const LLXMLNodePtr& new_child)
             mChildren->head = new_child;
             mChildren->tail = new_child;
         }
-        mChildren->map.insert(std::make_pair(child->mName, new_child));
+        mChildren->map.emplace(child->mName, new_child);
 
         if (mChildren->tail != new_child)
         {
@@ -707,7 +707,7 @@ bool LLXMLNode::parseStream(
     return true;
 }
 
-bool LLXMLNode::isFullyDefault()
+bool LLXMLNode::isFullyDefault() const
 {
     if (mDefault.isNull())
     {
@@ -969,7 +969,7 @@ void LLXMLNode::findName(const std::string& name, LLXMLNodeList &results)
     LLStringTableEntry* name_entry = gStringTable.checkStringEntry(name);
     if (name_entry == mName)
     {
-        results.insert(std::make_pair(this->mName->mString, this));
+        results.emplace(this->mName->mString, this);
         return;
     }
     if (mChildren.notNull())
@@ -985,7 +985,7 @@ void LLXMLNode::findName(LLStringTableEntry* name, LLXMLNodeList &results)
 {
     if (name == mName)
     {
-        results.insert(std::make_pair(this->mName->mString, this));
+        results.emplace(this->mName->mString, this);
         return;
     }
     if (mChildren.notNull())
@@ -1001,7 +1001,7 @@ void LLXMLNode::findID(const std::string& id, LLXMLNodeList &results)
 {
     if (id == mID)
     {
-        results.insert(std::make_pair(this->mName->mString, this));
+        results.emplace(this->mName->mString, this);
         return;
     }
     if (mChildren.notNull())
@@ -1057,12 +1057,12 @@ void LLXMLNode::scrubToTree(LLXMLNode *tree)
     }
 }
 
-bool LLXMLNode::getChild(const char* name, LLXMLNodePtr& node, bool use_default_if_missing)
+bool LLXMLNode::getChild(const char* name, LLXMLNodePtr& node, bool use_default_if_missing) const
 {
     return getChild(gStringTable.checkStringEntry(name), node, use_default_if_missing);
 }
 
-bool LLXMLNode::getChild(const LLStringTableEntry* name, LLXMLNodePtr& node, bool use_default_if_missing)
+bool LLXMLNode::getChild(const LLStringTableEntry* name, LLXMLNodePtr& node, bool use_default_if_missing) const
 {
     if (mChildren.notNull())
     {
@@ -1101,7 +1101,7 @@ void LLXMLNode::getChildren(const LLStringTableEntry* name, LLXMLNodeList &child
                 {
                     break;
                 }
-                children.insert(std::make_pair(child->mName->mString, child));
+                children.emplace(child->mName->mString, child);
                 child_itr++;
             }
         }
@@ -1121,7 +1121,7 @@ void LLXMLNode::getDescendants(const LLStringTableEntry* name, LLXMLNodeList &ch
         {
             if (name == child->mName)
             {
-                children.insert(std::make_pair(child->mName->mString, child));
+                children.emplace(child->mName->mString, child);
             }
             // and check each child as well
             child->getDescendants(name, children);
@@ -1129,12 +1129,12 @@ void LLXMLNode::getDescendants(const LLStringTableEntry* name, LLXMLNodeList &ch
     }
 }
 
-bool LLXMLNode::getAttribute(const char* name, LLXMLNodePtr& node, bool use_default_if_missing)
+bool LLXMLNode::getAttribute(const char* name, LLXMLNodePtr& node, bool use_default_if_missing) const
 {
     return getAttribute(gStringTable.checkStringEntry(name), node, use_default_if_missing);
 }
 
-bool LLXMLNode::getAttribute(const LLStringTableEntry* name, LLXMLNodePtr& node, bool use_default_if_missing)
+bool LLXMLNode::getAttribute(const LLStringTableEntry* name, LLXMLNodePtr& node, bool use_default_if_missing) const
 {
     if (name)
     {
@@ -1153,38 +1153,37 @@ bool LLXMLNode::getAttribute(const LLStringTableEntry* name, LLXMLNodePtr& node,
     return false;
 }
 
-bool LLXMLNode::setAttributeString(const char* attr, const std::string& value)
+bool LLXMLNode::setAttributeString(const char* attr, std::string value)
 {
     LLStringTableEntry* name = gStringTable.checkStringEntry(attr);
     LLXMLAttribList::const_iterator child_itr = mAttributes.find(name);
     if (child_itr != mAttributes.end())
     {
-        LLXMLNodePtr node = (*child_itr).second;
-        node->setValue(value);
+        child_itr->second->setValue(std::move(value));
         return true;
     }
     return false;
 }
 
-bool LLXMLNode::hasAttribute(const char* name )
+bool LLXMLNode::hasAttribute(const char* name ) const
 {
     LLXMLNodePtr node;
     return getAttribute(name, node);
 }
 
-bool LLXMLNode::getAttributeBOOL(const char* name, bool& value )
+bool LLXMLNode::getAttributeBOOL(const char* name, bool& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getBoolValue(1, &value));
 }
 
-bool LLXMLNode::getAttributeU8(const char* name, U8& value )
+bool LLXMLNode::getAttributeU8(const char* name, U8& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getByteValue(1, &value));
 }
 
-bool LLXMLNode::getAttributeS8(const char* name, S8& value )
+bool LLXMLNode::getAttributeS8(const char* name, S8& value ) const
 {
     LLXMLNodePtr node;
     S32 val{};
@@ -1196,7 +1195,7 @@ bool LLXMLNode::getAttributeS8(const char* name, S8& value )
     return true;
 }
 
-bool LLXMLNode::getAttributeU16(const char* name, U16& value )
+bool LLXMLNode::getAttributeU16(const char* name, U16& value ) const
 {
     LLXMLNodePtr node;
     U32 val{};
@@ -1208,7 +1207,7 @@ bool LLXMLNode::getAttributeU16(const char* name, U16& value )
     return true;
 }
 
-bool LLXMLNode::getAttributeS16(const char* name, S16& value )
+bool LLXMLNode::getAttributeS16(const char* name, S16& value ) const
 {
     LLXMLNodePtr node;
     S32 val{};
@@ -1220,73 +1219,73 @@ bool LLXMLNode::getAttributeS16(const char* name, S16& value )
     return true;
 }
 
-bool LLXMLNode::getAttributeU32(const char* name, U32& value )
+bool LLXMLNode::getAttributeU32(const char* name, U32& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getUnsignedValue(1, &value));
 }
 
-bool LLXMLNode::getAttributeS32(const char* name, S32& value )
+bool LLXMLNode::getAttributeS32(const char* name, S32& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getIntValue(1, &value));
 }
 
-bool LLXMLNode::getAttributeF32(const char* name, F32& value )
+bool LLXMLNode::getAttributeF32(const char* name, F32& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getFloatValue(1, &value));
 }
 
-bool LLXMLNode::getAttributeF64(const char* name, F64& value )
+bool LLXMLNode::getAttributeF64(const char* name, F64& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getDoubleValue(1, &value));
 }
 
-bool LLXMLNode::getAttributeColor(const char* name, LLColor4& value )
+bool LLXMLNode::getAttributeColor(const char* name, LLColor4& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getFloatValue(4, value.mV));
 }
 
-bool LLXMLNode::getAttributeColor4(const char* name, LLColor4& value )
+bool LLXMLNode::getAttributeColor4(const char* name, LLColor4& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getFloatValue(4, value.mV));
 }
 
-bool LLXMLNode::getAttributeColor4U(const char* name, LLColor4U& value )
+bool LLXMLNode::getAttributeColor4U(const char* name, LLColor4U& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getByteValue(4, value.mV));
 }
 
-bool LLXMLNode::getAttributeVector3(const char* name, LLVector3& value )
+bool LLXMLNode::getAttributeVector3(const char* name, LLVector3& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getFloatValue(3, value.mV));
 }
 
-bool LLXMLNode::getAttributeVector3d(const char* name, LLVector3d& value )
+bool LLXMLNode::getAttributeVector3d(const char* name, LLVector3d& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getDoubleValue(3, value.mdV));
 }
 
-bool LLXMLNode::getAttributeQuat(const char* name, LLQuaternion& value )
+bool LLXMLNode::getAttributeQuat(const char* name, LLQuaternion& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getFloatValue(4, value.mQ));
 }
 
-bool LLXMLNode::getAttributeUUID(const char* name, LLUUID& value )
+bool LLXMLNode::getAttributeUUID(const char* name, LLUUID& value ) const
 {
     LLXMLNodePtr node;
     return (getAttribute(name, node) && node->getUUIDValue(1, &value));
 }
 
-bool LLXMLNode::getAttributeString(const char* name, std::string& value )
+bool LLXMLNode::getAttributeString(const char* name, std::string& value ) const
 {
     LLXMLNodePtr node;
     if (!getAttribute(name, node))
@@ -1595,7 +1594,7 @@ const char *LLXMLNode::parseFloat(const char *str, F64 *dest, U32 precision, Enc
     return nullptr;
 }
 
-U32 LLXMLNode::getBoolValue(U32 expected_length, bool *array)
+U32 LLXMLNode::getBoolValue(U32 expected_length, bool *array) const
 {
     llassert(array);
 
@@ -1636,7 +1635,7 @@ U32 LLXMLNode::getBoolValue(U32 expected_length, bool *array)
     return ret_length;
 }
 
-U32 LLXMLNode::getByteValue(U32 expected_length, U8 *array, Encoding encoding)
+U32 LLXMLNode::getByteValue(U32 expected_length, U8 *array, Encoding encoding) const
 {
     llassert(array);
 
@@ -1689,7 +1688,7 @@ U32 LLXMLNode::getByteValue(U32 expected_length, U8 *array, Encoding encoding)
     return i;
 }
 
-U32 LLXMLNode::getIntValue(U32 expected_length, S32 *array, Encoding encoding)
+U32 LLXMLNode::getIntValue(U32 expected_length, S32 *array, Encoding encoding) const
 {
     llassert(array);
 
@@ -1742,7 +1741,7 @@ U32 LLXMLNode::getIntValue(U32 expected_length, S32 *array, Encoding encoding)
     return i;
 }
 
-U32 LLXMLNode::getUnsignedValue(U32 expected_length, U32 *array, Encoding encoding)
+U32 LLXMLNode::getUnsignedValue(U32 expected_length, U32 *array, Encoding encoding) const
 {
     llassert(array);
 
@@ -1797,7 +1796,7 @@ U32 LLXMLNode::getUnsignedValue(U32 expected_length, U32 *array, Encoding encodi
     return i;
 }
 
-U32 LLXMLNode::getLongValue(U32 expected_length, U64 *array, Encoding encoding)
+U32 LLXMLNode::getLongValue(U32 expected_length, U64 *array, Encoding encoding) const
 {
     llassert(array);
 
@@ -1851,7 +1850,7 @@ U32 LLXMLNode::getLongValue(U32 expected_length, U64 *array, Encoding encoding)
     return i;
 }
 
-U32 LLXMLNode::getFloatValue(U32 expected_length, F32 *array, Encoding encoding)
+U32 LLXMLNode::getFloatValue(U32 expected_length, F32 *array, Encoding encoding) const
 {
     llassert(array);
 
@@ -1896,7 +1895,7 @@ U32 LLXMLNode::getFloatValue(U32 expected_length, F32 *array, Encoding encoding)
     return i;
 }
 
-U32 LLXMLNode::getDoubleValue(U32 expected_length, F64 *array, Encoding encoding)
+U32 LLXMLNode::getDoubleValue(U32 expected_length, F64 *array, Encoding encoding) const
 {
     llassert(array);
 
@@ -1941,7 +1940,7 @@ U32 LLXMLNode::getDoubleValue(U32 expected_length, F64 *array, Encoding encoding
     return i;
 }
 
-U32 LLXMLNode::getStringValue(U32 expected_length, std::string *array)
+U32 LLXMLNode::getStringValue(U32 expected_length, std::string *array) const
 {
     llassert(array);
 
@@ -1990,7 +1989,7 @@ U32 LLXMLNode::getStringValue(U32 expected_length, std::string *array)
     return num_returned_strings;
 }
 
-U32 LLXMLNode::getUUIDValue(U32 expected_length, LLUUID *array)
+U32 LLXMLNode::getUUIDValue(U32 expected_length, LLUUID *array) const
 {
     llassert(array);
 
@@ -2135,7 +2134,7 @@ void LLXMLNode::setByteValue(U32 length, const U8* const array, Encoding encodin
     }
     // TODO -- Handle Base32
 
-    mValue = new_value;
+    mValue = std::move(new_value);
     mEncoding = encoding;
     mLength = length;
     mType = TYPE_INTEGER;
@@ -2176,11 +2175,11 @@ void LLXMLNode::setIntValue(U32 length, const S32 *array, Encoding encoding)
                 new_value.append(llformat("%08X", ((U32 *)array)[pos]));
             }
         }
-        mValue = new_value;
+        mValue = std::move(new_value);
     }
     else
     {
-        mValue = new_value;
+        mValue = std::move(new_value);
     }
     // TODO -- Handle Base32
 
@@ -2226,7 +2225,7 @@ void LLXMLNode::setUnsignedValue(U32 length, const U32* array, Encoding encoding
     }
     // TODO -- Handle Base32
 
-    mValue = new_value;
+    mValue = std::move(new_value);
     mEncoding = encoding;
     mLength = length;
     mType = TYPE_INTEGER;
@@ -2274,11 +2273,11 @@ void LLXMLNode::setLongValue(U32 length, const U64* array, Encoding encoding)
                 new_value.append(llformat("%08X%08X", upper_32, lower_32));
             }
         }
-        mValue = new_value;
+        mValue = std::move(new_value);
     }
     else
     {
-        mValue = new_value;
+        mValue = std::move(new_value);
     }
     // TODO -- Handle Base32
 
@@ -2331,11 +2330,11 @@ void LLXMLNode::setFloatValue(U32 length, const F32 *array, Encoding encoding, U
             const char* fmt = (pos > 0 && pos % 16 == 0) ? " %08X" : "%08X";
             new_value.append(llformat(fmt, bits));
         }
-        mValue = new_value;
+        mValue = std::move(new_value);
     }
     else
     {
-        mValue = new_value;
+        mValue = std::move(new_value);
     }
 
     mEncoding = encoding;
@@ -2388,11 +2387,11 @@ void LLXMLNode::setDoubleValue(U32 length, const F64 *array, Encoding encoding, 
             const char* fmt = (pos > 0 && pos % 8 == 0) ? " %08X%08X" : "%08X%08X";
             new_value.append(llformat(fmt, upper_32, lower_32));
         }
-        mValue = new_value;
+        mValue = std::move(new_value);
     }
     else
     {
-        mValue = new_value;
+        mValue = std::move(new_value);
     }
     // TODO -- Handle Base32
 
@@ -2434,7 +2433,7 @@ void LLXMLNode::setStringValue(U32 length, const std::string *strings)
         if (pos < length-1) new_value.append(" ");
     }
 
-    mValue = new_value;
+    mValue = std::move(new_value);
     mEncoding = ENCODING_DEFAULT;
     mLength = length;
     mType = TYPE_STRING;
@@ -2451,7 +2450,7 @@ void LLXMLNode::setUUIDValue(U32 length, const LLUUID *array)
         if (pos < length-1) new_value.append(" ");
     }
 
-    mValue = new_value;
+    mValue = std::move(new_value);
     mEncoding = ENCODING_DEFAULT;
     mLength = length;
     mType = TYPE_UUID;
@@ -2475,7 +2474,7 @@ void LLXMLNode::setNodeRefValue(U32 length, const LLXMLNode **array)
         if (pos < length-1) new_value.append(" ");
     }
 
-    mValue = new_value;
+    mValue = std::move(new_value);
     mEncoding = ENCODING_DEFAULT;
     mLength = length;
     mType = TYPE_NODEREF;
@@ -3232,7 +3231,7 @@ void LLXMLNode::setLineNumber(S32 line_number)
     mLineNumber = line_number;
 }
 
-S32 LLXMLNode::getLineNumber()
+S32 LLXMLNode::getLineNumber() const
 {
     return mLineNumber;
 }

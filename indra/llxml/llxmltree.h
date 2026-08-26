@@ -54,6 +54,13 @@ class LLXmlTree
 public:
     LLXmlTree();
     virtual ~LLXmlTree();
+
+    // Owns mRoot and deletes it, so a copy would free the tree twice. Moving
+    // hands the root over and leaves the source empty.
+    LLXmlTree(const LLXmlTree&) = delete;
+    LLXmlTree& operator=(const LLXmlTree&) = delete;
+    LLXmlTree(LLXmlTree&& other) noexcept;
+    LLXmlTree& operator=(LLXmlTree&& other) noexcept;
     void cleanup();
 
     virtual bool    parseFile(const std::string &path, bool keep_contents = true);
@@ -89,10 +96,15 @@ class LLXmlTreeNode
 
 protected:
     // Protected since nodes are only created and destroyed by friend classes and other LLXmlTreeNodes
-    LLXmlTreeNode( const std::string& name, LLXmlTreeNode* parent, LLXmlTree* tree );
+    LLXmlTreeNode( std::string name, LLXmlTreeNode* parent, LLXmlTree* tree );
 
 public:
     virtual ~LLXmlTreeNode();
+
+    // Owns its children and its attribute values as raw pointers and deletes
+    // every one of them, so a copy would free them twice.
+    LLXmlTreeNode(const LLXmlTreeNode&) = delete;
+    LLXmlTreeNode& operator=(const LLXmlTreeNode&) = delete;
 
     const std::string&  getName()
     {
@@ -164,7 +176,7 @@ protected:
     }
 
 private:
-    void            addAttribute( const std::string& name, const std::string& value );
+    void            addAttribute( const std::string& name, std::string value );
     void            appendContents( const char* str, std::string::size_type len );
     void            addChild( LLXmlTreeNode* child );
 
@@ -209,7 +221,7 @@ protected:
     void buildTree(const pugi::xml_node& root_element);
 
     //template method pattern
-    virtual LLXmlTreeNode* CreateXmlTreeNode(const std::string& name, LLXmlTreeNode* parent);
+    virtual LLXmlTreeNode* CreateXmlTreeNode(std::string name, LLXmlTreeNode* parent);
 
 protected:
     LLXmlTree*      mTree;

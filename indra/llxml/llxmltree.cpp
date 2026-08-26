@@ -59,6 +59,24 @@ LLXmlTree::~LLXmlTree()
     cleanup();
 }
 
+LLXmlTree::LLXmlTree(LLXmlTree&& other) noexcept
+    : mRoot(other.mRoot),
+      mNodeNames(512)
+{
+    other.mRoot = nullptr;
+}
+
+LLXmlTree& LLXmlTree::operator=(LLXmlTree&& other) noexcept
+{
+    if (this != &other)
+    {
+        cleanup();
+        mRoot = other.mRoot;
+        other.mRoot = nullptr;
+    }
+    return *this;
+}
+
 void LLXmlTree::cleanup()
 {
     delete mRoot;
@@ -104,8 +122,8 @@ void LLXmlTree::dumpNode( LLXmlTreeNode* node, const std::string& prefix )
 //////////////////////////////////////////////////////////////
 // LLXmlTreeNode
 
-LLXmlTreeNode::LLXmlTreeNode( const std::string& name, LLXmlTreeNode* parent, LLXmlTree* tree )
-    : mName(name),
+LLXmlTreeNode::LLXmlTreeNode( std::string name, LLXmlTreeNode* parent, LLXmlTree* tree )
+    : mName(std::move(name)),
       mParent(parent),
       mTree(tree)
 {
@@ -147,11 +165,14 @@ bool LLXmlTreeNode::hasAttribute(const std::string& name)
     return iter != mAttributes.end();
 }
 
-void LLXmlTreeNode::addAttribute(const std::string& name, const std::string& value)
+void LLXmlTreeNode::addAttribute(const std::string& name, std::string value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString(name);
-    const std::string *newstr = new std::string(value);
-    mAttributes[canonical_name] = newstr; // insert + copy
+    const std::string*& slot = mAttributes[canonical_name];
+    // The destructor owns whatever is here, so a repeated attribute name has to
+    // free the value it replaces rather than drop the pointer on the floor.
+    delete slot;
+    slot = new std::string(std::move(value));
 }
 
 LLXmlTreeNode*  LLXmlTreeNode::getFirstChild()
@@ -556,7 +577,7 @@ void LLXmlTreeParser::buildTree(const pugi::xml_node& root_element)
         LLXmlTreeNode* const parent = pending.back().second;
         pending.pop_back();
 
-        LLXmlTreeNode* node = CreateXmlTreeNode( std::string(element.name()), parent );
+        LLXmlTreeNode* node = CreateXmlTreeNode( element.name(), parent );
 
         for (pugi::xml_attribute attribute : element.attributes())
         {
@@ -605,9 +626,9 @@ void LLXmlTreeParser::buildTree(const pugi::xml_node& root_element)
     }
 }
 
-LLXmlTreeNode* LLXmlTreeParser::CreateXmlTreeNode(const std::string& name, LLXmlTreeNode* parent)
+LLXmlTreeNode* LLXmlTreeParser::CreateXmlTreeNode(std::string name, LLXmlTreeNode* parent)
 {
-    return new LLXmlTreeNode(name, parent, mTree);
+    return new LLXmlTreeNode(std::move(name), parent, mTree);
 }
 
 void test_llxmltree()

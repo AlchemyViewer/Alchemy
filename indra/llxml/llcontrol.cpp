@@ -166,7 +166,7 @@ LLControlVariable::LLControlVariable(const std::string& name, eControlType type,
         LL_ERRS() << "Must supply a comment for control " << mName << LL_ENDL;
     }
     //Push back versus setValue'ing here, since we don't want to call a signal yet
-    mValues.push_back(initial);
+    mValues.push_back(std::move(initial));
 }
 
 
@@ -231,7 +231,7 @@ void LLControlVariable::setValue(const LLSD& new_value, bool saved_value)
         resetToDefault(false);
         if (!llsd_compare(mValues.back(), storable_value))
         {
-            mValues.push_back(storable_value);
+            mValues.push_back(std::move(storable_value));
         }
     }
     else
@@ -254,7 +254,7 @@ void LLControlVariable::setValue(const LLSD& new_value, bool saved_value)
             }
 
             // Add the 'un-save' value.
-            mValues.push_back(storable_value);
+            mValues.push_back(std::move(storable_value));
         }
     }
 
@@ -275,7 +275,7 @@ void LLControlVariable::setDefaultValue(const LLSD& value)
     LLSD original_value = getValue();
     bool value_changed = !llsd_compare(original_value, comparable_value);
     resetToDefault(false);
-    mValues[0] = comparable_value;
+    mValues[0] = std::move(comparable_value);
     if (value_changed)
     {
         firePropertyChanged(original_value);
