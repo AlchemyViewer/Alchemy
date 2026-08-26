@@ -29,6 +29,7 @@
 #include "llviewerdisplay.h"
 
 #include "alfloaterprogressview.h"
+#include "aluniformbuffer.h"
 #include "fsyspath.h"
 #include "hexdump.h"
 #include "llagent.h"
@@ -1079,6 +1080,12 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     LLAppViewer::instance()->pingMainloopTimeout("Display:FrameStats");
 
     stop_glerror();
+
+    // Close out the UBO streaming rings' per-frame counters (slices, wraps, GPU stalls) and let
+    // them resize. Here rather than in resetFrameStats(): a resize deletes and remaps a ring and
+    // invalidates every outstanding slice, which must land past this frame's draws, not before its
+    // heaviest passes. See ALUniformBuffer::endFrame.
+    ALUniformBuffer::endFrame();
 
     display_stats();
 

@@ -2259,10 +2259,6 @@ void LLPipeline::resetFrameStats()
     sCompiles        = 0;
     mNumVisibleFaces = 0;
 
-    // Close out the UBO streaming ring's per-frame counters (slices, wraps, GPU stalls).
-    // Warns when the ring lapped or blocked -- see ALUniformBuffer::RingStats.
-    ALUniformBuffer::endFrame();
-
     if (mOldRenderDebugMask != mRenderDebugMask)
     {
         gObjectList.clearDebugText();

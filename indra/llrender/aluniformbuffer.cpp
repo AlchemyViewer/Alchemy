@@ -42,10 +42,11 @@ namespace
         }
     }
 
-    // Frames of sustained low traffic before an adaptively-sized ring shrinks (below) back toward
-    // the observed traffic. Long enough (~4 s at 60 fps) that a scene which merely fluctuates -- a
-    // crowd that comes and goes -- doesn't thrash the ring; growth is always immediate. Shared by
-    // all three streaming rings.
+    // Length of the window an adaptively-sized ring judges a shrink over (below): the ring may
+    // shrink at most once every this many frames, and only to what the window's BUSIEST frame
+    // asked for. Long enough (~4 s at 60 fps) to span the periodic spikes a scene produces --
+    // probe and mirror captures, a camera swing across a crowd -- so none of them lands between
+    // two evaluations. Growth is always immediate. Shared by all three streaming rings.
     constexpr int RING_SHRINK_COOLDOWN = 240;
 
     // Shared streaming ring for UPDATE_RING: every dirty shadowed buffer appends its contents and
@@ -66,7 +67,8 @@ namespace
     U32    sRingGeneration = 1;
     GLint  sRingAlign      = 256; // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, queried on creation
     size_t sRingBytes      = RING_MIN_BYTES; // ring size; sized adaptively in endFrame
-    int    sRingShrinkCd   = 0;              // frames of low traffic toward a shrink
+    int    sRingShrinkCd   = 0;              // frames toward the next shrink evaluation
+    U64    sRingPeakBytes  = 0;              // busiest frame of that window (next_ring_size)
 
     // Scratch ring for per-draw ranged engine-block payloads (see the header), written
     // through scratchWrite() by callers that cache their offsets across many binds
@@ -108,7 +110,8 @@ namespace
     GLint  sScratchAlign        = 256; // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, queried on creation
     int    sScratchSeg          = 0;
     size_t sScratchPersistBytes = SCRATCH_MIN_BYTES; // persistent-ring size; sized adaptively in endFrame
-    int    sScratchShrinkCd     = 0;                 // frames of low traffic toward a shrink
+    int    sScratchShrinkCd     = 0;                 // frames toward the next shrink evaluation
+    U64    sScratchPeakBytes    = 0;                 // busiest frame of that window (next_ring_size)
     GLsync sScratchFence[SCRATCH_SEGMENTS] = {};
     bool   sScratchPersistTried = false; // persistent creation attempted (no retry spam)
 
@@ -158,7 +161,8 @@ namespace
     GLint  sPersistAlign      = 256;
     int    sPersistSeg        = 0;
     size_t sPersistBytes      = PERSIST_MIN_BYTES; // ring size; sized adaptively in endFrame
-    int    sPersistShrinkCd   = 0;                 // frames of low traffic toward a shrink
+    int    sPersistShrinkCd   = 0;                 // frames toward the next shrink evaluation
+    U64    sPersistPeakBytes  = 0;                 // busiest frame of that window (next_ring_size)
     GLsync sPersistFence[PERSIST_SEGMENTS] = {};
     bool   sPersistTried      = false;   // creation attempted (at sPersistTriedCoherent)
     bool   sPersistTriedCoherent = true; // coherency of that attempt: a switch to the OTHER
@@ -446,14 +450,10 @@ namespace
         teardown_ring();
     }
 
-    // Decide the next size for an adaptively-sized ring from this frame's aligned byte traffic.
-    // `target` is the smallest power of two that keeps >= `slack` frames of head slack, clamped to
-    // [floor, cap]. Grow to it AT ONCE; shrink to it only after the ring has sat oversized (a
-    // power-of-two step or more above target) for RING_SHRINK_COOLDOWN frames -- so leaving a crowd
-    // reclaims memory while a scene that merely fluctuates never thrashes. Returns `current` when
-    // nothing should change; the caller resizes iff the result differs.
-    size_t next_ring_size(size_t current, U64 frame_bytes, size_t floor_bytes, size_t cap_bytes,
-                          int slack, int& shrink_cd)
+    // Smallest power of two in [floor, cap] that keeps >= `slack` frames of head slack for a frame
+    // moving `frame_bytes` of aligned traffic. Monotonic in `frame_bytes`, which next_ring_size
+    // relies on.
+    size_t ring_size_for(U64 frame_bytes, size_t floor_bytes, size_t cap_bytes, int slack)
     {
         const size_t want = (size_t)(frame_bytes * (U64)slack);
 
@@ -462,25 +462,53 @@ namespace
         {
             target <<= 1;
         }
-        target = llmin(target, cap_bytes);
+        return llmin(target, cap_bytes);
+    }
 
-        if (target > current)
+    // Decide the next size for an adaptively-sized ring. Grow AT ONCE to what THIS frame asked for;
+    // shrink only at the close of a RING_SHRINK_COOLDOWN-frame window, and only to what the
+    // window's BUSIEST frame asked for. `peak_bytes` carries that maximum and is reset by every
+    // decision. Returns `current` when nothing should change; the caller resizes iff the result
+    // differs.
+    //
+    // The asymmetry is the point, and both halves of it are. Growth is instantaneous because the
+    // failure it prevents -- a segment fence blocking the CPU on the GPU -- happens inside the very
+    // frame that needed the room. A shrink prevents nothing; it only reclaims memory, so it can
+    // afford to wait for evidence, and it must, because a resize is not free: it unmaps and deletes
+    // a multi-MiB persistently-mapped ring, makes the next flush allocate and map a fresh one, and
+    // bumps the generation so every outstanding slice re-flushes. That is a millisecond-class hitch.
+    //
+    // Judging the shrink by a single quiet frame is what makes those hitches recur. A scene whose
+    // slice traffic spikes periodically -- a reflection probe update, a mirror capture, a camera
+    // swing across a crowd -- has quiet frames between its spikes, so the ring shrinks in one of
+    // them and grows again on the next spike, forever, at whatever cadence the spikes arrive.
+    // Sizing the shrink to the window's peak instead holds such a scene at the size its spikes
+    // actually need, and the pair never forms.
+    size_t next_ring_size(size_t current, U64 frame_bytes, size_t floor_bytes, size_t cap_bytes,
+                          int slack, int& shrink_cd, U64& peak_bytes)
+    {
+        peak_bytes = llmax(peak_bytes, frame_bytes);
+
+        if (const size_t target = ring_size_for(frame_bytes, floor_bytes, cap_bytes, slack);
+            target > current)
         {
-            shrink_cd = 0;
+            shrink_cd  = 0;
+            peak_bytes = 0;
             return target; // grow immediately
         }
-        if (target < current)
+
+        if (++shrink_cd < RING_SHRINK_COOLDOWN)
         {
-            // Oversized (pow2 spacing => current is >= 2x target). Shrink only after a cooldown.
-            if (++shrink_cd >= RING_SHRINK_COOLDOWN)
-            {
-                shrink_cd = 0;
-                return target;
-            }
             return current;
         }
-        shrink_cd = 0; // right-sized
-        return current;
+
+        // Every frame in the window sized at or below `current` (a frame that sized above it grew
+        // the ring and restarted the window), so by ring_size_for's monotonicity this is <= current
+        // -- it either shrinks or leaves the size alone.
+        const size_t window = ring_size_for(peak_bytes, floor_bytes, cap_bytes, slack);
+        shrink_cd  = 0;
+        peak_bytes = 0;
+        return window;
     }
 
     // Create + map the persistent ring with the requested coherency on first use (or recreate it
@@ -1088,6 +1116,7 @@ void ALUniformBuffer::release()
 // static
 void ALUniformBuffer::endFrame()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     sPersistLastFrame = sPersistStats;
     sRingLastFrame    = sRingStats;
     sScratchLastFrame = sScratchStats;
@@ -1186,11 +1215,13 @@ void ALUniformBuffer::endFrame()
     sScratchStats = RingStats();
 
     // Adaptively size each live ring to the observed traffic (next_ring_size): grow at once to keep
-    // >= SLACK frames of head slack, shrink back toward the traffic after a cooldown so leaving a
-    // crowd reclaims memory without a fluctuating scene thrashing. A resize tears the ring down
-    // (resize_* -> teardown_*) and the next use recreates it at the new size -- safe here at the
-    // frame boundary: in-flight draws keep the old store alive via GL's deferred delete and the
-    // generation bump makes every owner re-write. Floors are restored on cleanupClass.
+    // >= SLACK frames of head slack, shrink back toward the busiest frame of a whole window so
+    // leaving a crowd reclaims memory without a spiking scene thrashing. A resize tears the ring
+    // down (resize_* -> teardown_*) and the next use recreates it at the new size -- which is why
+    // endFrame belongs at the END of the frame, past swap(), and not at some point inside it:
+    // in-flight draws keep the old store alive via GL's deferred delete, but the generation bump
+    // makes every owner re-write, and a frame that has already bound slices should not be made to
+    // do that mid-flight. Floors are restored on cleanupClass.
     //
     // Scratch: an early-frame payload must survive (through all its passes + GPU latency) without
     // the head lapping it mid-frame. Persistent streaming: a left segment's fence must have signaled
@@ -1200,19 +1231,22 @@ void ALUniformBuffer::endFrame()
     if (sScratchPtr)
     {
         const size_t next = next_ring_size(sScratchPersistBytes, sScratchLastFrame.mBytes,
-                                           SCRATCH_MIN_BYTES, SCRATCH_MAX_BYTES, SCRATCH_SLACK_FRAMES, sScratchShrinkCd);
+                                           SCRATCH_MIN_BYTES, SCRATCH_MAX_BYTES, SCRATCH_SLACK_FRAMES,
+                                           sScratchShrinkCd, sScratchPeakBytes);
         if (next != sScratchPersistBytes) { resize_scratch_ring(next); }
     }
     if (sPersistOK)
     {
         const size_t next = next_ring_size(sPersistBytes, sPersistLastFrame.mBytes,
-                                           PERSIST_MIN_BYTES, PERSIST_MAX_BYTES, PERSIST_SLACK_FRAMES, sPersistShrinkCd);
+                                           PERSIST_MIN_BYTES, PERSIST_MAX_BYTES, PERSIST_SLACK_FRAMES,
+                                           sPersistShrinkCd, sPersistPeakBytes);
         if (next != sPersistBytes) { resize_persist_ring(next); }
     }
     if (sRing != 0)
     {
         const size_t next = next_ring_size(sRingBytes, sRingLastFrame.mBytes,
-                                           RING_MIN_BYTES, RING_MAX_BYTES, RING_SLACK_FRAMES, sRingShrinkCd);
+                                           RING_MIN_BYTES, RING_MAX_BYTES, RING_SLACK_FRAMES,
+                                           sRingShrinkCd, sRingPeakBytes);
         if (next != sRingBytes) { resize_ring(next); }
     }
 }
@@ -1323,17 +1357,21 @@ U32 ALUniformBuffer::scratchGeneration()
 
 void ALUniformBuffer::cleanupClass()
 {
-    // Free all three rings and restore their size floors (and shrink timers) so a fresh context
-    // starts small again (the teardown helpers bump the generation so cached slices re-write).
+    // Free all three rings and restore their size floors (and their shrink windows) so a fresh
+    // context starts small again, and sizes itself from its own traffic rather than the departed
+    // context's peak (the teardown helpers bump the generation so cached slices re-write).
     teardown_ring();
     sRingBytes = RING_MIN_BYTES;
     sRingShrinkCd = 0;
+    sRingPeakBytes = 0;
 
     teardown_scratch_ring();
     sScratchPersistBytes = SCRATCH_MIN_BYTES;
     sScratchShrinkCd = 0;
+    sScratchPeakBytes = 0;
 
     teardown_persist_ring();
     sPersistBytes = PERSIST_MIN_BYTES;
     sPersistShrinkCd = 0;
+    sPersistPeakBytes = 0;
 }

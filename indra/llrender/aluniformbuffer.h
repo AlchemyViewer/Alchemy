@@ -179,8 +179,11 @@ public:
         U32 mLiveRebinds   = 0; // rebinds that reused a live slice (the cheap path)
     };
 
-    // Close the current frame's telemetry: log it, warn if the ring lapped, and reset
-    // the accumulators. Call once per rendered frame (LLPipeline::resetFrameStats).
+    // Close the current frame's telemetry: log it, warn if the ring lapped, reset the
+    // accumulators, and resize each ring to the traffic it has been carrying. Call once per
+    // rendered frame, at the END of it -- past the buffer swap, as display() does. A resize
+    // deletes and remaps a ring and invalidates every outstanding slice, so calling this from
+    // inside a frame makes that frame's own draws pay for it.
     static void endFrame();
 
     // Last completed frame's counters, for a stats readout. Persistent ring == modes
