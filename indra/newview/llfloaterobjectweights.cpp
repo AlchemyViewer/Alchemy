@@ -108,6 +108,9 @@ LLFloaterObjectWeights::LLFloaterObjectWeights(const LLSD& key)
 
 LLFloaterObjectWeights::~LLFloaterObjectWeights()
 {
+    // onClose() normally does this, but the floater can also be destroyed
+    // outright, and gIdleCallbacks would keep calling into freed memory.
+    gIdleCallbacks.deleteFunction(onIdleRefresh, this);
 }
 
 // virtual

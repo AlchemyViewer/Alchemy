@@ -137,8 +137,7 @@ namespace LLZeroCode
     //
     // If expansion would write past dst_capacity - which only a malformed or
     // malicious packet should cause - decoding is aborted, *overflow is set
-    // true, and the returned size reflects however much (if anything) was
-    // salvaged; the caller should treat the packet as invalid.
+    // true and 0 is returned; the caller should treat the packet as invalid.
     inline U32 decode(const U8* src, U32 src_size, U8* dst, U32 dst_capacity, U32 header_size, bool& overflow)
     {
         overflow = false;
@@ -163,7 +162,7 @@ namespace LLZeroCode
         // follow give its length (see the wire format described above).
         while (count--)
         {
-            if (outptr > &dst[dst_capacity - 1])
+            if ((U32)(outptr - dst) >= dst_capacity)
             {
                 overflow = true;
                 outptr = dst;
@@ -174,7 +173,7 @@ namespace LLZeroCode
             {
                 while ((count--) && (!(*inptr)))
                 {
-                    if (outptr > &dst[dst_capacity - 256])
+                    if ((U32)(outptr - dst) + 256 > dst_capacity)
                     {
                         overflow = true;
                         outptr = dst;
@@ -192,7 +191,7 @@ namespace LLZeroCode
                 }
                 else
                 {
-                    if (outptr > &dst[dst_capacity - (*inptr)])
+                    if ((U32)(outptr - dst) + (*inptr) > dst_capacity)
                     {
                         // Discard rather than decode on into a scrambled
                         // buffer, the same as the two cases above.

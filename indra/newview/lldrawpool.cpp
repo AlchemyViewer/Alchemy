@@ -559,19 +559,20 @@ void LLRenderPass::pushRiggedMaskBatches(U32 type, bool texture, bool batch_text
 
         llassert(pparams); // figure out how null got here, it shouldn't be happening
 
-        if (pparams && pparams->mMaterialSlotList.size() > 1)
+        if (!pparams)
+        {
+            continue;
+        }
+        if (pparams->mMaterialSlotList.size() > 1)
         { // multi-material legacy batch -- drawn by pushMaskBatchesIndexed
             continue;
         }
 
-        if (pparams)
-        {
-            LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
+        LLGLSLShader::sCurBoundShaderPtr->setMinimumAlpha(pparams->mAlphaMaskCutoff);
 
-            if (uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
-            {
-                pushBatch(*pparams, texture, batch_textures);
-            }
+        if (uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+        {
+            pushBatch(*pparams, texture, batch_textures);
         }
     }
 }

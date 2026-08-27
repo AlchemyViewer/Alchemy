@@ -213,6 +213,11 @@ bool LLFontFreetype::isFixedWidth() const
     return mFace && mFace->isFixedWidth();
 }
 
+bool LLFontFreetype::wghtAxisSet() const
+{
+    return mFace && mFace->wghtAxisSet();
+}
+
 namespace
 {
     // Walk a fallback list and return the (face, glyph_index) for the first
@@ -1098,18 +1103,10 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
         llassert_always_msg(FT_Err_Ok == error, message.c_str());
     }
 
-    // FT_Load_Glyph reported success, but a driver that produced no slot would
-    // fault on every dereference below.
-    if (!getFTFace()->glyph)
-    {
-        LL_WARNS() << "FT_Load_Glyph succeeded but glyph slot is null for character "
-                   << llformat("U+%X", U32(wch)) << LL_ENDL;
-        return;
-    }
-
-    // A bitmap may already be present: FreeType's OT-SVG renderer hook, an
-    // embedded bitmap strike, and sbix / CBDT colour glyphs all rasterize
-    // during FT_Load_Glyph. Rendering again would throw that away.
+    // An embedded bitmap strike and sbix / CBDT colour glyphs arrive already
+    // rasterized, with the slot's format left as FT_GLYPH_FORMAT_BITMAP.
+    // Rendering those again would throw the bitmap away. FT_Load_Glyph clears
+    // the slot on entry, so a buffer present here always belongs to this load.
     if (!getFTFace()->glyph->bitmap.buffer)
     {
         // FT_Render_Glyph's mode arg overrides the load_flags' target. For

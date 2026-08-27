@@ -64,7 +64,6 @@
 #endif
 
 #if LL_WINDOWS
-#include <windows.h>
 #include "llwin32headers.h"
 #include <mutex>
 
@@ -200,8 +199,6 @@ public:
     }
 
     // Called from LLProcess::tick() to initiate writing buffered data.
-    // Self-chains: each completed write immediately starts the next one if
-    // more data is waiting, so large transfers don't stall between ticks.
     void tick() override
     {
         startAsyncWrite();
@@ -215,36 +212,43 @@ private:
 
         mWritePending = true;
 
-        // Snapshot the number of bytes currently buffered so the async_write
-        // operates on a fixed-size, stable view. Any data written to
-        // get_ostream() while this write is in flight lands in the streambuf's
-        // put area and is excluded from the current operation; it will be sent
-        // on the next tick(). Without this snapshot, a concurrent write to
-        // get_ostream() could reallocate/invalidate the buffer sequence.
-        std::size_t writeSize = mStreambuf.size();
+        // Move the pending bytes into a buffer this operation owns. Handing
+        // async_write a view into mStreambuf would not survive a concurrent
+        // append: writing through get_ostream() calls overflow() -> reserve(),
+        // which memmoves the pending data to offset 0 and may reallocate the
+        // underlying vector, leaving the in-flight buffer dangling. Fixing the
+        // length is not enough, because it is the address that moves. A
+        // read completion dispatched from the same poll_one() loop as this
+        // write can do precisely that (LLLeap answers stdout on stdin).
+        const std::size_t writeSize = mStreambuf.size();
+        mWriteBuf.resize(writeSize);
+        asio::buffer_copy(asio::buffer(mWriteBuf), mStreambuf.data(), writeSize);
+        mStreambuf.consume(writeSize);
 
-        // Write all buffered data asynchronously. Do NOT self-chain in the
-        // completion handler: sending the next buffer immediately can cause
-        // the child to respond within the same tick(), which posts a read
-        // event before the test listener has a chance to disconnect -- that
-        // was the root cause of test 18 "more than 3 events" and test 9
-        // "many small messages" failures. tick() calls mWritePipe->tick() on
-        // every mainloop frame, so any newly-queued data will be sent then.
-        asio::async_write(*mPipe, asio::buffer(mStreambuf.data(), writeSize),
+        // Do NOT self-chain in the completion handler: sending the next buffer
+        // immediately can cause the child to respond within the same tick(),
+        // which posts a read event before the test listener has a chance to
+        // disconnect -- that was the root cause of test 18 "more than 3
+        // events" and test 9 "many small messages" failures. tick() calls
+        // mWritePipe->tick() on every mainloop frame, so anything queued
+        // meanwhile is sent then.
+        asio::async_write(*mPipe, asio::buffer(mWriteBuf),
             [this](const boost::system::error_code& ec, std::size_t bytes_transferred)
         {
             mWritePending = false;
 
             if (!ec)
             {
-                mStreambuf.consume(bytes_transferred);
                 LL_DEBUGS("LLProcess") << "Wrote " << bytes_transferred
                     << " bytes to " << mDesc << LL_ENDL;
             }
             else if (ec != asio::error::operation_aborted)
             {
-                LL_WARNS("LLProcess") << "Write error on " << mDesc
-                    << ": " << ec.message() << LL_ENDL;
+                // async_write only reports short counts alongside an error, and
+                // the pipe is unusable by then, so the remainder is dropped.
+                LL_WARNS("LLProcess") << "Write error on " << mDesc << " after "
+                    << bytes_transferred << " of " << mWriteBuf.size()
+                    << " bytes: " << ec.message() << LL_ENDL;
             }
         });
     }
@@ -252,6 +256,8 @@ private:
     std::string mDesc;
     std::shared_ptr<asio::writable_pipe> mPipe;
     asio::streambuf mStreambuf;
+    // Owned by the in-flight async_write; see startAsyncWrite().
+    std::vector<char> mWriteBuf;
     std::ostream mStream;
     bool mWritePending;
 };
@@ -868,9 +874,14 @@ void LLProcess::tick()
         {
             if (exit_code != STILL_ACTIVE)
             {
-                // Exit code is available
+                // Exit code is available.
                 Status exitStatus;
-                exitStatus.mState = EXITED;
+                // The STATUS_ACCESS_VIOLATION family (see WinNT.h) means the
+                // child died on an exception rather than returning a code, and
+                // callers and the log both want that distinction. This is the
+                // test APR's why_from_exit_code() used before the rewrite.
+                exitStatus.mState =
+                    ((exit_code & 0xFFFF0000) == 0xC0000000) ? KILLED : EXITED;
                 exitStatus.mData = static_cast<int>(exit_code);
                 handleExit(exitStatus);
             }

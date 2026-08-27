@@ -2507,7 +2507,7 @@ bool LLImageGL::analyzeAlphaData(
     S8 alpha_offset,
     S8 alpha_stride)
 {
-    if (!data_in)
+    if (!data_in || alpha_stride < 1)
     {
         return false;
     }
@@ -2564,7 +2564,8 @@ bool LLImageGL::analyzeAlphaData(
 
             rowstart += 2 * w * alpha_stride;
         }
-        length *= 2; // we sampled everything twice, essentially
+        // Two histogram entries per source texel over the paired region.
+        length = 2 * paired_w * paired_h;
     }
     else
     {
@@ -3049,12 +3050,6 @@ bool LLImageGL::scaleDown(S32 desired_discard)
 
         gGL.getTextureSlot(0)->unbind();
     }
-
-#if LL_DARWIN
-    // On macOS, flush before freeing, otherwise the texture may be freed
-    // before Metal's 'lazy' evaluation/restoration behavior triggers.
-    glFlush();
-#endif
 
     // Retire the old texture and publish the new one. Accounting for the new allocation
     // is done by allocateTextureStorage.

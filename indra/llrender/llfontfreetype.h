@@ -242,10 +242,11 @@ public:
     bool getAllowMonospaceLigatures() const { return mAllowMonospaceLigatures; }
     void setAllowMonospaceLigatures(bool allow) { mAllowMonospaceLigatures = allow; }
 
-    // True when this face was instantiated at an explicit "wght" variation
-    // axis value, i.e. it is a variable font the skin picked a weight from.
-    // Shaping asks such faces for tabular figures (see alfontshaping.cpp).
-    bool wghtAxisSet() const { return mVarAxes.wght_set; }
+    // True when the face actually applied a "wght" variation axis value, i.e.
+    // it is a variable font instantiated at a weight - not merely a face whose
+    // fonts.xml entry named one. Shaping asks such faces for tabular figures
+    // (see alfontshaping.cpp).
+    bool wghtAxisSet() const;
 
     // True when the pen position should accumulate fractionally through a
     // glyph run, with each glyph's destination rect snapped at draw time.

@@ -1020,7 +1020,7 @@
              initial_value=""
              label="Repeats per meter"
              layout="topleft"
-             label_width="195"
+             label_width="200"
              left="10"
              max_val="100"
              min_val="-100"
@@ -1031,12 +1031,12 @@
              height="19"
              initial_value="0"
              label="Rotation"
-             label_width="195"
+             label_width="200"
              layout="topleft"
              left="10"
              min_val="-360"
              max_val="360"
-             decimal_digits="5"
+             decimal_digits="2"
              name="gltfTextureRotation"
              width="271" />
             <spinner

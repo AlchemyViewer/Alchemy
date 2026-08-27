@@ -215,7 +215,7 @@ namespace tut
         U32 dec_size = LLZeroCode::decode(enc.data(), (U32)enc_size,
                                            dec.data(), (U32)dec.size(), 1, overflow);
         ensure("decode overflow (minimal capacity): overflow flagged", overflow);
-        ensure("decode overflow (minimal capacity): size bounded by capacity", dec_size <= dec.size());
+        ensure_equals("decode overflow (minimal capacity): partial output discarded", dec_size, 0u);
     }
 
     // ...or comfortably larger than 256 bytes but still short of the true decoded size.
@@ -233,7 +233,7 @@ namespace tut
         U32 dec_size = LLZeroCode::decode(enc.data(), (U32)enc_size,
                                            dec.data(), (U32)dec.size(), 1, overflow);
         ensure("decode overflow (insufficient capacity): overflow flagged", overflow);
-        ensure("decode overflow (insufficient capacity): size bounded by capacity", dec_size <= dec.size());
+        ensure_equals("decode overflow (insufficient capacity): partial output discarded", dec_size, 0u);
     }
 
     // A pathological alternating zero/non-zero pattern grows under zero-coding

@@ -225,7 +225,7 @@ void LLAudioEngine_OpenAL::initSystemDefaultFollowing()
 }
 
 // static
-void ALC_APIENTRY LLAudioEngine_OpenAL::onDeviceEventSOFT(ALCenum event_type, ALCenum /*device_type*/,
+void ALC_APIENTRY LLAudioEngine_OpenAL::onDeviceEventSOFT(ALCenum event_type, ALCenum device_type,
                                                           ALCdevice* /*device*/, ALCsizei /*length*/,
                                                           const ALCchar* /*message*/, void* user_param) noexcept
 {
@@ -233,6 +233,11 @@ void ALC_APIENTRY LLAudioEngine_OpenAL::onDeviceEventSOFT(ALCenum event_type, AL
     // flag — idle() does the reopen on the main thread, where the rest
     // of the engine's AL state is owned.
     if (event_type != ALC_EVENT_TYPE_DEFAULT_DEVICE_CHANGED_SOFT) return;
+
+    // The same event reports the default CAPTURE device changing. Reopening
+    // playback for that would interrupt audio because the user picked a
+    // different microphone.
+    if (device_type != ALC_PLAYBACK_DEVICE_SOFT) return;
 
     if (auto* self = static_cast<LLAudioEngine_OpenAL*>(user_param))
     {
@@ -420,6 +425,12 @@ void LLAudioEngine_OpenAL::setOutputDevice(const std::string& id)
         return;  // already running on this device
     }
     mPreferredDevice = id;
+    // Following the OS default is only correct while the user is ON the
+    // default; picking a device pins it, picking "default" resumes. Set it
+    // here so the early exits below cannot leave it disagreeing with
+    // mPreferredDevice.
+    mFollowSystemDefault  = mPreferredDevice.empty() && mEventControlSOFT != nullptr;
+    mDefaultDeviceChanged = false;
 
     if (!mALCDevice)
     {
@@ -463,11 +474,6 @@ void LLAudioEngine_OpenAL::setOutputDevice(const std::string& id)
     }
     LL_INFOS() << "LLAudioEngine_OpenAL::setOutputDevice() switched to '"
                << mActiveDevice << "'" << LL_ENDL;
-
-    // Following the OS default is only correct while the user is ON the
-    // default; picking a device pins it, picking "default" resumes.
-    mFollowSystemDefault = mPreferredDevice.empty() && mEventControlSOFT != nullptr;
-    mDefaultDeviceChanged = false;
 
     // Notify any UI listeners (Sound prefs combo) that the active
     // device has shifted so they can refresh.

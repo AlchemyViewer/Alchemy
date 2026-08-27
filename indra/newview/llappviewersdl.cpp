@@ -121,9 +121,13 @@ static IOPMAssertionID sPowerAssertionID = kIOPMNullAssertionID;
 static int sSleepInhibitFd = -1;
 
 // org.freedesktop.login1.Manager.Inhibit returns a file descriptor that keeps
-// the inhibition alive until it is closed. "block" (rather than "delay") is
-// what a running 3D client wants: delay only postpones the suspend.
-static int take_logind_sleep_inhibitor()
+// the inhibition alive until it is closed.
+//
+// "idle" rather than "sleep": we want to stop the machine idling to sleep
+// under the viewer, which is what Windows' ES_SYSTEM_REQUIRED and macOS'
+// NoIdleSleep do. Blocking "sleep" would also refuse a lid close or an
+// explicit suspend, which no other platform here does.
+static int take_logind_idle_inhibitor()
 {
     DBusError err;
     dbus_error_init(&err);
@@ -136,16 +140,20 @@ static int take_logind_sleep_inhibitor()
         return -1;
     }
 
+    // We pump nothing on this connection and must not die with it.
+    dbus_connection_set_exit_on_disconnect(bus, false);
+
     DBusMessage* message = dbus_message_new_method_call("org.freedesktop.login1",
                                                         "/org/freedesktop/login1",
                                                         "org.freedesktop.login1.Manager",
                                                         "Inhibit");
     if (!message)
     {
+        dbus_connection_unref(bus);
         return -1;
     }
 
-    const char* what  = "sleep:idle";
+    const char* what  = "idle";
     const char* who   = "Alchemy Viewer";
     const char* why   = "Viewer is running";
     const char* how   = "block";
@@ -163,6 +171,7 @@ static int take_logind_sleep_inhibitor()
     {
         LL_WARNS("OS") << "logind Inhibit failed: " << err.message << LL_ENDL;
         dbus_error_free(&err);
+        dbus_connection_unref(bus);
         return -1;
     }
 
@@ -174,6 +183,7 @@ static int take_logind_sleep_inhibitor()
         fd = -1;
     }
     dbus_message_unref(reply);
+    dbus_connection_unref(bus);
 
     return fd;
 }
@@ -1104,17 +1114,10 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
 //virtual
 void LLAppViewerSDL::setOSHibernationMode(eHibernationMode mode)
 {
-    // The screen half is the same on every SDL platform: SDL owns the screen
-    // saver state and undoes it at shutdown, so only the system-sleep half
-    // needs a per-platform assertion.
-    if (mode == LL_HIBERNATE_MODE_PREVENT_SCREEN)
-    {
-        SDL_DisableScreenSaver();
-    }
-    else
-    {
-        SDL_EnableScreenSaver();
-    }
+    // Deliberately no SDL_{Disable,Enable}ScreenSaver here. That flag is a
+    // single absolute global which llwindowsdl.cpp already drives from window
+    // focus, so writing it from here as well would have the two stomp each
+    // other. The screen half is handled by the platform assertion below.
 
 #if LL_DARWIN
     // An IOPMAssertion is released by name, so drop the previous one before
@@ -1154,10 +1157,17 @@ void LLAppViewerSDL::setOSHibernationMode(eHibernationMode mode)
 
     if (mode != LL_HIBERNATE_MODE_DEFAULT)
     {
-        sSleepInhibitFd = take_logind_sleep_inhibitor();
+        sSleepInhibitFd = take_logind_idle_inhibitor();
         if (sSleepInhibitFd < 0)
         {
-            LL_WARNS("OS") << "Could not inhibit system sleep via logind." << LL_ENDL;
+            LL_WARNS("OS") << "Could not inhibit idle sleep via logind." << LL_ENDL;
+        }
+        else if (mode == LL_HIBERNATE_MODE_PREVENT_SCREEN)
+        {
+            // Keeping the display awake is the session screensaver's business,
+            // not logind's, and this backend does not speak to it yet.
+            LL_INFOS("OS") << "Idle sleep inhibited; keeping the display awake "
+                              "is not implemented on this platform." << LL_ENDL;
         }
     }
 #endif

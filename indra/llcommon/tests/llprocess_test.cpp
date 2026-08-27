@@ -1276,9 +1276,6 @@ namespace tut
     template<> template<>
     void object::test<16>()
     {
-#ifdef LL_DISABLE_DEBUG_LOGGING
-        skip("Debug messages disabled");
-#endif
         set_test_name("get*Pipe() validation");
         PythonProcessLauncher py(get_test_name(),
             "from __future__ import print_function\n"

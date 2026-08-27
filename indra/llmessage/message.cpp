@@ -82,7 +82,6 @@
 #include "llmessagelog.h"
 #include "llpounceable.h"
 #include "llproxy.h"
-#include "llrand.h"
 
 // Constants
 //const char* MESSAGE_LOG_FILENAME = "message.log";
@@ -538,7 +537,13 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
             mTrueReceiveSize = fake_size;
             receive_size = mTrueReceiveSize;
             mLastSender = fake_host;
-            //don't really give two tits about the interface, just leave it
+            // A synthetic packet carries no real sequence number, so the
+            // circuit's inbound sequence state must not be advanced from it.
+            // Reporting the check as already done is how upstream's own
+            // buffered path skips it.
+            recv_packet_id_checked = true;
+            // clearReceiveState() invalidated mLastReceivingIF at the top of
+            // this iteration, and an injected packet has no interface to name.
         }
 
         // If you want to dump all received packets into Alchemy.log, uncomment this
@@ -1025,11 +1030,17 @@ S32 LLMessageSystem::bufferInboundPacket()
     LLHost invalid_host;
     LLPacketBuffer pkt(invalid_host, nullptr, 0);
     S32 packet_size = 0;
+    // What the socket handed us, which is not the usable payload size once a
+    // SOCKS header is stripped. drainUdpSocket() loops on this: reporting 0
+    // for a datagram that did arrive would end the drain and leave everything
+    // behind it sitting in the kernel buffer.
+    S32 socket_read_size = 0;
 
     if (LLProxy::isSOCKSProxyEnabled())
     {
         char buffer[NET_BUFFER_SIZE + SOCKS_HEADER_SIZE];   /* Flawfinder ignore */
         packet_size = receive_packet(mSocket, buffer);
+        socket_read_size = packet_size;
         if (packet_size > 0)
         {
             mActualBytesIn += packet_size;
@@ -1045,6 +1056,8 @@ S32 LLMessageSystem::bufferInboundPacket()
             }
             else
             {
+                // Runt wrapper with no payload past the header: discard the
+                // packet, but socket_read_size keeps the drain going.
                 packet_size = 0;
             }
         }
@@ -1053,6 +1066,7 @@ S32 LLMessageSystem::bufferInboundPacket()
     {
         pkt.init(mSocket);
         packet_size = pkt.getSize();
+        socket_read_size = packet_size;
         if (packet_size > 0)
         {
             mActualBytesIn += packet_size;
@@ -1118,7 +1132,7 @@ S32 LLMessageSystem::bufferInboundPacket()
         }
     }
 
-    return packet_size;
+    return socket_read_size;
 }
 
 bool LLMessageSystem::sendPacketToSocket(const char* datap, S32 data_size, LLHost host)

@@ -1378,8 +1378,9 @@ U8* LLVertexBuffer::mapIndexBuffer(U32 index, S32 count)
 //  dst -- mMappedData or mMappedIndexData
 void LLVertexBuffer::flush_vbo(GLenum target, U32 start, U32 end, void* data, U8* dst)
 {
-    // Callers compute end = start + size - 1; when size == 0 this underflows to (start - 1).
-    // Without this guard the non-Apple loop below iterates ~65k times against an underflowed end.
+    // Callers compute end = start + size - 1; when size == 0 this underflows to
+    // (start - 1), which then passes the "end != 0" test below and issues a
+    // glBufferSubData with a nonsense size.
     if (end + 1 == start)
         return;
 
