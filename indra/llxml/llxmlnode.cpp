@@ -1430,22 +1430,25 @@ const char *LLXMLNode::parseFloat(const char *str, F64 *dest, U32 precision, Enc
     {
         str = skipWhitespace(str);
 
-        if (memcmp(str, "inf", 3) == 0)
+        // strncmp, not memcmp: these run off the end of a shorter
+        // string. Comparing seven bytes against "-1.#INF" reads past
+        // the terminator of anything shorter, which is most values.
+        if (strncmp(str, "inf", 3) == 0)
         {
             *dest = std::numeric_limits<F64>::infinity();
             return str + 3;
         }
-        if (memcmp(str, "-inf", 4) == 0)
+        if (strncmp(str, "-inf", 4) == 0)
         {
             *dest = -std::numeric_limits<F64>::infinity();
             return str + 4;
         }
-        if (memcmp(str, "1.#INF", 6) == 0)
+        if (strncmp(str, "1.#INF", 6) == 0)
         {
             *dest = std::numeric_limits<F64>::infinity();
             return str + 6;
         }
-        if (memcmp(str, "-1.#INF", 7) == 0)
+        if (strncmp(str, "-1.#INF", 7) == 0)
         {
             *dest = -std::numeric_limits<F64>::infinity();
             return str + 7;

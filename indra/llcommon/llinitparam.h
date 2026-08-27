@@ -646,7 +646,6 @@ namespace LLInitParam
         validation_func_t   mValidationFunc;
         S32                 mMinCount;
         S32                 mMaxCount;
-        S32                 mNumRefs;
     };
 
     // Descriptors are created once, while a block type first constructs, and
@@ -1576,6 +1575,15 @@ namespace LLInitParam
             const self_t& src_typed_param = static_cast<const self_t&>(src);
             self_t& dst_typed_param = static_cast<self_t&>(dst);
 
+            // Nothing to take. Returning true regardless made every block
+            // holding a Multiple<> report itself changed by any fillFrom,
+            // and the fill branch below rebuilt the destination's vector to
+            // arrive at what it already held.
+            if (src_typed_param.mValues.empty())
+            {
+                return false;
+            }
+
             if (overwrite)
             {
                 std::copy(src_typed_param.begin(), src_typed_param.end(), std::back_inserter(dst_typed_param.mValues));
@@ -1587,10 +1595,7 @@ namespace LLInitParam
                 std::swap(dst_typed_param.mValues, new_values);
             }
 
-            if (src_typed_param.begin() != src_typed_param.end())
-            {
-                dst_typed_param.setProvided();
-            }
+            dst_typed_param.setProvided();
             return true;
         }
 
@@ -1820,6 +1825,15 @@ namespace LLInitParam
             const self_t& src_typed_param = static_cast<const self_t&>(src);
             self_t& dst_typed_param = static_cast<self_t&>(dst);
 
+            // Nothing to take. Returning true regardless made every block
+            // holding a Multiple<> report itself changed by any fillFrom,
+            // and the fill branch below rebuilt the destination's vector to
+            // arrive at what it already held.
+            if (src_typed_param.mValues.empty())
+            {
+                return false;
+            }
+
             if (overwrite)
             {
                 std::copy(src_typed_param.begin(), src_typed_param.end(), std::back_inserter(dst_typed_param.mValues));
@@ -1831,11 +1845,7 @@ namespace LLInitParam
                 std::swap(dst_typed_param.mValues, new_values);
             }
 
-            if (src_typed_param.begin() != src_typed_param.end())
-            {
-                dst_typed_param.setProvided();
-            }
-
+            dst_typed_param.setProvided();
             return true;
         }
 

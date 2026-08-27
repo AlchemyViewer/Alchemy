@@ -550,6 +550,33 @@ namespace tut
     }
 
     template<> template<>
+    void object::test<20>()
+    {
+        set_test_name("merging reports whether it actually took anything");
+
+        // The return value is what tells a caller its block changed. A
+        // Multiple<> used to answer yes unconditionally, so any block holding
+        // one looked modified by a merge that moved nothing.
+        OuterBlock empty_source;
+        OuterBlock destination;
+        ensure("filling from an empty block changes nothing",
+               !destination.fillFrom(empty_source));
+        ensure_equals("and leaves the list alone", destination.list.size(), size_t(0));
+
+        OuterBlock source;
+        source.list.add(1);
+        source.list.add(2);
+        ensure("filling from a block with values does change it",
+               destination.fillFrom(source));
+        ensure_equals("which arrive in the destination", destination.list.size(), size_t(2));
+
+        // Already-filled destination, still-empty source.
+        ensure("an empty source still changes nothing",
+               !destination.fillFrom(empty_source));
+        ensure_equals("and does not disturb what is there", destination.list.size(), size_t(2));
+    }
+
+    template<> template<>
     void object::test<19>()
     {
         set_test_name("the descriptor registry sees every block that has been built");
