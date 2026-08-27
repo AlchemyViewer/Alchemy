@@ -813,8 +813,17 @@ bool LLSimpleXUIParser::readXUI(const std::string& filename, LLInitParam::BaseBl
         return false;
     }
 
-    mOutputStack.emplace_back(&block, 0);
+    // A completed parse leaves all of these empty, but an abandoned one does
+    // not, and readXUI is a public entry point that says nothing about having
+    // to be the first. Clear them rather than build on whatever is there.
     mNameStack.clear();
+    mOutputStack.clear();
+    mScope.clear();
+    mTokenSizeStack.clear();
+    mEmptyLeafNode.clear();
+    mTextContents.clear();
+
+    mOutputStack.emplace_back(&block, 0);
     mCurFileName = filename;
     mCurReadDepth = 0;
     setParseSilently(silent);
