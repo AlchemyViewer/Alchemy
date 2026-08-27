@@ -1125,6 +1125,12 @@ bool LLProcess::kill(const LLProcessPtr& ptr, const std::string& who)
 
 void LLProcess::pump()
 {
+    // Same guard the mainloop listener holds: tick() posts events
+    // synchronously, and a listener that drops the last LLProcessPtr would
+    // destroy *this* while tick() is still on the stack. Empty when the object
+    // is not owned by a shared_ptr, in which case there is nothing to keep
+    // alive and nothing to guard against.
+    LLProcessPtr self(weak_from_this().lock());
     tick();
 }
 
