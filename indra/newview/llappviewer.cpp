@@ -2381,8 +2381,24 @@ void errorHandler(const std::string& title_string, const std::string& message_st
 
 namespace
 {
+    // argv as handed to the entry point, stashed before LLAppViewer exists.
+    std::vector<std::string> sStartupArgs;
+
     std::string getStartupLogFileName();
     std::string getOldLogFileName(const std::string& log_file);
+}
+
+// static
+void LLAppViewer::setStartupCommandLine(int argc, char** argv)
+{
+    sStartupArgs.clear();
+    for (int i = 0; i < argc; ++i)
+    {
+        if (argv[i])
+        {
+            sStartupArgs.emplace_back(argv[i]);
+        }
+    }
 }
 
 void LLAppViewer::initLoggingAndGetLastDuration()
@@ -2607,8 +2623,44 @@ namespace
                      OSMB_OK);
     }
 
+    // Value of an option that takes one, in the spellings the viewer's own
+    // parser accepts: "--opt VALUE", "--opt=VALUE", and the "-opt" / "/opt"
+    // variants, with ':' allowed as the separator alongside '='. Last
+    // occurrence wins, which is what LLCommandLineParser does.
+    std::string findCommandLineValue(const std::vector<std::string>& args,
+                                     const std::string& name)
+    {
+        const std::string forms[] = { "--" + name, "-" + name, "/" + name };
+        std::string value;
+
+        for (size_t i = 1; i < args.size(); ++i)
+        {
+            const std::string& arg = args[i];
+            for (const std::string& form : forms)
+            {
+                if (arg == form)
+                {
+                    if (i + 1 < args.size())
+                    {
+                        value = args[i + 1];
+                    }
+                }
+                else if (arg.size() > form.size() + 1 &&
+                         arg.compare(0, form.size(), form) == 0 &&
+                         (arg[form.size()] == '=' || arg[form.size()] == ':'))
+                {
+                    value = arg.substr(form.size() + 1);
+                }
+            }
+        }
+        return value;
+    }
+
     std::string getStartupLogFileName()
     {
+        // This runs from LLAppViewer's constructor, so gSavedSettings has no
+        // controls yet and this cannot match today. Kept because it is the
+        // right answer if that ordering ever changes.
         if (LLControlVariable* user_log_file = gSavedSettings.getControl("UserLogFile"))
         {
             std::string log_file = user_log_file->getValue().asString();
@@ -2618,41 +2670,34 @@ namespace
             }
         }
 
-#if LL_WINDOWS
-        int argc = 0;
-        LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-        if (argv)
-        {
-            std::string log_file;
-            for (int i = 1; i < argc; ++i)
-            {
-                std::string option = ll_convert_wide_to_string(argv[i]);
-                if ((option == "--logfile" || option == "-logfile" || option == "/logfile") &&
-                    i + 1 < argc)
-                {
-                    log_file = ll_convert_wide_to_string(argv[i + 1]);
-                }
-                else if (option.compare(0, 10, "--logfile=") == 0)
-                {
-                    log_file = option.substr(10);
-                }
-                else if (option.compare(0, 9, "-logfile=") == 0)
-                {
-                    log_file = option.substr(9);
-                }
-                else if (option.compare(0, 9, "/logfile:") == 0)
-                {
-                    log_file = option.substr(9);
-                }
-            }
-            LocalFree(argv);
+        std::string log_file = findCommandLineValue(sStartupArgs, "logfile");
 
-            if (!log_file.empty())
+#if LL_WINDOWS
+        if (log_file.empty())
+        {
+            // The native Win32 entry point is handed a command tail rather
+            // than argv, so setStartupCommandLine() was never called. Ask the
+            // OS instead. Keyed on an empty result rather than empty args, so
+            // this still covers an entry point that supplies only argv[0].
+            int argc = 0;
+            if (LPWSTR* argw = CommandLineToArgvW(GetCommandLineW(), &argc))
             {
-                return log_file;
+                std::vector<std::string> args;
+                args.reserve((size_t)argc);
+                for (int i = 0; i < argc; ++i)
+                {
+                    args.push_back(ll_convert_wide_to_string(argw[i]));
+                }
+                LocalFree(argw);
+                log_file = findCommandLineValue(args, "logfile");
             }
         }
 #endif
+
+        if (!log_file.empty())
+        {
+            return log_file;
+        }
 
         return gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "Alchemy.log");
     }

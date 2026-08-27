@@ -114,6 +114,12 @@ public:
     void abortQuit();  // Called to abort a quit request.
     void sendViewerStatistics(bool include_preferences);
 
+    // Hand the process's argv to the viewer. Must be called from the entry
+    // point BEFORE LLAppViewer is constructed: the startup log file name is
+    // decided in the constructor, long before gSavedSettings has any controls,
+    // so --logfile can only be read from the raw command line.
+    static void setStartupCommandLine(int argc, char** argv);
+
     bool quitRequested() { return mQuitRequested; }
     bool logoutRequestSent() { return mLogoutRequestSent; }
     bool isSecondInstance() { return mSecondInstance; }

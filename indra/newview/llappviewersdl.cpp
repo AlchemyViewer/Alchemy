@@ -654,6 +654,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     gArgC = argc;
     gArgV = argv;
 
+    // Before the viewer is constructed: its constructor picks the startup log
+    // file, and --logfile is only readable from here at that point.
+    LLAppViewer::setStartupCommandLine(argc, argv);
+
 #if LL_WINDOWS
     // Note: gIconResource (consumed by the native LLWindowWin32 window proc)
     // is not set here — SDL_RegisterApp sources the window-class icon from the
