@@ -101,7 +101,12 @@ protected:
     LLXmlTreeNode( std::string name, LLXmlTreeNode* parent, LLXmlTree* tree );
 
 public:
-    virtual ~LLXmlTreeNode();
+    // Not virtual, and so this class has no vtable: nothing derives from it.
+    // The one thing that could hand back something that did is
+    // LLXmlTreeParser::CreateXmlTreeNode, which nothing overrides. Giving
+    // that hook a real subclass means making this virtual again -- a node is
+    // deleted through an LLXmlTreeNode* by its parent and by LLXmlTree.
+    ~LLXmlTreeNode();
 
     // Owns its children and its attribute values as raw pointers and deletes
     // every one of them, so a copy would free them twice.
@@ -224,7 +229,9 @@ public:
 protected:
     void buildTree(const pugi::xml_node& root_element);
 
-    //template method pattern
+    // Template method pattern, unused: no subclass of this parser exists, so
+    // every node the tree holds is an LLXmlTreeNode. See its destructor
+    // before returning anything else from here.
     virtual LLXmlTreeNode* CreateXmlTreeNode(std::string name, LLXmlTreeNode* parent);
 
 protected:
