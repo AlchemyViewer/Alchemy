@@ -89,6 +89,14 @@ if(USE_SDL_WINDOW)
   )
 endif()
 
+if(DARWIN)
+  # IOKit deployment-target shim, consumed by newview's llmachineid.cpp.
+  target_sources(llwindow
+    PUBLIC
+      llwindowmacosx_iokit.h
+  )
+endif(DARWIN)
+
 if(WINDOWS)
   # lldxhardware (GPU/driver/VRAM queries) is used regardless of window
   # backend — the SDL backend calls LLDXHardware::updateVRAMBudgetFromDXGI()

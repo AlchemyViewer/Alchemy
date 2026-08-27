@@ -901,7 +901,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         }
 
         chars_drawn++;
-        cur_x += fgi->mXAdvance;
+        cur_x += mFontFreetype->getXAdvance(fgi);
         cur_y += fgi->mYAdvance;
 
         llwchar next_char = wstr[i+1];

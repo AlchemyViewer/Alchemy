@@ -183,10 +183,12 @@ namespace tut
     {
         slurlTest()
         {
+            LLGridManager::createInstance();
             LLGridManager::getInstance()->initialize(std::string(""));
         }
         ~slurlTest()
         {
+            LLGridManager::deleteSingleton();
         }
     };
 

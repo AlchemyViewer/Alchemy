@@ -130,6 +130,7 @@ public:
     void setPersist(ePersist);
     void setHiddenFromSettingsEditor(bool hide);
     void setComment(const std::string& comment);
+    bool setValueFromNotation(const std::string& notation, bool saved_value = true);
 
 private:
     void firePropertyChanged(const LLSD &pPreviousValue)
@@ -326,7 +327,7 @@ public:
     {
         if(!group.controlExists(name))
         {
-            LL_ERRS() << "Control named " << name << "not found." << LL_ENDL;
+            LL_ERRS() << "Control named " << name << " not found." << LL_ENDL;
         }
 
         bindToControl(group, name);

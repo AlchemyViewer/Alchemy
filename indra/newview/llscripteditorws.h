@@ -27,6 +27,7 @@
 #pragma once
 
 #include "lljsonrpcws.h"
+#include "llpublishedobjectmgr.h"
 #include "llsd.h"
 #include "lluuid.h"
 #include "llhandle.h"
@@ -35,9 +36,11 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include <map>
 #include <set>
 #include <atomic>
+#include <functional>
 
 // Forward declarations
 class LLLiveLSLEditor;
@@ -45,7 +48,6 @@ class LLScriptEdContainer;
 class LLScriptEditorWSServer;
 class LLChat;
 class LLPanel;
-class LLPublishedPrimListener;
 class LLViewerObject;
 class LLInventoryItem;
 
@@ -87,6 +89,7 @@ public:
     void onClose() override;
 
     void sendDisconnect(DisconnectReason reason = DisconnectReason::NORMAL, const std::string& message = "Goodbye");
+    bool hasFeature(const std::string& feature) const;
 
 private:
     using string_set_t = std::set<std::string>;
@@ -155,6 +158,14 @@ private:
 class LLScriptEditorWSServer : public LLJSONRPCServer
 {
 public:
+    struct ItemRef
+    {
+        LLUUID      mRootID;
+        LLUUID      mPrimID;
+        LLUUID      mItemID;
+        std::string mScriptName;
+    };
+
     static constexpr U32 ALL_CONNECTIONS = 0xFFFFFFFF;
     enum class SubscriptionError
     {
@@ -177,6 +188,8 @@ public:
 
     static LLScriptEditorWSServer::ptr_t getServer();
     static LLScriptEditorWSServer::ptr_t ensureServerRunning();
+    static std::string                   buildScriptSubscriptionId(const LLUUID& object_id,
+                                                                   const LLUUID& item_id);
     static std::string                   buildVSCodeURI(const LLUUID& object_id = LLUUID::null,
                                                         const LLUUID& script_id = LLUUID::null);
     static bool                          launchVSCode(const LLUUID& object_id = LLUUID::null,
@@ -197,7 +210,9 @@ public:
 
     LLHandle<LLPanel> findEditorForScript(const std::string& script_id) const;
 
-    void forwardChatToIDE(const LLChat& chat_msg) const;
+    void forwardChatToIDE(
+        const LLChat& chat_msg,
+        LLPublishedObjectMgr::RuntimeEventAggregator::Channel channel) const;
 
     std::set<std::string> getActiveScripts() const;
 
@@ -205,9 +220,11 @@ public:
     bool publishObject(const LLUUID& object_id);
     void unpublishObject(const LLUUID& object_id, const std::string& reason = "");
     bool isObjectPublished(const LLUUID& object_id) const;
+
+    // *TODO*: These should be moved to LLPublishedObjectMgr at some point.
     void onPrimInventoryReady(const LLUUID& object_id, const LLUUID& prim_id);
     void onPrimInventoryChanged(const LLUUID& object_id, const LLUUID& prim_id);
-    void onObjectPropertyChanged(const LLUUID& prim_id, const std::string& name, const std::string& desc);
+    void onObjectPropertyChanged(const LLUUID& prim_id, const std::string& name, const std::string& desc, S16 inventory_serial = -1);
     void onLinksetChildAdded(const LLUUID& root_id, LLViewerObject* child);
     void onLinksetChildRemoved(const LLUUID& root_id, const LLUUID& child_id);
 
@@ -242,7 +259,10 @@ protected:
     LLSD handleObjectScriptReset(U32 connection_id, const LLSD& params);
     LLSD handleObjectModify(U32 connection_id, const LLSD& params);
     LLSD handleObjectItemModify(U32 connection_id, const LLSD& params);
-    LLSD buildPublishedObjectLLSD(LLViewerObject* root) const;
+    LLSD handleCommandExecute(U32 connection_id, const LLSD& params);
+    LLSD handleSaveBackToObjectContents(U32 connection_id, const LLSD& params);
+    LLSD handleCommandList();
+    void sendCommandExecute(U32 connection_id, const std::string& command, const LLSD& params);
 
     struct ValidatedItem
     {
@@ -255,15 +275,12 @@ protected:
 
     // --- Object Content Publishing (helpers) ---
     static std::string getPrimName(LLViewerObject* obj);
-    LLSD buildPrimInventoryLLSD(LLViewerObject* object) const;
     void notifyConnection(U32 connection_id, const std::string& method, const LLSD& params) const;
     void notifyAll(const std::string& method, const LLSD& params) const;
-    void cleanupPrimListeners(const LLUUID& object_id);
     void buildAndSendPublish(const LLUUID& object_id);
     void scheduleLinksetFlush(const LLUUID& root_id, F32 delay);
     void cancelLinksetFlushTimer(const LLUUID& root_id);
     void flushLinksetUpdate(const LLUUID& root_id);
-    static LLSD errorResponse(const std::string& message);
 
     /// Wraps `fn` in a MethodHandler with a weak-ptr guard on this server,
     /// so the handler safely no-ops after server shutdown. `fn` is called
@@ -286,72 +303,50 @@ protected:
     }
 
 private:
+    void sendRuntimeEvent(
+        const LLPublishedObjectMgr::RuntimeChatEvent& event) const;
+
     struct EditorSubscription
     {
-        EditorSubscription(const LLUUID &object_id, const LLUUID &item_id, std::string_view script_name, LLHandle<LLPanel> editor_handle):
-            mObjectID(object_id),
-            mItemID(item_id),
-            mScriptName(script_name),
+        EditorSubscription(const ItemRef& item_ref, LLHandle<LLPanel> editor_handle):
+            mItemRef(item_ref),
             mEditorHandle(editor_handle)
-        {}
+        {
+        }
         U32 mConnectionID{ 0 };
-        LLUUID mObjectID;
-        LLUUID mItemID;
-        std::string mScriptName;
+        ItemRef mItemRef;
         LLScriptEditorWSConnection::wptr_t mConnection;
         LLHandle<LLPanel> mEditorHandle;
     };
     using subscriptions_t = std::unordered_map<std::string, EditorSubscription>;
 
-    struct PublishedPrimInfo
-    {
-        LLUUID      mPrimID;
-        std::string mPrimName;
-        S32         mLinkNumber;        // 1=root, >=2=child
-        S16         mInventorySerial;   // last-seen serial for change detection (Phase 4)
-    };
-
-    struct PublishedObjectInfo
-    {
-        LLUUID                                              mObjectID;      // root prim UUID
-        LLUUID                                              mOwnerID;
-        std::string                                         mObjectName;
-        std::string                                         mObjectDescription;
-        std::string                                         mRegionName;
-        std::vector<PublishedPrimInfo>                       mPrims;         // root + all children
-        std::vector<std::unique_ptr<LLPublishedPrimListener>> mListeners;
-    };
-
-    struct PendingPublish
-    {
-        LLUUID                                              mObjectID;
-        std::set<LLUUID>                                    mPendingPrims;  // prims whose inventory we're still waiting for
-        std::vector<std::unique_ptr<LLPublishedPrimListener>> mListeners;   // listeners for pending prims
-    };
-
     SubscriptionError updateScriptSubscription(const std::string &script_id, U32 connection_id);
     void                unsubscribeConnection(U32 connection_id);
 
     subscriptions_t mSubscriptions;
-    // Per-connection subscription count. Invariant: for c != 0,
-    // mConnectionSubscriptionCounts[c] == count of entries in mSubscriptions
-    // whose mConnectionID == c. Maintained transactionally at every site that
-    // mutates SubscriptionInfo::mConnectionID.
     std::unordered_map<U32, S32> mConnectionSubscriptionCounts;
     std::map<U32, LLScriptEditorWSConnection::wptr_t> mActiveConnections;
 
-    std::map<LLUUID, PublishedObjectInfo> mPublishedObjects;  // keyed by root object_id
-    std::map<LLUUID, PendingPublish>      mPendingPublishes;  // keyed by root object_id
-    std::map<LLUUID, std::string>         mPendingItemCreates; // prim_id -> pump name awaiting inventory update
-    std::map<LLUUID, std::set<LLUUID>>             mNewChildPrims;      // root_id → children awaiting first inventory response
-    std::map<LLUUID, std::weak_ptr<LLEventTimer>>   mLinksetFlushTimers; // root_id → pending coalesce timer
+    mutable LLPublishedObjectMgr mPublishedObjectManager;
+
+    struct WSCommandInfo
+    {
+        std::string command;
+        std::string description;
+    };
+    enum WSCommandError
+    {
+        UnknownCommand  = 1,
+        InvalidParams   = 2,
+        NotPermitted    = 3,
+        ExecutionError  = 4,
+    };
+    using WSCommandHandler = std::function<LLSD(U32 connection_id, const LLSD& params)>;
+    std::unordered_map<std::string, std::pair<WSCommandInfo, WSCommandHandler>> mCommandRegistry;
+
+    void registerCommand(const WSCommandInfo& info, WSCommandHandler handler);
 
     boost::signals2::connection mLanguageChangeSignal;
     LLUUID mLastSyntaxId;
-
-
-    LLTimer mCleanupTimer;
-    static constexpr F32 CLEANUP_INTERVAL = 60.0f; // seconds
-    static constexpr F32 CONNECTION_TIMEOUT = 300.0f; // 5 minutes
 
 };

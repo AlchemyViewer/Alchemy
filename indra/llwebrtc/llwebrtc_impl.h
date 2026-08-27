@@ -81,19 +81,28 @@ public:
     {
         if (mCallback)
         {
+            // RTC_LOG prefixes each message with its "(file:line): " origin. Use it to demote
+            // libwebrtc's own chatty INFO/WARNING logging to verbose, keeping ours as-is.
+            static const std::string file_prefix("(llwebrtc.cpp:");
             switch (severity)
             {
                 case webrtc::LS_VERBOSE:
                     mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
                     break;
                 case webrtc::LS_INFO:
-                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                    mCallback->LogMessage(msg.rfind(file_prefix, 0) == 0
+                                               ? LLWebRTCLogCallback::LOG_LEVEL_INFO
+                                               : LLWebRTCLogCallback::LOG_LEVEL_VERBOSE,
+                                           msg);
                     break;
                 case webrtc::LS_WARNING:
-                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                    mCallback->LogMessage(msg.rfind(file_prefix, 0) == 0
+                                               ? LLWebRTCLogCallback::LOG_LEVEL_WARNING
+                                               : LLWebRTCLogCallback::LOG_LEVEL_VERBOSE,
+                                           msg);
                     break;
                 case webrtc::LS_ERROR:
-                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_VERBOSE, msg);
+                    mCallback->LogMessage(LLWebRTCLogCallback::LOG_LEVEL_ERROR, msg);
                     break;
                 default:
                     break;
@@ -413,7 +422,11 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceO
     }
 
     void init();
-    void terminate();
+    // Returns true if shutdown completed cleanly and this object may be
+    // destroyed.  Returns false if it timed out: a detached thread is still
+    // using this object and its webrtc threads, so it must be leaked, not
+    // deleted.
+    bool terminate();
 
     //
     // LLWebRTCDeviceInterface
@@ -585,7 +598,12 @@ class LLWebRTCPeerConnectionImpl : public LLWebRTCPeerConnectionInterface,
     ~LLWebRTCPeerConnectionImpl();
 
     void init(LLWebRTCImpl * webrtc_impl);
+    // Posts closeOnSignalingThread() and returns immediately.
     void terminate();
+    // The actual close.  Signaling thread only.  Callable directly (via a
+    // BlockingCall) when the caller needs the connection to be fully closed
+    // before it continues -- see LLWebRTCImpl::terminate().
+    void closeOnSignalingThread();
 
     virtual void AddRef() const override = 0;
     virtual webrtc::RefCountReleaseStatus Release() const override = 0;
@@ -687,6 +705,14 @@ class LLWebRTCPeerConnectionImpl : public LLWebRTCPeerConnectionInterface,
     // connection state tracking for delayed renegotiation on disconnect
     webrtc::PeerConnectionInterface::PeerConnectionState mPeerConnectionState;
     uint32_t mDisconnectCount;
+
+    // Accessed only on the WebRTC signaling thread.
+    bool mStatsRequestPending;
+
+    // Set by closeOnSignalingThread() so that no new stats request (or other
+    // callback into the viewer) is issued while we're tearing down.
+    // Accessed only on the WebRTC signaling thread.
+    bool mShuttingDown;
 
     std::atomic<int> mPendingJobs;
 };

@@ -380,6 +380,7 @@ set(viewer_SOURCE_FILES
     llfloaterfonttest.cpp
     llfloaterforgetuser.cpp
     llfloatergesture.cpp
+    llfloatergestureautocompletepicker.cpp
     llfloatergodtools.cpp
     llfloatergotoline.cpp
     llfloatergridstatus.cpp
@@ -390,7 +391,6 @@ set(viewer_SOURCE_FILES
     llfloaterhelpbrowser.cpp
     llfloaterhexeditor.cpp
     llfloaterhoverheight.cpp
-    llfloaterhowto.cpp
     llfloaterhud.cpp
     llfloaterimagepreview.cpp
     llfloaterimsessiontab.cpp
@@ -704,6 +704,7 @@ set(viewer_SOURCE_FILES
     llpreview.cpp
     llpreviewanim.cpp
     llpreviewgesture.cpp
+    llpublishedobjectmgr.cpp
     llpreviewnotecard.cpp
     llpreviewscript.cpp
     llpreviewsound.cpp
@@ -1162,6 +1163,7 @@ set(viewer_HEADER_FILES
     llfloaterfonttest.h
     llfloaterforgetuser.h
     llfloatergesture.h
+    llfloatergestureautocompletepicker.h
     llfloatergodtools.h
     llfloatergotoline.h
     llfloatergridstatus.h
@@ -1172,7 +1174,6 @@ set(viewer_HEADER_FILES
     llfloaterhelpbrowser.h
     llfloaterhexeditor.h
     llfloaterhoverheight.h
-    llfloaterhowto.h
     llfloaterhud.h
     llfloaterimagepreview.h
     llfloaterimnearbychat.h
@@ -1474,6 +1475,7 @@ set(viewer_HEADER_FILES
     llpreview.h
     llpreviewanim.h
     llpreviewgesture.h
+    llpublishedobjectmgr.h
     llpreviewnotecard.h
     llpreviewscript.h
     llpreviewsound.h

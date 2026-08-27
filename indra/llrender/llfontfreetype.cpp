@@ -1098,15 +1098,39 @@ void LLFontFreetype::renderGlyph(EFontGlyphType bitmap_type, U32 glyph_index, ll
         llassert_always_msg(FT_Err_Ok == error, message.c_str());
     }
 
-    // FT_Render_Glyph's mode arg overrides the load_flags' target. For
-    // LIGHT we want the lighter stem-weight filter to match the LIGHT
-    // autohinter's no-horizontal-fit output; everything else uses NORMAL.
-    const FT_Render_Mode render_mode = (mHinting == EFontHinting::LIGHT)
-        ? FT_RENDER_MODE_LIGHT
-        : FT_RENDER_MODE_NORMAL;
-    if (FT_Render_Glyph(getFTFace()->glyph, render_mode) != 0)
+    // FT_Load_Glyph reported success, but a driver that produced no slot would
+    // fault on every dereference below.
+    if (!getFTFace()->glyph)
     {
-        LL_WARNS() << "Failed to render glyph for character " << llformat("U+%X", U32(wch)) << " at glyph index " << glyph_index << LL_ENDL;
+        LL_WARNS() << "FT_Load_Glyph succeeded but glyph slot is null for character "
+                   << llformat("U+%X", U32(wch)) << LL_ENDL;
+        return;
+    }
+
+    // A bitmap may already be present: FreeType's OT-SVG renderer hook, an
+    // embedded bitmap strike, and sbix / CBDT colour glyphs all rasterize
+    // during FT_Load_Glyph. Rendering again would throw that away.
+    if (!getFTFace()->glyph->bitmap.buffer)
+    {
+        // FT_Render_Glyph's mode arg overrides the load_flags' target. For
+        // LIGHT we want the lighter stem-weight filter to match the LIGHT
+        // autohinter's no-horizontal-fit output; everything else uses NORMAL.
+        const FT_Render_Mode render_mode = (mHinting == EFontHinting::LIGHT)
+            ? FT_RENDER_MODE_LIGHT
+            : FT_RENDER_MODE_NORMAL;
+        if (FT_Render_Glyph(getFTFace()->glyph, render_mode) != 0)
+        {
+            LL_WARNS() << "Failed to render glyph for character " << llformat("U+%X", U32(wch))
+                       << " at glyph index " << glyph_index << LL_ENDL;
+            // LIGHT is the only non-default target we ask for; fall back to
+            // NORMAL rather than leaving the slot without a bitmap.
+            if (render_mode != FT_RENDER_MODE_NORMAL
+                && FT_Render_Glyph(getFTFace()->glyph, FT_RENDER_MODE_NORMAL) != 0)
+            {
+                LL_WARNS() << "Fallback to FT_RENDER_MODE_NORMAL also failed for character "
+                           << llformat("U+%X", U32(wch)) << LL_ENDL;
+            }
+        }
     }
 
     mRenderGlyphCount++;

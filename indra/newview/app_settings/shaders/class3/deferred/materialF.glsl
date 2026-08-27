@@ -188,7 +188,7 @@ void alphaMask(float alpha)
 #endif
 }
 
-void waterClip()
+void applyWaterClip()
 {
 #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
     waterClip(vary_position.xyz);
@@ -210,17 +210,17 @@ float getShadow(vec3 pos, vec3 norm)
     #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
         return sampleDirectionalShadow(pos, norm, vary_texcoord0.xy);
     #else
-        return 1;
+        return 1.0;
     #endif
 #else
-    return 1;
+    return 1.0;
 #endif
 }
 
 void main()
 {
     mirrorClip(vary_position);
-    waterClip();
+    applyWaterClip();
 
     // diffcol == diffuse map combined with vertex color
     vec4 diffcol = texture(diffuseMap, vary_texcoord0.xy);
@@ -384,5 +384,3 @@ void main()
 
 #endif
 }
-
-
