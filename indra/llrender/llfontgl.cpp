@@ -1965,21 +1965,27 @@ U8 LLFontGL::getStyleFromString(const std::string &style)
 }
 
 // static
-std::string LLFontGL::getStringFromStyle(U8 style)
+const std::string& LLFontGL::getStringFromStyle(U8 style)
 {
-    std::string style_string = "NORMAL";
-    if (style == NORMAL)
-        return style_string;
-
-    auto append = [&](const char* part) {
-        if (!style_string.empty())
-            style_string += '|';
-        style_string += part;
+    // Three flags, so eight spellings, all of them fixed. NORMAL leads every
+    // one: getStyleFromString reads it as zero, and the legacy strings this
+    // has to match were written that way.
+    //
+    // A style carrying bits beyond the three indexes to NORMAL, which is what
+    // building the string a piece at a time did with them.
+    static const std::string sStyleStrings[8] =
+    {
+        "NORMAL",
+        "NORMAL|BOLD",
+        "NORMAL|ITALIC",
+        "NORMAL|BOLD|ITALIC",
+        "NORMAL|UNDERLINE",
+        "NORMAL|BOLD|UNDERLINE",
+        "NORMAL|ITALIC|UNDERLINE",
+        "NORMAL|BOLD|ITALIC|UNDERLINE"
     };
-    if (style & BOLD)      append("BOLD");
-    if (style & ITALIC)    append("ITALIC");
-    if (style & UNDERLINE) append("UNDERLINE");
-    return style_string;
+
+    return sStyleStrings[style & (BOLD | ITALIC | UNDERLINE)];
 }
 
 // static
