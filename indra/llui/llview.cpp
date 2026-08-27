@@ -2627,54 +2627,6 @@ void LLView::applyXUILayout(LLView::Params& p, LLView* parent, LLRect layout_rec
     }
 }
 
-static S32 invert_vertical(S32 y, LLView* parent)
-{
-    if (y < 0)
-    {
-        // already based on top-left, just invert
-        return -y;
-    }
-    else if (parent)
-    {
-        // use parent to flip coordinate
-        S32 parent_height = parent->getRect().getHeight();
-        return parent_height - y;
-    }
-    else
-    {
-        LL_WARNS() << "Attempting to convert layout to top-left with no parent" << LL_ENDL;
-        return y;
-    }
-}
-
-// Assumes that input is in bottom-left coordinates, hence must call
-// _before_ convert_coords_to_top_left().
-static void convert_coords_to_top_left(LLView::Params& p, LLView* parent)
-{
-    // Convert the coordinate system to be top-left based.
-    if (p.rect.top.isProvided())
-    {
-        p.rect.top = invert_vertical(p.rect.top, parent);
-    }
-    if (p.rect.bottom.isProvided())
-    {
-        p.rect.bottom = invert_vertical(p.rect.bottom, parent);
-    }
-    if (p.top_pad.isProvided())
-    {
-        p.top_pad = -p.top_pad;
-    }
-    if (p.top_delta.isProvided())
-    {
-        p.top_delta = -p.top_delta;
-    }
-    if (p.bottom_delta.isProvided())
-    {
-        p.bottom_delta = -p.bottom_delta;
-    }
-    p.layout = "topleft";
-}
-
 LLView::tree_iterator_t LLView::beginTreeDFS()
 {
     return tree_iterator_t(this,
