@@ -34,10 +34,10 @@
 #include <deque>
 #include <memory>
 #include <string_view>
-#include <utility>
-#include <boost/unordered_map.hpp>
-#include <boost/unordered/unordered_flat_map.hpp>
+
 #include <boost/function.hpp>
+#include <utility>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include "llerror.h"
 #include "llstl.h"
@@ -138,7 +138,17 @@ namespace LLInitParam
 
     // wraps comparison operator between any 2 values of the same type
     // specialize to handle cases where equality isn't defined well, or at all
-    template <typename T, bool IS_BOOST_FUNCTION = std::is_constructible_v<T, boost::function_base> || ll::is_std_function_v<T>>
+    // A callback wrapper has no equality, so comparing one against a
+    // default is meaningless; saying they never match makes the diffing
+    // serializers write it out rather than assume it is unchanged.
+    //
+    // Deliberately a narrow, stable test rather than a general
+    // "is it equality-comparable" concept: LLSD's operator== is a free
+    // function in llsdutil.h, so such a concept would answer differently
+    // depending on what a translation unit had included. Both halves are
+    // live -- LLScrollListCell::commit_callback_t is a boost::function,
+    // reached through its typedef rather than by name.
+    template <typename T, bool IS_FUNCTION = std::is_constructible_v<T, boost::function_base> || ll::is_std_function_v<T>>
     struct ParamCompare
     {
         static bool equals(const T &a, const T &b)
@@ -147,7 +157,7 @@ namespace LLInitParam
         }
     };
 
-    // boost and std function types are not comparable
+    // function types are not comparable
     template<typename T>
     struct ParamCompare<T, true>
     {
@@ -268,7 +278,7 @@ namespace LLInitParam
     private:
         struct Inaccessable{};
     public:
-        typedef boost::unordered_map<std::string, T> value_name_map_t;
+        typedef boost::unordered_flat_map<std::string, T, ll::string_hash, std::equal_to<>> value_name_map_t;
         typedef Inaccessable name_t;
         typedef TypeValues<T> type_value_t;
         typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;
@@ -319,7 +329,7 @@ namespace LLInitParam
     {
         typedef TypeValuesHelper<T, DERIVED_TYPE, IS_SPECIALIZED> self_t;
     public:
-        typedef typename boost::unordered_map<std::string, T> value_name_map_t;
+        typedef boost::unordered_flat_map<std::string, T, ll::string_hash, std::equal_to<>> value_name_map_t;
         typedef std::string name_t;
         typedef self_t type_value_t;
         typedef ParamValue<typename LLTypeTags::Sorted<T>::value_t> param_value_t;

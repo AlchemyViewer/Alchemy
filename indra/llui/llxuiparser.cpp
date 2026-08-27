@@ -35,16 +35,13 @@
 
 
 #include <algorithm>
+#include <cctype>
+#include <charconv>
 #include <fstream>
 #include <vector>
-#include <boost/tokenizer.hpp>
-#include <boost/bind.hpp>
-//#include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/classic_core.hpp>
 
 #include "lluicolor.h"
 #include "v3math.h"
-using namespace BOOST_SPIRIT_CLASSIC_NS;
 
 const S32 MAX_STRING_ATTRIBUTE_SIZE = 40;
 
@@ -1062,6 +1059,61 @@ bool LLSimpleXUIParser::readBoolValue(Parser& parser, void* val_ptr)
     return false;
 }
 
+// The readers below replace boost::spirit::classic's parse(...).full, which
+// succeeded only when the whole attribute was consumed. from_chars gives the
+// same answer by comparing its end pointer against the end of the text, and
+// range-checks the narrow types, which assign_a into a U8 did not.
+//
+// One spirit behaviour has to be kept by hand: int_p and real_p accepted a
+// leading '+', and from_chars does not.
+namespace
+{
+    const char* skipParseSpace(const char* p, const char* end)
+    {
+        while (p != end && std::isspace(static_cast<unsigned char>(*p)))
+        {
+            ++p;
+        }
+        return p;
+    }
+
+    template <typename T>
+    bool parseWholeValue(const std::string& text, T& out)
+    {
+        const char* begin = text.data();
+        const char* const end = begin + text.size();
+        if (begin != end && *begin == '+')
+        {
+            ++begin;
+        }
+        const std::from_chars_result result = std::from_chars(begin, end, out);
+        return result.ec == std::errc{} && result.ptr == end;
+    }
+
+    // Four reals separated by whitespace, as real_p >> real_p >> real_p >>
+    // real_p parsed with space_p as the skipper.
+    bool parseColor4Value(const std::string& text, LLColor4& value)
+    {
+        const char* p = text.data();
+        const char* const end = p + text.size();
+        for (S32 i = 0; i < 4; ++i)
+        {
+            p = skipParseSpace(p, end);
+            if (p != end && *p == '+')
+            {
+                ++p;
+            }
+            const std::from_chars_result result = std::from_chars(p, end, value.mV[i]);
+            if (result.ec != std::errc{})
+            {
+                return false;
+            }
+            p = result.ptr;
+        }
+        return skipParseSpace(p, end) == end;
+    }
+}
+
 bool LLSimpleXUIParser::readStringValue(Parser& parser, void* val_ptr)
 {
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
@@ -1072,49 +1124,49 @@ bool LLSimpleXUIParser::readStringValue(Parser& parser, void* val_ptr)
 bool LLSimpleXUIParser::readU8Value(Parser& parser, void* val_ptr)
 {
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
-    return parse(self.mCurAttributeValueBegin.c_str(), uint_p[assign_a(*(U8*)val_ptr)]).full;
+    return parseWholeValue(self.mCurAttributeValueBegin, *(U8*)val_ptr);
 }
 
 bool LLSimpleXUIParser::readS8Value(Parser& parser, void* val_ptr)
 {
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
-    return parse(self.mCurAttributeValueBegin.c_str(), int_p[assign_a(*(S8*)val_ptr)]).full;
+    return parseWholeValue(self.mCurAttributeValueBegin, *(S8*)val_ptr);
 }
 
 bool LLSimpleXUIParser::readU16Value(Parser& parser, void* val_ptr)
 {
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
-    return parse(self.mCurAttributeValueBegin.c_str(), uint_p[assign_a(*(U16*)val_ptr)]).full;
+    return parseWholeValue(self.mCurAttributeValueBegin, *(U16*)val_ptr);
 }
 
 bool LLSimpleXUIParser::readS16Value(Parser& parser, void* val_ptr)
 {
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
-    return parse(self.mCurAttributeValueBegin.c_str(), int_p[assign_a(*(S16*)val_ptr)]).full;
+    return parseWholeValue(self.mCurAttributeValueBegin, *(S16*)val_ptr);
 }
 
 bool LLSimpleXUIParser::readU32Value(Parser& parser, void* val_ptr)
 {
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
-    return parse(self.mCurAttributeValueBegin.c_str(), uint_p[assign_a(*(U32*)val_ptr)]).full;
+    return parseWholeValue(self.mCurAttributeValueBegin, *(U32*)val_ptr);
 }
 
 bool LLSimpleXUIParser::readS32Value(Parser& parser, void* val_ptr)
 {
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
-    return parse(self.mCurAttributeValueBegin.c_str(), int_p[assign_a(*(S32*)val_ptr)]).full;
+    return parseWholeValue(self.mCurAttributeValueBegin, *(S32*)val_ptr);
 }
 
 bool LLSimpleXUIParser::readF32Value(Parser& parser, void* val_ptr)
 {
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
-    return parse(self.mCurAttributeValueBegin.c_str(), real_p[assign_a(*(F32*)val_ptr)]).full;
+    return parseWholeValue(self.mCurAttributeValueBegin, *(F32*)val_ptr);
 }
 
 bool LLSimpleXUIParser::readF64Value(Parser& parser, void* val_ptr)
 {
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
-    return parse(self.mCurAttributeValueBegin.c_str(), real_p[assign_a(*(F64*)val_ptr)]).full;
+    return parseWholeValue(self.mCurAttributeValueBegin, *(F64*)val_ptr);
 }
 
 bool LLSimpleXUIParser::readColor4Value(Parser& parser, void* val_ptr)
@@ -1122,7 +1174,7 @@ bool LLSimpleXUIParser::readColor4Value(Parser& parser, void* val_ptr)
     LLSimpleXUIParser& self = static_cast<LLSimpleXUIParser&>(parser);
     LLColor4 value;
 
-    if (parse(self.mCurAttributeValueBegin.c_str(), real_p[assign_a(value.mV[0])] >> real_p[assign_a(value.mV[1])] >> real_p[assign_a(value.mV[2])] >> real_p[assign_a(value.mV[3])], space_p).full)
+    if (parseColor4Value(self.mCurAttributeValueBegin, value))
     {
         *(LLColor4*)(val_ptr) = value;
         return true;
@@ -1136,7 +1188,7 @@ bool LLSimpleXUIParser::readUIColorValue(Parser& parser, void* val_ptr)
     LLColor4 value;
     LLUIColor* colorp = (LLUIColor*)val_ptr;
 
-    if (parse(self.mCurAttributeValueBegin.c_str(), real_p[assign_a(value.mV[0])] >> real_p[assign_a(value.mV[1])] >> real_p[assign_a(value.mV[2])] >> real_p[assign_a(value.mV[3])], space_p).full)
+    if (parseColor4Value(self.mCurAttributeValueBegin, value))
     {
         colorp->set(value);
         return true;
