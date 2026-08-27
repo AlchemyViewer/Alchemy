@@ -31,53 +31,90 @@
 #include "lldefs.h"
 #include "llformat.h"
 #include "llstl.h"
-#include <list>
-#include <set>
 
-const U32 MAX_STRINGS_LENGTH = 256;
+#include <atomic>
+#include <memory>
+#include <set>
+#include <shared_mutex>
+#include <string>
+#include <string_view>
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 class LL_COMMON_API LLStringTableEntry
 {
 public:
-    LLStringTableEntry(const char *str);
-    ~LLStringTableEntry();
+    explicit LLStringTableEntry(std::string_view str);
 
-    // Owns a raw char buffer and is always heap-allocated and referenced by
-    // pointer (never copied), so delete copy to make that single-owner
-    // invariant explicit and rule out an accidental double-free.
+    // mString points into mText, so this must neither be copied nor moved:
+    // either would leave the pointer aimed at the old object's buffer. The
+    // table owns entries through unique_ptr and hands out bare pointers, so
+    // nothing needs to.
     LLStringTableEntry(const LLStringTableEntry&) = delete;
     LLStringTableEntry& operator=(const LLStringTableEntry&) = delete;
+    LLStringTableEntry(LLStringTableEntry&&) = delete;
+    LLStringTableEntry& operator=(LLStringTableEntry&&) = delete;
 
-    void incCount()     { mCount++; }
-    bool decCount()     { return --mCount != 0; }
+    void incCount() { mCount.fetch_add(1, std::memory_order_relaxed); }
+    bool decCount() { return mCount.fetch_sub(1, std::memory_order_acq_rel) != 1; }
 
-    char *mString;
-    S32  mCount;
+    std::string_view view() const { return mText; }
+
+private:
+    // Declared first so that mString can be initialized from it.
+    std::string         mText;
+    std::atomic<S32>    mCount;
+
+public:
+    // The whole string, NUL terminated. Callers read this; none writes it.
+    char*               mString;
 };
 
+// A table of unique strings. Entries are handed out as bare pointers and are
+// stable for as long as the table holds them, so callers may compare two names
+// by comparing their entry pointers.
+//
+// Safe to use from more than one thread: lookups of a string already present
+// take a shared lock, and only adding a new one is exclusive.
 class LL_COMMON_API LLStringTable
 {
 public:
-    LLStringTable(int tablesize);
+    // The size argument is a hint about how many distinct strings to expect.
+    // It no longer fixes a bucket count, and zero means "no idea".
+    explicit LLStringTable(int tablesize = 0);
     ~LLStringTable();
 
-    char *checkString(const char *str);
-    char *checkString(const std::string& str);
-    LLStringTableEntry *checkStringEntry(const char *str);
-    LLStringTableEntry *checkStringEntry(const std::string& str);
+    LLStringTable(const LLStringTable&) = delete;
+    LLStringTable& operator=(const LLStringTable&) = delete;
 
-    char *addString(const char *str);
-    char *addString(const std::string& str);
-    LLStringTableEntry *addStringEntry(const char *str);
-    LLStringTableEntry *addStringEntry(const std::string& str);
-    void  removeString(const char *str);
+    // Find without adding. Returns null when the string is not present.
+    char*               checkString(std::string_view str) const;
+    char*               checkString(const char* str) const;
+    LLStringTableEntry* checkStringEntry(std::string_view str) const;
+    LLStringTableEntry* checkStringEntry(const char* str) const;
 
-    S32 mMaxEntries;
-    S32 mUniqueEntries;
+    // Find, adding when absent. Either way the entry's count goes up by one.
+    char*               addString(std::string_view str);
+    char*               addString(const char* str);
+    LLStringTableEntry* addStringEntry(std::string_view str);
+    LLStringTableEntry* addStringEntry(const char* str);
 
-    typedef std::list<LLStringTableEntry *> string_list_t;
-    typedef string_list_t * string_list_ptr_t;
-    string_list_ptr_t   *mStringList;
+    // Drops one count, and the entry with it when that was the last.
+    void                removeString(std::string_view str);
+    void                removeString(const char* str);
+
+    S32                 getUniqueEntries() const;
+
+private:
+    // Keyed by a view onto each entry's own text, so a key costs nothing
+    // beyond the entry it names, and lookups compare whole strings.
+    typedef boost::unordered_flat_map<std::string_view,
+                                      std::unique_ptr<LLStringTableEntry>,
+                                      ll::string_hash,
+                                      std::equal_to<>> table_t;
+
+    mutable std::shared_mutex   mMutex;
+    table_t                     mTable;
 };
 
 extern LL_COMMON_API LLStringTable gStringTable;

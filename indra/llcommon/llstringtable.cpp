@@ -28,214 +28,120 @@
 #include "linden_common.h"
 
 #include "llstringtable.h"
-#include "llstl.h"
+
+#include <mutex>
 
 LLStringTable gStringTable(32768);
 
-LLStringTableEntry::LLStringTableEntry(const char *str)
-: mString(NULL), mCount(1)
+LLStringTableEntry::LLStringTableEntry(std::string_view str)
+:   mText(str),
+    mCount(1),
+    mString(mText.data())
 {
-    // Copy string
-    U32 length = (U32)strlen(str) + 1;   /*Flawfinder: ignore*/
-    length = llmin(length, MAX_STRINGS_LENGTH);
-    mString = new char[length];
-    strncpy(mString, str, length);   /*Flawfinder: ignore*/
-    mString[length - 1] = 0;
-}
-
-LLStringTableEntry::~LLStringTableEntry()
-{
-    delete [] mString;
-    mCount = 0;
 }
 
 LLStringTable::LLStringTable(int tablesize)
-: mUniqueEntries(0)
 {
-    if (!tablesize)
-        tablesize = 4096; // some arbitrary default
-    // Make sure tablesize is power of 2
-    for (S32 i = 31; i>0; i--)
+    if (tablesize > 0)
     {
-        if (tablesize & (1<<i))
-        {
-            if (tablesize >= (3<<(i-1)))
-                tablesize = (1<<(i+1));
-            else
-                tablesize = (1<<i);
-            break;
-        }
-    }
-    mMaxEntries = tablesize;
-
-    // Allocate the bucket array, value-initialized to null
-    mStringList = new string_list_ptr_t[mMaxEntries]();
-}
-
-LLStringTable::~LLStringTable()
-{
-    if (mStringList)
-    {
-        for (S32 i = 0; i < mMaxEntries; i++)
-        {
-            if (mStringList[i])
-            {
-                for (LLStringTableEntry* entry : *mStringList[i])
-                    delete entry;
-            }
-            delete mStringList[i];
-        }
-        delete [] mStringList;
-        mStringList = nullptr;
+        mTable.reserve(static_cast<std::size_t>(tablesize));
     }
 }
 
+LLStringTable::~LLStringTable() = default;
 
-static U32 hash_my_string(const char *str, int max_entries)
+S32 LLStringTable::getUniqueEntries() const
 {
-    U32 retval = 0;
-    while (*str)
-    {
-        retval = (retval<<4) + *str;
-        U32 x = (retval & 0xf0000000);
-        if (x) retval = retval ^ (x>>24);
-        retval = retval & (~x);
-        str++;
-    }
-    return (retval & (max_entries-1)); // max_entries is guaranteed to be power of 2
+    std::shared_lock<std::shared_mutex> lock(mMutex);
+    return static_cast<S32>(mTable.size());
 }
 
-char* LLStringTable::checkString(const std::string& str)
+LLStringTableEntry* LLStringTable::checkStringEntry(std::string_view str) const
 {
-    return checkString(str.c_str());
+    std::shared_lock<std::shared_mutex> lock(mMutex);
+    table_t::const_iterator found = mTable.find(str);
+    return found == mTable.end() ? nullptr : found->second.get();
 }
 
-char* LLStringTable::checkString(const char *str)
+LLStringTableEntry* LLStringTable::checkStringEntry(const char* str) const
+{
+    return str ? checkStringEntry(std::string_view(str)) : nullptr;
+}
+
+char* LLStringTable::checkString(std::string_view str) const
 {
     LLStringTableEntry* entry = checkStringEntry(str);
-    if (entry)
-    {
-    return entry->mString;
-    }
-    else
-    {
-    return NULL;
-    }
+    return entry ? entry->mString : nullptr;
 }
 
-LLStringTableEntry* LLStringTable::checkStringEntry(const std::string& str)
+char* LLStringTable::checkString(const char* str) const
 {
-    return checkStringEntry(str.c_str());
+    return str ? checkString(std::string_view(str)) : nullptr;
 }
 
-LLStringTableEntry* LLStringTable::checkStringEntry(const char *str)
+LLStringTableEntry* LLStringTable::addStringEntry(std::string_view str)
 {
-    if (str)
+    // Already present is the common case by a wide margin -- the same handful
+    // of tag and attribute names recur across every file parsed -- so look
+    // first under a shared lock and only take the table exclusively to insert.
     {
-        U32 hash_value = hash_my_string(str, mMaxEntries);
-        string_list_t* strlist = mStringList[hash_value];
-        if (strlist)
+        std::shared_lock<std::shared_mutex> lock(mMutex);
+        table_t::const_iterator found = mTable.find(str);
+        if (found != mTable.end())
         {
-            for (LLStringTableEntry* entry : *strlist)
-            {
-                if (!strncmp(entry->mString, str, MAX_STRINGS_LENGTH))
-                {
-                    return entry;
-                }
-            }
+            found->second->incCount();
+            return found->second.get();
         }
     }
-    return nullptr;
+
+    std::unique_lock<std::shared_mutex> lock(mMutex);
+
+    // Another thread may have inserted it while the lock was not held.
+    table_t::const_iterator found = mTable.find(str);
+    if (found != mTable.end())
+    {
+        found->second->incCount();
+        return found->second.get();
+    }
+
+    std::unique_ptr<LLStringTableEntry> owned = std::make_unique<LLStringTableEntry>(str);
+    LLStringTableEntry* entry = owned.get();
+    // Key on the entry's own text, not on the caller's buffer, which it does
+    // not own and which may be gone before the next lookup.
+    mTable.emplace(entry->view(), std::move(owned));
+    return entry;
 }
 
-char* LLStringTable::addString(const std::string& str)
+LLStringTableEntry* LLStringTable::addStringEntry(const char* str)
 {
-    //RN: safe to use temporary c_str since string is copied
-    return addString(str.c_str());
+    return str ? addStringEntry(std::string_view(str)) : nullptr;
 }
 
-char* LLStringTable::addString(const char *str)
+char* LLStringTable::addString(std::string_view str)
 {
-
     LLStringTableEntry* entry = addStringEntry(str);
-    if (entry)
-    {
-    return entry->mString;
-    }
-    else
-    {
-    return NULL;
-    }
+    return entry ? entry->mString : nullptr;
 }
 
-LLStringTableEntry* LLStringTable::addStringEntry(const std::string& str)
+char* LLStringTable::addString(const char* str)
 {
-    return addStringEntry(str.c_str());
+    return str ? addString(std::string_view(str)) : nullptr;
 }
 
-LLStringTableEntry* LLStringTable::addStringEntry(const char *str)
+void LLStringTable::removeString(std::string_view str)
 {
-    if (str)
+    std::unique_lock<std::shared_mutex> lock(mMutex);
+    table_t::iterator found = mTable.find(str);
+    if (found != mTable.end() && !found->second->decCount())
     {
-        U32 hash_value = hash_my_string(str, mMaxEntries);
-        string_list_t* strlist = mStringList[hash_value];
-
-        if (strlist)
-        {
-            for (LLStringTableEntry* entry : *strlist)
-            {
-                if (!strncmp(entry->mString, str, MAX_STRINGS_LENGTH))
-                {
-                    entry->incCount();
-                    return entry;
-                }
-            }
-        }
-        else
-        {
-            mStringList[hash_value] = new string_list_t;
-            strlist = mStringList[hash_value];
-        }
-
-        // not found, so add!
-        LLStringTableEntry *newentry = new LLStringTableEntry(str);
-        strlist->push_front(newentry);
-        mUniqueEntries++;
-        return newentry;
-    }
-    else
-    {
-        return nullptr;
+        mTable.erase(found);
     }
 }
 
-void LLStringTable::removeString(const char *str)
+void LLStringTable::removeString(const char* str)
 {
     if (str)
     {
-        U32 hash_value = hash_my_string(str, mMaxEntries);
-        string_list_t* strlist = mStringList[hash_value];
-
-        if (strlist)
-        {
-            for (LLStringTableEntry* entry : *strlist)
-            {
-                if (!strncmp(entry->mString, str, MAX_STRINGS_LENGTH))
-                {
-                    if (!entry->decCount())
-                    {
-                        mUniqueEntries--;
-                        if (mUniqueEntries < 0)
-                        {
-                            LL_ERRS() << "LLStringTable:removeString trying to remove too many strings!" << LL_ENDL;
-                        }
-                        strlist->remove(entry);
-                        delete entry;
-                    }
-                    return;
-                }
-            }
-        }
+        removeString(std::string_view(str));
     }
 }
-
