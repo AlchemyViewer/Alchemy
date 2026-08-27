@@ -160,8 +160,8 @@ namespace
         table.reserve(descriptor.mNamedParams.size());
         for (const auto& [name, param] : descriptor.mNamedParams)
         {
-            table.push_back(name + ':' + std::to_string(param->mMinCount)
-                                 + ':' + std::to_string(param->mMaxCount));
+            table.push_back(std::string(name) + ':' + std::to_string(param->mMinCount)
+                                              + ':' + std::to_string(param->mMaxCount));
         }
         // mNamedParams is a hash map, so impose an order of our own.
         std::sort(table.begin(), table.end());

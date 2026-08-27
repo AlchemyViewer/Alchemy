@@ -190,7 +190,7 @@ namespace LLInitParam
         size_t owned_descriptors = 0;
         size_t validated_entries = 0;
         size_t name_bytes = 0;
-        std::unordered_set<std::string> distinct_names;
+        std::unordered_set<std::string_view> distinct_names;
 
         for (const BlockDescriptor* descriptor : all)
         {
@@ -206,21 +206,22 @@ namespace LLInitParam
 
             for (const param_map_t::value_type& pair : descriptor->mNamedParams)
             {
-                name_bytes += pair.first.capacity();
-                distinct_names.insert(pair.first);
+                name_bytes += pair.first.size() + 1;
+                distinct_names.emplace(pair.first);
             }
         }
 
-        // A named entry is a hash node holding a std::string and a pointer;
-        // an mAllParams entry is one pointer in a flat vector.
-        const size_t named_node_bytes = named_entries * (sizeof(void*) + sizeof(size_t) + sizeof(std::string) + sizeof(ParamDescriptorPtr));
+        // A named entry in a flat map is a view and a pointer, with no node
+        // of its own. The name characters are not counted as heap at all
+        // now: they are the string literals in the block declarations.
+        const size_t named_node_bytes = named_entries * (sizeof(std::string_view) + sizeof(ParamDescriptorPtr));
         const size_t list_node_bytes = all_param_entries * sizeof(ParamDescriptorPtr);
         const size_t descriptor_bytes = owned_descriptors * sizeof(ParamDescriptor);
 
         size_t distinct_name_bytes = 0;
-        for (const std::string& name : distinct_names)
+        for (std::string_view name : distinct_names)
         {
-            distinct_name_bytes += name.capacity();
+            distinct_name_bytes += name.size() + 1;
         }
 
         std::ostringstream out;
@@ -233,13 +234,13 @@ namespace LLInitParam
             << "  validated params       : " << validated_entries << "\n"
             << "  distinct param names   : " << distinct_names.size()
             << " (of " << named_entries << " entries)\n"
-            << "  name string bytes      : " << name_bytes
-            << " (" << distinct_name_bytes << " if interned)\n"
-            << "  named map nodes        : ~" << named_node_bytes << " bytes\n"
+            << "  name chars in binary   : " << name_bytes
+            << " (" << distinct_name_bytes << " distinct)\n"
+            << "  named map entries      : ~" << named_node_bytes << " bytes\n"
             << "  mAllParams vector      : ~" << list_node_bytes << " bytes\n"
             << "  descriptor objects     : ~" << descriptor_bytes << " bytes\n"
             << "  approximate total      : ~"
-            << (named_node_bytes + list_node_bytes + descriptor_bytes + name_bytes) << " bytes\n";
+            << (named_node_bytes + list_node_bytes + descriptor_bytes) << " bytes\n";
         return out.str();
     }
 
@@ -360,7 +361,7 @@ namespace LLInitParam
                     continue;
                 }
 
-                name_stack.emplace_back(pair.first, true);
+                name_stack.emplace_back(std::string(pair.first), true);
                 const Param* diff_param = diff_block ? diff_block->getParamFromHandle(param_handle) : NULL;
                 serialized |= serialize_func(*param, parser, name_stack, predicate_rule, diff_param);
                 name_stack.pop_back();
@@ -433,7 +434,7 @@ namespace LLInitParam
         return false;
     }
 
-    void BaseBlock::addSynonym(Param& param, const std::string& synonym)
+    void BaseBlock::addSynonymImpl(Param& param, std::string_view synonym)
     {
         BlockDescriptor& block_data = mostDerivedBlockDescriptor();
         if (block_data.mInitializationState == BlockDescriptor::INITIALIZING)
@@ -462,7 +463,7 @@ namespace LLInitParam
         }
     }
 
-    const std::string& BaseBlock::getParamName(const BlockDescriptor& block_data, const Param* paramp) const
+    std::string_view BaseBlock::getParamName(const BlockDescriptor& block_data, const Param* paramp) const
     {
         param_handle_t handle = getHandleFromParam(paramp);
         for (BlockDescriptor::param_map_t::const_iterator it = block_data.mNamedParams.begin(); it != block_data.mNamedParams.end(); ++it)
@@ -473,7 +474,7 @@ namespace LLInitParam
             }
         }
 
-        return LLStringUtil::null;
+        return {};
     }
 
     ParamDescriptorPtr BaseBlock::findParamDescriptor(const Param& param)

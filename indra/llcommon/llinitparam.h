@@ -33,8 +33,10 @@
 #include <vector>
 #include <deque>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <boost/unordered_map.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/function.hpp>
 
 #include "llerror.h"
@@ -634,7 +636,12 @@ namespace LLInitParam
                       S32 max_count,
                       const char* name);
 
-        typedef boost::unordered_map<std::string, ParamDescriptorPtr, ll::string_hash, std::equal_to<>> param_map_t;
+        // Keyed by a view, not a string. Every name reaching this table comes
+        // from a string literal in a block declaration or an addSynonym call,
+        // so the characters already live in the binary for the life of the
+        // process and the table need not copy them. A flat map then costs no
+        // node allocation either.
+        typedef boost::unordered_flat_map<std::string_view, ParamDescriptorPtr, ll::string_hash, std::equal_to<>> param_map_t;
         typedef std::vector<ParamDescriptorPtr>                                                 param_list_t;
         typedef std::vector<ParamDescriptorPtr>                                                 all_params_list_t;
         typedef std::vector<std::pair<param_handle_t, ParamDescriptor::validation_func_t> >     param_validation_list_t;
@@ -856,7 +863,15 @@ namespace LLInitParam
             return reinterpret_cast<const Param*>(baseblock_address + param_handle);
         }
 
-        void addSynonym(Param& param, const std::string& synonym);
+        // Takes a char array rather than a pointer so that only a string
+        // literal (or another static array) can be passed. The table keeps a
+        // view of these characters forever, and a const char* would let
+        // someone hand it a temporary's buffer without a diagnostic.
+        template <std::size_t N>
+        void addSynonym(Param& param, const char (&synonym)[N])
+        {
+            addSynonymImpl(param, std::string_view(synonym, N - 1));
+        }
 
         // Blocks can override this to do custom tracking of changes
         virtual void paramChanged(const Param& changed_param, bool user_provided)
@@ -912,7 +927,8 @@ namespace LLInitParam
         bool            mParamProvided;
 
     private:
-        const std::string& getParamName(const BlockDescriptor& block_data, const Param* paramp) const;
+        void addSynonymImpl(Param& param, std::string_view synonym);
+        std::string_view getParamName(const BlockDescriptor& block_data, const Param* paramp) const;
     };
 
     class LL_COMMON_API Param
