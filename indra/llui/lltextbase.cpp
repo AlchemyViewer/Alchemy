@@ -367,8 +367,6 @@ bool LLTextBase::truncate()
 
 const LLStyle::Params& LLTextBase::getStyleParams()
 {
-    //FIXME: convert mDefaultStyle to a flyweight http://www.boost.org/doc/libs/1_40_0/libs/flyweight/doc/index.html
-    //and eliminate color member values
     if (mStyleDirty)
     {
           mStyle
@@ -378,8 +376,19 @@ const LLStyle::Params& LLTextBase::getStyleParams()
                   .font(mFont)
                   .drop_shadow(mFontShadow);
           mStyleDirty = false;
+          mDefaultStyle = nullptr;
     }
     return mStyle;
+}
+
+const LLStyleConstSP& LLTextBase::getDefaultStyle()
+{
+    const LLStyle::Params& params = getStyleParams();
+    if (mDefaultStyle.isNull())
+    {
+        mDefaultStyle = new LLStyle(params);
+    }
+    return mDefaultStyle;
 }
 
 void LLTextBase::beforeValueChange()
@@ -1098,8 +1107,7 @@ S32 LLTextBase::insertStringNoUndo(S32 pos, const LLWString &wstr, LLTextBase::s
     else
     {
         // create default editable segment to hold new text
-        LLStyleConstSP sp(new LLStyle(getStyleParams()));
-        default_segment = new LLNormalTextSegment( sp, pos, pos + insert_len, *this);
+        default_segment = new LLNormalTextSegment( getDefaultStyle(), pos, pos + insert_len, *this);
     }
 
     // shift remaining segments to right
@@ -1243,8 +1251,7 @@ void LLTextBase::createDefaultSegment()
     // ensures that there is always at least one segment
     if (mSegments.empty())
     {
-        LLStyleConstSP sp(new LLStyle(getStyleParams()));
-        LLTextSegmentPtr default_segment = new LLNormalTextSegment( sp, 0, getLength() + 1, *this);
+        LLTextSegmentPtr default_segment = new LLNormalTextSegment( getDefaultStyle(), 0, getLength() + 1, *this);
         mSegments.insert(default_segment);
         default_segment->linkToDocument(this);
     }

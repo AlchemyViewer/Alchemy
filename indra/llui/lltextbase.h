@@ -686,6 +686,15 @@ protected:
     void                            insertSegment(LLTextSegmentPtr segment_to_insert);
     const LLStyle::Params&          getStyleParams();
 
+    // The default style as one shared, immutable object. Segments that carry
+    // nothing but the widget's own style all point at this instead of each
+    // holding a copy of the same values. Callers that go on to change the
+    // style must build their own from getStyleParams().
+    //
+    // Shared within this widget only: the style holds links to this widget's
+    // own colour members, so it means nothing to another one.
+    const LLStyleConstSP&           getDefaultStyle();
+
     //  manage lines
 // [SL:KB] - Patch: Control-TextEditor | Checked: Catznip-5.2
 public:
@@ -751,6 +760,7 @@ protected:
 
     // default text style
     LLStyle::Params             mStyle;
+    LLStyleConstSP              mDefaultStyle;
     bool                        mStyleDirty;
     const LLFontGL*             mFont;
     const LLFontGL::ShadowType  mFontShadow;

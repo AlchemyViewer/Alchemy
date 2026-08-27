@@ -788,7 +788,7 @@ void LLTextEditor::insertEmoji(const LLWString& emoji)
     }
     else
     {
-        style = LLStyleConstSP(new LLStyle(getStyleParams()));
+        style = getDefaultStyle();
     }
     auto segment = new LLNormalTextSegment(style, mCursorPos, mCursorPos + span, *this);
     insert(mCursorPos, emoji, false, segment);

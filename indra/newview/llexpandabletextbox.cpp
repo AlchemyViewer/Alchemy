@@ -172,8 +172,7 @@ void LLExpandableTextBox::LLTextBoxEx::hideExpandText()
     if (mExpanderVisible)
     {
         // this will overwrite the expander segment and all text styling with a single style
-        LLStyleConstSP sp(new LLStyle(getStyleParams()));
-        LLNormalTextSegment* segmentp = new LLNormalTextSegment(sp, 0, getLength() + 1, *this);
+        LLNormalTextSegment* segmentp = new LLNormalTextSegment(getDefaultStyle(), 0, getLength() + 1, *this);
         insertSegment(segmentp);
 
         mExpanderVisible = false;

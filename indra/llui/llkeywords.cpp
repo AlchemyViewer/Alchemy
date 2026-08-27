@@ -47,6 +47,16 @@ inline bool LLKeywordToken::isTail(const llwchar* s) const
     return std::memcmp(s, mDelimiter.c_str(), len_bytes) == 0;
 }
 
+const LLStyleConstSP& LLKeywordToken::getStyle(const LLFontGL* font) const
+{
+    if (mStyle.isNull() || mStyleFont != font)
+    {
+        mStyleFont = font;
+        mStyle = new LLStyle(LLStyle::Params().font(font).color(mColor));
+    }
+    return mStyle;
+}
+
 LLKeywords::LLKeywords()
 :   mLoaded(false)
 {
@@ -912,7 +922,7 @@ void LLKeywords::insertSegments(const LLWString& wtext, std::vector<LLTextSegmen
 {
     std::string::size_type pos = wtext.find('\n',seg_start);
 
-    LLStyleConstSP cur_token_style = new LLStyle(LLStyle::Params().font(style->getFont()).color(cur_token->getColor()));
+    const LLStyleConstSP& cur_token_style = cur_token->getStyle(style->getFont());
 
     while (pos!=-1 && pos < (std::string::size_type)seg_end)
     {
