@@ -125,16 +125,6 @@ namespace LLInitParam
     //
     // BlockDescriptor
     //
-    void BlockDescriptor::aggregateBlockData(BlockDescriptor& src_block_data)
-    {
-        // The named table is not copied: findNamedParam walks to the base
-        // instead. The rest are iterated rather than looked up, and holding
-        // them flat keeps that a single pass.
-        std::copy(src_block_data.mUnnamedParams.begin(), src_block_data.mUnnamedParams.end(), std::back_inserter(mUnnamedParams));
-        std::copy(src_block_data.mValidationList.begin(), src_block_data.mValidationList.end(), std::back_inserter(mValidationList));
-        std::copy(src_block_data.mAllParams.begin(), src_block_data.mAllParams.end(), std::back_inserter(mAllParams));
-    }
-
     namespace
     {
         // Descriptors are registered once per block type and read for the life
@@ -275,10 +265,6 @@ namespace LLInitParam
         {
             own_entries += descriptor->mNamedParams.size();
             unnamed_entries += descriptor->mUnnamedParams.size();
-            // An entry is a slot in some block's table; a descriptor is an
-            // object. They are not the same count, because a derived block's
-            // table has an entry for each of its base's descriptors without
-            // owning any of them.
             all_param_entries += descriptor->mAllParams.size();
             validated_entries += descriptor->mValidationList.size();
             effective_entries += descriptor->namedParams().size();
@@ -389,9 +375,8 @@ namespace LLInitParam
             // A block with no base of its own is handed its own descriptor,
             // which would make findNamedParam walk in a circle.
             descriptor.mBaseDescriptor = (&base_descriptor == &descriptor) ? NULL : &base_descriptor;
-            // copy params from base class here
-            descriptor.aggregateBlockData(base_descriptor);
-
+            std::copy(base_descriptor.mUnnamedParams.begin(), base_descriptor.mUnnamedParams.end(),
+                      std::back_inserter(descriptor.mUnnamedParams));
             descriptor.mInitializationState = BlockDescriptor::INITIALIZING;
             break;
         case BlockDescriptor::INITIALIZING:
@@ -431,17 +416,23 @@ namespace LLInitParam
         if (!mValidated)
         {
             const BlockDescriptor& block_data = mostDerivedBlockDescriptor();
-            for (const BlockDescriptor::param_validation_list_t::value_type& pair : block_data.mValidationList)
-            {
-                const Param* param = getParamFromHandle(pair.first);
-                if (!pair.second(param))
+            const bool failed = block_data.anyValidator(
+                [&](const BlockDescriptor::param_validation_list_t::value_type& pair)
                 {
+                    const Param* param = getParamFromHandle(pair.first);
+                    if (pair.second(param))
+                    {
+                        return false;
+                    }
                     if (emit_errors)
                     {
                         LL_WARNS() << "Invalid param \"" << getParamName(block_data, param) << "\"" << LL_ENDL;
                     }
-                    return false;
-                }
+                    return true;
+                });
+            if (failed)
+            {
+                return false;
             }
             mValidated = true;
         }
@@ -642,11 +633,17 @@ namespace LLInitParam
     {
         param_handle_t handle = getHandleFromParam(&param);
         BlockDescriptor& descriptor = mostDerivedBlockDescriptor();
-        for (ParamDescriptorPtr ptr : descriptor.mAllParams)
+        ParamDescriptorPtr found = nullptr;
+        descriptor.anyParam([&](ParamDescriptorPtr ptr)
         {
-            if (ptr->mParamHandle == handle) return ptr;
-        }
-        return nullptr;
+            if (ptr->mParamHandle != handle)
+            {
+                return false;
+            }
+            found = ptr;
+            return true;
+        });
+        return found;
     }
 
     // take all provided params from other and apply to self
@@ -654,17 +651,18 @@ namespace LLInitParam
     bool BaseBlock::mergeBlock(BlockDescriptor& block_data, const BaseBlock& other, bool overwrite)
     {
         bool some_param_changed = false;
-        for (ParamDescriptorPtr ptr : block_data.mAllParams)
+        block_data.anyParam([&](ParamDescriptorPtr ptr)
         {
-            const Param* other_paramp = other.getParamFromHandle(ptr->mParamHandle);
             ParamDescriptor::merge_func_t merge_func = ptr->mMergeFunc;
             if (merge_func)
             {
+                const Param* other_paramp = other.getParamFromHandle(ptr->mParamHandle);
                 Param* paramp = getParamFromHandle(ptr->mParamHandle);
                 llassert(paramp->getEnclosingBlockOffset() == ptr->mParamHandle);
                 some_param_changed |= merge_func(*paramp, *other_paramp, overwrite);
             }
-        }
+            return false;
+        });
         return some_param_changed;
     }
 }

@@ -152,9 +152,21 @@ namespace
         }
         const auto copy_end = std::chrono::steady_clock::now();
 
+        // What LLUICtrlFactory::create does before building the widget, and
+        // the only thing that walks the whole parameter table.
+        const auto fill_start = std::chrono::steady_clock::now();
+        for (int i = 0; i < N; ++i)
+        {
+            P block;
+            block.fillFrom(source);
+            gBenchSink += reinterpret_cast<std::size_t>(&block);
+        }
+        const auto fill_end = std::chrono::steady_clock::now();
+
         out << "  " << tag << " sizeof=" << sizeof(P)
             << " default=" << std::chrono::duration<double, std::nano>(default_end - default_start).count() / N
             << "ns copy=" << std::chrono::duration<double, std::nano>(copy_end - copy_start).count() / N
+            << "ns default+fillFrom=" << std::chrono::duration<double, std::nano>(fill_end - fill_start).count() / N
             << "ns" << std::endl;
     }
 

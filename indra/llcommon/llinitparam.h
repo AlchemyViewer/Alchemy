@@ -667,7 +667,6 @@ namespace LLInitParam
             INITIALIZED
         } EInitializationState;
 
-        void aggregateBlockData(BlockDescriptor& src_block_data);
 
         // Builds a descriptor owned by this block and files it under `name`,
         // or among the unnamed parameters when `name` is empty.
@@ -701,10 +700,38 @@ namespace LLInitParam
         // that report or serialize rather than the one that parses.
         std::vector<std::pair<std::string_view, ParamDescriptorPtr> > namedParams() const;
 
+        // The three lists below hold only what this block declares, so anything
+        // wanting the whole set walks out to the bases. Least derived first:
+        // an aggregated list had a base's entries copied in ahead of the
+        // derived block's own, and the unnamed ones are tried in that order.
+        //
+        // Each stops as soon as func returns true, so a caller that means to
+        // visit everything returns false throughout.
+        template <typename FUNC> bool anyParam(const FUNC& func) const
+        {
+            if (mBaseDescriptor && mBaseDescriptor->anyParam(func)) { return true; }
+            for (ParamDescriptorPtr ptr : mAllParams) { if (func(ptr)) { return true; } }
+            return false;
+        }
+
+        template <typename FUNC> bool anyValidator(const FUNC& func) const
+        {
+            if (mBaseDescriptor && mBaseDescriptor->anyValidator(func)) { return true; }
+            for (const param_validation_list_t::value_type& pair : mValidationList)
+            {
+                if (func(pair)) { return true; }
+            }
+            return false;
+        }
+
         param_map_t                     mNamedParams;           // parameters this block itself named
-        param_list_t                    mUnnamedParams;         // parameters with_out_ associated names
-        param_validation_list_t         mValidationList;        // parameters that must be validated
-        all_params_list_t               mAllParams;             // all parameters, this block's and its bases'
+        // Not chained, unlike the two beside it: this is the fallback every
+        // attribute that is not a name falls through to, and there are 21 of
+        // them across the 67 blocks llui registers -- small enough that
+        // copying a base's in costs less than walking out to it did.
+        param_list_t                    mUnnamedParams;         // unnamed parameters, this block's and its bases'
+        param_validation_list_t         mValidationList;        // parameters this block declared that must be validated
+        all_params_list_t               mAllParams;             // every parameter this block declared
         BlockDescriptor*                mBaseDescriptor;        // the block this one derives from, or null
         const char*                     mTypeName;              // the block type, for reporting
         size_t                          mMaxParamOffset;
@@ -816,13 +843,6 @@ namespace LLInitParam
         // lift block tags into baseblock namespace so derived classes do not need to qualify them
         typedef LLInitParam::IS_A_BLOCK IS_A_BLOCK;
         typedef LLInitParam::NOT_BLOCK NOT_A_BLOCK;
-
-        template<typename T>
-        struct Sequential : public LLTypeTags::TypeTagBase<T, 2>
-        {
-            template <typename S> struct Cons { typedef Sequential<ParamValue<S> > value_t; };
-            template <typename S> struct Cons<Sequential<S> > { typedef Sequential<S> value_t; };
-        };
 
         template<typename T>
         struct Atomic : public LLTypeTags::TypeTagBase<T, 1>
@@ -2359,12 +2379,6 @@ namespace LLInitParam
         typedef typename IsBlock<T>::value_t value_t;
     };
 
-    template<typename T, typename BLOCK_IDENTIFIER>
-    struct IsBlock<ParamValue<BaseBlock::Sequential<T>, typename IsBlock<BaseBlock::Sequential<T> >::value_t >, BLOCK_IDENTIFIER>
-    {
-        typedef typename IsBlock<T>::value_t value_t;
-    };
-
 
     template<typename T>
     struct InnerMostType
@@ -2469,129 +2483,6 @@ namespace LLInitParam
         }
 
         T   mValue;
-    };
-
-    template<typename T>
-    class ParamValue <BaseBlock::Sequential<T>, IS_A_BLOCK>
-    {
-        typedef ParamValue <BaseBlock::Sequential<T>, IS_A_BLOCK> self_t;
-
-    public:
-        typedef typename InnerMostType<T>::value_t  value_t;
-        typedef T                                   default_value_t;
-
-        ParamValue()
-        :   mValue()
-        {
-            mCurParam = getBlockDescriptor().mAllParams.begin();
-        }
-
-        ParamValue(const default_value_t& value)
-        :   mValue(value)
-        {
-            mCurParam = getBlockDescriptor().mAllParams.begin();
-        }
-
-        void setValue(const value_t& val)
-        {
-            mValue.setValue(val);
-        }
-
-        const value_t& getValue() const
-        {
-            return mValue.getValue();
-        }
-
-        value_t& getValue()
-        {
-            return mValue.getValue();
-        }
-
-        bool deserializeBlock(Parser& p, Parser::name_stack_range_t& name_stack_range, bool new_name)
-        {
-            if (new_name)
-            {
-                mCurParam = getBlockDescriptor().mAllParams.begin();
-            }
-            if (name_stack_range.first == name_stack_range.second
-                && mCurParam != getBlockDescriptor().mAllParams.end())
-            {
-                // deserialize to mCurParam
-                ParamDescriptor& pd = *(*mCurParam);
-                ParamDescriptor::deserialize_func_t deserialize_func = pd.mDeserializeFunc;
-                Param* paramp = mValue.getParamFromHandle(pd.mParamHandle);
-
-                if (deserialize_func
-                    && paramp
-                    && deserialize_func(*paramp, p, name_stack_range, new_name))
-                {
-                    ++mCurParam;
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            else
-            {
-                return mValue.deserializeBlock(p, name_stack_range, new_name);
-            }
-        }
-
-        bool serializeBlock(Parser& p, Parser::name_stack_t& name_stack, const predicate_rule_t predicate_rule, const self_t* diff_block = NULL) const
-        {
-            const BaseBlock* base_block = diff_block
-                ? &(diff_block->mValue)
-                : NULL;
-            return mValue.serializeBlock(p, name_stack, predicate_rule, base_block);
-        }
-
-        bool mergeBlockParam(bool source_provided, bool dst_provided, BlockDescriptor& block_data, const self_t& source, bool overwrite)
-        {
-            return mValue.mergeBlock(block_data, source.getValue(), overwrite);
-        }
-
-        bool validateBlock(bool emit_errors = true) const
-        {
-            return mValue.validateBlock(emit_errors);
-        }
-
-        bool isValid() const
-        {
-            return validateBlock(false);
-        }
-
-        static BlockDescriptor& getBlockDescriptor()
-        {
-            return value_t::getBlockDescriptor();
-        }
-
-    private:
-
-        BlockDescriptor::all_params_list_t::iterator    mCurParam;
-        T                                               mValue;
-    };
-
-    template<typename T>
-    class ParamValue <BaseBlock::Sequential<T>, NOT_BLOCK>
-    : public T
-    {
-        typedef ParamValue <BaseBlock::Sequential<T>, NOT_BLOCK> self_t;
-
-    public:
-        typedef typename InnerMostType<T>::value_t  value_t;
-        typedef T                                   default_value_t;
-
-        ParamValue()
-        :   T()
-        {}
-
-        ParamValue(const default_value_t& value)
-        :   T(value.getValue())
-        {}
-
-        bool isValid() const { return true; }
     };
 
     template<typename T, typename BLOCK_T>
