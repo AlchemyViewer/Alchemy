@@ -29,6 +29,7 @@
 #include "linden_common.h"
 
 #include "../llstring.h"
+#include "../llsd.h"
 #include "StringVec.h"                  // must come BEFORE lltut.h
 #include "../test/lltut.h"
 
@@ -888,5 +889,49 @@ namespace tut
         ensure_equals("round trip nested entity text",
                       LLStringFn::xml_decode(LLStringFn::xml_encode("a&lt;b")),
                       "a&lt;b");
+    }
+
+    template<> template<>
+    void string_index_object_t::test<44>()
+    {
+        set_test_name("format leaves unsubstitutable strings alone");
+
+        LLStringUtil::format_map_t fmt_map;
+        fmt_map["FOO"] = "bar";
+
+        LLSD sd_map;
+        sd_map["FOO"] = "bar";
+
+        // Strings that reach format() without a usable [KEY] must come back
+        // byte-identical, whether or not they contain brackets at all.
+        const char* const untouched[] = {
+            "",
+            "plain label with no brackets",
+            "hello [MISSING_REPLACEMENT]",
+            "-=[Stylized Name]=-",
+            "[unclosed",
+            "]before[",
+            "]",
+        };
+
+        for (const char* src : untouched)
+        {
+            std::string s(src);
+            ensure_equals(std::string("format_map count: ") + src,
+                          0, LLStringUtil::format(s, fmt_map));
+            ensure_equals(std::string("format_map result: ") + src, s, std::string(src));
+
+            std::string s2(src);
+            ensure_equals(std::string("LLSD count: ") + src,
+                          0, LLStringUtil::format(s2, sd_map));
+            ensure_equals(std::string("LLSD result: ") + src, s2, std::string(src));
+        }
+
+        // A real substitution still fires, and the surrounding text — including
+        // brackets that are not a key — survives it.
+        std::string s("no [FOO] here [MISSING] -=[Stylized Name]=-");
+        ensure_equals("mixed count", 1, LLStringUtil::format(s, fmt_map));
+        ensure_equals("mixed result", s,
+                      std::string("no bar here [MISSING] -=[Stylized Name]=-"));
     }
 }

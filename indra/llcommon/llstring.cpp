@@ -1811,6 +1811,15 @@ S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
     S32 res = 0;
 
+    // Every substitution is bracketed, so a string with no '[' cannot produce
+    // one. Bail before building `output`: the loop below would copy the whole
+    // string into it and assign back, and most strings that reach here (button
+    // labels, menu entries, tooltips) have nothing to substitute.
+    if (s.find('[') == std::string::npos)
+    {
+        return res;
+    }
+
     std::string output;
     std::vector<std::string> tokens;
 
@@ -1885,6 +1894,12 @@ S32 LLStringUtil::format(std::string& s, const LLSD& substitutions)
     S32 res = 0;
 
     if (!substitutions.isMap())
+    {
+        return res;
+    }
+
+    // See the format_map_t overload: no '[' means no substitution is possible.
+    if (s.find('[') == std::string::npos)
     {
         return res;
     }
