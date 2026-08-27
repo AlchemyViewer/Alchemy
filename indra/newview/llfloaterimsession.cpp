@@ -66,7 +66,7 @@
 #include "llfloatergroupinvite.h"
 #include "llgroupactions.h"
 #include "llslurl.h"
-#include <boost/lexical_cast.hpp>
+#include "llstring.h"
 // [/SL:KB]
 // [RLVa:KB] - Checked: 2013-05-10 (RLVa-1.4.9)
 #include "rlvactions.h"
@@ -278,6 +278,30 @@ void LLFloaterIMSession::GearDoToSelectedGroup(const LLSD& userdata)
 // [/SL:KB]
 
 // [SL:KB] - Patch: Chat-Misc | Checked: 2014-03-22 (Catznip-3.6)
+void LLFloaterIMSession::onSnoozeGroupClicked(const LLUICtrl* pCtrl)
+{
+    if (!pCtrl)
+    {
+        return;
+    }
+
+    const std::string snooze_value = pCtrl->getValue().asString();
+    S32 snooze_duration = 0;
+    if (!snooze_value.empty())
+    {
+        S32 snooze_minutes = 0;
+        if (!LLStringUtil::convertToS32(snooze_value, snooze_minutes))
+        {
+            LL_WARNS("IMVIEW") << "Invalid group IM snooze value: " << snooze_value << LL_ENDL;
+            return;
+        }
+
+        snooze_duration = snooze_minutes < 0 ? -1 : snooze_minutes * 60;
+    }
+
+    LLGroupActions::snoozeIM(mSessionID, snooze_duration);
+}
+
 void LLFloaterIMSession::onTeleportClicked(const LLUICtrl* pCtrl)
 {
     if (pCtrl)
@@ -478,6 +502,7 @@ bool LLFloaterIMSession::postBuild()
         mExtendedButtonPanel->getChild<LLUICtrl>("profile_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_profile"));
         mExtendedButtonPanel->getChild<LLUICtrl>("chat_history_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "chat_history"));
         mExtendedButtonPanel->getChild<LLUICtrl>("view_notices_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::GearDoToSelectedGroup, this, "view_notices"));
+        mExtendedButtonPanel->getChild<LLUICtrl>("snooze_group_btn")->setCommitCallback(boost::bind(&LLFloaterIMSession::onSnoozeGroupClicked, this, _1));
     }
 // [/SL:KB]
 

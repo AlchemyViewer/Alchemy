@@ -105,6 +105,8 @@ public:
      * End group instant messaging session.
      */
     static void endIM(const LLUUID& group_id);
+    static void leaveIM(const LLUUID& group_id);
+    static void snoozeIM(const LLUUID& group_id, S32 snooze_duration = -1);
 
     /// Returns if the current user is a member of the group
     static bool isInGroup(const LLUUID& group_id);

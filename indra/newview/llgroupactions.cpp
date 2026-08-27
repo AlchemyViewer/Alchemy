@@ -605,6 +605,27 @@ LLUUID LLGroupActions::startIM(const LLUUID& group_id)
     }
 }
 
+static void close_group_im(const LLUUID& group_id, LLIMModel::LLIMSession::SCloseAction close_action, S32 snooze_duration = -1)
+{
+    if (group_id.isNull())
+    {
+        return;
+    }
+
+    LLUUID session_id = gIMMgr->computeSessionID(IM_SESSION_GROUP_START, group_id);
+    if (session_id.notNull())
+    {
+        LLIMModel::LLIMSession* session = LLIMModel::getInstance()->findIMSession(session_id);
+        if (session)
+        {
+            session->mCloseAction = close_action;
+            session->mSnoozeDuration = snooze_duration;
+        }
+
+        gIMMgr->leaveSession(session_id);
+    }
+}
+
 // static
 void LLGroupActions::endIM(const LLUUID& group_id)
 {
@@ -616,6 +637,18 @@ void LLGroupActions::endIM(const LLUUID& group_id)
     {
         gIMMgr->leaveSession(session_id);
     }
+}
+
+// static
+void LLGroupActions::leaveIM(const LLUUID& group_id)
+{
+    close_group_im(group_id, LLIMModel::LLIMSession::SCloseAction::CLOSE_LEAVE);
+}
+
+// static
+void LLGroupActions::snoozeIM(const LLUUID& group_id, S32 snooze_duration)
+{
+    close_group_im(group_id, LLIMModel::LLIMSession::SCloseAction::CLOSE_SNOOZE, snooze_duration);
 }
 
 // static
