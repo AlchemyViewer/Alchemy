@@ -136,114 +136,79 @@ extern LL_COMMON_API LLStringTable gStringTable;
 
 //============================================================================
 
-// This class is designed to be used locally,
-// e.g. as a member of an LLXmlTree
-// Strings can be inserted only, then quickly looked up
+// A table of unique strings for a caller that only ever adds to it, meant to
+// be held locally -- LLXmlTree keeps one for node names and a static one for
+// attribute names.
+//
+// A handle is a bare pointer to the stored string and stays valid until the
+// table is cleaned up or destroyed, so callers key containers on the handle
+// and compare two names by comparing pointers. LLXmlTreeNode holds its
+// attributes that way.
+//
+// No lock, unlike LLStringTable: everything reaching this goes through an
+// LLXmlTree, which is built and read on one thread.
 
 typedef const std::string* LLStdStringHandle;
 
 class LL_COMMON_API LLStdStringTable
 {
 public:
-    LLStdStringTable(S32 tablesize = 0)
+    // The size argument is a hint about how many distinct strings to expect.
+    // It no longer fixes a bucket count, and zero means "no idea".
+    explicit LLStdStringTable(S32 tablesize = 0)
     {
-        if (tablesize == 0)
+        if (tablesize > 0)
         {
-            tablesize = 256; // default
-        }
-        // Make sure tablesize is power of 2
-        for (S32 i = 31; i>0; i--)
-        {
-            if (tablesize & (1<<i))
-            {
-                if (tablesize >= (3<<(i-1)))
-                    tablesize = (1<<(i+1));
-                else
-                    tablesize = (1<<i);
-                break;
-            }
-        }
-        mTableSize = tablesize;
-        mStringList = new string_set_t[tablesize];
-    }
-    ~LLStdStringTable()
-    {
-        cleanup();
-        delete[] mStringList;
-    }
-    void cleanup()
-    {
-        // remove strings
-        for (S32 i = 0; i<mTableSize; i++)
-        {
-            string_set_t& stringset = mStringList[i];
-            for (LLStdStringHandle str : stringset)
-            {
-                delete str;
-            }
-            stringset.clear();
+            mTable.reserve(tablesize);
         }
     }
 
-    LLStdStringHandle lookup(const std::string& s)
-    {
-        U32 hashval = makehash(s);
-        return lookup(hashval, s);
-    }
+    ~LLStdStringTable() = default;
 
-    LLStdStringHandle checkString(const std::string& s)
-    {
-        U32 hashval = makehash(s);
-        return lookup(hashval, s);
-    }
+    LLStdStringTable(const LLStdStringTable&) = delete;
+    LLStdStringTable& operator=(const LLStdStringTable&) = delete;
 
-    LLStdStringHandle insert(const std::string& s)
+    // Drops every string, and with them every handle this table gave out.
+    void cleanup() { mTable.clear(); }
+
+    // Find, adding when absent.
+    LLStdStringHandle insert(std::string_view str)
     {
-        U32 hashval = makehash(s);
-        LLStdStringHandle result = lookup(hashval, s);
-        if (result == NULL)
+        table_t::iterator found = mTable.find(str);
+        if (found != mTable.end())
         {
-            result = new std::string(s);
-            mStringList[hashval].insert(result);
+            return found->second.get();
         }
-        return result;
+
+        // The key views the stored string's own characters. Growing the table
+        // moves the pointer, never the string it points at, so both the key
+        // and the handle survive a rehash.
+        std::unique_ptr<std::string> owned = std::make_unique<std::string>(str);
+        LLStdStringHandle handle = owned.get();
+        mTable.emplace(std::string_view(*handle), std::move(owned));
+        return handle;
     }
-    LLStdStringHandle addString(const std::string& s)
+
+    LLStdStringHandle addString(std::string_view str) { return insert(str); }
+
+    // Find without adding. Null when the string is not present.
+    LLStdStringHandle checkString(std::string_view str) const
     {
-        return insert(s);
+        table_t::const_iterator found = mTable.find(str);
+        return (found == mTable.end()) ? nullptr : found->second.get();
     }
+
+    LLStdStringHandle lookup(std::string_view str) const { return checkString(str); }
+
+    size_t getUniqueEntries() const { return mTable.size(); }
 
 private:
-    U32 makehash(const std::string& s)
-    {
-        S32 len = (S32)s.size();
-        const char* c = s.c_str();
-        U32 hashval = 0;
-        for (S32 i=0; i<len; i++)
-        {
-            hashval = ((hashval<<5) + hashval) + *c++;
-        }
-        return hashval & (mTableSize-1);
-    }
-    LLStdStringHandle lookup(U32 hashval, const std::string& s)
-    {
-        string_set_t& stringset = mStringList[hashval];
-        LLStdStringHandle handle = &s;
-        string_set_t::iterator iter = stringset.find(handle); // compares actual strings
-        if (iter != stringset.end())
-        {
-            return *iter;
-        }
-        else
-        {
-            return NULL;
-        }
-    }
+    typedef boost::unordered_flat_map<std::string_view,
+                                      std::unique_ptr<std::string>,
+                                      ll::string_hash,
+                                      std::equal_to<>> table_t;
 
-private:
-    S32 mTableSize;
-    typedef std::set<LLStdStringHandle, compare_pointer_contents<std::string> > string_set_t;
-    string_set_t* mStringList; // [mTableSize]
+    table_t mTable;
 };
 
 

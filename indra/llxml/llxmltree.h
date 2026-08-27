@@ -70,9 +70,11 @@ public:
     void            dump();
     void            dumpNode( LLXmlTreeNode* node, const std::string& prefix );
 
-    static LLStdStringHandle addAttributeString( const std::string& name)
+    // A view, so the fifty-odd call sites handing this a literal stop
+    // building a std::string to be thrown away.
+    static LLStdStringHandle addAttributeString(std::string_view name)
     {
-        return sAttributeKeys.addString( name );
+        return sAttributeKeys.addString(name);
     }
 
 public:
