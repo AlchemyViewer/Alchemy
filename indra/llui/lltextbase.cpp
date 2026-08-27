@@ -2774,6 +2774,19 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
     {
         LLStyle::Params highlight_params(style_params);
 
+        // An on-hover segment carries the style twice, the second copy with
+        // the font style forced to NORMAL. Only the colours vary per piece,
+        // so that copy is made once here: forcing NORMAL on highlight_params
+        // inside the loop left it there, and every piece after the first got
+        // a hovered style that was already NORMAL.
+        const bool needs_normal_style =
+            (underline_link == e_underline::UNDERLINE_ON_HOVER) || mSkipLinkUnderline;
+        LLStyle::Params normal_params(style_params);
+        if (needs_normal_style)
+        {
+            normal_params.font.style("NORMAL");
+        }
+
 // [SL:KB] - Patch: Control-TextParser | Checked: 2012-07-10 (Catznip-3.3)
         auto pieces = LLTextParser::instance().parsePartialLineHighlights(new_text, mHighlightsMask, (LLTextParser::EHighlightPosition)highlight_part);
         // Dedup uses mAppendTextFiredEntries (a LLTextBase member) so it spans every
@@ -2803,10 +2816,11 @@ void LLTextBase::appendAndHighlightTextImpl(const std::string &new_text, S32 hig
             S32 cur_length = getLength();
             LLStyleConstSP sp(new LLStyle(highlight_params));
             LLTextSegmentPtr segmentp;
-            if ((underline_link == e_underline::UNDERLINE_ON_HOVER) || mSkipLinkUnderline)
+            if (needs_normal_style)
             {
-                highlight_params.font.style("NORMAL");
-                LLStyleConstSP normal_sp(new LLStyle(highlight_params));
+                normal_params.color = highlight_params.color();
+                normal_params.readonly_color = highlight_params.readonly_color();
+                LLStyleConstSP normal_sp(new LLStyle(normal_params));
                 segmentp = new LLOnHoverChangeableTextSegment(sp, normal_sp, cur_length, cur_length + static_cast<S32>(wide_text.size()), *this);
             }
             else
