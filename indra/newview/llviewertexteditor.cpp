@@ -1092,7 +1092,7 @@ void LLViewerTextEditor::onValueChange(S32 start, S32 end)
 
 void LLViewerTextEditor::findEmbeddedItemSegments(S32 start, S32 end)
 {
-    LLWString text = getWText();
+    const LLWString& text = getWText();
 
     // Start with i just after the first embedded item
     for(S32 idx = start; idx < end; idx++ )
