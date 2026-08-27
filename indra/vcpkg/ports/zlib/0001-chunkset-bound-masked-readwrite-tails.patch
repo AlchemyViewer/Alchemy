@@ -1,0 +1,67 @@
+Keep the chunked copy tail guards on AVX-512
+
+CHUNKMEMSET_SAFE and CHUNKCOPY_SAFE fall back to a byte-at-a-time copy
+once fewer than sizeof(chunk_t) bytes remain. Both bail-outs are
+compiled out when HAVE_MASKED_READWRITE is defined, which only
+chunkset_avx512.c does, on the assumption that everything reachable
+below them is masked.
+
+It is not. With them removed, inflate reads one byte past the end of the
+caller's output buffer. That faults whenever the page after the buffer
+is unmapped, which on Windows is guaranteed for allocations of 512 KB
+and up because those get their own VirtualAlloc region.
+
+Measured against 2.3.3, driving inflate with the output buffer's last
+byte flush against a PAGE_NOACCESS page, 3000 runs each:
+
+  neither guard restored     235 access violations, all reads at
+                             buffer_end, 68 on uncorrupted streams
+  CHUNKMEMSET_SAFE restored    0
+  CHUNKCOPY_SAFE restored    235
+
+So CHUNKMEMSET_SAFE's guard is the one carrying the fix, on the path
+inflate.c takes at "copy match from output". CHUNKCOPY_SAFE's guard is
+restored alongside it because its from_dist half bounds reads against
+exactly the same end-of-region case on the window path, and leaving one
+half of the pair disabled invites the same fault somewhere else.
+
+Round-trip output is unchanged: 8580 deflate/inflate cases over match
+distances 3..31 and output sizes 1 byte to 512 KB all still compare
+equal.
+
+diff --git a/chunkset_tpl.h b/chunkset_tpl.h
+index 2087e66..dc2e348 100644
+--- a/chunkset_tpl.h
++++ b/chunkset_tpl.h
+@@ -243,7 +243,6 @@ Z_INTERNAL uint8_t* CHUNKMEMSET_SAFE(uint8_t *out, uint8_t *from, unsigned len,
+     }
+ #endif
+ 
+-#ifndef HAVE_MASKED_READWRITE
+     if (UNLIKELY(left < sizeof(chunk_t))) {
+         while (len > 0) {
+             *out++ = *from++;
+@@ -252,7 +251,6 @@ Z_INTERNAL uint8_t* CHUNKMEMSET_SAFE(uint8_t *out, uint8_t *from, unsigned len,
+ 
+         return out;
+     }
+-#endif
+ 
+     if (len)
+         out = CHUNKMEMSET(out, from, len);
+@@ -268,7 +266,6 @@ static inline uint8_t *CHUNKCOPY_SAFE(uint8_t *out, uint8_t *from, uint64_t len,
+     uint64_t safelen = (safe - out);
+     len = MIN(len, safelen);
+ 
+-#ifndef HAVE_MASKED_READWRITE
+     uint64_t from_dist = (uint64_t)llabs(safe - from);
+     if (UNLIKELY(from_dist < sizeof(chunk_t) || safelen < sizeof(chunk_t))) {
+         while (len--) {
+@@ -277,7 +274,6 @@ static inline uint8_t *CHUNKCOPY_SAFE(uint8_t *out, uint8_t *from, uint64_t len,
+ 
+         return out;
+     }
+-#endif
+ 
+     return CHUNKMEMSET(out, from, (unsigned)len);
+ }

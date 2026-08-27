@@ -4,6 +4,8 @@ vcpkg_from_github(
     REF "${VERSION}"
     SHA512 e2057c764f1d5aaee738edee7e977182c5b097e3c95489dcd8de813f237d92a05daaa86d68d44b331d9fec5d1802586a8f6cfb658ba849874aaa14e72a8107f5
     HEAD_REF develop
+    PATCHES
+        0001-chunkset-bound-masked-readwrite-tails.patch
 )
 
 # Set ZLIB_COMPAT in the triplet file to turn on
