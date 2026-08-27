@@ -461,7 +461,7 @@ void LLScriptEditor::queueSyntaxApply(LLWString text,
     mPendingApplySegmentIndex = 0;
     mPendingApplySegments.clear();
     mPendingApplySegmentSet.clear();
-    mPendingApplyStyle = new LLStyle(LLStyle::Params().font(getScriptFont()).color(mDefaultColor.get()));
+    mPendingApplyStyle = buildSyntaxStyle();
     mSyntaxApplyState = SyntaxApplyState::Building;
 }
 
@@ -490,7 +490,7 @@ void LLScriptEditor::processPendingSyntaxApply()
     {
         if (mPendingApplyStyle.isNull())
         {
-            mPendingApplyStyle = new LLStyle(LLStyle::Params().font(getScriptFont()).color(mDefaultColor.get()));
+            mPendingApplyStyle = buildSyntaxStyle();
         }
         bool done = getKeywords().applySegmentOpsRange(&mPendingApplySegments,
                                                       mPendingApplyText,
@@ -542,9 +542,14 @@ void LLScriptEditor::resetPendingSyntaxApply()
     mPendingApplyKeywords = nullptr;
 }
 
+LLStyleConstSP LLScriptEditor::buildSyntaxStyle()
+{
+    return new LLStyle(LLStyle::Params().font(getScriptFont()).color(mDefaultColor.get()));
+}
+
 void LLScriptEditor::applySyntaxSegments(const LLWString& text, const LLKeywords::segment_ops_t& ops)
 {
-    LLStyleConstSP style = new LLStyle(LLStyle::Params().font(getScriptFont()).color(mDefaultColor.get()));
+    LLStyleConstSP style = buildSyntaxStyle();
 
     segment_vec_t segment_list;
     getKeywords().applySegmentOps(&segment_list, text, ops, *this, style);

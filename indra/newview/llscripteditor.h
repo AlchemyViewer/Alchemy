@@ -89,6 +89,11 @@ private:
     void    processPendingSyntaxApply();
     void    resetPendingSyntaxApply();
 
+    // The style every syntax segment starts from: the script font in the
+    // editor's default colour. Built rather than cached, because both of
+    // those follow settings the user can change under us.
+    LLStyleConstSP buildSyntaxStyle();
+
     LLKeywords  mKeywordsLua;
     LLKeywords  mKeywordsLSL;
     bool        mLuauLanguage;
