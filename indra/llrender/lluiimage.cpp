@@ -161,14 +161,10 @@ namespace LLInitParam
 
     void ParamValue<LLUIImage*>::updateBlockFromValue(bool make_block_authoritative)
     {
-        if (getValue() == NULL)
-        {
-            name.set("none", make_block_authoritative);
-        }
-        else
-        {
-            name.set(getValue()->getName(), make_block_authoritative);
-        }
+        static const std::string sNone("none");
+
+        const LLUIImage* imagep = getValue();
+        setComponent(name, imagep ? imagep->getName() : sNone, make_block_authoritative);
     }
 
 

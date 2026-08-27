@@ -165,9 +165,14 @@ namespace LLInitParam
 
         ParamValue(const TestPoint& value)
         :   super_t(value),
-            x("x", value.mX),
-            y("y", value.mY)
-        {}
+            x("x"),
+            y("y")
+        {
+            // Splatting the value across the components in the constructor is
+            // what every one of these does in llui, so this block pays what
+            // they pay.
+            updateBlockFromValue(false);
+        }
 
         void updateValueFromBlock()
         {
@@ -177,8 +182,8 @@ namespace LLInitParam
         void updateBlockFromValue(bool make_block_authoritative)
         {
             const TestPoint& value = getValue();
-            x.set(value.mX, make_block_authoritative);
-            y.set(value.mY, make_block_authoritative);
+            setComponent(x, value.mX, make_block_authoritative);
+            setComponent(y, value.mY, make_block_authoritative);
         }
     };
 }
@@ -189,6 +194,19 @@ struct PointBlock : public LLInitParam::Block<PointBlock>
 
     PointBlock()
     :   point("point")
+    {}
+};
+
+// LLScrollListColumn's header is this shape: a choice between a plain value
+// and one that carries components of its own.
+struct PointChoice : public LLInitParam::ChoiceBlock<PointChoice>
+{
+    Alternative<S32>        scalar;
+    Alternative<TestPoint>  point;
+
+    PointChoice()
+    :   scalar("scalar"),
+        point("point")
     {}
 };
 
@@ -611,5 +629,66 @@ namespace tut
         ensure("the census reports something", !report.empty());
         ensure("the census names what it counted",
                report.find("block types registered") != std::string::npos);
+    }
+
+    template<> template<>
+    void object::test<21>()
+    {
+        set_test_name("a value filling in its own components is not a choice");
+
+        // TestPoint fills x and y from its value as it is built. That must
+        // read as the block keeping itself consistent, not as someone
+        // supplying a point.
+        //
+        // The first block of a type is the one that builds the descriptor, and
+        // while it does the first alternative declares itself the standing
+        // choice. Blocks built afterwards start with no choice at all, which
+        // is the case at issue here.
+        PointChoice initializes_the_descriptor;
+        (void)initializes_the_descriptor;
+
+        PointChoice choice;
+
+        ensure("nothing has been chosen yet", !choice.point.isChosen());
+        ensure("nothing has been chosen yet", !choice.scalar.isChosen());
+    }
+
+    template<> template<>
+    void object::test<22>()
+    {
+        set_test_name("providing an alternative still chooses it");
+
+        PointChoice choice;
+        choice.scalar = 5;
+        ensure("the provided alternative is the choice", choice.scalar.isChosen());
+        ensure_equals("and reads back", choice.scalar(), 5);
+
+        // Reaching into the components of the other alternative counts as
+        // providing it, the same way assigning the whole value would.
+        choice.point.x = 3;
+        ensure("the later alternative takes over", choice.point.isChosen());
+        ensure("and the earlier one steps down", !choice.scalar.isChosen());
+        ensure_equals("the component drives the value", choice.point().mX, 3);
+    }
+
+    template<> template<>
+    void object::test<23>()
+    {
+        set_test_name("merging does not hand the choice to a value with components");
+
+        // A choice merges as a unit: the destination takes the source's
+        // choice, and an alternative the source never provided is passed over
+        // rather than visited -- which matters here because visiting the point
+        // would refresh its components, and by merge time the block is built
+        // enough for that to reach the choice.
+        PointChoice source;
+        source.scalar = 5;
+
+        PointChoice destination;
+        destination.fillFrom(source);
+
+        ensure("the source's choice carried over", destination.scalar.isChosen());
+        ensure("the untouched alternative did not seize it", !destination.point.isChosen());
+        ensure_equals("and the value came with it", destination.scalar(), 5);
     }
 }

@@ -52,4 +52,11 @@ namespace ALParamFingerprint
     // What one instance of each widget's parameter block costs. The tables are
     // per type; this is what every widget built from them carries.
     std::string sizes();
+
+    // What it costs to build a parameter block, for the blocks that code
+    // builds by hand on a hot path rather than copying from the widget
+    // defaults. Reported per block as default construction against copy
+    // construction, because a widget parsed from XUI pays the copy and
+    // everything else pays the default.
+    std::string bench();
 }

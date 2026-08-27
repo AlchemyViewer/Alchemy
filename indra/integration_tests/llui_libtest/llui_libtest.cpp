@@ -195,14 +195,15 @@ int main(int argc, char** argv)
 
     init_llui();
 
-    // Both are off by default so the usual run stays silent.
+    // All of these are off by default so the usual run stays silent.
     //
     // "--params" fingerprints every widget's parameter block. Reworking
     // LLInitParam must leave this byte-identical, so it is the gate.
     //
-    // "--census" reports what the parameter tables cost. This is *expected*
-    // to move -- shrinking it is the point -- which is why it does not share
-    // a stream with the gate above.
+    // "--census" reports what the parameter tables cost, "--sizes" what one
+    // instance of each block costs, and "--bench" what building one costs.
+    // All three are *expected* to move -- shrinking them is the point --
+    // which is why none of them shares a stream with the gate above.
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg(argv[i]);
@@ -217,6 +218,10 @@ int main(int argc, char** argv)
         else if (arg == "--census")
         {
             std::cout << ALParamFingerprint::census();
+        }
+        else if (arg == "--bench")
+        {
+            std::cout << ALParamFingerprint::bench();
         }
     }
 

@@ -34,6 +34,7 @@
 #include "lluictrlfactory.h"
 
 #include "llbutton.h"
+#include "llstyle.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
 #include "llcontainerview.h"
@@ -67,6 +68,7 @@
 #include "llviewborder.h"
 
 #include <algorithm>
+#include <chrono>
 #include <iomanip>
 #include <ostream>
 #include <sstream>
@@ -117,6 +119,44 @@
 
 namespace
 {
+    // Written through so the loops below cannot be optimized away.
+    volatile std::size_t gBenchSink = 0;
+
+    template<typename P>
+    void benchBlock(const char* tag, std::ostream& out)
+    {
+        const int N = 20000;
+
+        // The first block of a type registers the type's parameters, which
+        // would otherwise land in whichever timed loop ran first.
+        {
+            P warm;
+            gBenchSink += warm.getBlockDescriptor().mNamedParams.size();
+        }
+
+        const auto default_start = std::chrono::steady_clock::now();
+        for (int i = 0; i < N; ++i)
+        {
+            P block;
+            gBenchSink += reinterpret_cast<std::size_t>(&block);
+        }
+        const auto default_end = std::chrono::steady_clock::now();
+
+        P source;
+        const auto copy_start = std::chrono::steady_clock::now();
+        for (int i = 0; i < N; ++i)
+        {
+            P block(source);
+            gBenchSink += reinterpret_cast<std::size_t>(&block);
+        }
+        const auto copy_end = std::chrono::steady_clock::now();
+
+        out << "  " << tag << " sizeof=" << sizeof(P)
+            << " default=" << std::chrono::duration<double, std::nano>(default_end - default_start).count() / N
+            << "ns copy=" << std::chrono::duration<double, std::nano>(copy_end - copy_start).count() / N
+            << "ns" << std::endl;
+    }
+
     template<typename T>
     void fingerprintWidget(const char* tag, std::ostream& out)
     {
@@ -219,6 +259,19 @@ namespace ALParamFingerprint
             << "  EnableCallbackParam         " << sizeof(LLUICtrl::EnableCallbackParam) << std::endl
             << "  LLUIColor                   " << sizeof(LLUIColor) << std::endl
             << "  LLRect                      " << sizeof(LLRect) << std::endl;
+        return out.str();
+    }
+
+    std::string bench()
+    {
+        std::ostringstream out;
+        out << "Parameter block construction" << std::endl;
+        benchBlock<LLStyle::Params>("LLStyle::Params", out);
+        benchBlock<LLScrollListCell::Params>("LLScrollListCell::Params", out);
+        benchBlock<LLScrollListItem::Params>("LLScrollListItem::Params", out);
+        benchBlock<LLTextBox::Params>("LLTextBox::Params", out);
+        benchBlock<LLButton::Params>("LLButton::Params", out);
+        benchBlock<LLView::Params>("LLView::Params", out);
         return out.str();
     }
 

@@ -994,6 +994,11 @@ namespace LLInitParam
 
         bool anyProvided() const { return mIsProvided; }
 
+        // Drop the provided flag without telling the enclosing block. Only a
+        // value the block worked out for itself may go this way; see
+        // TypedParam::setDerived.
+        void clearProvided() { mIsProvided = 0; }
+
         Param(BaseBlock* enclosing_block);
 
         // store pointer to enclosing block as offset to reduce space and allow for quick copying
@@ -1155,6 +1160,17 @@ namespace LLInitParam
             named_value_t::clearValueName();
             named_value_t::setValue(val);
             setProvided(flag_as_provided);
+        }
+
+        // Put in place a value the enclosing block derived from its own, which
+        // is how a CustomParamValue keeps its components in step. The param
+        // stays unprovided, so there is nothing to report -- and reporting is
+        // not free: set() walks the chain of enclosing blocks to deliver it.
+        void setDerived(const value_t& val)
+        {
+            named_value_t::clearValueName();
+            named_value_t::setValue(val);
+            Param::clearProvided();
         }
 
         self_t& operator =(const typename named_value_t::name_t& name)
@@ -2818,6 +2834,29 @@ namespace LLInitParam
         void updateValue(const value_t& value)
         {
             mValue = value;
+        }
+
+        // Use this from within updateBlockFromValue() to write a component.
+        //
+        // Every construction of a block holding one of these splats the value
+        // out across its components, so the write happens far more often than
+        // anyone reads the components back. Unless the block is being made
+        // authoritative those components are derived state, and set() would
+        // announce each one as a change -- a virtual call per enclosing block,
+        // carrying news that a param nobody provided still has not been
+        // provided. Skipping that is what makes building a parameter block
+        // roughly a fifth cheaper.
+        template <typename PARAM_T, typename VALUE_T>
+        static void setComponent(PARAM_T& component, const VALUE_T& value, bool make_block_authoritative)
+        {
+            if (make_block_authoritative)
+            {
+                component.set(value, true);
+            }
+            else
+            {
+                component.setDerived(value);
+            }
         }
 
         bool mergeBlockParam(bool source_provided, bool dst_provided, BlockDescriptor& block_data, const BaseBlock& source, bool overwrite)
