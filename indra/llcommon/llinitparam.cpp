@@ -120,32 +120,40 @@ namespace LLInitParam
         std::copy(src_block_data.mAllParams.begin(), src_block_data.mAllParams.end(), std::back_inserter(mAllParams));
     }
 
-    void BlockDescriptor::addParam(const ParamDescriptorPtr in_param, const char* char_name)
+    void BlockDescriptor::addParam(param_handle_t handle,
+                                   ParamDescriptor::merge_func_t merge_func,
+                                   ParamDescriptor::deserialize_func_t deserialize_func,
+                                   ParamDescriptor::serialize_func_t serialize_func,
+                                   ParamDescriptor::validation_func_t validation_func,
+                                   S32 min_count,
+                                   S32 max_count,
+                                   const char* char_name)
     {
-        // create a copy of the param descriptor in mAllParams
-        // so other data structures can store a pointer to it
-        mAllParams.push_back(in_param);
-        ParamDescriptorPtr param(mAllParams.back());
-
-        std::string name(char_name);
-        if ((size_t)param->mParamHandle > mMaxParamOffset)
+        if ((size_t)handle > mMaxParamOffset)
         {
             LL_ERRS() << "Attempted to register param with block defined for parent class, make sure to derive from LLInitParam::Block<YOUR_CLASS, PARAM_BLOCK_BASE_CLASS>" << LL_ENDL;
         }
 
-        if (name.empty())
+        // This block owns the descriptor. A deque never moves what it already
+        // holds, so blocks deriving from this one can keep the address.
+        ParamDescriptorPtr param = &mOwnedParams.emplace_back(
+            handle, merge_func, deserialize_func, serialize_func, validation_func, min_count, max_count);
+
+        mAllParams.push_back(param);
+
+        if (!char_name[0])
         {
             mUnnamedParams.push_back(param);
         }
         else
         {
             // don't use insert, since we want to overwrite existing entries
-            mNamedParams[name] = param;
+            mNamedParams[char_name] = param;
         }
 
-        if (param->mValidationFunc)
+        if (validation_func)
         {
-            mValidationList.emplace_back(param->mParamHandle, param->mValidationFunc);
+            mValidationList.emplace_back(handle, validation_func);
         }
     }
 
@@ -178,6 +186,7 @@ namespace LLInitParam
 
         size_t named_entries = 0;
         size_t unnamed_entries = 0;
+        size_t all_param_entries = 0;
         size_t owned_descriptors = 0;
         size_t validated_entries = 0;
         size_t name_bytes = 0;
@@ -187,7 +196,12 @@ namespace LLInitParam
         {
             named_entries += descriptor->mNamedParams.size();
             unnamed_entries += descriptor->mUnnamedParams.size();
-            owned_descriptors += descriptor->mAllParams.size();
+            // An entry is a slot in some block's table; a descriptor is an
+            // object. They are not the same count, because a derived block's
+            // table has an entry for each of its base's descriptors without
+            // owning any of them.
+            all_param_entries += descriptor->mAllParams.size();
+            owned_descriptors += descriptor->mOwnedParams.size();
             validated_entries += descriptor->mValidationList.size();
 
             for (const param_map_t::value_type& pair : descriptor->mNamedParams)
@@ -197,13 +211,11 @@ namespace LLInitParam
             }
         }
 
-        // A named entry is a hash node holding a std::string and a
-        // shared_ptr; an mAllParams entry is a list node holding a
-        // shared_ptr; each descriptor carries its own control block because
-        // it is allocated with new rather than make_shared.
+        // A named entry is a hash node holding a std::string and a pointer;
+        // an mAllParams entry is one pointer in a flat vector.
         const size_t named_node_bytes = named_entries * (sizeof(void*) + sizeof(size_t) + sizeof(std::string) + sizeof(ParamDescriptorPtr));
-        const size_t list_node_bytes = owned_descriptors * (2 * sizeof(void*) + sizeof(ParamDescriptorPtr));
-        const size_t descriptor_bytes = owned_descriptors * (sizeof(ParamDescriptor) + 3 * sizeof(void*));
+        const size_t list_node_bytes = all_param_entries * sizeof(ParamDescriptorPtr);
+        const size_t descriptor_bytes = owned_descriptors * sizeof(ParamDescriptor);
 
         size_t distinct_name_bytes = 0;
         for (const std::string& name : distinct_names)
@@ -216,14 +228,15 @@ namespace LLInitParam
             << "  block types registered : " << all.size() << "\n"
             << "  named param entries    : " << named_entries << "\n"
             << "  unnamed param entries  : " << unnamed_entries << "\n"
-            << "  descriptors owned      : " << owned_descriptors << "\n"
+            << "  param table entries    : " << all_param_entries << "\n"
+            << "  distinct descriptors   : " << owned_descriptors << "\n"
             << "  validated params       : " << validated_entries << "\n"
             << "  distinct param names   : " << distinct_names.size()
             << " (of " << named_entries << " entries)\n"
             << "  name string bytes      : " << name_bytes
             << " (" << distinct_name_bytes << " if interned)\n"
             << "  named map nodes        : ~" << named_node_bytes << " bytes\n"
-            << "  mAllParams list nodes  : ~" << list_node_bytes << " bytes\n"
+            << "  mAllParams vector      : ~" << list_node_bytes << " bytes\n"
             << "  descriptor objects     : ~" << descriptor_bytes << " bytes\n"
             << "  approximate total      : ~"
             << (named_node_bytes + list_node_bytes + descriptor_bytes + name_bytes) << " bytes\n";
@@ -309,7 +322,7 @@ namespace LLInitParam
         // unnamed param is like LLView::Params::rect - implicit
         const BlockDescriptor& block_data = mostDerivedBlockDescriptor();
 
-        for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
+        for (ParamDescriptorPtr ptr : block_data.mUnnamedParams)
         {
             param_handle_t param_handle = ptr->mParamHandle;
             const Param* param = getParamFromHandle(param_handle);
@@ -326,7 +339,7 @@ namespace LLInitParam
         // mUnnamedParams for every named param.
         std::unordered_set<param_handle_t> unnamed_handles;
         unnamed_handles.reserve(block_data.mUnnamedParams.size());
-        for (const ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
+        for (ParamDescriptorPtr ptr : block_data.mUnnamedParams)
         {
             unnamed_handles.insert(ptr->mParamHandle);
         }
@@ -398,7 +411,7 @@ namespace LLInitParam
         }
 
         // try to parse unnamed parameters, in declaration order
-        for (ParamDescriptorPtr& ptr : block_data.mUnnamedParams)
+        for (ParamDescriptorPtr ptr : block_data.mUnnamedParams)
         {
             Param* paramp = getParamFromHandle(ptr->mParamHandle);
             ParamDescriptor::deserialize_func_t deserialize_func = ptr->mDeserializeFunc;
@@ -467,11 +480,11 @@ namespace LLInitParam
     {
         param_handle_t handle = getHandleFromParam(&param);
         BlockDescriptor& descriptor = mostDerivedBlockDescriptor();
-        for (ParamDescriptorPtr& ptr : descriptor.mAllParams)
+        for (ParamDescriptorPtr ptr : descriptor.mAllParams)
         {
             if (ptr->mParamHandle == handle) return ptr;
         }
-        return ParamDescriptorPtr();
+        return nullptr;
     }
 
     // take all provided params from other and apply to self
@@ -479,7 +492,7 @@ namespace LLInitParam
     bool BaseBlock::mergeBlock(BlockDescriptor& block_data, const BaseBlock& other, bool overwrite)
     {
         bool some_param_changed = false;
-        for (const ParamDescriptorPtr& ptr : block_data.mAllParams)
+        for (ParamDescriptorPtr ptr : block_data.mAllParams)
         {
             const Param* other_paramp = other.getParamFromHandle(ptr->mParamHandle);
             ParamDescriptor::merge_func_t merge_func = ptr->mMergeFunc;

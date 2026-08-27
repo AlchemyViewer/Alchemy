@@ -31,7 +31,7 @@
 #include <functional>
 #include <type_traits>
 #include <vector>
-#include <list>
+#include <deque>
 #include <memory>
 #include <utility>
 #include <boost/unordered_map.hpp>
@@ -602,7 +602,11 @@ namespace LLInitParam
         S32                 mNumRefs;
     };
 
-    typedef std::shared_ptr<ParamDescriptor> ParamDescriptorPtr;
+    // Descriptors are created once, while a block type first constructs, and
+    // live for the life of the process. The block that declares a parameter
+    // owns its descriptor; blocks that inherit it hold a bare pointer. Nothing
+    // is ever freed, so there is no refcount to pay for.
+    typedef ParamDescriptor* ParamDescriptorPtr;
 
     // each derived Block class keeps a static data structure maintaining offsets to various params
     class LL_COMMON_API BlockDescriptor
@@ -618,17 +622,31 @@ namespace LLInitParam
         } EInitializationState;
 
         void aggregateBlockData(BlockDescriptor& src_block_data);
-        void addParam(ParamDescriptorPtr param, const char* name);
+
+        // Builds a descriptor owned by this block and files it under `name`,
+        // or among the unnamed parameters when `name` is empty.
+        void addParam(param_handle_t handle,
+                      ParamDescriptor::merge_func_t merge_func,
+                      ParamDescriptor::deserialize_func_t deserialize_func,
+                      ParamDescriptor::serialize_func_t serialize_func,
+                      ParamDescriptor::validation_func_t validation_func,
+                      S32 min_count,
+                      S32 max_count,
+                      const char* name);
 
         typedef boost::unordered_map<std::string, ParamDescriptorPtr, ll::string_hash, std::equal_to<>> param_map_t;
         typedef std::vector<ParamDescriptorPtr>                                                 param_list_t;
-        typedef std::list<ParamDescriptorPtr>                                                   all_params_list_t;
+        typedef std::vector<ParamDescriptorPtr>                                                 all_params_list_t;
         typedef std::vector<std::pair<param_handle_t, ParamDescriptor::validation_func_t> >     param_validation_list_t;
+
+        // A deque so that a descriptor's address survives later additions.
+        typedef std::deque<ParamDescriptor>                                                     owned_params_t;
 
         param_map_t                     mNamedParams;           // parameters with associated names
         param_list_t                    mUnnamedParams;         // parameters with_out_ associated names
         param_validation_list_t         mValidationList;        // parameters that must be validated
-        all_params_list_t               mAllParams;             // all parameters, owns descriptors
+        all_params_list_t               mAllParams;             // all parameters, this block's and its bases'
+        owned_params_t                  mOwnedParams;           // descriptors this block declared, and owns
         size_t                          mMaxParamOffset;
         EInitializationState            mInitializationState;   // whether or not static block data has been initialized
         class BaseBlock*                mCurrentBlockPtr;       // pointer to block currently being constructed
@@ -1116,14 +1134,13 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+            block_descriptor.addParam(
                 block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                 &mergeWith,
                 &deserializeParam,
                 &serializeParam,
                 validate_func,
-                min_count, max_count));
-            block_descriptor.addParam(param_descriptor, name);
+                min_count, max_count, name);
         }
     };
 
@@ -1291,14 +1308,13 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+            block_descriptor.addParam(
                 block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                 &mergeWith,
                 &deserializeParam,
                 &serializeParam,
                 validate_func,
-                min_count, max_count));
-            block_descriptor.addParam(param_descriptor, name);
+                min_count, max_count, name);
         }
     };
 
@@ -1524,14 +1540,13 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+            block_descriptor.addParam(
                 block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                 &mergeWith,
                 &deserializeParam,
                 &serializeParam,
                 validate_func,
-                min_count, max_count));
-            block_descriptor.addParam(param_descriptor, name);
+                min_count, max_count, name);
         }
     };
 
@@ -1770,14 +1785,13 @@ namespace LLInitParam
     private:
         void init( BlockDescriptor &block_descriptor, ParamDescriptor::validation_func_t validate_func, S32 min_count, S32 max_count, const char* name )
         {
-            ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+            block_descriptor.addParam(
                 block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                 &mergeWith,
                 &deserializeParam,
                 &serializeParam,
                 validate_func,
-                min_count, max_count));
-            block_descriptor.addParam(param_descriptor, name);
+                min_count, max_count, name);
         }
     };
 
@@ -2102,14 +2116,13 @@ namespace LLInitParam
                 BlockDescriptor& block_descriptor = DERIVED_BLOCK::getBlockDescriptor();
                 if (block_descriptor.mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
                 {
-                    ParamDescriptorPtr param_descriptor = ParamDescriptorPtr(new ParamDescriptor(
+                    block_descriptor.addParam(
                                                     block_descriptor.mCurrentBlockPtr->getHandleFromParam(this),
                                                     NULL,
                                                     &deserializeParam,
                                                     NULL,
                                                     NULL,
-                                                    0, S32_MAX));
-                    block_descriptor.addParam(param_descriptor, name);
+                                                    0, S32_MAX, name);
                 }
             }
 
