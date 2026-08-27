@@ -30,6 +30,7 @@
 #include "llinitparam.h"
 #include "llformat.h"
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -326,6 +327,52 @@ namespace LLInitParam
             << "  descriptor objects     : ~" << descriptor_bytes << " bytes\n"
             << "  approximate total      : ~"
             << (named_node_bytes + list_node_bytes + descriptor_bytes) << " bytes\n";
+
+        // A name declared at two levels of one chain resolves to the nearer,
+        // which is how Ignored swallows an attribute a base would otherwise
+        // act on -- a menu item takes its geometry from its menu, so
+        // LLMenuItemGL::Params declares rect and the deltas Ignored over
+        // LLView::Params. An Ignored param registers with neither a merge nor
+        // a serialize function, so the two cases are told apart here: the
+        // second list is two real parameters answering to one name, where one
+        // of them is unreachable from XUI and only the block that declared it
+        // can read what it holds.
+        std::vector<std::string> swallowed;
+        std::vector<std::string> collisions;
+        for (const BlockDescriptor* descriptor : all)
+        {
+            for (const param_map_t::value_type& pair : descriptor->mNamedParams)
+            {
+                for (const BlockDescriptor* base = descriptor->mBaseDescriptor; base; base = base->mBaseDescriptor)
+                {
+                    param_map_t::const_iterator found = base->mNamedParams.find(pair.first);
+                    if (found == base->mNamedParams.end() || found->second == pair.second)
+                    {
+                        continue;
+                    }
+
+                    std::ostringstream line;
+                    line << "    " << pair.first << " : " << descriptor->mTypeName
+                         << " over " << base->mTypeName << "\n";
+                    const bool ignored = !pair.second->mSerializeFunc && !pair.second->mMergeFunc;
+                    (ignored ? swallowed : collisions).push_back(line.str());
+                }
+            }
+        }
+        std::sort(swallowed.begin(), swallowed.end());
+        std::sort(collisions.begin(), collisions.end());
+
+        out << "  names an Ignored swallows : " << swallowed.size() << "\n";
+        for (const std::string& line : swallowed)
+        {
+            out << line;
+        }
+        out << "  names two params share    : " << collisions.size() << "\n";
+        for (const std::string& line : collisions)
+        {
+            out << line;
+        }
+
         return out.str();
     }
 

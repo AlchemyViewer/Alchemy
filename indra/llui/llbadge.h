@@ -104,7 +104,6 @@ public:
         Optional< LLUIImage* >          image;
         Optional< LLUIColor >           image_color;
 
-        Optional< std::string >         label;
         Optional< LLUIColor >           label_color;
 
         Optional< S32 >                 label_offset_horiz;

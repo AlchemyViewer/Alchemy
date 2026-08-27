@@ -51,9 +51,7 @@ public:
                                     highlight_text_field;
         Optional<commit_callback_t> keystroke_callback;
 
-        Optional<LLUIImage*>        background_image,
-                                    background_image_focused,
-                                    background_image_highlight;
+        Optional<LLUIImage*>        background_image_highlight;
 
         Params()
         :   search_button("search_button"),
@@ -61,8 +59,6 @@ public:
             clear_button("clear_button"),
             clear_button_visible("clear_button_visible"),
             highlight_text_field("highlight_text_field"),
-            background_image("background_image"),
-            background_image_focused("background_image_focused"),
             background_image_highlight("background_image_highlight")
         {}
     };

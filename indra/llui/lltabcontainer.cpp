@@ -224,7 +224,6 @@ LLTabContainer::Params::Params()
     tabs_flashing_color("tabs_flashing_color"),
     tab_icon_ctrl_pad("tab_icon_ctrl_pad", 0),
     use_ellipses("use_ellipses"),
-    font_halign("halign"),
     use_tab_offset("use_tab_offset", false)
 {}
 

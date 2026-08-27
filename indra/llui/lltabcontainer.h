@@ -91,11 +91,6 @@ public:
                                             last_tab;
 
         /**
-         * Tab label horizontal alignment
-         */
-        Optional<LLFontGL::HAlign>          font_halign;
-
-        /**
          * Tab label ellipses
          */
         Optional<bool>                      use_ellipses;

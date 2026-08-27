@@ -61,8 +61,6 @@ LLSearchEditor::LLSearchEditor(const LLSearchEditor::Params& p)
     // Set up line editor.
     LLLineEditor::Params line_editor_params(p);
     line_editor_params.name("filter edit box");
-    line_editor_params.background_image(p.background_image);
-    line_editor_params.background_image_focused(p.background_image_focused);
     line_editor_params.rect(getLocalRect());
     line_editor_params.follows.flags(FOLLOWS_ALL);
     line_editor_params.text_pad_left(text_pad_left);
