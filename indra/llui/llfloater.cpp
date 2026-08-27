@@ -2609,9 +2609,7 @@ static LLDefaultChildRegistry::Register<LLFloaterView> r("floater_view");
 LLFloaterView::LLFloaterView (const Params& p)
 :   LLUICtrl (p),
     mFocusCycleMode(false),
-    mMinimizePositionVOffset(0),
-    mSnapOffsetBottom(0),
-    mSnapOffsetRight(0)
+    mMinimizePositionVOffset(0)
 {
     mSnapView = getHandle();
 }
@@ -3436,7 +3434,8 @@ void LLFloaterView::setToolbarRect(LLToolBarEnums::EToolBarLocation tb, const LL
         mToolbarRightRect = toolbar_rect;
         break;
     case LLToolBarEnums::TOOLBAR_TOP:
-        mToolbarTopRect = toolbar_rect;
+        // Only the left, bottom and right rects are consulted, by
+        // fitWithDependentsOnScreen.
         break;
     default:
         LL_WARNS() << "setToolbarRect() passed odd toolbar number " << (S32) tb << LL_ENDL;

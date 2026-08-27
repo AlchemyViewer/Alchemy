@@ -102,7 +102,6 @@ protected:
     LLPointer<LLUIImage> mEditorImage;
     LLPointer<LLUIImage> mEditorImageFocused;
     LLPointer<LLUIImage> mEditorSearchImage;
-    LLPointer<LLUIImage> mEditorSearchImageFocused;
 
     bool mHighlightTextField;
 };

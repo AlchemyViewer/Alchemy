@@ -298,8 +298,6 @@ protected:
 
     LLFrameTimer    mMouseDownTimer;
     bool            mNeedsHighlight;
-    S32             mButtonFlashCount;
-    F32             mButtonFlashRate;
 
     void            drawBorder(LLUIImage* imagep, const LLColor4& color, S32 size);
     void            resetMouseDownTimer();
@@ -337,7 +335,6 @@ protected:
     LLUIColor                   mDisabledLabelColor;
 
     LLPointer<LLUIImage>        mImageDisabledSelected;
-    LLUIString                  mDisabledSelectedLabel;
     LLUIColor                   mDisabledSelectedLabelColor;
 
     LLPointer<LLUIImage>        mImagePressed;
@@ -390,7 +387,6 @@ protected:
     bool                        mForcePressedState;
     bool                        mDisplayPressedState;
 
-    LLFrameTimer                mFrameTimer;
     LLFlashTimer *              mFlashingTimer;
     bool                        mForceFlashing; // Stick flashing color even if button is pressed
     bool                        mHandleRightMouse;

@@ -54,7 +54,6 @@ public:
         Optional<F32>   overlap_threshold;
 
         Optional<LLUIColor> track_color,
-                            thumb_disabled_color,
                             thumb_highlight_color,
                             thumb_outline_color,
                             thumb_center_color,
@@ -147,7 +146,6 @@ protected:
     LLUIColor       mThumbHighlightColor;
     LLUIColor       mThumbCenterColor;
     LLUIColor       mThumbCenterSelectedColor;
-    LLUIColor       mDisabledThumbColor;
     LLUIColor       mTriangleColor;
     LLUIImagePtr    mThumbImagep; //blimps on the slider, for now no 'disabled' support
     LLUIImagePtr    mRoundedSquareImgp; //blimps on the slider, for now no 'disabled' support

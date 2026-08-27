@@ -198,19 +198,12 @@ public:
         const llwchar *mData;
         size_t mLength;
         bool mOwner;
-
-
-        LLUIColor            mColor;
     };
 
     typedef std::map<WStringMapIndex, LLKeywordToken*> word_token_map_t;
     typedef word_token_map_t::const_iterator keyword_iterator_t;
     keyword_iterator_t begin() const { return mWordTokenMap.begin(); }
     keyword_iterator_t end() const { return mWordTokenMap.end(); }
-
-    typedef std::map<WStringMapIndex, LLUIColor> group_color_map_t;
-    typedef group_color_map_t::const_iterator color_iterator_t;
-    group_color_map_t   mColorGroupMap;
 
 #ifdef _DEBUG
     void        dump();

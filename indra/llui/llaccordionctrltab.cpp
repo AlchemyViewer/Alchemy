@@ -112,13 +112,10 @@ private:
     // Overlay images (arrows)
     LLPointer<LLUIImage> mImageCollapsed;
     LLPointer<LLUIImage> mImageExpanded;
-    LLPointer<LLUIImage> mImageCollapsedPressed;
-    LLPointer<LLUIImage> mImageExpandedPressed;
 
     // Background images
     LLPointer<LLUIImage> mImageHeader;
     LLPointer<LLUIImage> mImageHeaderOver;
-    LLPointer<LLUIImage> mImageHeaderPressed;
     LLPointer<LLUIImage> mImageHeaderFocused;
 
     // style saved when applying it in setTitleFontStyle
@@ -143,12 +140,9 @@ LLAccordionCtrlTab::LLAccordionCtrlTabHeader::LLAccordionCtrlTabHeader(
 , mNeedsHighlight(false)
 , mIsSelected(false),
     mImageCollapsed(p.header_collapse_img),
-    mImageCollapsedPressed(p.header_collapse_img_pressed),
     mImageExpanded(p.header_expand_img),
-    mImageExpandedPressed(p.header_expand_img_pressed),
     mImageHeader(p.header_image),
     mImageHeaderOver(p.header_image_over),
-    mImageHeaderPressed(p.header_image_pressed),
     mImageHeaderFocused(p.header_image_focused)
 {
     LLTextBox::Params textboxParams;
@@ -402,12 +396,9 @@ LLAccordionCtrlTab::Params::Params()
     ,padding_top("padding_top",2)
     ,padding_bottom("padding_bottom",2)
     ,header_expand_img("header_expand_img")
-    ,header_expand_img_pressed("header_expand_img_pressed")
     ,header_collapse_img("header_collapse_img")
-    ,header_collapse_img_pressed("header_collapse_img_pressed")
     ,header_image("header_image")
     ,header_image_over("header_image_over")
-    ,header_image_pressed("header_image_pressed")
     ,header_image_focused("header_image_focused")
     ,header_text_color("header_text_color")
     ,header_check_box("header_check_box")

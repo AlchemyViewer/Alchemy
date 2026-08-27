@@ -104,11 +104,6 @@ protected:
     LLVirtualTrackball(const Params&);
 
 protected:
-    LLTextBox*          mNLabel;
-    LLTextBox*          mELabel;
-    LLTextBox*          mSLabel;
-    LLTextBox*          mWLabel;
-
     LLButton*           mBtnRotateTop;
     LLButton*           mBtnRotateBottom;
     LLButton*           mBtnRotateLeft;
@@ -144,10 +139,6 @@ private:
     LLUIImage*     mImgMoonFront;
     LLUIImage*     mImgSunBack;
     LLUIImage*     mImgSunFront;
-    LLUIImage*     mImgBtnRotTop;
-    LLUIImage*     mImgBtnRotLeft;
-    LLUIImage*     mImgBtnRotRight;
-    LLUIImage*     mImgBtnRotBottom;
     LLUIImage*     mImgSphere;
 
     LLQuaternion   mValue;

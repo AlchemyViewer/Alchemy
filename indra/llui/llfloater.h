@@ -663,11 +663,8 @@ private:
     LLRect              mToolbarLeftRect;
     LLRect              mToolbarBottomRect;
     LLRect              mToolbarRightRect;
-    LLRect              mToolbarTopRect;
     LLHandle<LLView>    mSnapView;
     bool            mFocusCycleMode;
-    S32             mSnapOffsetBottom;
-    S32             mSnapOffsetRight;
     S32             mMinimizePositionVOffset;
     typedef std::vector<std::pair<LLHandle<LLFloater>, boost::signals2::connection> > hidden_floaters_t;
     hidden_floaters_t mHiddenFloaters;

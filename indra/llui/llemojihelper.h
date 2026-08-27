@@ -66,8 +66,6 @@ private:
     LLHandle<LLUICtrl>  mHostHandle;
     LLHandle<LLFloater> mHelperHandle;
     boost::signals2::connection mHostCtrlFocusLostConn;
-    boost::signals2::connection mHelperCommitConn;
-    boost::signals2::connection mHelperCloseConn;
     std::function<void(const LLWString&)> mEmojiCommitCb;
     bool mIsHideDisabled = false;
 };

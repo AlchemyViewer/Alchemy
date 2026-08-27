@@ -334,7 +334,6 @@ public:
     LLView*         mRootView;
     LLHelp*         mHelpImpl;
 private:
-    std::vector<std::string> mXUIPaths;
     LLFrameTimer        mMouseIdleTimer;
     add_popup_t     mAddPopupFunc;
     remove_popup_t  mRemovePopupFunc;

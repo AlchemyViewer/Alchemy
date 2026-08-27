@@ -344,7 +344,6 @@ private:
 
     bool            mTabsToNextField;       // if true, tab moves focus to next field, else inserts spaces
     bool            mCommitOnFocusLost;
-    bool            mTakesFocus;
 
     bool            mAllowEmbeddedItems;
     bool            mShowContextMenu;
@@ -356,8 +355,6 @@ private:
     bool            mSelectedOnFocusReceived;
 
     LLUUID          mSourceID;
-
-    LLCoordGL       mLastIMEPosition;       // Last position of the IME editor
 
     keystroke_signal_t mKeystrokeSignal;
     LLTextValidate::Validator mPrevalidator;

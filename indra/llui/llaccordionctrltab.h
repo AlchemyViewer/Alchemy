@@ -66,14 +66,11 @@ public:
 
         // Overlay images (arrows on the left)
         Mandatory<LLUIImage*>   header_expand_img,
-                                header_expand_img_pressed,
-                                header_collapse_img,
-                                header_collapse_img_pressed;
+                                header_collapse_img;
 
         // Background images for the accordion tabs
         Mandatory<LLUIImage*>   header_image,
                                 header_image_over,
-                                header_image_pressed,
                                 header_image_focused;
 
         Optional<LLUIColor>     header_bg_color,

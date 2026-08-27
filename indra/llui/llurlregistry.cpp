@@ -28,7 +28,6 @@
 #include "linden_common.h"
 #include "llregex.h"
 #include "llurlregistry.h"
-#include "lluriparser.h"
 
 
 // default dummy callback that ignores any label updates from the server
@@ -295,15 +294,6 @@ bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LL
 
         // fill in the LLUrlMatch object and return it
         std::string url = text.substr(match_start, match_end - match_start + 1);
-
-        if (match_entry == mUrlEntryTrusted)
-        {
-            LLUriParser up(url);
-            if (up.normalize())
-            {
-                url = up.normalizedUri();
-            }
-        }
 
         match.setValues(match_start, match_end,
                         match_entry->getUrl(url),

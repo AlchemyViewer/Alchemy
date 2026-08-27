@@ -105,8 +105,8 @@ void LLEmojiHelper::showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, c
         // The picker serialises the chosen emoji as a UTF-8 string; decode
         // the whole sequence rather than just the first codepoint so ZWJ
         // families survive the callback.
-        mHelperCommitConn = pHelperFloater->setCommitCallback(std::bind([&](const LLSD& sdValue) { onCommitEmoji(utf8str_to_wstring(sdValue.asStringRef())); }, std::placeholders::_2));
-        mHelperCloseConn = pHelperFloater->setCloseCallback([this](LLUICtrl* ctrl, const LLSD& param) { onCloseHelper(ctrl, param); });
+        pHelperFloater->setCommitCallback(std::bind([&](const LLSD& sdValue) { onCommitEmoji(utf8str_to_wstring(sdValue.asStringRef())); }, std::placeholders::_2));
+        pHelperFloater->setCloseCallback([this](LLUICtrl* ctrl, const LLSD& param) { onCloseHelper(ctrl, param); });
     }
     setHostCtrl(hostctrl_p);
     mEmojiCommitCb = cb;

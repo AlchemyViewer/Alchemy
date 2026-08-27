@@ -96,7 +96,6 @@ public:
 
 private:
     std::vector<LLUrlEntryBase *> mUrlEntry;
-    LLUrlEntryBase* mUrlEntryTrusted;
     LLUrlEntryBase* mUrlEntryIcon;
     LLUrlEntryBase* mLLUrlEntryInvalidSLURL;
     LLUrlEntryBase* mUrlEntryHTTPLabel;
