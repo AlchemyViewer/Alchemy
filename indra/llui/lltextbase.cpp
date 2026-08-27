@@ -336,25 +336,18 @@ bool LLTextBase::truncate()
     // First rough check - if we're less than 1/4th the size, we're OK
     if (getLength() >= S32(mMaxTextByteLength / 4))
     {
-        // Have to check actual byte size
-        S32 utf8_byte_size = 0;
-        LLSD value = getViewModel()->getValue();
-        if (value.type() == LLSD::TypeString)
-        {
-            // save a copy for strings.
-            utf8_byte_size = static_cast<S32>(value.size());
-        }
-        else
-        {
-            // non string LLSDs need explicit conversion to string
-            utf8_byte_size = static_cast<S32>(value.asString().size());
-        }
+        // Have to check actual byte size. Nothing reaches
+        // LLTextViewModel::setValue -- LLTextBase overrides setValue to go
+        // through setText, and LLTextBase is the only thing that owns one -- so
+        // the model's LLSD is only ever written from its own display string and
+        // is always a String. getStringValue hands that over by reference,
+        // where getValue would have copied an LLSD to ask its type.
+        const std::string& utf8_text = getViewModel()->getStringValue();
 
-        if ( utf8_byte_size > mMaxTextByteLength )
+        if ( static_cast<S32>(utf8_text.size()) > mMaxTextByteLength )
         {
             // Truncate safely in UTF-8
-            std::string temp_utf8_text = value.asString();
-            temp_utf8_text = utf8str_truncate( temp_utf8_text, mMaxTextByteLength );
+            std::string temp_utf8_text = utf8str_truncate( utf8_text, mMaxTextByteLength );
             LLWString text = utf8str_to_wstring( temp_utf8_text );
             // remove extra bit of current string, to preserve formatting, etc.
             removeStringNoUndo(static_cast<S32>(text.size()), static_cast<S32>(getWText().size() - text.size()));
