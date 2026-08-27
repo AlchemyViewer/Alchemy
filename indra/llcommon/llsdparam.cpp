@@ -240,7 +240,7 @@ LLSD& LLParamSDParserUtilities::getSDWriteNode(LLSD& input, LLInitParam::Parser:
         }
         else
         {
-            sd_to_write = &(*sd_to_write)[std::string(it->first)];
+            sd_to_write = &(*sd_to_write)[it->first];
         }
         it->second = false;
     }
@@ -308,13 +308,14 @@ namespace LLInitParam
             return true;
         }
 
-        LLSD& sd = LLParamSDParserUtilities::getSDWriteNode(mValue, name_stack);
-
+        // Read before reaching for somewhere to put it. getSDWriteNode
+        // creates every node on the path and clears the "new" flag on the
+        // names it walks, so calling it first left a stray key behind on
+        // every value that turned out not to be readable.
         LLSD::String string;
-
         if (p.readValue<LLSD::String>(string))
         {
-            sd = string;
+            LLParamSDParserUtilities::getSDWriteNode(mValue, name_stack) = string;
             return true;
         }
         return false;
