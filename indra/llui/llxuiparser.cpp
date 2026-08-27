@@ -116,9 +116,15 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
     bool values_parsed = false;
     bool silent = mCurReadDepth > 0;
 
-    // getSanitizedValue() does real work; compute it once and reuse it for both
+    // getSanitizedValue() does real work, and for most element nodes there is
+    // no work to do: whatever sits between child elements is whitespace, which
+    // sanitizes to nothing. Ask first, then compute once and reuse it for both
     // the empty-node check and the "value" parameter below.
-    std::string text_contents = nodep->getSanitizedValue();
+    std::string text_contents;
+    if (nodep->hasTextContents())
+    {
+        nodep->getSanitizedValue(text_contents);
+    }
 
     if (nodep->getFirstChild().isNull()
         && nodep->mAttributes.empty()
@@ -391,7 +397,10 @@ bool LLXUIParser::writeBoolValue(Parser& parser, const void* val_ptr, name_stack
 bool LLXUIParser::readStringValue(Parser& parser, void* val_ptr)
 {
     LLXUIParser& self = static_cast<LLXUIParser&>(parser);
-    *((std::string*)val_ptr) = self.mCurReadNode->getSanitizedValue();
+    // Assign straight into the destination: the value being read is nearly
+    // always an attribute, where this is one copy rather than a copy into a
+    // temporary and a move out of it.
+    self.mCurReadNode->getSanitizedValue(*(std::string*)val_ptr);
     return true;
 }
 

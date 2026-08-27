@@ -204,6 +204,21 @@ public:
     U32 getPrecision() const { return mPrecision; }
     const std::string& getValue() const { return mValue; }
     std::string getSanitizedValue() const;
+
+    // Assigns the sanitized value instead of returning one, so a caller that
+    // already has a string to fill does not pay for a temporary. An attribute
+    // holds its value verbatim, which makes this a plain assignment.
+    void getSanitizedValue(std::string& out) const;
+
+    // False means getTextContents() would certainly return nothing, so a
+    // caller can skip building it. Both of that function's branches begin by
+    // looking for a non-whitespace character and produce nothing when there is
+    // none. True only means "maybe": quoted text can still sanitize away.
+    bool hasTextContents() const
+    {
+        return mValue.find_first_not_of(" \t\n") != std::string::npos;
+    }
+
     std::string getTextContents() const;
     const LLStringTableEntry* getName() const { return mName; }
     bool hasName(const char* name) const { return mName == gStringTable.checkStringEntry(name); }

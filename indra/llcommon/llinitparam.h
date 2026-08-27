@@ -473,6 +473,19 @@ namespace LLInitParam
 
     };
 
+    // Hands out one dense index per type that a parser can read or write. The
+    // first mention of a type claims its index and keeps it for the run, so a
+    // parser stores its readers in an array rather than a map keyed by
+    // type_index.
+    LL_COMMON_API std::size_t allocateParserTypeIndex();
+
+    template <typename T>
+    inline std::size_t parserTypeIndex()
+    {
+        static const std::size_t sIndex = allocateParserTypeIndex();
+        return sIndex;
+    }
+
     // parser base class with mechanisms for registering readers and writers of different types
     class LL_COMMON_API Parser
     {
@@ -487,8 +500,12 @@ namespace LLInitParam
         typedef bool (*parser_read_func_t)(Parser& parser, void* output);
         typedef bool (*parser_write_func_t)(Parser& parser, const void*, name_stack_t&);
 
-        typedef boost::unordered_map<std::type_index, parser_read_func_t>           parser_read_func_map_t;
-        typedef boost::unordered_map<std::type_index, parser_write_func_t>          parser_write_func_map_t;
+        // Dispatch is by dense index rather than by typeid. The set of
+        // parseable types is small, closed and known at compile time, so a
+        // parser can hold its readers in an array and index straight into it
+        // instead of hashing a type_index for every value it reads.
+        typedef std::vector<parser_read_func_t>                                     parser_read_func_map_t;
+        typedef std::vector<parser_write_func_t>                                    parser_write_func_map_t;
 
     public:
 
@@ -500,44 +517,35 @@ namespace LLInitParam
 
         virtual ~Parser() = default;
 
-        template <typename T> bool readValue(T& param, typename std::enable_if_t<!std::is_enum_v<T>>* dummy = 0)
+        template <typename T> bool readValue(T& param)
         {
-            parser_read_func_map_t::iterator found_it = mParserReadFuncs->find(typeid(T));
-            if (found_it != mParserReadFuncs->end())
+            if (parser_read_func_t read_func = findFunc(*mParserReadFuncs, parserTypeIndex<T>()))
             {
-                return found_it->second(*this, (void*)&param);
+                return read_func(*this, (void*)&param);
             }
 
-            return false;
-        }
-
-        template <typename T> bool readValue(T& param, typename std::enable_if_t<std::is_enum_v<T> >* dummy = 0)
-        {
-            parser_read_func_map_t::iterator found_it = mParserReadFuncs->find(typeid(T));
-            if (found_it != mParserReadFuncs->end())
+            if constexpr (std::is_enum_v<T>)
             {
-                return found_it->second(*this, (void*)&param);
-            }
-            else
-            {
-                found_it = mParserReadFuncs->find(typeid(S32));
-                if (found_it != mParserReadFuncs->end())
+                // An enum with no reader of its own is read as its underlying
+                // integer, which is how the XUI parsers take every enum that
+                // has no named values.
+                if (parser_read_func_t read_func = findFunc(*mParserReadFuncs, parserTypeIndex<S32>()))
                 {
-                    S32 int_value;
-                    bool parsed = found_it->second(*this, (void*)&int_value);
+                    S32 int_value = 0;
+                    const bool parsed = read_func(*this, (void*)&int_value);
                     param = (T)int_value;
                     return parsed;
                 }
             }
+
             return false;
         }
 
         template <typename T> bool writeValue(const T& param, name_stack_t& name_stack)
         {
-            parser_write_func_map_t::iterator found_it = mParserWriteFuncs->find(typeid(T));
-            if (found_it != mParserWriteFuncs->end())
+            if (parser_write_func_t write_func = findFunc(*mParserWriteFuncs, parserTypeIndex<T>()))
             {
-                return found_it->second(*this, (const void*)&param, name_stack);
+                return write_func(*this, (const void*)&param, name_stack);
             }
             return false;
         }
@@ -552,13 +560,37 @@ namespace LLInitParam
         template <typename T>
         void registerParserFuncs(parser_read_func_t read_func, parser_write_func_t write_func = nullptr)
         {
-            mParserReadFuncs->emplace(typeid(T), read_func);
-            mParserWriteFuncs->emplace(typeid(T), write_func);
+            const std::size_t index = parserTypeIndex<T>();
+            storeFunc(*mParserReadFuncs, index, read_func);
+            // A parser that only reads passes no writer. Storing the null
+            // would leave writeValue finding an entry and calling through it.
+            if (write_func)
+            {
+                storeFunc(*mParserWriteFuncs, index, write_func);
+            }
         }
 
         bool                mParseSilently;
 
     private:
+        // Indices are handed out across all parsers, so any one parser's array
+        // has gaps where types it does not handle were claimed by another.
+        template <typename FUNC>
+        static FUNC findFunc(const std::vector<FUNC>& funcs, std::size_t index)
+        {
+            return index < funcs.size() ? funcs[index] : nullptr;
+        }
+
+        template <typename FUNC>
+        static void storeFunc(std::vector<FUNC>& funcs, std::size_t index, FUNC func)
+        {
+            if (funcs.size() <= index)
+            {
+                funcs.resize(index + 1, nullptr);
+            }
+            funcs[index] = func;
+        }
+
         parser_read_func_map_t*     mParserReadFuncs;
         parser_write_func_map_t*    mParserWriteFuncs;
     };

@@ -30,6 +30,7 @@
 #include "llinitparam.h"
 #include "llformat.h"
 
+#include <atomic>
 #include <sstream>
 #include <unordered_set>
 
@@ -40,6 +41,15 @@ namespace LLInitParam
     predicate_rule_t default_parse_rules()
     {
         return ll_make_predicate(PROVIDED) && !ll_make_predicate(EMPTY);
+    }
+
+    std::size_t allocateParserTypeIndex()
+    {
+        // Parsers register their types while constructing, which can happen on
+        // more than one thread, so the counter is atomic. It runs a couple of
+        // dozen times over the life of the process.
+        static std::atomic<std::size_t> sNextIndex{0};
+        return sNextIndex.fetch_add(1, std::memory_order_relaxed);
     }
 
     //

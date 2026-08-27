@@ -3139,6 +3139,18 @@ std::string LLXMLNode::getSanitizedValue() const
     }
 }
 
+void LLXMLNode::getSanitizedValue(std::string& out) const
+{
+    if (mIsAttribute)
+    {
+        out = mValue;
+    }
+    else
+    {
+        out = getTextContents();
+    }
+}
+
 
 std::string LLXMLNode::getTextContents() const
 {
