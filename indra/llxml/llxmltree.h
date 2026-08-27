@@ -112,12 +112,12 @@ public:
     {
         return mName;
     }
-    bool hasName( const std::string& name )
+    bool hasName( std::string_view name )
     {
         return mName == name;
     }
 
-    bool hasAttribute( const std::string& name );
+    bool hasAttribute( std::string_view name );
 
     // Fast versions use cannonical_name handlee to entru in LLXmlTree::sAttributeKeys string table
     bool            getFastAttributeBOOL(       LLStdStringHandle cannonical_name, bool& value );
@@ -139,23 +139,23 @@ public:
     bool            getFastAttributeString(     LLStdStringHandle cannonical_name, std::string& value );
 
     // Normal versions find 'name' in LLXmlTree::sAttributeKeys then call fast versions
-    virtual bool        getAttributeBOOL(       const std::string& name, bool& value );
-    virtual bool        getAttributeU8(         const std::string& name, U8& value );
-    virtual bool        getAttributeS8(         const std::string& name, S8& value );
-    virtual bool        getAttributeU16(        const std::string& name, U16& value );
-    virtual bool        getAttributeS16(        const std::string& name, S16& value );
-    virtual bool        getAttributeU32(        const std::string& name, U32& value );
-    virtual bool        getAttributeS32(        const std::string& name, S32& value );
-    virtual bool        getAttributeF32(        const std::string& name, F32& value );
-    virtual bool        getAttributeF64(        const std::string& name, F64& value );
-    virtual bool        getAttributeColor(      const std::string& name, LLColor4& value );
-    virtual bool        getAttributeColor4(     const std::string& name, LLColor4& value );
-    virtual bool        getAttributeColor4U(    const std::string& name, LLColor4U& value );
-    virtual bool        getAttributeVector3(    const std::string& name, LLVector3& value );
-    virtual bool        getAttributeVector3d(   const std::string& name, LLVector3d& value );
-    virtual bool        getAttributeQuat(       const std::string& name, LLQuaternion& value );
-    virtual bool        getAttributeUUID(       const std::string& name, LLUUID& value );
-    virtual bool        getAttributeString(     const std::string& name, std::string& value );
+    virtual bool        getAttributeBOOL(       std::string_view name, bool& value );
+    virtual bool        getAttributeU8(         std::string_view name, U8& value );
+    virtual bool        getAttributeS8(         std::string_view name, S8& value );
+    virtual bool        getAttributeU16(        std::string_view name, U16& value );
+    virtual bool        getAttributeS16(        std::string_view name, S16& value );
+    virtual bool        getAttributeU32(        std::string_view name, U32& value );
+    virtual bool        getAttributeS32(        std::string_view name, S32& value );
+    virtual bool        getAttributeF32(        std::string_view name, F32& value );
+    virtual bool        getAttributeF64(        std::string_view name, F64& value );
+    virtual bool        getAttributeColor(      std::string_view name, LLColor4& value );
+    virtual bool        getAttributeColor4(     std::string_view name, LLColor4& value );
+    virtual bool        getAttributeColor4U(    std::string_view name, LLColor4U& value );
+    virtual bool        getAttributeVector3(    std::string_view name, LLVector3& value );
+    virtual bool        getAttributeVector3d(   std::string_view name, LLVector3d& value );
+    virtual bool        getAttributeQuat(       std::string_view name, LLQuaternion& value );
+    virtual bool        getAttributeUUID(       std::string_view name, LLUUID& value );
+    virtual bool        getAttributeString(     std::string_view name, std::string& value );
 
     const std::string& getContents()
     {
@@ -167,7 +167,7 @@ public:
     LLXmlTreeNode*  getFirstChild();
     LLXmlTreeNode*  getNextChild();
     S32             getChildCount()                     { return (S32)mChildren.size(); }
-    LLXmlTreeNode*  getChildByName( const std::string& name );  // returns first child with name, nullptr if none
+    LLXmlTreeNode*  getChildByName( std::string_view name );  // returns first child with name, nullptr if none
     LLXmlTreeNode*  getNextNamedChild();                // returns next child with name, nullptr if none
 
 protected:
@@ -178,7 +178,7 @@ protected:
     }
 
 private:
-    void            addAttribute( const std::string& name, std::string value );
+    void            addAttribute( std::string_view name, std::string value );
     void            appendContents( const char* str, std::string::size_type len );
     void            addChild( LLXmlTreeNode* child );
 

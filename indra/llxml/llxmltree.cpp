@@ -158,14 +158,14 @@ void LLXmlTreeNode::dump( const std::string& prefix )
     LL_CONT << LL_ENDL;
 }
 
-bool LLXmlTreeNode::hasAttribute(const std::string& name)
+bool LLXmlTreeNode::hasAttribute(std::string_view name)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString(name);
     attribute_map_t::iterator iter = mAttributes.find(canonical_name);
     return iter != mAttributes.end();
 }
 
-void LLXmlTreeNode::addAttribute(const std::string& name, std::string value)
+void LLXmlTreeNode::addAttribute(std::string_view name, std::string value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString(name);
     const std::string*& slot = mAttributes[canonical_name];
@@ -188,7 +188,7 @@ LLXmlTreeNode*  LLXmlTreeNode::getNextChild()
         return *mChildrenIter++;
 }
 
-LLXmlTreeNode* LLXmlTreeNode::getChildByName(const std::string& name)
+LLXmlTreeNode* LLXmlTreeNode::getChildByName(std::string_view name)
 {
     LLStdStringHandle tableptr = mTree->mNodeNames.checkString(name);
     mChildMapIter = mChildMap.lower_bound(tableptr);
@@ -336,103 +336,103 @@ bool LLXmlTreeNode::getFastAttributeString(LLStdStringHandle canonical_name, std
 
 //////////////////////////////////////////////////////////////
 
-bool LLXmlTreeNode::getAttributeBOOL(const std::string& name, bool& value)
+bool LLXmlTreeNode::getAttributeBOOL(std::string_view name, bool& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeBOOL(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeU8(const std::string& name, U8& value)
+bool LLXmlTreeNode::getAttributeU8(std::string_view name, U8& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeU8(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeS8(const std::string& name, S8& value)
+bool LLXmlTreeNode::getAttributeS8(std::string_view name, S8& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeS8(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeS16(const std::string& name, S16& value)
+bool LLXmlTreeNode::getAttributeS16(std::string_view name, S16& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeS16(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeU16(const std::string& name, U16& value)
+bool LLXmlTreeNode::getAttributeU16(std::string_view name, U16& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeU16(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeU32(const std::string& name, U32& value)
+bool LLXmlTreeNode::getAttributeU32(std::string_view name, U32& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeU32(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeS32(const std::string& name, S32& value)
+bool LLXmlTreeNode::getAttributeS32(std::string_view name, S32& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeS32(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeF32(const std::string& name, F32& value)
+bool LLXmlTreeNode::getAttributeF32(std::string_view name, F32& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeF32(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeF64(const std::string& name, F64& value)
+bool LLXmlTreeNode::getAttributeF64(std::string_view name, F64& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeF64(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeColor(const std::string& name, LLColor4& value)
+bool LLXmlTreeNode::getAttributeColor(std::string_view name, LLColor4& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeColor(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeColor4(const std::string& name, LLColor4& value)
+bool LLXmlTreeNode::getAttributeColor4(std::string_view name, LLColor4& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeColor4(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeColor4U(const std::string& name, LLColor4U& value)
+bool LLXmlTreeNode::getAttributeColor4U(std::string_view name, LLColor4U& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeColor4U(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeVector3(const std::string& name, LLVector3& value)
+bool LLXmlTreeNode::getAttributeVector3(std::string_view name, LLVector3& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeVector3(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeVector3d(const std::string& name, LLVector3d& value)
+bool LLXmlTreeNode::getAttributeVector3d(std::string_view name, LLVector3d& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeVector3d(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeQuat(const std::string& name, LLQuaternion& value)
+bool LLXmlTreeNode::getAttributeQuat(std::string_view name, LLQuaternion& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeQuat(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeUUID(const std::string& name, LLUUID& value)
+bool LLXmlTreeNode::getAttributeUUID(std::string_view name, LLUUID& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeUUID(canonical_name, value);
 }
 
-bool LLXmlTreeNode::getAttributeString(const std::string& name, std::string& value)
+bool LLXmlTreeNode::getAttributeString(std::string_view name, std::string& value)
 {
     LLStdStringHandle canonical_name = LLXmlTree::sAttributeKeys.addString( name );
     return getFastAttributeString(canonical_name, value);
