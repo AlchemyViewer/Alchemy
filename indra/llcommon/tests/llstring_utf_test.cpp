@@ -1599,4 +1599,72 @@ namespace tut
                       wstring_emoji_range_at(empty, 0).first,
                       wstring_emoji_range_at(empty, 0, no_clusters).first);
     }
+
+    // wstring_wstring_length_from_utf8_length walks a wstring spending a byte
+    // budget, stopping before any codepoint whose encoding would overrun it and
+    // reporting unaligned when the budget landed inside a multi-byte sequence.
+    template<> template<>
+    void llstring_utf_object_t::test<116>()
+    {
+        // 'A' (1 byte), U+00E9 (2), U+1F600 (4), 'B' (1). Cumulative: 0,1,3,7,8.
+        const LLWString w = { (llwchar)'A', (llwchar)0x00E9, (llwchar)0x1F600, (llwchar)'B' };
+        bool unaligned = false;
+
+        ensure_equals("budget 0", wstring_wstring_length_from_utf8_length(w, 0, 0, &unaligned), S32(0));
+        ensure("budget 0 aligned", !unaligned);
+
+        unaligned = true;
+        ensure_equals("budget 1", wstring_wstring_length_from_utf8_length(w, 0, 1, &unaligned), S32(1));
+        ensure("budget 1 aligned", !unaligned);
+
+        // 2 lands inside U+00E9's two bytes: 'A' only, and say so.
+        unaligned = false;
+        ensure_equals("budget 2", wstring_wstring_length_from_utf8_length(w, 0, 2, &unaligned), S32(1));
+        ensure("budget 2 unaligned", unaligned);
+
+        unaligned = true;
+        ensure_equals("budget 3", wstring_wstring_length_from_utf8_length(w, 0, 3, &unaligned), S32(2));
+        ensure("budget 3 aligned", !unaligned);
+
+        // 4, 5 and 6 all land inside the astral codepoint's four bytes.
+        for (S32 budget = 4; budget <= 6; ++budget)
+        {
+            unaligned = false;
+            ensure_equals("astral straddle", wstring_wstring_length_from_utf8_length(w, 0, budget, &unaligned), S32(2));
+            ensure("astral straddle unaligned", unaligned);
+        }
+
+        unaligned = true;
+        ensure_equals("budget 7", wstring_wstring_length_from_utf8_length(w, 0, 7, &unaligned), S32(3));
+        ensure("budget 7 aligned", !unaligned);
+
+        unaligned = true;
+        ensure_equals("budget 8", wstring_wstring_length_from_utf8_length(w, 0, 8, &unaligned), S32(4));
+        ensure("budget 8 aligned", !unaligned);
+
+        // Running out of string is not the same as stopping mid-codepoint.
+        unaligned = true;
+        ensure_equals("budget past end", wstring_wstring_length_from_utf8_length(w, 0, 100, &unaligned), S32(4));
+        ensure("budget past end aligned", !unaligned);
+
+        // woffset is respected, and the count returned is relative to it.
+        ensure_equals("offset 1 budget 2", wstring_wstring_length_from_utf8_length(w, 1, 2), S32(1));
+        ensure_equals("offset 2 budget 4", wstring_wstring_length_from_utf8_length(w, 2, 4), S32(1));
+        ensure_equals("offset 2 budget 3", wstring_wstring_length_from_utf8_length(w, 2, 3), S32(0));
+
+        // Offset past the end clamps rather than running off.
+        ensure_equals("offset oob", wstring_wstring_length_from_utf8_length(w, 10, 5), S32(0));
+
+        // Empty and null-budget degenerate cases.
+        const LLWString empty_w;
+        ensure_equals("empty wstring", wstring_wstring_length_from_utf8_length(empty_w, 0, 4), S32(0));
+
+        // The shape this exists for: a std::string::find offset against the UTF-8
+        // form of the same text becomes the matching codepoint index.
+        const std::string utf8 = wstring_to_utf8str(w);
+        const auto byte_offset = utf8.find("B");
+        ensure("needle found", byte_offset != std::string::npos);
+        ensure_equals("byte offset maps to codepoint index",
+                      wstring_wstring_length_from_utf8_length(w, 0, (S32)byte_offset), S32(3));
+    }
 }

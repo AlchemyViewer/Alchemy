@@ -1118,13 +1118,28 @@ void LLFolderViewItem::draw()
         return;
     }
 
-    S32 filter_string_length = mViewModelItem->hasFilterStringMatch() ? (S32)mViewModelItem->getFilterStringSize() : 0;
     F32 right_x  = 0;
     F32 y = (F32)rect_height - line_height - (F32)mStyle->textPadTop - (F32)sTopPad;
     F32 text_left = (F32)getLabelXPos();
-    LLWString combined_string = mLabel + mLabelSuffix;
 
-    S32 filter_offset = static_cast<S32>(mViewModelItem->getFilterStringOffset());
+    // The model reports the filter match as a byte offset and byte length into the
+    // item's UTF-8 searchable name, but everything below indexes LLWStrings by
+    // codepoint. Convert once here: left in bytes, both the highlight rect and the
+    // highlighted render range slide off the match for any name carrying multi-byte
+    // characters ahead of it. combined_string is only wanted on a match, so it is
+    // built here rather than for every item on every draw.
+    LLWString combined_string;
+    S32 filter_offset = 0;
+    S32 filter_string_length = 0;
+    if (mViewModelItem->hasFilterStringMatch())
+    {
+        combined_string = mLabel + mLabelSuffix;
+        filter_offset = wstring_wstring_length_from_utf8_length(
+            combined_string, 0, static_cast<S32>(mViewModelItem->getFilterStringOffset()));
+        filter_string_length = wstring_wstring_length_from_utf8_length(
+            combined_string, filter_offset, static_cast<S32>(mViewModelItem->getFilterStringSize()));
+    }
+
     if (filter_string_length > 0)
     {
         S32 bottom = rect_height - line_height - 3 - sTopPad;

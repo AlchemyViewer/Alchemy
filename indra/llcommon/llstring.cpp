@@ -295,6 +295,35 @@ S32 wstring_wstring_length_from_utf16_length(const LLWString & wstr, const S32 w
     return i - woffset;
 }
 
+// Given a wstring and an offset in it, returns the length as wstring (i.e.,
+// number of llwchars) of the longest substring that starts at the offset
+// and whose equivalent utf-8 string does not exceed the given utf8_length.
+S32 wstring_wstring_length_from_utf8_length(LLWStringView wstr, const S32 woffset, const S32 utf8_length, bool *unaligned)
+{
+    const S32 end = (S32)wstr.length();
+    const S32 start = llclamp(woffset, 0, end);
+
+    S32 i = start;
+    S32 bytes = 0;
+    while (i < end && bytes < utf8_length)
+    {
+        const S32 n = wchar_utf8_length(wstr[i]);
+        if (bytes + n > utf8_length)
+        {
+            // utf8_length falls inside this codepoint's encoding; stop before it.
+            break;
+        }
+        bytes += n;
+        i++;
+    }
+
+    if (unaligned)
+    {
+        *unaligned = (i < end) && (bytes < utf8_length);
+    }
+    return i - start;
+}
+
 S32 wchar_utf8_length(const llwchar wc)
 {
     if (wc < 0x80)

@@ -596,6 +596,13 @@ LL_COMMON_API S32 wstring_utf16_length(const LLWString & wstr, S32 woffset, S32 
 // Length in wstring (i.e., llwchar count) of a part of a wstring specified by utf16 length (i.e., utf16 units.)
 LL_COMMON_API S32 wstring_wstring_length_from_utf16_length(const LLWString & wstr, S32 woffset, S32 utf16_length, bool *unaligned = nullptr);
 
+// Length in wstring (i.e., llwchar count) of a part of a wstring specified by utf8 length (i.e., bytes.)
+// Use this to bring a byte offset produced against the UTF-8 form of some text -- a std::string::find
+// result, a network-supplied span -- into the codepoint indices the LLWString form uses. When non-null,
+// *unaligned reports that utf8_length landed inside a multi-byte sequence rather than on a codepoint
+// boundary, in which case the returned count stops short of that codepoint.
+LL_COMMON_API S32 wstring_wstring_length_from_utf8_length(LLWStringView wstr, S32 woffset, S32 utf8_length, bool *unaligned = nullptr);
+
 /**
  * @brief Properly truncate a utf8 string to a maximum byte count.
  *
