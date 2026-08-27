@@ -210,6 +210,10 @@ int main(int argc, char** argv)
         {
             ALParamFingerprint::collect(std::cout);
         }
+        else if (arg == "--sizes")
+        {
+            std::cout << ALParamFingerprint::sizes();
+        }
         else if (arg == "--census")
         {
             std::cout << ALParamFingerprint::census();

@@ -48,4 +48,8 @@ namespace ALParamFingerprint
 
     // What the parameter tables cost once every widget above has been built.
     std::string census();
+
+    // What one instance of each widget's parameter block costs. The tables are
+    // per type; this is what every widget built from them carries.
+    std::string sizes();
 }

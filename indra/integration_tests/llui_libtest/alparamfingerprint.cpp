@@ -191,6 +191,37 @@ namespace ALParamFingerprint
 #undef AL_FINGERPRINT_ONE
     }
 
+    std::string sizes()
+    {
+        // As census(): a block's parameter table is empty until something has
+        // constructed one, and the counts below read from that table.
+        std::ostringstream sink;
+        collect(sink);
+
+        std::ostringstream out;
+        std::size_t total = 0;
+        out << "Parameter block instance sizes" << std::endl;
+#define AL_SIZE_ONE(TYPE, TAG)                                                      {                                                                               const std::size_t bytes = sizeof(TYPE::Params);                             total += bytes;                                                             out << "  " << TAG << ' ' << bytes << " bytes / "                               << TYPE::Params::getBlockDescriptor().mNamedParams.size()                   << " params" << std::endl;                                          }
+        AL_FINGERPRINT_WIDGETS(AL_SIZE_ONE)
+#undef AL_SIZE_ONE
+        out << "  total across the set: " << total << " bytes" << std::endl;
+
+        out << "Building blocks" << std::endl
+            << "  LLInitParam::BaseBlock      " << sizeof(LLInitParam::BaseBlock) << std::endl
+            << "  LLInitParam::Param          " << sizeof(LLInitParam::Param) << std::endl
+            << "  ParamValue<LLRect>          " << sizeof(LLInitParam::ParamValue<LLRect>) << std::endl
+            << "  ParamValue<LLUIColor>       " << sizeof(LLInitParam::ParamValue<LLUIColor>) << std::endl
+            << "  LLView::Params              " << sizeof(LLView::Params) << std::endl
+            << "  LLUICtrl::Params            " << sizeof(LLUICtrl::Params) << std::endl
+            << "  LLButton::Params            " << sizeof(LLButton::Params) << std::endl
+            << "  LLScrollListCtrl::Params    " << sizeof(LLScrollListCtrl::Params) << std::endl
+            << "  CommitCallbackParam         " << sizeof(LLUICtrl::CommitCallbackParam) << std::endl
+            << "  EnableCallbackParam         " << sizeof(LLUICtrl::EnableCallbackParam) << std::endl
+            << "  LLUIColor                   " << sizeof(LLUIColor) << std::endl
+            << "  LLRect                      " << sizeof(LLRect) << std::endl;
+        return out.str();
+    }
+
     std::string census()
     {
         // A block type only registers its parameters once something has
