@@ -186,6 +186,11 @@ LLWatchdog::LLWatchdog()
 
 LLWatchdog::~LLWatchdog()
 {
+    // cleanup() is normally driven by the application, but on any path that
+    // skips it the timer thread would outlive the singleton and its next
+    // iteration would call getInstance() on an instance already being
+    // destroyed. cleanup() is idempotent, so running it again costs nothing.
+    cleanup();
 }
 
 void LLWatchdog::add(LLWatchdogEntry* e)

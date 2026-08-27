@@ -2063,4 +2063,46 @@ namespace tut
         verify_autokill_on_helper_exit(get_test_name(), 2);
 #endif
     }
+
+    template<> template<>
+    void object::test<38>()
+    {
+        set_test_name("attached=true, autokill=false");
+        // 'attached' governs destruction of the LLProcess object, 'autokill'
+        // governs termination of the parent, so this combination must still
+        // kill the child on destruction.
+        NamedTempFile out("out", "not started");
+        LLProcess::handle phandle(0);
+        {
+            PythonProcessLauncher py(get_test_name(),
+                                     "from __future__ import with_statement\n"
+                                     "import sys, time\n"
+                                     "with open(sys.argv[1], 'w') as f:\n"
+                                     "    f.write('ok')\n"
+                                     "# now sleep; expect caller to kill\n"
+                                     "time.sleep(120)\n"
+                                     "# if caller hasn't managed to kill by now, bad\n"
+                                     "with open(sys.argv[1], 'w') as f:\n"
+                                     "    f.write('bad')\n");
+            py.mParams.args.add(out.getPath().string());
+            py.mParams.autokill = false;
+            py.mParams.attached = true;
+            py.launch();
+            phandle = py.mPy->getProcessHandle();
+            int i = 0, timeout = 60;
+            for ( ; i < timeout; ++i)
+            {
+                yield();
+                if (readfile(out.getPath(), "from kill() script") == "ok")
+                    break;
+            }
+            ensure("script never started", i < timeout);
+            // Script has performed its first write and should now be sleeping.
+            // Destroy the LLProcess, which should kill the child.
+        }
+        waitfor(phandle, "kill() script");
+        // Had the destructor detached instead, the script would have woken on
+        // its own and overwritten the file with 'bad'.
+        ensure_equals(get_test_name() + " script output", readfile(out.getPath()), "ok");
+    }
 } // namespace tut

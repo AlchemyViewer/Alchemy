@@ -468,16 +468,19 @@ LLProcess::~LLProcess()
 {
     if (mChild && mStatus.mState == RUNNING)
     {
-        if (mAttached && mAutokill && !mKillCalled)
+        // Destruction is governed by 'attached' alone; 'autokill' governs what
+        // happens when the PARENT terminates, which is arranged at launch.
+        if (mAttached && !mKillCalled)
         {
             LL_INFOS("LLProcess") << "Terminating child process " << mDesc << LL_ENDL;
             boost::system::error_code ec;
             mChild->terminate(ec);
 
 #if !LL_WINDOWS
-            // On POSIX, terminate() sends SIGTERM which allows graceful shutdown.
-            // Poll with waitpid(WNOHANG) rather than mChild->running() to avoid
-            // competing with tick()'s own waitpid call.
+            // terminate() is SIGKILL in boost::process v2, so this waits for
+            // the child to be reaped rather than giving it time to exit on its
+            // own. Poll with waitpid(WNOHANG) rather than mChild->running() to
+            // avoid competing with tick()'s own waitpid call.
             pid_t pid = mChild->id();
             for (int i = 0; i < 30; ++i)
             {

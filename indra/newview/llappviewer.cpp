@@ -2702,24 +2702,43 @@ namespace
         return gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "Alchemy.log");
     }
 
-    std::string getOldLogFileName(const std::string& log_file)
+    // Sibling of the log file with its extension replaced (".old", ".crash").
+    std::string getLogFileSibling(const std::string& log_file, const std::string& extension)
     {
-        std::string old_log_file = log_file;
-        size_t separator = old_log_file.find_last_of("/\\");
+        std::string sibling = log_file;
+        size_t separator = sibling.find_last_of("/\\");
         size_t basename_start = (separator == std::string::npos) ? 0 : separator + 1;
-        size_t extension = old_log_file.find_last_of('.');
+        size_t dot = sibling.find_last_of('.');
 
-        if (extension != std::string::npos &&
-            extension > basename_start)
+        if (dot != std::string::npos &&
+            dot > basename_start)
         {
-            old_log_file.replace(extension, std::string::npos, ".old");
+            sibling.replace(dot, std::string::npos, extension);
         }
         else
         {
-            old_log_file += ".old";
+            sibling += extension;
         }
 
-        return old_log_file;
+        return sibling;
+    }
+
+    std::string getOldLogFileName(const std::string& log_file)
+    {
+        return getLogFileSibling(log_file, ".old");
+    }
+
+    // The log file actually in use, which is not the default name once
+    // --logfile has been honoured. Falls back to the default when logging is
+    // not going to a file at all, so the crash paths keep naming something.
+    std::string getActiveLogFileName()
+    {
+        std::string log_file = LLError::logFileName();
+        if (log_file.empty())
+        {
+            log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "Alchemy.log");
+        }
+        return log_file;
     }
 } // anonymous namespace
 
@@ -3990,15 +4009,17 @@ void LLAppViewer::writeSystemInfo()
         gDebugInfo["Dynamic"] = LLSD::emptyMap();
 
 #if LL_DARWIN
-    // crash processing in CrashMetadataSingleton reads SLLog
-    gDebugInfo["SLLog"] = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,"Alchemy.crash");
+    // crash processing in CrashMetadataSingleton reads SLLog. macOS reports a
+    // crash on the NEXT run, so what it wants is the copy taken at shutdown.
+    gDebugInfo["SLLog"] = getLogFileSibling(getActiveLogFileName(), ".crash");
 #elif LL_WINDOWS && !LL_BUGSPLAT
-    gDebugInfo["SLLog"] = gDirUtilp->getExpandedFilename(LL_PATH_DUMP,"Alchemy.log");
+    gDebugInfo["SLLog"] = getActiveLogFileName();
 #else
-    // Far from ideal, especially when multiple instances get involved.
-    // Note that attachmentsForBugSplat expects .old extendion.
-    // Todo: improve.
-    gDebugInfo["SLLog"] = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,"Alchemy.old");  //LLError::logFileName();
+    // The current log is still open and being written when the report is
+    // taken, so attach the previous run's instead; attachmentsForBugSplat
+    // expects that ".old" name.
+    // Far from ideal, especially when multiple instances get involved. Todo: improve.
+    gDebugInfo["SLLog"] = getOldLogFileName(getActiveLogFileName());
 #endif
 
     gDebugInfo["ClientInfo"]["Name"] = LLVersionInfo::instance().getChannel();
@@ -4506,10 +4527,9 @@ void LLAppViewer::processMarkerFiles()
         // While windows reports crashes immediately, mac reports next run and
         // may take a while to trigger crash report so it has a special file.
         // Remove .crash file if exists
-        std::string old_log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,
-            "Alchemy.old");
-        std::string crash_log_file = gDirUtilp->getExpandedFilename(LL_PATH_LOGS,
-            "Alchemy.crash");
+        const std::string log_file = getActiveLogFileName();
+        std::string old_log_file = getOldLogFileName(log_file);
+        std::string crash_log_file = getLogFileSibling(log_file, ".crash");
         LLFile::remove(crash_log_file);
         // Rename ".old" log file to ".crash"
         LLFile::rename(old_log_file, crash_log_file);
