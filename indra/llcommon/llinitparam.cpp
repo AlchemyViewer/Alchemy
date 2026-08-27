@@ -31,6 +31,8 @@
 #include "llformat.h"
 
 #include <atomic>
+#include <memory>
+#include <mutex>
 #include <sstream>
 #include <unordered_set>
 
@@ -124,10 +126,41 @@ namespace LLInitParam
     //
     void BlockDescriptor::aggregateBlockData(BlockDescriptor& src_block_data)
     {
-        mNamedParams.insert(src_block_data.mNamedParams.begin(), src_block_data.mNamedParams.end());
+        // The named table is not copied: findNamedParam walks to the base
+        // instead. The rest are iterated rather than looked up, and holding
+        // them flat keeps that a single pass.
         std::copy(src_block_data.mUnnamedParams.begin(), src_block_data.mUnnamedParams.end(), std::back_inserter(mUnnamedParams));
         std::copy(src_block_data.mValidationList.begin(), src_block_data.mValidationList.end(), std::back_inserter(mValidationList));
         std::copy(src_block_data.mAllParams.begin(), src_block_data.mAllParams.end(), std::back_inserter(mAllParams));
+    }
+
+    namespace
+    {
+        // Descriptors are registered once per block type and read for the life
+        // of the process, so they are cut from chunks that are never freed.
+        // One per allocation is what a std::deque gave: MSVC hands a deque
+        // holding anything above eight bytes exactly one element per block, so
+        // every descriptor carried an allocation header of its own.
+        //
+        // The lock is not for contention -- a descriptor is allocated once,
+        // during a block type's first construction -- but because which thread
+        // that happens on is not ours to say.
+        constexpr std::size_t DESCRIPTORS_PER_CHUNK = 64;
+
+        ParamDescriptor* allocateDescriptor()
+        {
+            static std::mutex sChunkMutex;
+            static std::vector<std::unique_ptr<ParamDescriptor[]> > sChunks;
+            static std::size_t sUsedInChunk = DESCRIPTORS_PER_CHUNK;
+
+            std::lock_guard<std::mutex> lock(sChunkMutex);
+            if (sUsedInChunk == DESCRIPTORS_PER_CHUNK)
+            {
+                sChunks.push_back(std::make_unique<ParamDescriptor[]>(DESCRIPTORS_PER_CHUNK));
+                sUsedInChunk = 0;
+            }
+            return &sChunks.back()[sUsedInChunk++];
+        }
     }
 
     void BlockDescriptor::addParam(param_handle_t handle,
@@ -144,10 +177,9 @@ namespace LLInitParam
             LL_ERRS() << "Attempted to register param with block defined for parent class, make sure to derive from LLInitParam::Block<YOUR_CLASS, PARAM_BLOCK_BASE_CLASS>" << LL_ENDL;
         }
 
-        // This block owns the descriptor. A deque never moves what it already
-        // holds, so blocks deriving from this one can keep the address.
-        ParamDescriptorPtr param = &mOwnedParams.emplace_back(
-            handle, merge_func, deserialize_func, serialize_func, validation_func, min_count, max_count);
+        ParamDescriptorPtr param = allocateDescriptor();
+        *param = ParamDescriptor(handle, merge_func, deserialize_func, serialize_func,
+                                 validation_func, min_count, max_count);
 
         mAllParams.push_back(param);
 
@@ -176,11 +208,46 @@ namespace LLInitParam
     }
 
     BlockDescriptor::BlockDescriptor()
-    :   mMaxParamOffset(0),
+    :   mBaseDescriptor(NULL),
+        mTypeName(""),
+        mMaxParamOffset(0),
         mInitializationState(UNINITIALIZED),
         mCurrentBlockPtr(NULL)
     {
         block_descriptor_registry().push_back(this);
+    }
+
+    ParamDescriptorPtr BlockDescriptor::findNamedParam(std::string_view name) const
+    {
+        for (const BlockDescriptor* descriptor = this; descriptor; descriptor = descriptor->mBaseDescriptor)
+        {
+            param_map_t::const_iterator found = descriptor->mNamedParams.find(name);
+            if (found != descriptor->mNamedParams.end())
+            {
+                return found->second;
+            }
+        }
+        return NULL;
+    }
+
+    std::vector<std::pair<std::string_view, ParamDescriptorPtr> > BlockDescriptor::namedParams() const
+    {
+        std::vector<std::pair<std::string_view, ParamDescriptorPtr> > named;
+        std::unordered_set<std::string_view> seen;
+
+        for (const BlockDescriptor* descriptor = this; descriptor; descriptor = descriptor->mBaseDescriptor)
+        {
+            for (const param_map_t::value_type& pair : descriptor->mNamedParams)
+            {
+                // Nearest first, so the first spelling of a name wins and a
+                // base's shadowed one is passed over.
+                if (seen.insert(pair.first).second)
+                {
+                    named.push_back(pair);
+                }
+            }
+        }
+        return named;
     }
 
     // static
@@ -194,58 +261,66 @@ namespace LLInitParam
     {
         const std::vector<BlockDescriptor*>& all = getAllDescriptors();
 
-        size_t named_entries = 0;
+        size_t own_entries = 0;
+        size_t effective_entries = 0;
         size_t unnamed_entries = 0;
         size_t all_param_entries = 0;
-        size_t owned_descriptors = 0;
         size_t validated_entries = 0;
-        size_t name_bytes = 0;
+        size_t deepest_chain = 0;
         std::unordered_set<std::string_view> distinct_names;
+        std::unordered_set<const ParamDescriptor*> distinct_descriptors;
 
         for (const BlockDescriptor* descriptor : all)
         {
-            named_entries += descriptor->mNamedParams.size();
+            own_entries += descriptor->mNamedParams.size();
             unnamed_entries += descriptor->mUnnamedParams.size();
             // An entry is a slot in some block's table; a descriptor is an
             // object. They are not the same count, because a derived block's
             // table has an entry for each of its base's descriptors without
             // owning any of them.
             all_param_entries += descriptor->mAllParams.size();
-            owned_descriptors += descriptor->mOwnedParams.size();
             validated_entries += descriptor->mValidationList.size();
+            effective_entries += descriptor->namedParams().size();
+
+            size_t depth = 0;
+            for (const BlockDescriptor* walk = descriptor; walk; walk = walk->mBaseDescriptor)
+            {
+                ++depth;
+            }
+            deepest_chain = llmax(deepest_chain, depth);
 
             for (const param_map_t::value_type& pair : descriptor->mNamedParams)
             {
-                name_bytes += pair.first.size() + 1;
                 distinct_names.emplace(pair.first);
+                distinct_descriptors.emplace(pair.second);
+            }
+            for (ParamDescriptorPtr ptr : descriptor->mUnnamedParams)
+            {
+                distinct_descriptors.emplace(ptr);
             }
         }
 
-        // A named entry in a flat map is a view and a pointer, with no node
-        // of its own. The name characters are not counted as heap at all
-        // now: they are the string literals in the block declarations.
-        const size_t named_node_bytes = named_entries * (sizeof(std::string_view) + sizeof(ParamDescriptorPtr));
+        // A named entry in a flat map is a view and a pointer, with no node of
+        // its own. Only the entries a block declares itself are stored; a name
+        // it inherits is found by walking to the base that declared it, which
+        // is what effective_entries counts and own_entries does not.
+        const size_t named_node_bytes = own_entries * (sizeof(std::string_view) + sizeof(ParamDescriptorPtr));
         const size_t list_node_bytes = all_param_entries * sizeof(ParamDescriptorPtr);
-        const size_t descriptor_bytes = owned_descriptors * sizeof(ParamDescriptor);
-
-        size_t distinct_name_bytes = 0;
-        for (std::string_view name : distinct_names)
-        {
-            distinct_name_bytes += name.size() + 1;
-        }
+        const size_t descriptor_bytes = distinct_descriptors.size() * sizeof(ParamDescriptor);
 
         std::ostringstream out;
         out << "LLInitParam block descriptors\n"
             << "  block types registered : " << all.size() << "\n"
-            << "  named param entries    : " << named_entries << "\n"
+            << "  named entries stored   : " << own_entries << "\n"
+            << "  named entries reachable: " << effective_entries
+            << " (what each block answers to, bases included)\n"
             << "  unnamed param entries  : " << unnamed_entries << "\n"
             << "  param table entries    : " << all_param_entries << "\n"
-            << "  distinct descriptors   : " << owned_descriptors << "\n"
+            << "  distinct descriptors   : " << distinct_descriptors.size() << "\n"
             << "  validated params       : " << validated_entries << "\n"
             << "  distinct param names   : " << distinct_names.size()
-            << " (of " << named_entries << " entries)\n"
-            << "  name chars in binary   : " << name_bytes
-            << " (" << distinct_name_bytes << " distinct)\n"
+            << " (of " << own_entries << " stored)\n"
+            << "  deepest block chain    : " << deepest_chain << "\n"
             << "  named map entries      : ~" << named_node_bytes << " bytes\n"
             << "  mAllParams vector      : ~" << list_node_bytes << " bytes\n"
             << "  descriptor objects     : ~" << descriptor_bytes << " bytes\n"
@@ -255,7 +330,7 @@ namespace LLInitParam
     }
 
     // called by each derived class in least to most derived order
-    void BaseBlock::init(BlockDescriptor& descriptor, BlockDescriptor& base_descriptor, size_t block_size)
+    void BaseBlock::init(BlockDescriptor& descriptor, BlockDescriptor& base_descriptor, size_t block_size, const char* type_name)
     {
         descriptor.mCurrentBlockPtr = this;
         descriptor.mMaxParamOffset = block_size;
@@ -263,6 +338,10 @@ namespace LLInitParam
         switch(descriptor.mInitializationState)
         {
         case BlockDescriptor::UNINITIALIZED:
+            descriptor.mTypeName = type_name;
+            // A block with no base of its own is handed its own descriptor,
+            // which would make findNamedParam walk in a circle.
+            descriptor.mBaseDescriptor = (&base_descriptor == &descriptor) ? NULL : &base_descriptor;
             // copy params from base class here
             descriptor.aggregateBlockData(base_descriptor);
 
@@ -355,7 +434,7 @@ namespace LLInitParam
             unnamed_handles.insert(ptr->mParamHandle);
         }
 
-        for (const BlockDescriptor::param_map_t::value_type& pair : block_data.mNamedParams)
+        for (const auto& pair : block_data.namedParams())
         {
             param_handle_t param_handle = pair.second->mParamHandle;
             const Param* param = getParamFromHandle(param_handle);
@@ -399,12 +478,12 @@ namespace LLInitParam
         {
             const std::string_view top_name = name_stack_range.first->first;
 
-            BlockDescriptor::param_map_t::iterator found_it = block_data.mNamedParams.find(top_name);
-            if (found_it != block_data.mNamedParams.end())
+            ParamDescriptorPtr found = block_data.findNamedParam(top_name);
+            if (found)
             {
                 // find pointer to member parameter from offset table
-                Param* paramp = getParamFromHandle(found_it->second->mParamHandle);
-                ParamDescriptor::deserialize_func_t deserialize_func = found_it->second->mDeserializeFunc;
+                Param* paramp = getParamFromHandle(found->mParamHandle);
+                ParamDescriptor::deserialize_func_t deserialize_func = found->mDeserializeFunc;
 
                 Parser::name_stack_range_t new_name_stack(name_stack_range.first, name_stack_range.second);
                 ++new_name_stack.first;
@@ -476,11 +555,14 @@ namespace LLInitParam
     std::string_view BaseBlock::getParamName(const BlockDescriptor& block_data, const Param* paramp) const
     {
         param_handle_t handle = getHandleFromParam(paramp);
-        for (BlockDescriptor::param_map_t::const_iterator it = block_data.mNamedParams.begin(); it != block_data.mNamedParams.end(); ++it)
+        for (const BlockDescriptor* descriptor = &block_data; descriptor; descriptor = descriptor->mBaseDescriptor)
         {
-            if (it->second->mParamHandle == handle)
+            for (const BlockDescriptor::param_map_t::value_type& pair : descriptor->mNamedParams)
             {
-                return it->first;
+                if (pair.second->mParamHandle == handle)
+                {
+                    return pair.first;
+                }
             }
         }
 

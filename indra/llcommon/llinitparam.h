@@ -31,7 +31,7 @@
 #include <functional>
 #include <type_traits>
 #include <vector>
-#include <deque>
+#include <typeinfo>
 #include <memory>
 #include <string_view>
 
@@ -690,14 +690,23 @@ namespace LLInitParam
         typedef std::vector<ParamDescriptorPtr>                                                 all_params_list_t;
         typedef std::vector<std::pair<param_handle_t, ParamDescriptor::validation_func_t> >     param_validation_list_t;
 
-        // A deque so that a descriptor's address survives later additions.
-        typedef std::deque<ParamDescriptor>                                                     owned_params_t;
+        // The name a lookup asks for, resolved nearest first: this block's own
+        // table, then its base's, and so on. Returns null if nothing answers
+        // to it. A name a derived block redeclares shadows the base's, which
+        // is what LLCheckBoxCtrl::Params does to initial_value.
+        ParamDescriptorPtr findNamedParam(std::string_view name) const;
 
-        param_map_t                     mNamedParams;           // parameters with associated names
+        // Every name this block answers to, its bases' included and a
+        // shadowed name appearing once. Materialized, so it is for the paths
+        // that report or serialize rather than the one that parses.
+        std::vector<std::pair<std::string_view, ParamDescriptorPtr> > namedParams() const;
+
+        param_map_t                     mNamedParams;           // parameters this block itself named
         param_list_t                    mUnnamedParams;         // parameters with_out_ associated names
         param_validation_list_t         mValidationList;        // parameters that must be validated
         all_params_list_t               mAllParams;             // all parameters, this block's and its bases'
-        owned_params_t                  mOwnedParams;           // descriptors this block declared, and owns
+        BlockDescriptor*                mBaseDescriptor;        // the block this one derives from, or null
+        const char*                     mTypeName;              // the block type, for reporting
         size_t                          mMaxParamOffset;
         EInitializationState            mInitializationState;   // whether or not static block data has been initialized
         class BaseBlock*                mCurrentBlockPtr;       // pointer to block currently being constructed
@@ -974,7 +983,7 @@ namespace LLInitParam
         }
 
     protected:
-        void init(BlockDescriptor& descriptor, BlockDescriptor& base_descriptor, size_t block_size);
+        void init(BlockDescriptor& descriptor, BlockDescriptor& base_descriptor, size_t block_size, const char* type_name);
 
 
         bool mergeBlockParam(bool source_provided, bool dst_provided, BlockDescriptor& block_data, const BaseBlock& source, bool overwrite)
@@ -1985,7 +1994,8 @@ namespace LLInitParam
         ChoiceBlock()
         :   mCurChoice(0)
         {
-            BaseBlock::init(getBlockDescriptor(), base_block_t::getBlockDescriptor(), sizeof(DERIVED_BLOCK));
+            BaseBlock::init(getBlockDescriptor(), base_block_t::getBlockDescriptor(), sizeof(DERIVED_BLOCK),
+                            typeid(DERIVED_BLOCK).name());
         }
 
         // Alternatives are mutually exclusive wrt other Alternatives in the same block.
@@ -2124,7 +2134,8 @@ namespace LLInitParam
         Block()
         {
             //#pragma message("Parsing LLInitParam::Block")
-            BaseBlock::init(getBlockDescriptor(), BASE_BLOCK::getBlockDescriptor(), sizeof(DERIVED_BLOCK));
+            BaseBlock::init(getBlockDescriptor(), BASE_BLOCK::getBlockDescriptor(), sizeof(DERIVED_BLOCK),
+                            typeid(DERIVED_BLOCK).name());
         }
 
         //

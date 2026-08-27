@@ -615,15 +615,15 @@ namespace tut
         size_t named_entries = 0;
         for (const LLInitParam::BlockDescriptor* descriptor : all)
         {
-            named_entries += descriptor->mNamedParams.size();
+            named_entries += descriptor->namedParams().size();
         }
         ensure("the tables hold the parameters we declared", named_entries >= 12);
 
         // DerivedBlock aggregates SimpleBlock's four parameters on top of its
         // own, which is the duplication the census exists to measure.
         ensure_equals("a derived block carries its base's parameters too",
-                      DerivedBlock::getBlockDescriptor().mNamedParams.size(),
-                      SimpleBlock::getBlockDescriptor().mNamedParams.size() + 1);
+                      DerivedBlock::getBlockDescriptor().namedParams().size(),
+                      SimpleBlock::getBlockDescriptor().namedParams().size() + 1);
 
         const std::string report = LLInitParam::BlockDescriptor::getStatsReport();
         ensure("the census reports something", !report.empty());

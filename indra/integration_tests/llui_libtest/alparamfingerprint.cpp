@@ -32,6 +32,7 @@
 #include "llsdparam.h"
 #include "llsdserialize.h"
 #include "lluictrlfactory.h"
+#include "llxuiparser.h"
 
 #include "llbutton.h"
 #include "llstyle.h"
@@ -157,6 +158,44 @@ namespace
             << "ns" << std::endl;
     }
 
+    // Parsing is where a name is looked up, so this is what a block's table
+    // layout costs at the moment it is used, rather than what it occupies.
+    template<typename T>
+    void benchParse(const char* tag, const char* widget_file, std::ostream& out)
+    {
+        LLXMLNodePtr root;
+        if (!LLUICtrlFactory::getLayeredXMLNode(gDirUtilp->add("widgets", widget_file), root)
+            || root.isNull())
+        {
+            out << "  " << tag << " (no template to read)" << std::endl;
+            return;
+        }
+
+        const typename T::Params& defaults = LLUICtrlFactory::getDefaultParams<T>();
+
+        const int N = 2000;
+        {
+            typename T::Params warm(defaults);
+            LLXUIParser parser;
+            parser.readXUI(root, warm, widget_file, true);
+            gBenchSink += warm.getBlockDescriptor().mAllParams.size();
+        }
+
+        const auto start = std::chrono::steady_clock::now();
+        for (int i = 0; i < N; ++i)
+        {
+            typename T::Params block(defaults);
+            LLXUIParser parser;
+            parser.readXUI(root, block, widget_file, true);
+            gBenchSink += reinterpret_cast<std::size_t>(&block);
+        }
+        const auto end = std::chrono::steady_clock::now();
+
+        out << "  " << tag << " copy+parse "
+            << std::chrono::duration<double, std::nano>(end - start).count() / N
+            << "ns" << std::endl;
+    }
+
     template<typename T>
     void fingerprintWidget(const char* tag, std::ostream& out)
     {
@@ -196,14 +235,17 @@ namespace
         LLSDSerialize::toNotation(sd, notation);
 
         const LLInitParam::BlockDescriptor& descriptor = T::Params::getBlockDescriptor();
+        // namedParams(), not mNamedParams: a block's own table holds only what
+        // it declares, and the fingerprint is over everything it answers to.
+        const auto named = descriptor.namedParams();
         std::vector<std::string> table;
-        table.reserve(descriptor.mNamedParams.size());
-        for (const auto& [name, param] : descriptor.mNamedParams)
+        table.reserve(named.size());
+        for (const auto& [name, param] : named)
         {
             table.push_back(std::string(name) + ':' + std::to_string(param->mMinCount)
                                               + ':' + std::to_string(param->mMaxCount));
         }
-        // mNamedParams is a hash map, so impose an order of our own.
+        // The tables are hash maps, so impose an order of our own.
         std::sort(table.begin(), table.end());
 
         std::ostringstream table_text;
@@ -212,7 +254,7 @@ namespace
             table_text << entry << '\n';
         }
 
-        out << " params=" << descriptor.mNamedParams.size()
+        out << " params=" << named.size()
             << " xml=" << (has_xml ? "yes" : "no")
             << " table=" << std::hex << std::setw(16) << std::setfill('0')
             << HBXXH64::digest(table_text.str())
@@ -241,7 +283,7 @@ namespace ALParamFingerprint
         std::ostringstream out;
         std::size_t total = 0;
         out << "Parameter block instance sizes" << std::endl;
-#define AL_SIZE_ONE(TYPE, TAG)                                                      {                                                                               const std::size_t bytes = sizeof(TYPE::Params);                             total += bytes;                                                             out << "  " << TAG << ' ' << bytes << " bytes / "                               << TYPE::Params::getBlockDescriptor().mNamedParams.size()                   << " params" << std::endl;                                          }
+#define AL_SIZE_ONE(TYPE, TAG)                                                      {                                                                               const std::size_t bytes = sizeof(TYPE::Params);                             total += bytes;                                                             out << "  " << TAG << ' ' << bytes << " bytes / "                               << TYPE::Params::getBlockDescriptor().namedParams().size()                   << " params" << std::endl;                                          }
         AL_FINGERPRINT_WIDGETS(AL_SIZE_ONE)
 #undef AL_SIZE_ONE
         out << "  total across the set: " << total << " bytes" << std::endl;
@@ -272,6 +314,11 @@ namespace ALParamFingerprint
         benchBlock<LLTextBox::Params>("LLTextBox::Params", out);
         benchBlock<LLButton::Params>("LLButton::Params", out);
         benchBlock<LLView::Params>("LLView::Params", out);
+
+        out << "Parameter block parsing" << std::endl;
+        benchParse<LLButton>("LLButton::Params", "button.xml", out);
+        benchParse<LLTextBox>("LLTextBox::Params", "text.xml", out);
+        benchParse<LLPanel>("LLPanel::Params", "panel.xml", out);
         return out.str();
     }
 
