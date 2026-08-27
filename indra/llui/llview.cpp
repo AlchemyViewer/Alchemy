@@ -130,11 +130,7 @@ LLView::Params::Params()
     left_delta("left_delta", S32_MAX),
     from_xui("from_xui", false),
     focus_root("focus_root", false),
-    needs_translate("translate"),
-    xmlns("xmlns"),
-    xmlns_xsi("xmlns:xsi"),
-    xsi_schemaLocation("xsi:schemaLocation"),
-    xsi_type("xsi:type")
+    needs_translate("translate")
 
 {
     addSynonym(rect, "");

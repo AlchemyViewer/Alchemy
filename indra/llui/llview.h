@@ -144,12 +144,12 @@ public:
                                     left_pad,       // from last right to my left
                                     left_delta;     // from last left to my left
 
-        //FIXME: get parent context involved in parsing traversal
-        Ignored                     needs_translate,    // cue for translation tools
-                                    xmlns,              // xml namespace
-                                    xmlns_xsi,          // xml namespace
-                                    xsi_schemaLocation, // xml schema
-                                    xsi_type;           // xml schema type
+        // Swallowed so that translate="false", which 53 of the shipped files
+        // carry as a cue for translation tools, does not read as an unknown
+        // attribute. The xml namespace and schema attributes that used to sit
+        // here alongside it appear in no XUI file at all -- only in the LLSD
+        // documents, which this parser never sees.
+        Ignored                     needs_translate;
 
         Params();
     };
