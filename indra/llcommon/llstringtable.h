@@ -79,9 +79,20 @@ public:
 class LL_COMMON_API LLStringTable
 {
 public:
+    // Whether entries are counted. A counted table hands a string back with
+    // removeString() once the last holder is done with it. An uncounted one
+    // never gives one back -- and so pays no refcount traffic on lookup,
+    // which is the whole cost difference on a path parsing hits per tag and
+    // per attribute.
+    enum ERefCounting
+    {
+        NOT_COUNTED,
+        COUNTED
+    };
+
     // The size argument is a hint about how many distinct strings to expect.
     // It no longer fixes a bucket count, and zero means "no idea".
-    explicit LLStringTable(int tablesize = 0);
+    explicit LLStringTable(int tablesize = 0, ERefCounting counting = COUNTED);
     ~LLStringTable();
 
     LLStringTable(const LLStringTable&) = delete;
@@ -93,13 +104,16 @@ public:
     LLStringTableEntry* checkStringEntry(std::string_view str) const;
     LLStringTableEntry* checkStringEntry(const char* str) const;
 
-    // Find, adding when absent. Either way the entry's count goes up by one.
+    // Find, adding when absent. On a counted table the entry's count goes up
+    // by one either way.
     char*               addString(std::string_view str);
     char*               addString(const char* str);
     LLStringTableEntry* addStringEntry(std::string_view str);
     LLStringTableEntry* addStringEntry(const char* str);
 
     // Drops one count, and the entry with it when that was the last.
+    // Does nothing on an uncounted table, which cannot know who still holds
+    // the entry; asking is a programming error and asserts.
     void                removeString(std::string_view str);
     void                removeString(const char* str);
 
@@ -115,6 +129,7 @@ private:
 
     mutable std::shared_mutex   mMutex;
     table_t                     mTable;
+    const bool                  mCounted;
 };
 
 extern LL_COMMON_API LLStringTable gStringTable;

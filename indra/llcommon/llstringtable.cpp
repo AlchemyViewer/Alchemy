@@ -31,7 +31,9 @@
 
 #include <mutex>
 
-LLStringTable gStringTable(32768);
+// Add-only: nothing calls removeString on it, so it skips the refcount
+// traffic that would otherwise land on every tag and attribute parsed.
+LLStringTable gStringTable(32768, LLStringTable::NOT_COUNTED);
 
 LLStringTableEntry::LLStringTableEntry(std::string_view str)
 :   mText(str),
@@ -40,7 +42,8 @@ LLStringTableEntry::LLStringTableEntry(std::string_view str)
 {
 }
 
-LLStringTable::LLStringTable(int tablesize)
+LLStringTable::LLStringTable(int tablesize, ERefCounting counting)
+:   mCounted(counting == COUNTED)
 {
     if (tablesize > 0)
     {
@@ -89,7 +92,10 @@ LLStringTableEntry* LLStringTable::addStringEntry(std::string_view str)
         table_t::const_iterator found = mTable.find(str);
         if (found != mTable.end())
         {
-            found->second->incCount();
+            if (mCounted)
+            {
+                found->second->incCount();
+            }
             return found->second.get();
         }
     }
@@ -100,7 +106,10 @@ LLStringTableEntry* LLStringTable::addStringEntry(std::string_view str)
     table_t::const_iterator found = mTable.find(str);
     if (found != mTable.end())
     {
-        found->second->incCount();
+        if (mCounted)
+        {
+            found->second->incCount();
+        }
         return found->second.get();
     }
 
@@ -130,6 +139,14 @@ char* LLStringTable::addString(const char* str)
 
 void LLStringTable::removeString(std::string_view str)
 {
+    // An uncounted table never incremented, so it has no idea whether anyone
+    // else still holds this entry and must not drop it.
+    llassert(mCounted);
+    if (!mCounted)
+    {
+        return;
+    }
+
     std::unique_lock<std::shared_mutex> lock(mMutex);
     table_t::iterator found = mTable.find(str);
     if (found != mTable.end() && !found->second->decCount())
