@@ -86,6 +86,8 @@ LLXUIParser::LLXUIParser()
     }
 }
 
+static S32 pushDottedName(LLInitParam::Parser::name_stack_t& stack, const char* name);
+
 const LLXMLNodePtr DUMMY_NODE = new LLXMLNode();
 
 void LLXUIParser::readXUI(LLXMLNodePtr node, LLInitParam::BaseBlock& block, const std::string& filename, bool silent)
@@ -160,56 +162,41 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
     mCurReadDepth++;
     for(LLXMLNodePtr childp = nodep->getFirstChild(); childp.notNull();)
     {
-        std::string child_name(childp->getName()->mString);
+        // The name belongs to the string table and outlives this parse, so the
+        // stack can hold runs of it rather than copies.
+        const std::string_view child_name(childp->getName()->mString);
         S32 num_tokens_pushed = 0;
 
         // for non "dotted" child nodes check to see if child node maps to another widget type
         // and if not, treat as a child element of the current node
         // e.g. <button><rect left="10"/></button> will interpret <rect> as "button.rect"
         // since there is no widget named "rect"
-        if (child_name.find('.') == std::string::npos)
+        const std::size_t first_dot = child_name.find('.');
+        if (first_dot == std::string_view::npos)
         {
             mNameStack.emplace_back(child_name, true);
             num_tokens_pushed++;
         }
         else
         {
-            // parse out "dotted" name into individual tokens
-            typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-            const boost::char_separator<char> sep(".");
-            tokenizer name_tokens(child_name, sep);
-
-            tokenizer::iterator name_token_it = name_tokens.begin();
-            if(name_token_it == name_tokens.end())
-            {
-                childp = childp->getNextSibling();
-                continue;
-            }
-
-            // check for proper nesting
+            // check for proper nesting against the leading token
+            const std::string_view head = child_name.substr(0, first_dot);
             if (mNameStack.empty())
             {
-                if (*name_token_it != mRootNodeName)
+                if (head != mRootNodeName)
                 {
                     childp = childp->getNextSibling();
                     continue;
                 }
             }
-            else if(mNameStack.back().first != *name_token_it)
+            else if (mNameStack.back().first != head)
             {
                 childp = childp->getNextSibling();
                 continue;
             }
 
-            // now ignore first token
-            ++name_token_it;
-
-            // copy remaining tokens on to our running token list
-            for(tokenizer::iterator token_to_push = name_token_it; token_to_push != name_tokens.end(); ++token_to_push)
-            {
-                mNameStack.emplace_back(*token_to_push, true);
-                num_tokens_pushed++;
-            }
+            // push everything after the leading token
+            num_tokens_pushed += pushDottedName(mNameStack, childp->getName()->mString + first_dot + 1);
         }
 
         // recurse and visit children XML nodes
@@ -239,32 +226,48 @@ bool LLXUIParser::readXUIImpl(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
 
 // A parameter name is a dot separated path, but almost never has a dot in it:
 // across the shipped skin, 349 of 109204 attribute names do. Splitting one that
-// holds no separator returns the name it was given, so build the tokenizer only
-// when there is something for it to separate. Returns how many names were pushed.
-S32 LLXUIParser::pushNameTokens(const char* name)
+// holds no separator returns the name it was given, so do nothing but push it.
+//
+// The name belongs to the caller and outlives the parse, so the pieces of a
+// dotted one are runs inside it rather than copies. Note that a run is not NUL
+// terminated -- anything wanting a C string from the stack must make one.
+// Returns how many names were pushed.
+static S32 pushDottedName(LLInitParam::Parser::name_stack_t& stack, const char* name)
 {
-    if (name[0] == '\0')
+    const std::string_view whole(name);
+    if (whole.empty())
     {
         return 0;
     }
 
-    if (strchr(name, '.') == NULL)
+    if (whole.find('.') == std::string_view::npos)
     {
-        mNameStack.emplace_back(name, true);
+        stack.emplace_back(whole, true);
         return 1;
     }
 
-    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-    const boost::char_separator<char> sep(".");
-    const std::string dotted(name);
-
     S32 pushed = 0;
-    for (const std::string& token : tokenizer(dotted, sep))
+    for (std::size_t begin = 0; begin <= whole.size(); )
     {
-        mNameStack.emplace_back(token, true);
-        ++pushed;
+        const std::size_t dot = whole.find('.', begin);
+        const std::size_t end = (dot == std::string_view::npos) ? whole.size() : dot;
+        if (end > begin)
+        {
+            stack.emplace_back(whole.substr(begin, end - begin), true);
+            ++pushed;
+        }
+        if (dot == std::string_view::npos)
+        {
+            break;
+        }
+        begin = dot + 1;
     }
     return pushed;
+}
+
+S32 LLXUIParser::pushNameTokens(const char* name)
+{
+    return pushDottedName(mNameStack, name);
 }
 
 bool LLXUIParser::readAttributes(LLXMLNodePtr nodep, LLInitParam::BaseBlock& block)
@@ -324,16 +327,20 @@ LLXMLNodePtr LLXUIParser::getNode(name_stack_t& stack)
         }
 
 
-        out_nodes_t::iterator found_it = mOutNodes.find(it->first);
+        // A run inside a dotted name has no terminator of its own, so the
+        // write path materializes one. It runs for toolbars, keybindings
+        // and colors, not for building widgets.
+        const std::string name(it->first);
+        out_nodes_t::iterator found_it = mOutNodes.find(name);
 
         // node with this name not yet written
         if (found_it == mOutNodes.end() || it->second || force_new_node)
         {
             // make an attribute if we are the last element on the name stack
             bool is_attribute = next_it == stack.end();
-            LLXMLNodePtr new_node = new LLXMLNode(it->first.c_str(), is_attribute);
+            LLXMLNodePtr new_node = new LLXMLNode(name.c_str(), is_attribute);
             out_node->addChild(new_node);
-            mOutNodes[it->first] = new_node;
+            mOutNodes[name] = new_node;
             out_node = new_node;
             it->second = false;
         }
@@ -733,7 +740,8 @@ bool LLXUIParser::writeSDValue(Parser& parser, const void* val_ptr, name_stack_t
         it != mNameStack.end();
         ++it)
     {
-        full_name += it->first + "."; // build up dotted names: "button.param.nestedparam."
+        full_name.append(it->first); // build up dotted names: "button.param.nestedparam."
+        full_name += '.';
     }
 
     return full_name;
@@ -886,7 +894,8 @@ void LLSimpleXUIParser::startElement(const pugi::xml_node& element)
     }
     else
     {   // compound attribute
-        if (child_name.find('.') == std::string::npos)
+        const std::size_t first_dot = child_name.find('.');
+        if (first_dot == std::string_view::npos)
         {
             mNameStack.emplace_back(child_name, true);
             num_tokens_pushed++;
@@ -894,33 +903,19 @@ void LLSimpleXUIParser::startElement(const pugi::xml_node& element)
         }
         else
         {
-            // parse out "dotted" name into individual tokens
-            typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-            const boost::char_separator<char> sep(".");
-            tokenizer name_tokens(std::string(child_name), sep);
-
-            tokenizer::iterator name_token_it = name_tokens.begin();
-            if(name_token_it == name_tokens.end())
+            // check for proper nesting against the leading token
+            if (!mScope.empty() && child_name.substr(0, first_dot) != mScope.back())
             {
                 return;
             }
 
-            // check for proper nesting
-            if(!mScope.empty() && *name_token_it != mScope.back())
+            // push everything after the leading token
+            num_tokens_pushed += pushDottedName(mNameStack, name + first_dot + 1);
+            if (num_tokens_pushed == 0)
             {
                 return;
             }
-
-            // now ignore first token
-            ++name_token_it;
-
-            // copy remaining tokens on to our running token list
-            for(tokenizer::iterator token_to_push = name_token_it; token_to_push != name_tokens.end(); ++token_to_push)
-            {
-                mNameStack.emplace_back(*token_to_push, true);
-                num_tokens_pushed++;
-            }
-            mScope.push_back(mNameStack.back().first);
+            mScope.emplace_back(mNameStack.back().first);
         }
     }
 
@@ -968,28 +963,7 @@ void LLSimpleXUIParser::endElement()
 // As LLXUIParser::pushNameTokens, over this parser's own name stack.
 S32 LLSimpleXUIParser::pushNameTokens(const char* name)
 {
-    if (name[0] == '\0')
-    {
-        return 0;
-    }
-
-    if (strchr(name, '.') == NULL)
-    {
-        mNameStack.emplace_back(name, true);
-        return 1;
-    }
-
-    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-    const boost::char_separator<char> sep(".");
-    const std::string dotted(name);
-
-    S32 pushed = 0;
-    for (const std::string& token : tokenizer(dotted, sep))
-    {
-        mNameStack.emplace_back(token, true);
-        ++pushed;
-    }
-    return pushed;
+    return pushDottedName(mNameStack, name);
 }
 
 bool LLSimpleXUIParser::readAttributes(const pugi::xml_node& element)
@@ -1037,7 +1011,8 @@ bool LLSimpleXUIParser::processText()
         it != mNameStack.end();
         ++it)
     {
-        full_name += it->first + "."; // build up dotted names: "button.param.nestedparam."
+        full_name.append(it->first); // build up dotted names: "button.param.nestedparam."
+        full_name += '.';
     }
 
     return full_name;

@@ -478,7 +478,10 @@ namespace LLInitParam
     {
         LOG_CLASS(Parser);
     public:
-        typedef std::vector<std::pair<std::string, bool> >                  name_stack_t;
+        // Views, not strings. Every name pushed here is either a literal, a
+        // name owned by the string table, or a run inside one of those, and
+        // all of them outlive the parse that walks them.
+        typedef std::vector<std::pair<std::string_view, bool> >             name_stack_t;
         typedef std::pair<name_stack_t::iterator, name_stack_t::iterator>   name_stack_range_t;
 
         typedef bool (*parser_read_func_t)(Parser& parser, void* output);
@@ -1431,7 +1434,7 @@ namespace LLInitParam
                 ++it)
             {
                 const std::string& key = it->getValueName();
-                name_stack.emplace_back(std::string(), true);
+                name_stack.emplace_back(std::string_view(), true);
 
                 bool element_written = false;
                 if(key.empty())
@@ -1680,7 +1683,7 @@ namespace LLInitParam
                 it != end_it;
                 ++it)
             {
-                name_stack.emplace_back(std::string(), true);
+                name_stack.emplace_back(std::string_view(), true);
 
                 const std::string& key = it->getValueName();
                 if (!key.empty())

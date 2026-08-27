@@ -361,7 +361,7 @@ namespace LLInitParam
                     continue;
                 }
 
-                name_stack.emplace_back(std::string(pair.first), true);
+                name_stack.emplace_back(pair.first, true);
                 const Param* diff_param = diff_block ? diff_block->getParamFromHandle(param_handle) : NULL;
                 serialized |= serialize_func(*param, parser, name_stack, predicate_rule, diff_param);
                 name_stack.pop_back();
@@ -387,7 +387,7 @@ namespace LLInitParam
 
         if (names_left)
         {
-            const std::string& top_name = name_stack_range.first->first;
+            const std::string_view top_name = name_stack_range.first->first;
 
             BlockDescriptor::param_map_t::iterator found_it = block_data.mNamedParams.find(top_name);
             if (found_it != block_data.mNamedParams.end())

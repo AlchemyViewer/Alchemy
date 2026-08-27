@@ -111,7 +111,10 @@ void LLParamSDParser::writeSDImpl(LLSD& sd, const LLInitParam::BaseBlock& block,
     std::string full_name = "sd";
     for (name_stack_t::value_type& stack_pair : mNameStack)
     {
-        full_name += llformat("[%s]", stack_pair.first.c_str());
+        // A view is not NUL terminated; this runs only when reporting a
+        // parse problem, so building a string for it costs nothing that
+        // matters.
+        full_name += llformat("[%.*s]", (int)stack_pair.first.size(), stack_pair.first.data());
     }
 
     return full_name;
@@ -237,7 +240,7 @@ LLSD& LLParamSDParserUtilities::getSDWriteNode(LLSD& input, LLInitParam::Parser:
         }
         else
         {
-            sd_to_write = &(*sd_to_write)[it->first];
+            sd_to_write = &(*sd_to_write)[std::string(it->first)];
         }
         it->second = false;
     }
@@ -254,7 +257,7 @@ void LLParamSDParserUtilities::readSDValues(read_sd_cb_t cb, const LLSD& sd, LLI
             it != sd.endMap();
             ++it)
         {
-            stack.push_back(make_pair(it->first, true));
+            stack.emplace_back(std::string_view(it->first), true);
             readSDValues(cb, it->second, stack);
             stack.pop_back();
         }
@@ -265,7 +268,7 @@ void LLParamSDParserUtilities::readSDValues(read_sd_cb_t cb, const LLSD& sd, LLI
             it != sd.endArray();
             ++it)
         {
-            stack.push_back(make_pair(std::string(), true));
+            stack.emplace_back(std::string_view(), true);
             readSDValues(cb, *it, stack);
             stack.pop_back();
         }
