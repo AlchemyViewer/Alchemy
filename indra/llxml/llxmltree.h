@@ -138,24 +138,26 @@ public:
     bool            getFastAttributeUUID(       LLStdStringHandle cannonical_name, LLUUID& value );
     bool            getFastAttributeString(     LLStdStringHandle cannonical_name, std::string& value );
 
-    // Normal versions find 'name' in LLXmlTree::sAttributeKeys then call fast versions
-    virtual bool        getAttributeBOOL(       std::string_view name, bool& value );
-    virtual bool        getAttributeU8(         std::string_view name, U8& value );
-    virtual bool        getAttributeS8(         std::string_view name, S8& value );
-    virtual bool        getAttributeU16(        std::string_view name, U16& value );
-    virtual bool        getAttributeS16(        std::string_view name, S16& value );
-    virtual bool        getAttributeU32(        std::string_view name, U32& value );
-    virtual bool        getAttributeS32(        std::string_view name, S32& value );
-    virtual bool        getAttributeF32(        std::string_view name, F32& value );
-    virtual bool        getAttributeF64(        std::string_view name, F64& value );
-    virtual bool        getAttributeColor(      std::string_view name, LLColor4& value );
-    virtual bool        getAttributeColor4(     std::string_view name, LLColor4& value );
-    virtual bool        getAttributeColor4U(    std::string_view name, LLColor4U& value );
-    virtual bool        getAttributeVector3(    std::string_view name, LLVector3& value );
-    virtual bool        getAttributeVector3d(   std::string_view name, LLVector3d& value );
-    virtual bool        getAttributeQuat(       std::string_view name, LLQuaternion& value );
-    virtual bool        getAttributeUUID(       std::string_view name, LLUUID& value );
-    virtual bool        getAttributeString(     std::string_view name, std::string& value );
+    // Normal versions find 'name' in LLXmlTree::sAttributeKeys then call
+    // the fast versions. Not virtual: nothing derives from this class, and
+    // the tree hands out LLXmlTreeNode* rather than anything to dispatch on.
+    bool                getAttributeBOOL(       std::string_view name, bool& value );
+    bool                getAttributeU8(         std::string_view name, U8& value );
+    bool                getAttributeS8(         std::string_view name, S8& value );
+    bool                getAttributeU16(        std::string_view name, U16& value );
+    bool                getAttributeS16(        std::string_view name, S16& value );
+    bool                getAttributeU32(        std::string_view name, U32& value );
+    bool                getAttributeS32(        std::string_view name, S32& value );
+    bool                getAttributeF32(        std::string_view name, F32& value );
+    bool                getAttributeF64(        std::string_view name, F64& value );
+    bool                getAttributeColor(      std::string_view name, LLColor4& value );
+    bool                getAttributeColor4(     std::string_view name, LLColor4& value );
+    bool                getAttributeColor4U(    std::string_view name, LLColor4U& value );
+    bool                getAttributeVector3(    std::string_view name, LLVector3& value );
+    bool                getAttributeVector3d(   std::string_view name, LLVector3d& value );
+    bool                getAttributeQuat(       std::string_view name, LLQuaternion& value );
+    bool                getAttributeUUID(       std::string_view name, LLUUID& value );
+    bool                getAttributeString(     std::string_view name, std::string& value );
 
     const std::string& getContents()
     {
