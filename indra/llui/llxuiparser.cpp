@@ -36,8 +36,13 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <charconv>
+#include <cstdlib>
 #include <fstream>
+#if LL_DARWIN
+#include <xlocale.h>
+#endif
 #include <vector>
 
 #include "lluicolor.h"
@@ -1099,6 +1104,74 @@ namespace
         return p;
     }
 
+    // libc++ marks the floating-point from_chars overloads unavailable before
+    // macOS 26, so a lower deployment target falls back to strtof/strtod. The
+    // checks below reject what strtod takes and from_chars does not: leading
+    // whitespace, a leading '+', and the hex form.
+#if defined(_LIBCPP_AVAILABILITY_HAS_FROM_CHARS_FLOATING_POINT) && !_LIBCPP_AVAILABILITY_HAS_FROM_CHARS_FLOATING_POINT
+
+    template <typename T>
+    std::from_chars_result fromChars(const char* begin, const char* end, T& out)
+        requires std::is_floating_point_v<T>
+    {
+        if (begin == end || std::isspace(static_cast<unsigned char>(*begin)) || *begin == '+')
+        {
+            return {begin, std::errc::invalid_argument};
+        }
+
+        const char* digits = (*begin == '-') ? begin + 1 : begin;
+        if (end - digits > 1 && digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X'))
+        {
+            return {begin, std::errc::invalid_argument};
+        }
+
+        // Safe: the text comes from std::string::data(), NUL-terminated at
+        // `end`, and strtod stops at the first character it cannot use.
+        char* stop = nullptr;
+        errno = 0;
+
+        // _l forms: from_chars ignores LC_NUMERIC, plain strtod does not.
+        // strtof, not narrowing: float overflow sets ERANGE in neither call.
+        T value{};
+        if constexpr (std::is_same_v<T, float>)
+        {
+            value = strtof_l(begin, &stop, LC_C_LOCALE);
+        }
+        else
+        {
+            value = static_cast<T>(strtod_l(begin, &stop, LC_C_LOCALE));
+        }
+
+        if (stop == begin || stop > end)
+        {
+            return {begin, std::errc::invalid_argument};
+        }
+        if (errno == ERANGE)
+        {
+            return {stop, std::errc::result_out_of_range};
+        }
+
+        out = value;
+        return {stop, std::errc{}};
+    }
+
+    template <typename T>
+    std::from_chars_result fromChars(const char* begin, const char* end, T& out)
+        requires (!std::is_floating_point_v<T>)
+    {
+        return std::from_chars(begin, end, out);
+    }
+
+#else
+
+    template <typename T>
+    std::from_chars_result fromChars(const char* begin, const char* end, T& out)
+    {
+        return std::from_chars(begin, end, out);
+    }
+
+#endif
+
     template <typename T>
     bool parseWholeValue(const std::string& text, T& out)
     {
@@ -1108,7 +1181,7 @@ namespace
         {
             ++begin;
         }
-        const std::from_chars_result result = std::from_chars(begin, end, out);
+        const std::from_chars_result result = fromChars(begin, end, out);
         return result.ec == std::errc{} && result.ptr == end;
     }
 
@@ -1125,7 +1198,7 @@ namespace
             {
                 ++p;
             }
-            const std::from_chars_result result = std::from_chars(p, end, value.mV[i]);
+            const std::from_chars_result result = fromChars(p, end, value.mV[i]);
             if (result.ec != std::errc{})
             {
                 return false;
