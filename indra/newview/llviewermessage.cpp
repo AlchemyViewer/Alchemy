@@ -1654,6 +1654,11 @@ void LLOfferInfo::handleRespond(const LLSD& notification, const LLSD& response)
     mRespondFunctions[name](notification, response);
 }
 
+static std::string no_link(const std::string& text)
+{
+    return "<nolink>" + text + "</nolink>";
+}
+
 bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD& response)
 {
     LLChat chat;
@@ -1767,7 +1772,7 @@ bool LLOfferInfo::inventory_offer_callback(const LLSD& notification, const LLSD&
         //don't spam them if they are getting flooded
         if (check_offer_throttle(mFromName, true))
         {
-            log_message = "<nolink>" + chatHistory_string + "</nolink> " + LLTrans::getString("InvOfferGaveYou") + " " + getSanitizedDescription() + LLTrans::getString(".");
+            log_message = no_link(chatHistory_string) + " " + LLTrans::getString("InvOfferGaveYou") + " " + getSanitizedDescription() + LLTrans::getString(".");
             LLSD args;
             args["MESSAGE"] = log_message;
             LLNotificationsUtil::add("SystemMessageTip", args);
@@ -1900,16 +1905,16 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
                     quot + mFromName + quot + " " +
                     LLTrans::getString("InvOfferOwnedByGroup") + " " +
                     quot + group_name + quot;
-                chatHistory_string = mFromName + " " +
+                chatHistory_string = no_link(mFromName) + " " +
                     LLTrans::getString("InvOfferOwnedByGroup") + " " +
-                    quot + group_name + quot;
+                    quot + no_link(group_name) + quot;
             }
             else
             {
                 from_string = LLTrans::getString("InvOfferAnObjectNamed") + " " +
                     quot + mFromName + quot + " " +
                     LLTrans::getString("InvOfferOwnedByUnknownGroup");
-                chatHistory_string = mFromName + " " +
+                chatHistory_string = no_link(mFromName) + " " +
                     LLTrans::getString("InvOfferOwnedByUnknownGroup");
             }
         }
@@ -1948,13 +1953,14 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
 
             from_string = LLTrans::getString("InvOfferAnObjectNamed") + " "+ LLTrans::getString("'") + mFromName
                 + LLTrans::getString("'")+" " + LLTrans::getString("InvOfferOwnedBy") + name_slurl;
-            chatHistory_string = mFromName + " " + LLTrans::getString("InvOfferOwnedBy") + " " + name_slurl;
+            chatHistory_string = no_link(mFromName) + " " + LLTrans::getString("InvOfferOwnedBy") + " " + name_slurl;
 // [/SL:KB]
         }
     }
     else
     {
-        from_string = chatHistory_string = mFromName;
+        from_string = mFromName;
+        chatHistory_string = no_link(mFromName);
     }
 
     LLUUID destination;
@@ -1996,7 +2002,7 @@ bool LLOfferInfo::inventory_task_offer_callback(const LLSD& notification, const 
             //don't spam user if flooded
             if (check_offer_throttle(mFromName, true))
             {
-                log_message = "<nolink>" + chatHistory_string + "</nolink> " + LLTrans::getString("InvOfferGaveYou") + " " + getSanitizedDescription() + LLTrans::getString(".");
+                log_message = chatHistory_string + " " + LLTrans::getString("InvOfferGaveYou") + " " + getSanitizedDescription() + LLTrans::getString(".");
                 LLSD args;
                 args["MESSAGE"] = log_message;
                 LLNotificationsUtil::add("SystemMessageTip", args);
