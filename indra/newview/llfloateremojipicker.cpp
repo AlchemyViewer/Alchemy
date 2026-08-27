@@ -273,7 +273,7 @@ protected:
         {
             LLWString text = mTitle.substr(0, mBegin);
             font->render(
-                text.c_str(),                          // text
+                text,                          // text
                 0,                             // begin_offset
                 x0,                            // x
                 y,                             // y
@@ -284,7 +284,7 @@ protected:
                 LLFontGL::DROP_SHADOW_SOFT,    // shadow
                 static_cast<S32>(text.size()), // max_chars
                 (S32)x1);                      // max_pixels
-            F32 dx = font->getWidthF32(text.c_str());
+            F32 dx = font->getWidthF32(text);
             x0 += dx;
             x1 -= dx;
         }
@@ -303,7 +303,7 @@ protected:
                 LLFontGL::DROP_SHADOW_SOFT,    // shadow
                 static_cast<S32>(text.size()), // max_chars
                 (S32)x1);                      // max_pixels
-            F32 dx = font->getWidthF32(text.c_str());
+            F32 dx = font->getWidthF32(text);
             x0 += dx;
             x1 -= dx;
         }

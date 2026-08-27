@@ -324,8 +324,8 @@ namespace tut
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font resolves", font != nullptr);
         LLWString s = utf8str_to_wstring("Hello");
-        const F32 wfull = font->getWidthF32(s.c_str());
-        const F32 wexp  = font->getWidthF32(s.c_str(), 0,
+        const F32 wfull = font->getWidthF32(s);
+        const F32 wexp  = font->getWidthF32(s, 0,
                                             (S32)s.size(), false);
         ensure("getWidthF32 with default max == explicit max",
                wfull == wexp);
@@ -348,9 +348,9 @@ namespace tut
         LLWString a   = utf8str_to_wstring("A");
         LLWString aa  = utf8str_to_wstring("AA");
         LLWString aaa = utf8str_to_wstring("AAA");
-        const F32 w1 = font->getWidthF32(a.c_str());
-        const F32 w2 = font->getWidthF32(aa.c_str());
-        const F32 w3 = font->getWidthF32(aaa.c_str());
+        const F32 w1 = font->getWidthF32(a);
+        const F32 w2 = font->getWidthF32(aa);
+        const F32 w3 = font->getWidthF32(aaa);
         ensure("width(A) > 0",      w1 > 0.f);
         ensure("width(AA) > width(A)",   w2 > w1);
         ensure("width(AAA) > width(AA)", w3 > w2);
@@ -370,7 +370,7 @@ namespace tut
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font resolves", font != nullptr);
         LLWString dots = utf8str_to_wstring("....");
-        const F32 w = font->getWidthF32(dots.c_str());
+        const F32 w = font->getWidthF32(dots);
         ensure("ellipsis width is positive", w > 0.f);
     }
 
@@ -389,18 +389,18 @@ namespace tut
         LLWString s = utf8str_to_wstring("Hello");
 
         ensure_equals("budget 0 fits 0 chars",
-                      font->maxDrawableChars(s.c_str(), 0.f, (S32)s.size()),
+                      font->maxDrawableChars(s, 0.f, (S32)s.size()),
                       (S32)0);
         ensure_equals("budget F32_MAX fits all chars",
-                      font->maxDrawableChars(s.c_str(), F32_MAX,
+                      font->maxDrawableChars(s, F32_MAX,
                                              (S32)s.size()),
                       (S32)s.size());
         // Find a budget that should fit "Hel" but not "Hell".
-        const F32 w_hel  = font->getWidthF32(s.c_str(), 0, 3, false);
-        const F32 w_hell = font->getWidthF32(s.c_str(), 0, 4, false);
+        const F32 w_hel  = font->getWidthF32(s, 0, 3, false);
+        const F32 w_hell = font->getWidthF32(s, 0, 4, false);
         // Budget halfway between produces partial fit.
         const F32 mid_budget = (w_hel + w_hell) * 0.5f;
-        const S32 fit = font->maxDrawableChars(s.c_str(), mid_budget,
+        const S32 fit = font->maxDrawableChars(s, mid_budget,
                                                (S32)s.size());
         ensure("partial-budget fit is in [3, 3] (Hel exactly)",
                fit == 3);
@@ -423,8 +423,8 @@ namespace tut
         // Compare pixel→char inverse for each prefix length 0..5.
         for (S32 i = 0; i <= (S32)s.size(); ++i)
         {
-            const F32 w = font->getWidthF32(s.c_str(), 0, i, false);
-            const S32 cp = font->charFromPixelOffset(s.c_str(), 0,
+            const F32 w = font->getWidthF32(s, 0, i, false);
+            const S32 cp = font->charFromPixelOffset(s, 0,
                                                      w,
                                                      F32_MAX,
                                                      (S32)s.size(),
@@ -459,9 +459,9 @@ namespace tut
         LLWString c_s(c_arr, 1);
         LLWString ac_s(ac_arr, 2);
 
-        const F32 wa = font->getWidthF32(a_s.c_str());
-        const F32 wc = font->getWidthF32(c_s.c_str());
-        const F32 wac = font->getWidthF32(ac_s.c_str());
+        const F32 wa = font->getWidthF32(a_s);
+        const F32 wc = font->getWidthF32(c_s);
+        const F32 wac = font->getWidthF32(ac_s);
         if (wc == 0.f)
             skip("font's fallback chain doesn't cover U+4F60");
         // Tolerance: ~0.5 px accounts for sub-pixel positioning across
@@ -494,7 +494,7 @@ namespace tut
                                 0xFE0F, L'Y', 0 };
         LLWString s(arr, 7);
 
-        const F32 wfull = font->getWidthF32(s.c_str(), 0, 7, false);
+        const F32 wfull = font->getWidthF32(s, 0, 7, false);
         if (wfull <= 0.f)
             skip("emoji fallback not available");
 
@@ -502,8 +502,8 @@ namespace tut
         // cluster start (1) by at least a few pixels — otherwise the
         // emoji didn't actually shape and the cluster-snap test below
         // would trivially pass on an unrendered glyph.
-        const F32 w_pre  = font->getWidthF32(s.c_str(), 0, 1, false);
-        const F32 w_post = font->getWidthF32(s.c_str(), 0, 6, false);
+        const F32 w_pre  = font->getWidthF32(s, 0, 1, false);
+        const F32 w_post = font->getWidthF32(s, 0, 6, false);
         if (w_post - w_pre < 2.f)
             skip("emoji cluster did not shape to a measurable glyph");
 
@@ -515,7 +515,7 @@ namespace tut
         for (F32 x = cluster_left - 1.f; x <= cluster_right + 1.f;
              x += 0.25f)
         {
-            const S32 cp = font->charFromPixelOffset(s.c_str(), 0,
+            const S32 cp = font->charFromPixelOffset(s, 0,
                                                      x, F32_MAX,
                                                      7, /*round=*/true);
             const bool inside_cluster = (cp >= 2 && cp <= 5);

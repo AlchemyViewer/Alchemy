@@ -442,7 +442,7 @@ void LLPanelEmojiComplete::updateConstraints()
     mRenderRect = getLocalRect();
 
     static const LLWString emojiForSize = LLWString(U"🏳️‍🌈"); // This emoji consists of 4 code points and is one of the widest emojis
-    mEmojiWidth = (U16)(mIconFont->getWidthF32(emojiForSize.c_str()) + mPadding * 2);
+    mEmojiWidth = (U16)(mIconFont->getWidthF32(emojiForSize) + mPadding * 2);
     if (mVertical)
     {
         mEmojiHeight = mIconFont->getLineHeight() + mPadding * 2;

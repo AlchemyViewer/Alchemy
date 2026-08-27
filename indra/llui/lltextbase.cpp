@@ -4268,7 +4268,7 @@ bool LLNormalTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& w
         height = font->getLineSpacing();
 
         const LLWString& text = getWText();
-        width += mFontWidthBuffer.getWidth(font, text.c_str(), mStart + first_char, num_chars, true);
+        width += mFontWidthBuffer.getWidth(font, text, mStart + first_char, num_chars, true);
     }
     // if last character is a newline, then return true, forcing line break
     return false;
@@ -4277,7 +4277,7 @@ bool LLNormalTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& w
 S32 LLNormalTextSegment::getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const
 {
     const LLWString &text = getWText();
-    return mStyle->getFont()->charFromPixelOffset(text.c_str(), mStart + start_offset,
+    return mStyle->getFont()->charFromPixelOffset(text, mStart + start_offset,
                                                (F32)segment_local_x_coord,
                                                F32_MAX,
                                                num_chars,
@@ -4320,7 +4320,11 @@ S32 LLNormalTextSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 lin
             << getLength() << "\tsegment_offset:\t" << segment_offset << "\tmStart:\t" << mStart << "\tsegments\t" << mEditor.mSegments.size() << LL_ENDL;
     }
 
-    S32 num_chars = mStyle->getFont()->maxDrawableChars( text.c_str() + (segment_offset + mStart),
+    // Clamp rather than substr() straight from (segment_offset + mStart): the
+    // diagnostic above fires precisely when that runs past the text, and a view
+    // would throw there where the old pointer arithmetic quietly walked off.
+    const size_t seg_begin = llmin((size_t)llmax(segment_offset + mStart, 0), text.length());
+    S32 num_chars = mStyle->getFont()->maxDrawableChars( LLWStringView(text).substr(seg_begin),
                                                 (F32)num_pixels,
                                                 max_chars,
                                                 word_wrap_style);

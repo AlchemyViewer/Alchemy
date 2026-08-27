@@ -150,17 +150,22 @@ public:
     S32 getLineHeight() const;     // ascender + descender (no line gap)
     S32 getLineSpacing() const;    // face->height — full baseline-to-baseline distance (includes line gap)
 
+    // The wide forms carry their own length, so a caller measuring part of a
+    // string passes a subview rather than a pointer plus a character budget the
+    // callee cannot check. A bare llwchar* still converts (it is what U"..."
+    // literals are), scanning to its terminator for the bound.
     S32 getWidth(const std::string& utf8text) const;
-    S32 getWidth(const llwchar* wchars) const;
+    S32 getWidth(LLWStringView wchars) const;
     S32 getWidth(const std::string& utf8text, S32 offset, S32 max_chars) const;
-    S32 getWidth(const llwchar* wchars, S32 offset, S32 max_chars) const;
+    S32 getWidth(LLWStringView wchars, S32 offset, S32 max_chars) const;
 
     F32 getWidthF32(const std::string& utf8text) const;
-    F32 getWidthF32(const llwchar* wchars) const;
+    F32 getWidthF32(LLWStringView wchars) const;
     F32 getWidthF32(const std::string& text, S32 offset, S32 max_chars) const;
-    F32 getWidthF32(const llwchar* wchars, S32 offset, S32 max_chars, bool no_padding = false) const;
+    F32 getWidthF32(LLWStringView wchars, S32 offset, S32 max_chars, bool no_padding = false) const;
 
-    // The following are called often, frequently with large buffers, so do not use a string interface
+    // The following are called often, frequently with large buffers, so do not take
+    // an owning string
 
     // Returns the max number of complete characters from text (up to max_chars) that can be drawn in max_pixels
     typedef enum e_word_wrap_style
@@ -169,14 +174,14 @@ public:
         WORD_BOUNDARY_IF_POSSIBLE,
         ANYWHERE
     } EWordWrapStyle ;
-    S32 maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_chars = S32_MAX, EWordWrapStyle end_on_word_boundary = ANYWHERE) const;
+    S32 maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_chars = S32_MAX, EWordWrapStyle end_on_word_boundary = ANYWHERE) const;
 
     // Returns the index of the first complete characters from text that can be drawn in max_pixels
     // given that the character at start_pos should be the last character (or as close to last as possible).
-    S32 firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_len, S32 start_pos=S32_MAX, S32 max_chars = S32_MAX) const;
+    S32 firstDrawableChar(LLWStringView wchars, F32 max_pixels, S32 start_pos=S32_MAX, S32 max_chars = S32_MAX) const;
 
     // Returns the index of the character closest to pixel position x (ignoring text to the right of max_pixels and max_chars)
-    S32 charFromPixelOffset(const llwchar* wchars, S32 char_offset, F32 x, F32 max_pixels=F32_MAX, S32 max_chars = S32_MAX, bool round = true) const;
+    S32 charFromPixelOffset(LLWStringView wchars, S32 char_offset, F32 x, F32 max_pixels=F32_MAX, S32 max_chars = S32_MAX, bool round = true) const;
 
     const LLFontDescriptor& getFontDesc() const;
 

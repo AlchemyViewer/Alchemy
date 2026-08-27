@@ -322,13 +322,13 @@ void LLConsole::Paragraph::updateLines(F32 screen_width, const LLFontGL* font, b
             skip_chars = 0;
         }
 
-        U32 drawable = font->maxDrawableChars(mParagraphText.c_str()+paragraph_offset, screen_width, static_cast<S32>(line_end) - paragraph_offset, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+        U32 drawable = font->maxDrawableChars(LLWStringView(mParagraphText).substr(paragraph_offset), screen_width, static_cast<S32>(line_end) - paragraph_offset, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
 
         if (drawable != 0)
         {
             F32 x_position = 0;                     //Screen X position of text.
 
-            mMaxWidth = llmax( mMaxWidth, (F32)font->getWidth( mParagraphText.substr( paragraph_offset, drawable ).c_str() ) );
+            mMaxWidth = llmax( mMaxWidth, (F32)font->getWidth( LLWStringView(mParagraphText).substr( paragraph_offset, drawable ) ) );
             Line line;
 
             U32 left_to_draw = drawable;
@@ -342,7 +342,7 @@ void LLConsole::Paragraph::updateLines(F32 screen_width, const LLFontGL* font, b
                                                 (*current_color).mColor,
                                                 x_position ) );
 
-                x_position += font->getWidth( color_text.c_str() ); //Set up next screen position.
+                x_position += font->getWidth( color_text ); //Set up next screen position.
 
                 drawn += current_color_length;
                 left_to_draw -= current_color_length;

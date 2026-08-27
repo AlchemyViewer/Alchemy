@@ -526,12 +526,12 @@ bool LLLineEditor::dragSelectCursorTo(S32 local_mouse_x)
         // Use the rendered text (asterisks in password mode) so widths match
         // what the mouse is actually hitting on screen.
         LLWString asterix_text;
-        const llwchar* wtext = text.c_str();
+        LLWStringView wtext = text;
         if (mDrawAsterixes)
         {
             for (S32 i = 0; i < mText.length(); i++)
                 asterix_text += utf8str_to_wstring(PASSWORD_ASTERISK);
-            wtext = asterix_text.c_str();
+            wtext = asterix_text;
         }
         const S32 left_offset = (S32)range.first - mScrollHPos;
         const S32 cluster_left_px = mTextLeftEdge
@@ -593,12 +593,13 @@ void LLLineEditor::setCursor( S32 pos )
     S32 pixels_after_scroll = findPixelNearestPos();
     if( pixels_after_scroll > mTextRightEdge )
     {
-        S32 width_chars_to_left = mGLFont->getWidth(mText.getWString().c_str(), 0, mScrollHPos);
-        S32 last_visible_char = mGLFont->maxDrawableChars(mText.getWString().c_str(), llmax(0.f, (F32)(mTextRightEdge - mTextLeftEdge + width_chars_to_left)));
+        S32 width_chars_to_left = mGLFont->getWidth(mText.getWString(), 0, mScrollHPos);
+        S32 last_visible_char = mGLFont->maxDrawableChars(mText.getWString(), llmax(0.f, (F32)(mTextRightEdge - mTextLeftEdge + width_chars_to_left)));
         // character immediately to left of cursor should be last one visible (SCROLL_INCREMENT_ADD will scroll in more characters)
         // or first character if cursor is at beginning
         S32 new_last_visible_char = llmax(0, getCursor() - 1);
-        S32 min_scroll = mGLFont->firstDrawableChar(mText.getWString().c_str(), (F32)(mTextRightEdge - mTextLeftEdge), mText.length(), new_last_visible_char);
+        // The view supplies what the pointer form was told via text_len (mText.length()).
+        S32 min_scroll = mGLFont->firstDrawableChar(mText.getWString(), (F32)(mTextRightEdge - mTextLeftEdge), new_last_visible_char);
         if (old_cursor_pos == last_visible_char)
         {
             mScrollHPos = llmin(mText.length(), llmax(min_scroll, mScrollHPos + SCROLL_INCREMENT_ADD));
@@ -2176,7 +2177,7 @@ void LLLineEditor::draw()
             LLColor4 color = mHighlightColor;
             color.setAlpha(alpha);
             // selected middle
-            S32 width = mGLFont->getWidth(mText.getWString().c_str(), mScrollHPos + rendered_text, select_right - mScrollHPos - rendered_text);
+            S32 width = mGLFont->getWidth(mText.getWString(), mScrollHPos + rendered_text, select_right - mScrollHPos - rendered_text);
             width = llmin(width, mTextRightEdge - ll_round(rendered_pixels_right));
             gl_rect_2d(ll_round(rendered_pixels_right), cursor_top, ll_round(rendered_pixels_right)+width, cursor_bottom, color);
 
@@ -2338,7 +2339,7 @@ void LLLineEditor::draw()
                 if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode() && !hasSelection())
                 {
                     S32 wswidth = mGLFont->getWidth(U" ");
-                    S32 width = mGLFont->getWidth(mText.getWString().c_str(), getCursor(), 1) + 1;
+                    S32 width = mGLFont->getWidth(mText.getWString(), getCursor(), 1) + 1;
                     cursor_right = cursor_left + llmax(wswidth, width);
                 }
                 // Use same color as text for the Cursor
@@ -2424,21 +2425,21 @@ void LLLineEditor::draw()
 S32 LLLineEditor::findPixelNearestPos(const S32 cursor_offset) const
 {
     S32 dpos = getCursor() - mScrollHPos + cursor_offset;
-    S32 result = mGLFont->getWidth(mText.getWString().c_str(), mScrollHPos, dpos) + mTextLeftEdge;
+    S32 result = mGLFont->getWidth(mText.getWString(), mScrollHPos, dpos) + mTextLeftEdge;
     return result;
 }
 
 S32 LLLineEditor::calcCursorPos(S32 mouse_x)
 {
-    const llwchar* wtext = mText.getWString().c_str();
     LLWString asterix_text;
+    LLWStringView wtext = mText.getWString();
     if (mDrawAsterixes)
     {
         for (S32 i = 0; i < mText.length(); i++)
         {
             asterix_text += utf8str_to_wstring(PASSWORD_ASTERISK);
         }
-        wtext = asterix_text.c_str();
+        wtext = asterix_text;
     }
 
     S32 cur_pos = mScrollHPos +

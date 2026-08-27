@@ -642,7 +642,7 @@ void LLHUDEffectLookAt::render()
                 *fontp,
                 LLFontGL::NORMAL,
                 LLFontGL::NO_SHADOW,
-                -0.5f * fontp->getWidthF32(wstr.c_str()),
+                -0.5f * fontp->getWidthF32(wstr),
                 0.0f,
                 (*mAttentions)[mTargetType].mColor,
                 false

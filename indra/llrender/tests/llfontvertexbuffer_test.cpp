@@ -217,9 +217,9 @@ namespace tut
         LLWString s = utf8str_to_wstring("Hello");
 
         LLFontWidthBuffer wb;
-        const F32 first  = wb.getWidth(font, s.c_str(), 0, 5, false);
-        const F32 second = wb.getWidth(font, s.c_str(), 0, 5, false);
-        const F32 ref    = font->getWidthF32(s.c_str(), 0, 5, false);
+        const F32 first  = wb.getWidth(font, s, 0, 5, false);
+        const F32 second = wb.getWidth(font, s, 0, 5, false);
+        const F32 ref    = font->getWidthF32(s, 0, 5, false);
         ensure("first width matches getWidthF32", first == ref);
         ensure("second call same as first (cache hit)",
                second == first);
@@ -239,10 +239,10 @@ namespace tut
         LLWString s = utf8str_to_wstring("Hello");
 
         LLFontWidthBuffer wb;
-        const F32 w_5 = wb.getWidth(font, s.c_str(), 0, 5, false);
-        const F32 w_3 = wb.getWidth(font, s.c_str(), 0, 3, false);
+        const F32 w_5 = wb.getWidth(font, s, 0, 5, false);
+        const F32 w_3 = wb.getWidth(font, s, 0, 3, false);
         ensure("width(5) > width(3)", w_5 > w_3);
-        const F32 w_3_again = wb.getWidth(font, s.c_str(), 0, 3, false);
+        const F32 w_3_again = wb.getWidth(font, s, 0, 3, false);
         ensure_equals("identical max_chars hits cache", w_3_again, w_3);
     }
 
@@ -260,9 +260,9 @@ namespace tut
         const F32 saved_scale = LLFontGL::sScaleX;
         LLFontWidthBuffer wb;
         LLFontGL::sScaleX = 1.0f;
-        const F32 w_1 = wb.getWidth(font, s.c_str(), 0, 2, false);
+        const F32 w_1 = wb.getWidth(font, s, 0, 2, false);
         LLFontGL::sScaleX = 0.5f;
-        const F32 w_half = wb.getWidth(font, s.c_str(), 0, 2, false);
+        const F32 w_half = wb.getWidth(font, s, 0, 2, false);
         LLFontGL::sScaleX = saved_scale; // restore
 
         // Width should scale roughly with sScaleX (within FP rounding
@@ -284,12 +284,12 @@ namespace tut
         LLWString s = utf8str_to_wstring("Hi");
 
         LLFontWidthBuffer wb;
-        const F32 first = wb.getWidth(font, s.c_str(), 0, 2, false);
+        const F32 first = wb.getWidth(font, s, 0, 2, false);
         // Force a generation tick by rasterizing a fresh glyph through
         // the font (atlas allocation bumps the global counter).
         font->getFontFreetype()->getGlyphInfo(L'É', // 'É'
                                               EFontGlyphType::Grayscale);
-        const F32 second = wb.getWidth(font, s.c_str(), 0, 2, false);
+        const F32 second = wb.getWidth(font, s, 0, 2, false);
         // Width value itself doesn't change, but the cache should have
         // recomputed: not directly observable except via the strider
         // path. The "no crash + same value" assertion exercises the
@@ -310,9 +310,9 @@ namespace tut
         LLWString s = utf8str_to_wstring("Hi");
 
         LLFontWidthBuffer wb;
-        const F32 first = wb.getWidth(font, s.c_str(), 0, 2, false);
+        const F32 first = wb.getWidth(font, s, 0, 2, false);
         wb.reset();
-        const F32 after = wb.getWidth(font, s.c_str(), 0, 2, false);
+        const F32 after = wb.getWidth(font, s, 0, 2, false);
         ensure_equals("width stable across reset()", first, after);
     }
 
@@ -328,9 +328,9 @@ namespace tut
         LLWString s = utf8str_to_wstring("Hi");
 
         LLFontWidthBuffer a, b;
-        const F32 wa = a.getWidth(font, s.c_str(), 0, 2, false);
+        const F32 wa = a.getWidth(font, s, 0, 2, false);
         a.reset();
-        const F32 wb_val = b.getWidth(font, s.c_str(), 0, 2, false);
+        const F32 wb_val = b.getWidth(font, s, 0, 2, false);
         ensure_equals("instance B unaffected by A's reset", wa, wb_val);
     }
 

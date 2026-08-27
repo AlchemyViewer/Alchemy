@@ -478,13 +478,13 @@ void LLFontWidthBuffer::reset()
 
 F32 LLFontWidthBuffer::getWidth(
     const LLFontGL* fontp,
-    const llwchar* wchars,
+    LLWStringView wchars,
     S32 begin_offset,
     S32 max_chars,
     bool no_padding)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    if (!fontp || !wchars)
+    if (!fontp || wchars.empty())
     {
         return 0.f;
     }

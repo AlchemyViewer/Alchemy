@@ -190,7 +190,7 @@ public:
     void reset();
 
     F32 getWidth(const LLFontGL* fontp,
-        const llwchar* wchars,
+        LLWStringView wchars,
         S32 begin_offset,
         S32 max_chars,
         bool no_padding);

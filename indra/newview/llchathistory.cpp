@@ -911,7 +911,7 @@ public:
         {
             LLTextBox* user_name = getChild<LLTextBox>("user_name");
             const LLWString& text = user_name->getWText();
-            mMinUserNameWidth = mUserNameFont->getWidth(text.c_str()) + PADDING;
+            mMinUserNameWidth = mUserNameFont->getWidth(text) + PADDING;
         }
     }
 

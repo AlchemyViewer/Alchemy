@@ -241,7 +241,7 @@ void LLBadge::draw()
             bool do_not_use_ellipses = false;
 
             F32 badge_width = (2.0f * mPaddingHoriz) +
-                mGLFont->getWidthF32(mLabel.getWString().c_str(), badge_label_begin_offset, badge_char_length);
+                mGLFont->getWidthF32(mLabel.getWString(), badge_label_begin_offset, badge_char_length);
 
             F32 badge_height = (2.0f * mPaddingVert) + mGLFont->getLineHeight();
 

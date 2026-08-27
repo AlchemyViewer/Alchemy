@@ -425,14 +425,18 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                 // "QualityAssurance AssuresQuality1" will end up as "QualityAssurance AssuresQua..." because we are enforcing single line
                 do
                 {
-                    auto segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
+                    // Measure against a view of the token's tail. substr() on the
+                    // token itself would heap-allocate a whole LLWString on every
+                    // pass just to hand the font a pointer.
+                    const LLWStringView tail = LLWStringView(*iter).substr(line_length);
+                    auto segment_length = font->maxDrawableChars(tail, max_pixels, S32_MAX, LLFontGL::ANYWHERE);
                     if (segment_length + line_length < wline.length()) // since we only draw one string, line_length should be 0
                     {
                         // token does does not fit into signle line, need to draw "...".
                         // Use four dots for ellipsis width to generate padding
                         F32 elipses_width = font->getWidthF32(U"....");
                         // truncated string length
-                        segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels - elipses_width, static_cast<S32>(wline.length()), LLFontGL::ANYWHERE);
+                        segment_length = font->maxDrawableChars(tail, max_pixels - elipses_width, S32_MAX, LLFontGL::ANYWHERE);
                         LLHUDTextSegment segment(iter->substr(line_length, segment_length) + U"...", style, color, font);
                         mTextSegments.push_back(segment);
                         break; // consider it to be complete
@@ -452,7 +456,7 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                 // "QualityAssurance AssuresQuality 1" will be split into two lines "QualityAssurance" and "AssuresQuality"
                 do
                 {
-                    S32 segment_length = font->maxDrawableChars(iter->substr(line_length).c_str(), max_pixels, static_cast<S32>(wline.length()), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                    S32 segment_length = font->maxDrawableChars(LLWStringView(*iter).substr(line_length), max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                     LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
                     mTextSegments.push_back(segment);
                     line_length += segment_length;
@@ -490,8 +494,8 @@ void LLHUDNameTag::addLabel(const std::string& label_utf8, F32 max_pixels)
             U32 line_length = 0;
             do
             {
-                S32 segment_length = mFontp->maxDrawableChars(iter->substr(line_length).c_str(),
-                    max_pixels, static_cast<S32>(wstr.length()), LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                S32 segment_length = mFontp->maxDrawableChars(LLWStringView(*iter).substr(line_length),
+                    max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                 LLHUDTextSegment segment(iter->substr(line_length, segment_length), LLFontGL::NORMAL, mColor, mFontp);
                 mLabelSegments.push_back(segment);
                 line_length += segment_length;
@@ -935,7 +939,7 @@ F32 LLHUDNameTag::LLHUDTextSegment::getWidth(const LLFontGL* font)
     }
     else
     {
-        F32 width = font->getWidthF32(mText.c_str());
+        F32 width = font->getWidthF32(mText);
         mFontWidthMap[font] = width;
         return width;
     }

@@ -713,7 +713,7 @@ void LLStatBar::drawTicks( F32 min, F32 max, F32 value_scale, LLRect &bar_rect )
                 decimal_digits = 0;
             }
             LLWString tick_label = utf8str_to_wstring(llformat("%.*f", decimal_digits, tick_value));
-            S32 tick_label_width = LLFontGL::getFontMonospace()->getWidth(tick_label.c_str());
+            S32 tick_label_width = LLFontGL::getFontMonospace()->getWidth(tick_label);
             if (mOrientation == HORIZONTAL)
             {
                 if (tick_begin > last_label + MIN_LABEL_SPACING)

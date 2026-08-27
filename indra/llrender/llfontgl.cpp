@@ -382,7 +382,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     const bool needs_string_width = (halign == RIGHT) || (halign == HCENTER)
                                   || (style_to_add & UNDERLINE) || use_ellipses;
     const F32 string_width_unscaled = needs_string_width
-        ? getWidthF32(wstr.c_str(), begin_offset, length)
+        ? getWidthF32(wstr, begin_offset, length)
         : 0.f;
     const S32 scaled_string_width = ll_round(string_width_unscaled * sScaleX);
 
@@ -488,7 +488,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         {
             // use four dots for ellipsis width to generate padding
             static const LLWString dots(U"....");
-            scaled_max_pixels = llmax(0, scaled_max_pixels - ll_round(getWidthF32(dots.c_str())));
+            scaled_max_pixels = llmax(0, scaled_max_pixels - ll_round(getWidthF32(dots)));
             draw_ellipses = true;
         }
     }
@@ -1090,10 +1090,10 @@ S32 LLFontGL::getLineSpacing() const
 S32 LLFontGL::getWidth(const std::string& utf8text) const
 {
     LLWString wtext = utf8str_to_wstring(utf8text);
-    return getWidth(wtext.c_str(), 0, S32_MAX);
+    return getWidth(wtext, 0, S32_MAX);
 }
 
-S32 LLFontGL::getWidth(const llwchar* wchars) const
+S32 LLFontGL::getWidth(LLWStringView wchars) const
 {
     return getWidth(wchars, 0, S32_MAX);
 }
@@ -1101,10 +1101,10 @@ S32 LLFontGL::getWidth(const llwchar* wchars) const
 S32 LLFontGL::getWidth(const std::string& utf8text, S32 begin_offset, S32 max_chars) const
 {
     LLWString wtext = utf8str_to_wstring(utf8text);
-    return getWidth(wtext.c_str(), begin_offset, max_chars);
+    return getWidth(wtext, begin_offset, max_chars);
 }
 
-S32 LLFontGL::getWidth(const llwchar* wchars, S32 begin_offset, S32 max_chars) const
+S32 LLFontGL::getWidth(LLWStringView wchars, S32 begin_offset, S32 max_chars) const
 {
     F32 width = getWidthF32(wchars, begin_offset, max_chars);
     // llceil, not ll_round: getWidth's contract is "minimum integer pixel
@@ -1119,10 +1119,10 @@ S32 LLFontGL::getWidth(const llwchar* wchars, S32 begin_offset, S32 max_chars) c
 F32 LLFontGL::getWidthF32(const std::string& utf8text) const
 {
     LLWString wtext = utf8str_to_wstring(utf8text);
-    return getWidthF32(wtext.c_str(), 0, S32_MAX);
+    return getWidthF32(wtext, 0, S32_MAX);
 }
 
-F32 LLFontGL::getWidthF32(const llwchar* wchars) const
+F32 LLFontGL::getWidthF32(LLWStringView wchars) const
 {
     return getWidthF32(wchars, 0, S32_MAX);
 }
@@ -1130,45 +1130,48 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars) const
 F32 LLFontGL::getWidthF32(const std::string& utf8text, S32 begin_offset, S32 max_chars) const
 {
     LLWString wtext = utf8str_to_wstring(utf8text);
-    return getWidthF32(wtext.c_str(), begin_offset, max_chars);
+    return getWidthF32(wtext, begin_offset, max_chars);
 }
 
-F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars, bool no_padding) const
+F32 LLFontGL::getWidthF32(LLWStringView wchars, S32 begin_offset, S32 max_chars, bool no_padding) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     F32 cur_x = 0;
+    const S32 text_len = (S32)wchars.length();
+    const S32 begin = llclamp(begin_offset, 0, text_len);
     // Clamp the upper bound the same way charFromPixelOffset does. The default
     // max_chars value is S32_MAX, so a non-zero begin_offset would otherwise
     // overflow the S32 sum (UB on signed overflow). Halign-right and underline
     // measurement paths in render() routinely call this with begin_offset > 0.
-    const S32 max_index = begin_offset + llmin(S32_MAX - begin_offset, max_chars);
+    const S32 max_index = llmin(text_len, begin + llmin(S32_MAX - begin, max_chars));
 
     // Mirror render()'s pen accumulation policy so width measurements agree
     // with what's drawn — see the comment at render()'s subpixel_pen.
     const bool subpixel_pen = mFontFreetype->useSubpixelPen();
 
-    // Determine the tight slice we'll actually measure (bounded by max_chars
-    // and the first NUL) so shaping only runs over real content.
-    S32 measure_end = begin_offset;
+    // Determine the tight slice we'll actually measure (bounded by max_chars,
+    // the view's own end, and the first embedded NUL) so shaping only runs over
+    // real content.
+    S32 measure_end = begin;
     while (measure_end < max_index && wchars[measure_end] != 0)
         ++measure_end;
-    const S32 measure_len = measure_end - begin_offset;
+    const S32 measure_len = measure_end - begin;
 
     // Same shape-first preprocessing as render(); kept consistent so caret
     // positions and ellipsis cutoffs agree with what's drawn. The layout's
-    // ranges come back slice-local; we compare against `i - begin_offset`
+    // ranges come back slice-local; we compare against `i - begin`
     // in the loop rather than mutating ranges.
-    LLWStringView slice(wchars + begin_offset, (size_t)measure_len);
+    LLWStringView slice = wchars.substr((size_t)begin, (size_t)measure_len);
     const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
     size_t next_shape_run = 0;
 
     const LLFontGlyphInfo* next_glyph = NULL;
 
     F32 width_padding = 0.f;
-    for (S32 i = begin_offset; i < max_index && wchars[i] != 0; i++)
+    for (S32 i = begin; i < max_index && wchars[i] != 0; i++)
     {
-        const S32 i_slice = i - begin_offset;
+        const S32 i_slice = i - begin;
         if (next_shape_run < layout.ranges.size()
             && (S32)layout.ranges[next_shape_run].first == i_slice)
         {
@@ -1199,7 +1202,7 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
                         cur_x = (F32)ll_round(cur_x);
                 }
                 width_padding = run_padding;
-                i = begin_offset + (S32)run_range.second - 1;
+                i = begin + (S32)run_range.second - 1;
                 continue;
             }
             // Fall through to codepoint path when shaping failed.
@@ -1227,16 +1230,22 @@ F32 LLFontGL::getWidthF32(const llwchar* wchars, S32 begin_offset, S32 max_chars
         }
 
         cur_x += advance;
-        llwchar next_char = wchars[i+1];
 
-        if (((i + 1) < max_index) && next_char)
+        // Read the kerning partner only once it is known to be in range. The
+        // old form indexed [i+1] before testing it, which stayed inside the
+        // buffer only because callers handed over a NUL-terminated pointer.
+        if ((i + 1) < max_index)
         {
-            // Kern this puppy. LAST_CHARACTER (255) was a vestigial limit
-            // from the era of ASCII-bucketed glyph caches; getXKerning
-            // works for any pair today and the codepoint path is the
-            // shape-failure / strict-mono fallback where this matters.
-            next_glyph = mFontFreetype->getGlyphInfo(next_char, EFontGlyphType::Unspecified);
-            cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
+            const llwchar next_char = wchars[i + 1];
+            if (next_char)
+            {
+                // Kern this puppy. LAST_CHARACTER (255) was a vestigial limit
+                // from the era of ASCII-bucketed glyph caches; getXKerning
+                // works for any pair today and the codepoint path is the
+                // shape-failure / strict-mono fallback where this matters.
+                next_glyph = mFontFreetype->getGlyphInfo(next_char, EFontGlyphType::Unspecified);
+                cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
+            }
         }
         // Round after kerning. With subpixel_pen on, accumulator stays
         // fractional so cumulative kerning precision survives.
@@ -1266,13 +1275,18 @@ void LLFontGL::generateASCIIglyphs()
 }
 
 // Returns the max number of complete characters from text (up to max_chars) that can be drawn in max_pixels
-S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_chars, EWordWrapStyle end_on_word_boundary) const
+S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_chars, EWordWrapStyle end_on_word_boundary) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    if (!wchars || !wchars[0] || max_chars <= 0)
+    if (wchars.empty() || !wchars[0] || max_chars <= 0)
     {
         return 0;
     }
+
+    // Everything below walks by index up to max_chars; the view's own end is the
+    // other bound. Folding them together here keeps the walk inside the buffer
+    // even when a caller asks for more characters than it handed over.
+    max_chars = llmin(max_chars, (S32)wchars.length());
 
     llassert(max_pixels >= 0.f);
 
@@ -1309,7 +1323,7 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
             ++measure_end;
         if (measure_end > 0)
         {
-            LLWStringView slice(wchars, (size_t)measure_end);
+            LLWStringView slice = wchars.substr(0, (size_t)measure_end);
             shape_glyphs = &ALFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)measure_end);
         }
     }
@@ -1340,7 +1354,10 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
             }
             if (iswindividual(wch))
             {
-                if (LLStringOps::isPunct(wchars[i+1]))
+                // Past the end reads as 0, which is what the NUL terminator used
+                // to supply here — isPunct(0) is false either way.
+                const llwchar peek = ((i + 1) < max_chars) ? wchars[i + 1] : 0;
+                if (LLStringOps::isPunct(peek))
                 {
                     in_word=true;
                 }
@@ -1457,9 +1474,9 @@ S32 LLFontGL::maxDrawableChars(const llwchar* wchars, F32 max_pixels, S32 max_ch
     return i;
 }
 
-S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_len, S32 start_pos, S32 max_chars) const
+S32 LLFontGL::firstDrawableChar(LLWStringView wchars, F32 max_pixels, S32 start_pos, S32 max_chars) const
 {
-    if (!wchars || !wchars[0] || max_chars <= 0)
+    if (wchars.empty() || !wchars[0] || max_chars <= 0)
     {
         return 0;
     }
@@ -1470,7 +1487,7 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
     F32 scaled_max_pixels = max_pixels * sScaleX;
     const bool subpixel_pen = mFontFreetype->useSubpixelPen();
 
-    S32 start = llmin(start_pos, text_len - 1);
+    S32 start = llmin(start_pos, (S32)wchars.length() - 1);
 
     // pre-shape [0, start+1) and project advances onto a
     // per-codepoint table. Walking backward through that table substitutes for
@@ -1484,7 +1501,7 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
         // shapeLine ref valid through the per_cp_advance fill below since
         // no other shape* calls run in between. Clusters are slice-local
         // (begin=0), which equals 0..start here.
-        LLWStringView slice(wchars, (size_t)(start + 1));
+        LLWStringView slice = wchars.substr(0, (size_t)(start + 1));
         const auto& shape_glyphs = ALFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)(start + 1));
         const size_t shape_gen = ALFontShaping::cacheMutationCount();
         (void)shape_gen;
@@ -1579,9 +1596,9 @@ S32 LLFontGL::firstDrawableChar(const llwchar* wchars, F32 max_pixels, S32 text_
 
 }
 
-S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 target_x, F32 max_pixels, S32 max_chars, bool round) const
+S32 LLFontGL::charFromPixelOffset(LLWStringView wchars, S32 begin_offset, F32 target_x, F32 max_pixels, S32 max_chars, bool round) const
 {
-    if (!wchars || !wchars[0] || max_chars <= 0)
+    if (wchars.empty() || !wchars[0] || max_chars <= 0)
     {
         return 0;
     }
@@ -1591,22 +1608,25 @@ S32 LLFontGL::charFromPixelOffset(const llwchar* wchars, S32 begin_offset, F32 t
 
     target_x *= sScaleX;
 
+    const S32 text_len = (S32)wchars.length();
+    begin_offset = llclamp(begin_offset, 0, text_len);
+
     // max_chars is S32_MAX by default, so make sure we don't get overflow
-    const S32 max_index = begin_offset + llmin(S32_MAX - begin_offset, max_chars - 1);
+    const S32 max_index = llmin(text_len, begin_offset + llmin(S32_MAX - begin_offset, max_chars - 1));
 
     F32 scaled_max_pixels = max_pixels * sScaleX;
 
-    // Locate the tight slice we'll consider (bounded by max_chars and the
-    // first NUL) so we can shape the same window render() does. Without
-    // this, per-codepoint advances disagree with the rendered composite
-    // glyph: clicks land in the middle of an emoji cluster instead of on
-    // its edges.
+    // Locate the tight slice we'll consider (bounded by max_chars, the view's
+    // own end, and the first embedded NUL) so we can shape the same window
+    // render() does. Without this, per-codepoint advances disagree with the
+    // rendered composite glyph: clicks land in the middle of an emoji cluster
+    // instead of on its edges.
     S32 slice_end = begin_offset;
     while (slice_end < max_index && wchars[slice_end] != 0)
         ++slice_end;
     const S32 slice_len = slice_end - begin_offset;
 
-    LLWStringView slice(wchars + begin_offset, (size_t)slice_len);
+    LLWStringView slice = wchars.substr((size_t)begin_offset, (size_t)slice_len);
     const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
     size_t next_shape_run = 0;
 
