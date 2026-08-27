@@ -430,22 +430,39 @@ namespace LLInitParam
         // only validate block when it hasn't already passed validation with current data
         if (!mValidated)
         {
-        const BlockDescriptor& block_data = mostDerivedBlockDescriptor();
-        for (const BlockDescriptor::param_validation_list_t::value_type& pair : block_data.mValidationList)
-        {
-            const Param* param = getParamFromHandle(pair.first);
-            if (!pair.second(param))
+            const BlockDescriptor& block_data = mostDerivedBlockDescriptor();
+            for (const BlockDescriptor::param_validation_list_t::value_type& pair : block_data.mValidationList)
             {
-                if (emit_errors)
+                const Param* param = getParamFromHandle(pair.first);
+                if (!pair.second(param))
                 {
-                    LL_WARNS() << "Invalid param \"" << getParamName(block_data, param) << "\"" << LL_ENDL;
+                    if (emit_errors)
+                    {
+                        LL_WARNS() << "Invalid param \"" << getParamName(block_data, param) << "\"" << LL_ENDL;
+                    }
+                    return false;
                 }
-                return false;
             }
-        }
             mValidated = true;
         }
         return mValidated;
+    }
+
+    namespace
+    {
+        // A block has one or two of these, so a scan beats building a set of
+        // them for every named param the caller is about to write.
+        bool isUnnamedParam(const BlockDescriptor& block_data, param_handle_t handle)
+        {
+            for (ParamDescriptorPtr ptr : block_data.mUnnamedParams)
+            {
+                if (ptr->mParamHandle == handle)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     bool BaseBlock::serializeBlock(Parser& parser, Parser::name_stack_t& name_stack, const predicate_rule_t predicate_rule, const LLInitParam::BaseBlock* diff_block) const
@@ -471,28 +488,33 @@ namespace LLInitParam
             }
         }
 
-        // Precompute the set of unnamed (implicit) param handles so the loop
-        // below can skip already-serialized params in O(1) instead of rescanning
-        // mUnnamedParams for every named param.
-        std::unordered_set<param_handle_t> unnamed_handles;
-        unnamed_handles.reserve(block_data.mUnnamedParams.size());
-        for (ParamDescriptorPtr ptr : block_data.mUnnamedParams)
+        // Named params are held by the block that declared them, so walk out
+        // to the bases rather than expecting one flat table.
+        for (const BlockDescriptor* descriptor = &block_data; descriptor; descriptor = descriptor->mBaseDescriptor)
         {
-            unnamed_handles.insert(ptr->mParamHandle);
-        }
-
-        for (const auto& pair : block_data.namedParams())
-        {
-            param_handle_t param_handle = pair.second->mParamHandle;
-            const Param* param = getParamFromHandle(param_handle);
-            ParamDescriptor::serialize_func_t serialize_func = pair.second->mSerializeFunc;
-            if (serialize_func && predicate_rule.check(ll_make_predicate(PROVIDED, param->anyProvided())))
+            for (const BlockDescriptor::param_map_t::value_type& pair : descriptor->mNamedParams)
             {
+                param_handle_t param_handle = pair.second->mParamHandle;
+                const Param* param = getParamFromHandle(param_handle);
+                ParamDescriptor::serialize_func_t serialize_func = pair.second->mSerializeFunc;
+                if (!serialize_func || !predicate_rule.check(ll_make_predicate(PROVIDED, param->anyProvided())))
+                {
+                    continue;
+                }
+
+                // Write the entry a lookup would reach. A name a derived block
+                // redeclares appears at two levels, and the one it shadows is
+                // unreachable -- writing it too would emit the name twice.
+                if (block_data.findNamedParam(pair.first) != pair.second)
+                {
+                    continue;
+                }
+
                 // Ensure this param has not already been serialized
                 // Prevents <rect> from being serialized as its own tag.
                 //FIXME: for now, don't attempt to serialize values under synonyms, as current parsers
                 // don't know how to detect them
-                if (unnamed_handles.find(param_handle) != unnamed_handles.end())
+                if (isUnnamedParam(block_data, param_handle))
                 {
                     continue;
                 }
