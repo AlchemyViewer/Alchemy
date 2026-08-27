@@ -790,6 +790,15 @@ namespace LLInitParam
         mutable std::unique_ptr<T> mPtr;
     };
 
+    // Which side of a CustomParamValue currently holds the truth: the value
+    // itself, or the component parameters it can also be written as.
+    enum class EValueAge : U8
+    {
+        VALUE_NEEDS_UPDATE,     // the value needs refreshing from the block parameters
+        VALUE_AUTHORITATIVE,    // the value is authoritative, and has been copied out to the block parameters
+        BLOCK_AUTHORITATIVE     // the value was derived from the block parameters, which are authoritative
+    };
+
     // root class of all parameter blocks
 
     class LL_COMMON_API BaseBlock
@@ -872,7 +881,8 @@ namespace LLInitParam
 
         BaseBlock()
         :   mValidated(false),
-            mParamProvided(false)
+            mParamProvided(false),
+            mValueAge(EValueAge::VALUE_AUTHORITATIVE)
         {}
 
         virtual ~BaseBlock() = default;
@@ -911,6 +921,11 @@ namespace LLInitParam
         // literal (or another static array) can be passed. The table keeps a
         // view of these characters forever, and a const char* would let
         // someone hand it a temporary's buffer without a diagnostic.
+        //
+        // A synonym registers once, while the block type is building its
+        // parameter table; every construction after that reaches here and
+        // finds nothing to do. Block and ChoiceBlock shadow this to ask
+        // their own descriptor, which they know without a virtual call.
         template <std::size_t N>
         void addSynonym(Param& param, const char (&synonym)[N])
         {
@@ -969,6 +984,14 @@ namespace LLInitParam
 
         mutable bool    mValidated; // lazy validation flag
         bool            mParamProvided;
+
+        // Owned by CustomParamValue, which is the only kind of block that has
+        // a value alongside its parameters and so needs to know which of the
+        // two is current. It lives here because a block's first member is a
+        // vtable pointer, leaving padding behind these flags that a derived
+        // class cannot reach: declaring the age there instead grew every
+        // parameter with components by a word.
+        mutable EValueAge   mValueAge;
 
     private:
         void addSynonymImpl(Param& param, std::string_view synonym);
@@ -1897,6 +1920,22 @@ namespace LLInitParam
             return static_cast<DERIVED_BLOCK*>(this)->mergeBlock(getBlockDescriptor(), other, true);
         }
 
+        // Registering a synonym only does anything while this block type is
+        // building its parameter table, and getBlockDescriptor() is the same
+        // descriptor mostDerivedBlockDescriptor() would return here without
+        // the virtual call.
+        template <std::size_t N>
+        void addSynonym(Param& param, const char (&synonym)[N])
+        {
+            if (getBlockDescriptor().mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
+            {
+                // BaseBlock, not BASE_BLOCK: every block in the chain has one
+                // of these, and each would test its own descriptor, which by
+                // now says INITIALIZED.
+                BaseBlock::addSynonym(param, synonym);
+            }
+        }
+
         // take all provided params that are not already provided, and apply to self
         bool fillFrom(const self_t& other)
         {
@@ -2054,6 +2093,22 @@ namespace LLInitParam
         bool overwriteFrom(const self_t& other)
         {
             return static_cast<DERIVED_BLOCK*>(this)->mergeBlock(getBlockDescriptor(), other, true);
+        }
+
+        // Registering a synonym only does anything while this block type is
+        // building its parameter table, and getBlockDescriptor() is the same
+        // descriptor mostDerivedBlockDescriptor() would return here without
+        // the virtual call.
+        template <std::size_t N>
+        void addSynonym(Param& param, const char (&synonym)[N])
+        {
+            if (getBlockDescriptor().mInitializationState == BlockDescriptor::INITIALIZING) [[unlikely]]
+            {
+                // BaseBlock, not BASE_BLOCK: every block in the chain has one
+                // of these, and each would test its own descriptor, which by
+                // now says INITIALIZED.
+                BaseBlock::addSynonym(param, synonym);
+            }
         }
 
         // take all provided params that are not already provided, and apply to self
@@ -2682,13 +2737,6 @@ namespace LLInitParam
     :   public Block<ParamValue<T> >
     {
     public:
-        typedef enum e_value_age
-        {
-            VALUE_NEEDS_UPDATE,     // mValue needs to be refreshed from the block parameters
-            VALUE_AUTHORITATIVE,    // mValue holds the authoritative value (which has been replicated to the block parameters via updateBlockFromValue)
-            BLOCK_AUTHORITATIVE     // mValue is derived from the block parameters, which are authoritative
-        } EValueAge;
-
         typedef TypeValues<T>           derived_t;
         typedef CustomParamValue<T>     self_t;
         typedef Block<ParamValue<T> >   block_t;
@@ -2698,8 +2746,7 @@ namespace LLInitParam
 
 
         CustomParamValue(const default_value_t& value = T())
-        :   mValue(value),
-            mValueAge(VALUE_AUTHORITATIVE)
+        :   mValue(value)
         {}
 
         bool deserializeBlock(Parser& parser, Parser::name_stack_range_t& name_stack_range, bool new_name)
@@ -2710,7 +2757,7 @@ namespace LLInitParam
             {
                 if(parser.readValue(typed_param.mValue))
                 {
-                    typed_param.mValueAge = VALUE_AUTHORITATIVE;
+                    typed_param.mValueAge = EValueAge::VALUE_AUTHORITATIVE;
                     typed_param.updateBlockFromValue(false);
 
                     return true;
@@ -2754,7 +2801,7 @@ namespace LLInitParam
                     // be specific about the RGB color values.  This also fixes an issue where we distinguish
                     // between rect.left not being provided and rect.left being explicitly set to 0 (same as default)
 
-                    if (typed_param.mValueAge == VALUE_AUTHORITATIVE)
+                    if (typed_param.mValueAge == EValueAge::VALUE_AUTHORITATIVE)
                     {
                         // if the value is authoritative but the parser doesn't accept the value type
                         // go ahead and make a copy, and splat the value out to its component params
@@ -2774,12 +2821,12 @@ namespace LLInitParam
 
         bool validateBlock(bool emit_errors = true) const
         {
-            if (mValueAge == VALUE_NEEDS_UPDATE)
+            if (this->mValueAge == EValueAge::VALUE_NEEDS_UPDATE)
             {
                 if (block_t::validateBlock(emit_errors))
                 {
                     // clear stale keyword associated with old value
-                    mValueAge = BLOCK_AUTHORITATIVE;
+                    this->mValueAge = EValueAge::BLOCK_AUTHORITATIVE;
                     static_cast<derived_t*>(const_cast<self_t*>(this))->updateValueFromBlock();
                     return true;
                 }
@@ -2804,14 +2851,14 @@ namespace LLInitParam
             if (user_provided)
             {
                 // a parameter changed, so our value is out of date
-                mValueAge = VALUE_NEEDS_UPDATE;
+                this->mValueAge = EValueAge::VALUE_NEEDS_UPDATE;
             }
         }
 
         void setValue(const value_t& val)
         {
             // set param version number to be up to date, so we ignore block contents
-            mValueAge = VALUE_AUTHORITATIVE;
+            this->mValueAge = EValueAge::VALUE_AUTHORITATIVE;
             mValue = val;
             static_cast<derived_t*>(this)->updateBlockFromValue(false);
         }
@@ -2865,14 +2912,14 @@ namespace LLInitParam
 
             const derived_t& src_typed_param = static_cast<const derived_t&>(source);
 
-            if (source_override && src_typed_param.mValueAge == VALUE_AUTHORITATIVE)
+            if (source_override && src_typed_param.mValueAge == EValueAge::VALUE_AUTHORITATIVE)
             {
                 // copy value over
                 setValue(src_typed_param.getValue());
                 return true;
             }
             // merge individual parameters into destination
-            if (mValueAge == VALUE_AUTHORITATIVE)
+            if (this->mValueAge == EValueAge::VALUE_AUTHORITATIVE)
             {
                 static_cast<derived_t*>(this)->updateBlockFromValue(dst_provided);
             }
@@ -2885,8 +2932,7 @@ namespace LLInitParam
         }
 
     private:
-        mutable T           mValue;
-        mutable EValueAge   mValueAge;
+        mutable T   mValue;
     };
 }
 
