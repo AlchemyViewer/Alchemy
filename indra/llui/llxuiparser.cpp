@@ -892,6 +892,7 @@ void LLSimpleXUIParser::startElement(const pugi::xml_node& element)
 
     mOutputStack.back().second++;
     S32 num_tokens_pushed = 0;
+    bool ignore_element = false;
     std::string_view child_name(name);
 
     if (mOutputStack.back().second == 1)
@@ -907,21 +908,27 @@ void LLSimpleXUIParser::startElement(const pugi::xml_node& element)
             num_tokens_pushed++;
             mScope.emplace_back(child_name);
         }
+        else if (!mScope.empty() && child_name.substr(0, first_dot) != mScope.back())
+        {
+            // Addressed to some other block, so take nothing from it. An
+            // empty scope keeps anything nested inside it from matching
+            // either.
+            ignore_element = true;
+            mScope.emplace_back();
+        }
         else
         {
-            // check for proper nesting against the leading token
-            if (!mScope.empty() && child_name.substr(0, first_dot) != mScope.back())
-            {
-                return;
-            }
-
             // push everything after the leading token
             num_tokens_pushed += pushDottedName(mNameStack, name + first_dot + 1);
             if (num_tokens_pushed == 0)
             {
-                return;
+                ignore_element = true;
+                mScope.emplace_back();
             }
-            mScope.emplace_back(mNameStack.back().first);
+            else
+            {
+                mScope.emplace_back(mNameStack.back().first);
+            }
         }
     }
 
@@ -930,9 +937,15 @@ void LLSimpleXUIParser::startElement(const pugi::xml_node& element)
     // we are empty if we have no attributes
     mEmptyLeafNode.push_back(!element.first_attribute());
 
+    // Every element reaches endElement, which pops one entry from each of
+    // these, so an element being ignored still has to leave one behind.
+    // Returning early here instead unbalanced all three, and popped whatever
+    // an enclosing element had put there -- or nothing at all, at the top.
     mTokenSizeStack.push_back(num_tokens_pushed);
-    readAttributes(element);
-
+    if (!ignore_element)
+    {
+        readAttributes(element);
+    }
 }
 
 void LLSimpleXUIParser::endElement()
