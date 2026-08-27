@@ -57,16 +57,59 @@ LLSDXMLFormatter::~LLSDXMLFormatter()
 S32 LLSDXMLFormatter::format(const LLSD& data, std::ostream& ostr,
                              EFormatterOptions options) const
 {
-    Sink sink(ostr);
-    std::string post;
-    if (options & LLSDFormatter::OPTIONS_PRETTY)
+    // A stream that has already failed cannot record anything we write, and
+    // the caller has no way to tell an empty document from a lost one.
+    if (ostr.rdstate() & (std::ios_base::badbit | std::ios_base::failbit))
     {
-        post = "\n";
+        LL_WARNS() << "LLSDXMLFormatter::format: Stream already in error state" << LL_ENDL;
+        return -1;
     }
-    sink.put("<llsd>");
-    sink.put(post);
-    S32 rv = format_impl(data, sink, options, 1);
-    sink.put("</llsd>\n");
+
+    S32 rv = 0;
+    try
+    {
+        // The Sink flushes from its destructor, so it has to be destroyed
+        // inside the try — a throw out of that flush would be a throw out of
+        // a destructor.
+        Sink sink(ostr);
+        std::string post;
+        if (options & LLSDFormatter::OPTIONS_PRETTY)
+        {
+            post = "\n";
+        }
+        sink.put("<llsd>");
+        sink.put(post);
+        rv = format_impl(data, sink, options, 1);
+        sink.put("</llsd>\n");
+    }
+    catch (const std::bad_alloc&)
+    {
+        // we might be saving something massive, don't error or crash
+        LL_WARNS() << "LLSDXMLFormatter::format: Memory allocation failed during formatting" << LL_ENDL;
+        return -1;
+    }
+    catch (const std::exception& e)
+    {
+        LL_WARNS() << "LLSDXMLFormatter::format: Standard exception: " << e.what() << LL_ENDL;
+        return -1;
+    }
+    catch (...)
+    {
+        LL_WARNS() << "LLSDXMLFormatter::format: Unknown exception during formatting" << LL_ENDL;
+        return -1;
+    }
+
+    // The Sink writes in blocks and does not check the stream as it goes, so
+    // a mid-document I/O failure only shows up in the stream's state here.
+    if (ostr.rdstate() & (std::ios_base::badbit | std::ios_base::failbit))
+    {
+        LL_WARNS() << "LLSDXMLFormatter::format: Stream I/O failed"
+                   << " - Stream state: good=" << ostr.good()
+                   << " eof=" << ostr.eof()
+                   << " fail=" << ostr.fail()
+                   << " bad=" << ostr.bad() << LL_ENDL;
+        return -1;
+    }
 
     return rv;
 }

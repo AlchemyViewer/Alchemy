@@ -100,6 +100,7 @@ static void handleUrl(const char* url_utf8);
 
 #if LL_LINUX && LL_DBUS
 #include <dbus/dbus.h>
+#include <unistd.h>         // close() for the logind inhibitor fd
 
 #define VIEWERAPI_SERVICE   "com.secondlife.ViewerAppAPIService"
 #define VIEWERAPI_PATH      "/com/secondlife/ViewerAppAPI"
@@ -110,6 +111,82 @@ static void handleUrl(const char* url_utf8);
 // *FIX:Mani It would be nice to provide a clean interface to get the
 // default_unix_signal_handler for the LLApp class.
 extern void default_unix_signal_handler(int, siginfo_t *, void *);
+#endif
+
+#if LL_DARWIN
+#include <IOKit/pwr_mgt/IOPMLib.h>
+static IOPMAssertionID sPowerAssertionID = kIOPMNullAssertionID;
+#elif LL_LINUX && LL_DBUS
+// Held open for as long as system sleep is inhibited; -1 when it is not.
+static int sSleepInhibitFd = -1;
+
+// org.freedesktop.login1.Manager.Inhibit returns a file descriptor that keeps
+// the inhibition alive until it is closed.
+//
+// "idle" rather than "sleep": we want to stop the machine idling to sleep
+// under the viewer, which is what Windows' ES_SYSTEM_REQUIRED and macOS'
+// NoIdleSleep do. Blocking "sleep" would also refuse a lid close or an
+// explicit suspend, which no other platform here does.
+static int take_logind_idle_inhibitor()
+{
+    DBusError err;
+    dbus_error_init(&err);
+
+    DBusConnection* bus = dbus_bus_get(DBUS_BUS_SYSTEM, &err);
+    if (!bus)
+    {
+        LL_WARNS("OS") << "Cannot connect to system bus: " << err.message << LL_ENDL;
+        dbus_error_free(&err);
+        return -1;
+    }
+
+    // We pump nothing on this connection and must not die with it.
+    dbus_connection_set_exit_on_disconnect(bus, false);
+
+    DBusMessage* message = dbus_message_new_method_call("org.freedesktop.login1",
+                                                        "/org/freedesktop/login1",
+                                                        "org.freedesktop.login1.Manager",
+                                                        "Inhibit");
+    if (!message)
+    {
+        dbus_connection_unref(bus);
+        return -1;
+    }
+
+    const char* what  = "idle";
+    const char* who   = "Alchemy Viewer";
+    const char* why   = "Viewer is running";
+    const char* how   = "block";
+    dbus_message_append_args(message,
+                             DBUS_TYPE_STRING, &what,
+                             DBUS_TYPE_STRING, &who,
+                             DBUS_TYPE_STRING, &why,
+                             DBUS_TYPE_STRING, &how,
+                             DBUS_TYPE_INVALID);
+
+    DBusMessage* reply = dbus_connection_send_with_reply_and_block(bus, message, 2000, &err);
+    dbus_message_unref(message);
+
+    if (!reply)
+    {
+        LL_WARNS("OS") << "logind Inhibit failed: " << err.message << LL_ENDL;
+        dbus_error_free(&err);
+        dbus_connection_unref(bus);
+        return -1;
+    }
+
+    int fd = -1;
+    if (!dbus_message_get_args(reply, &err, DBUS_TYPE_UNIX_FD, &fd, DBUS_TYPE_INVALID))
+    {
+        LL_WARNS("OS") << "logind Inhibit returned no fd: " << err.message << LL_ENDL;
+        dbus_error_free(&err);
+        fd = -1;
+    }
+    dbus_message_unref(reply);
+    dbus_connection_unref(bus);
+
+    return fd;
+}
 #endif
 
 namespace
@@ -577,6 +654,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     gArgC = argc;
     gArgV = argv;
 
+    // Before the viewer is constructed: its constructor picks the startup log
+    // file, and --logfile is only readable from here at that point.
+    LLAppViewer::setStartupCommandLine(argc, argv);
+
 #if LL_WINDOWS
     // Note: gIconResource (consumed by the native LLWindowWin32 window proc)
     // is not set here — SDL_RegisterApp sources the window-class icon from the
@@ -1033,6 +1114,70 @@ bool LLAppViewerSDL::sendURLToOtherInstance(const std::string& url)
     return false; // not implemented
 }
 #endif // LL_DBUS
+
+//virtual
+void LLAppViewerSDL::setOSHibernationMode(eHibernationMode mode)
+{
+    // Deliberately no SDL_{Disable,Enable}ScreenSaver here. That flag is a
+    // single absolute global which llwindowsdl.cpp already drives from window
+    // focus, so writing it from here as well would have the two stomp each
+    // other. The screen half is handled by the platform assertion below.
+
+#if LL_DARWIN
+    // An IOPMAssertion is released by name, so drop the previous one before
+    // taking a new one - otherwise switching modes leaks the old assertion and
+    // the strongest one ever taken wins forever.
+    if (sPowerAssertionID != kIOPMNullAssertionID)
+    {
+        IOPMAssertionRelease(sPowerAssertionID);
+        sPowerAssertionID = kIOPMNullAssertionID;
+    }
+
+    if (mode != LL_HIBERNATE_MODE_DEFAULT)
+    {
+        // NoDisplaySleep implies NoIdleSleep, so the screen mode needs only
+        // the one assertion.
+        CFStringRef type = (mode == LL_HIBERNATE_MODE_PREVENT_SCREEN)
+            ? kIOPMAssertionTypeNoDisplaySleep
+            : kIOPMAssertionTypeNoIdleSleep;
+        IOReturn result = IOPMAssertionCreateWithName(type, kIOPMAssertionLevelOn,
+                                                      CFSTR("Alchemy Viewer"),
+                                                      &sPowerAssertionID);
+        if (result != kIOReturnSuccess)
+        {
+            sPowerAssertionID = kIOPMNullAssertionID;
+            LL_WARNS("OS") << "IOPMAssertionCreateWithName failed: " << result << LL_ENDL;
+        }
+    }
+#elif LL_LINUX && LL_DBUS
+    // logind hands back a file descriptor; holding it open is the inhibition,
+    // closing it releases it. Drop any previous one first, same reason as the
+    // macOS assertion above.
+    if (sSleepInhibitFd >= 0)
+    {
+        close(sSleepInhibitFd);
+        sSleepInhibitFd = -1;
+    }
+
+    if (mode != LL_HIBERNATE_MODE_DEFAULT)
+    {
+        sSleepInhibitFd = take_logind_idle_inhibitor();
+        if (sSleepInhibitFd < 0)
+        {
+            LL_WARNS("OS") << "Could not inhibit idle sleep via logind." << LL_ENDL;
+        }
+        else if (mode == LL_HIBERNATE_MODE_PREVENT_SCREEN)
+        {
+            // Keeping the display awake is the session screensaver's business,
+            // not logind's, and this backend does not speak to it yet.
+            LL_INFOS("OS") << "Idle sleep inhibited; keeping the display awake "
+                              "is not implemented on this platform." << LL_ENDL;
+        }
+    }
+#endif
+
+    LL_INFOS("OS") << "OS hibernation mode set to " << (S32)mode << LL_ENDL;
+}
 
 void LLAppViewerSDL::initCrashReporting(bool reportFreeze)
 {

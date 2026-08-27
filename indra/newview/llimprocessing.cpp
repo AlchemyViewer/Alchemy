@@ -1881,7 +1881,8 @@ void LLIMProcessing::requestOfflineMessagesCoro(std::string url)
 
     if (!contents.size())
     {
-        LL_WARNS("Messaging") << "No contents received for offline messages via capability " << url << LL_ENDL;
+        // Received no offline messages on login.
+        LL_INFOS("Messaging") << "No contents received for offline messages via capability " << url << LL_ENDL;
         return;
     }
 

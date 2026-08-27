@@ -36,6 +36,7 @@
 #include "llaudioengine.h"
 #include "lllistener_openal.h"
 #include "llwindgen.h"
+#include "llatomic.h"
 
 #include <deque>
 #include <memory>
@@ -150,6 +151,23 @@ class LLAudioEngine_OpenAL : public LLAudioEngine
         bool         mDeviceDisconnected     = false;
         int          mConsecutiveDisconnects = 0;
         LLFrameTimer mDisconnectPollTimer;
+
+        // ALC_SOFT_system_events + ALC_SOFT_reopen_device let us follow
+        // the OS default output device while the viewer is running. Only
+        // armed when the user hasn't pinned a specific device — if
+        // mPreferredDevice names one, following the OS default would drag
+        // them off their choice. mDefaultDeviceChanged is written from
+        // OpenAL's own event thread and consumed in idle().
+        bool                   mFollowSystemDefault  = false;
+        LPALCEVENTCONTROLSOFT  mEventControlSOFT     = nullptr;
+        LPALCEVENTCALLBACKSOFT mEventCallbackSOFT    = nullptr;
+        LLAtomicBool           mDefaultDeviceChanged{false};
+
+        void initSystemDefaultFollowing();
+        static void ALC_APIENTRY onDeviceEventSOFT(ALCenum event_type, ALCenum device_type,
+                                                   ALCdevice* device, ALCsizei length,
+                                                   const ALCchar* message, void* user_param) noexcept;
+        void reopenOnDefaultDevice();
 
         // Pre-allocated buffer pool. Replaces the historical per-frame
         // alGenBuffers / alDeleteBuffers churn that ran every update

@@ -774,11 +774,12 @@
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-10000"
              max_val="10000"
+             decimal_digits="5"
              name="TexScaleU"
              top_pad="1"
              width="271" />
@@ -787,11 +788,12 @@
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-10000"
              max_val="10000"
+             decimal_digits="5"
              name="TexScaleV"
              width="271" />
             <spinner
@@ -826,11 +828,12 @@
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
+             decimal_digits="5"
              name="TexOffsetU"
              width="271" />
             <spinner
@@ -838,11 +841,12 @@
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
+             decimal_digits="5"
              name="TexOffsetV"
              width="271" />
             <spinner
@@ -850,11 +854,12 @@
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-10000"
              max_val="10000"
+             decimal_digits="5"
              name="bumpyScaleU"
              top_delta="-115"
              width="271" />
@@ -863,11 +868,12 @@
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-10000"
              max_val="10000"
+             decimal_digits="5"
              name="bumpyScaleV"
              width="271" />
            <spinner
@@ -890,11 +896,12 @@
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
+             decimal_digits="5"
              name="bumpyOffsetU"
              width="271" />
             <spinner
@@ -902,11 +909,12 @@
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
+             decimal_digits="5"
              name="bumpyOffsetV"
              width="271" />
             <spinner
@@ -914,11 +922,12 @@
              height="19"
              initial_value="0"
              label="Horizontal scale"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-10000"
              max_val="10000"
+             decimal_digits="5"
              name="shinyScaleU"
              top_delta="-115"
              width="271" />
@@ -927,11 +936,12 @@
              height="19"
              initial_value="0"
              label="Vertical scale"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-10000"
              max_val="10000"
+             decimal_digits="5"
              name="shinyScaleV"
              width="271" />
            <spinner
@@ -954,11 +964,12 @@
              height="19"
              initial_value="0"
              label="Horizontal offset"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
+             decimal_digits="5"
              name="shinyOffsetU"
              width="271" />
             <spinner
@@ -966,11 +977,12 @@
              height="19"
              initial_value="0"
              label="Vertical offset"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-1"
              max_val="1"
+             decimal_digits="5"
              name="shinyOffsetV"
              width="271" />
             <!-- BEGIN PBR Material texture transform parameters -->
@@ -979,11 +991,12 @@
              height="19"
              initial_value="1"
              label="Scale u"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-10000"
              max_val="10000"
+             decimal_digits="5"
              name="gltfTextureScaleU"
              top_delta="-115"
              width="271" />
@@ -992,11 +1005,12 @@
              height="19"
              initial_value="1"
              label="Scale v"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-10000"
              max_val="10000"
+             decimal_digits="5"
              name="gltfTextureScaleV"
              width="271" />
             <spinner
@@ -1022,6 +1036,7 @@
              left="10"
              min_val="-360"
              max_val="360"
+             decimal_digits="2"
              name="gltfTextureRotation"
              width="271" />
             <spinner
@@ -1029,11 +1044,12 @@
              height="19"
              initial_value="0"
              label="Offset u"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-999"
              max_val="999"
+             decimal_digits="5"
              name="gltfTextureOffsetU"
              width="271" />
             <spinner
@@ -1041,11 +1057,12 @@
              height="19"
              initial_value="0"
              label="Offset v"
-             label_width="200"
+             label_width="195"
              layout="topleft"
              left="10"
              min_val="-999"
              max_val="999"
+             decimal_digits="5"
              name="gltfTextureOffsetV"
              width="271" />
             <!-- END PBR Material texture transform parameters -->

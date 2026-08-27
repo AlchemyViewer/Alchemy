@@ -41,6 +41,7 @@
 #include "stringize.h"
 
 #include <simdjson.h>
+#include "llsdjson.h"
 
 namespace
 {
@@ -165,7 +166,7 @@ void LLTranslationAPIHandler::verifyKeyCoro(LLTranslate::EService service, LLSD 
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
-        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("getMerchantStatusCoro", httpPolicy);
+        httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("verifyKeyCoro", httpPolicy);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
     LLCore::HttpOptions::ptr_t httpOpts = std::make_shared<LLCore::HttpOptions>();
     LLCore::HttpHeaders::ptr_t httpHeaders = std::make_shared<LLCore::HttpHeaders>();
@@ -804,13 +805,10 @@ LLSD LLAzureTranslationHandler::sendMessageAndSuspend(LLCoreHttpUtil::HttpCorout
     LLCore::BufferArray::ptr_t rawbody(new LLCore::BufferArray);
     LLCore::BufferArrayStream outs(rawbody.get());
 
-    static const std::string allowed_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz "
-                                             "0123456789"
-                                             "-._~";
-
-    outs << "[{\"text\":\"";
-    outs << LLURI::escape(msg, allowed_chars);
-    outs << "\"}]";
+    // This is a JSON body, so the text needs JSON escaping, not URL escaping.
+    LLSD entry = LLSD::emptyMap();
+    entry["text"] = msg;
+    outs << LlsdToJson(LLSD::emptyArray().with(0, entry));
 
     return adapter->postRawAndSuspend(request, url, rawbody, options, headers);
 }

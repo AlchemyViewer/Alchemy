@@ -229,6 +229,15 @@ namespace
         static const hb_feature_t kFixedWidthLigaturesOk[] = {
             { HB_TAG('k','e','r','n'), 0, 0, (unsigned)-1 },
         };
+        // Tabular figures for variable faces instantiated at an explicit
+        // weight. Proportional digits make any column of changing numbers
+        // (L$ balances, statistics bars, timers) jitter as the digits
+        // change; 'tnum' asks the font for the equal-advance digit set it
+        // was designed with, which is what the UI wants everywhere it
+        // shows a number. Faces without a 'tnum' lookup ignore it.
+        static const hb_feature_t kTabularFigures[] = {
+            { HB_TAG('t','n','u','m'), 1, 0, (unsigned)-1 },
+        };
         const hb_feature_t* features = nullptr;
         unsigned int num_features = 0;
         if (face->isFixedWidth())
@@ -243,6 +252,11 @@ namespace
                 features = kFixedWidthStrict;
                 num_features = (unsigned int)(sizeof(kFixedWidthStrict) / sizeof(kFixedWidthStrict[0]));
             }
+        }
+        else if (face->wghtAxisSet())
+        {
+            features = kTabularFigures;
+            num_features = (unsigned int)(sizeof(kTabularFigures) / sizeof(kTabularFigures[0]));
         }
 
         // VS-16 stripping for faces whose cmap lacks U+FE0F (notably Noto-

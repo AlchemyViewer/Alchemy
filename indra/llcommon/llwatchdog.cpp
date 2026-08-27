@@ -59,6 +59,7 @@ public:
     {
         mStopping = true;
         mSleepMsecs = 1;
+        setQuitting();
     }
 
     void run() override
@@ -122,6 +123,11 @@ LLWatchdogTimeout::~LLWatchdogTimeout()
 bool LLWatchdogTimeout::isAlive() const
 {
     return (mTimer.getStarted() && !mTimer.hasExpired());
+}
+
+bool LLWatchdogTimeout::hasExpired() const
+{
+    return mTimer.hasExpired();
 }
 
 bool LLWatchdogTimeout::started() const
@@ -233,11 +239,23 @@ void LLWatchdog::init(
     mCrashOnFreeze = crash_on_freeze;
 }
 
-void LLWatchdog::cleanup()
+void LLWatchdog::shutdown()
 {
     if (mTimer)
     {
         mTimer->stop();
+    }
+}
+
+void LLWatchdog::cleanup()
+{
+    LL_PROFILE_ZONE_SCOPED;
+    if (mTimer)
+    {
+        // ~LLWatchdogTimerThread signals and joins the worker itself, so the
+        // stop/shutdown pair belongs to exactly one of the two -- calling it
+        // here as well would run setQuitting() again after shutdown() had
+        // already freed the thread's mutex.
         delete mTimer;
         mTimer = nullptr;
     }

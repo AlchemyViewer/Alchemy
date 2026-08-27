@@ -53,6 +53,10 @@ LLFlyoutButton::LLFlyoutButton(const Params& p)
 // [/SL:KB]
     bp.click_callback.function(boost::bind(&LLFlyoutButton::onActionButtonClick, this, _2));
     bp.follows.flags(FOLLOWS_ALL);
+    if (p.font.isProvided())
+    {
+        bp.font(p.font);
+    }
 
     mActionButton = LLUICtrlFactory::create<LLButton>(bp);
     addChild(mActionButton);
@@ -100,5 +104,4 @@ void LLFlyoutButton::setToggleState(bool state)
 {
     mToggleState = state;
 }
-
 

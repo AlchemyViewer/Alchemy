@@ -1,8 +1,8 @@
 include_guard()
 add_library(ll::boost INTERFACE IMPORTED)
 
-find_package(Boost CONFIG REQUIRED COMPONENTS context dll fiber filesystem program_options url)
-target_link_libraries(ll::boost INTERFACE Boost::disable_autolinking Boost::headers Boost::dll Boost::fiber Boost::context Boost::filesystem Boost::program_options Boost::url)
+find_package(Boost CONFIG REQUIRED COMPONENTS context dll fiber filesystem process program_options url)
+target_link_libraries(ll::boost INTERFACE Boost::disable_autolinking Boost::headers Boost::dll Boost::fiber Boost::context Boost::filesystem Boost::process Boost::program_options Boost::url)
 
 if(WINDOWS)
     find_package(Boost CONFIG REQUIRED COMPONENTS stacktrace_windbg)
@@ -11,3 +11,8 @@ else()
     find_package(Boost CONFIG REQUIRED COMPONENTS stacktrace_basic)
     target_link_libraries(ll::boost INTERFACE Boost::stacktrace_basic)
 endif()
+
+if(WINDOWS)
+    # Boost.Process v2 needs ntdll (NtSuspendProcess/NtResumeProcess)
+    target_link_libraries(ll::boost INTERFACE ntdll)
+endif(WINDOWS)

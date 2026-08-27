@@ -131,6 +131,8 @@ public:
     void setUseDaemon(bool use_daemon, const std::string& rendezvous_path = std::string())
     { mUseDaemon = use_daemon; mDaemonRendezvous = rendezvous_path; };
 
+    LLProcess::id getProcessID() const { return mProcess ? mProcess->getProcessID() : 0; }
+
     void setLaunchTimeout(F32 timeout) { mPluginLaunchTimeout = timeout; };
     void setLockupTimeout(F32 timeout) { mPluginLockupTimeout = timeout; };
 

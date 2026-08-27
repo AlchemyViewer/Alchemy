@@ -443,7 +443,11 @@ void LLRenderPass::pushBatches(U32 type, bool texture, bool batch_textures)
             LLDrawInfo* pparams = *i;
             LLCullResult::increment_iterator(i, end);
 
-            pushBatch(*pparams, texture, batch_textures);
+            llassert(pparams); // figure out how null got here, it shouldn't be happening
+            if (pparams)
+            {
+                pushBatch(*pparams, texture, batch_textures);
+            }
         }
     }
     else
@@ -462,7 +466,10 @@ void LLRenderPass::pushUntexturedBatches(U32 type)
         LLDrawInfo* pparams = *i;
         LLCullResult::increment_iterator(i, end);
 
-        pushUntexturedBatch(*pparams);
+        if (pparams)
+        {
+            pushUntexturedBatch(*pparams);
+        }
     }
 }
 
@@ -482,7 +489,7 @@ void LLRenderPass::pushRiggedBatches(U32 type, bool texture, bool batch_textures
             LLDrawInfo* pparams = *i;
             LLCullResult::increment_iterator(i, end);
 
-            if (uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+            if (pparams && uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
             {
                 pushBatch(*pparams, texture, batch_textures);
             }
@@ -507,7 +514,7 @@ void LLRenderPass::pushUntexturedRiggedBatches(U32 type)
         LLDrawInfo* pparams = *i;
         LLCullResult::increment_iterator(i, end);
 
-        if (uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
+        if (pparams && uploadMatrixPalette(pparams->mAvatar, pparams->mSkinInfo, lastAvatar, lastMeshId, skipLastSkin))
         {
             pushUntexturedBatch(*pparams);
         }
@@ -523,6 +530,10 @@ void LLRenderPass::pushMaskBatches(U32 type, bool texture, bool batch_textures)
     {
         LLDrawInfo* pparams = *i;
         LLCullResult::increment_iterator(i, end);
+        if (!pparams)
+        {
+            continue;
+        }
         if (pparams->mMaterialSlotList.size() > 1)
         { // multi-material legacy batch -- drawn by pushMaskBatchesIndexed
             continue;
@@ -546,8 +557,12 @@ void LLRenderPass::pushRiggedMaskBatches(U32 type, bool texture, bool batch_text
 
         LLCullResult::increment_iterator(i, end);
 
-        llassert(pparams);
+        llassert(pparams); // figure out how null got here, it shouldn't be happening
 
+        if (!pparams)
+        {
+            continue;
+        }
         if (pparams->mMaterialSlotList.size() > 1)
         { // multi-material legacy batch -- drawn by pushMaskBatchesIndexed
             continue;

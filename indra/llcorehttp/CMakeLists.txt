@@ -96,6 +96,7 @@ if (BUILD_TESTING AND LLCOREHTTP_TESTS)
       tests/test_httpheaders.hpp
       tests/test_bufferarray.hpp
       tests/test_bufferstream.hpp
+      tests/test_jsonrpcws.hpp
       )
 
   list(APPEND llcorehttp_TEST_SOURCE_FILES ${llcorehttp_TEST_HEADER_FILES})

@@ -188,6 +188,8 @@ protected:
 
     void    updateToastFadingTime();
 
+    LLToast* getToastFromPool();
+
     create_toast_panel_callback_t m_create_toast_panel_callback_t;
 
     bool    createPoolToast();
@@ -285,9 +287,19 @@ void LLFloaterIMNearbyChatScreenChannel::updateToastsLifetime()
     S32 seconds = gSavedSettings.getS32("NearbyToastLifeTime");
     toast_list_t::iterator it;
 
-    for(it = m_toast_pool.begin(); it != m_toast_pool.end(); ++it)
+    for(it = m_toast_pool.begin(); it != m_toast_pool.end();)
     {
-        (*it).get()->setLifetime(seconds);
+        LLToast* toast = it->get();
+        if (toast)
+        {
+            toast->setLifetime(seconds);
+            ++it;
+        }
+        else
+        {
+            LL_WARNS("NearbyChat") << "Discarding destroyed toast from pool" << LL_ENDL;
+            it = m_toast_pool.erase(it);
+        }
     }
 }
 
@@ -296,10 +308,36 @@ void LLFloaterIMNearbyChatScreenChannel::updateToastFadingTime()
     S32 seconds = gSavedSettings.getS32("NearbyToastFadingTime");
     toast_list_t::iterator it;
 
-    for(it = m_toast_pool.begin(); it != m_toast_pool.end(); ++it)
+    for(it = m_toast_pool.begin(); it != m_toast_pool.end();)
     {
-        (*it).get()->setFadingTime(seconds);
+        LLToast* toast = it->get();
+        if (toast)
+        {
+            toast->setFadingTime(seconds);
+            ++it;
+        }
+        else
+        {
+            LL_WARNS("NearbyChat") << "Discarding destroyed toast from pool" << LL_ENDL;
+            it = m_toast_pool.erase(it);
+        }
     }
+}
+
+LLToast* LLFloaterIMNearbyChatScreenChannel::getToastFromPool()
+{
+    while (!m_toast_pool.empty())
+    {
+        LLToast* toast = m_toast_pool.back().get();
+        m_toast_pool.pop_back();
+
+        if (toast)
+            return toast;
+
+        LL_WARNS("NearbyChat") << "Discarding destroyed toast from pool" << LL_ENDL;
+    }
+
+    return nullptr;
 }
 
 bool    LLFloaterIMNearbyChatScreenChannel::createPoolToast()
@@ -397,9 +435,18 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
     //take 1st element from pool, (re)initialize it, put it in active toasts
 
     LL_DEBUGS("NearbyChat") << "Getting toast from pool" << LL_ENDL;
-    LLToast* toast = m_toast_pool.back().get();
+    LLToast* toast = getToastFromPool();
+    if (!toast)
+    {
+        // A toast can be destroyed while its handle remains in the pool.
+        // Replenish the pool instead of dereferencing the dead handle.
+        if (!createPoolToast())
+            return;
 
-    m_toast_pool.pop_back();
+        toast = getToastFromPool();
+        if (!toast)
+            return;
+    }
 
 
     LLFloaterIMNearbyChatToastPanel* panel = dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(toast->getPanel());
@@ -707,6 +754,23 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
         return;
     }
 
+    if (LLScriptEditorWSServer::isEnabled() &&
+        gSavedSettings.getBOOL("ExternalWebsocketForwardDebug") &&
+        (chat_msg.mChatType == CHAT_TYPE_DEBUG_MSG ||
+         chat_msg.mChatType == CHAT_TYPE_OWNER))
+    {
+        LLScriptEditorWSServer::ptr_t server =
+            LLScriptEditorWSServer::getServer();
+        if (server)
+        {
+            const auto channel =
+                chat_msg.mChatType == CHAT_TYPE_OWNER
+                    ? LLPublishedObjectMgr::RuntimeEventAggregator::Channel::OWNER_SAY
+                    : LLPublishedObjectMgr::RuntimeEventAggregator::Channel::DEBUG;
+            server->forwardChatToIDE(chat_msg, channel);
+        }
+    }
+
     // don't show toast and add message to chat history on receive debug message
     // with disabled setting showing script errors or enabled setting to show script
     // errors in separate window.
@@ -717,15 +781,6 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
 
         if (!gSavedSettings.getBOOL("ShowScriptErrors"))
             return;
-
-        if (LLScriptEditorWSServer::isEnabled() && gSavedSettings.getBOOL("ExternalWebsocketForwardDebug"))
-        {
-            LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
-            if (server)
-            {
-                server->forwardChatToIDE(chat_msg);
-            }
-        }
 
         // don't process debug messages from not owned objects, see EXT-7762
         if (gAgentID != chat_msg.mOwnerID)
@@ -746,16 +801,6 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
             return;
         }
     }
-    else if ((chat_msg.mChatType == CHAT_TYPE_OWNER) && LLScriptEditorWSServer::isEnabled() &&
-        gSavedSettings.getBOOL("ExternalWebsocketForwardDebug"))
-    {
-        LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer();
-        if (server)
-        {
-            server->forwardChatToIDE(chat_msg);
-        }
-    }
-
     nearby_chat->addMessage(chat_msg, true, args);
 
     if (chat_msg.mSourceType == CHAT_SOURCE_AGENT

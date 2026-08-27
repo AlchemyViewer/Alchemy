@@ -38,6 +38,7 @@ class LLParcelSelection;
 class LLObjectSelection;
 class LLSelectNode;
 class LLControlAvatar;
+class LLViewerObject;
 
 // [RLVa:KB] - Checked: RLVa-2.0.0
 void set_use_wireframe(bool useWireframe);
@@ -79,6 +80,7 @@ void handle_take(bool take_separate = false);
 void handle_take_copy();
 void handle_look_at_selection(const LLSD& param);
 bool handle_zoom_to_object(const LLUUID& object_id);
+bool save_object_back_to_contents(LLViewerObject* object, const LLUUID& source_task_id);
 void handle_object_return();
 void handle_object_delete();
 void handle_object_edit();

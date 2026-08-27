@@ -1539,11 +1539,6 @@ void LLGLManager::initWGL()
     {
         LL_WARNS("RenderInit") << "No ARB WGL PBuffer extensions" << LL_ENDL;
     }
-
-    if(!mGLExtensions.contains("WGL_ARB_render_texture"))
-    {
-        LL_WARNS("RenderInit") << "No ARB WGL render texture extensions" << LL_ENDL;
-    }
 #endif
 }
 
@@ -1790,7 +1785,7 @@ bool LLGLManager::initGL()
         }
         if (mVRAM != 0)
         {
-            LL_WARNS("RenderInit") << "VRAM Detected (AMDAssociations):" << mVRAM << LL_ENDL;
+            LL_INFOS("RenderInit") << "VRAM Detected (AMDAssociations):" << mVRAM << LL_ENDL;
         }
     } else
 #endif
@@ -1805,7 +1800,7 @@ bool LLGLManager::initGL()
 
             if (mVRAM != 0)
             {
-                LL_WARNS("RenderInit") << "VRAM Detected (GLXMesaQueryRenderer):" << mVRAM << LL_ENDL;
+                LL_INFOS("RenderInit") << "VRAM Detected (GLXMesaQueryRenderer):" << mVRAM << LL_ENDL;
             }
         }
     }
@@ -1821,7 +1816,7 @@ bool LLGLManager::initGL()
 
             if (mVRAM != 0)
             {
-                LL_WARNS("RenderInit") << "VRAM Detected (NVXGpuMemoryInfo):" << mVRAM << LL_ENDL;
+                LL_INFOS("RenderInit") << "VRAM Detected (NVXGpuMemoryInfo):" << mVRAM << LL_ENDL;
             }
         }
 

@@ -150,6 +150,7 @@ target_sources(llmessage
     llxfer_mem.h
     llxfer_vfile.h
     llxorcipher.h
+    llzerocode.h
     machine.h
     mean_collision_data.h
     message.h
@@ -208,6 +209,7 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(lltemplatemessagebuilder "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llxfer_file "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llxorcipher "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llzerocode "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(message "" "${test_libs}" "${test_project}")
 endif ()
 

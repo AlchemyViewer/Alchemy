@@ -164,7 +164,120 @@ bool LLAudioEngine_OpenAL::init(void* userdata, const std::string &app_title)
         mDisconnectPollTimer.reset();
     }
 
+    initSystemDefaultFollowing();
+
     return true;
+}
+
+// ALC_SOFT_system_events tells us when the OS default output device
+// changes; ALC_SOFT_reopen_device lets us move onto it without tearing
+// down the context. Both are needed, and both only matter while the user
+// is running on the system default — a pinned device stays pinned.
+void LLAudioEngine_OpenAL::initSystemDefaultFollowing()
+{
+    mFollowSystemDefault = false;
+    mEventControlSOFT    = nullptr;
+    mEventCallbackSOFT   = nullptr;
+
+    if (alcIsExtensionPresent(mALCDevice, "ALC_SOFT_reopen_device") != ALC_TRUE ||
+        alcIsExtensionPresent(mALCDevice, "ALC_SOFT_system_events") != ALC_TRUE)
+    {
+        LL_INFOS() << "LLAudioEngine_OpenAL::init() ALC_SOFT_system_events / "
+                      "ALC_SOFT_reopen_device unavailable; a restart is needed "
+                      "to pick up OS default device changes." << LL_ENDL;
+        return;
+    }
+
+    mEventControlSOFT = reinterpret_cast<LPALCEVENTCONTROLSOFT>(
+        alcGetProcAddress(mALCDevice, "alcEventControlSOFT"));
+    mEventCallbackSOFT = reinterpret_cast<LPALCEVENTCALLBACKSOFT>(
+        alcGetProcAddress(mALCDevice, "alcEventCallbackSOFT"));
+    if (!mEventControlSOFT || !mEventCallbackSOFT)
+    {
+        mEventControlSOFT  = nullptr;
+        mEventCallbackSOFT = nullptr;
+        LL_WARNS() << "LLAudioEngine_OpenAL::init() ALC_SOFT_system_events "
+                      "advertised but its entry points did not resolve."
+                   << LL_ENDL;
+        return;
+    }
+
+    // Subscribe regardless of the current preference: the user can move
+    // back to "default" at runtime, and re-arming then would mean
+    // resolving entry points against a device we may no longer hold.
+    mDefaultDeviceChanged = false;
+    mEventCallbackSOFT(&LLAudioEngine_OpenAL::onDeviceEventSOFT, this);
+    ALCenum events[] = { ALC_EVENT_TYPE_DEFAULT_DEVICE_CHANGED_SOFT };
+    mEventControlSOFT(1, events, ALC_TRUE);
+
+    mFollowSystemDefault = mPreferredDevice.empty();
+    if (mFollowSystemDefault)
+    {
+        LL_INFOS() << "LLAudioEngine_OpenAL::init() following the OS default "
+                      "output device." << LL_ENDL;
+    }
+    else
+    {
+        LL_INFOS() << "LLAudioEngine_OpenAL::init() output device pinned to '"
+                   << mPreferredDevice << "'; OS default changes ignored."
+                   << LL_ENDL;
+    }
+}
+
+// static
+void ALC_APIENTRY LLAudioEngine_OpenAL::onDeviceEventSOFT(ALCenum event_type, ALCenum device_type,
+                                                          ALCdevice* /*device*/, ALCsizei /*length*/,
+                                                          const ALCchar* /*message*/, void* user_param) noexcept
+{
+    // Runs on OpenAL's own event thread. Do nothing here but raise the
+    // flag — idle() does the reopen on the main thread, where the rest
+    // of the engine's AL state is owned.
+    if (event_type != ALC_EVENT_TYPE_DEFAULT_DEVICE_CHANGED_SOFT) return;
+
+    // The same event reports the default CAPTURE device changing. Reopening
+    // playback for that would interrupt audio because the user picked a
+    // different microphone.
+    if (device_type != ALC_PLAYBACK_DEVICE_SOFT) return;
+
+    if (auto* self = static_cast<LLAudioEngine_OpenAL*>(user_param))
+    {
+        self->mDefaultDeviceChanged = true;
+    }
+}
+
+void LLAudioEngine_OpenAL::reopenOnDefaultDevice()
+{
+    if (!mFollowSystemDefault || !mALCDevice) return;
+
+    using ReopenFn = ALCboolean (ALC_APIENTRY *)(ALCdevice*, const ALCchar*,
+                                                 const ALCint*);
+    auto reopen = reinterpret_cast<ReopenFn>(
+        alcGetProcAddress(mALCDevice, "alcReopenDeviceSOFT"));
+    if (!reopen) return;
+
+    LL_INFOS() << "LLAudioEngine_OpenAL: OS default output device changed; "
+                  "reopening (was '" << mActiveDevice << "')" << LL_ENDL;
+
+    // Clear any pending device error so the failure branch reports ours.
+    (void)alcGetError(mALCDevice);
+
+    if (reopen(mALCDevice, nullptr, nullptr) != ALC_TRUE)
+    {
+        LL_WARNS() << "LLAudioEngine_OpenAL::reopenOnDefaultDevice() "
+                      "alcReopenDeviceSOFT failed: 0x" << std::hex
+                   << alcGetError(mALCDevice) << std::dec << LL_ENDL;
+        return;
+    }
+
+    if (const char* opened = alcGetString(mALCDevice, ALC_ALL_DEVICES_SPECIFIER))
+    {
+        mActiveDevice = opened;
+    }
+    LL_INFOS() << "LLAudioEngine_OpenAL::reopenOnDefaultDevice() now on '"
+               << mActiveDevice << "'" << LL_ENDL;
+
+    // The Sound prefs combo shows the active device, so let it refresh.
+    mDevicesChangedSignal();
 }
 
 // virtual
@@ -217,6 +330,18 @@ void LLAudioEngine_OpenAL::shutdown()
     // regresses, but the *intent* of the walk only holds with this
     // ordering.
     shutdownEfx();
+
+    // Unhook the OS default-device callback before the device is closed,
+    // so OpenAL's event thread can't call back into a half-torn engine.
+    if (mEventControlSOFT && mEventCallbackSOFT)
+    {
+        ALCenum events[] = { ALC_EVENT_TYPE_DEFAULT_DEVICE_CHANGED_SOFT };
+        mEventControlSOFT(1, events, ALC_FALSE);
+        mEventCallbackSOFT(nullptr, nullptr);
+    }
+    mFollowSystemDefault = false;
+    mEventControlSOFT    = nullptr;
+    mEventCallbackSOFT   = nullptr;
 
     LL_INFOS() << "About to LLAudioEngine::shutdown()" << LL_ENDL;
     LLAudioEngine::shutdown();
@@ -300,6 +425,12 @@ void LLAudioEngine_OpenAL::setOutputDevice(const std::string& id)
         return;  // already running on this device
     }
     mPreferredDevice = id;
+    // Following the OS default is only correct while the user is ON the
+    // default; picking a device pins it, picking "default" resumes. Set it
+    // here so the early exits below cannot leave it disagreeing with
+    // mPreferredDevice.
+    mFollowSystemDefault  = mPreferredDevice.empty() && mEventControlSOFT != nullptr;
+    mDefaultDeviceChanged = false;
 
     if (!mALCDevice)
     {
@@ -360,6 +491,13 @@ void LLAudioEngine_OpenAL::idle()
     // recomputation, channel reassignment. Our disconnect poll is
     // independent of any of it and just rides on top once a second.
     LLAudioEngine::idle();
+
+    // Raised on OpenAL's event thread by onDeviceEventSOFT.
+    if (mDefaultDeviceChanged)
+    {
+        mDefaultDeviceChanged = false;
+        reopenOnDefaultDevice();
+    }
 
     if (!mDisconnectExtAvailable || !mALCDevice) return;
 

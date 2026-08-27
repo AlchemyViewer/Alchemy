@@ -676,6 +676,44 @@ void LLFloaterColorPicker::drawPalette ()
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// Boolean test if input string is a valid hex color string
+bool LLFloaterColorPicker::isValidHexColor(std::string& hex_color, F32& hr, F32& hg, F32& hb)
+{
+    // Strip any whitespace and a leading # character if present
+    // (Often included in hex color strings from other places)
+    LLStringUtil::trim(hex_color);
+    if (!hex_color.empty() && hex_color.front() == '#')
+    {
+        hex_color = hex_color.substr(1);
+    }
+
+    // Make sure it's a real string and valid hex - we can't use the
+    // hex to dec code because that coerces invalid hex into decimal 0
+    if (hex_color.length() ==0 || hex_color.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos)
+    {
+        return false;
+    }
+
+    // Convert the hex string to a decimal number
+    std::stringstream oss;
+    oss << std::hex << hex_color;
+    unsigned int dec_val;
+    oss >> dec_val;
+
+    // Break out the RGB values in 0..1.0 range and pass back
+    // (They will only be used if this function returns true.)
+    hr = F32(((dec_val >> 16) & 0xff)) / 255.0f;
+    hg = F32(((dec_val >> 8) & 0xff)) / 255.0f;
+    hb = F32(((dec_val >> 0) & 0xff)) / 255.0f;
+
+    // The max chars in the field is more than 6 now so we can paste in
+    // poorly formatted color strings and reformat them on commit.
+    // TODO: there must be a way to to the preformat when the string
+    // is pasted into the line editor control.
+    return dec_val > 0xffffff ? false : true;
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // update text entry values for RGB/HSL (can't be done in ::draw () since this overwrites input
 void LLFloaterColorPicker::updateTextEntry ()
 {
@@ -756,28 +794,16 @@ void LLFloaterColorPicker::onTextEntryChanged ( LLUICtrl* ctrl )
     }
     else if ( name == "hex_value" )
     {
-        // get current RGB
-        S32 r, g, b;
         F32 rVal, gVal, bVal;
-        getCurRgb ( rVal, gVal, bVal );
-
         std::string hex_string = ctrl->getValue().asString();
-
-        static const boost::regex pattern("[[:xdigit:]]{6}");
-        if (!ll_regex_match(hex_string, pattern))
+        if (isValidHexColor(hex_string, rVal, gVal, bVal))
         {
-            return;
+            // update current RGB (and implicitly HSL)
+            selectCurRgb ( rVal, gVal, bVal );
         }
 
-        sscanf(hex_string.c_str(), "%02x%02x%02x", &r, &g, &b);
-
-        rVal = F32(r) / 255.f;
-        gVal = F32(g) / 255.f;
-        bVal = F32(b) / 255.f;
-
-        // update current RGB (and implicitly HSL)
-        selectCurRgb ( rVal, gVal, bVal );
-
+        // Either way: on a good entry this reformats it, on a bad one it puts
+        // the current colour back.
         updateTextEntry ();
     }
     // value in HSL boxes changed

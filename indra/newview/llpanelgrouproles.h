@@ -300,6 +300,7 @@ protected:
     LLLineEditor* mRoleTitle;
     LLTextEditor* mRoleDescription;
 
+    LLUICtrl*       mMembersNotLoadedLbl;
     LLCheckBoxCtrl* mMemberVisibleCheck;
     LLButton*       mDeleteRoleButton;
     LLButton*       mCreateRoleButton;
