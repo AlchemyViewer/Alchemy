@@ -3557,7 +3557,18 @@ bool LLIMMgr::leaveSession(const LLUUID& session_id)
     LLIMModel::LLIMSession* im_session = LLIMModel::getInstance()->findIMSession(session_id);
     if (!im_session) return false;
 
-    LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+    if (im_session->isGroupSessionType() && im_session->mCloseAction == LLIMModel::LLIMSession::SCloseAction::CLOSE_SNOOZE)
+    {
+        const S32 duration = im_session->mSnoozeDuration;
+        const F64 now = LLTimer::getTotalSeconds();
+        mSnoozedSessions[session_id] = duration < 0 ? -1.0 : now + duration;
+    }
+    else
+    {
+        LLIMModel::getInstance()->sendLeaveSession(session_id, im_session->mOtherParticipantID);
+        mSnoozedSessions.erase(session_id);
+    }
+
     gIMMgr->removeSession(session_id);
     return true;
 }
@@ -3746,6 +3757,45 @@ void LLIMMgr::disconnectAllSessions()
 bool LLIMMgr::hasSession(const LLUUID& session_id)
 {
     return LLIMModel::getInstance()->findIMSession(session_id) != NULL;
+}
+
+bool LLIMMgr::checkSnoozeExpiration(const LLUUID& session_id) const
+{
+    snoozed_sessions_t::const_iterator it = mSnoozedSessions.find(session_id);
+    return it != mSnoozedSessions.end() && it->second >= 0.0 && it->second <= LLTimer::getTotalSeconds();
+}
+
+bool LLIMMgr::isSnoozedSession(const LLUUID& session_id) const
+{
+    return mSnoozedSessions.find(session_id) != mSnoozedSessions.end();
+}
+
+bool LLIMMgr::restoreSnoozedSession(const LLUUID& session_id)
+{
+    snoozed_sessions_t::iterator it = mSnoozedSessions.find(session_id);
+    if (it == mSnoozedSessions.end())
+    {
+        return false;
+    }
+
+    LLGroupData group_data;
+    if (!gAgent.getGroupData(session_id, group_data))
+    {
+        return false;
+    }
+
+    mSnoozedSessions.erase(it);
+
+    gIMMgr->addSession(group_data.mName, IM_SESSION_GROUP_START, session_id);
+
+    uuid_vec_t ids;
+    LLIMModel::sendStartSession(session_id, session_id, ids, IM_SESSION_GROUP_START, false);
+
+    if (!gAgent.isDoNotDisturb())
+    {
+        make_ui_sound("UISndStartIM");
+    }
+    return true;
 }
 
 void LLIMMgr::clearPendingInvitation(const LLUUID& session_id)
@@ -4443,4 +4493,3 @@ LLHTTPRegistration<LLViewerChatterBoxSessionUpdate>
 LLHTTPRegistration<LLViewerChatterBoxInvitation>
     gHTTPRegistrationMessageChatterBoxInvitation(
         "/message/ChatterBoxInvitation");
-

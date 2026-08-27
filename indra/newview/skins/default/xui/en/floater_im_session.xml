@@ -301,6 +301,56 @@
                    tool_tip="View group notices"
                    top="1"
                    width="31" />
+                  <flyout_button
+                   arrow_button_width="18"
+                   follows="top|left"
+                   height="25"
+                   halign="left"
+                   label=""
+                   layout="topleft"
+                   left_pad="2"
+                   name="snooze_group_btn"
+                   tool_tip="Snooze group chat"
+                   top="1"
+                   width="44">
+                    <flyout_button.item
+                     label="Next message"
+                     value="0" />
+                    <flyout_button.item
+                     label="5 minutes"
+                     value="5" />
+                    <flyout_button.item
+                     label="15 minutes"
+                     value="15" />
+                    <flyout_button.item
+                     label="30 minutes"
+                     value="30" />
+                    <flyout_button.item
+                     label="45 minutes"
+                     value="45" />
+                    <flyout_button.item
+                     label="1 hour"
+                     value="60" />
+                    <flyout_button.item
+                     label="Next relog"
+                     value="-1" />
+                    <flyout_button.action_button
+                     image_bottom_pad="1"
+                     image_hover_unselected="Toolbar_Middle_Over"
+                     image_overlay="Conv_toolbar_snooze"
+                     image_overlay_alignment="left"
+                     image_selected="Toolbar_Middle_Selected"
+                     image_unselected="transparent.j2c"
+                     imgoverlay_label_space="0" />
+                    <flyout_button.drop_down_button
+                     image_hover_unselected="Toolbar_Middle_Over"
+                     image_overlay="Arrow_Small_Down"
+                     image_overlay_alignment="right"
+                     image_pressed="none"
+                     image_selected="Toolbar_Middle_Selected"
+                     image_unselected="Toolbar_Middle_Off"
+                     pad_right="-2" />
+                  </flyout_button>
                 </panel>           
                 <button
                  follows="right|top"

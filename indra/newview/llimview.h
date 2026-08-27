@@ -79,6 +79,13 @@ public:
             NONE_SESSION,
         } SType;
 
+        enum class SCloseAction
+        {
+            CLOSE_DEFAULT,
+            CLOSE_LEAVE,
+            CLOSE_SNOOZE
+        };
+
         LLIMSession(const LLUUID& session_id, const std::string& name,
             const EInstantMessage& type, const LLUUID& other_participant_id, const LLSD& voiceChannelInfo, const uuid_vec_t& ids, bool has_offline_msg);
         virtual ~LLIMSession();
@@ -122,6 +129,8 @@ public:
         std::string mName;
         EInstantMessage mType;
         SType mSessionType;
+        SCloseAction mCloseAction = SCloseAction::CLOSE_DEFAULT;
+        S32 mSnoozeDuration = -1;
         LLUUID mOtherParticipantID;
         uuid_vec_t mInitialTargetIDs;
         std::string mHistoryFileName;
@@ -444,6 +453,9 @@ public:
     void disconnectAllSessions();
 
     bool hasSession(const LLUUID& session_id);
+    bool checkSnoozeExpiration(const LLUUID& session_id) const;
+    bool isSnoozedSession(const LLUUID& session_id) const;
+    bool restoreSnoozedSession(const LLUUID& session_id);
 
     static LLUUID computeSessionID(EInstantMessage dialog, const LLUUID& other_participant_id);
 
@@ -529,6 +541,9 @@ private:
 
     LLSD mPendingInvitations;
     LLSD mPendingAgentListUpdates;
+
+    typedef std::map<LLUUID, F64> snoozed_sessions_t;
+    snoozed_sessions_t mSnoozedSessions;
 };
 
 class LLCallDialogManager : public LLSingleton<LLCallDialogManager>
