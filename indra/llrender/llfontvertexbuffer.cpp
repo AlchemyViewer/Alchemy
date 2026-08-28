@@ -89,6 +89,37 @@ void LLFontVertexBuffer::reset()
     mForegroundBufferList.clear();
 }
 
+namespace
+{
+    // The buffer keeps no copy of the text, so the only thing that varies with
+    // how it is stored is which LLFontGL entry point the offsets belong to.
+    S32 font_render(const LLFontGL* fontp, const LLWString& text, S32 begin_offset,
+                    F32 x, F32 y, const LLColor4& color,
+                    LLFontGL::HAlign halign, LLFontGL::VAlign valign,
+                    U8 style, LLFontGL::ShadowType shadow,
+                    S32 max_chars, S32 max_pixels, F32* right_x,
+                    bool use_ellipses, bool use_color,
+                    LLFontGL::pass_boundary_cb_t on_pass_boundary = nullptr)
+    {
+        return fontp->render(text, begin_offset, x, y, color, halign, valign, style, shadow,
+                             max_chars, max_pixels, right_x, use_ellipses, use_color,
+                             std::move(on_pass_boundary));
+    }
+
+    S32 font_render(const LLFontGL* fontp, std::string_view text, S32 begin_offset,
+                    F32 x, F32 y, const LLColor4& color,
+                    LLFontGL::HAlign halign, LLFontGL::VAlign valign,
+                    U8 style, LLFontGL::ShadowType shadow,
+                    S32 max_bytes, S32 max_pixels, F32* right_x,
+                    bool use_ellipses, bool use_color,
+                    LLFontGL::pass_boundary_cb_t on_pass_boundary = nullptr)
+    {
+        return fontp->renderBytes(text, begin_offset, x, y, color, halign, valign, style, shadow,
+                                  max_bytes, max_pixels, right_x, use_ellipses, use_color,
+                                  std::move(on_pass_boundary));
+    }
+}
+
 S32 LLFontVertexBuffer::render(
     const LLFontGL* fontp,
     const LLWString& text,
@@ -105,6 +136,24 @@ S32 LLFontVertexBuffer::render(
 {
     LLRectf rect_float((F32)rect.mLeft, (F32)rect.mTop, (F32)rect.mRight, (F32)rect.mBottom);
     return render(fontp, text, begin_offset, rect_float, color, halign, valign, style, shadow, max_chars, right_x, use_ellipses, use_color);
+}
+
+S32 LLFontVertexBuffer::renderBytes(
+    const LLFontGL* fontp,
+    std::string_view text,
+    S32 begin_offset,
+    LLRect rect,
+    const LLColor4& color,
+    LLFontGL::HAlign halign, LLFontGL::VAlign valign,
+    U8 style,
+    LLFontGL::ShadowType shadow,
+    S32 max_bytes, S32 max_pixels,
+    F32* right_x,
+    bool use_ellipses,
+    bool use_color)
+{
+    LLRectf rect_float((F32)rect.mLeft, (F32)rect.mTop, (F32)rect.mRight, (F32)rect.mBottom);
+    return renderBytes(fontp, text, begin_offset, rect_float, color, halign, valign, style, shadow, max_bytes, right_x, use_ellipses, use_color);
 }
 
 S32 LLFontVertexBuffer::render(
@@ -143,9 +192,82 @@ S32 LLFontVertexBuffer::render(
     return render(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow, max_chars, (S32)rect.getWidth(), right_x, use_ellipses, use_color);
 }
 
+S32 LLFontVertexBuffer::renderBytes(
+    const LLFontGL* fontp,
+    std::string_view text,
+    S32 begin_offset,
+    LLRectf rect,
+    const LLColor4& color,
+    LLFontGL::HAlign halign, LLFontGL::VAlign valign,
+    U8 style,
+    LLFontGL::ShadowType shadow,
+    S32 max_bytes,
+    F32* right_x,
+    bool use_ellipses,
+    bool use_color)
+{
+    F32 x = rect.mLeft;
+    F32 y = 0.f;
+
+    switch (valign)
+    {
+    case LLFontGL::TOP:
+        y = rect.mTop;
+        break;
+    case LLFontGL::VCENTER:
+        y = rect.getCenterY();
+        break;
+    case LLFontGL::BASELINE:
+    case LLFontGL::BOTTOM:
+        y = rect.mBottom;
+        break;
+    default:
+        y = rect.mBottom;
+        break;
+    }
+    return renderBytes(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow, max_bytes, (S32)rect.getWidth(), right_x, use_ellipses, use_color);
+}
+
 S32 LLFontVertexBuffer::render(
     const LLFontGL* fontp,
     const LLWString& text,
+    S32 begin_offset,
+    F32 x, F32 y,
+    const LLColor4& color,
+    LLFontGL::HAlign halign, LLFontGL::VAlign valign,
+    U8 style,
+    LLFontGL::ShadowType shadow,
+    S32 max_chars , S32 max_pixels,
+    F32* right_x,
+    bool use_ellipses,
+    bool use_color )
+{
+    return renderImpl(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow,
+                      max_chars, max_pixels, right_x, use_ellipses, use_color);
+}
+
+S32 LLFontVertexBuffer::renderBytes(
+    const LLFontGL* fontp,
+    std::string_view text,
+    S32 begin_offset,
+    F32 x, F32 y,
+    const LLColor4& color,
+    LLFontGL::HAlign halign, LLFontGL::VAlign valign,
+    U8 style,
+    LLFontGL::ShadowType shadow,
+    S32 max_bytes, S32 max_pixels,
+    F32* right_x,
+    bool use_ellipses,
+    bool use_color )
+{
+    return renderImpl(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow,
+                      max_bytes, max_pixels, right_x, use_ellipses, use_color);
+}
+
+template <typename TEXT>
+S32 LLFontVertexBuffer::renderImpl(
+    const LLFontGL* fontp,
+    const TEXT& text,
     S32 begin_offset,
     F32 x, F32 y,
     const LLColor4& color,
@@ -164,7 +286,7 @@ S32 LLFontVertexBuffer::render(
     if (!sEnableBufferCollection)
     {
         // For debug purposes and performance testing
-        return fontp->render(text, begin_offset, x, y, color, halign, valign, style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
+        return font_render(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
     }
     // Geometry-invalidating params: any change forces full genBuffers.
     const bool geometry_invalid =
@@ -236,9 +358,10 @@ S32 LLFontVertexBuffer::render(
     return mChars;
 }
 
+template <typename TEXT>
 void LLFontVertexBuffer::genBuffers(
     const LLFontGL* fontp,
-    const LLWString& text,
+    const TEXT& text,
     S32 begin_offset,
     F32 x, F32 y,
     const LLColor4& color,
@@ -284,7 +407,7 @@ void LLFontVertexBuffer::genBuffers(
     {
         gGL.beginList(&mForegroundBufferList);
     }
-    mChars = fontp->render(text, begin_offset, x, y, color, halign, valign,
+    mChars = font_render(fontp, text, begin_offset, x, y, color, halign, valign,
         style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color, pass_boundary);
     gGL.endList();
 

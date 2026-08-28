@@ -117,7 +117,7 @@ protected:
 
     LLFolderViewItem(const Params& p);
 
-    LLWString                   mLabel;
+    std::string                 mLabel;
     S32                         mLabelWidth;
     bool                        mLabelWidthDirty;
     bool                        mIsFavorite;
@@ -126,7 +126,7 @@ protected:
     LLFolderViewFolder*         mParentFolder;
     LLPointer<LLFolderViewModelItem> mViewModelItem;
     LLFontGL::StyleFlags        mLabelStyle;
-    LLWString                   mLabelSuffix;
+    std::string                 mLabelSuffix;
     bool                        mSuffixNeedsRefresh; //suffix and icons
     LLUIImagePtr                mIcon,
                                 mIconOpen,
@@ -272,7 +272,7 @@ public:
     // This method returns the label displayed on the view. This
     // method was primarily added to allow sorting on the folder
     // contents possible before the entire view has been constructed.
-    const LLWString& getLabel() const { return mLabel; }
+    const std::string& getLabel() const { return mLabel; }
 
     LLFolderViewFolder* getParentFolder( void ) { return mParentFolder; }
     const LLFolderViewFolder* getParentFolder( void ) const { return mParentFolder; }

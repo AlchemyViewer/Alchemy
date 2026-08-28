@@ -90,11 +90,69 @@ public:
         bool use_ellipses = false,
         bool use_color = true);
 
+    // The same three, in bytes. Nothing about the caching depends on how the
+    // text is stored — the buffer keeps no copy of it, so these share an
+    // implementation with the wide forms and differ only in which LLFontGL
+    // entry point the offsets are meant for.
+    S32 renderBytes(const LLFontGL* fontp,
+        std::string_view text,
+        S32 begin_offset,
+        LLRect rect,
+        const LLColor4& color,
+        LLFontGL::HAlign halign = LLFontGL::LEFT, LLFontGL::VAlign valign = LLFontGL::BASELINE,
+        U8 style = LLFontGL::NORMAL,
+        LLFontGL::ShadowType shadow = LLFontGL::NO_SHADOW,
+        S32 max_bytes = S32_MAX, S32 max_pixels = S32_MAX,
+        F32* right_x = NULL,
+        bool use_ellipses = false,
+        bool use_color = true);
+
+    S32 renderBytes(const LLFontGL* fontp,
+        std::string_view text,
+        S32 begin_offset,
+        LLRectf rect,
+        const LLColor4& color,
+        LLFontGL::HAlign halign = LLFontGL::LEFT, LLFontGL::VAlign valign = LLFontGL::BASELINE,
+        U8 style = LLFontGL::NORMAL,
+        LLFontGL::ShadowType shadow = LLFontGL::NO_SHADOW,
+        S32 max_bytes = S32_MAX,
+        F32* right_x = NULL,
+        bool use_ellipses = false,
+        bool use_color = true);
+
+    S32 renderBytes(const LLFontGL* fontp,
+        std::string_view text,
+        S32 begin_offset,
+        F32 x, F32 y,
+        const LLColor4& color,
+        LLFontGL::HAlign halign = LLFontGL::LEFT, LLFontGL::VAlign valign = LLFontGL::BASELINE,
+        U8 style = LLFontGL::NORMAL,
+        LLFontGL::ShadowType shadow = LLFontGL::NO_SHADOW,
+        S32 max_bytes = S32_MAX, S32 max_pixels = S32_MAX,
+        F32* right_x = NULL,
+        bool use_ellipses = false,
+        bool use_color = true);
+
     static void enableBufferCollection(bool enable) { sEnableBufferCollection = enable; }
 private:
 
+    template <typename TEXT>
+    S32 renderImpl(const LLFontGL* fontp,
+         const TEXT& text,
+         S32 begin_offset,
+         F32 x, F32 y,
+         const LLColor4& color,
+         LLFontGL::HAlign halign, LLFontGL::VAlign valign,
+         U8 style,
+         LLFontGL::ShadowType shadow,
+         S32 max_chars, S32 max_pixels,
+         F32* right_x,
+         bool use_ellipses,
+         bool use_color);
+
+    template <typename TEXT>
     void genBuffers(const LLFontGL* fontp,
-         const LLWString& text,
+         const TEXT& text,
          S32 begin_offset,
          F32 x, F32 y,
          const LLColor4& color,

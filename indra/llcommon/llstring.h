@@ -895,17 +895,17 @@ LL_COMMON_API void wstring_line_break_opportunities(LLWStringView wstr, std::vec
 LL_COMMON_API void wstring_tolower_indexed(LLWStringView wstr, LLWString& out_str,
                                            std::vector<size_t>* out_map = nullptr);
 
-// Codepoints of `utf8str` whose cased UTF-8 encoding fills exactly
-// `cased_bytes` bytes. This maps an offset produced against a cased copy of
-// some text back onto the text itself, without either the copy or a stored
-// index map: the original is walked applying the same conversion, and the cased
-// byte lengths are accumulated as it goes.
+// Bytes of `utf8str` whose cased UTF-8 encoding fills exactly `cased_bytes`
+// bytes. This maps an offset produced against a cased copy of some text back
+// onto the text itself, without either the copy or a stored index map: the
+// original is walked applying the same conversion, and the cased byte lengths
+// are accumulated as it goes.
 //
 // Casing UTF-8 is not length-preserving -- sharp s uppercases to two bytes'
 // worth more -- so any offset taken from a cased search key needs this before it
 // can index the text that key was built from.
-LL_COMMON_API size_t utf8str_length_from_cased_utf8_length(std::string_view utf8str,
-                                                           size_t cased_bytes, bool to_upper);
+LL_COMMON_API size_t utf8str_bytes_from_cased_bytes(std::string_view utf8str,
+                                                    size_t cased_bytes, bool to_upper);
 
 // True when every byte is below 0x80, so the string is its own codepoint
 // sequence and case conversion cannot move an offset within it. Worth asking
@@ -1536,7 +1536,7 @@ template<> LL_COMMON_API void LLStringUtilBase<llwchar>::toLower(std::basic_stri
 // The narrow forms case UTF-8 in place of running tolower/toupper over each
 // byte, which left every non-ASCII character alone. Pure-ASCII input is
 // unaffected; anything else now cases, and may change length doing so -- see
-// utf8str_length_from_cased_utf8_length for callers holding an offset across it.
+// utf8str_bytes_from_cased_bytes for callers holding an offset across it.
 template<> LL_COMMON_API void LLStringUtilBase<char>::toUpper(std::string& string);
 template<> LL_COMMON_API void LLStringUtilBase<char>::toLower(std::string& string);
 

@@ -1422,7 +1422,7 @@ void LLStringUtilBase<llwchar>::toLower(std::basic_string<llwchar>& string)
     string = utf8str_to_wstring(utf8);
 }
 
-size_t utf8str_length_from_cased_utf8_length(std::string_view utf8str, size_t cased_bytes, bool to_upper)
+size_t utf8str_bytes_from_cased_bytes(std::string_view utf8str, size_t cased_bytes, bool to_upper)
 {
     const UCaseMap* csm = case_map();
     if (!csm)
@@ -1433,7 +1433,6 @@ size_t utf8str_length_from_cased_utf8_length(std::string_view utf8str, size_t ca
     const uint8_t* bytes = (const uint8_t*)utf8str.data();
     const int32_t length = (int32_t)utf8str.size();
 
-    size_t codepoints = 0;
     size_t spent = 0;
     int32_t at = 0;
 
@@ -1443,20 +1442,26 @@ size_t utf8str_length_from_cased_utf8_length(std::string_view utf8str, size_t ca
         UChar32 cp = 0;
         U8_NEXT(bytes, at, length, cp);
         if (cp < 0)
+        {
+            // Ill-formed. Stop at its start rather than partway through it, so
+            // the offset returned is always one a caller can slice on.
+            at = begin;
             break;
+        }
 
         // Ask for the cased length of this one codepoint without writing it.
         UErrorCode status = U_ZERO_ERROR;
         const int32_t cased = convert(csm, nullptr, 0, utf8str.data() + begin, at - begin, &status);
         if (cased < 0 || spent + (size_t)cased > cased_bytes)
         {
-            // The offset lands inside this codepoint's cased form; stop before it.
+            // The offset lands inside this codepoint's cased form; stop before
+            // it, which leaves `at` at this codepoint's own start.
+            at = begin;
             break;
         }
         spent += (size_t)cased;
-        ++codepoints;
     }
-    return codepoints;
+    return (size_t)at;
 }
 
 void wstring_tolower_indexed(LLWStringView wstr, LLWString& out_str, std::vector<size_t>* out_map)

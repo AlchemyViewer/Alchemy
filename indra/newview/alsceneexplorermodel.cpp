@@ -329,8 +329,8 @@ LLFolderViewFilter::Match ALSceneExplorerFilter::getFilterMatch(LLFolderViewMode
 
     const std::string& label = item->getDisplayName();
 
-    // All-ASCII means lowercasing moved nothing, so the byte offset already
-    // indexes the label by codepoint.
+    // All-ASCII means lowercasing moved nothing, so the offset already indexes
+    // the label as it stands.
     if (utf8str_is_ascii(label) && utf8str_is_ascii(mConstraints.mFilterSubString))
     {
         match.mOffset = at;
@@ -338,8 +338,8 @@ LLFolderViewFilter::Match ALSceneExplorerFilter::getFilterMatch(LLFolderViewMode
         return match;
     }
 
-    match.mOffset = utf8str_length_from_cased_utf8_length(label, at, false);
-    const size_t end = utf8str_length_from_cased_utf8_length(
+    match.mOffset = utf8str_bytes_from_cased_bytes(label, at, false);
+    const size_t end = utf8str_bytes_from_cased_bytes(
         label, at + mConstraints.mFilterSubString.size(), false);
     match.mLength = (end > match.mOffset) ? end - match.mOffset : 0;
     return match;

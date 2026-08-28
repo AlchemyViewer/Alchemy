@@ -73,7 +73,7 @@ public:
     //color.
     struct ParagraphColorSegment
     {
-        S32     mNumChars;
+        S32     mNumBytes;
         LLColor4 mColor;
     };
 
@@ -84,9 +84,9 @@ public:
     class LineColorSegment
     {
         public:
-            LineColorSegment(LLWString text, LLColor4 color, F32 xpos) : mText(text), mColor(color), mXPosition(xpos) {}
+            LineColorSegment(std::string text, LLColor4 color, F32 xpos) : mText(std::move(text)), mColor(color), mXPosition(xpos) {}
         public:
-            LLWString mText;
+            std::string mText;
             LLColor4  mColor;
             F32       mXPosition;
     };
@@ -111,11 +111,11 @@ public:
     class Paragraph
     {
         public:
-            Paragraph (LLWString str, const LLColor4 &color, F32 add_time, const LLFontGL* font, F32 screen_width);
+            Paragraph (std::string str, const LLColor4 &color, F32 add_time, const LLFontGL* font, F32 screen_width);
             void makeParagraphColorSegments ( const LLColor4 &color);
             void updateLines ( F32 screen_width,  const LLFontGL* font, bool force_resize=false );
         public:
-            LLWString mParagraphText;   //The entire text of the paragraph
+            std::string mParagraphText; //The entire text of the paragraph
             paragraph_color_segments_t  mParagraphColorSegments;
             F32 mAddTime;               //Time this paragraph was added to the display.
             F32 mMaxWidth;              //Width of the widest line of text in this paragraph.

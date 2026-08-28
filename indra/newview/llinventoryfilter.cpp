@@ -729,7 +729,7 @@ LLFolderViewFilter::Match LLInventoryFilter::getFilterMatch(LLFolderViewModelIte
     const std::string suffix = item->getLabelSuffix();
 
     // While the label and the search term are both ASCII, uppercasing moved
-    // nothing and the byte offset is already the codepoint offset. That covers
+    // nothing and the offset already indexes the label as it stands. That covers
     // most of an inventory, and skips building the combined label as well as
     // both walks of it.
     if (utf8str_is_ascii(name) && utf8str_is_ascii(suffix) && utf8str_is_ascii(mFilterSubString))
@@ -741,8 +741,8 @@ LLFolderViewFilter::Match LLInventoryFilter::getFilterMatch(LLFolderViewModelIte
 
     std::string label = name;
     label += suffix;
-    match.mOffset = utf8str_length_from_cased_utf8_length(label, at, true);
-    const size_t end = utf8str_length_from_cased_utf8_length(label, at + mFilterSubString.size(), true);
+    match.mOffset = utf8str_bytes_from_cased_bytes(label, at, true);
+    const size_t end = utf8str_bytes_from_cased_bytes(label, at + mFilterSubString.size(), true);
     match.mLength = (end > match.mOffset) ? end - match.mOffset : 0;
     return match;
 }

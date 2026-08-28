@@ -1944,37 +1944,54 @@ namespace tut
         LLStringUtil::toLower(ascii);
         ensure_equals("ascii unchanged", ascii, std::string("image.png"));
 
-        // "straße" uppercases to "STRASSE": the search key is one byte and one
-        // codepoint longer than the label it came from. An offset past the
-        // sharp s must come back to the label's own indexing.
+        // The ff ligature uppercases to "FF": three bytes become two, so an
+        // offset taken from the key sits BEFORE where the same text starts in
+        // the label. This is the case the mapping exists for.
+        {
+            const std::string label = "a\xEF\xAC\x80" "b xyz";
+            std::string key = label;
+            LLStringUtil::toUpper(key);
+            const size_t at = key.find("XYZ");
+            ensure("found in the key", at != std::string::npos);
+            ensure("the ligature expanded, so the key is shorter",
+                   key.size() < label.size());
+
+            // xyz begins at byte 6 of the label and byte 5 of the key.
+            ensure_equals("offset maps onto the label's own bytes",
+                          utf8str_bytes_from_cased_bytes(label, at, true), size_t(6));
+            ensure("the raw offset would have been wrong", at != size_t(6));
+        }
+
+        // "straße" uppercases to "STRASSE": one codepoint longer, but the same
+        // number of bytes, because the sharp s already took two. In bytes the
+        // offset maps straight through -- which is the point of counting them.
         const std::string label = "stra\xC3\x9F" "e xyz";
         std::string key = label;
         LLStringUtil::toUpper(key);
         const size_t at = key.find("XYZ");
         ensure("found in the key", at != std::string::npos);
+        ensure_equals("same byte length either cased or not", key.size(), label.size());
 
-        // Raw, that offset is past where xyz sits in the label.
-        const size_t mapped = utf8str_length_from_cased_utf8_length(label, at, true);
-        ensure_equals("mapped to the label's codepoint index", mapped, size_t(7));
+        const size_t mapped = utf8str_bytes_from_cased_bytes(label, at, true);
+        ensure_equals("mapped to the label's own byte offset", mapped, size_t(8));
 
-        // And the matched span's own length, which is not the key's: here they
-        // agree because xyz is ASCII, but the sharp s shows the difference.
-        const size_t span_begin = utf8str_length_from_cased_utf8_length(label, 0, true);
-        const size_t span_end = utf8str_length_from_cased_utf8_length(label, key.find(' '), true);
-        ensure_equals("word before the space is 6 codepoints", span_end - span_begin, size_t(6));
+        // And the matched span's own length, which is not the key's.
+        const size_t span_begin = utf8str_bytes_from_cased_bytes(label, 0, true);
+        const size_t span_end = utf8str_bytes_from_cased_bytes(label, key.find(' '), true);
+        ensure_equals("word before the space is seven bytes", span_end - span_begin, size_t(7));
 
         // Offset 0 and a whole-string offset are the degenerate ends.
         ensure_equals("zero maps to zero",
-                      utf8str_length_from_cased_utf8_length(label, 0, true), size_t(0));
-        ensure_equals("whole string maps to its codepoint count",
-                      utf8str_length_from_cased_utf8_length(label, key.size(), true), size_t(10));
+                      utf8str_bytes_from_cased_bytes(label, 0, true), size_t(0));
+        ensure_equals("whole string maps to its byte count",
+                      utf8str_bytes_from_cased_bytes(label, key.size(), true), size_t(11));
 
         // ASCII text maps one-to-one, so existing offsets are unaffected.
         const std::string plain = "hello world";
         ensure_equals("ascii maps straight through",
-                      utf8str_length_from_cased_utf8_length(plain, 6, true), size_t(6));
+                      utf8str_bytes_from_cased_bytes(plain, 6, true), size_t(6));
 
-        ensure_equals("empty", utf8str_length_from_cased_utf8_length(std::string(), 4, true), size_t(0));
+        ensure_equals("empty", utf8str_bytes_from_cased_bytes(std::string(), 4, true), size_t(0));
     }
 
     // "Which word is here" and "where is the next one", the questions

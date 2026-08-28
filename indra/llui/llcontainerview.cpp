@@ -46,7 +46,7 @@ static ContainerViewRegistry::Register<LLPanel> r3("panel", &LLPanel::fromXML);
 LLContainerView::LLContainerView(const LLContainerView::Params& p)
 :   LLView(p),
     mShowLabel(p.show_label),
-    mLabel(utf8str_to_wstring(p.label)),
+    mLabel(p.label),
     mDisplayChildren(p.display_children)
 {
     mScrollContainer = NULL;
@@ -120,7 +120,7 @@ void LLContainerView::draw()
     // Draw the label
     if (mShowLabel)
     {
-        LLFontGL::getFontMonospace()->render(
+        LLFontGL::getFontMonospace()->renderBytes(
             mLabel, 0, 2.f, (F32)(getRect().getHeight() - 2), LLColor4(1,1,1,1), LLFontGL::LEFT, LLFontGL::TOP);
     }
 
@@ -285,7 +285,7 @@ LLRect LLContainerView::getRequiredRect()
 
 void LLContainerView::setLabel(const std::string& label)
 {
-    mLabel = utf8str_to_wstring(label);
+    mLabel = label;
 }
 
 void LLContainerView::setDisplayChildren(bool displayChildren)
