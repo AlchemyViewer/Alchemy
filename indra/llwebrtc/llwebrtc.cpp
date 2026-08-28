@@ -1787,9 +1787,12 @@ void LLWebRTCPeerConnectionImpl::OnSuccess(webrtc::SessionDescriptionInterface *
             opus_payload = std::to_string(payload_id);
             sdp_mangled_stream << "a=rtpmap:" << opus_payload << " opus/48000/2" << "\n";
         }
-        else if (sdp_line.find("a=fmtp:" + opus_payload) == 0)
+        else if (!opus_payload.empty() && sdp_line.find("a=fmtp:" + opus_payload) == 0)
         {
-            sdp_mangled_stream << sdp_line << "a=fmtp:" << opus_payload
+            // Replaces the line rather than trailing it.  Written end to end the
+            // two run together into something that is not an attribute at all,
+            // and every parameter below is lost with it.
+            sdp_mangled_stream << "a=fmtp:" << opus_payload
             << " minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxplaybackrate=48000;sprop-maxplaybackrate=48000;sprop-maxcapturerate=48000\n";
         }
         else
