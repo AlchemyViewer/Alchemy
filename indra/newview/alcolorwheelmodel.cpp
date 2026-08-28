@@ -72,8 +72,20 @@ const F32 ALColorWheelModel::MAX_CHROMA = 1.15470054f * 0.70710678f;   // sqrt(2
 // static
 void ALColorWheelModel::toChroma(const LLVector3& rgb, F32& u_out, F32& v_out)
 {
-    const F32 m = masterOf(rgb);
-    const LLVector3 d(rgb.mV[VX] - m, rgb.mV[VY] - m, rgb.mV[VZ] - m);
+    const F32 r = rgb.mV[VX];
+    const F32 g = rgb.mV[VY];
+    const F32 b = rgb.mV[VZ];
+
+    // (2r - g - b) / 3 rather than r - (r + g + b) / 3. Algebraically the same
+    // deviation from the master, but this form is exactly zero when the three
+    // channels are equal: 2v - v - v cancels bit for bit whatever the compiler
+    // does with contraction, where the mean of three equal floats is generally
+    // not the float they came from, leaving a deviation of an epsilon whose
+    // sign is not even stable. A neutral colour has no chroma, and everything
+    // downstream bins or pins on that being zero and not nearly zero.
+    const LLVector3 d((2.f * r - g - b) / 3.f,
+                      (2.f * g - r - b) / 3.f,
+                      (2.f * b - r - g) / 3.f);
 
     u_out = d * CHROMA_U;
     v_out = d * CHROMA_V;
