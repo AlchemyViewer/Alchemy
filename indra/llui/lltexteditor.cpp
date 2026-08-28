@@ -3401,9 +3401,12 @@ LLWString LLTextEditor::getConvertedText() const
         if (segment && segment->getStyle() && segment->getStyle()->getDrawHighlightBg())
         {
             S32 seg_length = segment->getEnd() - segment->getStart();
-            std::string slurl = segment->getStyle()->getLinkHREF();
+            LLWString slurl = utf8str_to_wstring(segment->getStyle()->getLinkHREF());
 
-            text.replace(segment->getStart() + diff, seg_length, utf8str_to_wstring(slurl));
+            text.replace(segment->getStart() + diff, seg_length, slurl);
+            // Both terms are codepoints, because that is what `text` and the
+            // segment offsets are. Counting the link's bytes here runs every
+            // later segment's offset off by however much of it was not ASCII.
             diff += (S32)slurl.size() - seg_length;
         }
     }

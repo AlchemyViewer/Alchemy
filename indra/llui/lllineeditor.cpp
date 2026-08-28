@@ -1147,8 +1147,15 @@ void LLLineEditor::removeWord(bool prev)
 
 void LLLineEditor::addChar(const llwchar uni_char)
 {
-    if (!mAllowEmoji && LLStringOps::isEmoji(uni_char))
+    // The extenders go with the emoji they extend. Characters arrive here one
+    // at a time, so rejecting only the emoji leaves a skin tone or a variation
+    // selector to land as a mark on whatever preceded it. ZWJ is deliberately
+    // not one of them and stays: Indic scripts need it.
+    if (!mAllowEmoji
+        && (LLStringOps::isEmoji(uni_char) || LLStringOps::isEmojiClusterExtender(uni_char)))
+    {
         return;
+    }
 
     llwchar new_c = uni_char;
     if (hasSelection())
@@ -1496,37 +1503,42 @@ void LLLineEditor::pasteHelper(bool is_primary)
 
             // Insert the string
 
-            // Check to see that the size isn't going to be larger than the max number of bytes
-            U32 available_bytes = mMaxLengthBytes - wstring_utf8_length(mText);
+            // Check to see that the size isn't going to be larger than the max number of bytes.
+            // Signed, and floored at zero: the text can already be over the
+            // limit -- setText was asked to skip it, or setMaxTextLength
+            // lowered it afterwards -- and an unsigned subtraction there wraps
+            // to a number no paste can exceed, letting the whole thing in.
+            const S32 available_bytes = llmax(0, mMaxLengthBytes - wstring_utf8_length(mText));
 
-            if ( available_bytes < (U32) wstring_utf8_length(clean_string) )
+            if (available_bytes < wstring_utf8_length(clean_string))
             {   // Doesn't all fit
-                llwchar current_symbol = clean_string[0];
-                U32 wchars_that_fit = 0;
-                U32 total_bytes = wchar_utf8_length(current_symbol);
-
-                //loop over the "wide" characters (symbols)
-                //and check to see how large (in bytes) each symbol is.
-                while ( total_bytes <= available_bytes )
+                S32 total_bytes = 0;
+                size_t wchars_that_fit = 0;
+                while (wchars_that_fit < clean_string.size())
                 {
-                    //while we still have available bytes
-                    //"accept" the current symbol and check the size
-                    //of the next one
-                    current_symbol = clean_string[++wchars_that_fit];
-                    total_bytes += wchar_utf8_length(current_symbol);
+                    const S32 symbol_bytes = wchar_utf8_length(clean_string[wchars_that_fit]);
+                    if (total_bytes + symbol_bytes > available_bytes)
+                        break;
+                    total_bytes += symbol_bytes;
+                    ++wchars_that_fit;
                 }
-                // Truncate the clean string at the limit of what will fit
-                clean_string = clean_string.substr(0, wchars_that_fit);
+                // Truncate the clean string at the limit of what will fit,
+                // backed off to a whole character so the cut cannot land
+                // between a letter and its accent or inside a flag.
+                clean_string = clean_string.substr(0,
+                    wstring_grapheme_align_backward(clean_string, wchars_that_fit));
                 LLUI::getInstance()->reportBadKeystroke();
             }
 
             if (mMaxLengthChars)
             {
-                auto available_chars = mMaxLengthChars - mText.getWString().size();
+                const S32 available_chars =
+                    llmax(0, mMaxLengthChars - (S32)mText.getWString().size());
 
-                if (available_chars < clean_string.size())
+                if ((size_t)available_chars < clean_string.size())
                 {
-                    clean_string = clean_string.substr(0, available_chars);
+                    clean_string = clean_string.substr(0,
+                        wstring_grapheme_align_backward(clean_string, (size_t)available_chars));
                     LLUI::getInstance()->reportBadKeystroke();
                 }
             }

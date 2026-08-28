@@ -346,9 +346,13 @@ bool LLTextBase::truncate()
 
         if ( static_cast<S32>(utf8_text.size()) > mMaxTextByteLength )
         {
-            // Truncate safely in UTF-8
-            std::string temp_utf8_text = utf8str_truncate( utf8_text, mMaxTextByteLength );
-            LLWString text = utf8str_to_wstring( temp_utf8_text );
+            // Truncate safely in UTF-8. utf8str_truncate stops on a codepoint
+            // boundary; backing that off against the whole string finds a
+            // character boundary, so the cut cannot fall between a letter and
+            // its accent or inside a flag or a family.
+            const size_t byte_cut = utf8str_grapheme_align_backward(utf8_text,
+                utf8str_truncate(utf8_text, mMaxTextByteLength).size());
+            LLWString text = utf8str_to_wstring(utf8_text.substr(0, byte_cut));
             // remove extra bit of current string, to preserve formatting, etc.
             removeStringNoUndo(static_cast<S32>(text.size()), static_cast<S32>(getWText().size() - text.size()));
             did_truncate = true;
@@ -1703,7 +1707,7 @@ void LLTextBase::replaceWithSuggestion(U32 index)
             deselect();
             // Insert the suggestion in its place
             LLWString suggestion = utf8str_to_wstring(mSuggestionList[index]);
-            insertStringNoUndo(it->first, utf8str_to_wstring(mSuggestionList[index]));
+            insertStringNoUndo(it->first, suggestion);
 
             // Delete the misspelled word
             removeStringNoUndo(it->first + (S32)suggestion.length(), it->second - it->first);

@@ -2138,4 +2138,51 @@ namespace tut
         const auto range = wstring_word_range_at(text, 2);
         ensure("an ideograph is a word", range.first != range.second);
     }
+
+    // utf8str_grapheme_align_backward: the byte offsets are the caller's own,
+    // and a cut backs off to where a whole character starts. Everything that
+    // trims UTF-8 to a length leans on this.
+    template<> template<>
+    void llstring_utf_object_t::test<125>()
+    {
+        // ASCII: every offset is already a boundary.
+        const std::string ascii = "abcd";
+        for (size_t i = 0; i <= ascii.size(); ++i)
+        {
+            ensure_equals("ascii is all boundaries",
+                          utf8str_grapheme_align_backward(ascii, i), i);
+        }
+
+        // Inside a multi-byte codepoint, back to where it starts. "A" + U+65E5
+        // (3 bytes) + "B".
+        const std::string cjk = "A\xE6\x97\xA5" "B";
+        ensure_equals("before the codepoint", utf8str_grapheme_align_backward(cjk, 1), size_t(1));
+        ensure_equals("inside it, byte 2",    utf8str_grapheme_align_backward(cjk, 2), size_t(1));
+        ensure_equals("inside it, byte 3",    utf8str_grapheme_align_backward(cjk, 3), size_t(1));
+        ensure_equals("after it",             utf8str_grapheme_align_backward(cjk, 4), size_t(4));
+
+        // A base and its combining mark are one character: "e" + U+0301.
+        const std::string combining = "e\xCC\x81" "x";
+        ensure_equals("between base and mark",
+                      utf8str_grapheme_align_backward(combining, 1), size_t(0));
+        ensure_equals("inside the mark",
+                      utf8str_grapheme_align_backward(combining, 2), size_t(0));
+        ensure_equals("after the whole cluster",
+                      utf8str_grapheme_align_backward(combining, 3), size_t(3));
+
+        // A flag is two codepoints and eight bytes, and one character. Cutting
+        // anywhere inside gives nothing rather than half a flag.
+        const std::string flag = "\xF0\x9F\x87\xBA\xF0\x9F\x87\xB8";
+        for (size_t i = 1; i < flag.size(); ++i)
+        {
+            ensure_equals("no half flags", utf8str_grapheme_align_backward(flag, i), size_t(0));
+        }
+        ensure_equals("whole flag survives",
+                      utf8str_grapheme_align_backward(flag, flag.size()), flag.size());
+
+        // Degenerate input.
+        ensure_equals("zero",  utf8str_grapheme_align_backward(cjk, 0), size_t(0));
+        ensure_equals("past end", utf8str_grapheme_align_backward(cjk, 99), cjk.size());
+        ensure_equals("empty", utf8str_grapheme_align_backward(std::string(), 0), size_t(0));
+    }
 }

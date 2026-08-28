@@ -1094,6 +1094,14 @@ size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos
     if (byte_pos >= n)
         return n;
 
+    // An offset landing inside a codepoint has to come back to that
+    // codepoint's own start first. ICU normalises such an index down and then
+    // steps strictly back from there, which lands a whole character too early.
+    while (byte_pos > 0 && ((unsigned char)utf8str[byte_pos] & 0xC0) == 0x80)
+    {
+        --byte_pos;
+    }
+
     thread_local BreakIterators iters;
     UBreakIterator* iter = iters.get(UBRK_CHARACTER);
     if (!iter)
