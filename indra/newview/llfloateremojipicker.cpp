@@ -64,10 +64,10 @@ static const std::string FREQUENTLY_USED_CATEGORY = "frequently used";
 
 // Floater state related variables
 // Per-user most-recently-used and most-frequently-used lists. Stored as
-// LLWString so multi-codepoint emoji (ZWJ families, flag pairs, keycap, tag
+// UTF-8 so multi-codepoint emoji (ZWJ families, flag pairs, keycap, tag
 // subdivision flags) count as a single logical emoji.
-static std::list<LLWString> sRecentlyUsed;
-static std::list<std::pair<LLWString, U32>> sFrequentlyUsed;
+static std::list<std::string> sRecentlyUsed;
+static std::list<std::pair<std::string, U32>> sFrequentlyUsed;
 
 // State file related values
 static std::string sStateFileName;
@@ -97,7 +97,7 @@ class LLEmojiGridDivider : public LLScrollingPanel
 public:
     LLEmojiGridDivider(const LLPanel::Params& panel_params, std::string text)
         : LLScrollingPanel(panel_params)
-        , mText(utf8string_to_wstring(text))
+        , mText(std::move(text))
     {
     }
 
@@ -107,8 +107,8 @@ public:
 
         F32 x = 4; // padding-left
         F32 y = (F32)(getRect().getHeight() / 2);
-        LLFontGL::getFontSansSerif()->render(
-            mText,                           // wstr
+        LLFontGL::getFontSansSerif()->renderBytes(
+            mText,                           // utf8text
             0,                               // begin_offset
             x,                               // x
             y,                               // y
@@ -123,7 +123,7 @@ public:
     virtual void updatePanel(bool allow_modify) override {}
 
 private:
-    const LLWString mText;
+    const std::string mText;
 };
 
 class LLEmojiGridIcon : public LLScrollingPanel
@@ -147,8 +147,8 @@ public:
 
         F32 x = (F32)(getRect().getWidth() / 2);
         F32 y = (F32)(getRect().getHeight() / 2);
-        LLFontGL::getFontEmojiLarge()->render(
-            mChar,                      // wstr
+        LLFontGL::getFontEmojiLarge()->renderBytes(
+            mChar,                      // utf8text
             0,                          // begin_offset
             x,                          // x
             y,                          // y
@@ -188,13 +188,13 @@ public:
     virtual void updatePanel(bool allow_modify) override {}
 
     const LLEmojiSearchResult& getData() const { return mData; }
-    const LLWString& getChar() const { return mChar; }
+    const std::string& getChar() const { return mChar; }
     void setHasVariants(bool b) { mHasVariants = b; }
     void setRightClickCallback(right_click_cb_t cb) { mRightClickCb = std::move(cb); }
 
 private:
     const LLEmojiSearchResult mData;
-    const LLWString mChar;
+    const std::string mChar;
     bool mHasVariants;
     right_click_cb_t mRightClickCb;
 };
@@ -215,14 +215,14 @@ public:
         }
         else
         {
-            setData(LLWString(), LLStringUtil::null, 0, 0);
+            setData(std::string(), LLStringUtil::null, 0, 0);
         }
     }
 
-    void setData(const LLWString& emoji, std::string title, size_t begin, size_t end)
+    void setData(const std::string& emoji, std::string title, size_t begin, size_t end)
     {
         mWStr = emoji;
-        mTitle = utf8str_to_wstring(title);
+        mTitle = std::move(title);
         mBegin = begin;
         mEnd = end;
     }
@@ -247,7 +247,7 @@ public:
 protected:
     void drawIcon(F32 x, F32 y, S32 max_pixels)
     {
-        LLFontGL::getFontEmojiHuge()->render(
+        LLFontGL::getFontEmojiHuge()->renderBytes(
             mWStr,                      // wstr
             0,                          // begin_offset
             x,                          // x
@@ -271,8 +271,8 @@ protected:
         LLFontGL* font = LLFontGL::getFontSansSerifHuge();
         if (mBegin)
         {
-            LLWString text = mTitle.substr(0, mBegin);
-            font->render(
+            std::string text = mTitle.substr(0, mBegin);
+            font->renderBytes(
                 text,                          // text
                 0,                             // begin_offset
                 x0,                            // x
@@ -282,7 +282,7 @@ protected:
                 LLFontGL::VCENTER,             // valign
                 LLFontGL::NORMAL,              // style
                 LLFontGL::DROP_SHADOW_SOFT,    // shadow
-                static_cast<S32>(text.size()), // max_chars
+                static_cast<S32>(text.size()), // max_bytes
                 (S32)x1);                      // max_pixels
             F32 dx = font->getWidthF32(text);
             x0 += dx;
@@ -290,8 +290,8 @@ protected:
         }
         if (x1 > 0 && mEnd > mBegin)
         {
-            LLWString text = mTitle.substr(mBegin, mEnd - mBegin);
-            font->render(
+            std::string text = mTitle.substr(mBegin, mEnd - mBegin);
+            font->renderBytes(
                 text,                          // text
                 0,                             // begin_offset
                 x0,                            // x
@@ -301,7 +301,7 @@ protected:
                 LLFontGL::VCENTER,             // valign
                 LLFontGL::NORMAL,              // style
                 LLFontGL::DROP_SHADOW_SOFT,    // shadow
-                static_cast<S32>(text.size()), // max_chars
+                static_cast<S32>(text.size()), // max_bytes
                 (S32)x1);                      // max_pixels
             F32 dx = font->getWidthF32(text);
             x0 += dx;
@@ -309,8 +309,8 @@ protected:
         }
         if (x1 > 0 && mEnd < mTitle.size())
         {
-            LLWString text = mEnd ? mTitle.substr(mEnd) : mTitle;
-            font->render(
+            std::string text = mEnd ? mTitle.substr(mEnd) : mTitle;
+            font->renderBytes(
                 text,                          // text
                 0,                             // begin_offset
                 x0,                            // x
@@ -320,14 +320,14 @@ protected:
                 LLFontGL::VCENTER,             // valign
                 LLFontGL::NORMAL,              // style
                 LLFontGL::DROP_SHADOW_SOFT,    // shadow
-                static_cast<S32>(text.size()), // max_chars
+                static_cast<S32>(text.size()), // max_bytes
                 (S32)x1);                      // max_pixels
         }
     }
 
 private:
-    LLWString mWStr;
-    LLWString mTitle;
+    std::string mWStr;
+    std::string mTitle;
     size_t mBegin;
     size_t mEnd;
 };
@@ -466,7 +466,7 @@ void LLFloaterEmojiPicker::initialize()
             args["[FILTER]"] = mFilterPattern.substr(1);
             std::string title(getString("text_no_emoji_for_filter", args));
             LLEmojiDictionary::searchInShortCode(begin, end, title, mFilterPattern);
-            mPreview->setData(LLWString(1, (llwchar)EMPTY_LIST_IMAGE_INDEX), title, begin, end);
+            mPreview->setData(utf8str_from_cp((llwchar)EMPTY_LIST_IMAGE_INDEX), title, begin, end);
             showPreview(true);
         }
         return;
@@ -514,7 +514,7 @@ void LLFloaterEmojiPicker::fillGroups()
 
     // Create button for "All categories"
     params.name = "all_categories";
-    createGroupButton(params, rect, LLWString(1, (llwchar)ALL_EMOJIS_IMAGE_INDEX));
+    createGroupButton(params, rect, utf8str_from_cp((llwchar)ALL_EMOJIS_IMAGE_INDEX));
 
     // Create group and button for "Frequently used"
     if (!sFrequentlyUsed.empty())
@@ -527,7 +527,7 @@ void LLFloaterEmojiPicker::fillGroups()
             mFilteredEmojiGroups.push_back(USED_EMOJIS_GROUP_INDEX);
             mFilteredEmojis.emplace_back(cats);
             params.name = "used_categories";
-            createGroupButton(params, rect, LLWString(1, (llwchar)USED_EMOJIS_IMAGE_INDEX));
+            createGroupButton(params, rect, utf8str_from_cp((llwchar)USED_EMOJIS_IMAGE_INDEX));
         }
     }
 
@@ -630,7 +630,7 @@ void LLFloaterEmojiPicker::fillGroupEmojis(std::map<std::string, std::vector<LLE
     }
 }
 
-void LLFloaterEmojiPicker::createGroupButton(LLButton::Params& params, const LLRect& rect, const LLWString& emoji)
+void LLFloaterEmojiPicker::createGroupButton(LLButton::Params& params, const LLRect& rect, const std::string& emoji)
 {
     LLButton* button = LLUICtrlFactory::create<LLButton>(params);
     button->setClickedCallback([this](LLUICtrl* ctrl, const LLSD&) { onGroupButtonClick(ctrl); });
@@ -863,7 +863,7 @@ void LLFloaterEmojiPicker::fillEmojisCategory(const std::vector<LLEmojiSearchRes
     {
         const LLEmojiDictionary& dict = LLEmojiDictionary::instance();
         const LLEmojiDictionary::emoji2descr_map_t& emoji2descr = dict.getEmoji2Descr();
-        LLEmojiSearchResult emoji { LLWString(), "", 0, 0 };
+        LLEmojiSearchResult emoji { std::string(), "", 0, 0 };
         if (category == FREQUENTLY_USED_CATEGORY)
         {
             for (const auto& code : sFrequentlyUsed)
@@ -1011,7 +1011,7 @@ void LLFloaterEmojiPicker::buildToneStrip()
     {
         params.name = name;
         LLButton* button = LLUICtrlFactory::create<LLButton>(params);
-        button->setLabel(LLUIString(LLWString(1, glyph)));
+        button->setLabel(LLUIString(utf8str_from_cp(glyph)));
         button->setToolTip(getString(tooltip_key));
         // Render the tone-modifier glyph in its own font color from the
         // start — without this the buttons inherit the disabled-grey
@@ -1337,7 +1337,7 @@ void LLFloaterEmojiPicker::showVariantFlyout(LLEmojiGridIcon* baseIcon)
     // stay nullptr (data gaps). Keyboard nav walks this.
     mFlyoutCells.assign(row_count, std::vector<LLEmojiGridIcon*>(COLS, nullptr));
 
-    auto add_cell = [&](S32 col, S32 row_index, const LLWString& seq, const std::string& shortcode)
+    auto add_cell = [&](S32 col, S32 row_index, const std::string& seq, const std::string& shortcode)
     {
         if (seq.empty())
             return; // skip — empty cell, preserves grid alignment without rendering
@@ -1577,9 +1577,9 @@ void LLFloaterEmojiPicker::dismissVariantFlyout()
     }
 }
 
-void LLFloaterEmojiPicker::commitVariant(const LLWString& sequence)
+void LLFloaterEmojiPicker::commitVariant(const std::string& sequence)
 {
-    LLSD value(wstring_to_utf8str(sequence));
+    LLSD value(sequence);
     setValue(value);
     onCommit();
     // Defer the actual deletion: this is being invoked from a child cell's
@@ -1714,7 +1714,7 @@ void LLFloaterEmojiPicker::onEmojiMouseUp(LLUICtrl* ctrl)
 
     if (LLEmojiGridIcon* icon = dynamic_cast<LLEmojiGridIcon*>(ctrl))
     {
-        LLSD value(wstring_to_utf8str(icon->getChar()));
+        LLSD value(icon->getChar());
         setValue(value);
 
         onCommit();
@@ -1998,14 +1998,14 @@ void LLFloaterEmojiPicker::hideFloater() const
 }
 
 // static
-std::list<LLWString>& LLFloaterEmojiPicker::getRecentlyUsed()
+std::list<std::string>& LLFloaterEmojiPicker::getRecentlyUsed()
 {
     loadState();
     return sRecentlyUsed;
 }
 
 // static
-void LLFloaterEmojiPicker::onEmojiUsed(const LLWString& emoji)
+void LLFloaterEmojiPicker::onEmojiUsed(const std::string& emoji)
 {
     if (emoji.empty())
         return;
@@ -2096,7 +2096,7 @@ void LLFloaterEmojiPicker::loadState()
     int maxCountR = 20;
     for (const std::string& token : rtokens)
     {
-        LLWString emoji = utf8str_to_wstring(token);
+        std::string emoji = token;
         // Drop legacy ASCII-decimal tokens and obvious garbage.
         if (emoji.empty() || emoji[0] < 0x80)
             continue;
@@ -2121,7 +2121,7 @@ void LLFloaterEmojiPicker::loadState()
         if (colon == std::string::npos || colon == 0 || colon + 1 >= token.size())
             continue;
 
-        LLWString emoji = utf8str_to_wstring(token.substr(0, colon));
+        std::string emoji = token.substr(0, colon);
         if (emoji.empty() || emoji[0] < 0x80)
             continue;
 
@@ -2130,7 +2130,7 @@ void LLFloaterEmojiPicker::loadState()
             continue;
 
         auto it = std::find_if(sFrequentlyUsed.begin(), sFrequentlyUsed.end(),
-            [&emoji](std::pair<LLWString, U32>& it) { return it.first == emoji; });
+            [&emoji](std::pair<std::string, U32>& it) { return it.first == emoji; });
         if (it != sFrequentlyUsed.end())
         {
             it->second += count;
@@ -2171,11 +2171,11 @@ void LLFloaterEmojiPicker::saveState()
     {
         U32 maxCount = 20;
         std::string recentlyUsed;
-        for (const LLWString& emoji : sRecentlyUsed)
+        for (const std::string& emoji : sRecentlyUsed)
         {
             if (!recentlyUsed.empty())
                 recentlyUsed += ",";
-            recentlyUsed += wstring_to_utf8str(emoji);
+            recentlyUsed += emoji;
             if (!--maxCount)
                 break;
         }
@@ -2192,7 +2192,7 @@ void LLFloaterEmojiPicker::saveState()
                 frequentlyUsed += ",";
             char buffer[32];
             snprintf(buffer, sizeof(buffer), ":%u", (U32)it.second);
-            frequentlyUsed += wstring_to_utf8str(it.first);
+            frequentlyUsed += it.first;
             frequentlyUsed += buffer;
             if (!--maxCount)
                 break;

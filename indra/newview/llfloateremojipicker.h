@@ -59,8 +59,8 @@ public:
 
     void hideFloater() const;
 
-    static std::list<LLWString>& getRecentlyUsed();
-    static void onEmojiUsed(const LLWString& emoji);
+    static std::list<std::string>& getRecentlyUsed();
+    static void onEmojiUsed(const std::string& emoji);
 
     static void loadState();
     static void saveState();
@@ -70,7 +70,7 @@ private:
     void fillGroups();
     void fillCategoryFrequentlyUsed(std::map<std::string, std::vector<LLEmojiSearchResult>>& cats);
     void fillGroupEmojis(std::map<std::string, std::vector<LLEmojiSearchResult>>& cats, U32 index);
-    void createGroupButton(LLButton::Params& params, const LLRect& rect, const LLWString& emoji);
+    void createGroupButton(LLButton::Params& params, const LLRect& rect, const std::string& emoji);
     void resizeGroupButtons();
     void selectEmojiGroup(U32 index);
     void fillEmojis(bool fromResize = false);
@@ -90,7 +90,7 @@ private:
     void refreshToneStripHighlight();
     void showVariantFlyout(LLEmojiGridIcon* baseIcon);
     void dismissVariantFlyout();
-    void commitVariant(const LLWString& sequence);
+    void commitVariant(const std::string& sequence);
     // Keyboard nav over the 2D flyout grid. Returns true when the
     // event was consumed.
     bool moveFlyoutFocus(S32 dRow, S32 dCol);

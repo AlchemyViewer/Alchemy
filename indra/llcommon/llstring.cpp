@@ -1041,6 +1041,26 @@ private:
 
 } // anonymous namespace
 
+void utf8str_append_cp(std::string& out, llwchar cp)
+{
+    // A lone surrogate or an out-of-range value has no UTF-8 form.
+    // Substituting rather than dropping keeps every codepoint contributing
+    // bytes, which is what an offset map built alongside this depends on.
+    const UChar32 c = (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+                    ? (UChar32)0xFFFD : (UChar32)cp;
+    char encoded[4];
+    int32_t written = 0;
+    U8_APPEND_UNSAFE(encoded, written, c);
+    out.append(encoded, (size_t)written);
+}
+
+std::string utf8str_from_cp(llwchar cp)
+{
+    std::string out;
+    utf8str_append_cp(out, cp);
+    return out;
+}
+
 void ALUtf8View::assign(LLWStringView wstr)
 {
     mUtf8.clear();
@@ -1048,18 +1068,10 @@ void ALUtf8View::assign(LLWStringView wstr)
     mUtf8.reserve(wstr.size());
     mOffsets.reserve(wstr.size() + 1);
 
-    char encoded[4];
     for (const llwchar cp : wstr)
     {
         mOffsets.push_back(mUtf8.size());
-        // A lone surrogate or an out-of-range value has no UTF-8 form.
-        // Substituting keeps the bytes and the offset map agreeing, which
-        // is what every index that comes back depends on.
-        const UChar32 c = (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
-                        ? (UChar32)0xFFFD : (UChar32)cp;
-        int32_t written = 0;
-        U8_APPEND_UNSAFE(encoded, written, c);
-        mUtf8.append(encoded, (size_t)written);
+        utf8str_append_cp(mUtf8, cp);
     }
     mOffsets.push_back(mUtf8.size());
 }

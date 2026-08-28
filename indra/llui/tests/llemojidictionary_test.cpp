@@ -27,15 +27,15 @@ namespace
 LLEmojiDescriptor make_thumbs_up_descriptor()
 {
     LLEmojiDescriptor d;
-    d.Character = utf8str_to_wstring("\xF0\x9F\x91\x8D"); // 👍
+    d.Character = "\xF0\x9F\x91\x8D"; // 👍
     d.ShortCodes.push_back("thumbs_up");
     for (U8 tone = 1; tone <= 5; ++tone)
     {
         LLEmojiVariant v;
         // The exact bytes don't matter for scoring tests — just need a
-        // distinct LLWString per variant so equality comparisons work.
-        v.Character.push_back((llwchar)0x1F44D);
-        v.Character.push_back((llwchar)(0x1F3FA + tone));
+        // distinct sequence per variant so equality comparisons work.
+        utf8str_append_cp(v.Character, (llwchar)0x1F44D);
+        utf8str_append_cp(v.Character, (llwchar)(0x1F3FA + tone));
         v.Tone = tone;
         v.Gender = -1;
         d.Variants.push_back(std::move(v));
@@ -46,14 +46,14 @@ LLEmojiDescriptor make_thumbs_up_descriptor()
 LLEmojiDescriptor make_astronaut_descriptor()
 {
     LLEmojiDescriptor d;
-    d.Character = utf8str_to_wstring("\xF0\x9F\xA7\x91\xE2\x80\x8D\xF0\x9F\x9A\x80"); // 🧑‍🚀
+    d.Character = "\xF0\x9F\xA7\x91\xE2\x80\x8D\xF0\x9F\x9A\x80"; // 🧑‍🚀
     d.ShortCodes.push_back("person_astronaut");
     // person, then person + 5 tones
     {
         LLEmojiVariant v;
-        v.Character.push_back((llwchar)0x1F9D1);
-        v.Character.push_back((llwchar)0x200D);
-        v.Character.push_back((llwchar)0x1F680);
+        utf8str_append_cp(v.Character, (llwchar)0x1F9D1);
+        utf8str_append_cp(v.Character, (llwchar)0x200D);
+        utf8str_append_cp(v.Character, (llwchar)0x1F680);
         v.Tone = 0;
         v.Gender = 2;
         d.Variants.push_back(v);
@@ -61,10 +61,10 @@ LLEmojiDescriptor make_astronaut_descriptor()
     for (U8 tone = 1; tone <= 5; ++tone)
     {
         LLEmojiVariant w;
-        w.Character.push_back((llwchar)0x1F9D1);
-        w.Character.push_back((llwchar)(0x1F3FA + tone));
-        w.Character.push_back((llwchar)0x200D);
-        w.Character.push_back((llwchar)0x1F680);
+        utf8str_append_cp(w.Character, (llwchar)0x1F9D1);
+        utf8str_append_cp(w.Character, (llwchar)(0x1F3FA + tone));
+        utf8str_append_cp(w.Character, (llwchar)0x200D);
+        utf8str_append_cp(w.Character, (llwchar)0x1F680);
         w.Tone = tone;
         w.Gender = 2;
         d.Variants.push_back(w);
@@ -72,9 +72,9 @@ LLEmojiDescriptor make_astronaut_descriptor()
     // man, then man + 5 tones
     {
         LLEmojiVariant m;
-        m.Character.push_back((llwchar)0x1F468);
-        m.Character.push_back((llwchar)0x200D);
-        m.Character.push_back((llwchar)0x1F680);
+        utf8str_append_cp(m.Character, (llwchar)0x1F468);
+        utf8str_append_cp(m.Character, (llwchar)0x200D);
+        utf8str_append_cp(m.Character, (llwchar)0x1F680);
         m.Tone = 0;
         m.Gender = 0;
         d.Variants.push_back(m);
@@ -82,10 +82,10 @@ LLEmojiDescriptor make_astronaut_descriptor()
     for (U8 tone = 1; tone <= 5; ++tone)
     {
         LLEmojiVariant w;
-        w.Character.push_back((llwchar)0x1F468);
-        w.Character.push_back((llwchar)(0x1F3FA + tone));
-        w.Character.push_back((llwchar)0x200D);
-        w.Character.push_back((llwchar)0x1F680);
+        utf8str_append_cp(w.Character, (llwchar)0x1F468);
+        utf8str_append_cp(w.Character, (llwchar)(0x1F3FA + tone));
+        utf8str_append_cp(w.Character, (llwchar)0x200D);
+        utf8str_append_cp(w.Character, (llwchar)0x1F680);
         w.Tone = tone;
         w.Gender = 0;
         d.Variants.push_back(w);
@@ -142,7 +142,7 @@ namespace tut
     void object::test<3>()
     {
         LLEmojiDescriptor empty;
-        empty.Character = utf8str_to_wstring("\xF0\x9F\x92\xA9"); // 💩
+        empty.Character = "\xF0\x9F\x92\xA9"; // 💩
         const LLEmojiVariant* v = LLEmojiDictionary::instance().findVariant(empty, 3, -1);
         ensure("no variants returns nullptr", v == nullptr);
     }
@@ -295,7 +295,7 @@ namespace tut
     {
         LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
         ensure("base char returned",
-               LLEmojiDictionary::instance().getEmojiFromShortCode(":thumbs_up:") == utf8str_to_wstring("\xF0\x9F\x91\x8D"));
+               LLEmojiDictionary::instance().getEmojiFromShortCode(":thumbs_up:") == "\xF0\x9F\x91\x8D");
     }
 
     // getEmojiFromShortCode returns the VARIANT character for a variant
@@ -306,7 +306,7 @@ namespace tut
         LLEmojiDictionary::instance().loadEmojisFromSD(make_thumbs_up_dictionary_blob());
         ensure("variant char returned",
                LLEmojiDictionary::instance().getEmojiFromShortCode(":thumbs_up_dark_skin_tone:")
-                   == utf8str_to_wstring("\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF"));
+                   == "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF");
     }
 
     // getEmojiFromShortCode returns empty for an unknown shortcode.
@@ -329,7 +329,7 @@ namespace tut
         LLEmojiDictionary::instance().findByShortCode(results, ":thumbs_up_d");
         ensure("at least one result", !results.empty());
 
-        const LLWString expected_dark = utf8str_to_wstring("\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF");
+        const std::string expected_dark = "\xF0\x9F\x91\x8D\xF0\x9F\x8F\xBF";
         bool saw_dark = false;
         for (const auto& r : results)
         {

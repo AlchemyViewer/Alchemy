@@ -46,7 +46,9 @@ constexpr S32 HELPER_FLOATER_OFFSET_Y = 0;
 
 std::string LLEmojiHelper::getToolTip(const LLWString& emoji) const
 {
-    return LLEmojiDictionary::instance().getNameFromEmoji(emoji);
+    // The helper still speaks the editors' LLWString; the dictionary is UTF-8.
+    // This conversion goes when the editors do.
+    return LLEmojiDictionary::instance().getNameFromEmoji(wstring_to_utf8str(emoji));
 }
 
 bool LLEmojiHelper::isActive(const LLUICtrl* ctrl_p) const
@@ -90,7 +92,8 @@ void LLEmojiHelper::showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, c
     // Variant shortcodes (e.g. :thumbs_up_dark_skin_tone:) need the
     // variant's character, not the base's, so we go through
     // getEmojiFromShortCode rather than reading descriptor->Character.
-    LLWString emoji_chars = LLEmojiDictionary::instance().getEmojiFromShortCode(short_code);
+    LLWString emoji_chars = utf8str_to_wstring(
+        LLEmojiDictionary::instance().getEmojiFromShortCode(short_code));
     if (!emoji_chars.empty())
     {
         cb(emoji_chars);

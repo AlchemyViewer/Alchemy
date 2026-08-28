@@ -561,7 +561,7 @@ void LLFloaterIMSessionTab::onEmojiPickerClosed()
 
 void LLFloaterIMSessionTab::initEmojiRecentPanel()
 {
-    std::list<LLWString>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
+    std::list<std::string>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
     if (recentlyUsed.empty())
     {
         mEmojiRecentEmptyText->setVisible(true);
@@ -570,9 +570,9 @@ void LLFloaterIMSessionTab::initEmojiRecentPanel()
     else
     {
         // Pass as a list-of-clusters so setEmojis can keep ZWJ sequences
-        // intact. A single concatenated LLWString would collapse the groups
+        // intact. A single concatenated string would collapse the groups
         // back into ambiguous codepoints.
-        std::vector<LLWString> emojis(recentlyUsed.begin(), recentlyUsed.end());
+        std::vector<std::string> emojis(recentlyUsed.begin(), recentlyUsed.end());
         mEmojiRecentIconsCtrl->setEmojis(emojis);
         mEmojiRecentEmptyText->setVisible(false);
         mEmojiRecentContainer->setVisible(true);
@@ -686,8 +686,8 @@ void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
     {
         if (next_run != clusters.end() && next_run->first == i)
         {
-            LLFloaterEmojiPicker::onEmojiUsed(LLWString(text.data() + next_run->first,
-                                                        next_run->second - next_run->first));
+            LLFloaterEmojiPicker::onEmojiUsed(wstring_to_utf8str(LLWString(text.data() + next_run->first,
+                                                        next_run->second - next_run->first)));
             emojiSent = true;
             i = next_run->second;
             ++next_run;
@@ -696,7 +696,7 @@ void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
 
         if (dictionary->isEmoji(text[i]))
         {
-            LLFloaterEmojiPicker::onEmojiUsed(LLWString(1, text[i]));
+            LLFloaterEmojiPicker::onEmojiUsed(utf8str_from_cp(text[i]));
             emojiSent = true;
         }
         ++i;

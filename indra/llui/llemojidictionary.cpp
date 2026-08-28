@@ -104,9 +104,9 @@ struct emoji_filter_shortcode_or_category_contains : public emoji_filter_base
 };
 
 // Match a needle against a descriptor's variant shortcodes, returning the
-// LLWString of the first matching variant (so a search like ":thumbs_up_dark"
+// character of the first matching variant (so a search like ":thumbs_up_dark"
 // surfaces 👍🏿 directly rather than the yellow base).
-static const LLWString* find_variant_shortcode_match(const LLEmojiDescriptor& descr, const std::string& needle)
+static const std::string* find_variant_shortcode_match(const LLEmojiDescriptor& descr, const std::string& needle)
 {
     for (const LLEmojiVariant& v : descr.Variants)
     {
@@ -151,11 +151,11 @@ void LLEmojiDictionary::initClass()
     pThis->loadEmojis();
 }
 
-LLWString LLEmojiDictionary::findMatchingEmojis(const std::string& needle) const
+std::string LLEmojiDictionary::findMatchingEmojis(const std::string& needle) const
 {
-    // Each descriptor's Character is itself an LLWString (possibly several
-    // codepoints for ZWJ sequences). Concatenate them all into a single
-    // LLWString so the caller can render the match as a run of emoji.
+    // Each descriptor's Character is itself a sequence (possibly several
+    // codepoints for ZWJ families). Concatenate them all into one string so
+    // the caller can render the match as a run of emoji.
     //
     // For the variant-matching fallback we strip the leading colon so a
     // needle like ":thumbs_up_dark" walks the variants of every descriptor —
@@ -166,7 +166,7 @@ LLWString LLEmojiDictionary::findMatchingEmojis(const std::string& needle) const
         variant_needle.erase(variant_needle.begin());
     LLStringUtil::toLower(variant_needle);
 
-    LLWString result;
+    std::string result;
     for (const LLEmojiDescriptor& d : mEmojis)
     {
         if (emoji_filter_shortcode_or_category_contains(needle)(d))
@@ -179,7 +179,7 @@ LLWString LLEmojiDictionary::findMatchingEmojis(const std::string& needle) const
         // the user gets the tone-or-gender-specific emoji directly.
         if (!variant_needle.empty())
         {
-            if (const LLWString* variant_char = find_variant_shortcode_match(d, variant_needle))
+            if (const std::string* variant_char = find_variant_shortcode_match(d, variant_needle))
             {
                 result += *variant_char;
             }
@@ -243,16 +243,18 @@ void LLEmojiDictionary::findByShortCode(
     if (needle.empty() || needle.front() != ':')
         return;
 
-    std::map<llwchar, std::vector<LLEmojiSearchResult>> results;
+    // Grouped by where in the shortcode the match began, so earlier matches
+    // sort first. The key is that position, not a character.
+    std::map<std::size_t, std::vector<LLEmojiSearchResult>> results;
 
-    auto try_match = [&](const LLWString& character, const std::string& shortCode)
+    auto try_match = [&](const std::string& character, const std::string& shortCode)
     {
         if (shortCode.size() < needle.size() || shortCode.front() != needle.front())
             return;
         std::size_t begin, end;
         if (searchInShortCode(begin, end, shortCode, needle))
         {
-            results[static_cast<llwchar>(begin)].emplace_back(character, shortCode, begin, end);
+            results[begin].emplace_back(character, shortCode, begin, end);
         }
     };
 
@@ -284,7 +286,7 @@ void LLEmojiDictionary::findByShortCode(
     }
 }
 
-const LLEmojiDescriptor* LLEmojiDictionary::getDescriptorFromEmoji(const LLWString& emoji) const
+const LLEmojiDescriptor* LLEmojiDictionary::getDescriptorFromEmoji(std::string_view emoji) const
 {
     const auto it = mEmoji2Descr.find(emoji);
     return (mEmoji2Descr.end() != it) ? it->second : nullptr;
@@ -302,7 +304,7 @@ const LLEmojiDescriptor* LLEmojiDictionary::getDescriptorFromShortCode(const std
     return (mVariantShortCode2Base.end() != vit) ? vit->second.first : nullptr;
 }
 
-LLWString LLEmojiDictionary::getEmojiFromShortCode(const std::string& short_code) const
+std::string LLEmojiDictionary::getEmojiFromShortCode(const std::string& short_code) const
 {
     const auto it = mShortCode2Descr.find(short_code);
     if (mShortCode2Descr.end() != it)
@@ -315,10 +317,10 @@ LLWString LLEmojiDictionary::getEmojiFromShortCode(const std::string& short_code
         if (base && idx >= 0 && idx < (S32)base->Variants.size())
             return base->Variants[idx].Character;
     }
-    return LLWString();
+    return std::string();
 }
 
-const LLEmojiDescriptor* LLEmojiDictionary::getBaseFromVariant(const LLWString& emoji, S32* outIndex) const
+const LLEmojiDescriptor* LLEmojiDictionary::getBaseFromVariant(std::string_view emoji, S32* outIndex) const
 {
     const auto it = mVariantEmoji2Base.find(emoji);
     if (mVariantEmoji2Base.end() == it)
@@ -404,7 +406,7 @@ const LLEmojiVariant* LLEmojiDictionary::findVariant(const LLEmojiDescriptor& ba
     return best_score > 0 ? best : nullptr;
 }
 
-std::string LLEmojiDictionary::getNameFromEmoji(const LLWString& emoji) const
+std::string LLEmojiDictionary::getNameFromEmoji(std::string_view emoji) const
 {
     const auto it = mEmoji2Descr.find(emoji);
     return (mEmoji2Descr.end() != it) ? it->second->ShortCodes.front() : LLStringUtil::null;
@@ -415,9 +417,9 @@ bool LLEmojiDictionary::isEmoji(llwchar ch) const
     // Currently used codes: A9,AE,203C,2049,2122,...,2B55,3030,303D,3297,3299,1F004,...,1FAF6
     if (ch == 0xA9 || ch == 0xAE || (ch >= 0x2000 && ch < 0x3300) || (ch >= 0x1F000 && ch < 0x20000))
     {
-        // The dictionary is keyed by full LLWString sequences, so ask
+        // The dictionary is keyed by whole sequences, so ask
         // whether the single-codepoint emoji exists as its own entry.
-        return mEmoji2Descr.find(LLWString(1, ch)) != mEmoji2Descr.end();
+        return mEmoji2Descr.find(utf8str_from_cp(ch)) != mEmoji2Descr.end();
     }
 
     return false;
@@ -504,7 +506,7 @@ void LLEmojiDictionary::loadGroups()
             // Add new group
             mGroups.emplace_back();
             LLEmojiGroup& group = mGroups.back();
-            // Carry the full LLWString — some group icons need U+FE0F to
+            // Carry the whole sequence — some group icons need U+FE0F to
             // force emoji presentation (✈ 🛩 ⏲ etc.), and truncating to
             // a single codepoint left those buttons blank.
             group.Character = loadIcon(sd);
@@ -520,7 +522,7 @@ void LLEmojiDictionary::loadGroups()
 
     // Add group "others"
     mGroups.emplace_back();
-    mGroups.back().Character = LLWString(1, (llwchar)GROUP_OTHERS_IMAGE_INDEX);
+    mGroups.back().Character = utf8str_from_cp((llwchar)GROUP_OTHERS_IMAGE_INDEX);
 }
 
 void LLEmojiDictionary::loadEmojis()
@@ -559,7 +561,7 @@ void LLEmojiDictionary::loadEmojisFromSD(const LLSD& data)
     {
         const LLSD& sd = *it;
 
-        LLWString icon = loadIcon(sd);
+        std::string icon = loadIcon(sd);
         if (icon.empty())
         {
             LL_WARNS() << "Skipping invalid emoji descriptor (no icon)" << LL_ENDL;
@@ -647,13 +649,13 @@ void LLEmojiDictionary::loadEmojisFromSD(const LLSD& data)
     }
 }
 
-LLWString LLEmojiDictionary::loadIcon(const LLSD& sd)
+std::string LLEmojiDictionary::loadIcon(const LLSD& sd)
 {
     // The Character field may be a single codepoint or a multi-codepoint
     // sequence (ZWJ family, flag pair, keycap, tag subdivision). Return the
-    // whole LLWString; the caller decides whether only a single codepoint
+    // whole sequence; the caller decides whether only a single codepoint
     // is acceptable (LLEmojiGroup icons collapse to the first).
-    return utf8str_to_wstring(sd["Character"].asString());
+    return sd["Character"].asString();
 }
 
 std::list<std::string> LLEmojiDictionary::loadCategories(const LLSD& sd)
@@ -685,7 +687,7 @@ std::vector<LLEmojiVariant> LLEmojiDictionary::loadVariants(const LLSD& sd)
     {
         const LLSD& vsd = *it;
         LLEmojiVariant v;
-        v.Character = utf8str_to_wstring(vsd["Character"].asString());
+        v.Character = vsd["Character"].asString();
         if (v.Character.empty())
             continue;
         if (vsd.has("Tone"))

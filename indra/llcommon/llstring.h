@@ -829,6 +829,13 @@ struct LLCodepointAt
 };
 LL_COMMON_API LLCodepointAt utf8str_decode_at(std::string_view utf8str, size_t byte_pos);
 
+// The inverse: one codepoint as the bytes that encode it. What a caller holding
+// a single character — a keystroke, a map key — needs to reach an API that takes
+// bytes. Anything unencodable becomes U+FFFD, so the result is always
+// well-formed and always non-empty.
+LL_COMMON_API void utf8str_append_cp(std::string& out, llwchar cp);
+LL_COMMON_API std::string utf8str_from_cp(llwchar cp);
+
 LL_COMMON_API size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos);
