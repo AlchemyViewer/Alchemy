@@ -202,7 +202,10 @@ void LLCustomProcessor::Initialize(int sample_rate_hz, int num_channels)
 
 void LLCustomProcessor::Process(webrtc::AudioBuffer *audio)
 {
-    if (audio->num_channels() < 1 || audio->num_frames() < 480)
+    // A 10ms buffer holds 480 frames at 48kHz but only 160 at 16kHz, the rate a
+    // headset delivers in hands-free mode, so the frame count says nothing about
+    // whether the buffer is usable.
+    if (audio->num_channels() < 1 || audio->num_frames() < 1)
     {
         return;
     }
@@ -219,7 +222,14 @@ void LLCustomProcessor::Process(webrtc::AudioBuffer *audio)
 
         // we've changed our desired gain, so set the incremental
         // gain change so that we smoothly step over 20ms
-        mGainStep = (desired_gain - mCurrentGain) / (mSampleRateHz / 50);
+        // 20ms of samples to ramp over, or an immediate step if the rate is
+        // not known yet.
+        const int ramp_samples = mSampleRateHz / 50;
+        mGainStep = ramp_samples > 0 ? (desired_gain - mCurrentGain) / ramp_samples : 0.0f;
+        if (ramp_samples <= 0)
+        {
+            mCurrentGain = desired_gain;
+        }
     }
 
     if (mRampFrames)
