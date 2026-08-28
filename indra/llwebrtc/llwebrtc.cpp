@@ -121,7 +121,151 @@ int32_t LLWebRTCAudioTransport::RecordedDataIsAvailable(const void* audio_data,
     totalSum += energy;
     mMicrophoneEnergy = std::sqrt(totalSum / (number_of_frames * number_of_channels * buffer_size));
 
+    // 3) While previewing devices, keep a copy to render back to the user.
+    if (mTuning.load(std::memory_order_relaxed))
+    {
+        WriteEcho(samples, number_of_frames, number_of_channels, samples_per_sec);
+    }
+
     return ret;
+}
+
+void LLWebRTCAudioTransport::SetTuning(bool tuning)
+{
+    std::lock_guard<std::mutex> lock(mEchoMutex);
+    mTuning.store(tuning, std::memory_order_relaxed);
+    mEchoSamples.clear();
+    mEchoRead       = 0;
+    mEchoFill       = 0;
+    mEchoChannels   = 0;
+    mEchoSampleRate = 0;
+}
+
+void LLWebRTCAudioTransport::WriteEcho(const int16_t* samples, size_t frames, size_t channels, uint32_t samples_per_sec)
+{
+    if (!samples || !frames || !channels || !samples_per_sec)
+    {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(mEchoMutex);
+
+    if (channels != mEchoChannels || samples_per_sec != mEchoSampleRate)
+    {
+        // First block of the preview, or the capture device changed shape.
+        mEchoChannels   = channels;
+        mEchoSampleRate = samples_per_sec;
+        mEchoSamples.assign((samples_per_sec * channels * ECHO_BUFFER_MS) / 1000, 0);
+        mEchoRead = 0;
+        mEchoFill = 0;
+    }
+
+    const size_t capacity = mEchoSamples.size();
+    if (!capacity)
+    {
+        return;
+    }
+
+    // Keep the newest audio when more arrives than fits: an echo that lags is
+    // worse than one that drops.
+    const size_t available = frames * channels;
+    const size_t count     = std::min(available, capacity);
+    const size_t from      = available - count;
+
+    size_t write = (mEchoRead + mEchoFill) % capacity;
+    for (size_t i = 0; i < count; ++i)
+    {
+        mEchoSamples[write] = samples[from + i];
+        write               = (write + 1) % capacity;
+    }
+
+    if (mEchoFill + count > capacity)
+    {
+        mEchoRead = (mEchoRead + (mEchoFill + count - capacity)) % capacity;
+        mEchoFill = capacity;
+    }
+    else
+    {
+        mEchoFill += count;
+    }
+}
+
+bool LLWebRTCAudioTransport::ReadEcho(int16_t* out, size_t frames, size_t channels, uint32_t samples_per_sec)
+{
+    if (!out || !frames || !channels)
+    {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(mEchoMutex);
+
+    // Nothing is resampled here.  Rendering audio captured at another rate
+    // would be heard as noise rather than as the microphone.
+    if (!mEchoChannels || samples_per_sec != mEchoSampleRate)
+    {
+        return false;
+    }
+
+    const size_t capacity = mEchoSamples.size();
+    const size_t needed   = frames * mEchoChannels;
+    if (!capacity || mEchoFill < needed)
+    {
+        return false;
+    }
+
+    // Render at the gain the peer path applies, so the preview is as loud as
+    // the microphone will actually be to others.  Read once per block: within
+    // one 10ms block the gain is constant, so a slider drag steps at block
+    // boundaries rather than part way through a waveform.
+    const float gain = mGain.load(std::memory_order_relaxed);
+
+    auto scaled = [gain](int32_t sample) -> int16_t
+    {
+        const float value = static_cast<float>(sample) * gain;
+        if (value >= 32767.0f)
+        {
+            return 32767;
+        }
+        if (value <= -32768.0f)
+        {
+            return -32768;
+        }
+        return static_cast<int16_t>(value);
+    };
+
+    if (channels == mEchoChannels)
+    {
+        for (size_t i = 0; i < needed; ++i)
+        {
+            out[i] = scaled(mEchoSamples[(mEchoRead + i) % capacity]);
+        }
+    }
+    else if (mEchoChannels == 1 && channels == 2)
+    {
+        for (size_t frame = 0; frame < frames; ++frame)
+        {
+            const int16_t sample = scaled(mEchoSamples[(mEchoRead + frame) % capacity]);
+            out[frame * 2]       = sample;
+            out[frame * 2 + 1]   = sample;
+        }
+    }
+    else if (mEchoChannels == 2 && channels == 1)
+    {
+        for (size_t frame = 0; frame < frames; ++frame)
+        {
+            const int32_t left  = mEchoSamples[(mEchoRead + frame * 2) % capacity];
+            const int32_t right = mEchoSamples[(mEchoRead + frame * 2 + 1) % capacity];
+            out[frame]          = scaled((left + right) / 2);
+        }
+    }
+    else
+    {
+        return false;
+    }
+
+    mEchoRead = (mEchoRead + needed) % capacity;
+    mEchoFill -= needed;
+    return true;
 }
 
 int32_t LLWebRTCAudioTransport::NeedMorePlayData(size_t   number_of_frames,
@@ -133,15 +277,28 @@ int32_t LLWebRTCAudioTransport::NeedMorePlayData(size_t   number_of_frames,
                                                  int64_t* elapsed_time_ms,
                                                  int64_t* ntp_time_ms)
 {
+    // bytes_per_frame already accounts for all channels, so do not multiply by
+    // number_of_channels again (that would overrun the playout buffer).
+    const size_t bytes = number_of_frames * bytes_per_frame;
+
+    // While previewing devices there is no engine audio to render, so play the
+    // captured audio back instead.
+    if (mTuning.load(std::memory_order_relaxed))
+    {
+        if (!ReadEcho(static_cast<int16_t*>(audio_data), number_of_frames, number_of_channels, samples_per_sec))
+        {
+            memset(audio_data, 0, bytes);
+        }
+        number_of_samples_out = number_of_frames;
+        return 0;
+    }
+
     auto* engine = engine_.load(std::memory_order_acquire);
     if (!engine)
     {
         // No engine sink; output silence to be safe.
-        // bytes_per_frame already accounts for all channels, so do not multiply
-        // by number_of_channels again (that would overrun the playout buffer).
-        const size_t bytes = number_of_frames * bytes_per_frame;
         memset(audio_data, 0, bytes);
-        number_of_samples_out = bytes_per_frame;
+        number_of_samples_out = number_of_frames;
         return 0;
     }
 
@@ -263,16 +420,17 @@ void LLCustomProcessor::Process(webrtc::AudioBuffer *audio)
 void LLWebRTCAudioDeviceModule::SetTuning(bool tuning, bool mute)
 {
     tuning_ = tuning;
+    audio_transport_.SetTuning(tuning);
     if (tuning)
     {
         // Ensure capture is running (it's normally already running -- capture is
-        // session-long) so the mic-level meter works, and stop rendering the
-        // call while tuning.  The recording calls are no-ops if capture is
-        // already active, so this won't cold-start it.
+        // session-long) so the mic-level meter works.  The recording calls are
+        // no-ops if capture is already active, so this won't cold-start it.
+        // Playout is left up: the preview renders capture back so the user can
+        // hear the devices being previewed.
         inner_->InitMicrophone();
         inner_->InitRecording();
         inner_->StartRecording();
-        inner_->StopPlayout();
     }
     // On exit, capture is deliberately left running (mute is handled by gain,
     // not by stopping the device, so there's no AEC cold-start hiss).  Playout
@@ -697,9 +855,10 @@ void LLWebRTCImpl::workerStartRecording()
 // changes go through workerDeployDevices(), which stops playout first.
 void LLWebRTCImpl::workerStartPlayout()
 {
-    // Only run playout while voice is enabled and there's a connection to
-    // render (running the output device otherwise is heard as a buzz).
-    if (!mDeviceModule || !mVoiceEnabled || mTuningMode || mDeviceModule->Playing() || mPeerConnections.empty())
+    // Only run playout while voice is enabled and there is something to render:
+    // either a connection, or the device preview echoing capture back.  Running
+    // the output device with neither is heard as a buzz.
+    if (!mDeviceModule || !mVoiceEnabled || mDeviceModule->Playing() || (!mTuningMode && mPeerConnections.empty()))
     {
         return;
     }
@@ -909,13 +1068,16 @@ void LLWebRTCImpl::setTuningMode(bool enable)
         [this]
         {
             mDeviceModule->SetTuning(mTuningMode, mMute);
-            if (!mTuningMode)
+            if (!mTuningMode && mPeerConnections.empty())
             {
-                // Restore playout after tuning, gated on there being a
-                // connection to render (so the output device isn't left
-                // spinning with no engine data).
-                workerStartPlayout();
+                // The preview was the only thing being rendered; leaving it
+                // running would spin the output device on silence.
+                mDeviceModule->StopPlayout();
             }
+            // Bring playout up for the preview's echo on the way in, and
+            // restore it for the call on the way out.  Either way it stays
+            // gated on there being something to render.
+            workerStartPlayout();
             mSignalingThread->PostTask(
                 [this]
                 {

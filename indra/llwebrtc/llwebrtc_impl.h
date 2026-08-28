@@ -40,6 +40,7 @@
 
 #include "llwebrtc.h"
 #include "alaudiodevicenotifier.h"
+#include <mutex>
 // WebRTC Includes
 #ifdef WEBRTC_WIN
 #pragma warning(push)
@@ -173,13 +174,37 @@ public:
     float GetMicrophoneEnergy() { return mMicrophoneEnergy.load(std::memory_order_relaxed); }
     void  SetGain(float gain) { mGain.store(gain, std::memory_order_relaxed); }
 
+    // While devices are being previewed there is no engine audio to render, so
+    // capture is held here and played straight back out.  Discards whatever is
+    // buffered on either edge, so previews never begin with stale audio.
+    void SetTuning(bool tuning);
+
 private:
+    // Capture thread.  Keeps the most recent audio, dropping the oldest once
+    // ECHO_BUFFER_MS is exceeded, so the echo tracks the microphone rather
+    // than falling steadily further behind it.
+    void WriteEcho(const int16_t* samples, size_t frames, size_t channels, uint32_t samples_per_sec);
+
+    // Render thread.  Applies the microphone gain so the preview is as loud as
+    // others will hear.  False when nothing usable is buffered -- too little
+    // audio yet, or a capture format the echo cannot be mapped from -- and the
+    // caller renders silence instead.
+    bool ReadEcho(int16_t* out, size_t frames, size_t channels, uint32_t samples_per_sec);
+
     std::atomic<webrtc::AudioTransport*> engine_{ nullptr };
     static const int                     NUM_PACKETS_TO_FILTER = 30; // 300 ms of smoothing (30 frames)
     float                                mSumVector[NUM_PACKETS_TO_FILTER];
     std::atomic<float>                   mMicrophoneEnergy;
     std::atomic<float>                   mGain{ 0.0f };
 
+    static const size_t                  ECHO_BUFFER_MS = 120;
+    std::atomic<bool>                    mTuning{ false };
+    std::mutex                           mEchoMutex;
+    std::vector<int16_t>                 mEchoSamples; // interleaved, mEchoChannels wide
+    size_t                               mEchoRead{ 0 };
+    size_t                               mEchoFill{ 0 };
+    size_t                               mEchoChannels{ 0 };
+    uint32_t                             mEchoSampleRate{ 0 };
 };
 
 
@@ -237,10 +262,7 @@ public:
     // --- Init/start/stop (forward) ---
     int32_t InitPlayout() override { return inner_->InitPlayout(); }
     bool    PlayoutIsInitialized() const override { return inner_->PlayoutIsInitialized(); }
-    int32_t StartPlayout() override {
-        if (tuning_) return 0;  // For tuning, don't allow playout
-        return inner_->StartPlayout();
-    }
+    int32_t StartPlayout() override { return inner_->StartPlayout(); }
     int32_t StopPlayout() override { return inner_->StopPlayout(); }
     bool    Playing() const override { return inner_->Playing(); }
 
