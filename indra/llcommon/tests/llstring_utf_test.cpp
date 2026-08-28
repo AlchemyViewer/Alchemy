@@ -2175,4 +2175,97 @@ namespace tut
         ensure_equals("past end", utf8str_grapheme_align_backward(cjk, 99), cjk.size());
         ensure_equals("empty", utf8str_grapheme_align_backward(std::string(), 0), size_t(0));
     }
+
+    // The walkers work in UTF-8 and the wide entry points are adapters over
+    // them, so walking the same text both ways has to land in the same places.
+    // Text with a byte per codepoint, three, two, and a two-codepoint cluster,
+    // so the two index spaces disagree everywhere after the first space.
+    template<> template<>
+    void llstring_utf_object_t::test<126>()
+    {
+        const std::string utf8 =
+            "ab "                                   // ascii
+            "\xE6\x97\xA5\xE6\x9C\xAC"              // CJK, three bytes each
+            " e\xCC\x81 "                           // e + combining acute
+            "\xF0\x9F\x87\xBA\xF0\x9F\x87\xB8"      // flag: two codepoints, one cluster
+            " end";
+        const LLWString wide = utf8str_to_wstring(utf8);
+
+        // Grapheme stepping, all the way across, comparing the text each step
+        // covered rather than the indices -- the indices are meant to differ.
+        size_t byte_pos = 0;
+        size_t cp_pos = 0;
+        while (byte_pos < utf8.size())
+        {
+            const size_t next_byte = utf8str_step_grapheme_forward(utf8, byte_pos);
+            const size_t next_cp = wstring_step_grapheme_forward(wide, cp_pos);
+            ensure("byte walk advances", next_byte > byte_pos);
+            ensure("codepoint walk advances", next_cp > cp_pos);
+            ensure_equals("same cluster both ways",
+                          wstring_to_utf8str(wide.substr(cp_pos, next_cp - cp_pos)),
+                          utf8.substr(byte_pos, next_byte - byte_pos));
+            byte_pos = next_byte;
+            cp_pos = next_cp;
+        }
+        ensure_equals("both walks ended together", cp_pos, wide.size());
+
+        // And backwards.
+        while (byte_pos > 0)
+        {
+            const size_t prev_byte = utf8str_step_grapheme_backward(utf8, byte_pos);
+            const size_t prev_cp = wstring_step_grapheme_backward(wide, cp_pos);
+            ensure_equals("same cluster stepping back",
+                          wstring_to_utf8str(wide.substr(prev_cp, cp_pos - prev_cp)),
+                          utf8.substr(prev_byte, byte_pos - prev_byte));
+            byte_pos = prev_byte;
+            cp_pos = prev_cp;
+        }
+        ensure_equals("both walks came back to nothing", cp_pos, size_t(0));
+
+        // Word stepping likewise.
+        byte_pos = 0;
+        cp_pos = 0;
+        for (int step = 0; step < 8; ++step)
+        {
+            byte_pos = utf8str_step_word_forward(utf8, byte_pos);
+            cp_pos = wstring_step_word_forward(wide, cp_pos);
+            ensure_equals("word steps agree",
+                          wstring_to_utf8str(wide.substr(0, cp_pos)),
+                          utf8.substr(0, byte_pos));
+        }
+
+        // The word under a position, asked of both.
+        const size_t cjk_byte = utf8.find("\xE6\x97\xA5");
+        const size_t cjk_cp = wstring_wstring_length_from_utf8_length(wide, 0, (S32)cjk_byte);
+        const auto byte_range = utf8str_word_range_at(utf8, cjk_byte);
+        const auto cp_range = wstring_word_range_at(wide, cjk_cp);
+        ensure_equals("same word both ways",
+                      wstring_to_utf8str(wide.substr(cp_range.first, cp_range.second - cp_range.first)),
+                      utf8.substr(byte_range.first, byte_range.second - byte_range.first));
+
+        // Line break opportunities, as byte offsets against codepoint indices.
+        std::vector<size_t> byte_breaks;
+        std::vector<size_t> cp_breaks;
+        utf8str_line_break_opportunities(utf8, byte_breaks);
+        wstring_line_break_opportunities(wide, cp_breaks);
+        ensure_equals("same number of opportunities", byte_breaks.size(), cp_breaks.size());
+        for (size_t i = 0; i < byte_breaks.size(); ++i)
+        {
+            ensure_equals("opportunity " + std::to_string(i) + " is the same place",
+                          wstring_to_utf8str(wide.substr(0, cp_breaks[i])),
+                          utf8.substr(0, byte_breaks[i]));
+        }
+
+        // A flag is one cluster of eight bytes, and nothing cuts it in half.
+        const size_t flag = utf8.find("\xF0\x9F\x87\xBA");
+        ensure_equals("flag steps whole",
+                      utf8str_step_grapheme_forward(utf8, flag), flag + 8);
+        for (size_t inside = 1; inside < 8; ++inside)
+        {
+            ensure_equals("inside the flag aligns back to its start",
+                          utf8str_grapheme_align_backward(utf8, flag + inside), flag);
+            ensure_equals("and forward to its end",
+                          utf8str_grapheme_align_forward(utf8, flag + inside), flag + 8);
+        }
+    }
 }

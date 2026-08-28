@@ -773,10 +773,23 @@ LL_COMMON_API size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t p
 LL_COMMON_API size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos);
 LL_COMMON_API size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos);
 
-// The same snap for UTF-8, where the position and the answer are byte offsets.
-// Anything that cuts a UTF-8 string to a length wants this: a count of bytes or
-// of codepoints can land between a letter and its accent, or inside a flag.
+// The same walkers over UTF-8, where the position and the answer are byte
+// offsets into the caller's own string. These are the implementation: ICU reads
+// UTF-8 where it lies, so they need neither a conversion nor an index map, and
+// the wide forms above are adapters that convert once and map the answer back.
+// Stage B retires the wide half.
+//
+// Every contract above holds here word for word, byte offsets in place of
+// codepoint indices.
+LL_COMMON_API size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API size_t utf8str_grapheme_align_forward(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API size_t utf8str_step_word_forward(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API size_t utf8str_step_word_backward(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API std::pair<size_t, size_t> utf8str_word_range_at(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API std::pair<size_t, size_t> utf8str_next_word_range(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API void utf8str_line_break_opportunities(std::string_view utf8str, std::vector<size_t>& out);
 
 // Word stepping in the sense a text cursor means it: land on the start of a
 // word rather than in the gap before it, so ctrl+arrow steps over whitespace

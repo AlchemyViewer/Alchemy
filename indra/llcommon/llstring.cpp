@@ -912,166 +912,193 @@ private:
     std::array<UBreakIterator*, 4> mIters {};
 };
 
-// A span of LLWString as the UTF-16 ICU works in, with the maps between the
-// two index spaces. A codepoint above U+FFFF occupies two UTF-16 units, so the
-// two spaces drift apart, and every position ICU reports has to come back
-// through toCodepoint rather than be used where it stands.
-//
-// Stage B retires this whole class: over UTF-8 text ICU reads the bytes where
-// they lie, and the offsets it reports are the ones the caller already holds.
-class Utf16Span
+// An ICU break iterator pointed at a span of UTF-8. ICU reads those bytes where
+// they lie -- no conversion, no index map, and the offsets it takes and reports
+// are the caller's own. The UText is held alongside because ICU keeps a pointer
+// to it rather than adopting it, so the two have to live and die together.
+class Utf8Breaks
 {
 public:
-    void assign(LLWStringView wstr, size_t begin, size_t end);
+    Utf8Breaks(std::string_view utf8str, UBreakIteratorType type)
+    {
+        if (utf8str.empty())
+            return;
 
-    // An iterator pointed at this span, or null when ICU could not supply one
-    // -- in which case the caller has no segmentation to work from and falls
-    // back to something crude but bounded. The span must outlive the iterator's
-    // use: ICU keeps the pointer rather than a copy.
-    UBreakIterator* iterator(UBreakIteratorType type) const;
+        thread_local BreakIterators iters;
+        UBreakIterator* iter = iters.get(type);
+        if (!iter)
+            return;
 
-    // A UTF-16 offset from ICU, as an index into the original LLWString.
-    size_t toCodepoint(int32_t offset) const { return mBegin + mToCodepoint[(size_t)offset]; }
+        UErrorCode status = U_ZERO_ERROR;
+        utext_openUTF8(&mText, utf8str.data(), (int64_t)utf8str.size(), &status);
+        if (U_FAILURE(status))
+            return;
+        mOpen = true;
 
-    // An index into the original LLWString, as a UTF-16 offset.
-    int32_t toUtf16(size_t pos) const { return mToUtf16[pos - mBegin]; }
+        ubrk_setUText(iter, &mText, &status);
+        if (U_SUCCESS(status))
+        {
+            mIter = iter;
+        }
+    }
+
+    ~Utf8Breaks()
+    {
+        if (mOpen)
+        {
+            utext_close(&mText);
+        }
+    }
+
+    Utf8Breaks(const Utf8Breaks&) = delete;
+    Utf8Breaks& operator=(const Utf8Breaks&) = delete;
+
+    // Null when ICU could not supply an iterator, or the span was empty. The
+    // caller then has no segmentation to work from and falls back to something
+    // crude but bounded.
+    UBreakIterator* get() const { return mIter; }
+    explicit operator bool() const { return mIter != nullptr; }
 
 private:
-    std::vector<UChar> mUnits;
-    std::vector<size_t> mToCodepoint;   // one per UTF-16 unit, plus the end
-    std::vector<int32_t> mToUtf16;      // one per codepoint, plus the end
-    size_t mBegin = 0;
+    UText mText = UTEXT_INITIALIZER;
+    bool mOpen = false;
+    UBreakIterator* mIter = nullptr;
 };
 
-void Utf16Span::assign(LLWStringView wstr, size_t begin, size_t end)
+// An LLWString as the UTF-8 the walkers work in, with the map back to codepoint
+// indices. The wide entry points are adapters over the narrow ones -- one
+// implementation rather than two -- and Stage B deletes this along with them,
+// leaving the walkers reading the caller's own bytes.
+class Utf8View
 {
-    mBegin = begin;
-    mUnits.clear();
-    mToCodepoint.clear();
-    mToUtf16.clear();
-
-    for (size_t i = begin; i < end; ++i)
+public:
+    void assign(LLWStringView wstr)
     {
-        const llwchar cp = wstr[i];
-        mToUtf16.push_back((int32_t)mUnits.size());
-        if (cp > 0xFFFF && cp <= 0x10FFFF)
-        {
-            const llwchar rest = cp - 0x10000;
-            mUnits.push_back((UChar)(0xD800 + (rest >> 10)));
-            mUnits.push_back((UChar)(0xDC00 + (rest & 0x3FF)));
-            // Both halves answer with the codepoint's index. A break never
-            // falls between them, so which one they name does not arise.
-            mToCodepoint.push_back(i - begin);
-            mToCodepoint.push_back(i - begin);
-        }
-        else
-        {
-            mUnits.push_back(cp <= 0xFFFF ? (UChar)cp : (UChar)0xFFFD);
-            mToCodepoint.push_back(i - begin);
-        }
-    }
-    mToUtf16.push_back((int32_t)mUnits.size());
-    mToCodepoint.push_back(end - begin);
-}
+        mUtf8.clear();
+        mOffsets.clear();
+        mUtf8.reserve(wstr.size());
+        mOffsets.reserve(wstr.size() + 1);
 
-UBreakIterator* Utf16Span::iterator(UBreakIteratorType type) const
-{
-    thread_local BreakIterators iters;
-    UBreakIterator* iter = iters.get(type);
-    if (!iter || mUnits.empty())
-    {
-        return nullptr;
+        char encoded[4];
+        for (const llwchar cp : wstr)
+        {
+            mOffsets.push_back(mUtf8.size());
+            // A lone surrogate or an out-of-range value has no UTF-8 form.
+            // Substituting keeps the bytes and the offset map agreeing, which
+            // is what every index that comes back depends on.
+            const UChar32 c = (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+                            ? (UChar32)0xFFFD : (UChar32)cp;
+            int32_t written = 0;
+            U8_APPEND_UNSAFE(encoded, written, c);
+            mUtf8.append(encoded, (size_t)written);
+        }
+        mOffsets.push_back(mUtf8.size());
     }
-    UErrorCode status = U_ZERO_ERROR;
-    ubrk_setText(iter, mUnits.data(), (int32_t)mUnits.size(), &status);
-    return U_SUCCESS(status) ? iter : nullptr;
-}
+
+    std::string_view text() const { return mUtf8; }
+
+    // A codepoint index into the original string, as a byte offset.
+    size_t toBytes(size_t pos) const
+    {
+        return mOffsets[llmin(pos, mOffsets.size() - 1)];
+    }
+
+    // A byte offset a walker reported, as a codepoint index. Walkers only ever
+    // report codepoint boundaries, so the search always lands on one.
+    size_t toCodepoints(size_t byte_pos) const
+    {
+        const auto it = std::lower_bound(mOffsets.begin(), mOffsets.end(), byte_pos);
+        return (size_t)(it - mOffsets.begin());
+    }
+
+private:
+    std::string mUtf8;
+    std::vector<size_t> mOffsets;   // one per codepoint, plus the end
+};
 
 } // anonymous namespace
 
-// Bounds [begin, end) of the line containing pos, excluding its newline.
+// Bounds [begin, end) of the line containing byte_pos, excluding its newline.
 // UAX #29 breaks words either side of a newline (WB3a, WB3b), so one line is a
-// self-contained scan.
-static std::pair<size_t, size_t> wstring_line_bounds(LLWStringView wstr, size_t pos)
+// self-contained scan. Scanning for the byte is safe: 0x0A cannot appear inside
+// a multi-byte UTF-8 sequence, only as itself.
+static std::pair<size_t, size_t> utf8str_line_bounds(std::string_view utf8str, size_t byte_pos)
 {
-    const size_t n = wstr.size();
-    const size_t at = llmin(pos, n);
+    const size_t n = utf8str.size();
+    const size_t at = llmin(byte_pos, n);
 
     size_t begin = 0;
-    for (size_t i = at; i > 0; --i)
+    if (at > 0)
     {
-        if (wstr[i - 1] == U'\n')
+        const size_t newline = utf8str.rfind('\n', at - 1);
+        if (newline != std::string_view::npos)
         {
-            begin = i;
-            break;
+            begin = newline + 1;
         }
     }
 
-    size_t end = at;
-    while (end < n && wstr[end] != U'\n')
+    size_t end = utf8str.find('\n', at);
+    if (end == std::string_view::npos)
     {
-        ++end;
+        end = n;
     }
     return { begin, end };
 }
 
-// The window a cluster query needs around pos. Unlike words, clusters step
-// across newlines, so it reaches back into the line above -- otherwise a step
-// backward from the head of a line has nowhere to land. It also keeps the
-// trailing newline, because a CR is joined to the LF that follows it and a
-// window ending between them would offer a boundary that is not there.
-static std::pair<size_t, size_t> wstring_cluster_bounds(LLWStringView wstr, size_t pos)
+// A run the cursor should step over rather than stop in. Empty runs do not
+// count -- they are the zero-width segment at the end of a line.
+static bool utf8str_run_is_space(std::string_view utf8str, size_t begin, size_t end)
 {
-    const size_t n = wstr.size();
-    const size_t at = llmin(pos, n);
+    if (begin >= end)
+        return false;
 
-    const size_t begin = wstring_line_bounds(wstr, at > 0 ? at - 1 : 0).first;
-    size_t end = wstring_line_bounds(wstr, at).second;
-    if (end < n)
+    const uint8_t* bytes = (const uint8_t*)utf8str.data();
+    int32_t at = (int32_t)begin;
+    const int32_t limit = (int32_t)end;
+    while (at < limit)
     {
-        ++end;
+        UChar32 cp = 0;
+        U8_NEXT(bytes, at, limit, cp);
+        if (cp < 0 || !LLStringOps::isSpace((llwchar)cp))
+            return false;
     }
-    return { begin, end };
+    return true;
 }
 
-size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
+size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos)
 {
-    const size_t n = wstr.size();
-    if (pos >= n)
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
         return n;
 
-    const auto bounds = wstring_cluster_bounds(wstr, pos);
-    Utf16Span span;
-    span.assign(wstr, bounds.first, bounds.second);
-    UBreakIterator* iter = span.iterator(UBRK_CHARACTER);
-    if (!iter)
-        return pos + 1;
+    // No window here, unlike the wide form this replaced: reading UTF-8 costs
+    // nothing to set up, and ICU's own safe-backward rules keep a query local
+    // without one being drawn for it.
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    if (!breaks)
+        return byte_pos + 1;
 
-    const int32_t next = ubrk_following(iter, span.toUtf16(pos));
-    return next == UBRK_DONE ? bounds.second : span.toCodepoint(next);
+    const int32_t next = ubrk_following(breaks.get(), (int32_t)byte_pos);
+    return next == UBRK_DONE ? n : (size_t)next;
 }
 
-size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
+size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos)
 {
-    const size_t n = wstr.size();
-    if (pos == 0)
+    const size_t n = utf8str.size();
+    if (byte_pos == 0)
         return 0;
     // A position past the end clamps rather than steps. The caller is holding
     // an index its own string cannot account for, and the end is the nearest
     // answer that is certainly inside it.
-    if (pos > n)
+    if (byte_pos > n)
         return n;
-    const size_t at = pos;
 
-    const auto bounds = wstring_cluster_bounds(wstr, at);
-    Utf16Span span;
-    span.assign(wstr, bounds.first, bounds.second);
-    UBreakIterator* iter = span.iterator(UBRK_CHARACTER);
-    if (!iter)
-        return at - 1;
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    if (!breaks)
+        return byte_pos - 1;
 
-    const int32_t prev = ubrk_preceding(iter, span.toUtf16(at));
-    return prev == UBRK_DONE ? bounds.first : span.toCodepoint(prev);
+    const int32_t prev = ubrk_preceding(breaks.get(), (int32_t)byte_pos);
+    return prev == UBRK_DONE ? 0 : (size_t)prev;
 }
 
 size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos)
@@ -1090,39 +1117,93 @@ size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos
         --byte_pos;
     }
 
-    thread_local BreakIterators iters;
-    UBreakIterator* iter = iters.get(UBRK_CHARACTER);
-    if (!iter)
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    if (!breaks)
         return byte_pos;
-
-    // ICU reads UTF-8 where it lies, so there is no conversion and no index
-    // map here: the offsets it takes and reports are the caller's own bytes.
-    // This is the shape the wide walkers above take once Stage B lands.
-    UErrorCode status = U_ZERO_ERROR;
-    UText text = UTEXT_INITIALIZER;
-    utext_openUTF8(&text, utf8str.data(), (int64_t)n, &status);
-    if (U_SUCCESS(status))
-    {
-        ubrk_setUText(iter, &text, &status);
-    }
-    if (U_FAILURE(status))
-    {
-        utext_close(&text);
-        return byte_pos;
-    }
 
     const int32_t at = (int32_t)byte_pos;
-    size_t result = byte_pos;
-    if (!ubrk_isBoundary(iter, at))
-    {
-        const int32_t prev = ubrk_preceding(iter, at);
-        result = (prev == UBRK_DONE) ? 0 : (size_t)prev;
-    }
+    if (ubrk_isBoundary(breaks.get(), at))
+        return byte_pos;
 
-    // The iterator outlives the text it was pointed at, so it must not be
-    // left holding it -- the next caller re-points it before any use.
-    utext_close(&text);
-    return result;
+    const int32_t prev = ubrk_preceding(breaks.get(), at);
+    return prev == UBRK_DONE ? 0 : (size_t)prev;
+}
+
+size_t utf8str_grapheme_align_forward(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
+        return n;
+    if (byte_pos == 0)
+        return 0;
+
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    if (!breaks)
+        return byte_pos;
+
+    const int32_t at = (int32_t)byte_pos;
+    if (ubrk_isBoundary(breaks.get(), at))
+        return byte_pos;
+
+    const int32_t next = ubrk_following(breaks.get(), at);
+    return next == UBRK_DONE ? n : (size_t)next;
+}
+
+size_t utf8str_step_word_forward(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
+        return n;
+
+    const auto bounds = utf8str_line_bounds(utf8str, byte_pos);
+    if (byte_pos >= bounds.second)
+        return byte_pos;
+
+    const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+    const Utf8Breaks breaks(line, UBRK_WORD);
+    if (!breaks)
+        return bounds.second;
+
+    UBreakIterator* iter = breaks.get();
+    int32_t prev = ubrk_first(iter);
+    for (int32_t next = ubrk_next(iter); next != UBRK_DONE; prev = next, next = ubrk_next(iter))
+    {
+        const size_t begin = bounds.first + (size_t)prev;
+        const size_t end = bounds.first + (size_t)next;
+        if (begin > byte_pos && !utf8str_run_is_space(utf8str, begin, end))
+            return begin;
+    }
+    return bounds.second;
+}
+
+// ---------------------------------------------------------------------------
+// The wide entry points, as adapters over the narrow ones above. Each converts
+// once, delegates, and brings the answer back through the offset map. Stage B
+// deletes this half and leaves the callers holding bytes of their own.
+// ---------------------------------------------------------------------------
+
+size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
+{
+    const size_t n = wstr.size();
+    if (pos >= n)
+        return n;
+
+    Utf8View view;
+    view.assign(wstr);
+    return view.toCodepoints(utf8str_step_grapheme_forward(view.text(), view.toBytes(pos)));
+}
+
+size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
+{
+    const size_t n = wstr.size();
+    if (pos == 0)
+        return 0;
+    if (pos > n)
+        return n;
+
+    Utf8View view;
+    view.assign(wstr);
+    return view.toCodepoints(utf8str_step_grapheme_backward(view.text(), view.toBytes(pos)));
 }
 
 size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
@@ -1133,18 +1214,9 @@ size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
     if (pos >= n)
         return n;
 
-    const auto bounds = wstring_cluster_bounds(wstr, pos);
-    Utf16Span span;
-    span.assign(wstr, bounds.first, bounds.second);
-    UBreakIterator* iter = span.iterator(UBRK_CHARACTER);
-    if (!iter)
-        return pos;
-
-    const int32_t at = span.toUtf16(pos);
-    if (ubrk_isBoundary(iter, at))
-        return pos;
-    const int32_t prev = ubrk_preceding(iter, at);
-    return prev == UBRK_DONE ? bounds.first : span.toCodepoint(prev);
+    Utf8View view;
+    view.assign(wstr);
+    return view.toCodepoints(utf8str_grapheme_align_backward(view.text(), view.toBytes(pos)));
 }
 
 size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
@@ -1155,32 +1227,9 @@ size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
     if (pos == 0)
         return 0;
 
-    const auto bounds = wstring_cluster_bounds(wstr, pos);
-    Utf16Span span;
-    span.assign(wstr, bounds.first, bounds.second);
-    UBreakIterator* iter = span.iterator(UBRK_CHARACTER);
-    if (!iter)
-        return pos;
-
-    const int32_t at = span.toUtf16(pos);
-    if (ubrk_isBoundary(iter, at))
-        return pos;
-    const int32_t next = ubrk_following(iter, at);
-    return next == UBRK_DONE ? bounds.second : span.toCodepoint(next);
-}
-
-// A run the cursor should step over rather than stop in. Empty runs do not
-// count -- they are the zero-width segment at the end of a line.
-static bool wstring_run_is_space(LLWStringView wstr, size_t begin, size_t end)
-{
-    if (begin >= end)
-        return false;
-    for (size_t i = begin; i < end; ++i)
-    {
-        if (!LLStringOps::isSpace(wstr[i]))
-            return false;
-    }
-    return true;
+    Utf8View view;
+    view.assign(wstr);
+    return view.toCodepoints(utf8str_grapheme_align_forward(view.text(), view.toBytes(pos)));
 }
 
 size_t wstring_step_word_forward(LLWStringView wstr, size_t pos)
@@ -1189,27 +1238,9 @@ size_t wstring_step_word_forward(LLWStringView wstr, size_t pos)
     if (pos >= n)
         return n;
 
-    const auto bounds = wstring_line_bounds(wstr, pos);
-    const size_t line_begin = bounds.first;
-    const size_t line_end = bounds.second;
-    if (pos >= line_end)
-        return pos;
-
-    Utf16Span span;
-    span.assign(wstr, line_begin, line_end);
-    UBreakIterator* iter = span.iterator(UBRK_WORD);
-    if (!iter)
-        return line_end;
-
-    int32_t prev = ubrk_first(iter);
-    for (int32_t next = ubrk_next(iter); next != UBRK_DONE; prev = next, next = ubrk_next(iter))
-    {
-        const size_t begin = span.toCodepoint(prev);
-        const size_t end = span.toCodepoint(next);
-        if (begin > pos && !wstring_run_is_space(wstr, begin, end))
-            return begin;
-    }
-    return line_end;
+    Utf8View view;
+    view.assign(wstr);
+    return view.toCodepoints(utf8str_step_word_forward(view.text(), view.toBytes(pos)));
 }
 
 namespace
@@ -1421,29 +1452,26 @@ void wstring_tolower_indexed(LLWStringView wstr, LLWString& out_str, std::vector
     }
 }
 
-void wstring_line_break_opportunities(LLWStringView wstr, std::vector<size_t>& out)
+void utf8str_line_break_opportunities(std::string_view utf8str, std::vector<size_t>& out)
 {
     out.clear();
-    if (wstr.empty())
+    if (utf8str.empty())
         return;
 
-    // Measurement work, run per frame over whole paragraphs, so the span is
-    // kept between calls rather than rebuilt. None of these walkers reenter.
-    thread_local Utf16Span span;
-    span.assign(wstr, 0, wstr.size());
-    UBreakIterator* iter = span.iterator(UBRK_LINE);
-    if (!iter)
+    const Utf8Breaks breaks(utf8str, UBRK_LINE);
+    if (!breaks)
     {
-        out.push_back(wstr.size());
+        out.push_back(utf8str.size());
         return;
     }
 
     // The first boundary is 0, which is never an opportunity. The last is the
     // string's own end, which always is.
+    UBreakIterator* iter = breaks.get();
     ubrk_first(iter);
     for (int32_t b = ubrk_next(iter); b != UBRK_DONE; b = ubrk_next(iter))
     {
-        out.push_back(span.toCodepoint(b));
+        out.push_back((size_t)b);
     }
 }
 
@@ -1452,66 +1480,68 @@ void wstring_line_break_opportunities(LLWStringView wstr, std::vector<size_t>& o
 // ICU tags every break with what kind of run preceded it, which is exactly
 // that distinction, and it knows about scripts a test for alphanumerics cannot
 // speak for.
-static bool wstring_status_is_word(int32_t rule_status)
+static bool utf8str_status_is_word(int32_t rule_status)
 {
     return rule_status >= UBRK_WORD_NONE_LIMIT;
 }
 
-std::pair<size_t, size_t> wstring_word_range_at(LLWStringView wstr, size_t pos)
+std::pair<size_t, size_t> utf8str_word_range_at(std::string_view utf8str, size_t byte_pos)
 {
-    const size_t n = wstr.size();
-    if (pos >= n)
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
         return { n, n };
 
-    const auto bounds = wstring_line_bounds(wstr, pos);
-    if (pos >= bounds.second)
-        return { pos, pos };
+    const auto bounds = utf8str_line_bounds(utf8str, byte_pos);
+    if (byte_pos >= bounds.second)
+        return { byte_pos, byte_pos };
 
-    Utf16Span span;
-    span.assign(wstr, bounds.first, bounds.second);
-    UBreakIterator* iter = span.iterator(UBRK_WORD);
-    if (!iter)
-        return { pos, pos };
+    const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+    const Utf8Breaks breaks(line, UBRK_WORD);
+    if (!breaks)
+        return { byte_pos, byte_pos };
 
-    // The segment holding pos is the one ending at the first boundary past it.
-    const int32_t at = span.toUtf16(pos);
+    // The segment holding byte_pos is the one ending at the first boundary
+    // past it.
+    UBreakIterator* iter = breaks.get();
+    const int32_t at = (int32_t)(byte_pos - bounds.first);
     const int32_t end = ubrk_isBoundary(iter, at) ? ubrk_next(iter) : ubrk_current(iter);
     if (end == UBRK_DONE)
-        return { pos, pos };
+        return { byte_pos, byte_pos };
 
     // The status describes the run behind the break the iterator sits on, so
     // it has to be read before stepping back across it.
-    const bool is_word = wstring_status_is_word(ubrk_getRuleStatus(iter));
+    const bool is_word = utf8str_status_is_word(ubrk_getRuleStatus(iter));
     const int32_t begin = ubrk_previous(iter);
     if (!is_word || begin == UBRK_DONE)
-        return { pos, pos };
+        return { byte_pos, byte_pos };
 
-    return { span.toCodepoint(begin), span.toCodepoint(end) };
+    return { bounds.first + (size_t)begin, bounds.first + (size_t)end };
 }
 
-std::pair<size_t, size_t> wstring_next_word_range(LLWStringView wstr, size_t pos)
+std::pair<size_t, size_t> utf8str_next_word_range(std::string_view utf8str, size_t byte_pos)
 {
-    const size_t n = wstr.size();
-    size_t at = llmin(pos, n);
+    const size_t n = utf8str.size();
+    size_t at = llmin(byte_pos, n);
 
     while (at < n)
     {
-        const auto bounds = wstring_line_bounds(wstr, at);
+        const auto bounds = utf8str_line_bounds(utf8str, at);
 
         if (at < bounds.second)
         {
-            Utf16Span span;
-            span.assign(wstr, bounds.first, bounds.second);
-            if (UBreakIterator* iter = span.iterator(UBRK_WORD))
+            const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+            const Utf8Breaks breaks(line, UBRK_WORD);
+            if (breaks)
             {
+                UBreakIterator* iter = breaks.get();
                 int32_t begin = ubrk_first(iter);
                 for (int32_t end = ubrk_next(iter); end != UBRK_DONE;
                      begin = end, end = ubrk_next(iter))
                 {
-                    if (span.toCodepoint(end) > at
-                        && wstring_status_is_word(ubrk_getRuleStatus(iter)))
+                    if (bounds.first + (size_t)end > at
+                        && utf8str_status_is_word(ubrk_getRuleStatus(iter)))
                     {
-                        return { span.toCodepoint(begin), span.toCodepoint(end) };
+                        return { bounds.first + (size_t)begin, bounds.first + (size_t)end };
                     }
                 }
             }
@@ -1522,36 +1552,92 @@ std::pair<size_t, size_t> wstring_next_word_range(LLWStringView wstr, size_t pos
     return { n, n };
 }
 
+size_t utf8str_step_word_backward(std::string_view utf8str, size_t byte_pos)
+{
+    if (byte_pos == 0)
+        return 0;
+    const size_t at = llmin(byte_pos, utf8str.size());
+
+    const auto bounds = utf8str_line_bounds(utf8str, at);
+    if (at <= bounds.first)
+        return at;
+
+    const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+    const Utf8Breaks breaks(line, UBRK_WORD);
+    if (!breaks)
+        return bounds.first;
+
+    const size_t scan_end = llmin(at, bounds.second);
+    size_t best = bounds.first;
+
+    UBreakIterator* iter = breaks.get();
+    int32_t prev = ubrk_first(iter);
+    for (int32_t next = ubrk_next(iter); next != UBRK_DONE; prev = next, next = ubrk_next(iter))
+    {
+        const size_t begin = bounds.first + (size_t)prev;
+        if (begin >= scan_end)
+            break;
+        if (!utf8str_run_is_space(utf8str, begin, bounds.first + (size_t)next))
+            best = begin;
+    }
+    return best;
+}
+
+// --- the wide adapters -----------------------------------------------------
+
+void wstring_line_break_opportunities(LLWStringView wstr, std::vector<size_t>& out)
+{
+    out.clear();
+    if (wstr.empty())
+        return;
+
+    // Measurement work, run per frame over whole paragraphs, so the view and
+    // the byte offsets it produces are kept between calls rather than rebuilt.
+    // None of these walkers reenter.
+    thread_local Utf8View view;
+    thread_local std::vector<size_t> byte_breaks;
+    view.assign(wstr);
+
+    utf8str_line_break_opportunities(view.text(), byte_breaks);
+    out.reserve(byte_breaks.size());
+    for (const size_t b : byte_breaks)
+    {
+        out.push_back(view.toCodepoints(b));
+    }
+}
+
+std::pair<size_t, size_t> wstring_word_range_at(LLWStringView wstr, size_t pos)
+{
+    const size_t n = wstr.size();
+    if (pos >= n)
+        return { n, n };
+
+    Utf8View view;
+    view.assign(wstr);
+    const auto range = utf8str_word_range_at(view.text(), view.toBytes(pos));
+    return { view.toCodepoints(range.first), view.toCodepoints(range.second) };
+}
+
+std::pair<size_t, size_t> wstring_next_word_range(LLWStringView wstr, size_t pos)
+{
+    const size_t n = wstr.size();
+    if (pos >= n)
+        return { n, n };
+
+    Utf8View view;
+    view.assign(wstr);
+    const auto range = utf8str_next_word_range(view.text(), view.toBytes(pos));
+    return { view.toCodepoints(range.first), view.toCodepoints(range.second) };
+}
+
 size_t wstring_step_word_backward(LLWStringView wstr, size_t pos)
 {
     if (pos == 0)
         return 0;
-    const size_t at = llmin(pos, wstr.size());
 
-    const auto bounds = wstring_line_bounds(wstr, at);
-    const size_t line_begin = bounds.first;
-    const size_t line_end = bounds.second;
-    if (at <= line_begin)
-        return at;
-
-    Utf16Span span;
-    span.assign(wstr, line_begin, line_end);
-    UBreakIterator* iter = span.iterator(UBRK_WORD);
-    if (!iter)
-        return line_begin;
-
-    const size_t scan_end = llmin(at, line_end);
-    size_t best = line_begin;
-    int32_t prev = ubrk_first(iter);
-    for (int32_t next = ubrk_next(iter); next != UBRK_DONE; prev = next, next = ubrk_next(iter))
-    {
-        const size_t begin = span.toCodepoint(prev);
-        if (begin >= scan_end)
-            break;
-        if (!wstring_run_is_space(wstr, begin, span.toCodepoint(next)))
-            best = begin;
-    }
-    return best;
+    Utf8View view;
+    view.assign(wstr);
+    return view.toCodepoints(utf8str_step_word_backward(view.text(), view.toBytes(pos)));
 }
 
 std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos,
