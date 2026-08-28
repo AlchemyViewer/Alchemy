@@ -2655,8 +2655,6 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
     // previous analysis results.
     // Use a serial number to filter out obsolete analysis results.
 
-    ref(); // Keep texture alive
-
     auto mainq = mMainQueue.lock();
 
     // Get the GL thread queue
@@ -2689,8 +2687,21 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         }
         );
 
-        // Conservative default until analysis completes
-        mIsMask = false;
+        if (posted_job)
+        {
+            // Keep the texture alive until the completion callback runs, which
+            // is what drops this reference again. Taken only once the post has
+            // succeeded: the callback runs on this same queue and so cannot
+            // execute before we return, whereas a reference taken up front has
+            // to be dropped again when the post fails -- and that balanced pair
+            // deletes the texture outright while its reference count is still
+            // zero, as it is whenever createGLTexture runs from the
+            // LLImageGL(LLImageRaw*) constructor.
+            ref();
+
+            // Conservative default until analysis completes
+            mIsMask = false;
+        }
     }
     if (!posted_job)
     {
@@ -2698,7 +2709,6 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
         // Queues not available - fall back to synchronous analysis
         delete[] data_copy;
         mIsMask = analyzeAlphaData(data_in, w, h, mAlphaOffset, mAlphaStride);
-        unref();
     }
 }
 
