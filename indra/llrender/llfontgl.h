@@ -137,6 +137,20 @@ public:
                 bool use_color = true,
                 pass_boundary_cb_t on_pass_boundary = nullptr) const;
 
+    // The draw itself, in bytes: `begin_offset`, `max_bytes` and the count
+    // returned all index the UTF-8. The LLWString overloads above convert and
+    // call this.
+    S32 renderBytes(std::string_view utf8text, S32 begin_offset,
+                F32 x, F32 y,
+                const LLColor4 &color,
+                HAlign halign = LEFT,  VAlign valign = BASELINE,
+                U8 style = NORMAL, ShadowType shadow = NO_SHADOW,
+                S32 max_bytes = S32_MAX, S32 max_pixels = S32_MAX,
+                F32* right_x=NULL,
+                bool use_ellipses = false,
+                bool use_color = true,
+                pass_boundary_cb_t on_pass_boundary = nullptr) const;
+
     S32 render(const LLWString &text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color) const;
 
     // renderUTF8 does a conversion, so is slower!

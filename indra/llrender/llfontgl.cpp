@@ -265,14 +265,45 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRectf& rec
 S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
                      ShadowType shadow, S32 max_chars, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color, pass_boundary_cb_t on_pass_boundary) const
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-
+    // Wide adapter over renderBytes -- see getWidthF32's.
     if(!sDisplayFont) //do not display texts
     {
         return static_cast<S32>(wstr.length());
     }
 
     if (wstr.empty() || begin_offset < 0 || begin_offset >= (S32)wstr.length())
+    {
+        return 0;
+    }
+
+    static thread_local ALUtf8View view;
+    view.assign(wstr);
+    const size_t begin_bytes = view.toBytes((size_t)begin_offset);
+    S32 max_bytes = max_chars;
+    if (max_chars >= 0)
+    {
+        const S32 text_len = (S32)wstr.length();
+        const S32 end_cp   = llmin(text_len, begin_offset
+                                             + llmin(S32_MAX - begin_offset, max_chars));
+        max_bytes = (S32)(view.toBytes((size_t)end_cp) - begin_bytes);
+    }
+    const S32 drawn = renderBytes(view.text(), (S32)begin_bytes, x, y, color,
+                                  halign, valign, style, shadow, max_bytes, max_pixels,
+                                  right_x, use_ellipses, use_color, on_pass_boundary);
+    return (S32)view.toCodepoints(begin_bytes + (size_t)drawn) - begin_offset;
+}
+
+S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
+                          ShadowType shadow, S32 max_chars, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color, pass_boundary_cb_t on_pass_boundary) const
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    if(!sDisplayFont) //do not display texts
+    {
+        return static_cast<S32>(utf8text.length());
+    }
+
+    if (utf8text.empty() || begin_offset < 0 || begin_offset >= (S32)utf8text.length())
     {
         return 0;
     }
@@ -331,11 +362,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
     if (-1 == max_chars)
     {
-        max_chars = length = (S32)wstr.length() - begin_offset;
+        max_chars = length = (S32)utf8text.length() - begin_offset;
     }
     else
     {
-        length = llmin((S32)wstr.length() - begin_offset, max_chars );
+        length = llmin((S32)utf8text.length() - begin_offset, max_chars );
     }
 
     F32 cur_x, cur_y, cur_render_x, cur_render_y;
@@ -383,7 +414,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     const bool needs_string_width = (halign == RIGHT) || (halign == HCENTER)
                                   || (style_to_add & UNDERLINE) || use_ellipses;
     const F32 string_width_unscaled = needs_string_width
-        ? getWidthF32(wstr, begin_offset, length)
+        ? getWidthF32Bytes(utf8text, begin_offset, length)
         : 0.f;
     const S32 scaled_string_width = ll_round(string_width_unscaled * sScaleX);
 
@@ -580,30 +611,24 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // clusters still shape; the non-mono path gets a single range covering
     // the whole slice. Layout's ranges are slice-local; we compare against
     // `i - begin_offset` in the loop.
-    //
-    // Shaping works in bytes, so the slice goes through a UTF-8 view and the
-    // positions it reports come back through the same map. The render walk
-    // itself is still the wide one; it becomes a byte walk with the widgets
-    // that feed it, and this view goes with the LLWString parameter.
-    LLWStringView slice(wstr.data() + begin_offset, (size_t)length);
-    static thread_local ALUtf8View slice_view;
-    slice_view.assign(slice);
-    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice_view.text());
+    std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)length);
+    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
     size_t next_shape_run = 0;
 
-    for (i = begin_offset; i < begin_offset + length; i++)
+    S32 next_i = begin_offset;
+    for (i = begin_offset; i < begin_offset + length; i = next_i)
     {
+        const LLCodepointAt at = utf8str_decode_at(utf8text, (size_t)i);
+        next_i = (S32)at.next;
         const S32 i_slice = i - begin_offset;
         // Entered a shaped run? Emit its HarfBuzz-positioned glyphs in one
         // go and jump past the range. When shaping produced no glyphs (rare —
         // face/HB failure) we fall through to the codepoint path so the
         // range still draws something, even if ZWJ presentation is wrong.
         if (next_shape_run < layout.ranges.size()
-            && (S32)slice_view.toCodepoints(layout.ranges[next_shape_run].first) == i_slice)
+            && (S32)layout.ranges[next_shape_run].first == i_slice)
         {
-            const size_t run_begin_bytes = layout.ranges[next_shape_run].first;
-            const S32 run_first = i_slice;
-            const S32 run_last  = (S32)slice_view.toCodepoints(layout.ranges[next_shape_run].second);
+            const auto  run_range  = layout.ranges[next_shape_run];
             const auto& run_glyphs = *layout.glyphs[next_shape_run];
             ++next_shape_run;
 
@@ -611,11 +636,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             {
                 next_glyph = NULL;  // drop any kerning prefetch from before the run
                 bool overflow = false;
-                // Slice-local cp index of the glyph that overflowed. shapeLine
-                // returns clusters relative to its begin parameter (here,
-                // run_range.first), so this is in [0, run_len). Used so
-                // chars_drawn reflects only cps whose cluster was reached
-                // before clipping — counting the full run on overflow lies
+                // Byte offset within the run of the glyph that overflowed.
+                // shapeLine returns clusters relative to its begin parameter
+                // (here, run_range.first), so this is in [0, run_len). Used so
+                // chars_drawn reflects only what was reached before clipping —
+                // counting the full run on overflow lies
                 // to callers that drive word-wrap / chunked draw off the
                 // return value.
                 S32 overflow_cluster_local = 0;
@@ -706,12 +731,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     if ((start_x + scaled_max_pixels) < (glyph_x + (F32)slot.mWidth))
                     {
                         overflow = true;
-                        // sg.cluster is a byte offset within the run, so it
-                        // reaches slice coordinates through the run's own
-                        // start before the map back to codepoints.
-                        overflow_cluster_local =
-                            (S32)slice_view.toCodepoints(run_begin_bytes + (size_t)sg.cluster)
-                            - run_first;
+                        overflow_cluster_local = sg.cluster;
                         break;
                     }
 
@@ -767,22 +787,22 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
                 if (overflow)
                 {
-                    // Count cps strictly before the overflowing cluster.
-                    // overflow_cluster_local is slice-local (0-based within
-                    // the run), so adding it directly gives the cp count.
+                    // Count the bytes strictly before the overflowing cluster.
+                    // overflow_cluster_local is run-local (0-based within the
+                    // run), so adding it directly gives that count.
                     chars_drawn += llmax(0, overflow_cluster_local);
                     break;
                 }
-                chars_drawn += run_last - run_first;
+                chars_drawn += (S32)(run_range.second - run_range.first);
 
-                i = begin_offset + run_last - 1;  // loop's ++ lands past the run
+                next_i = begin_offset + (S32)run_range.second;
                 continue;
             }
             // Empty run_glyphs — shaping failed. Fall through to the
             // codepoint path for this iteration.
         }
 
-        llwchar wch = wstr[i];
+        llwchar wch = at.cp;
 
         const LLFontGlyphInfo* fgi = next_glyph;
         next_glyph = NULL;
@@ -915,11 +935,11 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
             }
         }
 
-        chars_drawn++;
+        chars_drawn += (S32)(at.next - (size_t)i);
         cur_x += mFontFreetype->getXAdvance(fgi);
         cur_y += fgi->mYAdvance;
 
-        llwchar next_char = wstr[i+1];
+        llwchar next_char = utf8str_decode_at(utf8text, at.next).cp;
         if (next_char)
         {
             // Kern this puppy. The old `next_char < LAST_CHAR_FULL`
@@ -1032,8 +1052,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         // double-fire it. Rendering the ellipsis without a shadow keeps the
         // captured streams consistent and avoids tinting the ellipsis shadow
         // with the foreground color in LLFontVertexBuffer.
-        static const LLWString elipses_wstr(U"...");
-        render(elipses_wstr,
+        renderBytes("...",
                 0,
                 (cur_x - origin.mV[VX]) / sScaleX, (F32)y,
                 color,
