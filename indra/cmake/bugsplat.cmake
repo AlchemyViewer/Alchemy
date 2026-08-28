@@ -2,17 +2,11 @@ include_guard()
 add_library(ll::bugsplat INTERFACE IMPORTED)
 
 if(USE_BUGSPLAT AND NOT LINUX)
-    if(WINDOWS)
-        find_library(BUGSPLAT_LIBRARIES BugSplat64 REQUIRED)
-        target_link_libraries( ll::bugsplat INTERFACE ${BUGSPLAT_LIBRARIES})
-
-        find_path(BUGSPLAT_INCLUDE_DIRS "bugsplat/BugSplat.h" REQUIRED)
-        target_include_directories(ll::bugsplat SYSTEM INTERFACE ${BUGSPLAT_INCLUDE_DIRS})
-    elseif(DARWIN)
-        find_library(BUGSPLAT_LIBRARIES BugSplatMac REQUIRED)
-        target_link_libraries(ll::bugsplat INTERFACE
-                ${BUGSPLAT_LIBRARIES}
-                )
+    if(WINDOWS OR DARWIN)
+        # bugsplat on Windows, bugsplat-apple on macOS; both ship the same
+        # package and target.
+        find_package(unofficial-bugsplat CONFIG REQUIRED)
+        target_link_libraries(ll::bugsplat INTERFACE unofficial::bugsplat::bugsplat)
     else ()
         message(FATAL_ERROR "BugSplat is not supported; add -DUSE_BUGSPLAT=OFF")
     endif()

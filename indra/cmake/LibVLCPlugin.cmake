@@ -4,10 +4,9 @@ include_guard()
 add_library(ll::libvlc INTERFACE IMPORTED)
 
 if(WINDOWS OR DARWIN)
-    find_library(LIBVLC_LIBRARY_RELEASE NAMES libvlc vlc PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib" NO_DEFAULT_PATH REQUIRED)
-    find_library(LIBVLCCORE_LIBRARY_RELEASE NAMES libvlccore vlccore PATHS "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib" NO_DEFAULT_PATH REQUIRED)
-    target_link_libraries(ll::libvlc INTERFACE ${LIBVLC_LIBRARY_RELEASE} ${LIBVLCCORE_LIBRARY_RELEASE})
-    target_include_directories(ll::libvlc SYSTEM INTERFACE ${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include)
+    # Defines unofficial::libvlc::libvlc along with VLC_PLUGINS_DIR.
+    find_package(unofficial-libvlc CONFIG REQUIRED)
+    target_link_libraries(ll::libvlc INTERFACE unofficial::libvlc::libvlc)
 else()
     find_package(PkgConfig REQUIRED)
 

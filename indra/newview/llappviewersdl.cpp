@@ -70,7 +70,7 @@
 #include <filesystem>
 #include <vector>
 #include "llbugsplat_mac.h"
-@import BugSplatMac;
+@import BugSplat;
 #endif
 
 // Forward decl so the Obj-C @implementation below can call into the C++ side.

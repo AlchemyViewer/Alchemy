@@ -125,8 +125,7 @@ if (WINDOWS)
   )
   target_link_options(media_plugin_cef PRIVATE /IGNORE:4099)
 
-  set(CEF_BIN_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/cef-bin")
-  set(CEF_BIN_BINARY_DIR "$<IF:$<CONFIG:Debug>,${CEF_BIN_DIR}/Debug,${CEF_BIN_DIR}/Release>")
+  set(CEF_BIN_BINARY_DIR "$<IF:$<CONFIG:Debug>,${CEF_BINARY_DIR_DEBUG},${CEF_BINARY_DIR_RELEASE}>")
 
   # Ship CEF's bootstrap.exe renamed to media_plugin_cef.exe; matching base name
   # makes it load media_plugin_cef.dll and call our exported RunWinMain with the
@@ -155,10 +154,10 @@ if (WINDOWS)
   )
 
   set(CEF_RESOURCE_FILES
-    "${CEF_BIN_DIR}/Resources/chrome_100_percent.pak"
-    "${CEF_BIN_DIR}/Resources/chrome_200_percent.pak"
-    "${CEF_BIN_DIR}/Resources/resources.pak"
-    "${CEF_BIN_DIR}/Resources/icudtl.dat"
+    "${CEF_RESOURCE_DIR}/chrome_100_percent.pak"
+    "${CEF_RESOURCE_DIR}/chrome_200_percent.pak"
+    "${CEF_RESOURCE_DIR}/resources.pak"
+    "${CEF_RESOURCE_DIR}/icudtl.dat"
   )
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD
@@ -168,7 +167,7 @@ if (WINDOWS)
 
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_BIN_DIR}/Resources/locales" "${VIEWER_STAGING_DIR}/llplugin/locales"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_RESOURCE_DIR}/locales" "${VIEWER_STAGING_DIR}/llplugin/locales"
   )
 
   add_custom_command(

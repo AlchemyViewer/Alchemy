@@ -754,7 +754,7 @@ class DarwinManifest(ViewerManifest):
                     self._codesign(os.path.join(root, name))
 
         # 2. Frameworks (the CEF framework appears at the top level and inside
-        #    each SLPlugin host; BugSplatMac is optional). Deepest first.
+        #    each SLPlugin host; BugSplat is optional). Deepest first.
         frameworks = [os.path.join(root, d)
                       for root, dirs, _files in os.walk(contents)
                       for d in dirs if d.endswith('.framework')]
@@ -809,12 +809,12 @@ class DarwinManifest(ViewerManifest):
                                           'llwebrtc', self.args['configuration'])):
                     self.path('libllwebrtc.dylib')
 
-                # BugsplatMac framework — required at runtime when LL_BUGSPLAT
+                # BugSplat framework — required at runtime when LL_BUGSPLAT
                 # is enabled. The viewer binary's INSTALL_RPATH
                 # (@executable_path/../Frameworks) resolves the @rpath load
-                # command emitted by the BugsplatMac framework here.
+                # command emitted by the BugSplat framework here.
                 if self.args.get('bugsplat'):
-                    self.path("BugSplatMac.framework")
+                    self.path("BugSplat.framework")
 
             with self.prefix(dst="MacOS"):
                 executable = self.dst_path_of(self.channel())

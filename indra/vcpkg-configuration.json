@@ -1,8 +1,14 @@
 {
-  "overlay-ports": [
-    "vcpkg/ports"
+  "registries": [
+    {
+      "kind": "git",
+      "repository": "https://github.com/AlchemyViewer/alchemy-registry",
+      "reference": "main",
+      "baseline": "849ad28cb592d6bef639bb22929ef08d3372de0d",
+      "packages": [ "alchemy-branding", "alchemy-dictionaries", "alchemy-fonts", "alsa", "apr", "bugsplat", "bugsplat-apple", "cef-bin", "collada-dom", "curl", "dbus", "faudio", "libgrapheme", "libndofdev", "lsl-definitions", "md4c", "minizip", "nvapi", "open-libndofdev", "openjpeg", "pipewire", "ppqsort", "pulseaudio", "secondlife-emoji-shortcodes", "tinygltf", "tracy", "v-hacd", "velopack", "vlc-bin", "webrtc", "websocketpp", "zlib" ]
+    }
   ],
   "overlay-triplets": [
-    "vcpkg/triplets"
+    "cmake/triplets"
   ]
 }

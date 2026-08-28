@@ -21,21 +21,24 @@ configure_file("${INDRA_SOURCE_DIR}/externals/js/three.min.js" "${CMAKE_CURRENT_
 configure_file("${INDRA_SOURCE_DIR}/externals/js/OrbitControls.js" "${CMAKE_CURRENT_SOURCE_DIR}/skins/default/html/common/equirectangular/js/OrbitControls.js" COPYONLY)
 
 # LSL Definitions
-configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/lsl_definitions/lsl_keywords.xml"
+find_package(unofficial-lsl-definitions CONFIG REQUIRED)
+configure_file("${LSL_DEFINITIONS_DIR}/lsl_keywords.xml"
                "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lsl_default.xml" COPYONLY)
-configure_file("${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/lsl-definitions/lsl_definitions/lua_keywords.xml"
+configure_file("${LSL_DEFINITIONS_DIR}/lua_keywords.xml"
                "${CMAKE_CURRENT_SOURCE_DIR}/app_settings/keywords_lua_default.xml" COPYONLY)
 
 message(STATUS "Copying fonts")
+find_package(unofficial-alchemy-fonts CONFIG REQUIRED)
 file(GLOB FONT_FILE_GLOB_LIST
-  "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/alchemy-fonts/fonts/*"
+  "${ALCHEMY_FONTS_DIR}/*"
 )
 file(COPY ${FONT_FILE_GLOB_LIST} DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/fonts")
 
 # Copy over the Emoji/shortcodes mapping XML files (and create dependency
 # if they are changed, CMake will run again and copy over new versions)
 message(STATUS "Copying Emoji/shortcode mappings")
-set(emoji_mapping_src_folder ${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/secondlife-emoji-shortcodes/xui)
+find_package(unofficial-emoji-shortcodes CONFIG REQUIRED)
+set(emoji_mapping_src_folder ${EMOJI_SHORTCODES_XUI_DIR})
 set(emoji_mapping_dst_folder ${CMAKE_CURRENT_SOURCE_DIR}/skins/default/xui)
 
 # Turkish (tr) is in the generator's ALLOWED_FOLDERS but not yet shipped
@@ -68,7 +71,8 @@ elseif(channel_lower MATCHES "^alchemy project")
 endif()
 message(STATUS "Copying icons for ${ICON_PATH}")
 
-set(BRANDING_SOURCE_DIR "${_VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/alchemy-branding")
+find_package(unofficial-alchemy-branding CONFIG REQUIRED)
+set(BRANDING_SOURCE_DIR "${ALCHEMY_BRANDING_DIR}")
 if (WINDOWS)
   execute_process(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

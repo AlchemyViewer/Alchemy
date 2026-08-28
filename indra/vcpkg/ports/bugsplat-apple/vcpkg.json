@@ -1,7 +1,0 @@
-{
-  "name": "bugsplat-apple",
-  "version-string": "2.0.0",
-  "description": "Bugsplat crash reporting framework for windows",
-  "homepage": "https://github.com/secondlife/3p-bugsplat",
-  "supports": "osx"
-}
