@@ -1222,25 +1222,6 @@ size_t utf8str_strlen(const std::string& utf8)
     return length;
 }
 
-std::string utf8str_chtruncate(const std::string& utf8, size_t length)
-{
-    if (0 == length)
-        return std::string();
-    if (utf8.length() <= length)
-        return utf8;
-
-    const char* pUTF8 = utf8.c_str(); int idx = 0;
-    while ( (pUTF8[idx]) && (length > 0) )
-    {
-        // We're looking for characters that don't start with 10 as their high bits
-        if ((pUTF8[idx] & 0xC0) != 0x80)
-            length--;
-        idx++;
-    }
-
-    return utf8.substr(0, idx);
-}
-
 // Checked: 2010-03-26 (RLVa-1.2.0b) | Modified: RLVa-1.0.0f
 bool RlvHandler::filterChat(std::string& strUTF8Text, bool fFilterEmote) const
 {
@@ -1261,7 +1242,7 @@ bool RlvHandler::filterChat(std::string& strUTF8Text, bool fFilterEmote) const
             else if (!hasBehaviour(RLV_BHVR_EMOTE))
             {
                 size_t idx = strUTF8Text.find('.');    // Truncate at 20 characters or at the dot (whichever is shorter)
-                strUTF8Text = utf8str_chtruncate(strUTF8Text, ( (idx > 0) && (idx < 20) ) ? idx + 1 : 20);
+                strUTF8Text = utf8str_symbol_truncate(strUTF8Text, ( (idx > 0) && (idx < 20) ) ? (S32)idx + 1 : 20);
             }
         }
     }

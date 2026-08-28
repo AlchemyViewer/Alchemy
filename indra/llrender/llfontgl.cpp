@@ -1293,8 +1293,9 @@ S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_cha
     bool clip = false;
     F32 cur_x = 0;
 
-    S32 start_of_last_word = 0;
-    bool in_word = false;
+    // Where the line may end, per UAX #14. Tracked against the walk below so
+    // that when the text clips we know the last place a break was allowed.
+    S32 last_break = 0;
 
     // avoid S32 overflow when max_pixels == S32_MAX by staying in floating point
     F32 scaled_max_pixels = max_pixels * sScaleX;
@@ -1316,17 +1317,24 @@ S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_cha
     static const std::vector<ALShapedGlyph> sEmptyShape;
     const std::vector<ALShapedGlyph>* shape_glyphs = &sEmptyShape;
     size_t shape_idx = 0;
-    if (max_chars > 0 && wchars[0])
+
+    S32 measure_end = 0;
+    while (measure_end < max_chars && wchars[measure_end] != 0)
+        ++measure_end;
+
+    if (measure_end > 0)
     {
-        S32 measure_end = 0;
-        while (measure_end < max_chars && wchars[measure_end] != 0)
-            ++measure_end;
-        if (measure_end > 0)
-        {
-            LLWStringView slice = wchars.substr(0, (size_t)measure_end);
-            shape_glyphs = &ALFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)measure_end);
-        }
+        LLWStringView slice = wchars.substr(0, (size_t)measure_end);
+        shape_glyphs = &ALFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)measure_end);
     }
+
+    // Same window, asked where a break is permitted. Positions are where the
+    // next line would begin, so they line up with what the clip below wants.
+    // The buffer outlives the call so a wrapping loop does not allocate per
+    // line; nothing re-enters this function while `breaks` is live.
+    static thread_local std::vector<size_t> breaks;
+    wstring_line_break_opportunities(wchars.substr(0, (size_t)measure_end), breaks);
+    size_t break_idx = 0;
     const bool use_shaped = !shape_glyphs->empty();
     // shape_glyphs points into the shape LRU until the loop's last use.
     const size_t shape_gen = ALFontShaping::cacheMutationCount();
@@ -1343,38 +1351,12 @@ S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_cha
             break;
         }
 
-        if (in_word)
+        // Carry the break cursor up to the last opportunity at or before i, so
+        // a clip here knows where it may retreat to.
+        while (break_idx < breaks.size() && breaks[break_idx] <= (size_t)i)
         {
-            if (LLStringOps::isSpace(wch))
-            {
-                if(wch !=(0x00A0))
-                {
-                    in_word = false;
-                }
-            }
-            if (iswindividual(wch))
-            {
-                // Past the end reads as 0, which is what the NUL terminator used
-                // to supply here — isPunct(0) is false either way.
-                const llwchar peek = ((i + 1) < max_chars) ? wchars[i + 1] : 0;
-                if (LLStringOps::isPunct(peek))
-                {
-                    in_word=true;
-                }
-                else
-                {
-                    in_word=false;
-                    start_of_last_word = i;
-                }
-            }
-        }
-        else
-        {
-            start_of_last_word = i;
-            if (!LLStringOps::isSpace(wch) || !iswindividual(wch))
-            {
-                in_word = true;
-            }
+            last_break = (S32)breaks[break_idx];
+            ++break_idx;
         }
 
         if (use_shaped)
@@ -1457,12 +1439,15 @@ S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_cha
         switch (end_on_word_boundary)
         {
         case ONLY_WORD_BOUNDARIES:
-            i = start_of_last_word;
+            i = last_break;
             break;
         case WORD_BOUNDARY_IF_POSSIBLE:
-            if (start_of_last_word != 0)
+            // Zero means nothing on this line was a legal place to break, so
+            // the caller gets the clip position and a mid-word split rather
+            // than an empty line it would never make progress past.
+            if (last_break != 0)
             {
-                i = start_of_last_word;
+                i = last_break;
             }
             break;
         default:

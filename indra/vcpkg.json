@@ -50,6 +50,7 @@
     },
     "glm",
     "harfbuzz",
+    "icu",
     {
       "name": "libavif",
       "features": [

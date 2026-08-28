@@ -868,32 +868,22 @@ void LLTextBase::drawText()
                     seg_end = llmin(text_segment->getEnd(), end);
                 }
 
-                // Find the start of the first word
-                U32 word_start = seg_start, word_end = -1;
-                U32 text_length = static_cast<U32>(wstrText.length());
-                while ( (word_start < text_length) && (!LLStringOps::isAlpha(wstrText[word_start])) )
+                // Iterate over all words in the text block and check them one by
+                // one. Word bounds come from Unicode, so a contraction arrives
+                // whole -- the loop this replaced re-derived that rule by hand,
+                // testing the characters either side of an apostrophe.
+                size_t word_at = seg_start;
+                while (word_at < seg_end)
                 {
-                    word_start++;
-                }
-
-                // Iterate over all words in the text block and check them one by one
-                while (word_start < seg_end)
-                {
-                    // Find the end of the current word (special case handling for "'" when it's used as a contraction)
-                    word_end = word_start + 1;
-                    while ( (word_end < seg_end) &&
-                            ((LLWStringUtil::isPartOfWord(wstrText[word_end])) ||
-                                ((L'\'' == wstrText[word_end]) &&
-                                (LLStringOps::isAlnum(wstrText[word_end - 1])) && (LLStringOps::isAlnum(wstrText[word_end + 1])))) )
-                    {
-                        word_end++;
-                    }
-                    if (word_end > seg_end)
+                    const auto word_range = wstring_next_word_range(wstrText, word_at);
+                    if (word_range.first >= word_range.second || word_range.first >= seg_end)
                     {
                         break;
                     }
 
-                    if (word_start < text_length && word_end <= text_length && word_end > word_start)
+                    const U32 word_start = (U32)word_range.first;
+                    const U32 word_end = (U32)llmin(word_range.second, (size_t)seg_end);
+                    if (word_end > word_start)
                     {
                         std::string word = wstring_to_utf8str(wstrText.substr(word_start, word_end - word_start));
 
@@ -904,12 +894,7 @@ void LLTextBase::drawText()
                         }
                     }
 
-                    // Find the start of the next word
-                    word_start = word_end + 1;
-                    while ( (word_start < seg_end) && (!LLWStringUtil::isPartOfWord(wstrText[word_start])) )
-                    {
-                        word_start++;
-                    }
+                    word_at = word_range.second;
                 }
             }
 
@@ -3440,22 +3425,33 @@ void LLTextBase::refreshHighlights()
         {
             const LLWString& wstrText = getWText();
 
-            // boost::ifind_all needs std::ctype<char32_t>, which libc++ doesn't define; lowercase via ICU instead.
+            // boost::ifind_all needs std::ctype<char32_t>, which libc++ doesn't
+            // define, so the text is folded and searched by hand.
             std::list<boost::iterator_range<LLWString::const_iterator> > highlightRanges;
             if (mHighlightCaseInsensitive)
             {
-                LLWString lowerText(wstrText);
-                LLWStringUtil::toLower(lowerText);
-                LLWString lowerNeedle(mHighlightWord);
-                LLWStringUtil::toLower(lowerNeedle);
+                // Ranges found in the folded copy are mapped back rather than
+                // reused directly: lowercasing can change length (U+0130 folds
+                // to two codepoints), so an offset taken from the fold does not
+                // index the document once anything like that precedes it.
+                LLWString lowerText;
+                std::vector<size_t> fold_map;
+                wstring_tolower_indexed(wstrText, lowerText, &fold_map);
+                LLWString lowerNeedle;
+                wstring_tolower_indexed(mHighlightWord, lowerNeedle);
 
                 std::list<boost::iterator_range<LLWString::const_iterator> > lowerRanges;
                 boost::find_all(lowerRanges, lowerText, lowerNeedle);
                 for (const auto& range : lowerRanges)
                 {
-                    auto offset = range.begin() - lowerText.begin();
-                    auto begin = wstrText.begin() + offset;
-                    highlightRanges.emplace_back(begin, begin + range.size());
+                    const size_t folded_begin = (size_t)(range.begin() - lowerText.begin());
+                    const size_t folded_end = folded_begin + range.size();
+                    const size_t doc_begin = (folded_begin < fold_map.size())
+                        ? fold_map[folded_begin] : wstrText.size();
+                    const size_t doc_end = (folded_end < fold_map.size())
+                        ? fold_map[folded_end] : wstrText.size();
+                    highlightRanges.emplace_back(wstrText.begin() + doc_begin,
+                                                 wstrText.begin() + doc_end);
                 }
             }
             else

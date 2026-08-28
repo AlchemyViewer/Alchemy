@@ -377,17 +377,49 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
 //      return;
     }
 
-    LLWString text = getWText();
+    // `loc` below indexes `text` and is then handed to setCursorPos, so when a
+    // case-insensitive search folds the document the offset has to be mapped
+    // back: lowercasing is not length-preserving (U+0130 becomes two
+    // codepoints), and every position after such a character would otherwise
+    // be off by the difference.
+    LLWString text;
     LLWString search_text = utf8str_to_wstring(search_text_in);
+    std::vector<size_t> fold_map;
     if (case_insensitive)
     {
-        LLWStringUtil::toLower(text);
-        LLWStringUtil::toLower(search_text);
+        wstring_tolower_indexed(getWText(), text, &fold_map);
+        LLWString folded_needle;
+        wstring_tolower_indexed(search_text, folded_needle);
+        search_text.swap(folded_needle);
     }
+    else
+    {
+        text = getWText();
+    }
+    // fold_map is non-decreasing, so the inverse of a lookup is a lower_bound.
+    const auto to_folded = [&](S32 doc) -> size_t
+    {
+        const size_t at = (size_t)llmax(doc, 0);
+        if (fold_map.empty())
+            return llmin(at, text.size());
+        return (size_t)(std::lower_bound(fold_map.begin(), fold_map.end(), at) - fold_map.begin());
+    };
+    const auto to_document = [&](size_t folded) -> S32
+    {
+        if (fold_map.empty())
+            return narrow(llmin(folded, text.size()));
+        if (folded < fold_map.size())
+            return narrow(fold_map[folded]);
+        return (S32)getLength();
+    };
 
     if (mIsSelecting)
     {
-        LLWString selected_text = text.substr(mSelectionEnd, mSelectionStart - mSelectionEnd);
+        const size_t sel_begin = to_folded(mSelectionEnd);
+        const size_t sel_end = to_folded(mSelectionStart);
+        LLWString selected_text = (sel_end > sel_begin)
+            ? text.substr(sel_begin, sel_end - sel_begin)
+            : LLWString();
 
         if (selected_text == search_text)
         {
@@ -409,7 +441,10 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
     }
 
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-29 (Catznip-2.3)
-    size_t loc = (search_up) ? text.rfind(search_text, llmax(0, mCursorPos - (S32)search_text.size())) : text.find(search_text,mCursorPos);
+    const size_t folded_cursor = to_folded(mCursorPos);
+    const size_t rfind_from = (folded_cursor >= search_text.size())
+        ? folded_cursor - search_text.size() : 0;
+    size_t loc = (search_up) ? text.rfind(search_text, rfind_from) : text.find(search_text, folded_cursor);
 // [/SL:KB]
 //  size_t loc = text.find(search_text,mCursorPos);
 
@@ -440,7 +475,7 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
 //      return;
     }
 
-    setCursorPos(narrow(loc));
+    setCursorPos(to_document(loc));
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
     if (mReadOnly)
     {
@@ -451,7 +486,9 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
     mIsSelecting = true;
     mSelectedOnFocusReceived = false;
     mSelectionEnd = mCursorPos;
-    mSelectionStart = llmin((S32)getLength(), (S32)(mCursorPos + search_text.size()));
+    // The match's far edge comes back through the map too: search_text.size()
+    // counts folded codepoints, which is not what the document is indexed in.
+    mSelectionStart = llmin((S32)getLength(), to_document(loc + search_text.size()));
 // [SL:KB] - Patch: Chat-Logs | Checked: Catznip-5.2
     return true;
 // [/SL:KB]
@@ -509,33 +546,12 @@ void LLTextEditor::replaceTextAll(const std::string& search_text, const std::str
 
 S32 LLTextEditor::prevWordPos(S32 cursorPos) const
 {
-    const LLWString& wtext = getWText();
-    while( (cursorPos > 0) && (wtext[cursorPos-1] == ' ') )
-    {
-        cursorPos--;
-    }
-    while( (cursorPos > 0) && LLWStringUtil::isPartOfWord( wtext[cursorPos-1] ) )
-    {
-        cursorPos--;
-    }
-    // ZWJ, VS and tag codepoints are neither word chars nor spaces, so the
-    // walk can stop in the middle of an emoji cluster. Snap to the cluster
-    // start so ctrl+left never parks the caret inside a ZWJ sequence.
-    return (S32)wstring_grapheme_align_backward(wtext, (size_t)cursorPos);
+    return (S32)wstring_step_word_backward(getWText(), (size_t)llmax(cursorPos, 0));
 }
 
 S32 LLTextEditor::nextWordPos(S32 cursorPos) const
 {
-    const LLWString& wtext = getWText();
-    while( (cursorPos < getLength()) && LLWStringUtil::isPartOfWord( wtext[cursorPos] ) )
-    {
-        cursorPos++;
-    }
-    while( (cursorPos < getLength()) && (wtext[cursorPos] == ' ') )
-    {
-        cursorPos++;
-    }
-    return (S32)wstring_grapheme_align_forward(wtext, (size_t)cursorPos);
+    return (S32)wstring_step_word_forward(getWText(), (size_t)llmax(cursorPos, 0));
 }
 
 const LLTextSegmentPtr  LLTextEditor::getPreviousSegment() const
@@ -1084,20 +1100,15 @@ bool LLTextEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
             setCursorPos((S32)cluster.second);
             mSelectionEnd = mCursorPos;
         }
-        else if( LLWStringUtil::isPartOfWord( text[mCursorPos] ) )
+        else if (const auto word = wstring_word_range_at(text, (size_t)mCursorPos);
+                 word.first != word.second)
         {
-            // Select word the cursor is over
-            while ((mCursorPos > 0) && LLWStringUtil::isPartOfWord(text[mCursorPos-1]))
-            {
-                if (!setCursorPos(mCursorPos - 1)) break;
-            }
+            // Select the word the cursor is over, as Unicode bounds it: a
+            // contraction comes out whole, and a script without spaces still
+            // yields a word rather than the run up to the next punctuation.
+            setCursorPos((S32)word.first);
             startSelection();
-
-            while ((mCursorPos < (S32)text.length()) && LLWStringUtil::isPartOfWord( text[mCursorPos] ) )
-            {
-                if (!setCursorPos(mCursorPos + 1)) break;
-            }
-
+            setCursorPos((S32)word.second);
             mSelectionEnd = mCursorPos;
         }
         else if ((mCursorPos < (S32)text.length()) && !LLStringOps::isSpace( text[mCursorPos]) )
@@ -1494,11 +1505,9 @@ bool LLTextEditor::handleSelectionKey(const KEY key, const MASK mask)
             if( 0 < mCursorPos )
             {
                 startSelection();
-                setCursorPos((S32)wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos));
-                if( mask & MASK_CONTROL )
-                {
-                    setCursorPos(prevWordPos(mCursorPos));
-                }
+                setCursorPos((mask & MASK_CONTROL)
+                    ? prevWordPos(mCursorPos)
+                    : (S32)wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos));
                 mSelectionEnd = mCursorPos;
             }
             break;
@@ -1507,11 +1516,9 @@ bool LLTextEditor::handleSelectionKey(const KEY key, const MASK mask)
             if( mCursorPos < getLength() )
             {
                 startSelection();
-                setCursorPos((S32)wstring_step_grapheme_forward(getWText(), (size_t)mCursorPos));
-                if( mask & MASK_CONTROL )
-                {
-                    setCursorPos(nextWordPos(mCursorPos));
-                }
+                setCursorPos((mask & MASK_CONTROL)
+                    ? nextWordPos(mCursorPos)
+                    : (S32)wstring_step_grapheme_forward(getWText(), (size_t)mCursorPos));
                 mSelectionEnd = mCursorPos;
             }
             break;
@@ -1923,12 +1930,7 @@ bool LLTextEditor::handleControlKey(const KEY key, const MASK mask)
                 // all move the cursor as if clicking, so should deselect.
                 deselect();
 
-                // Step past the current cluster before scanning so multi-
-                // codepoint emoji (🏳️‍⚧️) get treated as one unit, matching
-                // the single-codepoint emoji case (🐶) where +1 already does.
-                const LLWString& wtext = getWText();
-                const S32 stepped = (S32)wstring_step_grapheme_forward(wtext, (size_t)mCursorPos);
-                setCursorPos(nextWordPos(stepped));
+                setCursorPos(nextWordPos(mCursorPos));
             }
             break;
 
@@ -1940,9 +1942,7 @@ bool LLTextEditor::handleControlKey(const KEY key, const MASK mask)
                 // all move the cursor as if clicking, so should deselect.
                 deselect();
 
-                const LLWString& wtext = getWText();
-                const S32 stepped = (S32)wstring_step_grapheme_backward(wtext, (size_t)mCursorPos);
-                setCursorPos(prevWordPos(stepped));
+                setCursorPos(prevWordPos(mCursorPos));
             }
             break;
 

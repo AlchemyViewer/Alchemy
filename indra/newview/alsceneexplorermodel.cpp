@@ -306,22 +306,43 @@ void ALSceneExplorerFilter::setModified(EFilterModified behavior)
     }
 }
 
-std::string::size_type ALSceneExplorerFilter::getStringMatchOffset(LLFolderViewModelItem* item) const
+// Only a name match can be highlighted: the widget draws the highlight within
+// its displayed label, and the name is the only searched field the label shows
+// (description/UUID/owner matches return no match). The search copy is
+// lowercased, and lowercasing UTF-8 changes byte lengths, so the raw find
+// offset does not index the label.
+LLFolderViewFilter::Match ALSceneExplorerFilter::getFilterMatch(LLFolderViewModelItem* item) const
 {
+    Match match;
     if (mConstraints.mFilterSubString.empty())
-        return std::string::npos;
-    // Only a name match can be highlighted: the widget draws the highlight at
-    // this offset within its displayed label, and the name is the only
-    // searched field the label shows (description/UUID/owner matches return
-    // npos). The lowercased search copy is byte-length-identical to the
-    // display name, so the offset maps straight onto the label — matching
-    // LLInventoryFilter's behaviour, including its non-ASCII imprecision.
+        return match;
     if (mConstraints.mSearchType != (U32)SEARCH_NAME
         && mConstraints.mSearchType != (U32)SEARCH_ALL)
     {
-        return std::string::npos;
+        return match;
     }
-    return static_cast<ALSceneExplorerItem*>(item)->searchName().find(mConstraints.mFilterSubString);
+
+    const std::string::size_type at =
+        static_cast<ALSceneExplorerItem*>(item)->searchName().find(mConstraints.mFilterSubString);
+    if (at == std::string::npos)
+        return match;
+
+    const std::string& label = item->getDisplayName();
+
+    // All-ASCII means lowercasing moved nothing, so the byte offset already
+    // indexes the label by codepoint.
+    if (utf8str_is_ascii(label) && utf8str_is_ascii(mConstraints.mFilterSubString))
+    {
+        match.mOffset = at;
+        match.mLength = mConstraints.mFilterSubString.size();
+        return match;
+    }
+
+    match.mOffset = utf8str_length_from_cased_utf8_length(label, at, false);
+    const size_t end = utf8str_length_from_cased_utf8_length(
+        label, at + mConstraints.mFilterSubString.size(), false);
+    match.mLength = (end > match.mOffset) ? end - match.mOffset : 0;
+    return match;
 }
 
 bool ALSceneExplorerFilter::check(const LLFolderViewModelItem* item)
@@ -625,10 +646,11 @@ bool ALSceneExplorerItem::filter(LLFolderViewFilter& filter)
     if (continue_filtering)
     {
         const bool passed = filter.check(this);
-        // The match offset/size make the folder view draw the standard
+        // The match span makes the folder view draw the standard
         // inventory-style highlight over the matched substring.
+        const LLFolderViewFilter::Match match = filter.getFilterMatch(this);
         setPassedFilter(passed, filter_generation,
-                        filter.getStringMatchOffset(this), filter.getFilterStringSize());
+                        match.mOffset, match.mLength);
         continue_filtering = !filter.isTimedOut();
     }
 

@@ -79,10 +79,13 @@ void LLUIString::setArg(const std::string& key, const std::string& replacement)
 
 void LLUIString::truncate(S32 maxchars)
 {
-    if (getUpdatedWResult().size() > (size_t)maxchars)
+    LLWString& wresult = getUpdatedWResult();
+    if (wresult.size() > (size_t)maxchars)
     {
-        LLWStringUtil::truncate(getUpdatedWResult(), maxchars);
-        mResult = wstring_to_utf8str(getUpdatedWResult());
+        // Back off to a whole character. A codepoint count can fall between a
+        // letter and its accent, or inside a flag or a family.
+        LLWStringUtil::truncate(wresult, wstring_grapheme_align_backward(wresult, (size_t)maxchars));
+        mResult = wstring_to_utf8str(wresult);
     }
 }
 

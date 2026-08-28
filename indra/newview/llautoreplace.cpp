@@ -44,47 +44,33 @@ void LLAutoReplace::autoreplaceCallback(S32& replacement_start, S32& replacement
     {
         S32 word_end = cursor_pos - 1;
 
-        bool at_space  = (input_text[word_end] == ' ');
-        bool have_word = (LLWStringUtil::isPartOfWord(input_text[word_end]));
-
-        if (at_space || have_word)
+        // Replacement only fires once the word is finished, which is what the
+        // just-typed space signals; the word itself is the one before it.
+        const bool at_space = (input_text[word_end] == ' ');
+        if (at_space && word_end > 0)
         {
-            if (at_space && word_end > 0)
-            {
-                // find out if this space immediately follows a word
-                word_end--;
-                have_word  = (LLWStringUtil::isPartOfWord(input_text[word_end]));
-            }
-            if (have_word)
-            {
-                // word_end points to the end of a word, now find the start of the word
-                std::string word;
-                S32 word_start = word_end;
-                for (S32 back_one = word_start - 1;
-                     back_one >= 0 && LLWStringUtil::isPartOfWord(input_text[back_one]);
-                     back_one--
-                    )
-                {
-                    word_start--; // walk word_start back to the beginning of the word
-                }
-                LL_DEBUGS("AutoReplace") << "word_start: " << word_start << " word_end: " << word_end << LL_ENDL;
-                LLWString old_string = input_text.substr(word_start, word_end - word_start + 1);
-                std::string last_word = wstring_to_utf8str(old_string);
-                std::string replacement_word(mSettings.replaceWord(last_word));
+            word_end--;
+        }
 
-                if (replacement_word != last_word)
-                {
-                    // The last word is one for which we have a replacement
-                    if (at_space)
-                    {
-                        // return the replacement string
-                        replacement_start = word_start;
-                        replacement_length = word_end - word_start + 1;
-                        replacement_string = utf8str_to_wstring(replacement_word);
-                        S32 size_change = static_cast<S32>(replacement_string.size() - old_string.size());
-                        cursor_pos += size_change;
-                    }
-                }
+        // Unicode bounds the word, so "don't" reaches the replacer whole rather
+        // than as "t" -- the walk this replaced stopped at the apostrophe.
+        const auto word_range = wstring_word_range_at(input_text, (size_t)llmax(word_end, 0));
+        if (at_space && word_range.first != word_range.second)
+        {
+            const S32 word_start = (S32)word_range.first;
+            word_end = (S32)word_range.second - 1;
+            LL_DEBUGS("AutoReplace") << "word_start: " << word_start << " word_end: " << word_end << LL_ENDL;
+            LLWString old_string = input_text.substr(word_start, word_end - word_start + 1);
+            std::string last_word = wstring_to_utf8str(old_string);
+            std::string replacement_word(mSettings.replaceWord(last_word));
+
+            if (replacement_word != last_word)
+            {
+                replacement_start = word_start;
+                replacement_length = word_end - word_start + 1;
+                replacement_string = utf8str_to_wstring(replacement_word);
+                S32 size_change = static_cast<S32>(replacement_string.size() - old_string.size());
+                cursor_pos += size_change;
             }
         }
     }
@@ -713,14 +699,13 @@ bool LLAutoReplaceSettings::addEntryToList(LLWString keyword, LLWString replacem
 
     if ( ! keyword.empty() && ! replacement.empty() )
     {
-        bool isOneWord = true;
-        for (S32 character = 0; isOneWord && character < keyword.size(); character++ )
+        // One word by Unicode's reckoning, so a contraction is a usable keyword.
+        const auto keyword_range = wstring_word_range_at(keyword, 0);
+        const bool isOneWord = (keyword_range.first == 0) && (keyword_range.second == keyword.size());
+        if (!isOneWord)
         {
-            if ( ! LLWStringUtil::isPartOfWord(keyword[character]) )
-            {
-                LL_WARNS("AutoReplace") << "keyword '" << wstring_to_utf8str(keyword) << "' not a single word (len "<<keyword.size()<<" '"<<character<<"')" << LL_ENDL;
-                isOneWord = false;
-            }
+            LL_WARNS("AutoReplace") << "keyword '" << wstring_to_utf8str(keyword)
+                                    << "' not a single word (len " << keyword.size() << ")" << LL_ENDL;
         }
 
         if ( isOneWord )

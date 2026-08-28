@@ -832,23 +832,18 @@ bool LLLineEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
             doSelectAll = (old_selection_start == mSelectionStart) &&
                           (old_selection_end   == mSelectionEnd);
         }
-        // Select the word we're on
-        else if( LLWStringUtil::isPartOfWord( wtext[mCursorPos] ) )
+        // Select the word we're on, as Unicode bounds it: a contraction comes
+        // out whole, and a script without spaces still yields a word rather
+        // than the run up to the next punctuation.
+        else if (const auto word = wstring_word_range_at(wtext, (size_t)mCursorPos);
+                 word.first != word.second)
         {
             S32 old_selection_start = mLastSelectionStart;
             S32 old_selection_end = mLastSelectionEnd;
 
-            // Select word the cursor is over
-            while ((mCursorPos > 0) && LLWStringUtil::isPartOfWord( wtext[mCursorPos-1] ))
-            {   // Find the start of the word
-                mCursorPos--;
-            }
+            mCursorPos = (S32)word.first;
             startSelection();
-
-            while ((mCursorPos < (S32)wtext.length()) && LLWStringUtil::isPartOfWord( wtext[mCursorPos] ) )
-            {   // Find the end of the word
-                mCursorPos++;
-            }
+            mCursorPos = (S32)word.second;
             mSelectionEnd = mCursorPos;
 
             // If nothing changed, then the word was already selected.  Select the whole line.
@@ -1126,10 +1121,10 @@ void LLLineEditor::removeWord(bool prev)
     const S32 pos(getCursor());
     if (prev ? pos > 0 : static_cast<S32>(pos) < getLength())
     {
-        S32 new_pos(prev ? prevWordPos(pos) : nextWordPos(pos));
-        if (new_pos == pos) // Other character we don't jump over
-            new_pos = prev ? prevWordPos(new_pos-1) : nextWordPos(new_pos+1);
-
+        // Both walkers move strictly while the guard above holds: the text
+        // carries no newline (paste turns one into a space or a pilcrow), so
+        // the whole string is one line and neither can be standing at its edge.
+        const S32 new_pos(prev ? prevWordPos(pos) : nextWordPos(pos));
         const S32 diff(llabs(pos - new_pos));
         if (prev)
         {
@@ -1285,34 +1280,12 @@ void LLLineEditor::setDrawAsterixes(bool b)
 
 S32 LLLineEditor::prevWordPos(S32 cursorPos) const
 {
-    const LLWString& wtext = mText.getWString();
-    while( (cursorPos > 0) && (wtext[cursorPos-1] == ' ') )
-    {
-        cursorPos--;
-    }
-    while( (cursorPos > 0) && LLWStringUtil::isPartOfWord( wtext[cursorPos-1] ) )
-    {
-        cursorPos--;
-    }
-    // Emoji (ZWJ, VS, skin tone, tag characters) pass neither isPartOfWord
-    // nor the space test, so the walk stops wherever inside an emoji
-    // cluster those characters start. Snap back to the cluster's own start
-    // so ctrl+left doesn't leave the caret between 🐕 and the ZWJ.
-    return (S32)wstring_grapheme_align_backward(wtext, (size_t)cursorPos);
+    return (S32)wstring_step_word_backward(mText.getWString(), (size_t)llmax(cursorPos, 0));
 }
 
 S32 LLLineEditor::nextWordPos(S32 cursorPos) const
 {
-    const LLWString& wtext = mText.getWString();
-    while( (cursorPos < getLength()) && LLWStringUtil::isPartOfWord( wtext[cursorPos] ) )
-    {
-        cursorPos++;
-    }
-    while( (cursorPos < getLength()) && (wtext[cursorPos] == ' ') )
-    {
-        cursorPos++;
-    }
-    return (S32)wstring_grapheme_align_forward(wtext, (size_t)cursorPos);
+    return (S32)wstring_step_word_forward(mText.getWString(), (size_t)llmax(cursorPos, 0));
 }
 
 
@@ -1329,11 +1302,9 @@ bool LLLineEditor::handleSelectionKey(KEY key, MASK mask)
         case KEY_LEFT:
             if( 0 < getCursor() )
             {
-                S32 cursorPos = (S32)wstring_step_grapheme_backward(mText.getWString(), (size_t)getCursor());
-                if( mask & MASK_CONTROL )
-                {
-                    cursorPos = prevWordPos(cursorPos);
-                }
+                const S32 cursorPos = (mask & MASK_CONTROL)
+                    ? prevWordPos(getCursor())
+                    : (S32)wstring_step_grapheme_backward(mText.getWString(), (size_t)getCursor());
                 extendSelection( cursorPos );
             }
             else
@@ -1345,11 +1316,9 @@ bool LLLineEditor::handleSelectionKey(KEY key, MASK mask)
         case KEY_RIGHT:
             if( getCursor() < mText.length())
             {
-                S32 cursorPos = (S32)wstring_step_grapheme_forward(mText.getWString(), (size_t)getCursor());
-                if( mask & MASK_CONTROL )
-                {
-                    cursorPos = nextWordPos(cursorPos);
-                }
+                const S32 cursorPos = (mask & MASK_CONTROL)
+                    ? nextWordPos(getCursor())
+                    : (S32)wstring_step_grapheme_forward(mText.getWString(), (size_t)getCursor());
                 extendSelection( cursorPos );
             }
             else
@@ -1696,11 +1665,9 @@ bool LLLineEditor::handleSpecialKey(KEY key, MASK mask)
             else
             if( 0 < getCursor() )
             {
-                S32 cursorPos = (S32)wstring_step_grapheme_backward(mText.getWString(), (size_t)getCursor());
-                if( mask & MASK_CONTROL )
-                {
-                    cursorPos = prevWordPos(cursorPos);
-                }
+                const S32 cursorPos = (mask & MASK_CONTROL)
+                    ? prevWordPos(getCursor())
+                    : (S32)wstring_step_grapheme_backward(mText.getWString(), (size_t)getCursor());
                 setCursor(cursorPos);
             }
             else
@@ -1725,11 +1692,9 @@ bool LLLineEditor::handleSpecialKey(KEY key, MASK mask)
             else
             if (getCursor() < mText.length())
             {
-                S32 cursorPos = (S32)wstring_step_grapheme_forward(mText.getWString(), (size_t)getCursor());
-                if( mask & MASK_CONTROL )
-                {
-                    cursorPos = nextWordPos(cursorPos);
-                }
+                const S32 cursorPos = (mask & MASK_CONTROL)
+                    ? nextWordPos(getCursor())
+                    : (S32)wstring_step_grapheme_forward(mText.getWString(), (size_t)getCursor());
                 setCursor(cursorPos);
             }
             else
@@ -2237,44 +2202,30 @@ void LLLineEditor::draw()
         {
             const LLWString& text = mText.getWString().substr(start, end);
 
-            // Find the start of the first word
-            U32 word_start = 0, word_end = 0;
-            while ( (word_start < text.length()) && (!LLStringOps::isAlpha(text[word_start])) )
-            {
-                word_start++;
-            }
-
-            // Iterate over all words in the text block and check them one by one
+            // Iterate over all words in the text block and check them one by
+            // one. Word bounds come from Unicode, so a contraction arrives
+            // whole -- the loop this replaced re-derived that rule by hand,
+            // testing the characters either side of an apostrophe.
             mMisspellRanges.clear();
-            while (word_start < text.length())
+            size_t word_at = 0;
+            while (word_at < text.length())
             {
-                // Find the end of the current word (special case handling for "'" when it's used as a contraction)
-                word_end = word_start + 1;
-                while ( (word_end < text.length()) &&
-                        ((LLWStringUtil::isPartOfWord(text[word_end])) ||
-                         ((L'\'' == text[word_end]) && (word_end + 1 < text.length()) &&
-                          (LLStringOps::isAlnum(text[word_end - 1])) && (LLStringOps::isAlnum(text[word_end + 1])))) )
-                {
-                    word_end++;
-                }
-                if (word_end > text.length())
+                const auto word_range = wstring_next_word_range(text, word_at);
+                if (word_range.first >= word_range.second)
                 {
                     break;
                 }
 
                 // Don't process words shorter than 3 characters
-                std::string word = wstring_to_utf8str(text.substr(word_start, word_end - word_start));
+                std::string word = wstring_to_utf8str(
+                    text.substr(word_range.first, word_range.second - word_range.first));
                 if ( (word.length() >= 3) && (!LLSpellChecker::instance().checkSpelling(word)) )
                 {
-                    mMisspellRanges.push_back(std::pair<U32, U32>(start + word_start, start + word_end));
+                    mMisspellRanges.push_back(std::pair<U32, U32>(
+                        start + (U32)word_range.first, start + (U32)word_range.second));
                 }
 
-                // Find the start of the next word
-                word_start = word_end + 1;
-                while ( (word_start < text.length()) && (!LLWStringUtil::isPartOfWord(text[word_start])) )
-                {
-                    word_start++;
-                }
+                word_at = word_range.second;
             }
 
             mSpellCheckStart = start;

@@ -299,8 +299,7 @@ public:
 
     bool                showAllResults() const;
 
-    std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const;
-    std::string::size_type getFilterStringSize() const;
+    Match getFilterMatch(LLFolderViewModelItem* item) const override;
     // +-------------------------------------------------------------------+
     // + Presentation
     // +-------------------------------------------------------------------+

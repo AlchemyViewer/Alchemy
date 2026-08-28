@@ -447,6 +447,25 @@ namespace tut
         str1 = "A is equal to a";
         str2 = "a is EQUAL to A";
         ensure("4: compareInsensitive failed", LLStringUtil::compareInsensitive(str1, str2) == 0);
+
+        // Ignoring case is not the same as uppercasing both sides, which is
+        // what this used to do: that turns sharp s into SS and so calls two
+        // different words the same word.
+        ensure("sharp s is not ss",
+               LLStringUtil::compareInsensitive(std::string("stra\xC3\x9F""e"),
+                                                std::string("strasse")) != 0);
+        ensure("sharp s is not SS",
+               LLStringUtil::compareInsensitive(std::string("stra\xC3\x9F""e"),
+                                                std::string("STRASSE")) != 0);
+
+        // Accents are a secondary difference and survive; case is tertiary
+        // and does not.
+        ensure("accents survive",
+               LLStringUtil::compareInsensitive(std::string("ab"),
+                                                std::string("\xC3\xA4""b")) < 0);
+        ensure("case does not",
+               LLStringUtil::compareInsensitive(std::string("\xC3\x84""B"),
+                                                std::string("\xC3\xA4""b")) == 0);
     }
 
     template<> template<>
@@ -466,6 +485,31 @@ namespace tut
         rhs_str = "PROgRAM12FILES";
         ensure("compareDict 3 failed", LLStringUtil::compareDict(lhs_str, rhs_str) > 0);
         ensure("precedesDict 3 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == false);
+
+        // Uppercase sorts first, which is a tertiary-level ordering. The
+        // caseless form drops that level and so sees no difference at all.
+        ensure("compareDictInsensitive case", LLStringUtil::compareDictInsensitive(lhs_str, rhs_str) == 0);
+        ensure("compareDict case", LLStringUtil::compareDict(std::string("abc"), std::string("ABC")) > 0);
+        ensure("compareDict case 2", LLStringUtil::compareDict(std::string("Apple"), std::string("apple")) < 0);
+
+        // Digit runs compare as the numbers they spell.
+        ensure("natural 2 before 10",
+               LLStringUtil::compareDict(std::string("item2"), std::string("item10")) < 0);
+        ensure("natural 10 after 9",
+               LLStringUtil::compareDict(std::string("item10"), std::string("item9")) > 0);
+
+        // An accented letter sorts beside the letter it decorates rather than
+        // past the end of the alphabet: a < a-diaeresis < b, not merely
+        // somewhere before z. Codepoint order put it after z.
+        ensure("accent after plain",
+               LLStringUtil::compareDict(std::string("ab"), std::string("\xC3\xA4" "b")) < 0);
+        ensure("accent before next letter",
+               LLStringUtil::compareDict(std::string("\xC3\xA4" "b"), std::string("bb")) < 0);
+        ensure("accent before z",
+               LLStringUtil::compareDict(std::string("\xC3\xA4" "b"), std::string("zb")) < 0);
+        // ... and case-insensitive still keeps accents apart.
+        ensure("caseless keeps accents",
+               LLStringUtil::compareDictInsensitive(std::string("ab"), std::string("\xC3\xA4" "b")) < 0);
     }
 
     template<> template<>

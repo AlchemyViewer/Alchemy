@@ -706,14 +706,45 @@ const std::string& LLInventoryFilter::getFilterSubString(bool trim) const
     return mFilterSubString;
 }
 
-std::string::size_type LLInventoryFilter::getStringMatchOffset(LLFolderViewModelItem* item) const
+// The search runs against an uppercased copy of the name, and uppercasing UTF-8
+// changes byte lengths, so the byte offset the find returns does not index the
+// label the highlight is drawn over. Rather than keep an index map per item --
+// inventories run to six figures -- the item's own name is walked applying the
+// same conversion.
+LLFolderViewFilter::Match LLInventoryFilter::getFilterMatch(LLFolderViewModelItem* item) const
 {
-    if (mSearchType == SEARCHTYPE_NAME)
+    Match match;
+    if (mSearchType != SEARCHTYPE_NAME || mFilterSubString.empty())
     {
-        return mFilterSubString.size() ? item->getSearchableName().find(mFilterSubString) : std::string::npos;
+        return match;
     }
 
-    return std::string::npos;
+    const std::string::size_type at = item->getSearchableName().find(mFilterSubString);
+    if (at == std::string::npos)
+    {
+        return match;
+    }
+
+    const std::string& name = item->getDisplayName();
+    const std::string suffix = item->getLabelSuffix();
+
+    // While the label and the search term are both ASCII, uppercasing moved
+    // nothing and the byte offset is already the codepoint offset. That covers
+    // most of an inventory, and skips building the combined label as well as
+    // both walks of it.
+    if (utf8str_is_ascii(name) && utf8str_is_ascii(suffix) && utf8str_is_ascii(mFilterSubString))
+    {
+        match.mOffset = at;
+        match.mLength = mFilterSubString.size();
+        return match;
+    }
+
+    std::string label = name;
+    label += suffix;
+    match.mOffset = utf8str_length_from_cased_utf8_length(label, at, true);
+    const size_t end = utf8str_length_from_cased_utf8_length(label, at + mFilterSubString.size(), true);
+    match.mLength = (end > match.mOffset) ? end - match.mOffset : 0;
+    return match;
 }
 
 bool LLInventoryFilter::isDefault() const
@@ -1699,10 +1730,6 @@ bool LLInventoryFilter::hasFilterString() const
     return mFilterSubString.size() > 0;
 }
 
-std::string::size_type LLInventoryFilter::getFilterStringSize() const
-{
-    return mFilterSubString.size();
-}
 
 PermissionMask LLInventoryFilter::getFilterPermissions() const
 {

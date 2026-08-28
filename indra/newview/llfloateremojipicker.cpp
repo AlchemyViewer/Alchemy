@@ -830,7 +830,7 @@ void LLFloaterEmojiPicker::fillEmojisCategory(const std::vector<LLEmojiSearchRes
     {
         const std::string title =
             category == FREQUENTLY_USED_CATEGORY ? getString("title_for_frequently_used") :
-            isupper(category.front()) ? category : LLStringUtil::capitalize(category);
+            LLStringOps::isUpper(category.front()) ? category : LLStringUtil::capitalize(category);
         LLEmojiGridDivider* div = new LLEmojiGridDivider(row_panel_params, title);
         mEmojiGrid->addPanel(div, true);
     }
@@ -854,7 +854,7 @@ void LLFloaterEmojiPicker::fillEmojisCategory(const std::vector<LLEmojiSearchRes
         icon_index = 0;
         row = nullptr;
         const std::string sub_title =
-            (!subcat.empty() && isupper(subcat.front())) ? subcat : LLStringUtil::capitalize(subcat);
+            (!subcat.empty() && LLStringOps::isUpper(subcat.front())) ? subcat : LLStringUtil::capitalize(subcat);
         LLEmojiGridDivider* sub_div = new LLEmojiGridDivider(row_panel_params, sub_title);
         mEmojiGrid->addPanel(sub_div, true);
     };

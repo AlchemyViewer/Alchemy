@@ -1500,8 +1500,11 @@ U32 LLScrollListCtrl::searchItems(const LLWString& substring, bool case_sensitiv
         deselectAllItems(true);
         if (!case_sensitive)
         {
-            // do comparisons in lower case
-            LLWStringUtil::toLower(substring_trimmed);
+            // Folded the same way as the labels below, so the two agree on
+            // cases where whole-string conversion would be context-sensitive.
+            LLWString folded_needle;
+            wstring_tolower_indexed(substring_trimmed, folded_needle);
+            substring_trimmed.swap(folded_needle);
         }
 
         for (LLScrollListItem* item : mItemList)
@@ -1516,20 +1519,35 @@ U32 LLScrollListCtrl::searchItems(const LLWString& substring, bool case_sensitiv
             {
                 continue;
             }
-            LLWString item_label = utf8str_to_wstring(cellp->getValue().asString());
+            const LLWString cell_label = utf8str_to_wstring(cellp->getValue().asString());
+
+            // highlightText indexes the cell's own text, so the offset found
+            // below has to be in those terms. Two things would otherwise shift
+            // it: lowercasing, which is not length-preserving, and the trim,
+            // which used to drop leading whitespace before the search and left
+            // the highlight sitting that many characters early.
+            LLWString item_label;
+            std::vector<size_t> fold_map;
             if (!case_sensitive)
             {
-                LLWStringUtil::toLower(item_label);
+                wstring_tolower_indexed(cell_label, item_label, &fold_map);
             }
-            // remove extraneous whitespace from searchable label
-            LLWStringUtil::trim(item_label);
+            else
+            {
+                item_label = cell_label;
+            }
 
             size_t found_iter = item_label.find(substring_trimmed);
 
             if (found_iter != std::string::npos)
             {
-                // find offset of matching text
-                cellp->highlightText(static_cast<S32>(found_iter), static_cast<S32>(substring_trimmed.size()));
+                const size_t match_begin = fold_map.empty() ? found_iter
+                    : (found_iter < fold_map.size() ? fold_map[found_iter] : cell_label.size());
+                const size_t folded_end = found_iter + substring_trimmed.size();
+                const size_t match_end = fold_map.empty() ? folded_end
+                    : (folded_end < fold_map.size() ? fold_map[folded_end] : cell_label.size());
+                cellp->highlightText(static_cast<S32>(match_begin),
+                                     static_cast<S32>(match_end - match_begin));
                 selectItem(item, -1, false);
 
                 found++;

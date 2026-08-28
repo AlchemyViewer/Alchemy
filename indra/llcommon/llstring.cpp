@@ -37,6 +37,17 @@
 
 #include <simdutf.h>
 
+#include <array>
+
+#include <unicode/uchar.h>
+#include <unicode/ubrk.h>
+#include <unicode/ucasemap.h>
+#include <unicode/ucol.h>
+#include <unicode/ustring.h>
+#include <unicode/utext.h>
+#include <unicode/utf8.h>
+
+
 #if LL_WINDOWS
 #include "llwin32headers.h"
 #endif
@@ -128,25 +139,6 @@ U8 hex_as_nybble(char hex)
         return (U8)(10 + hex - 'A');
     }
     return 0; // uh - oh, not hex any more...
-}
-
-bool iswindividual(llwchar elem)
-{
-    U32 cur_char = (U32)elem;
-    bool result = false;
-    if (0x2E80<= cur_char && cur_char <= 0x9FFF)
-    {
-        result = true;
-    }
-    else if (0xAC00<= cur_char && cur_char <= 0xD7A0 )
-    {
-        result = true;
-    }
-    else if (0xF900<= cur_char && cur_char <= 0xFA60 )
-    {
-        result = true;
-    }
-    return result;
 }
 
 bool _read_file_into_string(std::string& str, const std::string& filename)
@@ -440,17 +432,15 @@ std::string utf8str_trim(const std::string& utf8str)
 
 std::string utf8str_tolower(const std::string& utf8str)
 {
-    LLWString out_str = utf8str_to_wstring(utf8str);
-    LLWStringUtil::toLower(out_str);
-    return wstring_to_utf8str(out_str);
+    std::string out_str(utf8str);
+    LLStringUtilBase<char>::toLower(out_str);
+    return out_str;
 }
 
 
 S32 utf8str_compare_insensitive(const std::string& lhs, const std::string& rhs)
 {
-    LLWString wlhs = utf8str_to_wstring(lhs);
-    LLWString wrhs = utf8str_to_wstring(rhs);
-    return LLWStringUtil::compareInsensitive(wlhs, wrhs);
+    return LLStringUtilBase<char>::compareInsensitive(lhs, rhs);
 }
 
 std::string utf8str_truncate(const std::string& utf8str, const S32 max_len)
@@ -533,7 +523,10 @@ std::string utf8str_symbol_truncate(const std::string& utf8str, const S32 symbol
         }
         ++byteIndex;
     }
-    return utf8str.substr(0, byteIndex);
+    // Counting codepoints can stop in the middle of what the reader sees as
+    // one character -- between a letter and its accent, or inside a flag or a
+    // family. Give back the last whole one instead.
+    return utf8str.substr(0, utf8str_grapheme_align_backward(utf8str, byteIndex));
 }
 
 std::string utf8str_substChar(
@@ -769,15 +762,12 @@ bool utf8str_remove_emojis(std::string& utf8str)
 }
 
 // Codepoints that can act as a ZWJ/VS emoji-sequence base. Broader than
-// LLStringOps::isEmoji (which is restricted to the "genuine" astral emoji
-// range so font fallback only routes genuine emoji to the colour face) —
-// BMP pictographs like ❤ (U+2764), ©, ®, and the various symbol blocks in
-// U+2000..U+32FF are eligible sequence bases per UAX #51, and HarfBuzz
-// compositions like ❤️‍🔥 (U+2764 U+FE0F U+200D U+1F525) require they be
-// detected here even though they are not "genuine" emoji.
+// LLStringOps::isEmoji, which asks only how a codepoint renders on its own —
+// BMP pictographs like ❤ (U+2764), © and ® are eligible sequence bases per
+// UAX #51, and compositions like ❤️‍🔥 (U+2764 U+FE0F U+200D U+1F525) need them
+// recognised here even though none of them renders as colour unaided.
 // (Defined as LLStringOps::isPictographBase so the same predicate is
-// available to llrender's shape-itemizer and font-fallback walkers without
-// duplicating the range list.)
+// available to llrender's shape-itemizer and font-fallback walkers.)
 
 // True if position i begins an emoji sequence that the 1:1 codepoint->glyph
 // path cannot render correctly — i.e., the next codepoint transforms the base
@@ -886,88 +876,686 @@ EmojiClusterList wstring_find_emoji_clusters(LLWStringView wstr)
     return runs;
 }
 
-size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos,
-                                     const EmojiClusterList& clusters)
+namespace
+{
+
+// ubrk_open parses ICU's break rules into a state machine, so an iterator is
+// kept and pointed at fresh text rather than opened per query. They carry scan
+// state, so each thread keeps its own set.
+//
+// Breaking runs in the root locale rather than the user's: where the cursor
+// lands is a property of the text, and two people reading the same string
+// should see it land in the same place.
+class BreakIterators
+{
+public:
+    BreakIterators() = default;
+    BreakIterators(const BreakIterators&) = delete;
+    BreakIterators& operator=(const BreakIterators&) = delete;
+
+    ~BreakIterators()
+    {
+        for (UBreakIterator* iter : mIters)
+        {
+            if (iter)
+            {
+                ubrk_close(iter);
+            }
+        }
+    }
+
+    UBreakIterator* get(UBreakIteratorType type)
+    {
+        UBreakIterator*& slot = mIters[(size_t)type];
+        if (!slot)
+        {
+            UErrorCode status = U_ZERO_ERROR;
+            slot = ubrk_open(type, "", nullptr, 0, &status);
+            if (U_FAILURE(status))
+            {
+                slot = nullptr;
+            }
+        }
+        return slot;
+    }
+
+private:
+    // UBRK_CHARACTER, UBRK_WORD, UBRK_LINE, UBRK_SENTENCE.
+    std::array<UBreakIterator*, 4> mIters {};
+};
+
+// A span of LLWString as the UTF-16 ICU works in, with the maps between the
+// two index spaces. A codepoint above U+FFFF occupies two UTF-16 units, so the
+// two spaces drift apart, and every position ICU reports has to come back
+// through toCodepoint rather than be used where it stands.
+//
+// Stage B retires this whole class: over UTF-8 text ICU reads the bytes where
+// they lie, and the offsets it reports are the ones the caller already holds.
+class Utf16Span
+{
+public:
+    void assign(LLWStringView wstr, size_t begin, size_t end);
+
+    // An iterator pointed at this span, or null when ICU could not supply one
+    // -- in which case the caller has no segmentation to work from and falls
+    // back to something crude but bounded. The span must outlive the iterator's
+    // use: ICU keeps the pointer rather than a copy.
+    UBreakIterator* iterator(UBreakIteratorType type) const;
+
+    // A UTF-16 offset from ICU, as an index into the original LLWString.
+    size_t toCodepoint(int32_t offset) const { return mBegin + mToCodepoint[(size_t)offset]; }
+
+    // An index into the original LLWString, as a UTF-16 offset.
+    int32_t toUtf16(size_t pos) const { return mToUtf16[pos - mBegin]; }
+
+private:
+    std::vector<UChar> mUnits;
+    std::vector<size_t> mToCodepoint;   // one per UTF-16 unit, plus the end
+    std::vector<int32_t> mToUtf16;      // one per codepoint, plus the end
+    size_t mBegin = 0;
+};
+
+void Utf16Span::assign(LLWStringView wstr, size_t begin, size_t end)
+{
+    mBegin = begin;
+    mUnits.clear();
+    mToCodepoint.clear();
+    mToUtf16.clear();
+
+    for (size_t i = begin; i < end; ++i)
+    {
+        const llwchar cp = wstr[i];
+        mToUtf16.push_back((int32_t)mUnits.size());
+        if (cp > 0xFFFF && cp <= 0x10FFFF)
+        {
+            const llwchar rest = cp - 0x10000;
+            mUnits.push_back((UChar)(0xD800 + (rest >> 10)));
+            mUnits.push_back((UChar)(0xDC00 + (rest & 0x3FF)));
+            // Both halves answer with the codepoint's index. A break never
+            // falls between them, so which one they name does not arise.
+            mToCodepoint.push_back(i - begin);
+            mToCodepoint.push_back(i - begin);
+        }
+        else
+        {
+            mUnits.push_back(cp <= 0xFFFF ? (UChar)cp : (UChar)0xFFFD);
+            mToCodepoint.push_back(i - begin);
+        }
+    }
+    mToUtf16.push_back((int32_t)mUnits.size());
+    mToCodepoint.push_back(end - begin);
+}
+
+UBreakIterator* Utf16Span::iterator(UBreakIteratorType type) const
+{
+    thread_local BreakIterators iters;
+    UBreakIterator* iter = iters.get(type);
+    if (!iter || mUnits.empty())
+    {
+        return nullptr;
+    }
+    UErrorCode status = U_ZERO_ERROR;
+    ubrk_setText(iter, mUnits.data(), (int32_t)mUnits.size(), &status);
+    return U_SUCCESS(status) ? iter : nullptr;
+}
+
+} // anonymous namespace
+
+// Bounds [begin, end) of the line containing pos, excluding its newline.
+// UAX #29 breaks words either side of a newline (WB3a, WB3b), so one line is a
+// self-contained scan.
+static std::pair<size_t, size_t> wstring_line_bounds(LLWStringView wstr, size_t pos)
 {
     const size_t n = wstr.size();
-    if (pos >= n)
-        return n;
-    const size_t next = pos + 1;
-    // Clusters are sorted by start, so stop scanning once we pass `next`.
-    for (const auto& run : clusters)
+    const size_t at = llmin(pos, n);
+
+    size_t begin = 0;
+    for (size_t i = at; i > 0; --i)
     {
-        if (next <= run.first)
+        if (wstr[i - 1] == U'\n')
+        {
+            begin = i;
             break;
-        if (run.first < next && next < run.second)
-            return run.second;
+        }
     }
-    return next;
+
+    size_t end = at;
+    while (end < n && wstr[end] != U'\n')
+    {
+        ++end;
+    }
+    return { begin, end };
+}
+
+// The window a cluster query needs around pos. Unlike words, clusters step
+// across newlines, so it reaches back into the line above -- otherwise a step
+// backward from the head of a line has nowhere to land. It also keeps the
+// trailing newline, because a CR is joined to the LF that follows it and a
+// window ending between them would offer a boundary that is not there.
+static std::pair<size_t, size_t> wstring_cluster_bounds(LLWStringView wstr, size_t pos)
+{
+    const size_t n = wstr.size();
+    const size_t at = llmin(pos, n);
+
+    const size_t begin = wstring_line_bounds(wstr, at > 0 ? at - 1 : 0).first;
+    size_t end = wstring_line_bounds(wstr, at).second;
+    if (end < n)
+    {
+        ++end;
+    }
+    return { begin, end };
 }
 
 size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
 {
-    return wstring_step_grapheme_forward(wstr, pos, wstring_find_emoji_clusters(wstr));
-}
+    const size_t n = wstr.size();
+    if (pos >= n)
+        return n;
 
-size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos,
-                                      const EmojiClusterList& clusters)
-{
-    if (pos == 0)
-        return 0;
-    const size_t prev = pos - 1;
-    for (const auto& run : clusters)
-    {
-        if (prev < run.first)
-            break;
-        if (run.first < prev && prev < run.second)
-            return run.first;
-    }
-    return prev;
+    const auto bounds = wstring_cluster_bounds(wstr, pos);
+    Utf16Span span;
+    span.assign(wstr, bounds.first, bounds.second);
+    UBreakIterator* iter = span.iterator(UBRK_CHARACTER);
+    if (!iter)
+        return pos + 1;
+
+    const int32_t next = ubrk_following(iter, span.toUtf16(pos));
+    return next == UBRK_DONE ? bounds.second : span.toCodepoint(next);
 }
 
 size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
 {
-    return wstring_step_grapheme_backward(wstr, pos, wstring_find_emoji_clusters(wstr));
+    const size_t n = wstr.size();
+    if (pos == 0)
+        return 0;
+    // A position past the end clamps rather than steps. The caller is holding
+    // an index its own string cannot account for, and the end is the nearest
+    // answer that is certainly inside it.
+    if (pos > n)
+        return n;
+    const size_t at = pos;
+
+    const auto bounds = wstring_cluster_bounds(wstr, at);
+    Utf16Span span;
+    span.assign(wstr, bounds.first, bounds.second);
+    UBreakIterator* iter = span.iterator(UBRK_CHARACTER);
+    if (!iter)
+        return at - 1;
+
+    const int32_t prev = ubrk_preceding(iter, span.toUtf16(at));
+    return prev == UBRK_DONE ? bounds.first : span.toCodepoint(prev);
 }
 
-size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos,
-                                       const EmojiClusterList& clusters)
+size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos)
 {
-    if (pos == 0 || pos >= wstr.size())
-        return pos;
-    for (const auto& run : clusters)
+    const size_t n = utf8str.size();
+    if (byte_pos == 0 || n == 0)
+        return 0;
+    if (byte_pos >= n)
+        return n;
+
+    thread_local BreakIterators iters;
+    UBreakIterator* iter = iters.get(UBRK_CHARACTER);
+    if (!iter)
+        return byte_pos;
+
+    // ICU reads UTF-8 where it lies, so there is no conversion and no index
+    // map here: the offsets it takes and reports are the caller's own bytes.
+    // This is the shape the wide walkers above take once Stage B lands.
+    UErrorCode status = U_ZERO_ERROR;
+    UText text = UTEXT_INITIALIZER;
+    utext_openUTF8(&text, utf8str.data(), (int64_t)n, &status);
+    if (U_SUCCESS(status))
     {
-        if (pos <= run.first)
-            break;
-        if (run.first < pos && pos < run.second)
-            return run.first;
+        ubrk_setUText(iter, &text, &status);
     }
-    return pos;
+    if (U_FAILURE(status))
+    {
+        utext_close(&text);
+        return byte_pos;
+    }
+
+    const int32_t at = (int32_t)byte_pos;
+    size_t result = byte_pos;
+    if (!ubrk_isBoundary(iter, at))
+    {
+        const int32_t prev = ubrk_preceding(iter, at);
+        result = (prev == UBRK_DONE) ? 0 : (size_t)prev;
+    }
+
+    // The iterator outlives the text it was pointed at, so it must not be
+    // left holding it -- the next caller re-points it before any use.
+    utext_close(&text);
+    return result;
 }
 
 size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
 {
-    return wstring_grapheme_align_backward(wstr, pos, wstring_find_emoji_clusters(wstr));
-}
+    const size_t n = wstr.size();
+    if (n == 0 || pos == 0)
+        return 0;
+    if (pos >= n)
+        return n;
 
-size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos,
-                                      const EmojiClusterList& clusters)
-{
-    if (pos >= wstr.size())
-        return wstr.size();
-    for (const auto& run : clusters)
-    {
-        if (pos <= run.first)
-            break;
-        if (run.first < pos && pos < run.second)
-            return run.second;
-    }
-    return pos;
+    const auto bounds = wstring_cluster_bounds(wstr, pos);
+    Utf16Span span;
+    span.assign(wstr, bounds.first, bounds.second);
+    UBreakIterator* iter = span.iterator(UBRK_CHARACTER);
+    if (!iter)
+        return pos;
+
+    const int32_t at = span.toUtf16(pos);
+    if (ubrk_isBoundary(iter, at))
+        return pos;
+    const int32_t prev = ubrk_preceding(iter, at);
+    return prev == UBRK_DONE ? bounds.first : span.toCodepoint(prev);
 }
 
 size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
 {
-    return wstring_grapheme_align_forward(wstr, pos, wstring_find_emoji_clusters(wstr));
+    const size_t n = wstr.size();
+    if (pos >= n)
+        return n;
+    if (pos == 0)
+        return 0;
+
+    const auto bounds = wstring_cluster_bounds(wstr, pos);
+    Utf16Span span;
+    span.assign(wstr, bounds.first, bounds.second);
+    UBreakIterator* iter = span.iterator(UBRK_CHARACTER);
+    if (!iter)
+        return pos;
+
+    const int32_t at = span.toUtf16(pos);
+    if (ubrk_isBoundary(iter, at))
+        return pos;
+    const int32_t next = ubrk_following(iter, at);
+    return next == UBRK_DONE ? bounds.second : span.toCodepoint(next);
+}
+
+// A run the cursor should step over rather than stop in. Empty runs do not
+// count -- they are the zero-width segment at the end of a line.
+static bool wstring_run_is_space(LLWStringView wstr, size_t begin, size_t end)
+{
+    if (begin >= end)
+        return false;
+    for (size_t i = begin; i < end; ++i)
+    {
+        if (!LLStringOps::isSpace(wstr[i]))
+            return false;
+    }
+    return true;
+}
+
+size_t wstring_step_word_forward(LLWStringView wstr, size_t pos)
+{
+    const size_t n = wstr.size();
+    if (pos >= n)
+        return n;
+
+    const auto bounds = wstring_line_bounds(wstr, pos);
+    const size_t line_begin = bounds.first;
+    const size_t line_end = bounds.second;
+    if (pos >= line_end)
+        return pos;
+
+    Utf16Span span;
+    span.assign(wstr, line_begin, line_end);
+    UBreakIterator* iter = span.iterator(UBRK_WORD);
+    if (!iter)
+        return line_end;
+
+    int32_t prev = ubrk_first(iter);
+    for (int32_t next = ubrk_next(iter); next != UBRK_DONE; prev = next, next = ubrk_next(iter))
+    {
+        const size_t begin = span.toCodepoint(prev);
+        const size_t end = span.toCodepoint(next);
+        if (begin > pos && !wstring_run_is_space(wstr, begin, end))
+            return begin;
+    }
+    return line_end;
+}
+
+namespace
+{
+    // Casing runs in the root locale rather than the user's: Turkish would
+    // case an ASCII i into a dotless one, and these strings are matched,
+    // sorted and compared far more often than they are read.
+    const UCaseMap* case_map()
+    {
+        struct Holder
+        {
+            UCaseMap* map = nullptr;
+
+            Holder()
+            {
+                UErrorCode status = U_ZERO_ERROR;
+                map = ucasemap_open("", 0, &status);
+                if (U_FAILURE(status))
+                {
+                    map = nullptr;
+                }
+            }
+            ~Holder()
+            {
+                if (map)
+                {
+                    ucasemap_close(map);
+                }
+            }
+            Holder(const Holder&) = delete;
+            Holder& operator=(const Holder&) = delete;
+        };
+
+        thread_local Holder holder;
+        return holder.map;
+    }
+
+    using icu_case_utf8_fn = int32_t (*)(const UCaseMap*, char*, int32_t,
+                                         const char*, int32_t, UErrorCode*);
+
+    // A null destination asks for the length, which arrives alongside a buffer
+    // overflow that is not an error here. A buffer of exactly the reported size
+    // is enough -- ICU reports a warning about the terminator it could not
+    // write, and writes every byte that matters.
+    void utf8str_convert_case(std::string& string, icu_case_utf8_fn convert)
+    {
+        if (string.empty())
+            return;
+
+        const UCaseMap* csm = case_map();
+        if (!csm)
+            return;
+
+        UErrorCode status = U_ZERO_ERROR;
+        const int32_t needed = convert(csm, nullptr, 0, string.data(), (int32_t)string.size(), &status);
+        if (needed <= 0)
+        {
+            if (needed == 0)
+            {
+                string.clear();
+            }
+            return;
+        }
+
+        std::string out((size_t)needed, '\0');
+        status = U_ZERO_ERROR;
+        const int32_t written = convert(csm, out.data(), needed, string.data(), (int32_t)string.size(), &status);
+        if (U_FAILURE(status) || written <= 0)
+            return;
+
+        out.resize((size_t)llmin(written, needed));
+        string.swap(out);
+    }
+}
+
+template<>
+void LLStringUtilBase<char>::toUpper(std::string& string)
+{
+    utf8str_convert_case(string, &ucasemap_utf8ToUpper);
+}
+
+template<>
+void LLStringUtilBase<char>::toLower(std::string& string)
+{
+    utf8str_convert_case(string, &ucasemap_utf8ToLower);
+}
+
+// UTF-8 is where ICU cases, so the wide forms go through it rather than carry a
+// second implementation. Both conversions are simdutf's, and the pair costs
+// less than the case pass they bracket.
+template<>
+void LLStringUtilBase<llwchar>::toUpper(std::basic_string<llwchar>& string)
+{
+    if (string.empty())
+        return;
+    std::string utf8 = wstring_to_utf8str(string);
+    LLStringUtilBase<char>::toUpper(utf8);
+    string = utf8str_to_wstring(utf8);
+}
+
+template<>
+void LLStringUtilBase<llwchar>::toLower(std::basic_string<llwchar>& string)
+{
+    if (string.empty())
+        return;
+    std::string utf8 = wstring_to_utf8str(string);
+    LLStringUtilBase<char>::toLower(utf8);
+    string = utf8str_to_wstring(utf8);
+}
+
+size_t utf8str_length_from_cased_utf8_length(std::string_view utf8str, size_t cased_bytes, bool to_upper)
+{
+    const UCaseMap* csm = case_map();
+    if (!csm)
+        return 0;
+
+    const icu_case_utf8_fn convert = to_upper ? &ucasemap_utf8ToUpper
+                                              : &ucasemap_utf8ToLower;
+    const uint8_t* bytes = (const uint8_t*)utf8str.data();
+    const int32_t length = (int32_t)utf8str.size();
+
+    size_t codepoints = 0;
+    size_t spent = 0;
+    int32_t at = 0;
+
+    while (at < length && spent < cased_bytes)
+    {
+        const int32_t begin = at;
+        UChar32 cp = 0;
+        U8_NEXT(bytes, at, length, cp);
+        if (cp < 0)
+            break;
+
+        // Ask for the cased length of this one codepoint without writing it.
+        UErrorCode status = U_ZERO_ERROR;
+        const int32_t cased = convert(csm, nullptr, 0, utf8str.data() + begin, at - begin, &status);
+        if (cased < 0 || spent + (size_t)cased > cased_bytes)
+        {
+            // The offset lands inside this codepoint's cased form; stop before it.
+            break;
+        }
+        spent += (size_t)cased;
+        ++codepoints;
+    }
+    return codepoints;
+}
+
+void wstring_tolower_indexed(LLWStringView wstr, LLWString& out_str, std::vector<size_t>* out_map)
+{
+    out_str.clear();
+    if (out_map)
+    {
+        out_map->clear();
+    }
+
+    // One codepoint at a time on purpose: an offset has to survive the fold, so
+    // no mapping may be allowed to depend on its neighbours. The longest
+    // expansion Unicode defines is three UTF-16 units, and the buffer is
+    // checked against what ICU reports regardless.
+    UChar src[2];
+    UChar folded[8];
+    for (size_t i = 0; i < wstr.size(); ++i)
+    {
+        const llwchar cp = wstr[i];
+        int32_t src_length = 0;
+        if (cp > 0xFFFF && cp <= 0x10FFFF)
+        {
+            const llwchar rest = cp - 0x10000;
+            src[src_length++] = (UChar)(0xD800 + (rest >> 10));
+            src[src_length++] = (UChar)(0xDC00 + (rest & 0x3FF));
+        }
+        else
+        {
+            src[src_length++] = cp <= 0xFFFF ? (UChar)cp : (UChar)0xFFFD;
+        }
+
+        UErrorCode status = U_ZERO_ERROR;
+        const int32_t produced = u_strToLower(folded, (int32_t)std::size(folded),
+                                              src, src_length, "", &status);
+        if (U_FAILURE(status) || produced <= 0 || produced > (int32_t)std::size(folded))
+        {
+            // Would not fit, or ICU declined: keep the codepoint as it stands
+            // rather than dropping it.
+            out_str.push_back(cp);
+            if (out_map)
+            {
+                out_map->push_back(i);
+            }
+            continue;
+        }
+
+        for (int32_t k = 0; k < produced; ++k)
+        {
+            llwchar out = folded[k];
+            // A fold that produced an astral codepoint comes back as the pair
+            // ICU works in, and has to be put together again.
+            if (out >= 0xD800 && out <= 0xDBFF && k + 1 < produced
+                && folded[k + 1] >= 0xDC00 && folded[k + 1] <= 0xDFFF)
+            {
+                out = 0x10000 + ((out - 0xD800) << 10) + (folded[k + 1] - 0xDC00);
+                ++k;
+            }
+            out_str.push_back(out);
+            if (out_map)
+            {
+                out_map->push_back(i);
+            }
+        }
+    }
+}
+
+void wstring_line_break_opportunities(LLWStringView wstr, std::vector<size_t>& out)
+{
+    out.clear();
+    if (wstr.empty())
+        return;
+
+    // Measurement work, run per frame over whole paragraphs, so the span is
+    // kept between calls rather than rebuilt. None of these walkers reenter.
+    thread_local Utf16Span span;
+    span.assign(wstr, 0, wstr.size());
+    UBreakIterator* iter = span.iterator(UBRK_LINE);
+    if (!iter)
+    {
+        out.push_back(wstr.size());
+        return;
+    }
+
+    // The first boundary is 0, which is never an opportunity. The last is the
+    // string's own end, which always is.
+    ubrk_first(iter);
+    for (int32_t b = ubrk_next(iter); b != UBRK_DONE; b = ubrk_next(iter))
+    {
+        out.push_back(span.toCodepoint(b));
+    }
+}
+
+// UAX #29 says where the segments are, not which of them a human would call a
+// word -- runs of spaces and of punctuation are segments in their own right.
+// ICU tags every break with what kind of run preceded it, which is exactly
+// that distinction, and it knows about scripts a test for alphanumerics cannot
+// speak for.
+static bool wstring_status_is_word(int32_t rule_status)
+{
+    return rule_status >= UBRK_WORD_NONE_LIMIT;
+}
+
+std::pair<size_t, size_t> wstring_word_range_at(LLWStringView wstr, size_t pos)
+{
+    const size_t n = wstr.size();
+    if (pos >= n)
+        return { n, n };
+
+    const auto bounds = wstring_line_bounds(wstr, pos);
+    if (pos >= bounds.second)
+        return { pos, pos };
+
+    Utf16Span span;
+    span.assign(wstr, bounds.first, bounds.second);
+    UBreakIterator* iter = span.iterator(UBRK_WORD);
+    if (!iter)
+        return { pos, pos };
+
+    // The segment holding pos is the one ending at the first boundary past it.
+    const int32_t at = span.toUtf16(pos);
+    const int32_t end = ubrk_isBoundary(iter, at) ? ubrk_next(iter) : ubrk_current(iter);
+    if (end == UBRK_DONE)
+        return { pos, pos };
+
+    // The status describes the run behind the break the iterator sits on, so
+    // it has to be read before stepping back across it.
+    const bool is_word = wstring_status_is_word(ubrk_getRuleStatus(iter));
+    const int32_t begin = ubrk_previous(iter);
+    if (!is_word || begin == UBRK_DONE)
+        return { pos, pos };
+
+    return { span.toCodepoint(begin), span.toCodepoint(end) };
+}
+
+std::pair<size_t, size_t> wstring_next_word_range(LLWStringView wstr, size_t pos)
+{
+    const size_t n = wstr.size();
+    size_t at = llmin(pos, n);
+
+    while (at < n)
+    {
+        const auto bounds = wstring_line_bounds(wstr, at);
+
+        if (at < bounds.second)
+        {
+            Utf16Span span;
+            span.assign(wstr, bounds.first, bounds.second);
+            if (UBreakIterator* iter = span.iterator(UBRK_WORD))
+            {
+                int32_t begin = ubrk_first(iter);
+                for (int32_t end = ubrk_next(iter); end != UBRK_DONE;
+                     begin = end, end = ubrk_next(iter))
+                {
+                    if (span.toCodepoint(end) > at
+                        && wstring_status_is_word(ubrk_getRuleStatus(iter)))
+                    {
+                        return { span.toCodepoint(begin), span.toCodepoint(end) };
+                    }
+                }
+            }
+        }
+        // Nothing left on this line; resume past its newline.
+        at = bounds.second + 1;
+    }
+    return { n, n };
+}
+
+size_t wstring_step_word_backward(LLWStringView wstr, size_t pos)
+{
+    if (pos == 0)
+        return 0;
+    const size_t at = llmin(pos, wstr.size());
+
+    const auto bounds = wstring_line_bounds(wstr, at);
+    const size_t line_begin = bounds.first;
+    const size_t line_end = bounds.second;
+    if (at <= line_begin)
+        return at;
+
+    Utf16Span span;
+    span.assign(wstr, line_begin, line_end);
+    UBreakIterator* iter = span.iterator(UBRK_WORD);
+    if (!iter)
+        return line_begin;
+
+    const size_t scan_end = llmin(at, line_end);
+    size_t best = line_begin;
+    int32_t prev = ubrk_first(iter);
+    for (int32_t next = ubrk_next(iter); next != UBRK_DONE; prev = next, next = ubrk_next(iter))
+    {
+        const size_t begin = span.toCodepoint(prev);
+        if (begin >= scan_end)
+            break;
+        if (!wstring_run_is_space(wstr, begin, span.toCodepoint(next)))
+            best = begin;
+    }
+    return best;
 }
 
 std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos,
@@ -1230,57 +1818,305 @@ std::string LLStringOps::sPM;
 // static
 bool LLStringOps::isEmoji(llwchar a)
 {
-#if 0   // Do not consider special characters that might have a corresponding
-        // glyph in the monochorme fallback fonts as a "genuine" emoji. HB
-    return a == 0xa9 || a == 0xae || (a >= 0x2000 && a < 0x3300) ||
-           (a >= 0x1f000 && a < 0x20000);
-#else
-    // These are indeed "genuine" emojis, we *do want* rendered as such. HB
-    return a >= 0x1f000 && a < 0x20000;
-#endif
-    }
+    // Emoji_Presentation is the property that means "renders in colour unless
+    // asked otherwise", which is the question. Nothing below U+231A carries it,
+    // so ordinary text never reaches the table.
+    return a >= 0x231A && u_hasBinaryProperty((UChar32)a, UCHAR_EMOJI_PRESENTATION);
+}
 
 // static
 bool LLStringOps::isPictographBase(llwchar a)
 {
-    // Emoji-sequence extenders sit inside the broad pictograph ranges below
-    // (notably ZWJ at U+200D in the General Punctuation block, and the
-    // skin-tone modifiers in U+1F3FB..U+1F3FF). Exclude them up front so
-    // callers that ask "is this codepoint a base of an emoji cluster" get
-    // a no for these — the cluster walker handles them as extenders.
-    if (a == 0x200C || a == 0x200D)            // ZWNJ, ZWJ
+    // Extended_Pictographic is what UAX #51 builds its sequences out of, and it
+    // already excludes every extender: ZWJ, the variation selectors, the keycap
+    // mark, the skin tones and the tag characters are none of them pictographic.
+    //
+    // Regional indicators are the one thing it leaves out that belongs here. A
+    // flag is a pair of them and nothing else, and Unicode does not count them
+    // as pictographic.
+    if (a < 0xA9)
         return false;
-    if (a == 0xFE0E || a == 0xFE0F)            // VS-15 / VS-16
-        return false;
-    if (a == 0x20E3)                           // combining enclosing keycap
-        return false;
-    if (a >= 0x1F3FB && a <= 0x1F3FF)          // skin-tone modifiers
-        return false;
-    if (a >= 0xE0020 && a <= 0xE007F)          // tag characters (SP-CANCEL)
-        return false;
-
-    return a == 0xA9 || a == 0xAE
-        || (a >= 0x2000 && a < 0x3300)
-        || (a >= 0x1F000 && a < 0x20000);
+    if (a >= 0x1F1E6 && a <= 0x1F1FF)
+        return true;
+    return u_hasBinaryProperty((UChar32)a, UCHAR_EXTENDED_PICTOGRAPHIC);
 }
 
 bool LLStringOps::isEmojiClusterExtender(llwchar a)
 {
-    return a == 0xFE0E || a == 0xFE0F            // VS-15 / VS-16
-        || a == 0x20E3                           // keycap combiner
-        || (a >= 0x1F3FB && a <= 0x1F3FF)        // skin-tone modifiers
-        || (a >= 0xE0020 && a <= 0xE007F);       // tag chars + CANCEL TAG
+    if (a < 0x20E3)
+        return false;
+    return a == 0xFE0E || a == 0xFE0F                             // VS-15 / VS-16
+        || a == 0x20E3                                            // keycap combiner
+        || (a >= 0xE0020 && a <= 0xE007F)                         // tag chars + CANCEL TAG
+        || u_hasBinaryProperty((UChar32)a, UCHAR_EMOJI_MODIFIER); // skin tones
+}
+
+// The simple, one-to-one case mappings. A codepoint whose full mapping is
+// longer than itself -- sharp s uppercasing to SS, U+0130 lowercasing to i
+// plus a combining dot -- keeps its simple mapping here, because one llwchar
+// in cannot give two out. LLStringUtilBase<llwchar>::toUpper/toLower case
+// whole strings and are free to change their length, so those are the ones
+// that get such a character right.
+llwchar LLStringOps::toUpperAboveAscii(llwchar elem)
+{
+    return (llwchar)u_toupper((UChar32)elem);
+}
+
+llwchar LLStringOps::toLowerAboveAscii(llwchar elem)
+{
+    return (llwchar)u_tolower((UChar32)elem);
+}
+
+bool LLStringOps::isSpaceAboveAscii(llwchar elem)
+{
+    return u_hasBinaryProperty((UChar32)elem, UCHAR_WHITE_SPACE);
+}
+
+bool LLStringOps::isUpperAboveAscii(llwchar elem)
+{
+    return u_charType((UChar32)elem) == U_UPPERCASE_LETTER;
+}
+
+bool LLStringOps::isLowerAboveAscii(llwchar elem)
+{
+    return u_charType((UChar32)elem) == U_LOWERCASE_LETTER;
+}
+
+bool LLStringOps::isAlphaAboveAscii(llwchar elem)
+{
+    return u_isalpha((UChar32)elem) != 0;
+}
+
+bool LLStringOps::isAlnumAboveAscii(llwchar elem)
+{
+    return u_isalnum((UChar32)elem) != 0;
+}
+
+// Symbols count, as they do for the ASCII half: ispunct('+') is true, so
+// isPunct(U+00B1 PLUS-MINUS SIGN) had better be too. That is wider than
+// Unicode's own punctuation categories, which hold no symbols at all.
+bool LLStringOps::isPunctAboveAscii(llwchar elem)
+{
+    switch (u_charType((UChar32)elem))
+    {
+    case U_CONNECTOR_PUNCTUATION:
+    case U_DASH_PUNCTUATION:
+    case U_START_PUNCTUATION:
+    case U_END_PUNCTUATION:
+    case U_INITIAL_PUNCTUATION:
+    case U_FINAL_PUNCTUATION:
+    case U_OTHER_PUNCTUATION:
+    case U_MATH_SYMBOL:
+    case U_CURRENCY_SYMBOL:
+    case U_MODIFIER_SYMBOL:
+    case U_OTHER_SYMBOL:
+        return true;
+    default:
+        return false;
+    }
+}
+
+namespace
+{
+    // Root-locale collation, so a list sorts the same way for everyone. What
+    // this replaces did not: wcscmp on Windows is codepoint order, in which
+    // every accented letter sorts past z, while wcscoll elsewhere follows
+    // whatever locale the process happens to be in.
+    enum class CollatorKind
+    {
+        Plain,                // Unicode default order
+        Caseless,             // + case ignored
+        Dictionary,           // + digit runs compared as numbers
+        DictionaryCaseless,   // + digit runs, and case ignored
+        Count
+    };
+
+    UCollator* collator(CollatorKind kind)
+    {
+        struct Holder
+        {
+            std::array<UCollator*, (size_t)CollatorKind::Count> colls {};
+
+            Holder() = default;
+            Holder(const Holder&) = delete;
+            Holder& operator=(const Holder&) = delete;
+            ~Holder()
+            {
+                for (UCollator* coll : colls)
+                {
+                    if (coll)
+                    {
+                        ucol_close(coll);
+                    }
+                }
+            }
+        };
+
+        thread_local Holder holder;
+        UCollator*& slot = holder.colls[(size_t)kind];
+        if (!slot)
+        {
+            UErrorCode status = U_ZERO_ERROR;
+            UCollator* coll = ucol_open("", &status);
+            if (U_SUCCESS(status))
+            {
+                // Uppercase before lowercase, which is the order the viewer's
+                // lists have always had; Unicode's own default is the other way
+                // round. Case is a tertiary difference and accents are a
+                // secondary one, so this reorders the former and leaves the
+                // latter where collation puts it.
+                ucol_setAttribute(coll, UCOL_CASE_FIRST, UCOL_UPPER_FIRST, &status);
+            }
+            const bool numeric = (kind == CollatorKind::Dictionary
+                               || kind == CollatorKind::DictionaryCaseless);
+            const bool caseless = (kind == CollatorKind::Caseless
+                                || kind == CollatorKind::DictionaryCaseless);
+
+            if (U_SUCCESS(status) && numeric)
+            {
+                // A run of digits compares as the number it spells, so item2
+                // comes before item10.
+                ucol_setAttribute(coll, UCOL_NUMERIC_COLLATION, UCOL_ON, &status);
+            }
+            if (U_SUCCESS(status) && caseless)
+            {
+                // Case is a tertiary difference, so dropping to secondary
+                // strength folds it away. Accents are secondary and survive.
+                ucol_setStrength(coll, UCOL_SECONDARY);
+            }
+            if (U_FAILURE(status))
+            {
+                if (coll)
+                {
+                    ucol_close(coll);
+                }
+                return nullptr;
+            }
+            slot = coll;
+        }
+        return slot;
+    }
+
+    // Collation is a sort's inner loop, so the UTF-16 it needs is built into a
+    // buffer that outlives the call rather than a fresh allocation each time.
+    int32_t to_utf16_scratch(LLWStringView src, std::vector<UChar>& out)
+    {
+        out.clear();
+        out.reserve(src.size());
+        for (const llwchar cp : src)
+        {
+            if (cp > 0xFFFF && cp <= 0x10FFFF)
+            {
+                const llwchar rest = cp - 0x10000;
+                out.push_back((UChar)(0xD800 + (rest >> 10)));
+                out.push_back((UChar)(0xDC00 + (rest & 0x3FF)));
+            }
+            else
+            {
+                out.push_back(cp <= 0xFFFF ? (UChar)cp : (UChar)0xFFFD);
+            }
+        }
+        return (int32_t)out.size();
+    }
+
+    // With no collator to be had, order by codepoint. It is the wrong order,
+    // but it is still a total order, which is what a sort needs before it
+    // needs anything else.
+    S32 collate_utf8(std::string_view a, std::string_view b, CollatorKind kind)
+    {
+        UCollator* coll = collator(kind);
+        if (!coll)
+            return (S32)a.compare(b);
+
+        UErrorCode status = U_ZERO_ERROR;
+        const S32 result = (S32)ucol_strcollUTF8(coll, a.data(), (int32_t)a.size(),
+                                                 b.data(), (int32_t)b.size(), &status);
+        return U_SUCCESS(status) ? result : (S32)a.compare(b);
+    }
+
+    S32 collate_wide(LLWStringView a, LLWStringView b, CollatorKind kind)
+    {
+        UCollator* coll = collator(kind);
+        if (!coll)
+            return (a < b) ? -1 : ((b < a) ? 1 : 0);
+
+        thread_local std::vector<UChar> lhs;
+        thread_local std::vector<UChar> rhs;
+        const int32_t lhs_length = to_utf16_scratch(a, lhs);
+        const int32_t rhs_length = to_utf16_scratch(b, rhs);
+
+        return (S32)ucol_strcoll(coll, lhs.data(), lhs_length, rhs.data(), rhs_length);
+    }
+}
+
+S32 LLStringOps::collate(const char* a, const char* b)
+{
+    return collate_utf8(a, b, CollatorKind::Plain);
 }
 
 S32 LLStringOps::collate(const llwchar* a, const llwchar* b)
 {
-#if LL_WINDOWS
-    // in Windows, wide string functions operator on 16-bit strings,
-    // not the proper 32 bit wide string
-    return wcscmp(ll_convert<std::wstring>(a).c_str(), ll_convert<std::wstring>(b).c_str());
-#else
-    return wcscoll((const wchar_t*)a, (const wchar_t*)b);
-#endif
+    return collate_wide(a, b, CollatorKind::Plain);
+}
+
+template<>
+S32 LLStringUtilBase<char>::compareInsensitive(const char* lhs, const char* rhs)
+{
+    if (lhs == rhs)
+        return 0;
+    if (!lhs || !lhs[0])
+        return (!rhs || !rhs[0]) ? 0 : 1;
+    if (!rhs || !rhs[0])
+        return -1;
+    return collate_utf8(lhs, rhs, CollatorKind::Caseless);
+}
+
+template<>
+S32 LLStringUtilBase<char>::compareInsensitive(const std::string& lhs, const std::string& rhs)
+{
+    return collate_utf8(lhs, rhs, CollatorKind::Caseless);
+}
+
+template<>
+S32 LLStringUtilBase<llwchar>::compareInsensitive(const llwchar* lhs, const llwchar* rhs)
+{
+    if (lhs == rhs)
+        return 0;
+    if (!lhs || !lhs[0])
+        return (!rhs || !rhs[0]) ? 0 : 1;
+    if (!rhs || !rhs[0])
+        return -1;
+    return collate_wide(lhs, rhs, CollatorKind::Caseless);
+}
+
+template<>
+S32 LLStringUtilBase<llwchar>::compareInsensitive(const LLWString& lhs, const LLWString& rhs)
+{
+    return collate_wide(lhs, rhs, CollatorKind::Caseless);
+}
+
+template<>
+S32 LLStringUtilBase<char>::compareDict(const std::string& a, const std::string& b)
+{
+    return collate_utf8(a, b, CollatorKind::Dictionary);
+}
+
+template<>
+S32 LLStringUtilBase<char>::compareDictInsensitive(const std::string& a, const std::string& b)
+{
+    return collate_utf8(a, b, CollatorKind::DictionaryCaseless);
+}
+
+template<>
+S32 LLStringUtilBase<llwchar>::compareDict(const LLWString& a, const LLWString& b)
+{
+    return collate_wide(a, b, CollatorKind::Dictionary);
+}
+
+template<>
+S32 LLStringUtilBase<llwchar>::compareDictInsensitive(const LLWString& a, const LLWString& b)
+{
+    return collate_wide(a, b, CollatorKind::DictionaryCaseless);
 }
 
 void LLStringOps::setupDatetimeInfo (bool daylight)

@@ -73,8 +73,18 @@ public:
 
     virtual bool                showAllResults() const = 0;
 
-    virtual std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const = 0;
-    virtual std::string::size_type getFilterStringSize() const = 0;
+    // Where a filter's match falls within an item's label, in codepoints of
+    // that label. Both halves depend on the item and on each other -- a filter
+    // searches a cased copy of the name, and casing UTF-8 changes neither byte
+    // length nor codepoint count predictably -- so they are answered together
+    // rather than as two queries that would repeat the same search and the same
+    // walk of the label.
+    struct Match
+    {
+        std::string::size_type mOffset = std::string::npos;
+        std::string::size_type mLength = 0;
+    };
+    virtual Match getFilterMatch(LLFolderViewModelItem* item) const = 0;
     // +-------------------------------------------------------------------+
     // + Status
     // +-------------------------------------------------------------------+

@@ -509,16 +509,23 @@ namespace tut
     //                         emoji helpers
     // ---------------------------------------------------------------
 
-    // LLStringOps::isEmoji only accepts code points in the "genuine" emoji
-    // range U+1F000..U+1FFFF. Non-emoji symbols (©, ®) and BMP pictographs
-    // must not be classified as emoji.
+    // LLStringOps::isEmoji is Unicode's Emoji_Presentation: does this render
+    // in colour on its own. Symbols that only become emoji when a VS-16 asks
+    // them to (©, ®, ❤) are not, and neither is a codepoint that merely sits
+    // in an emoji block.
     template<> template<>
     void llstring_utf_object_t::test<60>()
     {
         ensure("isEmoji rocket",       LLStringOps::isEmoji((llwchar)0x1F680));
-        ensure("isEmoji mahjong",      LLStringOps::isEmoji((llwchar)0x1F000));
+        // Both mahjong tiles, one of which Unicode calls an emoji and one of
+        // which it does not. A block-shaped range test cannot tell them apart.
+        ensure("isEmoji mahjong red dragon", LLStringOps::isEmoji((llwchar)0x1F004));
+        ensure("not isEmoji mahjong east wind", !LLStringOps::isEmoji((llwchar)0x1F000));
+        // A BMP emoji, which the old astral-only range could never see.
+        ensure("isEmoji watch",        LLStringOps::isEmoji((llwchar)0x231A));
         ensure("not isEmoji 'A'",     !LLStringOps::isEmoji((llwchar)'A'));
         ensure("not isEmoji ©",       !LLStringOps::isEmoji((llwchar)0x00A9));
+        ensure("not isEmoji ❤",       !LLStringOps::isEmoji((llwchar)0x2764));
         ensure("not isEmoji CJK-Ext", !LLStringOps::isEmoji((llwchar)0x20000));
     }
 
@@ -864,18 +871,6 @@ namespace tut
     //                     byte-level helpers
     // ---------------------------------------------------------------
 
-    // iswindividual recognises the CJK Unified / Hangul / CJK Compat ranges
-    // used for per-character word breaks.
-    template<> template<>
-    void llstring_utf_object_t::test<80>()
-    {
-        ensure("iswindividual CJK 日",       iswindividual((llwchar)0x65E5));
-        ensure("iswindividual Hangul",       iswindividual((llwchar)0xAC00));
-        ensure("iswindividual CJK Compat",   iswindividual((llwchar)0xF900));
-        ensure("not iswindividual 'A'",     !iswindividual((llwchar)'A'));
-        ensure("not iswindividual emoji",   !iswindividual((llwchar)0x1F680));
-    }
-
     template<> template<>
     void llstring_utf_object_t::test<81>()
     {
@@ -1203,9 +1198,9 @@ namespace tut
     }
 
     // ---------------------------------------------------------------
-    // LLStringOps::isPictographBase: broader than isEmoji. Recognises BMP
-    // pictographs (U+2000..U+3300, plus copyright/registered) so heart-on-
-    // fire (U+2764 + ZWJ + U+1F525) registers as an emoji-cluster start.
+    // LLStringOps::isPictographBase: Extended_Pictographic plus the regional
+    // indicators, so heart-on-fire (U+2764 + ZWJ + U+1F525) registers as an
+    // emoji-cluster start and flags still pair up.
     // ---------------------------------------------------------------
 
     template<> template<>
@@ -1233,17 +1228,31 @@ namespace tut
                !LLStringOps::isPictographBase((llwchar)0x200D));
         ensure("not isPictographBase VS-16",
                !LLStringOps::isPictographBase((llwchar)0xFE0F));
-        // Above the astral range upper bound: not a pictograph base.
         ensure("not isPictographBase U+20000",
                !LLStringOps::isPictographBase((llwchar)0x20000));
-        // Below U+2000 BMP cutoff (e.g. CJK Symbols U+3000 IS in range,
-        // but U+1FFF is not).
         ensure("not isPictographBase U+1FFF",
                !LLStringOps::isPictographBase((llwchar)0x1FFF));
-        ensure("isPictographBase U+2000 boundary",
-                LLStringOps::isPictographBase((llwchar)0x2000));
         ensure("not isPictographBase U+3300 boundary",
                !LLStringOps::isPictographBase((llwchar)0x3300));
+
+        // A flag is two regional indicators and nothing else. Unicode does
+        // not call them pictographic, so they are named here separately;
+        // reading Extended_Pictographic alone would stop flags clustering.
+        ensure("isPictographBase regional indicator",
+                LLStringOps::isPictographBase((llwchar)0x1F1FA));
+
+        // The old range ran from U+2000 to U+3300, which swept up punctuation,
+        // maths, and every kana and Hangul jamo along the way.
+        ensure("not isPictographBase EN QUAD",
+               !LLStringOps::isPictographBase((llwchar)0x2000));
+        ensure("not isPictographBase summation",
+               !LLStringOps::isPictographBase((llwchar)0x2211));
+        ensure("not isPictographBase hiragana",
+               !LLStringOps::isPictographBase((llwchar)0x3042));
+        ensure("not isPictographBase katakana",
+               !LLStringOps::isPictographBase((llwchar)0x30A2));
+        ensure("not isPictographBase Hangul jamo",
+               !LLStringOps::isPictographBase((llwchar)0x3131));
     }
 
     // ---------------------------------------------------------------
@@ -1484,11 +1493,12 @@ namespace tut
         ensure_equals("empty step_forward",  wstring_step_grapheme_forward(empty, 0),  size_t(0));
         ensure_equals("empty step_backward", wstring_step_grapheme_backward(empty, 0), size_t(0));
 
-        // Out-of-bounds position — step_forward clamps to size, step_backward
-        // returns size-1 if size>0 (consistent with `prev = pos - 1`).
+        // Out-of-bounds position — both directions clamp into [0, size], as the
+        // header says. The old walker returned pos-1 here, handing a caller an
+        // index past the end of its own string.
         LLWString ascii = { (llwchar)'a', (llwchar)'b' };
         ensure_equals("oob step_forward",  wstring_step_grapheme_forward(ascii, 99),  size_t(2));
-        ensure_equals("oob step_backward", wstring_step_grapheme_backward(ascii, 99), size_t(98));
+        ensure_equals("oob step_backward", wstring_step_grapheme_backward(ascii, 99), size_t(2));
 
         // Cluster at start of string — backward from inside or just-past
         // snaps to 0 (cluster.first).
@@ -1545,8 +1555,8 @@ namespace tut
 
     // ---------------------------------------------------------------
     // Pin overload-equivalence: the no-clusters and with-clusters forms
-    // of every cluster-aware helper must produce identical results for
-    // the same input. The with-clusters overloads exist to let callers
+    // of wstring_emoji_range_at must produce identical results for the
+    // same input. The with-clusters overload exists to let callers
     // amortise the wstring_find_emoji_clusters scan across many lookups,
     // so any future change that updates one body without the other
     // (e.g. a bug fix in the loop) needs to fail loudly here.
@@ -1569,32 +1579,16 @@ namespace tut
         const auto clusters = wstring_find_emoji_clusters(two);
         for (size_t p = 0; p <= two.size(); ++p)
         {
-            ensure_equals("step_forward overload",
-                          wstring_step_grapheme_forward(two, p),
-                          wstring_step_grapheme_forward(two, p, clusters));
-            ensure_equals("step_backward overload",
-                          wstring_step_grapheme_backward(two, p),
-                          wstring_step_grapheme_backward(two, p, clusters));
-            ensure_equals("align_backward overload",
-                          wstring_grapheme_align_backward(two, p),
-                          wstring_grapheme_align_backward(two, p, clusters));
-            ensure_equals("align_forward overload",
-                          wstring_grapheme_align_forward(two, p),
-                          wstring_grapheme_align_forward(two, p, clusters));
             auto r1 = wstring_emoji_range_at(two, p);
             auto r2 = wstring_emoji_range_at(two, p, clusters);
             ensure_equals("range_at first",  r1.first,  r2.first);
             ensure_equals("range_at second", r1.second, r2.second);
         }
 
-        // Empty wstring — pinning that the with-clusters overloads handle
-        // a degenerate empty cluster vector identically to the
-        // no-clusters form.
+        // Empty wstring — pinning that the with-clusters overload handles a
+        // degenerate empty cluster vector identically to the no-clusters form.
         LLWString empty;
         const EmojiClusterList no_clusters;
-        ensure_equals("empty step_forward overload",
-                      wstring_step_grapheme_forward(empty, 0),
-                      wstring_step_grapheme_forward(empty, 0, no_clusters));
         ensure_equals("empty range_at first overload",
                       wstring_emoji_range_at(empty, 0).first,
                       wstring_emoji_range_at(empty, 0, no_clusters).first);
@@ -1666,5 +1660,482 @@ namespace tut
         ensure("needle found", byte_offset != std::string::npos);
         ensure_equals("byte offset maps to codepoint index",
                       wstring_wstring_length_from_utf8_length(w, 0, (S32)byte_offset), S32(3));
+    }
+
+    // The grapheme walkers moved from an emoji-only cluster list to full
+    // UAX #29 via ICU. These are the cases the old walker stepped
+    // through one codepoint at a time.
+    template<> template<>
+    void llstring_utf_object_t::test<117>()
+    {
+        // "e" + COMBINING ACUTE, then "x". The base and its mark are one
+        // cluster; the old walker split them.
+        const LLWString combining = { (llwchar)'e', (llwchar)0x0301, (llwchar)'x' };
+        ensure_equals("combining fwd from 0", wstring_step_grapheme_forward(combining, 0), size_t(2));
+        ensure_equals("combining back from 2", wstring_step_grapheme_backward(combining, 2), size_t(0));
+        ensure_equals("combining align back mid", wstring_grapheme_align_backward(combining, 1), size_t(0));
+        ensure_equals("combining align fwd mid", wstring_grapheme_align_forward(combining, 1), size_t(2));
+
+        // Hangul LVT: HANGUL SYLLABLE inputs as jamo L + V + T are one cluster.
+        const LLWString hangul = { (llwchar)0x1100, (llwchar)0x1161, (llwchar)0x11A8, (llwchar)'!' };
+        ensure_equals("hangul fwd from 0", wstring_step_grapheme_forward(hangul, 0), size_t(3));
+        ensure_equals("hangul back from 3", wstring_step_grapheme_backward(hangul, 3), size_t(0));
+
+        // Regional indicator pairs still pair up, and a third RI starts a new
+        // cluster rather than joining the first two.
+        const LLWString flags = { (llwchar)0x1F1FA, (llwchar)0x1F1F8, (llwchar)0x1F1FA };
+        ensure_equals("flag pair fwd", wstring_step_grapheme_forward(flags, 0), size_t(2));
+        ensure_equals("third RI is its own", wstring_step_grapheme_forward(flags, 2), size_t(3));
+
+        // ZWJ family stays one cluster, as before.
+        const LLWString family = { (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x1F469,
+                                   (llwchar)0x200D, (llwchar)0x1F467, (llwchar)'!' };
+        ensure_equals("zwj family fwd", wstring_step_grapheme_forward(family, 0), size_t(5));
+        ensure_equals("zwj family back", wstring_step_grapheme_backward(family, 5), size_t(0));
+
+        // GB4 breaks after LF, which is also what bounds the backward scan.
+        const LLWString lines = { (llwchar)'a', (llwchar)'\n', (llwchar)'e', (llwchar)0x0301 };
+        ensure_equals("break after lf", wstring_step_grapheme_backward(lines, 2), size_t(1));
+        ensure_equals("cluster after lf", wstring_step_grapheme_backward(lines, 4), size_t(2));
+
+        // Degenerate input: empty, and positions past the end clamp.
+        const LLWString empty;
+        ensure_equals("empty fwd", wstring_step_grapheme_forward(empty, 0), size_t(0));
+        ensure_equals("empty back", wstring_step_grapheme_backward(empty, 0), size_t(0));
+        ensure_equals("past end fwd", wstring_step_grapheme_forward(combining, 99), combining.size());
+        ensure_equals("past end align", wstring_grapheme_align_forward(combining, 99), combining.size());
+
+        // Stepping forward from every position must strictly advance, and
+        // backward must strictly retreat, or a caret can wedge.
+        for (size_t p = 0; p < family.size(); ++p)
+        {
+            ensure("fwd advances", wstring_step_grapheme_forward(family, p) > p);
+        }
+        for (size_t p = 1; p <= family.size(); ++p)
+        {
+            ensure("back retreats", wstring_step_grapheme_backward(family, p) < p);
+        }
+    }
+
+    // Word stepping lands on the start of a word, stepping over the whitespace
+    // between. UAX #29 via ICU, replacing an alnum-or-underscore test.
+    template<> template<>
+    void llstring_utf_object_t::test<118>()
+    {
+        const LLWString two_words = utf8str_to_wstring("foo bar");
+        ensure_equals("fwd to next word", wstring_step_word_forward(two_words, 0), size_t(4));
+        ensure_equals("fwd from next word", wstring_step_word_forward(two_words, 4), size_t(7));
+        ensure_equals("back from end", wstring_step_word_backward(two_words, 7), size_t(4));
+        ensure_equals("back over the space", wstring_step_word_backward(two_words, 4), size_t(0));
+        ensure_equals("back from mid-word", wstring_step_word_backward(two_words, 5), size_t(4));
+
+        // A full stop between letters does not split the word -- UAX #29 wants
+        // example.com and 3.14 to hold together (WB6/WB7, FULL STOP is
+        // MidNumLet). So the word here is "foo.bar" and the next one is "baz".
+        const LLWString dotted = utf8str_to_wstring("foo.bar baz");
+        ensure_equals("dot does not split", wstring_step_word_forward(dotted, 0), size_t(8));
+        ensure_equals("fwd from inside the dot word",
+                      wstring_step_word_forward(dotted, 3), size_t(8));
+
+        // A comma does separate, and standing on one used to wedge the cursor:
+        // it is neither alnum nor a space, so both of the old loops declined to
+        // move and the caller had to retry from pos+1 (LLLineEditor::removeWord
+        // still carries that workaround).
+        const LLWString comma = utf8str_to_wstring("foo, bar");
+        ensure_equals("fwd stops on the comma", wstring_step_word_forward(comma, 0), size_t(3));
+        ensure_equals("fwd off the comma", wstring_step_word_forward(comma, 3), size_t(5));
+        ensure("fwd never stands still", wstring_step_word_forward(comma, 3) > size_t(3));
+
+        // An apostrophe is inside the word, not a break in it. The old walk
+        // stopped at index 3, mid-word.
+        const LLWString contraction = utf8str_to_wstring("don't stop");
+        ensure_equals("contraction is one word",
+                      wstring_step_word_forward(contraction, 0), size_t(6));
+        ensure_equals("back over a contraction",
+                      wstring_step_word_backward(contraction, 10), size_t(6));
+
+        // Tabs are whitespace to step over; the old test was == ' ' only.
+        const LLWString tabbed = utf8str_to_wstring("foo\tbar");
+        ensure_equals("fwd over a tab", wstring_step_word_forward(tabbed, 0), size_t(4));
+
+        // Neither direction crosses a newline, matching what the old walk did
+        // by accident (a newline is neither a word char nor a space).
+        const LLWString lines = utf8str_to_wstring("ab\ncd");
+        ensure_equals("fwd stops at eol", wstring_step_word_forward(lines, 0), size_t(2));
+        ensure_equals("fwd parked on eol", wstring_step_word_forward(lines, 2), size_t(2));
+        ensure_equals("back stops at bol", wstring_step_word_backward(lines, 5), size_t(3));
+        ensure_equals("back parked on bol", wstring_step_word_backward(lines, 3), size_t(3));
+
+        // Trailing whitespace has no word after it, so the line's end is where
+        // forward stops.
+        const LLWString trailing = utf8str_to_wstring("foo   ");
+        ensure_equals("fwd into trailing space",
+                      wstring_step_word_forward(trailing, 0), size_t(6));
+
+        // Degenerate input.
+        const LLWString empty;
+        ensure_equals("empty fwd", wstring_step_word_forward(empty, 0), size_t(0));
+        ensure_equals("empty back", wstring_step_word_backward(empty, 0), size_t(0));
+        ensure_equals("past end fwd", wstring_step_word_forward(two_words, 99), two_words.size());
+        ensure_equals("past end back", wstring_step_word_backward(two_words, 99), size_t(4));
+
+        // Scripts without spaces still segment, rather than swallowing the
+        // whole run the way an alnum test would.
+        const LLWString cjk = utf8str_to_wstring("\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E ok");
+        ensure("cjk advances", wstring_step_word_forward(cjk, 0) > size_t(0));
+        ensure("cjk terminates", wstring_step_word_forward(cjk, 0) <= cjk.size());
+
+        // Adjacent emoji are separate words, so a word step crosses exactly
+        // one. Callers must not pre-step a grapheme and then ask for the next
+        // word -- that lands two emoji away.
+        const LLWString two_emoji = { (llwchar)0x1F436, (llwchar)0x1F431, (llwchar)'x' };
+        ensure_equals("one emoji forward", wstring_step_word_forward(two_emoji, 0), size_t(1));
+        ensure_equals("one emoji back", wstring_step_word_backward(two_emoji, 2), size_t(1));
+
+        // A ZWJ sequence is a single word, however many codepoints it spans.
+        const LLWString flag_then_dog = { (llwchar)0x1F3F3, (llwchar)0xFE0F, (llwchar)0x200D,
+                                          (llwchar)0x26A7, (llwchar)0xFE0F, (llwchar)0x1F436 };
+        ensure_equals("zwj sequence is one word",
+                      wstring_step_word_forward(flag_then_dog, 0), size_t(5));
+        ensure_equals("back over the zwj sequence",
+                      wstring_step_word_backward(flag_then_dog, 6), size_t(5));
+    }
+
+    // UAX #14 line break opportunities, which replaced a spaces-plus-CJK-range
+    // heuristic in LLFontGL::maxDrawableChars.
+    template<> template<>
+    void llstring_utf_object_t::test<119>()
+    {
+        std::vector<size_t> breaks;
+
+        // A break is offered after the space, so the line keeps its trailing
+        // space and the next one starts on the word. This is what the old
+        // start_of_last_word tracking computed, and it has to stay that way.
+        wstring_line_break_opportunities(utf8str_to_wstring("hello world"), breaks);
+        ensure_equals("two opportunities", breaks.size(), size_t(2));
+        ensure_equals("after the space", breaks[0], size_t(6));
+        ensure_equals("and the end", breaks[1], size_t(11));
+
+        // The string's end is always an opportunity; 0 never is.
+        wstring_line_break_opportunities(utf8str_to_wstring("unbroken"), breaks);
+        ensure_equals("single word, one opportunity", breaks.size(), size_t(1));
+        ensure_equals("at the end", breaks[0], size_t(8));
+
+        // A non-breaking space is glue. The old code special-cased U+00A0 by
+        // hand; here it simply produces no opportunity.
+        wstring_line_break_opportunities(utf8str_to_wstring("a\xC2\xA0" "b"), breaks);
+        ensure_equals("nbsp does not break", breaks.size(), size_t(1));
+        ensure_equals("only the end", breaks[0], size_t(3));
+
+        // CJK ideographs may be split between characters...
+        const LLWString cjk = utf8str_to_wstring("\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E");
+        wstring_line_break_opportunities(cjk, breaks);
+        ensure("cjk splits between characters", breaks.size() > size_t(1));
+
+        // ...but a line may not begin with closing punctuation, so there is no
+        // opportunity immediately before U+3002 IDEOGRAPHIC FULL STOP. The old
+        // ideograph-range test would have broken there happily.
+        const LLWString cjk_stop = utf8str_to_wstring("\xE6\x97\xA5\xE6\x9C\xAC\xE3\x80\x82");
+        wstring_line_break_opportunities(cjk_stop, breaks);
+        ensure("no break before the full stop",
+               std::find(breaks.begin(), breaks.end(), size_t(2)) == breaks.end());
+
+        // Every opportunity is in range and strictly ascending, since the
+        // consumer walks them with a single forward cursor.
+        const LLWString mixed = utf8str_to_wstring("one two\xC2\xA0three, four");
+        wstring_line_break_opportunities(mixed, breaks);
+        ensure("mixed has opportunities", !breaks.empty());
+        for (size_t k = 0; k < breaks.size(); ++k)
+        {
+            ensure("in range", breaks[k] > 0 && breaks[k] <= mixed.size());
+            if (k > 0)
+            {
+                ensure("ascending", breaks[k] > breaks[k - 1]);
+            }
+        }
+        ensure_equals("ends at the end", breaks.back(), mixed.size());
+
+        // Empty input clears the caller's buffer rather than leaving it alone,
+        // since the buffer is reused across lines.
+        wstring_line_break_opportunities(LLWString(), breaks);
+        ensure("empty clears", breaks.empty());
+    }
+
+    // Case conversion, and the index map that lets a search fold its haystack
+    // without losing track of where a match sits in the original.
+    template<> template<>
+    void llstring_utf_object_t::test<120>()
+    {
+        // Uppercasing sharp s produces two characters. towupper could not do
+        // this at all -- it maps one codepoint to one codepoint.
+        LLWString sharp_s = utf8str_to_wstring("stra\xC3\x9F" "e");
+        ensure_equals("sharp s starts at 6", sharp_s.size(), size_t(6));
+        LLWStringUtil::toUpper(sharp_s);
+        ensure_equals("uppercased grows", wstring_to_utf8str(sharp_s), std::string("STRASSE"));
+
+        LLWString plain = utf8str_to_wstring("Hello");
+        LLWStringUtil::toLower(plain);
+        ensure_equals("ordinary lowercase", wstring_to_utf8str(plain), std::string("hello"));
+
+        // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE lowercases to two
+        // codepoints, so every index after it shifts. This is the case that
+        // breaks an offset taken from a folded copy.
+        const LLWString dotted_i = utf8str_to_wstring("a\xC4\xB0" "b");
+        ensure_equals("three codepoints in", dotted_i.size(), size_t(3));
+
+        LLWString folded;
+        std::vector<size_t> map;
+        wstring_tolower_indexed(dotted_i, folded, &map);
+        ensure("fold grew", folded.size() > dotted_i.size());
+        ensure_equals("map matches fold", map.size(), folded.size());
+
+        // Every output character points at the input it came from, and the
+        // two codepoints from the dotted I both point at index 1.
+        ensure_equals("a maps to 0", map[0], size_t(0));
+        ensure_equals("b maps to 2", map[map.size() - 1], size_t(2));
+        for (size_t k = 1; k + 1 < map.size(); ++k)
+        {
+            ensure_equals("expansion maps to its source", map[k], size_t(1));
+        }
+
+        // The map is non-decreasing, which is what lets a caller invert it with
+        // a lower_bound.
+        for (size_t k = 1; k < map.size(); ++k)
+        {
+            ensure("map is non-decreasing", map[k] >= map[k - 1]);
+        }
+
+        // The point of all this: find 'b' in the folded copy and land on the
+        // right character in the original. Taken raw, the offset would be one
+        // past where b actually is.
+        const size_t folded_at = folded.find((llwchar)'b');
+        ensure("found in fold", folded_at != LLWString::npos);
+        ensure("raw offset would be wrong", folded_at != size_t(2));
+        ensure_equals("mapped offset is right", map[folded_at], size_t(2));
+
+        // ASCII stays one-to-one, so the map is an identity and existing
+        // offsets are unaffected.
+        wstring_tolower_indexed(utf8str_to_wstring("ABC"), folded, &map);
+        ensure_equals("ascii keeps length", folded.size(), size_t(3));
+        for (size_t k = 0; k < map.size(); ++k)
+        {
+            ensure_equals("ascii map is identity", map[k], k);
+        }
+
+        // The map is optional, and empty input clears both outputs.
+        wstring_tolower_indexed(utf8str_to_wstring("XY"), folded);
+        ensure_equals("no map requested", wstring_to_utf8str(folded), std::string("xy"));
+        wstring_tolower_indexed(LLWString(), folded, &map);
+        ensure("empty clears fold", folded.empty());
+        ensure("empty clears map", map.empty());
+    }
+
+    // The narrow forms case UTF-8 now, and the helper that brings an offset
+    // taken against a cased copy back onto the text it was built from.
+    template<> template<>
+    void llstring_utf_object_t::test<121>()
+    {
+        std::string s = "stra\xC3\x9F" "e";
+        LLStringUtil::toUpper(s);
+        ensure_equals("narrow toUpper is unicode", s, std::string("STRASSE"));
+
+        std::string acc = "\xC3\xA9" "cole";
+        LLStringUtil::toUpper(acc);
+        ensure_equals("narrow toUpper accents", acc, std::string("\xC3\x89" "COLE"));
+
+        std::string upper = "\xC3\x89" "COLE";
+        LLStringUtil::toLower(upper);
+        ensure_equals("narrow toLower accents", upper, std::string("\xC3\xA9" "cole"));
+
+        // ASCII is untouched, which is what the identifier and protocol callers
+        // rely on.
+        std::string ascii = "Image.PNG";
+        LLStringUtil::toLower(ascii);
+        ensure_equals("ascii unchanged", ascii, std::string("image.png"));
+
+        // "straße" uppercases to "STRASSE": the search key is one byte and one
+        // codepoint longer than the label it came from. An offset past the
+        // sharp s must come back to the label's own indexing.
+        const std::string label = "stra\xC3\x9F" "e xyz";
+        std::string key = label;
+        LLStringUtil::toUpper(key);
+        const size_t at = key.find("XYZ");
+        ensure("found in the key", at != std::string::npos);
+
+        // Raw, that offset is past where xyz sits in the label.
+        const size_t mapped = utf8str_length_from_cased_utf8_length(label, at, true);
+        ensure_equals("mapped to the label's codepoint index", mapped, size_t(7));
+
+        // And the matched span's own length, which is not the key's: here they
+        // agree because xyz is ASCII, but the sharp s shows the difference.
+        const size_t span_begin = utf8str_length_from_cased_utf8_length(label, 0, true);
+        const size_t span_end = utf8str_length_from_cased_utf8_length(label, key.find(' '), true);
+        ensure_equals("word before the space is 6 codepoints", span_end - span_begin, size_t(6));
+
+        // Offset 0 and a whole-string offset are the degenerate ends.
+        ensure_equals("zero maps to zero",
+                      utf8str_length_from_cased_utf8_length(label, 0, true), size_t(0));
+        ensure_equals("whole string maps to its codepoint count",
+                      utf8str_length_from_cased_utf8_length(label, key.size(), true), size_t(10));
+
+        // ASCII text maps one-to-one, so existing offsets are unaffected.
+        const std::string plain = "hello world";
+        ensure_equals("ascii maps straight through",
+                      utf8str_length_from_cased_utf8_length(plain, 6, true), size_t(6));
+
+        ensure_equals("empty", utf8str_length_from_cased_utf8_length(std::string(), 4, true), size_t(0));
+    }
+
+    // "Which word is here" and "where is the next one", the questions
+    // double-click selection, spell check and autoreplace ask.
+    template<> template<>
+    void llstring_utf_object_t::test<122>()
+    {
+        const LLWString text = utf8str_to_wstring("don't stop, ok");
+
+        // A contraction is one word. The alnum-or-underscore walk this replaced
+        // stopped at the apostrophe and offered "don" or "t".
+        auto word = wstring_word_range_at(text, 0);
+        ensure_equals("contraction begin", word.first, size_t(0));
+        ensure_equals("contraction end", word.second, size_t(5));
+
+        // Anywhere inside it gives the same word.
+        for (size_t p = 0; p < 5; ++p)
+        {
+            const auto at = wstring_word_range_at(text, p);
+            ensure_equals("same word from inside", at.first, size_t(0));
+            ensure_equals("same word end", at.second, size_t(5));
+        }
+
+        // Whitespace and punctuation are segments too, and neither is a word.
+        const auto space = wstring_word_range_at(text, 5);
+        ensure("space is not a word", space.first == space.second);
+        const auto comma = wstring_word_range_at(text, 10);
+        ensure("comma is not a word", comma.first == comma.second);
+
+        // Iterating: each call yields the next word, skipping what is between.
+        std::vector<std::string> found;
+        size_t at = 0;
+        while (at < text.size())
+        {
+            const auto next = wstring_next_word_range(text, at);
+            if (next.first >= next.second)
+                break;
+            found.push_back(wstring_to_utf8str(text.substr(next.first, next.second - next.first)));
+            at = next.second;
+        }
+        ensure_equals("three words", found.size(), size_t(3));
+        ensure_equals("first", found[0], std::string("don't"));
+        ensure_equals("second", found[1], std::string("stop"));
+        ensure_equals("third", found[2], std::string("ok"));
+
+        // Iteration crosses lines, which the spell checker relies on.
+        const LLWString lines = utf8str_to_wstring("one\ntwo");
+        const auto first = wstring_next_word_range(lines, 0);
+        ensure_equals("first line word end", first.second, size_t(3));
+        const auto second = wstring_next_word_range(lines, first.second);
+        ensure_equals("second line word begin", second.first, size_t(4));
+        ensure_equals("second line word end", second.second, size_t(7));
+
+        // Past the end, and past the last word, both terminate.
+        const auto none = wstring_next_word_range(lines, 7);
+        ensure("no more words", none.first == none.second);
+        const auto oob = wstring_word_range_at(lines, 99);
+        ensure("past end is empty", oob.first == oob.second);
+
+        const LLWString empty;
+        const auto on_empty = wstring_word_range_at(empty, 0);
+        ensure("empty string", on_empty.first == on_empty.second);
+
+        // A whole string that is one word -- what autoreplace validates a
+        // keyword with.
+        const LLWString keyword = utf8str_to_wstring("don't");
+        const auto whole = wstring_word_range_at(keyword, 0);
+        ensure("keyword is one word",
+               whole.first == size_t(0) && whole.second == keyword.size());
+        const LLWString two_words = utf8str_to_wstring("not one");
+        const auto partial = wstring_word_range_at(two_words, 0);
+        ensure("two words is not one", partial.second != two_words.size());
+    }
+
+    // Classification above the BMP. Every one of these codepoints used to be
+    // handed to <cwctype>, whose wint_t is 16 bits on Windows -- so each
+    // arrived with its top half cut off and was answered for by whatever
+    // happened to live at the remaining address.
+    template<> template<>
+    void llstring_utf_object_t::test<123>()
+    {
+        // The low half of each is given as the answer it used to produce.
+        const llwchar CJK_EXT_B_A   = 0x2000A;  // -> U+000A, a line feed
+        const llwchar CJK_EXT_B_ONE = 0x20031;  // -> U+0031, digit one
+        const llwchar LINEAR_B      = 0x10020;  // -> U+0020, a space
+        const llwchar DESERET_CAP   = 0x10401;  // -> U+0401, Cyrillic Io
+        const llwchar DESERET_SMALL = 0x10429;
+        const llwchar MATH_BOLD_A   = 0x1D400;  // -> U+D400, a lone surrogate
+        const llwchar GRINNING_FACE = 0x1F600;
+
+        ensure("CJK ideograph is not whitespace", !LLStringOps::isSpace(CJK_EXT_B_A));
+        ensure("CJK ideograph is alphanumeric",   LLStringOps::isAlnum(CJK_EXT_B_A));
+        ensure("CJK ideograph is not a digit",   !LLStringOps::isDigit(CJK_EXT_B_ONE));
+        ensure("CJK ideograph is alphanumeric",   LLStringOps::isAlnum(CJK_EXT_B_ONE));
+        ensure("Linear B is not whitespace",     !LLStringOps::isSpace(LINEAR_B));
+        ensure("math capital is a letter",        LLStringOps::isAlpha(MATH_BOLD_A));
+        ensure("emoji is not alphanumeric",      !LLStringOps::isAlnum(GRINNING_FACE));
+        ensure("emoji is not whitespace",        !LLStringOps::isSpace(GRINNING_FACE));
+
+        // Case above the BMP: this used to return an unrelated codepoint
+        // rather than fail to convert.
+        // char32_t has no operator<<, so the comparands are widened for the
+        // failure message rather than compared as they stand.
+        const auto cased = [](llwchar c) { return (U32)c; };
+
+        ensure("Deseret capital is upper", LLStringOps::isUpper(DESERET_CAP));
+        ensure_equals("Deseret capital lowercases within Deseret",
+                      cased(LLStringOps::toLower(DESERET_CAP)), cased(DESERET_SMALL));
+        ensure_equals("Deseret small uppercases back",
+                      cased(LLStringOps::toUpper(DESERET_SMALL)), cased(DESERET_CAP));
+
+        // Case inside the BMP, which towlower left alone entirely.
+        ensure_equals("Greek sigma lowercases",   cased(LLStringOps::toLower(llwchar(0x03A3))), cased(0x03C3));
+        ensure_equals("Cyrillic Io lowercases",   cased(LLStringOps::toLower(llwchar(0x0401))), cased(0x0451));
+        ensure_equals("Cyrillic io uppercases",   cased(LLStringOps::toUpper(llwchar(0x0451))), cased(0x0401));
+
+        // Whitespace is the Unicode property, not a guess.
+        ensure("no-break space is whitespace",     LLStringOps::isSpace(llwchar(0x00A0)));
+        ensure("ideographic space is whitespace",  LLStringOps::isSpace(llwchar(0x3000)));
+        ensure("zero width space is not",         !LLStringOps::isSpace(llwchar(0x200B)));
+
+        // Digits are ASCII on purpose -- every caller reads the run as a number.
+        ensure("Arabic-Indic zero is not a digit", !LLStringOps::isDigit(llwchar(0x0660)));
+        ensure("Arabic-Indic zero is alphanumeric", LLStringOps::isAlnum(llwchar(0x0660)));
+
+        // ASCII keeps answering as it always did.
+        ensure("A is upper",     LLStringOps::isUpper(llwchar('A')));
+        ensure("a is lower",     LLStringOps::isLower(llwchar('a')));
+        ensure("5 is a digit",   LLStringOps::isDigit(llwchar('5')));
+        ensure("space is space", LLStringOps::isSpace(llwchar(' ')));
+        ensure("dot is punct",   LLStringOps::isPunct(llwchar('.')));
+        ensure_equals("A lowercases", cased(LLStringOps::toLower(llwchar('A'))), cased(llwchar('a')));
+    }
+
+    // The consequence of the above for the cursor: a CJK ideograph whose low
+    // half is a line feed must not read as a run of whitespace to step over.
+    template<> template<>
+    void llstring_utf_object_t::test<124>()
+    {
+        LLWString text = utf8str_to_wstring("ab");
+        text.push_back(0x2000A);
+        text.push_back(0x2000A);
+        text += utf8str_to_wstring(" cd");
+
+        // Each ideograph is its own segment, and none of them is whitespace,
+        // so the cursor stops at the first. Reading their low halves as line
+        // feeds made all three of the ideographs and the space look like one
+        // gap, and the cursor jumped clear to "cd" at 5.
+        ensure_equals("cursor stops at the ideograph",
+                      wstring_step_word_forward(text, 0), size_t(2));
+
+        const auto range = wstring_word_range_at(text, 2);
+        ensure("an ideograph is a word", range.first != range.second);
     }
 }
