@@ -40,12 +40,12 @@
 
 namespace
 {
-    // LRU cache for shaped runs. Keyed by the codepoint sequence plus the
-    // owning face — direction/script/language are fixed in shapeRun(), so
-    // they don't need to participate in the key. Clusters in the cached
-    // glyphs are stored in *slice-local* coordinates (begin=0) and rebased
-    // to original-wstr coords at copy-out time, so the same codepoint
-    // sequence in different wstring positions can share an entry.
+    // LRU cache for shaped runs. Keyed by the UTF-8 bytes plus the owning
+    // face — direction/script/language are fixed in shapeRun(), so they
+    // do not need to participate in the key. Clusters in the cached glyphs
+    // are stored as *slice-local* byte offsets (begin=0) and rebased to
+    // original-string offsets at copy-out time, so the same text sitting at
+    // different positions in different strings shares one entry.
     //
     // The index map owns the canonical key; the LRU list holds a pointer
     // back into the index so lookups don't store the key twice. Pointer
@@ -54,7 +54,7 @@ namespace
     // and re-find when erasing — the LRU never holds a map iterator.
     struct ShapeCacheKey
     {
-        std::u32string        codepoints;
+        std::string           utf8;
         // The root face alone determines itemization (fallback chain) and
         // therefore the shaped output for a given slice; per-codepoint face
         // selection is deterministic downstream.
@@ -62,10 +62,10 @@ namespace
     };
 
     // Borrowed counterpart used for cache lookup so hits don't allocate a
-    // u32string just to compute the hash.
+    // string just to compute the hash.
     struct ShapeCacheKeyView
     {
-        std::u32string_view   codepoints;
+        std::string_view      utf8;
         const LLFontFreetype* root_face;
     };
 
@@ -77,20 +77,20 @@ namespace
 
         size_t operator()(const ShapeCacheKey& k) const noexcept
         {
-            return hash_impl(std::u32string_view(k.codepoints), k.root_face);
+            return hash_impl(std::string_view(k.utf8), k.root_face);
         }
         size_t operator()(const ShapeCacheKeyView& k) const noexcept
         {
-            return hash_impl(k.codepoints, k.root_face);
+            return hash_impl(k.utf8, k.root_face);
         }
     private:
         // Always hash through the string_view path so both overloads agree
-        // bit-for-bit — std::hash<u32string> and std::hash<u32string_view>
-        // are required to produce the same value, but routing both through
-        // the view variant removes any platform doubt.
-        static size_t hash_impl(std::u32string_view sv, const LLFontFreetype* face) noexcept
+        // bit-for-bit — std::hash<string> and std::hash<string_view> are
+        // required to produce the same value, but routing both through the
+        // view variant removes any platform doubt.
+        static size_t hash_impl(std::string_view sv, const LLFontFreetype* face) noexcept
         {
-            size_t h = std::hash<std::u32string_view>{}(sv);
+            size_t h = std::hash<std::string_view>{}(sv);
             boost::hash_combine(h, face);
             return h;
         }
@@ -102,17 +102,17 @@ namespace
 
         bool operator()(const ShapeCacheKey& a, const ShapeCacheKey& b) const noexcept
         {
-            return a.root_face == b.root_face && a.codepoints == b.codepoints;
+            return a.root_face == b.root_face && a.utf8 == b.utf8;
         }
         bool operator()(const ShapeCacheKey& a, const ShapeCacheKeyView& b) const noexcept
         {
             return a.root_face == b.root_face
-                   && std::u32string_view(a.codepoints) == b.codepoints;
+                   && std::string_view(a.utf8) == b.utf8;
         }
         bool operator()(const ShapeCacheKeyView& a, const ShapeCacheKey& b) const noexcept
         {
             return a.root_face == b.root_face
-                   && a.codepoints == std::u32string_view(b.codepoints);
+                   && a.utf8 == std::string_view(b.utf8);
         }
     };
 
@@ -155,7 +155,7 @@ namespace
     // rebase them at copy-out time. Reserves/destroys its own hb_buffer.
     void shape_sub_run(const LLFontFreetype*        face,
                        const LLFontFreetype*        root_face,
-                       std::u32string_view          slice,
+                       std::string_view             slice,
                        size_t                       sub_begin_in_slice,
                        size_t                       sub_end_in_slice,
                        hb_script_t                  script,
@@ -200,8 +200,9 @@ namespace
         hb_buffer_t* buf = sBuf;
         hb_buffer_clear_contents(buf);
 
-        const uint32_t* codepoints = reinterpret_cast<const uint32_t*>(slice.data() + sub_begin_in_slice);
-        const int       len        = static_cast<int>(sub_end_in_slice - sub_begin_in_slice);
+        const std::string_view sub = slice.substr(sub_begin_in_slice,
+                                                  sub_end_in_slice - sub_begin_in_slice);
+        const int              len = static_cast<int>(sub.size());
 
         // Monospace feature overrides. Two profiles:
         //
@@ -274,25 +275,27 @@ namespace
         // shape_sub_run is main-thread only per the header notes, but
         // thread_local is the same cost as static here and keeps the
         // assumption explicit.
-        static thread_local std::vector<uint32_t> stripped_buf;
-        static thread_local std::vector<int>      cluster_back_map;
+        static thread_local std::string      stripped_buf;
+        static thread_local std::vector<int> cluster_back_map;
         // True when stripping ran for the last do_shape call. Read by the
         // output loop to rebase HB's cluster values back to original input
-        // positions via cluster_back_map.
+        // positions via cluster_back_map, which is indexed by stripped-buffer
+        // byte and holds the byte the character came from. Every byte of a
+        // kept character maps to that character's own start, so a cluster
+        // landing anywhere inside one still resolves.
         bool stripped_for_last_shape = false;
 
-        // Helper: shape `codepoints` through `shape_face` and return the
-        // resulting glyph count. The buffer ends up populated with the most
-        // recent shape's output, so the caller reads infos/positions from
-        // it after picking the winning face.
+        // Helper: shape `sub` through `shape_face` and return the resulting
+        // glyph count. The buffer ends up populated with the most recent
+        // shape's output, so the caller reads infos/positions from it after
+        // picking the winning face.
         auto do_shape = [&](const LLFontFreetype* shape_face) -> unsigned int
         {
             hb_font_t* hbf = shape_face ? shape_face->getHbFont() : nullptr;
             if (!hbf)
                 return 0;
 
-            const uint32_t* in_cps = codepoints;
-            int             in_len = len;
+            std::string_view in_text = sub;
             stripped_for_last_shape = false;
             // VS-15 (U+FE0E, text presentation) and VS-16 (U+FE0F, emoji
             // presentation) both need stripping when the chosen face's cmap
@@ -309,20 +312,23 @@ namespace
             {
                 stripped_buf.clear();
                 cluster_back_map.clear();
-                stripped_buf.reserve(len);
-                cluster_back_map.reserve(len);
-                for (int k = 0; k < len; ++k)
+                stripped_buf.reserve(sub.size());
+                cluster_back_map.reserve(sub.size());
+                for (size_t k = 0; k < sub.size(); )
                 {
-                    if ((strip_vs15 && codepoints[k] == 0xFE0E)
-                     || (strip_vs16 && codepoints[k] == 0xFE0F))
-                        continue;
-                    stripped_buf.push_back(codepoints[k]);
-                    cluster_back_map.push_back(k);
+                    const LLCodepointAt at = utf8str_decode_at(sub, k);
+                    if (!((strip_vs15 && at.cp == 0xFE0E)
+                       || (strip_vs16 && at.cp == 0xFE0F)))
+                    {
+                        stripped_buf.append(sub, k, at.next - k);
+                        cluster_back_map.insert(cluster_back_map.end(),
+                                                at.next - k, (int)k);
+                    }
+                    k = at.next;
                 }
-                if ((int)stripped_buf.size() != len)
+                if (stripped_buf.size() != sub.size())
                 {
-                    in_cps = stripped_buf.data();
-                    in_len = (int)stripped_buf.size();
+                    in_text = stripped_buf;
                     stripped_for_last_shape = true;
                 }
             }
@@ -330,7 +336,8 @@ namespace
             hb_buffer_clear_contents(buf);
             // offset=0 so HB cluster values come back local to this sub-run;
             // we rebase below to the slice's coordinate system.
-            hb_buffer_add_utf32(buf, in_cps, in_len, 0, in_len);
+            hb_buffer_add_utf8(buf, in_text.data(), (int)in_text.size(),
+                               0, (int)in_text.size());
             hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
             hb_buffer_set_script(buf, script);
             hb_buffer_set_language(buf, hb_language_get_default());
@@ -355,10 +362,13 @@ namespace
         // buffer ends populated with that shape's output before we read
         // glyphs out below.
         bool has_zwj = false;
-        for (int k = 0; k < len; ++k)
+        for (size_t k = 0; k < sub.size(); )
         {
-            if (codepoints[k] == 0x200D) { has_zwj = true; break; }
+            const LLCodepointAt at = utf8str_decode_at(sub, k);
+            if (at.cp == 0x200D) { has_zwj = true; break; }
+            k = at.next;
         }
+        const llwchar sub_base = utf8str_decode_at(sub, 0).cp;
         if (has_zwj && glyph_count > 1)
         {
             unsigned int best_count = glyph_count;
@@ -371,9 +381,9 @@ namespace
                 const auto& functor        = entry.second;
                 if (!cand || cand == face)
                     continue;
-                if (!functor || !functor((llwchar)codepoints[0]))
+                if (!functor || !functor(sub_base))
                     continue;
-                if (!cand->faceHasGlyph((llwchar)codepoints[0]))
+                if (!cand->faceHasGlyph(sub_base))
                     continue;
                 const unsigned int cand_count = do_shape(cand);
                 any_candidate_ran = true;
@@ -406,10 +416,10 @@ namespace
             ALShapedGlyph sg;
             sg.face      = shape_face;
             sg.glyph_id  = infos[i].codepoint;
-            // Rebase HB's cluster index. When VS-16 stripping ran for this
-            // shape, HB sees a shorter input than the original; the output
-            // cluster points into the stripped array and needs mapping back
-            // to the original-index space cluster_back_map encodes.
+            // Rebase HB's cluster byte offset. When VS stripping ran for this
+            // shape, HB saw a shorter input than the original; the output
+            // cluster points into the stripped bytes and needs mapping back
+            // to the original byte space cluster_back_map encodes.
             S32 src_cluster = static_cast<S32>(infos[i].cluster);
             if (stripped_for_last_shape
                 && src_cluster >= 0
@@ -419,8 +429,17 @@ namespace
             }
             // ZWJ-retry candidates and corrupt GSUB tables can produce cluster
             // values outside [0, len). Clamp at the producer so consumers can
-            // index into the original slice without per-site bounds checks.
-            src_cluster  = llclamp(src_cluster, 0, len - 1);
+            // slice the original text without per-site bounds checks, then
+            // walk back to a character start: clamping to len-1 otherwise
+            // lands inside the sub-run's last character whenever it is
+            // multi-byte, and a cluster that splits a character is not an
+            // offset any consumer can use.
+            src_cluster = llclamp(src_cluster, 0, len - 1);
+            while (src_cluster > 0
+                   && ((unsigned char)sub[(size_t)src_cluster] & 0xC0) == 0x80)
+            {
+                --src_cluster;
+            }
             sg.cluster   = cluster_base + src_cluster;
             sg.x_advance = positions[i].x_advance * INV_64;
             sg.y_advance = positions[i].y_advance * INV_64;
@@ -455,27 +474,30 @@ namespace
     //      ligature can't compose. Better than rendering tofu on a
     //      face that can't honor the cluster.
     const LLFontFreetype* pick_cluster_face(const LLFontFreetype* root_face,
-                                            std::u32string_view   slice,
+                                            std::string_view      slice,
                                             size_t                cb,
                                             size_t                ce)
     {
         auto covers_non_strippable = [&](const LLFontFreetype* f) {
-            for (size_t k = cb; k < ce; ++k)
+            for (size_t k = cb; k < ce; )
             {
-                const llwchar c = slice[k];
-                if (c == 0xFE0E || c == 0xFE0F)
+                const LLCodepointAt at = utf8str_decode_at(slice, k);
+                k = at.next;
+                if (at.cp == 0xFE0E || at.cp == 0xFE0F)
                     continue; // VS-15/16 strippable in shape_sub_run
-                if (!f->faceHasGlyph(c))
+                if (!f->faceHasGlyph(at.cp))
                     return false;
             }
             return true;
         };
 
         // First non-root candidate with full coverage.
-        for (size_t k = cb; k < ce; ++k)
+        for (size_t k = cb; k < ce; )
         {
+            const LLCodepointAt at = utf8str_decode_at(slice, k);
+            k = at.next;
             U32 unused = 0;
-            const LLFontFreetype* f = root_face->selectShapingFace(slice[k], unused);
+            const LLFontFreetype* f = root_face->selectShapingFace(at.cp, unused);
             if (f && f != root_face && covers_non_strippable(f))
                 return f;
         }
@@ -506,7 +528,7 @@ namespace
     // "Hello, world!" as one run with script LATIN rather than fragmenting
     // at every comma.
     void shape_all_sub_runs(const LLFontFreetype* root_face,
-                            std::u32string_view   slice,
+                            std::string_view      slice,
                             std::vector<ALShapedGlyph>& out_glyphs)
     {
         const size_t n = slice.size();
@@ -519,7 +541,7 @@ namespace
         // for "what counts as one emoji glyph in this slice" (see
         // project_emoji_cluster_walker_single_source). Drives the cluster
         // fast path inside the loop.
-        const EmojiClusterList clusters = wstring_find_emoji_clusters(slice);
+        const EmojiClusterList clusters = utf8str_find_emoji_clusters(slice);
         size_t next_cluster_idx = 0;
 
         const LLFontFreetype* cur_face   = nullptr;
@@ -546,8 +568,15 @@ namespace
             shape_sub_run(cur_face, root_face, slice, cur_begin, end_excl, script, out_glyphs);
         };
 
-        for (size_t i = 0; i < n; ++i)
+        // next_i carries the advance so every `continue` below lands on the
+        // start of the following character without each branch having to
+        // decode again — and so the cluster fast path can jump the whole
+        // cluster by assigning it once.
+        for (size_t i = 0, next_i = 0; i < n; i = next_i)
         {
+            const LLCodepointAt at = utf8str_decode_at(slice, i);
+            next_i = at.next;
+
             // Cluster fast path: the cluster walker has identified [cb, ce)
             // as one emoji cluster — route it to a single face so HarfBuzz
             // can collapse the sequence in one buffer. Without this, e.g.
@@ -572,9 +601,11 @@ namespace
 
                 // First non-neutral script in the cluster, COMMON otherwise.
                 hb_script_t cluster_script = HB_SCRIPT_COMMON;
-                for (size_t k = cb; k < ce; ++k)
+                for (size_t k = cb; k < ce; )
                 {
-                    const hb_script_t s = hb_unicode_script(uf, slice[k]);
+                    const LLCodepointAt kat = utf8str_decode_at(slice, k);
+                    k = kat.next;
+                    const hb_script_t s = hb_unicode_script(uf, kat.cp);
                     if (s != HB_SCRIPT_COMMON && s != HB_SCRIPT_INHERITED)
                     {
                         cluster_script = s;
@@ -603,16 +634,16 @@ namespace
                 cur_face = nullptr;
                 cur_script = HB_SCRIPT_INVALID;
 
-                i = ce - 1; // for-loop's ++i will land on ce
+                next_i = ce;
                 continue;
             }
 
             U32 unused = 0;
-            const LLFontFreetype* face = root_face->selectShapingFace(slice[i], unused);
+            const LLFontFreetype* face = root_face->selectShapingFace(at.cp, unused);
             if (!face)
                 face = root_face; // selectShapingFace never returns null, but defensive
 
-            const hb_script_t cp_script = hb_unicode_script(uf, slice[i]);
+            const hb_script_t cp_script = hb_unicode_script(uf, at.cp);
             const bool is_neutral = (cp_script == HB_SCRIPT_COMMON
                                   || cp_script == HB_SCRIPT_INHERITED);
 
@@ -620,7 +651,7 @@ namespace
             {
                 cur_face  = face;
                 cur_begin = i;
-                cur_run_is_emoji = LLStringOps::isPictographBase(slice[i]);
+                cur_run_is_emoji = LLStringOps::isPictographBase(at.cp);
                 set_cur_script_from(cp_script, is_neutral);
                 continue;
             }
@@ -643,7 +674,7 @@ namespace
             //     cur_face when it covers them gives the best-effort
             //     rendering for malformed input without splitting the
             //     codepoint across sub-runs.
-            const llwchar wch = slice[i];
+            const llwchar wch = at.cp;
             const auto cat = hb_unicode_general_category(uf, wch);
             const bool is_mark = (cat == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK
                                || cat == HB_UNICODE_GENERAL_CATEGORY_ENCLOSING_MARK
@@ -691,9 +722,11 @@ namespace
                     // text is rare in practice and (b) a successful migration
                     // is a render-quality fix worth the cost.
                     bool mark_face_covers_sub_run = true;
-                    for (size_t j = cur_begin; j < i; ++j)
+                    for (size_t j = cur_begin; j < i; )
                     {
-                        if (!face->faceHasGlyph(slice[j]))
+                        const LLCodepointAt jat = utf8str_decode_at(slice, j);
+                        j = jat.next;
+                        if (!face->faceHasGlyph(jat.cp))
                         {
                             mark_face_covers_sub_run = false;
                             break;
@@ -718,7 +751,7 @@ namespace
                 emit(i);
                 cur_face  = face;
                 cur_begin = i;
-                cur_run_is_emoji = LLStringOps::isPictographBase(slice[i]);
+                cur_run_is_emoji = LLStringOps::isPictographBase(at.cp);
                 set_cur_script_from(cp_script, is_neutral);
             }
             else if (cur_script == HB_SCRIPT_INVALID && !is_neutral)
@@ -735,7 +768,7 @@ namespace
 
 const std::vector<ALShapedGlyph>& ALFontShaping::shapeLine(
     const LLFontFreetype* root_face,
-    LLWStringView         wstr,
+    std::string_view      utf8str,
     size_t                begin,
     size_t                end)
 {
@@ -745,13 +778,13 @@ const std::vector<ALShapedGlyph>& ALFontShaping::shapeLine(
 
     static const std::vector<ALShapedGlyph> sEmpty;
 
-    if (!root_face || begin >= end || end > wstr.size())
+    if (!root_face || begin >= end || end > utf8str.size())
         return sEmpty;
 
     // Build the lookup view from the slice + root face. Itemization is
     // deterministic given (slice, root_face), so no need to encode the
     // per-codepoint face chain explicitly.
-    std::u32string_view slice(wstr.data() + begin, end - begin);
+    std::string_view slice = utf8str.substr(begin, end - begin);
     ShapeCacheKeyView lookup{slice, root_face};
 
     if (auto it = sShapeIndex.find(lookup); it != sShapeIndex.end())
@@ -767,7 +800,7 @@ const std::vector<ALShapedGlyph>& ALFontShaping::shapeLine(
     shape_all_sub_runs(root_face, slice, shaped);
 
     ShapeCacheKey key;
-    key.codepoints.assign(slice.data(), slice.size());
+    key.utf8.assign(slice.data(), slice.size());
     key.root_face = root_face;
 
     // One bump covers the insert and any evictions below — either way,
@@ -791,14 +824,14 @@ const std::vector<ALShapedGlyph>& ALFontShaping::shapeLine(
 }
 
 void ALFontShaping::shapeRun(const LLFontFreetype* root_face,
-                             LLWStringView         wstr,
+                             std::string_view      utf8str,
                              size_t                begin,
                              size_t                end,
                              std::vector<ALShapedGlyph>& out_glyphs)
 {
     out_glyphs.clear();
 
-    const auto& cached = shapeLine(root_face, wstr, begin, end);
+    const auto& cached = shapeLine(root_face, utf8str, begin, end);
     if (cached.empty())
         return;
 

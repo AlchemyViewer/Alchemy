@@ -26,6 +26,7 @@
 
 #include "llstring.h"
 
+#include <string_view>
 #include <vector>
 
 class LLFontFreetype;
@@ -36,7 +37,8 @@ struct ALShapedGlyph
 {
     const LLFontFreetype* face;       // Face that owns glyph_id; shared by every glyph in a run.
     U32                   glyph_id;   // FT glyph index in `face`, *not* a Unicode codepoint.
-    S32                   cluster;    // Index into the original LLWString (not the slice).
+    S32                   cluster;    // Byte offset into the original string (not the slice),
+                                      // always at a character start.
     F32                   x_advance;
     F32                   y_advance;
     F32                   x_offset;
@@ -45,7 +47,7 @@ struct ALShapedGlyph
 
 namespace ALFontShaping
 {
-    // Shape wstr[begin..end) using `root_face`'s fallback chain to pick a
+    // Shape utf8str[begin..end) using `root_face`'s fallback chain to pick a
     // single owning face for the whole run. Produces glyphs laid out LTR in
     // common script — the minimum setup needed for ZWJ families, VS15/16,
     // skin-tone modifiers, regional-indicator flag pairs, keycap sequences
@@ -54,8 +56,12 @@ namespace ALFontShaping
     // populated at face/script split boundaries — Arabic init/medi/fina
     // forms across a split won't fire correctly.
     //
-    // Results are cached behind a bounded LRU keyed by (codepoints, face),
-    // so repeated render/width/hit-test calls on the same text do not pay
+    // `begin` and `end` are BYTE offsets, and so are the cluster values that
+    // come back. Nothing here converts: HarfBuzz reads the caller's own bytes
+    // and reports clusters in them.
+    //
+    // Results are cached behind a bounded LRU keyed by (bytes, face), so
+    // repeated render/width/hit-test calls on the same text do not pay
     // HarfBuzz's cost every frame. The cache is global (shared across all
     // LLFontGL instances backed by the same face) and invalidated via
     // clearCacheForFace(face) whenever a face is reloaded or destroyed.
@@ -65,15 +71,16 @@ namespace ALFontShaping
     // to the 1:1 codepoint path for that run. Empty results are cached too
     // so the failure isn't re-attempted on every frame.
     void shapeRun(const LLFontFreetype* root_face,
-                  LLWStringView         wstr,
+                  std::string_view      utf8str,
                   size_t                begin,
                   size_t                end,
                   std::vector<ALShapedGlyph>& out_glyphs);
 
     // Like shapeRun, but returns a const reference into the LRU instead of
     // copying out. Cluster values in the returned glyphs are SLICE-LOCAL —
-    // i.e. relative to `begin`, not original-wstr coords. Callers that need
-    // original-wstr clusters add `begin` once on consumption.
+    // i.e. byte offsets relative to `begin`, not into the original string.
+    // Callers that need original-string offsets add `begin` once on
+    // consumption.
     //
     // The reference is invalidated by any subsequent shapeLine/shapeRun call
     // or by clearCache/clearCacheForFace. Intended for renderer hot paths
@@ -81,7 +88,7 @@ namespace ALFontShaping
     // On failure or bad input returns a reference to a static empty vector.
     const std::vector<ALShapedGlyph>& shapeLine(
         const LLFontFreetype* root_face,
-        LLWStringView         wstr,
+        std::string_view      utf8str,
         size_t                begin,
         size_t                end);
 

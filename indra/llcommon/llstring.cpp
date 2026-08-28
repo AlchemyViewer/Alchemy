@@ -757,27 +757,77 @@ bool utf8str_remove_emojis(std::string& utf8str)
 // (Defined as LLStringOps::isPictographBase so the same predicate is
 // available to llrender's shape-itemizer and font-fallback walkers.)
 
+LLCodepointAt utf8str_decode_at(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    if (byte_pos >= n)
+        return { 0, byte_pos };
+
+    const auto lead = (unsigned char)utf8str[byte_pos];
+    if (lead < 0x80)
+        return { (llwchar)lead, byte_pos + 1 };
+
+    size_t  len = 0;
+    llwchar cp  = 0;
+    if ((lead & 0xE0) == 0xC0)      { len = 2; cp = lead & 0x1F; }
+    else if ((lead & 0xF0) == 0xE0) { len = 3; cp = lead & 0x0F; }
+    else if ((lead & 0xF8) == 0xF0) { len = 4; cp = lead & 0x07; }
+    else
+        return { 0xFFFD, byte_pos + 1 };
+
+    if (byte_pos + len > n)
+        return { 0xFFFD, byte_pos + 1 };
+    for (size_t k = 1; k < len; ++k)
+    {
+        const auto cont = (unsigned char)utf8str[byte_pos + k];
+        if ((cont & 0xC0) != 0x80)
+            return { 0xFFFD, byte_pos + 1 };
+        cp = (cp << 6) | (cont & 0x3F);
+    }
+    return { cp, byte_pos + len };
+}
+
+namespace
+{
+
+using CodepointAt = LLCodepointAt;
+
+CodepointAt decode_at(LLWStringView wstr, size_t pos)
+{
+    if (pos >= wstr.size())
+        return { 0, pos };
+    return { wstr[pos], pos + 1 };
+}
+
+CodepointAt decode_at(std::string_view utf8str, size_t pos)
+{
+    return utf8str_decode_at(utf8str, pos);
+}
+
 // True if position i begins an emoji sequence that the 1:1 codepoint->glyph
 // path cannot render correctly — i.e., the next codepoint transforms the base
 // (ZWJ, VS15/16, skin-tone, keycap combiner, tag character, or regional
 // indicator pair), or we're sitting on a keycap starter (digit/#/* + FE0F +
 // 20E3). Isolated emoji are excluded: they render fine through FreeType alone.
-static bool is_shaping_starter(const llwchar* p, size_t n, size_t i)
+template <typename VIEW>
+bool is_shaping_starter(VIEW text, size_t i)
 {
-    const llwchar c = p[i];
+    const CodepointAt at = decode_at(text, i);
+    const llwchar     c  = at.cp;
     // Keycap sequence: digit/#/* + VS16 + COMBINING ENCLOSING KEYCAP.
     // shapeRun itemises these into per-face sub-runs (digit on the text
     // font, combining mark on the emoji font) so we can treat keycap as
     // one cluster for cursor/grapheme purposes without losing the mark's
     // natural overlay on the base.
-    if ((c == '#' || c == '*' || (c >= '0' && c <= '9'))
-        && i + 2 < n && p[i + 1] == 0xFE0F && p[i + 2] == 0x20E3)
+    if (c == '#' || c == '*' || (c >= '0' && c <= '9'))
     {
-        return true;
+        const CodepointAt vs = decode_at(text, at.next);
+        if (vs.cp == 0xFE0F && decode_at(text, vs.next).cp == 0x20E3)
+            return true;
     }
-    if (!LLStringOps::isPictographBase(c) || i + 1 >= n)
+    if (!LLStringOps::isPictographBase(c))
         return false;
-    const llwchar next = p[i + 1];
+    const llwchar next = decode_at(text, at.next).cp;
     if (next == 0x200D || LLStringOps::isEmojiClusterExtender(next))
         return true;
     // Regional indicator pair (flag).
@@ -786,46 +836,57 @@ static bool is_shaping_starter(const llwchar* p, size_t n, size_t i)
 }
 
 // Greedy forward walk from a confirmed shaping-starter position, returning the
-// one-past-end index of the sequence.
-static size_t advance_shaping_run(const llwchar* p, size_t n, size_t start)
+// one-past-end position of the sequence.
+template <typename VIEW>
+size_t advance_shaping_run(VIEW text, size_t start)
 {
-    const llwchar base = p[start];
-    size_t r = start + 1;
+    const CodepointAt first = decode_at(text, start);
+    const llwchar     base  = first.cp;
+    size_t            r     = first.next;
 
     // Keycap: always exactly 3 codepoints.
-    if ((base == '#' || base == '*' || (base >= '0' && base <= '9'))
-        && r + 1 < n && p[r] == 0xFE0F && p[r + 1] == 0x20E3)
+    if (base == '#' || base == '*' || (base >= '0' && base <= '9'))
     {
-        return r + 2;
+        const CodepointAt vs = decode_at(text, r);
+        if (vs.cp == 0xFE0F)
+        {
+            const CodepointAt keycap = decode_at(text, vs.next);
+            if (keycap.cp == 0x20E3)
+                return keycap.next;
+        }
     }
 
     // Regional indicator pair: exactly one trailing RI.
-    if (base >= 0x1F1E6 && base <= 0x1F1FF
-        && r < n && p[r] >= 0x1F1E6 && p[r] <= 0x1F1FF)
+    if (base >= 0x1F1E6 && base <= 0x1F1FF)
     {
-        return r + 1;
+        const CodepointAt second = decode_at(text, r);
+        if (second.cp >= 0x1F1E6 && second.cp <= 0x1F1FF)
+            return second.next;
     }
 
     // General case: ZWJ joins another base, then any number of plain
     // extenders (VS, skin-tone, keycap mark, tag chars).
-    while (r < n)
+    for (;;)
     {
-        const llwchar c = p[r];
-        if (c == 0x200D)
+        const CodepointAt at = decode_at(text, r);
+        if (at.next == r)
+            break; // end of text
+        if (at.cp == 0x200D)
         {
             // Accept any pictograph base after the joiner, including BMP
             // pictographs like 🔥's partner heart in ❤️‍🔥 where the base
             // sits outside the astral emoji range.
-            if (r + 1 < n && LLStringOps::isPictographBase(p[r + 1]))
+            const CodepointAt joined = decode_at(text, at.next);
+            if (joined.next != at.next && LLStringOps::isPictographBase(joined.cp))
             {
-                r += 2;
+                r = joined.next;
                 continue;
             }
             break; // orphan ZWJ
         }
-        if (LLStringOps::isEmojiClusterExtender(c))
+        if (LLStringOps::isEmojiClusterExtender(at.cp))
         {
-            ++r;
+            r = at.next;
             continue;
         }
         break;
@@ -833,35 +894,48 @@ static size_t advance_shaping_run(const llwchar* p, size_t n, size_t start)
     return r;
 }
 
-EmojiClusterList wstring_find_emoji_clusters(LLWStringView wstr)
+template <typename VIEW>
+EmojiClusterList find_emoji_clusters(VIEW text)
 {
     EmojiClusterList runs;
-    const llwchar* p = wstr.data();
-    const size_t n = wstr.size();
+    const size_t n = text.size();
     size_t i = 0;
     while (i < n)
     {
-        if (is_shaping_starter(p, n, i))
+        const CodepointAt at = decode_at(text, i);
+        if (is_shaping_starter(text, i))
         {
-            const size_t end = advance_shaping_run(p, n, i);
+            const size_t end = advance_shaping_run(text, i);
             // is_shaping_starter accepts a base when the *next* codepoint is
             // an extender, but advance_shaping_run can still bail (e.g. a
             // ZWJ at end of string with nothing after it, or a ZWJ followed
             // by something that isn't a pictograph base). That leaves us
-            // with a degenerate length-1 "cluster" that's really just the
-            // base alone with a dangling extender. Skip those — isolated
+            // with a degenerate single-character "cluster" that's really just
+            // the base alone with a dangling extender. Skip those — isolated
             // single-codepoint emoji shape correctly via the 1:1 path and
             // are intentionally absent from the cluster list.
-            if (end > i + 1)
+            if (end > at.next)
                 runs.emplace_back(i, end);
             i = end;
         }
         else
         {
-            ++i;
+            i = at.next;
         }
     }
     return runs;
+}
+
+}
+
+EmojiClusterList wstring_find_emoji_clusters(LLWStringView wstr)
+{
+    return find_emoji_clusters(wstr);
+}
+
+EmojiClusterList utf8str_find_emoji_clusters(std::string_view utf8str)
+{
+    return find_emoji_clusters(utf8str);
 }
 
 namespace
@@ -965,58 +1039,43 @@ private:
     UBreakIterator* mIter = nullptr;
 };
 
-// An LLWString as the UTF-8 the walkers work in, with the map back to codepoint
-// indices. The wide entry points are adapters over the narrow ones -- one
-// implementation rather than two -- and Stage B deletes this along with them,
-// leaving the walkers reading the caller's own bytes.
-class Utf8View
-{
-public:
-    void assign(LLWStringView wstr)
-    {
-        mUtf8.clear();
-        mOffsets.clear();
-        mUtf8.reserve(wstr.size());
-        mOffsets.reserve(wstr.size() + 1);
-
-        char encoded[4];
-        for (const llwchar cp : wstr)
-        {
-            mOffsets.push_back(mUtf8.size());
-            // A lone surrogate or an out-of-range value has no UTF-8 form.
-            // Substituting keeps the bytes and the offset map agreeing, which
-            // is what every index that comes back depends on.
-            const UChar32 c = (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
-                            ? (UChar32)0xFFFD : (UChar32)cp;
-            int32_t written = 0;
-            U8_APPEND_UNSAFE(encoded, written, c);
-            mUtf8.append(encoded, (size_t)written);
-        }
-        mOffsets.push_back(mUtf8.size());
-    }
-
-    std::string_view text() const { return mUtf8; }
-
-    // A codepoint index into the original string, as a byte offset.
-    size_t toBytes(size_t pos) const
-    {
-        return mOffsets[llmin(pos, mOffsets.size() - 1)];
-    }
-
-    // A byte offset a walker reported, as a codepoint index. Walkers only ever
-    // report codepoint boundaries, so the search always lands on one.
-    size_t toCodepoints(size_t byte_pos) const
-    {
-        const auto it = std::lower_bound(mOffsets.begin(), mOffsets.end(), byte_pos);
-        return (size_t)(it - mOffsets.begin());
-    }
-
-private:
-    std::string mUtf8;
-    std::vector<size_t> mOffsets;   // one per codepoint, plus the end
-};
-
 } // anonymous namespace
+
+void ALUtf8View::assign(LLWStringView wstr)
+{
+    mUtf8.clear();
+    mOffsets.clear();
+    mUtf8.reserve(wstr.size());
+    mOffsets.reserve(wstr.size() + 1);
+
+    char encoded[4];
+    for (const llwchar cp : wstr)
+    {
+        mOffsets.push_back(mUtf8.size());
+        // A lone surrogate or an out-of-range value has no UTF-8 form.
+        // Substituting keeps the bytes and the offset map agreeing, which
+        // is what every index that comes back depends on.
+        const UChar32 c = (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+                        ? (UChar32)0xFFFD : (UChar32)cp;
+        int32_t written = 0;
+        U8_APPEND_UNSAFE(encoded, written, c);
+        mUtf8.append(encoded, (size_t)written);
+    }
+    mOffsets.push_back(mUtf8.size());
+}
+
+size_t ALUtf8View::toBytes(size_t pos) const
+{
+    if (mOffsets.empty())
+        return 0;
+    return mOffsets[llmin(pos, mOffsets.size() - 1)];
+}
+
+size_t ALUtf8View::toCodepoints(size_t byte_pos) const
+{
+    const auto it = std::lower_bound(mOffsets.begin(), mOffsets.end(), byte_pos);
+    return (size_t)(it - mOffsets.begin());
+}
 
 // Bounds [begin, end) of the line containing byte_pos, excluding its newline.
 // UAX #29 breaks words either side of a newline (WB3a, WB3b), so one line is a
@@ -1188,7 +1247,7 @@ size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
     if (pos >= n)
         return n;
 
-    Utf8View view;
+    ALUtf8View view;
     view.assign(wstr);
     return view.toCodepoints(utf8str_step_grapheme_forward(view.text(), view.toBytes(pos)));
 }
@@ -1201,7 +1260,7 @@ size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
     if (pos > n)
         return n;
 
-    Utf8View view;
+    ALUtf8View view;
     view.assign(wstr);
     return view.toCodepoints(utf8str_step_grapheme_backward(view.text(), view.toBytes(pos)));
 }
@@ -1214,7 +1273,7 @@ size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
     if (pos >= n)
         return n;
 
-    Utf8View view;
+    ALUtf8View view;
     view.assign(wstr);
     return view.toCodepoints(utf8str_grapheme_align_backward(view.text(), view.toBytes(pos)));
 }
@@ -1227,7 +1286,7 @@ size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
     if (pos == 0)
         return 0;
 
-    Utf8View view;
+    ALUtf8View view;
     view.assign(wstr);
     return view.toCodepoints(utf8str_grapheme_align_forward(view.text(), view.toBytes(pos)));
 }
@@ -1238,7 +1297,7 @@ size_t wstring_step_word_forward(LLWStringView wstr, size_t pos)
     if (pos >= n)
         return n;
 
-    Utf8View view;
+    ALUtf8View view;
     view.assign(wstr);
     return view.toCodepoints(utf8str_step_word_forward(view.text(), view.toBytes(pos)));
 }
@@ -1594,7 +1653,7 @@ void wstring_line_break_opportunities(LLWStringView wstr, std::vector<size_t>& o
     // Measurement work, run per frame over whole paragraphs, so the view and
     // the byte offsets it produces are kept between calls rather than rebuilt.
     // None of these walkers reenter.
-    thread_local Utf8View view;
+    thread_local ALUtf8View view;
     thread_local std::vector<size_t> byte_breaks;
     view.assign(wstr);
 
@@ -1612,7 +1671,7 @@ std::pair<size_t, size_t> wstring_word_range_at(LLWStringView wstr, size_t pos)
     if (pos >= n)
         return { n, n };
 
-    Utf8View view;
+    ALUtf8View view;
     view.assign(wstr);
     const auto range = utf8str_word_range_at(view.text(), view.toBytes(pos));
     return { view.toCodepoints(range.first), view.toCodepoints(range.second) };
@@ -1624,7 +1683,7 @@ std::pair<size_t, size_t> wstring_next_word_range(LLWStringView wstr, size_t pos
     if (pos >= n)
         return { n, n };
 
-    Utf8View view;
+    ALUtf8View view;
     view.assign(wstr);
     const auto range = utf8str_next_word_range(view.text(), view.toBytes(pos));
     return { view.toCodepoints(range.first), view.toCodepoints(range.second) };
@@ -1635,7 +1694,7 @@ size_t wstring_step_word_backward(LLWStringView wstr, size_t pos)
     if (pos == 0)
         return 0;
 
-    Utf8View view;
+    ALUtf8View view;
     view.assign(wstr);
     return view.toCodepoints(utf8str_step_word_backward(view.text(), view.toBytes(pos)));
 }

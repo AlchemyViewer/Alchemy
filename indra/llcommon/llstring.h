@@ -720,9 +720,10 @@ LL_COMMON_API bool wstring_remove_emojis(LLWString& wstr);
 
 LL_COMMON_API bool utf8str_remove_emojis(std::string& utf8str);
 
-// Half-open codepoint ranges of multi-codepoint emoji clusters in a wstring,
-// in ascending order. Produced by wstring_find_emoji_clusters and consumed by
-// the emoji helpers below.
+// Half-open ranges of multi-codepoint emoji clusters, in ascending order.
+// The unit is whatever the producer was handed: codepoints from
+// wstring_find_emoji_clusters, bytes from utf8str_find_emoji_clusters. Both
+// walk the same rules; only the positions they count in differ.
 using EmojiClusterList = std::vector<std::pair<size_t, size_t>>;
 
 // Locate contiguous ranges [begin, end) of wstr that form a multi-code-point
@@ -740,6 +741,12 @@ using EmojiClusterList = std::vector<std::pair<size_t, size_t>>;
 // and Hangul onto the emoji face.
 LL_COMMON_API EmojiClusterList
 wstring_find_emoji_clusters(LLWStringView wstr);
+
+// The same walk over UTF-8, reporting byte ranges. Neither form converts: the
+// rules are written against a decoding cursor and instantiated twice, so the
+// two can only ever disagree about where a position is counted from.
+LL_COMMON_API EmojiClusterList
+utf8str_find_emoji_clusters(std::string_view utf8str);
 
 // Cost note: the single-argument emoji helpers rebuild the cluster list
 // internally on every call (an O(N) scan of `wstr`). Fine for one-off lookups;
@@ -781,6 +788,47 @@ LL_COMMON_API size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t p
 //
 // Every contract above holds here word for word, byte offsets in place of
 // codepoint indices.
+// An LLWString as the UTF-8 that the byte-offset APIs work in, with the map
+// back to codepoint indices. Every wide entry point that still exists — in
+// llcommon, in llrender's font measurement, in llui's widgets — is an adapter
+// over its narrow counterpart through this, so there is one implementation
+// rather than two. Stage B deletes it along with the wide entry points, leaving
+// every walker and every measurement reading the caller's own bytes.
+//
+// Reusable: assign() overwrites, so a caller measuring repeatedly can keep one
+// of these rather than rebuilding the map per call.
+class LL_COMMON_API ALUtf8View
+{
+public:
+    void assign(LLWStringView wstr);
+
+    std::string_view text() const { return mUtf8; }
+
+    // A codepoint index into the original string, as a byte offset. Indices
+    // past the end give the end, which is what a clamped range wants.
+    size_t toBytes(size_t pos) const;
+
+    // A byte offset that came back out, as a codepoint index. Only codepoint
+    // boundaries are ever reported, so the search always lands on one.
+    size_t toCodepoints(size_t byte_pos) const;
+
+private:
+    std::string         mUtf8;
+    std::vector<size_t> mOffsets;   // one per codepoint, plus the end
+};
+
+// One decoded codepoint and the byte position just past it. Off the end of the
+// text, `cp` is 0 and `next` is the position handed in — read that as "nothing
+// here" rather than testing the length separately. Malformed input decodes to
+// U+FFFD over a single byte, so `next` always advances and a walk driven off
+// this terminates on any input at all.
+struct LLCodepointAt
+{
+    llwchar cp   = 0;
+    size_t  next = 0;
+};
+LL_COMMON_API LLCodepointAt utf8str_decode_at(std::string_view utf8str, size_t byte_pos);
+
 LL_COMMON_API size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos);

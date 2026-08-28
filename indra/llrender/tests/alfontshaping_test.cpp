@@ -115,6 +115,38 @@ namespace
         const llwchar arr[] = { static_cast<llwchar>(cps)... };
         return LLWString(arr, sizeof...(Cps));
     }
+
+    // A test string in both representations. The sequences under test are
+    // specified in codepoints, which is how they are written below; shaping
+    // takes and reports bytes. `at` turns a codepoint index into the byte
+    // offset an expectation has to compare against, so a test can go on
+    // saying "the cluster starts at the third codepoint" and still check the
+    // value the shaper actually produces.
+    struct Text
+    {
+        LLWString           wide;
+        std::string         utf8;
+        std::vector<size_t> offsets;   // one per codepoint, plus the end
+
+        explicit Text(LLWString ws) : wide(std::move(ws))
+        {
+            offsets.reserve(wide.size() + 1);
+            for (size_t k = 0; k <= wide.size(); ++k)
+                offsets.push_back(wstring_to_utf8str(wide.substr(0, k)).size());
+            utf8 = wstring_to_utf8str(wide);
+        }
+
+        size_t at(size_t cp) const { return offsets[llmin(cp, offsets.size() - 1)]; }
+        size_t size() const { return utf8.size(); }
+        size_t codepoints() const { return wide.size(); }
+        operator std::string_view() const { return utf8; }
+    };
+
+    template <typename... Cps>
+    Text text(Cps... cps)
+    {
+        return Text(wstr(cps...));
+    }
 }
 
 namespace tut
@@ -149,7 +181,7 @@ namespace tut
     void alfontshaping_object::test<1>()
     {
         std::vector<ALShapedGlyph> out;
-        LLWString s = wstr('a','b','c');
+        const Text s = text('a','b','c');
 
         ALFontShaping::shapeRun(/*root_face=*/nullptr, s, 0, s.size(), out);
         ensure("null root face -> empty output", out.empty());
@@ -191,7 +223,7 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        LLWString s = wstr('a','b','c');
+        const Text s = text('a','b','c');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("3 glyphs for 'abc'", out.size(), 3u);
@@ -227,18 +259,20 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        LLWString s = wstr('X','Y','a','b','c');
+        const Text s = text('X','Y','a','b','c');
+        const size_t begin = s.at(2);
+        const size_t end   = s.at(5);
         std::vector<ALShapedGlyph> shape_run_out;
-        ALFontShaping::shapeRun(ft, s, /*begin=*/2, /*end=*/5, shape_run_out);
+        ALFontShaping::shapeRun(ft, s, begin, end, shape_run_out);
         ensure_equals("shapeRun produced 3 glyphs", shape_run_out.size(), 3u);
-        // 'a' is at original position 2 (begin == 2).
-        ensure_equals("shapeRun cluster[0] is original-string index 2",
-                      shape_run_out[0].cluster, 2);
+        // 'a' starts where the slice does.
+        ensure_equals("shapeRun cluster[0] is an original-string offset",
+                      shape_run_out[0].cluster, (S32)begin);
 
-        const auto& shape_line_out = ALFontShaping::shapeLine(ft, s, 2, 5);
+        const auto& shape_line_out = ALFontShaping::shapeLine(ft, s, begin, end);
         ensure_equals("shapeLine produced 3 glyphs", shape_line_out.size(), 3u);
-        // shapeLine clusters are slice-local: 'a' is at slice index 0.
-        ensure_equals("shapeLine cluster[0] is slice-local index 0",
+        // shapeLine clusters are slice-local: 'a' is at slice offset 0.
+        ensure_equals("shapeLine cluster[0] is slice-local offset 0",
                       shape_line_out[0].cluster, 0);
     }
 
@@ -256,7 +290,7 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        LLWString s = wstr('h','e','l','l','o');
+        const Text s = text('h','e','l','l','o');
         std::vector<ALShapedGlyph> first;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), first);
 
@@ -296,7 +330,7 @@ namespace tut
         LLPointer<LLFontFreetype> b = loadFt(b_path);
         ensure("both faces loaded", a.notNull() && b.notNull());
 
-        LLWString s = wstr('a','b');
+        const Text s = text('a','b');
         const auto& a_first  = ALFontShaping::shapeLine(a, s, 0, s.size());
         const auto& b_first  = ALFontShaping::shapeLine(b, s, 0, s.size());
         ensure("a shape non-empty", !a_first.empty());
@@ -337,7 +371,7 @@ namespace tut
         ensure("Noto-COLRv1 loaded", ft.notNull());
 
         // U+2764 (heart) U+200D (ZWJ) U+1F525 (fire)
-        LLWString s = wstr(0x2764, 0x200D, 0x1F525);
+        const Text s = text(0x2764, 0x200D, 0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure("heart-on-fire shaped to non-empty output", !out.empty());
@@ -364,8 +398,8 @@ namespace tut
         ensure_equals("Noto-COLRv1 cmap lacks U+FE0F",
                       ft->getCharGlyphIndex(0xFE0F), 0u);
 
-        LLWString with_vs    = wstr(0x2764, 0xFE0F);
-        LLWString without_vs = wstr(0x2764);
+        const Text with_vs    = text(0x2764, 0xFE0F);
+        const Text without_vs = text(0x2764);
 
         std::vector<ALShapedGlyph> with_out;
         std::vector<ALShapedGlyph> without_out;
@@ -404,7 +438,7 @@ namespace tut
         head->addFallbackFont(emo);
 
         // 'a' (head) + U+4F60 你 (cjk) + U+1F525 fire (emoji).
-        LLWString s = wstr('a', 0x4F60, 0x1F525);
+        const Text s = text('a', 0x4F60, 0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure_equals("3 glyphs (one per codepoint)", out.size(), 3u);
@@ -434,26 +468,26 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("Noto-COLRv1 loaded", ft.notNull());
 
-        // Heart + VS-16 + ZWJ + fire. Position 1 (FE0F) gets stripped.
-        // The output's clusters must still reference original positions
-        // {0, 2, 3} or the ZWJ-collapse may produce a single cluster=0.
-        LLWString s = wstr(0x2764, 0xFE0F, 0x200D, 0x1F525);
+        // Heart + VS-16 + ZWJ + fire. The second codepoint (FE0F) gets
+        // stripped. The output's clusters must still reference the original
+        // codepoints {0, 2, 3} or the ZWJ-collapse may produce a single
+        // cluster=0.
+        const Text s = text(0x2764, 0xFE0F, 0x200D, 0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure("output non-empty", !out.empty());
         // Whatever the final shape (ZWJ ligature collapses to 1 glyph,
         // or 2 with VS-16 stripped), every cluster must point into the
-        // ORIGINAL string range [0, 4). A regression that left clusters
-        // in the post-strip space would produce values in [0, 3) — fine
-        // here numerically but would break if string lengths were larger.
-        // Stronger pin: no cluster equals 1 (the position of the
-        // stripped VS-16); the strip MUST rebase past it.
+        // ORIGINAL string. A regression that left clusters in the post-strip
+        // space would produce offsets short by the VS-16's three bytes.
+        // Stronger pin: no cluster sits at the stripped VS-16's own offset;
+        // the strip MUST rebase past it.
         for (const auto& g : out)
         {
             ensure("cluster points into original string range",
                    g.cluster >= 0 && g.cluster < (S32)s.size());
             ensure_not_equals("cluster does NOT point at stripped VS-16 position",
-                              g.cluster, 1);
+                              g.cluster, (S32)s.at(1));
         }
     }
 
@@ -477,7 +511,7 @@ namespace tut
 
         // Shape via A — its entry's glyph stream contains a B glyph
         // for the CJK codepoint. Shape via B directly — separate entry.
-        LLWString s = wstr('a', 0x4F60);
+        const Text s = text('a', 0x4F60);
         const auto& a_first = ALFontShaping::shapeLine(a, s, 0, s.size());
         const auto& b_first = ALFontShaping::shapeLine(b, s, 0, s.size());
         ensure("a non-empty", !a_first.empty());
@@ -519,7 +553,7 @@ namespace tut
 
         // U+1F525 (fire emoji) is not in DejaVuSans's cmap, and we
         // attached no fallback, so HB must produce notdef.
-        LLWString s = wstr(0x1F525);
+        const Text s = text(0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("uncovered codepoint produces 1 glyph", out.size(), 1u);
@@ -546,7 +580,7 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        LLWString s = wstr('h','i');
+        const Text s = text('h','i');
         const auto& first = ALFontShaping::shapeLine(ft, s, 0, s.size());
         ensure("shape produced output", !first.empty());
         ensure_equals("first shape leaves one entry",
@@ -599,7 +633,7 @@ namespace tut
         ensure("both loaded", head.notNull() && emoji.notNull());
         head->addFallbackFont(emoji);
 
-        LLWString s = wstr('9', 0xFE0F, 0x20E3);
+        const Text s = text('9', 0xFE0F, 0x20E3);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure("keycap shaped to non-empty output", !out.empty());
@@ -646,7 +680,7 @@ namespace tut
                "would route to head and split the cluster)",
                head->getCharGlyphIndex(0x2764) != 0u);
 
-        LLWString s = wstr(0x2764, 0xFE0F, 0x200D, 0x1F525);
+        const Text s = text(0x2764, 0xFE0F, 0x200D, 0x1F525);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure("heart-on-fire shaped to non-empty output", !out.empty());
@@ -688,7 +722,7 @@ namespace tut
 
         // '3' VS-16 U+20E3 (keycap), then U+1F3F3 (waving white flag)
         // VS-16 ZWJ U+1F308 (rainbow) — pride flag.
-        LLWString s = wstr('3', 0xFE0F, 0x20E3,
+        const Text s = text('3', 0xFE0F, 0x20E3,
                            0x1F3F3, 0xFE0F, 0x200D, 0x1F308);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
@@ -736,7 +770,7 @@ namespace tut
         ensure_not_equals("Inter has '#' in cmap",
                           head->getCharGlyphIndex(L'#'), 0u);
 
-        LLWString s = wstr('#', 0xFE0F, 0x20E3);
+        const Text s = text('#', 0xFE0F, 0x20E3);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure("shape produced output", !out.empty());
@@ -778,7 +812,7 @@ namespace tut
         ensure_not_equals("Noto-COLRv1 has U+20E3 in cmap",
                           ft->getCharGlyphIndex(0x20E3), 0u);
 
-        LLWString s = wstr('#', 0xFE0F, 0x20E3);
+        const Text s = text('#', 0xFE0F, 0x20E3);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure("hash-keycap shaped to non-empty output", !out.empty());
@@ -805,7 +839,7 @@ namespace tut
         ensure("both loaded", head.notNull() && emoji.notNull());
         head->addFallbackFont(emoji);
 
-        LLWString s = wstr('9');
+        const Text s = text('9');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(head, s, 0, s.size(), out);
         ensure_equals("bare '9' produces one glyph", out.size(), 1u);
@@ -836,7 +870,7 @@ namespace tut
         head->addFallbackFont(emoji);
 
         // 🏴 (U+1F3F4) + 'g' 'b' 'e' 'n' 'g' tag chars + U+E007F.
-        LLWString s = wstr(0x1F3F4,
+        const Text s = text(0x1F3F4,
                            0xE0067, 0xE0062, 0xE0065, 0xE006E, 0xE0067,
                            0xE007F);
         std::vector<ALShapedGlyph> out;
@@ -888,10 +922,11 @@ namespace tut
             "0123456789"
             "!@#$%^&*()_+-=[]{};':\",./<>?";
         constexpr size_t N = 200;
-        LLWString s;
+        // All ASCII, so a byte is a codepoint and no map is needed.
+        std::string s;
         s.reserve(N);
         for (size_t i = 0; i < N; ++i)
-            s.push_back((llwchar)ascii_pool[i % ascii_pool.size()]);
+            s.push_back(ascii_pool[i % ascii_pool.size()]);
 
         size_t fonts_tested = 0;
         for (const char* fname : mono_files)
@@ -1006,10 +1041,8 @@ namespace tut
             ensure("ligatures default off",
                    !ft->getAllowMonospaceLigatures());
 
-            LLWString s;
-            s.reserve(ligature_bait.size());
-            for (char c : ligature_bait)
-                s.push_back((llwchar)c);
+            // All ASCII, so a byte is a codepoint here too.
+            const std::string& s = ligature_bait;
 
             std::vector<ALShapedGlyph> out;
             ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
@@ -1042,7 +1075,7 @@ namespace tut
         ensure("DejaVuSansMono loaded", ft.notNull());
         ensure("DejaVuSansMono is fixed-width", ft->isFixedWidth());
 
-        LLWString s = wstr(L'a', 0x0301);  // a + COMBINING ACUTE ACCENT
+        const Text s = text(L'a', 0x0301);  // a + COMBINING ACUTE ACCENT
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         std::printf("combining mark probe: 'a'+U+0301 -> %zu glyphs\n",
@@ -1168,7 +1201,7 @@ namespace tut
         FT_Face ftf = face->face();
         const FT_Int32 load_flags = static_cast<FT_Int32>(face->hinting());
 
-        LLWString s = wstr('a','b','c','d','e','f');
+        const Text s = text('a','b','c','d','e','f');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("6 glyphs for 'abcdef'", out.size(), 6u);
@@ -1343,8 +1376,8 @@ namespace tut
         if (ft->getCharGlyphIndex(0xFE0E) != 0u)
             skip("Noto-COLRv1 unexpectedly has U+FE0E in cmap");
 
-        LLWString with_vs    = wstr(0x2764, 0xFE0E);
-        LLWString without_vs = wstr(0x2764);
+        const Text with_vs    = text(0x2764, 0xFE0E);
+        const Text without_vs = text(0x2764);
 
         std::vector<ALShapedGlyph> with_out;
         std::vector<ALShapedGlyph> without_out;
@@ -1390,7 +1423,7 @@ namespace tut
         if (wch == 0)
             skip("no non-ASCII codepoint covered in DejaVuSans");
 
-        LLWString s; s.push_back(wch);
+        const Text s = text(wch);
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("1 glyph for non-ASCII codepoint", out.size(), 1u);
@@ -1415,28 +1448,31 @@ namespace tut
         LLPointer<LLFontFreetype> ft = loadFt(path);
         ensure("DejaVuSans loaded", ft.notNull());
 
-        struct Case { LLWString s; size_t begin; size_t end; };
+        // begin/end are written as codepoint indices and converted per case.
+        struct Case { Text s; size_t begin; size_t end; };
         const std::vector<Case> cases = {
-            { wstr('a','b','c'),                          0, 3 },
-            { wstr('A','V','A','W','T','o','L','T'),      0, 8 },
-            { wstr('h','e','l','l','o',' ','w','o','r','l','d'), 0, 11 },
-            { wstr('a','b','c','d','e','f'),              2, 5 },
+            { text('a','b','c'),                          0, 3 },
+            { text('A','V','A','W','T','o','L','T'),      0, 8 },
+            { text('h','e','l','l','o',' ','w','o','r','l','d'), 0, 11 },
+            { text('a','b','c','d','e','f'),              2, 5 },
             // VS-16 / ZWJ extenders interleaved with Latin — exercises
             // the strip+rebase path even on a face that covers them.
-            { wstr('A', 0xFE0F, 'B', 0x200D, 'C'),        0, 5 },
+            { text('A', 0xFE0F, 'B', 0x200D, 'C'),        0, 5 },
         };
 
         for (size_t ci = 0; ci < cases.size(); ++ci)
         {
             const auto& c = cases[ci];
+            const size_t begin_bytes = c.s.at(c.begin);
+            const size_t end_bytes   = c.s.at(c.end);
             std::vector<ALShapedGlyph> out;
-            ALFontShaping::shapeRun(ft, c.s, c.begin, c.end, out);
+            ALFontShaping::shapeRun(ft, c.s, begin_bytes, end_bytes, out);
             for (const auto& g : out)
             {
                 ensure(("cluster >= begin (case " + std::to_string(ci) + ")").c_str(),
-                       g.cluster >= (S32)c.begin);
+                       g.cluster >= (S32)begin_bytes);
                 ensure(("cluster < end (case " + std::to_string(ci) + ")").c_str(),
-                       g.cluster < (S32)c.end);
+                       g.cluster < (S32)end_bytes);
             }
         }
     }
@@ -1467,22 +1503,23 @@ namespace tut
         // as a cluster sub-run on DejaVu, which can't ligate the
         // sequence. Without cluster atomicity, HB hands back glyph
         // cluster IDs 1..5 — the bug we're pinning.
-        LLWString s = wstr(L'X', 0x1F3F3, 0xFE0F, 0x200D, 0x26A7,
+        const Text s = text(L'X', 0x1F3F3, 0xFE0F, 0x200D, 0x26A7,
                            0xFE0F, L'Y');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure("shape produced output", !out.empty());
 
-        // Every glyph whose cluster falls inside [1, 6) must report 1
-        // (the cluster's start). Glyphs for X (cluster=0) and Y (cluster=6)
-        // are unaffected.
+        // Every glyph whose cluster falls inside the flag must report the
+        // cluster's start. Glyphs for X and Y are unaffected.
+        const S32 flag_begin = (S32)s.at(1);
+        const S32 flag_end   = (S32)s.at(6);
         bool saw_cluster_glyph = false;
         for (const auto& g : out)
         {
-            if (g.cluster >= 1 && g.cluster < 6)
+            if (g.cluster >= flag_begin && g.cluster < flag_end)
                 saw_cluster_glyph = true;
             ensure("trans-flag cluster glyphs collapse to cluster start",
-                   !(g.cluster > 1 && g.cluster < 6));
+                   !(g.cluster > flag_begin && g.cluster < flag_end));
         }
         ensure("at least one glyph routed through the cluster sub-run "
                "(otherwise this test isn't exercising the fast path)",
@@ -1513,7 +1550,7 @@ namespace tut
 
         // Pre-fallback shape: U+4F60 (你) is not in DejaVuSans's cmap, so
         // HB returns one notdef glyph (glyph_id=0) on face A.
-        LLWString s = wstr(0x4F60);
+        const Text s = text(0x4F60);
         std::vector<ALShapedGlyph> pre;
         ALFontShaping::shapeRun(a, s, 0, s.size(), pre);
         ensure_equals("pre-fallback shape produces 1 glyph", pre.size(), 1u);
@@ -1670,7 +1707,7 @@ namespace tut
         ensure("monospace ligatures default off",
                !ft->getAllowMonospaceLigatures());
 
-        LLWString s = wstr('A','B');
+        const Text s = text('A','B');
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("AB produces 2 glyphs through HB strict-mono path",
@@ -1709,7 +1746,7 @@ namespace tut
         ensure("ligatures-on toggle applied",
                ft->getAllowMonospaceLigatures());
 
-        LLWString s = wstr('A','V'); // AV is a classic kerned pair
+        const Text s = text('A','V'); // AV is a classic kerned pair
         std::vector<ALShapedGlyph> out;
         ALFontShaping::shapeRun(ft, s, 0, s.size(), out);
         ensure_equals("AV produces 2 glyphs through HB", out.size(), 2u);
@@ -1746,9 +1783,9 @@ namespace tut
         bool found_kerned = false;
         for (const auto& p : pairs)
         {
-            LLWString l    = wstr(p.l);
-            LLWString r    = wstr(p.r);
-            LLWString lr   = wstr(p.l, p.r);
+            const Text l    = text(p.l);
+            const Text r    = text(p.r);
+            const Text lr   = text(p.l, p.r);
             std::vector<ALShapedGlyph> lg, rg, lrg;
             ALFontShaping::shapeRun(ft, l,  0, l.size(),  lg);
             ALFontShaping::shapeRun(ft, r,  0, r.size(),  rg);

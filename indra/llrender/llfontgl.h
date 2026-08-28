@@ -170,6 +170,15 @@ public:
     F32 getWidthF32(const std::string& text, S32 offset, S32 max_chars) const;
     F32 getWidthF32(LLWStringView wchars, S32 offset, S32 max_chars, bool no_padding = false) const;
 
+    // The measurement itself, in bytes. `offset` and `max_bytes` index the
+    // UTF-8 directly, which is what a caller holding UTF-8 already has; the
+    // overloads above are adapters that convert their codepoint windows into
+    // one of these. The name carries the unit because the type cannot -- an
+    // S32 offset reads the same whichever it counts, and that is the one
+    // mistake this whole conversion exists to make impossible.
+    S32 getWidthBytes(std::string_view utf8text, S32 offset, S32 max_bytes) const;
+    F32 getWidthF32Bytes(std::string_view utf8text, S32 offset, S32 max_bytes, bool no_padding = false) const;
+
     // The following are called often, frequently with large buffers, so do not take
     // an owning string
 
@@ -188,6 +197,15 @@ public:
 
     // Returns the index of the character closest to pixel position x (ignoring text to the right of max_pixels and max_chars)
     S32 charFromPixelOffset(LLWStringView wchars, S32 char_offset, F32 x, F32 max_pixels=F32_MAX, S32 max_chars = S32_MAX, bool round = true) const;
+
+    // The same three walks in bytes, which is what the three above are
+    // adapters over. Offsets, budgets and results all index the UTF-8, and
+    // every position handed back sits at a character start — and, where the
+    // text shapes, at a cluster start, so no caller is ever given somewhere it
+    // must not begin drawing from.
+    S32 maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 max_bytes = S32_MAX, EWordWrapStyle end_on_word_boundary = ANYWHERE) const;
+    S32 firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 start_pos = S32_MAX, S32 max_bytes = S32_MAX) const;
+    S32 byteFromPixelOffset(std::string_view utf8text, S32 byte_offset, F32 x, F32 max_pixels = F32_MAX, S32 max_bytes = S32_MAX, bool round = true) const;
 
     const LLFontDescriptor& getFontDesc() const;
 

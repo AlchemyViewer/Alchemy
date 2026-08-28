@@ -95,10 +95,11 @@ namespace tut
     //   9x  shaping          (cluster walker: wstring_find_emoji_clusters)
     //   10x grapheme         (step + align + range_at)
     //   11x utf8str helpers  (substChar/makeASCII/removeCRLF/split/preview)
+    //   12x utf8 walkers     (byte-offset segmentation against its wide twin)
     // The TUT default registers only test<1>..test<50>, but the explicit
-    // test_group<..., 128> below raises that ceiling. Keep this index in
+    // test_group<..., 136> below raises that ceiling. Keep this index in
     // sync with categories used below.
-    typedef test_group<llstring_utf_data, 128> llstring_utf_t;
+    typedef test_group<llstring_utf_data, 136> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
 
@@ -2267,5 +2268,105 @@ namespace tut
             ensure_equals("and forward to its end",
                           utf8str_grapheme_align_forward(utf8, flag + inside), flag + 8);
         }
+    }
+
+    // ---------------------------------------------------------------
+    //                 12x  utf8 walkers
+    // ---------------------------------------------------------------
+
+    // The two cluster walkers are one set of rules instantiated twice, so
+    // every run the wide walker finds has to be the same run in the UTF-8
+    // walker's byte coordinates, and there must be no extra ones.
+    template<> template<>
+    void llstring_utf_object_t::test<127>()
+    {
+        const std::vector<LLWString> corpus = {
+            LLWString(),
+            { (llwchar)'H', (llwchar)'i', (llwchar)'!' },
+            { (llwchar)0x65E5, (llwchar)0x672C },                       // CJK
+            { (llwchar)0x1F680 },                                       // lone emoji
+            { (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x1F469,
+              (llwchar)0x200D, (llwchar)0x1F467 },                      // ZWJ family
+            { (llwchar)0x1F468, (llwchar)0x1F3FB },                     // skin tone
+            { (llwchar)0x1F1FA, (llwchar)0x1F1F8 },                     // flag
+            { (llwchar)'1', (llwchar)0xFE0F, (llwchar)0x20E3 },         // keycap
+            { (llwchar)0x2764, (llwchar)0xFE0F, (llwchar)0x200D,
+              (llwchar)0x1F525 },                                       // heart on fire
+            // ASCII, CJK, a cluster, then more ASCII: byte and codepoint
+            // offsets have already diverged before the cluster starts.
+            { (llwchar)'a', (llwchar)0x65E5, (llwchar)0x1F468,
+              (llwchar)0x200D, (llwchar)0x1F469, (llwchar)'z' },
+        };
+
+        for (size_t c = 0; c < corpus.size(); ++c)
+        {
+            const LLWString&  wide = corpus[c];
+            const std::string utf8 = wstring_to_utf8str(wide);
+            const std::string tag  = "corpus " + std::to_string(c);
+
+            // Codepoint index to byte offset, measured off the prefixes.
+            std::vector<size_t> byte_of;
+            byte_of.reserve(wide.size() + 1);
+            for (size_t k = 0; k <= wide.size(); ++k)
+                byte_of.push_back(wstring_to_utf8str(wide.substr(0, k)).size());
+
+            const auto wide_runs = wstring_find_emoji_clusters(wide);
+            const auto utf8_runs = utf8str_find_emoji_clusters(utf8);
+            ensure_equals(tag + ": same run count", utf8_runs.size(), wide_runs.size());
+            for (size_t r = 0; r < wide_runs.size() && r < utf8_runs.size(); ++r)
+            {
+                const std::string rtag = tag + " run " + std::to_string(r);
+                ensure_equals(rtag + " begin",
+                              utf8_runs[r].first,  byte_of[wide_runs[r].first]);
+                ensure_equals(rtag + " end",
+                              utf8_runs[r].second, byte_of[wide_runs[r].second]);
+            }
+        }
+    }
+
+    // Byte coordinates pinned outright, so a change that moved both walkers
+    // the same wrong way is still caught. A ZWJ pair sitting behind an
+    // ideograph starts at byte 4, not codepoint 2.
+    template<> template<>
+    void llstring_utf_object_t::test<128>()
+    {
+        LLWString wide = { (llwchar)'a', (llwchar)0x65E5,
+                           (llwchar)0x1F468, (llwchar)0x200D, (llwchar)0x1F469,
+                           (llwchar)'z' };
+        const std::string utf8 = wstring_to_utf8str(wide);
+        ensure_equals("byte length", utf8.size(), size_t(1 + 3 + 4 + 3 + 4 + 1));
+
+        const auto runs = utf8str_find_emoji_clusters(utf8);
+        ensure_equals("one run", runs.size(), size_t(1));
+        ensure_equals("begins past 'a' and the ideograph", runs[0].first,  size_t(4));
+        ensure_equals("ends before 'z'",                   runs[0].second, size_t(15));
+
+        const auto wide_runs = wstring_find_emoji_clusters(wide);
+        ensure_equals("wide one run", wide_runs.size(),    size_t(1));
+        ensure_equals("wide begin",   wide_runs[0].first,  size_t(2));
+        ensure_equals("wide end",     wide_runs[0].second, size_t(5));
+    }
+
+    // Malformed UTF-8 must not stall the walk or invent a cluster. Every bad
+    // byte decodes to U+FFFD over one byte, which matches no rule.
+    template<> template<>
+    void llstring_utf_object_t::test<129>()
+    {
+        ensure_equals("lone continuation",
+                      utf8str_find_emoji_clusters("\x80\x80\x80").size(), size_t(0));
+        ensure_equals("truncated four-byte",
+                      utf8str_find_emoji_clusters("\xF0\x9F\x91").size(), size_t(0));
+        ensure_equals("bad lead",
+                      utf8str_find_emoji_clusters("\xFF\xFE").size(),     size_t(0));
+
+        // A bad byte in front of a real cluster still leaves the cluster
+        // findable, at the offset that byte pushed it to.
+        std::string text = "\xFF";
+        text += wstring_to_utf8str(LLWString{ (llwchar)0x1F468, (llwchar)0x200D,
+                                              (llwchar)0x1F469 });
+        const auto runs = utf8str_find_emoji_clusters(text);
+        ensure_equals("one run past the bad byte", runs.size(),     size_t(1));
+        ensure_equals("begins at byte 1",          runs[0].first,   size_t(1));
+        ensure_equals("ends at the end",           runs[0].second,  text.size());
     }
 }
