@@ -145,6 +145,27 @@ if (BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llfontbitmapcache "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(alfontshaping "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfontfreetype "" "${registry_test_libs}" "${test_project}")
+
+  # Wholly GL-backed suites. The context comes from SDL on a window that is
+  # never shown -- the same GL the viewer runs on -- so these want plain
+  # llrender and none of the headless library set, and they run everywhere
+  # rather than only where OSMesa happens to be installed.
+  set(gl_test_libs llrender ll::SDL3core)
+  set(gl_test_compile_defs
+      LL_TEST_GL=1
+      "LLFONT_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+      "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\""
+      "LLFONT_TEST_FONTS_XML=\"${INDRA_SOURCE_DIR}/newview/skins/default/xui/en/fonts.xml\"")
+
+  LL_ADD_INTEGRATION_TEST(llfontgl "" "${gl_test_libs}" "${test_project}")
+  if (TARGET INTEGRATION_TEST_llfontgl)
+    target_compile_definitions(INTEGRATION_TEST_llfontgl PRIVATE ${gl_test_compile_defs})
+  endif()
+
+  LL_ADD_INTEGRATION_TEST(llfontvertexbuffer "" "${gl_test_libs}" "${test_project}")
+  if (TARGET INTEGRATION_TEST_llfontvertexbuffer)
+    target_compile_definitions(INTEGRATION_TEST_llfontvertexbuffer PRIVATE ${gl_test_compile_defs})
+  endif()
   if (TARGET INTEGRATION_TEST_alfontcolrv1)
     # Hand the source-tree font directory to the test as a string literal.
     # Tests that need a real font file (Noto-COLRv1.ttf, InterVariable.woff2)
@@ -207,20 +228,6 @@ if (BUILD_TESTING)
       # painter with the font atlas — same library swap pattern as
       # llfontbitmapcache and llfontfreetype.
       target_compile_definitions(INTEGRATION_TEST_alfontcolrv1 PRIVATE
-          ${headless_test_compile_defs})
-    endif()
-
-    LL_ADD_INTEGRATION_TEST(llfontgl "" "llrenderheadless" "${test_project}")
-    if (TARGET INTEGRATION_TEST_llfontgl)
-      target_compile_definitions(INTEGRATION_TEST_llfontgl PRIVATE
-          ${headless_test_compile_defs})
-    endif()
-
-    # llfontvertexbuffer: pure-headless. The vertex buffer renders
-    # text geometry through gGL; all tests need an OSMesa context.
-    LL_ADD_INTEGRATION_TEST(llfontvertexbuffer "" "llrenderheadless" "${test_project}")
-    if (TARGET INTEGRATION_TEST_llfontvertexbuffer)
-      target_compile_definitions(INTEGRATION_TEST_llfontvertexbuffer PRIVATE
           ${headless_test_compile_defs})
     endif()
 

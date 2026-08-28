@@ -1,9 +1,15 @@
 /**
  * @file llheadlessgl_fixture.h
- * @brief One-shot OSMesa GL bring-up shared across the GL-backed
- *        llrender integration tests.
+ * @brief One-shot GL bring-up shared across the GL-backed llrender
+ *        integration tests.
  *
- * The OSMesa context is the expensive part — TUT spins a fresh
+ * The context comes from SDL, on a window that is never shown. That
+ * is deliberately the same GL the viewer itself runs on -- WGL on
+ * Windows, EGL or GLX on Linux -- where OSMesa, which this used to
+ * use, is a software path we do not ship and so did not test.
+ * It also drops a dependency that distributions have begun removing.
+ *
+ * Standing the context up is the expensive part — TUT spins a fresh
  * fixture per test method, so we hide a static-local instance
  * behind getHeadlessGl() and let every fixture struct embed a
  * reference. That keeps each test isolated against its own state
@@ -45,8 +51,7 @@
 #include "../llshadermgr.h"
 #include "../llvertexbuffer.h"
 
-#include "llwindowcallbacks.h"
-#include "llwindowmesaheadless.h"
+#include <SDL3/SDL.h>
 
 namespace ll_test
 {
@@ -240,11 +245,50 @@ namespace ll_test
         return px;
     }
 
-    // Owns the OSMesa context plus the GL-side singletons that the
-    // llrender code paths assume are alive. Construction order is
-    // window → LLImageGL → LLFontManager (→ TestShaderMgr + gUIProgram
-    // when needs_render); teardown is the reverse.
-    struct HeadlessGL : public LLWindowCallbacks
+    // Route the debug context's messages into the test log. Anything the
+    // driver considers an error or a portability problem shows up named,
+    // rather than as a wrong pixel three tests later. Notifications are
+    // dropped -- drivers use them for buffer-allocation chatter.
+#ifndef APIENTRY
+#  define APIENTRY
+#endif
+    inline void APIENTRY onGLDebugMessage(GLenum /*source*/, GLenum type, GLuint id,
+                                          GLenum severity, GLsizei /*length*/,
+                                          const GLchar* message, const void* /*user*/)
+    {
+        if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
+            return;
+
+        const char* kind = (type == GL_DEBUG_TYPE_ERROR)               ? "error"
+                         : (type == GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR)  ? "undefined behaviour"
+                         : (type == GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR) ? "deprecated"
+                         : (type == GL_DEBUG_TYPE_PORTABILITY)         ? "portability"
+                         : (type == GL_DEBUG_TYPE_PERFORMANCE)         ? "performance"
+                         : "other";
+
+        LL_WARNS("HeadlessGL") << "GL " << kind << " [" << id << "]: "
+                               << (message ? message : "(no message)") << LL_ENDL;
+    }
+
+    inline void installDebugMessageCallback()
+    {
+        if (!glDebugMessageCallback)
+        {
+            LL_WARNS("HeadlessGL") << "No glDebugMessageCallback; GL debug output is off" << LL_ENDL;
+            return;
+        }
+        glEnable(GL_DEBUG_OUTPUT);
+        // Synchronous, so a message arrives while the call that caused it is
+        // still on the stack and a breakpoint here is worth setting.
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        glDebugMessageCallback(&onGLDebugMessage, nullptr);
+    }
+
+    // Owns the GL context plus the GL-side singletons that the llrender
+    // code paths assume are alive. Construction order is context →
+    // LLImageGL → LLFontManager (→ TestShaderMgr + gUIProgram when
+    // needs_render); teardown is the reverse.
+    struct HeadlessGL
     {
         static constexpr S32 WIDTH  = 256;
         static constexpr S32 HEIGHT = 256;
@@ -261,28 +305,64 @@ namespace ll_test
                 needs_vbos = needs_imagegl = needs_llrender = true;
             }
 
-            const S32  WINDOW_ORIGIN_X       = 0;
-            const S32  WINDOW_ORIGIN_Y       = 0;
-            const U32  FLAGS                 = 32; // *TODO: Why did mapserver use this?  mFlags looks unused.
-            const bool NO_FULLSCREEN         = false;
-            const bool NO_CLEAR_BG           = false;
-            const bool ENABLE_VSYNC          = false;
-            const bool IGNORE_PIXEL_DEPTH    = false;
-            const bool USE_GL                = true;
-            mWindow = LLWindowManager::createWindow(this, "llrender-headless-test", "llrender-headless-test", WINDOW_ORIGIN_X, WINDOW_ORIGIN_Y,
-                                                    WIDTH, HEIGHT, FLAGS, NO_FULLSCREEN, NO_CLEAR_BG,
-                                                    ENABLE_VSYNC,           // gSavedSettings.getBOOL("DisableVerticalSync"),
-                                                    USE_GL,                 // not headless
-                                                    IGNORE_PIXEL_DEPTH);    // gIgnorePixelDepth = false
-
-            if (nullptr == mWindow)
+#if !LL_WINDOWS && !LL_DARWIN
+            // Where there is no display -- CI, a container, WSL without an X
+            // or Wayland socket -- SDL's offscreen driver gives a context over
+            // EGL with no surface at all. With a display, the default driver's
+            // hidden window is closer to what ships.
+            if (!SDL_getenv("SDL_VIDEO_DRIVER")
+                && !SDL_getenv("DISPLAY")
+                && !SDL_getenv("WAYLAND_DISPLAY"))
             {
-                throw std::runtime_error("Failed to init window bailing");
+                SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "offscreen");
+            }
+#endif
+
+            if (!SDL_Init(SDL_INIT_VIDEO))
+            {
+                throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
+            }
+            mOwnsSDL = true;
+
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+            // A debug context costs nothing here and turns "the draw came out
+            // wrong" into a message naming the call that did it. Tests are
+            // exactly where that is worth paying for.
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+            SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+            SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+            SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+            SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+            SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+            SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+
+            mSDLWindow = SDL_CreateWindow("llrender-gl-test", WIDTH, HEIGHT,
+                                          SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+            if (!mSDLWindow)
+            {
+                throw std::runtime_error(std::string("SDL_CreateWindow failed: ") + SDL_GetError());
             }
 
+            mSDLContext = SDL_GL_CreateContext(mSDLWindow);
+            if (!mSDLContext)
+            {
+                throw std::runtime_error(std::string("SDL_GL_CreateContext failed: ") + SDL_GetError());
+            }
+            SDL_GL_MakeCurrent(mSDLWindow, mSDLContext);
+
+            // The window used to do this on the way up. Nothing else will.
+            llverify(gGLManager.initGL());
+
+            installDebugMessageCallback();
+
+            // Both of these take an LLWindow only to hand to worker threads
+            // they are not being asked to start: ENABLE_GL_WORK_QUEUE is 0,
+            // and the texture and media threads are off below.
             if (needs_vbos)
             {
-                LLVertexBuffer::initClass(mWindow);
+                LLVertexBuffer::initClass(nullptr);
             }
 
             if (needs_llrender)
@@ -296,7 +376,7 @@ namespace ll_test
                 // the test never tags textures so the count is moot beyond ≥1.
                 // thread_texture_loads/thread_media_updates default to false so no
                 // worker threads are spun up — keeps teardown simple.
-                LLImageGL::initClass(mWindow, LLGLTexture::MAX_GL_IMAGE_CATEGORY, false, false, false);
+                LLImageGL::initClass(nullptr, LLGLTexture::MAX_GL_IMAGE_CATEGORY, false, false, false);
             }
 
             LLFontManager::initClass();
@@ -344,12 +424,25 @@ namespace ll_test
             // rigged-palette scratch ring) with this context: a stale buffer name
             // surviving into the next fixture's fresh context would alias or fail.
             ALUniformBuffer::cleanupClass();
-            LLWindowManager::destroyWindow(mWindow);
+
+            gGLManager.shutdownGL();
+            if (mSDLContext)
+            {
+                SDL_GL_DestroyContext(mSDLContext);
+            }
+            if (mSDLWindow)
+            {
+                SDL_DestroyWindow(mSDLWindow);
+            }
+            if (mOwnsSDL)
+            {
+                SDL_Quit();
+            }
         }
 
         void swapBuffer()
         {
-            mWindow -> swapBuffers();
+            SDL_GL_SwapWindow(mSDLWindow);
         }
 
         // Clear the framebuffer to opaque black so a fresh readFramebufferRGBA
@@ -364,8 +457,9 @@ namespace ll_test
         HeadlessGL& operator=(const HeadlessGL&) = delete;
 
     private:
-        LLWindowCallbacks    mCallbacks;
-        LLWindow* mWindow;
+        SDL_Window*   mSDLWindow  = nullptr;
+        SDL_GLContext mSDLContext = nullptr;
+        bool          mOwnsSDL    = false;
         std::unique_ptr<TestShaderMgr> mShaderMgr;
     };
 }

@@ -5308,10 +5308,25 @@ F32 LLWindowWin32::getSystemUISize()
 PROC WINAPI LLWindowWin32::getProcAddress(const char* func)
 {
     PROC ret_func = wglGetProcAddress(func);
-    if (!ret_func && sGLDLLHandle)
+    if (!ret_func)
     {
-        // Try to fallback to OpenGL32.dll
-        ret_func = GetProcAddress(sGLDLLHandle, func);
+        // wglGetProcAddress answers for extensions and nothing else -- every
+        // OpenGL 1.0 and 1.1 entry point comes back null from it, by spec, and
+        // has to be fetched from the library itself.
+        //
+        // Loaded here rather than only alongside a window: whoever holds the
+        // current context is entitled to resolve against it, and the GL-backed
+        // tests stand a context up through SDL without one of these ever being
+        // constructed. Without this they take null for glClear and the like and
+        // fault on the first call.
+        if (!sGLDLLHandle)
+        {
+            sGLDLLHandle = LoadLibrary(L"opengl32.dll");
+        }
+        if (sGLDLLHandle)
+        {
+            ret_func = GetProcAddress(sGLDLLHandle, func);
+        }
     }
     return ret_func;
 }
