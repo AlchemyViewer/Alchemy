@@ -529,16 +529,6 @@ namespace tut
         ensure("not isEmoji CJK-Ext", !LLStringOps::isEmoji((llwchar)0x20000));
     }
 
-    template<> template<>
-    void llstring_utf_object_t::test<61>()
-    {
-        const LLWString with_emoji = { (llwchar)'H', (llwchar)'i', (llwchar)0x1F680 };
-        const LLWString no_emoji   = { (llwchar)'H', (llwchar)'i', (llwchar)0x65E5 };
-        ensure("wstring_has_emoji yes", wstring_has_emoji(with_emoji));
-        ensure("wstring_has_emoji no", !wstring_has_emoji(no_emoji));
-        ensure("wstring_has_emoji empty", !wstring_has_emoji(LLWString()));
-    }
-
     // wstring_remove_emojis must strip consecutive emojis without skipping
     // the following code point (the implementation uses i-- after erase to
     // re-check the new index).

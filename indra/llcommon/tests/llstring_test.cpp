@@ -208,6 +208,24 @@ namespace tut
 
         str_val = "ABC ";
         ensure("containsNonprintable failed", LLStringUtil::containsNonprintable(str_val) == false);
+
+        // Controls above the ASCII range are two bytes, and neither of them
+        // looks like a control on its own. U+0085 NEXT LINE.
+        str_val = "AB\xC2\x85" "C";
+        ensure("C1 control found", LLStringUtil::containsNonprintable(str_val) == true);
+        // U+2028 LINE SEPARATOR.
+        str_val = "AB\xE2\x80\xA8" "C";
+        ensure("line separator found", LLStringUtil::containsNonprintable(str_val) == true);
+        // DEL, which a test for "below 0x20" never saw.
+        str_val = "AB\x7F" "C";
+        ensure("delete found", LLStringUtil::containsNonprintable(str_val) == true);
+
+        // Non-ASCII text is printable, and so are the format characters that
+        // scripts depend on -- ZWJ here, which Indic conjuncts need.
+        str_val = "\xE6\x97\xA5" "\xC3\xA9" "ok";
+        ensure("ordinary text is printable", LLStringUtil::containsNonprintable(str_val) == false);
+        str_val = "\xE0\xA4\x95\xE2\x80\x8D\xE0\xA4\xB7";
+        ensure("ZWJ is printable", LLStringUtil::containsNonprintable(str_val) == false);
     }
 
     template<> template<>
@@ -224,6 +242,40 @@ namespace tut
         str_val = "";
         LLStringUtil::stripNonprintable(str_val);
         ensure_equals("stripNonprintable of empty string resulting in empty string failed", str_val, "");
+
+        // A control above the ASCII range goes whole, taking both its bytes.
+        str_val = "AB\xC2\x85" "C";
+        LLStringUtil::stripNonprintable(str_val);
+        ensure_equals("C1 control stripped whole", str_val, "ABC");
+
+        // Text either side of it is left alone, bytes and all.
+        str_val = "\xE6\x97\xA5" "\xE2\x80\xA8" "\xC3\xA9";
+        LLStringUtil::stripNonprintable(str_val);
+        ensure_equals("only the separator goes", str_val, "\xE6\x97\xA5" "\xC3\xA9");
+    }
+
+    // Capitalising a byte can only ever reach ASCII, so the narrow form works
+    // in codepoints.
+    template<> template<>
+    void string_index_object_t::test<45>()
+    {
+        std::string str_val("hello world-again_now");
+        LLStringUtil::capitalize(str_val);
+        ensure_equals("ascii words", str_val, "Hello World-Again_Now");
+
+        // U+00E9 -> U+00C9, which uppercasing one byte at a time could not do.
+        str_val = "\xC3\xA9" "cole";
+        LLStringUtil::capitalize(str_val);
+        ensure_equals("accented first letter", str_val, "\xC3\x89" "cole");
+
+        // The word rule is the caller's and still only sees these three.
+        str_val = "a b-c_d.e";
+        LLStringUtil::capitalize(str_val);
+        ensure_equals("dot is not a separator", str_val, "A B-C_D.e");
+
+        str_val = "";
+        LLStringUtil::capitalize(str_val);
+        ensure_equals("empty", str_val, "");
     }
 
     template<> template<>

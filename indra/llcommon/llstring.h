@@ -137,6 +137,12 @@ public:
     static bool isDigit(char a) { return a >= '0' && a <= '9'; }
     static bool isDigit(llwchar a) { return a >= U'0' && a <= U'9'; }
 
+    // Has no printed form and no business in a name or a line of text: the C0
+    // and C1 control ranges, and the line and paragraph separators. Format
+    // characters are deliberately absent -- ZWJ and the bidi marks are
+    // load-bearing in the scripts that use them.
+    static bool isNonprintable(llwchar a);
+
     static bool isPunct(char a) { return ispunct((unsigned char)a) != 0; }
     static bool isPunct(llwchar a)
     {
@@ -709,7 +715,6 @@ LL_COMMON_API std::string utf8str_removeCRLF(const std::string& utf8str);
 
 LL_COMMON_API std::string utf8str_showBytesUTF8(const std::string& utf8str);
 
-LL_COMMON_API bool wstring_has_emoji(LLWStringView wstr);
 
 LL_COMMON_API bool wstring_remove_emojis(LLWString& wstr);
 
@@ -1733,52 +1738,34 @@ void LLStringUtilBase<T>::capitalize(string_type& str)
 template<class T>
 bool LLStringUtilBase<T>::containsNonprintable(string_view_type string)
 {
-    const char MIN = 32;
-    bool rv = false;
-    for (size_type i = 0; i < string.size(); i++)
+    for (const T c : string)
     {
-        if(string[i] < MIN)
+        if (LLStringOps::isNonprintable(c))
         {
-            rv = true;
-            break;
+            return true;
         }
     }
-    return rv;
+    return false;
 }
 
-// *TODO: reimplement in terms of algorithm
 //static
 template<class T>
 void LLStringUtilBase<T>::stripNonprintable(string_type& string)
 {
-    const char MIN = 32;
-    size_type j = 0;
-    if (string.empty())
-    {
-        return;
-    }
-    size_t src_size = string.size();
-    char* c_string = new char[src_size + 1];
-    if(c_string == NULL)
-    {
-        return;
-    }
-    copy(c_string, string.c_str(), src_size+1);
-    char* write_head = &c_string[0];
-    for (size_type i = 0; i < src_size; i++)
-    {
-        char* read_head = &string[i];
-        write_head = &c_string[j];
-        if(!(*read_head < MIN))
-        {
-            *write_head = *read_head;
-            ++j;
-        }
-    }
-    c_string[j]= '\0';
-    string = c_string;
-    delete []c_string;
+    string.erase(std::remove_if(string.begin(), string.end(),
+                                [](T c) { return LLStringOps::isNonprintable(c); }),
+                 string.end());
 }
+
+// The narrow forms read UTF-8 rather than bytes. A byte below 0x20 is always a
+// C0 control and so was safe to test on its own, but a control above the ASCII
+// range is two bytes and neither of them looks like one. Defined in
+// llstring.cpp, where the Unicode tables are.
+template<> LL_COMMON_API bool LLStringUtilBase<char>::containsNonprintable(std::string_view string);
+template<> LL_COMMON_API void LLStringUtilBase<char>::stripNonprintable(std::string& string);
+
+// Likewise: uppercasing one byte can only ever reach ASCII.
+template<> LL_COMMON_API void LLStringUtilBase<char>::capitalize(std::string& str);
 
 // *TODO: reimplement in terms of algorithm
 template<class T>

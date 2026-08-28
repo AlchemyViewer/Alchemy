@@ -697,18 +697,6 @@ std::string utf8str_showBytesUTF8(const std::string& utf8str)
     return result;
 }
 
-// Search for any emoji symbol, return true if found
-bool wstring_has_emoji(LLWStringView wstr)
-{
-    for (const llwchar& wch : wstr)
-    {
-        if (LLStringOps::isEmoji(wch))
-            return true;
-    }
-
-    return false;
-}
-
 // Strip every emoji-cluster the cluster walker identifies, plus any isolated
 // astral-emoji codepoint (LLStringOps::isEmoji-true) that the walker excludes
 // because it shapes correctly via the 1:1 path. Sharing the cluster walker
@@ -1875,6 +1863,23 @@ llwchar LLStringOps::toLowerAboveAscii(llwchar elem)
     return (llwchar)u_tolower((UChar32)elem);
 }
 
+bool LLStringOps::isNonprintable(llwchar a)
+{
+    // The ASCII printables are most of most text and never qualify.
+    if (a >= 0x20 && a < 0x7F)
+        return false;
+
+    switch (u_charType((UChar32)a))
+    {
+    case U_CONTROL_CHAR:
+    case U_LINE_SEPARATOR:
+    case U_PARAGRAPH_SEPARATOR:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool LLStringOps::isSpaceAboveAscii(llwchar elem)
 {
     return u_hasBinaryProperty((UChar32)elem, UCHAR_WHITE_SPACE);
@@ -2065,6 +2070,62 @@ S32 LLStringOps::collate(const char* a, const char* b)
 S32 LLStringOps::collate(const llwchar* a, const llwchar* b)
 {
     return collate_wide(a, b, CollatorKind::Plain);
+}
+
+// Malformed UTF-8 counts as unprintable, which is what it is.
+template<>
+bool LLStringUtilBase<char>::containsNonprintable(std::string_view string)
+{
+    const uint8_t* bytes = (const uint8_t*)string.data();
+    const int32_t length = (int32_t)string.size();
+    int32_t at = 0;
+    while (at < length)
+    {
+        UChar32 cp = 0;
+        U8_NEXT(bytes, at, length, cp);
+        if (cp < 0 || LLStringOps::isNonprintable((llwchar)cp))
+            return true;
+    }
+    return false;
+}
+
+template<>
+void LLStringUtilBase<char>::stripNonprintable(std::string& string)
+{
+    if (string.empty())
+        return;
+
+    const uint8_t* bytes = (const uint8_t*)string.data();
+    const int32_t length = (int32_t)string.size();
+    std::string kept;
+    kept.reserve(string.size());
+
+    int32_t at = 0;
+    while (at < length)
+    {
+        const int32_t begin = at;
+        UChar32 cp = 0;
+        U8_NEXT(bytes, at, length, cp);
+        if (cp >= 0 && !LLStringOps::isNonprintable((llwchar)cp))
+        {
+            kept.append(string, (size_t)begin, (size_t)(at - begin));
+        }
+    }
+    string.swap(kept);
+}
+
+// Capitalising a byte can only ever reach ASCII, so the narrow form goes
+// through codepoints. The word rule -- a capital after a space, a hyphen or an
+// underscore -- is the caller's and stays as it is.
+template<>
+void LLStringUtilBase<char>::capitalize(std::string& str)
+{
+    if (str.empty())
+        return;
+
+    LLWString wide = utf8str_to_wstring(str);
+    LLStringUtilBase<llwchar>::capitalize(wide);
+    str = wstring_to_utf8str(wide);
 }
 
 template<>
