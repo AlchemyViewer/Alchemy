@@ -1492,11 +1492,21 @@ S32 LLFontGL::firstDrawableChar(LLWStringView wchars, F32 max_pixels, S32 start_
         (void)shape_gen;
         if (!shape_glyphs.empty())
         {
-            per_cp_advance.assign(start + 1, 0.f);
+            // Negative marks a codepoint that no glyph claimed as its cluster
+            // -- a trailing member of one that began earlier. Zero would say
+            // "a cluster of its own that happens to advance nothing", and the
+            // walk below has to tell those apart: it may stop between the two,
+            // and stopping inside a cluster hands the caller somewhere it must
+            // not start drawing from.
+            per_cp_advance.assign(start + 1, -1.f);
             for (const auto& sg : shape_glyphs)
             {
                 if (sg.cluster >= 0 && sg.cluster <= start)
                 {
+                    if (per_cp_advance[sg.cluster] < 0.f)
+                    {
+                        per_cp_advance[sg.cluster] = 0.f;
+                    }
                     per_cp_advance[sg.cluster] += sg.x_advance;
                     if (sg.cluster == start)
                     {
@@ -1520,9 +1530,10 @@ S32 LLFontGL::firstDrawableChar(LLWStringView wchars, F32 max_pixels, S32 start_
         if (use_shaped)
         {
             // Last cp uses extent so the rightmost glyph stays fully visible.
+            const F32 advance = llmax(0.f, per_cp_advance[i]);
             F32 width = (i == start)
-                        ? llmax(per_cp_last_extent, per_cp_advance[i])
-                        : per_cp_advance[i];
+                        ? llmax(per_cp_last_extent, advance)
+                        : advance;
             if (scaled_max_pixels < (total_width + width))
                 break;
             total_width += width;
@@ -1576,7 +1587,27 @@ S32 LLFontGL::firstDrawableChar(LLWStringView wchars, F32 max_pixels, S32 start_
     {
         // if only 1 character is drawable, we want to return start_pos as the first character to draw
         // if 2 are drawable, return start_pos and character before start_pos, etc.
-        return start_pos + 1 - drawable_chars;
+        S32 first = start_pos + 1 - drawable_chars;
+
+        // The trailing codepoints of a cluster carry no advance, so the walk
+        // above always finds room for them and can then stop at the one that
+        // carries the whole width. That leaves `first` inside a cluster, and
+        // the caller scrolls to it and draws from there -- half an emoji, or a
+        // letter without the mark that belongs to it.
+        //
+        // Back up to where the cluster begins rather than forward past it: the
+        // whole character then shows, clipped, which is what this already does
+        // when nothing fits at all. Going forward could step beyond the
+        // position the caller asked to see.
+        if (use_shaped && first > 0 && first <= start && per_cp_advance[first] < 0.f)
+        {
+            do
+            {
+                --first;
+            }
+            while (first > 0 && per_cp_advance[first] < 0.f);
+        }
+        return first;
     }
 
 }
