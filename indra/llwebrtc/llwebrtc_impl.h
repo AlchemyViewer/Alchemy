@@ -40,7 +40,8 @@
 
 #include "llwebrtc.h"
 #include "alaudiodevicenotifier.h"
-#include <mutex>
+#include "alaudioechobuffer.h"
+#include <memory>
 // WebRTC Includes
 #ifdef WEBRTC_WIN
 #pragma warning(push)
@@ -174,37 +175,17 @@ public:
     float GetMicrophoneEnergy() { return mMicrophoneEnergy.load(std::memory_order_relaxed); }
     void  SetGain(float gain) { mGain.store(gain, std::memory_order_relaxed); }
 
-    // While devices are being previewed there is no engine audio to render, so
-    // capture is held here and played straight back out.  Discards whatever is
-    // buffered on either edge, so previews never begin with stale audio.
-    void SetTuning(bool tuning);
+    // Rendered in place of engine audio while devices are being previewed.
+    // Set during startup, before any audio thread is running.
+    void SetEchoBuffer(std::shared_ptr<ALAudioEchoBuffer> buffer) { mEchoBuffer = std::move(buffer); }
 
 private:
-    // Capture thread.  Keeps the most recent audio, dropping the oldest once
-    // ECHO_BUFFER_MS is exceeded, so the echo tracks the microphone rather
-    // than falling steadily further behind it.
-    void WriteEcho(const int16_t* samples, size_t frames, size_t channels, uint32_t samples_per_sec);
-
-    // Render thread.  Applies the microphone gain so the preview is as loud as
-    // others will hear.  False when nothing usable is buffered -- too little
-    // audio yet, or a capture format the echo cannot be mapped from -- and the
-    // caller renders silence instead.
-    bool ReadEcho(int16_t* out, size_t frames, size_t channels, uint32_t samples_per_sec);
-
     std::atomic<webrtc::AudioTransport*> engine_{ nullptr };
     static const int                     NUM_PACKETS_TO_FILTER = 30; // 300 ms of smoothing (30 frames)
     float                                mSumVector[NUM_PACKETS_TO_FILTER];
     std::atomic<float>                   mMicrophoneEnergy;
     std::atomic<float>                   mGain{ 0.0f };
-
-    static const size_t                  ECHO_BUFFER_MS = 120;
-    std::atomic<bool>                    mTuning{ false };
-    std::mutex                           mEchoMutex;
-    std::vector<int16_t>                 mEchoSamples; // interleaved, mEchoChannels wide
-    size_t                               mEchoRead{ 0 };
-    size_t                               mEchoFill{ 0 };
-    size_t                               mEchoChannels{ 0 };
-    uint32_t                             mEchoSampleRate{ 0 };
+    std::shared_ptr<ALAudioEchoBuffer>   mEchoBuffer;
 };
 
 
@@ -357,6 +338,7 @@ public:
     // tuning microphone energy calculations
     float GetMicrophoneEnergy() { return audio_transport_.GetMicrophoneEnergy(); }
     void SetTuningMicGain(float gain) { audio_transport_.SetGain(gain); }
+    void SetEchoBuffer(std::shared_ptr<ALAudioEchoBuffer> buffer) { audio_transport_.SetEchoBuffer(std::move(buffer)); }
 
     void  SetTuning(bool tuning, bool mute);
 
@@ -400,7 +382,7 @@ using LLCustomProcessorStatePtr = std::shared_ptr<LLCustomProcessorState>;
 class LLCustomProcessor : public webrtc::CustomProcessing
 {
 public:
-    LLCustomProcessor(LLCustomProcessorStatePtr state);
+    LLCustomProcessor(LLCustomProcessorStatePtr state, std::shared_ptr<ALAudioEchoBuffer> echo);
     ~LLCustomProcessor() override {}
 
     // (Re-) Initializes the submodule.
@@ -423,6 +405,7 @@ protected:
     float mSumVector[NUM_PACKETS_TO_FILTER];
     friend LLCustomProcessorState;
     LLCustomProcessorStatePtr mState;
+    std::shared_ptr<ALAudioEchoBuffer> mEchoBuffer;
 };
 
 
@@ -592,8 +575,10 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public ALAudioDeviceNotifie
     // Whether voice is enabled; gates whether the capture/playout devices run.
     bool                                                       mVoiceEnabled;
     float                                                      mGain;
+    float                                                      mTuningGain{ 0.0f };
 
     LLCustomProcessorStatePtr                                  mPeerCustomProcessor;
+    std::shared_ptr<ALAudioEchoBuffer>                         mEchoBuffer;
 
     // peer connections
     std::vector<webrtc::scoped_refptr<LLWebRTCPeerConnectionImpl>> mPeerConnections;

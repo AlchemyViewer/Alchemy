@@ -2,11 +2,13 @@
 
 set(llwebrtc_SOURCE_FILES
     alaudiodevicenotifier.cpp
+    alaudioechobuffer.cpp
     llwebrtc.cpp
     )
 
 set(llwebrtc_HEADER_FILES
     alaudiodevicenotifier.h
+    alaudioechobuffer.h
     llwebrtc.h
     llwebrtc_impl.h
     )

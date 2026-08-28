@@ -121,152 +121,9 @@ int32_t LLWebRTCAudioTransport::RecordedDataIsAvailable(const void* audio_data,
     totalSum += energy;
     mMicrophoneEnergy = std::sqrt(totalSum / (number_of_frames * number_of_channels * buffer_size));
 
-    // 3) While previewing devices, keep a copy to render back to the user.
-    if (mTuning.load(std::memory_order_relaxed))
-    {
-        WriteEcho(samples, number_of_frames, number_of_channels, samples_per_sec);
-    }
-
     return ret;
 }
 
-void LLWebRTCAudioTransport::SetTuning(bool tuning)
-{
-    std::lock_guard<std::mutex> lock(mEchoMutex);
-    mTuning.store(tuning, std::memory_order_relaxed);
-    mEchoSamples.clear();
-    mEchoRead       = 0;
-    mEchoFill       = 0;
-    mEchoChannels   = 0;
-    mEchoSampleRate = 0;
-}
-
-void LLWebRTCAudioTransport::WriteEcho(const int16_t* samples, size_t frames, size_t channels, uint32_t samples_per_sec)
-{
-    if (!samples || !frames || !channels || !samples_per_sec)
-    {
-        return;
-    }
-
-    std::lock_guard<std::mutex> lock(mEchoMutex);
-
-    if (channels != mEchoChannels || samples_per_sec != mEchoSampleRate)
-    {
-        // First block of the preview, or the capture device changed shape.
-        mEchoChannels   = channels;
-        mEchoSampleRate = samples_per_sec;
-        mEchoSamples.assign((samples_per_sec * channels * ECHO_BUFFER_MS) / 1000, 0);
-        mEchoRead = 0;
-        mEchoFill = 0;
-    }
-
-    const size_t capacity = mEchoSamples.size();
-    if (!capacity)
-    {
-        return;
-    }
-
-    // Keep the newest audio when more arrives than fits: an echo that lags is
-    // worse than one that drops.
-    const size_t available = frames * channels;
-    const size_t count     = std::min(available, capacity);
-    const size_t from      = available - count;
-
-    size_t write = (mEchoRead + mEchoFill) % capacity;
-    for (size_t i = 0; i < count; ++i)
-    {
-        mEchoSamples[write] = samples[from + i];
-        write               = (write + 1) % capacity;
-    }
-
-    if (mEchoFill + count > capacity)
-    {
-        mEchoRead = (mEchoRead + (mEchoFill + count - capacity)) % capacity;
-        mEchoFill = capacity;
-    }
-    else
-    {
-        mEchoFill += count;
-    }
-}
-
-bool LLWebRTCAudioTransport::ReadEcho(int16_t* out, size_t frames, size_t channels, uint32_t samples_per_sec)
-{
-    if (!out || !frames || !channels)
-    {
-        return false;
-    }
-
-    std::lock_guard<std::mutex> lock(mEchoMutex);
-
-    // Nothing is resampled here.  Rendering audio captured at another rate
-    // would be heard as noise rather than as the microphone.
-    if (!mEchoChannels || samples_per_sec != mEchoSampleRate)
-    {
-        return false;
-    }
-
-    const size_t capacity = mEchoSamples.size();
-    const size_t needed   = frames * mEchoChannels;
-    if (!capacity || mEchoFill < needed)
-    {
-        return false;
-    }
-
-    // Render at the gain the peer path applies, so the preview is as loud as
-    // the microphone will actually be to others.  Read once per block: within
-    // one 10ms block the gain is constant, so a slider drag steps at block
-    // boundaries rather than part way through a waveform.
-    const float gain = mGain.load(std::memory_order_relaxed);
-
-    auto scaled = [gain](int32_t sample) -> int16_t
-    {
-        const float value = static_cast<float>(sample) * gain;
-        if (value >= 32767.0f)
-        {
-            return 32767;
-        }
-        if (value <= -32768.0f)
-        {
-            return -32768;
-        }
-        return static_cast<int16_t>(value);
-    };
-
-    if (channels == mEchoChannels)
-    {
-        for (size_t i = 0; i < needed; ++i)
-        {
-            out[i] = scaled(mEchoSamples[(mEchoRead + i) % capacity]);
-        }
-    }
-    else if (mEchoChannels == 1 && channels == 2)
-    {
-        for (size_t frame = 0; frame < frames; ++frame)
-        {
-            const int16_t sample = scaled(mEchoSamples[(mEchoRead + frame) % capacity]);
-            out[frame * 2]       = sample;
-            out[frame * 2 + 1]   = sample;
-        }
-    }
-    else if (mEchoChannels == 2 && channels == 1)
-    {
-        for (size_t frame = 0; frame < frames; ++frame)
-        {
-            const int32_t left  = mEchoSamples[(mEchoRead + frame * 2) % capacity];
-            const int32_t right = mEchoSamples[(mEchoRead + frame * 2 + 1) % capacity];
-            out[frame]          = scaled((left + right) / 2);
-        }
-    }
-    else
-    {
-        return false;
-    }
-
-    mEchoRead = (mEchoRead + needed) % capacity;
-    mEchoFill -= needed;
-    return true;
-}
 
 int32_t LLWebRTCAudioTransport::NeedMorePlayData(size_t   number_of_frames,
                                                  size_t   bytes_per_frame,
@@ -283,9 +140,9 @@ int32_t LLWebRTCAudioTransport::NeedMorePlayData(size_t   number_of_frames,
 
     // While previewing devices there is no engine audio to render, so play the
     // captured audio back instead.
-    if (mTuning.load(std::memory_order_relaxed))
+    if (mEchoBuffer && mEchoBuffer->enabled())
     {
-        if (!ReadEcho(static_cast<int16_t*>(audio_data), number_of_frames, number_of_channels, samples_per_sec))
+        if (!mEchoBuffer->read(static_cast<int16_t*>(audio_data), number_of_frames, number_of_channels, samples_per_sec))
         {
             memset(audio_data, 0, bytes);
         }
@@ -330,7 +187,8 @@ void LLWebRTCAudioTransport::PullRenderData(int      bits_per_sample,
     }
 }
 
-LLCustomProcessor::LLCustomProcessor(LLCustomProcessorStatePtr state) : mSampleRateHz(0), mNumChannels(0), mState(state)
+LLCustomProcessor::LLCustomProcessor(LLCustomProcessorStatePtr state, std::shared_ptr<ALAudioEchoBuffer> echo)
+    : mSampleRateHz(0), mNumChannels(0), mState(state), mEchoBuffer(std::move(echo))
 {
     memset(mSumVector, 0, sizeof(mSumVector));
 }
@@ -410,6 +268,13 @@ void LLCustomProcessor::Process(webrtc::AudioBuffer *audio)
     mSumVector[i] = energy;
     totalSum += energy;
     mState->setMicrophoneEnergy(std::sqrt(totalSum / (audio->num_channels() * audio->num_frames() * buffer_size)));
+
+    // Hand the processed capture to the preview, which renders it back so
+    // the user hears themselves as the far side will.
+    if (mEchoBuffer && mEchoBuffer->enabled())
+    {
+        mEchoBuffer->write(chans, audio->num_channels(), audio->num_frames(), static_cast<uint32_t>(mSampleRateHz));
+    }
 }
 
 
@@ -420,7 +285,6 @@ void LLCustomProcessor::Process(webrtc::AudioBuffer *audio)
 void LLWebRTCAudioDeviceModule::SetTuning(bool tuning, bool mute)
 {
     tuning_ = tuning;
-    audio_transport_.SetTuning(tuning);
     if (tuning)
     {
         // Ensure capture is running (it's normally already running -- capture is
@@ -477,12 +341,17 @@ void LLWebRTCImpl::init()
     mSignalingThread->SetName("WebRTCSignalingThread", nullptr);
     mSignalingThread->Start();
 
+    // Shared by the processing chain, which fills it, and the device module,
+    // which renders it back while previewing devices.
+    mEchoBuffer = std::make_shared<ALAudioEchoBuffer>();
+
     mWorkerThread->BlockingCall(
         [this]()
         {
             webrtc::scoped_refptr<webrtc::AudioDeviceModule> realADM =
                 webrtc::CreateAudioDeviceModule(mEnv, webrtc::AudioDeviceModule::AudioLayer::kPlatformDefaultAudio);
             mDeviceModule = webrtc::make_ref_counted<LLWebRTCAudioDeviceModule>(realADM);
+            mDeviceModule->SetEchoBuffer(mEchoBuffer);
             // Created here, and destroyed on this same thread in terminate(),
             // because Windows balances its COM initialization per thread.
             mDeviceNotifier = ALAudioDeviceNotifier::create(this);
@@ -500,7 +369,7 @@ void LLWebRTCImpl::init()
     // from after other audio processing such as AEC, AGC, etc.
     mPeerCustomProcessor = std::make_shared<LLCustomProcessorState>();
     webrtc::BuiltinAudioProcessingBuilder apb;
-    apb.SetCapturePostProcessing(std::make_unique<LLCustomProcessor>(mPeerCustomProcessor));
+    apb.SetCapturePostProcessing(std::make_unique<LLCustomProcessor>(mPeerCustomProcessor, mEchoBuffer));
     mAudioProcessingModule = apb.Build(webrtc::CreateEnvironment());
 
     // Initial software-APM state, matching setAudioConfig() so there's no
@@ -1057,12 +926,19 @@ void LLWebRTCImpl::OnDevicesUpdated()
 void LLWebRTCImpl::setTuningMode(bool enable)
 {
     mTuningMode = enable;
-    if (!mTuningMode
-        && !mMute
-        && mPeerCustomProcessor
-        && mPeerCustomProcessor->getGain() != mGain)
+    if (mEchoBuffer)
     {
-        mPeerCustomProcessor->setGain(mGain);
+        mEchoBuffer->setEnabled(enable);
+    }
+    if (mTuningMode && mPeerCustomProcessor)
+    {
+        mPeerCustomProcessor->setGain(mTuningGain);
+    }
+    if (!mTuningMode && mPeerCustomProcessor)
+    {
+        // The preview borrowed this gain; hand it back to the peer path, which
+        // owns whether the microphone is muted.
+        mPeerCustomProcessor->setGain(mMute ? 0.0f : mGain);
     }
     mWorkerThread->PostTask(
         [this]
@@ -1116,9 +992,24 @@ float LLWebRTCImpl::getTuningAudioLevel()
 
 void LLWebRTCImpl::setTuningMicGain(float gain)
 {
-    if (mTuningMode && mDeviceModule)
+    // Remembered whether or not a preview is running, so one that arrives
+    // before the preview opens is not lost.
+    mTuningGain = gain;
+    if (mDeviceModule)
     {
         mDeviceModule->SetTuningMicGain(gain);
+    }
+    if (mTuningMode)
+    {
+        if (mPeerCustomProcessor)
+        {
+            // The preview renders from the end of the processing chain, so this
+            // is the gain the user hears there.  Drive it from the preview
+            // rather than leaving it wherever mute left it, which would render
+            // silence.  Nothing is transmitted meanwhile: the sender tracks are
+            // disabled for as long as the preview runs.
+            mPeerCustomProcessor->setGain(gain);
+        }
     }
 }
 
@@ -1155,6 +1046,13 @@ void LLWebRTCImpl::intSetMute(bool mute, int delay_ms)
     // muting/unmuting never stops or starts it -- that's what avoids the AEC
     // cold-start hiss on unmute.  Capture start/stop is tied to device
     // selection (workerStartRecording) and shutdown, not to mute.
+    if (mTuningMode)
+    {
+        // The preview owns this gain while it runs, and restores the peer
+        // path's on the way out.  Nothing is transmitted meanwhile: the sender
+        // tracks are disabled for the duration.
+        return;
+    }
     if (mPeerCustomProcessor)
     {
         mPeerCustomProcessor->setGain(mMute ? 0.0f : mGain);
