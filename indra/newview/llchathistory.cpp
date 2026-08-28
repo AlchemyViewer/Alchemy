@@ -1380,7 +1380,11 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
     LLUIColor txt_color = LLUIColorTable::instance().getColor("White");
     LLUIColor name_color = LLUIColorTable::instance().getColor("ChatHeaderDisplayNameColor"); // <alchemy/>
     LLViewerChat::getChatColor(chat, txt_color, alpha);
-    const bool irc_name_color = ALAvatarGroups::instance().getIRCNameColor(chat, name_color);
+    const bool irc_name_color = chat.mSourceType == CHAT_SOURCE_AGENT
+        && chat.mFromID.notNull()
+        && chat.mFromID != gAgentID
+        && chat.mFromName != SYSTEM_FROM
+        && ALAvatarGroups::instance().getIRCNameColor(chat, name_color);
 
     LLFontGL* fontp = LLViewerChat::getChatFont();
     std::string font_name = LLFontGL::nameFromFont(fontp);

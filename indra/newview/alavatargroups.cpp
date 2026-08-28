@@ -330,9 +330,13 @@ bool ALAvatarGroups::getIRCNameColor(const LLChat& chat, LLUIColor& color)
         return false;
     }
 
-    // Keep the default name styling while restricted from seeing this speaker's
-    // name, matching getIRCChatColor.
-    if (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, chat.mFromID))
+    // Only override names for the same other-agent messages whose chat color is
+    // overridden by getIRCChatColor.
+    if (chat.mSourceType != CHAT_SOURCE_AGENT
+        || chat.mFromID.isNull()
+        || chat.mFromID == gAgentID
+        || chat.mFromName == SYSTEM_FROM
+        || !RlvActions::canShowName(RlvActions::SNC_DEFAULT, chat.mFromID))
     {
         return false;
     }

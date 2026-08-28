@@ -3090,12 +3090,14 @@ void LLPanelPreferenceColors::draw()
     static const char* const color_names[] = {
         "UserChatColor", "AgentChatColor", "FriendChatColor", "SystemChatColor",
         "ObjectChatColor", "llOwnerSayChatColor", "LindenChatColor", "HTMLLinkColor",
+        "ChatHeaderTimestampColor",
     };
     std::string signature;
     for (const char* name : color_names)
     {
         const LLColor4& c = LLUIColorTable::instance().getColor(name).get();
-        signature += llformat("%.3f,%.3f,%.3f;", c.mV[VRED], c.mV[VGREEN], c.mV[VBLUE]);
+        signature += llformat("%.3f,%.3f,%.3f,%.3f;",
+            c.mV[VRED], c.mV[VGREEN], c.mV[VBLUE], c.mV[VALPHA]);
     }
     signature += llformat("%d;%.3f;%.3f;%.3f;%d",
         gSavedSettings.getBOOL("AlchemyChatIRCColorsEnabled") ? 1 : 0,
@@ -3145,7 +3147,7 @@ void LLPanelPreferenceColors::updatePreview()
         { K_OWNER,    "llOwnerSayChatColor", "e5e5e5e5-0000-0000-0000-000000000005", 13, 49, "Animation HUD",           "Memory Free: 2167 KiB :)" },
     };
 
-    static const LLUIColor time_color = LLUIColorTable::instance().getColor("ChatHeaderTimestampColor");
+    const LLUIColor time_color = LLUIColorTable::instance().getColor("ChatHeaderTimestampColor");
     const bool use_24h = gSavedSettings.getBOOL("Use24HourClock");
 
     mPreviewEditor->clear();   // clear before re-appending
