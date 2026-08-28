@@ -537,7 +537,7 @@ void LLWebRTCVoiceClient::updateSettings()
         static LLCachedControl<U32> sNoiseSuppressionLevel(
             gSavedSettings,
             "VoiceNoiseSuppressionLevel",
-            llwebrtc::LLWebRTCDeviceInterface::AudioConfig::ENoiseSuppressionLevel::NOISE_SUPPRESSION_LEVEL_VERY_HIGH);
+            llwebrtc::LLWebRTCDeviceInterface::AudioConfig::ENoiseSuppressionLevel::NOISE_SUPPRESSION_LEVEL_HIGH);
         auto noiseSuppressionLevel =
             (llwebrtc::LLWebRTCDeviceInterface::AudioConfig::ENoiseSuppressionLevel)(U32)sNoiseSuppressionLevel;
         if (noiseSuppressionLevel != config.mNoiseSuppressionLevel)

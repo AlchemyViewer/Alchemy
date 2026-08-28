@@ -184,7 +184,8 @@ private:
     static const int                     NUM_PACKETS_TO_FILTER = 30; // 300 ms of smoothing (30 frames)
     float                                mSumVector[NUM_PACKETS_TO_FILTER];
     std::atomic<float>                   mMicrophoneEnergy;
-    std::atomic<float>                   mGain{ 0.0f };
+    std::atomic<float>                   mGain{ 1.0f };
+    std::vector<int16_t>                 mTrimmed; // capture thread only
     std::shared_ptr<ALAudioEchoBuffer>   mEchoBuffer;
 };
 
@@ -337,7 +338,7 @@ public:
 
     // tuning microphone energy calculations
     float GetMicrophoneEnergy() { return audio_transport_.GetMicrophoneEnergy(); }
-    void SetTuningMicGain(float gain) { audio_transport_.SetGain(gain); }
+    void SetMicGain(float gain) { audio_transport_.SetGain(gain); }
     void SetEchoBuffer(std::shared_ptr<ALAudioEchoBuffer> buffer) { audio_transport_.SetEchoBuffer(std::move(buffer)); }
 
     void  SetTuning(bool tuning, bool mute);

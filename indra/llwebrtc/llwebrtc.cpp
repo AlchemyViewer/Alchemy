@@ -79,12 +79,36 @@ int32_t LLWebRTCAudioTransport::RecordedDataIsAvailable(const void* audio_data,
                                                         uint32_t&   new_mic_level)
 {
     auto* engine = engine_.load(std::memory_order_acquire);
+    const short* samples = (const short *) audio_data;
 
-    // 1) Deliver to engine (authoritative).
+    // 1) Trim to the level the user asked for, before the processing module
+    // sees it.  Trimming afterwards would fight the automatic gain control,
+    // which has already levelled the signal by then, and only reach the far
+    // side as clipping.
+    const void* trimmed_data = audio_data;
+    const float trim         = mGain.load(std::memory_order_relaxed);
+    if (trim != 1.0f)
+    {
+        const size_t count = number_of_frames * number_of_channels;
+        if (mTrimmed.size() < count)
+        {
+            mTrimmed.resize(count);
+        }
+        for (size_t index = 0; index < count; index++)
+        {
+            const float scaled = static_cast<float>(samples[index]) * trim;
+            mTrimmed[index]    = scaled >= 32767.0f    ? 32767
+                                 : scaled <= -32768.0f ? -32768
+                                                       : static_cast<int16_t>(scaled);
+        }
+        trimmed_data = mTrimmed.data();
+    }
+
+    // 2) Deliver to engine (authoritative).
     int32_t ret = 0;
     if (engine)
     {
-        ret = engine->RecordedDataIsAvailable(audio_data,
+        ret = engine->RecordedDataIsAvailable(trimmed_data,
                                               number_of_frames,
                                               bytes_per_frame,
                                               number_of_channels,
@@ -96,10 +120,9 @@ int32_t LLWebRTCAudioTransport::RecordedDataIsAvailable(const void* audio_data,
                                               new_mic_level);
     }
 
-    // 2) Calculate energy for microphone level monitoring
+    // 3) Calculate energy for microphone level monitoring
     // calculate the energy
-    float        energy  = 0;
-    const short *samples = (const short *) audio_data;
+    float energy = 0;
 
     for (size_t index = 0; index < number_of_frames * number_of_channels; index++)
     {
@@ -393,7 +416,7 @@ void LLWebRTCImpl::init()
     apm_config.gain_controller2.adaptive_digital.enabled = true; // auto-level speech
     apm_config.high_pass_filter.enabled                  = true;
     apm_config.noise_suppression.enabled                 = true;
-    apm_config.noise_suppression.level                   = webrtc::AudioProcessing::Config::NoiseSuppression::kVeryHigh;
+    apm_config.noise_suppression.level                   = webrtc::AudioProcessing::Config::NoiseSuppression::kHigh;
     apm_config.transient_suppression.enabled             = true;
     apm_config.pipeline.multi_channel_render             = true;
     apm_config.pipeline.multi_channel_capture            = true;
@@ -940,15 +963,17 @@ void LLWebRTCImpl::setTuningMode(bool enable)
     {
         mEchoBuffer->setEnabled(enable);
     }
-    if (mTuningMode && mPeerCustomProcessor)
+    if (mPeerCustomProcessor)
     {
-        mPeerCustomProcessor->setGain(mTuningGain);
+        // A preview exists to be heard, so it is never muted; on the way out
+        // the peer path decides again.
+        mPeerCustomProcessor->setGain(enable ? 1.0f : (mMute ? 0.0f : 1.0f));
     }
-    if (!mTuningMode && mPeerCustomProcessor)
+    if (mDeviceModule)
     {
-        // The preview borrowed this gain; hand it back to the peer path, which
-        // owns whether the microphone is muted.
-        mPeerCustomProcessor->setGain(mMute ? 0.0f : mGain);
+        // The preview trims capture with its own slider, and hands the peer
+        // path's trim back when it closes.
+        mDeviceModule->SetMicGain(enable ? mTuningGain : mGain);
     }
     mWorkerThread->PostTask(
         [this]
@@ -1005,21 +1030,9 @@ void LLWebRTCImpl::setTuningMicGain(float gain)
     // Remembered whether or not a preview is running, so one that arrives
     // before the preview opens is not lost.
     mTuningGain = gain;
-    if (mDeviceModule)
+    if (mTuningMode && mDeviceModule)
     {
-        mDeviceModule->SetTuningMicGain(gain);
-    }
-    if (mTuningMode)
-    {
-        if (mPeerCustomProcessor)
-        {
-            // The preview renders from the end of the processing chain, so this
-            // is the gain the user hears there.  Drive it from the preview
-            // rather than leaving it wherever mute left it, which would render
-            // silence.  Nothing is transmitted meanwhile: the sender tracks are
-            // disabled for as long as the preview runs.
-            mPeerCustomProcessor->setGain(gain);
-        }
+        mDeviceModule->SetMicGain(gain);
     }
 }
 
@@ -1033,9 +1046,9 @@ float LLWebRTCImpl::getPeerConnectionAudioLevel()
 void LLWebRTCImpl::setMicGain(float gain)
 {
     mGain = gain;
-    if (!mTuningMode && mPeerCustomProcessor)
+    if (!mTuningMode && mDeviceModule)
     {
-        mPeerCustomProcessor->setGain(gain);
+        mDeviceModule->SetMicGain(gain);
     }
 }
 
@@ -1065,7 +1078,9 @@ void LLWebRTCImpl::intSetMute(bool mute, int delay_ms)
     }
     if (mPeerCustomProcessor)
     {
-        mPeerCustomProcessor->setGain(mMute ? 0.0f : mGain);
+        // Gain is applied ahead of the processing module now; all this stage
+        // decides is whether the result reaches anyone.
+        mPeerCustomProcessor->setGain(mMute ? 0.0f : 1.0f);
     }
 }
 

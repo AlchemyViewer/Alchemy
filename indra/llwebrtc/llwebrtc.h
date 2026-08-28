@@ -139,7 +139,7 @@ class LLWebRTCDeviceInterface
             NOISE_SUPPRESSION_LEVEL_HIGH,
             NOISE_SUPPRESSION_LEVEL_VERY_HIGH
         } ENoiseSuppressionLevel;
-        ENoiseSuppressionLevel mNoiseSuppressionLevel { NOISE_SUPPRESSION_LEVEL_VERY_HIGH };
+        ENoiseSuppressionLevel mNoiseSuppressionLevel { NOISE_SUPPRESSION_LEVEL_HIGH };
     };
 
     virtual void setAudioConfig(AudioConfig config) = 0;
