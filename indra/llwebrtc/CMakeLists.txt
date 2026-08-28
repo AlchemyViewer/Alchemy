@@ -1,10 +1,12 @@
 # -*- cmake -*-
 
 set(llwebrtc_SOURCE_FILES
+    alaudiodevicenotifier.cpp
     llwebrtc.cpp
     )
 
 set(llwebrtc_HEADER_FILES
+    alaudiodevicenotifier.h
     llwebrtc.h
     llwebrtc_impl.h
     )
@@ -29,7 +31,8 @@ if (WINDOWS)
                                        wmcodecdspuuid
                                        msdmo
                                        strmiids
-                                       iphlpapi)
+                                       iphlpapi
+                                       ole32)
 
     if (USE_BUGSPLAT)
         set_target_properties(llwebrtc PROPERTIES PDB_OUTPUT_DIRECTORY "${SYMBOLS_STAGING_DIR}")
@@ -57,7 +60,7 @@ elseif(DARWIN)
         endif()
     endif (USE_BUGSPLAT)
 else()
-    target_link_libraries(llwebrtc PRIVATE ll::webrtc)
+    target_link_libraries(llwebrtc PRIVATE ll::webrtc ${CMAKE_DL_LIBS})
     target_compile_options(llwebrtc PRIVATE -Wno-deprecated-declarations) # webrtc::CreateAudioDeviceWithDataObserver is deprecated
 endif (WINDOWS)
 

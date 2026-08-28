@@ -150,7 +150,19 @@
       "name": "vlc-bin",
       "platform": "windows | osx"
     },
-    "webrtc-bin",
+    {
+      "name": "webrtc",
+      "features": [
+        {
+          "name": "alsa",
+          "platform": "linux"
+        },
+        {
+          "name": "pulseaudio",
+          "platform": "linux"
+        }
+      ]
+    },
     "websocketpp",
     "xxhash",
     "zlib"

@@ -12,3 +12,7 @@ endif()
 if(PORT MATCHES "openal-soft")
     set(VCPKG_LIBRARY_LINKAGE dynamic)
 endif()
+
+if(PORT MATCHES "^webrtc$")
+    set(VCPKG_BUILD_TYPE release)
+endif()

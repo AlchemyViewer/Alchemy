@@ -30,6 +30,7 @@
 #include <future>
 #include <thread>
 #include <string.h>
+#include "api/audio/create_audio_device_module.h"
 #include "api/audio_codecs/audio_decoder_factory.h"
 #include "api/audio_codecs/audio_encoder_factory.h"
 #include "api/audio_codecs/builtin_audio_decoder_factory.h"
@@ -322,10 +323,11 @@ void LLWebRTCImpl::init()
         [this]()
         {
             webrtc::scoped_refptr<webrtc::AudioDeviceModule> realADM =
-                webrtc::AudioDeviceModule::Create(webrtc::AudioDeviceModule::AudioLayer::kPlatformDefaultAudio,
-                                                  &mEnv.task_queue_factory());
+                webrtc::CreateAudioDeviceModule(mEnv, webrtc::AudioDeviceModule::AudioLayer::kPlatformDefaultAudio);
             mDeviceModule = webrtc::make_ref_counted<LLWebRTCAudioDeviceModule>(realADM);
-            mDeviceModule->SetObserver(this);
+            // Created here, and destroyed on this same thread in terminate(),
+            // because Windows balances its COM initialization per thread.
+            mDeviceNotifier = ALAudioDeviceNotifier::create(this);
             mDeviceModule->Init();
 
             mBuiltinNS = mDeviceModule->BuiltInNSIsAvailable();
@@ -349,7 +351,6 @@ void LLWebRTCImpl::init()
     // disabled), so enable echo cancellation from the very first frame.
     webrtc::AudioProcessing::Config apm_config;
     apm_config.echo_canceller.enabled                    = true;
-    apm_config.echo_canceller.mobile_mode                = false;
     apm_config.gain_controller1.enabled                  = false;
     apm_config.gain_controller2.enabled                  = true;
     apm_config.gain_controller2.adaptive_digital.enabled = true; // auto-level speech
@@ -414,10 +415,7 @@ bool LLWebRTCImpl::terminate()
     // shutdown_thread, if detached, can outlive observer.
     mWorkerThread->BlockingCall([this]()
     {
-        if (mDeviceModule)
-        {
-            mDeviceModule->SetObserver(nullptr);
-        }
+        mDeviceNotifier.reset();
     });
     mVoiceDevicesObserverList.clear();
 
@@ -554,7 +552,6 @@ void LLWebRTCImpl::setAudioConfig(LLWebRTCDeviceInterface::AudioConfig config)
     // requested config without deferring to any built-in processor.
     webrtc::AudioProcessing::Config apm_config;
     apm_config.echo_canceller.enabled                    = config.mEchoCancellation;
-    apm_config.echo_canceller.mobile_mode                = false;
     apm_config.gain_controller1.enabled                  = false;
     apm_config.gain_controller2.enabled                  = config.mAGC;
     apm_config.gain_controller2.adaptive_digital.enabled = true; // auto-level speech
@@ -892,8 +889,8 @@ void LLWebRTCImpl::updateDevices()
 
 void LLWebRTCImpl::OnDevicesUpdated()
 {
-    // OnDevicesUpdated() is called on macOS CoreAudio's device-change callback
-    // thread.  Calling updateDevices() on that thread causes a deadlock.
+    // OnDevicesUpdated() arrives on a platform callback thread.  Calling
+    // updateDevices() from there causes a deadlock.
     mWorkerThread->PostTask([this] { updateDevices(); });
 }
 

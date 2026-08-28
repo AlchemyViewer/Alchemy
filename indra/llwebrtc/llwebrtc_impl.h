@@ -39,6 +39,7 @@
 #endif
 
 #include "llwebrtc.h"
+#include "alaudiodevicenotifier.h"
 // WebRTC Includes
 #ifdef WEBRTC_WIN
 #pragma warning(push)
@@ -331,10 +332,6 @@ public:
     virtual int GetRecordAudioParameters(AudioParameters* params) override { return inner_->GetRecordAudioParameters(params); }
 #endif // WEBRTC_IOS
 
-    virtual int32_t GetPlayoutDevice() const override { return inner_->GetPlayoutDevice(); }
-    virtual int32_t GetRecordingDevice() const override { return inner_->GetRecordingDevice(); }
-    virtual int32_t SetObserver(webrtc::AudioDeviceObserver* observer) override { return inner_->SetObserver(observer); }
-
     // tuning microphone energy calculations
     float GetMicrophoneEnergy() { return audio_transport_.GetMicrophoneEnergy(); }
     void SetTuningMicGain(float gain) { audio_transport_.SetGain(gain); }
@@ -409,7 +406,7 @@ protected:
 
 // Primary singleton implementation for interfacing
 // with the native webrtc library.
-class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceObserver
+class LLWebRTCImpl : public LLWebRTCDeviceInterface, public ALAudioDeviceNotifier::Observer
 {
   public:
     LLWebRTCImpl(LLWebRTCLogCallback* logCallback);
@@ -455,7 +452,7 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceO
     void intSetMute(bool mute, int delay_ms = 20);
 
     //
-    // AudioDeviceObserver
+    // ALAudioDeviceNotifier::Observer
     //
     void OnDevicesUpdated() override;
 
@@ -554,6 +551,7 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public webrtc::AudioDeviceO
     void deployDevices();
     std::atomic<int>                                           mDevicesDeploying;
     webrtc::scoped_refptr<LLWebRTCAudioDeviceModule>           mDeviceModule;
+    std::unique_ptr<ALAudioDeviceNotifier>                     mDeviceNotifier;
     std::vector<LLWebRTCDevicesObserver *>                     mVoiceDevicesObserverList;
 
     bool mBuiltinNS;
