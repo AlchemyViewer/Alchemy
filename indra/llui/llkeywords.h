@@ -175,32 +175,12 @@ public:
                     const std::string& tool_tip = LLStringUtil::null,
                     const std::string& delimiter = LLStringUtil::null);
 
-    // This class is here as a performance optimization.
-    // The word token map used to be defined as std::map<LLWString, LLKeywordToken*>.
-    // This worked, but caused a performance bottleneck due to memory allocation and string copies
-    //  because it's not possible to search such a map without creating an LLWString.
-    // Using this class as the map index instead allows us to search using segments of an existing
-    //  text run without copying them first, which greatly reduces overhead in LLKeywords::findSegments().
-    class WStringMapIndex
-    {
-    public:
-        // copy constructor
-        WStringMapIndex(const WStringMapIndex& other);
-        // constructor from a string (copies the string's data into the new object)
-        WStringMapIndex(const LLWString& str);
-        // constructor from pointer and length
-        // NOTE: does NOT copy data, caller must ensure that the lifetime of the pointer exceeds that of the new object!
-        WStringMapIndex(const llwchar *start, size_t length);
-        ~WStringMapIndex();
-        bool operator<(const WStringMapIndex &other) const;
-    private:
-        void copyData(const llwchar *start, size_t length);
-        const llwchar *mData;
-        size_t mLength;
-        bool mOwner;
-    };
-
-    typedef std::map<WStringMapIndex, LLKeywordToken*> word_token_map_t;
+    // Searched with a view onto a span of the text being highlighted, so a
+    // lookup copies nothing. std::less<> is what allows that: without a
+    // transparent comparator, find() has to be handed a whole LLWString built
+    // for the purpose, once per word per redraw, which is what the hand-rolled
+    // index class that used to sit here existed to avoid.
+    typedef std::map<LLWString, LLKeywordToken*, std::less<>> word_token_map_t;
     typedef word_token_map_t::const_iterator keyword_iterator_t;
     keyword_iterator_t begin() const { return mWordTokenMap.begin(); }
     keyword_iterator_t end() const { return mWordTokenMap.end(); }

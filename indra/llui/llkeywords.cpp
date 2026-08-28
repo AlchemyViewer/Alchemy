@@ -419,91 +419,6 @@ void LLKeywords::processTokensGroup(const LLSD& tokens, std::string_view group)
     }
 }
 
-LLKeywords::WStringMapIndex::WStringMapIndex(const WStringMapIndex& other)
-{
-    if(other.mOwner)
-    {
-        copyData(other.mData, other.mLength);
-    }
-    else
-    {
-        mOwner = false;
-        mLength = other.mLength;
-        mData = other.mData;
-    }
-}
-
-LLKeywords::WStringMapIndex::WStringMapIndex(const LLWString& str)
-{
-    copyData(str.data(), str.size());
-}
-
-LLKeywords::WStringMapIndex::WStringMapIndex(const llwchar *start, size_t length)
-:   mData(start)
-,   mLength(length)
-,   mOwner(false)
-{
-}
-
-LLKeywords::WStringMapIndex::~WStringMapIndex()
-{
-    if (mOwner)
-    {
-        delete[] mData;
-    }
-}
-
-void LLKeywords::WStringMapIndex::copyData(const llwchar *start, size_t length)
-{
-    llwchar *data = new llwchar[length];
-    memcpy((void*)data, (const void*)start, length * sizeof(llwchar));
-
-    mOwner = true;
-    mLength = length;
-    mData = data;
-}
-
-bool LLKeywords::WStringMapIndex::operator<(const LLKeywords::WStringMapIndex &other) const
-{
-    // NOTE: Since this is only used to organize a std::map, it doesn't matter if it uses correct collate order or not.
-    // The comparison only needs to strictly order all possible strings, and be stable.
-
-    bool result = false;
-    const llwchar* self_iter = mData;
-    const llwchar* self_end = mData + mLength;
-    const llwchar* other_iter = other.mData;
-    const llwchar* other_end = other.mData + other.mLength;
-
-    while(true)
-    {
-        if(other_iter >= other_end)
-        {
-            // We've hit the end of other.
-            // This covers two cases: other being shorter than self, or the strings being equal.
-            // In either case, we want to return false.
-            result = false;
-            break;
-        }
-        else if(self_iter >= self_end)
-        {
-            // self is shorter than other.
-            result = true;
-            break;
-        }
-        else if(*self_iter != *other_iter)
-        {
-            // The current character differs.  The strings are not equal.
-            result = *self_iter < *other_iter;
-            break;
-        }
-
-        self_iter++;
-        other_iter++;
-    }
-
-    return result;
-}
-
 constexpr size_t AVERAGE_SEGMENT_LENGTH = 8;
 
 void LLKeywords::collectSegmentOps(segment_ops_t& ops, const LLWString& wtext, bool disable_syntax_highlighting) const
@@ -786,7 +701,7 @@ void LLKeywords::collectSegmentOps(segment_ops_t& ops, const LLWString& wtext, b
                     S32 seg_end = seg_start + seg_len;
 
                     // First try to match the whole token (including dots for Lua namespaces)
-                    word_token_map_t::const_iterator map_iter = mWordTokenMap.find(WStringMapIndex(word_start, seg_len));
+                    word_token_map_t::const_iterator map_iter = mWordTokenMap.find(LLWStringView(word_start, seg_len));
 
                     if (map_iter != mWordTokenMap.end())
                     {
@@ -801,7 +716,7 @@ void LLKeywords::collectSegmentOps(segment_ops_t& ops, const LLWString& wtext, b
                         {
                             // Get the namespace prefix (part before the first dot)
                             S32 prefix_len = (S32)(last_dot - word_start);
-                            map_iter = mWordTokenMap.find(WStringMapIndex(word_start, prefix_len));
+                            map_iter = mWordTokenMap.find(LLWStringView(word_start, prefix_len));
 
                             if (map_iter != mWordTokenMap.end())
                             {
@@ -815,7 +730,7 @@ void LLKeywords::collectSegmentOps(segment_ops_t& ops, const LLWString& wtext, b
                                 if (func_len > 0)
                                 {
                                     // Look for complete function matches
-                                    map_iter = mWordTokenMap.find(WStringMapIndex(func_part, func_len));
+                                    map_iter = mWordTokenMap.find(LLWStringView(func_part, func_len));
 
                                     if (map_iter != mWordTokenMap.end())
                                     {

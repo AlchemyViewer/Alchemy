@@ -69,6 +69,7 @@ const F32   TRIPLE_CLICK_INTERVAL = 0.3f;   // delay between double and triple c
 const F32   SPELLCHECK_DELAY = 0.5f;    // delay between the last keypress and spell checking the word the cursor is on
 
 const std::string PASSWORD_ASTERISK( "\xE2\x80\xA2" ); // U+2022 BULLET
+const llwchar PASSWORD_ASTERISK_CHAR = 0x2022;         // the same bullet, for the wide side
 
 static LLDefaultChildRegistry::Register<LLLineEditor> r1("line_editor");
 
@@ -529,8 +530,7 @@ bool LLLineEditor::dragSelectCursorTo(S32 local_mouse_x)
         LLWStringView wtext = text;
         if (mDrawAsterixes)
         {
-            for (S32 i = 0; i < mText.length(); i++)
-                asterix_text += utf8str_to_wstring(PASSWORD_ASTERISK);
+            asterix_text.assign(mText.length(), PASSWORD_ASTERISK_CHAR);
             wtext = asterix_text;
         }
         const S32 left_offset = (S32)range.first - mScrollHPos;
@@ -2398,10 +2398,7 @@ S32 LLLineEditor::calcCursorPos(S32 mouse_x)
     LLWStringView wtext = mText.getWString();
     if (mDrawAsterixes)
     {
-        for (S32 i = 0; i < mText.length(); i++)
-        {
-            asterix_text += utf8str_to_wstring(PASSWORD_ASTERISK);
-        }
+        asterix_text.assign(mText.length(), PASSWORD_ASTERISK_CHAR);
         wtext = asterix_text;
     }
 
