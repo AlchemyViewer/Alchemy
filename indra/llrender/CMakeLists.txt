@@ -176,6 +176,9 @@ if (BUILD_TESTING)
         "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
   endif()
   if (TARGET INTEGRATION_TEST_alfontshaping)
+    # Both Unicode tables in one place, so the test can hold them against each
+    # other. llrender itself has no need of ICU.
+    target_link_libraries(INTEGRATION_TEST_alfontshaping ll::icu)
     target_compile_definitions(INTEGRATION_TEST_alfontshaping PRIVATE
         "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
   endif()

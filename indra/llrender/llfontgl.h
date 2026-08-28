@@ -154,6 +154,12 @@ public:
     // string passes a subview rather than a pointer plus a character budget the
     // callee cannot check. A bare llwchar* still converts (it is what U"..."
     // literals are), scanning to its terminator for the bound.
+    // `offset` and `max_chars` count CODEPOINTS, on the UTF-8 overloads as
+    // much as the wide ones -- those convert first and then index what the
+    // conversion produced. A byte offset into the std::string, which is what
+    // it looks like they want, is wrong for anything but ASCII. The same goes
+    // for renderUTF8's begin_offset and max_chars above, and for the count it
+    // returns.
     S32 getWidth(const std::string& utf8text) const;
     S32 getWidth(LLWStringView wchars) const;
     S32 getWidth(const std::string& utf8text, S32 offset, S32 max_chars) const;
