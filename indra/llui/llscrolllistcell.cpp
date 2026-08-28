@@ -335,7 +335,7 @@ bool LLScrollListText::needsToolTip() const
         return LLScrollListCell::needsToolTip();
 
     // ...otherwise, show tooltips for truncated text
-    return mFont->getWidth(mText.getWString()) > getWidth();
+    return mFont->getWidth(mText.getString()) > getWidth();
 }
 
 void LLScrollListText::setTextWidth(S32 value)
@@ -371,7 +371,7 @@ LLScrollListText::~LLScrollListText()
 
 S32 LLScrollListText::getContentWidth() const
 {
-    return mFont->getWidth(mText.getWString());
+    return mFont->getWidth(mText.getString());
 }
 
 
@@ -445,25 +445,25 @@ void LLScrollListText::draw(const LLColor4& color, const LLColor4& highlight_col
         switch(mFontAlignment)
         {
         case LLFontGL::LEFT:
-            left = mFont->getWidth(mText.getWString(), 1, mHighlightOffset);
+            left = mFont->getWidthBytes(mText.getString(), 1, mHighlightOffset);
             break;
         case LLFontGL::RIGHT:
-            left = getWidth() - mFont->getWidth(mText.getWString(), mHighlightOffset, S32_MAX);
+            left = getWidth() - mFont->getWidthBytes(mText.getString(), mHighlightOffset, S32_MAX);
             break;
         case LLFontGL::HCENTER:
-            left = (getWidth() - mFont->getWidth(mText.getWString())) / 2;
+            left = (getWidth() - mFont->getWidth(mText.getString())) / 2;
             break;
         }
         LLRect highlight_rect(left - 2,
                 mFont->getLineHeight() + 1,
-                left + mFont->getWidth(mText.getWString(), mHighlightOffset, mHighlightCount) + 1,
+                left + mFont->getWidthBytes(mText.getString(), mHighlightOffset, mHighlightCount) + 1,
                 1);
         mRoundedRectImage->draw(highlight_rect, highlight_color);
     }
 
     // Try to draw the entire string
     F32 right_x;
-    U32 string_chars = mText.length();
+    U32 string_bytes = (U32)mText.getString().size();
     F32 start_x = 0.f;
     switch(mFontAlignment)
     {
@@ -477,15 +477,15 @@ void LLScrollListText::draw(const LLColor4& color, const LLColor4& highlight_col
         start_x = (F32)getWidth() * 0.5f;
         break;
     }
-    mFontBuffer.render(mFont,
-                       mText.getWString(), 0,
+    mFontBuffer.renderBytes(mFont,
+                       mText.getString(), 0,
                        start_x, 0.f,
                        display_color,
                        mFontAlignment,
                        LLFontGL::BOTTOM,
                        0,
                        LLFontGL::NO_SHADOW,
-                       string_chars,
+                       string_bytes,
                        getTextWidth(),
                        &right_x,
                        true);
@@ -680,25 +680,25 @@ void LLScrollListIconText::draw(const LLColor4& color, const LLColor4& highlight
         switch (mFontAlignment)
         {
         case LLFontGL::LEFT:
-            left = mFont->getWidth(mText.getWString(), icon_space + 1, mHighlightOffset);
+            left = mFont->getWidthBytes(mText.getString(), icon_space + 1, mHighlightOffset);
             break;
         case LLFontGL::RIGHT:
-            left = getWidth() - mFont->getWidth(mText.getWString(), mHighlightOffset, S32_MAX) - icon_space;
+            left = getWidth() - mFont->getWidthBytes(mText.getString(), mHighlightOffset, S32_MAX) - icon_space;
             break;
         case LLFontGL::HCENTER:
-            left = (getWidth() - mFont->getWidth(mText.getWString()) - icon_space) / 2;
+            left = (getWidth() - mFont->getWidth(mText.getString()) - icon_space) / 2;
             break;
         }
         LLRect highlight_rect(left - 2,
             mFont->getLineHeight() + 1,
-            left + mFont->getWidth(mText.getWString(), mHighlightOffset, mHighlightCount) + 1,
+            left + mFont->getWidthBytes(mText.getString(), mHighlightOffset, mHighlightCount) + 1,
             1);
         mRoundedRectImage->draw(highlight_rect, highlight_color);
     }
 
     // Try to draw the entire string
     F32 right_x;
-    U32 string_chars = mText.length();
+    U32 string_bytes = (U32)mText.getString().size();
     F32 start_text_x = 0.f;
     S32 start_icon_x = 0;
     switch (mFontAlignment)
@@ -709,24 +709,24 @@ void LLScrollListIconText::draw(const LLColor4& color, const LLColor4& highlight
         break;
     case LLFontGL::RIGHT:
         start_text_x = (F32)getWidth();
-        start_icon_x = getWidth() - mFont->getWidth(mText.getWString()) - icon_space;
+        start_icon_x = getWidth() - mFont->getWidth(mText.getString()) - icon_space;
         break;
     case LLFontGL::HCENTER:
         F32 center = (F32)getWidth()* 0.5f;
         start_text_x = center + ((F32)icon_space * 0.5f);
-        start_icon_x = (S32)(center - (((F32)icon_space + mFont->getWidth(mText.getWString())) * 0.5f));
+        start_icon_x = (S32)(center - (((F32)icon_space + mFont->getWidth(mText.getString())) * 0.5f));
         break;
     }
-    mFontBuffer.render(
+    mFontBuffer.renderBytes(
         mFont,
-        mText.getWString(), 0,
+        mText.getString(), 0,
         start_text_x, 0.f,
         display_color,
         mFontAlignment,
         LLFontGL::BOTTOM,
         0,
         LLFontGL::NO_SHADOW,
-        string_chars,
+        string_bytes,
         getTextWidth(),
         &right_x,
         true);

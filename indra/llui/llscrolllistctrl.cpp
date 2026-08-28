@@ -1397,18 +1397,13 @@ LLScrollListItem* LLScrollListCtrl::getItemByIndex(S32 index)
     return NULL;
 }
 
-bool LLScrollListCtrl::selectItemByPrefix(const std::string& target, bool case_sensitive, S32 column)
-{
-    return selectItemByPrefix(utf8str_to_wstring(target), case_sensitive, column);
-}
-
 // Selects first enabled item that has a name where the name's first part matched the target string.
 // Returns false if item not found.
-bool LLScrollListCtrl::selectItemByPrefix(const LLWString& target, bool case_sensitive, S32 column)
+bool LLScrollListCtrl::selectItemByPrefix(const std::string& target, bool case_sensitive, S32 column)
 {
     bool found = false;
 
-    LLWString target_trimmed( target );
+    std::string target_trimmed( target );
     auto target_len = target_trimmed.size();
 
     if( 0 == target_len )
@@ -1434,7 +1429,7 @@ bool LLScrollListCtrl::selectItemByPrefix(const LLWString& target, bool case_sen
         if (!case_sensitive)
         {
             // do comparisons in lower case
-            LLWStringUtil::toLower(target_trimmed);
+            LLStringUtil::toLower(target_trimmed);
         }
 
         for (item_list::iterator iter = mItemList.begin(); iter != mItemList.end(); iter++)
@@ -1447,14 +1442,15 @@ bool LLScrollListCtrl::selectItemByPrefix(const LLWString& target, bool case_sen
             {
                 continue;
             }
-            LLWString item_label = utf8str_to_wstring(cellp->getValue().asString());
+            const std::string cell_label = cellp->getValue().asString();
+            std::string item_label = cell_label;
             if (!case_sensitive)
             {
-                LLWStringUtil::toLower(item_label);
+                LLStringUtil::toLower(item_label);
             }
             // remove extraneous whitespace from searchable label
-            LLWString trimmed_label = item_label;
-            LLWStringUtil::trim(trimmed_label);
+            std::string trimmed_label = item_label;
+            LLStringUtil::trim(trimmed_label);
 
             bool select = item->getEnabled() && trimmed_label.compare(0, target_trimmed.size(), target_trimmed) == 0;
 
@@ -1462,7 +1458,16 @@ bool LLScrollListCtrl::selectItemByPrefix(const LLWString& target, bool case_sen
             {
                 // find offset of matching text (might have leading whitespace)
                 auto offset = item_label.find(target_trimmed);
-                cellp->highlightText(static_cast<S32>(offset), static_cast<S32>(target_trimmed.size()));
+                // That offset is into the lowercased copy, and lowercasing is
+                // not length-preserving, but highlightText indexes the cell's
+                // own text -- so it comes back through the same walk the
+                // inventory filter uses.
+                const size_t match_begin = case_sensitive ? offset
+                    : utf8str_bytes_from_cased_bytes(cell_label, offset, false);
+                const size_t match_end = case_sensitive ? offset + target_trimmed.size()
+                    : utf8str_bytes_from_cased_bytes(cell_label, offset + target_trimmed.size(), false);
+                cellp->highlightText(static_cast<S32>(match_begin),
+                                     static_cast<S32>(match_end - match_begin));
                 selectItem(item, -1);
                 found = true;
                 break;
@@ -1480,14 +1485,9 @@ bool LLScrollListCtrl::selectItemByPrefix(const LLWString& target, bool case_sen
 
 U32 LLScrollListCtrl::searchItems(const std::string& substring, bool case_sensitive, bool focus)
 {
-    return searchItems(utf8str_to_wstring(substring), case_sensitive, focus);
-}
-
-U32 LLScrollListCtrl::searchItems(const LLWString& substring, bool case_sensitive, bool focus)
-{
     U32 found = 0;
 
-    LLWString substring_trimmed(substring);
+    std::string substring_trimmed(substring);
     auto len = substring_trimmed.size();
 
     if (0 == len)
@@ -1500,11 +1500,7 @@ U32 LLScrollListCtrl::searchItems(const LLWString& substring, bool case_sensitiv
         deselectAllItems(true);
         if (!case_sensitive)
         {
-            // Folded the same way as the labels below, so the two agree on
-            // cases where whole-string conversion would be context-sensitive.
-            LLWString folded_needle;
-            wstring_tolower_indexed(substring_trimmed, folded_needle);
-            substring_trimmed.swap(folded_needle);
+            LLStringUtil::toLower(substring_trimmed);
         }
 
         for (LLScrollListItem* item : mItemList)
@@ -1519,33 +1515,28 @@ U32 LLScrollListCtrl::searchItems(const LLWString& substring, bool case_sensitiv
             {
                 continue;
             }
-            const LLWString cell_label = utf8str_to_wstring(cellp->getValue().asString());
+            const std::string cell_label = cellp->getValue().asString();
 
             // highlightText indexes the cell's own text, so the offset found
             // below has to be in those terms. Two things would otherwise shift
             // it: lowercasing, which is not length-preserving, and the trim,
             // which used to drop leading whitespace before the search and left
             // the highlight sitting that many characters early.
-            LLWString item_label;
-            std::vector<size_t> fold_map;
+            std::string item_label = cell_label;
             if (!case_sensitive)
             {
-                wstring_tolower_indexed(cell_label, item_label, &fold_map);
-            }
-            else
-            {
-                item_label = cell_label;
+                LLStringUtil::toLower(item_label);
             }
 
             size_t found_iter = item_label.find(substring_trimmed);
 
             if (found_iter != std::string::npos)
             {
-                const size_t match_begin = fold_map.empty() ? found_iter
-                    : (found_iter < fold_map.size() ? fold_map[found_iter] : cell_label.size());
                 const size_t folded_end = found_iter + substring_trimmed.size();
-                const size_t match_end = fold_map.empty() ? folded_end
-                    : (folded_end < fold_map.size() ? fold_map[folded_end] : cell_label.size());
+                const size_t match_begin = case_sensitive ? found_iter
+                    : utf8str_bytes_from_cased_bytes(cell_label, found_iter, false);
+                const size_t match_end = case_sensitive ? folded_end
+                    : utf8str_bytes_from_cased_bytes(cell_label, folded_end, false);
                 cellp->highlightText(static_cast<S32>(match_begin),
                                      static_cast<S32>(match_end - match_begin));
                 selectItem(item, -1, false);
@@ -2624,7 +2615,7 @@ bool LLScrollListCtrl::handleKeyHere(KEY key,MASK mask )
                 mSearchTimer.reset();
                 if (mSearchString.size())
                 {
-                    mSearchString.erase(mSearchString.size() - 1, 1);
+                    mSearchString.erase(utf8str_step_grapheme_backward(mSearchString, mSearchString.size()));
                 }
                 if (mSearchString.empty())
                 {
@@ -2637,7 +2628,7 @@ bool LLScrollListCtrl::handleKeyHere(KEY key,MASK mask )
                         }
                     }
                 }
-                else if (selectItemByPrefix(wstring_to_utf8str(mSearchString), false))
+                else if (selectItemByPrefix(mSearchString, false))
                 {
                     mNeedsScroll = true;
                     // update search string only on successful match
@@ -2677,11 +2668,11 @@ bool LLScrollListCtrl::handleUnicodeCharHere(llwchar uni_char)
     // type ahead search is case insensitive
     uni_char = LLStringOps::toLower((llwchar)uni_char);
 
-    if (selectItemByPrefix(wstring_to_utf8str(mSearchString + (llwchar)uni_char), false))
+    if (selectItemByPrefix(mSearchString + utf8str_from_cp(uni_char), false))
     {
         // update search string only on successful match
         mNeedsScroll = true;
-        mSearchString += uni_char;
+        utf8str_append_cp(mSearchString, uni_char);
         mSearchTimer.reset();
 
         if (mCommitOnKeyboardMovement
@@ -2691,7 +2682,7 @@ bool LLScrollListCtrl::handleUnicodeCharHere(llwchar uni_char)
         }
     }
     // handle iterating over same starting character
-    else if (isRepeatedChars(mSearchString + (llwchar)uni_char) && !mItemList.empty())
+    else if (isRepeatedChars(mSearchString + utf8str_from_cp(uni_char)) && !mItemList.empty())
     {
         // start from last selected item, in case we previously had a successful match against
         // duplicated characters ('AA' matches 'Aaron')
@@ -2722,12 +2713,14 @@ bool LLScrollListCtrl::handleUnicodeCharHere(llwchar uni_char)
             if (cellp)
             {
                 // Only select enabled items with matching first characters
-                LLWString item_label = utf8str_to_wstring(cellp->getValue().asString());
-                if (item->getEnabled() && LLStringOps::toLower(item_label[0]) == uni_char)
+                const std::string item_label = cellp->getValue().asString();
+                const LLCodepointAt first = utf8str_decode_at(item_label, 0);
+                if (item->getEnabled() && LLStringOps::toLower(first.cp) == uni_char)
                 {
                     selectItem(item, -1);
                     mNeedsScroll = true;
-                    cellp->highlightText(0, 1);
+                    // The whole first character, however many bytes it took.
+                    cellp->highlightText(0, (S32)first.next);
                     mSearchTimer.reset();
 
                     if (mCommitOnKeyboardMovement
@@ -2757,21 +2750,23 @@ void LLScrollListCtrl::reportInvalidInput()
     make_ui_sound("UISndBadKeystroke");
 }
 
-bool LLScrollListCtrl::isRepeatedChars(const LLWString& string) const
+bool LLScrollListCtrl::isRepeatedChars(std::string_view string) const
 {
     if (string.empty())
     {
         return false;
     }
 
-    llwchar first_char = string[0];
+    const LLCodepointAt first = utf8str_decode_at(string, 0);
 
-    for (U32 i = 0; i < string.size(); i++)
+    for (size_t i = first.next; i < string.size(); )
     {
-        if (string[i] != first_char)
+        const LLCodepointAt at = utf8str_decode_at(string, i);
+        if (at.cp != first.cp)
         {
             return false;
         }
+        i = at.next;
     }
 
     return true;

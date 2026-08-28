@@ -271,7 +271,6 @@ public:
 
     bool            selectItemByLabel(const std::string& item, bool case_sensitive = true, S32 column = 0);       // false if item not found
     bool            selectItemByPrefix(const std::string& target, bool case_sensitive = true, S32 column = -1);
-    bool            selectItemByPrefix(const LLWString& target, bool case_sensitive = true, S32 column = -1);
     LLScrollListItem* getItemByLabel(const std::string& label, bool case_sensitive = true, S32 column = 0);
     LLScrollListItem* getItemByValue(const std::string& value);
     LLScrollListItem* getItemByIndex(S32 index);
@@ -284,7 +283,6 @@ public:
     // Returns number of results.
     // Note: at the moment search happens in one go and is expensive
     U32         searchItems(const std::string& substring, bool case_sensitive = false, bool focus = true);
-    U32         searchItems(const LLWString& substring, bool case_sensitive = false, bool focus = true);
 
     // DEPRECATED: Use LLSD versions of setCommentText() and getSelectedValue().
     // "StringUUID" interface: use this when you're creating a list that contains non-unique strings each of which
@@ -482,7 +480,7 @@ private:
 
     void            updateLineHeightInsert(LLScrollListItem* item);
     void            reportInvalidInput();
-    bool            isRepeatedChars(const LLWString& string) const;
+    bool            isRepeatedChars(std::string_view string) const;
     void            selectItem(LLScrollListItem* itemp, S32 cell, bool single_select = true);
     void            deselectItem(LLScrollListItem* itemp);
     void            commitIfChanged();
@@ -560,7 +558,7 @@ private:
 
     LLTextBox*      mCommentText = nullptr;
 
-    LLWString       mSearchString;
+    std::string     mSearchString;
     LLFrameTimer    mSearchTimer;
 
     std::string     mFilterString;

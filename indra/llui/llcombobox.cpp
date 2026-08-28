@@ -1110,7 +1110,7 @@ void LLComboBox::updateSelection()
         mTextEntry->setTentative(false);
         mLastSelectedIndex = mList->getFirstSelectedIndex();
     }
-    else if (mList->selectItemByPrefix(left_wstring, false))
+    else if (mList->selectItemByPrefix(wstring_to_utf8str(left_wstring), false))
     {
         LLWString selected_item = utf8str_to_wstring(getSelectedItemLabel());
         LLWString wtext = left_wstring + selected_item.substr(left_wstring.size(), selected_item.size());
