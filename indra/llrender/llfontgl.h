@@ -272,11 +272,8 @@ public:
     static std::string nameFromFont(const LLFontGL* fontp);
     static std::string sizeFromFont(const LLFontGL* fontp);
 
-    static std::string nameFromHAlign(LLFontGL::HAlign align);
     static LLFontGL::HAlign hAlignFromName(const std::string& name);
 
-    static std::string nameFromVAlign(LLFontGL::VAlign align);
-    static LLFontGL::VAlign vAlignFromName(const std::string& name);
 
     static void setFontDisplay(bool flag) { sDisplayFont = flag; }
 

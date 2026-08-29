@@ -66,7 +66,7 @@ private:
     static long sLocalTimeOffset;
     static bool sPacificDaylightTime;
 
-    static std::map<std::string, std::string> datetimeToCodes;
+    static std::map<std::string, std::string, std::less<>> datetimeToCodes;
 
     // Above-ASCII halves of the classification predicates below.
     static llwchar toUpperAboveAscii(llwchar elem);
@@ -207,7 +207,7 @@ public:
     // currently in daylight savings time?
     static bool getPacificDaylightTime(void) { return sPacificDaylightTime;}
 
-    static std::string getDatetimeCode (std::string key);
+    static std::string getDatetimeCode (std::string_view key);
 
     // Express a value like 1234567 as "1.23M"
     static std::string getReadableNumber(F64 num);
@@ -229,6 +229,7 @@ public:
     LLFormatMapString() = default;
     LLFormatMapString(const char* s) : mString(ll_safe_string(s)) {};
     LLFormatMapString(const std::string& s) : mString(s) {};
+    LLFormatMapString(std::string_view s) : mString(s) {};
     operator const std::string&() const { return mString; }
     const std::string& operator()() const { return mString; }
     bool operator<(const LLFormatMapString& rhs) const { return mString < rhs.mString; }
@@ -236,6 +237,24 @@ public:
 
 private:
     std::string mString;
+};
+
+// Lets a format map be probed with a view. Every lookup used to build an
+// LLFormatMapString first, so asking whether a token was present allocated a
+// copy of it -- and the bracketed retry allocated a second.
+struct LLFormatMapStringLess
+{
+    using is_transparent = void;
+    bool operator()(const LLFormatMapString& a, const LLFormatMapString& b) const { return a() < b(); }
+    bool operator()(const LLFormatMapString& a, std::string_view b) const { return a() < b; }
+    bool operator()(std::string_view a, const LLFormatMapString& b) const { return a < b(); }
+    // A string literal converts just as well to LLFormatMapString as it does
+    // to a view, so without these the two overloads above are ambiguous for
+    // every caller that looks a token up by literal. Matching const char*
+    // exactly settles it, and keeps a null pointer behaving as the empty
+    // string the way LLFormatMapString's own constructor does.
+    bool operator()(const LLFormatMapString& a, const char* b) const { return a() < std::string_view(b ? b : ""); }
+    bool operator()(const char* a, const LLFormatMapString& b) const { return std::string_view(a ? a : "") < b(); }
 };
 
 template <class T>
@@ -255,7 +274,7 @@ public:
 
     static const string_type null;
 
-    typedef std::map<LLFormatMapString, LLFormatMapString> format_map_t;
+    typedef std::map<LLFormatMapString, LLFormatMapString, LLFormatMapStringLess> format_map_t;
     /// considers any sequence of delims as a single field separator
     LL_COMMON_API static void getTokens(const string_type& instr,
                                         std::vector<string_type >& tokens,
@@ -289,11 +308,11 @@ public:
                                               const string_type& escapes);
 
     LL_COMMON_API static void formatNumber(string_type& numStr, string_type decimals);
-    LL_COMMON_API static bool formatDatetime(string_type& replacement, string_type token, string_type param, S32 secFromEpoch);
+    LL_COMMON_API static bool formatDatetime(string_type& replacement, string_view_type token, string_view_type param, S32 secFromEpoch);
     LL_COMMON_API static S32 format(string_type& s, const format_map_t& substitutions);
     LL_COMMON_API static S32 format(string_type& s, const LLSD& substitutions);
-    LL_COMMON_API static bool simpleReplacement(string_type& replacement, string_type token, const format_map_t& substitutions);
-    LL_COMMON_API static bool simpleReplacement(string_type& replacement, string_type token, const LLSD& substitutions);
+    LL_COMMON_API static bool simpleReplacement(string_type& replacement, string_view_type token, const format_map_t& substitutions);
+    LL_COMMON_API static bool simpleReplacement(string_type& replacement, string_view_type token, const LLSD& substitutions);
     LL_COMMON_API static void setLocale (std::string inLocale);
     LL_COMMON_API static std::string getLocale (void);
 
@@ -612,7 +631,7 @@ aliasmacro(OUTSTR, const INSTR::value_type*, longname(in))
 // Make the incoming string a utf8 string. Replaces any unknown glyph
 // with the UNKNOWN_CHARACTER. Once any unknown glyph is found, the rest
 // of the data may not be recovered.
-LL_COMMON_API std::string rawstr_to_utf8(const std::string& raw);
+LL_COMMON_API std::string rawstr_to_utf8(std::string_view raw);
 
 //
 // We should never use UTF16 except when communicating with Win32!
@@ -650,7 +669,7 @@ LL_COMMON_API S32 wchar_utf8_length(const llwchar wc);
 
 LL_COMMON_API std::string wchar_utf8_preview(const llwchar wc);
 
-LL_COMMON_API std::string utf8str_tolower(const std::string& utf8str);
+LL_COMMON_API std::string utf8str_tolower(std::string_view utf8str);
 
 // Length in utf16string (UTF-16) of wlen wchars beginning at woffset.
 LL_COMMON_API S32 wstring_utf16_length(const LLWString & wstr, S32 woffset, S32 wlen);
@@ -688,14 +707,14 @@ LL_COMMON_API S32 wstring_wstring_length_from_utf8_length(LLWStringView wstr, S3
  * @param max_len The maximum number of bytes in the return value.
  * @return Returns a valid utf8 string with byte count <= max_len.
  */
-LL_COMMON_API std::string utf8str_truncate(const std::string& utf8str, const S32 max_len);
+LL_COMMON_API std::string utf8str_truncate(std::string_view utf8str, const S32 max_len);
 
 // [RLVa:KB] - Checked: RLVa-2.1.0
-LL_COMMON_API std::string utf8str_substr(const std::string& utf8str, const S32 index, const S32 max_len);
-LL_COMMON_API void utf8str_split(std::list<std::string>& split_list, const std::string& utf8str, size_t maxlen, char split_token);
+LL_COMMON_API std::string utf8str_substr(std::string_view utf8str, const S32 index, const S32 max_len);
+LL_COMMON_API void utf8str_split(std::list<std::string>& split_list, std::string_view utf8str, size_t maxlen, char split_token);
 // [/RLVa:KB]
 
-LL_COMMON_API std::string utf8str_trim(const std::string& utf8str);
+LL_COMMON_API std::string utf8str_trim(std::string_view utf8str);
 
 LL_COMMON_API S32 utf8str_compare_insensitive(
     const std::string& lhs,
@@ -710,7 +729,7 @@ LL_COMMON_API S32 utf8str_compare_insensitive(
 * @param symbol_len The maximum number of symbols in the return value.
 * @return Returns a valid utf8 string with symbol count <= max_len.
 */
-LL_COMMON_API std::string utf8str_symbol_truncate(const std::string& utf8str, const S32 symbol_len);
+LL_COMMON_API std::string utf8str_symbol_truncate(std::string_view utf8str, const S32 symbol_len);
 
 /**
  * @brief Replace all occurences of target_char with replace_char
@@ -720,18 +739,18 @@ LL_COMMON_API std::string utf8str_symbol_truncate(const std::string& utf8str, co
  * @param replace_char The wchar which is written on replace
  */
 LL_COMMON_API std::string utf8str_substChar(
-    const std::string& utf8str,
+    std::string_view utf8str,
     const llwchar target_char,
     const llwchar replace_char);
 
-LL_COMMON_API std::string utf8str_makeASCII(const std::string& utf8str);
+LL_COMMON_API std::string utf8str_makeASCII(std::string_view utf8str);
 
 // Hack - used for evil notecards.
-LL_COMMON_API std::string mbcsstring_makeASCII(const std::string& str);
+LL_COMMON_API std::string mbcsstring_makeASCII(std::string_view str);
 
-LL_COMMON_API std::string utf8str_removeCRLF(const std::string& utf8str);
+LL_COMMON_API std::string utf8str_removeCRLF(std::string_view utf8str);
 
-LL_COMMON_API std::string utf8str_showBytesUTF8(const std::string& utf8str);
+LL_COMMON_API std::string utf8str_showBytesUTF8(std::string_view utf8str);
 
 
 LL_COMMON_API bool wstring_remove_emojis(LLWString& wstr);

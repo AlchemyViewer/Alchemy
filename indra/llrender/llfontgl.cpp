@@ -538,7 +538,14 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         const ALFontFace* face;
         LLColor4U color;
     };
-    std::vector<DeferredGlyph> deferred;
+    // Reused rather than built per call: every shadowed draw in the UI takes
+    // the two-pass path, so this was an allocate-and-free on each one. The
+    // ellipsis tail below DOES re-enter this function, but only after pass B
+    // has finished walking `deferred` -- nothing reads it again afterwards,
+    // so the recursive clear is harmless. Keep it that way: a read of
+    // `deferred` placed after the ellipsis render would see the tail's glyphs.
+    static thread_local std::vector<DeferredGlyph> deferred;
+    deferred.clear();
     if (needs_two_pass)
     {
         deferred.reserve(length);
@@ -2055,15 +2062,6 @@ std::string LLFontGL::sizeFromFont(const LLFontGL* fontp)
 }
 
 // static
-std::string LLFontGL::nameFromHAlign(LLFontGL::HAlign align)
-{
-    if (align == LEFT)          return std::string("left");
-    else if (align == RIGHT)    return std::string("right");
-    else if (align == HCENTER)  return std::string("center");
-    else return std::string();
-}
-
-// static
 LLFontGL::HAlign LLFontGL::hAlignFromName(const std::string& name)
 {
     LLFontGL::HAlign gl_hfont_align = LLFontGL::LEFT;
@@ -2081,40 +2079,6 @@ LLFontGL::HAlign LLFontGL::hAlignFromName(const std::string& name)
     }
     //else leave left
     return gl_hfont_align;
-}
-
-// static
-std::string LLFontGL::nameFromVAlign(LLFontGL::VAlign align)
-{
-    if (align == TOP)           return std::string("top");
-    else if (align == VCENTER)  return std::string("center");
-    else if (align == BASELINE) return std::string("baseline");
-    else if (align == BOTTOM)   return std::string("bottom");
-    else return std::string();
-}
-
-// static
-LLFontGL::VAlign LLFontGL::vAlignFromName(const std::string& name)
-{
-    LLFontGL::VAlign gl_vfont_align = LLFontGL::BASELINE;
-    if (name == "top")
-    {
-        gl_vfont_align = LLFontGL::TOP;
-    }
-    else if (name == "center")
-    {
-        gl_vfont_align = LLFontGL::VCENTER;
-    }
-    else if (name == "baseline")
-    {
-        gl_vfont_align = LLFontGL::BASELINE;
-    }
-    else if (name == "bottom")
-    {
-        gl_vfont_align = LLFontGL::BOTTOM;
-    }
-    //else leave baseline
-    return gl_vfont_align;
 }
 
 //static

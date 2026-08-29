@@ -173,10 +173,13 @@ std::ostream& operator<<(std::ostream &s, const LLWString &wstr)
     return s;
 }
 
-std::string rawstr_to_utf8(const std::string& raw)
+std::string rawstr_to_utf8(std::string_view raw)
 {
-    LLWString wstr(utf8str_to_wstring(raw));
-    return wstring_to_utf8str(wstr);
+    // Converting up and back is what this used to do, and what it was for:
+    // the conversion in replaces anything malformed. utf8str_sanitize is that
+    // same repair with simdutf asked first, so text that was already valid --
+    // which is nearly all of it -- skips both conversions.
+    return utf8str_sanitize(raw);
 }
 
 std::ptrdiff_t wchar_to_utf8chars(llwchar in_char, char* outchars)
@@ -471,15 +474,36 @@ std::string u8str_to_str(const char8_t* u8str, size_t len)
     return std::string(u8str_view.begin(), u8str_view.end());
 }
 
-std::string utf8str_trim(const std::string& utf8str)
+std::string utf8str_trim(std::string_view utf8str)
 {
-    LLWString wstr = utf8str_to_wstring(utf8str);
-    LLWStringUtil::trim(wstr);
-    return wstring_to_utf8str(wstr);
+    // One decoding pass rather than a conversion to UTF-32 and back. The
+    // decode is the part that cannot be skipped: LLStringOps::isSpace on a
+    // char answers for ASCII only, so trimming bytes would leave a no-break
+    // space or an ideographic space behind where the wide form removed them.
+    size_t begin = 0;
+    size_t end = 0;
+    bool found = false;
+
+    for (size_t i = 0; i < utf8str.size(); )
+    {
+        const LLCodepointAt at = utf8str_decode_at(utf8str, i);
+        if (!LLStringOps::isSpace(at.cp))
+        {
+            if (!found)
+            {
+                begin = i;
+                found = true;
+            }
+            end = at.next;
+        }
+        i = at.next;
+    }
+
+    return found ? std::string(utf8str.substr(begin, end - begin)) : std::string();
 }
 
 
-std::string utf8str_tolower(const std::string& utf8str)
+std::string utf8str_tolower(std::string_view utf8str)
 {
     std::string out_str(utf8str);
     LLStringUtilBase<char>::toLower(out_str);
@@ -492,33 +516,33 @@ S32 utf8str_compare_insensitive(const std::string& lhs, const std::string& rhs)
     return LLStringUtilBase<char>::compareInsensitive(lhs, rhs);
 }
 
-std::string utf8str_truncate(const std::string& utf8str, const S32 max_len)
+std::string utf8str_truncate(std::string_view utf8str, const S32 max_len)
 {
     if (0 == max_len) return std::string();
-    if ((S32)utf8str.length() <= max_len) return utf8str;
-    return utf8str.substr(0,
-        simdutf::trim_partial_utf8(utf8str.data(), (size_t)max_len));
+    if ((S32)utf8str.length() <= max_len) return std::string(utf8str);
+    return std::string(utf8str.substr(0,
+        simdutf::trim_partial_utf8(utf8str.data(), (size_t)max_len)));
 }
 
 // [RLVa:KB] - Checked: RLVa-2.1.0
-std::string utf8str_substr(const std::string& utf8str, const S32 index, const S32 max_len)
+std::string utf8str_substr(std::string_view utf8str, const S32 index, const S32 max_len)
 {
     if (0 == max_len) return std::string();
     if (utf8str.length() - index <= (size_t)max_len)
     {
-        return utf8str.substr(index, max_len);
+        return std::string(utf8str.substr(index, max_len));
     }
-    return utf8str.substr(index,
-        simdutf::trim_partial_utf8(utf8str.data() + index, (size_t)max_len));
+    return std::string(utf8str.substr(index,
+        simdutf::trim_partial_utf8(utf8str.data() + index, (size_t)max_len)));
 }
 
-void utf8str_split(std::list<std::string>& split_list, const std::string& utf8str, size_t maxlen, char split_token)
+void utf8str_split(std::list<std::string>& split_list, std::string_view utf8str, size_t maxlen, char split_token)
 {
     split_list.clear();
 
     std::string::size_type lenMsg = utf8str.length(), lenIt = 0;
 
-    const char* pstrIt = utf8str.c_str(); std::string strTemp;
+    const char* pstrIt = utf8str.data(); std::string strTemp;
     while (lenIt < lenMsg)
     {
         if (lenIt + maxlen < lenMsg)
@@ -541,14 +565,17 @@ void utf8str_split(std::list<std::string>& split_list, const std::string& utf8st
         split_list.push_back(strTemp);
 
         lenIt += strTemp.length();
-        pstrIt = utf8str.c_str() + lenIt;
-        if (*pstrIt == split_token)
+        pstrIt = utf8str.data() + lenIt;
+        // A view carries no terminator, so the end has to be checked before
+        // the byte is read. c_str() used to make the one-past-the-end read
+        // land on the NUL.
+        if (lenIt < lenMsg && *pstrIt == split_token)
             lenIt++;
     }
 }
 // [/RLVa:KB]
 
-std::string utf8str_symbol_truncate(const std::string& utf8str, const S32 symbol_len)
+std::string utf8str_symbol_truncate(std::string_view utf8str, const S32 symbol_len)
 {
     if (0 == symbol_len)
     {
@@ -556,7 +583,7 @@ std::string utf8str_symbol_truncate(const std::string& utf8str, const S32 symbol
     }
     if ((S32)utf8str.length() <= symbol_len)
     {
-        return utf8str;
+        return std::string(utf8str);
     }
 
     int symbols = 0;
@@ -575,31 +602,47 @@ std::string utf8str_symbol_truncate(const std::string& utf8str, const S32 symbol
     // Counting codepoints can stop in the middle of what the reader sees as
     // one character -- between a letter and its accent, or inside a flag or a
     // family. Give back the last whole one instead.
-    return utf8str.substr(0, utf8str_grapheme_align_backward(utf8str, byteIndex));
+    return std::string(utf8str.substr(0, utf8str_grapheme_align_backward(utf8str, byteIndex)));
 }
 
 std::string utf8str_substChar(
-    const std::string& utf8str,
+    std::string_view utf8str,
     const llwchar target_char,
     const llwchar replace_char)
 {
-    LLWString wstr = utf8str_to_wstring(utf8str);
-    LLWStringUtil::replaceChar(wstr, target_char, replace_char);
-    //wstr = wstring_substChar(wstr, target_char, replace_char);
-    return wstring_to_utf8str(wstr);
+    // Decode and rebuild in one pass rather than converting to UTF-32 and
+    // back. It cannot be done in place either: the two characters need not
+    // occupy the same number of bytes.
+    std::string out_str;
+    out_str.reserve(utf8str.size());
+    for (size_t i = 0; i < utf8str.size(); )
+    {
+        const LLCodepointAt at = utf8str_decode_at(utf8str, i);
+        utf8str_append_cp(out_str, at.cp == target_char ? replace_char : at.cp);
+        i = at.next;
+    }
+    return out_str;
 }
 
-std::string utf8str_makeASCII(const std::string& utf8str)
+std::string utf8str_makeASCII(std::string_view utf8str)
 {
-    LLWString wstr = utf8str_to_wstring(utf8str);
-    LLWStringUtil::_makeASCII(wstr);
-    return wstring_to_utf8str(wstr);
+    // One character in, one byte out, in a single pass -- the conversion to
+    // UTF-32 and back that this replaces produced exactly the same thing.
+    std::string out_str;
+    out_str.reserve(utf8str.size());
+    for (size_t i = 0; i < utf8str.size(); )
+    {
+        const LLCodepointAt at = utf8str_decode_at(utf8str, i);
+        out_str.push_back(at.cp > 0x7f ? LL_UNKNOWN_CHAR : (char)at.cp);
+        i = at.next;
+    }
+    return out_str;
 }
 
-std::string mbcsstring_makeASCII(const std::string& wstr)
+std::string mbcsstring_makeASCII(std::string_view wstr)
 {
     // Replace non-ASCII chars with replace_char
-    std::string out_str = wstr;
+    std::string out_str(wstr);
     for (S32 i = 0; i < (S32)out_str.length(); i++)
     {
         if ((U8)out_str[i] > 0x7f)
@@ -610,7 +653,7 @@ std::string mbcsstring_makeASCII(const std::string& wstr)
     return out_str;
 }
 
-std::string utf8str_removeCRLF(const std::string& utf8str)
+std::string utf8str_removeCRLF(std::string_view utf8str)
 {
     if (0 == utf8str.length())
     {
@@ -633,7 +676,7 @@ std::string utf8str_removeCRLF(const std::string& utf8str)
 
 // Only used by utf8str_showBytesUTF8 below. Kept file-local after the simdutf
 // migration (no external callers).
-static llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_t length)
+static llwchar utf8str_to_wchar(std::string_view utf8str, size_t offset, size_t length)
 {
     switch (length)
     {
@@ -673,7 +716,7 @@ static llwchar utf8str_to_wchar(const std::string& utf8str, size_t offset, size_
     return LL_UNKNOWN_CHAR;
 }
 
-std::string utf8str_showBytesUTF8(const std::string& utf8str)
+std::string utf8str_showBytesUTF8(std::string_view utf8str)
 {
     std::string result;
 
@@ -2077,7 +2120,7 @@ std::optional<std::string> llstring_getoptenv(const std::string& key)
 long LLStringOps::sPacificTimeOffset = 0;
 long LLStringOps::sLocalTimeOffset = 0;
 bool LLStringOps::sPacificDaylightTime = 0;
-std::map<std::string, std::string> LLStringOps::datetimeToCodes;
+std::map<std::string, std::string, std::less<>> LLStringOps::datetimeToCodes;
 
 std::vector<std::string> LLStringOps::sWeekDayList;
 std::vector<std::string> LLStringOps::sWeekDayShortList;
@@ -2551,11 +2594,11 @@ void LLStringOps::setupDayFormat(const std::string& data)
 }
 
 
-std::string LLStringOps::getDatetimeCode (std::string key)
+std::string LLStringOps::getDatetimeCode (std::string_view key)
 {
-    std::map<std::string, std::string>::iterator iter;
-
-    iter = datetimeToCodes.find (key);
+    // datetimeToCodes is keyed on std::string; the transparent comparator lets
+    // the token probe it without a copy being made to ask.
+    auto iter = datetimeToCodes.find (key);
     if (iter != datetimeToCodes.end())
     {
         return iter->second;
@@ -2763,7 +2806,7 @@ void LLStringUtil::getTokens(const std::string& instr, std::vector<std::string >
 template<>
 LLStringUtil::size_type LLStringUtil::getSubstitution(const std::string& instr, size_type& start, std::vector<std::string>& tokens)
 {
-    const std::string delims (",");
+    static const std::string delims (",");
 
     // Find the first [
     size_type pos1 = instr.find('[', start);
@@ -2788,7 +2831,7 @@ LLStringUtil::size_type LLStringUtil::getSubstitution(const std::string& instr, 
 
 // static
 template<>
-bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token, const format_map_t& substitutions)
+bool LLStringUtil::simpleReplacement(std::string &replacement, std::string_view token, const format_map_t& substitutions)
 {
     // see if we have a replacement for the bracketed string (without the brackets)
     // test first using has() because if we just look up with operator[] we get back an
@@ -2800,8 +2843,12 @@ bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token
         replacement = iter->second;
         return true;
     }
-    // if not, see if there's one WITH brackets
-    iter = substitutions.find(std::string("[" + token + "]"));
+    // if not, see if there's one WITH brackets. Built into a buffer that is
+    // kept between calls: the first probe misses for every map that stores its
+    // keys bracketed, so this ran on the common path.
+    static thread_local std::string bracketed;
+    bracketed.assign(1, '[').append(token).append(1, ']');
+    iter = substitutions.find(std::string_view(bracketed));
     if (iter != substitutions.end())
     {
         replacement = iter->second;
@@ -2813,21 +2860,25 @@ bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token
 
 // static
 template<>
-bool LLStringUtil::simpleReplacement(std::string &replacement, std::string token, const LLSD& substitutions)
+bool LLStringUtil::simpleReplacement(std::string &replacement, std::string_view token, const LLSD& substitutions)
 {
     // see if we have a replacement for the bracketed string (without the brackets)
     // test first using has() because if we just look up with operator[] we get back an
     // empty string even if the value is missing. We want to distinguish between
     // missing replacements and deliberately empty replacement strings.
-    if (substitutions.has(token))
+    // LLSD keys are std::string, so these do build one -- but only the two the
+    // lookups actually need, rather than a copy of the token as well.
+    const std::string key(token);
+    if (substitutions.has(key))
     {
-        replacement = substitutions[token].asString();
+        replacement = substitutions[key].asString();
         return true;
     }
     // if not, see if there's one WITH brackets
-    else if (substitutions.has(std::string("[" + token + "]")))
+    const std::string bracketed = "[" + key + "]";
+    if (substitutions.has(bracketed))
     {
-        replacement = substitutions[std::string("[" + token + "]")].asString();
+        replacement = substitutions[bracketed].asString();
         return true;
     }
 
@@ -2900,8 +2951,8 @@ void LLStringUtil::formatNumber(std::string& numStr, std::string decimals)
 
 // static
 template<>
-bool LLStringUtil::formatDatetime(std::string& replacement, std::string token,
-                                  std::string param, S32 secFromEpoch)
+bool LLStringUtil::formatDatetime(std::string& replacement, std::string_view token,
+                                  std::string_view param, S32 secFromEpoch)
 {
     if (param == "local")   // local
     {

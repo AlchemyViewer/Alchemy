@@ -394,7 +394,11 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
     const auto to_folded = [&](S32 at) -> size_t
     {
         const size_t pos = llmin((size_t)llmax(at, 0), doc.size());
-        return case_insensitive ? utf8str_tolower(doc.substr(0, pos)).size() : pos;
+        // A view of the prefix, not a copy of it -- only the folded length is
+        // wanted, and this runs once per search step.
+        return case_insensitive
+            ? utf8str_tolower(std::string_view(doc).substr(0, pos)).size()
+            : pos;
     };
     const auto to_document = [&](size_t folded_at) -> S32
     {
