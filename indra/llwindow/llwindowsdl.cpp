@@ -2591,18 +2591,28 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
 
             const std::string_view preedit(event.edit.text);
 
-            // event.edit.start is a UTF-8 byte offset within event.edit.text
-            // (the IME's caret position inside the composition), or -1 when
-            // the IME hasn't reported a position. start == 0 is a legitimate
-            // "caret at the beginning" value and must NOT be confused with
-            // the -1 default (the earlier `> 0` check did exactly that and
-            // pinned the caret to the end of the preedit whenever the IME
-            // started the cursor at byte 0). The preeditor counts bytes too,
-            // so the offset passes straight through.
+            // event.edit.start is the IME's caret inside the composition
+            // counted in CHARACTERS, or -1 when the IME hasn't reported one.
+            // SDL's own backends settle the unit: fcitx and the Wayland text
+            // input both run their byte position through SDL_utf8strnlen,
+            // which counts codepoints, before dispatching the event. The
+            // preeditor counts bytes, so the caret has to be walked out.
+            // start == 0 is a legitimate "caret at the beginning" value and
+            // must NOT be confused with the -1 default (the earlier `> 0`
+            // check did exactly that and pinned the caret to the end of the
+            // preedit whenever the IME started the cursor at the first
+            // character).
             S32 caret = static_cast<S32>(preedit.length());
             if (event.edit.start >= 0)
             {
-                caret = llmin(static_cast<S32>(event.edit.start), caret);
+                size_t at = 0;
+                for (S32 remaining = event.edit.start;
+                     remaining > 0 && at < preedit.size();
+                     --remaining)
+                {
+                    at = utf8str_decode_at(preedit, at).next;
+                }
+                caret = static_cast<S32>(at);
             }
             const LLPreeditor::segment_lengths_t lengths { static_cast<S32>(preedit.length()) };
             const LLPreeditor::standouts_t standouts { false };

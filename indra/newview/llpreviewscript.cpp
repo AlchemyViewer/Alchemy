@@ -1404,8 +1404,11 @@ void LLScriptEdCore::loadScriptFromFile(const std::vector<std::string>& filename
     if (self && (text.length() > 0))
     {
         self->mEditor->selectAll();
-        std::string script(text);
-        self->mEditor->insertText(script);
+        // The file is whatever the user picked, and a script saved in some
+        // other encoding is not UTF-8. What lands in the editor is what gets
+        // uploaded as the asset, so repair it on the way in rather than
+        // storing bytes the grid cannot read back.
+        self->mEditor->insertText(utf8str_sanitize(text));
     }
 }
 
