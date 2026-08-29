@@ -94,8 +94,13 @@ void LLChatMsgBox::addText( const LLStringExplicit& text , const LLStyle::Params
     // if there is existing text, add a separator
     if (length > 0)
     {
-        // chat separator exists right before the null terminator
-        insertSegment(new ChatSeparator(length - 1, length - 1));
+        // The separator sits at the last character of what is already there.
+        // insertSegment splits the segment it lands in, so the position has to
+        // be a character boundary -- one byte back from the end is the middle
+        // of the last character whenever that character is not ASCII, and the
+        // split then draws both halves as replacement marks.
+        const S32 sep_pos = (S32)utf8str_step_grapheme_backward(getText(), (size_t)length);
+        insertSegment(new ChatSeparator(sep_pos, sep_pos));
     }
     // prepend newline only if there is some existing text
     appendText(text, length > 0, input_params);

@@ -167,8 +167,12 @@ const S32 EMBEDDED_ITEM_LABEL_PADDING = 2;
 class LLEmbeddedItemSegment : public LLTextSegment
 {
 public:
-    LLEmbeddedItemSegment(S32 pos, LLUIImagePtr image, LLPointer<LLInventoryItem> inv_item, LLTextEditor& editor)
-    :   LLTextSegment(pos, pos + 1),
+    // `num_bytes` is what the item's character occupies in the document, not
+    // the width of anything drawn. Those characters live at U+100000 and up,
+    // so it is four -- and a segment that claimed one left the other three
+    // outside it, to be drawn as the replacement characters they are not.
+    LLEmbeddedItemSegment(S32 pos, S32 num_bytes, LLUIImagePtr image, LLPointer<LLInventoryItem> inv_item, LLTextEditor& editor)
+    :   LLTextSegment(pos, pos + num_bytes),
         mImage(image),
         mLabel(inv_item->getName()),
         mItem(inv_item),
@@ -186,7 +190,7 @@ public:
         if (!editor)
             return nullptr;
 
-        return new LLEmbeddedItemSegment(mStart, mImage, mItem, *editor);
+        return new LLEmbeddedItemSegment(mStart, mEnd - mStart, mImage, mItem, *editor);
     }
 
     /*virtual*/ bool getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
@@ -211,23 +215,26 @@ public:
 
     /*virtual*/ S32             getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
     {
+        // The item is one character however many bytes it takes, so it is
+        // drawn whole or not at all.
+        const S32 span = mEnd - mStart;
         // always draw at beginning of line
         if (line_offset == 0)
         {
-            return 1;
+            return span;
         }
         else
         {
             F32 width;
             S32 height;
-            getSegmentDimensionsF32(mStart, 1, width, height);
+            getSegmentDimensionsF32(mStart, span, width, height);
             if (width > num_pixels)
             {
                 return 0;
             }
             else
             {
-                return 1;
+                return span;
             }
         }
     }
@@ -252,16 +259,16 @@ public:
     /*virtual*/ bool            handleRightMouseDown(S32 x, S32 y, MASK mask)
     {
         bool show_menu = !mEditor.hasSelection()
-            || (mEditor.mSelectionStart == mStart && mEditor.mSelectionEnd == mStart + 1);
+            || (mEditor.mSelectionStart == mStart && mEditor.mSelectionEnd == mEnd);
         if (show_menu && mEditor.getShowContextMenu())
         {
             // User clicked an item, user expects the menu to be
             // in 'context' for the item. Change selection to match.
             // Todo: Might be better to 'smartly' deselect here
             // and to have an object specific menu.
-            mEditor.setCursorPos(mStart + 1);
+            mEditor.setCursorPos(mEnd);
             mEditor.mSelectionStart = mStart;
-            mEditor.mSelectionEnd = mStart + 1;
+            mEditor.mSelectionEnd = mEnd;
 
             mEditor.showContextMenu(x, y);
             return true;
@@ -947,10 +954,12 @@ bool LLViewerTextEditor::handleDragAndDrop(S32 x, S32 y, MASK mask,
                     setCursorAtLocalPos( x, y, true );
                     S32 insert_pos = mCursorPos;
                     setCursorPos(old_cursor);
-                    bool inserted = insertEmbeddedItem( insert_pos, item );
-                    if( inserted && (old_cursor > mCursorPos) )
+                    // insertEmbeddedItem returns the bytes it added, which is
+                    // how far a cursor sitting after the drop has moved.
+                    const S32 inserted = insertEmbeddedItem( insert_pos, item );
+                    if( inserted > 0 && (old_cursor > mCursorPos) )
                     {
-                        setCursorPos(mCursorPos + 1);
+                        setCursorPos(mCursorPos + inserted);
                     }
 
                     needsReflow();
@@ -1137,7 +1146,7 @@ void LLViewerTextEditor::findEmbeddedItemSegments(S32 start, S32 end)
         {
             LLInventoryItem* itemp = mEmbeddedItemList->getEmbeddedItemPtr(embedded_char);
             LLUIImagePtr image = mEmbeddedItemList->getItemImage(embedded_char);
-            insertSegment(new LLEmbeddedItemSegment(idx, image, itemp, *this));
+            insertSegment(new LLEmbeddedItemSegment(idx, (S32)(at.next - (size_t)idx), image, itemp, *this));
         }
         idx = (S32)at.next;
     }
