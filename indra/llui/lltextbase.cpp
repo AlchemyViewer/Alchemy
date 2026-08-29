@@ -2429,6 +2429,12 @@ void LLTextBase::setText(const LLStringExplicit &utf8str, const LLStyle::Params&
     // Can insert a lot of different segments, don't want to spam events.
     mTrackValueChange = false;
 
+    // Copy before clearing. `utf8str` can be a reference into this widget's
+    // own document -- LLTextUtil hands back slices of what it read from
+    // getText() -- and the clear below empties the string it refers to.
+    std::string text(utf8str);
+    LLStringUtil::removeCRLF(text);
+
     // clear out the existing text and segments
     getViewModel()->setDisplayUtf8(LLStringUtil::null);
 
@@ -2436,10 +2442,6 @@ void LLTextBase::setText(const LLStringExplicit &utf8str, const LLStyle::Params&
 //  createDefaultSegment();
 
     deselect();
-
-    // append the new text (supports Url linking)
-    std::string text(utf8str);
-    LLStringUtil::removeCRLF(text);
 
     // appendText modifies mCursorPos...
     appendText(text, false, input_params);

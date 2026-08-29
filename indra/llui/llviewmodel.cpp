@@ -101,7 +101,20 @@ void LLTextViewModel::setDisplayUtf8(std::string_view value)
     // This is the strange way to alter the value. Normally we'd setValue().
     // But a text editor edits the string directly, and rebuilds the LLSD from
     // it on commit.
-    mDisplay.assign(value);
+    //
+    // The view IS allowed to be over mDisplay itself -- a caller can pass back
+    // a slice of what it read from getStringValue() -- and assigning a string
+    // from a view into its own buffer is undefined. Take a copy in that case;
+    // the pointer comparison costs nothing on the ordinary path.
+    const char* const begin = mDisplay.data();
+    if (value.data() >= begin && value.data() <= begin + mDisplay.size())
+    {
+        mDisplay = std::string(value);
+    }
+    else
+    {
+        mDisplay.assign(value);
+    }
     mDisplayGeneration++;
     mDirty = true;
     // Don't immediately rebuild the LLSD -- do it lazily -- we expect many

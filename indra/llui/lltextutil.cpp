@@ -52,10 +52,18 @@ void LLTextUtil::textboxSetHighlightedVal(LLTextBox *txtbox, const LLStyle::Para
     LLStyle::Params hl_style = normal_style;
     hl_style.color = sFilterTextColor;
 
+    // Slice before clearing. `text` is routinely the box's own content --
+    // LLAvatarListItem passes mAvatarName->getText() straight back in -- and
+    // setText() empties the string it refers to, so every offset taken above
+    // would then index a string that no longer holds anything.
+    const std::string before = text.substr(0, hl_begin);
+    const std::string match  = text.substr(hl_begin, hl_len);
+    const std::string after  = text.substr(hl_begin + hl_len);
+
     txtbox->setText(LLStringUtil::null); // clear text
-    txtbox->appendText(text.substr(0, hl_begin),        false, normal_style);
-    txtbox->appendText(text.substr(hl_begin, hl_len),   false, hl_style);
-    txtbox->appendText(text.substr(hl_begin + hl_len),  false, normal_style);
+    txtbox->appendText(before, false, normal_style);
+    txtbox->appendText(match,  false, hl_style);
+    txtbox->appendText(after,  false, normal_style);
 }
 
 void LLTextUtil::textboxSetGreyedVal(LLTextBox *txtbox, const LLStyle::Params& normal_style, const std::string& text, const std::string& greyed)
@@ -72,10 +80,16 @@ void LLTextUtil::textboxSetGreyedVal(LLTextBox *txtbox, const LLStyle::Params& n
 
     LLStyle::Params greyed_style = normal_style;
     greyed_style.color = sGreyedTextColor;
+
+    // Slice before clearing -- see textboxSetHighlightedVal above.
+    const std::string before = text.substr(0, greyed_begin);
+    const std::string match  = text.substr(greyed_begin, greyed_len);
+    const std::string after  = text.substr(greyed_begin + greyed_len);
+
     txtbox->setText(LLStringUtil::null); // clear text
-    txtbox->appendText(text.substr(0, greyed_begin),        false, normal_style);
-    txtbox->appendText(text.substr(greyed_begin, greyed_len),   false, greyed_style);
-    txtbox->appendText(text.substr(greyed_begin + greyed_len),  false, normal_style);
+    txtbox->appendText(before, false, normal_style);
+    txtbox->appendText(match,  false, greyed_style);
+    txtbox->appendText(after,  false, normal_style);
 }
 
 bool LLTextUtil::processUrlMatch(LLUrlMatch* match,LLTextBase* text_base, bool is_content_trusted)
