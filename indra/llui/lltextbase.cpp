@@ -3261,7 +3261,7 @@ bool LLTextBase::dragSelectCursorTo(S32 local_x, S32 local_y)
     // are exactly the cluster's bounds, an ordinary drag commits this hover
     // would flip the highlight rect across the cluster's full pixel span —
     // what users perceive as flicker when sub-pixel jitter (or just slow
-    // motion through the glyph) repeatedly crosses charFromPixelOffset's
+    // motion through the glyph) repeatedly crosses byteFromPixelOffset's
     // 50% snap threshold. Lock the cursor to its current boundary until
     // the mouse is clearly in the other half (past 30% from the far edge).
     // Non-cluster moves (regular text where each codepoint is its own
@@ -3517,7 +3517,7 @@ bool LLTextBase::setCursorPos(S32 cursor_pos, bool keep_cursor_offset)
     {
         new_cursor_pos = getEditableIndex(new_cursor_pos, new_cursor_pos >= mCursorPos);
         // Mouse clicks and other pixel-driven callers can land mid-cluster
-        // (charFromPixelOffset rounds at codepoint boundaries, not cluster
+        // (byteFromPixelOffset rounds at codepoint boundaries, not cluster
         // boundaries). Snap onto the nearest cluster edge so the caret never
         // parks inside a ZWJ family / flag pair / keycap. No-op when already
         // on a boundary, so arrow-key callers (already grapheme-stepped) and

@@ -1149,6 +1149,18 @@ size_t utf8str_codepoint_count(std::string_view utf8str)
     return count;
 }
 
+std::string utf8str_sanitize(std::string_view utf8str)
+{
+    if (utf8str.empty() || simdutf::validate_utf8(utf8str.data(), utf8str.size()))
+    {
+        return std::string(utf8str);
+    }
+
+    // simdutf is the arbiter, so the repair goes through it rather than through
+    // a hand decoder that would accept the overlong forms it just rejected.
+    return wstring_to_utf8str(utf8str_to_wstring(utf8str.data(), utf8str.size()));
+}
+
 size_t ALUtf8View::toBytes(size_t pos) const
 {
     if (mOffsets.empty())

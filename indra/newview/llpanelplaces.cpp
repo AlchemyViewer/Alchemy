@@ -1398,7 +1398,7 @@ static void onSLURLBuilt(std::string& slurl)
         return;
     }
 
-    LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(slurl));
+    LLView::getWindow()->copyTextToClipboard(slurl);
 
     LLSD args;
     args["SLURL"] = slurl;

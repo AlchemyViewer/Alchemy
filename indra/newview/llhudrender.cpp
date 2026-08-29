@@ -41,19 +41,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-void hud_render_utf8text(const std::string &str, const LLVector3 &pos_agent,
-                     const LLFontGL &font,
-                     const U8 style,
-                     const LLFontGL::ShadowType shadow,
-                     const F32 x_offset, const F32 y_offset,
-                     const LLColor4& color,
-                     const bool orthographic)
-{
-    LLWString wstr(utf8str_to_wstring(str));
-    hud_render_text(wstr, pos_agent, font, style, shadow, x_offset, y_offset, color, orthographic);
-}
-
-void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
+void hud_render_text(std::string_view utf8text, const LLVector3 &pos_agent,
                     const LLFontGL &font,
                     const U8 style,
                     const LLFontGL::ShadowType shadow,
@@ -66,7 +54,7 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
     LLVector3 dir_vec = pos_agent - camera->getOrigin();
     dir_vec /= dir_vec.magVec();
 
-    if (wstr.empty() || (!orthographic && dir_vec * camera->getAtAxis() <= 0.f))
+    if (utf8text.empty() || (!orthographic && dir_vec * camera->getAtAxis() <= 0.f))
     {
         return;
     }
@@ -145,7 +133,7 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
     LLUI::translate(int_x, int_y, hud_text_z);
     F32 right_x;
 
-    font.render(wstr, 0, frac_x, 1.f + frac_y, color, LLFontGL::LEFT, LLFontGL::BASELINE, style, shadow, static_cast<S32>(wstr.length()), 1000, &right_x, /*use_ellipses*/false, /*use_color*/true);
+    font.renderBytes(utf8text, 0, frac_x, 1.f + frac_y, color, LLFontGL::LEFT, LLFontGL::BASELINE, style, shadow, static_cast<S32>(utf8text.length()), 1000, &right_x, /*use_ellipses*/false, /*use_color*/true);
 
     LLUI::popMatrix();
     gGL.popMatrix();

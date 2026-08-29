@@ -2943,7 +2943,7 @@ bool LLViewerMediaImpl::handleUnicodeCharHere(llwchar uni_char)
         {
             LLSD native_key_data = gViewerWindow->getWindow()->getNativeKeyData();
 
-            mMediaSource->textInput(wstring_to_utf8str(LLWString(1, uni_char)), gKeyboard->currentMask(false), native_key_data);
+            mMediaSource->textInput(utf8str_from_cp(uni_char), gKeyboard->currentMask(false), native_key_data);
         }
     }
 

@@ -1855,7 +1855,7 @@ void LLItemBridge::performAction(LLInventoryModel* model, std::string action)
         std::string buffer;
         asset_id.toString(buffer);
 
-        gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(buffer));
+        gViewerWindow->getWindow()->copyTextToClipboard(buffer);
         return;
     }
     else if ("copy_inventory_uuid" == action)
@@ -1867,7 +1867,7 @@ void LLItemBridge::performAction(LLInventoryModel* model, std::string action)
         std::string buffer;
         inventory_id.toString(buffer);
 
-        gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(buffer));
+        gViewerWindow->getWindow()->copyTextToClipboard(buffer);
         return;
     }
     else if ("show_in_main_panel" == action)
@@ -2005,7 +2005,7 @@ void copy_slurl_to_clipboard_callback_inv(const std::string& slurl)
         LLNotificationsUtil::add("LandmarkLocationUnknown");
         return;
     }
-    gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(slurl));
+    gViewerWindow->getWindow()->copyTextToClipboard(slurl);
     LLSD args;
     args["SLURL"] = slurl;
     LLNotificationsUtil::add("CopySLURL", args);
@@ -3872,7 +3872,7 @@ void LLFolderBridge::performAction(LLInventoryModel* model, std::string action)
     {
         LLInventoryCategory* cat = gInventory.getCategory(mUUID);
         if (!cat) return;
-        gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(mUUID.asString()));
+        gViewerWindow->getWindow()->copyTextToClipboard(mUUID.asString());
         return;
     }
 }
@@ -3925,7 +3925,7 @@ void LLFolderBridge::copyOutfitToClipboard()
         }
     }
 
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(text), 0, static_cast<S32>(text.size()));
+    LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
 }
 
 void LLFolderBridge::openItem()

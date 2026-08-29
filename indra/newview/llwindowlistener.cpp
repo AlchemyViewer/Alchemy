@@ -333,10 +333,10 @@ void LLWindowListener::keyDown(LLSD const & evt)
 
     if (evt.has("char"))
     {
-        LLWString wstr = utf8str_to_wstring(evt["char"].asString());
-        if (!wstr.empty())
+        const std::string str = evt["char"].asString();
+        if (!str.empty())
         {
-            uni_char = wstr[0];
+            uni_char = utf8str_decode_at(str, 0).cp;
             // If the Unicode code point is outside ASCII range, use Unicode-only handling
             is_non_ascii = (uni_char >= 0x80);
         }
@@ -657,10 +657,10 @@ void LLWindowListener::pasteText(LLSD const & evt)
     }
 
     // Save current clipboard contents
-    LLWString saved_clipboard;
+    std::string saved_clipboard;
     LLClipboard::instance().pasteFromClipboard(saved_clipboard);
 
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(text_to_paste), 0, static_cast<S32>(text_to_paste.size()));
+    LLClipboard::instance().copyToClipboard(text_to_paste, 0, static_cast<S32>(text_to_paste.size()));
     LLEditMenuHandler::gEditMenuHandler->paste();
 
     // Restore original clipboard contents if there were any

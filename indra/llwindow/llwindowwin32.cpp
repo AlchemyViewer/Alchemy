@@ -3726,7 +3726,7 @@ bool LLWindowWin32::isClipboardTextAvailable()
 }
 
 
-bool LLWindowWin32::pasteTextFromClipboard(LLWString &dst)
+bool LLWindowWin32::pasteTextFromClipboard(std::string &dst)
 {
     bool success = false;
 
@@ -3740,8 +3740,8 @@ bool LLWindowWin32::pasteTextFromClipboard(LLWString &dst)
                 WCHAR *utf16str = (WCHAR*) GlobalLock(h_data);
                 if (utf16str)
                 {
-                    dst = ll_convert<LLWString>(std::wstring(utf16str));
-                    LLWStringUtil::removeWindowsCR(dst);
+                    dst = ll_convert<std::string>(std::wstring(utf16str));
+                    LLStringUtil::removeWindowsCR(dst);
                     GlobalUnlock(h_data);
                     success = true;
                 }
@@ -3754,7 +3754,7 @@ bool LLWindowWin32::pasteTextFromClipboard(LLWString &dst)
 }
 
 
-bool LLWindowWin32::copyTextToClipboard(const LLWString& wstr)
+bool LLWindowWin32::copyTextToClipboard(const std::string& utf8text)
 {
     bool success = false;
 
@@ -3763,8 +3763,8 @@ bool LLWindowWin32::copyTextToClipboard(const LLWString& wstr)
         EmptyClipboard();
 
         // Provide a copy of the data in Unicode format.
-        LLWString sanitized_string(wstr);
-        LLWStringUtil::addCRLF(sanitized_string);
+        std::string sanitized_string(utf8text);
+        LLStringUtil::addCRLF(sanitized_string);
         std::wstring out_utf16 = ll_convert<std::wstring>(sanitized_string);
         const size_t size_utf16 = (out_utf16.length() + 1) * sizeof(wchar_t);
 

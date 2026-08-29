@@ -531,7 +531,7 @@ void ALFloaterParticleEditor::onClickCopy()
     const std::string script = createScript();
     if (!script.empty())
     {
-        getWindow()->copyTextToClipboard(utf8str_to_wstring(script));
+        getWindow()->copyTextToClipboard(script);
         LLNotificationsUtil::add("ParticleScriptCopiedToClipboard");
     }
 }

@@ -61,13 +61,7 @@ public:
     // copy-and-pasted clipboard. The second is the so-called 'primary' clipboard
     // which is implicitly copied upon selection on platforms which expect this
     // (i.e. X11/Linux, Mac).
-    bool copyToClipboard(const LLWString& src, S32 pos, S32 len, bool use_primary = false);
-    bool addToClipboard(const LLWString& src, S32 pos, S32 len, bool use_primary = false);
-    bool pasteFromClipboard(LLWString& dst, bool use_primary = false);
-
-    // The same three in UTF-8, where `pos` and `len` count bytes. The window
-    // below still speaks UTF-32, so these convert at that boundary rather than
-    // holding a second copy of the text.
+    // `pos` and `len` count bytes.
     bool copyToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary = false);
     bool addToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary = false);
     bool pasteFromClipboard(std::string& dst, bool use_primary = false);
@@ -91,7 +85,7 @@ public:
 
 private:
     std::vector<LLUUID> mObjects;       // Objects on the clipboard. Can be empty while mString contains something licit (e.g. text from chat)
-    LLWString mString;                  // The text string. If mObjects is not empty, this string is reflecting them (UUIDs for the moment) if the asset type is knowable.
+    std::string mString;                // The text string. If mObjects is not empty, this string is reflecting them (UUIDs for the moment) if the asset type is knowable.
     bool mCutMode;                      // This is a convenience flag for the viewer.
     int mGeneration;                    // Incremented when the clipboard changes so that interested parties can check for changes on the clipboard.
 };

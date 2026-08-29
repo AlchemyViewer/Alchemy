@@ -158,7 +158,7 @@ void LLUrlAction::showParcelOnMap(std::string url)
 
 void LLUrlAction::copyURLToClipboard(std::string url)
 {
-    LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(url));
+    LLView::getWindow()->copyTextToClipboard(url);
 }
 
 void LLUrlAction::copyUUIDToClipboard(std::string url)
@@ -166,7 +166,7 @@ void LLUrlAction::copyUUIDToClipboard(std::string url)
     std::string id_str = getUserID(url);
     if (LLUUID::validate(id_str))
     {
-        LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(id_str));
+        LLView::getWindow()->copyTextToClipboard(id_str);
     }
 }
 
@@ -175,7 +175,7 @@ void LLUrlAction::copyLabelToClipboard(std::string url)
     LLUrlMatch match;
     if (LLUrlRegistry::instance().findUrl(url, match))
     {
-        LLView::getWindow()->copyTextToClipboard(utf8str_to_wstring(match.getLabel()));
+        LLView::getWindow()->copyTextToClipboard(match.getLabel());
     }
 }
 

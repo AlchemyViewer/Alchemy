@@ -38,7 +38,7 @@ void ll::prefs::SearchableItem::setNotHighlighted()
     mCtrl->setHighlighted( false );
 }
 
-bool ll::prefs::SearchableItem::hightlightAndHide( LLWString const &aFilter )
+bool ll::prefs::SearchableItem::hightlightAndHide( std::string_view aFilter )
 {
     if( mCtrl->getHighlighted() )
         return true;
@@ -53,7 +53,7 @@ bool ll::prefs::SearchableItem::hightlightAndHide( LLWString const &aFilter )
         return true;
     }
 
-    if( mLabel.find( aFilter ) != LLWString::npos )
+    if( mLabel.find( aFilter ) != std::string::npos )
     {
         mCtrl->setHighlighted( true );
         return true;
@@ -65,7 +65,7 @@ bool ll::prefs::SearchableItem::hightlightAndHide( LLWString const &aFilter )
 ll::prefs::PanelData::~PanelData()
 {}
 
-bool ll::prefs::PanelData::hightlightAndHide( LLWString const &aFilter )
+bool ll::prefs::PanelData::hightlightAndHide( std::string_view aFilter )
 {
     for( tSearchableItemList::iterator itr = mChildren.begin(); itr  != mChildren.end(); ++itr )
         (*itr)->setNotHighlighted();
@@ -92,7 +92,7 @@ void ll::prefs::PanelData::setNotHighlighted()
         (*itr)->setNotHighlighted();
 }
 
-bool ll::prefs::TabContainerData::hightlightAndHide( LLWString const &aFilter )
+bool ll::prefs::TabContainerData::hightlightAndHide( std::string_view aFilter )
 {
     for( tSearchableItemList::iterator itr = mChildren.begin(); itr  != mChildren.end(); ++itr )
         (*itr)->setNotHighlighted( );
@@ -135,7 +135,7 @@ void ll::statusbar::SearchableItem::setNotHighlighted( )
     }
 }
 
-bool ll::statusbar::SearchableItem::hightlightAndHide(LLWString const &aFilter, bool hide)
+bool ll::statusbar::SearchableItem::hightlightAndHide(std::string_view aFilter, bool hide)
 {
     if ((mMenu && !mMenu->getVisible() && !mWasHiddenBySearch) || dynamic_cast<LLMenuItemTearOffGL*>(mMenu))
         return false;
@@ -150,7 +150,7 @@ bool ll::statusbar::SearchableItem::hightlightAndHide(LLWString const &aFilter, 
     }
 
     bool bHighlighted(!hide);
-    if( mLabel.find( aFilter ) != LLWString::npos )
+    if( mLabel.find( aFilter ) != std::string::npos )
     {
         if( mCtrl )
             mCtrl->setHighlighted( true );

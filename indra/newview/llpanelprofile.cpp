@@ -1519,13 +1519,13 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
     }
     else if (item_name == "copy_user_slurl")
     {
-        LLWString wstr = utf8str_to_wstring(LLSLURL("agent", getAvatarId(), "about").getSLURLString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        const std::string slurl = LLSLURL("agent", getAvatarId(), "about").getSLURLString();
+        LLClipboard::instance().copyToClipboard(slurl, 0, narrow(slurl.size()));
     }
     else if (item_name == "copy_user_id")
     {
-        LLWString wstr = utf8str_to_wstring(getAvatarId().asString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, static_cast<S32>(wstr.size()));
+        const std::string id_str = getAvatarId().asString();
+        LLClipboard::instance().copyToClipboard(id_str, 0, static_cast<S32>(id_str.size()));
     }
     else if (item_name == "agent_permissions")
     {
@@ -1542,20 +1542,20 @@ void LLPanelProfileSecondLife::onCommitMenu(const LLSD& userdata)
             LL_WARNS() << "Failed to get agent data" << LL_ENDL;
             return;
         }
-        LLWString wstr;
+        std::string name_str;
         if (item_name == "copy_display_name")
         {
-            wstr = utf8str_to_wstring(av_name.getDisplayName(true));
+            name_str = av_name.getDisplayName(true);
         }
         else if (item_name == "copy_username")
         {
-            wstr = utf8str_to_wstring(av_name.getUserName());
+            name_str = av_name.getUserName();
         }
         else if (item_name == "copy_full_name")
         {
-            wstr = utf8str_to_wstring(av_name.getCompleteName(true, true));
+            name_str = av_name.getCompleteName(true, true);
         }
-        LLClipboard::instance().copyToClipboard(wstr, 0, static_cast<S32>(wstr.size()));
+        LLClipboard::instance().copyToClipboard(name_str, 0, static_cast<S32>(name_str.size()));
     }
     else if (item_name == "edit_display_name")
     {

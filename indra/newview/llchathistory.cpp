@@ -1518,12 +1518,12 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                     }
                     else
                     {
-                        LLWString from_text = utf8string_to_wstring(chat.mFromName);
-                        size_t i = from_text.length();
-                        if (i > name_column) from_text.erase(name_column);
-                        else if (i < name_column) from_text = LLWString(name_column - i, ' ') + from_text;
+                        std::string from_text = chat.mFromName;
+                        size_t i = utf8str_codepoint_count(from_text);
+                        if (i > name_column) from_text = utf8str_symbol_truncate(from_text, name_column);
+                        else if (i < name_column) from_text = std::string(name_column - i, ' ') + from_text;
 
-                        mEditor->appendText("<" + wstring_to_utf8str(from_text) + ">", prependNewLineState, link_params);
+                        mEditor->appendText("<" + from_text + ">", prependNewLineState, link_params);
                         prependNewLineState = false;
                         mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
                     }
@@ -1556,13 +1556,13 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                     }
                     else
                     {
-                        LLWString from_text = utf8string_to_wstring(chat.mFromName);
+                        std::string from_text = chat.mFromName;
                         std::string text_padding;
-                        size_t i = from_text.length();
-                        if (i >= name_column) from_text = from_text.substr(0, name_column);
+                        size_t i = utf8str_codepoint_count(from_text);
+                        if (i >= name_column) from_text = utf8str_symbol_truncate(from_text, name_column);
                         else if (i < name_column) text_padding = std::string(name_column - i, ' ');
 
-                        mEditor->appendText("<" + text_padding + "[" + std::string(link_params.link_href) + " " + wstring_to_utf8str(from_text) + "]>", prependNewLineState, link_params);
+                        mEditor->appendText("<" + text_padding + "[" + std::string(link_params.link_href) + " " + from_text + "]>", prependNewLineState, link_params);
                         prependNewLineState = false;
                         mEditor->appendText(alchemyFancyChatDivider, false, name_params);
                     }
@@ -1601,12 +1601,12 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                     }
                     else
                     {
-                        LLWString from_text = utf8string_to_wstring(chat.mFromName);
-                        size_t i = from_text.length();
-                        if (i >= name_column) from_text = from_text.substr(0, name_column);
-                        else if (i < name_column) from_text = LLWString(name_column - i, ' ') + from_text;
+                        std::string from_text = chat.mFromName;
+                        size_t i = utf8str_codepoint_count(from_text);
+                        if (i >= name_column) from_text = utf8str_symbol_truncate(from_text, name_column);
+                        else if (i < name_column) from_text = std::string(name_column - i, ' ') + from_text;
 
-                        mEditor->appendText("<<nolink>" + wstring_to_utf8str(from_text) + "</nolink>>", prependNewLineState, body_message_params);
+                        mEditor->appendText("<<nolink>" + from_text + "</nolink>>", prependNewLineState, body_message_params);
                         prependNewLineState = false;
                         mEditor->appendText(alchemyFancyChatDivider, prependNewLineState, name_params);
                     }

@@ -1031,8 +1031,7 @@ void LLHexEditor::copy()
         for(U32 i = start; i < end; i++)
             text.append(llformat("%c", mValue[i]));
     }
-    LLWString wtext = utf8str_to_wstring(text);
-    LLClipboard::instance().copyToClipboard(wtext, 0, wtext.length());
+    LLClipboard::instance().copyToClipboard(text, 0, (S32)text.length());
 }
 
 bool LLHexEditor::canPaste() const
@@ -1044,10 +1043,9 @@ void LLHexEditor::paste()
 {
     if(!canPaste()) return;
 
-    LLWString paste;
-    LLClipboard::instance().pasteFromClipboard(paste, true);
+    std::string clipstr;
+    LLClipboard::instance().pasteFromClipboard(clipstr, true);
 
-    std::string clipstr = wstring_to_utf8str(paste);//wstring_to_utf8str(LLClipboard::instance().getPasteWString());
     const char* clip = clipstr.c_str();
 
     std::vector<U8> new_data;

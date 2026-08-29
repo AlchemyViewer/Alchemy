@@ -1637,8 +1637,7 @@ void LLFloaterModelPreview::addStringToLogTab(const std::string& str, bool flash
         return;
     }
 
-    LLWString text = utf8str_to_wstring(str);
-    S32 add_text_len = static_cast<S32>(text.length()) + 1; // newline
+    S32 add_text_len = static_cast<S32>(str.length()) + 1; // newline
     S32 editor_max_len = mUploadLogText->getMaxTextLength();
     if (add_text_len > editor_max_len)
         {

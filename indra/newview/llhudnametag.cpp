@@ -414,19 +414,17 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                         const bool use_ellipses,
                         F32 max_pixels)
 {
-    LLWString wline = utf8str_to_wstring(text_utf8);
-    if (!wline.empty())
+    if (!text_utf8.empty())
     {
         // use default font for segment if custom font not specified
         if (!font)
         {
             font = mFontp;
         }
-        typedef boost::tokenizer<boost::char_separator<llwchar>, LLWString::const_iterator, LLWString > tokenizer;
-        static const LLWString seps(U"\r\n");
-        boost::char_separator<llwchar> sep(seps.c_str());
+        typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+        boost::char_separator<char> sep("\r\n");
 
-        tokenizer tokens(wline, sep);
+        tokenizer tokens(text_utf8, sep);
         tokenizer::iterator iter = tokens.begin();
 
         max_pixels = llmin(max_pixels, NAMETAG_MAX_WIDTH);
@@ -441,18 +439,19 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                 do
                 {
                     // Measure against a view of the token's tail. substr() on the
-                    // token itself would heap-allocate a whole LLWString on every
+                    // token itself would heap-allocate a whole string on every
                     // pass just to hand the font a pointer.
-                    const LLWStringView tail = LLWStringView(*iter).substr(line_length);
-                    auto segment_length = font->maxDrawableChars(tail, max_pixels, S32_MAX, LLFontGL::ANYWHERE);
-                    if (segment_length + line_length < wline.length()) // since we only draw one string, line_length should be 0
+                    const std::string_view tail = std::string_view(*iter).substr(line_length);
+                    auto segment_length = font->maxDrawableBytes(tail, max_pixels, S32_MAX, LLFontGL::ANYWHERE);
+                    if (segment_length + line_length < text_utf8.length()) // since we only draw one string, line_length should be 0
                     {
                         // token does does not fit into signle line, need to draw "...".
                         // Use four dots for ellipsis width to generate padding
-                        F32 elipses_width = font->getWidthF32(U"....");
+                        static const std::string ELLIPSIS_PAD("....");
+                        F32 elipses_width = font->getWidthF32(ELLIPSIS_PAD);
                         // truncated string length
-                        segment_length = font->maxDrawableChars(tail, max_pixels - elipses_width, S32_MAX, LLFontGL::ANYWHERE);
-                        LLHUDTextSegment segment(iter->substr(line_length, segment_length) + U"...", style, color, font);
+                        segment_length = font->maxDrawableBytes(tail, max_pixels - elipses_width, S32_MAX, LLFontGL::ANYWHERE);
+                        LLHUDTextSegment segment(iter->substr(line_length, segment_length) + "...", style, color, font);
                         mTextSegments.push_back(segment);
                         break; // consider it to be complete
                     }
@@ -471,7 +470,7 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                 // "QualityAssurance AssuresQuality 1" will be split into two lines "QualityAssurance" and "AssuresQuality"
                 do
                 {
-                    S32 segment_length = font->maxDrawableChars(LLWStringView(*iter).substr(line_length), max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                    S32 segment_length = font->maxDrawableBytes(std::string_view(*iter).substr(line_length), max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                     LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
                     mTextSegments.push_back(segment);
                     line_length += segment_length;
@@ -490,16 +489,12 @@ void LLHUDNameTag::setLabel(const std::string &label_utf8)
 
 void LLHUDNameTag::addLabel(const std::string& label_utf8, F32 max_pixels)
 {
-    LLWString wstr = utf8string_to_wstring(label_utf8);
-    if (!wstr.empty())
+    if (!label_utf8.empty())
     {
-        static const LLWString seps(U"\r\n");
-        static const LLWString empty;
+        typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+        boost::char_separator<char> sep("\r\n", "", boost::keep_empty_tokens);
 
-        typedef boost::tokenizer<boost::char_separator<llwchar>, LLWString::const_iterator, LLWString > tokenizer;
-        boost::char_separator<llwchar> sep(seps.c_str(), empty.c_str(), boost::keep_empty_tokens);
-
-        tokenizer tokens(wstr, sep);
+        tokenizer tokens(label_utf8, sep);
         tokenizer::iterator iter = tokens.begin();
 
         max_pixels = llmin(max_pixels, NAMETAG_MAX_WIDTH);
@@ -509,7 +504,7 @@ void LLHUDNameTag::addLabel(const std::string& label_utf8, F32 max_pixels)
             U32 line_length = 0;
             do
             {
-                S32 segment_length = mFontp->maxDrawableChars(LLWStringView(*iter).substr(line_length),
+                S32 segment_length = mFontp->maxDrawableBytes(std::string_view(*iter).substr(line_length),
                     max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                 LLHUDTextSegment segment(iter->substr(line_length, segment_length), LLFontGL::NORMAL, mColor, mFontp);
                 mLabelSegments.push_back(segment);

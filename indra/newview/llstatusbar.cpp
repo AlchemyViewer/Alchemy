@@ -735,8 +735,7 @@ void LLStatusBar::onObscureBalanceChanged(const LLSD& newvalue)
 
 void LLStatusBar::onUpdateFilterTerm()
 {
-    LLWString searchValue = utf8str_to_wstring( mFilterEdit->getValue() );
-    LLWStringUtil::toLower( searchValue );
+    const std::string searchValue = utf8str_tolower( mFilterEdit->getValue().asString() );
 
     if( !mSearchData || mSearchData->mLastFilter == searchValue )
         return;
@@ -756,8 +755,7 @@ void collectChildren( LLMenuGL *aMenu, ll::statusbar::SearchableItemPtr aParentM
         ll::statusbar::SearchableItemPtr pItem = std::make_shared<ll::statusbar::SearchableItem>();
         pItem->mCtrl = pMenu;
         pItem->mMenu = pMenu;
-        pItem->mLabel = utf8str_to_wstring( pMenu->ll::ui::SearchableControl::getSearchText() );
-        LLWStringUtil::toLower( pItem->mLabel );
+        pItem->mLabel = utf8str_tolower( pMenu->ll::ui::SearchableControl::getSearchText() );
         aParentMenu->mChildren.push_back( pItem );
 
         LLMenuItemBranchGL *pBranch = dynamic_cast< LLMenuItemBranchGL* >( pMenu );

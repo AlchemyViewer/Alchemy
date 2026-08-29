@@ -2994,8 +2994,7 @@ void ALFloaterSceneExplorer::doCopy(const LLSD& param)
     if (out.empty())
         return;
 
-    const LLWString wout = utf8str_to_wstring(out);
-    LLClipboard::instance().copyToClipboard(wout, 0, (S32)wout.size());
+    LLClipboard::instance().copyToClipboard(out, 0, (S32)out.size());
 }
 
 void ALFloaterSceneExplorer::doCopyResults()
@@ -3056,8 +3055,7 @@ void ALFloaterSceneExplorer::doCopyResults()
     if (!rows)
         return;
 
-    const LLWString wout = utf8str_to_wstring(out);
-    LLClipboard::instance().copyToClipboard(wout, 0, (S32)wout.size());
+    LLClipboard::instance().copyToClipboard(out, 0, (S32)out.size());
 }
 
 void ALFloaterSceneExplorer::doShowOnMap()

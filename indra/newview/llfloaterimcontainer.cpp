@@ -1573,19 +1573,18 @@ void LLFloaterIMContainer::doToSelectedGroup(const LLSD& userdata)
     {
         if (auto group = LLGroupMgr::getInstance()->getGroupData(mSelectedSession))
         {
-            LLWString wstr = utf8str_to_wstring(group->mName);
-            LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.length()));
+            LLClipboard::instance().copyToClipboard(group->mName, 0, narrow(group->mName.length()));
         }
     }
     else if (action == "copy_group_slurl")
     {
-        LLWString wstr = utf8str_to_wstring(LLSLURL("group", mSelectedSession, "about").getSLURLString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.length()));
+        const std::string slurl = LLSLURL("group", mSelectedSession, "about").getSLURLString();
+        LLClipboard::instance().copyToClipboard(slurl, 0, narrow(slurl.length()));
     }
     else if (action == "copy_group_id")
     {
-        LLWString wstr = utf8str_to_wstring(mSelectedSession.asString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.length()));
+        const std::string id_str = mSelectedSession.asString();
+        LLClipboard::instance().copyToClipboard(id_str, 0, narrow(id_str.length()));
     }
 }
 

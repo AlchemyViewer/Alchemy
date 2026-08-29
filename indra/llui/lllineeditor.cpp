@@ -518,7 +518,7 @@ bool LLLineEditor::dragSelectCursorTo(S32 local_mouse_x)
     S32 new_pos = calcCursorPos(local_mouse_x);
     const S32 old_pos = getCursor();
 
-    // Snap to a grapheme boundary up front. calcCursorPos / charFromPixelOffset
+    // Snap to a grapheme boundary up front. calcCursorPos / byteFromPixelOffset
     // can hand back a position mid-cluster (the past-end-of-text branch);
     // without alignment, the spans_cluster check below would miss and
     // setCursor's clamp-only behaviour would let mid-cluster placements through.

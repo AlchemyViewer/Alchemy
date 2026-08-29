@@ -183,7 +183,7 @@ void LLInventoryGalleryContextMenu::doToSelected(const LLSD& userdata)
             std::string buffer;
             asset_id.toString(buffer);
 
-            gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(buffer));
+            gViewerWindow->getWindow()->copyTextToClipboard(buffer);
         }
     }
     else if ("purge" == action)
@@ -342,7 +342,7 @@ void LLInventoryGalleryContextMenu::doToSelected(const LLSD& userdata)
             {
                 std::function<void(std::string& slurl)> copy_slurl_to_clipboard_cb = [](const std::string& slurl)
                 {
-                    gViewerWindow->getWindow()->copyTextToClipboard(utf8str_to_wstring(slurl));
+                    gViewerWindow->getWindow()->copyTextToClipboard(slurl);
                     LLSD args;
                     args["SLURL"] = slurl;
                     LLNotificationsUtil::add("CopySLURL", args);

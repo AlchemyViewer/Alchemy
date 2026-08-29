@@ -82,7 +82,6 @@ template <> S32 convert_from_llsd<S32>(const LLSD& sd, eControlType type, std::s
 template <> U32 convert_from_llsd<U32>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> F32 convert_from_llsd<F32>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> std::string convert_from_llsd<std::string>(const LLSD& sd, eControlType type, std::string_view control_name);
-template <> LLWString convert_from_llsd<LLWString>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLVector3 convert_from_llsd<LLVector3>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLVector3d convert_from_llsd<LLVector3d>(const LLSD& sd, eControlType type, std::string_view control_name);
 template <> LLRect convert_from_llsd<LLRect>(const LLSD& sd, eControlType type, std::string_view control_name);
@@ -579,11 +578,6 @@ F32 LLControlGroup::getF32(std::string_view name)
 std::string LLControlGroup::getString(std::string_view name)
 {
     return get<std::string>(name);
-}
-
-LLWString LLControlGroup::getWString(std::string_view name)
-{
-    return get<LLWString>(name);
 }
 
 std::string LLControlGroup::getText(std::string_view name)
@@ -1424,12 +1418,6 @@ std::string convert_from_llsd<std::string>(const LLSD& sd, eControlType type, st
         CONTROL_ERRS << "Invalid string value for " << control_name << ": " << LLControlGroup::typeEnumToString(type) << " " << sd << LL_ENDL;
         return LLStringUtil::null;
     }
-}
-
-template<>
-LLWString convert_from_llsd<LLWString>(const LLSD& sd, eControlType type, std::string_view control_name)
-{
-    return utf8str_to_wstring(convert_from_llsd<std::string>(sd, type, control_name));
 }
 
 template<>

@@ -1694,14 +1694,16 @@ bool LLWindowSDL::isClipboardTextAvailable()
     return SDL_HasClipboardText();
 }
 
-bool LLWindowSDL::pasteTextFromClipboard(LLWString &dst)
+bool LLWindowSDL::pasteTextFromClipboard(std::string &dst)
 {
     if (isClipboardTextAvailable())
     {
         char* data = SDL_GetClipboardText();
         if (data)
         {
-            dst = LLWString(utf8str_to_wstring(data));
+            // SDL hands back whatever the selection owner published; Win32 gets
+            // its guarantee from WideCharToMultiByte, and this side has none.
+            dst = utf8str_sanitize(data);
             SDL_free(data);
             return true;
         }
@@ -1709,10 +1711,9 @@ bool LLWindowSDL::pasteTextFromClipboard(LLWString &dst)
     return false;
 }
 
-bool LLWindowSDL::copyTextToClipboard(const LLWString& text)
+bool LLWindowSDL::copyTextToClipboard(const std::string& text)
 {
-    const std::string utf8 = wstring_to_utf8str(text);
-    return SDL_SetClipboardText(utf8.c_str());
+    return SDL_SetClipboardText(text.c_str());
 }
 
 bool LLWindowSDL::isPrimaryTextAvailable()
@@ -1720,14 +1721,16 @@ bool LLWindowSDL::isPrimaryTextAvailable()
     return SDL_HasPrimarySelectionText();
 }
 
-bool LLWindowSDL::pasteTextFromPrimary(LLWString &dst)
+bool LLWindowSDL::pasteTextFromPrimary(std::string &dst)
 {
     if (isPrimaryTextAvailable())
     {
         char* data = SDL_GetPrimarySelectionText();
         if (data)
         {
-            dst = LLWString(utf8str_to_wstring(data));
+            // SDL hands back whatever the selection owner published; Win32 gets
+            // its guarantee from WideCharToMultiByte, and this side has none.
+            dst = utf8str_sanitize(data);
             SDL_free(data);
             return true;
         }
@@ -1735,10 +1738,9 @@ bool LLWindowSDL::pasteTextFromPrimary(LLWString &dst)
     return false;
 }
 
-bool LLWindowSDL::copyTextToPrimary(const LLWString& text)
+bool LLWindowSDL::copyTextToPrimary(const std::string& text)
 {
-    const std::string utf8 = wstring_to_utf8str(text);
-    return SDL_SetPrimarySelectionText(utf8.c_str());
+    return SDL_SetPrimarySelectionText(text.c_str());
 }
 
 LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_resolutions)
@@ -2521,10 +2523,14 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             {
                 mPreeditor->resetPreedit();
             }
-            auto string = utf8str_to_wstring(event.text.text);
+            const std::string_view committed(event.text.text ? event.text.text : "");
             MASK current_mask = gKeyboard->currentMask(false);
-            for (auto key : string)
+            for (size_t i = 0; i < committed.size(); )
             {
+                const LLCodepointAt at = utf8str_decode_at(committed, i);
+                i = at.next;
+                const llwchar key = at.cp;
+
                 // Deliberately do NOT overwrite mKeyVirtualKey here.
                 // mKeyVirtualKey is read by getNativeKeyData() and forwarded
                 // to Dullahan/CEF as the virtual-key code; Win32 keeps it as

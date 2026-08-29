@@ -258,19 +258,17 @@ void LLHUDText::addLine(const std::string &text_utf8,
                         const LLFontGL::StyleFlags style,
                         const LLFontGL* font)
 {
-    LLWString wline = utf8str_to_wstring(text_utf8);
-    if (!wline.empty())
+    if (!text_utf8.empty())
     {
         // use default font for segment if custom font not specified
         if (!font)
         {
             font = mFontp;
         }
-        typedef boost::tokenizer<boost::char_separator<llwchar>, LLWString::const_iterator, LLWString > tokenizer;
-        static const LLWString seps(U"\r\n");
-        boost::char_separator<llwchar> sep(seps.c_str());
+        typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+        boost::char_separator<char> sep("\r\n");
 
-        tokenizer tokens(wline, sep);
+        tokenizer tokens(text_utf8, sep);
         tokenizer::iterator iter = tokens.begin();
 
         while (iter != tokens.end())
@@ -279,7 +277,7 @@ void LLHUDText::addLine(const std::string &text_utf8,
             do
             {
                 F32 max_pixels = HUD_TEXT_MAX_WIDTH_NO_BUBBLE;
-                S32 segment_length = font->maxDrawableChars(LLWStringView(*iter).substr(line_length), max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                S32 segment_length = font->maxDrawableBytes(std::string_view(*iter).substr(line_length), max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                 LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
                 mTextSegments.push_back(segment);
                 line_length += segment_length;

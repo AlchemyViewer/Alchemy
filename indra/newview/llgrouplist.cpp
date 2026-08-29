@@ -385,19 +385,17 @@ bool LLGroupList::onContextMenuItemClick(const LLSD& userdata)
     {
         std::string group_name;
         gCacheName->getGroupName(LLUUID(selected_group), group_name);
-        LLWString wstr = utf8str_to_wstring(group_name);
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        LLClipboard::instance().copyToClipboard(group_name, 0, narrow(group_name.size()));
     }
     else if (action == "copy_slurl")
     {
         std::string slurl = LLSLURL("group", selected_group, "about").getSLURLString();
-        LLWString wstr = utf8str_to_wstring(slurl);
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        LLClipboard::instance().copyToClipboard(slurl, 0, narrow(slurl.size()));
     }
     else if (action == "copy_uuid")
     {
-        LLWString wstr = utf8str_to_wstring(selected_group.asString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        const std::string id_str = selected_group.asString();
+        LLClipboard::instance().copyToClipboard(id_str, 0, narrow(id_str.size()));
     }
 
     return true;

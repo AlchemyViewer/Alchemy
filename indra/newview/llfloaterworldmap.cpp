@@ -1531,7 +1531,7 @@ void LLFloaterWorldMap::onClickTeleportBtn()
 
 void LLFloaterWorldMap::onCopySLURL()
 {
-    getWindow()->copyTextToClipboard(utf8str_to_wstring(mSLURL.getSLURLString()));
+    getWindow()->copyTextToClipboard(mSLURL.getSLURLString());
 
     LLSD args;
     args["SLURL"] = mSLURL.getSLURLString();

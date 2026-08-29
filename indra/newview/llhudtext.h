@@ -54,14 +54,14 @@ protected:
     class LLHUDTextSegment
     {
     public:
-        LLHUDTextSegment(const LLWString& text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
+        LLHUDTextSegment(std::string text, const LLFontGL::StyleFlags style, const LLColor4& color, const LLFontGL* font)
         :   mColor(color),
             mStyle(style),
-            mText(text),
+            mText(std::move(text)),
             mFont(font)
         {}
         F32 getWidth(const LLFontGL* font);
-        const LLWString& getText() const { return mText; }
+        const std::string& getText() const { return mText; }
         void clearFontWidthMap() { mFontWidthMap.clear(); }
 
         LLColor4                mColor;
@@ -69,7 +69,7 @@ protected:
         const LLFontGL*         mFont;
         LLFontVertexBuffer      mFontBuffer;
     private:
-        LLWString               mText;
+        std::string             mText;
         std::map<const LLFontGL*, F32> mFontWidthMap;
     };
 

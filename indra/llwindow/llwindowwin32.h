@@ -88,8 +88,8 @@ public:
     void releaseMouse() override;
     void setMouseClipping( bool b ) override;
     bool isClipboardTextAvailable() override;
-    bool pasteTextFromClipboard(LLWString &dst) override;
-    bool copyTextToClipboard(const LLWString &src) override;
+    bool pasteTextFromClipboard(std::string &dst) override;
+    bool copyTextToClipboard(const std::string &src) override;
     void flashIcon(F32 seconds) override;
     F32 getGamma() override;
     bool setGamma(const F32 gamma) override; // Set the gamma

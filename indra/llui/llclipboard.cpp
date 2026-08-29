@@ -52,7 +52,7 @@ void LLClipboard::reset()
     // Clear the clipboard
     mObjects.clear();
     mCutMode = false;
-    mString = LLWString();
+    mString.clear();
 }
 
 // Copy the input uuid to the LL clipboard
@@ -115,17 +115,17 @@ bool LLClipboard::isOnClipboard(const LLUUID& object) const
 }
 
 // Copy the input string to the LL and the system clipboard
-bool LLClipboard::copyToClipboard(const LLWString &src, S32 pos, S32 len, bool use_primary)
+bool LLClipboard::copyToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary)
 {
-    return addToClipboard(src, pos, len, use_primary);
+    return addToClipboard(src, byte_pos, byte_len, use_primary);
 }
 
 // Concatenate the input string to the LL and the system clipboard
-bool LLClipboard::addToClipboard(const LLWString &src, S32 pos, S32 len, bool use_primary)
+bool LLClipboard::addToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary)
 {
     try
     {
-        mString = src.substr(pos, len);
+        mString.assign(src.substr(byte_pos, byte_len));
     }
     catch (const std::exception& e)
     {
@@ -137,42 +137,12 @@ bool LLClipboard::addToClipboard(const LLWString &src, S32 pos, S32 len, bool us
 
 // Copy the System clipboard to the output string.
 // Manage the LL Clipboard / System clipboard consistency
-bool LLClipboard::pasteFromClipboard(LLWString &dst, bool use_primary)
+bool LLClipboard::pasteFromClipboard(std::string& dst, bool use_primary)
 {
-    bool res = (use_primary ? LLView::getWindow()->pasteTextFromPrimary(dst) : LLView::getWindow()->pasteTextFromClipboard(dst));
+    const bool res = (use_primary ? LLView::getWindow()->pasteTextFromPrimary(dst) : LLView::getWindow()->pasteTextFromClipboard(dst));
     if (res)
     {
         mString = dst;
-    }
-    return res;
-}
-
-bool LLClipboard::copyToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary)
-{
-    return addToClipboard(src, byte_pos, byte_len, use_primary);
-}
-
-bool LLClipboard::addToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary)
-{
-    try
-    {
-        mString = utf8str_to_wstring(std::string(src.substr(byte_pos, byte_len)));
-    }
-    catch (const std::exception& e)
-    {
-        LL_WARNS() << "Can't add the substring to clipboard: " << e.what() << LL_ENDL;
-        return false;
-    }
-    return (use_primary ? LLView::getWindow()->copyTextToPrimary(mString) : LLView::getWindow()->copyTextToClipboard(mString));
-}
-
-bool LLClipboard::pasteFromClipboard(std::string& dst, bool use_primary)
-{
-    LLWString wide;
-    const bool res = pasteFromClipboard(wide, use_primary);
-    if (res)
-    {
-        dst = wstring_to_utf8str(wide);
     }
     return res;
 }

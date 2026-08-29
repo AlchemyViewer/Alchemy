@@ -315,7 +315,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 }
 
 S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
-                          ShadowType shadow, S32 max_chars, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color, pass_boundary_cb_t on_pass_boundary) const
+                          ShadowType shadow, S32 max_bytes, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color, pass_boundary_cb_t on_pass_boundary) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -381,13 +381,13 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     S32 i;
     S32 length;
 
-    if (-1 == max_chars)
+    if (-1 == max_bytes)
     {
-        max_chars = length = (S32)utf8text.length() - begin_offset;
+        max_bytes = length = (S32)utf8text.length() - begin_offset;
     }
     else
     {
-        length = llmin((S32)utf8text.length() - begin_offset, max_chars );
+        length = llmin((S32)utf8text.length() - begin_offset, max_bytes );
     }
 
     F32 cur_x, cur_y, cur_render_x, cur_render_y;

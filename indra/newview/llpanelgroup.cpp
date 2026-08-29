@@ -684,21 +684,20 @@ void LLPanelGroup::onCommitMenu(const LLSD& userdata)
     const std::string item_name = userdata.asString();
     if (item_name == "copy_group_slurl")
     {
-        LLWString wstr = utf8str_to_wstring(LLSLURL("group", mID, "about").getSLURLString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        const std::string slurl = LLSLURL("group", mID, "about").getSLURLString();
+        LLClipboard::instance().copyToClipboard(slurl, 0, narrow(slurl.size()));
     }
     else if (item_name == "copy_group_id")
     {
-        LLWString wstr = utf8str_to_wstring(mID.asString());
-        LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+        const std::string id_str = mID.asString();
+        LLClipboard::instance().copyToClipboard(id_str, 0, narrow(id_str.size()));
     }
     else if (item_name == "copy_group_name")
     {
         std::string name;
         if (gCacheName->getGroupName(mID, name))
         {
-            LLWString wstr = utf8str_to_wstring(name);
-            LLClipboard::instance().copyToClipboard(wstr, 0, narrow(wstr.size()));
+            LLClipboard::instance().copyToClipboard(name, 0, narrow(name.size()));
         }
     }
 }

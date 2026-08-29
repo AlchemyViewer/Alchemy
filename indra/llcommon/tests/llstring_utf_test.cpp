@@ -2550,4 +2550,55 @@ namespace tut
         ensure_equals("past the end", utf8str_utf16_length(utf8, 999, 999), S32(0));
         ensure_equals("no budget", utf8str_length_from_utf16_length(utf8, 0, 0), S32(0));
     }
+
+    // Valid text has to come back byte-identical -- the clipboard calls this on
+    // every paste, and a sanitizer that rewrites what was already correct would
+    // be worse than none.
+    template<> template<>
+    void llstring_utf_object_t::test<134>()
+    {
+        const std::string ascii = "plain ascii";
+        ensure_equals("ascii untouched", utf8str_sanitize(ascii), ascii);
+
+        const LLWString wide = { (llwchar)'a', (llwchar)0x00E9, (llwchar)0x65E5,
+                                 (llwchar)0x1F600, (llwchar)'z' };
+        const std::string mixed = wstring_to_utf8str(wide);
+        ensure_equals("mixed untouched", utf8str_sanitize(mixed), mixed);
+
+        ensure_equals("empty", utf8str_sanitize(std::string_view()), std::string());
+
+        // Embedded NUL is valid UTF-8 and must survive; string_view carries it.
+        const std::string with_nul("a\0b", 3);
+        ensure_equals("nul survives", utf8str_sanitize(with_nul), with_nul);
+    }
+
+    // And malformed text has to come back valid, whatever shape the damage took.
+    template<> template<>
+    void llstring_utf_object_t::test<135>()
+    {
+        const auto is_valid = [](const std::string& s)
+        {
+            return utf8str_sanitize(s) == s;
+        };
+
+        // A lone continuation byte, a truncated lead, an overlong 'A', an
+        // encoded surrogate half, and a value past U+10FFFF. simdutf rejects
+        // the last three even though a naive decoder would accept them.
+        const std::string bad[] = {
+            std::string("ok\x80" "ok"),
+            std::string("ok\xE6\x97" "ok"),
+            std::string("ok\xC1\x81" "ok"),
+            std::string("ok\xED\xA0\x80" "ok"),
+            std::string("ok\xF5\x80\x80\x80" "ok"),
+        };
+
+        for (const std::string& s : bad)
+        {
+            ensure("input really is malformed", !is_valid(s));
+            const std::string fixed = utf8str_sanitize(s);
+            ensure("output is valid", is_valid(fixed));
+            ensure("the good bytes are still there",
+                   fixed.find("ok") == 0 && fixed.rfind("ok") == fixed.size() - 2);
+        }
+    }
 }

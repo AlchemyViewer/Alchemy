@@ -859,6 +859,13 @@ LL_COMMON_API std::string utf8str_from_cp(llwchar cp);
 // bytes count one each, so this never disagrees with a walk over the same text.
 LL_COMMON_API size_t utf8str_codepoint_count(std::string_view utf8str);
 
+// Valid UTF-8, with any malformed sequence replaced by the unknown character.
+// Text arriving from outside the viewer -- the system clipboard is the one that
+// reaches a document today -- carries no guarantee of validity, and now that the
+// document is UTF-8 there is no conversion on the way in to check it. Returns
+// the input unchanged when it is already valid, which is the case that matters.
+LL_COMMON_API std::string utf8str_sanitize(std::string_view utf8str);
+
 LL_COMMON_API size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos);

@@ -170,7 +170,7 @@ public:
     LLEmbeddedItemSegment(S32 pos, LLUIImagePtr image, LLPointer<LLInventoryItem> inv_item, LLTextEditor& editor)
     :   LLTextSegment(pos, pos + 1),
         mImage(image),
-        mLabel(utf8str_to_wstring(inv_item->getName())),
+        mLabel(inv_item->getName()),
         mItem(inv_item),
         mEditor(editor)
     {
@@ -243,7 +243,7 @@ public:
         const LLColor4& color = mEditor.getReadOnly() ? embedded_item_readonly_col : embedded_item_col;
 
         F32 right_x;
-        mStyle->getFont()->render(mLabel, 0, image_rect.mRight + EMBEDDED_ITEM_LABEL_PADDING, draw_rect.mTop, color, LLFontGL::LEFT, LLFontGL::TOP, LLFontGL::UNDERLINE, LLFontGL::NO_SHADOW, static_cast<S32>(mLabel.length()), S32_MAX, &right_x);
+        mStyle->getFont()->renderBytes(mLabel, 0, image_rect.mRight + EMBEDDED_ITEM_LABEL_PADDING, draw_rect.mTop, color, LLFontGL::LEFT, LLFontGL::TOP, LLFontGL::UNDERLINE, LLFontGL::NO_SHADOW, static_cast<S32>(mLabel.length()), S32_MAX, &right_x);
         return right_x;
     }
 
@@ -303,7 +303,7 @@ public:
 
 private:
     LLUIImagePtr    mImage;
-    LLWString       mLabel;
+    std::string     mLabel;
     LLStyleSP       mStyle;
     std::string     mToolTip;
     LLPointer<LLInventoryItem> mItem;
