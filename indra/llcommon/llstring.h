@@ -891,6 +891,13 @@ LL_COMMON_API std::string utf8str_from_cp(llwchar cp);
 // bytes count one each, so this never disagrees with a walk over the same text.
 LL_COMMON_API size_t utf8str_codepoint_count(std::string_view utf8str);
 
+// Whether the bytes are well-formed UTF-8: shortest forms, no surrogate halves,
+// nothing past U+10FFFF. Worth asking before utf8str_sanitize where the answer
+// is nearly always yes and the caller already holds the text -- sanitize has to
+// return a string, and copying one per line of chat to learn nothing changed is
+// a cost the check does not have.
+LL_COMMON_API bool utf8str_is_valid(std::string_view utf8str);
+
 // Valid UTF-8, with any malformed sequence replaced by the unknown character.
 // Text arriving from outside the viewer -- the system clipboard is the one that
 // reaches a document today -- carries no guarantee of validity, and now that the

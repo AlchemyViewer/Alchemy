@@ -1340,9 +1340,14 @@ size_t utf8str_codepoint_count(std::string_view utf8str)
     return count;
 }
 
+bool utf8str_is_valid(std::string_view utf8str)
+{
+    return utf8str.empty() || simdutf::validate_utf8(utf8str.data(), utf8str.size());
+}
+
 std::string utf8str_sanitize(std::string_view utf8str)
 {
-    if (utf8str.empty() || simdutf::validate_utf8(utf8str.data(), utf8str.size()))
+    if (utf8str_is_valid(utf8str))
     {
         return std::string(utf8str);
     }

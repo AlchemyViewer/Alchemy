@@ -2616,6 +2616,19 @@ void LLTextBase::appendText(const std::string &new_text, bool prepend_newline, c
 
     if(prepend_newline)
         appendLineBreakSegment(input_params);
+
+    // Everything a widget is ever given to show arrives here -- setText and
+    // setValue both come through, as does every line of chat -- and none of it
+    // is promised to be UTF-8. It used to be laundered by the conversion into
+    // the UTF-32 the document was kept in, which ran simdutf and replaced what
+    // it rejected; the document holds bytes now and that conversion is gone.
+    // Asked rather than repaired, because valid is the answer nearly every
+    // time and the repair has to build a string to say so.
+    if (!utf8str_is_valid(new_text))
+    {
+        appendTextImpl(utf8str_sanitize(new_text), input_params);
+        return;
+    }
     appendTextImpl(new_text,input_params);
 }
 

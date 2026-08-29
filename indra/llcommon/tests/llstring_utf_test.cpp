@@ -2601,8 +2601,14 @@ namespace tut
         for (const std::string& s : bad)
         {
             ensure("input really is malformed", !is_valid(s));
+            // The predicate the widgets ask before deciding whether to repair
+            // has to agree with simdutf, or a widget skips a repair it needed.
+            ensure_equals("utf8str_is_valid agrees with simdutf",
+                          utf8str_is_valid(s), is_valid(s));
             const std::string fixed = utf8str_sanitize(s);
             ensure("output is valid", is_valid(fixed));
+            ensure_equals("and the predicate says so too",
+                          utf8str_is_valid(fixed), true);
             ensure("the good bytes are still there",
                    fixed.find("ok") == 0 && fixed.rfind("ok") == fixed.size() - 2);
         }

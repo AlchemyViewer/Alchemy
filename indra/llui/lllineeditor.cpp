@@ -445,6 +445,15 @@ void LLLineEditor::setText(const LLStringExplicit &new_text, bool use_size_limit
     all_selected = all_selected || (len == 0 && hasFocus() && mSelectAllonFocusReceived);
 
     std::string truncated_utf8 = new_text;
+    // Whatever the caller was handed -- an object name off the wire, a value
+    // out of an asset -- and nothing promises it is UTF-8. The conversion into
+    // the UTF-32 this field used to hold ran simdutf and replaced what it
+    // rejected; the field holds bytes now and that check went with it. The copy
+    // is being made either way, so a clean string costs one validate pass.
+    if (!utf8str_is_valid(truncated_utf8))
+    {
+        truncated_utf8 = utf8str_sanitize(truncated_utf8);
+    }
     if (!mAllowEmoji)
     {
         // Cut emoji symbols if exist
@@ -452,7 +461,10 @@ void LLLineEditor::setText(const LLStringExplicit &new_text, bool use_size_limit
     }
     if (use_size_limit && truncated_utf8.size() > (U32)mMaxLengthBytes)
     {
-        truncated_utf8 = utf8str_truncate(new_text, mMaxLengthBytes);
+        // Cut what is being kept, not the argument: the emoji strip and the
+        // repair above both happened to the copy, and truncating the original
+        // instead would put back whatever they took out.
+        truncated_utf8 = utf8str_truncate(truncated_utf8, mMaxLengthBytes);
     }
     mText.assign(truncated_utf8);
 
