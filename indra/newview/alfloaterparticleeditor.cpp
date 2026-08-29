@@ -483,7 +483,7 @@ default\n\
     LLStringUtil::replaceString(script, "[SOURCE_MAX_AGE]", mSourceMaxAgeCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[PART_MAX_AGE]", mParticlesMaxAgeCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[BURST_RATE]", mBurstRateCtrl->getValue().asString());
-    LLStringUtil::replaceString(script, "[BURST_COUNT]", mBurstCountCtrl->getValue());
+    LLStringUtil::replaceString(script, "[BURST_COUNT]", mBurstCountCtrl->getValue().asString());
     LLStringUtil::replaceString(script, "[ACCELERATION]", lslVector((F32)mAcellerationXCtrl->getValue().asReal(),
         (F32)mAcellerationYCtrl->getValue().asReal(),
         (F32)mAcellerationZCtrl->getValue().asReal()));

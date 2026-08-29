@@ -398,6 +398,17 @@ namespace tut
 
         str_val = "4294967296";
         ensure("3: convertToU32 failed", !LLStringUtil::convertToU32(str_val, value));
+
+        // A negative is rejected rather than wrapped. convertToU8 and
+        // convertToU16 above already answer false for "-1" -- they range-check
+        // after parsing as signed -- so this is the unsigned form agreeing with
+        // its own siblings. Stream extraction let num_get negate it instead.
+        str_val = "-1";
+        ensure("4: convertToU32 failed", !LLStringUtil::convertToU32(str_val, value));
+
+        // A leading '+' is still accepted, as it was through the stream.
+        str_val = "+7";
+        ensure("5: convertToU32 failed", LLStringUtil::convertToU32(str_val, value) && value == 7);
     }
 
     template<> template<>
@@ -420,6 +431,22 @@ namespace tut
 
         str_val = "-2147483649";
         ensure("5: convertToS32 failed", !LLStringUtil::convertToS32(str_val, value));
+
+        // from_chars does not take a leading '+' on its own; the conversions
+        // strip it so they keep accepting what stream extraction accepted.
+        str_val = "+42";
+        ensure("6: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 42);
+
+        // Surrounding space is trimmed, and a parse that stops early still
+        // reports what it read -- both as the stream did.
+        str_val = "  13  ";
+        ensure("7: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 13);
+
+        str_val = "12abc";
+        ensure("8: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 12);
+
+        str_val = "abc";
+        ensure("9: convertToS32 failed", !LLStringUtil::convertToS32(str_val, value));
     }
 
     template<> template<>
@@ -442,6 +469,27 @@ namespace tut
         str_val = "-2147483649";
         ensure("5: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
         */
+
+        // The reals go through fast_float now. Decimals, exponents, a sign and
+        // a leading '+' all read the same as they did through the stream, and
+        // the decimal point stays a point whatever the C locale is set to.
+        str_val = "1.5";
+        ensure("6: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 1.5f);
+
+        str_val = "-2.25";
+        ensure("7: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == -2.25f);
+
+        str_val = "+0.5";
+        ensure("8: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 0.5f);
+
+        str_val = "1.5e2";
+        ensure("9: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 150.f);
+
+        str_val = "  0.25  ";
+        ensure("10: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 0.25f);
+
+        str_val = "nonsense";
+        ensure("11: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
     }
 
     template<> template<>

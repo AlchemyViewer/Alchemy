@@ -31,8 +31,6 @@
 #define LL_LLSTRING_H
 
 #include <boost/call_traits.hpp>
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -307,7 +305,7 @@ public:
                                               const string_type& quotes,
                                               const string_type& escapes);
 
-    LL_COMMON_API static void formatNumber(string_type& numStr, string_type decimals);
+    LL_COMMON_API static void formatNumber(string_type& numStr, string_view_type decimals);
     LL_COMMON_API static bool formatDatetime(string_type& replacement, string_view_type token, string_view_type param, S32 secFromEpoch);
     LL_COMMON_API static S32 format(string_type& s, const format_map_t& substitutions);
     LL_COMMON_API static S32 format(string_type& s, const LLSD& substitutions);
@@ -386,7 +384,7 @@ public:
     static void replaceTabsWithSpaces( string_type& string, size_type spaces_per_tab );
     static void replaceNonstandardASCII( string_type& string, T replacement );
     static void replaceChar( string_type& string, T target, T replacement );
-    static void replaceString( string_type& string, string_type target, string_type replacement );
+    static void replaceString( string_type& string, string_view_type target, string_view_type replacement );
     static string_type capitalize(const string_type& str);
     static void capitalize(string_type& str);
 
@@ -438,20 +436,20 @@ public:
     // Win32, and falls back to a non-locale aware comparison on
     // Linux.
     static S32      compareInsensitive(const T* lhs, const T* rhs);
-    static S32      compareInsensitive(const string_type& lhs, const string_type& rhs);
+    static S32      compareInsensitive(string_view_type lhs, string_view_type rhs);
 
     // Sort order for lists people read: Unicode collation with digit runs
     // compared as numbers, so item2 comes before item10 and an accented letter
     // sorts beside the letter it decorates. Case is a tertiary difference, so
     // "abc" and "ABC" differ but sort next to each other, lowercase first.
     // Root locale, so a list looks the same to everyone.
-    static S32      compareDict(const string_type& a, const string_type& b);
+    static S32      compareDict(string_view_type a, string_view_type b);
 
     // The same, with case ignored entirely. Accents still separate.
-    static S32      compareDictInsensitive(const string_type& a, const string_type& b);
+    static S32      compareDictInsensitive(string_view_type a, string_view_type b);
 
     // Puts compareDict() in a form appropriate for LL container classes to use for sorting.
-    static bool     precedesDict( const string_type& a, const string_type& b );
+    static bool     precedesDict( string_view_type a, string_view_type b );
 
     // A replacement for strncpy.
     // If the dst buffer is dst_size bytes long or more, ensures that dst is null terminated and holds
@@ -459,7 +457,7 @@ public:
     static void     copy(T* dst, const T* src, size_type dst_size);
 
     // Copies src into dst at a given offset.
-    static void     copyInto(string_type& dst, const string_type& src, size_type offset);
+    static void     copyInto(string_type& dst, string_view_type src, size_type offset);
 
 
 #ifdef _DEBUG
@@ -1532,21 +1530,21 @@ S32 LLStringUtilBase<T>::compareStrings(const string_type& lhs, const string_typ
 // sharp s onto SS and so calls two different words equal, and it allocates and
 // cases both sides on every comparison in a sort.
 template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareInsensitive(const char* lhs, const char* rhs);
-template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareInsensitive(const std::string& lhs, const std::string& rhs);
+template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareInsensitive(std::string_view lhs, std::string_view rhs);
 template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareInsensitive(const llwchar* lhs, const llwchar* rhs);
-template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareInsensitive(const LLWString& lhs, const LLWString& rhs);
+template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareInsensitive(LLWStringView lhs, LLWStringView rhs);
 
 // Collation is ICU's, so these are defined in llstring.cpp where it is
 // reachable. Only char and llwchar are ever asked for.
-template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareDict(const std::string& a, const std::string& b);
-template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareDictInsensitive(const std::string& a, const std::string& b);
-template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareDict(const LLWString& a, const LLWString& b);
-template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareDictInsensitive(const LLWString& a, const LLWString& b);
+template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareDict(std::string_view a, std::string_view b);
+template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareDictInsensitive(std::string_view a, std::string_view b);
+template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareDict(LLWStringView a, LLWStringView b);
+template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareDictInsensitive(LLWStringView a, LLWStringView b);
 
 // Puts compareDict() in a form appropriate for LL container classes to use for sorting.
 // static
 template<class T>
-bool LLStringUtilBase<T>::precedesDict( const string_type& a, const string_type& b )
+bool LLStringUtilBase<T>::precedesDict( string_view_type a, string_view_type b )
 {
     if( a.size() && b.size() )
     {
@@ -1788,8 +1786,20 @@ void LLStringUtilBase<T>::replaceChar( string_type& string, T target, T replacem
 
 //static
 template<class T>
-void LLStringUtilBase<T>::replaceString( string_type& string, string_type target, string_type replacement )
+void LLStringUtilBase<T>::replaceString( string_type& string, string_view_type target, string_view_type replacement )
 {
+    // A view is allowed to point into `string` itself, and replacing from a
+    // view of the buffer being replaced into is undefined. Copy in that one
+    // case; the pointer comparison costs nothing on the ordinary path, where
+    // both arguments are literals or unrelated strings.
+    const T* const begin = string.data();
+    if (replacement.data() >= begin && replacement.data() <= begin + string.size())
+    {
+        const string_type owned(replacement);
+        replaceString(string, target, string_view_type(owned));
+        return;
+    }
+
     size_type found_pos = 0;
     while( (found_pos = string.find(target, found_pos)) != string_type::npos )
     {
@@ -1896,6 +1906,14 @@ template<> LL_COMMON_API bool LLStringUtilBase<char>::containsNonprintable(std::
 template<> LL_COMMON_API void LLStringUtilBase<char>::stripNonprintable(std::string& string);
 
 // Likewise: uppercasing one byte can only ever reach ASCII.
+// Parsing is std::from_chars for the integers and fast_float::from_chars for
+// the reals, both defined in llstring.cpp so neither header has to reach the
+// whole viewer. Only char is ever asked for; the stream extraction these
+// replace could not have compiled for llwchar either.
+template<> LL_COMMON_API bool LLStringUtilBase<char>::convertToU32(std::string_view string, U32& value);
+template<> LL_COMMON_API bool LLStringUtilBase<char>::convertToS32(std::string_view string, S32& value);
+template<> LL_COMMON_API bool LLStringUtilBase<char>::convertToF64(std::string_view string, F64& value);
+
 template<> LL_COMMON_API void LLStringUtilBase<char>::capitalize(std::string& str);
 
 // *TODO: reimplement in terms of algorithm
@@ -1965,7 +1983,7 @@ void LLStringUtilBase<T>::copy( T* dst, const T* src, size_type dst_size )
 
 // static
 template<class T>
-void LLStringUtilBase<T>::copyInto(string_type& dst, const string_type& src, size_type offset)
+void LLStringUtilBase<T>::copyInto(string_type& dst, string_view_type src, size_type offset)
 {
     if ( offset == dst.length() )
     {
@@ -2146,51 +2164,6 @@ bool LLStringUtilBase<T>::convertToU16(string_view_type string, U16& value)
 }
 
 template<class T>
-bool LLStringUtilBase<T>::convertToU32(string_view_type string, U32& value)
-{
-    if( string.empty() )
-    {
-        return false;
-    }
-
-    trim(string);
-    U32 v;
-    boost::iostreams::stream<boost::iostreams::array_source> i_stream(string.data(), string.size());
-    if(i_stream >> v)
-    {
-        value = v;
-        return true;
-    }
-    return false;
-}
-
-template<class T>
-bool LLStringUtilBase<T>::convertToS32(string_view_type string, S32& value)
-{
-    if( string.empty() )
-    {
-        return false;
-    }
-
-    trim(string);
-    S32 v;
-    boost::iostreams::stream<boost::iostreams::array_source> i_stream(string.data(), string.size());
-    if(i_stream >> v)
-    {
-        //TODO: figure out overflow and underflow reporting here
-        //if((LONG_MAX == v) || (LONG_MIN == v))
-        //{
-        //  // Underflow or overflow
-        //  return false;
-        //}
-
-        value = v;
-        return true;
-    }
-    return false;
-}
-
-template<class T>
 bool LLStringUtilBase<T>::convertToF32(string_view_type string, F32& value)
 {
     F64 value64 = 0.0;
@@ -2198,32 +2171,6 @@ bool LLStringUtilBase<T>::convertToF32(string_view_type string, F32& value)
     if( success && (-F32_MAX <= value64) && (value64 <= F32_MAX) )
     {
         value = (F32) value64;
-        return true;
-    }
-    return false;
-}
-
-template<class T>
-bool LLStringUtilBase<T>::convertToF64(string_view_type string, F64& value)
-{
-    if( string.empty() )
-    {
-        return false;
-    }
-
-    trim(string);
-    F64 v;
-    boost::iostreams::stream<boost::iostreams::array_source> i_stream(string.data(), string.size());
-    if(i_stream >> v)
-    {
-        //TODO: figure out overflow and underflow reporting here
-        //if( ((-HUGE_VAL == v) || (HUGE_VAL == v))) )
-        //{
-        //  // Underflow or overflow
-        //  return false;
-        //}
-
-        value = v;
         return true;
     }
     return false;

@@ -35,6 +35,8 @@
 #include "llsd.h"
 #include <vector>
 
+#include <charconv>
+#include <fast_float/fast_float.h>
 #include <simdutf.h>
 
 #include <array>
@@ -834,11 +836,42 @@ bool wstring_remove_emojis(LLWString& wstr)
 // Cut emoji symbols if exist
 bool utf8str_remove_emojis(std::string& utf8str)
 {
-    LLWString wstr = utf8str_to_wstring(utf8str);
-    if (!wstring_remove_emojis(wstr))
-        return false;
-    utf8str = wstring_to_utf8str(wstr);
-    return true;
+    // Removal only ever shortens, so this compacts in place the way the wide
+    // form does. Converting to UTF-32 and back to drop a few characters cost
+    // two allocations of the whole string whether or not anything was found.
+    const auto clusters = utf8str_find_emoji_clusters(utf8str);
+    bool found = false;
+    size_t read = 0, write = 0;
+    auto cluster_it = clusters.begin();
+    while (read < utf8str.size())
+    {
+        if (cluster_it != clusters.end() && read == cluster_it->first)
+        {
+            read = cluster_it->second;
+            ++cluster_it;
+            found = true;
+            continue;
+        }
+
+        const LLCodepointAt at = utf8str_decode_at(utf8str, read);
+        if (LLStringOps::isEmoji(at.cp))
+        {
+            read = at.next;
+            found = true;
+            continue;
+        }
+
+        const size_t span = at.next - read;
+        if (write != read)
+        {
+            std::copy_n(utf8str.begin() + read, span, utf8str.begin() + write);
+        }
+        write += span;
+        read = at.next;
+    }
+    if (found)
+        utf8str.resize(write);
+    return found;
 }
 
 // Codepoints that can act as a ZWJ/VS emoji-sequence base. Broader than
@@ -2438,15 +2471,102 @@ void LLStringUtilBase<char>::stripNonprintable(std::string& string)
 // Capitalising a byte can only ever reach ASCII, so the narrow form goes
 // through codepoints. The word rule -- a capital after a space, a hyphen or an
 // underscore -- is the caller's and stays as it is.
+namespace
+{
+    // The stream extraction these replace skipped leading space and took a
+    // leading '+'; from_chars does neither. trim() has dealt with the space,
+    // so only the sign is left to handle by hand.
+    std::string_view without_plus(std::string_view s)
+    {
+        return (!s.empty() && s.front() == '+') ? s.substr(1) : s;
+    }
+}
+
+// A parse that consumes a prefix still succeeds, as extraction did: "12abc"
+// reads 12. What changes is that an out-of-range value now says so through
+// from_chars rather than through a stream failbit nobody could interpret,
+// which is what the TODOs these carried were asking for -- and that a
+// negative fed to the unsigned form is rejected instead of wrapping, which
+// is what num_get did with it.
+template<>
+bool LLStringUtilBase<char>::convertToU32(std::string_view string, U32& value)
+{
+    trim(string);
+    const std::string_view s = without_plus(string);
+    if (s.empty())
+        return false;
+
+    U32 v = 0;
+    const auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+    if (ec != std::errc{})
+        return false;
+
+    value = v;
+    return true;
+}
+
+template<>
+bool LLStringUtilBase<char>::convertToS32(std::string_view string, S32& value)
+{
+    trim(string);
+    const std::string_view s = without_plus(string);
+    if (s.empty())
+        return false;
+
+    S32 v = 0;
+    const auto [ptr, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+    if (ec != std::errc{})
+        return false;
+
+    value = v;
+    return true;
+}
+
+template<>
+bool LLStringUtilBase<char>::convertToF64(std::string_view string, F64& value)
+{
+    trim(string);
+    const std::string_view s = without_plus(string);
+    if (s.empty())
+        return false;
+
+    // fast_float rather than std::from_chars: libc++ marks the floating-point
+    // overloads unavailable below macOS 26, and llcommon already depends on it.
+    F64 v = 0.0;
+    const auto [ptr, ec] = fast_float::from_chars(s.data(), s.data() + s.size(), v);
+    if (ec != std::errc{})
+        return false;
+
+    value = v;
+    return true;
+}
+
 template<>
 void LLStringUtilBase<char>::capitalize(std::string& str)
 {
     if (str.empty())
         return;
 
-    LLWString wide = utf8str_to_wstring(str);
-    LLStringUtilBase<llwchar>::capitalize(wide);
-    str = wstring_to_utf8str(wide);
+    // Rebuilt rather than converted through UTF-32 and back. It cannot be done
+    // in place either: uppercasing one codepoint stays one codepoint, but not
+    // necessarily the same number of bytes -- dotless i is two and becomes I,
+    // which is one. `last` is the character that was WRITTEN, matching the
+    // wide form, so a capitalised separator would start the next word too.
+    std::string out_str;
+    out_str.reserve(str.size());
+    llwchar last = 0;
+    bool at_start = true;
+    for (size_t i = 0; i < str.size(); )
+    {
+        const LLCodepointAt at = utf8str_decode_at(str, i);
+        i = at.next;
+
+        const bool starts_word = at_start || last == ' ' || last == '-' || last == '_';
+        last = starts_word ? LLStringOps::toUpper(at.cp) : at.cp;
+        at_start = false;
+        utf8str_append_cp(out_str, last);
+    }
+    str.swap(out_str);
 }
 
 template<>
@@ -2462,7 +2582,7 @@ S32 LLStringUtilBase<char>::compareInsensitive(const char* lhs, const char* rhs)
 }
 
 template<>
-S32 LLStringUtilBase<char>::compareInsensitive(const std::string& lhs, const std::string& rhs)
+S32 LLStringUtilBase<char>::compareInsensitive(std::string_view lhs, std::string_view rhs)
 {
     return collate_utf8(lhs, rhs, CollatorKind::Caseless);
 }
@@ -2480,31 +2600,31 @@ S32 LLStringUtilBase<llwchar>::compareInsensitive(const llwchar* lhs, const llwc
 }
 
 template<>
-S32 LLStringUtilBase<llwchar>::compareInsensitive(const LLWString& lhs, const LLWString& rhs)
+S32 LLStringUtilBase<llwchar>::compareInsensitive(LLWStringView lhs, LLWStringView rhs)
 {
     return collate_wide(lhs, rhs, CollatorKind::Caseless);
 }
 
 template<>
-S32 LLStringUtilBase<char>::compareDict(const std::string& a, const std::string& b)
+S32 LLStringUtilBase<char>::compareDict(std::string_view a, std::string_view b)
 {
     return collate_utf8(a, b, CollatorKind::Dictionary);
 }
 
 template<>
-S32 LLStringUtilBase<char>::compareDictInsensitive(const std::string& a, const std::string& b)
+S32 LLStringUtilBase<char>::compareDictInsensitive(std::string_view a, std::string_view b)
 {
     return collate_utf8(a, b, CollatorKind::DictionaryCaseless);
 }
 
 template<>
-S32 LLStringUtilBase<llwchar>::compareDict(const LLWString& a, const LLWString& b)
+S32 LLStringUtilBase<llwchar>::compareDict(LLWStringView a, LLWStringView b)
 {
     return collate_wide(a, b, CollatorKind::Dictionary);
 }
 
 template<>
-S32 LLStringUtilBase<llwchar>::compareDictInsensitive(const LLWString& a, const LLWString& b)
+S32 LLStringUtilBase<llwchar>::compareDictInsensitive(LLWStringView a, LLWStringView b)
 {
     return collate_wide(a, b, CollatorKind::DictionaryCaseless);
 }
@@ -2909,7 +3029,7 @@ std::string LLStringUtil::getLocale(void)
 
 // static
 template<>
-void LLStringUtil::formatNumber(std::string& numStr, std::string decimals)
+void LLStringUtil::formatNumber(std::string& numStr, std::string_view decimals)
 {
     std::stringstream strStream;
     S32 intDecimals = 0;

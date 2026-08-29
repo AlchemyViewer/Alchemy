@@ -273,6 +273,8 @@ target_link_libraries(llui
         llxml
         llmath
         llcommon
+        PRIVATE
+        ll::fastfloat
     )
 
 if (USE_NSSPELLCHECKER)
