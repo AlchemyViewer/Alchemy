@@ -2098,7 +2098,9 @@ void LLFloaterEmojiPicker::loadState()
     {
         std::string emoji = token;
         // Drop legacy ASCII-decimal tokens and obvious garbage.
-        if (emoji.empty() || emoji[0] < 0x80)
+        // Through unsigned char: a lead byte is above 0x7F, and plain char is
+        // signed here, so comparing it directly would call every token ASCII.
+        if (emoji.empty() || (unsigned char)emoji[0] < 0x80)
             continue;
         if (std::find(sRecentlyUsed.begin(), sRecentlyUsed.end(), emoji) == sRecentlyUsed.end())
         {
@@ -2122,7 +2124,7 @@ void LLFloaterEmojiPicker::loadState()
             continue;
 
         std::string emoji = token.substr(0, colon);
-        if (emoji.empty() || emoji[0] < 0x80)
+        if (emoji.empty() || (unsigned char)emoji[0] < 0x80)
             continue;
 
         const U32 count = (U32)atoi(token.c_str() + colon + 1);
