@@ -734,8 +734,14 @@ LLFolderViewFilter::Match LLInventoryFilter::getFilterMatch(LLFolderViewModelIte
     // both walks of it.
     if (utf8str_is_ascii(name) && utf8str_is_ascii(suffix) && utf8str_is_ascii(mFilterSubString))
     {
-        match.mOffset = at;
-        match.mLength = mFilterSubString.size();
+        // Bounded against the label the caller is about to index. The offset
+        // was found in the cached searchable name, which is rebuilt only when
+        // the item asks for it, so a suffix that has shrunk since leaves it
+        // pointing past the end. The path below is bounded by
+        // utf8str_bytes_from_cased_bytes; this one has to say so itself.
+        const size_t label_len = name.size() + suffix.size();
+        match.mOffset = llmin((size_t)at, label_len);
+        match.mLength = llmin(mFilterSubString.size(), label_len - match.mOffset);
         return match;
     }
 

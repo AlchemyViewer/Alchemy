@@ -35,14 +35,19 @@
 #include "llstl.h"
 #include "llcontrol.h"
 
+// strncmp rather than memcmp: `s` points into the text being scanned and the
+// caller does not say how much of it is left, so comparing a fixed count reads
+// past the end whenever the token is longer than the tail of the document.
+// Both sides are NUL-terminated and a token holding a NUL is not a thing, so
+// stopping there costs nothing and bounds the read.
 inline bool LLKeywordToken::isHead(const char* s) const
 {
-    return std::memcmp(s, mToken.c_str(), mToken.size()) == 0;
+    return std::strncmp(s, mToken.c_str(), mToken.size()) == 0;
 }
 
 inline bool LLKeywordToken::isTail(const char* s) const
 {
-    return std::memcmp(s, mDelimiter.c_str(), mDelimiter.size()) == 0;
+    return std::strncmp(s, mDelimiter.c_str(), mDelimiter.size()) == 0;
 }
 
 const LLStyleConstSP& LLKeywordToken::getStyle(const LLFontGL* font) const

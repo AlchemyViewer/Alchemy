@@ -289,9 +289,12 @@ S32 ALPanelMusicTicker::countExtraChars(LLTextBox *texbox, const std::string &te
         end = utf8str_step_grapheme_backward(text, end);
         ++extra;
         if (font->getWidthBytes(text, 0, (S32)end) <= box_width)
-            break;
+            return extra;
     }
-    return extra;
+    // Not one character fits. Every character counted as extra would leave the
+    // scrolling window empty, so the ticker would step through nothing at all;
+    // leave the text where it is and let the box clip it.
+    return 0;
 }
 
 void ALPanelMusicTicker::iterateTickerOffset()

@@ -94,7 +94,11 @@ public:
     virtual bool execute( LLTextBase* editor, S32* delta )
     {
         *delta = insert(editor, getPosition(), mString );
-        LLStringUtil::truncate(mString, *delta);
+        // Trimmed to what the document actually took, which the editor can
+        // clamp below what was offered. A byte count is not a place to cut a
+        // string: undo and redo replay this text verbatim, so half a character
+        // stored here is half a character put back into the document.
+        mString = utf8str_truncate(mString, *delta);
         return (*delta != 0);
     }
     virtual S32 undo( LLTextBase* editor )
@@ -134,7 +138,11 @@ public:
     virtual bool execute( LLTextBase* editor, S32* delta )
     {
         *delta = insert(editor, getPosition(), mString);
-        LLStringUtil::truncate(mString, *delta);
+        // Trimmed to what the document actually took, which the editor can
+        // clamp below what was offered. A byte count is not a place to cut a
+        // string: undo and redo replay this text verbatim, so half a character
+        // stored here is half a character put back into the document.
+        mString = utf8str_truncate(mString, *delta);
         return (*delta != 0);
     }
     virtual bool extendAndExecute( LLTextBase* editor, S32 pos, llwchar wc, S32* delta )
@@ -706,7 +714,11 @@ void LLTextEditor::indentSelectedLines( S32 spaces )
         }
         else
         {
-            while( (text[right] != '\n') && (right <= getLengthBytes() ) )
+            // Bound first. Indexing before the test reads text[right] at the
+            // end of the document, which is the terminator and so never the
+            // newline the loop is looking for -- and the test that followed
+            // admitted one more step past that.
+            while( (right < getLengthBytes()) && (text[right] != '\n') )
             {
                 right++;
             }
@@ -3144,9 +3156,16 @@ void LLTextEditor::resetPreedit()
             deselect();
         }
 
-        setCursorPos(mPreeditPositions.front());
-        removeStringNoUndo(mCursorPos, mPreeditPositions.back() - mCursorPos);
-        insertStringNoUndo(mCursorPos, mPreeditOverwrittenString);
+        // Cut where the preedit was recorded as starting, not where the caret
+        // ends up being put. setCursorPos aligns to a grapheme, so a preedit
+        // whose first codepoint clusters with the character before it -- a
+        // combining mark, a variation selector -- would move the caret back
+        // over that character and take it away with the composition.
+        const S32 preedit_begin = mPreeditPositions.front();
+        const S32 preedit_end   = mPreeditPositions.back();
+        removeStringNoUndo(preedit_begin, preedit_end - preedit_begin);
+        insertStringNoUndo(preedit_begin, mPreeditOverwrittenString);
+        setCursorPos(preedit_begin);
 
         mPreeditString.clear();
         mPreeditOverwrittenString.clear();

@@ -1146,11 +1146,16 @@ void LLLineEditor::removeWord(bool prev)
     const S32 pos(getCursor());
     if (prev ? pos > 0 : pos < getLengthBytes())
     {
-        // Both walkers move strictly while the guard above holds: the text
-        // carries no newline (paste turns one into a space or a pilcrow), so
-        // the whole string is one line and neither can be standing at its edge.
+        // The helpers cross a line break themselves, so with the guard above
+        // holding they always move. Anything that did not would erase a span of
+        // zero and report the key as having worked.
         const S32 new_pos(prev ? prevWordPos(pos) : nextWordPos(pos));
         const S32 diff(llabs(pos - new_pos));
+        if (0 == diff)
+        {
+            LLUI::getInstance()->reportBadKeystroke();
+            return;
+        }
         if (prev)
         {
             mText.erase(new_pos, diff);
@@ -1306,14 +1311,23 @@ void LLLineEditor::setDrawAsterixes(bool b)
     updateAllowingLanguageInput();
 }
 
+// The word walkers stay inside the line the offset sits on, and a line editor
+// is not guaranteed to hold only one: pasteHelper substitutes a newline, but
+// setText and setValue pass one straight through. A caret at a line edge would
+// otherwise have nowhere to go, so ctrl+arrow would stall there and ctrl+delete
+// would silently remove nothing.
 S32 LLLineEditor::prevWordPos(S32 cursorPos) const
 {
-    return (S32)utf8str_step_word_backward(mText.getString(), (size_t)llmax(cursorPos, 0));
+    const std::string& text = mText.getString();
+    const size_t at = utf8str_step_grapheme_backward(text, (size_t)llmax(cursorPos, 0));
+    return (S32)utf8str_step_word_backward(text, at);
 }
 
 S32 LLLineEditor::nextWordPos(S32 cursorPos) const
 {
-    return (S32)utf8str_step_word_forward(mText.getString(), (size_t)llmax(cursorPos, 0));
+    const std::string& text = mText.getString();
+    const size_t at = utf8str_step_grapheme_forward(text, (size_t)llmax(cursorPos, 0));
+    return (S32)utf8str_step_word_forward(text, at);
 }
 
 

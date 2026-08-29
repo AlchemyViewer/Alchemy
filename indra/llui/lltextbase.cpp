@@ -2910,9 +2910,14 @@ void LLTextBase::replaceUrl(const std::string &url,
         // if we find a link with our Url, then replace the label
         if (style->getLinkHREF() == url)
         {
-            S32 start = seg->getStart();
-            S32 end = seg->getEnd();
-            text = text.substr(0, start) + label + text.substr(end, text.size() - end + 1);
+            // Clamped, because the last segment's end is the virtual position
+            // every segment carries one past the document -- substr throws on a
+            // position past the end rather than clamping the way a count is
+            // clamped. The count itself was one longer than the text it could
+            // ever return, so it says the rest of it instead.
+            const S32 start = llclamp(seg->getStart(), 0, (S32)text.size());
+            const S32 end   = llclamp(seg->getEnd(), start, (S32)text.size());
+            text = text.substr(0, start) + label + text.substr(end);
             seg->setEnd(start + static_cast<S32>(label.size()));
             modified = true;
         }

@@ -1489,7 +1489,16 @@ S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 s
     {
         --start;
     }
-    const size_t measure_end = utf8str_decode_at(utf8text, (size_t)start).next;
+    // And back to the start of the cluster holding it. A caller may not begin
+    // drawing partway through one, so the cluster is the unit at both ends of
+    // this walk -- and the extent lookup below keys on the cluster the shaper
+    // reports, which is its first byte.
+    start = (S32)utf8str_grapheme_align_backward(utf8text, (size_t)start);
+    // Measure to the end of that cluster, not the end of the one character
+    // there. A run cut after the first codepoint of a ZWJ sequence shapes as
+    // its unligated parts, so the advances collected below are not the ones
+    // render() lays down -- and the caller scrolls a field by them.
+    const size_t measure_end = utf8str_step_grapheme_forward(utf8text, (size_t)start);
 
     // Pre-shape [0, measure_end) and collect the advance each cluster carries.
     // Walking backward through that substitutes for the legacy
