@@ -674,15 +674,25 @@ void LLKeywords::collectSegmentOps(segment_ops_t& ops, const std::string& wtext,
             }
 
             // check against words
+            // A byte at or above 0x80 is the interior of a multi-byte
+            // character, and a letter carrying an accent is as much a word
+            // character as one without. <cctype> answers "not alnum" for such a
+            // byte, which would make the tail of every accented letter read as
+            // a word boundary and start a keyword match inside a word.
+            const auto is_word_byte = [](char c)
+            {
+                return LLStringOps::isAlnum(c) || '_' == c || (unsigned char)c >= 0x80;
+            };
+
             char prev = cur > base ? *(cur-1) : 0;
-            if (!LLStringOps::isAlnum(prev) && prev != '_' && prev != '.')
+            if (!is_word_byte(prev) && prev != '.')
             {
                 const char* word_start = cur;
                 S32 namespace_dots = 0;
                 const char* last_dot = nullptr;
 
                 // Find the full extent of the word, potentially including namespace dots
-                while (LLStringOps::isAlnum(*cur) || *cur == '_' || (mLuauLanguage && *cur == '.' && LLStringOps::isAlnum(*(cur+1))))
+                while (is_word_byte(*cur) || (mLuauLanguage && *cur == '.' && is_word_byte(*(cur+1))))
                 {
                     if (mLuauLanguage && *cur == '.')
                     {
