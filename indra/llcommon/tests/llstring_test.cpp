@@ -1078,4 +1078,92 @@ namespace tut
         ensure_equals("mixed result", s,
                       std::string("no bar here [MISSING] -=[Stylized Name]=-"));
     }
+
+    // Both views replaceString takes are allowed to point into the string it is
+    // replacing into, and both are read after a replace that can have moved the
+    // buffer under them. Taking them by value used to make that safe without
+    // saying so; a view does not, so the guard is the only thing holding it up
+    // and nothing was watching the guard.
+    template<> template<>
+    void string_index_object_t::test<46>()
+    {
+        // replacement views the subject: the classic case, and the one the
+        // original guard covered.
+        {
+            std::string s("abcabc");
+            LLStringUtil::replaceString(s, "b", std::string_view(s).substr(0, 3));
+            ensure_equals("replacement viewing the subject",
+                          s, std::string("aabccaabcc"));
+        }
+
+        // target views the subject. This one is read on every turn of the loop,
+        // so it dangles from the second replace onward rather than the first.
+        {
+            std::string s("xyxyxy");
+            LLStringUtil::replaceString(s, std::string_view(s).substr(0, 2), "Q");
+            ensure_equals("target viewing the subject", s, std::string("QQQ"));
+        }
+
+        // Both at once, and a replacement long enough to force the subject to
+        // reallocate while the views are still live.
+        {
+            std::string s("aXbXc");
+            LLStringUtil::replaceString(s,
+                                        std::string_view(s).substr(1, 1),
+                                        std::string_view(s).substr(0, 1));
+            ensure_equals("both viewing the subject", s, std::string("aabac"));
+        }
+
+        // And the ordinary path still works.
+        {
+            std::string s("one two one");
+            LLStringUtil::replaceString(s, "one", "three");
+            ensure_equals("unrelated arguments", s, std::string("three two three"));
+        }
+        {
+            std::string s("aaa");
+            LLStringUtil::replaceString(s, "a", "aa");
+            ensure_equals("replacement containing the target terminates",
+                          s, std::string("aaaaaa"));
+        }
+    }
+
+    // copyInto has the same shape: src may view dst, the append path appends
+    // from it, and the insert path assigns dst out from under it first.
+    template<> template<>
+    void string_index_object_t::test<47>()
+    {
+        // Append from a view of the destination.
+        {
+            std::string s("abcd");
+            LLStringUtil::copyInto(s, std::string_view(s).substr(0, 2), s.length());
+            ensure_equals("append from a view of the destination",
+                          s, std::string("abcdab"));
+        }
+
+        // Insert from a view of the destination, at the front, so the assign
+        // that shortens dst happens before src is read.
+        {
+            std::string s("abcd");
+            LLStringUtil::copyInto(s, std::string_view(s).substr(2, 2), 0);
+            ensure_equals("insert from a view of the destination",
+                          s, std::string("cdabcd"));
+        }
+
+        // A view of the whole of it, long enough that the growth reallocates.
+        {
+            std::string s("0123456789");
+            LLStringUtil::copyInto(s, std::string_view(s), 5);
+            ensure_equals("insert the whole of the destination into itself",
+                          s, std::string("01234012345678956789"));
+        }
+
+        // Offset at the end is the append fast path; offset past it is not a
+        // case any caller has, so it is simply not exercised here.
+        {
+            std::string s("head");
+            LLStringUtil::copyInto(s, std::string("-tail"), s.length());
+            ensure_equals("unrelated source appends", s, std::string("head-tail"));
+        }
+    }
 }

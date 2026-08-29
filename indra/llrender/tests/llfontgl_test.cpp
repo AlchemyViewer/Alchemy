@@ -284,9 +284,32 @@ namespace tut
         const LLFontFreetype* ft = font->getFontFreetype();
         ensure("freetype present", ft != nullptr);
 
+        // What a sweep must not do is disturb glyphs still in use. Measure
+        // first, sweep twice -- the second is inside the throttle interval and
+        // should do nothing at all -- and measure again: same width, and the
+        // atlas page the glyphs came from still carries a live texture. The
+        // assertion this replaces was the literal `true`, which held whether
+        // the sweep ran, was throttled, or evicted the whole atlas.
+        const std::string sample = "The quick brown fox";
+        font->generateASCIIglyphs();
+        const F32 before = font->getWidthF32Bytes(sample, 0, (S32)sample.size(), false);
+        ensure("sample has a width to begin with", before > 0.f);
+
+        const LLFontBitmapCache* cache = ft->getFontBitmapCache();
+        ensure("bitmap cache present", cache != nullptr);
+        const U32 pages_before = cache->getNumBitmaps(EFontGlyphType::Grayscale);
+
         ft->collectGarbage();
         ft->collectGarbage();
-        ensure("repeat collectGarbage is throttled and safe", true);
+
+        const F32 after = font->getWidthF32Bytes(sample, 0, (S32)sample.size(), false);
+        ensure_equals("a sweep does not change what live text measures",
+                      before, after);
+        ensure_equals("a sweep does not drop a page holding live glyphs",
+                      cache->getNumBitmaps(EFontGlyphType::Grayscale), pages_before);
+        LLImageGL* page = cache->getImageGL(EFontGlyphType::Grayscale, 0);
+        ensure("page 0 still present after a sweep", page != nullptr);
+        ensure("page 0 still has a live GL texture", page->getTexName() != 0);
     }
 
     // Re-calling initClass after the registry is up is a no-op
@@ -423,11 +446,24 @@ namespace tut
                                                      F32_MAX,
                                                      (S32)s.size(),
                                                      /*round=*/true);
-            // round=true rounds to the nearest character boundary, so
-            // hitting exactly w should map back to i (or off-by-one
-            // due to rounding at the half-glyph mark — accept ±1).
-            ensure("round-trip offset is within ±1",
-                   std::abs(cp - i) <= 1);
+            // Exactly, not within one. A tolerance of ±1 over ASCII is a whole
+            // character wide -- it accepts precisely the mistake this is here
+            // to catch -- and the target is a boundary, which rounding takes
+            // to the boundary itself.
+            ensure_equals("round-trip lands on the offset it was measured from",
+                          cp, i);
+        }
+
+        // The same round trip where a character is not a byte. The expected
+        // offsets are the character starts, recorded rather than counted.
+        const std::string m = "A\xE6\x97\xA5" "B";
+        const S32 starts[] = { 0, 1, 4, 5 };
+        for (S32 start : starts)
+        {
+            const F32 w = font->getWidthF32Bytes(m, 0, start, false);
+            const S32 got = font->byteFromPixelOffset(m, 0, w, F32_MAX,
+                                                      (S32)m.size(), /*round=*/true);
+            ensure_equals("round-trip through a multi-byte character", got, start);
         }
     }
 
@@ -722,6 +758,141 @@ namespace tut
         }
     }
 
+    // maxDrawableBytes over text where a character is not a byte. The ASCII
+    // test beside this one cannot tell a byte count from a character count, a
+    // glyph count or a cluster count -- they are the same number there.
+    template<> template<>
+    void llfontgl_object::test<22>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        // Three characters, three bytes each.
+        const std::string s = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E";
+        const S32 total = (S32)s.size();
+        ensure_equals("the fixture string is nine bytes", total, (S32)9);
+        if (font->getWidthF32Bytes(s, 0, total, false) <= 0.f)
+            skip("font produced no width for the sample");
+
+        ensure_equals("all the room in the world fits every byte",
+                      font->maxDrawableBytes(s, F32_MAX, total), total);
+        ensure_equals("no room fits nothing",
+                      font->maxDrawableBytes(s, 0.f, total), (S32)0);
+
+        // A budget that stops inside a character has to come back to where
+        // that character started. Answering 4 would split it.
+        ensure_equals("a byte budget inside a character backs off",
+                      font->maxDrawableBytes(s, F32_MAX, 4), (S32)3);
+        ensure_equals("and again one byte further in",
+                      font->maxDrawableBytes(s, F32_MAX, 5), (S32)3);
+        ensure_equals("a budget on a boundary is kept",
+                      font->maxDrawableBytes(s, F32_MAX, 6), (S32)6);
+
+        // By pixels rather than bytes: room for two characters and not three.
+        const F32 w2 = font->getWidthF32Bytes(s, 0, 6, false);
+        const F32 w3 = font->getWidthF32Bytes(s, 0, 9, false);
+        ensure("the third character has a width", w3 > w2);
+        ensure_equals("a pixel budget also lands on a character",
+                      font->maxDrawableBytes(s, (w2 + w3) * 0.5f, total), (S32)6);
+    }
+
+    // begin_offset, and what the answer is counted from. Every one of these
+    // takes an offset to start at, and byteFromPixelOffset reports back
+    // relative to it -- LLLineEditor::calcCursorPos adds its scroll position
+    // to the result, so an absolute answer would double it.
+    template<> template<>
+    void llfontgl_object::test<23>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        // "A", a three-byte character, "B" -- and the tail on its own.
+        const std::string s    = "A\xE6\x97\xA5" "B";
+        const std::string tail = "\xE6\x97\xA5" "B";
+        if (font->getWidthF32Bytes(s, 0, (S32)s.size(), false) <= 0.f)
+            skip("font produced no width for the sample");
+
+        ensure_equals("measuring from an offset measures the rest",
+                      font->getWidthF32Bytes(s, 1, S32_MAX, false),
+                      font->getWidthF32Bytes(tail, 0, S32_MAX, false));
+        ensure_equals("S32_MAX from a non-zero offset does not overflow",
+                      font->getWidthF32Bytes(s, 1, S32_MAX, false),
+                      font->getWidthF32Bytes(s, 1, (S32)s.size() - 1, false));
+        ensure_equals("an offset at the end measures nothing",
+                      font->getWidthF32Bytes(s, (S32)s.size(), S32_MAX, false), 0.f);
+
+        // Hit-testing from an offset answers in the same frame of reference.
+        const F32 w_tail_first = font->getWidthF32Bytes(tail, 0, 3, false);
+        ensure_equals("hit-testing from an offset is relative to it",
+                      font->byteFromPixelOffset(s, 1, w_tail_first, F32_MAX,
+                                                S32_MAX, /*round=*/true),
+                      (S32)3);
+
+        // round=false asks which character the pixel is inside, rather than
+        // which boundary it is nearest, so a point just past a character's
+        // start still belongs to that character.
+        const F32 just_inside = font->getWidthF32Bytes(s, 0, 1, false) + 0.5f;
+        ensure_equals("round=false stays in the character the pixel is in",
+                      font->byteFromPixelOffset(s, 0, just_inside, F32_MAX,
+                                                S32_MAX, /*round=*/false),
+                      (S32)1);
+    }
+
+    // The two wrap styles that are not ANYWHERE. maxDrawableBytes was rewritten
+    // onto UAX #14 in this work and only its default was ever exercised.
+    template<> template<>
+    void llfontgl_object::test<24>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        const std::string s = "alpha beta";
+        const S32 total = (S32)s.size();
+        const S32 after_space = 6;   // "alpha " -- where "beta" begins
+
+        // A budget reaching into "beta" but not through it. ANYWHERE cuts
+        // wherever it runs out; the word-boundary styles retreat to the break.
+        const F32 w_partial = font->getWidthF32Bytes(s, 0, 8, false);
+        if (w_partial <= 0.f)
+            skip("font produced no width for the sample");
+
+        const S32 anywhere = font->maxDrawableBytes(s, w_partial, total,
+                                                    LLFontGL::ANYWHERE);
+        ensure("ANYWHERE cuts inside the last word", anywhere > after_space);
+
+        ensure_equals("a word boundary is preferred when there is one",
+                      font->maxDrawableBytes(s, w_partial, total,
+                                             LLFontGL::WORD_BOUNDARY_IF_POSSIBLE),
+                      after_space);
+        ensure_equals("and required when the style says only",
+                      font->maxDrawableBytes(s, w_partial, total,
+                                             LLFontGL::ONLY_WORD_BOUNDARIES),
+                      after_space);
+
+        // One long word offers no break at all. IF_POSSIBLE has to give the
+        // caller the clip position anyway, or a line it can never make
+        // progress past. ONLY_WORD_BOUNDARIES is entitled to refuse.
+        const std::string one_word = "unbreakablesequence";
+        const F32 w_some = font->getWidthF32Bytes(one_word, 0, 6, false);
+        const S32 no_break = font->maxDrawableBytes(one_word, w_some,
+                                                    (S32)one_word.size(),
+                                                    LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+        ensure("with no legal break the caller still gets progress",
+               no_break > 0);
+    }
+
     // ===================================================================
     // Render-output group: fixture brings up gUIProgram (needs_render=true)
     // so LLFontGL::render() completes end-to-end against the OSMesa
@@ -1000,5 +1171,48 @@ namespace tut
             ensure("batch texture is one of the string's atlas pages",
                    entry.mTexName == latin_tex || entry.mTexName == emoji_tex);
         }
+    }
+
+    // What renderBytes counts. Over ASCII its return is indistinguishable from
+    // a codepoint count, a glyph count or a cluster count, and every existing
+    // assertion about it is over ASCII. Three characters of three bytes each
+    // tell the four apart: nine, and nothing else.
+    template<> template<>
+    void llfontgl_render_object::test<7>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        const std::string s = "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E";
+        const S32 total = (S32)s.size();
+        ensure_equals("the fixture string is nine bytes", total, (S32)9);
+        if (font->getWidthF32Bytes(s, 0, total, false) <= 0.f)
+            skip("font produced no width for the sample");
+
+        const S32 drawn = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
+                                            LLFontGL::LEFT, LLFontGL::BASELINE,
+                                            LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                            total);
+        gGL.flush();
+        ensure_equals("renderBytes returns bytes, not characters", drawn, total);
+
+        // A budget of one character is three bytes, and drawing from an offset
+        // reports what it drew rather than where it stopped.
+        const S32 one = font->renderBytes(s, 0, 100.f, 120.f, LLColor4::white,
+                                          LLFontGL::LEFT, LLFontGL::BASELINE,
+                                          LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                          3);
+        gGL.flush();
+        ensure_equals("a one-character budget is three bytes", one, (S32)3);
+
+        const S32 tail = font->renderBytes(s, 3, 100.f, 140.f, LLColor4::white,
+                                           LLFontGL::LEFT, LLFontGL::BASELINE,
+                                           LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                           S32_MAX);
+        gGL.flush();
+        ensure_equals("drawing from an offset returns the bytes it drew",
+                      tail, total - 3);
     }
 }

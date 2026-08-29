@@ -290,12 +290,14 @@ namespace tut
         font->getFontFreetype()->getGlyphInfo(L'É', // 'É'
                                               EFontGlyphType::Grayscale);
         const F32 second = wb.getWidthBytes(font, s, 0, 2, false);
-        // Width value itself doesn't change, but the cache should have
-        // recomputed: not directly observable except via the strider
-        // path. The "no crash + same value" assertion exercises the
-        // recompute path under generation invalidation.
-        ensure_equals("width stable across atlas generation tick",
+        // Held against the font rather than against the buffer's own earlier
+        // answer. Comparing a cache to itself passes whether it invalidated,
+        // recomputed, or returned a stale value -- the only reading that can
+        // fail is one where the buffer and the font disagree.
+        ensure_equals("width survives an atlas generation tick",
                       first, second);
+        ensure_equals("and still agrees with the font it came from",
+                      second, font->getWidthF32Bytes(s, 0, 2, false));
     }
 
     // reset() clears the cache — next call recomputes. Pins
@@ -313,7 +315,12 @@ namespace tut
         const F32 first = wb.getWidthBytes(font, s, 0, 2, false);
         wb.reset();
         const F32 after = wb.getWidthBytes(font, s, 0, 2, false);
-        ensure_equals("width stable across reset()", first, after);
+        ensure_equals("width survives reset()", first, after);
+        // Again, against the font: a reset that failed to clear and a reset
+        // that recomputed correctly both return the earlier value, and only
+        // one of those also matches an independent measurement.
+        ensure_equals("and still agrees with the font it came from",
+                      after, font->getWidthF32Bytes(s, 0, 2, false));
     }
 
     // Multiple LLFontWidthBuffer instances stay independent: cache
@@ -332,6 +339,45 @@ namespace tut
         a.reset();
         const F32 wb_val = b.getWidthBytes(font, s, 0, 2, false);
         ensure_equals("instance B unaffected by A's reset", wa, wb_val);
+    }
+
+    // The bound the cache is keyed on, over text where a byte is not a
+    // character. Every other test in this group uses ASCII, where a byte
+    // count, a character count and a glyph count are the same number, so a
+    // cache keyed in the wrong one of them hits and misses identically on all
+    // of them and every assertion still passes.
+    template<> template<>
+    void llfontvertexbuffer_object::test<12>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not present in test data dir");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font available", font != nullptr);
+
+        // "A", a three-byte character, "B": five bytes, three characters.
+        const std::string s = "A\xE6\x97\xA5" "B";
+        if (font->getWidthF32Bytes(s, 0, (S32)s.size(), false) <= 0.f)
+            skip("font produced no width for the sample");
+
+        // Every bound, boundary or not, has to agree with the font. A bound of
+        // 1 and a bound of 4 are one character apart and three bytes apart;
+        // a cache counting the wrong one answers one of these with the other's
+        // width.
+        LLFontWidthBuffer wb;
+        for (S32 bound : { 0, 1, 4, 5 })
+        {
+            const F32 cached = wb.getWidthBytes(font, s, 0, bound, false);
+            ensure_equals("cached width agrees with the font",
+                          cached, font->getWidthF32Bytes(s, 0, bound, false));
+            // And again, now that it is cached.
+            ensure_equals("and still agrees on the second reading",
+                          wb.getWidthBytes(font, s, 0, bound, false), cached);
+        }
+
+        // Distinct bounds must not collapse onto one entry.
+        const F32 w1 = wb.getWidthBytes(font, s, 0, 1, false);
+        const F32 w4 = wb.getWidthBytes(font, s, 0, 4, false);
+        ensure("one character in is narrower than two", w1 < w4);
     }
 
     // ===================================================================

@@ -42,6 +42,8 @@
 #include <cstring>
 #include <sstream>
 
+#include <simdutf.h>
+
 namespace
 {
     // LLWString / llutf16string element types have no std::ostream operator<<,
@@ -97,9 +99,9 @@ namespace tut
     //   11x utf8str helpers  (substChar/makeASCII/removeCRLF/split/preview)
     //   12x utf8 walkers     (byte-offset segmentation against its wide twin)
     // The TUT default registers only test<1>..test<50>, but the explicit
-    // test_group<..., 139> below raises that ceiling. Keep this index in
+    // test_group<..., 141> below raises that ceiling. Keep this index in
     // sync with categories used below.
-    typedef test_group<llstring_utf_data, 139> llstring_utf_t;
+    typedef test_group<llstring_utf_data, 141> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
 
@@ -2576,9 +2578,13 @@ namespace tut
     template<> template<>
     void llstring_utf_object_t::test<135>()
     {
+        // Against simdutf, not against the function under test. Defining
+        // validity as "sanitize leaves it alone" only asks whether the repair
+        // is a fixed point -- it cannot fail for a repair that returns
+        // something invalid, so long as it does so consistently.
         const auto is_valid = [](const std::string& s)
         {
-            return utf8str_sanitize(s) == s;
+            return simdutf::validate_utf8(s.data(), s.size());
         };
 
         // A lone continuation byte, a truncated lead, an overlong 'A', an
@@ -2683,5 +2689,85 @@ namespace tut
                    std::string("caf\xC3\xA9"), std::string("caf\xC3\x89")));
         ensure("empty equals empty",
                LLStringUtil::isEqualInsensitiveASCII(std::string(), std::string()));
+    }
+
+    // The word walkers driven by their own offsets. The tests beside these go
+    // through the wstring_* adapters, which prove the ALUtf8View index map is
+    // self-consistent -- not that a byte offset supplied by a caller is read
+    // correctly, which is what every caller in llui now passes.
+    template<> template<>
+    void llstring_utf_object_t::test<139>()
+    {
+        // ASCII first, so the byte answers can be read against the wide test.
+        const std::string two_words = "foo bar";
+        ensure_equals("fwd to next word", utf8str_step_word_forward(two_words, 0), size_t(4));
+        ensure_equals("fwd from next word", utf8str_step_word_forward(two_words, 4), size_t(7));
+        ensure_equals("back from end", utf8str_step_word_backward(two_words, 7), size_t(4));
+        ensure_equals("back over the space", utf8str_step_word_backward(two_words, 4), size_t(0));
+
+        // And where a character is not a byte. "café bar": the accent makes
+        // the second word start at byte 6 where it is codepoint 5, so these
+        // numbers are wrong under any reading but the byte one.
+        const std::string accented = "caf\xC3\xA9 bar";
+        ensure_equals("the fixture string is nine bytes",
+                      accented.size(), size_t(9));
+        ensure_equals("fwd over an accented word",
+                      utf8str_step_word_forward(accented, 0), size_t(6));
+        ensure_equals("fwd from the last word runs to the end",
+                      utf8str_step_word_forward(accented, 6), size_t(9));
+        ensure_equals("back from the end",
+                      utf8str_step_word_backward(accented, 9), size_t(6));
+        ensure_equals("back over the space",
+                      utf8str_step_word_backward(accented, 6), size_t(0));
+
+        // An offset inside the accent is still inside the first word.
+        ensure_equals("stepping from inside a character",
+                      utf8str_step_word_forward(accented, 4), size_t(6));
+
+        // The walkers stay on their line -- LLTextEditor::nextWordPos crosses
+        // the break itself, and would stall on every newline if this changed.
+        const std::string lines = "ab\ncd";
+        ensure_equals("fwd stops at eol", utf8str_step_word_forward(lines, 0), size_t(2));
+        ensure_equals("fwd parked on eol", utf8str_step_word_forward(lines, 2), size_t(2));
+        ensure_equals("back parked on bol", utf8str_step_word_backward(lines, 3), size_t(3));
+    }
+
+    // Word ranges in bytes: what a double-click selects, and what comes next.
+    template<> template<>
+    void llstring_utf_object_t::test<140>()
+    {
+        const std::string accented = "caf\xC3\xA9 bar";
+
+        // Anywhere inside the first word reports the whole of it, including a
+        // position inside the accent.
+        for (size_t at : { size_t(0), size_t(2), size_t(3), size_t(4) })
+        {
+            const auto range = utf8str_word_range_at(accented, at);
+            ensure_equals("word range begins at 0", range.first, size_t(0));
+            ensure_equals("word range ends after the accent", range.second, size_t(5));
+        }
+
+        const auto second = utf8str_word_range_at(accented, 7);
+        ensure_equals("second word begins at 6", second.first, size_t(6));
+        ensure_equals("second word ends at 9", second.second, size_t(9));
+
+        // next_word_range finds the word whose end lies past the position --
+        // the one the position is in, when it is in one, and only otherwise
+        // the following word. From inside the first word that is still the
+        // first word.
+        const auto from_start = utf8str_next_word_range(accented, 0);
+        ensure_equals("from 0 the word is the one at 0", from_start.first, size_t(0));
+        ensure_equals("and it ends after the accent", from_start.second, size_t(5));
+
+        // Standing on the space, the answer is the word after it.
+        const auto from_space = utf8str_next_word_range(accented, 5);
+        ensure_equals("from the space the next word begins at 6",
+                      from_space.first, size_t(6));
+        ensure_equals("and ends at 9", from_space.second, size_t(9));
+
+        // Past the last word there is nothing further to select.
+        const auto none = utf8str_next_word_range(accented, accented.size());
+        ensure_equals("nothing begins past the end", none.first, accented.size());
+        ensure_equals("nothing ends past the end", none.second, accented.size());
     }
 }
