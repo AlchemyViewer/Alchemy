@@ -38,13 +38,73 @@
 namespace LLTextValidate
 {
 
-static S32 strtol(const std::string& str) { return ::strtol(str.c_str(), NULL, 10); }
-static S32 strtol(const LLWString& str) { return ::strtol(wstring_to_utf8str(str).c_str(), NULL, 10); }
+namespace
+{
 
-static LLSD llsd(const std::string& str) { return LLSD(str); }
-static LLSD llsd(const LLWString& str) { return LLSD(wstring_to_utf8str(str)); }
-template <class CHAR>
-LLSD llsd(CHAR ch) { return llsd(std::basic_string<CHAR>(1, ch)); }
+S32 strtol(std::string_view str)
+{
+    return ::strtol(std::string(str).c_str(), NULL, 10);
+}
+
+// A decoded character and where it sits in the string it came from. Every
+// predicate the rules below use classifies Unicode, so each has to be handed a
+// whole codepoint: one byte of a multi-byte character reaches LLStringOps as a
+// lead byte, which is a negative number here, and that is why the same field
+// used to accept an accented letter while it was being typed and reject it
+// once the text arrived as UTF-8.
+struct CharAt
+{
+    llwchar     cp    = 0;
+    std::size_t begin = 0;
+    S32         index = 0;  // 1-based, counted in characters
+};
+
+// The character an error message names, or none. `bad` is asked about every
+// character from `from` onwards, and the LAST one it rejects is reported --
+// these rules were written as `while (len--)` loops counting down from the end
+// of the string, so that is the character they picked out.
+template <typename FN>
+bool find_last_bad(std::string_view str, std::size_t from, FN&& bad, CharAt& out)
+{
+    bool found = false;
+    S32  index = 1;
+    for (std::size_t i = from; i < str.size(); ++index)
+    {
+        const LLCodepointAt at = utf8str_decode_at(str, i);
+        if (bad(at.cp))
+        {
+            out   = { at.cp, i, index };
+            found = true;
+        }
+        i = at.next;
+    }
+    return found;
+}
+
+// As above, but stopping at the first character rejected, for the rules that
+// were written as forward loops.
+template <typename FN>
+bool find_first_bad(std::string_view str, std::size_t from, FN&& bad, CharAt& out)
+{
+    S32 index = 1;
+    for (std::size_t i = from; i < str.size(); ++index)
+    {
+        const LLCodepointAt at = utf8str_decode_at(str, i);
+        if (bad(at.cp))
+        {
+            out = { at.cp, i, index };
+            return true;
+        }
+        i = at.next;
+    }
+    return false;
+}
+
+// The offending character, whole, for the notification. Naming it by its first
+// byte would put a stray fragment of a character in the message.
+LLSD llsd(llwchar cp) { return LLSD(utf8str_from_cp(cp)); }
+
+}
 
 void ValidatorImpl::setLastErrorShowTime()
 {
@@ -66,43 +126,34 @@ void Validator::showLastErrorUsingTimeout(U32 timeout)
 // the simple reasons that intermediate states may be invalid even if the final result is valid.
 class ValidatorFloat : public ValidatorImpl
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR> &str)
+public:
+    bool validate(std::string_view str) override
     {
         LLLocale locale(LLLocale::USER_LOCALE);
 
-        std::basic_string<CHAR> trimmed = str;
-        LLStringUtilBase<CHAR>::trim(trimmed);
-        auto len = trimmed.length();
-        if (0 < len)
+        std::string trimmed(str);
+        LLStringUtil::trim(trimmed);
+        if (!trimmed.empty())
         {
             // May be a comma or period, depending on the locale
-            CHAR decimal_point = LLResMgr::getInstance()->getDecimalPoint();
-
-            S32 i = 0;
+            const llwchar decimal_point = (llwchar)(unsigned char)LLResMgr::getInstance()->getDecimalPoint();
 
             // First character can be a negative sign
-            if ('-' == trimmed.front())
-            {
-                i++;
-            }
+            const std::size_t from = trimmed.front() == '-' ? 1 : 0;
 
-            for (; i < len; i++)
+            CharAt at;
+            if (find_first_bad(trimmed, from,
+                               [decimal_point](llwchar c)
+                               { return decimal_point != c && !LLStringOps::isDigit(c); },
+                               at))
             {
-                CHAR ch = trimmed[i];
-                if ((decimal_point != ch) && !LLStringOps::isDigit(ch))
-                {
-                    return setError("Validator_ShouldBeDigitOrDot", LLSD().with("NR", i + 1).with("CH", llsd(ch)));
-                }
+                return setError("Validator_ShouldBeDigitOrDot",
+                                LLSD().with("NR", at.index + (S32)from).with("CH", llsd(at.cp)));
             }
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorFloatImpl;
 Validator validateFloat(validatorFloatImpl);
 
@@ -111,225 +162,179 @@ Validator validateFloat(validatorFloatImpl);
 // the simple reasons that intermediate states may be invalid even if the final result is valid.
 class ValidatorInt : public ValidatorImpl
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR> &str)
+public:
+    bool validate(std::string_view str) override
     {
         LLLocale locale(LLLocale::USER_LOCALE);
 
-        std::basic_string<CHAR> trimmed = str;
-        LLStringUtilBase<CHAR>::trim(trimmed);
-        auto len = trimmed.length();
-        if (0 < len)
+        std::string trimmed(str);
+        LLStringUtil::trim(trimmed);
+        if (!trimmed.empty())
         {
-            S32 i = 0;
-
             // First character can be a negative sign
-            if ('-' == trimmed.front())
-            {
-                i++;
-            }
+            const std::size_t from = trimmed.front() == '-' ? 1 : 0;
 
-            for (; i < len; i++)
+            CharAt at;
+            if (find_first_bad(trimmed, from,
+                               [](llwchar c) { return !LLStringOps::isDigit(c); }, at))
             {
-                CHAR ch = trimmed[i];
-                if (!LLStringOps::isDigit(ch))
-                {
-                    return setError("Validator_ShouldBeDigit", LLSD().with("NR", i + 1).with("CH", llsd(ch)));
-                }
+                return setError("Validator_ShouldBeDigit",
+                                LLSD().with("NR", at.index + (S32)from).with("CH", llsd(at.cp)));
             }
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorIntImpl;
 Validator validateInt(validatorIntImpl);
 
 class ValidatorPositiveS32 : public ValidatorImpl
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
         LLLocale locale(LLLocale::USER_LOCALE);
 
-        std::basic_string<CHAR> trimmed = str;
-        LLStringUtilBase<CHAR>::trim(trimmed);
-        auto len = trimmed.length();
-        if (0 < len)
+        std::string trimmed(str);
+        LLStringUtil::trim(trimmed);
+        if (!trimmed.empty())
         {
-            CHAR ch = trimmed.front();
+            const char ch = trimmed.front();
 
             if (('-' == ch) || ('0' == ch))
             {
-                return setError("Validator_ShouldNotBeMinusOrZero", LLSD().with("CH", llsd(ch)));
+                return setError("Validator_ShouldNotBeMinusOrZero", LLSD().with("CH", llsd((llwchar)ch)));
             }
 
-            for (size_t i = 0; i < len; ++i)
+            CharAt at;
+            if (find_first_bad(trimmed, 0,
+                               [](llwchar c) { return !LLStringOps::isDigit(c); }, at))
             {
-                ch = trimmed[i];
-                if (!LLStringOps::isDigit(ch))
-                {
-                    return setError("Validator_ShouldBeDigit", LLSD().with("NR", i + 1).with("CH", llsd(ch)));
-                }
+                return setError("Validator_ShouldBeDigit",
+                                LLSD().with("NR", at.index).with("CH", llsd(at.cp)));
             }
         }
 
-        auto val = strtol(trimmed);
-        if (val <= 0)
+        if (strtol(trimmed) <= 0)
         {
-            return setError("Validator_InvalidNumericString", LLSD().with("STR", llsd(trimmed)));
+            return setError("Validator_InvalidNumericString", LLSD().with("STR", LLSD(trimmed)));
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorPositiveS32Impl;
 Validator validatePositiveS32(validatorPositiveS32Impl);
 
 class ValidatorNonNegativeS32 : public ValidatorImpl
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
         LLLocale locale(LLLocale::USER_LOCALE);
 
-        std::basic_string<CHAR> trimmed = str;
-        LLStringUtilBase<CHAR>::trim(trimmed);
-        auto len = trimmed.length();
-        if (0 < len)
+        std::string trimmed(str);
+        LLStringUtil::trim(trimmed);
+        if (!trimmed.empty())
         {
-            CHAR ch = trimmed.front();
+            const char ch = trimmed.front();
 
             if ('-' == ch)
             {
-                return setError("Validator_ShouldNotBeMinus", LLSD().with("CH", llsd(ch)));
+                return setError("Validator_ShouldNotBeMinus", LLSD().with("CH", llsd((llwchar)ch)));
             }
 
-            for (size_t i = 0; i < len; ++i)
+            CharAt at;
+            if (find_first_bad(trimmed, 0,
+                               [](llwchar c) { return !LLStringOps::isDigit(c); }, at))
             {
-                ch = trimmed[i];
-                if (!LLStringOps::isDigit(ch))
-                {
-                    return setError("Validator_ShouldBeDigit", LLSD().with("NR", i + 1).with("CH", llsd(ch)));
-                }
+                return setError("Validator_ShouldBeDigit",
+                                LLSD().with("NR", at.index).with("CH", llsd(at.cp)));
             }
         }
 
-        auto val = strtol(trimmed);
-        if (val < 0)
+        if (strtol(trimmed) < 0)
         {
-            return setError("Validator_InvalidNumericString", LLSD().with("STR", llsd(trimmed)));
+            return setError("Validator_InvalidNumericString", LLSD().with("STR", LLSD(trimmed)));
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorNonNegativeS32Impl;
 Validator validateNonNegativeS32(validatorNonNegativeS32Impl);
 
 class ValidatorNonNegativeS32NoSpace : public ValidatorImpl
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
         LLLocale locale(LLLocale::USER_LOCALE);
 
-        std::basic_string<CHAR> test_str = str;
-        auto len = test_str.length();
-        if (0 < len)
+        if (!str.empty())
         {
-            CHAR ch = test_str.front();
+            const char ch = str.front();
 
             if ('-' == ch)
             {
-                return setError("Validator_ShouldNotBeMinus", LLSD().with("CH", llsd(ch)));
+                return setError("Validator_ShouldNotBeMinus", LLSD().with("CH", llsd((llwchar)ch)));
             }
 
-            for (size_t i = 0; i < len; ++i)
+            CharAt at;
+            if (find_first_bad(str, 0,
+                               [](llwchar c)
+                               { return !LLStringOps::isDigit(c) || LLStringOps::isSpace(c); },
+                               at))
             {
-                ch = test_str[i];
-                if (!LLStringOps::isDigit(ch) || LLStringOps::isSpace(ch))
-                {
-                    return setError("Validator_ShouldBeDigitNotSpace", LLSD().with("NR", i + 1).with("CH", llsd(ch)));
-                }
+                return setError("Validator_ShouldBeDigitNotSpace",
+                                LLSD().with("NR", at.index).with("CH", llsd(at.cp)));
             }
         }
 
-        auto val = strtol(test_str);
-        if (val < 0)
+        if (strtol(str) < 0)
         {
-            return setError("Validator_InvalidNumericString", LLSD().with("STR", llsd(test_str)));
+            return setError("Validator_InvalidNumericString", LLSD().with("STR", LLSD(std::string(str))));
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorNonNegativeS32NoSpaceImpl;
 Validator validateNonNegativeS32NoSpace(validatorNonNegativeS32NoSpaceImpl);
 
 class ValidatorAlphaNum : public ValidatorImpl
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
         LLLocale locale(LLLocale::USER_LOCALE);
 
-        auto len = str.length();
-        while (len--)
+        CharAt at;
+        if (find_last_bad(str, 0, [](llwchar c) { return !LLStringOps::isAlnum(c); }, at))
         {
-            CHAR ch = str[len];
-
-            if (!LLStringOps::isAlnum(ch))
-            {
-                return setError("Validator_ShouldBeDigitOrAlpha", LLSD().with("NR", len + 1).with("CH", llsd(ch)));
-            }
+            return setError("Validator_ShouldBeDigitOrAlpha",
+                            LLSD().with("NR", at.index).with("CH", llsd(at.cp)));
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorAlphaNumImpl;
 Validator validateAlphaNum(validatorAlphaNumImpl);
 
 class ValidatorAlphaNumSpace : public ValidatorImpl
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
         LLLocale locale(LLLocale::USER_LOCALE);
 
-        auto len = str.length();
-        while (len--)
+        CharAt at;
+        if (find_last_bad(str, 0,
+                          [](llwchar c) { return !LLStringOps::isAlnum(c) && (U' ' != c); }, at))
         {
-            CHAR ch = str[len];
-
-            if (!LLStringOps::isAlnum(ch) && (' ' != ch))
-            {
-                return setError("Validator_ShouldBeDigitOrAlphaOrSpace", LLSD().with("NR", len + 1).with("CH", llsd(ch)));
-            }
+            return setError("Validator_ShouldBeDigitOrAlphaOrSpace",
+                            LLSD().with("NR", at.index).with("CH", llsd(at.cp)));
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorAlphaNumSpaceImpl;
 Validator validateAlphaNumSpace(validatorAlphaNumSpaceImpl);
 
@@ -338,99 +343,83 @@ Validator validateAlphaNumSpace(validatorAlphaNumSpaceImpl);
 // inventory item names, parcel names, object names, etc.
 class ValidatorASCIIPrintableNoPipe : public ValidatorImpl
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
-        auto len = str.length();
-        while (len--)
+        CharAt at;
+        if (find_last_bad(str, 0,
+                          [](llwchar c)
+                          {
+                              return c < 0x20 || c > 0x7f || c == U'|' ||
+                                     (c != U' ' && !LLStringOps::isAlnum(c) && !LLStringOps::isPunct(c));
+                          },
+                          at))
         {
-            CHAR ch = str[len];
-
-            if (ch < 0x20 || ch > 0x7f || ch == '|' ||
-                (ch != ' ' && !LLStringOps::isAlnum(ch) && !LLStringOps::isPunct(ch)))
-            {
-                return setError("Validator_ShouldBeDigitOrAlphaOrPunct", LLSD().with("NR", len + 1).with("CH", llsd(ch)));
-            }
+            return setError("Validator_ShouldBeDigitOrAlphaOrPunct",
+                            LLSD().with("NR", at.index).with("CH", llsd(at.cp)));
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorASCIIPrintableNoPipeImpl;
 Validator validateASCIIPrintableNoPipe(validatorASCIIPrintableNoPipeImpl);
 
 // Used for avatar names
 class ValidatorASCIIPrintableNoSpace : public ValidatorImpl
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
-        auto len = str.length();
-        while (len--)
+        CharAt at;
+        if (find_last_bad(str, 0,
+                          [](llwchar c)
+                          {
+                              return c <= 0x20 || c > 0x7f || LLStringOps::isSpace(c) ||
+                                     (!LLStringOps::isAlnum(c) && !LLStringOps::isPunct(c));
+                          },
+                          at))
         {
-            CHAR ch = str[len];
-
-            if (ch <= 0x20 || ch > 0x7f || LLStringOps::isSpace(ch) ||
-                (!LLStringOps::isAlnum(ch) && !LLStringOps::isPunct(ch)))
-            {
-                return setError("Validator_ShouldBeDigitOrAlphaOrPunctNotSpace", LLSD().with("NR", len + 1).with("CH", llsd(ch)));
-            }
+            return setError("Validator_ShouldBeDigitOrAlphaOrPunctNotSpace",
+                            LLSD().with("NR", at.index).with("CH", llsd(at.cp)));
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorASCIIPrintableNoSpaceImpl;
 Validator validateASCIIPrintableNoSpace(validatorASCIIPrintableNoSpaceImpl);
 
 class ValidatorASCII : public ValidatorImpl
 {
-protected:
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
-        auto len = str.length();
-        while (len--)
+        CharAt at;
+        if (find_last_bad(str, 0, [](llwchar c) { return c < 0x20 || c > 0x7f; }, at))
         {
-            CHAR ch = str[len];
-
-            if (ch < 0x20 || ch > 0x7f)
-            {
-                return setError("Validator_ShouldBeASCII", LLSD().with("NR", len + 1).with("CH", llsd(ch)));
-            }
+            return setError("Validator_ShouldBeASCII",
+                            LLSD().with("NR", at.index).with("CH", llsd(at.cp)));
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorASCIIImpl;
 Validator validateASCII(validatorASCIIImpl);
 
 class ValidatorASCIINoLeadingSpace : public ValidatorASCII
 {
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
-        if (LLStringOps::isSpace(str.front()))
+        // Guarding the empty case is not optional here: a view has no
+        // terminator to read past, whereas the std::string this used to take
+        // handed back its null and quietly answered "not a space".
+        if (!str.empty() && LLStringOps::isSpace(str.front()))
         {
             return false;
         }
 
-        return ValidatorASCII::validate<CHAR>(str);
+        return ValidatorASCII::validate(str);
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorASCIINoLeadingSpaceImpl;
 Validator validateASCIINoLeadingSpace(validatorASCIINoLeadingSpaceImpl);
 
@@ -438,26 +427,21 @@ class ValidatorASCIIWithNewLineNoPipe : public ValidatorImpl
 {
     // Used for multiline text stored on the server.
     // Example is landmark description in Places SP.
-    template <class CHAR>
-    bool validate(const std::basic_string<CHAR>& str)
+public:
+    bool validate(std::string_view str) override
     {
-        auto len = str.length();
-        while (len--)
+        CharAt at;
+        if (find_last_bad(str, 0,
+                          [](llwchar c)
+                          { return (c < 0x20 && c != 0xA) || c > 0x7f || c == U'|'; },
+                          at))
         {
-            CHAR ch = str[len];
-
-            if ((ch < 0x20 && ch != 0xA) || ch > 0x7f || ch == '|')
-            {
-                return setError("Validator_ShouldBeNewLineOrASCIINoPipe", LLSD().with("NR", len + 1).with("CH", llsd(ch)));
-            }
+            return setError("Validator_ShouldBeNewLineOrASCIINoPipe",
+                            LLSD().with("NR", at.index).with("CH", llsd(at.cp)));
         }
 
         return resetError();
     }
-
-public:
-    /*virtual*/ bool validate(const std::string& str) override { return validate<char>(str); }
-    /*virtual*/ bool validate(const LLWString& str) override { return validate<llwchar>(str); }
 } validatorASCIIWithNewLineNoPipeImpl;
 Validator validateASCIIWithNewLineNoPipe(validatorASCIIWithNewLineNoPipeImpl);
 
