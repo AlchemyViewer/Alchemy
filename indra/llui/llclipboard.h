@@ -64,6 +64,14 @@ public:
     bool copyToClipboard(const LLWString& src, S32 pos, S32 len, bool use_primary = false);
     bool addToClipboard(const LLWString& src, S32 pos, S32 len, bool use_primary = false);
     bool pasteFromClipboard(LLWString& dst, bool use_primary = false);
+
+    // The same three in UTF-8, where `pos` and `len` count bytes. The window
+    // below still speaks UTF-32, so these convert at that boundary rather than
+    // holding a second copy of the text.
+    bool copyToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary = false);
+    bool addToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary = false);
+    bool pasteFromClipboard(std::string& dst, bool use_primary = false);
+
     bool isTextAvailable(bool use_primary = false) const;
 
     // Object list management:

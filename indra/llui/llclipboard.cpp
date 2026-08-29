@@ -72,7 +72,7 @@ bool LLClipboard::addToClipboard(const LLUUID& src, const LLAssetType::EType typ
         res = true;
         if (LLAssetType::lookupIsAssetIDKnowable(type))
         {
-            LLWString source = utf8str_to_wstring(src.asString());
+            const std::string source = src.asString();
             res = addToClipboard(source, 0, static_cast<S32>(source.size()));
         }
         if (res)
@@ -143,6 +143,36 @@ bool LLClipboard::pasteFromClipboard(LLWString &dst, bool use_primary)
     if (res)
     {
         mString = dst;
+    }
+    return res;
+}
+
+bool LLClipboard::copyToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary)
+{
+    return addToClipboard(src, byte_pos, byte_len, use_primary);
+}
+
+bool LLClipboard::addToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary)
+{
+    try
+    {
+        mString = utf8str_to_wstring(std::string(src.substr(byte_pos, byte_len)));
+    }
+    catch (const std::exception& e)
+    {
+        LL_WARNS() << "Can't add the substring to clipboard: " << e.what() << LL_ENDL;
+        return false;
+    }
+    return (use_primary ? LLView::getWindow()->copyTextToPrimary(mString) : LLView::getWindow()->copyTextToClipboard(mString));
+}
+
+bool LLClipboard::pasteFromClipboard(std::string& dst, bool use_primary)
+{
+    LLWString wide;
+    const bool res = pasteFromClipboard(wide, use_primary);
+    if (res)
+    {
+        dst = wstring_to_utf8str(wide);
     }
     return res;
 }
