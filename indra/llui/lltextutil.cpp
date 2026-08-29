@@ -38,16 +38,30 @@ void LLTextUtil::textboxSetHighlightedVal(LLTextBox *txtbox, const LLStyle::Para
 {
     static LLUIColor sFilterTextColor = LLUIColorTable::instance().getColor("FilterTextColor", LLColor4::green);
 
-    std::string text_uc = text;
-    LLStringUtil::toUpper(text_uc);
-
-    size_t hl_begin = 0, hl_len = hl.size();
-
-    if (hl_len == 0 || (hl_begin = text_uc.find(hl)) == std::string::npos)
+    if (hl.empty())
     {
         txtbox->setText(text, normal_style);
         return;
     }
+
+    std::string text_uc = text;
+    LLStringUtil::toUpper(text_uc);
+
+    const size_t cased_begin = text_uc.find(hl);
+    if (cased_begin == std::string::npos)
+    {
+        txtbox->setText(text, normal_style);
+        return;
+    }
+
+    // The match was found in the uppercased copy, and uppercasing is not
+    // length-preserving -- sharp s grows a byte, and so do the ligatures --
+    // so both ends have to come back through the fold before they can index
+    // `text`. Taking them straight across highlights the wrong characters,
+    // and substr throws outright once the copy has grown past the original.
+    const size_t hl_begin = utf8str_bytes_from_cased_bytes(text, cased_begin, true);
+    const size_t hl_end   = utf8str_bytes_from_cased_bytes(text, cased_begin + hl.size(), true);
+    const size_t hl_len   = hl_end - hl_begin;
 
     LLStyle::Params hl_style = normal_style;
     hl_style.color = sFilterTextColor;
