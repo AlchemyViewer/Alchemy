@@ -2386,4 +2386,120 @@ namespace tut
         ensure_equals("begins at byte 1",          runs[0].first,   size_t(1));
         ensure_equals("ends at the end",           runs[0].second,  text.size());
     }
+
+    // utf8str_emoji_range_at must answer in bytes exactly what the wide form
+    // answers in codepoints, for every position in the string -- including the
+    // ones inside a character, which belong to no pictograph.
+    template<> template<>
+    void llstring_utf_object_t::test<130>()
+    {
+        const LLWString wide = { (llwchar)'a',                    // 1 byte
+                                 (llwchar)0x2764, (llwchar)0xFE0F,// heart + VS16
+                                 (llwchar)0x65E5,                 // ideograph
+                                 (llwchar)0x1F468, (llwchar)0x200D,
+                                 (llwchar)0x1F469,                // ZWJ family
+                                 (llwchar)0x00A9,                 // lone (c)
+                                 (llwchar)'z' };
+        const std::string utf8 = wstring_to_utf8str(wide);
+
+        ALUtf8View view;
+        view.assign(wide);
+        ensure_equals("view agrees with the conversion", view.text(), utf8);
+
+        for (size_t cp = 0; cp <= wide.size(); ++cp)
+        {
+            const auto want  = wstring_emoji_range_at(wide, cp);
+            const size_t b   = view.toBytes(cp);
+            const auto got   = utf8str_emoji_range_at(utf8, b);
+            ensure_equals("range begin at " + std::to_string(cp),
+                          got.first,  view.toBytes(want.first));
+            ensure_equals("range end at " + std::to_string(cp),
+                          got.second, view.toBytes(want.second));
+        }
+
+        // The heart carries a presentation selector, so it is a cluster and
+        // its range spans both codepoints -- three bytes plus three.
+        const auto heart = utf8str_emoji_range_at(utf8, 1);
+        ensure_equals("heart begins at 1", heart.first,  size_t(1));
+        ensure_equals("heart spans VS16",  heart.second, size_t(7));
+
+        // The lone copyright sign is no cluster, but it is a pictograph base,
+        // so it reports its own two bytes rather than an empty range.
+        const size_t copy_at = 1 + 6 + 3 + 11;
+        const auto copyright = utf8str_emoji_range_at(utf8, copy_at);
+        ensure_equals("(c) begins", copyright.first,  copy_at);
+        ensure_equals("(c) is two bytes", copyright.second, copy_at + 2);
+
+        // A position inside the ideograph is not a character start and so
+        // belongs to nothing.
+        const auto split = utf8str_emoji_range_at(utf8, 8);
+        ensure_equals("mid-character is empty", split.first, split.second);
+
+        // Past the end reports an empty range at the position asked about,
+        // not at the end of the string.
+        const auto past = utf8str_emoji_range_at(utf8, utf8.size() + 4);
+        ensure_equals("past the end is empty", past.first, past.second);
+    }
+
+    // ALUtf8View built from UTF-8 has to index exactly what the same text
+    // indexes when it arrives as UTF-32, in both directions.
+    template<> template<>
+    void llstring_utf_object_t::test<131>()
+    {
+        const LLWString wide = { (llwchar)'a', (llwchar)0x00E9, (llwchar)0x65E5,
+                                 (llwchar)0x1F600, (llwchar)'z' };
+        const std::string utf8 = wstring_to_utf8str(wide);
+
+        ALUtf8View from_wide, from_utf8;
+        from_wide.assign(wide);
+        from_utf8.assign(utf8);
+
+        ensure_equals("same text", from_utf8.text(), from_wide.text());
+
+        for (size_t cp = 0; cp <= wide.size() + 2; ++cp)
+        {
+            ensure_equals("toBytes at " + std::to_string(cp),
+                          from_utf8.toBytes(cp), from_wide.toBytes(cp));
+        }
+        for (size_t b = 0; b <= utf8.size() + 2; ++b)
+        {
+            ensure_equals("toCodepoints at " + std::to_string(b),
+                          from_utf8.toCodepoints(b), from_wide.toCodepoints(b));
+        }
+
+        // The two are inverses on character starts.
+        for (size_t cp = 0; cp <= wide.size(); ++cp)
+        {
+            ensure_equals("round trip at " + std::to_string(cp),
+                          from_utf8.toCodepoints(from_utf8.toBytes(cp)), cp);
+        }
+
+        ALUtf8View empty;
+        empty.assign(std::string_view());
+        ensure_equals("empty maps to 0", empty.toBytes(3), size_t(0));
+        ensure_equals("empty counts 0",  empty.toCodepoints(3), size_t(0));
+    }
+
+    // utf8str_codepoint_count is what a limit expressed in characters gets
+    // compared against, so it has to agree with the UTF-32 form's size().
+    template<> template<>
+    void llstring_utf_object_t::test<132>()
+    {
+        ensure_equals("empty", utf8str_codepoint_count(""), size_t(0));
+        ensure_equals("ascii", utf8str_codepoint_count("abc"), size_t(3));
+
+        const LLWString wide = { (llwchar)'a', (llwchar)0x00E9, (llwchar)0x65E5,
+                                 (llwchar)0x1F600, (llwchar)0x200D, (llwchar)0x1F600 };
+        const std::string utf8 = wstring_to_utf8str(wide);
+        ensure_equals("bytes", utf8.size(), size_t(1 + 2 + 3 + 4 + 3 + 4));
+        ensure_equals("agrees with the wide size",
+                      utf8str_codepoint_count(utf8), wide.size());
+
+        // Malformed bytes count one each, so the count never disagrees with a
+        // walk over the same text.
+        ensure_equals("lone continuation bytes",
+                      utf8str_codepoint_count("\x80\x80"), size_t(2));
+        ensure_equals("truncated sequence",
+                      utf8str_codepoint_count("\xF0\x9F"), size_t(2));
+    }
 }

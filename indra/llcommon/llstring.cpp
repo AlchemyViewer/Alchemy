@@ -1076,6 +1076,30 @@ void ALUtf8View::assign(LLWStringView wstr)
     mOffsets.push_back(mUtf8.size());
 }
 
+void ALUtf8View::assign(std::string_view utf8str)
+{
+    mUtf8.assign(utf8str);
+    mOffsets.clear();
+    mOffsets.reserve(utf8str.size() + 1);
+
+    for (size_t i = 0; i < mUtf8.size(); )
+    {
+        mOffsets.push_back(i);
+        i = utf8str_decode_at(mUtf8, i).next;
+    }
+    mOffsets.push_back(mUtf8.size());
+}
+
+size_t utf8str_codepoint_count(std::string_view utf8str)
+{
+    size_t count = 0;
+    for (size_t i = 0; i < utf8str.size(); ++count)
+    {
+        i = utf8str_decode_at(utf8str, i).next;
+    }
+    return count;
+}
+
 size_t ALUtf8View::toBytes(size_t pos) const
 {
     if (mOffsets.empty())
@@ -1085,8 +1109,13 @@ size_t ALUtf8View::toBytes(size_t pos) const
 
 size_t ALUtf8View::toCodepoints(size_t byte_pos) const
 {
+    if (mOffsets.empty())
+        return 0;
     const auto it = std::lower_bound(mOffsets.begin(), mOffsets.end(), byte_pos);
-    return (size_t)(it - mOffsets.begin());
+    // Clamped like toBytes: a byte offset past the end is the end, not a
+    // codepoint index one beyond the last, which is what the bare search
+    // returns and what no caller can do anything with.
+    return (size_t)llmin(it - mOffsets.begin(), (std::ptrdiff_t)mOffsets.size() - 1);
 }
 
 // Bounds [begin, end) of the line containing byte_pos, excluding its newline.
@@ -1716,10 +1745,14 @@ size_t wstring_step_word_backward(LLWStringView wstr, size_t pos)
     return view.toCodepoints(utf8str_step_word_backward(view.text(), view.toBytes(pos)));
 }
 
-std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos,
-                                                 const EmojiClusterList& clusters)
+namespace
 {
-    if (pos >= wstr.size())
+
+template <typename VIEW>
+std::pair<size_t, size_t> emoji_range_at(VIEW text, size_t pos,
+                                         const EmojiClusterList& clusters)
+{
+    if (pos >= text.size())
         return { pos, pos };
     for (const auto& run : clusters)
     {
@@ -1734,14 +1767,36 @@ std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos,
     // pictographs (©, ®, ☦, ⚓, ❤, …) get a range; isPictographBase already
     // excludes extenders (ZWJ, VS-15/16, keycap combiner, skin-tone mods,
     // tag chars) which have no business being a standalone tooltip target.
-    return LLStringOps::isPictographBase(wstr[pos])
-        ? std::make_pair(pos, pos + 1)
+    // Over UTF-8 a position inside a character decodes to the replacement
+    // character, which is no pictograph, so it reports empty as it should.
+    const CodepointAt at = decode_at(text, pos);
+    return LLStringOps::isPictographBase(at.cp)
+        ? std::make_pair(pos, at.next)
         : std::make_pair(pos, pos);
+}
+
+}
+
+std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos,
+                                                 const EmojiClusterList& clusters)
+{
+    return emoji_range_at(wstr, pos, clusters);
 }
 
 std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos)
 {
     return wstring_emoji_range_at(wstr, pos, wstring_find_emoji_clusters(wstr));
+}
+
+std::pair<size_t, size_t> utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos,
+                                                 const EmojiClusterList& clusters)
+{
+    return emoji_range_at(utf8str, byte_pos, clusters);
+}
+
+std::pair<size_t, size_t> utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos)
+{
+    return utf8str_emoji_range_at(utf8str, byte_pos, utf8str_find_emoji_clusters(utf8str));
 }
 
 #if LL_WINDOWS

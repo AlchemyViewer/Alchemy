@@ -802,6 +802,11 @@ class LL_COMMON_API ALUtf8View
 public:
     void assign(LLWStringView wstr);
 
+    // The same map over text that is already UTF-8. Nothing is converted, only
+    // indexed, so this is the form to reach for when an interface still counts
+    // codepoints over text that no longer stores them -- the IME's, above all.
+    void assign(std::string_view utf8str);
+
     std::string_view text() const { return mUtf8; }
 
     // A codepoint index into the original string, as a byte offset. Indices
@@ -835,6 +840,11 @@ LL_COMMON_API LLCodepointAt utf8str_decode_at(std::string_view utf8str, size_t b
 // well-formed and always non-empty.
 LL_COMMON_API void utf8str_append_cp(std::string& out, llwchar cp);
 LL_COMMON_API std::string utf8str_from_cp(llwchar cp);
+
+// How many characters the text holds -- what .size() answers once it is UTF-32
+// and what a limit expressed in characters has to be compared against. Malformed
+// bytes count one each, so this never disagrees with a walk over the same text.
+LL_COMMON_API size_t utf8str_codepoint_count(std::string_view utf8str);
 
 LL_COMMON_API size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos);
@@ -934,6 +944,15 @@ LL_COMMON_API std::pair<size_t, size_t>
 wstring_emoji_range_at(LLWStringView wstr, size_t pos);
 LL_COMMON_API std::pair<size_t, size_t>
 wstring_emoji_range_at(LLWStringView wstr, size_t pos,
+                       const EmojiClusterList& clusters);
+
+// The same lookup over UTF-8, taking and reporting byte offsets. A `byte_pos`
+// that is not a character start belongs to no pictograph and so reports an
+// empty range, as an out-of-bounds position does.
+LL_COMMON_API std::pair<size_t, size_t>
+utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API std::pair<size_t, size_t>
+utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos,
                        const EmojiClusterList& clusters);
 
 #if LL_WINDOWS
