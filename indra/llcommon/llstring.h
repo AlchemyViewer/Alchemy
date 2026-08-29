@@ -438,6 +438,16 @@ public:
     static S32      compareInsensitive(const T* lhs, const T* rhs);
     static S32      compareInsensitive(string_view_type lhs, string_view_type rhs);
 
+    // Same bytes, give or take the case of an ASCII letter. This is the
+    // question to ask about a token whose spelling a protocol or a file format
+    // fixes -- a wire header, a keyword, a stream tag, a URL scheme -- where
+    // matching has to mean the same characters and nothing else.
+    // compareInsensitive() asks a collator, which is right for text a person
+    // reads and wrong here: it folds away distinctions a reader is meant to
+    // overlook, so a fullwidth or soft-hyphenated spelling the format never
+    // allowed would be accepted as the real one.
+    static bool     isEqualInsensitiveASCII(string_view_type lhs, string_view_type rhs);
+
     // Sort order for lists people read: Unicode collation with digit runs
     // compared as numbers, so item2 comes before item10 and an accented letter
     // sorts beside the letter it decorates. Case is a tertiary difference, so
@@ -1522,6 +1532,30 @@ template<class T>
 S32 LLStringUtilBase<T>::compareStrings(const string_type& lhs, const string_type& rhs)
 {
     return LLStringOps::collate(lhs.c_str(), rhs.c_str());
+}
+
+//static
+template<class T>
+bool LLStringUtilBase<T>::isEqualInsensitiveASCII(string_view_type lhs, string_view_type rhs)
+{
+    if (lhs.size() != rhs.size())
+    {
+        return false;
+    }
+    for (size_type i = 0; i < lhs.size(); ++i)
+    {
+        T a = lhs[i];
+        T b = rhs[i];
+        // Only the twenty-six. Anything else, including every byte of a
+        // multi-byte character, has to match exactly.
+        if (a >= 'A' && a <= 'Z') { a = (T)(a - 'A' + 'a'); }
+        if (b >= 'A' && b <= 'Z') { b = (T)(b - 'A' + 'a'); }
+        if (a != b)
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 // Case-insensitive comparison is Unicode collation with the level that carries

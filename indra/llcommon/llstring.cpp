@@ -36,6 +36,7 @@
 #include <vector>
 
 #include <charconv>
+#include <cmath>
 #include <fast_float/fast_float.h>
 #include <simdutf.h>
 
@@ -604,7 +605,17 @@ std::string utf8str_symbol_truncate(std::string_view utf8str, const S32 symbol_l
     // Counting codepoints can stop in the middle of what the reader sees as
     // one character -- between a letter and its accent, or inside a flag or a
     // family. Give back the last whole one instead.
-    return std::string(utf8str.substr(0, utf8str_grapheme_align_backward(utf8str, byteIndex)));
+    size_t cut = utf8str_grapheme_align_backward(utf8str, byteIndex);
+    if (0 == cut && byteIndex > 0)
+    {
+        // The very first character spends more codepoints than the budget
+        // allows, so no whole one fits inside it. Returning nothing would
+        // erase the text rather than shorten it -- a name that opens with a
+        // family emoji would render as blank -- so overshoot by that one
+        // character and let the caller's own width clip it.
+        cut = utf8str_grapheme_align_forward(utf8str, byteIndex);
+    }
+    return std::string(utf8str.substr(0, cut));
 }
 
 std::string utf8str_substChar(
@@ -908,6 +919,17 @@ LLCodepointAt utf8str_decode_at(std::string_view utf8str, size_t byte_pos)
         if ((cont & 0xC0) != 0x80)
             return { 0xFFFD, byte_pos + 1 };
         cp = (cp << 6) | (cont & 0x3F);
+    }
+    // A well-formed sequence is the shortest one that spells its codepoint, is
+    // not half of a surrogate pair, and does not reach past the last codepoint
+    // there is. Taking the others at face value lets an overlong form carry a
+    // character past a filter that already looked for it -- an overlong slash
+    // still reads as a slash to everything downstream -- and puts values into
+    // llwchar that no encoder further on can represent.
+    static constexpr llwchar sMinForLength[5] = { 0, 0, 0x80, 0x800, 0x10000 };
+    if (cp < sMinForLength[len] || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+    {
+        return { 0xFFFD, byte_pos + 1 };
     }
     return { cp, byte_pos + len };
 }
@@ -1302,6 +1324,35 @@ static bool utf8str_run_is_space(std::string_view utf8str, size_t begin, size_t 
     return true;
 }
 
+// Where the character containing byte_pos begins. Only for the paths that run
+// without ICU: they still owe their caller an offset it can cut a string at,
+// and stepping a raw byte would hand back somewhere inside a character.
+static size_t utf8str_prev_char_start(std::string_view utf8str, size_t byte_pos)
+{
+    size_t at = llmin(byte_pos, utf8str.size());
+    if (at > 0)
+    {
+        --at;
+    }
+    while (at > 0 && ((unsigned char)utf8str[at] & 0xC0) == 0x80)
+    {
+        --at;
+    }
+    return at;
+}
+
+// The other direction: the first character start at or after byte_pos.
+static size_t utf8str_next_char_start(std::string_view utf8str, size_t byte_pos)
+{
+    const size_t n = utf8str.size();
+    size_t at = llmin(byte_pos, n);
+    while (at < n && ((unsigned char)utf8str[at] & 0xC0) == 0x80)
+    {
+        ++at;
+    }
+    return at;
+}
+
 size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos)
 {
     const size_t n = utf8str.size();
@@ -1313,7 +1364,7 @@ size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos)
     // without one being drawn for it.
     const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
     if (!breaks)
-        return byte_pos + 1;
+        return (size_t)utf8str_decode_at(utf8str, byte_pos).next;
 
     const int32_t next = ubrk_following(breaks.get(), (int32_t)byte_pos);
     return next == UBRK_DONE ? n : (size_t)next;
@@ -1332,7 +1383,7 @@ size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos)
 
     const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
     if (!breaks)
-        return byte_pos - 1;
+        return utf8str_prev_char_start(utf8str, byte_pos);
 
     const int32_t prev = ubrk_preceding(breaks.get(), (int32_t)byte_pos);
     return prev == UBRK_DONE ? 0 : (size_t)prev;
@@ -1376,7 +1427,7 @@ size_t utf8str_grapheme_align_forward(std::string_view utf8str, size_t byte_pos)
 
     const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
     if (!breaks)
-        return byte_pos;
+        return utf8str_next_char_start(utf8str, byte_pos);
 
     const int32_t at = (int32_t)byte_pos;
     if (ubrk_isBoundary(breaks.get(), at))
@@ -1533,12 +1584,18 @@ namespace
 
         UErrorCode status = U_ZERO_ERROR;
         const int32_t needed = convert(csm, nullptr, 0, string.data(), (int32_t)string.size(), &status);
+        // Asking for the length always reports the overflow, since there is no
+        // buffer to write into; that one status is the expected answer and not
+        // a failure. Any other is ICU declining to measure the string at all,
+        // and it reports zero when it does. Case mapping never removes
+        // characters, so a zero length for input that is not empty can only
+        // mean failure -- leave the text as it stands rather than erasing it.
+        if (U_FAILURE(status) && U_BUFFER_OVERFLOW_ERROR != status)
+        {
+            return;
+        }
         if (needed <= 0)
         {
-            if (needed == 0)
-            {
-                string.clear();
-            }
             return;
         }
 
@@ -2389,6 +2446,23 @@ namespace
     // With no collator to be had, order by codepoint. It is the wrong order,
     // but it is still a total order, which is what a sort needs before it
     // needs anything else.
+    // Whether a comparison exists to put things in order, as against to answer
+    // whether two strings are the same. Collation deliberately overlooks
+    // differences the reader is not meant to see -- the leading zeros in a
+    // numeric run, a variation selector, a soft hyphen -- and an ordering that
+    // calls two distinct names equal lets an unstable sort shuffle them between
+    // one refresh and the next. Breaking that tie by bytes is arbitrary, but it
+    // is fixed, which is all a sort needs.
+    //
+    // Only the case-sensitive dictionary order gets that treatment. Every other
+    // kind is asked whether two strings are the same and has callers relying on
+    // the answer: the caseless forms are equivalences on purpose, so a tie there
+    // is the result rather than a gap in it.
+    constexpr bool orders_rather_than_equates(CollatorKind kind)
+    {
+        return CollatorKind::Dictionary == kind;
+    }
+
     S32 collate_utf8(std::string_view a, std::string_view b, CollatorKind kind)
     {
         UCollator* coll = collator(kind);
@@ -2398,7 +2472,11 @@ namespace
         UErrorCode status = U_ZERO_ERROR;
         const S32 result = (S32)ucol_strcollUTF8(coll, a.data(), (int32_t)a.size(),
                                                  b.data(), (int32_t)b.size(), &status);
-        return U_SUCCESS(status) ? result : (S32)a.compare(b);
+        if (U_FAILURE(status))
+            return (S32)a.compare(b);
+        if (0 != result || !orders_rather_than_equates(kind))
+            return result;
+        return (S32)a.compare(b);
     }
 
     S32 collate_wide(LLWStringView a, LLWStringView b, CollatorKind kind)
@@ -2412,7 +2490,10 @@ namespace
         const int32_t lhs_length = to_utf16_scratch(a, lhs);
         const int32_t rhs_length = to_utf16_scratch(b, rhs);
 
-        return (S32)ucol_strcoll(coll, lhs.data(), lhs_length, rhs.data(), rhs_length);
+        const S32 result = (S32)ucol_strcoll(coll, lhs.data(), lhs_length, rhs.data(), rhs_length);
+        if (0 != result || !orders_rather_than_equates(kind))
+            return result;
+        return (a < b) ? -1 : ((b < a) ? 1 : 0);
     }
 }
 
@@ -2535,6 +2616,13 @@ bool LLStringUtilBase<char>::convertToF64(std::string_view string, F64& value)
     F64 v = 0.0;
     const auto [ptr, ec] = fast_float::from_chars(s.data(), s.data() + s.size(), v);
     if (ec != std::errc{})
+        return false;
+
+    // from_chars spells the same infinities and NaNs strtod does, so "inf" and
+    // "nan" parse where the stream this replaced set failbit on them. Settings,
+    // XML attributes and typed fields all reach here, and none of them means a
+    // non-finite number by writing a word.
+    if (!std::isfinite(v))
         return false;
 
     value = v;

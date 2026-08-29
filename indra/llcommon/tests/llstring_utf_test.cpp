@@ -97,9 +97,9 @@ namespace tut
     //   11x utf8str helpers  (substChar/makeASCII/removeCRLF/split/preview)
     //   12x utf8 walkers     (byte-offset segmentation against its wide twin)
     // The TUT default registers only test<1>..test<50>, but the explicit
-    // test_group<..., 136> below raises that ceiling. Keep this index in
+    // test_group<..., 139> below raises that ceiling. Keep this index in
     // sync with categories used below.
-    typedef test_group<llstring_utf_data, 136> llstring_utf_t;
+    typedef test_group<llstring_utf_data, 139> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
 
@@ -2600,5 +2600,88 @@ namespace tut
             ensure("the good bytes are still there",
                    fixed.find("ok") == 0 && fixed.rfind("ok") == fixed.size() - 2);
         }
+    }
+
+    // A decoder that accepts more than the encoding allows lets a character
+    // reach somewhere a filter already looked for it.
+    template<> template<>
+    void llstring_utf_object_t::test<136>()
+    {
+        struct { const char* bytes; const char* what; } bad[] = {
+            { "\xC0\xAF",         "overlong slash" },
+            { "\xC0\x80",         "overlong NUL" },
+            { "\xE0\x80\x80",     "overlong three-byte NUL" },
+            { "\xED\xA0\x80",     "encoded surrogate half" },
+            { "\xF5\x80\x80\x80", "past U+10FFFF" },
+            { "\xF7\xBF\xBF\xBF", "well past U+10FFFF" },
+            { "\x80",             "lone continuation" },
+            { "\xFF",             "no such lead" },
+        };
+
+        for (const auto& c : bad)
+        {
+            const std::string s(c.bytes);
+            const LLCodepointAt at = utf8str_decode_at(s, 0);
+            ensure_equals(std::string(c.what) + " decodes to the replacement",
+                          (S32)at.cp, (S32)0xFFFD);
+            ensure_equals(std::string(c.what) + " consumes exactly one byte",
+                          (S32)at.next, 1);
+        }
+
+        // The shapes that are legal still decode whole.
+        ensure_equals("ASCII", (S32)utf8str_decode_at(std::string("A"), 0).cp, (S32)'A');
+        ensure_equals("two-byte", (S32)utf8str_decode_at(std::string("\xC3\xA9"), 0).cp, (S32)0xE9);
+        ensure_equals("three-byte", (S32)utf8str_decode_at(std::string("\xE6\x97\xA5"), 0).cp, (S32)0x65E5);
+        ensure_equals("four-byte", (S32)utf8str_decode_at(std::string("\xF0\x9F\x90\xB6"), 0).cp, (S32)0x1F436);
+        ensure_equals("four-byte spans four", (S32)utf8str_decode_at(std::string("\xF0\x9F\x90\xB6"), 0).next, (S32)4);
+    }
+
+    // Shortening text must not empty it. The budget counts codepoints while the
+    // cut lands on a cluster, so a first cluster that spends more codepoints
+    // than the budget allows has nowhere to fall back to except itself.
+    template<> template<>
+    void llstring_utf_object_t::test<137>()
+    {
+        // A ZWJ family: five codepoints, eighteen bytes, one cluster.
+        const std::string family("\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7");
+        const std::string text = family + "abc";
+
+        for (S32 budget = 1; budget <= 5; ++budget)
+        {
+            const std::string cut = utf8str_symbol_truncate(text, budget);
+            ensure("a budget under the first cluster still returns text", !cut.empty());
+            ensure_equals("and returns the whole of that cluster", cut, family);
+        }
+
+        // Once the budget clears the cluster the next characters come too.
+        ensure_equals("budget past the cluster takes the next character",
+                      utf8str_symbol_truncate(text, 6), family + "a");
+        ensure_equals("input already short enough is untouched",
+                      utf8str_symbol_truncate(std::string("abc"), 10), std::string("abc"));
+    }
+
+    // Case-insensitive over ASCII compares bytes, so a spelling the format
+    // never allowed cannot pass for the one it did.
+    template<> template<>
+    void llstring_utf_object_t::test<138>()
+    {
+        ensure("same word, different case",
+               LLStringUtil::isEqualInsensitiveASCII(std::string("llsd/binary"), std::string("LLSD/Binary")));
+        ensure("a different length never matches",
+               !LLStringUtil::isEqualInsensitiveASCII(std::string("llsd"), std::string("llsd/binary")));
+        // Fullwidth 'l' is its own character, whatever a collator makes of it.
+        ensure("fullwidth is not the ASCII letter",
+               !LLStringUtil::isEqualInsensitiveASCII(
+                   std::string("\xEF\xBD\x8C\xEF\xBD\x8Csd/binary"), std::string("llsd/binary")));
+        // A soft hyphen is a character, not an absence of one.
+        ensure("an ignorable is still a difference",
+               !LLStringUtil::isEqualInsensitiveASCII(
+                   std::string("llsd/bin\xC2\xAD" "ary"), std::string("llsd/binary")));
+        // Above ASCII nothing is folded -- these are simply different bytes.
+        ensure("no folding above ASCII",
+               !LLStringUtil::isEqualInsensitiveASCII(
+                   std::string("caf\xC3\xA9"), std::string("caf\xC3\x89")));
+        ensure("empty equals empty",
+               LLStringUtil::isEqualInsensitiveASCII(std::string(), std::string()));
     }
 }
