@@ -105,6 +105,11 @@ public:
     // own list with a uniform color across all vertices — a prerequisite for
     // color-only cache regeneration. For NO_SHADOW renders the callback is not
     // invoked (single-pass).
+    // It runs between the two passes of a draw that is still in progress, and
+    // the glyphs pass A collected are held in per-thread buffers until pass B
+    // has walked them. So it must not draw text: a nested render would clear
+    // those buffers out from under the draw that invoked it, and the shadow
+    // would come out carrying the nested string's glyphs.
     typedef std::function<void()> pass_boundary_cb_t;
 
     // The draw: `begin_offset`, `max_bytes` and the count returned all index

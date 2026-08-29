@@ -1556,6 +1556,18 @@ S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 s
 
     if (use_shaped)
     {
+        // Nothing fitting leaves drawing to start at the last cluster rather
+        // than the last character: start is only a character start, and a
+        // caller may not begin partway through a cluster even when that is all
+        // the room there is. Ascending order, so the last entry at or before
+        // start is the cluster holding it.
+        for (const auto& entry : cluster_advance)
+        {
+            if (entry.first > start)
+                break;
+            first = entry.first;
+        }
+
         for (size_t k = cluster_advance.size(); k-- > 0; )
         {
             const S32 pos     = cluster_advance[k].first;

@@ -43,6 +43,7 @@
 #include "../test/lltut.h"
 
 #include <cstdio>
+#include <set>
 
 namespace
 {
@@ -588,6 +589,137 @@ namespace tut
         ensure_equals("BOLD|ITALIC tokenizes correctly",
                       LLFontGL::getStyleFromString("BOLD|ITALIC"),
                       LLFontGL::BOLD | LLFontGL::ITALIC);
+    }
+
+    // firstDrawableByte is the only one of the three layout walks that goes
+    // backward, and a backward walk is where a cluster gets split: the
+    // trailing codepoints of one carry no advance of their own, so a naive
+    // step always finds room for them and then stops on the one holding the
+    // width. Sweep the budget across a string with a ZWJ cluster in it and
+    // hold every answer to the promise llfontgl.h makes -- a character start,
+    // and where the text shapes, a cluster start.
+    template<> template<>
+    void llfontgl_object::test<19>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        // Byte bounds recorded as the string is built: the five codepoints of
+        // a trans flag are 4/3/3/3/3 bytes, so a hand-written offset here
+        // would be a lie the moment anything about it drifts.
+        std::string s = "X";
+        const S32 cluster_start = (S32)s.size();
+        for (llwchar cp : { (llwchar)0x1F3F3, (llwchar)0xFE0F, (llwchar)0x200D,
+                            (llwchar)0x26A7, (llwchar)0xFE0F })
+        {
+            utf8str_append_cp(s, cp);
+        }
+        const S32 cluster_end = (S32)s.size();
+        s += "Y";
+        const S32 total = (S32)s.size();
+
+        const F32 wfull = font->getWidthF32Bytes(s, 0, total, false);
+        if (wfull <= 0.f)
+            skip("emoji fallback not available");
+        const F32 w_pre  = font->getWidthF32Bytes(s, 0, cluster_start, false);
+        const F32 w_post = font->getWidthF32Bytes(s, 0, cluster_end, false);
+        if (w_post - w_pre < 2.f)
+            skip("emoji cluster did not shape to a measurable glyph");
+
+        for (F32 px = 0.f; px <= wfull + 2.f; px += 0.5f)
+        {
+            const S32 first = font->firstDrawableByte(s, px);
+            ensure("firstDrawableByte names a position inside the text",
+                   first >= 0 && first < total);
+            ensure("firstDrawableByte returns a continuation byte",
+                   ((unsigned char)s[first] & 0xC0) != 0x80);
+            const bool inside_cluster = (first > cluster_start && first < cluster_end);
+            ensure("firstDrawableByte returns a position inside a cluster",
+                   !inside_cluster);
+        }
+    }
+
+    // What the budget buys, and that it buys it one character at a time. The
+    // set of positions a full sweep can return has to be exactly the set of
+    // character starts: anything missing is a character the backward walk
+    // stepped over, and anything extra is an offset inside one.
+    template<> template<>
+    void llfontgl_object::test<20>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        // "a", e-acute (two bytes), "b", "c" -- so byte 2 is the only offset
+        // in the string that is not somewhere drawing may begin.
+        const std::string s = "a\xC3\xA9" "bc";
+        const S32 total = (S32)s.size();
+        ensure_equals("the fixture string is five bytes", total, (S32)5);
+
+        const F32 wfull = font->getWidthF32Bytes(s, 0, total, false);
+        if (wfull <= 0.f)
+            skip("font produced no width");
+
+        std::set<S32> seen;
+        S32 previous = total;
+        for (F32 px = 0.f; px <= wfull + 2.f; px += 0.25f)
+        {
+            const S32 first = font->firstDrawableByte(s, px);
+            ensure("a larger budget starts drawing later", first <= previous);
+            previous = first;
+            seen.insert(first);
+        }
+
+        const std::set<S32> starts{ 0, 1, 3, 4 };
+        ensure("the sweep reaches every character start and nothing else",
+               seen == starts);
+    }
+
+    // The edges, and the one case with no good answer. A budget that cannot
+    // hold even the last character still has to name a place to draw from --
+    // that character, clipped -- because returning nothing would leave a
+    // caller scrolling a field it can never make progress in.
+    template<> template<>
+    void llfontgl_object::test<21>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        const std::string s = "Hello";
+        const S32 total = (S32)s.size();
+        const F32 wfull = font->getWidthF32Bytes(s, 0, total, false);
+        if (wfull <= 0.f)
+            skip("font produced no width");
+
+        ensure_equals("empty text draws from the beginning",
+                      font->firstDrawableByte(std::string_view(), 100.f), (S32)0);
+        ensure_equals("room for everything draws from the beginning",
+                      font->firstDrawableByte(s, F32_MAX), (S32)0);
+        ensure_equals("no room at all still draws the last character",
+                      font->firstDrawableByte(s, 0.f), total - 1);
+        ensure_equals("a byte budget of nothing draws from the beginning",
+                      font->firstDrawableByte(s, F32_MAX, S32_MAX, 0), (S32)0);
+
+        // start_pos chooses which character has to be the last one drawn, so
+        // with room to spare the answer is the beginning whichever it is.
+        for (S32 start = 0; start < total; ++start)
+        {
+            ensure_equals("room for everything draws from the beginning",
+                          font->firstDrawableByte(s, F32_MAX, start), (S32)0);
+            ensure_equals("no room draws the character asked for",
+                          font->firstDrawableByte(s, 0.f, start), start);
+        }
     }
 
     // ===================================================================
