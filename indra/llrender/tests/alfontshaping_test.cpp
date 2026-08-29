@@ -1435,8 +1435,8 @@ namespace tut
 
     // Cluster index invariant: every glyph emitted by shapeRun has
     // cluster ∈ [begin, end). The producer-side clamp in shape_sub_run
-    // protects downstream consumers (firstDrawableChar, maxDrawableChars)
-    // that index per-codepoint arrays by cluster. ZWJ-retry candidates
+    // protects downstream consumers (firstDrawableByte, maxDrawableBytes)
+    // that index per-cluster advances by cluster. ZWJ-retry candidates
     // and corrupt GSUB tables can synthesize cluster values outside the
     // input range; the clamp pins them back into the slice.
     template<> template<>
@@ -1480,7 +1480,7 @@ namespace tut
     // Cluster atomicity: every glyph emitted by the cluster fast path
     // must carry the cluster's start codepoint as its cluster ID, not
     // a per-glyph ID HarfBuzz hands back when the face fails to ligate.
-    // charFromPixelOffset feeds sg.cluster directly into the cursor
+    // byteFromPixelOffset feeds sg.cluster directly into the cursor
     // position it returns for round=true mid-glyph hit-tests; a
     // mid-cluster cluster value lands the cursor inside the cluster
     // and oscillates the drag-select highlight rect across the

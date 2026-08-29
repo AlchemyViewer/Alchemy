@@ -51,49 +51,8 @@ public:
 
     void reset();
 
-    S32 render(const LLFontGL* fontp,
-        const LLWString& text,
-        S32 begin_offset,
-        LLRect rect,
-        const LLColor4& color,
-        LLFontGL::HAlign halign = LLFontGL::LEFT, LLFontGL::VAlign valign = LLFontGL::BASELINE,
-        U8 style = LLFontGL::NORMAL,
-        LLFontGL::ShadowType shadow = LLFontGL::NO_SHADOW,
-        S32 max_chars = S32_MAX, S32 max_pixels = S32_MAX,
-        F32* right_x = NULL,
-        bool use_ellipses = false,
-        bool use_color = true);
-
-    S32 render(const LLFontGL* fontp,
-        const LLWString& text,
-        S32 begin_offset,
-        LLRectf rect,
-        const LLColor4& color,
-        LLFontGL::HAlign halign = LLFontGL::LEFT, LLFontGL::VAlign valign = LLFontGL::BASELINE,
-        U8 style = LLFontGL::NORMAL,
-        LLFontGL::ShadowType shadow = LLFontGL::NO_SHADOW,
-        S32 max_chars = S32_MAX,
-        F32* right_x = NULL,
-        bool use_ellipses = false,
-        bool use_color = true);
-
-    S32 render(const LLFontGL* fontp,
-        const LLWString& text,
-        S32 begin_offset,
-        F32 x, F32 y,
-        const LLColor4& color,
-        LLFontGL::HAlign halign = LLFontGL::LEFT, LLFontGL::VAlign valign = LLFontGL::BASELINE,
-        U8 style = LLFontGL::NORMAL,
-        LLFontGL::ShadowType shadow = LLFontGL::NO_SHADOW,
-        S32 max_chars = S32_MAX, S32 max_pixels = S32_MAX,
-        F32* right_x = NULL,
-        bool use_ellipses = false,
-        bool use_color = true);
-
-    // The same three, in bytes. Nothing about the caching depends on how the
-    // text is stored — the buffer keeps no copy of it, so these share an
-    // implementation with the wide forms and differ only in which LLFontGL
-    // entry point the offsets are meant for.
+    // `begin_offset` and `max_bytes` index the UTF-8. The buffer keeps no copy
+    // of the text, so nothing about the caching depends on the text itself.
     S32 renderBytes(const LLFontGL* fontp,
         std::string_view text,
         S32 begin_offset,
@@ -136,30 +95,28 @@ public:
     static void enableBufferCollection(bool enable) { sEnableBufferCollection = enable; }
 private:
 
-    template <typename TEXT>
     S32 renderImpl(const LLFontGL* fontp,
-         const TEXT& text,
+         std::string_view text,
          S32 begin_offset,
          F32 x, F32 y,
          const LLColor4& color,
          LLFontGL::HAlign halign, LLFontGL::VAlign valign,
          U8 style,
          LLFontGL::ShadowType shadow,
-         S32 max_chars, S32 max_pixels,
+         S32 max_bytes, S32 max_pixels,
          F32* right_x,
          bool use_ellipses,
          bool use_color);
 
-    template <typename TEXT>
     void genBuffers(const LLFontGL* fontp,
-         const TEXT& text,
+         std::string_view text,
          S32 begin_offset,
          F32 x, F32 y,
          const LLColor4& color,
          LLFontGL::HAlign halign, LLFontGL::VAlign valign,
          U8 style,
         LLFontGL::ShadowType shadow,
-         S32 max_chars, S32 max_pixels,
+         S32 max_bytes, S32 max_pixels,
          F32* right_x,
          bool use_ellipses,
          bool use_color);
@@ -198,7 +155,7 @@ private:
     S32 mChars = 0;
     const LLFontGL *mLastFont = nullptr;
     S32 mLastOffset = 0;
-    S32 mLastMaxChars = 0;
+    S32 mLastMaxBytes = 0;
     S32 mLastMaxPixels = 0;
     F32 mLastX = 0.f;
     F32 mLastY = 0.f;
@@ -247,13 +204,6 @@ public:
 
     void reset();
 
-    F32 getWidth(const LLFontGL* fontp,
-        LLWStringView wchars,
-        S32 begin_offset,
-        S32 max_chars,
-        bool no_padding);
-
-    // The same measurement in bytes, for callers holding UTF-8.
     F32 getWidthBytes(const LLFontGL* fontp,
         std::string_view utf8text,
         S32 begin_offset,
@@ -265,12 +215,12 @@ private:
         // The cache check is the same whichever unit the caller measures in;
         // only the call that fills it differs.
         template <typename MEASURE>
-        F32 cachedWidth(const LLFontGL* fontp, S32 begin_offset, S32 max_units,
+        F32 cachedWidth(const LLFontGL* fontp, S32 begin_offset, S32 max_bytes,
                         bool no_padding, MEASURE&& measure);
 
         const LLFontGL* mLastFont = nullptr;
         S32 mLastOffset = 0;
-        S32 mLastMaxChars = 0;
+        S32 mLastMaxBytes = 0;
         bool mLastNoPadding = false;
         F32 mWidth = -1.f;
 

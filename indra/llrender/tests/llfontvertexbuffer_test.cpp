@@ -214,12 +214,12 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hello");
+        const std::string s = "Hello";
 
         LLFontWidthBuffer wb;
-        const F32 first  = wb.getWidth(font, s, 0, 5, false);
-        const F32 second = wb.getWidth(font, s, 0, 5, false);
-        const F32 ref    = font->getWidthF32(s, 0, 5, false);
+        const F32 first  = wb.getWidthBytes(font, s, 0, 5, false);
+        const F32 second = wb.getWidthBytes(font, s, 0, 5, false);
+        const F32 ref    = font->getWidthF32Bytes(s, 0, 5, false);
         ensure("first width matches getWidthF32", first == ref);
         ensure("second call same as first (cache hit)",
                second == first);
@@ -236,13 +236,13 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hello");
+        const std::string s = "Hello";
 
         LLFontWidthBuffer wb;
-        const F32 w_5 = wb.getWidth(font, s, 0, 5, false);
-        const F32 w_3 = wb.getWidth(font, s, 0, 3, false);
+        const F32 w_5 = wb.getWidthBytes(font, s, 0, 5, false);
+        const F32 w_3 = wb.getWidthBytes(font, s, 0, 3, false);
         ensure("width(5) > width(3)", w_5 > w_3);
-        const F32 w_3_again = wb.getWidth(font, s, 0, 3, false);
+        const F32 w_3_again = wb.getWidthBytes(font, s, 0, 3, false);
         ensure_equals("identical max_chars hits cache", w_3_again, w_3);
     }
 
@@ -255,14 +255,14 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hi");
+        const std::string s = "Hi";
 
         const F32 saved_scale = LLFontGL::sScaleX;
         LLFontWidthBuffer wb;
         LLFontGL::sScaleX = 1.0f;
-        const F32 w_1 = wb.getWidth(font, s, 0, 2, false);
+        const F32 w_1 = wb.getWidthBytes(font, s, 0, 2, false);
         LLFontGL::sScaleX = 0.5f;
-        const F32 w_half = wb.getWidth(font, s, 0, 2, false);
+        const F32 w_half = wb.getWidthBytes(font, s, 0, 2, false);
         LLFontGL::sScaleX = saved_scale; // restore
 
         // Width should scale roughly with sScaleX (within FP rounding
@@ -281,15 +281,15 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hi");
+        const std::string s = "Hi";
 
         LLFontWidthBuffer wb;
-        const F32 first = wb.getWidth(font, s, 0, 2, false);
+        const F32 first = wb.getWidthBytes(font, s, 0, 2, false);
         // Force a generation tick by rasterizing a fresh glyph through
         // the font (atlas allocation bumps the global counter).
         font->getFontFreetype()->getGlyphInfo(L'É', // 'É'
                                               EFontGlyphType::Grayscale);
-        const F32 second = wb.getWidth(font, s, 0, 2, false);
+        const F32 second = wb.getWidthBytes(font, s, 0, 2, false);
         // Width value itself doesn't change, but the cache should have
         // recomputed: not directly observable except via the strider
         // path. The "no crash + same value" assertion exercises the
@@ -307,12 +307,12 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hi");
+        const std::string s = "Hi";
 
         LLFontWidthBuffer wb;
-        const F32 first = wb.getWidth(font, s, 0, 2, false);
+        const F32 first = wb.getWidthBytes(font, s, 0, 2, false);
         wb.reset();
-        const F32 after = wb.getWidth(font, s, 0, 2, false);
+        const F32 after = wb.getWidthBytes(font, s, 0, 2, false);
         ensure_equals("width stable across reset()", first, after);
     }
 
@@ -325,12 +325,12 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hi");
+        const std::string s = "Hi";
 
         LLFontWidthBuffer a, b;
-        const F32 wa = a.getWidth(font, s, 0, 2, false);
+        const F32 wa = a.getWidthBytes(font, s, 0, 2, false);
         a.reset();
-        const F32 wb_val = b.getWidth(font, s, 0, 2, false);
+        const F32 wb_val = b.getWidthBytes(font, s, 0, 2, false);
         ensure_equals("instance B unaffected by A's reset", wa, wb_val);
     }
 
@@ -372,11 +372,11 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hello");
+        const std::string s = "Hello";
 
         gl.clearFramebuffer();
         LLFontVertexBuffer vb;
-        const S32 n = vb.render(font, s, 0,
+        const S32 n = vb.renderBytes(font, s, 0,
                                 /*x=*/100.f, /*y=*/100.f,
                                 LLColor4::white,
                                 LLFontGL::LEFT, LLFontGL::BASELINE,
@@ -397,21 +397,21 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hello");
+        const std::string s = "Hello";
 
         LLFontVertexBuffer vb;
         // Pre-rasterize all glyphs of "Hello" so neither call grows
         // the atlas (otherwise both calls would bump the gen counter
         // and the test would be a no-op).
         font->generateASCIIglyphs();
-        vb.render(font, s, 0, 100.f, 100.f, LLColor4::white,
+        vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                   LLFontGL::LEFT, LLFontGL::BASELINE,
                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
 
         const S32 gen_before = LLFontBitmapCache::getGlobalGeneration();
         // Second call: same geometry, same color. Should be a no-regen
         // replay — neither genBuffers nor recolorBuffers fires.
-        vb.render(font, s, 0, 100.f, 100.f, LLColor4::white,
+        vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                   LLFontGL::LEFT, LLFontGL::BASELINE,
                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
         const S32 gen_after = LLFontBitmapCache::getGlobalGeneration();
@@ -431,15 +431,15 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hello");
+        const std::string s = "Hello";
 
         LLFontVertexBuffer vb;
         font->generateASCIIglyphs();
-        const S32 n_white = vb.render(font, s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_white = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                                       LLFontGL::LEFT, LLFontGL::BASELINE,
                                       LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
         const S32 gen_before = LLFontBitmapCache::getGlobalGeneration();
-        const S32 n_red = vb.render(font, s, 0, 100.f, 100.f, LLColor4::red,
+        const S32 n_red = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::red,
                                     LLFontGL::LEFT, LLFontGL::BASELINE,
                                     LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
         const S32 gen_after = LLFontBitmapCache::getGlobalGeneration();
@@ -461,15 +461,15 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("AB");
+        const std::string s = "AB";
 
         LLFontVertexBuffer vb;
         font->generateASCIIglyphs();
 
-        const S32 n1 = vb.render(font, s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n1 = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                                  LLFontGL::LEFT, LLFontGL::BASELINE,
                                  LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
-        const S32 n2 = vb.render(font, s, 0, 200.f, 100.f, LLColor4::white,
+        const S32 n2 = vb.renderBytes(font, s, 0, 200.f, 100.f, LLColor4::white,
                                  LLFontGL::LEFT, LLFontGL::BASELINE,
                                  LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
         ensure_equals("char count stable after geometry change", n1, n2);
@@ -487,18 +487,18 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hi");
+        const std::string s = "Hi";
 
         LLFontVertexBuffer vb;
         font->generateASCIIglyphs();
-        vb.render(font, s, 0, 100.f, 100.f, LLColor4::white,
+        vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                   LLFontGL::LEFT, LLFontGL::BASELINE,
                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
 
         LLFontVertexBuffer::enableColorOnlyRegen(false);
         // Same geometry, different color — with fast path off, this
         // should still complete cleanly through genBuffers.
-        const S32 n = vb.render(font, s, 0, 100.f, 100.f, LLColor4::red,
+        const S32 n = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::red,
                                 LLFontGL::LEFT, LLFontGL::BASELINE,
                                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
         LLFontVertexBuffer::enableColorOnlyRegen(true);
@@ -515,14 +515,14 @@ namespace tut
             skip("fonts.xml not present in test data dir");
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font available", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hi");
+        const std::string s = "Hi";
 
         LLFontVertexBuffer vb;
         font->generateASCIIglyphs();
-        const S32 n_norm = vb.render(font, s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_norm = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                                      LLFontGL::LEFT, LLFontGL::BASELINE,
                                      LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
-        const S32 n_bold = vb.render(font, s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_bold = vb.renderBytes(font, s, 0, 100.f, 100.f, LLColor4::white,
                                      LLFontGL::LEFT, LLFontGL::BASELINE,
                                      LLFontGL::BOLD, LLFontGL::NO_SHADOW, 2);
         ensure_equals("char count stable across style flip", n_norm, n_bold);
@@ -549,11 +549,11 @@ namespace tut
         // exact visible count depends on font metrics; the test reads
         // it back from render's return and computes expected quad
         // counts off that.
-        LLWString s = utf8str_to_wstring("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        const std::string s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         font->generateASCIIglyphs();
 
         LLFontVertexBuffer vb;
-        const S32 n = vb.render(font, s, 0,
+        const S32 n = vb.renderBytes(font, s, 0,
                                 /*x=*/0.f, /*y=*/100.f,
                                 LLColor4::white,
                                 LLFontGL::LEFT, LLFontGL::BASELINE,
@@ -595,11 +595,11 @@ namespace tut
 
         ll_test::FontStateScope scope;
 
-        LLWString s = utf8str_to_wstring("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        const std::string s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         font->generateASCIIglyphs();
 
         LLFontVertexBuffer vb;
-        const S32 n_truncated = vb.render(font, s, 0,
+        const S32 n_truncated = vb.renderBytes(font, s, 0,
                                           0.f, 100.f,
                                           LLColor4::white,
                                           LLFontGL::LEFT, LLFontGL::BASELINE,
@@ -615,7 +615,7 @@ namespace tut
         // Same render with max_pixels wide enough to fit the whole
         // string. No truncation, no ellipsis path; full count returned.
         LLFontVertexBuffer vb2;
-        const S32 n_full = vb2.render(font, s, 0,
+        const S32 n_full = vb2.renderBytes(font, s, 0,
                                       0.f, 100.f,
                                       LLColor4::white,
                                       LLFontGL::LEFT, LLFontGL::BASELINE,

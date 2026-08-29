@@ -124,7 +124,7 @@ struct LLFontGlyphInfo
     const ALFontFace* mSourceFace = nullptr;
 
     // Glyph-level metrics. These are taken from phase 0 and used by the
-    // measurement paths (getWidthF32, maxDrawableChars, etc.) that don't
+    // measurement paths (getWidthF32Bytes, maxDrawableBytes, etc.) that don't
     // need phase-specific accuracy. The renderer uses per-phase dimensions
     // from mPhaseSlots[phase] instead.
     S32 mWidth;         // In pixels

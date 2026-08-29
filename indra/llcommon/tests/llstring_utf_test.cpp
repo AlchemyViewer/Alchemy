@@ -1793,7 +1793,7 @@ namespace tut
     }
 
     // UAX #14 line break opportunities, which replaced a spaces-plus-CJK-range
-    // heuristic in LLFontGL::maxDrawableChars.
+    // heuristic in LLFontGL::maxDrawableBytes.
     template<> template<>
     void llstring_utf_object_t::test<119>()
     {

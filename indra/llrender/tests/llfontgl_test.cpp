@@ -311,9 +311,8 @@ namespace tut
                       after, before);
     }
 
-    // getWidthF32: legacy 2-arg overload defaults max_chars=text length;
-    // a 4-arg call with explicit max_chars matches it. Pins legacy
-    // entry-point's max_chars defaulting (llfontgl.cpp:1063).
+    // getWidthF32: the whole-string overload defaults to the text's length;
+    // a getWidthF32Bytes call with an explicit budget matches it.
     template<> template<>
     void llfontgl_object::test<11>()
     {
@@ -323,10 +322,10 @@ namespace tut
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font resolves", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hello");
+        const std::string s = "Hello";
         const F32 wfull = font->getWidthF32(s);
-        const F32 wexp  = font->getWidthF32(s, 0,
-                                            (S32)s.size(), false);
+        const F32 wexp  = font->getWidthF32Bytes(s, 0,
+                                                 (S32)s.size(), false);
         ensure("getWidthF32 with default max == explicit max",
                wfull == wexp);
         ensure("width is positive", wfull > 0.f);
@@ -345,18 +344,15 @@ namespace tut
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font resolves", font != nullptr);
-        LLWString a   = utf8str_to_wstring("A");
-        LLWString aa  = utf8str_to_wstring("AA");
-        LLWString aaa = utf8str_to_wstring("AAA");
-        const F32 w1 = font->getWidthF32(a);
-        const F32 w2 = font->getWidthF32(aa);
-        const F32 w3 = font->getWidthF32(aaa);
+        const F32 w1 = font->getWidthF32(std::string("A"));
+        const F32 w2 = font->getWidthF32(std::string("AA"));
+        const F32 w3 = font->getWidthF32(std::string("AAA"));
         ensure("width(A) > 0",      w1 > 0.f);
         ensure("width(AA) > width(A)",   w2 > w1);
         ensure("width(AAA) > width(AA)", w3 > w2);
     }
 
-    // Ellipsis budget: getWidthF32(L"....") is positive — render() pre-
+    // Ellipsis budget: getWidthF32("....") is positive — render() pre-
     // computes this for the truncation path (llfontgl.cpp:459 references
     // the dots constant). A regression where '.' rasterized to a 0-width
     // glyph would silently break ellipsis sizing.
@@ -369,14 +365,12 @@ namespace tut
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font resolves", font != nullptr);
-        LLWString dots = utf8str_to_wstring("....");
-        const F32 w = font->getWidthF32(dots);
+        const F32 w = font->getWidthF32(std::string("...."));
         ensure("ellipsis width is positive", w > 0.f);
     }
 
-    // maxDrawableChars boundary: zero pixel budget fits 0 chars,
-    // F32_MAX fits all, mid-budget fits a partial prefix. Pins the
-    // measurement loop at llfontgl.cpp:1210.
+    // maxDrawableBytes boundary: zero pixel budget fits nothing,
+    // F32_MAX fits all, mid-budget fits a partial prefix.
     template<> template<>
     void llfontgl_object::test<14>()
     {
@@ -386,30 +380,29 @@ namespace tut
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font resolves", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hello");
+        const std::string s = "Hello";
 
-        ensure_equals("budget 0 fits 0 chars",
-                      font->maxDrawableChars(s, 0.f, (S32)s.size()),
+        ensure_equals("budget 0 fits nothing",
+                      font->maxDrawableBytes(s, 0.f, (S32)s.size()),
                       (S32)0);
-        ensure_equals("budget F32_MAX fits all chars",
-                      font->maxDrawableChars(s, F32_MAX,
+        ensure_equals("budget F32_MAX fits the whole string",
+                      font->maxDrawableBytes(s, F32_MAX,
                                              (S32)s.size()),
                       (S32)s.size());
         // Find a budget that should fit "Hel" but not "Hell".
-        const F32 w_hel  = font->getWidthF32(s, 0, 3, false);
-        const F32 w_hell = font->getWidthF32(s, 0, 4, false);
+        const F32 w_hel  = font->getWidthF32Bytes(s, 0, 3, false);
+        const F32 w_hell = font->getWidthF32Bytes(s, 0, 4, false);
         // Budget halfway between produces partial fit.
         const F32 mid_budget = (w_hel + w_hell) * 0.5f;
-        const S32 fit = font->maxDrawableChars(s, mid_budget,
+        const S32 fit = font->maxDrawableBytes(s, mid_budget,
                                                (S32)s.size());
         ensure("partial-budget fit is in [3, 3] (Hel exactly)",
                fit == 3);
     }
 
-    // charFromPixelOffset round-trip: for each prefix length i, the
+    // byteFromPixelOffset round-trip: for each prefix length i, the
     // pixel offset corresponding to the prefix's width must invert to
-    // i. Pins the inverse path at llfontgl.cpp:1518 — width
-    // accumulation and pixel→char lookup must agree.
+    // i. Width accumulation and pixel->offset lookup must agree.
     template<> template<>
     void llfontgl_object::test<15>()
     {
@@ -419,12 +412,12 @@ namespace tut
                             LLSD(), /*create_gl_textures=*/true);
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font resolves", font != nullptr);
-        LLWString s = utf8str_to_wstring("Hello");
-        // Compare pixel→char inverse for each prefix length 0..5.
+        const std::string s = "Hello";
+        // ASCII, so one byte per character: prefix lengths 0..5.
         for (S32 i = 0; i <= (S32)s.size(); ++i)
         {
-            const F32 w = font->getWidthF32(s, 0, i, false);
-            const S32 cp = font->charFromPixelOffset(s, 0,
+            const F32 w = font->getWidthF32Bytes(s, 0, i, false);
+            const S32 cp = font->byteFromPixelOffset(s, 0,
                                                      w,
                                                      F32_MAX,
                                                      (S32)s.size(),
@@ -432,7 +425,7 @@ namespace tut
             // round=true rounds to the nearest character boundary, so
             // hitting exactly w should map back to i (or off-by-one
             // due to rounding at the half-glyph mark — accept ±1).
-            ensure("round-trip char index is within ±1",
+            ensure("round-trip offset is within ±1",
                    std::abs(cp - i) <= 1);
         }
     }
@@ -452,12 +445,9 @@ namespace tut
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font resolves", font != nullptr);
 
-        const llwchar a_arr[] = { L'a', 0 };
-        const llwchar c_arr[] = { 0x4F60, 0 };
-        const llwchar ac_arr[] = { L'a', 0x4F60, 0 };
-        LLWString a_s(a_arr, 1);
-        LLWString c_s(c_arr, 1);
-        LLWString ac_s(ac_arr, 2);
+        const std::string a_s  = "a";
+        const std::string c_s  = utf8str_from_cp(0x4F60);
+        const std::string ac_s = a_s + c_s;
 
         const F32 wa = font->getWidthF32(a_s);
         const F32 wc = font->getWidthF32(c_s);
@@ -470,7 +460,7 @@ namespace tut
                std::abs(wac - (wa + wc)) <= 0.5f);
     }
 
-    // charFromPixelOffset must snap to cluster boundaries on a
+    // byteFromPixelOffset must snap to cluster boundaries on a
     // multi-codepoint emoji during mouse-driven cursor placement.
     // The trans-flag ZWJ sequence (1F3F3 FE0F 200D 26A7 FE0F) shapes
     // to a single glyph; as target_x walks across that glyph's pixel
@@ -489,37 +479,47 @@ namespace tut
         LLFontGL* font = LLFontGL::getFontSansSerif();
         ensure("font resolves", font != nullptr);
 
-        // "X" + trans flag (5 cps) + "Y": cluster occupies indices 1..6.
-        const llwchar arr[] = { L'X', 0x1F3F3, 0xFE0F, 0x200D, 0x26A7,
-                                0xFE0F, L'Y', 0 };
-        LLWString s(arr, 7);
+        // "X" + trans flag (5 codepoints) + "Y". The cluster's byte bounds
+        // are recorded as the string is built rather than counted by hand:
+        // each of those codepoints is a different width in UTF-8, and a
+        // hand-written offset here would be a silent lie the moment it drifts.
+        std::string s = "X";
+        const S32 cluster_start = (S32)s.size();
+        for (llwchar cp : { (llwchar)0x1F3F3, (llwchar)0xFE0F, (llwchar)0x200D,
+                            (llwchar)0x26A7, (llwchar)0xFE0F })
+        {
+            utf8str_append_cp(s, cp);
+        }
+        const S32 cluster_end = (S32)s.size();
+        s += "Y";
+        const S32 total = (S32)s.size();
 
-        const F32 wfull = font->getWidthF32(s, 0, 7, false);
+        const F32 wfull = font->getWidthF32Bytes(s, 0, total, false);
         if (wfull <= 0.f)
             skip("emoji fallback not available");
 
-        // Sanity: width up to cluster end (6) must exceed width up to
-        // cluster start (1) by at least a few pixels — otherwise the
-        // emoji didn't actually shape and the cluster-snap test below
-        // would trivially pass on an unrendered glyph.
-        const F32 w_pre  = font->getWidthF32(s, 0, 1, false);
-        const F32 w_post = font->getWidthF32(s, 0, 6, false);
+        // Sanity: width up to the cluster's end must exceed width up to its
+        // start by at least a few pixels — otherwise the emoji didn't
+        // actually shape and the cluster-snap test below would trivially
+        // pass on an unrendered glyph.
+        const F32 w_pre  = font->getWidthF32Bytes(s, 0, cluster_start, false);
+        const F32 w_post = font->getWidthF32Bytes(s, 0, cluster_end, false);
         if (w_post - w_pre < 2.f)
             skip("emoji cluster did not shape to a measurable glyph");
 
         // Walk target_x across the rendered cluster's pixel span at
-        // sub-pixel granularity. Every returned cursor pos must land
-        // on a cluster boundary — never inside the cluster (2..5).
+        // sub-pixel granularity. Every returned cursor pos must land on a
+        // cluster boundary — never inside it.
         const F32 cluster_left  = w_pre;
         const F32 cluster_right = w_post;
         for (F32 x = cluster_left - 1.f; x <= cluster_right + 1.f;
              x += 0.25f)
         {
-            const S32 cp = font->charFromPixelOffset(s, 0,
-                                                     x, F32_MAX,
-                                                     7, /*round=*/true);
-            const bool inside_cluster = (cp >= 2 && cp <= 5);
-            ensure("charFromPixelOffset round=true returns mid-cluster index",
+            const S32 pos = font->byteFromPixelOffset(s, 0,
+                                                      x, F32_MAX,
+                                                      total, /*round=*/true);
+            const bool inside_cluster = (pos > cluster_start && pos < cluster_end);
+            ensure("byteFromPixelOffset round=true returns mid-cluster offset",
                    !inside_cluster);
         }
     }
@@ -652,8 +652,8 @@ namespace tut
         ensure("font resolves", font != nullptr);
 
         gl.clearFramebuffer();
-        LLWString s = utf8str_to_wstring("A");
-        const S32 n = font->render(s, 0, /*x=*/64.f, /*y=*/64.f,
+        const std::string s = "A";
+        const S32 n = font->renderBytes(s, 0, /*x=*/64.f, /*y=*/64.f,
                                    LLColor4::white,
                                    LLFontGL::LEFT, LLFontGL::BASELINE,
                                    LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
@@ -684,21 +684,21 @@ namespace tut
         if (!fileExists(kFontsXml))
             skip("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        LLWString s = utf8str_to_wstring("ABC");
+        const std::string s = "ABC";
 
-        const S32 n_left = font->render(s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_left = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                         LLFontGL::LEFT, LLFontGL::BASELINE,
                                         LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 3);
-        const S32 n_cen  = font->render(s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_cen  = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                         LLFontGL::HCENTER, LLFontGL::BASELINE,
                                         LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 3);
-        const S32 n_right = font->render(s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_right = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                          LLFontGL::RIGHT, LLFontGL::BASELINE,
                                          LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 3);
         gGL.flush();
-        ensure_equals("LEFT render returns 3 chars",     n_left,  3);
-        ensure_equals("HCENTER render returns 3 chars",  n_cen,   3);
-        ensure_equals("RIGHT render returns 3 chars",    n_right, 3);
+        ensure_equals("LEFT render returns 3 bytes",     n_left,  3);
+        ensure_equals("HCENTER render returns 3 bytes",  n_cen,   3);
+        ensure_equals("RIGHT render returns 3 bytes",    n_right, 3);
     }
 
     // VAlign branches: render() must complete through TOP, VCENTER,
@@ -711,21 +711,21 @@ namespace tut
         if (!fileExists(kFontsXml))
             skip("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        LLWString s = utf8str_to_wstring("Hi");
+        const std::string s = "Hi";
 
-        const S32 n_top = font->render(s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_top = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                        LLFontGL::LEFT, LLFontGL::TOP,
                                        LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
-        const S32 n_bs  = font->render(s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_bs  = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                        LLFontGL::LEFT, LLFontGL::BASELINE,
                                        LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
-        const S32 n_btm = font->render(s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_btm = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                        LLFontGL::LEFT, LLFontGL::BOTTOM,
                                        LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
         gGL.flush();
-        ensure_equals("TOP render returns 2 chars",       n_top, 2);
-        ensure_equals("BASELINE render returns 2 chars",  n_bs,  2);
-        ensure_equals("BOTTOM render returns 2 chars",    n_btm, 2);
+        ensure_equals("TOP render returns 2 bytes",       n_top, 2);
+        ensure_equals("BASELINE render returns 2 bytes",  n_bs,  2);
+        ensure_equals("BOTTOM render returns 2 bytes",    n_btm, 2);
     }
 
     // Style flip across renders: render with NORMAL style, then BOLD.
@@ -737,21 +737,21 @@ namespace tut
         if (!fileExists(kFontsXml))
             skip("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        LLWString s = utf8str_to_wstring("Hello");
+        const std::string s = "Hello";
 
-        const S32 n_norm = font->render(s, 0, 50.f, 100.f, LLColor4::white,
+        const S32 n_norm = font->renderBytes(s, 0, 50.f, 100.f, LLColor4::white,
                                         LLFontGL::LEFT, LLFontGL::BASELINE,
                                         LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 5);
-        const S32 n_bold = font->render(s, 0, 50.f, 100.f, LLColor4::white,
+        const S32 n_bold = font->renderBytes(s, 0, 50.f, 100.f, LLColor4::white,
                                         LLFontGL::LEFT, LLFontGL::BASELINE,
                                         LLFontGL::BOLD, LLFontGL::NO_SHADOW, 5);
-        const S32 n_und  = font->render(s, 0, 50.f, 100.f, LLColor4::white,
+        const S32 n_und  = font->renderBytes(s, 0, 50.f, 100.f, LLColor4::white,
                                         LLFontGL::LEFT, LLFontGL::BASELINE,
                                         LLFontGL::UNDERLINE, LLFontGL::NO_SHADOW, 5);
         gGL.flush();
-        ensure_equals("NORMAL render returns 5 chars",    n_norm, 5);
-        ensure_equals("BOLD render returns 5 chars",      n_bold, 5);
-        ensure_equals("UNDERLINE render returns 5 chars", n_und,  5);
+        ensure_equals("NORMAL render returns 5 bytes",    n_norm, 5);
+        ensure_equals("BOLD render returns 5 bytes",      n_bold, 5);
+        ensure_equals("UNDERLINE render returns 5 bytes", n_und,  5);
     }
 
     // Shadow rendering paths: render with NO_SHADOW, DROP_SHADOW, and
@@ -767,15 +767,15 @@ namespace tut
         if (!fileExists(kFontsXml))
             skip("fonts.xml not found");
         LLFontGL* font = LLFontGL::getFontSansSerif();
-        LLWString s = utf8str_to_wstring("Hi");
+        const std::string s = "Hi";
 
-        const S32 n_no = font->render(s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_no = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                       LLFontGL::LEFT, LLFontGL::BASELINE,
                                       LLFontGL::NORMAL, LLFontGL::NO_SHADOW, 2);
-        const S32 n_drop = font->render(s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_drop = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                         LLFontGL::LEFT, LLFontGL::BASELINE,
                                         LLFontGL::NORMAL, LLFontGL::DROP_SHADOW, 2);
-        const S32 n_soft = font->render(s, 0, 100.f, 100.f, LLColor4::white,
+        const S32 n_soft = font->renderBytes(s, 0, 100.f, 100.f, LLColor4::white,
                                         LLFontGL::LEFT, LLFontGL::BASELINE,
                                         LLFontGL::NORMAL, LLFontGL::DROP_SHADOW_SOFT, 2);
         gGL.flush();
@@ -822,11 +822,11 @@ namespace tut
         if (emoji_face->getFontFace()->findGlyphInfo(emoji_idx, EFontGlyphType::Color))
             skip("U+1F995 already rasterized; mid-render upload won't fire");
 
-        LLWString s = utf8str_to_wstring("stomp \xF0\x9F\xA6\x95 check");
+        const std::string s = "stomp \xF0\x9F\xA6\x95 check";
 
         std::list<LLVertexBufferData> capture;
         gGL.beginList(&capture);
-        const S32 n = font->render(s, 0, 50.f, 100.f, LLColor4::white,
+        const S32 n = font->renderBytes(s, 0, 50.f, 100.f, LLColor4::white,
                                    LLFontGL::LEFT, LLFontGL::BASELINE,
                                    LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
                                    (S32)s.size());

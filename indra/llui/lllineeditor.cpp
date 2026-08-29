@@ -2326,7 +2326,7 @@ void LLLineEditor::draw()
                 S32 cursor_right = cursor_left + lineeditor_cursor_thickness;
                 if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode() && !hasSelection())
                 {
-                    S32 wswidth = mGLFont->getWidth(U" ");
+                    S32 wswidth = mGLFont->getWidthBytes(" ", 0, S32_MAX);
                     const S32 cursor_span = (S32)utf8str_step_grapheme_forward(
                         mText.getString(), (size_t)getCursor()) - getCursor();
                     S32 width = mGLFont->getWidthBytes(mText.getString(), getCursor(), cursor_span) + 1;
