@@ -3168,7 +3168,28 @@ void LLTextBase::endOfLine()
     }
     else
     {
-        setCursorPos( getLineStart(line + 1) - 1 );
+        // A hard break, and a wrap that falls on a space, both consume one
+        // character that is not part of the visible line, and the caret belongs
+        // in front of it. A line can also wrap where nothing was consumed --
+        // between two ideographs, say -- and there the line's own end is
+        // already the right place. Stepping a fixed byte back would land inside
+        // the last character every time the break ate nothing.
+        const std::string& text = getText();
+        const S32 line_begin = getLineStart(line);
+        S32 pos = llclamp(getLineEnd(line), line_begin, getLengthBytes());
+        if (pos > line_begin)
+        {
+            const size_t prev = utf8str_step_grapheme_backward(text, (size_t)pos);
+            if ((S32)prev >= line_begin)
+            {
+                const llwchar wc = utf8str_decode_at(text, prev).cp;
+                if ('\n' == wc || LLStringOps::isSpace(wc))
+                {
+                    pos = (S32)prev;
+                }
+            }
+        }
+        setCursorPos(pos);
     }
 }
 
@@ -3494,18 +3515,27 @@ bool LLTextBase::setCursor(S32 row, S32 column)
             break; // invalid column specified
         }
 
-        // Found the given row.
-        S32 line_length = li.mDocIndexEnd - li.mDocIndexStart;;
-        if (column >= line_length)
+        // Found the given row. A column is a count of characters -- it comes
+        // from a person typing a number into Go To Line, or from a compiler
+        // pointing at a script -- while the line records its extent in bytes,
+        // so the column has to be walked out rather than added on.
+        const std::string& text = getText();
+        S32 pos = li.mDocIndexStart;
+        while (column > 0 && pos < li.mDocIndexEnd)
         {
-            column -= line_length;
+            pos = (S32)utf8str_decode_at(text, (size_t)pos).next;
+            --column;
+        }
+        if (column > 0)
+        {
+            // The column runs past this piece of the row, which is the same
+            // logical line wrapped; carry the remainder on to the next piece.
             continue;
         }
 
         // Found the given column.
         updateCursorXPos();
-        S32 doc_pos = li.mDocIndexStart + column;
-        return setCursorPos(doc_pos);
+        return setCursorPos(pos);
     }
 
     return false; // invalid row or column specified

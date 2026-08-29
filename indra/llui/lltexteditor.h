@@ -253,6 +253,11 @@ protected:
     S32             prevWordPos(S32 cursorPos) const;
     S32             nextWordPos(S32 cursorPos) const;
 
+    // How many characters precede doc_index on its own line. Tab stops are
+    // counted in characters, so the byte offset into the line is the wrong
+    // number the moment anything above ASCII shares the line with them.
+    S32             getLineColumnFromDocIndex(S32 doc_index, bool include_wordwrap = true) const;
+
     void            autoIndent();
 
     void            getSegmentsInRange(segment_vec_t& segments, S32 start, S32 end, bool include_partial) const;

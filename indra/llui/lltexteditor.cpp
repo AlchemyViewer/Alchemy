@@ -539,14 +539,30 @@ void LLTextEditor::replaceTextAll(const std::string& search_text, const std::str
     }
 }
 
+S32 LLTextEditor::getLineColumnFromDocIndex(S32 doc_index, bool include_wordwrap) const
+{
+    const S32 line_start = doc_index - getLineOffsetFromDocIndex(doc_index, include_wordwrap);
+    const S32 span = llmax(doc_index - line_start, 0);
+    return (S32)utf8str_codepoint_count(
+        std::string_view(getText()).substr((size_t)line_start, (size_t)span));
+}
+
+// The word walkers stay inside the line the offset sits on, so a caret already
+// at a line edge has nowhere left to go and would not move at all. Crossing the
+// break first is what carries ctrl+left and ctrl+right on into the neighbouring
+// line rather than stalling on every newline in the document.
 S32 LLTextEditor::prevWordPos(S32 cursorPos) const
 {
-    return (S32)utf8str_step_word_backward(getText(), (size_t)llmax(cursorPos, 0));
+    const std::string& text = getText();
+    const size_t at = utf8str_step_grapheme_backward(text, (size_t)llmax(cursorPos, 0));
+    return (S32)utf8str_step_word_backward(text, at);
 }
 
 S32 LLTextEditor::nextWordPos(S32 cursorPos) const
 {
-    return (S32)utf8str_step_word_forward(getText(), (size_t)llmax(cursorPos, 0));
+    const std::string& text = getText();
+    const size_t at = utf8str_step_grapheme_forward(text, (size_t)llmax(cursorPos, 0));
+    return (S32)utf8str_step_word_forward(text, at);
 }
 
 const LLTextSegmentPtr  LLTextEditor::getPreviousSegment() const
@@ -1083,7 +1099,12 @@ bool LLTextEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
         auto cluster = utf8str_emoji_range_at(text, (size_t)mCursorPos);
         if (cluster.first == cluster.second && mCursorPos > 0)
         {
-            const auto prev = utf8str_emoji_range_at(text, (size_t)(mCursorPos - 1));
+            // Somewhere inside the character just passed; any position within
+            // a cluster reports the whole of it, but only once the offset is
+            // back on a character start -- a continuation byte decodes to no
+            // pictograph at all and the lookup comes back empty.
+            const size_t before = utf8str_grapheme_align_backward(text, (size_t)mCursorPos - 1);
+            const auto prev = utf8str_emoji_range_at(text, before);
             if ((S32)prev.second == mCursorPos)
                 cluster = prev;
         }
@@ -1232,7 +1253,7 @@ void LLTextEditor::removeCharOrTab()
         if (text[mCursorPos - 1] == ' ')
         {
             // Try to remove a "tab"
-            S32 offset = getLineOffsetFromDocIndex(mCursorPos);
+            S32 offset = getLineColumnFromDocIndex(mCursorPos);
             if (offset > 0)
             {
                 chars_to_remove = offset % SPACES_PER_TAB;
@@ -2036,7 +2057,7 @@ bool LLTextEditor::handleSpecialKey(const KEY key, const MASK mask)
                 deleteSelection(false);
             }
 
-            S32 offset = getLineOffsetFromDocIndex(mCursorPos);
+            S32 offset = getLineColumnFromDocIndex(mCursorPos);
 
             S32 spaces_needed = SPACES_PER_TAB - (offset % SPACES_PER_TAB);
             for( S32 i=0; i < spaces_needed; i++ )
@@ -2239,7 +2260,7 @@ void LLTextEditor::doDelete()
         if( (text[ mCursorPos ] == ' ') && (mCursorPos + SPACES_PER_TAB < getLengthBytes()) )
         {
             // Try to remove a full tab's worth of spaces
-            S32 offset = getLineOffsetFromDocIndex(mCursorPos);
+            S32 offset = getLineColumnFromDocIndex(mCursorPos);
             chars_to_remove = SPACES_PER_TAB - (offset % SPACES_PER_TAB);
             if( chars_to_remove == 0 )
             {
@@ -2664,7 +2685,7 @@ void LLTextEditor::setCursorAndScrollToEnd()
 void LLTextEditor::getCurrentLineAndColumn( S32* line, S32* col, bool include_wordwrap )
 {
     *line = getLineNumFromDocIndex(mCursorPos, include_wordwrap);
-    *col = getLineOffsetFromDocIndex(mCursorPos, include_wordwrap);
+    *col = getLineColumnFromDocIndex(mCursorPos, include_wordwrap);
 }
 
 void LLTextEditor::autoIndent()
