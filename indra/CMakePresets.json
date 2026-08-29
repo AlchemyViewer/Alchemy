@@ -72,23 +72,6 @@
       ]
     },
     {
-      "name": "vs2022-os",
-      "displayName": "Visual Studio 2022",
-      "inherits": [
-        "common",
-        "windows"
-      ],
-      "generator": "Visual Studio 17 2022"
-    },
-    {
-      "name": "vs2022",
-      "displayName": "Visual Studio 2022 Proprietary",
-      "inherits": [
-        "vs2022-os",
-        "nonfree"
-      ]
-    },
-    {
       "name": "vs2026-os",
       "displayName": "Visual Studio 2026",
       "inherits": [
@@ -270,70 +253,6 @@
       "configuration": "Release"
     },
     {
-      "name": "vs2022-debug",
-      "configurePreset": "vs2022",
-      "configuration": "Debug",
-      "inherits": [
-        "windows"
-      ]
-    },
-    {
-      "name": "vs2022-optdebug",
-      "configurePreset": "vs2022",
-      "configuration": "OptDebug",
-      "inherits": [
-        "windows"
-      ]
-    },
-    {
-      "name": "vs2022-relwithdebinfo",
-      "configurePreset": "vs2022",
-      "configuration": "RelWithDebInfo",
-      "inherits": [
-        "windows"
-      ]
-    },
-    {
-      "name": "vs2022-release",
-      "configurePreset": "vs2022",
-      "configuration": "Release",
-      "inherits": [
-        "windows"
-      ]
-    },
-    {
-      "name": "vs2022-os-debug",
-      "configurePreset": "vs2022-os",
-      "configuration": "Debug",
-      "inherits": [
-        "windows"
-      ]
-    },
-    {
-      "name": "vs2022-os-optdebug",
-      "configurePreset": "vs2022-os",
-      "configuration": "OptDebug",
-      "inherits": [
-        "windows"
-      ]
-    },
-    {
-      "name": "vs2022-os-relwithdebinfo",
-      "configurePreset": "vs2022-os",
-      "configuration": "RelWithDebInfo",
-      "inherits": [
-        "windows"
-      ]
-    },
-    {
-      "name": "vs2022-os-release",
-      "configurePreset": "vs2022-os",
-      "configuration": "Release",
-      "inherits": [
-        "windows"
-      ]
-    },
-    {
       "name": "vs2026-release",
       "configurePreset": "vs2026",
       "configuration": "Release",
@@ -470,32 +389,6 @@
         {
           "type": "build",
           "name": "ninja-os-release"
-        }
-      ]
-    },
-    {
-      "name": "vs2022-release",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "vs2022"
-        },
-        {
-          "type": "build",
-          "name": "vs2022-release"
-        }
-      ]
-    },
-    {
-      "name": "vs2022-os",
-      "steps": [
-        {
-          "type": "configure",
-          "name": "vs2022-os"
-        },
-        {
-          "type": "build",
-          "name": "vs2022-os-release"
         }
       ]
     },

@@ -30,7 +30,7 @@ Install commands are platform-specific; see below.
 
 Install the following:
 
-- [Visual Studio 2026](https://visualstudio.microsoft.com/vs/community/) or Visual Studio 2022 — select the **Desktop development with C++** workload
+- [Visual Studio 2026](https://visualstudio.microsoft.com/vs/community/) — select the **Desktop development with C++** workload
 - [CMake](https://cmake.org/download/) 3.27+
 - [Git for Windows](https://git-scm.com/install/windows)
 - [Python 3.13+](https://www.python.org/downloads/) — tick **Add Python to PATH** during install
@@ -207,7 +207,7 @@ Most contributors want the `-os` variants.
 
 | Preset                                       | Platform | Generator          |
 |:---------------------------------------------|:---------|:-------------------|
-| `vs2026-os`, `vs2022-os`                     | Windows  | Visual Studio      |
+| `vs2026-os`                                  | Windows  | Visual Studio      |
 | `ninja-os`                                   | Linux    | Ninja Multi-Config |
 | `ninja-os-arm64`, `ninja-os-x64`             | macOS    | Ninja Multi-Config |
 | `xcode-os`, `xcode-os-arm64`, `xcode-os-x64` | macOS    | Xcode              |
@@ -263,7 +263,7 @@ start .\build-Windows-vs2026-os\Alchemy.slnx
 open ./build-Darwin-xcode-os-arm64/Alchemy.xcodeproj
 ```
 
-> `.slnx` is the newer Visual Studio solution format. Requires VS 2022 17.10+ or VS 2026.
+> `.slnx` is the newer Visual Studio solution format. Requires VS 2026.
 
 ### Output locations
 
