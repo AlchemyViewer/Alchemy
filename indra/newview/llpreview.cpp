@@ -556,7 +556,7 @@ std::string LLPreview::getBackupFileName() const
     const LLInventoryItem* pItem = getItem();
     if (pItem)
     {
-        strFile += gDirUtilp->getScrubbedFileName(pItem->getName().substr(0, 32));
+        strFile += gDirUtilp->getScrubbedFileName(utf8str_symbol_truncate(pItem->getName(), 32));
         strFile += "-";
     }
 

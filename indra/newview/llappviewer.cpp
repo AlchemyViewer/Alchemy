@@ -3206,7 +3206,7 @@ bool LLAppViewer::initConfiguration()
     {
         gWindowTitle += std::string(" ") + gArgs;
     }
-    LLStringUtil::truncate(gWindowTitle, 255);
+    gWindowTitle = utf8str_truncate(gWindowTitle, 255);
 
     //
     // Check for another instance of the app running

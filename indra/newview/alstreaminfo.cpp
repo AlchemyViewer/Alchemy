@@ -76,7 +76,7 @@ void ALStreamInfo::handleMetadataUpdate(const LLSD& metadata)
         // Some stations get a little ridiculous with the length.
         if (station.length() > 64)
         {
-            LLStringUtil::truncate(station, 64);
+            station = utf8str_truncate(station, 64);
             station.append("...");
         }
         LLSD args;

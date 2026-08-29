@@ -316,6 +316,11 @@ public:
     static void trimTail(string_view_type& string);
     static void trim(string_view_type& string)   { trimHead(string); trimTail(string); }
 
+    // Cuts at `count` units of string_type, which for the char instantiation
+    // means bytes: it will split a multi-byte character in half. Use
+    // utf8str_truncate() for UTF-8 held in a std::string -- it takes the same
+    // byte bound and backs off to a character boundary. This one is right when
+    // the count already came from a find() or from a walk over the text.
     static void truncate(string_type& string, size_type count);
 
     static void toUpper(string_type& string);
