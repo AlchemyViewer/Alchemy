@@ -351,25 +351,25 @@ void LLStreamingAudio_FMODSTUDIO::update()
                     {
                         case FMOD_TAGTYPE_ID3V2:
                         {
-                            if (!LLStringUtil::compareInsensitive(name, "TIT2")) name = "TITLE";
-                            else if(!LLStringUtil::compareInsensitive(name, "TPE1")) name = "ARTIST";
+                            if (LLStringUtil::isEqualInsensitiveASCII(name, "TIT2")) name = "TITLE";
+                            else if(LLStringUtil::isEqualInsensitiveASCII(name, "TPE1")) name = "ARTIST";
                             break;
                         }
                         case FMOD_TAGTYPE_ASF:
                         {
-                            if (!LLStringUtil::compareInsensitive(name, "Title")) name = "TITLE";
-                            else if (!LLStringUtil::compareInsensitive(name, "WM/AlbumArtist")) name = "ARTIST";
+                            if (LLStringUtil::isEqualInsensitiveASCII(name, "Title")) name = "TITLE";
+                            else if (LLStringUtil::isEqualInsensitiveASCII(name, "WM/AlbumArtist")) name = "ARTIST";
                             break;
                         }
                         case FMOD_TAGTYPE_VORBISCOMMENT:
                         {
-                                if (!LLStringUtil::compareInsensitive(name, "title")) name = "TITLE";
-                                else if (!LLStringUtil::compareInsensitive(name, "artist")) name = "ARTIST";
+                                if (LLStringUtil::isEqualInsensitiveASCII(name, "title")) name = "TITLE";
+                                else if (LLStringUtil::isEqualInsensitiveASCII(name, "artist")) name = "ARTIST";
                             break;
                         }
                         case FMOD_TAGTYPE_FMOD:
                         {
-                            if (!LLStringUtil::compareInsensitive(name, "Sample Rate Change"))
+                            if (LLStringUtil::isEqualInsensitiveASCII(name, "Sample Rate Change"))
                             {
                                 LL_INFOS("FMOD") << "Stream forced changing sample rate to " << *((float *)tag.data) << LL_ENDL;
                                 Check_FMOD_Stream_Error(mFMODInternetStreamChannelp->setFrequency(*((float *)tag.data)), "FMOD::Channel::setFrequency");
@@ -377,8 +377,8 @@ void LLStreamingAudio_FMODSTUDIO::update()
                             continue;
                         }
                         default:
-                            if (!LLStringUtil::compareInsensitive(name, "TITLE") ||
-                                !LLStringUtil::compareInsensitive(name, "ARTIST"))
+                            if (LLStringUtil::isEqualInsensitiveASCII(name, "TITLE") ||
+                                LLStringUtil::isEqualInsensitiveASCII(name, "ARTIST"))
                                 LLStringUtil::toUpper(name);
                             break;
                     }

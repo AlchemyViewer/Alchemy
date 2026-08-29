@@ -598,7 +598,7 @@ bool LLFloaterIMNearbyChat::matchChatTypeTrigger(const std::string& in_str, std:
             std::string trigger_trunc = sChatTypeTriggers[n].name;
             LLStringUtil::truncate(trigger_trunc, in_len);
 
-            if (!LLStringUtil::compareInsensitive(in_str, trigger_trunc))
+            if (LLStringUtil::isEqualInsensitiveASCII(in_str, trigger_trunc))
             {
                 *out_str = sChatTypeTriggers[n].name;
                 string_was_found = true;
@@ -741,7 +741,7 @@ EChatType LLFloaterIMNearbyChat::processChatTypeTriggers(EChatType type, std::st
         {
             std::string trigger = str.substr(0, sChatTypeTriggers[n].name.length());
 
-            if (!LLStringUtil::compareInsensitive(trigger, sChatTypeTriggers[n].name))
+            if (LLStringUtil::isEqualInsensitiveASCII(trigger, sChatTypeTriggers[n].name))
             {
                 auto trigger_length = sChatTypeTriggers[n].name.length();
 

@@ -214,15 +214,15 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
     /*
      * Create the parser as appropriate
      */
-    if (0 == LLStringUtil::compareInsensitive(header, LLSD_BINARY_HEADER))
+    if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_BINARY_HEADER))
     {
         return (parse_using<LLSDBinaryParser>(str, sd, remaining) > 0);
     }
-    else if (0 == LLStringUtil::compareInsensitive(header, LLSD_XML_HEADER))
+    else if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_XML_HEADER))
     {
         return (parse_using<LLSDXMLParser>(str, sd, remaining) > 0);
     }
-    else if (0 == LLStringUtil::compareInsensitive(header, LLSD_NOTATION_HEADER))
+    else if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_NOTATION_HEADER))
     {
         return (parse_using<LLSDNotationParser>(str, sd, remaining) > 0);
     }

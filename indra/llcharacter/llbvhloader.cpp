@@ -257,7 +257,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
         //----------------------------------------------------------------
         // check for optional emote
         //----------------------------------------------------------------
-        if (loadingGlobals && LLStringUtil::compareInsensitive(token, "emote")==0)
+        if (loadingGlobals && LLStringUtil::isEqualInsensitiveASCII(token, "emote"))
         {
             char emote_str[1024];   /* Flawfinder: ignore */
             if ( sscanf(mLine, " %*s = %1023s", emote_str) != 1 )   /* Flawfinder: ignore */
@@ -272,7 +272,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
         //----------------------------------------------------------------
         // check for global priority setting
         //----------------------------------------------------------------
-        if (loadingGlobals && LLStringUtil::compareInsensitive(token, "priority")==0)
+        if (loadingGlobals && LLStringUtil::isEqualInsensitiveASCII(token, "priority"))
         {
             S32 priority;
             if ( sscanf(mLine, " %*s = %d", &priority) != 1 )
@@ -286,7 +286,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
         //----------------------------------------------------------------
         // check for global loop setting
         //----------------------------------------------------------------
-        if (loadingGlobals && LLStringUtil::compareInsensitive(token, "loop")==0)
+        if (loadingGlobals && LLStringUtil::isEqualInsensitiveASCII(token, "loop"))
         {
             char trueFalse[128];        /* Flawfinder: ignore */
             trueFalse[0] = '\0';
@@ -300,7 +300,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
             }
             else if ( sscanf(mLine, " %*s = %127s", trueFalse) == 1 )   /* Flawfinder: ignore */
             {
-                mLoop = (LLStringUtil::compareInsensitive(trueFalse, "true")==0);
+                mLoop = (LLStringUtil::isEqualInsensitiveASCII(trueFalse, "true"));
             }
             else
             {
@@ -316,7 +316,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
         //----------------------------------------------------------------
         // check for global easeIn setting
         //----------------------------------------------------------------
-        if (loadingGlobals && LLStringUtil::compareInsensitive(token, "easein")==0)
+        if (loadingGlobals && LLStringUtil::isEqualInsensitiveASCII(token, "easein"))
         {
             F32 duration;
             char type[128]; /* Flawfinder: ignore */
@@ -330,7 +330,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
         //----------------------------------------------------------------
         // check for global easeOut setting
         //----------------------------------------------------------------
-        if (loadingGlobals && LLStringUtil::compareInsensitive(token, "easeout")==0)
+        if (loadingGlobals && LLStringUtil::isEqualInsensitiveASCII(token, "easeout"))
         {
             F32 duration;
             char type[128];     /* Flawfinder: ignore */
@@ -344,7 +344,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
         //----------------------------------------------------------------
         // check for global handMorph setting
         //----------------------------------------------------------------
-        if (loadingGlobals && LLStringUtil::compareInsensitive(token, "hand")==0)
+        if (loadingGlobals && LLStringUtil::isEqualInsensitiveASCII(token, "hand"))
         {
             S32 handMorph;
             if (sscanf(mLine, " %*s = %d", &handMorph) != 1)
@@ -354,7 +354,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
             continue;
         }
 
-        if (loadingGlobals && LLStringUtil::compareInsensitive(token, "constraint")==0)
+        if (loadingGlobals && LLStringUtil::isEqualInsensitiveASCII(token, "constraint"))
         {
             Constraint constraint;
 
@@ -414,7 +414,7 @@ ELoadStatus LLBVHLoader::loadTranslationTable(const char *fileName)
             continue;
         }
 
-        if (loadingGlobals && LLStringUtil::compareInsensitive(token, "planar_constraint")==0)
+        if (loadingGlobals && LLStringUtil::isEqualInsensitiveASCII(token, "planar_constraint"))
         {
             Constraint constraint;
 
