@@ -649,7 +649,7 @@ void LLStatBar::drawLabelAndValue( F32 value, std::string &label, LLRect &bar_re
     const S32 value_width = font->getWidth(value_str);
     const S32 label_max_pixels = llmax(0, bar_rect.mRight - value_width - LABEL_VALUE_GAP);
 
-    font->render(mLabel.getWString(), 0, 0.f, (F32)getRect().getHeight(), LLColor4(1.f, 1.f, 1.f, 1.f),
+    font->renderBytes(mLabel.getString(), 0, 0.f, (F32)getRect().getHeight(), LLColor4(1.f, 1.f, 1.f, 1.f),
         LLFontGL::LEFT, LLFontGL::TOP, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
         S32_MAX, label_max_pixels, NULL, /*use_ellipses=*/true);
 

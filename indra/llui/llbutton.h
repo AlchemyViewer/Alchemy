@@ -228,8 +228,8 @@ public:
     void            setImageOverlayBottomPad( S32 pad )         { mImageOverlayBottomPad = pad; }
     S32             getImageOverlayBottomPad() const            { return mImageOverlayBottomPad; }
 
-    const std::string   getLabelUnselected() const { return wstring_to_utf8str(mUnselectedLabel); }
-    const std::string   getLabelSelected() const { return wstring_to_utf8str(mSelectedLabel); }
+    const std::string&  getLabelUnselected() const { return mUnselectedLabel.getString(); }
+    const std::string&  getLabelSelected() const { return mSelectedLabel.getString(); }
 
     void            setImageColor(const LLUIColor& c);
     /*virtual*/ void    setColor(const LLUIColor& c) override;
@@ -259,7 +259,7 @@ public:
     const LLFontGL* getFont() const override { return mGLFont; }
     const std::string& getText() const override { return getCurrentLabel().getString(); }
 
-    S32             getLastDrawCharsCount() const { return mLastDrawCharsCount; }
+    S32             getLastDrawBytesCount() const { return mLastDrawBytesCount; }
     bool            labelIsTruncated() const;
     const LLUIString&   getCurrentLabel() const;
 
@@ -310,7 +310,7 @@ protected:
     S32                         mMouseHeldDownCount;    // Counter for parameter passed to held-down callback
     F32                         mHeldDownDelay;         // seconds, after which held-down callbacks get called
     S32                         mHeldDownFrameDelay;    // frames, after which held-down callbacks get called
-    S32                         mLastDrawCharsCount;
+    S32                         mLastDrawBytesCount;
 
     bool                        mImageOverlayEnable;
     LLPointer<LLUIImage>        mImageOverlay;

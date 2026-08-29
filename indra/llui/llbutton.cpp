@@ -179,7 +179,7 @@ LLButton::LLButton(const LLButton::Params& p)
     mFadeWhenDisabled(false),
     mForcePressedState(false),
     mDisplayPressedState(p.display_pressed_state),
-    mLastDrawCharsCount(0),
+    mLastDrawBytesCount(0),
     mMouseDownSignal(NULL),
     mMouseUpSignal(NULL),
     mHeldDownSignal(NULL),
@@ -978,7 +978,7 @@ void LLButton::draw()
     }
 
     // Draw label
-    const LLWString& label = getCurrentLabel();
+    const std::string& label = getCurrentLabel().getString();
     if (!label.empty()) // Unselected label assignments
     {
         S32 x;
@@ -1006,7 +1006,7 @@ void LLButton::draw()
         // LLFontGL::render expects S32 max_chars variable but process in a separate way -1 value.
         // Due to U32_MAX is equal to S32 -1 value I have rest this value for non-ellipses mode.
         // Not sure if it is really needed. Probably S32_MAX should be always passed as max_chars.
-        mLastDrawCharsCount = mFontBuffer.render(mGLFont, label, 0,
+        mLastDrawBytesCount = mFontBuffer.renderBytes(mGLFont, label, 0,
             (F32)x,
             (F32)(getRect().getHeight() / 2 + mBottomVPad),
             label_color % alpha,
@@ -1127,7 +1127,10 @@ void LLButton::setFont(const LLFontGL* font)
 
 bool LLButton::labelIsTruncated() const
 {
-    return getCurrentLabel().getString().size() > mLastDrawCharsCount;
+    // Both sides in bytes. They used to disagree: the draw reported the
+    // characters it had got through, and the label was measured in the UTF-8
+    // it is stored as.
+    return (S32)getCurrentLabel().getString().size() > mLastDrawBytesCount;
 }
 
 const LLUIString& LLButton::getCurrentLabel() const
@@ -1158,7 +1161,7 @@ void LLButton::autoResize()
 void LLButton::resize(const LLUIString& label)
 {
     // get label length
-    S32 label_width = mGLFont->getWidth(label.getWString());
+    S32 label_width = mGLFont->getWidthBytes(label.getString(), 0, S32_MAX);
     // get current btn length
     S32 btn_width =getRect().getWidth();
     // check if it need resize

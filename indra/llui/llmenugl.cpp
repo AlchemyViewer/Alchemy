@@ -374,7 +374,7 @@ U32 LLMenuItemGL::getNominalWidth( void ) const
         appendAcceleratorString( temp );
         width += mFont->getWidth( temp );
     }
-    width += mFont->getWidth( mLabel.getWString() );
+    width += mFont->getWidthBytes( mLabel.getString(), 0, S32_MAX );
     return width;
 }
 
@@ -514,7 +514,7 @@ void LLMenuItemGL::draw( void )
     // Draw the text on top.
     if (mBriefItem)
     {
-        mFont->render( mLabel, 0, BRIEF_PAD_PIXELS / 2, 0, color,
+        mFont->renderBytes( mLabel.getString(), 0, BRIEF_PAD_PIXELS / 2, 0, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
     }
     else
@@ -525,19 +525,19 @@ void LLMenuItemGL::draw( void )
         F32 y = (F32)MENU_ITEM_PADDING / 2.f;
         if( !mDrawBoolLabel.empty() )
         {
-            mFont->render( mDrawBoolLabel.getWString(), 0, (F32)LEFT_PAD_PIXELS, y, color,
+            mFont->renderBytes( mDrawBoolLabel.getString(), 0, (F32)LEFT_PAD_PIXELS, y, color,
                            LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
-        mFont->render( mLabel.getWString(), 0, (F32)LEFT_PLAIN_PIXELS, y, color,
+        mFont->renderBytes( mLabel.getString(), 0, (F32)LEFT_PLAIN_PIXELS, y, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         if( !mDrawAccelLabel.empty() )
         {
-            mFont->render( mDrawAccelLabel.getWString(), 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
+            mFont->renderBytes( mDrawAccelLabel.getString(), 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
         if( !mDrawBranchLabel.empty() )
         {
-            mFont->render( mDrawBranchLabel.getWString(), 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
+            mFont->renderBytes( mDrawBranchLabel.getString(), 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
     }
@@ -545,13 +545,19 @@ void LLMenuItemGL::draw( void )
     // underline "jump" key only when keyboard navigation has been initiated
     if (getMenu()->jumpKeysActive() && LLMenuGL::getKeyboardMode())
     {
-        std::string upper_case_label = mLabel.getString();
+        const std::string& label = mLabel.getString();
+        std::string upper_case_label = label;
         LLStringUtil::toUpper(upper_case_label);
         std::string::size_type offset = upper_case_label.find(mJumpKey);
         if (offset != std::string::npos)
         {
-            S32 x_begin = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset));
-            S32 x_end = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset) + 1);
+            // The offset indexes the uppercased copy, and uppercasing UTF-8
+            // does not preserve length, so it has to be carried back onto the
+            // label before it can measure any of it.
+            const S32 key_begin = (S32)utf8str_bytes_from_cased_bytes(label, offset, true);
+            const S32 key_end   = (S32)utf8str_decode_at(label, (size_t)key_begin).next;
+            S32 x_begin = LEFT_PLAIN_PIXELS + mFont->getWidthBytes(label, 0, key_begin);
+            S32 x_end = LEFT_PLAIN_PIXELS + mFont->getWidthBytes(label, 0, key_end);
             gl_line_2d(x_begin, (MENU_ITEM_PADDING / 2) + 1, x_end, (MENU_ITEM_PADDING / 2) + 1);
         }
     }
@@ -1394,7 +1400,7 @@ LLMenuItemBranchDownGL::LLMenuItemBranchDownGL( const Params& p) :
 U32 LLMenuItemBranchDownGL::getNominalWidth( void ) const
 {
     U32 width = LEFT_PAD_PIXELS + LEFT_WIDTH_PIXELS + RIGHT_PAD_PIXELS;
-    width += getFont()->getWidth( mLabel.getWString() );
+    width += getFont()->getWidthBytes( mLabel.getString(), 0, S32_MAX );
     return width;
 }
 
@@ -1645,21 +1651,26 @@ void LLMenuItemBranchDownGL::draw( void )
     // Munus are all of the same size, so fixed offset works here,
     // but it won't work if somebody decides to use different font
     // todo: adjust logic to work of rect and font height
-    getFont()->render( mLabel.getWString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
+    getFont()->renderBytes( mLabel.getString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
                    LLFontGL::HCENTER, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false);
 
 
     // underline navigation key only when keyboard navigation has been initiated
     if (getMenu()->jumpKeysActive() && LLMenuGL::getKeyboardMode())
     {
-        std::string upper_case_label = mLabel.getString();
+        const std::string& label = mLabel.getString();
+        std::string upper_case_label = label;
         LLStringUtil::toUpper(upper_case_label);
         std::string::size_type offset = upper_case_label.find(getJumpKey());
         if (offset != std::string::npos)
         {
-            S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - getFont()->getWidthF32(mLabel.getWString(), 0, S32_MAX) / 2.f);
-            S32 x_begin = x_offset + getFont()->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset));
-            S32 x_end = x_offset + getFont()->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset) + 1);
+            // See LLMenuItemGL::draw: the offset indexes the uppercased copy,
+            // which is not the same length as the label it came from.
+            const S32 key_begin = (S32)utf8str_bytes_from_cased_bytes(label, offset, true);
+            const S32 key_end   = (S32)utf8str_decode_at(label, (size_t)key_begin).next;
+            S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - getFont()->getWidthF32Bytes(label, 0, S32_MAX) / 2.f);
+            S32 x_begin = x_offset + getFont()->getWidthBytes(label, 0, key_begin);
+            S32 x_end = x_offset + getFont()->getWidthBytes(label, 0, key_end);
             gl_line_2d(x_begin, LABEL_BOTTOM_PAD_PIXELS, x_end, LABEL_BOTTOM_PAD_PIXELS);
         }
     }
