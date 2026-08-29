@@ -1251,8 +1251,15 @@ void LLFavoritesBarCtrl::fitLabelWidth(LLMenuItemCallGL* menu_item)
     if (menu_item->getNominalWidth() > max_width)
     {
         menu_item->setLabel(LLStringExplicit(""));
-        S32 label_space = max_width - menu_item->getFont()->getWidth("...") -
-                menu_item->getNominalWidth();// This returns width of menu item with empty label (pad pixels)
+        // Signed, and floored. getNominalWidth() is unsigned -- it returns the
+        // width of the item with an empty label, the pad pixels -- so working
+        // this out in the unsigned domain turns a menu narrower than its own
+        // padding into an enormous positive number that arrives here negative.
+        // A budget below zero is no budget, and the font asserts on one.
+        const S32 label_space = llmax(0,
+                (S32)max_width
+                - menu_item->getFont()->getWidth("...")
+                - (S32)menu_item->getNominalWidth());
 
         // Measured and cut in the same unit. The re-measuring loop this
         // replaces counted the total in bytes, asked the font about codepoints

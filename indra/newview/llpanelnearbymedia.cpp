@@ -1253,12 +1253,16 @@ void LLPanelNearByMedia::onMenuAction(const LLSD& userdata)
         if (pos != std::string::npos)
         {
             pos += encoding_specifier.size();
-            std::string res = LLBase64::decodeAsString(url.substr(pos));
+            // Base64 decodes to whatever it decodes to, and the media URL was
+            // set by the object's owner. The system clipboard is handed these
+            // bytes verbatim on Linux, so repair them rather than publishing
+            // something no other application can read.
+            const std::string res = utf8str_sanitize(LLBase64::decodeAsString(url.substr(pos)));
             LLClipboard::instance().copyToClipboard(res, 0, static_cast<S32>(res.size()));
         }
         else
         {
-            url = LLURI::unescape(url);
+            url = utf8str_sanitize(LLURI::unescape(url));
             LLClipboard::instance().copyToClipboard(url, 0, static_cast<S32>(url.size()));
         }
     }

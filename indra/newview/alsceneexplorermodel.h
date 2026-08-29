@@ -115,9 +115,9 @@ public:
 
     bool showAllResults() const override { return false; }
 
-    // Span of the text match within the item's display name, in codepoints
-    // (empty when the match landed in another field), so the folder view draws
-    // the standard inventory match highlight.
+    // Span of the text match within the item's display name, in bytes (empty
+    // when the match landed in another field), so the folder view draws the
+    // standard inventory match highlight.
     Match getFilterMatch(LLFolderViewModelItem* item) const override;
 
     bool isActive() const override;

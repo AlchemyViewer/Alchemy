@@ -1459,9 +1459,13 @@ void LLFloaterIMSessionTab::applyMUPose(std::string& text)
             text.replace(0, 1, "/me");
         }
         // Account for emotes and smilies
-        else if (!isdigit(text.at(1))
-                 && !ispunct(text.at(1))
-                 && !isspace(text.at(1)))
+        // Through LLStringOps rather than <cctype> directly: char is signed,
+        // so the lead byte of anything above ASCII arrives negative and lands
+        // outside the domain those take, which is undefined and asserts in a
+        // debug CRT. Typing a colon in front of an accented word is enough.
+        else if (!LLStringOps::isDigit(text.at(1))
+                 && !LLStringOps::isPunct(text.at(1))
+                 && !LLStringOps::isSpace(text.at(1)))
         {
             text.replace(0, 1, "/me ");
         }

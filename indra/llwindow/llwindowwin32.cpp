@@ -4743,7 +4743,12 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
                 S32 byte_offset = 0;    // bytes, indexes preedit_string
                 for (U32 i = 0; i < preedit_segment_lengths.size(); i++)
                 {
-                    if (ATTR_TARGET_CONVERTED == data[offset] || ATTR_TARGET_NOTCONVERTED == data[offset])
+                    // A clause occupying no code units -- which the guard above
+                    // admits, since it only checks the first and last boundary
+                    // -- leaves offset at the end of the array, and there is no
+                    // attribute there to read.
+                    if (offset < size
+                        && (ATTR_TARGET_CONVERTED == data[offset] || ATTR_TARGET_NOTCONVERTED == data[offset]))
                     {
                         preedit_standouts[i] = true;
                     }

@@ -1031,6 +1031,11 @@ void LLHexEditor::copy()
         for(U32 i = start; i < end; i++)
             text.append(llformat("%c", mValue[i]));
     }
+    // The text column is raw asset bytes rendered one per character, so on any
+    // non-ASCII selection this is not UTF-8 at all. The clipboard is published
+    // as UTF-8 regardless, so what cannot be one character is made into the
+    // character that says so.
+    text = utf8str_sanitize(text);
     LLClipboard::instance().copyToClipboard(text, 0, (S32)text.length());
 }
 
