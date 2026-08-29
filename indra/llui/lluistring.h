@@ -58,14 +58,12 @@ class LLUIString
 public:
     // These methods all perform appropriate argument substitution
     // and modify mOrig where appropriate
-    LLUIString() : mArgs(NULL), mNeedsResult(false), mNeedsWResult(false) {}
+    LLUIString() : mArgs(NULL), mNeedsResult(false) {}
     LLUIString(const std::string& instring, const LLStringUtil::format_map_t& args);
     LLUIString(const std::string& instring) : mArgs(NULL) { assign(instring); }
-    LLUIString(const LLWString& instring) : mArgs(NULL) { assign(instring); }
     ~LLUIString() { delete mArgs; }
 
     void assign(const std::string& instring);
-    void assign(const LLWString& instring);
     LLUIString& operator=(const std::string& s) { assign(s); return *this; }
 
     void setArgList(const LLStringUtil::format_map_t& args);
@@ -76,42 +74,43 @@ public:
     const std::string& getString() const { return getUpdatedResult(); }
     operator std::string() const { return getUpdatedResult(); }
 
-    const LLWString& getWString() const { return getUpdatedWResult(); }
-    operator LLWString() const { return getUpdatedWResult(); }
-
     bool empty() const { return getUpdatedResult().empty(); }
-    S32 length() const { return static_cast<S32>(getUpdatedWResult().size()); }
+
+    // Named for its unit, because an S32 length reads the same whether it
+    // counts bytes or characters and the two used to disagree here: this
+    // returned a codepoint count while everything it fed measured and drew in
+    // bytes.
+    S32 lengthBytes() const { return static_cast<S32>(getUpdatedResult().size()); }
 
     void clear();
     void clearArgs() { if (mArgs) mArgs->clear(); }
 
     // These utility functions are included for text editing.
-    // They do not affect mOrig and do not perform argument substitution
-    void truncate(S32 maxchars);
-    void erase(S32 charidx, S32 len);
-    void insert(S32 charidx, const LLWString& wchars);
-    void replace(S32 charidx, llwchar wc);
+    // They do not affect mOrig and do not perform argument substitution.
+    // Every offset and length below counts BYTES of the UTF-8 result, and each
+    // is expected to sit at a character start; replace() and truncate() are the
+    // two that move on their own, to whole characters.
+    void truncate(S32 max_bytes);
+    void erase(S32 byte_idx, S32 byte_len);
+    void insert(S32 byte_idx, std::string_view chars);
+    void replace(S32 byte_idx, llwchar wc);
 
 private:
     // something changed, requiring reformatting of strings
     void dirty();
 
     std::string& getUpdatedResult() const { if (mNeedsResult) { updateResult(); } return mResult; }
-    LLWString& getUpdatedWResult() const{ if (mNeedsWResult) { updateWResult(); } return mWResult; }
 
     // do actual work of updating strings (non-inlined)
     void updateResult() const;
-    void updateWResult() const;
     LLStringUtil::format_map_t& getArgs();
 
     std::string mOrig;
     mutable std::string mResult;
-    mutable LLWString mWResult; // for displaying
     LLStringUtil::format_map_t* mArgs;
 
     // controls lazy evaluation
     mutable bool    mNeedsResult { true };
-    mutable bool    mNeedsWResult { true };
 };
 
 #endif // LL_LLUISTRING_H

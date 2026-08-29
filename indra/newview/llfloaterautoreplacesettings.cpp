@@ -620,15 +620,15 @@ void LLFloaterAutoReplaceSettings::onSaveEntry()
         mSettings.removeEntryFromList( mPreviousKeyword, mSelectedListName );
     }
 
-    LLWString keyword     = mKeyword->getWText();
-    LLWString replacement = mReplacement->getWText();
+    const std::string& keyword     = mKeyword->getText();
+    const std::string& replacement = mReplacement->getText();
     if ( mSettings.addEntryToList(keyword, replacement, mSelectedListName) )
     {
         // insert the new keyword->replacement pair
         LL_INFOS("AutoReplace")
             << "list '" << mSelectedListName << "' "
-            << "added '" << wstring_to_utf8str(keyword)
-            << "' -> '" << wstring_to_utf8str(replacement)
+            << "added '" << keyword
+            << "' -> '" << replacement
             << "'" << LL_ENDL;
 
         updateReplacementsList();
@@ -637,8 +637,8 @@ void LLFloaterAutoReplaceSettings::onSaveEntry()
     {
         LLNotificationsUtil::add("InvalidAutoReplaceEntry");
         LL_WARNS("AutoReplace")<<"invalid entry "
-                               << "keyword '" << wstring_to_utf8str(keyword)
-                               << "' replacement '" << wstring_to_utf8str(replacement)
+                               << "keyword '" << keyword
+                               << "' replacement '" << replacement
                                << "'" << LL_ENDL;
     }
 }

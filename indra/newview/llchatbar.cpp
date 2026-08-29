@@ -469,12 +469,12 @@ void LLChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
 {
     LLChatBar* self = (LLChatBar *)userdata;
 
-    LLWString raw_text;
-    if (self->mInputEditor) raw_text = self->mInputEditor->getWText();
+    std::string raw_text;
+    if (self->mInputEditor) raw_text = self->mInputEditor->getText();
 
     // Can't trim the end, because that will cause autocompletion
     // to eat trailing spaces that might be part of a gesture.
-    LLWStringUtil::trimHead(raw_text);
+    LLStringUtil::trimHead(raw_text);
 
     auto length = raw_text.length();
 
@@ -511,7 +511,7 @@ void LLChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
     {
         // we're starting a gesture, attempt to autocomplete
 
-        std::string utf8_trigger = wstring_to_utf8str(raw_text);
+        std::string utf8_trigger = raw_text;
         std::string utf8_out_str(utf8_trigger);
 
         if (LLGestureMgr::instance().matchPrefix(utf8_trigger, &utf8_out_str))
@@ -520,10 +520,11 @@ void LLChatBar::onInputEditorKeystroke( LLLineEditor* caller, void* userdata )
             {
                 std::string rest_of_match = utf8_out_str.substr(utf8_trigger.size());
                 self->mInputEditor->setText(utf8_trigger + rest_of_match); // keep original capitalization for user-entered part
-                S32 outlength = self->mInputEditor->getLength(); // in characters
+                S32 outlength = self->mInputEditor->getLengthBytes();
 
                 // Select to end of line, starting from the character
-                // after the last one the user typed.
+                // after the last one the user typed. `length` is the trigger's
+                // own byte length, which is where the completion begins.
                 self->mInputEditor->setSelection(static_cast<S32>(length), outlength);
             }
         }

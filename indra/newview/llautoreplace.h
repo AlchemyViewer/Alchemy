@@ -117,7 +117,7 @@ class LLAutoReplaceSettings
     std::string replacementFor(std::string keyword, std::string listName);
 
     /// Adds a keywword/replacement pair to the named list
-    bool addEntryToList(LLWString keyword, LLWString replacement, std::string listName);
+    bool addEntryToList(std::string_view keyword, std::string_view replacement, std::string listName);
 
     /// Removes the keywword and its replacement from the named list
     bool removeEntryFromList(std::string keyword, std::string listName);

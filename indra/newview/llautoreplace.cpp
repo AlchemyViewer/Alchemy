@@ -46,7 +46,8 @@ void LLAutoReplace::autoreplaceCallback(S32& replacement_start, S32& replacement
 
         // Replacement only fires once the word is finished, which is what the
         // just-typed space signals; the word itself is the one before it.
-        const bool at_space = (input_text[word_end] == ' ');
+        const bool at_space = word_end >= 0 && (size_t)word_end < input_text.size()
+                              && input_text[word_end] == ' ';
         if (at_space && word_end > 0)
         {
             word_end--;
@@ -693,18 +694,18 @@ std::string LLAutoReplaceSettings::replaceWord(const std::string currentWord)
     return returnedWord;
 }
 
-bool LLAutoReplaceSettings::addEntryToList(LLWString keyword, LLWString replacement, std::string listName)
+bool LLAutoReplaceSettings::addEntryToList(std::string_view keyword, std::string_view replacement, std::string listName)
 {
     bool added = false;
 
     if ( ! keyword.empty() && ! replacement.empty() )
     {
         // One word by Unicode's reckoning, so a contraction is a usable keyword.
-        const auto keyword_range = wstring_word_range_at(keyword, 0);
+        const auto keyword_range = utf8str_word_range_at(keyword, 0);
         const bool isOneWord = (keyword_range.first == 0) && (keyword_range.second == keyword.size());
         if (!isOneWord)
         {
-            LL_WARNS("AutoReplace") << "keyword '" << wstring_to_utf8str(keyword)
+            LL_WARNS("AutoReplace") << "keyword '" << keyword
                                     << "' not a single word (len " << keyword.size() << ")" << LL_ENDL;
         }
 
@@ -719,7 +720,7 @@ bool LLAutoReplaceSettings::addEntryToList(LLWString keyword, LLWString replacem
                 if ( listNameMatches(*list, listName) )
                 {
                     listFound = true;
-                    (*list)[AUTOREPLACE_LIST_REPLACEMENTS][wstring_to_utf8str(keyword)]=wstring_to_utf8str(replacement);
+                    (*list)[AUTOREPLACE_LIST_REPLACEMENTS][std::string(keyword)]=std::string(replacement);
                 }
             }
             if (listFound)

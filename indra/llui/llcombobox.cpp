@@ -1091,18 +1091,18 @@ void LLComboBox::onTextEntry(LLLineEditor* line_editor)
 
 void LLComboBox::updateSelection()
 {
-    LLWString left_wstring = mTextEntry->getWText().substr(0, mTextEntry->getCursor());
+    const std::string full_string = mTextEntry->getText();
+    const std::string left_string  = full_string.substr(0, mTextEntry->getCursor());
     // user-entered portion of string, based on assumption that any selected
     // text was a result of auto-completion
-    LLWString user_wstring = mHasAutocompletedText ? left_wstring : mTextEntry->getWText();
-    std::string full_string = mTextEntry->getText();
+    const std::string user_string  = mHasAutocompletedText ? left_string : full_string;
 
     // go ahead and arrange drop down list on first typed character, even
     // though we aren't showing it... some code relies on prearrange
     // callback to populate content
-    if( mTextEntry->getWText().size() == 1 )
+    if( utf8str_codepoint_count(full_string) == 1 )
     {
-        prearrangeList(mTextEntry->getText());
+        prearrangeList(full_string);
     }
 
     if (mList->selectItemByLabel(full_string, false))
@@ -1110,12 +1110,18 @@ void LLComboBox::updateSelection()
         mTextEntry->setTentative(false);
         mLastSelectedIndex = mList->getFirstSelectedIndex();
     }
-    else if (mList->selectItemByPrefix(wstring_to_utf8str(left_wstring), false))
+    else if (mList->selectItemByPrefix(left_string, false))
     {
-        LLWString selected_item = utf8str_to_wstring(getSelectedItemLabel());
-        LLWString wtext = left_wstring + selected_item.substr(left_wstring.size(), selected_item.size());
-        mTextEntry->setText(wstring_to_utf8str(wtext));
-        mTextEntry->setSelection(static_cast<S32>(left_wstring.size()), static_cast<S32>(mTextEntry->getWText().size()));
+        const std::string selected_item = getSelectedItemLabel();
+        // Where the typed text ends and the completion begins. The prefix
+        // match is not case-sensitive and casing does not preserve length, so
+        // the join is nudged forward onto a character start rather than
+        // trusted to land on one.
+        const size_t join = utf8str_grapheme_align_forward(
+            selected_item, llmin(left_string.size(), selected_item.size()));
+        const std::string text = left_string + selected_item.substr(join);
+        mTextEntry->setText(text);
+        mTextEntry->setSelection(static_cast<S32>(left_string.size()), static_cast<S32>(text.size()));
         mTextEntry->endSelection();
         mTextEntry->setTentative(false);
         mHasAutocompletedText = true;
@@ -1124,7 +1130,7 @@ void LLComboBox::updateSelection()
     else // no matching items found
     {
         mList->deselectAllItems();
-        mTextEntry->setText(wstring_to_utf8str(user_wstring)); // removes text added by autocompletion
+        mTextEntry->setText(user_string); // removes text added by autocompletion
         mTextEntry->setTentative(mTextEntryTentative);
         mHasAutocompletedText = false;
         mLastSelectedIndex = -1;

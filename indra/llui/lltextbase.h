@@ -471,7 +471,12 @@ public:
     /*virtual*/ bool        setLabelArg(const std::string& key, const LLStringExplicit& text) override;
 
     const   std::string&    getLabel()  { return mLabel.getString(); }
-    const   LLWString&      getWlabel() { return mLabel.getWString();}
+
+    // The label in the unit this class still counts segment bounds and cursor
+    // positions in. It is kept as a second copy rather than measured on demand
+    // because LLLabelTextSegment hands out a reference to it; both the copy and
+    // this accessor go when the document itself moves to bytes.
+    const   LLWString&      getWlabel();
 
     void                    setLastSegmentToolTip(const std::string &tooltip);
 
@@ -867,6 +872,8 @@ protected:
 // [/SL:KB]
 
     LLUIString                  mLabel; // text label that is visible when no user text provided
+    LLWString                   mWLabel;        // mLabel as getWlabel() reports it
+    std::string                 mWLabelSource;  // what mWLabel was converted from
 };
 
 #endif

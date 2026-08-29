@@ -805,7 +805,7 @@ void LLTextBase::drawText()
     }
     else if (useLabel())
     {
-        text_len = static_cast<S32>(mLabel.getWString().length());
+        text_len = static_cast<S32>(getWlabel().length());
     }
 
     S32 selection_left = -1;
@@ -2614,6 +2614,19 @@ void LLTextBase::appendText(const std::string &new_text, bool prepend_newline, c
     appendTextImpl(new_text,input_params);
 }
 
+const LLWString& LLTextBase::getWlabel()
+{
+    // Argument substitution can change the label without setLabel() being
+    // called, so the copy is refreshed from what the label currently reads
+    // rather than at the points that write it.
+    if (mWLabelSource != mLabel.getString())
+    {
+        mWLabelSource = mLabel.getString();
+        mWLabel = utf8str_to_wstring(mWLabelSource);
+    }
+    return mWLabel;
+}
+
 void LLTextBase::setLabel(const LLStringExplicit& label)
 {
     mLabel = label;
@@ -2636,7 +2649,7 @@ void LLTextBase::resetLabel()
         style->setColor(mTentativeFgColor);
         LLStyleConstSP sp(style);
 
-        LLTextSegmentPtr label = new LLLabelTextSegment(sp, 0, static_cast<S32>(mLabel.getWString().length()) + 1, *this);
+        LLTextSegmentPtr label = new LLLabelTextSegment(sp, 0, static_cast<S32>(getWlabel().length()) + 1, *this);
         insertSegment(label);
     }
 }

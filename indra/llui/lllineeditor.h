@@ -207,10 +207,12 @@ public:
     void            setText(const LLStringExplicit &new_text);
 
     const std::string& getText() const override { return mText.getString(); }
-    const LLWString&   getWText() const    { return mText.getWString(); }
-    LLWString getConvertedText() const; // trimmed text with paragraphs converted to newlines
+    std::string getConvertedText() const; // trimmed text with paragraphs converted to newlines
 
-    S32             getLength() const   { return mText.length(); }
+    // Named for its unit. Every offset this class takes and hands back --
+    // cursor, selection, scroll, preedit -- is a byte offset into getText(),
+    // sitting at a character start.
+    S32             getLengthBytes() const   { return mText.lengthBytes(); }
 
     S32             getCursor() const   { return mCursorPos; }
     void            setCursor( S32 pos );
@@ -221,7 +223,10 @@ public:
 
     // Selects characters 'start' to 'end'.
     void            setSelection(S32 start, S32 end);
+    // Reports characters, as LLPreeditor requires. getSelectionRangeBytes()
+    // gives the same span in the unit everything else here counts in.
     /*virtual*/ void    getSelectionRange(S32 *position, S32 *length) const override;
+    void                getSelectionRangeBytes(S32 *position, S32 *length) const;
 
     void            setCommitOnFocusLost( bool b )  { mCommitOnFocusLost = b; }
     void            setRevertOnEsc( bool b )        { mRevertOnEsc = b; }
@@ -279,7 +284,7 @@ public:
     void            setPrevalidateInput(LLTextValidate::Validator validator);
     static bool     postvalidateFloat(const std::string &str);
 
-    bool            prevalidateInput(const LLWString& wstr);
+    bool            prevalidateInput(std::string_view str);
     bool            evaluateFloat();
 
     // line history support:
@@ -297,7 +302,7 @@ public:
     bool getShowContextMenu() const { return mShowContextMenu; }
 
     // Autoreplace
-    typedef std::function<void(S32&, S32&, LLWString&, S32&, const LLWString&)> autoreplace_callback_t;
+    typedef std::function<void(S32&, S32&, std::string&, S32&, const std::string&)> autoreplace_callback_t;
     autoreplace_callback_t mAutoreplaceCallback;
     void            setAutoreplaceCallback(autoreplace_callback_t cb) { mAutoreplaceCallback = cb; }
 
@@ -317,6 +322,17 @@ public:
     // bounce the highlight rect across the full glyph. Returns true if the
     // cursor moved.
     bool            dragSelectCursorTo(S32 local_mouse_x);
+
+    // In password mode the field draws one bullet per character rather than
+    // the text. A bullet is three bytes whatever it stands in for, so an
+    // offset into the text and the matching offset into what is drawn are
+    // different numbers, and anything that measures the drawn form has to
+    // carry its offsets across. Outside password mode drawnText() is the text
+    // itself and both maps are the identity.
+    std::string_view drawnText(std::string& buffer) const;
+    S32             toDrawnOffset(S32 text_offset) const;
+    S32             fromDrawnOffset(S32 drawn_offset) const;
+
     S32             findPixelNearestPos(S32 cursor_offset = 0) const;
     S32             calcCursorPos(S32 mouse_x);
     bool            handleSpecialKey(KEY key, MASK mask);
@@ -339,7 +355,10 @@ public:
     /*virtual*/ void    getPreeditRange(S32 *position, S32 *length) const override;
     /*virtual*/ bool    getPreeditLocation(S32 query_position, LLCoordGL *coord, LLRect *bounds, LLRect *control) const override;
     /*virtual*/ S32     getPreeditFontSize() const override;
-    /*virtual*/ LLWString getPreeditString() const override { return getWText(); }
+    // LLPreeditor counts in UTF-32 characters throughout, by its own
+    // documented contract, so the preedit boundary converts. Stage B4 moves
+    // that interface to bytes and these conversions go with it.
+    /*virtual*/ LLWString getPreeditString() const override { return utf8str_to_wstring(getText()); }
 
     void            setText(const LLStringExplicit &new_text, bool use_size_limit);
 
@@ -427,9 +446,9 @@ protected:
     bool        mUseBgColor;
     bool        mDrawFocusBorder;
 
-    LLWString   mPreeditWString;
-    LLWString   mPreeditOverwrittenWString;
-    std::vector<S32> mPreeditPositions;
+    std::string mPreeditString;
+    std::string mPreeditOverwrittenString;
+    std::vector<S32> mPreeditPositions;   // byte offsets into mText
     LLPreeditor::standouts_t mPreeditStandouts;
 
     LLHandle<LLContextMenu> mContextMenuHandle;

@@ -44,12 +44,6 @@ void LLUIString::assign(const std::string& s)
     dirty();
 }
 
-void LLUIString::assign(const LLWString& instring)
-{
-    mOrig = wstring_to_utf8str(instring);
-    dirty();
-}
-
 void LLUIString::setArgList(const LLStringUtil::format_map_t& args)
 
 {
@@ -77,34 +71,35 @@ void LLUIString::setArg(const std::string& key, const std::string& replacement)
     dirty();
 }
 
-void LLUIString::truncate(S32 maxchars)
+void LLUIString::truncate(S32 max_bytes)
 {
-    LLWString& wresult = getUpdatedWResult();
-    if (wresult.size() > (size_t)maxchars)
+    std::string& result = getUpdatedResult();
+    if (result.size() > (size_t)max_bytes)
     {
-        // Back off to a whole character. A codepoint count can fall between a
+        // Back off to a whole character. A byte count can fall between a
         // letter and its accent, or inside a flag or a family.
-        LLWStringUtil::truncate(wresult, wstring_grapheme_align_backward(wresult, (size_t)maxchars));
-        mResult = wstring_to_utf8str(wresult);
+        result.resize(utf8str_grapheme_align_backward(result, (size_t)max_bytes));
     }
 }
 
-void LLUIString::erase(S32 charidx, S32 len)
+void LLUIString::erase(S32 byte_idx, S32 byte_len)
 {
-    getUpdatedWResult().erase(charidx, len);
-    mResult = wstring_to_utf8str(getUpdatedWResult());
+    getUpdatedResult().erase(byte_idx, byte_len);
 }
 
-void LLUIString::insert(S32 charidx, const LLWString& wchars)
+void LLUIString::insert(S32 byte_idx, std::string_view chars)
 {
-    getUpdatedWResult().insert(charidx, wchars);
-    mResult = wstring_to_utf8str(getUpdatedWResult());
+    getUpdatedResult().insert(byte_idx, chars);
 }
 
-void LLUIString::replace(S32 charidx, llwchar wc)
+void LLUIString::replace(S32 byte_idx, llwchar wc)
 {
-    getUpdatedWResult()[charidx] = wc;
-    mResult = wstring_to_utf8str(getUpdatedWResult());
+    // Not an assignment the way the UTF-32 form was: the character being
+    // replaced and the one replacing it need not occupy the same number of
+    // bytes, so the span of the old one has to be measured first.
+    std::string& result = getUpdatedResult();
+    const auto at = utf8str_decode_at(result, (size_t)byte_idx);
+    result.replace((size_t)byte_idx, at.next - (size_t)byte_idx, utf8str_from_cp(wc));
 }
 
 void LLUIString::clear()
@@ -112,13 +107,11 @@ void LLUIString::clear()
     // Keep Args
     mOrig.clear();
     mResult.clear();
-    mWResult.clear();
 }
 
 void LLUIString::dirty()
 {
     mNeedsResult = true;
-    mNeedsWResult = true;
 }
 
 void LLUIString::updateResult() const
@@ -131,7 +124,6 @@ void LLUIString::updateResult() const
     if (mOrig.empty())
     {
         mResult.clear();
-        mWResult.clear();
         return;
     }
     mResult = mOrig;
@@ -150,13 +142,6 @@ void LLUIString::updateResult() const
     {
         LLStringUtil::format(mResult, LLTrans::getDefaultArgs());
     }
-}
-
-void LLUIString::updateWResult() const
-{
-    mNeedsWResult = false;
-
-    mWResult = utf8str_to_wstring(getUpdatedResult());
 }
 
 LLStringUtil::format_map_t& LLUIString::getArgs()
