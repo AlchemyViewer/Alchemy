@@ -1822,15 +1822,24 @@ void LLStringUtilBase<T>::replaceChar( string_type& string, T target, T replacem
 template<class T>
 void LLStringUtilBase<T>::replaceString( string_type& string, string_view_type target, string_view_type replacement )
 {
-    // A view is allowed to point into `string` itself, and replacing from a
-    // view of the buffer being replaced into is undefined. Copy in that one
+    // Either view is allowed to point into `string` itself, and both are read
+    // after a replace that can have moved the buffer they point into -- target
+    // on every turn of the loop below, not only the first. Copy in that one
     // case; the pointer comparison costs nothing on the ordinary path, where
-    // both arguments are literals or unrelated strings.
+    // the arguments are literals or unrelated strings.
     const T* const begin = string.data();
-    if (replacement.data() >= begin && replacement.data() <= begin + string.size())
+    const T* const end   = begin + string.size();
+    const auto views_the_subject = [begin, end](string_view_type v)
     {
-        const string_type owned(replacement);
-        replaceString(string, target, string_view_type(owned));
+        return v.data() >= begin && v.data() <= end;
+    };
+    if (views_the_subject(target) || views_the_subject(replacement))
+    {
+        const string_type owned_target(target);
+        const string_type owned_replacement(replacement);
+        replaceString(string,
+                      string_view_type(owned_target),
+                      string_view_type(owned_replacement));
         return;
     }
 
@@ -2019,6 +2028,18 @@ void LLStringUtilBase<T>::copy( T* dst, const T* src, size_type dst_size )
 template<class T>
 void LLStringUtilBase<T>::copyInto(string_type& dst, string_view_type src, size_type offset)
 {
+    // src is allowed to view dst. Appending a string to itself is defined, but
+    // appending from a view of it is not, and the insert path below assigns dst
+    // out from under src before reading it. Taking src by value used to make
+    // this safe at no stated cost; a view does not.
+    const T* const begin = dst.data();
+    if (src.data() >= begin && src.data() <= begin + dst.size())
+    {
+        const string_type owned(src);
+        copyInto(dst, string_view_type(owned), offset);
+        return;
+    }
+
     if ( offset == dst.length() )
     {
         // special case - append to end of string and avoid expensive

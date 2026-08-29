@@ -521,7 +521,11 @@ S32 utf8str_compare_insensitive(const std::string& lhs, const std::string& rhs)
 
 std::string utf8str_truncate(std::string_view utf8str, const S32 max_len)
 {
-    if (0 == max_len) return std::string();
+    // A negative bound would sail past the zero test and reach trim_partial_utf8
+    // as a size_t near its maximum, which reads until it faults. Callers get
+    // theirs from a settings file or a database constant, so it is worth not
+    // trusting the sign.
+    if (max_len <= 0) return std::string();
     if ((S32)utf8str.length() <= max_len) return std::string(utf8str);
     return std::string(utf8str.substr(0,
         simdutf::trim_partial_utf8(utf8str.data(), (size_t)max_len)));
@@ -530,7 +534,11 @@ std::string utf8str_truncate(std::string_view utf8str, const S32 max_len)
 // [RLVa:KB] - Checked: RLVa-2.1.0
 std::string utf8str_substr(std::string_view utf8str, const S32 index, const S32 max_len)
 {
-    if (0 == max_len) return std::string();
+    if (max_len <= 0 || index < 0) return std::string();
+    // An index past the end makes the subtraction below wrap to an enormous
+    // size_t, so the fits-entirely test fails and the pointer arithmetic that
+    // follows walks off the buffer -- before the substr that would have thrown.
+    if ((size_t)index >= utf8str.length()) return std::string();
     if (utf8str.length() - index <= (size_t)max_len)
     {
         return std::string(utf8str.substr(index, max_len));
@@ -563,6 +571,19 @@ void utf8str_split(std::list<std::string>& split_list, std::string_view utf8str,
         else
         {
             strTemp = utf8str.substr(lenIt, std::string::npos);
+        }
+
+        // A budget smaller than the character sitting at lenIt leaves nothing
+        // to cut, and an empty piece advances nothing -- the loop would push
+        // empty strings until it ran out of memory. Take one whole character
+        // instead: it overshoots the budget by less than a character, and it
+        // finishes.
+        if (strTemp.empty())
+        {
+            const size_t next = utf8str_decode_at(utf8str, lenIt).next;
+            if (next <= lenIt)
+                break;
+            strTemp = std::string(utf8str.substr(lenIt, next - lenIt));
         }
 
         split_list.push_back(strTemp);
@@ -1128,10 +1149,61 @@ public:
         return slot;
     }
 
+    // Hands out the shared iterator for `type`, unless one is already checked
+    // out on this thread -- then the caller gets one of its own to close. Two
+    // live queries of the same kind would otherwise be holding one iterator,
+    // and setting the text on the second silently re-points the first at a
+    // different string, which reads as a wrong answer rather than a crash.
+    // Nothing nests today; the cost of saying so here is a bool.
+    UBreakIterator* acquire(UBreakIteratorType type, bool& owned)
+    {
+        const size_t slot = (size_t)type;
+        if (slot >= mInUse.size())
+        {
+            owned = false;
+            return nullptr;
+        }
+        if (mInUse[slot])
+        {
+            UErrorCode status = U_ZERO_ERROR;
+            UBreakIterator* iter = ubrk_open(type, "", nullptr, 0, &status);
+            if (U_FAILURE(status))
+            {
+                return nullptr;
+            }
+            owned = true;
+            return iter;
+        }
+        UBreakIterator* iter = get(type);
+        if (iter)
+        {
+            mInUse[slot] = true;
+            owned = false;
+        }
+        return iter;
+    }
+
+    void release(UBreakIteratorType type)
+    {
+        const size_t slot = (size_t)type;
+        if (slot < mInUse.size())
+        {
+            mInUse[slot] = false;
+        }
+    }
+
 private:
     // UBRK_CHARACTER, UBRK_WORD, UBRK_LINE, UBRK_SENTENCE.
     std::array<UBreakIterator*, 4> mIters {};
+    std::array<bool, 4>            mInUse {};
 };
+
+// The per-thread holder, reached by both Utf8Breaks and its destructor.
+inline BreakIterators& break_iterators()
+{
+    thread_local BreakIterators iters;
+    return iters;
+}
 
 // An ICU break iterator pointed at a span of UTF-8. ICU reads those bytes where
 // they lie -- no conversion, no index map, and the offsets it takes and reports
@@ -1145,10 +1217,11 @@ public:
         if (utf8str.empty())
             return;
 
-        thread_local BreakIterators iters;
-        UBreakIterator* iter = iters.get(type);
+        UBreakIterator* iter = break_iterators().acquire(type, mOwned);
         if (!iter)
             return;
+        mHeld = iter;
+        mType = type;
 
         UErrorCode status = U_ZERO_ERROR;
         utext_openUTF8(&mText, utf8str.data(), (int64_t)utf8str.size(), &status);
@@ -1156,6 +1229,9 @@ public:
             return;
         mOpen = true;
 
+        // A fresh status: the open above reports success through warnings as
+        // well, and ICU does nothing at all when handed a code already set.
+        status = U_ZERO_ERROR;
         ubrk_setUText(iter, &mText, &status);
         if (U_SUCCESS(status))
         {
@@ -1165,6 +1241,17 @@ public:
 
     ~Utf8Breaks()
     {
+        if (mHeld)
+        {
+            if (mOwned)
+            {
+                ubrk_close(mHeld);
+            }
+            else
+            {
+                break_iterators().release(mType);
+            }
+        }
         if (mOpen)
         {
             utext_close(&mText);
@@ -1183,7 +1270,13 @@ public:
 private:
     UText mText = UTEXT_INITIALIZER;
     bool mOpen = false;
+    // What get() hands out, and so only set once the text is attached. mHeld is
+    // the same iterator from the moment it is checked out, since the release
+    // owes the holder an answer whether the attach worked or not.
     UBreakIterator* mIter = nullptr;
+    UBreakIterator* mHeld = nullptr;
+    UBreakIteratorType mType = UBRK_CHARACTER;
+    bool mOwned = false;
 };
 
 } // anonymous namespace
