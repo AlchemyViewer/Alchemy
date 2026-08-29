@@ -73,12 +73,14 @@ public:
 
     virtual bool                showAllResults() const = 0;
 
-    // Where a filter's match falls within an item's label, in codepoints of
-    // that label. Both halves depend on the item and on each other -- a filter
-    // searches a cased copy of the name, and casing UTF-8 changes neither byte
-    // length nor codepoint count predictably -- so they are answered together
-    // rather than as two queries that would repeat the same search and the same
-    // walk of the label.
+    // Where a filter's match falls within an item's label, as BYTE offsets into
+    // that label -- the same offsets LLFolderViewItem hands to the font's
+    // getWidthBytes / renderBytes. A filter searches a cased copy of the name
+    // and casing UTF-8 is not length-preserving, so an offset found in that copy
+    // has to come back through utf8str_bytes_from_cased_bytes before it can be
+    // reported here. Both halves depend on the item and on each other, so they
+    // are answered together rather than as two queries that would repeat the
+    // same search and the same walk of the label.
     struct Match
     {
         std::string::size_type mOffset = std::string::npos;

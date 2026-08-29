@@ -276,21 +276,20 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         return 0;
     }
 
+    // Only the window is encoded -- see getWidthF32's. The window IS the budget
+    // once it starts at begin_offset and ends at max_chars, so what reaches
+    // renderBytes is the whole of it, and what comes back counts from its start.
     static thread_local ALUtf8View view;
-    view.assign(wstr);
-    const size_t begin_bytes = view.toBytes((size_t)begin_offset);
-    S32 max_bytes = max_chars;
-    if (max_chars >= 0)
-    {
-        const S32 text_len = (S32)wstr.length();
-        const S32 end_cp   = llmin(text_len, begin_offset
-                                             + llmin(S32_MAX - begin_offset, max_chars));
-        max_bytes = (S32)(view.toBytes((size_t)end_cp) - begin_bytes);
-    }
-    const S32 drawn = renderBytes(view.text(), (S32)begin_bytes, x, y, color,
-                                  halign, valign, style, shadow, max_bytes, max_pixels,
+    const S32 text_len = (S32)wstr.length();
+    const S32 end_cp   = (max_chars < 0)
+                       ? text_len
+                       : llmin(text_len, begin_offset + llmin(S32_MAX - begin_offset, max_chars));
+    view.assign(LLWStringView(wstr).substr((size_t)begin_offset,
+                                           (size_t)(end_cp - begin_offset)));
+    const S32 drawn = renderBytes(view.text(), 0, x, y, color,
+                                  halign, valign, style, shadow, S32_MAX, max_pixels,
                                   right_x, use_ellipses, use_color, on_pass_boundary);
-    return (S32)view.toCodepoints(begin_bytes + (size_t)drawn) - begin_offset;
+    return (S32)view.toCodepoints((size_t)drawn);
 }
 
 S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
@@ -1178,20 +1177,19 @@ F32 LLFontGL::getWidthF32(LLWStringView wchars, S32 begin_offset, S32 max_chars,
     // codepoint window into one and hands it over. Stage B deletes the overload
     // along with the last LLWString caller.
     //
-    // The view is reused rather than built per call — measurement runs often
-    // enough that two allocations each would show. Each adapter keeps its own,
-    // so the one case where two are live at once (render holding its slice
-    // while it measures for alignment) still gets two distinct views; none of
-    // them re-enters itself.
+    // ONLY THE WINDOW IS ENCODED. Callers routinely pass a view running to the
+    // end of a document and ask about one line of it — LLTextBase does exactly
+    // that on every reflow — so encoding the whole view would make a reflow
+    // quadratic in the document. The view is also reused rather than built per
+    // call. Each adapter keeps its own, so the one case where two are live at
+    // once (render holding its slice while it measures for alignment) still
+    // gets two distinct views; none of them re-enters itself.
     static thread_local ALUtf8View view;
-    view.assign(wchars);
     const S32 text_len  = (S32)wchars.length();
     const S32 begin     = llclamp(begin_offset, 0, text_len);
     const S32 max_index = llmin(text_len, begin + llmin(S32_MAX - begin, max_chars));
-    const size_t begin_bytes = view.toBytes((size_t)begin);
-    const size_t end_bytes   = view.toBytes((size_t)max_index);
-    return getWidthF32Bytes(view.text(), (S32)begin_bytes,
-                            (S32)(end_bytes - begin_bytes), no_padding);
+    view.assign(wchars.substr((size_t)begin, (size_t)(max_index - begin)));
+    return getWidthF32Bytes(view.text(), 0, S32_MAX, no_padding);
 }
 
 F32 LLFontGL::getWidthF32Bytes(std::string_view utf8text, S32 begin_offset, S32 max_bytes, bool no_padding) const
@@ -1346,11 +1344,13 @@ S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_cha
     {
         return 0;
     }
+    // Only the window is encoded -- see getWidthF32's. This is the reflow path,
+    // where the view runs to the end of the document and max_chars is about a
+    // line, so the difference is the whole cost of laying a document out.
     static thread_local ALUtf8View view;
-    view.assign(wchars);
-    const S32 max_bytes = (S32)view.toBytes((size_t)max_chars);
-    const S32 drawable  = maxDrawableBytes(view.text(), max_pixels, max_bytes,
-                                           end_on_word_boundary);
+    view.assign(wchars.substr(0, llmin((size_t)max_chars, wchars.size())));
+    const S32 drawable = maxDrawableBytes(view.text(), max_pixels, S32_MAX,
+                                          end_on_word_boundary);
     return (S32)view.toCodepoints((size_t)drawable);
 }
 
@@ -1558,9 +1558,15 @@ S32 LLFontGL::firstDrawableChar(LLWStringView wchars, F32 max_pixels, S32 start_
     {
         return 0;
     }
+    const S32 last_cp = llmin(start_pos, (S32)wchars.length() - 1);
+    if (last_cp < 0)
+    {
+        return 0;
+    }
+    // The walk runs backward from start_pos, so nothing past it is reachable
+    // and nothing past it is encoded.
     static thread_local ALUtf8View view;
-    view.assign(wchars);
-    const S32 last_cp  = llmin(start_pos, (S32)wchars.length() - 1);
+    view.assign(wchars.substr(0, (size_t)last_cp + 1));
     const S32 first_cp = (max_chars >= last_cp + 1) ? 0 : (last_cp + 1 - max_chars);
     const size_t end_bytes   = view.toBytes((size_t)(last_cp + 1));
     const size_t start_bytes = view.toBytes((size_t)last_cp);
@@ -1737,16 +1743,17 @@ S32 LLFontGL::charFromPixelOffset(LLWStringView wchars, S32 begin_offset, F32 ta
     {
         return 0;
     }
+    // Only the window is encoded -- see getWidthF32's. Both the budget and the
+    // answer are relative to begin_offset, so the window starting there means
+    // the answer needs no rebasing either.
     static thread_local ALUtf8View view;
-    view.assign(wchars);
     const S32 text_len = (S32)wchars.length();
     const S32 begin    = llclamp(begin_offset, 0, text_len);
     const S32 end_cp   = llmin(text_len, begin + llmin(S32_MAX - begin, max_chars));
-    const size_t begin_bytes = view.toBytes((size_t)begin);
-    const size_t budget      = view.toBytes((size_t)end_cp) - begin_bytes;
-    const S32 offset = byteFromPixelOffset(view.text(), (S32)begin_bytes, target_x,
-                                           max_pixels, (S32)budget, round);
-    return (S32)view.toCodepoints(begin_bytes + (size_t)offset) - begin;
+    view.assign(wchars.substr((size_t)begin, (size_t)(end_cp - begin)));
+    const S32 offset = byteFromPixelOffset(view.text(), 0, target_x,
+                                           max_pixels, S32_MAX, round);
+    return (S32)view.toCodepoints((size_t)offset);
 }
 
 S32 LLFontGL::byteFromPixelOffset(std::string_view utf8text, S32 begin_offset, F32 target_x, F32 max_pixels, S32 max_bytes, bool round) const

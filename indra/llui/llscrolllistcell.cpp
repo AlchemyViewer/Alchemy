@@ -445,7 +445,12 @@ void LLScrollListText::draw(const LLColor4& color, const LLColor4& highlight_col
         switch(mFontAlignment)
         {
         case LLFontGL::LEFT:
-            left = mFont->getWidthBytes(mText.getString(), 1, mHighlightOffset);
+            // Start one character in, as this has always done -- not one byte
+            // in, which would land inside the first character whenever it is
+            // multi-byte and measure a replacement glyph instead of it.
+            left = mFont->getWidthBytes(mText.getString(),
+                                        (S32)utf8str_decode_at(mText.getString(), 0).next,
+                                        mHighlightOffset);
             break;
         case LLFontGL::RIGHT:
             left = getWidth() - mFont->getWidthBytes(mText.getString(), mHighlightOffset, S32_MAX);
