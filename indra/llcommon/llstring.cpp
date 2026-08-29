@@ -1116,6 +1116,24 @@ namespace
 // Breaking runs in the root locale rather than the user's: where the cursor
 // lands is a property of the text, and two people reading the same string
 // should see it land in the same place.
+const char* break_iterator_kind(UBreakIteratorType type)
+{
+    switch (type)
+    {
+    case UBRK_CHARACTER: return "character";
+    case UBRK_WORD:      return "word";
+    case UBRK_LINE:      return "line";
+    case UBRK_SENTENCE:  return "sentence";
+    default:             return "unknown";
+    }
+}
+
+// Segmentation failing is not a condition that comes and goes -- ICU either has
+// the data or it does not -- so it is said once and the callers get on with the
+// crude walk they fall back to. Saying it at all is the point: without it the
+// only symptom is a caret that moves a byte at a time, which reads as a
+// rendering bug rather than as missing data. The data filter that trims icudt
+// before shipping is exactly how this would start happening.
 class BreakIterators
 {
 public:
@@ -1144,6 +1162,10 @@ public:
             if (U_FAILURE(status))
             {
                 slot = nullptr;
+                LL_WARNS_ONCE("Unicode") << "ICU has no " << break_iterator_kind(type)
+                    << " break iterator (" << u_errorName(status)
+                    << "); cursor movement, word selection and wrapping fall back"
+                       " to a crude walk" << LL_ENDL;
             }
         }
         return slot;
@@ -1169,6 +1191,9 @@ public:
             UBreakIterator* iter = ubrk_open(type, "", nullptr, 0, &status);
             if (U_FAILURE(status))
             {
+                LL_WARNS_ONCE("Unicode") << "ICU could not open a nested "
+                    << break_iterator_kind(type) << " break iterator ("
+                    << u_errorName(status) << ")" << LL_ENDL;
                 return nullptr;
             }
             owned = true;
@@ -1226,7 +1251,12 @@ public:
         UErrorCode status = U_ZERO_ERROR;
         utext_openUTF8(&mText, utf8str.data(), (int64_t)utf8str.size(), &status);
         if (U_FAILURE(status))
+        {
+            LL_WARNS_ONCE("Unicode") << "ICU could not read a " << utf8str.size()
+                << "-byte span as UTF-8 (" << u_errorName(status)
+                << "); segmentation of it falls back to a crude walk" << LL_ENDL;
             return;
+        }
         mOpen = true;
 
         // A fresh status: the open above reports success through warnings as
@@ -1236,6 +1266,13 @@ public:
         if (U_SUCCESS(status))
         {
             mIter = iter;
+        }
+        else
+        {
+            LL_WARNS_ONCE("Unicode") << "ICU could not point its "
+                << break_iterator_kind(type) << " break iterator at a span ("
+                << u_errorName(status) << "); segmentation of it falls back to"
+                   " a crude walk" << LL_ENDL;
         }
     }
 
