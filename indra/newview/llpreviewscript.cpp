@@ -387,14 +387,6 @@ void LLScriptMovedObserver::changed(U32 mask)
 /// LLScriptEdCore
 /// ---------------------------------------------------------------------------
 
-struct LLSECKeywordCompare
-{
-    bool operator()(const std::string& lhs, const std::string& rhs)
-    {
-        return (LLStringUtil::compareDictInsensitive( lhs, rhs ) < 0 );
-    }
-};
-
 LLScriptEdCore::LLScriptEdCore(
     LLScriptEdContainer* container,
     const std::string& sample,
