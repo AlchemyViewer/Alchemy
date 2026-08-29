@@ -1452,10 +1452,17 @@ S32 LLFontGL::maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 ma
             break;
         }
     }
-    // A budget that stops mid-character lets the walk step past it, since the
-    // walk only ever lands on character starts. Callers get their budget back,
-    // never more than they asked for.
-    return llmin(i, max_bytes);
+    // The walk only ever lands on character starts, so it can step past a
+    // budget that stops inside one. Clamping to the budget would then hand back
+    // an offset in the middle of a character, and the callers cut strings at
+    // what they are given -- a segment whose own end falls mid-character is
+    // enough to get here. Come back to the character that budget started in
+    // instead: never more than was asked for, and never somewhere that splits.
+    if (i <= max_bytes)
+    {
+        return i;
+    }
+    return (S32)utf8str_grapheme_align_backward(utf8text, (size_t)max_bytes);
 }
 
 S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 start_pos, S32 max_bytes) const
@@ -1634,19 +1641,12 @@ S32 LLFontGL::byteFromPixelOffset(std::string_view utf8text, S32 begin_offset, F
 
     // max_bytes is S32_MAX by default, so make sure we don't get overflow
     const S32 budget_end = llmin(text_len, begin_offset + llmin(S32_MAX - begin_offset, max_bytes));
-    // The walk stops at the start of the budget's last character rather than at
-    // its end, so a click past everything still returns the whole budget and
-    // the caret can land after that character instead of on it.
-    S32 max_index = budget_end;
-    if (max_index > begin_offset)
-    {
-        --max_index;
-        while (max_index > begin_offset
-               && ((unsigned char)utf8text[max_index] & 0xC0) == 0x80)
-        {
-            --max_index;
-        }
-    }
+    // Every character inside the budget is hit-tested, the last one included.
+    // Running the walk out means the click was past all of them, and the answer
+    // is then the budget's own end, so the caret lands after the final character
+    // rather than on it. Stopping a character short would also shape a slice
+    // narrower than the one render() draws, and measure a cluster it split.
+    const S32 max_index = budget_end;
 
     F32 scaled_max_pixels = max_pixels * sScaleX;
 
