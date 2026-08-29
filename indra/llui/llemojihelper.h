@@ -41,16 +41,17 @@ class LLEmojiHelper : public LLSingleton<LLEmojiHelper>
 
 public:
     // General
-    std::string getToolTip(const LLWString& emoji) const;
+    std::string getToolTip(std::string_view emoji) const;
     bool        isActive(const LLUICtrl* ctrl_p) const;
-    static bool isCursorInEmojiCode(const LLWString& wtext, S32 cursor_pos, S32* short_code_pos_p = nullptr);
-    void        showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, const std::string& short_code, std::function<void(const LLWString&)> commit_cb);
+    // `text` is UTF-8 and every offset here is a byte offset into it.
+    static bool isCursorInEmojiCode(std::string_view text, S32 cursor_pos, S32* short_code_pos_p = nullptr);
+    void        showHelper(LLUICtrl* hostctrl_p, S32 local_x, S32 local_y, const std::string& short_code, std::function<void(const std::string&)> commit_cb);
     void        hideHelper(const LLUICtrl* ctrl_p = nullptr, bool strict = false);
     void        setIsHideDisabled(bool disabled) { mIsHideDisabled = disabled; };
 
     // Eventing
     bool handleKey(const LLUICtrl* ctrl_p, KEY key, MASK mask);
-    void onCommitEmoji(const LLWString& emoji);
+    void onCommitEmoji(const std::string& emoji);
     void onCloseHelper(LLUICtrl* ctrl, const LLSD& param);
 
     typedef boost::signals2::signal<void(LLUICtrl* ctrl, const LLSD& param)> commit_signal_t;
@@ -66,6 +67,6 @@ private:
     LLHandle<LLUICtrl>  mHostHandle;
     LLHandle<LLFloater> mHelperHandle;
     boost::signals2::connection mHostCtrlFocusLostConn;
-    std::function<void(const LLWString&)> mEmojiCommitCb;
+    std::function<void(const std::string&)> mEmojiCommitCb;
     bool mIsHideDisabled = false;
 };

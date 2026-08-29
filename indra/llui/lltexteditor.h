@@ -92,8 +92,8 @@ public:
 
     static S32      spacesPerTab();
 
-    void    insertEmoji(const LLWString& emoji);
-    void    handleEmojiCommit(const LLWString& emoji);
+    void    insertEmoji(const std::string& emoji);
+    void    handleEmojiCommit(const std::string& emoji);
 
     void handleMentionCommit(std::string name_url);
 
@@ -169,7 +169,7 @@ public:
     bool            allowsEmbeddedItems() const { return mAllowEmbeddedItems; }
 
     // Autoreplace (formerly part of LLLineEditor)
-    typedef std::function<void(S32&, S32&, LLWString&, S32&, const LLWString&)> autoreplace_callback_t;
+    typedef std::function<void(S32&, S32&, std::string&, S32&, const std::string&)> autoreplace_callback_t;
     autoreplace_callback_t mAutoreplaceCallback;
     void            setAutoreplaceCallback(autoreplace_callback_t cb) { mAutoreplaceCallback = cb; }
 
@@ -181,7 +181,7 @@ public:
 
     // inserts text at cursor
     void            insertText(const std::string &text);
-    void            insertText(LLWString &text);
+    void            insertText(std::string &text);
 
     void            appendWidget(const LLInlineViewSegment::Params& params, const std::string& text, bool allow_undo);
     // Non-undoable
@@ -231,7 +231,7 @@ public:
 // [/RLVa:KB]
     void            setPassDelete(bool b) { mPassDelete = b; }
 
-    LLWString       getConvertedText() const;
+    std::string     getConvertedText() const;
 
 protected:
     void            drawPreeditMarker();
@@ -270,7 +270,7 @@ protected:
     S32             overwriteChar(S32 pos, llwchar wc);
     void            removeChar();
     S32             removeChar(S32 pos);
-    S32             insert(S32 pos, const LLWString &wstr, bool group_with_next_op, LLTextSegmentPtr segment);
+    S32             insert(S32 pos, std::string_view utf8str, bool group_with_next_op, LLTextSegmentPtr segment);
     S32             remove(S32 pos, S32 length, bool group_with_next_op);
 
     void            tryToShowEmojiHelper();
@@ -285,10 +285,17 @@ protected:
                         const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position);
     virtual void    markAsPreedit(S32 position, S32 length);
     virtual void    getPreeditRange(S32 *position, S32 *length) const;
+    // Reported in characters, as LLPreeditor requires.
+    // getSelectionRangeBytes() gives the same span in the unit everything else
+    // here counts in.
     virtual void    getSelectionRange(S32 *position, S32 *length) const;
+    void            getSelectionRangeBytes(S32 *position, S32 *length) const;
     virtual bool    getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect *bounds, LLRect *control) const;
     virtual S32     getPreeditFontSize() const;
-    virtual LLWString getPreeditString() const { return getWText(); }
+    // LLPreeditor counts in UTF-32 characters throughout, by its own
+    // documented contract, so the preedit boundary converts. Stage B4 moves
+    // that interface to bytes and these conversions go with it.
+    virtual LLWString getPreeditString() const { return utf8str_to_wstring(getText()); }
 
     virtual bool    useFontBuffers() const { return getReadOnly(); }
     //
@@ -302,8 +309,8 @@ protected:
     S32             mMouseDownX;
     S32             mMouseDownY;
 
-    LLWString           mPreeditWString;
-    LLWString           mPreeditOverwrittenWString;
+    std::string         mPreeditString;
+    std::string         mPreeditOverwrittenString;
     std::vector<S32>    mPreeditPositions;
     LLPreeditor::standouts_t mPreeditStandouts;
 
@@ -323,8 +330,8 @@ private:
     // Methods
     //
     void            pasteHelper(bool is_primary);
-    void            cleanStringForPaste(LLWString& clean_string);
-    void            pasteTextWithLinebreaks(LLWString & clean_string);
+    void            cleanStringForPaste(std::string& clean_string);
+    void            pasteTextWithLinebreaks(std::string& clean_string);
 
     void            onKeyStroke();
 

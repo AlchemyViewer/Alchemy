@@ -953,8 +953,8 @@ public:
         if (mUserNameFont)
         {
             LLTextBox* user_name = getChild<LLTextBox>("user_name");
-            const LLWString& text = user_name->getWText();
-            mMinUserNameWidth = mUserNameFont->getWidth(text) + PADDING;
+            const std::string& text = user_name->getText();
+            mMinUserNameWidth = mUserNameFont->getWidthBytes(text, 0, S32_MAX) + PADDING;
         }
     }
 
@@ -1657,7 +1657,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                 return;
             }
 
-            p.top_pad = mEditor->getLength() ? mTopHeaderPad : 0;
+            p.top_pad = mEditor->getLengthBytes() ? mTopHeaderPad : 0;
             p.bottom_pad = teleport_separator ? mBottomSeparatorPad : mBottomHeaderPad;
         }
         p.view = view;

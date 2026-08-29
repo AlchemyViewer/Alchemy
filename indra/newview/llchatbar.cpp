@@ -306,7 +306,7 @@ void LLChatBar::setGestureCombo(LLComboBox* combo)
 
 // If input of the form "/20foo" or "/20 foo", returns "foo" and channel 20.
 // Otherwise returns input and channel 0.
-LLWString LLChatBar::stripChannelNumber(const LLWString &mesg, S32* channel)
+std::string LLChatBar::stripChannelNumber(const std::string &mesg, S32* channel)
 {
     if (mesg[0] == '/'
         && mesg[1] == '/')
@@ -323,9 +323,11 @@ LLWString LLChatBar::stripChannelNumber(const LLWString &mesg, S32* channel)
         // This a special "/20" speak on a channel
         S32 pos = 0;
 
-        // Copy the channel number into a string
-        LLWString channel_string;
-        llwchar c;
+        // Copy the channel number into a string. The slash, the digits, the
+        // minus and whitespace are all ASCII, so a byte walk reads exactly what
+        // a codepoint walk read and stops in the same place.
+        std::string channel_string;
+        char c;
         do
         {
             c = mesg[pos+1];
@@ -337,13 +339,13 @@ LLWString LLChatBar::stripChannelNumber(const LLWString &mesg, S32* channel)
         // Move the pointer forward to the first non-whitespace char
         // Check isspace before looping, so we can handle "/33foo"
         // as well as "/33 foo"
-        while(c && iswspace(c))
+        while(c && LLStringOps::isSpace(c))
         {
             c = mesg[pos+1];
             pos++;
         }
 
-        mLastSpecialChatChannel = strtol(wstring_to_utf8str(channel_string).c_str(), NULL, 10);
+        mLastSpecialChatChannel = strtol(channel_string.c_str(), NULL, 10);
         *channel = mLastSpecialChatChannel;
         return mesg.substr(pos, mesg.length() - pos);
     }
@@ -360,7 +362,7 @@ void LLChatBar::sendChat( EChatType type )
 {
     if (mInputEditor)
     {
-        LLWString text = mInputEditor->getConvertedText();
+        std::string text = mInputEditor->getConvertedText();
         if (!text.empty())
         {
             // store sent line in history, duplicates will get filtered
@@ -369,7 +371,7 @@ void LLChatBar::sendChat( EChatType type )
             S32 channel = 0;
             stripChannelNumber(text, &channel);
 
-            std::string utf8text = wstring_to_utf8str(text);
+            const std::string& utf8text = text;
             // Try to trigger a gesture, if not chat to a script.
             std::string utf8_revised_text;
             if (0 == channel)
@@ -566,26 +568,19 @@ void LLChatBar::onClickSay( LLUICtrl* ctrl )
 
 void LLChatBar::sendChatFromViewer(const std::string &utf8text, EChatType type, bool animate)
 {
-    sendChatFromViewer(utf8str_to_wstring(utf8text), type, animate);
-}
-
-void LLChatBar::sendChatFromViewer(const LLWString &wtext, EChatType type, bool animate)
-{
     // as soon as we say something, we no longer care about teaching the user
     // how to chat
     gWarningSettings.setBOOL("FirstOtherChatBeforeUser", false);
 
     // Look for "/20 foo" channel chats.
     S32 channel = 0;
-    LLWString out_text = stripChannelNumber(wtext, &channel);
-    std::string utf8_out_text = wstring_to_utf8str(out_text);
+    std::string utf8_out_text = stripChannelNumber(utf8text, &channel);
     if (!utf8_out_text.empty())
     {
         utf8_out_text = utf8str_truncate(utf8_out_text, MAX_MSG_STR_LEN);
     }
 
-    std::string utf8_text = wstring_to_utf8str(wtext);
-    utf8_text = utf8str_trim(utf8_text);
+    std::string utf8_text = utf8str_trim(utf8text);
     if (!utf8_text.empty())
     {
         utf8_text = utf8str_truncate(utf8_text, MAX_STRING - 1);

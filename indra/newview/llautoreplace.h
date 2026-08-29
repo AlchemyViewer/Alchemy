@@ -194,7 +194,7 @@ class LLAutoReplace : public LLSingleton<LLAutoReplace>
     LLSINGLETON(LLAutoReplace);
 public:
     /// Callback that provides the hook for use in text entry methods
-    void autoreplaceCallback(S32& replacement_start, S32& replacement_length, LLWString& replacement_string, S32& cursor_pos, const LLWString& input_text);
+    void autoreplaceCallback(S32& replacement_start, S32& replacement_length, std::string& replacement_string, S32& cursor_pos, const std::string& input_text);
 
     /// Get a copy of the current settings
     LLAutoReplaceSettings getSettings();

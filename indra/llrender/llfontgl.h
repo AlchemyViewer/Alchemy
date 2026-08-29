@@ -141,6 +141,26 @@ public:
     // returned all index the UTF-8. The LLWString overloads above convert and
     // call this.
     S32 renderBytes(std::string_view utf8text, S32 begin_offset,
+                const LLRect& rect,
+                const LLColor4 &color,
+                HAlign halign = LEFT,  VAlign valign = BASELINE,
+                U8 style = NORMAL, ShadowType shadow = NO_SHADOW,
+                S32 max_bytes = S32_MAX,
+                F32* right_x=NULL,
+                bool use_ellipses = false,
+                bool use_color = true) const;
+
+    S32 renderBytes(std::string_view utf8text, S32 begin_offset,
+                const LLRectf& rect,
+                const LLColor4 &color,
+                HAlign halign = LEFT,  VAlign valign = BASELINE,
+                U8 style = NORMAL, ShadowType shadow = NO_SHADOW,
+                S32 max_bytes = S32_MAX,
+                F32* right_x=NULL,
+                bool use_ellipses = false,
+                bool use_color = true) const;
+
+    S32 renderBytes(std::string_view utf8text, S32 begin_offset,
                 F32 x, F32 y,
                 const LLColor4 &color,
                 HAlign halign = LEFT,  VAlign valign = BASELINE,

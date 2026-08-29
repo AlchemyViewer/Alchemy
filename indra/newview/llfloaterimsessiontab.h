@@ -170,7 +170,7 @@ public:
     static void applyMUPose(std::string& text);
     static void applyOOCClose(std::string& text);
 
-    void updateUsedEmojis(LLWStringView text);
+    void updateUsedEmojis(std::string_view text);
 
 protected:
     S32  mFloaterExtraWidth;

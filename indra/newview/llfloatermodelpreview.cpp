@@ -1646,7 +1646,7 @@ void LLFloaterModelPreview::addStringToLogTab(const std::string& str, bool flash
     }
 
     // Make sure we have space for new string
-    S32 editor_text_len = mUploadLogText->getLength();
+    S32 editor_text_len = mUploadLogText->getLengthBytes();
     if (editor_max_len < (editor_text_len + add_text_len)
         && mUploadLogText->getLineCount() <= 0)
     {

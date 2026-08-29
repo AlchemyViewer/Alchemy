@@ -90,7 +90,7 @@ LLChatMsgBox::LLChatMsgBox(const Params& p) :
 
 void LLChatMsgBox::addText( const LLStringExplicit& text , const LLStyle::Params& input_params )
 {
-    S32 length = getLength();
+    S32 length = getLengthBytes();
     // if there is existing text, add a separator
     if (length > 0)
     {

@@ -571,11 +571,11 @@ void LLScriptEdCore::processKeywords(bool luau_language)
         token = token_it->second;
         if (token->getType() == LLKeywordToken::TT_FUNCTION)
         {
-            primary_keywords.push_back( wstring_to_utf8str(token->getToken()) );
+            primary_keywords.push_back( token->getToken() );
         }
         else
         {
-            secondary_keywords.push_back( wstring_to_utf8str(token->getToken()) );
+            secondary_keywords.push_back( token->getToken() );
         }
     }
 
@@ -862,10 +862,9 @@ void LLScriptEdCore::updateDynamicHelp(bool immediate)
         }
         if (immediate || (mLiveHelpTimer.getStarted() && mLiveHelpTimer.getElapsedTimeF32() > LIVE_HELP_REFRESH_TIME))
         {
-            // Use Wtext since segment's start/end are made for wstring and will
-            // result in a shift for case of multi-byte symbols inside std::string.
-            LLWString segment_text = mEditor->getWText().substr(segment->getStart(), segment->getEnd() - segment->getStart());
-            std::string help_string = wstring_to_utf8str(segment_text);
+            // The segment's start/end index the document, which is the same
+            // UTF-8 this substring comes out of.
+            std::string help_string = mEditor->getText().substr(segment->getStart(), segment->getEnd() - segment->getStart());
             setHelpPage(help_string);
             mLiveHelpTimer.stop();
         }
@@ -1039,7 +1038,7 @@ void LLScriptEdCore::onBtnDynamicHelp()
              ++token_it)
         {
             token = token_it->second;
-            help_combo->add(wstring_to_utf8str(token->getToken()));
+            help_combo->add(token->getToken());
         }
         help_combo->sortByName();
 
@@ -1405,7 +1404,7 @@ void LLScriptEdCore::loadScriptFromFile(const std::vector<std::string>& filename
     if (self && (text.length() > 0))
     {
         self->mEditor->selectAll();
-        LLWString script(utf8str_to_wstring(text));
+        std::string script(text);
         self->mEditor->insertText(script);
     }
 }

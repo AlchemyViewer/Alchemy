@@ -32,7 +32,7 @@
 
 const char* LLAutoReplace::SETTINGS_FILE_NAME = "autoreplace.xml";
 
-void LLAutoReplace::autoreplaceCallback(S32& replacement_start, S32& replacement_length, LLWString& replacement_string, S32& cursor_pos, const LLWString& input_text)
+void LLAutoReplace::autoreplaceCallback(S32& replacement_start, S32& replacement_length, std::string& replacement_string, S32& cursor_pos, const std::string& input_text)
 {
     // make sure these returned values are cleared in case there is no replacement
     replacement_start = 0;
@@ -45,32 +45,34 @@ void LLAutoReplace::autoreplaceCallback(S32& replacement_start, S32& replacement
         S32 word_end = cursor_pos - 1;
 
         // Replacement only fires once the word is finished, which is what the
-        // just-typed space signals; the word itself is the one before it.
+        // just-typed space signals; the word itself is the one before it. The
+        // space is one byte, so it sits exactly one before the cursor, but what
+        // precedes it need not be -- hence the step back by a character rather
+        // than by a byte.
         const bool at_space = word_end >= 0 && (size_t)word_end < input_text.size()
                               && input_text[word_end] == ' ';
         if (at_space && word_end > 0)
         {
-            word_end--;
+            word_end = (S32)utf8str_grapheme_align_backward(input_text, (size_t)(word_end - 1));
         }
 
         // Unicode bounds the word, so "don't" reaches the replacer whole rather
         // than as "t" -- the walk this replaced stopped at the apostrophe.
-        const auto word_range = wstring_word_range_at(input_text, (size_t)llmax(word_end, 0));
+        const auto word_range = utf8str_word_range_at(input_text, (size_t)llmax(word_end, 0));
         if (at_space && word_range.first != word_range.second)
         {
             const S32 word_start = (S32)word_range.first;
-            word_end = (S32)word_range.second - 1;
-            LL_DEBUGS("AutoReplace") << "word_start: " << word_start << " word_end: " << word_end << LL_ENDL;
-            LLWString old_string = input_text.substr(word_start, word_end - word_start + 1);
-            std::string last_word = wstring_to_utf8str(old_string);
+            const S32 word_stop  = (S32)word_range.second;   // one past the word
+            LL_DEBUGS("AutoReplace") << "word_start: " << word_start << " word_end: " << (word_stop - 1) << LL_ENDL;
+            std::string last_word = input_text.substr(word_start, word_stop - word_start);
             std::string replacement_word(mSettings.replaceWord(last_word));
 
             if (replacement_word != last_word)
             {
                 replacement_start = word_start;
-                replacement_length = word_end - word_start + 1;
-                replacement_string = utf8str_to_wstring(replacement_word);
-                S32 size_change = static_cast<S32>(replacement_string.size() - old_string.size());
+                replacement_length = word_stop - word_start;
+                replacement_string = replacement_word;
+                S32 size_change = static_cast<S32>(replacement_string.size() - last_word.size());
                 cursor_pos += size_change;
             }
         }

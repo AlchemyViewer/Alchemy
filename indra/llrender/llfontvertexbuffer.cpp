@@ -599,23 +599,24 @@ void LLFontWidthBuffer::reset()
     mLastFontCacheGen = 0;
 }
 
-F32 LLFontWidthBuffer::getWidth(
+// The cache check is the same whichever unit the caller measures in; only the
+// call that fills it differs, so both entry points route through here.
+template <typename MEASURE>
+F32 LLFontWidthBuffer::cachedWidth(
     const LLFontGL* fontp,
-    LLWStringView wchars,
     S32 begin_offset,
-    S32 max_chars,
-    bool no_padding)
+    S32 max_units,
+    bool no_padding,
+    MEASURE&& measure)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    if (!fontp || wchars.empty())
-    {
-        return 0.f;
-    }
 
     if (!sEnableBufferCollection)
     {
-        return fontp->getWidthF32(wchars, begin_offset, max_chars, no_padding);
+        return measure();
     }
+
+    const S32 max_chars = max_units;
 
     // Check if we can use cached width
     bool needs_recalc = (mWidth < 0.f)
@@ -633,7 +634,7 @@ F32 LLFontWidthBuffer::getWidth(
     if (needs_recalc)
     {
         // Calculate width using the font
-        mWidth = fontp->getWidthF32(wchars, begin_offset, max_chars, no_padding);
+        mWidth = measure();
 
         // Cache the parameters
         mLastFont = fontp;
@@ -649,4 +650,34 @@ F32 LLFontWidthBuffer::getWidth(
     }
 
     return mWidth;
+}
+
+F32 LLFontWidthBuffer::getWidth(
+    const LLFontGL* fontp,
+    LLWStringView wchars,
+    S32 begin_offset,
+    S32 max_chars,
+    bool no_padding)
+{
+    if (!fontp || wchars.empty())
+    {
+        return 0.f;
+    }
+    return cachedWidth(fontp, begin_offset, max_chars, no_padding,
+                       [&] { return fontp->getWidthF32(wchars, begin_offset, max_chars, no_padding); });
+}
+
+F32 LLFontWidthBuffer::getWidthBytes(
+    const LLFontGL* fontp,
+    std::string_view utf8text,
+    S32 begin_offset,
+    S32 max_bytes,
+    bool no_padding)
+{
+    if (!fontp || utf8text.empty())
+    {
+        return 0.f;
+    }
+    return cachedWidth(fontp, begin_offset, max_bytes, no_padding,
+                       [&] { return fontp->getWidthF32Bytes(utf8text, begin_offset, max_bytes, no_padding); });
 }

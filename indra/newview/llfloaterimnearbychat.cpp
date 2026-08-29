@@ -619,11 +619,11 @@ void LLFloaterIMNearbyChat::onChatBoxKeystroke()
 
     LLFirstUse::otherAvatarChatFirst(false);
 
-    LLWString raw_text = mInputEditor->getWText();
+    std::string raw_text = mInputEditor->getText();
 
     // Can't trim the end, because that will cause autocompletion
     // to eat trailing spaces that might be part of a gesture.
-    LLWStringUtil::trimHead(raw_text);
+    LLStringUtil::trimHead(raw_text);
 
     auto length = raw_text.length();
 
@@ -662,7 +662,7 @@ void LLFloaterIMNearbyChat::onChatBoxKeystroke()
     {
         std::vector<LLGestureAutocompleteHelper::Row> rows;
         size_t total = 0;
-        const std::string utf8_trigger = wstring_to_utf8str(raw_text);
+        const std::string& utf8_trigger = raw_text;
 
         if (buildGestureAutocompleteRows(utf8_trigger, rows, total))
         {
@@ -688,7 +688,7 @@ void LLFloaterIMNearbyChat::onChatBoxKeystroke()
     {
         // we're starting a gesture, attempt to autocomplete
 
-        std::string utf8_trigger = wstring_to_utf8str(raw_text);
+        std::string utf8_trigger = raw_text;
         std::string utf8_out_str(utf8_trigger);
 
         if (LLGestureMgr::instance().matchPrefix(utf8_trigger, &utf8_out_str))
@@ -766,9 +766,11 @@ void LLFloaterIMNearbyChat::sendChat( EChatType type )
 {
     if (mInputEditor)
     {
-        LLWString text = mInputEditor->getConvertedText();
-        LLWStringUtil::trim(text);
-        LLWStringUtil::replaceChar(text,182,'\n'); // Convert paragraph symbols back into newlines.
+        std::string text = mInputEditor->getConvertedText();
+        LLStringUtil::trim(text);
+        // The paragraph character is two bytes, so this is a substitution
+        // rather than a character-for-character swap.
+        LLStringUtil::replaceString(text, "\xC2\xB6", "\n");
 
         LLGestureAutocompleteHelper::instance().hideHelper();
 
@@ -780,7 +782,7 @@ void LLFloaterIMNearbyChat::sendChat( EChatType type )
 
             updateUsedEmojis(text);
 
-            std::string utf8text = wstring_to_utf8str(text);
+            std::string utf8text = text;
 
             if (type == CHAT_TYPE_OOC)
             {
@@ -910,18 +912,10 @@ void LLFloaterIMNearbyChat::changeChannelLabel(S32 channel)
 
 void LLFloaterIMNearbyChat::sendChatFromViewer(const std::string &utf8text, EChatType type, bool animate)
 {
-    sendChatFromViewer(utf8str_to_wstring(utf8text), type, animate);
-}
-
-void LLFloaterIMNearbyChat::sendChatFromViewer(const LLWString &wtext, EChatType type, bool animate)
-{
     // Look for "/20 foo" channel chats.
     S32 channel = gSavedSettings.getS32("AlchemyNearbyChatChannel");
-    LLWString out_text = stripChannelNumber(wtext, &channel);
-    std::string utf8_out_text = wstring_to_utf8str(out_text);
-    std::string utf8_text = wstring_to_utf8str(wtext);
-
-    utf8_text = utf8str_trim(utf8_text);
+    std::string utf8_out_text = stripChannelNumber(utf8text, &channel);
+    std::string utf8_text = utf8str_trim(utf8text);
     if (!utf8_text.empty())
     {
         utf8_text = utf8str_truncate(utf8_text, MAX_STRING - 1);
@@ -1032,7 +1026,7 @@ void LLFloaterIMNearbyChat::stopChat()
 
 // If input of the form "/20foo" or "/20 foo", returns "foo" and channel 20.
 // Otherwise returns input and channel 0.
-LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* channel)
+std::string LLFloaterIMNearbyChat::stripChannelNumber(const std::string &mesg, S32* channel)
 {
     if (mesg[0] == '/'
         && mesg[1] == '/')
@@ -1050,8 +1044,8 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
         S32 pos = 0;
 
         // Copy the channel number into a string
-        LLWString channel_string;
-        llwchar c;
+        std::string channel_string;
+        char c;
         do
         {
             c = mesg[pos+1];
@@ -1069,7 +1063,7 @@ LLWString LLFloaterIMNearbyChat::stripChannelNumber(const LLWString &mesg, S32* 
             pos++;
         }
 
-        sLastSpecialChatChannel = strtol(wstring_to_utf8str(channel_string).c_str(), NULL, 10);
+        sLastSpecialChatChannel = strtol(channel_string.c_str(), NULL, 10);
         *channel = sLastSpecialChatChannel;
         return mesg.substr(pos, mesg.length() - pos);
     }

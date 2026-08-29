@@ -164,8 +164,11 @@ protected:
     virtual bool        useFontBuffers() const { return true; }
     F32                 drawClippedSegment(S32 seg_start, S32 seg_end, S32 selection_start, S32 selection_end, LLRectf rect);
 
-    virtual     const LLWString&    getWText()  const;
-    virtual     const S32           getLength() const;
+    // The document this segment draws from, and the span of it the segment
+    // covers. Both count BYTES, as every offset in this class does; the names
+    // carry the unit because an S32 cannot.
+    virtual     const std::string&  getTextUtf8()   const;
+    virtual     const S32           getLengthBytes() const;
 
     void setAllowEdit(bool can_edit) { mCanEdit = can_edit; }
 
@@ -187,7 +190,7 @@ protected:
 };
 
 // This text segment is the same as LLNormalTextSegment, the only difference
-// is that LLNormalTextSegment draws value of LLTextBase (LLTextBase::getWText()),
+// is that LLNormalTextSegment draws value of LLTextBase (LLTextBase::getText()),
 // but LLLabelTextSegment draws label of the LLTextBase (LLTextBase::mLabel)
 class LLLabelTextSegment : public LLNormalTextSegment
 {
@@ -198,8 +201,8 @@ public:
 
 protected:
 
-    /*virtual*/ const LLWString&    getWText()  const;
-    /*virtual*/ const S32           getLength() const;
+    /*virtual*/ const std::string&  getTextUtf8()   const;
+    /*virtual*/ const S32           getLengthBytes() const;
 };
 
 // Text segment that changes it's style depending of mouse pointer position ( is it inside or outside segment)
@@ -460,9 +463,6 @@ public:
     void                    setMaxTextLength(S32 length) { mMaxTextByteLength = length; }
     S32                     getMaxTextLength() const { return mMaxTextByteLength; }
 
-    // wide-char versions
-    void                    setWText(const LLWString& text);
-    const LLWString&        getWText() const;
     S32                     getTextGeneration() const;
 
     void                    appendText(const std::string &new_text, bool prepend_newline, const LLStyle::Params& input_params = LLStyle::Params());
@@ -471,12 +471,6 @@ public:
     /*virtual*/ bool        setLabelArg(const std::string& key, const LLStringExplicit& text) override;
 
     const   std::string&    getLabel()  { return mLabel.getString(); }
-
-    // The label in the unit this class still counts segment bounds and cursor
-    // positions in. It is kept as a second copy rather than measured on demand
-    // because LLLabelTextSegment hands out a reference to it; both the copy and
-    // this accessor go when the document itself moves to bytes.
-    const   LLWString&      getWlabel();
 
     void                    setLastSegmentToolTip(const std::string &tooltip);
 
@@ -491,7 +485,10 @@ public:
     // force reflow of text
     void                    needsReflow(S32 index = 0);
 
-    S32                     getLength() const { return static_cast<S32>(getWText().length()); }
+    // Named for its unit. Every offset this class takes and hands back --
+    // cursor, selection, segment bounds, line ranges -- is a byte offset into
+    // getText(), sitting at a character start.
+    S32                     getLengthBytes() const { return static_cast<S32>(getText().length()); }
     S32                     getLineCount() const { return static_cast<S32>(mLineInfoList.size()); }
     S32                     removeFirstLine(); // returns removed length
 
@@ -634,7 +631,7 @@ protected:
         virtual bool    hasExtCharValue( llwchar value ) const { return false; }
 
         // Defined here so they can access protected LLTextEditor editing methods
-        S32             insert(LLTextBase* editor, S32 pos, const LLWString &wstr) { return editor->insertStringNoUndo( pos, wstr, &mSegments ); }
+        S32             insert(LLTextBase* editor, S32 pos, std::string_view utf8str) { return editor->insertStringNoUndo( pos, utf8str, &mSegments ); }
         S32             remove(LLTextBase* editor, S32 pos, S32 length) { return editor->removeStringNoUndo( pos, length ); }
         S32             overwrite(LLTextBase* editor, S32 pos, llwchar wc) { return editor->overwriteCharNoUndo(pos, wc); }
 
@@ -672,7 +669,7 @@ protected:
     void                            drawHighlightedBackground();
 
     // modify contents
-    S32                             insertStringNoUndo(S32 pos, const LLWString &wstr, segment_vec_t* segments = NULL); // returns num of chars actually inserted
+    S32                             insertStringNoUndo(S32 pos, std::string_view utf8str, segment_vec_t* segments = NULL); // returns num of BYTES actually inserted
     S32                             removeStringNoUndo(S32 pos, S32 length);
     S32                             overwriteCharNoUndo(S32 pos, llwchar wc);
     void                            appendAndHighlightText(const std::string &new_text, S32 highlight_part, const LLStyle::Params& stylep, e_underline underline_link = e_underline::UNDERLINE_ALWAYS);
@@ -807,7 +804,7 @@ protected:
 
 // [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
     // highlighting
-    LLWString                   mHighlightWord;
+    std::string                 mHighlightWord;
     bool                        mHighlightCaseInsensitive;
     highlight_list_t            mHighlights;
     bool                        mHighlightsDirty;
@@ -872,8 +869,6 @@ protected:
 // [/SL:KB]
 
     LLUIString                  mLabel; // text label that is visible when no user text provided
-    LLWString                   mWLabel;        // mLabel as getWlabel() reports it
-    std::string                 mWLabelSource;  // what mWLabel was converted from
 };
 
 #endif

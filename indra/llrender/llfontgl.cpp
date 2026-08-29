@@ -229,6 +229,30 @@ U64 LLFontGL::getCacheGeneration() const
     return gen;
 }
 
+// Where a rect-anchored draw starts, which is the only thing the rect forms do
+// beyond handing off to the x/y ones.
+static void origin_from_rect(const LLRectf& rect, LLFontGL::VAlign valign, F32& x, F32& y)
+{
+    x = rect.mLeft;
+
+    switch(valign)
+    {
+    case LLFontGL::TOP:
+        y = rect.mTop;
+        break;
+    case LLFontGL::VCENTER:
+        y = rect.getCenterY();
+        break;
+    case LLFontGL::BASELINE:
+    case LLFontGL::BOTTOM:
+        y = rect.mBottom;
+        break;
+    default:
+        y = rect.mBottom;
+        break;
+    }
+}
+
 S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRect& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
     ShadowType shadow, S32 max_chars, F32* right_x, bool use_ellipses, bool use_color) const
 {
@@ -239,26 +263,24 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRect& rect
 S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRectf& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
                      ShadowType shadow, S32 max_chars, F32* right_x, bool use_ellipses, bool use_color) const
 {
-    F32 x = rect.mLeft;
-    F32 y = 0.f;
-
-    switch(valign)
-    {
-    case TOP:
-        y = rect.mTop;
-        break;
-    case VCENTER:
-        y = rect.getCenterY();
-        break;
-    case BASELINE:
-    case BOTTOM:
-        y = rect.mBottom;
-        break;
-    default:
-        y = rect.mBottom;
-        break;
-    }
+    F32 x, y;
+    origin_from_rect(rect, valign, x, y);
     return render(wstr, begin_offset, x, y, color, halign, valign, style, shadow, max_chars, (S32)rect.getWidth(), right_x, use_ellipses, use_color);
+}
+
+S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, const LLRect& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
+    ShadowType shadow, S32 max_bytes, F32* right_x, bool use_ellipses, bool use_color) const
+{
+    LLRectf rect_float((F32)rect.mLeft, (F32)rect.mTop, (F32)rect.mRight, (F32)rect.mBottom);
+    return renderBytes(utf8text, begin_offset, rect_float, color, halign, valign, style, shadow, max_bytes, right_x, use_ellipses, use_color);
+}
+
+S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, const LLRectf& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
+                          ShadowType shadow, S32 max_bytes, F32* right_x, bool use_ellipses, bool use_color) const
+{
+    F32 x, y;
+    origin_from_rect(rect, valign, x, y);
+    return renderBytes(utf8text, begin_offset, x, y, color, halign, valign, style, shadow, max_bytes, (S32)rect.getWidth(), right_x, use_ellipses, use_color);
 }
 
 

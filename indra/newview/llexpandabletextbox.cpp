@@ -159,7 +159,7 @@ void LLExpandableTextBox::LLTextBoxEx::showExpandText()
         LLStyle::Params expander_style(getStyleParams());
         expander_style.font.style = "UNDERLINE";
         expander_style.color = LLUIColorTable::instance().getColor("HTMLLinkColor");
-        LLExpanderSegment* expanderp = new LLExpanderSegment(new LLStyle(expander_style), getLineStart(last_line), getLength() + 1, mExpanderLabel, *this);
+        LLExpanderSegment* expanderp = new LLExpanderSegment(new LLStyle(expander_style), getLineStart(last_line), getLengthBytes() + 1, mExpanderLabel, *this);
         insertSegment(expanderp);
         mExpanderVisible = true;
     }
@@ -172,7 +172,7 @@ void LLExpandableTextBox::LLTextBoxEx::hideExpandText()
     if (mExpanderVisible)
     {
         // this will overwrite the expander segment and all text styling with a single style
-        LLNormalTextSegment* segmentp = new LLNormalTextSegment(getDefaultStyle(), 0, getLength() + 1, *this);
+        LLNormalTextSegment* segmentp = new LLNormalTextSegment(getDefaultStyle(), 0, getLengthBytes() + 1, *this);
         insertSegment(segmentp);
 
         mExpanderVisible = false;

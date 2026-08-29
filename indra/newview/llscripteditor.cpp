@@ -46,7 +46,7 @@ class LLScriptEditorSyntaxWorker final : public LLWorkerClass
 public:
     struct Request
     {
-        LLWString       text;
+        std::string     text;
         S32             text_generation = 0;
         U32             keywords_generation = 0;
         bool            disable_highlight = false;
@@ -55,7 +55,7 @@ public:
 
     struct Result
     {
-        LLWString                   text;
+        std::string                 text;
         LLKeywords::segment_ops_t   ops;
         S32                         text_generation = 0;
         U32                         keywords_generation = 0;
@@ -318,11 +318,11 @@ void LLScriptEditor::drawLineNumbers()
             // draw the line numbers
             if(line.mLineNum != last_line_num && line.mRect.mTop <= scrolled_view_rect.mTop)
             {
-                const LLWString ltext = utf8str_to_wstring(llformat("%d", mLuauLanguage ? line.mLineNum + 1 : line.mLineNum));
+                const std::string ltext = llformat("%d", mLuauLanguage ? line.mLineNum + 1 : line.mLineNum);
                 bool is_cur_line = cursor_line == line.mLineNum;
                 const U8 style = is_cur_line ? LLFontGL::BOLD : LLFontGL::NORMAL;
                 const LLColor4& fg_color = is_cur_line ? mCursorColor : mReadOnlyFgColor;
-                getScriptFont()->render(
+                getScriptFont()->renderBytes(
                                  ltext, // string to draw
                                  0, // begin offset
                                  UI_TEXTEDITOR_LINE_NUMBER_MARGIN - 2, // x
@@ -359,14 +359,12 @@ void LLScriptEditor::loadKeywords()
     ++mKeywordsGeneration;
 
     LLKeywords::segment_ops_t ops;
-    const LLWString& text = getWText();
-    const llwchar* base = text.c_str();
-    for (const llwchar* cur = base; *cur; ++cur)
+    const std::string& text = getText();
+    // Newline is ASCII, so scanning bytes finds every line break and no byte of
+    // a multi-byte character can be mistaken for one.
+    for (size_t at = text.find('\n'); at != std::string::npos; at = text.find('\n', at + 1))
     {
-        if (*cur == '\n')
-        {
-            ops.push_back({LLKeywords::SegmentOp::OP_LINE_BREAK, (S32)(cur - base), 0, nullptr});
-        }
+        ops.push_back({LLKeywords::SegmentOp::OP_LINE_BREAK, (S32)at, 0, nullptr});
     }
     applySyntaxSegments(text, ops);
     queueSyntaxParse();
@@ -419,7 +417,7 @@ void LLScriptEditor::queueSyntaxParse()
     mLastQueuedKeywords = keywords;
 
     LLScriptEditorSyntaxWorker::Request request;
-    request.text = getWText();
+    request.text = getText();
     request.text_generation = text_generation;
     request.keywords_generation = mKeywordsGeneration;
     request.disable_highlight = disable_syntax_highlighting;
@@ -427,7 +425,7 @@ void LLScriptEditor::queueSyntaxParse()
     mSyntaxWorker->queueRequest(request);
 }
 
-void LLScriptEditor::queueSyntaxApply(LLWString text,
+void LLScriptEditor::queueSyntaxApply(std::string text,
                                       LLKeywords::segment_ops_t ops,
                                       S32 text_generation,
                                       U32 keywords_generation,
@@ -547,7 +545,7 @@ LLStyleConstSP LLScriptEditor::buildSyntaxStyle()
     return new LLStyle(LLStyle::Params().font(getScriptFont()).color(mDefaultColor.get()));
 }
 
-void LLScriptEditor::applySyntaxSegments(const LLWString& text, const LLKeywords::segment_ops_t& ops)
+void LLScriptEditor::applySyntaxSegments(const std::string& text, const LLKeywords::segment_ops_t& ops)
 {
     LLStyleConstSP style = buildSyntaxStyle();
 

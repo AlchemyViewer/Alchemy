@@ -81,14 +81,14 @@ void LLTextViewModel::setValue(const LLSD& value)
 {
     // approximate LLSD storage usage
     LLViewModel::setValue(value);
-    mDisplay = utf8str_to_wstring(mStringValue = value.asString());
+    mDisplay = value.asString();
     mDisplayGeneration++;
 
     // mDisplay and mValue agree
     mUpdateFromDisplay = false;
 }
 
-LLWString& LLTextViewModel::getEditableDisplay()
+std::string& LLTextViewModel::getEditableDisplayUtf8()
 {
     mDirty = true;
     mDisplayGeneration++;
@@ -96,25 +96,24 @@ LLWString& LLTextViewModel::getEditableDisplay()
     return mDisplay;
 }
 
-void LLTextViewModel::setDisplay(const LLWString& value)
+void LLTextViewModel::setDisplayUtf8(std::string_view value)
 {
-    // This is the strange way to alter the value. Normally we'd setValue()
-    // and do the utf8str_to_wstring() to get the corresponding mDisplay
-    // value. But a text editor might want to edit the display string
-    // directly, then convert back to UTF8 on commit.
-    mDisplay = value;
+    // This is the strange way to alter the value. Normally we'd setValue().
+    // But a text editor edits the string directly, and rebuilds the LLSD from
+    // it on commit.
+    mDisplay.assign(value);
     mDisplayGeneration++;
     mDirty = true;
-    // Don't immediately convert to UTF8 -- do it lazily -- we expect many
-    // more setDisplay() calls than getValue() calls. Just flag that it needs
-    // doing.
+    // Don't immediately rebuild the LLSD -- do it lazily -- we expect many
+    // more setDisplayUtf8() calls than getValue() calls. Just flag that it
+    // needs doing.
     mUpdateFromDisplay = true;
 }
 
 inline void updateFromDisplayIfNeeded(const LLTextViewModel* model)
 {
-    // Has anyone called setDisplay() since the last setValue()?
-    // If so, have to convert mDisplay back to UTF8.
+    // Has anyone edited the display string since the last setValue()?
+    // If so, the LLSD is behind it.
     if (model->mUpdateFromDisplay)
     {
         // The fact that we're lazily updating fields
@@ -124,7 +123,7 @@ inline void updateFromDisplayIfNeeded(const LLTextViewModel* model)
         // Just cast away constness in this one place.
         LLTextViewModel* nthis = const_cast<LLTextViewModel*>(model);
         nthis->mUpdateFromDisplay = false;
-        nthis->mValue = nthis->mStringValue = wstring_to_utf8str(model->mDisplay);
+        nthis->mValue = nthis->mDisplay;
     }
 }
 
@@ -132,12 +131,6 @@ LLSD LLTextViewModel::getValue() const
 {
     updateFromDisplayIfNeeded(this);
     return mValue;
-}
-
-const std::string& LLTextViewModel::getStringValue() const
-{
-    updateFromDisplayIfNeeded(this);
-    return mStringValue;
 }
 
 ////////////////////////////////////////////////////////////////////////////

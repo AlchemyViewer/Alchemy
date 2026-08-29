@@ -225,7 +225,7 @@ bool LLSliderCtrl::setLabelArg( const std::string& key, const LLStringExplicit& 
         res = mLabelBox->setTextArg(key, text);
         if (res && mLabelFont && mLabelWidth == 0)
         {
-            S32 label_width = mLabelFont->getWidth(mLabelBox->getWText());
+            S32 label_width = mLabelFont->getWidthBytes(mLabelBox->getText(), 0, S32_MAX);
             LLRect rect = mLabelBox->getRect();
             S32 prev_right = rect.mRight;
             rect.mRight = rect.mLeft + label_width;

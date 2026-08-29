@@ -596,11 +596,10 @@ void LLFloaterIMSessionTab::onRecentEmojiPicked(const LLSD& value)
     LLSD::String str = value.asString();
     if (str.size())
     {
-        LLWString wstr = utf8string_to_wstring(str);
-        if (wstr.size())
+        if (!str.empty())
         {
-            // Whole wstr so ZWJ / flag / keycap / tag clusters stay together.
-            mInputEditor->insertEmoji(wstr);
+            // The whole string, so ZWJ / flag / keycap / tag clusters stay together.
+            mInputEditor->insertEmoji(str);
         }
     }
 }
@@ -669,7 +668,7 @@ void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD& args)
     mChatHistory->appendMessage(chat, chat_args, input_append_params);
 }
 
-void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
+void LLFloaterIMSessionTab::updateUsedEmojis(std::string_view text)
 {
     LLEmojiDictionary* dictionary = LLEmojiDictionary::getInstance();
     llassert_always(dictionary);
@@ -680,26 +679,27 @@ void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
     // (ZWJ family, flag pair, keycap, tag subdivision) that must be
     // recorded as a single emoji. Codepoints outside any cluster are
     // handled with the single-codepoint path below.
-    const auto clusters = wstring_find_emoji_clusters(text);
+    const auto clusters = utf8str_find_emoji_clusters(text);
     auto next_run = clusters.begin();
     for (size_t i = 0; i < text.size(); )
     {
         if (next_run != clusters.end() && next_run->first == i)
         {
-            LLFloaterEmojiPicker::onEmojiUsed(wstring_to_utf8str(LLWString(text.data() + next_run->first,
-                                                        next_run->second - next_run->first)));
+            LLFloaterEmojiPicker::onEmojiUsed(
+                std::string(text.substr(next_run->first, next_run->second - next_run->first)));
             emojiSent = true;
             i = next_run->second;
             ++next_run;
             continue;
         }
 
-        if (dictionary->isEmoji(text[i]))
+        const LLCodepointAt at = utf8str_decode_at(text, i);
+        if (dictionary->isEmoji(at.cp))
         {
-            LLFloaterEmojiPicker::onEmojiUsed(utf8str_from_cp(text[i]));
+            LLFloaterEmojiPicker::onEmojiUsed(utf8str_from_cp(at.cp));
             emojiSent = true;
         }
-        ++i;
+        i = at.next;
     }
 
     if (!emojiSent)

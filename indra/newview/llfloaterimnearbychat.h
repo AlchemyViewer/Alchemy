@@ -80,7 +80,6 @@ public:
     static void stopChat();
 
     static void sendChatFromViewer(const std::string &utf8text, EChatType type, bool animate);
-    static void sendChatFromViewer(const LLWString &wtext, EChatType type, bool animate);
 
     static bool isWordsName(const std::string& name);
 
@@ -108,7 +107,7 @@ protected:
     void onClickCloseBtn(bool app_qutting = false) override;
 
 public:
-    static LLWString stripChannelNumber(const LLWString &mesg, S32* channel);
+    static std::string stripChannelNumber(const std::string &mesg, S32* channel);
     static EChatType processChatTypeTriggers(EChatType type, std::string &str);
 
 protected:

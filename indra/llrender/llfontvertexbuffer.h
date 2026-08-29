@@ -253,8 +253,21 @@ public:
         S32 max_chars,
         bool no_padding);
 
+    // The same measurement in bytes, for callers holding UTF-8.
+    F32 getWidthBytes(const LLFontGL* fontp,
+        std::string_view utf8text,
+        S32 begin_offset,
+        S32 max_bytes,
+        bool no_padding);
+
     static void enableBufferCollection(bool enable) { sEnableBufferCollection = enable; }
 private:
+        // The cache check is the same whichever unit the caller measures in;
+        // only the call that fills it differs.
+        template <typename MEASURE>
+        F32 cachedWidth(const LLFontGL* fontp, S32 begin_offset, S32 max_units,
+                        bool no_padding, MEASURE&& measure);
+
         const LLFontGL* mLastFont = nullptr;
         S32 mLastOffset = 0;
         S32 mLastMaxChars = 0;

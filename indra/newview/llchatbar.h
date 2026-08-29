@@ -69,12 +69,11 @@ public:
 
     // Send a chat (after stripping /20foo channel chats).
     // "Animate" means the nodding animation for regular text.
-    void        sendChatFromViewer(const LLWString &wtext, EChatType type, bool animate);
     void        sendChatFromViewer(const std::string &utf8text, EChatType type, bool animate);
 
     // If input of the form "/20foo" or "/20 foo", returns "foo" and channel 20.
     // Otherwise returns input and channel 0.
-    LLWString stripChannelNumber(const LLWString &mesg, S32* channel);
+    std::string stripChannelNumber(const std::string &mesg, S32* channel);
 
     // callbacks
     void onClickSay(LLUICtrl* ctrl);

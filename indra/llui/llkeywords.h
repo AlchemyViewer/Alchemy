@@ -77,7 +77,7 @@ public:
         TT_TYPE                             // WORD
     } ETokenType;
 
-    LLKeywordToken( ETokenType type, const LLUIColor& color, const LLWString& token, const LLWString& tool_tip, const LLWString& delimiter  )
+    LLKeywordToken( ETokenType type, const LLUIColor& color, const std::string& token, const std::string& tool_tip, const std::string& delimiter  )
         :
         mType( type ),
         mToken( token ),
@@ -93,13 +93,13 @@ public:
 
     S32                 getLengthHead() const   { return static_cast<S32>(mToken.size()); }
     S32                 getLengthTail() const   { return static_cast<S32>(mDelimiter.size()); }
-    bool                isHead(const llwchar* s) const;
-    bool                isTail(const llwchar* s) const;
-    const LLWString&    getToken() const        { return mToken; }
+    bool                isHead(const char* s) const;
+    bool                isTail(const char* s) const;
+    const std::string&    getToken() const        { return mToken; }
     const LLUIColor&     getColor() const        { return mColor; }
     ETokenType          getType()  const        { return mType; }
-    const LLWString&    getToolTip() const      { return mToolTip; }
-    const LLWString&    getDelimiter() const    { return mDelimiter; }
+    const std::string&    getToolTip() const      { return mToolTip; }
+    const std::string&    getDelimiter() const    { return mDelimiter; }
 
     // The style every segment of this token shares. A script has one segment
     // per occurrence and only a few dozen tokens, so building one style per
@@ -116,10 +116,10 @@ public:
 
 private:
     ETokenType  mType;
-    LLWString   mToken;
+    std::string   mToken;
     LLUIColor    mColor;
-    LLWString   mToolTip;
-    LLWString   mDelimiter;
+    std::string   mToolTip;
+    std::string   mDelimiter;
 
     mutable LLStyleConstSP  mStyle;
     mutable const LLFontGL* mStyleFont = nullptr;
@@ -136,7 +136,7 @@ public:
     bool        isLoaded() const { return mLoaded; }
 
     void        findSegments(std::vector<LLTextSegmentPtr> *seg_list,
-                             const LLWString& text,
+                             const std::string& text,
                              class LLTextEditor& editor,
                              LLStyleConstSP style);
     struct SegmentOp
@@ -152,14 +152,14 @@ public:
         LLKeywordToken* token;
     };
     typedef std::vector<SegmentOp> segment_ops_t;
-    void        collectSegmentOps(segment_ops_t& ops, const LLWString& text, bool disable_syntax_highlighting) const;
+    void        collectSegmentOps(segment_ops_t& ops, const std::string& text, bool disable_syntax_highlighting) const;
     void        applySegmentOps(std::vector<LLTextSegmentPtr> *seg_list,
-                                const LLWString& text,
+                                const std::string& text,
                                 const segment_ops_t& ops,
                                 class LLTextEditor& editor,
                                 LLStyleConstSP style);
     bool        applySegmentOpsRange(std::vector<LLTextSegmentPtr> *seg_list,
-                                     const LLWString& text,
+                                     const std::string& text,
                                      const segment_ops_t& ops,
                                      size_t& op_index,
                                      size_t max_ops,
@@ -177,10 +177,10 @@ public:
 
     // Searched with a view onto a span of the text being highlighted, so a
     // lookup copies nothing. std::less<> is what allows that: without a
-    // transparent comparator, find() has to be handed a whole LLWString built
+    // transparent comparator, find() has to be handed a whole std::string built
     // for the purpose, once per word per redraw, which is what the hand-rolled
     // index class that used to sit here existed to avoid.
-    typedef std::map<LLWString, LLKeywordToken*, std::less<>> word_token_map_t;
+    typedef std::map<std::string, LLKeywordToken*, std::less<>> word_token_map_t;
     typedef word_token_map_t::const_iterator keyword_iterator_t;
     keyword_iterator_t begin() const { return mWordTokenMap.begin(); }
     keyword_iterator_t end() const { return mWordTokenMap.end(); }
@@ -196,7 +196,7 @@ protected:
                               S32 text_len,
                               const LLUIColor &defaultColor,
                               class LLTextEditor& editor);
-    void        insertSegments(const LLWString& wtext,
+    void        insertSegments(const std::string& wtext,
                                std::vector<LLTextSegmentPtr>& seg_list,
                                LLKeywordToken* token,
                                S32 text_len,
@@ -214,7 +214,7 @@ protected:
     typedef std::deque<LLKeywordToken*> token_list_t;
     token_list_t mLineTokenList;
     token_list_t mDelimiterTokenList;
-    typedef std::map<llwchar, token_list_t> token_by_first_char_map_t;
+    typedef std::map<char, token_list_t> token_by_first_char_map_t;
     token_by_first_char_map_t mLineTokenByFirstChar;
     token_by_first_char_map_t mDelimiterTokenByFirstChar;
 
