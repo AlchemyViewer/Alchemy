@@ -193,11 +193,8 @@ bool LLSearchComboBox::handleKeyHere(KEY key,MASK mask )
         S32 first = 0;
         S32 size = 0;
 
-        // get entered text (without auto-complete part). The range has to be
-        // the byte one: it is about to index a std::string, and the character
-        // range this used to ask for is a different number in any text that is
-        // not plain ASCII.
-        mTextEntry->getSelectionRangeBytes(&first, &size);
+        // get entered text (without auto-complete part)
+        mTextEntry->getSelectionRange(&first, &size);
         std::string search_query = mTextEntry->getText();
         search_query.erase(first, size);
 

@@ -189,14 +189,14 @@ public:
         return new LLEmbeddedItemSegment(mStart, mImage, mItem, *editor);
     }
 
-    /*virtual*/ bool getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
+    /*virtual*/ bool getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
     {
-        return getSegmentDimensionsF32(first_char, num_chars, width, height);
+        return getSegmentDimensionsF32(first_byte, num_bytes, width, height);
     }
 
-    inline bool getSegmentDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
+    inline bool getSegmentDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height) const
     {
-        if (num_chars == 0)
+        if (num_bytes == 0)
         {
             width = 0;
             height = 0;
@@ -209,7 +209,7 @@ public:
         return false;
     }
 
-    /*virtual*/ S32             getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const
+    /*virtual*/ S32             getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
     {
         // always draw at beginning of line
         if (line_offset == 0)

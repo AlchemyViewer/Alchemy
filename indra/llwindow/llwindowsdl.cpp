@@ -2583,7 +2583,7 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                 break;
             }
 
-            const LLWString preedit = utf8str_to_wstring(event.edit.text);
+            const std::string_view preedit(event.edit.text);
 
             // event.edit.start is a UTF-8 byte offset within event.edit.text
             // (the IME's caret position inside the composition), or -1 when
@@ -2591,14 +2591,12 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             // "caret at the beginning" value and must NOT be confused with
             // the -1 default (the earlier `> 0` check did exactly that and
             // pinned the caret to the end of the preedit whenever the IME
-            // started the cursor at byte 0).
+            // started the cursor at byte 0). The preeditor counts bytes too,
+            // so the offset passes straight through.
             S32 caret = static_cast<S32>(preedit.length());
             if (event.edit.start >= 0)
             {
-                // Convert from UTF-8 byte offset to llwchar (UTF-32) offset
-                // by re-encoding the prefix and taking its length.
-                const std::string prefix(event.edit.text, event.edit.start);
-                caret = static_cast<S32>(utf8str_to_wstring(prefix).length());
+                caret = llmin(static_cast<S32>(event.edit.start), caret);
             }
             const LLPreeditor::segment_lengths_t lengths { static_cast<S32>(preedit.length()) };
             const LLPreeditor::standouts_t standouts { false };

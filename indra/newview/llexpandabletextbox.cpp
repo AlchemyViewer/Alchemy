@@ -52,10 +52,10 @@ public:
         return copy;
     }
 
-    /*virtual*/ bool    getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
+    /*virtual*/ bool    getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
     {
         // more label always spans width of text box
-        if (num_chars == 0)
+        if (num_bytes == 0)
         {
             width = 0;
             height = 0;
@@ -67,11 +67,11 @@ public:
         }
         return true;
     }
-    /*virtual*/ S32     getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const
+    /*virtual*/ S32     getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const
     {
         return start_offset;
     }
-    /*virtual*/ S32     getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const
+    /*virtual*/ S32     getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
     {
         // require full line to ourselves
         if (line_offset == 0)

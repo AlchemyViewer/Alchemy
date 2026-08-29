@@ -4563,15 +4563,17 @@ void LLWindowWin32::fillCompositionLogfont(LOGFONT *logfont)
     logfont->lfWeight = FW_NORMAL;
 }
 
-U32 LLWindowWin32::fillReconvertString(const LLWString &text,
+U32 LLWindowWin32::fillReconvertString(const std::string &text,
     S32 focus, S32 focus_length, RECONVERTSTRING *reconvert_string)
 {
     const std::wstring text_utf16 = ll_convert<std::wstring>(text);
     const DWORD required_size = sizeof(RECONVERTSTRING) + (static_cast<DWORD>(text_utf16.length()) + 1) * sizeof(WCHAR);
     if (reconvert_string && reconvert_string->dwSize >= required_size)
     {
-        const DWORD focus_utf16_at = wstring_utf16_length(text, 0, focus);
-        const DWORD focus_utf16_length = wstring_utf16_length(text, focus, focus_length);
+        // `focus` and `focus_length` are byte offsets into `text`; the IME
+        // wants them in UTF-16 code units.
+        const DWORD focus_utf16_at = utf8str_utf16_length(text, 0, focus);
+        const DWORD focus_utf16_length = utf8str_utf16_length(text, focus, focus_length);
 
         reconvert_string->dwVersion = 0;
         reconvert_string->dwStrLen = static_cast<DWORD>(text_utf16.length());
@@ -4653,8 +4655,8 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
         return;
     }
     bool needs_update = false;
-    LLWString result_string;
-    LLWString preedit_string;
+    LLWString result_string;      // iterated per codepoint, never handed to the preeditor
+    std::string preedit_string;
     S32 preedit_string_utf16_length = 0;
     LLPreeditor::segment_lengths_t preedit_segment_lengths;
     LLPreeditor::standouts_t preedit_standouts;
@@ -4693,7 +4695,7 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
             if (size > 0)
             {
                 preedit_string_utf16_length = size / sizeof(WCHAR);
-                preedit_string = ll_convert_wide_to_wstring(std::wstring(data, size / sizeof(WCHAR)));
+                preedit_string = ll_convert<std::string>(std::wstring(data, size / sizeof(WCHAR)));
             }
             delete[] data;
             needs_update = true;
@@ -4714,7 +4716,9 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
                 S32 offset = 0;
                 for (U32 i = 0; i < preedit_segment_lengths.size(); i++)
                 {
-                    const S32 length = wstring_wstring_length_from_utf16_length(preedit_string, offset, data[i + 1] - data[i]);
+                    // The clause boundaries arrive in UTF-16 code units; the
+                    // preeditor partitions the string in bytes.
+                    const S32 length = utf8str_length_from_utf16_length(preedit_string, offset, data[i + 1] - data[i]);
                     preedit_segment_lengths[i] = length;
                     offset += length;
                 }
@@ -4733,14 +4737,18 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
             if (size == preedit_string_utf16_length)
             {
                 preedit_standouts.assign(preedit_segment_lengths.size(), false);
-                S32 offset = 0;
+                // `data` is indexed in UTF-16 code units while the segment
+                // lengths are bytes, so the walk carries both.
+                S32 offset = 0;         // UTF-16 units, indexes data
+                S32 byte_offset = 0;    // bytes, indexes preedit_string
                 for (U32 i = 0; i < preedit_segment_lengths.size(); i++)
                 {
                     if (ATTR_TARGET_CONVERTED == data[offset] || ATTR_TARGET_NOTCONVERTED == data[offset])
                     {
                         preedit_standouts[i] = true;
                     }
-                    offset += wstring_utf16_length(preedit_string, offset, preedit_segment_lengths[i]);
+                    offset += utf8str_utf16_length(preedit_string, byte_offset, preedit_segment_lengths[i]);
+                    byte_offset += preedit_segment_lengths[i];
                 }
             }
             delete[] data;
@@ -4753,7 +4761,7 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
         const S32 caret_position_utf16 = LLWinImm::getCompositionString(himc, GCS_CURSORPOS, NULL, 0);
         if (caret_position_utf16 >= 0 && caret_position_utf16 <= preedit_string_utf16_length)
         {
-            caret_position = wstring_wstring_length_from_utf16_length(preedit_string, 0, caret_position_utf16);
+            caret_position = utf8str_length_from_utf16_length(preedit_string, 0, caret_position_utf16);
         }
     }
 
@@ -4813,26 +4821,33 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
 // to by offset receives the offset in llwchars of the beginning of
 // the returned context string in the given wtext.
 
-static LLWString find_context(const LLWString & wtext, S32 focus, S32 focus_length, S32 *offset)
+static std::string find_context(const std::string & text, S32 focus, S32 focus_length, S32 *offset)
 {
     static const S32 CONTEXT_EXCESS = 30;   // This value is by experiences.
 
-    const S32 e = llmin((S32) wtext.length(), focus + focus_length + CONTEXT_EXCESS);
+    // Newline is ASCII, so no byte of a multi-byte character can be mistaken
+    // for one and this walk lands on character boundaries. The excess is a
+    // rough window, not a promise, so counting it in bytes is fine -- but the
+    // ends are aligned before they cut, since the context is handed to the IME
+    // as text.
+    const S32 e = llmin((S32) text.length(), focus + focus_length + CONTEXT_EXCESS);
     S32 end = focus + focus_length;
-    while (end < e && '\n' != wtext[end])
+    while (end < e && '\n' != text[end])
     {
         end++;
     }
+    end = (S32)utf8str_grapheme_align_backward(text, (size_t)end);
 
     const S32 s = llmax(0, focus - CONTEXT_EXCESS);
     S32 start = focus;
-    while (start > s && '\n' != wtext[start - 1])
+    while (start > s && '\n' != text[start - 1])
     {
         --start;
     }
+    start = (S32)utf8str_grapheme_align_backward(text, (size_t)start);
 
     *offset = start;
-    return wtext.substr(start, end - start);
+    return text.substr(start, llmax(0, end - start));
 }
 
 // final stage of handling drop requests - both from WM_DROPFILES message
@@ -4884,12 +4899,12 @@ bool LLWindowWin32::handleImeRequests(WPARAM request, LPARAM param, LRESULT *res
                 // WCHARs, i.e., UTF-16 encoding units, so we can't simply pass the
                 // number to getPreeditLocation.
 
-                const LLWString & wtext = mPreeditor->getPreeditString();
+                const std::string & text = mPreeditor->getPreeditStringUtf8();
                 S32 preedit, preedit_length;
                 mPreeditor->getPreeditRange(&preedit, &preedit_length);
                 LLCoordGL caret_coord;
                 LLRect preedit_bounds, text_control;
-                const S32 position = wstring_wstring_length_from_utf16_length(wtext, preedit, char_position->dwCharPos);
+                const S32 position = utf8str_length_from_utf16_length(text, preedit, char_position->dwCharPos);
 
                 if (!mPreeditor->getPreeditLocation(position, &caret_coord, &preedit_bounds, &text_control))
                 {
@@ -4912,12 +4927,12 @@ bool LLWindowWin32::handleImeRequests(WPARAM request, LPARAM param, LRESULT *res
             case IMR_RECONVERTSTRING:
             {
                 mPreeditor->resetPreedit();
-                const LLWString & wtext = mPreeditor->getPreeditString();
+                const std::string & text = mPreeditor->getPreeditStringUtf8();
                 S32 select, select_length;
                 mPreeditor->getSelectionRange(&select, &select_length);
 
                 S32 context_offset;
-                const LLWString context = find_context(wtext, select, select_length, &context_offset);
+                const std::string context = find_context(text, select, select_length, &context_offset);
 
                 RECONVERTSTRING * const reconvert_string = (RECONVERTSTRING *)param;
                 const U32 size = fillReconvertString(context, select - context_offset, select_length, reconvert_string);
@@ -4937,11 +4952,13 @@ bool LLWindowWin32::handleImeRequests(WPARAM request, LPARAM param, LRESULT *res
                         }
                         if (adjusted)
                         {
-                            const std::wstring text_utf16 = ll_convert<std::wstring>(context);
+                            // The IME reports its chosen range in UTF-16 code
+                            // units of the context we gave it; the preeditor
+                            // wants bytes of the same text.
                             const S32 new_preedit_start = reconvert_string->dwCompStrOffset / sizeof(WCHAR);
                             const S32 new_preedit_end = new_preedit_start + reconvert_string->dwCompStrLen;
-                            select = wide_wstring_length(text_utf16, new_preedit_start);
-                            select_length = wide_wstring_length(text_utf16, new_preedit_end) - select;
+                            select = utf8str_length_from_utf16_length(context, 0, new_preedit_start);
+                            select_length = utf8str_length_from_utf16_length(context, 0, new_preedit_end) - select;
                             select += context_offset;
                         }
                     }
@@ -4958,12 +4975,12 @@ bool LLWindowWin32::handleImeRequests(WPARAM request, LPARAM param, LRESULT *res
             }
             case IMR_DOCUMENTFEED:
             {
-                const LLWString & wtext = mPreeditor->getPreeditString();
+                const std::string & text = mPreeditor->getPreeditStringUtf8();
                 S32 preedit, preedit_length;
                 mPreeditor->getPreeditRange(&preedit, &preedit_length);
 
                 S32 context_offset;
-                LLWString context = find_context(wtext, preedit, preedit_length, &context_offset);
+                std::string context = find_context(text, preedit, preedit_length, &context_offset);
                 preedit -= context_offset;
                 preedit_length = llmin(preedit_length, (S32)context.length() - preedit);
                 if (preedit_length > 0 && preedit >= 0)

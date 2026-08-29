@@ -178,7 +178,7 @@ protected:
     void    fillCandidateForm(const LLCoordGL& caret, const LLRect& bounds, CANDIDATEFORM *form);
     void    fillCharPosition(const LLCoordGL& caret, const LLRect& bounds, const LLRect& control, IMECHARPOSITION *char_position);
     void    fillCompositionLogfont(LOGFONT *logfont);
-    U32     fillReconvertString(const LLWString &text, S32 focus, S32 focus_length, RECONVERTSTRING *reconvert_string);
+    U32     fillReconvertString(const std::string &text, S32 focus, S32 focus_length, RECONVERTSTRING *reconvert_string);
     void    handleStartCompositionMessage();
     void    handleCompositionMessage(U32 indexes);
     bool    handleImeRequests(WPARAM request, LPARAM param, LRESULT *result);

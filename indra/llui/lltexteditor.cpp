@@ -358,7 +358,7 @@ void LLTextEditor::setText(const LLStringExplicit &utf8str, const LLStyle::Param
 std::string LLTextEditor::getSelectionString() const
 {
     S32 idxSel = 0, lenSel = 0;
-    getSelectionRangeBytes(&idxSel, &lenSel);
+    getSelectionRange(&idxSel, &lenSel);
     return (lenSel > 0) ? getText().substr(idxSel, lenSel) : LLStringUtil::null;
 }
 // [/SL:KB]
@@ -3134,7 +3134,7 @@ void LLTextEditor::resetPreedit()
     }
 }
 
-void LLTextEditor::updatePreedit(const LLWString &preedit_string,
+void LLTextEditor::updatePreedit(std::string_view preedit_string,
         const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position)
 {
     // Just in case.
@@ -3147,31 +3147,24 @@ void LLTextEditor::updatePreedit(const LLWString &preedit_string,
 
     S32 insert_preedit_at = mCursorPos;
 
-    // Everything this method is handed counts UTF-32 characters, by
-    // LLPreeditor's own contract; the document stores UTF-8. So the string
-    // converts, and so does every length that partitions it -- the segment
-    // lengths and the caret below.
-    mPreeditString = wstring_to_utf8str(preedit_string);
+    mPreeditString.assign(preedit_string);
     mPreeditPositions.resize(preedit_segment_lengths.size() + 1);
     S32 position = insert_preedit_at;
-    size_t consumed = 0;
     for (segment_lengths_t::size_type i = 0; i < preedit_segment_lengths.size(); i++)
     {
         mPreeditPositions[i] = position;
-        const size_t chars = (size_t)llmax(0, preedit_segment_lengths[i]);
-        position += wstring_utf8_length(preedit_string.substr(consumed, chars));
-        consumed += chars;
+        position += llmax(0, preedit_segment_lengths[i]);
     }
     mPreeditPositions.back() = position;
 
     if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode())
     {
-        // As many bytes of the document as the preedit has characters.
-        ALUtf8View view;
-        view.assign(getText());
-        const S32 overwritten_end =
-            (S32)view.toBytes(view.toCodepoints((size_t)insert_preedit_at) + preedit_string.length());
-        const S32 overwritten = overwritten_end - insert_preedit_at;
+        // As much of the document as the preedit will cover, backed off to a
+        // whole character so the overwrite cannot end inside one.
+        const S32 overwritten = (S32)utf8str_grapheme_align_backward(
+            getText(),
+            llmin((size_t)insert_preedit_at + preedit_string.length(),
+                  (size_t)getLengthBytes())) - insert_preedit_at;
         mPreeditOverwrittenString = getText().substr(insert_preedit_at, overwritten);
         removeStringNoUndo(insert_preedit_at, overwritten);
     }
@@ -3186,8 +3179,7 @@ void LLTextEditor::updatePreedit(const LLWString &preedit_string,
 
     mPreeditStandouts = preedit_standouts;
 
-    setCursorPos(insert_preedit_at
-                 + wstring_utf8_length(preedit_string.substr(0, (size_t)llmax(0, caret_position))));
+    setCursorPos(insert_preedit_at + llmax(0, caret_position));
 
     // Update of the preedit should be caused by some key strokes.
     resetCursorBlink();
@@ -3215,14 +3207,7 @@ bool LLTextEditor::getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect
         preedit_left_position = preedit_right_position = mCursorPos;
     }
 
-    // query_offset is preedit-local and counted in characters.
-    S32 query = mCursorPos;
-    if (query_offset >= 0)
-    {
-        ALUtf8View view;
-        view.assign(getText());
-        query = (S32)view.toBytes(view.toCodepoints((size_t)preedit_left_position) + (size_t)query_offset);
-    }
+    const S32 query = (query_offset >= 0 ? preedit_left_position + query_offset : mCursorPos);
     if (query < preedit_left_position || query > preedit_right_position)
     {
         return false;
@@ -3295,9 +3280,7 @@ bool LLTextEditor::getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect
     return true;
 }
 
-// A byte range, for callers inside the viewer. The LLPreeditor override below
-// reports the same span counted in characters, which is what the IME asked for.
-void LLTextEditor::getSelectionRangeBytes(S32 *position, S32 *length) const
+void LLTextEditor::getSelectionRange(S32 *position, S32 *length) const
 {
     if (hasSelection())
     {
@@ -3311,43 +3294,24 @@ void LLTextEditor::getSelectionRangeBytes(S32 *position, S32 *length) const
     }
 }
 
-void LLTextEditor::getSelectionRange(S32 *position, S32 *length) const
-{
-    S32 begin, span;
-    getSelectionRangeBytes(&begin, &span);
-
-    ALUtf8View view;
-    view.assign(getText());
-    *position = (S32)view.toCodepoints((size_t)begin);
-    *length   = (S32)view.toCodepoints((size_t)(begin + span)) - *position;
-}
-
 void LLTextEditor::getPreeditRange(S32 *position, S32 *length) const
 {
-    S32 begin = mCursorPos, end = mCursorPos;
     if (hasPreeditString())
     {
-        begin = mPreeditPositions.front();
-        end   = mPreeditPositions.back();
+        *position = mPreeditPositions.front();
+        *length   = mPreeditPositions.back() - mPreeditPositions.front();
     }
-
-    ALUtf8View view;
-    view.assign(getText());
-    *position = (S32)view.toCodepoints((size_t)begin);
-    *length   = (S32)view.toCodepoints((size_t)end) - *position;
+    else
+    {
+        *position = mCursorPos;
+        *length   = 0;
+    }
 }
 
 void LLTextEditor::markAsPreedit(S32 position, S32 length)
 {
-    // Both arrive counted in characters.
-    S32 begin, end;
-    {
-        ALUtf8View view;
-        view.assign(getText());
-        const size_t first = (size_t)llmax(0, position);
-        begin = (S32)view.toBytes(first);
-        end   = (S32)view.toBytes(first + (size_t)llmax(0, length));
-    }
+    const S32 begin = position;
+    const S32 end   = position + length;
 
     deselect();
     setCursorPos(begin);

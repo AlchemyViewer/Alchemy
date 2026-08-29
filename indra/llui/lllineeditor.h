@@ -223,10 +223,7 @@ public:
 
     // Selects characters 'start' to 'end'.
     void            setSelection(S32 start, S32 end);
-    // Reports characters, as LLPreeditor requires. getSelectionRangeBytes()
-    // gives the same span in the unit everything else here counts in.
     /*virtual*/ void    getSelectionRange(S32 *position, S32 *length) const override;
-    void                getSelectionRangeBytes(S32 *position, S32 *length) const;
 
     void            setCommitOnFocusLost( bool b )  { mCommitOnFocusLost = b; }
     void            setRevertOnEsc( bool b )        { mRevertOnEsc = b; }
@@ -349,16 +346,13 @@ public:
     bool            hasPreeditString() const;
     // Implementation (overrides) of LLPreeditor
     /*virtual*/ void    resetPreedit() override;
-    /*virtual*/ void    updatePreedit(const LLWString &preedit_string,
+    /*virtual*/ void    updatePreedit(std::string_view preedit_string,
                         const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position) override;
     /*virtual*/ void    markAsPreedit(S32 position, S32 length) override;
     /*virtual*/ void    getPreeditRange(S32 *position, S32 *length) const override;
     /*virtual*/ bool    getPreeditLocation(S32 query_position, LLCoordGL *coord, LLRect *bounds, LLRect *control) const override;
     /*virtual*/ S32     getPreeditFontSize() const override;
-    // LLPreeditor counts in UTF-32 characters throughout, by its own
-    // documented contract, so the preedit boundary converts. Stage B4 moves
-    // that interface to bytes and these conversions go with it.
-    /*virtual*/ LLWString getPreeditString() const override { return utf8str_to_wstring(getText()); }
+    /*virtual*/ const std::string& getPreeditStringUtf8() const override { return getText(); }
 
     void            setText(const LLStringExplicit &new_text, bool use_size_limit);
 

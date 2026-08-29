@@ -281,21 +281,14 @@ protected:
 
     // Overrides LLPreeditor
     virtual void    resetPreedit();
-    virtual void    updatePreedit(const LLWString &preedit_string,
+    virtual void    updatePreedit(std::string_view preedit_string,
                         const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position);
     virtual void    markAsPreedit(S32 position, S32 length);
     virtual void    getPreeditRange(S32 *position, S32 *length) const;
-    // Reported in characters, as LLPreeditor requires.
-    // getSelectionRangeBytes() gives the same span in the unit everything else
-    // here counts in.
     virtual void    getSelectionRange(S32 *position, S32 *length) const;
-    void            getSelectionRangeBytes(S32 *position, S32 *length) const;
     virtual bool    getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect *bounds, LLRect *control) const;
     virtual S32     getPreeditFontSize() const;
-    // LLPreeditor counts in UTF-32 characters throughout, by its own
-    // documented contract, so the preedit boundary converts. Stage B4 moves
-    // that interface to bytes and these conversions go with it.
-    virtual LLWString getPreeditString() const { return utf8str_to_wstring(getText()); }
+    virtual const std::string& getPreeditStringUtf8() const { return getText(); }
 
     virtual bool    useFontBuffers() const { return getReadOnly(); }
     //

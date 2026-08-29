@@ -258,6 +258,55 @@ S32 wstring_utf16_length(const LLWString &wstr, const S32 woffset, const S32 wle
     return (S32)simdutf::utf16_length_from_utf32(wstr.data() + woffset, end - woffset);
 }
 
+S32 utf8str_utf16_length(std::string_view utf8str, const S32 byte_offset, const S32 byte_len)
+{
+    const S32 size  = (S32)utf8str.size();
+    const S32 begin = llclamp(byte_offset, 0, size);
+    // The budget is clamped before it is added, not after: callers pass S32_MAX
+    // for "the rest of it", and begin + S32_MAX overflows to a negative.
+    const S32 end   = llmin(begin + llmin(S32_MAX - begin, llmax(byte_len, 0)), size);
+
+    // One UTF-16 code unit per character, two for anything above the BMP --
+    // which in UTF-8 is exactly the four-byte forms.
+    S32 units = 0;
+    for (S32 i = begin; i < end; )
+    {
+        const LLCodepointAt at = utf8str_decode_at(utf8str, (size_t)i);
+        units += (at.cp >= 0x10000) ? 2 : 1;
+        i = (S32)at.next;
+    }
+    return units;
+}
+
+S32 utf8str_length_from_utf16_length(std::string_view utf8str, const S32 byte_offset,
+                                     const S32 utf16_length, bool *unaligned)
+{
+    const S32 size  = (S32)utf8str.size();
+    const S32 begin = llclamp(byte_offset, 0, size);
+
+    bool u = false;
+    S32  units = 0;
+    S32  i = begin;
+    while (i < size && units < utf16_length)
+    {
+        const LLCodepointAt at = utf8str_decode_at(utf8str, (size_t)i);
+        const S32 cost = (at.cp >= 0x10000) ? 2 : 1;
+        if (units + cost > utf16_length)
+        {
+            // The budget ends between the two halves of a surrogate pair.
+            u = true;
+            break;
+        }
+        units += cost;
+        i = (S32)at.next;
+    }
+    if (unaligned)
+    {
+        *unaligned = u;
+    }
+    return i - begin;
+}
+
 // Given a wstring and an offset in it, returns the length as wstring (i.e.,
 // number of llwchars) of the longest substring that starts at the offset
 // and whose equivalent utf-16 string does not exceeds the given utf16_length.

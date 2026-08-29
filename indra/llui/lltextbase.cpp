@@ -464,8 +464,8 @@ std::vector<LLRect> LLTextBase::getSelectionRects(const highlight_list_t& highli
                     // if selection after beginning of segment
                     if (selection_left >= segment_line_start)
                     {
-                        S32 num_chars = llmin(selection_left, segment_line_end) - segment_line_start;
-                        segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                        S32 num_bytes = llmin(selection_left, segment_line_end) - segment_line_start;
+                        segmentp->getDimensionsF32(segment_offset, num_bytes, segment_width, segment_height);
                         left_precise += segment_width;
                     }
 
@@ -477,15 +477,15 @@ std::vector<LLRect> LLTextBase::getSelectionRects(const highlight_list_t& highli
                     {
                         // extend selection slightly beyond end of line
                         // to indicate selection of newline character (use "n" character to determine width)
-                        S32 num_chars = segment_line_end - segment_line_start;
-                        segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                        S32 num_bytes = segment_line_end - segment_line_start;
+                        segmentp->getDimensionsF32(segment_offset, num_bytes, segment_width, segment_height);
                         right_precise += segment_width;
                     }
                     // else if selection ends on current segment...
                     else
                     {
-                        S32 num_chars = selection_right - segment_line_start;
-                        segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                        S32 num_bytes = selection_right - segment_line_start;
+                        segmentp->getDimensionsF32(segment_offset, num_bytes, segment_width, segment_height);
                         right_precise += segment_width;
 
                         break;
@@ -549,8 +549,8 @@ std::vector<std::pair<LLRect, LLUIColor>> LLTextBase::getHighlightedBgRects()
                 F32 segment_width  = 0;
                 S32 segment_height = 0;
 
-                S32 num_chars = segment_line_end - segment_line_start;
-                segmentp->getDimensionsF32(segment_offset, num_chars, segment_width, segment_height);
+                S32 num_bytes = segment_line_end - segment_line_start;
+                segmentp->getDimensionsF32(segment_offset, num_bytes, segment_width, segment_height);
                 right_precise += segment_width;
 
                 if (segmentp->getStyle()->getDrawHighlightBg())
@@ -1015,7 +1015,7 @@ void LLTextBase::drawText()
         // can fit them, which leaves nothing in front of the rect edge.
         if (needs_ellipsis)
         {
-            const F32 dots_width_f = mFont->getWidthF32(U"....");
+            const F32 dots_width_f = mFont->getWidthF32Bytes("....", 0, S32_MAX);
             // Only render manual dots if there's room AFTER the line content,
             // i.e. the segment's own use_ellipses path didn't already eat
             // into the right edge. A gap >= dots width means render() left
@@ -1024,8 +1024,8 @@ void LLTextBase::drawText()
             {
                 LLRectf dots_rect = text_rect;
                 dots_rect.mRight = saved_right;
-                static const LLWString dots = U"...";
-                mFont->render(dots, 0,
+                static const std::string dots = "...";
+                mFont->renderBytes(dots, 0,
                               dots_rect,
                               mFgColor.get(),
                               LLFontGL::LEFT, mTextVAlign,
@@ -1933,7 +1933,7 @@ void LLTextBase::reflow()
             S32 cur_index = segment->getStart() + seg_offset;
 
             // ask segment how many character fit in remaining space
-            S32 character_count = segment->getNumChars(getWordWrap() ? llmax(0, ll_round(remaining_pixels)) : S32_MAX,
+            S32 character_count = segment->getNumBytes(getWordWrap() ? llmax(0, ll_round(remaining_pixels)) : S32_MAX,
                                                         seg_offset,
                                                         cur_index - line_start_index,
                                                         S32_MAX,
@@ -3297,13 +3297,13 @@ bool LLTextBase::dragSelectCursorTo(S32 local_x, S32 local_y)
             // ordering key) so we can call non-const getDimensionsF32 on
             // the segment.
             LLTextSegmentPtr segmentp = *seg_iter;
-            // Clamp num_chars to the segment's end so a cluster that
+            // Clamp num_bytes to the segment's end so a cluster that
             // somehow straddles a segment boundary doesn't read past it
             // (clusters normally don't, but the assert is cheap).
-            const S32 num_chars = llmin((S32)range.second, segmentp->getEnd())
+            const S32 num_bytes = llmin((S32)range.second, segmentp->getEnd())
                                 - (S32)range.first;
             S32 cluster_pixel_height = 0;
-            segmentp->getDimensionsF32(seg_offset, num_chars,
+            segmentp->getDimensionsF32(seg_offset, num_bytes,
                                        cluster_pixel_width,
                                        cluster_pixel_height);
         }
@@ -3858,17 +3858,17 @@ LLStyleSP LLTextSegment::cloneStyle(LLTextBase& target, const LLStyle* source)
 }
 
 
-bool LLTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) { width = 0; height = 0; return false; }
-bool LLTextSegment::getDimensions(S32 first_char, S32 num_chars, S32& width, S32& height)
+bool LLTextSegment::getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height) { width = 0; height = 0; return false; }
+bool LLTextSegment::getDimensions(S32 first_byte, S32 num_bytes, S32& width, S32& height)
 {
     F32 fwidth = 0;
-    bool result = getDimensionsF32(first_char, num_chars, fwidth, height);
+    bool result = getDimensionsF32(first_byte, num_bytes, fwidth, height);
     width = ll_round(fwidth);
     return result;
 }
 
-S32 LLTextSegment::getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const { return 0; }
-S32 LLTextSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const { return 0; }
+S32 LLTextSegment::getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const { return 0; }
+S32 LLTextSegment::getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const { return 0; }
 void LLTextSegment::updateLayout(const LLTextBase& editor) {}
 F32 LLTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect) { return draw_rect.mLeft; }
 bool LLTextSegment::canEdit() const { return false; }
@@ -4234,11 +4234,11 @@ LLTextSegmentPtr LLNormalTextSegment::clone(LLTextBase& target) const
     return new LLNormalTextSegment(sp, mStart, mEnd, target);
 }
 
-bool LLNormalTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
+bool LLNormalTextSegment::getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
 {
     height = 0;
     width = 0;
-    if (num_chars > 0 && (mStart + first_char >= 0))
+    if (num_bytes > 0 && (mStart + first_byte >= 0))
     {
         const LLFontGL* font = mStyle->getFont();
         // Re-read line spacing each call rather than relying on the
@@ -4248,23 +4248,23 @@ bool LLNormalTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& w
         height = font->getLineSpacing();
 
         const std::string& text = getTextUtf8();
-        width += mFontWidthBuffer.getWidthBytes(font, text, mStart + first_char, num_chars, true);
+        width += mFontWidthBuffer.getWidthBytes(font, text, mStart + first_byte, num_bytes, true);
     }
     // if last character is a newline, then return true, forcing line break
     return false;
 }
 
-S32 LLNormalTextSegment::getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const
+S32 LLNormalTextSegment::getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const
 {
     const std::string& text = getTextUtf8();
     return mStyle->getFont()->byteFromPixelOffset(text, mStart + start_offset,
                                                (F32)segment_local_x_coord,
                                                F32_MAX,
-                                               num_chars,
+                                               num_bytes,
                                                round);
 }
 
-S32 LLNormalTextSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const
+S32 LLNormalTextSegment::getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
 {
     const std::string& text = getTextUtf8();
 
@@ -4274,10 +4274,10 @@ S32 LLNormalTextSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 lin
         num_pixels = llmax(0, num_pixels - image->getWidth());
     }
 
-    S32 last_char = mEnd;
+    S32 last_byte = mEnd;
 
     // set max characters to length of segment, or to first newline
-    max_chars = llmin(max_chars, last_char - (mStart + segment_offset));
+    max_bytes = llmin(max_bytes, last_byte - (mStart + segment_offset));
 
     // if no character yet displayed on this line, don't require word wrapping since
     // we can just move to the next line, otherwise insist on it so we make forward progress
@@ -4291,12 +4291,12 @@ S32 LLNormalTextSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 lin
     if(getLengthBytes() < segment_offset + mStart)
     {
         LL_INFOS() << "getLengthBytes() < segment_offset + mStart\t getLengthBytes()\t" << getLengthBytes() << "\tsegment_offset:\t"
-                        << segment_offset << "\tmStart:\t" << mStart << "\tsegments\t" << mEditor.mSegments.size() << "\tmax_chars\t" << max_chars << LL_ENDL;
+                        << segment_offset << "\tmStart:\t" << mStart << "\tsegments\t" << mEditor.mSegments.size() << "\tmax_chars\t" << max_bytes << LL_ENDL;
     }
 
-    if( (offsetLength + 1) < max_chars)
+    if( (offsetLength + 1) < max_bytes)
     {
-        LL_INFOS() << "offsetString.length() + 1 < max_chars\t max_chars:\t" << max_chars << "\toffsetString.length():\t" << offsetLength << " getLengthBytes() : "
+        LL_INFOS() << "offsetString.length() + 1 < max_bytes\t max_bytes:\t" << max_bytes << "\toffsetString.length():\t" << offsetLength << " getLengthBytes() : "
             << getLengthBytes() << "\tsegment_offset:\t" << segment_offset << "\tmStart:\t" << mStart << "\tsegments\t" << mEditor.mSegments.size() << LL_ENDL;
     }
 
@@ -4304,31 +4304,31 @@ S32 LLNormalTextSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 lin
     // diagnostic above fires precisely when that runs past the text, and a view
     // would throw there where the old pointer arithmetic quietly walked off.
     const size_t seg_begin = llmin((size_t)llmax(segment_offset + mStart, 0), text.length());
-    S32 num_chars = mStyle->getFont()->maxDrawableBytes( std::string_view(text).substr(seg_begin),
+    S32 num_bytes = mStyle->getFont()->maxDrawableBytes( std::string_view(text).substr(seg_begin),
                                                 (F32)num_pixels,
-                                                max_chars,
+                                                max_bytes,
                                                 word_wrap_style);
 
-    if (num_chars == 0
+    if (num_bytes == 0
         && line_offset == 0
-        && max_chars > 0)
+        && max_bytes > 0)
     {
         // If at the beginning of a line, and a single character won't fit, draw
         // it anyway -- the whole of it, which is however many bytes it takes.
-        num_chars = (S32)(utf8str_step_grapheme_forward(text, seg_begin) - seg_begin);
+        num_bytes = (S32)(utf8str_step_grapheme_forward(text, seg_begin) - seg_begin);
     }
 
     // include *either* the EOF or newline character in this run of text
     // but not both. The extra one is the virtual position every segment carries
     // past the end of the document, not a character, so it is one either way.
-    S32 last_char_in_run = mStart + segment_offset + num_chars;
+    S32 last_char_in_run = mStart + segment_offset + num_bytes;
     // check length first to avoid indexing off end of string
     if (last_char_in_run < mEnd
         && (last_char_in_run >= getLengthBytes()))
     {
-        num_chars++;
+        num_bytes++;
     }
-    return num_chars;
+    return num_bytes;
 }
 
 void LLNormalTextSegment::updateLayout(const class LLTextBase& editor)
@@ -4456,9 +4456,9 @@ LLTextSegmentPtr LLInlineViewSegment::clone(LLTextBase& target) const
     return nullptr;
 }
 
-bool LLInlineViewSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
+bool LLInlineViewSegment::getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
 {
-    if (first_char == 0 && num_chars == 0)
+    if (first_byte == 0 && num_bytes == 0)
     {
         // We didn't fit on a line or were forced to new string
         // the widget will fall on the next line, so width here is 0
@@ -4487,7 +4487,7 @@ bool LLInlineViewSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& w
     return false;
 }
 
-S32 LLInlineViewSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const
+S32 LLInlineViewSegment::getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
 {
     // if putting a widget anywhere but at the beginning of a line
     // and the widget doesn't fit or mForceNewLine is true
@@ -4548,7 +4548,7 @@ LLTextSegmentPtr LLLineBreakTextSegment::clone(LLTextBase& target) const
     copy->mFont = mFont;
     return copy;
 }
-bool LLLineBreakTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
+bool LLLineBreakTextSegment::getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
 {
     width = 0;
     // Re-read each call (see LLNormalTextSegment::getDimensionsF32). mFont
@@ -4558,7 +4558,7 @@ bool LLLineBreakTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32
 
     return true;
 }
-S32 LLLineBreakTextSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const
+S32 LLLineBreakTextSegment::getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
 {
     return 1;
 }
@@ -4588,13 +4588,13 @@ LLTextSegmentPtr LLImageTextSegment::clone(LLTextBase& target) const
 static const S32 IMAGE_HPAD = 3;
 
 // virtual
-bool LLImageTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
+bool LLImageTextSegment::getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
 {
     width = 0;
     height = mStyle->getFont()->getLineSpacing();
 
     LLUIImagePtr image = mStyle->getImage();
-    if( num_chars>0 && image.notNull())
+    if( num_bytes>0 && image.notNull())
     {
         width += image->getWidth() + IMAGE_HPAD;
         height = llmax(height, image->getHeight() + IMAGE_HPAD );
@@ -4602,7 +4602,7 @@ bool LLImageTextSegment::getDimensionsF32(S32 first_char, S32 num_chars, F32& wi
     return false;
 }
 
-S32  LLImageTextSegment::getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const
+S32  LLImageTextSegment::getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
 {
     LLUIImagePtr image = mStyle->getImage();
 

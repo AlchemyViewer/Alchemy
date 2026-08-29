@@ -650,6 +650,19 @@ LL_COMMON_API std::string utf8str_tolower(const std::string& utf8str);
 // Length in utf16string (UTF-16) of wlen wchars beginning at woffset.
 LL_COMMON_API S32 wstring_utf16_length(const LLWString & wstr, S32 woffset, S32 wlen);
 
+// The same two over UTF-8, where the offsets and lengths that describe the text
+// count BYTES and only the UTF-16 length counts code units. The Win32 IME
+// speaks UTF-16 and the editors speak UTF-8, so every offset crossing that
+// boundary goes through one of these.
+LL_COMMON_API S32 utf8str_utf16_length(std::string_view utf8str, S32 byte_offset, S32 byte_len);
+
+// Bytes of the longest substring starting at byte_offset whose UTF-16 form does
+// not exceed utf16_length code units. *unaligned reports that the limit fell
+// inside a character -- a surrogate half, which an IME can ask for -- in which
+// case the count stops short of it.
+LL_COMMON_API S32 utf8str_length_from_utf16_length(std::string_view utf8str, S32 byte_offset,
+                                                   S32 utf16_length, bool *unaligned = nullptr);
+
 // Length in wstring (i.e., llwchar count) of a part of a wstring specified by utf16 length (i.e., utf16 units.)
 LL_COMMON_API S32 wstring_wstring_length_from_utf16_length(const LLWString & wstr, S32 woffset, S32 utf16_length, bool *unaligned = nullptr);
 

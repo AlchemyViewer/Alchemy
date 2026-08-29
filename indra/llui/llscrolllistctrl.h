@@ -36,7 +36,7 @@
 #include "llctrlselectioninterface.h"
 #include "llfontgl.h"
 #include "llui.h"
-#include "llstring.h"   // LLWString
+#include "llstring.h"
 #include "lleditmenuhandler.h"
 #include "llframetimer.h"
 

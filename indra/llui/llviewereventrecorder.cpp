@@ -246,10 +246,10 @@ void LLViewerEventRecorder::logKeyUnicodeEvent(llwchar uni_char) {
   // keycode...or
   // char
 
-  LL_DEBUGS() << "Wrapped in conversion to wstring " <<  wstring_to_utf8str(LLWString( 1, uni_char)) << "\n" << LL_ENDL;
+  LL_DEBUGS() << "Wrapped in conversion to wstring " <<  utf8str_from_cp(uni_char) << "\n" << LL_ENDL;
 
   event.insert("char",
-           LLSD(  wstring_to_utf8str(LLWString( 1,uni_char))  )
+           LLSD(  utf8str_from_cp(uni_char)  )
            );
 
   // path (optional) - for now we are not recording path for key events during record - should not be needed for full record and playback of recorded steps

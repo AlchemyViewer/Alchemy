@@ -64,7 +64,6 @@ namespace LLTextValidate
         Validator(const Validator* validator) : mImpl(validator->mImpl) {}
 
         bool validate(std::string_view str) const { return !mImpl || mImpl->validate(str); }
-        bool validate(const LLWString& str) const { return !mImpl || mImpl->validate(wstring_to_utf8str(str)); }
 
         operator bool() const { return mImpl; }
 

@@ -1391,7 +1391,7 @@ void LLLineEditor::deleteSelection()
     if( !mReadOnly && hasSelection() )
     {
         S32 left_pos, selection_length;
-        getSelectionRangeBytes(&left_pos, &selection_length);
+        getSelectionRange(&left_pos, &selection_length);
 
         if (!prevalidateInput(std::string_view(mText.getString()).substr(left_pos, selection_length)))
             return;
@@ -1417,7 +1417,7 @@ void LLLineEditor::cut()
     if( canCut() )
     {
         S32 left_pos, length;
-        getSelectionRangeBytes(&left_pos, &length);
+        getSelectionRange(&left_pos, &length);
 
         if (!prevalidateInput(std::string_view(mText.getString()).substr(left_pos, length)))
             return;
@@ -2794,7 +2794,7 @@ void LLLineEditor::resetPreedit()
     }
 }
 
-void LLLineEditor::updatePreedit(const LLWString &preedit_string,
+void LLLineEditor::updatePreedit(std::string_view preedit_string,
         const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position)
 {
     // Just in case.
@@ -2808,30 +2808,23 @@ void LLLineEditor::updatePreedit(const LLWString &preedit_string,
 
     S32 insert_preedit_at = getCursor();
 
-    // Everything this method is handed counts UTF-32 characters, by
-    // LLPreeditor's own contract; the text stores UTF-8. So the string
-    // converts, and so does every length that partitions it -- the segment
-    // lengths and the caret below.
-    mPreeditString = wstring_to_utf8str(preedit_string);
+    mPreeditString.assign(preedit_string);
     mPreeditPositions.resize(preedit_segment_lengths.size() + 1);
     S32 position = insert_preedit_at;
-    size_t consumed = 0;
     for (segment_lengths_t::size_type i = 0; i < preedit_segment_lengths.size(); i++)
     {
         mPreeditPositions[i] = position;
-        const size_t chars = (size_t)llmax(0, preedit_segment_lengths[i]);
-        position += wstring_utf8_length(preedit_string.substr(consumed, chars));
-        consumed += chars;
+        position += llmax(0, preedit_segment_lengths[i]);
     }
     mPreeditPositions.back() = position;
     if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode())
     {
-        // As many bytes of the text as the preedit has characters.
-        ALUtf8View view;
-        view.assign(mText.getString());
-        const S32 overwritten_end =
-            (S32)view.toBytes(view.toCodepoints((size_t)insert_preedit_at) + preedit_string.length());
-        const S32 overwritten = overwritten_end - insert_preedit_at;
+        // As much of the text as the preedit will cover, backed off to a whole
+        // character so the overwrite cannot end inside one.
+        const S32 overwritten = (S32)utf8str_grapheme_align_backward(
+            mText.getString(),
+            llmin((size_t)insert_preedit_at + preedit_string.length(),
+                  (size_t)mText.lengthBytes())) - insert_preedit_at;
         mPreeditOverwrittenString = mText.getString().substr(insert_preedit_at, overwritten);
         mText.erase(insert_preedit_at, overwritten);
     }
@@ -2847,8 +2840,7 @@ void LLLineEditor::updatePreedit(const LLWString &preedit_string,
     mPreeditStandouts = preedit_standouts;
 
     setCursor(position);
-    setCursor(mPreeditPositions.front()
-              + wstring_utf8_length(preedit_string.substr(0, (size_t)llmax(0, caret_position))));
+    setCursor(mPreeditPositions.front() + llmax(0, caret_position));
 
     // Update of the preedit should be caused by some key strokes.
     mKeystrokeTimer.reset();
@@ -2882,13 +2874,7 @@ bool LLLineEditor::getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect
         return false;
     }
 
-    S32 query = getCursor();
-    if (query_offset >= 0)
-    {
-        ALUtf8View view;
-        view.assign(mText.getString());
-        query = (S32)view.toBytes(view.toCodepoints((size_t)preedit_left_column) + (size_t)query_offset);
-    }
+    const S32 query = (query_offset >= 0 ? preedit_left_column + query_offset : getCursor());
     if (query < mScrollHPos || query < preedit_left_column || query > preedit_right_column)
     {
         return false;
@@ -2921,9 +2907,7 @@ bool LLLineEditor::getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect
     return true;
 }
 
-// A byte range, for callers inside the viewer. The LLPreeditor override below
-// reports the same span counted in characters, which is what the IME asked for.
-void LLLineEditor::getSelectionRangeBytes(S32 *position, S32 *length) const
+void LLLineEditor::getSelectionRange(S32 *position, S32 *length) const
 {
     if (hasSelection())
     {
@@ -2939,41 +2923,22 @@ void LLLineEditor::getSelectionRangeBytes(S32 *position, S32 *length) const
 
 void LLLineEditor::getPreeditRange(S32 *position, S32 *length) const
 {
-    S32 begin = mCursorPos, end = mCursorPos;
     if (hasPreeditString())
     {
-        begin = mPreeditPositions.front();
-        end   = mPreeditPositions.back();
+        *position = mPreeditPositions.front();
+        *length   = mPreeditPositions.back() - mPreeditPositions.front();
     }
-
-    ALUtf8View view;
-    view.assign(mText.getString());
-    *position = (S32)view.toCodepoints((size_t)begin);
-    *length   = (S32)view.toCodepoints((size_t)end) - *position;
-}
-
-void LLLineEditor::getSelectionRange(S32 *position, S32 *length) const
-{
-    S32 begin, span;
-    getSelectionRangeBytes(&begin, &span);
-
-    ALUtf8View view;
-    view.assign(mText.getString());
-    *position = (S32)view.toCodepoints((size_t)begin);
-    *length   = (S32)view.toCodepoints((size_t)(begin + span)) - *position;
+    else
+    {
+        *position = mCursorPos;
+        *length   = 0;
+    }
 }
 
 void LLLineEditor::markAsPreedit(S32 position, S32 length)
 {
-    // Both arrive counted in characters.
-    S32 begin, end;
-    {
-        ALUtf8View view;
-        view.assign(mText.getString());
-        const size_t first = (size_t)llmax(0, position);
-        begin = (S32)view.toBytes(first);
-        end   = (S32)view.toBytes(first + (size_t)llmax(0, length));
-    }
+    const S32 begin = position;
+    const S32 end   = position + length;
 
     deselect();
     setCursor(begin);

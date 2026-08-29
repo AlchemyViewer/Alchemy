@@ -69,24 +69,25 @@ public:
     virtual LLTextSegmentPtr clone(LLTextBase& terget) const { return new LLTextSegment(mStart, mEnd); }
     static LLStyleSP cloneStyle(LLTextBase& target, const LLStyle* source);
 
-    bool                        getDimensions(S32 first_char, S32 num_chars, S32& width, S32& height);
+    bool                        getDimensions(S32 first_byte, S32 num_bytes, S32& width, S32& height);
     bool                        getPermitsEmoji() const { return mPermitsEmoji; };
 
-    virtual bool                getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    virtual S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const;
+    virtual bool                getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    virtual S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const;
 
     /**
-    * Get number of chars that fit into free part of current line.
+    * Get number of bytes that fit into free part of current line.
     *
     * @param num_pixels - maximum width of rect
-    * @param segment_offset - symbol in segment we start processing line from
-    * @param line_offset - symbol in line after which segment starts
-    * @param max_chars - limit of symbols that will fit in current line
+    * @param segment_offset - byte in segment we start processing line from
+    * @param line_offset - byte in line after which segment starts
+    * @param max_bytes - limit of bytes that will fit in current line
     * @param line_ind - index of not word-wrapped string inside segment for multi-line segments.
     * Two string separated by word-wrap will have same index.
-    * @return number of chars that will fit into current line
+    * @return number of bytes that will fit into current line, always ending on
+    * a character boundary
     */
-    virtual S32                 getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    virtual S32                 getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     virtual void                updateLayout(const class LLTextBase& editor);
     virtual F32                 draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
     virtual bool                canEdit() const;
@@ -140,9 +141,9 @@ public:
     virtual ~LLNormalTextSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
 
-    /*virtual*/ bool                getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    /*virtual*/ S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const;
-    /*virtual*/ S32                 getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool                getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    /*virtual*/ S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const;
+    /*virtual*/ S32                 getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     /*virtual*/ void                updateLayout(const class LLTextBase& editor);
     /*virtual*/ F32                 draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
     /*virtual*/ bool                canEdit() const { return mCanEdit; }
@@ -245,8 +246,8 @@ public:
     ~LLInlineViewSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
 
-    /*virtual*/ bool        getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    /*virtual*/ S32         getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool        getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    /*virtual*/ S32         getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     /*virtual*/ void        updateLayout(const class LLTextBase& editor);
     /*virtual*/ F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
     /*virtual*/ bool        canEdit() const { return false; }
@@ -271,8 +272,8 @@ public:
     LLLineBreakTextSegment(S32 pos);
     ~LLLineBreakTextSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
-    /*virtual*/ bool        getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    S32         getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool        getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    S32         getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
 
 private:
@@ -290,8 +291,8 @@ public:
     ~LLImageTextSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
 
-    /*virtual*/ bool        getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    S32         getNumChars(S32 num_pixels, S32 segment_offset, S32 char_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool        getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    S32         getNumBytes(S32 num_pixels, S32 segment_offset, S32 byte_offset, S32 max_bytes, S32 line_ind) const;
     F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
 
     /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask);

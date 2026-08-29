@@ -184,52 +184,55 @@ bool LLUrlEntryBase::isLinkDisabled() const
 
 bool LLUrlEntryBase::isWikiLinkCorrect(const std::string &labeled_url) const
 {
-    LLWString wlabel = utf8str_to_wstring(getLabelFromWikiLink(labeled_url));
-    wlabel.erase(std::remove(wlabel.begin(), wlabel.end(), L'\u200B'), wlabel.end());
+    const std::string wiki_label = getLabelFromWikiLink(labeled_url);
 
-    // Unicode URL validation, see SL-15243
-    std::replace_if(wlabel.begin(),
-                    wlabel.end(),
-                    [](const llwchar &chr)
-                    {
-                        return (chr == L'\u2024') // "One Dot Leader"
-                               || (chr == L'\uFE52') // "Small Full Stop"
-                               || (chr == L'\uFF0E') // "Fullwidth Full Stop"
-                               // Not a decomposition, but suficiently similar
-                               || (chr == L'\u05C5'); // "Hebrew Mark Lower Dot"
-                    },
-                    L'\u002E'); // Dot "Full Stop"
-
-    std::replace_if(wlabel.begin(),
-        wlabel.end(),
-        [](const llwchar &chr)
+    // Unicode URL validation, see SL-15243. Confusables are folded onto the
+    // ASCII characters they imitate, so a label cannot disguise a different
+    // host. Each replacement is one byte where the character it replaces is
+    // several, so the string is rebuilt rather than edited in place.
+    std::string label;
+    label.reserve(wiki_label.size());
+    for (size_t i = 0; i < wiki_label.size(); )
     {
-        return (chr == L'\u02D0') // "Modifier Letter Colon"
-            || (chr == L'\uFF1A') // "Fullwidth Colon"
-            || (chr == L'\u2236') // "Ratio"
-            || (chr == L'\uFE55'); // "Small Colon"
-    },
-        L'\u003A'); // Colon
+        const size_t begin = i;
+        const LLCodepointAt at = utf8str_decode_at(wiki_label, i);
+        i = at.next;
 
-    std::replace_if(wlabel.begin(),
-        wlabel.end(),
-        [](const llwchar &chr)
-    {
-        return (chr == L'\uFF0F'); // "Fullwidth Solidus"
-    },
-        L'\u002F'); // Solidus
+        switch (at.cp)
+        {
+        case 0x200B:    // "Zero Width Space" -- removed outright
+            break;
 
-    std::replace_if(wlabel.begin(),
-        wlabel.end(),
-        [](const llwchar& chr)
-    {
-        return // Not a decomposition, but suficiently similar
-            (chr == L'\u04BA') // "Cyrillic Capital Letter Shha"
-            || (chr == L'\u04BB'); // "Cyrillic Small Letter Shha"
-    },
-        L'\u0068'); // "Latin Small Letter H"
+        case 0x2024:    // "One Dot Leader"
+        case 0xFE52:    // "Small Full Stop"
+        case 0xFF0E:    // "Fullwidth Full Stop"
+        case 0x05C5:    // "Hebrew Mark Lower Dot" -- not a decomposition, but sufficiently similar
+            label += '.';
+            break;
 
-    std::string label = wstring_to_utf8str(wlabel);
+        case 0x02D0:    // "Modifier Letter Colon"
+        case 0xFF1A:    // "Fullwidth Colon"
+        case 0x2236:    // "Ratio"
+        case 0xFE55:    // "Small Colon"
+            label += ':';
+            break;
+
+        case 0xFF0F:    // "Fullwidth Solidus"
+            label += '/';
+            break;
+
+        case 0x04BA:    // "Cyrillic Capital Letter Shha"
+        case 0x04BB:    // "Cyrillic Small Letter Shha" -- not a decomposition, but sufficiently similar
+            label += 'h';
+            break;
+
+        default:
+            // The character's own bytes, so malformed input survives as it
+            // arrived rather than being normalised into something else.
+            label.append(wiki_label, begin, at.next - begin);
+            break;
+        }
+    }
     if ((label.find(".com") != std::string::npos
          || label.find("www.") != std::string::npos)
         && label.find("://") == std::string::npos)

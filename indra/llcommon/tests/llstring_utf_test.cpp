@@ -2502,4 +2502,52 @@ namespace tut
         ensure_equals("truncated sequence",
                       utf8str_codepoint_count("\xF0\x9F"), size_t(2));
     }
+
+    // The UTF-16 pair has to agree with the wide forms it stands beside: the
+    // Win32 IME hands offsets in code units and the editors index bytes, so a
+    // disagreement here is a caret landing in the wrong place mid-composition.
+    template<> template<>
+    void llstring_utf_object_t::test<133>()
+    {
+        // 'a', e-acute, an ideograph, an astral emoji (a surrogate pair), 'z'.
+        const LLWString wide = { (llwchar)'a', (llwchar)0x00E9, (llwchar)0x65E5,
+                                 (llwchar)0x1F600, (llwchar)'z' };
+        const std::string utf8 = wstring_to_utf8str(wide);
+
+        ALUtf8View view;
+        view.assign(wide);
+
+        // Whole-string length in code units, and every prefix of it.
+        ensure_equals("whole string", utf8str_utf16_length(utf8, 0, S32_MAX),
+                      wstring_utf16_length(wide, 0, (S32)wide.size()));
+        for (size_t cp = 0; cp <= wide.size(); ++cp)
+        {
+            ensure_equals("prefix at " + std::to_string(cp),
+                          utf8str_utf16_length(utf8, 0, (S32)view.toBytes(cp)),
+                          wstring_utf16_length(wide, 0, (S32)cp));
+        }
+
+        // The emoji is the only character costing two code units.
+        ensure_equals("units", utf8str_utf16_length(utf8, 0, S32_MAX), S32(6));
+
+        // Back the other way: a budget in code units becomes a byte count.
+        for (S32 units = 0; units <= 6; ++units)
+        {
+            bool unaligned = false;
+            const S32 bytes = utf8str_length_from_utf16_length(utf8, 0, units, &unaligned);
+            const S32 cps   = wstring_wstring_length_from_utf16_length(wide, 0, units);
+            ensure_equals("bytes for " + std::to_string(units) + " units",
+                          bytes, (S32)view.toBytes((size_t)cps));
+            // Four units lands between the emoji's surrogate halves.
+            ensure("unaligned only mid-pair", unaligned == (units == 4));
+        }
+
+        // Offsets are honoured, not just whole-string calls.
+        const S32 after_e = (S32)view.toBytes(2);   // past 'a' and the accent
+        ensure_equals("offset form", utf8str_utf16_length(utf8, after_e, S32_MAX), S32(4));
+
+        // Out of range clamps rather than running off.
+        ensure_equals("past the end", utf8str_utf16_length(utf8, 999, 999), S32(0));
+        ensure_equals("no budget", utf8str_length_from_utf16_length(utf8, 0, 0), S32(0));
+    }
 }

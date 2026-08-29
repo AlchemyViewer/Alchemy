@@ -61,7 +61,7 @@ public:
         mEditor = NULL;
     }
 
-    /*virtual*/ S32 getWidth(S32 first_char, S32 num_chars) const
+    /*virtual*/ S32 getWidth(S32 first_byte, S32 num_bytes) const
     {
         return mEditor->getDocumentView()->getRect().getWidth();
     }
