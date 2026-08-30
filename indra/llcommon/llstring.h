@@ -1526,6 +1526,17 @@ void LLStringUtilBase<T>::toLower(string_type& string)
 template<> LL_COMMON_API void LLStringUtilBase<char>::toUpper(std::string& string);
 template<> LL_COMMON_API void LLStringUtilBase<char>::toLower(std::string& string);
 
+// The narrow trims decode, so they answer for the whole of Unicode: a
+// no-break space pasted in from a web page, an ideographic space either side
+// of CJK, and a narrow no-break space are whitespace here, where a byte-wise
+// isspace() saw none of them and left them in the string. ASCII settles
+// inline and only a lead byte pays for the decode. Same rule as utf8str_trim,
+// which shares the implementation.
+template<> LL_COMMON_API void LLStringUtilBase<char>::trimHead(std::string& string);
+template<> LL_COMMON_API void LLStringUtilBase<char>::trimTail(std::string& string);
+template<> LL_COMMON_API void LLStringUtilBase<char>::trimHead(std::string_view& string);
+template<> LL_COMMON_API void LLStringUtilBase<char>::trimTail(std::string_view& string);
+
 //static
 template<class T>
 void LLStringUtilBase<T>::trimHead(string_type& string)

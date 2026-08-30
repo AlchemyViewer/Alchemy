@@ -388,32 +388,103 @@ std::string u8str_to_str(const char8_t* u8str, size_t len)
     return std::string(u8str_view.begin(), u8str_view.end());
 }
 
-std::string utf8str_trim(std::string_view utf8str)
+namespace
 {
-    // One decoding pass rather than a conversion to UTF-32 and back. The
-    // decode is the part that cannot be skipped: LLStringOps::isSpace on a
-    // char answers for ASCII only, so trimming bytes would leave a no-break
-    // space or an ideographic space behind where the wide form removed them.
-    size_t begin = 0;
-    size_t end = 0;
-    bool found = false;
 
-    for (size_t i = 0; i < utf8str.size(); )
+// Where the leading whitespace stops. The decode is the part that cannot be
+// skipped: LLStringOps::isSpace on a char answers for ASCII only, so trimming
+// bytes leaves a no-break space or an ideographic space behind. ASCII settles
+// without decoding, which is the whole of the common case.
+size_t utf8str_trim_head_offset(std::string_view utf8str)
+{
+    size_t i = 0;
+    while (i < utf8str.size())
     {
+        const unsigned char byte = static_cast<unsigned char>(utf8str[i]);
+        if (byte < 0x80)
+        {
+            if (!LLStringOps::isSpace(static_cast<char>(byte)))
+            {
+                break;
+            }
+            ++i;
+            continue;
+        }
+
         const LLCodepointAt at = utf8str_decode_at(utf8str, i);
         if (!LLStringOps::isSpace(at.cp))
         {
-            if (!found)
-            {
-                begin = i;
-                found = true;
-            }
-            end = at.next;
+            break;
         }
         i = at.next;
     }
+    return i;
+}
 
-    return found ? std::string(utf8str.substr(begin, end - begin)) : std::string();
+// Where the trailing whitespace starts. Walks backward over continuation
+// bytes to find the character start, bounded by the longest encoding, and
+// stops on anything that does not decode back to exactly where it began --
+// malformed bytes are content, and leaving them is the safe direction.
+size_t utf8str_trim_tail_offset(std::string_view utf8str)
+{
+    size_t i = utf8str.size();
+    while (i > 0)
+    {
+        size_t start = i - 1;
+        while (start > 0
+               && (i - start) < 4
+               && (static_cast<unsigned char>(utf8str[start]) & 0xC0) == 0x80)
+        {
+            --start;
+        }
+
+        const unsigned char byte = static_cast<unsigned char>(utf8str[start]);
+        if (byte < 0x80)
+        {
+            if (start + 1 != i || !LLStringOps::isSpace(static_cast<char>(byte)))
+            {
+                break;
+            }
+        }
+        else
+        {
+            const LLCodepointAt at = utf8str_decode_at(utf8str, start);
+            if (at.next != i || !LLStringOps::isSpace(at.cp))
+            {
+                break;
+            }
+        }
+        i = start;
+    }
+    return i;
+}
+
+}
+
+template<> void LLStringUtilBase<char>::trimHead(std::string& string)
+{
+    string.erase(0, utf8str_trim_head_offset(string));
+}
+
+template<> void LLStringUtilBase<char>::trimTail(std::string& string)
+{
+    string.erase(utf8str_trim_tail_offset(string));
+}
+
+template<> void LLStringUtilBase<char>::trimHead(std::string_view& string)
+{
+    string = string.substr(utf8str_trim_head_offset(string));
+}
+
+template<> void LLStringUtilBase<char>::trimTail(std::string_view& string)
+{
+    string = string.substr(0, utf8str_trim_tail_offset(string));
+}
+
+std::string utf8str_trim(std::string_view utf8str)
+{
+    utf8str = utf8str.substr(utf8str_trim_head_offset(utf8str));
+    return std::string(utf8str.substr(0, utf8str_trim_tail_offset(utf8str)));
 }
 
 

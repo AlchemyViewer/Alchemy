@@ -233,10 +233,11 @@ namespace tut
     //   10x grapheme         (step + align + range_at)
     //   11x utf8str helpers  (substChar/makeASCII/removeCRLF/split/preview)
     //   12x utf8 walkers     (byte-offset segmentation against its wide twin)
+    //   14x trim             (Unicode whitespace, and what is not whitespace)
     // The TUT default registers only test<1>..test<50>, but the explicit
-    // test_group<..., 141> below raises that ceiling. Keep this index in
+    // test_group<..., 145> below raises that ceiling. Keep this index in
     // sync with categories used below.
-    typedef test_group<llstring_utf_data, 142> llstring_utf_t;
+    typedef test_group<llstring_utf_data, 145> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
 
@@ -2824,5 +2825,100 @@ namespace tut
             at = next;
         }
         ensure_equals("stepping forward reaches the end", at, lines.size());
+    }
+
+    // ---------------------------------------------------------------
+    //                              trim
+    // ---------------------------------------------------------------
+
+    // LLStringUtil::trim answers for Unicode whitespace, not just ASCII. A
+    // no-break space arrives pasted out of a web page and an ideographic
+    // space sits either side of CJK; a byte-wise isspace() saw neither.
+    template<> template<>
+    void llstring_utf_object_t::test<142>()
+    {
+        const std::string nbsp   = "\xC2\xA0";      // U+00A0
+        const std::string ideo   = "\xE3\x80\x80";  // U+3000
+        const std::string em     = "\xE2\x80\x83";  // U+2003
+        const std::string narrow = "\xE2\x80\xAF";  // U+202F
+        const std::string cjk    = "\xE6\x97\xA5\xE6\x9C\xAC";
+
+        std::string s = nbsp + "Rye" + nbsp;
+        LLStringUtil::trim(s);
+        ensure_equals("a no-break space is whitespace", s, std::string("Rye"));
+
+        s = ideo + cjk + ideo;
+        LLStringUtil::trim(s);
+        ensure_equals("an ideographic space is whitespace", s, cjk);
+
+        s = em + narrow + " \tx\t " + narrow + em;
+        LLStringUtil::trim(s);
+        ensure_equals("ASCII and Unicode spaces mixed", s, std::string("x"));
+
+        s = nbsp + "a";
+        LLStringUtil::trimHead(s);
+        ensure_equals("trimHead crosses one", s, std::string("a"));
+
+        s = "a" + nbsp;
+        LLStringUtil::trimTail(s);
+        ensure_equals("trimTail crosses one", s, std::string("a"));
+
+        s = nbsp + ideo + em;
+        LLStringUtil::trim(s);
+        ensure("all whitespace trims to nothing", s.empty());
+    }
+
+    // What is not White_Space stays, and malformed bytes are content: a trim
+    // that guessed at them could cut a character in half.
+    template<> template<>
+    void llstring_utf_object_t::test<143>()
+    {
+        const std::string zwsp = "\xE2\x80\x8B";  // U+200B, not White_Space
+        const std::string bom  = "\xEF\xBB\xBF";  // U+FEFF, not White_Space
+
+        std::string s = zwsp + "a" + zwsp;
+        LLStringUtil::trim(s);
+        ensure_equals("a zero-width space is not whitespace", s, zwsp + "a" + zwsp);
+
+        s = bom + "a" + bom;
+        LLStringUtil::trim(s);
+        ensure_equals("a byte order mark is not whitespace", s, bom + "a" + bom);
+
+        s = std::string("\x80") + "a" + std::string("\x80");
+        LLStringUtil::trim(s);
+        ensure_equals("a stray continuation byte is content", s.size(), size_t(3));
+
+        // U+3000 missing its last byte. The lead byte it shares with a real
+        // ideographic space must not be enough to cut it.
+        s = std::string("a") + "\xE3\x80";
+        LLStringUtil::trim(s);
+        ensure_equals("a truncated character is left whole", s.size(), size_t(3));
+
+        s = "  hello  ";
+        LLStringUtil::trim(s);
+        ensure_equals("ASCII trims as it always did", s, std::string("hello"));
+
+        s.clear();
+        LLStringUtil::trim(s);
+        ensure("an empty string survives", s.empty());
+    }
+
+    // The view forms cut where the string forms cut, and utf8str_trim shares
+    // that decision rather than keeping a second one.
+    template<> template<>
+    void llstring_utf_object_t::test<144>()
+    {
+        const std::string src = std::string("\xC2\xA0") + "\t" + "caf\xC3\xA9" + "\xE3\x80\x80";
+        const std::string expected = "caf\xC3\xA9";
+
+        std::string owned = src;
+        LLStringUtil::trim(owned);
+        ensure_equals("the string form", owned, expected);
+
+        std::string_view view = src;
+        LLStringUtil::trim(view);
+        ensure_equals("the view form cuts the same place", std::string(view), expected);
+
+        ensure_equals("utf8str_trim agrees", utf8str_trim(src), expected);
     }
 }
