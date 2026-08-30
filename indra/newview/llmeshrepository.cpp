@@ -4570,6 +4570,10 @@ void LLMeshRepository::unregisterMesh(LLVOVolume* vobj, const LLVolumeParams& me
                 auto it = std::find(mPendingRequests.begin(), mPendingRequests.end(), req);
                 if (it != mPendingRequests.end())
                 {
+                    if (req->getRequestType() == MESH_REQUEST_LOD)
+                    {
+                        LLMeshRepository::sLODPending--;
+                    }
                     mPendingRequests.erase(it);
                 }
             }
@@ -4634,6 +4638,15 @@ void LLMeshRepository::unregisterAllMeshes()
     // that were tracked by the maps above. Now that every tracking entry is gone
     // any queued request has no volumes to notify, so discard them here to keep
     // ownership consistent and avoid submitting requests against freed data.
+    // Decrement sLODPending for any LOD requests being discarded to keep the
+    // counter balanced with the increments in loadMesh().
+    for (const std::shared_ptr<PendingRequestBase>& req : mPendingRequests)
+    {
+        if (req && req->getRequestType() == MESH_REQUEST_LOD)
+        {
+            LLMeshRepository::sLODPending--;
+        }
+    }
     mPendingRequests.clear();
 }
 
@@ -5062,6 +5075,11 @@ void LLMeshRepository::notifyLoadedMeshes()
         // Skip rather than dereferencing a potentially stale object.
         if (!req_p || !req_p->hasTrackedData())
         {
+            // Keep sLODPending balanced with the increment in loadMesh().
+            if (req_p && req_p->getRequestType() == MESH_REQUEST_LOD)
+            {
+                LLMeshRepository::sLODPending--;
+            }
             continue;
         }
         switch (req_p->getRequestType())
