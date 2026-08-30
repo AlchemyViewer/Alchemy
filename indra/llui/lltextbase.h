@@ -198,7 +198,11 @@ protected:
     // scrolling back into view finds its geometry where it left it.
     std::vector<LinePieceCache> mLinePieces;
     size_t                      mNextLinePiece = 0;
-    S32                         mLastDrawPass = -1;
+    // 0 is "not drawn yet", and cannot be mistaken for a real pass: the editor
+    // counts the pass before any segment draws in it, so the first one seen
+    // here is 1. A lap of the counter can hand a segment a pass number it has
+    // seen before, which costs one pass of rebuilding and then settles.
+    U32                         mLastDrawPass = 0;
 
     LinePieceCache&     nextLinePiece();
 
@@ -484,8 +488,10 @@ public:
 
     // Counts passes over the visible text. A segment that wraps is drawn once
     // per line it covers, and this is how it tells the pieces of one pass from
-    // the pieces of the next.
-    S32                     getDrawPass() const { return mDrawPass; }
+    // the pieces of the next. Unsigned because it is only ever compared for
+    // equality and must be allowed to wrap: signed overflow would be undefined
+    // where this is simply a lap of the counter.
+    U32                     getDrawPass() const { return mDrawPass; }
 
     void                    appendText(const std::string &new_text, bool prepend_newline, const LLStyle::Params& input_params = LLStyle::Params());
 
@@ -778,7 +784,7 @@ protected:
     // text segmentation and flow
     segment_set_t               mSegments;
     line_list_t                 mLineInfoList;
-    S32                         mDrawPass = 0;
+    U32                         mDrawPass = 0;
     LLRect                      mVisibleTextRect;           // The rect in which text is drawn.  Excludes borders.
     LLRect                      mTextBoundingRect;
 

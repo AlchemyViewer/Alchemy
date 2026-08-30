@@ -4016,7 +4016,7 @@ F32 LLNormalTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 selec
 // piece of the next and finds its own geometry waiting.
 LLNormalTextSegment::LinePieceCache& LLNormalTextSegment::nextLinePiece()
 {
-    const S32 pass = mEditor.getDrawPass();
+    const U32 pass = mEditor.getDrawPass();
     if (mLastDrawPass != pass)
     {
         mLastDrawPass = pass;
