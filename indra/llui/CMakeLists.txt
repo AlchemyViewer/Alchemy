@@ -113,6 +113,7 @@ target_sources(llui
     PUBLIC
     FILE_SET HEADERS
     FILES
+    alcachedlabel.h
     altextcaret.h
     fsvirtualtrackpad.h
     llaccordionctrl.h

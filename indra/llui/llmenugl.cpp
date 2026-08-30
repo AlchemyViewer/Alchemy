@@ -514,7 +514,8 @@ void LLMenuItemGL::draw( void )
     // Draw the text on top.
     if (mBriefItem)
     {
-        mFont->renderBytes( mLabel.getString(), 0, BRIEF_PAD_PIXELS / 2, 0, color,
+        const std::string& label = mLabel.getString();
+        mLabelBuffer.forText(label).renderBytes( mFont, label, 0, BRIEF_PAD_PIXELS / 2.f, 0.f, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
     }
     else
@@ -525,19 +526,23 @@ void LLMenuItemGL::draw( void )
         F32 y = (F32)MENU_ITEM_PADDING / 2.f;
         if( !mDrawBoolLabel.empty() )
         {
-            mFont->renderBytes( mDrawBoolLabel.getString(), 0, (F32)LEFT_PAD_PIXELS, y, color,
+            const std::string& bool_label = mDrawBoolLabel.getString();
+            mBoolLabelBuffer.forText(bool_label).renderBytes( mFont, bool_label, 0, (F32)LEFT_PAD_PIXELS, y, color,
                            LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
-        mFont->renderBytes( mLabel.getString(), 0, (F32)LEFT_PLAIN_PIXELS, y, color,
+        const std::string& label = mLabel.getString();
+        mLabelBuffer.forText(label).renderBytes( mFont, label, 0, (F32)LEFT_PLAIN_PIXELS, y, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         if( !mDrawAccelLabel.empty() )
         {
-            mFont->renderBytes( mDrawAccelLabel.getString(), 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
+            const std::string& accel_label = mDrawAccelLabel.getString();
+            mAccelLabelBuffer.forText(accel_label).renderBytes( mFont, accel_label, 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
         if( !mDrawBranchLabel.empty() )
         {
-            mFont->renderBytes( mDrawBranchLabel.getString(), 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
+            const std::string& branch_label = mDrawBranchLabel.getString();
+            mBranchLabelBuffer.forText(branch_label).renderBytes( mFont, branch_label, 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
     }
@@ -575,6 +580,10 @@ void LLMenuItemGL::onVisibilityChange(bool new_visibility)
     {
         getMenu()->needsArrange();
     }
+    mLabelBuffer.reset();
+    mBoolLabelBuffer.reset();
+    mAccelLabelBuffer.reset();
+    mBranchLabelBuffer.reset();
     LLView::onVisibilityChange(new_visibility);
 }
 
@@ -2126,7 +2135,7 @@ void LLMenuGL::arrange( void )
         U32 max_height = getTornOff() ? U32_MAX: menu_region_rect.getHeight();
 
         // *FIX: create the item first and then ask for its dimensions?
-        S32 spillover_item_width = PLAIN_PAD_PIXELS + LLFontGL::getFontSansSerif()->getWidth( std::string("More") ); // *TODO: Translate
+        S32 spillover_item_width = PLAIN_PAD_PIXELS + LLFontGL::getFontSansSerif()->getWidth("More"); // *TODO: Translate
         S32 spillover_item_height = LLFontGL::getFontSansSerif()->getLineHeight() + MENU_ITEM_PADDING;
 
         // Scrolling support
