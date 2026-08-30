@@ -287,6 +287,10 @@ enum
 constexpr int WATCHED_EVENTS = PA_SUBSCRIPTION_MASK_SINK | PA_SUBSCRIPTION_MASK_SOURCE |
                                PA_SUBSCRIPTION_MASK_SERVER | PA_SUBSCRIPTION_MASK_CARD;
 
+// dlsym() returns void*, but our slots are typed function pointers. Casting
+// through void** trips -Wstrict-aliasing unless the slot is may-alias.
+typedef void* __attribute__((__may_alias__)) al_pulse_void_p_alias;
+
 struct ALPulseSymbols
 {
     pa_threaded_mainloop* (*mainloop_new)(void);
@@ -387,7 +391,7 @@ class ALPulseNotifier final : public ALAudioDeviceNotifier
         {                                                                                   \
             return false;                                                                   \
         }                                                                                   \
-        *reinterpret_cast<void**>(&mPulse.member) = address;                                \
+        *reinterpret_cast<al_pulse_void_p_alias*>(&mPulse.member) = address;                   \
     } while (false)
 
         AL_PULSE_LOAD(mainloop_new, "pa_threaded_mainloop_new");

@@ -18,6 +18,15 @@ list(APPEND llwebrtc_SOURCE_FILES ${llwebrtc_HEADER_FILES})
 add_library(llwebrtc SHARED ${llwebrtc_SOURCE_FILES})
 set_target_properties(llwebrtc PROPERTIES PUBLIC_HEADER llwebrtc.h)
 
+# WebRTC is built with RTTI disabled (-fno-rtti / /GR-). Subclasses such as
+# LLWebRTCLogSink / LLCustomProcessor need matching flags or the linker looks
+# for typeinfo symbols that libwebrtc.a does not provide.
+if (WINDOWS)
+    target_compile_options(llwebrtc PRIVATE /GR-)
+else()
+    target_compile_options(llwebrtc PRIVATE -fno-rtti)
+endif()
+
 if (WINDOWS)
     set_target_properties(llwebrtc
         PROPERTIES
