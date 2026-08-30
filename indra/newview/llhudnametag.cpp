@@ -325,6 +325,7 @@ void LLHUDNameTag::renderText()
 
     // Render label
     {
+        LLHUDTextScope scope(render_position, false);
         for(std::vector<LLHUDTextSegment>::iterator segment_iter = mLabelSegments.begin();
             segment_iter != mLabelSegments.end(); ++segment_iter )
         {
@@ -343,7 +344,7 @@ void LLHUDNameTag::renderText()
             }
 
             LLColor4 label_color(0.f, 0.f, 0.f, alpha_factor);
-            hud_render_text(segment_iter->getText(), render_position, *fontp, segment_iter->mStyle, LLFontGL::NO_SHADOW, x_offset, y_offset, label_color, false);
+            scope.draw(segment_iter->getText(), *fontp, segment_iter->mStyle, LLFontGL::NO_SHADOW, x_offset, y_offset, label_color);
         }
     }
 
@@ -362,6 +363,7 @@ void LLHUDNameTag::renderText()
             start_segment = llmax((S32)0, (S32)mTextSegments.size() - max_lines);
         }
 
+        LLHUDTextScope scope(render_position, false);
         for (std::vector<LLHUDTextSegment>::iterator segment_iter = mTextSegments.begin() + start_segment;
              segment_iter != mTextSegments.end(); ++segment_iter )
         {
@@ -388,7 +390,7 @@ void LLHUDNameTag::renderText()
             text_color = segment_iter->mColor;
             text_color.mV[VALPHA] *= alpha_factor;
 
-            hud_render_text(segment_iter->getText(), render_position, *fontp, style, shadow, x_offset, y_offset, text_color, false);
+            scope.draw(segment_iter->getText(), *fontp, style, shadow, x_offset, y_offset, text_color);
         }
     }
     /// Reset the default color to white.  The renderer expects this to be the default.

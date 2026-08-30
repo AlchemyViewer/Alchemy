@@ -187,6 +187,7 @@ void LLHUDText::renderText()
             start_segment = llmax((S32)0, (S32)mTextSegments.size() - max_lines);
         }
 
+        LLHUDTextScope scope(render_position, mOnHUDAttachment);
         for (std::vector<LLHUDTextSegment>::iterator segment_iter = mTextSegments.begin() + start_segment;
              segment_iter != mTextSegments.end(); ++segment_iter )
         {
@@ -209,7 +210,7 @@ void LLHUDText::renderText()
             text_color = segment_iter->mColor;
             text_color.mV[VALPHA] *= alpha_factor;
 
-            hud_render_text(segment_iter->getText(), render_position, *fontp, style, shadow, x_offset, y_offset, text_color, mOnHUDAttachment);
+            scope.draw(segment_iter->getText(), *fontp, style, shadow, x_offset, y_offset, text_color);
         }
     }
     /// Reset the default color to white.  The renderer expects this to be the default.
