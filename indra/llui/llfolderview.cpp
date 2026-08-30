@@ -356,6 +356,11 @@ void LLFolderView::filter( LLFolderViewFilter& filter )
 
 void LLFolderView::reshape(S32 width, S32 height, bool called_from_parent)
 {
+    // Two LLView::reshape passes: the first so the scroll container can decide
+    // whether it needs a scrollbar, the second with the width that answer
+    // implies. Each is a walk of the whole item tree.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     LLRect scroll_rect;
     if (mScrollContainer)
     {

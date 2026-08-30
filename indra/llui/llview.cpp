@@ -1429,6 +1429,12 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
 
     if (delta_width || delta_height || sForceReshape)
     {
+        // Named so a resize says how much of the view tree it walked: this
+        // recurses into every child whose size changed, and a panel holding
+        // thousands of them (an inventory) walks all of them per reshape.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("view reshape");
+        LL_PROFILE_ZONE_NUM(mChildList.size());
+
         // adjust our rectangle
         mRect.mRight = getRect().mLeft + width;
         mRect.mTop = getRect().mBottom + height;
@@ -1480,7 +1486,14 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
 
             S32 delta_x = child_rect.mLeft - viewp->getRect().mLeft;
             S32 delta_y = child_rect.mBottom - viewp->getRect().mBottom;
-            viewp->translate( delta_x, delta_y );
+            if (delta_x || delta_y)
+            {
+                // translate() recomputes a bounding rect and can dirty the
+                // screen. A child that did not move wants none of that, and on
+                // a width change none of them move -- a view that follows both
+                // edges keeps its left where it was.
+                viewp->translate( delta_x, delta_y );
+            }
             if (child_rect.getWidth() != viewp->getRect().getWidth()
                 || child_rect.getHeight() != viewp->getRect().getHeight()
                 || sForceReshape)
