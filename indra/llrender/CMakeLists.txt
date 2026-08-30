@@ -13,7 +13,7 @@ set(llrender_SOURCE_FILES
     llfontbitmapcache.cpp
     llfontfreetype.cpp
     llfontgl.cpp
-    llfontvertexbuffer.cpp
+    llfonttextcache.cpp
     llfontregistry.cpp
     llgl.cpp
     llglslshader.cpp
@@ -43,7 +43,7 @@ set(llrender_HEADER_FILES
     llcubemap.h
     llcubemaparray.h
     llfontgl.h
-    llfontvertexbuffer.h
+    llfonttextcache.h
     llfontfreetype.h
     llfontbitmapcache.h
     llfontregistry.h
@@ -162,9 +162,9 @@ if (BUILD_TESTING)
     target_compile_definitions(INTEGRATION_TEST_llfontgl PRIVATE ${gl_test_compile_defs})
   endif()
 
-  LL_ADD_INTEGRATION_TEST(llfontvertexbuffer "" "${gl_test_libs}" "${test_project}")
-  if (TARGET INTEGRATION_TEST_llfontvertexbuffer)
-    target_compile_definitions(INTEGRATION_TEST_llfontvertexbuffer PRIVATE ${gl_test_compile_defs})
+  LL_ADD_INTEGRATION_TEST(llfonttextcache "" "${gl_test_libs}" "${test_project}")
+  if (TARGET INTEGRATION_TEST_llfonttextcache)
+    target_compile_definitions(INTEGRATION_TEST_llfonttextcache PRIVATE ${gl_test_compile_defs})
   endif()
   if (TARGET INTEGRATION_TEST_alfontcolrv1)
     # Hand the source-tree font directory to the test as a string literal.

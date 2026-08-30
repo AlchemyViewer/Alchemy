@@ -285,7 +285,7 @@ U64 LLFontGL::getCacheGeneration() const
 // The underline rule, drawn before the glyphs so descenders ('g', 'y', 'p',
 // 'q', 'j') sit on top of it rather than being crossed by it -- typographically
 // correct and what every text engine produces. On the captured-list path
-// (LLFontVertexBuffer) this becomes the first entry in mForegroundBufferList,
+// (LLFontTextCache) this becomes the first entry in mForegroundBufferList,
 // so replay draws it first too.
 //
 // Texture: sWhiteTexture samples vec4(1,1,1,1), so vertex_color multiplied
@@ -547,7 +547,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // textShadowMode is pushed once before pass A starts and reset to
     // passthrough (0) before pass B's foreground emission. It is the only
     // shadow uniform by design: per-pass constant, so the captured-buffer
-    // replay (LLFontVertexBuffer::renderBuffers re-pushes it; LLVertexBufferData
+    // replay (LLFontTextCache::renderBuffers re-pushes it; LLVertexBufferData
     // doesn't capture uniforms) stays correct. Everything that varies per
     // batch in a mixed-atlas string — texel size of the bound atlas, alpha
     // channel layout — derives from the bound texture inside uiF.glsl
@@ -599,7 +599,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // string and emits shadow geometry (or nothing, when the luminance gate
     // above force-disabled it) plus per-glyph metadata into `deferred`; pass B
     // walks `deferred` and emits foreground geometry. The boundary callback
-    // (if any) fires between the passes so LLFontVertexBuffer can swap capture
+    // (if any) fires between the passes so LLFontTextCache can swap capture
     // lists, giving each pass its own captured stream with a uniform color
     // across all vertices — the structural prerequisite for color-only cache
     // regen. We key on the *original* requested shadow type so the callback
@@ -964,7 +964,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
 
     if (needs_two_pass)
     {
-        // Pass-boundary callback: LLFontVertexBuffer uses this to close the
+        // Pass-boundary callback: LLFontTextCache uses this to close the
         // shadow capture list and open the foreground capture list. With no
         // callback this is a no-op (direct callers don't need separate lists).
         if (on_pass_boundary)
@@ -1041,7 +1041,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         // already split the capture lists, and forwarding the callback would
         // double-fire it. Rendering the ellipsis without a shadow keeps the
         // captured streams consistent and avoids tinting the ellipsis shadow
-        // with the foreground color in LLFontVertexBuffer.
+        // with the foreground color in LLFontTextCache.
         renderBytes("...",
                 0,
                 (cur_x - origin.mV[VX]) / sScaleX, (F32)y,

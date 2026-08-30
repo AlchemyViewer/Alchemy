@@ -1,7 +1,7 @@
 /**
- * @file llfontgl.h
+ * @file llfonttextcache.h
  * @author Andrii Kleshchev
- * @brief Buffer storage for font rendering.
+ * @brief What one piece of text costs to draw, kept so it can be reused.
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -98,14 +98,16 @@ private:
     U64             mFontCacheGen = 0;
 };
 
-// Rendering fonts is expensive, this class is intended to store
-// vertex buffers for rendered text, so that they can be reused.
-class LLFontVertexBuffer : private ALFontCacheKey
+// Everything one piece of text costs to draw, kept so it can be reused: the
+// shaped and laid-out geometry, and the widths measured from the same glyphs.
+// These were two classes with two keys, and the width half had exactly one
+// user while every other text draw in the tree measured uncached.
+class LLFontTextCache : private ALFontCacheKey
 {
     friend struct ll_test::VertexBufferProbe;
 public:
-    LLFontVertexBuffer();
-    ~LLFontVertexBuffer();
+    LLFontTextCache();
+    ~LLFontTextCache();
 
     void reset();
 
@@ -161,8 +163,42 @@ public:
         bool use_ellipses = false,
         bool use_color = true);
 
+    // Width, from the same cache and behind the same key. Extracting it from a
+    // font is expensive, it is wanted separately from the draw and usually
+    // before it, and everything that invalidates it -- the text, the font, the
+    // scale it rasterizes at -- has already been compared for the draw.
+    //
+    // One slot per span, because one holder is asked about several per frame
+    // and each answer used to evict the last: the selection rects want two
+    // spans, the cursor's document rect wants the line-start prefix and the
+    // whole segment, and reflow wants its own. Round-robin rather than LRU --
+    // at this size the bookkeeping would cost more than the miss it saves.
+    F32 getWidthBytes(const LLFontGL* fontp,
+        std::string_view utf8text,
+        S32 begin_offset,
+        S32 max_bytes,
+        bool no_padding);
+
     static void enableBufferCollection(bool enable) { sEnableBufferCollection = enable; }
 private:
+
+    // The cache check is the same whichever unit the caller measures in;
+    // only the call that fills it differs.
+    template <typename MEASURE>
+    F32 cachedWidth(const LLFontGL* fontp, S32 begin_offset, S32 max_bytes,
+                    bool no_padding, MEASURE&& measure);
+
+    struct WidthSlot
+    {
+        S32  offset     = 0;
+        S32  max_bytes  = 0;
+        bool no_padding = false;
+        bool valid      = false;
+        F32  width      = 0.f;
+    };
+    static constexpr size_t WIDTH_SLOT_COUNT = 4;
+    WidthSlot mWidthSlots[WIDTH_SLOT_COUNT];
+    size_t    mNextWidthSlot = 0;
 
     S32 renderImpl(const LLFontGL* fontp,
          std::string_view text,
@@ -250,64 +286,5 @@ private:
     static bool sEnableColorOnlyRegen;
 };
 
-// Extracting width from a font is expensive, and due to
-// mechanics of font rendering, we need width separately
-// and usually before rendering.
-class LLFontWidthBuffer : private ALFontCacheKey
-{
-public:
-    LLFontWidthBuffer();
-    ~LLFontWidthBuffer();
-
-    void reset();
-
-    // As LLFontVertexBuffer::setSource: the text is the one input a width
-    // cache is handed by view and cannot compare for itself.
-    void setSource(const void* owner, U32 version)
-    {
-        if (sourceMoved(owner, version))
-        {
-            reset();
-        }
-    }
-
-    F32 getWidthBytes(const LLFontGL* fontp,
-        std::string_view utf8text,
-        S32 begin_offset,
-        S32 max_bytes,
-        bool no_padding);
-
-    static void enableBufferCollection(bool enable) { sEnableBufferCollection = enable; }
-private:
-        // The cache check is the same whichever unit the caller measures in;
-        // only the call that fills it differs.
-        template <typename MEASURE>
-        F32 cachedWidth(const LLFontGL* fontp, S32 begin_offset, S32 max_bytes,
-                        bool no_padding, MEASURE&& measure);
-
-
-        // One slot per span, because one segment is asked about several per
-        // frame and each answer used to evict the last: the selection rects
-        // want two spans, the cursor's document rect wants the line-start
-        // prefix and the whole segment, and reflow wants its own. With a
-        // single slot every one of those was a full measurement walk.
-        //
-        // Round-robin rather than LRU -- at this size the bookkeeping would
-        // cost more than the miss it saves. The font and the scale/DPI state
-        // are shared by every slot, so a change in those empties all of them.
-        struct WidthSlot
-        {
-            S32  offset     = 0;
-            S32  max_bytes  = 0;
-            bool no_padding = false;
-            bool valid      = false;
-            F32  width      = 0.f;
-        };
-        static constexpr size_t WIDTH_SLOT_COUNT = 4;
-        WidthSlot mSlots[WIDTH_SLOT_COUNT];
-        size_t    mNextSlot = 0;
-
-        static bool sEnableBufferCollection;
-};
 
 #endif

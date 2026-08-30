@@ -3965,8 +3965,7 @@ LLNormalTextSegment::LLNormalTextSegment( LLStyleConstSP style, S32 start, S32 e
 :   LLTextSegment(start, end),
     mStyle( style ),
     mToken(NULL),
-    mEditor(editor),
-    mLastGeneration(-1)
+    mEditor(editor)
 {
     mCanEdit = !mStyle->getDrawHighlightBg();
 
@@ -3980,8 +3979,7 @@ LLNormalTextSegment::LLNormalTextSegment( LLStyleConstSP style, S32 start, S32 e
 LLNormalTextSegment::LLNormalTextSegment( const LLUIColor& color, S32 start, S32 end, LLTextBase& editor, bool is_visible)
 :   LLTextSegment(start, end),
     mToken(NULL),
-    mEditor(editor),
-    mLastGeneration(-1)
+    mEditor(editor)
 {
     mStyle = new LLStyle(LLStyle::Params().visible(is_visible).color(color));
 }
@@ -4003,7 +4001,6 @@ F32 LLNormalTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 selec
         mFontBufferPreSelection.reset();
         mFontBufferSelection.reset();
         mFontBufferPostSelection.reset();
-        mFontWidthBuffer.reset();
     }
     return draw_rect.mLeft;
 }
@@ -4020,17 +4017,14 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
     F32 alpha = LLViewDrawContext::getCurrentContext().mAlpha;
 
     const std::string& text = getTextUtf8();
-    S32 text_gen = mEditor.getTextGeneration();
 
-    if (text_gen != mLastGeneration)
-    {
-        mLastGeneration = text_gen;
-
-        mFontBufferPreSelection.reset();
-        mFontBufferSelection.reset();
-        mFontBufferPostSelection.reset();
-        mFontWidthBuffer.reset();
-    }
+    // Name the text the caches are holding work for. The document counts its
+    // own edits, so this is the whole of the invalidation the caches cannot
+    // see for themselves -- everything else about the draw they compare.
+    const U32 text_gen = (U32)mEditor.getTextGeneration();
+    mFontBufferPreSelection.setSource(&mEditor, text_gen);
+    mFontBufferSelection.setSource(&mEditor, text_gen);
+    mFontBufferPostSelection.setSource(&mEditor, text_gen);
 
     const LLFontGL* font = mStyle->getFont();
     LLColor4 color = (mEditor.getReadOnly() ? mStyle->getReadOnlyColor() : mStyle->getColor())  % (alpha * mStyle->getAlpha());
@@ -4062,7 +4056,6 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
             // Font buffer doesn't do well with changes and huge notecard with a bunch
             // of segments will see a lot of buffer updates, so instead use derect
             // rendering to cache.
-            // Todo: instead of mLastGeneration make buffer invalidation more fine grained
             // like string hash of a given segment.
             font->renderBytes(
                 text, start,
@@ -4299,7 +4292,7 @@ bool LLNormalTextSegment::getDimensionsF32(S32 first_byte, S32 num_bytes, F32& w
         height = font->getLineSpacing();
 
         const std::string& text = getTextUtf8();
-        width += mFontWidthBuffer.getWidthBytes(font, text, mStart + first_byte, num_bytes, true);
+        width += mFontBufferPreSelection.getWidthBytes(font, text, mStart + first_byte, num_bytes, true);
     }
     // if last character is a newline, then return true, forcing line break
     return false;
@@ -4390,7 +4383,6 @@ void LLNormalTextSegment::updateLayout(const class LLTextBase& editor)
     mFontBufferPreSelection.reset();
     mFontBufferSelection.reset();
     mFontBufferPostSelection.reset();
-    mFontWidthBuffer.reset();
 }
 
 void LLNormalTextSegment::dump() const

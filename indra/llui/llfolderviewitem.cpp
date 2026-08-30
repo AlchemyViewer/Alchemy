@@ -444,7 +444,7 @@ void LLFolderViewItem::refreshSuffix()
         mLabelStyle = vmi->getLabelStyle();
         pLabelFont = nullptr;
         mLabelSuffix = vmi->getLabelSuffix();
-        // LLFontVertexBuffer::render doesn't compare the string, so cached
+        // LLFontTextCache::render doesn't compare the string, so cached
         // geometry must be invalidated here or it would replay the old suffix.
         // (A style change is covered by render's font-pointer compare.)
         if (mSuffixFontBuffer)
@@ -1073,7 +1073,7 @@ void LLFolderViewItem::drawLabel(const LLFontGL * font, const F32 x, const F32 y
     //
     if (!mLabelFontBuffer)
     {
-        mLabelFontBuffer = std::make_unique<LLFontVertexBuffer>();
+        mLabelFontBuffer = std::make_unique<LLFontTextCache>();
     }
     mLabelFontBuffer->renderBytes(font, mLabel, 0, x, y, color,
         LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
@@ -1208,7 +1208,7 @@ void LLFolderViewItem::draw()
     {
         if (!mSuffixFontBuffer)
         {
-            mSuffixFontBuffer = std::make_unique<LLFontVertexBuffer>();
+            mSuffixFontBuffer = std::make_unique<LLFontTextCache>();
         }
         mSuffixFontBuffer->renderBytes(sSuffixFont, mLabelSuffix, 0, right_x, y, isFadeItem() ? color : sSuffixColor.get(),
             LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,

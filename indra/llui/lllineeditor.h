@@ -40,7 +40,7 @@
 #include "llframetimer.h"
 
 #include "lleditmenuhandler.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llspellcheckmenuhandler.h"
 #include "lluictrl.h"
 #include "lluiimage.h"
@@ -371,10 +371,10 @@ protected:
 
     LLViewBorder* mBorder;
     const LLFontGL* mGLFont;
-    LLFontVertexBuffer mFontBufferPreSelection;
-    LLFontVertexBuffer mFontBufferSelection;
-    LLFontVertexBuffer mFontBufferPostSelection;
-    LLFontVertexBuffer mFontBufferLabel;
+    LLFontTextCache mFontBufferPreSelection;
+    LLFontTextCache mFontBufferSelection;
+    LLFontTextCache mFontBufferPostSelection;
+    LLFontTextCache mFontBufferLabel;
     std::string mDefaultText;
     S32         mMaxLengthBytes;            // Max length of the UTF8 string in bytes
     S32         mMaxLengthChars;            // Maximum number of characters in the string

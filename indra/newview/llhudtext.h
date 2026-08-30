@@ -35,7 +35,7 @@
 #include "v2math.h"
 #include "llrect.h"
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include <set>
 #include <vector>
 
@@ -67,7 +67,7 @@ protected:
         LLColor4                mColor;
         LLFontGL::StyleFlags    mStyle;
         const LLFontGL*         mFont;
-        LLFontVertexBuffer      mFontBuffer;
+        LLFontTextCache      mFontBuffer;
     private:
         std::string             mText;
         std::map<const LLFontGL*, F32> mFontWidthMap;

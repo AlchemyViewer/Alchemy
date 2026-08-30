@@ -30,7 +30,7 @@
 
 #include "v4color.h"
 #include "lleditmenuhandler.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llspellcheckmenuhandler.h"
 #include "llstyle.h"
 #include "llkeywords.h"
@@ -178,12 +178,14 @@ protected:
 
     bool mCanEdit { true };
 
-    // font rendering
-    LLFontVertexBuffer  mFontBufferPreSelection;
-    LLFontVertexBuffer  mFontBufferSelection;
-    LLFontVertexBuffer  mFontBufferPostSelection;
-    LLFontWidthBuffer   mFontWidthBuffer;
-    S32                 mLastGeneration = -1;
+    // Font rendering. Three spans are drawn -- before, inside and after the
+    // selection -- and several more are measured. The first cache answers the
+    // measurements: every cache here is keyed on the same text and the same
+    // font, so any of them would, and picking one keeps the width slots in a
+    // named place rather than scattered across the three.
+    LLFontTextCache     mFontBufferPreSelection;
+    LLFontTextCache     mFontBufferSelection;
+    LLFontTextCache     mFontBufferPostSelection;
 };
 
 // This text segment is the same as LLNormalTextSegment, the only difference

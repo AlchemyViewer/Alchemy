@@ -46,7 +46,7 @@
 #include "../llfontfreetype.h"
 #include "../alfontshaping.h"
 #include "../aluniformbuffer.h"
-#include "../llfontvertexbuffer.h"
+#include "../llfonttextcache.h"
 #include "../llrender.h"
 #include "../llshadermgr.h"
 #include "../llvertexbuffer.h"
@@ -55,8 +55,8 @@
 
 namespace ll_test
 {
-    // Test-only accessor for LLFontVertexBuffer's private capture lists.
-    // Friended in llfontvertexbuffer.h so we can count emitted quads per
+    // Test-only accessor for LLFontTextCache's private capture lists.
+    // Friended in llfonttextcache.h so we can count emitted quads per
     // pass without poisoning the production API with public accessors.
     struct VertexBufferProbe
     {
@@ -66,7 +66,7 @@ namespace ll_test
             size_t foreground_quads = 0;
         };
 
-        static CaptureCounts count(const LLFontVertexBuffer& buf)
+        static CaptureCounts count(const LLFontTextCache& buf)
         {
             CaptureCounts c;
             for (const LLVertexBufferData& e : buf.mShadowBufferList)
@@ -294,7 +294,7 @@ namespace ll_test
         static constexpr S32 HEIGHT = 256;
 
         // needs_render = true compiles gUIProgram and binds it so
-        // LLFontVertexBuffer::render() / LLFontGL::render() complete
+        // LLFontTextCache::render() / LLFontGL::render() complete
         // end-to-end against OSMesa. Implies the other three flags
         // (rendering needs vbos + imagegl + llrender to be live).
         HeadlessGL(bool needs_vbos = true, bool needs_imagegl = true,

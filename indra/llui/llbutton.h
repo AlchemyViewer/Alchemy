@@ -35,7 +35,7 @@
 #include "v4color.h"
 #include "llframetimer.h"
 #include "lluiimage.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "lluistring.h"
 
 //
@@ -394,7 +394,7 @@ protected:
 
 private:
     const LLFontGL* mGLFont;
-    LLFontVertexBuffer          mFontBuffer;
+    LLFontTextCache          mFontBuffer;
 
 protected:
     virtual std::string _getSearchText() const override

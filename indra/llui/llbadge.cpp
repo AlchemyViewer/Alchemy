@@ -30,7 +30,7 @@
 #include "llbadge.h"
 
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
 

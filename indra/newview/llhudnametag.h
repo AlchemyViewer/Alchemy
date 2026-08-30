@@ -37,7 +37,7 @@
 #include "llrect.h"
 //#include "llframetimer.h"
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include <set>
 #include <vector>
 

@@ -100,7 +100,7 @@ public:
     const LLFontFreetype* getFontFreetype() const { return mFontFreetype.get(); }
 
     // on_pass_boundary, if non-null, is invoked once between the shadow pass and
-    // the foreground pass when shadow != NO_SHADOW. LLFontVertexBuffer uses it to
+    // the foreground pass when shadow != NO_SHADOW. LLFontTextCache uses it to
     // close one captured display list and open another so each pass lands in its
     // own list with a uniform color across all vertices — a prerequisite for
     // color-only cache regeneration. For NO_SHADOW renders the callback is not

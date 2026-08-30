@@ -44,7 +44,7 @@
 #include "llfloaterreg.h"
 #include "llfocusmgr.h"
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llwindow.h"
 #include "llnotificationsutil.h"
 #include "llrender.h"

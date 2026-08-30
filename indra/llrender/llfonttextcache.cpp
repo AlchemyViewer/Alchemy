@@ -1,6 +1,6 @@
 /**
- * @file llfontvertexbuffer.cpp
- * @brief Buffer storage for font rendering.
+ * @file llfonttextcache.cpp
+ * @brief What one piece of text costs to draw, kept so it can be reused.
  *
  * $LicenseInfo:firstyear=2024&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -29,7 +29,7 @@
 
 #include "linden_common.h"
 
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 
 #include "llfontbitmapcache.h"
 #include "llfontfreetype.h"
@@ -42,8 +42,8 @@
 #include "llmath.h"  // clamp_rescale
 
 
-bool LLFontVertexBuffer::sEnableBufferCollection = true;
-bool LLFontVertexBuffer::sEnableColorOnlyRegen = true;
+bool LLFontTextCache::sEnableBufferCollection = true;
+bool LLFontTextCache::sEnableColorOnlyRegen = true;
 
 namespace
 {
@@ -96,21 +96,26 @@ bool ALFontCacheKey::environmentMoved(const LLFontGL* fontp)
     return true;
 }
 
-LLFontVertexBuffer::LLFontVertexBuffer()
+LLFontTextCache::LLFontTextCache()
 {
 }
 
-LLFontVertexBuffer::~LLFontVertexBuffer()
+LLFontTextCache::~LLFontTextCache()
 {
     reset();
 }
 
-void LLFontVertexBuffer::reset()
+void LLFontTextCache::reset()
 {
     // Todo: some form of debug only frequecy check&assert to see if this is happening too often.
     // Regenerating this list is expensive
     mShadowBufferList.clear();
     mForegroundBufferList.clear();
+    for (WidthSlot& slot : mWidthSlots)
+    {
+        slot.valid = false;
+    }
+    mNextWidthSlot = 0;
     forgetSource();
 }
 
@@ -130,7 +135,7 @@ namespace
     }
 }
 
-S32 LLFontVertexBuffer::renderBytes(
+S32 LLFontTextCache::renderBytes(
     const LLFontGL* fontp,
     std::string_view text,
     S32 begin_offset,
@@ -148,7 +153,7 @@ S32 LLFontVertexBuffer::renderBytes(
     return renderBytes(fontp, text, begin_offset, rect_float, color, halign, valign, style, shadow, max_bytes, right_x, use_ellipses, use_color);
 }
 
-S32 LLFontVertexBuffer::renderBytes(
+S32 LLFontTextCache::renderBytes(
     const LLFontGL* fontp,
     std::string_view text,
     S32 begin_offset,
@@ -184,7 +189,7 @@ S32 LLFontVertexBuffer::renderBytes(
     return renderBytes(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow, max_bytes, (S32)rect.getWidth(), right_x, use_ellipses, use_color);
 }
 
-S32 LLFontVertexBuffer::renderBytes(
+S32 LLFontTextCache::renderBytes(
     const LLFontGL* fontp,
     std::string_view text,
     S32 begin_offset,
@@ -202,7 +207,7 @@ S32 LLFontVertexBuffer::renderBytes(
                       max_bytes, max_pixels, right_x, use_ellipses, use_color);
 }
 
-S32 LLFontVertexBuffer::renderImpl(
+S32 LLFontTextCache::renderImpl(
     const LLFontGL* fontp,
     std::string_view text,
     S32 begin_offset,
@@ -305,7 +310,7 @@ S32 LLFontVertexBuffer::renderImpl(
     return mChars;
 }
 
-void LLFontVertexBuffer::genBuffers(
+void LLFontTextCache::genBuffers(
     const LLFontGL* fontp,
     std::string_view text,
     S32 begin_offset,
@@ -430,7 +435,7 @@ void LLFontVertexBuffer::genBuffers(
     }
 }
 
-void LLFontVertexBuffer::recolorBuffers(
+void LLFontTextCache::recolorBuffers(
     const LLColor4& color,
     LLFontGL::ShadowType shadow)
 {
@@ -478,7 +483,7 @@ void LLFontVertexBuffer::recolorBuffers(
     mLastColor = color;
 }
 
-void LLFontVertexBuffer::renderBuffers()
+void LLFontTextCache::renderBuffers()
 {
     // The replay path: no shaping, no measurement, just the captured draws.
     // Named apart from genBuffers so a capture shows at a glance whether a
@@ -521,31 +526,10 @@ void LLFontVertexBuffer::renderBuffers()
     gGL.popUIMatrix();
 }
 
-// LLFontWidthBuffer
-bool LLFontWidthBuffer::sEnableBufferCollection = true;
-
-LLFontWidthBuffer::LLFontWidthBuffer()
-{
-}
-
-LLFontWidthBuffer::~LLFontWidthBuffer()
-{
-}
-
-void LLFontWidthBuffer::reset()
-{
-    forgetSource();
-    for (WidthSlot& slot : mSlots)
-    {
-        slot.valid = false;
-    }
-    mNextSlot = 0;
-}
-
 // The cache check is the same whichever unit the caller measures in; only the
 // call that fills it differs, so both entry points route through here.
 template <typename MEASURE>
-F32 LLFontWidthBuffer::cachedWidth(
+F32 LLFontTextCache::cachedWidth(
     const LLFontGL* fontp,
     S32 begin_offset,
     S32 max_bytes,
@@ -563,15 +547,15 @@ F32 LLFontWidthBuffer::cachedWidth(
     // measured earlier is worth keeping, whatever span it was for.
     if (environmentMoved(fontp))
     {
-        for (WidthSlot& slot : mSlots)
+        for (WidthSlot& slot : mWidthSlots)
         {
             slot.valid = false;
         }
-        mNextSlot = 0;
+        mNextWidthSlot = 0;
     }
     else
     {
-        for (const WidthSlot& slot : mSlots)
+        for (const WidthSlot& slot : mWidthSlots)
         {
             if (slot.valid
                 && slot.offset == begin_offset
@@ -585,8 +569,8 @@ F32 LLFontWidthBuffer::cachedWidth(
 
     const F32 width = measure();
 
-    WidthSlot& slot = mSlots[mNextSlot];
-    mNextSlot       = (mNextSlot + 1) % WIDTH_SLOT_COUNT;
+    WidthSlot& slot = mWidthSlots[mNextWidthSlot];
+    mNextWidthSlot       = (mNextWidthSlot + 1) % WIDTH_SLOT_COUNT;
     slot.offset     = begin_offset;
     slot.max_bytes  = max_bytes;
     slot.no_padding = no_padding;
@@ -596,7 +580,7 @@ F32 LLFontWidthBuffer::cachedWidth(
     return width;
 }
 
-F32 LLFontWidthBuffer::getWidthBytes(
+F32 LLFontTextCache::getWidthBytes(
     const LLFontGL* fontp,
     std::string_view utf8text,
     S32 begin_offset,

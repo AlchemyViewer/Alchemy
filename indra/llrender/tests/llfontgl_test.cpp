@@ -1087,7 +1087,7 @@ namespace tut
     // VAlign branches: render() must complete through TOP, VCENTER,
     // BASELINE, and BOTTOM without crashing; return value matches
     // requested char count for each. Pins the valign switch at
-    // llfontvertexbuffer.cpp:123-138.
+    // llfonttextcache.cpp:123-138.
     template<> template<>
     void llfontgl_render_object::test<3>()
     {
@@ -1140,7 +1140,7 @@ namespace tut
     // Shadow rendering paths: render with NO_SHADOW, DROP_SHADOW, and
     // DROP_SHADOW_SOFT. All three branches must complete without
     // crashing. The two-pass shadow capture (genBuffers' beginList
-    // dance at llfontvertexbuffer.cpp:281-290) needs sCurBoundShader
+    // dance at llfonttextcache.cpp:281-290) needs sCurBoundShader
     // to be gUIProgram, which the fixture ensures. Pins shadow
     // rendering doesn't crash; visible-shadow geometry verification is
     // out of scope for this fixture (no production shadow shader).

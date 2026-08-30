@@ -29,7 +29,7 @@
 #include "llflashtimer.h"
 #include "llview.h"
 #include "lluiimage.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 
 #include <memory>
 
@@ -356,8 +356,8 @@ private:
     // item goes off-screen (see setVisible), so only on-screen items hold vertex
     // buffers and their MSVC per-std::list sentinel allocations. Null until first
     // drawn, after being hidden, or (for the suffix) when there is no suffix.
-    std::unique_ptr<LLFontVertexBuffer> mLabelFontBuffer;
-    std::unique_ptr<LLFontVertexBuffer> mSuffixFontBuffer;
+    std::unique_ptr<LLFontTextCache> mLabelFontBuffer;
+    std::unique_ptr<LLFontTextCache> mSuffixFontBuffer;
     LLFontGL* pLabelFont{nullptr};
 };
 
