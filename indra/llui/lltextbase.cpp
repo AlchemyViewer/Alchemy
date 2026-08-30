@@ -1540,9 +1540,15 @@ void LLTextBase::reshape(S32 width, S32 height, bool called_from_parent)
         // up-to-date mVisibleTextRect
         updateRects();
 
-        // Todo: This might be wrong. updateRects already sets needsReflow conditionaly.
-        // Reflow is expensive and doing it at any twith can be too much.
-        needsReflow();
+        // updateRects marks the reflow when the width it wrapped against has
+        // moved, which is the only thing that changes where lines break. A
+        // second unconditional mark here re-wrapped the document for every
+        // resize in either direction. sForceReshape is not a size change at
+        // all -- it is "assume everything moved" -- so it keeps its reflow.
+        if (LLView::sForceReshape)
+        {
+            needsReflow();
+        }
     }
 }
 
@@ -1930,7 +1936,10 @@ void LLTextBase::reflow()
 
         while(seg_iter != mSegments.end())
         {
-            LLTextSegmentPtr segment = *seg_iter;
+            // A reference: the set owns the pointer for the whole loop, and
+            // copying it here is a reference count round trip per segment per
+            // line of the document.
+            const LLTextSegmentPtr& segment = *seg_iter;
 
             // track maximum height of any segment on this line
             S32 cur_index = segment->getStart() + seg_offset;
@@ -2021,7 +2030,7 @@ void LLTextBase::reflow()
             segment_it != mSegments.end();
             ++segment_it)
         {
-            LLTextSegmentPtr segmentp = *segment_it;
+            const LLTextSegmentPtr& segmentp = *segment_it;
             segmentp->updateLayout(*this);
 
         }
@@ -3700,7 +3709,14 @@ void LLTextBase::updateRects()
     {
         mVisibleTextRect.stretch(-1);
     }
-    if (mVisibleTextRect != old_text_rect)
+    // Width only. Reflow exists to decide where lines break, and nothing in
+    // that decision reads the height: the wrap loop measures against
+    // mVisibleTextRect.getWidth(), and where the resulting lines sit
+    // vertically is this function's own job, done unconditionally above.
+    // Marking a reflow for a height change re-wraps the whole document to
+    // reach the same break positions it already had, which for a chat history
+    // is every segment in the scrollback on every frame of a vertical drag.
+    if (mVisibleTextRect.getWidth() != old_text_rect.getWidth())
     {
         needsReflow();
     }
