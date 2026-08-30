@@ -235,11 +235,10 @@ U64 LLFontGL::getCacheGeneration() const
     // sum — no A+1/B-1 aliasing. addFallbackFont growing the chain adds a
     // component, which also only increases it.
     //
-    // This used to return the global counter, which invalidated EVERY
-    // cached text buffer viewer-wide whenever any font rasterized a glyph;
-    // during glyph churn (first CJK chat fill, post-eviction warm-up) each
-    // regen rasterized more glyphs and re-invalidated everything again for
-    // several frames.
+    // Per font, not global: a global counter invalidates every cached text
+    // buffer viewer-wide whenever any font rasterizes a glyph, and glyph churn
+    // (the first CJK chat fill, a post-eviction warm-up) then rasterizes more
+    // glyphs per regen and re-invalidates everything again for several frames.
     const LLFontFreetype* ft = mFontFreetype.get();
     if (!ft)
         return 0;
@@ -281,6 +280,39 @@ U64 LLFontGL::getCacheGeneration() const
     mCacheGenChain  = chain_len;
     mCacheGenValid  = true;
     return gen;
+}
+
+// The underline rule, drawn before the glyphs so descenders ('g', 'y', 'p',
+// 'q', 'j') sit on top of it rather than being crossed by it -- typographically
+// correct and what every text engine produces. On the captured-list path
+// (LLFontVertexBuffer) this becomes the first entry in mForegroundBufferList,
+// so replay draws it first too.
+//
+// Texture: sWhiteTexture samples vec4(1,1,1,1), so vertex_color multiplied
+// through the standard ui shader produces a solid stroke. TRIANGLES over a
+// textured quad keeps the pipeline uniform with glyphs -- a LINES + unbind
+// sequence captures a texName=0 batch that replays as an unbind→sWhiteTexture
+// dance and renders inconsistently across drivers. The face's own
+// underline_position / underline_thickness give a typographically correct
+// stroke rather than a 1px line at the descender depth.
+static void draw_underline(const LLFontFreetype* face, F32 start_x, F32 baseline_y,
+                           F32 width, const LLColor4& color)
+{
+    const F32 end_x = start_x + width;
+    const F32 y_bot = baseline_y + face->getUnderlinePosition();
+    const F32 y_top = y_bot + face->getUnderlineThickness();
+
+    LLColor4U col(color);
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, ALTextureSlot::sWhiteTexture);
+    gGL.color4ubv(col.mV);
+    gGL.begin(LLRender::TRIANGLES);
+    gGL.vertex2f(start_x, y_bot);
+    gGL.vertex2f(end_x,   y_bot);
+    gGL.vertex2f(start_x, y_top);
+    gGL.vertex2f(end_x,   y_bot);
+    gGL.vertex2f(end_x,   y_top);
+    gGL.vertex2f(start_x, y_top);
+    gGL.end();
 }
 
 // Where a rect-anchored draw starts, which is the only thing the rect forms do
@@ -338,12 +370,10 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         return 0;
     }
 
-    // Atlas-sheet eviction now runs once per frame from
-    // LLFontGL::sweepGlyphCaches (driven by LLViewerWindow::checkSettings),
-    // not here. Doing it inside render() forced every glyph render to
-    // pay the throttle-check overhead and risked racing eviction with
-    // glyph pointers active inside the same render call.
-
+    // Atlas-sheet eviction belongs to LLFontGL::sweepGlyphCaches, once per
+    // frame: run from here it would put a throttle check in the per-glyph path
+    // and could evict a sheet while this call still holds glyph pointers into
+    // it.
 
     S32 scaled_max_pixels = max_pixels == S32_MAX ? S32_MAX : llceil((F32)max_pixels * sScaleX);
 
@@ -496,46 +526,12 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
 
     if (style_to_add & UNDERLINE)
     {
-        // Draw the underline BEFORE glyph emission so descenders ('g',
-        // 'y', 'p', 'q', 'j') sit on top of the rule rather than being
-        // crossed by it — typographically correct and what every text
-        // engine produces. Captured-list path (LLFontVertexBuffer) gets
-        // an underline batch as the first entry in mForegroundBufferList,
-        // so replay draws it first too. Non-capture mode just streams it
-        // ahead of the glyph batches.
-        //
-        // Width: getWidthF32 is the same per-pen-accumulation walk the
-        // render loop uses, clamped to scaled_max_pixels for the ellipses
-        // path. Mirrors halign-RIGHT/HCENTER's existing math (lines 286,
-        // 289). For the rare overflow-without-ellipses case the rule may
-        // extend slightly past the last visible glyph; the typography
-        // win on common usage outweighs that corner.
-        //
-        // Texture: sWhiteTexture sample = vec4(1,1,1,1), so vertex_color
-        // multiplied through the standard ui shader produces a solid
-        // colored stroke. Going through TRIANGLES + textured-quad keeps
-        // the pipeline uniform with glyphs (the legacy LINES + unbind
-        // sequence captured a texName=0 batch that re-played as an
-        // unbind→sWhiteTexture dance and rendered inconsistently across
-        // drivers). Using the face's own underline_position /
-        // underline_thickness gives a typographically correct stroke
-        // instead of a fixed 1px line stuck at the descender depth.
-        const S32 underline_width = llmin(scaled_max_pixels, scaled_string_width);
-        const F32 end_x = start_x + (F32)underline_width;
-        const F32 y_bot = cur_y + mFontFreetype->getUnderlinePosition();
-        const F32 y_top = y_bot + mFontFreetype->getUnderlineThickness();
-
-        LLColor4U col(color);
-        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, ALTextureSlot::sWhiteTexture);
-        gGL.color4ubv(col.mV);
-        gGL.begin(LLRender::TRIANGLES);
-        gGL.vertex2f(start_x, y_bot);
-        gGL.vertex2f(end_x,   y_bot);
-        gGL.vertex2f(start_x, y_top);
-        gGL.vertex2f(end_x,   y_bot);
-        gGL.vertex2f(end_x,   y_top);
-        gGL.vertex2f(start_x, y_top);
-        gGL.end();
+        // The same string width the halign cases above use, clamped to
+        // scaled_max_pixels for the ellipses path. In the rare
+        // overflow-without-ellipses case the rule may extend slightly past the
+        // last visible glyph; the typography win on common usage outweighs it.
+        draw_underline(mFontFreetype, start_x, cur_y,
+                       (F32)llmin(scaled_max_pixels, scaled_string_width), color);
     }
 
     // After the ALFontFace move, atlas ownership is per source face — heads
@@ -628,7 +624,9 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     deferred.clear();
     if (needs_two_pass)
     {
-        deferred.reserve(length);
+        // Glyphs, not bytes: a CJK line is three bytes per glyph and an emoji
+        // four, and this vector never gives its capacity back.
+        deferred.reserve(layout.glyphs ? layout.glyphs->size() : 0);
     }
 
     LLColor4U text_color(color);
@@ -646,12 +644,10 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // binds brand-new sheets to create their GL textures), so the texture
     // bound at flush time is NOT necessarily the one the pending quads were
     // built for. Submitting under the stomped binding samples another atlas
-    // page — glyphs from unrelated text — which is exactly the legacy
-    // "CJK/emoji on first render" corruption the old per-codepoint
-    // `last_char != wch` flush band-aided around (the per-char flush kept the
-    // pending batch to ~1 glyph, making the misdraw practically invisible).
-    // bind() is a cached no-op when the binding didn't move, so the re-assert
-    // costs nothing on the common path.
+    // page — glyphs from unrelated text, which is what "CJK and emoji come out
+    // corrupted the first time they are drawn" looks like. bind() is a cached
+    // no-op when the binding didn't move, so the re-assert costs nothing on the
+    // common path.
     LLImageGL* batch_image = nullptr;
     auto flush_batch = [&]()
     {
