@@ -219,10 +219,27 @@ private:
                         bool no_padding, MEASURE&& measure);
 
         const LLFontGL* mLastFont = nullptr;
-        S32 mLastOffset = 0;
-        S32 mLastMaxBytes = 0;
-        bool mLastNoPadding = false;
-        F32 mWidth = -1.f;
+
+        // One slot per span, because one segment is asked about several per
+        // frame and each answer used to evict the last: the selection rects
+        // want two spans, the cursor's document rect wants the line-start
+        // prefix and the whole segment, and reflow wants its own. With a
+        // single slot every one of those was a full measurement walk.
+        //
+        // Round-robin rather than LRU -- at this size the bookkeeping would
+        // cost more than the miss it saves. The font and the scale/DPI state
+        // are shared by every slot, so a change in those empties all of them.
+        struct WidthSlot
+        {
+            S32  offset     = 0;
+            S32  max_bytes  = 0;
+            bool no_padding = false;
+            bool valid      = false;
+            F32  width      = 0.f;
+        };
+        static constexpr size_t WIDTH_SLOT_COUNT = 4;
+        WidthSlot mSlots[WIDTH_SLOT_COUNT];
+        size_t    mNextSlot = 0;
 
         // LLFontGL's values that affect width calculation
         F32 mLastScaleX = 1.f;

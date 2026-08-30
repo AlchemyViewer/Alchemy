@@ -211,6 +211,23 @@ U64 LLFontGL::getCacheGeneration() const
     const LLFontFreetype* ft = mFontFreetype.get();
     if (!ft)
         return 0;
+
+    // Memoized, because the callers ask on the path where the answer is
+    // "nothing changed, replay what you have" -- every cached-text widget,
+    // every frame -- and answering meant walking the whole fallback chain,
+    // which for the default SansSerif is a handful of faces before the OS
+    // ones attach at runtime.
+    //
+    // Two things can move the sum. A component takes a new value, which it can
+    // only draw from the global counter, so the counter moving is a necessary
+    // condition. Or the chain gains a face that already had a cache, which
+    // moves no counter at all -- so its length is part of the key too.
+    const S32    global_gen = LLFontBitmapCache::getGlobalGeneration();
+    const size_t chain_len  = ft->getFallbackFonts().size();
+    if (mCacheGenValid && mCacheGenGlobal == global_gen && mCacheGenChain == chain_len)
+    {
+        return mCacheGenSum;
+    }
     // U64 accumulator: components are non-negative S32s drawn from the
     // monotonic global counter, so the unsigned 64-bit sum can't overflow
     // within any reachable session and the comparison contract in the
@@ -226,6 +243,11 @@ U64 LLFontGL::getCacheGeneration() const
                 gen += (U64)cache->getCacheGeneration();
         }
     }
+
+    mCacheGenSum    = gen;
+    mCacheGenGlobal = global_gen;
+    mCacheGenChain  = chain_len;
+    mCacheGenValid  = true;
     return gen;
 }
 
@@ -1643,7 +1665,10 @@ S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 s
     // states the thing the walk needs outright — a position that appears here
     // is a cluster start, and only a cluster start is somewhere the caller may
     // begin drawing from.
-    std::vector<std::pair<S32, F32>> cluster_advance;
+    // Reused rather than built per call: this runs on every cursor move that
+    // scrolls a line editor, and the table is a few entries long.
+    static thread_local std::vector<std::pair<S32, F32>> cluster_advance;
+    cluster_advance.clear();
     F32 last_cluster_extent = 0.f;
     {
         std::string_view slice = utf8text.substr(0, measure_end);
@@ -1655,7 +1680,21 @@ S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 s
         {
             if (sg.cluster < 0 || (size_t)sg.cluster >= measure_end)
                 continue;
-            cluster_advance.emplace_back(sg.cluster, sg.x_advance);
+            // HarfBuzz emits an LTR run with non-decreasing clusters, and the
+            // direction is set LTR unconditionally, so glyphs sharing a cluster
+            // arrive together and the table comes out ordered. Summing them as
+            // they arrive replaces a sort and a compaction pass; the assert is
+            // what says the ordering is being relied on rather than assumed.
+            if (!cluster_advance.empty() && cluster_advance.back().first == sg.cluster)
+            {
+                cluster_advance.back().second += sg.x_advance;
+            }
+            else
+            {
+                llassert(cluster_advance.empty()
+                         || cluster_advance.back().first < sg.cluster);
+                cluster_advance.emplace_back(sg.cluster, sg.x_advance);
+            }
             if (sg.cluster == start)
             {
                 const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
@@ -1668,25 +1707,6 @@ S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 s
         // The fill above is shape_glyphs' last dereference — it must not
         // have been invalidated by a shape-cache mutation mid-hold.
         llassert(shape_gen == ALFontShaping::cacheMutationCount());
-    }
-    // The sweep below needs these in position order, and several glyphs can
-    // share one cluster -- a mark stack, a ligature's parts -- so their
-    // advances have to sum into a single entry. Sorting rather than trusting
-    // the shaper's emission order keeps this independent of it, the way the
-    // table it replaced was.
-    std::sort(cluster_advance.begin(), cluster_advance.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
-    if (!cluster_advance.empty())
-    {
-        auto write = cluster_advance.begin();
-        for (auto read = write + 1; read != cluster_advance.end(); ++read)
-        {
-            if (read->first == write->first)
-                write->second += read->second;
-            else
-                *++write = *read;
-        }
-        cluster_advance.erase(write + 1, cluster_advance.end());
     }
 
     const bool use_shaped = !cluster_advance.empty();

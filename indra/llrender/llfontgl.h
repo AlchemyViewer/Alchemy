@@ -354,6 +354,16 @@ private:
     LLFontDescriptor mFontDescriptor;
     LLPointer<LLFontFreetype> mFontFreetype;
 
+    // Memo for getCacheGeneration, which is asked on the do-nothing path of
+    // every cached-text widget every frame. Keyed on the global stamp counter
+    // and the fallback chain's length -- between them, the two things that can
+    // move the sum. Mutable because the accessor is const and the answer is
+    // derived state, not a property of the font.
+    mutable U64    mCacheGenSum    = 0;
+    mutable S32    mCacheGenGlobal = 0;
+    mutable size_t mCacheGenChain  = 0;
+    mutable bool   mCacheGenValid  = false;
+
     void renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, F32 slant_amt) const;
     // Caller hoists shadow_color and italic slant_offset out of the glyph loop and
     // selects which half to emit. drawGlyphShadow is a no-op for NO_SHADOW or BOLD

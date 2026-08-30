@@ -509,10 +509,11 @@ LLFontWidthBuffer::~LLFontWidthBuffer()
 void LLFontWidthBuffer::reset()
 {
     mLastFont = nullptr;
-    mLastOffset = 0;
-    mLastMaxBytes = 0;
-    mLastNoPadding = false;
-    mWidth = -1.f;
+    for (WidthSlot& slot : mSlots)
+    {
+        slot.valid = false;
+    }
+    mNextSlot = 0;
     mLastScaleX = 1.f;
     mLastScaleY = 1.f;
     mLastVertDPI = 0.f;
@@ -538,38 +539,57 @@ F32 LLFontWidthBuffer::cachedWidth(
         return measure();
     }
 
-    // Check if we can use cached width
-    bool needs_recalc = (mWidth < 0.f)
-        || (mLastFont != fontp)
-        || (mLastOffset != begin_offset)
-        || (mLastMaxBytes != max_bytes)
-        || (mLastNoPadding != no_padding)
+    // Everything the whole cache depends on. A change here says nothing
+    // measured earlier is worth keeping, whatever span it was for.
+    const U64 font_cache_gen = fontp->getCacheGeneration();
+    const bool env_changed = (mLastFont != fontp)
         || (mLastScaleX != LLFontGL::sScaleX)
         || (mLastScaleY != LLFontGL::sScaleY)
         || (mLastVertDPI != LLFontGL::sVertDPI)
         || (mLastHorizDPI != LLFontGL::sHorizDPI)
         || (mLastResGeneration != LLFontGL::sResolutionGeneration)
-        || (mLastFontCacheGen != fontp->getCacheGeneration());
+        || (mLastFontCacheGen != font_cache_gen);
 
-    if (needs_recalc)
+    if (env_changed)
     {
-        // Calculate width using the font
-        mWidth = measure();
-
-        // Cache the parameters
-        mLastFont = fontp;
-        mLastOffset = begin_offset;
-        mLastMaxBytes = max_bytes;
-        mLastNoPadding = no_padding;
-        mLastScaleX = LLFontGL::sScaleX;
-        mLastScaleY = LLFontGL::sScaleY;
-        mLastVertDPI = LLFontGL::sVertDPI;
-        mLastHorizDPI = LLFontGL::sHorizDPI;
+        for (WidthSlot& slot : mSlots)
+        {
+            slot.valid = false;
+        }
+        mNextSlot          = 0;
+        mLastFont          = fontp;
+        mLastScaleX        = LLFontGL::sScaleX;
+        mLastScaleY        = LLFontGL::sScaleY;
+        mLastVertDPI       = LLFontGL::sVertDPI;
+        mLastHorizDPI      = LLFontGL::sHorizDPI;
         mLastResGeneration = LLFontGL::sResolutionGeneration;
-        mLastFontCacheGen = fontp->getCacheGeneration();
+        mLastFontCacheGen  = font_cache_gen;
+    }
+    else
+    {
+        for (const WidthSlot& slot : mSlots)
+        {
+            if (slot.valid
+                && slot.offset == begin_offset
+                && slot.max_bytes == max_bytes
+                && slot.no_padding == no_padding)
+            {
+                return slot.width;
+            }
+        }
     }
 
-    return mWidth;
+    const F32 width = measure();
+
+    WidthSlot& slot = mSlots[mNextSlot];
+    mNextSlot       = (mNextSlot + 1) % WIDTH_SLOT_COUNT;
+    slot.offset     = begin_offset;
+    slot.max_bytes  = max_bytes;
+    slot.no_padding = no_padding;
+    slot.width      = width;
+    slot.valid      = true;
+
+    return width;
 }
 
 F32 LLFontWidthBuffer::getWidthBytes(

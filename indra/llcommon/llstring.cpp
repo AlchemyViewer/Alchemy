@@ -2141,6 +2141,14 @@ std::pair<size_t, size_t> utf8str_emoji_range_at(std::string_view utf8str, size_
 
 std::pair<size_t, size_t> utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos)
 {
+    // Scans the whole string, which the drag-select and tooltip callers pay
+    // per mouse-move against a document that can be a chat history. Windowing
+    // it needs care this has not had: a window that opens inside a cluster can
+    // report no cluster at all rather than a cut one, so an empty result is not
+    // evidence that a wider window would agree -- and deciding where it is safe
+    // to cut means knowing what a cluster is made of, which is knowledge that
+    // lives in the walker and should stay there. The callers that already hold
+    // a list should pass it; see the overload above.
     return utf8str_emoji_range_at(utf8str, byte_pos, utf8str_find_emoji_clusters(utf8str));
 }
 
