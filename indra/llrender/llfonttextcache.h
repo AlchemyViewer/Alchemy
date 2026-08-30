@@ -28,10 +28,13 @@
  * $/LicenseInfo$
  */
 
-#ifndef LL_LLFONTVERTEXBUFFER_H
-#define LL_LLFONTVERTEXBUFFER_H
+#ifndef LL_LLFONTTEXTCACHE_H
+#define LL_LLFONTTEXTCACHE_H
 
 #include "llfontgl.h"
+
+#include <functional>
+#include <string_view>
 
 class LLVertexBufferData;
 
@@ -75,6 +78,7 @@ public:
         }
         mOwner = owner;
         mVersion = version;
+        mTextHashed = false;
         return true;
     }
 
@@ -83,11 +87,32 @@ public:
     // folding it into a short-circuiting || would sometimes skip the record.
     bool environmentMoved(const LLFontGL* fontp);
 
-    void forgetSource() { mOwner = nullptr; }
+    void forgetSource() { mOwner = nullptr; mTextHashed = false; }
+
+    // Every query against one source has to be about the same text. The width
+    // slots are keyed on the span and not on the bytes, so a caller that shows
+    // this cache a second string is handed the first one's answer for that
+    // span -- a password field's bullets and the text behind them are the
+    // shape of the mistake. Hashed rather than kept as a view: the text may
+    // have moved between calls, and a stale view could not be compared safely.
+    // Debug only; llassert compiles the call away with it.
+    bool sameTextAsRecorded(std::string_view text)
+    {
+        const size_t hash = std::hash<std::string_view>{}(text);
+        if (!mTextHashed)
+        {
+            mTextHash = hash;
+            mTextHashed = true;
+            return true;
+        }
+        return hash == mTextHash;
+    }
 
 private:
     const void*     mOwner = nullptr;   // never dereferenced, only compared
     U32             mVersion = 0;
+    size_t          mTextHash = 0;
+    bool            mTextHashed = false;
 
     const LLFontGL* mFont = nullptr;
     F32             mScaleX = 1.f;

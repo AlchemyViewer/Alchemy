@@ -231,6 +231,9 @@ S32 LLFontTextCache::renderImpl(
         // For debug purposes and performance testing
         return font_render(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color);
     }
+    // One source, one text: see sameTextAsRecorded.
+    llassert(sameTextAsRecorded(text));
+
     // Ask once and keep the answer: environmentMoved records as it compares,
     // so it must not sit inside a short-circuiting chain. It also has to be
     // asked here, before anything is generated: rendering can rasterize a new
@@ -542,6 +545,8 @@ F32 LLFontTextCache::cachedWidth(
     {
         return measure();
     }
+
+    llassert(sameTextAsRecorded(utf8text));
 
     // Everything the whole cache depends on. A change here says nothing
     // measured earlier is worth keeping, whatever span it was for.
