@@ -74,6 +74,14 @@ public:
     const std::string& getString() const { return getUpdatedResult(); }
     operator std::string() const { return getUpdatedResult(); }
 
+    // Bumped whenever the result could have moved -- a new value, a new
+    // argument, or one of the edit helpers below. Anything caching work
+    // derived from this text (shaped glyphs, a measured width) keys on this
+    // rather than comparing the string, and so cannot forget to. It may bump
+    // without the text actually differing; that costs a rebuild, where the
+    // reverse would leave the wrong text on screen.
+    U32 getGeneration() const { return mGeneration; }
+
     bool empty() const { return getUpdatedResult().empty(); }
 
     // Named for its unit, because an S32 length reads the same whether it
@@ -111,6 +119,10 @@ private:
 
     // controls lazy evaluation
     mutable bool    mNeedsResult { true };
+
+    // Not mutable: updateResult() recomputes what the last change already
+    // announced, so producing the result must not count as a change.
+    U32             mGeneration { 0 };
 };
 
 #endif // LL_LLUISTRING_H

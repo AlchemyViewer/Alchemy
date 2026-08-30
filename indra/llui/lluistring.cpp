@@ -76,6 +76,7 @@ void LLUIString::truncate(S32 max_bytes)
     std::string& result = getUpdatedResult();
     if (result.size() > (size_t)max_bytes)
     {
+        ++mGeneration;
         // Back off to a whole character. A byte count can fall between a
         // letter and its accent, or inside a flag or a family.
         result.resize(utf8str_grapheme_align_backward(result, (size_t)max_bytes));
@@ -85,11 +86,13 @@ void LLUIString::truncate(S32 max_bytes)
 void LLUIString::erase(S32 byte_idx, S32 byte_len)
 {
     getUpdatedResult().erase(byte_idx, byte_len);
+    ++mGeneration;
 }
 
 void LLUIString::insert(S32 byte_idx, std::string_view chars)
 {
     getUpdatedResult().insert(byte_idx, chars);
+    ++mGeneration;
 }
 
 void LLUIString::replace(S32 byte_idx, llwchar wc)
@@ -100,6 +103,7 @@ void LLUIString::replace(S32 byte_idx, llwchar wc)
     std::string& result = getUpdatedResult();
     const auto at = utf8str_decode_at(result, (size_t)byte_idx);
     result.replace((size_t)byte_idx, at.next - (size_t)byte_idx, utf8str_from_cp(wc));
+    ++mGeneration;
 }
 
 void LLUIString::clear()
@@ -107,11 +111,13 @@ void LLUIString::clear()
     // Keep Args
     mOrig.clear();
     mResult.clear();
+    ++mGeneration;
 }
 
 void LLUIString::dirty()
 {
     mNeedsResult = true;
+    ++mGeneration;
 }
 
 void LLUIString::updateResult() const

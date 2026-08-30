@@ -72,6 +72,30 @@ namespace
     }
 }
 
+bool ALFontCacheKey::environmentMoved(const LLFontGL* fontp)
+{
+    const U64 font_cache_gen = fontp ? fontp->getCacheGeneration() : 0;
+    if (mFont == fontp
+        && mScaleX == LLFontGL::sScaleX
+        && mScaleY == LLFontGL::sScaleY
+        && mVertDPI == LLFontGL::sVertDPI
+        && mHorizDPI == LLFontGL::sHorizDPI
+        && mResGeneration == LLFontGL::sResolutionGeneration
+        && mFontCacheGen == font_cache_gen)
+    {
+        return false;
+    }
+
+    mFont          = fontp;
+    mScaleX        = LLFontGL::sScaleX;
+    mScaleY        = LLFontGL::sScaleY;
+    mVertDPI       = LLFontGL::sVertDPI;
+    mHorizDPI      = LLFontGL::sHorizDPI;
+    mResGeneration = LLFontGL::sResolutionGeneration;
+    mFontCacheGen  = font_cache_gen;
+    return true;
+}
+
 LLFontVertexBuffer::LLFontVertexBuffer()
 {
 }
@@ -87,6 +111,7 @@ void LLFontVertexBuffer::reset()
     // Regenerating this list is expensive
     mShadowBufferList.clear();
     mForegroundBufferList.clear();
+    forgetSource();
 }
 
 namespace
@@ -201,11 +226,18 @@ S32 LLFontVertexBuffer::renderImpl(
         // For debug purposes and performance testing
         return font_render(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color);
     }
+    // Ask once and keep the answer: environmentMoved records as it compares,
+    // so it must not sit inside a short-circuiting chain. It also has to be
+    // asked here, before anything is generated: rendering can rasterize a new
+    // glyph and bump the font's cache generation mid-draw, and the value worth
+    // recording is the one the captured geometry was built against.
+    const bool env_moved = environmentMoved(fontp);
+
     // Geometry-invalidating params: any change forces full genBuffers.
     const bool geometry_invalid =
-            mLastX != x
+            env_moved
+         || mLastX != x
          || mLastY != y
-         || mLastFont != fontp
          || mLastHalign != halign
          || mLastValign != valign
          || mLastOffset != begin_offset
@@ -219,13 +251,9 @@ S32 LLFontVertexBuffer::renderImpl(
          // so a caller flipping one without reset() replayed the old geometry.
          || mLastUseEllipses != use_ellipses
          || mLastUseColor != use_color
-         || mLastScaleX != LLFontGL::sScaleX
-         || mLastScaleY != LLFontGL::sScaleY
-         || mLastVertDPI != LLFontGL::sVertDPI
-         || mLastHorizDPI != LLFontGL::sHorizDPI
-         || mLastOrigin != LLFontGL::sCurOrigin
-         || mLastResGeneration != LLFontGL::sResolutionGeneration
-         || mLastFontCacheGen != fontp->getCacheGeneration();
+         // Placement, not font state: where the UI origin sits moves the text
+         // without changing a glyph, so it stays here rather than in the key.
+         || mLastOrigin != LLFontGL::sCurOrigin;
 
     // Crossing the dark-text gate (luminance 0.35) toggles whether shadow
     // geometry was emitted at all, which is geometry-affecting. Detect with a
@@ -298,10 +326,6 @@ void LLFontVertexBuffer::genBuffers(
     // todo: add a debug build assert if this triggers too often for to long?
     mShadowBufferList.clear();
     mForegroundBufferList.clear();
-    // Save before rendreing, it can change mid-render,
-    // so will need to rerender previous characters
-    mLastFontCacheGen = fontp->getCacheGeneration();
-
     // Snapshot shader-shadow state for the cache. The static flag could flip
     // between gen and replay, so we cache it alongside the captured streams
     // and use the snapshot in renderBuffers. shadowMode is the only shadow
@@ -385,7 +409,6 @@ void LLFontVertexBuffer::genBuffers(
         }
     }
 
-    mLastFont = fontp;
     mLastOffset = begin_offset;
     mLastMaxBytes = max_bytes;
     mLastMaxPixels = max_pixels;
@@ -399,12 +422,7 @@ void LLFontVertexBuffer::genBuffers(
     mLastUseEllipses = use_ellipses;
     mLastUseColor = use_color;
 
-    mLastScaleX = LLFontGL::sScaleX;
-    mLastScaleY = LLFontGL::sScaleY;
-    mLastVertDPI = LLFontGL::sVertDPI;
-    mLastHorizDPI = LLFontGL::sHorizDPI;
     mLastOrigin = LLFontGL::sCurOrigin;
-    mLastResGeneration = LLFontGL::sResolutionGeneration;
 
     if (right_x)
     {
@@ -516,18 +534,12 @@ LLFontWidthBuffer::~LLFontWidthBuffer()
 
 void LLFontWidthBuffer::reset()
 {
-    mLastFont = nullptr;
+    forgetSource();
     for (WidthSlot& slot : mSlots)
     {
         slot.valid = false;
     }
     mNextSlot = 0;
-    mLastScaleX = 1.f;
-    mLastScaleY = 1.f;
-    mLastVertDPI = 0.f;
-    mLastHorizDPI = 0.f;
-    mLastResGeneration = 0;
-    mLastFontCacheGen = 0;
 }
 
 // The cache check is the same whichever unit the caller measures in; only the
@@ -549,29 +561,13 @@ F32 LLFontWidthBuffer::cachedWidth(
 
     // Everything the whole cache depends on. A change here says nothing
     // measured earlier is worth keeping, whatever span it was for.
-    const U64 font_cache_gen = fontp->getCacheGeneration();
-    const bool env_changed = (mLastFont != fontp)
-        || (mLastScaleX != LLFontGL::sScaleX)
-        || (mLastScaleY != LLFontGL::sScaleY)
-        || (mLastVertDPI != LLFontGL::sVertDPI)
-        || (mLastHorizDPI != LLFontGL::sHorizDPI)
-        || (mLastResGeneration != LLFontGL::sResolutionGeneration)
-        || (mLastFontCacheGen != font_cache_gen);
-
-    if (env_changed)
+    if (environmentMoved(fontp))
     {
         for (WidthSlot& slot : mSlots)
         {
             slot.valid = false;
         }
-        mNextSlot          = 0;
-        mLastFont          = fontp;
-        mLastScaleX        = LLFontGL::sScaleX;
-        mLastScaleY        = LLFontGL::sScaleY;
-        mLastVertDPI       = LLFontGL::sVertDPI;
-        mLastHorizDPI      = LLFontGL::sHorizDPI;
-        mLastResGeneration = LLFontGL::sResolutionGeneration;
-        mLastFontCacheGen  = font_cache_gen;
+        mNextSlot = 0;
     }
     else
     {

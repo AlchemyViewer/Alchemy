@@ -27,7 +27,6 @@
 #ifndef LL_LLBUTTON_H
 #define LL_LLBUTTON_H
 
-#include "alcachedlabel.h"
 #include "lluuid.h"
 #include "llbadgeowner.h"
 #include "llcontrol.h"
@@ -36,6 +35,7 @@
 #include "v4color.h"
 #include "llframetimer.h"
 #include "lluiimage.h"
+#include "llfontvertexbuffer.h"
 #include "lluistring.h"
 
 //
@@ -394,7 +394,7 @@ protected:
 
 private:
     const LLFontGL* mGLFont;
-    ALCachedLabel               mFontBuffer;
+    LLFontVertexBuffer          mFontBuffer;
 
 protected:
     virtual std::string _getSearchText() const override

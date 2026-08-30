@@ -997,7 +997,9 @@ void LLButton::draw()
         // LLFontGL::render expects S32 max_chars variable but process in a separate way -1 value.
         // Due to U32_MAX is equal to S32 -1 value I have rest this value for non-ellipses mode.
         // Not sure if it is really needed. Probably S32_MAX should be always passed as max_chars.
-        mLastDrawBytesCount = mFontBuffer.forText(label).renderBytes(mGLFont, label, 0,
+        const LLUIString& label_source = getCurrentLabel();
+        mFontBuffer.setSource(&label_source, label_source.getGeneration());
+        mLastDrawBytesCount = mFontBuffer.renderBytes(mGLFont, label, 0,
             (F32)x,
             (F32)(getRect().getHeight() / 2 + mBottomVPad),
             label_color % alpha,

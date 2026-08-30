@@ -477,7 +477,8 @@ void LLScrollListText::draw(const LLColor4& color, const LLColor4& highlight_col
         start_x = (F32)getWidth() * 0.5f;
         break;
     }
-    mFontBuffer.forText(mText.getString()).renderBytes(mFont,
+    mFontBuffer.setSource(&mText, mText.getGeneration());
+    mFontBuffer.renderBytes(mFont,
                        mText.getString(), 0,
                        start_x, 0.f,
                        display_color,
@@ -717,7 +718,8 @@ void LLScrollListIconText::draw(const LLColor4& color, const LLColor4& highlight
         start_icon_x = (S32)(center - (((F32)icon_space + mFont->getWidth(mText.getString())) * 0.5f));
         break;
     }
-    mFontBuffer.forText(mText.getString()).renderBytes(
+    mFontBuffer.setSource(&mText, mText.getGeneration());
+    mFontBuffer.renderBytes(
         mFont,
         mText.getString(), 0,
         start_text_x, 0.f,

@@ -515,7 +515,8 @@ void LLMenuItemGL::draw( void )
     if (mBriefItem)
     {
         const std::string& label = mLabel.getString();
-        mLabelBuffer.forText(label).renderBytes( mFont, label, 0, BRIEF_PAD_PIXELS / 2.f, 0.f, color,
+        mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+        mLabelBuffer.renderBytes( mFont, label, 0, BRIEF_PAD_PIXELS / 2.f, 0.f, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
     }
     else
@@ -527,22 +528,26 @@ void LLMenuItemGL::draw( void )
         if( !mDrawBoolLabel.empty() )
         {
             const std::string& bool_label = mDrawBoolLabel.getString();
-            mBoolLabelBuffer.forText(bool_label).renderBytes( mFont, bool_label, 0, (F32)LEFT_PAD_PIXELS, y, color,
+            mBoolLabelBuffer.setSource(&mDrawBoolLabel, mDrawBoolLabel.getGeneration());
+        mBoolLabelBuffer.renderBytes( mFont, bool_label, 0, (F32)LEFT_PAD_PIXELS, y, color,
                            LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
         const std::string& label = mLabel.getString();
-        mLabelBuffer.forText(label).renderBytes( mFont, label, 0, (F32)LEFT_PLAIN_PIXELS, y, color,
+        mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+        mLabelBuffer.renderBytes( mFont, label, 0, (F32)LEFT_PLAIN_PIXELS, y, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         if( !mDrawAccelLabel.empty() )
         {
             const std::string& accel_label = mDrawAccelLabel.getString();
-            mAccelLabelBuffer.forText(accel_label).renderBytes( mFont, accel_label, 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
+            mAccelLabelBuffer.setSource(&mDrawAccelLabel, mDrawAccelLabel.getGeneration());
+        mAccelLabelBuffer.renderBytes( mFont, accel_label, 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
         if( !mDrawBranchLabel.empty() )
         {
             const std::string& branch_label = mDrawBranchLabel.getString();
-            mBranchLabelBuffer.forText(branch_label).renderBytes( mFont, branch_label, 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
+            mBranchLabelBuffer.setSource(&mDrawBranchLabel, mDrawBranchLabel.getGeneration());
+        mBranchLabelBuffer.renderBytes( mFont, branch_label, 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
     }

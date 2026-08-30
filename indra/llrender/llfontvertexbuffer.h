@@ -37,12 +37,70 @@ class LLVertexBufferData;
 
 namespace ll_test { struct VertexBufferProbe; }
 
+// Which text a cache is holding work for. Both caches below compare every
+// input they are given against the one they last used -- font, position,
+// alignment, style, colour, scale -- except the text, which they are handed as
+// a view and cannot compare without keeping a copy of it. A second copy of
+// every label in the UI is not worth the comparison.
+//
+// So the caller names the text instead: an address that is stable for as long
+// as the text lives, and a counter its owner bumps when it changes.
+// LLUIString::getGeneration is one such counter, which is what llui widgets
+// pass. The address separates a widget's selected label from its unselected
+// one; the counter catches either of them moving.
+//
+// A version may bump without the text differing -- reassigning a label to the
+// value it already had rebuilds. That is the safe direction.
+// It also holds what both caches independently tracked and independently
+// compared: the font, and the state that changes what that font produces --
+// the scale and DPI it rasterizes at, a resolution change, a glyph cache
+// rebuilt underneath it. Seven fields and one comparison, once.
+//
+// This is the whole of what invalidates a width. Geometry dies on all of it
+// and on more besides -- where the text sits, its colour, alignment, shadow,
+// whether it ellipsizes -- so the two are nested, not separate: everything
+// that kills a width kills the geometry too. What keeps them apart below is
+// not the invalidation but the question. Widths are asked for spans that are
+// never drawn, and asked before drawing the span that is, so they need slots
+// of their own rather than an answer read back off a draw.
+class ALFontCacheKey
+{
+public:
+    // True when this names a different text than the last call did.
+    bool sourceMoved(const void* owner, U32 version)
+    {
+        if (owner == mOwner && version == mVersion)
+        {
+            return false;
+        }
+        mOwner = owner;
+        mVersion = version;
+        return true;
+    }
+
+    // True when anything about how this font renders has changed. Records the
+    // new state as it goes, so ask it once per query and keep the answer --
+    // folding it into a short-circuiting || would sometimes skip the record.
+    bool environmentMoved(const LLFontGL* fontp);
+
+    void forgetSource() { mOwner = nullptr; }
+
+private:
+    const void*     mOwner = nullptr;   // never dereferenced, only compared
+    U32             mVersion = 0;
+
+    const LLFontGL* mFont = nullptr;
+    F32             mScaleX = 1.f;
+    F32             mScaleY = 1.f;
+    F32             mVertDPI = 0.f;
+    F32             mHorizDPI = 0.f;
+    S32             mResGeneration = 0;
+    U64             mFontCacheGen = 0;
+};
+
 // Rendering fonts is expensive, this class is intended to store
 // vertex buffers for rendered text, so that they can be reused.
-// LLFontVertexBuffer tracks font and rendering parameters, but
-// expects caller to track text changes and call reset() when
-// text changes.
-class LLFontVertexBuffer
+class LLFontVertexBuffer : private ALFontCacheKey
 {
     friend struct ll_test::VertexBufferProbe;
 public:
@@ -51,8 +109,19 @@ public:
 
     void reset();
 
+    // Name the text being drawn, before drawing it. Everything else the buffer
+    // notices for itself; this is the one input it is handed by view and so
+    // cannot. Callers that never change their text may skip it.
+    void setSource(const void* owner, U32 version)
+    {
+        if (sourceMoved(owner, version))
+        {
+            reset();
+        }
+    }
+
     // `begin_offset` and `max_bytes` index the UTF-8. The buffer keeps no copy
-    // of the text, so nothing about the caching depends on the text itself.
+    // of the text; setSource above is how it is told the text moved.
     S32 renderBytes(const LLFontGL* fontp,
         std::string_view text,
         S32 begin_offset,
@@ -153,7 +222,6 @@ private:
     // uiF.glsl, which the captured streams DO rebind per batch.
     bool mLastUsedShaderShadow = false;
     S32 mChars = 0;
-    const LLFontGL *mLastFont = nullptr;
     S32 mLastOffset = 0;
     S32 mLastMaxBytes = 0;
     S32 mLastMaxPixels = 0;
@@ -169,17 +237,7 @@ private:
     F32 mLastRightX = 0.f;
 
     // LLFontGL's statics
-    F32 mLastScaleX = 1.f;
-    F32 mLastScaleY = 1.f;
-    F32 mLastVertDPI = 0.f;
-    F32 mLastHorizDPI = 0.f;
-    S32 mLastResGeneration = 0;
     LLCoordGL mLastOrigin;
-
-    // Adding new characters to bitmap cache can alter value from getBitmapWidth();
-    // which alters whole string. So rerender when new characters were added to cache.
-    // U64 to match LLFontGL::getCacheGeneration's summed stamp.
-    U64 mLastFontCacheGen = 0;
 
     static bool sEnableBufferCollection;
 
@@ -195,16 +253,23 @@ private:
 // Extracting width from a font is expensive, and due to
 // mechanics of font rendering, we need width separately
 // and usually before rendering.
-// LLFontWidthBuffer tracks font and rendering parameters,
-// but expects caller to track text changes and call reset()
-// when text changes.
-class LLFontWidthBuffer
+class LLFontWidthBuffer : private ALFontCacheKey
 {
 public:
     LLFontWidthBuffer();
     ~LLFontWidthBuffer();
 
     void reset();
+
+    // As LLFontVertexBuffer::setSource: the text is the one input a width
+    // cache is handed by view and cannot compare for itself.
+    void setSource(const void* owner, U32 version)
+    {
+        if (sourceMoved(owner, version))
+        {
+            reset();
+        }
+    }
 
     F32 getWidthBytes(const LLFontGL* fontp,
         std::string_view utf8text,
@@ -220,7 +285,6 @@ private:
         F32 cachedWidth(const LLFontGL* fontp, S32 begin_offset, S32 max_bytes,
                         bool no_padding, MEASURE&& measure);
 
-        const LLFontGL* mLastFont = nullptr;
 
         // One slot per span, because one segment is asked about several per
         // frame and each answer used to evict the last: the selection rects
@@ -242,16 +306,6 @@ private:
         static constexpr size_t WIDTH_SLOT_COUNT = 4;
         WidthSlot mSlots[WIDTH_SLOT_COUNT];
         size_t    mNextSlot = 0;
-
-        // LLFontGL's values that affect width calculation
-        F32 mLastScaleX = 1.f;
-        F32 mLastScaleY = 1.f;
-        F32 mLastVertDPI = 0.f;
-        F32 mLastHorizDPI = 0.f;
-        S32 mLastResGeneration = 0;
-
-        // Cache generation tracking. U64 to match LLFontGL::getCacheGeneration.
-        U64 mLastFontCacheGen = 0;
 
         static bool sEnableBufferCollection;
 };

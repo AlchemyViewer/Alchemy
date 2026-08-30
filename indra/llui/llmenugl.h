@@ -29,7 +29,7 @@
 
 #include <list>
 
-#include "alcachedlabel.h"
+#include "llfontvertexbuffer.h"
 #include "llstring.h"
 #include "v4color.h"
 #include "llframetimer.h"
@@ -207,10 +207,10 @@ protected:
     // The menu bar is drawn on every frame the viewer runs, and an open menu
     // on every frame it is open, so each of the four labels keeps its geometry
     // between frames rather than being shaped and laid out again.
-    ALCachedLabel mLabelBuffer;
-    ALCachedLabel mBoolLabelBuffer;
-    ALCachedLabel mAccelLabelBuffer;
-    ALCachedLabel mBranchLabelBuffer;
+    LLFontVertexBuffer mLabelBuffer;
+    LLFontVertexBuffer mBoolLabelBuffer;
+    LLFontVertexBuffer mAccelLabelBuffer;
+    LLFontVertexBuffer mBranchLabelBuffer;
 
     LLUIColor mEnabledColor;
     LLUIColor mDisabledColor;
