@@ -894,6 +894,91 @@ namespace tut
                no_break > 0);
     }
 
+    // maxDrawableBytes shapes a window sized from the pixel budget rather than
+    // the whole remaining text, and widens it when the walk runs out of text
+    // before it runs out of pixels. Every answer has to be the one the
+    // unwindowed walk gave, or a wrapped paragraph silently breaks in
+    // different places than it used to.
+    //
+    // The bound is checked by construction: a budget of F32_MAX takes the
+    // whole text as its window, so the two are the same walk and comparing
+    // them proves nothing. What proves it is that a small budget over a long
+    // string -- where the window is a fraction of the text -- agrees with the
+    // same question asked over a string short enough that no window applies.
+    template<> template<>
+    void llfontgl_object::test<25>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        // Long enough that a small pixel budget windows well inside it, in a
+        // mix of scripts so the shaping is not trivially uniform.
+        std::string s;
+        for (int i = 0; i < 40; ++i)
+        {
+            s += "the quick brown fox ";
+            s += "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E ";
+            s += "caf\xC3\xA9 na\xC3\xAFve ";
+        }
+        const S32 total = (S32)s.size();
+        ensure("the fixture string is long", total > 1500);
+        if (font->getWidthF32Bytes(s, 0, 64, false) <= 0.f)
+            skip("font produced no width for the sample");
+
+        // Held against getWidthF32Bytes rather than against maxDrawableBytes
+        // itself. Asking the same function a second question only proves it is
+        // consistent with its own window; both readings move together when the
+        // window is wrong. getWidthF32Bytes walks independently, and its
+        // return is exactly the quantity the clip compares -- advance plus the
+        // extent overhang of the last glyph -- so the two are directly
+        // comparable.
+        for (F32 px = 8.f; px < 900.f; px += 13.f)
+        {
+            const S32 got = font->maxDrawableBytes(s, px, total, LLFontGL::ANYWHERE);
+            ensure("the answer stays inside the text", got >= 0 && got <= total);
+
+            if (got > 0)
+            {
+                ensure("what fits is within the budget",
+                       font->getWidthF32Bytes(s, 0, got, false) <= px);
+            }
+            if (got < total)
+            {
+                // And it is the most that fits: one character more overruns.
+                const S32 more = (S32)utf8str_step_grapheme_forward(s, (size_t)got);
+                ensure("and one character more does not",
+                       font->getWidthF32Bytes(s, 0, more, false) > px);
+            }
+        }
+
+        // The word-boundary styles retreat to a break, so they answer with no
+        // more than ANYWHERE does and never with something that overruns.
+        for (const LLFontGL::EWordWrapStyle style :
+             { LLFontGL::WORD_BOUNDARY_IF_POSSIBLE, LLFontGL::ONLY_WORD_BOUNDARIES })
+        {
+            for (F32 px = 24.f; px < 900.f; px += 37.f)
+            {
+                const S32 got = font->maxDrawableBytes(s, px, total, style);
+                ensure("a word-boundary answer stays inside the text",
+                       got >= 0 && got <= total);
+                ensure("a word-boundary answer never overruns",
+                       got == 0 || font->getWidthF32Bytes(s, 0, got, false) <= px);
+                ensure("and never exceeds what ANYWHERE would take",
+                       got <= font->maxDrawableBytes(s, px, total, LLFontGL::ANYWHERE));
+            }
+        }
+
+        // A budget nothing fits in, and a budget everything fits in.
+        ensure_equals("no room fits nothing",
+                      font->maxDrawableBytes(s, 0.f, total), (S32)0);
+        ensure_equals("all the room takes everything",
+                      font->maxDrawableBytes(s, F32_MAX, total), total);
+    }
+
     // ===================================================================
     // Render-output group: fixture brings up gUIProgram (needs_render=true)
     // so LLFontGL::render() completes end-to-end against the OSMesa

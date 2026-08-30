@@ -1400,39 +1400,57 @@ S32 LLFontGL::maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 ma
     while (measure_end < max_bytes && utf8text[measure_end] != 0)
         ++measure_end;
 
-    if (measure_end > 0)
-    {
-        std::string_view slice = utf8text.substr(0, (size_t)measure_end);
-        shape_glyphs = &ALFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)measure_end);
-    }
-
-    // Same window, asked where a break is permitted. Positions are where the
-    // next line would begin, so they line up with what the clip below wants.
+    // Only the word-boundary styles ever read the break list. ANYWHERE is the
+    // default argument, and asking ICU to enumerate every break in the window
+    // so the answer can be discarded is a rule-engine pass for nothing.
     // The buffer outlives the call so a wrapping loop does not allocate per
     // line; nothing re-enters this function while `breaks` is live.
-    // Only the word-boundary styles ever read the result. ANYWHERE is the
-    // default argument, and asking ICU to enumerate every break in the slice
-    // so the answer can be discarded is a rule-engine pass over the whole
-    // measurement window for nothing.
     static thread_local std::vector<size_t> breaks;
     const bool wants_breaks = (end_on_word_boundary != ANYWHERE);
-    if (wants_breaks)
-    {
-        utf8str_line_break_opportunities(utf8text.substr(0, (size_t)measure_end), breaks);
-    }
-    else
-    {
-        breaks.clear();
-    }
-    size_t break_idx = 0;
-    const bool use_shaped = !shape_glyphs->empty();
-    // shape_glyphs points into the shape LRU until the loop's last use.
-    const size_t shape_gen = ALFontShaping::cacheMutationCount();
-    (void)shape_gen;
 
-    S32 i;
+    size_t break_idx = 0;
+    size_t shape_gen = 0;
+    bool   use_shaped = false;
+
+    S32 i = 0;
     S32 next_i = 0;
-    for (i = 0; (i < max_bytes); i = next_i)
+
+    // Shape and walk the first `window` bytes, and say where the walk stopped.
+    // Everything it touches lives in the enclosing scope because the answer is
+    // read from there afterwards -- `clip` and `last_break` decide where a
+    // clipped line retreats to. False means a glyph the font could not supply,
+    // which the caller answers with zero rather than a measurement.
+    auto measure_window = [&](S32 window) -> bool
+    {
+        clip          = false;
+        cur_x         = 0.f;
+        last_break    = 0;
+        width_padding = 0.f;
+        next_glyph    = NULL;
+        shape_idx     = 0;
+        break_idx     = 0;
+        shape_glyphs  = &sEmptyShape;
+
+        if (window > 0)
+        {
+            std::string_view slice = utf8text.substr(0, (size_t)window);
+            shape_glyphs = &ALFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)window);
+            if (wants_breaks)
+            {
+                utf8str_line_break_opportunities(slice, breaks);
+            }
+        }
+        if (!wants_breaks)
+        {
+            breaks.clear();
+        }
+        use_shaped = !shape_glyphs->empty();
+        // shape_glyphs points into the shape LRU until the walk's last use.
+        shape_gen = ALFontShaping::cacheMutationCount();
+        (void)shape_gen;
+
+    next_i = 0;
+    for (i = 0; (i < window); i = next_i)
     {
         const LLCodepointAt at = utf8str_decode_at(utf8text, (size_t)i);
         next_i = (S32)at.next;
@@ -1493,7 +1511,7 @@ S32 LLFontGL::maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 ma
 
             if (NULL == fgi)
             {
-                return 0;
+                return false;
             }
         }
 
@@ -1511,7 +1529,7 @@ S32 LLFontGL::maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 ma
             break;
         }
 
-        if (next_i < max_bytes)
+        if (next_i < window)
         {
             const llwchar next_char = utf8str_decode_at(utf8text, (size_t)next_i).cp;
             if (next_char)
@@ -1530,6 +1548,44 @@ S32 LLFontGL::maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 ma
     // No shape* call may fire while shape_glyphs is held (see the comment
     // at the shapeLine call above).
     llassert(shape_gen == ALFontShaping::cacheMutationCount());
+    return true;
+    };
+
+    // Answering "how much fits in max_pixels" does not need the rest of the
+    // document shaped. The wrapping callers hand this the whole remaining
+    // segment and call it once per line, each time with a different suffix, so
+    // each call was a fresh HarfBuzz pass and a fresh UAX #14 enumeration over
+    // everything that was left -- quadratic in the length of a wrapped
+    // paragraph, and a shape-cache entry per line holding all of it.
+    //
+    // Start from a window that comfortably covers the budget. A byte is never
+    // more than a glyph and no glyph we ship advances less than a pixel, so a
+    // byte per pixel is already generous for text that advances at all; text
+    // that does not -- a long run of combining marks -- is what the widening
+    // below is for. Widen only when the walk ran out of text before it ran out
+    // of pixels, which is the one case the window can be wrong in.
+    S32 window = measure_end;
+    if (max_pixels < (F32)S32_MAX)
+    {
+        const F32 guess = max_pixels + 64.f;
+        if (guess < (F32)measure_end)
+        {
+            window = (S32)guess;
+        }
+    }
+
+    for (;;)
+    {
+        if (!measure_window(window))
+        {
+            return 0;
+        }
+        if (clip || window >= measure_end)
+        {
+            break;
+        }
+        window = (window > measure_end / 2) ? measure_end : (window * 2);
+    }
 
     if( clip )
     {
