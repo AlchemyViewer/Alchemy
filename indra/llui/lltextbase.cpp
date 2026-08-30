@@ -30,6 +30,8 @@
 
 #include "lltextbase.h"
 
+#include "altextcaret.h"
+
 #include "llemojihelper.h"
 #include "lllocalcliprect.h"
 #include "llmenugl.h"
@@ -3352,25 +3354,11 @@ bool LLTextBase::dragSelectCursorTo(S32 local_x, S32 local_y)
 
         if (cluster_pixel_width > 0.f)
         {
-            // 30%/70% deadband around the midpoint. Asymmetric thresholds
-            // so the rule reads as "must move clearly into the new half."
-            // Wider than a delta gate, and independent of drag speed —
-            // a fast drag through a cluster still snaps once at the 30%
-            // line, but slow motion or jitter inside the deadband never
-            // does.
-            const S32 cluster_width = (S32)cluster_pixel_width;
-            const S32 stick_to_left  = cluster_left_px + cluster_width * 3 / 10;
-            const S32 stick_to_right = cluster_left_px + cluster_width * 7 / 10;
-            const bool was_at_cluster_end = (old_pos == (S32)range.second);
-            if (was_at_cluster_end)
+            if (ALTextCaret::holdsCluster(local_x, cluster_left_px,
+                                          (S32)cluster_pixel_width,
+                                          old_pos == (S32)range.second))
             {
-                if (local_x >= stick_to_left)
-                    return false;
-            }
-            else
-            {
-                if (local_x <= stick_to_right)
-                    return false;
+                return false;
             }
         }
     }

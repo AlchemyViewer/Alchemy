@@ -2021,6 +2021,18 @@ size_t utf8str_step_word_backward(std::string_view utf8str, size_t byte_pos)
     return best;
 }
 
+size_t utf8str_caret_word_forward(std::string_view utf8str, size_t byte_pos)
+{
+    return utf8str_step_word_forward(utf8str,
+                                     utf8str_step_grapheme_forward(utf8str, byte_pos));
+}
+
+size_t utf8str_caret_word_backward(std::string_view utf8str, size_t byte_pos)
+{
+    return utf8str_step_word_backward(utf8str,
+                                      utf8str_step_grapheme_backward(utf8str, byte_pos));
+}
+
 // --- the wide adapters -----------------------------------------------------
 
 void wstring_line_break_opportunities(LLWStringView wstr, std::vector<size_t>& out)

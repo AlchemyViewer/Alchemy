@@ -555,22 +555,14 @@ S32 LLTextEditor::getLineColumnFromDocIndex(S32 doc_index, bool include_wordwrap
         std::string_view(getText()).substr((size_t)line_start, (size_t)span));
 }
 
-// The word walkers stay inside the line the offset sits on, so a caret already
-// at a line edge has nowhere left to go and would not move at all. Crossing the
-// break first is what carries ctrl+left and ctrl+right on into the neighbouring
-// line rather than stalling on every newline in the document.
 S32 LLTextEditor::prevWordPos(S32 cursorPos) const
 {
-    const std::string& text = getText();
-    const size_t at = utf8str_step_grapheme_backward(text, (size_t)llmax(cursorPos, 0));
-    return (S32)utf8str_step_word_backward(text, at);
+    return (S32)utf8str_caret_word_backward(getText(), (size_t)llmax(cursorPos, 0));
 }
 
 S32 LLTextEditor::nextWordPos(S32 cursorPos) const
 {
-    const std::string& text = getText();
-    const size_t at = utf8str_step_grapheme_forward(text, (size_t)llmax(cursorPos, 0));
-    return (S32)utf8str_step_word_forward(text, at);
+    return (S32)utf8str_caret_word_forward(getText(), (size_t)llmax(cursorPos, 0));
 }
 
 const LLTextSegmentPtr  LLTextEditor::getPreviousSegment() const

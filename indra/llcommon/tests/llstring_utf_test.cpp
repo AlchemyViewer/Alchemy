@@ -101,7 +101,7 @@ namespace tut
     // The TUT default registers only test<1>..test<50>, but the explicit
     // test_group<..., 141> below raises that ceiling. Keep this index in
     // sync with categories used below.
-    typedef test_group<llstring_utf_data, 141> llstring_utf_t;
+    typedef test_group<llstring_utf_data, 142> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
 
@@ -2775,5 +2775,52 @@ namespace tut
         const auto none = utf8str_next_word_range(accented, accented.size());
         ensure_equals("nothing begins past the end", none.first, accented.size());
         ensure_equals("nothing ends past the end", none.second, accented.size());
+    }
+
+    // The caret forms differ from the raw walkers in exactly one way: they
+    // cross a line break instead of stalling on it. Both text widgets forward
+    // to these rather than carrying the policy twice, so it is worth pinning
+    // the difference rather than only the agreement.
+    template<> template<>
+    void llstring_utf_object_t::test<141>()
+    {
+        const std::string lines = "one two\nthree four";
+
+        // Away from a break the two are the same walk.
+        ensure_equals("forward agrees mid-line",
+                      utf8str_caret_word_forward(lines, 0),
+                      utf8str_step_word_forward(lines, 0));
+        ensure_equals("backward agrees mid-line",
+                      utf8str_caret_word_backward(lines, 7),
+                      utf8str_step_word_backward(lines, 7));
+
+        // On the break the raw walker has nowhere to go and says so.
+        ensure_equals("the raw walker stalls on the newline",
+                      utf8str_step_word_forward(lines, 7), size_t(7));
+        ensure("the caret walker crosses it",
+               utf8str_caret_word_forward(lines, 7) > size_t(7));
+
+        // And at a line start, going back.
+        ensure_equals("the raw walker stalls at the line start",
+                      utf8str_step_word_backward(lines, 8), size_t(8));
+        ensure("the caret walker crosses back",
+               utf8str_caret_word_backward(lines, 8) < size_t(8));
+
+        // Neither runs off either end.
+        ensure_equals("nothing before the beginning",
+                      utf8str_caret_word_backward(lines, 0), size_t(0));
+        ensure_equals("nothing after the end",
+                      utf8str_caret_word_forward(lines, lines.size()), lines.size());
+
+        // Repeated stepping terminates rather than parking.
+        size_t at = 0;
+        for (int i = 0; i < 32 && at < lines.size(); ++i)
+        {
+            const size_t next = utf8str_caret_word_forward(lines, at);
+            ensure("forward never moves backward", next >= at);
+            if (next == at) break;
+            at = next;
+        }
+        ensure_equals("stepping forward reaches the end", at, lines.size());
     }
 }

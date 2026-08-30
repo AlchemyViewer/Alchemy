@@ -49,6 +49,7 @@
 #include "llstring.h"
 #include "llwindow.h"
 #include "llui.h"
+#include "altextcaret.h"
 #include "lluictrlfactory.h"
 #include "llclipboard.h"
 #include "llmenugl.h"
@@ -563,21 +564,11 @@ bool LLLineEditor::dragSelectCursorTo(S32 local_mouse_x)
         const S32 cluster_pixel_width =
             mGLFont->getWidthBytes(drawn, drawn_lo, drawn_hi - drawn_lo);
 
-        if (cluster_pixel_width > 0)
+        if (ALTextCaret::holdsCluster(local_mouse_x, cluster_left_px,
+                                      cluster_pixel_width,
+                                      old_pos == (S32)range.second))
         {
-            const S32 stick_to_left  = cluster_left_px + cluster_pixel_width * 3 / 10;
-            const S32 stick_to_right = cluster_left_px + cluster_pixel_width * 7 / 10;
-            const bool was_at_cluster_end = (old_pos == (S32)range.second);
-            if (was_at_cluster_end)
-            {
-                if (local_mouse_x >= stick_to_left)
-                    return false;
-            }
-            else
-            {
-                if (local_mouse_x <= stick_to_right)
-                    return false;
-            }
+            return false;
         }
     }
 
@@ -1316,23 +1307,17 @@ void LLLineEditor::setDrawAsterixes(bool b)
     updateAllowingLanguageInput();
 }
 
-// The word walkers stay inside the line the offset sits on, and a line editor
-// is not guaranteed to hold only one: pasteHelper substitutes a newline, but
-// setText and setValue pass one straight through. A caret at a line edge would
-// otherwise have nowhere to go, so ctrl+arrow would stall there and ctrl+delete
-// would silently remove nothing.
+// A line editor is not guaranteed to hold only one line: pasteHelper
+// substitutes a newline, but setText and setValue pass one straight through --
+// which is why the caret forms are wanted here too.
 S32 LLLineEditor::prevWordPos(S32 cursorPos) const
 {
-    const std::string& text = mText.getString();
-    const size_t at = utf8str_step_grapheme_backward(text, (size_t)llmax(cursorPos, 0));
-    return (S32)utf8str_step_word_backward(text, at);
+    return (S32)utf8str_caret_word_backward(mText.getString(), (size_t)llmax(cursorPos, 0));
 }
 
 S32 LLLineEditor::nextWordPos(S32 cursorPos) const
 {
-    const std::string& text = mText.getString();
-    const size_t at = utf8str_step_grapheme_forward(text, (size_t)llmax(cursorPos, 0));
-    return (S32)utf8str_step_word_forward(text, at);
+    return (S32)utf8str_caret_word_forward(mText.getString(), (size_t)llmax(cursorPos, 0));
 }
 
 

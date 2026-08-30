@@ -911,6 +911,15 @@ LL_COMMON_API size_t utf8str_grapheme_align_backward(std::string_view utf8str, s
 LL_COMMON_API size_t utf8str_grapheme_align_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_step_word_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_step_word_backward(std::string_view utf8str, size_t byte_pos);
+
+// Word movement as a caret means it, which is the pair above plus one thing:
+// those stay inside the line the offset sits on, so a caret already at a line
+// edge has nowhere to go and does not move at all. Crossing the break first is
+// what carries ctrl+left and ctrl+right into the neighbouring line rather than
+// stalling on every newline in the document. Both text widgets want exactly
+// this, so it lives here rather than once in each of them.
+LL_COMMON_API size_t utf8str_caret_word_forward(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API size_t utf8str_caret_word_backward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API std::pair<size_t, size_t> utf8str_word_range_at(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API std::pair<size_t, size_t> utf8str_next_word_range(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API void utf8str_line_break_opportunities(std::string_view utf8str, std::vector<size_t>& out);
