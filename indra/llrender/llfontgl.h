@@ -158,8 +158,8 @@ public:
     S32 getLineSpacing() const;    // face->height — full baseline-to-baseline distance (includes line gap)
 
     // Whole-string measurement, for the many callers that want exactly that.
-    S32 getWidth(const std::string& utf8text) const;
-    F32 getWidthF32(const std::string& utf8text) const;
+    S32 getWidth(std::string_view utf8text) const;
+    F32 getWidthF32(std::string_view utf8text) const;
 
     // The measurement itself. `offset` and `max_bytes` index the UTF-8
     // directly, which is what a caller holding UTF-8 already has. The name

@@ -93,7 +93,7 @@ LLMultiSliderCtrl::LLMultiSliderCtrl(const LLMultiSliderCtrl::Params& p)
     {
         if (p.label_width == 0)
         {
-            label_width = p.font()->getWidth(p.label);
+            label_width = p.font()->getWidth(p.label());
         }
         LLRect label_rect( left, top, label_width, bottom );
         LLTextBox::Params params;
@@ -114,13 +114,13 @@ LLMultiSliderCtrl::LLMultiSliderCtrl(const LLMultiSliderCtrl::Params& p)
             text_width = 0;
             // calculate the size of the text box (log max_value is number of digits - 1 so plus 1)
             if ( p.max_value() )
-                text_width = p.font()->getWidth(std::string("0")) * ( static_cast < S32 > ( log10  ( p.max_value ) ) + p.decimal_digits + 1 );
+                text_width = p.font()->getWidth("0") * ( static_cast < S32 > ( log10  ( p.max_value ) ) + p.decimal_digits + 1 );
 
             if ( p.increment < 1.0f )
-                text_width += p.font()->getWidth(std::string(".")); // (mostly) take account of decimal point in value
+                text_width += p.font()->getWidth("."); // (mostly) take account of decimal point in value
 
             if ( p.min_value < 0.0f || p.max_value < 0.0f )
-                text_width += p.font()->getWidth(std::string("-")); // (mostly) take account of minus sign
+                text_width += p.font()->getWidth("-"); // (mostly) take account of minus sign
 
             // padding to make things look nicer
             text_width += 8;

@@ -1110,7 +1110,7 @@ S32 LLFontGL::getLineSpacing() const
     return llceil(mFontFreetype->getLineHeight() / sScaleY);
 }
 
-S32 LLFontGL::getWidth(const std::string& utf8text) const
+S32 LLFontGL::getWidth(std::string_view utf8text) const
 {
     return getWidthBytes(utf8text, 0, S32_MAX);
 }
@@ -1126,7 +1126,7 @@ S32 LLFontGL::getWidthBytes(std::string_view utf8text, S32 begin_offset, S32 max
     return llceil(getWidthF32Bytes(utf8text, begin_offset, max_bytes));
 }
 
-F32 LLFontGL::getWidthF32(const std::string& utf8text) const
+F32 LLFontGL::getWidthF32(std::string_view utf8text) const
 {
     return getWidthF32Bytes(utf8text, 0, S32_MAX);
 }
