@@ -70,23 +70,6 @@ void hud_render_text(std::string_view utf8text, const LLVector3 &pos_agent,
     {
         camera->getPixelVectors(pos_agent, up_axis, right_axis);
     }
-    LLCoordFrame render_frame = *camera;
-    LLQuaternion rot;
-    if (!orthographic)
-    {
-        rot = render_frame.getQuaternion();
-        rot = rot * LLQuaternion(-F_PI_BY_TWO, camera->getYAxis());
-        rot = rot * LLQuaternion(F_PI_BY_TWO, camera->getXAxis());
-    }
-    else
-    {
-        rot = LLQuaternion(-F_PI_BY_TWO, LLVector3(0.f, 0.f, 1.f));
-        rot = rot * LLQuaternion(-F_PI_BY_TWO, LLVector3(0.f, 1.f, 0.f));
-    }
-    F32 angle;
-    LLVector3 axis;
-    rot.getAngleAxis(&angle, axis);
-
     LLVector3 render_pos = pos_agent + (x_offset * right_axis) + (y_offset * up_axis);
 
     //get the render_pos in screen space
