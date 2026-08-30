@@ -662,13 +662,15 @@ S32 LLTextEditor::indentLine( S32 pos, S32 spaces )
     }
     else
     {
-        // Unindent
+        // Unindent. remove() reports a negative delta, as addChar reports a
+        // positive one, so both branches accumulate the same way and the
+        // result carries the sign the caller adds to its bounds.
         for(S32 i=0; i < -spaces; i++)
         {
             const std::string& text = getText();
             if (text[pos] == ' ')
             {
-                delta_spaces -= remove( pos, 1, false );
+                delta_spaces += remove( pos, 1, false );
             }
         }
     }
@@ -1214,18 +1216,18 @@ S32 LLTextEditor::insert(S32 pos, std::string_view utf8str, bool group_with_next
 S32 LLTextEditor::remove(S32 pos, S32 length, bool group_with_next_op)
 {
     S32 end_pos = getEditableIndex(pos + length, true);
-    bool removedChar = false;
 
     segment_vec_t segments_to_remove;
     // store text segments
     getSegmentsInRange(segments_to_remove, pos, pos + length, false);
 
-    if (pos <= end_pos)
+    if (pos > end_pos)
     {
-        removedChar = execute( new TextCmdRemove( pos, group_with_next_op, end_pos - pos, segments_to_remove ) );
+        return 0;
     }
 
-    return removedChar;
+    // Negative, being a removal: the count the document shrank by, in bytes.
+    return execute( new TextCmdRemove( pos, group_with_next_op, end_pos - pos, segments_to_remove ) );
 }
 
 S32 LLTextEditor::overwriteChar(S32 pos, llwchar wc)
