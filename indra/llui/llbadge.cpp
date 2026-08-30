@@ -240,8 +240,10 @@ void LLBadge::draw()
             F32 *right_position_out = NULL;
             bool do_not_use_ellipses = false;
 
+            mFontBuffer.setSource(&mLabel, mLabel.getGeneration());
             F32 badge_width = (2.0f * mPaddingHoriz) +
-                mGLFont->getWidthF32Bytes(mLabel.getString(), badge_label_begin_offset, badge_byte_length);
+                mFontBuffer.getWidthBytes(mGLFont, mLabel.getString(),
+                                          badge_label_begin_offset, badge_byte_length, false);
 
             F32 badge_height = (2.0f * mPaddingVert) + mGLFont->getLineHeight();
 
