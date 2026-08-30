@@ -603,9 +603,18 @@ void LLView::deleteAllChildren()
     while (!mChildList.empty())
     {
         LLView* viewp = mChildList.front();
+        // Pop before deleting. The child's destructor (and its children's
+        // destructors, e.g. LLFloater::~LLFloater deleting mDragHandle and
+        // mResizeBar/mResizeHandle explicitly) call ~LLView(), which calls
+        // mParentView->removeChild(this). If viewp is still at the front of
+        // the list at that point, removeChild() erases it -- but pop_front()
+        // below then removes whatever is now at the front instead, leaving the
+        // originally-next entry as a dangling pointer in mChildList.
+        // Popping first means removeChild() finds mParentView == NULL and
+        // takes the no-op warning branch, keeping the list consistent.
+        mChildList.pop_front();
         viewp->mParentView = NULL;
         delete viewp;
-        mChildList.pop_front();
     }
     updateBoundingRect();
 }
