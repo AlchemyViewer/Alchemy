@@ -386,4 +386,32 @@ private:
     static LLFontRegistry* sFontRegistry;
 };
 
+// Where a piece of text sits, held apart from the glyphs that make it up.
+// Glyph geometry is built relative to this rather than in screen coordinates,
+// which is what lets a captured draw be replayed after the text has moved
+// instead of being rebuilt for its new place: scrolling a list, dragging a
+// floater, resizing one.
+//
+// The origin is snapped to whole pixels. Glyph bitmaps are rasterized on the
+// pixel grid and the fraction of the pen position picks a glyph's subpixel
+// phase, so an origin carrying a fraction would rasterize the text differently
+// depending on where it happened to be. Being whole is also what makes the
+// move exact: it commutes with the rounding the pen does.
+class ALTextTransform
+{
+public:
+    ALTextTransform();
+    ~ALTextTransform();
+
+    ALTextTransform(const ALTextTransform&) = delete;
+    ALTextTransform& operator=(const ALTextTransform&) = delete;
+
+    // Leave the transform ahead of the destructor, for a draw that has one of
+    // its own to bring. Doing it twice is harmless.
+    void end();
+
+private:
+    bool mActive { true };
+};
+
 #endif

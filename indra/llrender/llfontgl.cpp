@@ -355,6 +355,42 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, const LLR
 }
 
 
+ALTextTransform::ALTextTransform()
+{
+    // The glyph batch is emitted pre-transformed, so the UI offset the view
+    // tree accumulated must not reach it; the same placement arrives through
+    // the matrix below instead, where it costs nothing to change.
+    gGL.pushUIMatrix();
+    gGL.loadUIIdentity();
+
+    // Where the text sits, and how deep it is so that floating text appears
+    // 'in-world' and is correctly occluded.
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.pushMatrix();
+    gGL.translatef(floorf((F32)LLFontGL::sCurOrigin.mX * LLFontGL::sScaleX),
+                   floorf((F32)LLFontGL::sCurOrigin.mY * LLFontGL::sScaleY),
+                   LLFontGL::sCurDepth);
+}
+
+ALTextTransform::~ALTextTransform()
+{
+    end();
+}
+
+void ALTextTransform::end()
+{
+    if (!mActive)
+    {
+        return;
+    }
+    mActive = false;
+
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.popMatrix();
+    gGL.popUIMatrix();
+}
+
+
 S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
                           ShadowType shadow, S32 max_bytes, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color, pass_boundary_cb_t on_pass_boundary) const
 {
@@ -406,15 +442,9 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         }
     }
 
-    gGL.pushUIMatrix();
-
-    gGL.loadUIIdentity();
-
-    LLVector2 origin(floorf(sCurOrigin.mX*sScaleX), floorf(sCurOrigin.mY*sScaleY));
-
-    // Depth translation, so that floating text appears 'in-world'
-    // and is correctly occluded.
-    gGL.translatef(0.f,0.f,sCurDepth);
+    // Everything below places glyphs relative to this, never in screen
+    // coordinates, so the same geometry serves wherever the text ends up.
+    ALTextTransform transform;
 
     S32 chars_drawn = 0;
     S32 i;
@@ -455,8 +485,8 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // FORCE_AUTOHINT and NO_HINTING.
     const bool subpixel_pen = mFontFreetype->useSubpixelPen();
 
-    cur_x = ((F32)x * sScaleX) + origin.mV[VX];
-    cur_y = ((F32)y * sScaleY) + origin.mV[VY];
+    cur_x = (F32)x * sScaleX;
+    cur_y = (F32)y * sScaleY;
 
     // Offset y by vertical alignment.
     // use unscaled font metrics here
@@ -1022,8 +1052,13 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
 
     if (right_x)
     {
-        *right_x = (cur_x - origin.mV[VX]) / sScaleX;
+        *right_x = cur_x / sScaleX;
     }
+
+    // The ellipsis is a draw of its own and sets up its own transform, so this
+    // one has to be gone before it starts or the origin would be applied twice.
+    const F32 ellipsis_x = cur_x / sScaleX;
+    transform.end();
 
     if (draw_ellipses)
     {
@@ -1036,7 +1071,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         // with the foreground color in LLFontTextCache.
         renderBytes("...",
                 0,
-                (cur_x - origin.mV[VX]) / sScaleX, (F32)y,
+                ellipsis_x, (F32)y,
                 color,
                 LEFT, valign,
                 style_to_add,
@@ -1046,8 +1081,6 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                 false,
                 use_color);
     }
-
-    gGL.popUIMatrix();
 
     return chars_drawn;
 }

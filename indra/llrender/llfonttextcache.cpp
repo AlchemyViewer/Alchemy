@@ -44,6 +44,7 @@
 
 bool LLFontTextCache::sEnableBufferCollection = true;
 bool LLFontTextCache::sEnableColorOnlyRegen = true;
+U64  LLFontTextCache::sRegenCount = 0;
 
 namespace
 {
@@ -258,10 +259,10 @@ S32 LLFontTextCache::renderImpl(
          // caller's colour reaches the vertices at all. Neither was compared,
          // so a caller flipping one without reset() replayed the old geometry.
          || mLastUseEllipses != use_ellipses
-         || mLastUseColor != use_color
-         // Placement, not font state: where the UI origin sits moves the text
-         // without changing a glyph, so it stays here rather than in the key.
-         || mLastOrigin != LLFontGL::sCurOrigin;
+         || mLastUseColor != use_color;
+    // Where the UI origin sits is deliberately absent. It moves the text
+    // without changing a glyph, and the geometry is built relative to it, so
+    // a scroll or a floater drag replays rather than rebuilds.
 
     // Crossing the dark-text gate (luminance 0.35) toggles whether shadow
     // geometry was emitted at all, which is geometry-affecting. Detect with a
@@ -331,6 +332,7 @@ void LLFontTextCache::genBuffers(
     // exists to answer -- whether a frame reused its text or rebuilt it.
     LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen");
     LL_PROFILE_ZONE_NUM(text.size());
+    ++sRegenCount;
     // todo: add a debug build assert if this triggers too often for to long?
     mShadowBufferList.clear();
     mForegroundBufferList.clear();
@@ -430,8 +432,6 @@ void LLFontTextCache::genBuffers(
     mLastUseEllipses = use_ellipses;
     mLastUseColor = use_color;
 
-    mLastOrigin = LLFontGL::sCurOrigin;
-
     if (right_x)
     {
         mLastRightX = *right_x;
@@ -494,18 +494,13 @@ void LLFontTextCache::renderBuffers()
     // this class, and was not observable.
     LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font replay");
     gGL.flush(); // deliberately empty pending verts
-    gGL.pushUIMatrix();
 
-    gGL.loadUIIdentity();
-
-    // Depth translation, so that floating text appears 'in-world'
-    // and is correctly occluded.
-    gGL.translatef(0.f, 0.f, LLFontGL::sCurDepth);
+    // The same transform the geometry was built under, taken fresh. The
+    // vertices hold no absolute position, so this is what puts the text where
+    // it is now rather than where it was when it was captured.
+    ALTextTransform transform;
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
-    // Note: ellipses should technically be covered by push/load/translate of their own
-    // but it's more complexity, values do not change, skipping doesn't appear to break
-    // anything, so we can skip that until it proves to cause issues.
     // Shadow first (under), foreground second (over). Pass-boundary order matches
     // the original interleaved-per-glyph emission's net visual stacking — shadow
     // contributions sit beneath glyph foregrounds rather than between them.
@@ -526,7 +521,6 @@ void LLFontTextCache::renderBuffers()
     {
         buffer.draw();
     }
-    gGL.popUIMatrix();
 }
 
 // The cache check is the same whichever unit the caller measures in; only the

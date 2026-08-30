@@ -674,4 +674,75 @@ namespace tut
         ensure_equals("full-fit render returns the entire string length",
                       n_full, (S32)s.length());
     }
+
+    // Moving text does not rebuild it. Glyph geometry is built relative to the
+    // text's own origin rather than in screen coordinates, so a scroll, a
+    // floater drag or a resize replays the capture under a new transform. That
+    // was not true while the origin was added into the vertices: everything
+    // visible in a moving container was reshaped every frame.
+    template<> template<>
+    void llfonttextcache_render_object::test<9>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not present in test data dir");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font available", font != nullptr);
+
+        ll_test::FontStateScope scope;
+
+        const std::string s = "Moved, not rebuilt";
+        font->generateASCIIglyphs();
+
+        const LLCoordGL saved_origin = LLFontGL::sCurOrigin;
+        LLFontGL::sCurOrigin.set(0, 0);
+
+        LLFontTextCache vb;
+        vb.setSource(&s, 0);
+
+        // Same text, at whatever place in its own coordinates it is asked for.
+        auto draw_at = [&](F32 x)
+        {
+            vb.renderBytes(font, s, 0, x, 34.f, LLColor4::white,
+                           LLFontGL::LEFT, LLFontGL::BASELINE,
+                           LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+        };
+        auto draw = [&]() { draw_at(12.f); };
+
+        const U64 before = LLFontTextCache::regenCount();
+
+        // Draw where it is until it stops rebuilding. This takes more than one
+        // pass on purpose: a draw can rasterize glyph phases, which bumps the
+        // font's cache generation, and geometry captured while the atlas was
+        // growing under it is deliberately not trusted for a second frame.
+        bool settled = false;
+        for (int i = 0; i < 8 && !settled; ++i)
+        {
+            const U64 before_draw = LLFontTextCache::regenCount();
+            draw();
+            settled = (LLFontTextCache::regenCount() == before_draw);
+        }
+        const U64 after_settle = LLFontTextCache::regenCount();
+
+        LLFontGL::sCurOrigin.set(137, 42);
+        draw();
+        LLFontGL::sCurOrigin.set(-71, 900);
+        draw();
+        const U64 after_moves = LLFontTextCache::regenCount();
+
+        // Moving the text within its own coordinates is a different draw and
+        // must still rebuild. Without this the assertion above would hold just
+        // as well for a cache that had stopped noticing anything.
+        draw_at(200.f);
+        const U64 after_real_change = LLFontTextCache::regenCount();
+
+        LLFontGL::sCurOrigin = saved_origin;
+
+        ensure("the first draw builds", after_settle > before);
+        // And without this it would hold for a cache that never replays at all.
+        ensure("an unmoved redraw eventually replays", settled);
+        ensure_equals("moving the text replays rather than rebuilds",
+                      after_moves, after_settle);
+        ensure("a draw somewhere else still rebuilds",
+               after_real_change > after_moves);
+    }
 }

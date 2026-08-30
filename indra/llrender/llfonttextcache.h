@@ -218,6 +218,11 @@ public:
         bool no_padding);
 
     static void enableBufferCollection(bool enable) { sEnableBufferCollection = enable; }
+
+    // How many times any cache anywhere has rebuilt its geometry. The whole
+    // purpose of this class is that the number stops moving once the UI
+    // settles, and nothing outside it can otherwise see whether it did.
+    static U64 regenCount() { return sRegenCount; }
 private:
 
     // The cache check is the same whichever unit the caller measures in;
@@ -310,10 +315,8 @@ private:
     bool mLastUseColor = true;
     F32 mLastRightX = 0.f;
 
-    // LLFontGL's statics
-    LLCoordGL mLastOrigin;
-
     static bool sEnableBufferCollection;
+    static U64  sRegenCount;
 
 public:
     // Toggle for the color-only regen fast path. When false, color changes
