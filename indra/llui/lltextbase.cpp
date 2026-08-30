@@ -801,6 +801,13 @@ void LLTextBase::drawCursor()
 void LLTextBase::drawText()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    // One pass over the visible text starts here. A wrapped segment is drawn
+    // once per line it covers and keeps a cache per piece; this is what tells
+    // it that the piece it is about to draw is the first of a pass and not the
+    // next of the one before.
+    ++mDrawPass;
+
     S32 text_len = getLengthBytes();
 
     if (text_len <= 0 && mLabel.empty())
@@ -3998,11 +4005,28 @@ F32 LLNormalTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 selec
     }
     else
     {
-        mFontBufferPreSelection.reset();
-        mFontBufferSelection.reset();
-        mFontBufferPostSelection.reset();
+        mLinePieces.clear();
+        mNextLinePiece = 0;
     }
     return draw_rect.mLeft;
+}
+
+// The piece this segment is drawing now. Pieces come in line order and that
+// order is the same on every pass, so the nth piece of one pass is the nth
+// piece of the next and finds its own geometry waiting.
+LLNormalTextSegment::LinePieceCache& LLNormalTextSegment::nextLinePiece()
+{
+    const S32 pass = mEditor.getDrawPass();
+    if (mLastDrawPass != pass)
+    {
+        mLastDrawPass = pass;
+        mNextLinePiece = 0;
+    }
+    if (mNextLinePiece >= mLinePieces.size())
+    {
+        mLinePieces.resize(mNextLinePiece + 1);
+    }
+    return mLinePieces[mNextLinePiece++];
 }
 
 // Draws a single text segment, reversing the color for selection if needed.
@@ -4022,9 +4046,10 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
     // own edits, so this is the whole of the invalidation the caches cannot
     // see for themselves -- everything else about the draw they compare.
     const U32 text_gen = (U32)mEditor.getTextGeneration();
-    mFontBufferPreSelection.setSource(&mEditor, text_gen);
-    mFontBufferSelection.setSource(&mEditor, text_gen);
-    mFontBufferPostSelection.setSource(&mEditor, text_gen);
+    LinePieceCache& piece = nextLinePiece();
+    piece.mPreSelection.setSource(&mEditor, text_gen);
+    piece.mSelection.setSource(&mEditor, text_gen);
+    piece.mPostSelection.setSource(&mEditor, text_gen);
 
     const LLFontGL* font = mStyle->getFont();
     LLColor4 color = (mEditor.getReadOnly() ? mStyle->getReadOnlyColor() : mStyle->getColor())  % (alpha * mStyle->getAlpha());
@@ -4038,7 +4063,7 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
         S32 length =  end - start;
         if (use_font_buffers)
         {
-            mFontBufferPreSelection.renderBytes(
+            piece.mPreSelection.renderBytes(
                 font,
                 text, start,
                 rect,
@@ -4081,7 +4106,7 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
 
         if (use_font_buffers)
         {
-            mFontBufferSelection.renderBytes(
+            piece.mSelection.renderBytes(
                 font,
                 text, start,
                 rect,
@@ -4118,7 +4143,7 @@ F32 LLNormalTextSegment::drawClippedSegment(S32 seg_start, S32 seg_end, S32 sele
         S32 length = end - start;
         if (use_font_buffers)
         {
-            mFontBufferPostSelection.renderBytes(
+            piece.mPostSelection.renderBytes(
                 font,
                 text, start,
                 rect,
@@ -4292,7 +4317,11 @@ bool LLNormalTextSegment::getDimensionsF32(S32 first_byte, S32 num_bytes, F32& w
         height = font->getLineSpacing();
 
         const std::string& text = getTextUtf8();
-        width += mFontBufferPreSelection.getWidthBytes(font, text, mStart + first_byte, num_bytes, true);
+        // Named here as well as in the draw: reflow measures before anything
+        // is drawn, so an edit followed by a reflow would otherwise be
+        // measured against widths recorded for the text the edit replaced.
+        mMeasureCache.setSource(&mEditor, (U32)mEditor.getTextGeneration());
+        width += mMeasureCache.getWidthBytes(font, text, mStart + first_byte, num_bytes, true);
     }
     // if last character is a newline, then return true, forcing line break
     return false;
@@ -4380,9 +4409,11 @@ void LLNormalTextSegment::updateLayout(const class LLTextBase& editor)
 {
     LLTextSegment::updateLayout(editor);
 
-    mFontBufferPreSelection.reset();
-    mFontBufferSelection.reset();
-    mFontBufferPostSelection.reset();
+    // A reflow moves every piece, so none of the captured geometry survives
+    // it. The widths do: reflow rewraps text, it does not change it, and the
+    // generation says so if it ever did.
+    mLinePieces.clear();
+    mNextLinePiece = 0;
 }
 
 void LLNormalTextSegment::dump() const

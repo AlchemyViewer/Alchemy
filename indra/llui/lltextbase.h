@@ -178,14 +178,34 @@ protected:
 
     bool mCanEdit { true };
 
-    // Font rendering. Three spans are drawn -- before, inside and after the
-    // selection -- and several more are measured. The first cache answers the
-    // measurements: every cache here is keyed on the same text and the same
-    // font, so any of them would, and picking one keeps the width slots in a
-    // named place rather than scattered across the three.
-    LLFontTextCache     mFontBufferPreSelection;
-    LLFontTextCache     mFontBufferSelection;
-    LLFontTextCache     mFontBufferPostSelection;
+    // Font rendering. A segment that wraps is drawn once per line it covers --
+    // a different span of it, in a different place, each time -- so one set of
+    // caches per segment holds one line and every other line rebuilds its
+    // geometry on every frame, which is the whole of what the cache exists to
+    // prevent. There is a set per piece instead.
+    //
+    // Three spans within a piece: before the selection, inside it, after it.
+    struct LinePieceCache
+    {
+        LLFontTextCache mPreSelection;
+        LLFontTextCache mSelection;
+        LLFontTextCache mPostSelection;
+    };
+
+    // Indexed by the order the pieces are drawn in, which is the order of the
+    // lines they sit on and is the same on every pass. A pass that draws fewer
+    // pieces than the last leaves the tail of the vector alone, so a segment
+    // scrolling back into view finds its geometry where it left it.
+    std::vector<LinePieceCache> mLinePieces;
+    size_t                      mNextLinePiece = 0;
+    S32                         mLastDrawPass = -1;
+
+    LinePieceCache&     nextLinePiece();
+
+    // Widths, which are asked for spans that are never drawn and are asked
+    // during reflow, before there is a piece to answer from. Its own cache, so
+    // a measurement and a draw cannot evict each other.
+    LLFontTextCache     mMeasureCache;
 };
 
 // This text segment is the same as LLNormalTextSegment, the only difference
@@ -461,6 +481,11 @@ public:
     S32                     getMaxTextLength() const { return mMaxTextByteLength; }
 
     S32                     getTextGeneration() const;
+
+    // Counts passes over the visible text. A segment that wraps is drawn once
+    // per line it covers, and this is how it tells the pieces of one pass from
+    // the pieces of the next.
+    S32                     getDrawPass() const { return mDrawPass; }
 
     void                    appendText(const std::string &new_text, bool prepend_newline, const LLStyle::Params& input_params = LLStyle::Params());
 
@@ -753,6 +778,7 @@ protected:
     // text segmentation and flow
     segment_set_t               mSegments;
     line_list_t                 mLineInfoList;
+    S32                         mDrawPass = 0;
     LLRect                      mVisibleTextRect;           // The rect in which text is drawn.  Excludes borders.
     LLRect                      mTextBoundingRect;
 
