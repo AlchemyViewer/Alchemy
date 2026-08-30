@@ -189,6 +189,16 @@ public:
     // start_pos is the last one drawn, or as close to last as fits.
     // byteFromPixelOffset: the position closest to pixel x, ignoring anything
     // beyond max_pixels or max_bytes.
+    //
+    // maxDrawableBytes cannot also report how wide its answer is, tempting as
+    // that looks: wrapping asks it where a line ends and then asks
+    // getWidthF32Bytes how wide that line is, and the two are not measuring
+    // the same thing. This walks the whole remaining text as one shaped run,
+    // so the last glyph before the cut carries the kerning of the character
+    // that follows it; the line is then drawn as a run of its own, where that
+    // character is not there. Handing back the in-context width places lines
+    // by a number the draw will not reproduce. The second call is also not
+    // wasted: it shapes exactly the slice the draw will ask for next.
     S32 maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 max_bytes = S32_MAX, EWordWrapStyle end_on_word_boundary = ANYWHERE) const;
     S32 firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 start_pos = S32_MAX, S32 max_bytes = S32_MAX) const;
     S32 byteFromPixelOffset(std::string_view utf8text, S32 byte_offset, F32 x, F32 max_pixels = F32_MAX, S32 max_bytes = S32_MAX, bool round = true) const;

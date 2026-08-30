@@ -44,6 +44,7 @@
 #include "../test/lltut.h"
 
 #include <cstdio>
+
 #include <set>
 
 namespace
@@ -1428,4 +1429,88 @@ namespace tut
                           right_x, 40.f + expect);
         }
     }
+
+    // What a reflow costs the shaper. LLTextBase wraps by asking
+    // maxDrawableBytes how much of the remaining text fits, then asking
+    // getWidthF32Bytes how wide that answer is -- two questions about the same
+    // run, per line, per segment, and every one of them can be a HarfBuzz
+    // pass. The shape cache turns the repeats into lookups only when the two
+    // calls agree on the slice they are asking about.
+    //
+    // Counted in cache mutations, which rise once per insert, so the number is
+    // exactly "how many runs had to be shaped". Timing would not survive a
+    // build machine; this does.
+    template<> template<>
+    void llfontgl_object::test<26>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL::initClass(96.f, 1.f, 1.f, kAppDir, kFontsXml,
+                            LLSD(), /*create_gl_textures=*/true);
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        // A chat line long enough to wrap several times at a readable width.
+        const std::string paragraph =
+            "The quick brown fox jumps over the lazy dog while the "
+            "second sentence carries on for long enough to wrap a few "
+            "times at any sensible chat width at all.";
+
+        // One pass of LLTextBase's wrap loop over one segment, counting the
+        // shapes it costs. Mirrors LLNormalTextSegment::getNumBytes followed
+        // by getDimensionsF32.
+        auto wrap_once = [&](F32 width) -> size_t
+        {
+            const size_t before = ALFontShaping::cacheMutationCount();
+            S32 at = 0;
+            while (at < (S32)paragraph.size())
+            {
+                const std::string_view rest = std::string_view(paragraph).substr((size_t)at);
+                const S32 fits = font->maxDrawableBytes(rest, width,
+                                                        (S32)rest.size(),
+                                                        LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
+                if (fits <= 0)
+                {
+                    break;
+                }
+                // The width of exactly what fit, which is what the wrap loop
+                // asks for next to place the line.
+                (void)font->getWidthF32Bytes(paragraph, at, fits, true);
+                at += fits;
+            }
+            return ALFontShaping::cacheMutationCount() - before;
+        };
+
+        // Cold, so every distinct slice counts.
+        ALFontShaping::clearCache();
+        const size_t first = wrap_once(220.f);
+        ensure("wrapping shapes something", first > 0);
+
+        // The same width again: every slice is already cached, so a repeated
+        // reflow at an unchanged width must cost nothing.
+        const size_t again = wrap_once(220.f);
+        ensure_equals("re-wrapping at the same width re-shapes nothing", again, size_t(0));
+
+        // A drag-resize. Each frame moves the width a pixel or two, and the
+        // wrap points move with it, so the slices differ from the ones the
+        // last frame cached. This is what a resize costs per frame per
+        // segment, and it is the number worth watching.
+        size_t dragging = 0;
+        for (S32 px = 219; px >= 200; --px)
+        {
+            dragging += wrap_once((F32)px);
+        }
+
+        // Not an assertion about a good number -- an assertion that the number
+        // is bounded by the work there is to do. Twenty widths over a
+        // paragraph that wraps into a handful of lines: if this ever exceeds
+        // two shapes per line per width, the two callers have stopped agreeing
+        // on their slices again.
+        const size_t lines_per_wrap = first;
+        std::printf("[reflow shaping] cold=%zu same-width=%zu drag-20px=%zu\n",
+                    first, again, dragging);
+        ensure("the drag stays within two shapes per line per width",
+               dragging <= 2 * lines_per_wrap * 20);
+    }
+
 }
