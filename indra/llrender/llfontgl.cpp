@@ -102,9 +102,17 @@ namespace
     // call and don't fire other shape* in between, this is safe in practice.
     struct ShapeLayout
     {
-        std::vector<std::pair<size_t, size_t>>           ranges;
-        std::vector<const std::vector<ALShapedGlyph>*>   glyphs;
-        // Shape-cache mutation count at build time. The glyph pointers are
+        // One range, always: the slice is shaped end to end. Two vectors used
+        // to hold that, from a design that partitioned the slice per face
+        // before shape_sub_run's feature plan made the partition unnecessary.
+        // Holding one element in two heap allocations cost a malloc and a free
+        // apiece on every draw and every measurement.
+        //
+        // `glyphs` is null for an empty slice or a null face.
+        size_t begin = 0;
+        size_t end   = 0;
+        const std::vector<ALShapedGlyph>* glyphs = nullptr;
+        // Shape-cache mutation count at build time. The glyph pointer is
         // valid only while this matches ALFontShaping::cacheMutationCount();
         // holders llassert equality after their last dereference so a
         // use-after-invalidation trips a debug assert instead of reading
@@ -130,21 +138,13 @@ namespace
         if (!root_face || slice.empty())
             return out;
 
-        out.ranges.emplace_back(size_t(0), slice.size());
+        out.begin  = 0;
+        out.end    = slice.size();
+        out.glyphs = &ALFontShaping::shapeLine(root_face, slice, out.begin, out.end);
 
-        out.glyphs.resize(out.ranges.size(), nullptr);
-        for (size_t s = 0; s < out.ranges.size(); ++s)
-        {
-            out.glyphs[s] = &ALFontShaping::shapeLine(root_face, slice,
-                                                     out.ranges[s].first,
-                                                     out.ranges[s].second);
-        }
-        // Re-snapshot AFTER all shapeLine calls — each call may itself
-        // mutate (miss-insert), which is fine: only mutations after this
-        // point invalidate the pointers collected above. (With a single
-        // range there's nothing to invalidate mid-build; with several,
-        // entries just shaped sit at the LRU front, out of eviction's
-        // reach.)
+        // Re-snapshot AFTER the shapeLine call — it may itself mutate
+        // (miss-insert), which is fine: only mutations after this point
+        // invalidate the pointer collected above.
         out.mutation_snapshot = ALFontShaping::cacheMutationCount();
         return out;
     }
@@ -623,9 +623,14 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // clusters still shape; the non-mono path gets a single range covering
     // the whole slice. Layout's ranges are slice-local; we compare against
     // `i - begin_offset` in the loop.
+    // Constant for the whole draw, and it was being derived again for every
+    // glyph -- twice in the innermost loop, once more per cluster measured.
+    const EFontGlyphType glyph_type = (!use_color || LLFontGL::sForceMonochromeEmoji)
+                                    ? EFontGlyphType::Grayscale : EFontGlyphType::Color;
+
     std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)length);
     const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
-    size_t next_shape_run = 0;
+    bool shape_run_taken = false;
 
     S32 next_i = begin_offset;
     for (i = begin_offset; i < begin_offset + length; i = next_i)
@@ -637,12 +642,11 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         // go and jump past the range. When shaping produced no glyphs (rare —
         // face/HB failure) we fall through to the codepoint path so the
         // range still draws something, even if ZWJ presentation is wrong.
-        if (next_shape_run < layout.ranges.size()
-            && (S32)layout.ranges[next_shape_run].first == i_slice)
+        if (!shape_run_taken && layout.glyphs && (S32)layout.begin == i_slice)
         {
-            const auto  run_range  = layout.ranges[next_shape_run];
-            const auto& run_glyphs = *layout.glyphs[next_shape_run];
-            ++next_shape_run;
+            const std::pair<size_t, size_t> run_range{ layout.begin, layout.end };
+            const auto& run_glyphs = *layout.glyphs;
+            shape_run_taken = true;
 
             if (!run_glyphs.empty())
             {
@@ -676,9 +680,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                     {
                         const ALShapedGlyph& g = run_glyphs[k];
                         const LLFontGlyphInfo* gi = mFontFreetype->getGlyphInfoByIndex(
-                            g.face, g.glyph_id,
-                            (!use_color || LLFontGL::sForceMonochromeEmoji)
-                                ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+                            g.face, g.glyph_id, glyph_type);
                         // A glyph with no info is skipped whole by the loop
                         // below, pen included, so it is skipped here too.
                         if (!gi)
@@ -740,9 +742,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                     // hits the same atlas slot regardless of which path
                     // produced the ALShapedGlyph.
                     const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
-                        sg.face, sg.glyph_id,
-                        (!use_color || LLFontGL::sForceMonochromeEmoji)
-                            ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+                        sg.face, sg.glyph_id, glyph_type);
                     if (!sfgi)
                         continue;
 
@@ -880,9 +880,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         next_glyph = NULL;
         if(!fgi)
         {
-            fgi = mFontFreetype->getGlyphInfo(wch,
-                (!use_color || LLFontGL::sForceMonochromeEmoji)
-                    ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+            fgi = mFontFreetype->getGlyphInfo(wch, glyph_type);
         }
         if (!fgi)
         {
@@ -893,27 +891,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         // matching block in the shaped path above for the wrap-around rationale.
         U8 cp_phase;
         S32 cp_dest_int_x;
-        if (fgi->mPhaseCount > 1)
-        {
-            const F32 frac_x = cur_render_x - floorf(cur_render_x);
-            const U32 raw =
-                (U32)floorf(frac_x * (F32)LLFontGlyphInfo::kNumPhases + 0.5f);
-            if (raw >= LLFontGlyphInfo::kNumPhases)
-            {
-                cp_phase = 0;
-                cp_dest_int_x = (S32)floorf(cur_render_x) + 1;
-            }
-            else
-            {
-                cp_phase = (U8)raw;
-                cp_dest_int_x = (S32)floorf(cur_render_x);
-            }
-        }
-        else
-        {
-            cp_phase = 0;
-            cp_dest_int_x = ll_round(cur_render_x);
-        }
+        place_glyph(fgi, cur_render_x, cp_phase, cp_dest_int_x);
         const auto& cp_slot = fgi->mPhaseSlots[cp_phase];
 
         // Per-glyph bitmap texture. Flush + rebind only when the atlas
@@ -1017,9 +995,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
             // Kern this puppy. The old `next_char < LAST_CHAR_FULL`
             // gate was a vestigial ASCII-bucket-cache limit; today
             // getXKerning works for any pair.
-            next_glyph = mFontFreetype->getGlyphInfo(next_char,
-                (!use_color || LLFontGL::sForceMonochromeEmoji)
-                    ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+            next_glyph = mFontFreetype->getGlyphInfo(next_char, glyph_type);
             cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
         }
 
@@ -1240,7 +1216,7 @@ F32 LLFontGL::getWidthF32Bytes(std::string_view utf8text, S32 begin_offset, S32 
     // in the loop rather than mutating ranges.
     std::string_view slice = utf8text.substr((size_t)begin, (size_t)measure_len);
     const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
-    size_t next_shape_run = 0;
+    bool shape_run_taken = false;
 
     const LLFontGlyphInfo* next_glyph = NULL;
 
@@ -1251,12 +1227,11 @@ F32 LLFontGL::getWidthF32Bytes(std::string_view utf8text, S32 begin_offset, S32 
         if (at.cp == 0)
             break;
         const S32 i_slice = i - begin;
-        if (next_shape_run < layout.ranges.size()
-            && (S32)layout.ranges[next_shape_run].first == i_slice)
+        if (!shape_run_taken && layout.glyphs && (S32)layout.begin == i_slice)
         {
-            const auto  run_range  = layout.ranges[next_shape_run];
-            const auto& run_glyphs = *layout.glyphs[next_shape_run];
-            ++next_shape_run;
+            const std::pair<size_t, size_t> run_range{ layout.begin, layout.end };
+            const auto& run_glyphs = *layout.glyphs;
+            shape_run_taken = true;
 
             if (!run_glyphs.empty())
             {
@@ -1840,7 +1815,7 @@ S32 LLFontGL::byteFromPixelOffset(std::string_view utf8text, S32 begin_offset, F
 
     std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)slice_len);
     const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
-    size_t next_shape_run = 0;
+    bool shape_run_taken = false;
 
     const LLFontGlyphInfo* next_glyph = NULL;
 
@@ -1865,12 +1840,11 @@ S32 LLFontGL::byteFromPixelOffset(std::string_view utf8text, S32 begin_offset, F
         // mid-ligature. Mid-test matches the legacy codepoint path's
         // unrounded `cur_x + W*0.5f` so behavior agrees character-for-
         // character on Latin text.
-        if (next_shape_run < layout.ranges.size()
-            && (S32)layout.ranges[next_shape_run].first == pos_slice)
+        if (!shape_run_taken && layout.glyphs && (S32)layout.begin == pos_slice)
         {
-            const auto  run_range  = layout.ranges[next_shape_run];
-            const auto& run_glyphs = *layout.glyphs[next_shape_run];
-            ++next_shape_run;
+            const std::pair<size_t, size_t> run_range{ layout.begin, layout.end };
+            const auto& run_glyphs = *layout.glyphs;
+            shape_run_taken = true;
 
             if (!run_glyphs.empty())
             {
