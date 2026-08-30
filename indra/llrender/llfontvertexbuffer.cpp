@@ -191,6 +191,7 @@ S32 LLFontVertexBuffer::renderImpl(
     bool use_ellipses,
     bool use_color )
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     if (!LLFontGL::sDisplayFont) //do not display texts
     {
         return static_cast<S32>(text.length());
@@ -283,6 +284,11 @@ void LLFontVertexBuffer::genBuffers(
     bool use_ellipses,
     bool use_color)
 {
+    // The regeneration path: shapes, measures and rebuilds the geometry. Named
+    // apart from the replay so a capture answers the question this class
+    // exists to answer -- whether a frame reused its text or rebuilt it.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen");
+    LL_PROFILE_ZONE_NUM(text.size());
     // todo: add a debug build assert if this triggers too often for to long?
     mShadowBufferList.clear();
     mForegroundBufferList.clear();
@@ -448,6 +454,11 @@ void LLFontVertexBuffer::recolorBuffers(
 
 void LLFontVertexBuffer::renderBuffers()
 {
+    // The replay path: no shaping, no measurement, just the captured draws.
+    // Named apart from genBuffers so a capture shows at a glance whether a
+    // frame regenerated its text or reused it -- which is the whole point of
+    // this class, and was not observable.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font replay");
     gGL.flush(); // deliberately empty pending verts
     gGL.pushUIMatrix();
 

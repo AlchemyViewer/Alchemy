@@ -161,6 +161,7 @@ namespace
                        hb_script_t                  script,
                        std::vector<ALShapedGlyph>&  out_glyphs)
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
         if (!face || sub_begin_in_slice >= sub_end_in_slice)
             return;
 
@@ -531,6 +532,7 @@ namespace
                             std::string_view      slice,
                             std::vector<ALShapedGlyph>& out_glyphs)
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
         const size_t n = slice.size();
         if (!root_face || n == 0)
             return;
@@ -789,9 +791,18 @@ const std::vector<ALShapedGlyph>& ALFontShaping::shapeLine(
 
     if (auto it = sShapeIndex.find(lookup); it != sShapeIndex.end())
     {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("shapeLine hit");
+        LL_PROFILE_ZONE_NUM(slice.size());
         sShapeLru.splice(sShapeLru.begin(), sShapeLru, it->second.lru_pos);
         return it->second.glyphs;
     }
+
+    // Named apart from the hit so the two are distinguishable in a capture.
+    // They cost orders of magnitude differently and a caller that misses every
+    // frame -- one measuring a moving suffix, say -- looks exactly like one
+    // that hits, if the zone cannot tell them apart.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("shapeLine miss");
+    LL_PROFILE_ZONE_NUM(slice.size());
 
     // Miss: itemize the slice into per-face sub-runs, shape each on its
     // owning face, and concatenate the glyph streams. Empty results are

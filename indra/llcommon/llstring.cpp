@@ -1103,6 +1103,8 @@ EmojiClusterList wstring_find_emoji_clusters(LLWStringView wstr)
 
 EmojiClusterList utf8str_find_emoji_clusters(std::string_view utf8str)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(utf8str.size());
     return find_emoji_clusters(utf8str);
 }
 
@@ -1888,6 +1890,8 @@ void wstring_tolower_indexed(LLWStringView wstr, LLWString& out_str, std::vector
 
 void utf8str_line_break_opportunities(std::string_view utf8str, std::vector<size_t>& out)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(utf8str.size());
     out.clear();
     if (utf8str.empty())
         return;

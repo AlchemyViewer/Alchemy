@@ -798,6 +798,7 @@ void LLTextBase::drawCursor()
 
 void LLTextBase::drawText()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     S32 text_len = getLengthBytes();
 
     if (text_len <= 0 && mLabel.empty())
@@ -4286,6 +4287,7 @@ LLTextSegmentPtr LLNormalTextSegment::clone(LLTextBase& target) const
 
 bool LLNormalTextSegment::getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     height = 0;
     width = 0;
     if (num_bytes > 0 && (mStart + first_byte >= 0))
@@ -4316,6 +4318,7 @@ S32 LLNormalTextSegment::getOffset(S32 segment_local_x_coord, S32 start_offset, 
 
 S32 LLNormalTextSegment::getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     const std::string& text = getTextUtf8();
 
     LLUIImagePtr image = mStyle->getImage();
