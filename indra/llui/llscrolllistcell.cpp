@@ -341,14 +341,12 @@ bool LLScrollListText::needsToolTip() const
 void LLScrollListText::setTextWidth(S32 value)
 {
     mTextWidth = value;
-    mFontBuffer.reset();
 }
 
 void LLScrollListText::setWidth(S32 width)
 {
     LLScrollListCell::setWidth(width);
     mTextWidth = width;
-    mFontBuffer.reset();
 }
 
 //virtual
@@ -384,7 +382,6 @@ void LLScrollListText::setColor(const LLColor4& color)
 void LLScrollListText::setText(const LLStringExplicit& text)
 {
     mText = text;
-    mFontBuffer.reset();
 }
 
 void LLScrollListText::setFontStyle(const U8 font_style)
@@ -392,13 +389,11 @@ void LLScrollListText::setFontStyle(const U8 font_style)
     LLFontDescriptor new_desc(mFont->getFontDesc());
     new_desc.setStyle(font_style);
     mFont = LLFontGL::getFont(new_desc);
-    mFontBuffer.reset();
 }
 
 void LLScrollListText::setAlignment(LLFontGL::HAlign align)
 {
     mFontAlignment = align;
-    mFontBuffer.reset();
 }
 
 //virtual
@@ -482,7 +477,7 @@ void LLScrollListText::draw(const LLColor4& color, const LLColor4& highlight_col
         start_x = (F32)getWidth() * 0.5f;
         break;
     }
-    mFontBuffer.renderBytes(mFont,
+    mFontBuffer.forText(mText.getString()).renderBytes(mFont,
                        mText.getString(), 0,
                        start_x, 0.f,
                        display_color,
@@ -722,7 +717,7 @@ void LLScrollListIconText::draw(const LLColor4& color, const LLColor4& highlight
         start_icon_x = (S32)(center - (((F32)icon_space + mFont->getWidth(mText.getString())) * 0.5f));
         break;
     }
-    mFontBuffer.renderBytes(
+    mFontBuffer.forText(mText.getString()).renderBytes(
         mFont,
         mText.getString(), 0,
         start_text_x, 0.f,

@@ -27,6 +27,7 @@
 #ifndef LL_LLBUTTON_H
 #define LL_LLBUTTON_H
 
+#include "alcachedlabel.h"
 #include "lluuid.h"
 #include "llbadgeowner.h"
 #include "llcontrol.h"
@@ -55,7 +56,7 @@ S32 round_up(S32 grid, S32 value);
 
 class LLUICtrlFactory;
 class LLFontGL;
-class LLFontVertexBuffer;
+
 
 //
 // Classes
@@ -393,7 +394,7 @@ protected:
 
 private:
     const LLFontGL* mGLFont;
-    LLFontVertexBuffer          mFontBuffer;
+    ALCachedLabel               mFontBuffer;
 
 protected:
     virtual std::string _getSearchText() const override

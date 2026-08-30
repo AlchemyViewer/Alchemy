@@ -29,6 +29,7 @@
 #define LLSCROLLLISTCELL_H
 
 #include "llfontgl.h"       // HAlign
+#include "alcachedlabel.h"
 #include "llfontvertexbuffer.h"       // HAlign
 #include "llpointer.h"      // LLPointer<>
 #include "lluistring.h"
@@ -193,7 +194,7 @@ protected:
     LLUIString      mAltText;
     S32             mTextWidth;
     const LLFontGL* mFont;
-    LLFontVertexBuffer mFontBuffer;
+    ALCachedLabel   mFontBuffer;
     LLColor4        mColor;
     LLColor4        mHighlightColor;
     U8              mUseColor;
