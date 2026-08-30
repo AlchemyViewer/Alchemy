@@ -664,6 +664,44 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         }
     };
 
+    // Point the batch at the atlas sheet a glyph comes from, draining whatever
+    // is queued under the old one first. Both passes ask for this -- the first
+    // from the shaped glyphs, the second from the metadata the first deferred
+    // -- and each carried its own copy of these rules, one of them without the
+    // texel-size update.
+    auto use_atlas = [&](const ALFontFace* face, std::pair<EFontGlyphType, S32> entry)
+    {
+        if (face == current_face && entry == bitmap_entry)
+        {
+            return;
+        }
+
+        flush_batch();
+        bitmap_entry = entry;
+        if (face != current_face)
+        {
+            current_face = face;
+            font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
+            if (font_bitmap_cache)
+            {
+                inv_width  = 1.f / font_bitmap_cache->getBitmapWidth();
+                inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
+            }
+        }
+
+        // Null when the slot's sheet has been released (shouldn't happen
+        // mid-render -- eviction runs at the frame boundary and purges glyph
+        // entries first). The emission guards skip the quad rather than
+        // sampling whatever texture happens to be bound.
+        batch_image = font_bitmap_cache
+            ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
+            : nullptr;
+        if (batch_image)
+        {
+            gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
+        }
+    };
+
     // Where a glyph's bitmap lands for a given pen position. Shared so the
     // cluster measurement below and the emission that follows it cannot drift
     // apart: they have to agree on the subpixel phase, since the phase decides
@@ -833,37 +871,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                     place_glyph(sfgi, pen_x, phase, dest_int_x);
                     const auto& slot = sfgi->mPhaseSlots[phase];
 
-                    const ALFontFace* glyph_face = sfgi->mSourceFace;
-                    std::pair<EFontGlyphType, S32> next_bitmap_entry = slot.mBitmapEntry;
-                    if (glyph_face != current_face || next_bitmap_entry != bitmap_entry)
-                    {
-                        // Drain the queued glyphs under their own texture
-                        // before switching the batch to the new one.
-                        flush_batch();
-                        bitmap_entry = next_bitmap_entry;
-                        if (glyph_face != current_face)
-                        {
-                            current_face = glyph_face;
-                            font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
-                            if (font_bitmap_cache)
-                            {
-                                inv_width  = 1.f / font_bitmap_cache->getBitmapWidth();
-                                inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
-                            }
-                        }
-                        // Null when the slot's sheet has been released
-                        // (shouldn't happen mid-render — eviction runs at the
-                        // frame boundary and purges glyph entries first). The
-                        // emission guard below skips the quad rather than
-                        // sampling whatever texture happens to be bound.
-                        batch_image = font_bitmap_cache
-                            ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
-                            : nullptr;
-                        if (batch_image)
-                        {
-                            gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
-                        }
-                    }
+                    use_atlas(sfgi->mSourceFace, slot.mBitmapEntry);
 
                     const F32 glyph_x = (F32)(dest_int_x + slot.mXBearing);
                     const F32 glyph_y = (F32)ll_round(pen_y) + (F32)slot.mYBearing;
@@ -992,23 +1000,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         batch_image = nullptr;
         for (const DeferredGlyph& dg : deferred)
         {
-            if (dg.face != current_face || dg.bitmap_entry != bitmap_entry)
-            {
-                flush_batch();
-                bitmap_entry = dg.bitmap_entry;
-                if (dg.face != current_face)
-                {
-                    current_face = dg.face;
-                    font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
-                }
-                batch_image = font_bitmap_cache
-                    ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
-                    : nullptr;
-                if (batch_image)
-                {
-                    gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
-                }
-            }
+            use_atlas(dg.face, dg.bitmap_entry);
 
             if (!batch_image)
             {
