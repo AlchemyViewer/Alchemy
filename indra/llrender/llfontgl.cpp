@@ -588,6 +588,35 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         }
     };
 
+    // Where a glyph's bitmap lands for a given pen position. Shared so the
+    // cluster measurement below and the emission that follows it cannot drift
+    // apart: they have to agree on the subpixel phase, since the phase decides
+    // which slot is consulted and so how wide the glyph is.
+    auto place_glyph = [](const LLFontGlyphInfo* gi, F32 pen, U8& phase, S32& dest_int_x)
+    {
+        if (gi->mPhaseCount > 1)
+        {
+            const F32 frac_x = pen - floorf(pen);
+            const U32 raw =
+                (U32)floorf(frac_x * (F32)LLFontGlyphInfo::kNumPhases + 0.5f);
+            if (raw >= LLFontGlyphInfo::kNumPhases)
+            {
+                phase = 0;
+                dest_int_x = (S32)floorf(pen) + 1;
+            }
+            else
+            {
+                phase = (U8)raw;
+                dest_int_x = (S32)floorf(pen);
+            }
+        }
+        else
+        {
+            phase = 0;
+            dest_int_x = ll_round(pen);
+        }
+    };
+
     // Itemize + shape the slice via the shared helper. Strict-monospace
     // gets emoji-cluster ranges so ASCII keeps the codepoint path's exact
     // metrics (visual parity with toggle-off) while embedded emoji
@@ -627,8 +656,68 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                 // to callers that drive word-wrap / chunked draw off the
                 // return value.
                 S32 overflow_cluster_local = 0;
-                for (const ALShapedGlyph& sg : run_glyphs)
+
+                // Whether every glyph sharing the cluster that starts at
+                // `first` fits, measured from the pen it would start at.
+                // Several glyphs can carry one cluster -- a mark stack, a
+                // Devanagari conjunct, an emoji and its variation selector --
+                // and the pen moves inside one, so this walks the cluster the
+                // way the emission does rather than assuming the marks are
+                // weightless. A cluster drawn with only some of its glyphs is
+                // not a clipped syllable; it is a different syllable.
+                auto cluster_fits = [&](size_t first, F32 pen_from) -> bool
                 {
+                    const S32 cluster = run_glyphs[first].cluster;
+                    F32 sim_x = pen_from;
+                    F32 right = pen_from;
+                    for (size_t k = first;
+                         k < run_glyphs.size() && run_glyphs[k].cluster == cluster;
+                         ++k)
+                    {
+                        const ALShapedGlyph& g = run_glyphs[k];
+                        const LLFontGlyphInfo* gi = mFontFreetype->getGlyphInfoByIndex(
+                            g.face, g.glyph_id,
+                            (!use_color || LLFontGL::sForceMonochromeEmoji)
+                                ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+                        // A glyph with no info is skipped whole by the loop
+                        // below, pen included, so it is skipped here too.
+                        if (!gi)
+                            continue;
+
+                        U8  sim_phase;
+                        S32 sim_dest;
+                        place_glyph(gi, sim_x + g.x_offset, sim_phase, sim_dest);
+                        const auto& sim_slot = gi->mPhaseSlots[sim_phase];
+                        right = llmax(right,
+                                      (F32)(sim_dest + sim_slot.mXBearing) + (F32)sim_slot.mWidth);
+
+                        sim_x += g.x_advance;
+                        if (!subpixel_pen)
+                            sim_x = (F32)ll_round(sim_x);
+                    }
+                    return (start_x + scaled_max_pixels) >= right;
+                };
+
+                S32 open_cluster = -1;
+                for (size_t sg_index = 0; sg_index < run_glyphs.size(); ++sg_index)
+                {
+                    const ALShapedGlyph& sg = run_glyphs[sg_index];
+
+                    // Tested once per cluster, before any of it is emitted.
+                    // Testing per glyph clips between two glyphs of the same
+                    // cluster, which paints a base without its mark and then
+                    // reports the whole cluster as undrawn.
+                    if (sg.cluster != open_cluster)
+                    {
+                        if (!cluster_fits(sg_index, cur_render_x))
+                        {
+                            overflow = true;
+                            overflow_cluster_local = sg.cluster;
+                            break;
+                        }
+                        open_cluster = sg.cluster;
+                    }
+
                     // Cache lives on the root face and its bitmap atlas; the
                     // fallback face is only the *source* for the glyph. The
                     // codepoint path also routes through getGlyphInfoByIndex
@@ -653,27 +742,7 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                     const F32 pen_y = cur_render_y + sg.y_offset;
                     U8 phase;
                     S32 dest_int_x;
-                    if (sfgi->mPhaseCount > 1)
-                    {
-                        const F32 frac_x = pen_x - floorf(pen_x);
-                        const U32 raw =
-                            (U32)floorf(frac_x * (F32)LLFontGlyphInfo::kNumPhases + 0.5f);
-                        if (raw >= LLFontGlyphInfo::kNumPhases)
-                        {
-                            phase = 0;
-                            dest_int_x = (S32)floorf(pen_x) + 1;
-                        }
-                        else
-                        {
-                            phase = (U8)raw;
-                            dest_int_x = (S32)floorf(pen_x);
-                        }
-                    }
-                    else
-                    {
-                        phase = 0;
-                        dest_int_x = ll_round(pen_x);
-                    }
+                    place_glyph(sfgi, pen_x, phase, dest_int_x);
                     const auto& slot = sfgi->mPhaseSlots[phase];
 
                     const ALFontFace* glyph_face = sfgi->mSourceFace;
@@ -711,12 +780,6 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                     const F32 glyph_x = (F32)(dest_int_x + slot.mXBearing);
                     const F32 glyph_y = (F32)ll_round(pen_y) + (F32)slot.mYBearing;
 
-                    if ((start_x + scaled_max_pixels) < (glyph_x + (F32)slot.mWidth))
-                    {
-                        overflow = true;
-                        overflow_cluster_local = sg.cluster;
-                        break;
-                    }
 
                     if (batch_image)
                     {

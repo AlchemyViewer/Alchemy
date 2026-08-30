@@ -37,6 +37,7 @@
 #include "../llfontfreetype.h"
 #include "../llfontbitmapcache.h"
 #include "../llimagegl.h"
+#include "../alfontshaping.h"
 
 #include "llheadlessgl_fixture.h"
 
@@ -923,25 +924,6 @@ namespace tut
     typedef llfontgl_render_test::object     llfontgl_render_object;
     tut::llfontgl_render_test llfontgl_render_testcase("LLFontGLRender");
 
-    // Helper: scan a region of a readback buffer and return true iff
-    // any pixel has non-zero alpha. Used to detect "did the glyph
-    // actually rasterize at this position?".
-    inline bool hasAnyAlpha(const std::vector<U8>& px, S32 fb_w, S32 fb_h,
-                            S32 x0, S32 y0, S32 x1, S32 y1)
-    {
-        x0 = llmax(0, x0); y0 = llmax(0, y0);
-        x1 = llmin(fb_w, x1); y1 = llmin(fb_h, y1);
-        for (S32 y = y0; y < y1; ++y)
-        {
-            for (S32 x = x0; x < x1; ++x)
-            {
-                const U8 a = px[(y * fb_w + x) * 4 + 3];
-                if (a > 0) return true;
-            }
-        }
-        return false;
-    }
-
     // First end-to-end render() call with LEFT/BASELINE places glyph
     // pixels into the framebuffer at the requested x. Pins the full
     // chain: shape → atlas → vertex buffer → drawArrays → fragment
@@ -956,6 +938,16 @@ namespace tut
 
         gl.clearFramebuffer();
         const std::string s = "A";
+
+        // Held against the quads the draw emits rather than against pixels.
+        // Nothing this harness draws reaches the framebuffer -- a readback
+        // after a render finds the clear colour and nothing else -- so a test
+        // that asks whether a glyph appeared there can only answer yes by
+        // accident. It did: clearFramebuffer clears to opaque black, the check
+        // was for a non-zero alpha, and alpha is 255 over the whole buffer
+        // before anything is drawn at all.
+        std::list<LLVertexBufferData> capture;
+        gGL.beginList(&capture);
         const S32 n = font->renderBytes(s, 0, /*x=*/64.f, /*y=*/64.f,
                                    LLColor4::white,
                                    LLFontGL::LEFT, LLFontGL::BASELINE,
@@ -963,16 +955,17 @@ namespace tut
                                    1);
         // Force any pending verts to draw.
         gGL.flush();
+        gGL.endList();
         ensure_equals("render returned 1 char", n, 1);
 
-        // Read back the framebuffer; expect non-zero alpha somewhere
-        // in the rendered glyph's bounding box (rough ±32px around 64).
-        auto px = ll_test::readFramebufferRGBA(ll_test::HeadlessGL::WIDTH,
-                                               ll_test::HeadlessGL::HEIGHT);
-        ensure("rendered glyph appears in framebuffer",
-               hasAnyAlpha(px, ll_test::HeadlessGL::WIDTH,
-                           ll_test::HeadlessGL::HEIGHT,
-                           48, 32, 96, 96));
+        U32 verts = 0;
+        for (const LLVertexBufferData& entry : capture)
+        {
+            verts += entry.mCount;
+        }
+        ensure_equals("one glyph is one quad", verts, (U32)6);
+        ensure("the quad carries an atlas texture",
+               !capture.empty() && capture.front().mTexName != 0);
     }
 
     // HCENTER and RIGHT alignment branches: render() must complete
@@ -1214,5 +1207,82 @@ namespace tut
         gGL.flush();
         ensure_equals("drawing from an offset returns the bytes it drew",
                       tail, total - 3);
+    }
+
+    // Clipping is per cluster, and the count says so. Several glyphs can carry
+    // one cluster -- a Devanagari conjunct, a Thai vowel sign, a mark stack,
+    // an emoji and its variation selector -- and the pen moves inside one, so
+    // a per-glyph clip can paint a base and drop the mark that belongs to it.
+    // That is not a clipped syllable, it is a different syllable, and the
+    // count reported back calls the whole cluster undrawn either way.
+    template<> template<>
+    void llfontgl_render_object::test<8>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+        const LLFontFreetype* ft = font->getFontFreetype();
+        ensure("freetype present", ft != nullptr);
+
+        // Devanagari, which shapes two glyphs to a cluster with an advance on
+        // each -- the shape that a per-glyph clip splits.
+        const std::string s =
+            "\xE0\xA4\xA8\xE0\xA4\xAE\xE0\xA4\xB8\xE0\xA5\x8D\xE0\xA4\xA4\xE0\xA5\x87";
+        const S32 total = (S32)s.size();
+        const F32 full = font->getWidthF32Bytes(s, 0, total, false);
+        if (full <= 0.f)
+            skip("no Devanagari coverage in the test font set");
+
+        // Cluster boundaries from the shaper itself rather than by hand: which
+        // bytes are boundaries is the font's business, not this test's.
+        const auto& glyphs = ALFontShaping::shapeLine(ft, s, 0, (size_t)total);
+        if (glyphs.empty())
+            skip("Devanagari did not shape");
+        std::set<S32> boundaries;
+        for (const ALShapedGlyph& g : glyphs)
+        {
+            boundaries.insert(g.cluster);
+        }
+        boundaries.insert(total);
+
+        // Counted through the vertex capture rather than the framebuffer: the
+        // quads a draw emits are what the count has to agree with, and they are
+        // observable here whether or not the harness rasterizes anything.
+        S32 checked = 0;
+        for (F32 px = 0.f; px <= full + 2.f; px += 0.5f)
+        {
+            std::list<LLVertexBufferData> capture;
+            gGL.beginList(&capture);
+            const S32 n = font->renderBytes(s, 0, 20.f, 64.f, LLColor4::white,
+                                            LLFontGL::LEFT, LLFontGL::BASELINE,
+                                            LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                                            S32_MAX, (S32)px);
+            gGL.flush();
+            gGL.endList();
+
+            U32 verts = 0;
+            for (const LLVertexBufferData& entry : capture)
+            {
+                verts += entry.mCount;
+            }
+
+            ensure("a clipped draw stops on a cluster boundary",
+                   boundaries.count(n) == 1);
+
+            // Exactly the glyphs of the clusters the count claims. A per-glyph
+            // clip emits the glyphs of the overflowing cluster that came before
+            // the one that did not fit, and then reports that whole cluster as
+            // undrawn -- so the quads outnumber what the count accounts for,
+            // which is the same as saying a base was painted without its mark.
+            U32 expected = 0;
+            for (const ALShapedGlyph& g : glyphs)
+            {
+                if (g.cluster < n) expected += 6;
+            }
+            ensure_equals("quads drawn match the bytes reported", verts, expected);
+            if (n > 0 && n < total) ++checked;
+        }
+        ensure("the sweep reached a partially-clipped draw", checked > 0);
     }
 }
