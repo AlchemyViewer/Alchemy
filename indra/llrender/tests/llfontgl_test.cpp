@@ -979,6 +979,7 @@ namespace tut
                       font->maxDrawableBytes(s, F32_MAX, total), total);
     }
 
+
     // ===================================================================
     // Render-output group: fixture brings up gUIProgram (needs_render=true)
     // so LLFontGL::render() completes end-to-end against the OSMesa
@@ -1377,5 +1378,54 @@ namespace tut
             if (n > 0 && n < total) ++checked;
         }
         ensure("the sweep reached a partially-clipped draw", checked > 0);
+    }
+    // renderBytes places a right-aligned or centred string by measuring it, and
+    // it takes that measurement from the glyphs it is about to draw rather than
+    // shaping the text a second time. The two have to agree exactly: the number
+    // that positions the text and the number getWidthF32Bytes reports are the
+    // same quantity, and a string measured by one and drawn by the other sits
+    // in the wrong place.
+    //
+    // right_x is the observable end of the drawn run, so LEFT-aligned it is the
+    // origin plus the width. That is what pins the shared sum against the
+    // independent walk.
+    template<> template<>
+    void llfontgl_render_object::test<9>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font resolves", font != nullptr);
+
+        const std::string samples[] = {
+            std::string("Hello world"),
+            std::string("caf\xC3\xA9 na\xC3\xAFve"),
+            std::string("\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E"),
+            std::string("A\xE6\x97\xA5" "B"),
+            std::string("Wa"),          // a kerning pair
+            std::string("."),
+        };
+
+        for (const std::string& s : samples)
+        {
+            const S32 total = (S32)s.size();
+            // no_padding: right_x is where the pen ended, so it carries the
+            // advances and not the extent overhang of the last glyph, which is
+            // what the padded form adds on top.
+            const F32 expect = font->getWidthF32Bytes(s, 0, total, true);
+            if (expect <= 0.f)
+                continue;
+
+            F32 right_x = 0.f;
+            font->renderBytes(s, 0, 40.f, 60.f, LLColor4::white,
+                              LLFontGL::LEFT, LLFontGL::BASELINE,
+                              LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                              total, S32_MAX, &right_x);
+            gGL.flush();
+
+            // right_x is in the same unscaled space the origin was given in.
+            ensure_equals("the drawn run ends where the measurement says",
+                          right_x, 40.f + expect);
+        }
     }
 }

@@ -120,6 +120,38 @@ namespace
         size_t mutation_snapshot = 0;
     };
 
+    // Width of a shaped run in scaled pixels, including the extent overhang of
+    // whichever glyph reaches furthest past its own advance. The one place that
+    // arithmetic lives: renderBytes needs the same number to place a
+    // right-aligned or centred string, and deriving it twice from the same
+    // glyphs is how the drawn position and the measured one drift apart.
+    F32 shaped_run_width(const LLFontFreetype* ft,
+                         const std::vector<ALShapedGlyph>& glyphs,
+                         bool no_padding, bool subpixel_pen)
+    {
+        F32 cur_x   = 0.f;
+        F32 padding = 0.f;
+        for (const ALShapedGlyph& sg : glyphs)
+        {
+            const LLFontGlyphInfo* gi = ft->getGlyphInfoByIndex(
+                sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
+            if (!gi)
+                continue;
+            if (!no_padding)
+            {
+                padding = llmax(0.f,
+                                padding - sg.x_advance,
+                                (F32)(gi->mWidth + gi->mXBearing) - sg.x_advance);
+            }
+            cur_x += sg.x_advance;
+            // Match render()'s pen motion so caret positions and ellipsis
+            // cutoffs agree with what is drawn.
+            if (!subpixel_pen)
+                cur_x = (F32)ll_round(cur_x);
+        }
+        return no_padding ? cur_x : (cur_x + padding);
+    }
+
     // Build the shape layout for `slice` against `root_face`. One
     // all-encompassing range, shaped end-to-end through HarfBuzz. The
     // monospace feature plan in shape_sub_run (kern + ligatures off for
@@ -367,6 +399,18 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
         length = llmin((S32)utf8text.length() - begin_offset, max_bytes );
     }
 
+    // Nothing past an embedded NUL is ever drawn -- the walk below stops there
+    // -- so nothing past it is worth shaping either, and stopping here is also
+    // what lets the width be taken from the same glyphs the draw uses:
+    // getWidthF32Bytes trims at the NUL, and a run measured past one would
+    // place a right-aligned string by text that never appears.
+    {
+        S32 trimmed = 0;
+        while (trimmed < length && utf8text[begin_offset + trimmed] != 0)
+            ++trimmed;
+        length = trimmed;
+    }
+
     F32 cur_x, cur_y, cur_render_x, cur_render_y;
 
     // Not guaranteed to be set correctly
@@ -411,9 +455,24 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     // measurement work paid for nothing.
     const bool needs_string_width = (halign == RIGHT) || (halign == HCENTER)
                                   || (style_to_add & UNDERLINE) || use_ellipses;
-    const F32 string_width_unscaled = needs_string_width
-        ? getWidthF32Bytes(utf8text, begin_offset, length)
-        : 0.f;
+
+    // The slice is shaped here rather than further down, so the width comes
+    // out of the glyphs this draw is about to lay down instead of a second
+    // shape and a second walk of the same text. getWidthF32Bytes did both, on
+    // every button label and every scroll-list cell.
+    const std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)length);
+    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
+
+    F32 string_width_unscaled = 0.f;
+    if (needs_string_width)
+    {
+        // Shaping failing leaves nothing to measure from, so that case still
+        // asks the codepoint walk -- which is where it lives.
+        string_width_unscaled = (layout.glyphs && !layout.glyphs->empty())
+            ? shaped_run_width(mFontFreetype, *layout.glyphs,
+                               /*no_padding=*/false, subpixel_pen) / sScaleX
+            : getWidthF32Bytes(utf8text, begin_offset, length);
+    }
     const S32 scaled_string_width = ll_round(string_width_unscaled * sScaleX);
 
     switch (halign)
@@ -650,8 +709,6 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
     const EFontGlyphType glyph_type = (!use_color || LLFontGL::sForceMonochromeEmoji)
                                     ? EFontGlyphType::Grayscale : EFontGlyphType::Color;
 
-    std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)length);
-    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
     bool shape_run_taken = false;
 
     S32 next_i = begin_offset;
@@ -1258,26 +1315,12 @@ F32 LLFontGL::getWidthF32Bytes(std::string_view utf8text, S32 begin_offset, S32 
             if (!run_glyphs.empty())
             {
                 next_glyph = NULL;
-                F32 run_padding = 0.f;
-                for (const ALShapedGlyph& sg : run_glyphs)
-                {
-                    const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
-                        sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
-                    if (!sfgi)
-                        continue;
-                    if (!no_padding)
-                    {
-                        run_padding = llmax(0.f,
-                            run_padding - sg.x_advance,
-                            (F32)(sfgi->mWidth + sfgi->mXBearing) - sg.x_advance);
-                    }
-                    cur_x += sg.x_advance;
-                    // Match render()'s pen motion so caret positions and
-                    // ellipsis cutoffs agree with what's drawn.
-                    if (!subpixel_pen)
-                        cur_x = (F32)ll_round(cur_x);
-                }
-                width_padding = run_padding;
+                // The run is consumed whole, so its width is the shared sum
+                // rather than a second copy of the same accumulation. Padding
+                // is folded in by the helper, so nothing is owed at the end.
+                cur_x += shaped_run_width(mFontFreetype, run_glyphs,
+                                          no_padding, subpixel_pen);
+                width_padding = 0.f;
                 i = begin + (S32)run_range.second;
                 continue;
             }
