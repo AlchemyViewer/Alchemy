@@ -356,16 +356,33 @@ void LLFolderView::filter( LLFolderViewFilter& filter )
 
 void LLFolderView::reshape(S32 width, S32 height, bool called_from_parent)
 {
-    // Two LLView::reshape passes: the first so the scroll container can decide
-    // whether it needs a scrollbar, the second with the width that answer
-    // implies. Each is a walk of the whole item tree.
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     LLRect scroll_rect;
     if (mScrollContainer)
     {
-        LLView::reshape(width, height, called_from_parent);
+        // What the scroll container needs in order to say whether it wants a
+        // scrollbar is this view's own size, which it reads off this rect; it
+        // never asks an item. So the size it is to answer for goes onto the
+        // rect and comes straight back off. A reshape here would have walked
+        // the whole item tree to place children that the reshape below then
+        // places again, and that walk is what a resize costs.
+        const S32 own_width = getRect().getWidth();
+        const S32 own_height = getRect().getHeight();
+
+        LLRect asked_rect = getRect();
+        asked_rect.mRight = asked_rect.mLeft + width;
+        asked_rect.mTop = asked_rect.mBottom + height;
+        setRect(asked_rect);
+
         scroll_rect = mScrollContainer->getContentWindowRect();
+
+        // Answering that question scrolls, which moves us, so the size is put
+        // back onto wherever we now sit rather than onto the corner we left.
+        LLRect restored_rect = getRect();
+        restored_rect.mRight = restored_rect.mLeft + own_width;
+        restored_rect.mTop = restored_rect.mBottom + own_height;
+        setRect(restored_rect);
     }
     width  = llmax(mMinWidth, scroll_rect.getWidth());
     height = llmax(ll_round(mCurHeight), scroll_rect.getHeight());
