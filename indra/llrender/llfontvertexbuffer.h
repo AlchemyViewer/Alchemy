@@ -164,6 +164,8 @@ private:
     LLFontGL::VAlign mLastValign = LLFontGL::BASELINE;
     U8 mLastStyle = LLFontGL::NORMAL;
     LLFontGL::ShadowType mLastShadow = LLFontGL::NO_SHADOW;
+    bool mLastUseEllipses = false;
+    bool mLastUseColor = true;
     F32 mLastRightX = 0.f;
 
     // LLFontGL's statics

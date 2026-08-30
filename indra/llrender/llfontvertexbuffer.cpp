@@ -213,6 +213,12 @@ S32 LLFontVertexBuffer::renderImpl(
          || mLastMaxPixels != max_pixels
          || mLastStyle != style
          || mLastShadow != shadow // shadow-type change also alters dark-text gate threshold
+         // Both reach genBuffers and change what it emits -- ellipses replace
+         // the tail of an overflowing string, and use_color decides whether the
+         // caller's colour reaches the vertices at all. Neither was compared,
+         // so a caller flipping one without reset() replayed the old geometry.
+         || mLastUseEllipses != use_ellipses
+         || mLastUseColor != use_color
          || mLastScaleX != LLFontGL::sScaleX
          || mLastScaleY != LLFontGL::sScaleY
          || mLastVertDPI != LLFontGL::sVertDPI
@@ -390,6 +396,8 @@ void LLFontVertexBuffer::genBuffers(
     mLastValign = valign;
     mLastStyle = style;
     mLastShadow = shadow;
+    mLastUseEllipses = use_ellipses;
+    mLastUseColor = use_color;
 
     mLastScaleX = LLFontGL::sScaleX;
     mLastScaleY = LLFontGL::sScaleY;
