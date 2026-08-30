@@ -175,6 +175,12 @@ public:
     // before it, and everything that invalidates it -- the text, the font, the
     // scale it rasterizes at -- has already been compared for the draw.
     //
+    // Only ever ask it about the text setSource named. The slots are keyed on
+    // the span, not on the bytes, so measuring some other string through this
+    // returns the width of the span of the text it is holding: a password
+    // field's bullets and the text behind them are different strings, and a
+    // cache keyed on one cannot answer for the other.
+    //
     // One slot per span, because one holder is asked about several per frame
     // and each answer used to evict the last: the selection rects want two
     // spans, the cursor's document rect wants the line-start prefix and the

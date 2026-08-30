@@ -354,6 +354,13 @@ LLMenuGL* LLMenuItemGL::getMenu() const
 // getNominalWidth() - returns the normal width of this control in
 // pixels - this is used for calculating the widest item, as well as
 // for horizontal arrangement.
+S32 LLMenuItemGL::labelWidth(S32 offset, S32 max_bytes) const
+{
+    const std::string& label = mLabel.getString();
+    mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+    return llceil(mLabelBuffer.getWidthBytes(getFont(), label, offset, max_bytes, false));
+}
+
 U32 LLMenuItemGL::getNominalWidth( void ) const
 {
     U32 width;
@@ -374,7 +381,7 @@ U32 LLMenuItemGL::getNominalWidth( void ) const
         appendAcceleratorString( temp );
         width += mFont->getWidth( temp );
     }
-    width += mFont->getWidthBytes( mLabel.getString(), 0, S32_MAX );
+    width += labelWidth();
     return width;
 }
 
@@ -566,8 +573,8 @@ void LLMenuItemGL::draw( void )
             // label before it can measure any of it.
             const S32 key_begin = (S32)utf8str_bytes_from_cased_bytes(label, offset, true);
             const S32 key_end   = (S32)utf8str_decode_at(label, (size_t)key_begin).next;
-            S32 x_begin = LEFT_PLAIN_PIXELS + mFont->getWidthBytes(label, 0, key_begin);
-            S32 x_end = LEFT_PLAIN_PIXELS + mFont->getWidthBytes(label, 0, key_end);
+            S32 x_begin = LEFT_PLAIN_PIXELS + labelWidth(0, key_begin);
+            S32 x_end = LEFT_PLAIN_PIXELS + labelWidth(0, key_end);
             gl_line_2d(x_begin, (MENU_ITEM_PADDING / 2) + 1, x_end, (MENU_ITEM_PADDING / 2) + 1);
         }
     }
@@ -1414,7 +1421,7 @@ LLMenuItemBranchDownGL::LLMenuItemBranchDownGL( const Params& p) :
 U32 LLMenuItemBranchDownGL::getNominalWidth( void ) const
 {
     U32 width = LEFT_PAD_PIXELS + LEFT_WIDTH_PIXELS + RIGHT_PAD_PIXELS;
-    width += getFont()->getWidthBytes( mLabel.getString(), 0, S32_MAX );
+    width += labelWidth();
     return width;
 }
 
@@ -1682,9 +1689,9 @@ void LLMenuItemBranchDownGL::draw( void )
             // which is not the same length as the label it came from.
             const S32 key_begin = (S32)utf8str_bytes_from_cased_bytes(label, offset, true);
             const S32 key_end   = (S32)utf8str_decode_at(label, (size_t)key_begin).next;
-            S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - getFont()->getWidthF32Bytes(label, 0, S32_MAX) / 2.f);
-            S32 x_begin = x_offset + getFont()->getWidthBytes(label, 0, key_begin);
-            S32 x_end = x_offset + getFont()->getWidthBytes(label, 0, key_end);
+            S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - (F32)labelWidth() / 2.f);
+            S32 x_begin = x_offset + labelWidth(0, key_begin);
+            S32 x_end = x_offset + labelWidth(0, key_end);
             gl_line_2d(x_begin, LABEL_BOTTOM_PAD_PIXELS, x_end, LABEL_BOTTOM_PAD_PIXELS);
         }
     }

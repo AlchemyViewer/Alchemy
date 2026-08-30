@@ -1144,8 +1144,9 @@ void LLButton::autoResize()
 
 void LLButton::resize(const LLUIString& label)
 {
-    // get label length
-    S32 label_width = mGLFont->getWidthBytes(label.getString(), 0, S32_MAX);
+    // get label length, from the cache that holds this label's glyphs
+    mFontBuffer.setSource(&label, label.getGeneration());
+    S32 label_width = llceil(mFontBuffer.getWidthBytes(mGLFont, label.getString(), 0, S32_MAX, false));
     // get current btn length
     S32 btn_width =getRect().getWidth();
     // check if it need resize

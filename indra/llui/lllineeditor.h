@@ -371,10 +371,18 @@ protected:
 
     LLViewBorder* mBorder;
     const LLFontGL* mGLFont;
-    LLFontTextCache mFontBufferPreSelection;
+    // Mutable: measuring is a const question of the same cache the draw fills.
+    // The pre-selection cache answers the widths -- all four are keyed on the
+    // same text, so any would, and naming one keeps the slots in one place.
+    mutable LLFontTextCache mFontBufferPreSelection;
     LLFontTextCache mFontBufferSelection;
     LLFontTextCache mFontBufferPostSelection;
     LLFontTextCache mFontBufferLabel;
+
+    // A span of this editor's own text, measured through that cache. Only the
+    // text it is keyed on: the password form draws bullets, which are a
+    // different string and must not be measured against this.
+    S32 textWidth(S32 offset, S32 max_bytes) const;
     std::string mDefaultText;
     S32         mMaxLengthBytes;            // Max length of the UTF8 string in bytes
     S32         mMaxLengthChars;            // Maximum number of characters in the string

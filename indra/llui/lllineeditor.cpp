@@ -609,7 +609,7 @@ void LLLineEditor::setCursor( S32 pos )
     if( pixels_after_scroll > mTextRightEdge )
     {
         const std::string& text = mText.getString();
-        S32 width_chars_to_left = mGLFont->getWidthBytes(text, 0, mScrollHPos);
+        S32 width_chars_to_left = textWidth(0, mScrollHPos);
         S32 last_visible_char = mGLFont->maxDrawableBytes(text, llmax(0.f, (F32)(mTextRightEdge - mTextLeftEdge + width_chars_to_left)));
         // character immediately to left of cursor should be last one visible (SCROLL_INCREMENT_ADD will scroll in more characters)
         // or first character if cursor is at beginning
@@ -2184,7 +2184,7 @@ void LLLineEditor::draw()
             LLColor4 color = mHighlightColor;
             color.setAlpha(alpha);
             // selected middle
-            S32 width = mGLFont->getWidthBytes(mText.getString(), mScrollHPos + rendered_text, select_right - mScrollHPos - rendered_text);
+            S32 width = textWidth(mScrollHPos + rendered_text, select_right - mScrollHPos - rendered_text);
             width = llmin(width, mTextRightEdge - ll_round(rendered_pixels_right));
             gl_rect_2d(ll_round(rendered_pixels_right), cursor_top, ll_round(rendered_pixels_right)+width, cursor_bottom, color);
 
@@ -2333,7 +2333,7 @@ void LLLineEditor::draw()
                     S32 wswidth = mGLFont->getWidthBytes(" ", 0, S32_MAX);
                     const S32 cursor_span = (S32)utf8str_step_grapheme_forward(
                         mText.getString(), (size_t)getCursor()) - getCursor();
-                    S32 width = mGLFont->getWidthBytes(mText.getString(), getCursor(), cursor_span) + 1;
+                    S32 width = textWidth(getCursor(), cursor_span) + 1;
                     cursor_right = cursor_left + llmax(wswidth, width);
                 }
                 // Use same color as text for the Cursor
@@ -2464,10 +2464,17 @@ S32 LLLineEditor::fromDrawnOffset(S32 drawn_offset) const
 
 // Returns the local screen space X coordinate associated with the text cursor position.
 // `cursor_offset` is a distance in bytes from the cursor, as every offset here is.
+S32 LLLineEditor::textWidth(S32 offset, S32 max_bytes) const
+{
+    const std::string& text = mText.getString();
+    mFontBufferPreSelection.setSource(&mText, mText.getGeneration());
+    return llceil(mFontBufferPreSelection.getWidthBytes(mGLFont, text, offset, max_bytes, false));
+}
+
 S32 LLLineEditor::findPixelNearestPos(const S32 cursor_offset) const
 {
     S32 dpos = getCursor() - mScrollHPos + cursor_offset;
-    S32 result = mGLFont->getWidthBytes(mText.getString(), mScrollHPos, dpos) + mTextLeftEdge;
+    S32 result = textWidth(mScrollHPos, dpos) + mTextLeftEdge;
     return result;
 }
 
