@@ -2458,9 +2458,8 @@ S32 LLLineEditor::fromDrawnOffset(S32 drawn_offset) const
         return drawn_offset;
     }
 
-    ALUtf8View view;
-    view.assign(mText.getString());
-    return (S32)view.toBytes((size_t)llmax(0, drawn_offset) / PASSWORD_ASTERISK.size());
+    return (S32)utf8str_offset_from_codepoint_index(
+        mText.getString(), (size_t)llmax(0, drawn_offset) / PASSWORD_ASTERISK.size());
 }
 
 // Returns the local screen space X coordinate associated with the text cursor position.

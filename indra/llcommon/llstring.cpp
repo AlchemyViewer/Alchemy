@@ -169,13 +169,6 @@ bool _read_file_into_string(std::string& str, const std::string& filename)
 // it.
 
 
-std::ostream& operator<<(std::ostream &s, const LLWString &wstr)
-{
-    std::string utf8_str = wstring_to_utf8str(wstr);
-    s << utf8_str;
-    return s;
-}
-
 std::string rawstr_to_utf8(std::string_view raw)
 {
     // Converting up and back is what this used to do, and what it was for:
@@ -236,34 +229,6 @@ std::ptrdiff_t wchar_to_utf8chars(llwchar in_char, char* outchars)
     return outchars - base;
 }
 
-llutf16string wstring_to_utf16str(const llwchar* utf32str, size_t len)
-{
-    return utf_convert_with_replacement<char32_t, char16_t>(
-        utf32str, len,
-        &simdutf::validate_utf32_with_errors,
-        &simdutf::utf16_length_from_utf32,
-        &simdutf::convert_valid_utf32_to_utf16le,
-        static_cast<char16_t>(LL_UNKNOWN_CHAR));
-}
-
-LLWString utf16str_to_wstring(const char16_t* utf16str, size_t len)
-{
-    return utf_convert_with_replacement<char16_t, char32_t>(
-        utf16str, len,
-        &simdutf::validate_utf16le_with_errors,
-        &simdutf::utf32_length_from_utf16le,
-        &simdutf::convert_valid_utf16le_to_utf32,
-        static_cast<char32_t>(LL_UNKNOWN_CHAR));
-}
-
-// Length in utf16string (UTF-16) of wlen wchars beginning at woffset.
-S32 wstring_utf16_length(const LLWString &wstr, const S32 woffset, const S32 wlen)
-{
-    const S32 end = llmin((S32)wstr.length(), woffset + wlen);
-    if (end <= woffset) return 0;
-    return (S32)simdutf::utf16_length_from_utf32(wstr.data() + woffset, end - woffset);
-}
-
 S32 utf8str_utf16_length(std::string_view utf8str, const S32 byte_offset, const S32 byte_len)
 {
     const S32 size  = (S32)utf8str.size();
@@ -311,64 +276,6 @@ S32 utf8str_length_from_utf16_length(std::string_view utf8str, const S32 byte_of
         *unaligned = u;
     }
     return i - begin;
-}
-
-// Given a wstring and an offset in it, returns the length as wstring (i.e.,
-// number of llwchars) of the longest substring that starts at the offset
-// and whose equivalent utf-16 string does not exceeds the given utf16_length.
-S32 wstring_wstring_length_from_utf16_length(const LLWString & wstr, const S32 woffset, const S32 utf16_length, bool *unaligned)
-{
-    const auto end = wstr.length();
-    bool u{ false };
-    S32 n = woffset + utf16_length;
-    S32 i = woffset;
-    while (i < end)
-    {
-        if (wstr[i] >= 0x10000)
-        {
-            --n;
-        }
-        if (i >= n)
-        {
-            u = (i > n);
-            break;
-        }
-        i++;
-    }
-    if (unaligned)
-    {
-        *unaligned = u;
-    }
-    return i - woffset;
-}
-
-// Given a wstring and an offset in it, returns the length as wstring (i.e.,
-// number of llwchars) of the longest substring that starts at the offset
-// and whose equivalent utf-8 string does not exceed the given utf8_length.
-S32 wstring_wstring_length_from_utf8_length(LLWStringView wstr, const S32 woffset, const S32 utf8_length, bool *unaligned)
-{
-    const S32 end = (S32)wstr.length();
-    const S32 start = llclamp(woffset, 0, end);
-
-    S32 i = start;
-    S32 bytes = 0;
-    while (i < end && bytes < utf8_length)
-    {
-        const S32 n = wchar_utf8_length(wstr[i]);
-        if (bytes + n > utf8_length)
-        {
-            // utf8_length falls inside this codepoint's encoding; stop before it.
-            break;
-        }
-        bytes += n;
-        i++;
-    }
-
-    if (unaligned)
-    {
-        *unaligned = (i < end) && (bytes < utf8_length);
-    }
-    return i - start;
 }
 
 S32 wchar_utf8_length(const llwchar wc)
@@ -424,29 +331,33 @@ std::string wchar_utf8_preview(const llwchar wc)
     return oss.str();
 }
 
-S32 wstring_utf8_length(const LLWString& wstr)
+namespace
 {
-    return (S32)simdutf::utf8_length_from_utf32(wstr.data(), wstr.size());
-}
 
-LLWString utf8str_to_wstring(const char* utf8str, size_t len)
+// The one place UTF-32 survives: repairing UTF-8 means decoding it, and simdutf
+// is the arbiter of what is malformed. Going out through UTF-32 and back keeps
+// that judgement in simdutf's hands rather than a second decoder's, which would
+// have to agree with it exactly and has no way to prove that it does.
+std::u32string utf8_to_u32_lossy(std::string_view utf8str)
 {
     return utf_convert_with_replacement<char, char32_t>(
-        utf8str, len,
+        utf8str.data(), utf8str.size(),
         &simdutf::validate_utf8_with_errors,
         &simdutf::utf32_length_from_utf8,
         &simdutf::convert_valid_utf8_to_utf32,
         static_cast<char32_t>(LL_UNKNOWN_CHAR));
 }
 
-std::string wstring_to_utf8str(const llwchar* utf32str, size_t len)
+std::string u32_to_utf8_lossy(std::u32string_view utf32str)
 {
     return utf_convert_with_replacement<char32_t, char>(
-        utf32str, len,
+        utf32str.data(), utf32str.size(),
         &simdutf::validate_utf32_with_errors,
         &simdutf::utf8_length_from_utf32,
         &simdutf::convert_valid_utf32_to_utf8,
         static_cast<char>(LL_UNKNOWN_CHAR));
+}
+
 }
 
 std::string utf16str_to_utf8str(const char16_t* utf16str, size_t len)
@@ -823,48 +734,6 @@ std::string utf8str_showBytesUTF8(std::string_view utf8str)
     return result;
 }
 
-// Strip every emoji-cluster the cluster walker identifies, plus any isolated
-// astral-emoji codepoint (LLStringOps::isEmoji-true) that the walker excludes
-// because it shapes correctly via the 1:1 path. Sharing the cluster walker
-// here means this function and wstring_find_emoji_clusters can never disagree
-// on cluster bounds — historical ad-hoc state machines diverged on tag chars,
-// VS-15, BMP-base ZWJ sequences, and keycaps and produced visibly broken
-// output (orphan ZWJ, leftover tag bytes) in those cases.
-//
-// "Cluster" here means anything HarfBuzz would itemize as a single emoji
-// glyph — keycaps, BMP-base sequences (heart-on-fire, isolated heart+VS16),
-// subdivision flags. Earlier the function used the narrower
-// LLStringOps::isEmoji predicate which let composed glyphs survive partial
-// stripping; the broader contract matches the visual intent of "remove
-// emojis" for input fields like usernames and search.
-bool wstring_remove_emojis(LLWString& wstr)
-{
-    const auto clusters = wstring_find_emoji_clusters(wstr);
-    bool found = false;
-    size_t read = 0, write = 0;
-    auto cluster_it = clusters.begin();
-    while (read < wstr.size())
-    {
-        if (cluster_it != clusters.end() && read == cluster_it->first)
-        {
-            read = cluster_it->second;
-            ++cluster_it;
-            found = true;
-            continue;
-        }
-        if (LLStringOps::isEmoji(wstr[read]))
-        {
-            ++read;
-            found = true;
-            continue;
-        }
-        wstr[write++] = wstr[read++];
-    }
-    if (found)
-        wstr.resize(write);
-    return found;
-}
-
 // Cut emoji symbols if exist
 bool utf8str_remove_emojis(std::string& utf8str)
 {
@@ -959,13 +828,6 @@ namespace
 {
 
 using CodepointAt = LLCodepointAt;
-
-CodepointAt decode_at(LLWStringView wstr, size_t pos)
-{
-    if (pos >= wstr.size())
-        return { 0, pos };
-    return { wstr[pos], pos + 1 };
-}
 
 CodepointAt decode_at(std::string_view utf8str, size_t pos)
 {
@@ -1094,11 +956,6 @@ EmojiClusterList find_emoji_clusters(VIEW text)
     return runs;
 }
 
-}
-
-EmojiClusterList wstring_find_emoji_clusters(LLWStringView wstr)
-{
-    return find_emoji_clusters(wstr);
 }
 
 EmojiClusterList utf8str_find_emoji_clusters(std::string_view utf8str)
@@ -1340,35 +1197,6 @@ std::string utf8str_from_cp(llwchar cp)
     return out;
 }
 
-void ALUtf8View::assign(LLWStringView wstr)
-{
-    mUtf8.clear();
-    mOffsets.clear();
-    mUtf8.reserve(wstr.size());
-    mOffsets.reserve(wstr.size() + 1);
-
-    for (const llwchar cp : wstr)
-    {
-        mOffsets.push_back(mUtf8.size());
-        utf8str_append_cp(mUtf8, cp);
-    }
-    mOffsets.push_back(mUtf8.size());
-}
-
-void ALUtf8View::assign(std::string_view utf8str)
-{
-    mUtf8.assign(utf8str);
-    mOffsets.clear();
-    mOffsets.reserve(utf8str.size() + 1);
-
-    for (size_t i = 0; i < mUtf8.size(); )
-    {
-        mOffsets.push_back(i);
-        i = utf8str_decode_at(mUtf8, i).next;
-    }
-    mOffsets.push_back(mUtf8.size());
-}
-
 size_t utf8str_codepoint_count(std::string_view utf8str)
 {
     size_t count = 0;
@@ -1377,6 +1205,16 @@ size_t utf8str_codepoint_count(std::string_view utf8str)
         i = utf8str_decode_at(utf8str, i).next;
     }
     return count;
+}
+
+size_t utf8str_offset_from_codepoint_index(std::string_view utf8str, size_t index)
+{
+    size_t i = 0;
+    for (size_t seen = 0; seen < index && i < utf8str.size(); ++seen)
+    {
+        i = utf8str_decode_at(utf8str, i).next;
+    }
+    return i;
 }
 
 bool utf8str_is_valid(std::string_view utf8str)
@@ -1391,27 +1229,7 @@ std::string utf8str_sanitize(std::string_view utf8str)
         return std::string(utf8str);
     }
 
-    // simdutf is the arbiter, so the repair goes through it rather than through
-    // a hand decoder that would accept the overlong forms it just rejected.
-    return wstring_to_utf8str(utf8str_to_wstring(utf8str.data(), utf8str.size()));
-}
-
-size_t ALUtf8View::toBytes(size_t pos) const
-{
-    if (mOffsets.empty())
-        return 0;
-    return mOffsets[llmin(pos, mOffsets.size() - 1)];
-}
-
-size_t ALUtf8View::toCodepoints(size_t byte_pos) const
-{
-    if (mOffsets.empty())
-        return 0;
-    const auto it = std::lower_bound(mOffsets.begin(), mOffsets.end(), byte_pos);
-    // Clamped like toBytes: a byte offset past the end is the end, not a
-    // codepoint index one beyond the last, which is what the bare search
-    // returns and what no caller can do anything with.
-    return (size_t)llmin(it - mOffsets.begin(), (std::ptrdiff_t)mOffsets.size() - 1);
+    return u32_to_utf8_lossy(utf8_to_u32_lossy(utf8str));
 }
 
 // Bounds [begin, end) of the line containing byte_pos, excluding its newline.
@@ -1607,67 +1425,6 @@ size_t utf8str_step_word_forward(std::string_view utf8str, size_t byte_pos)
 // deletes this half and leaves the callers holding bytes of their own.
 // ---------------------------------------------------------------------------
 
-size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos)
-{
-    const size_t n = wstr.size();
-    if (pos >= n)
-        return n;
-
-    ALUtf8View view;
-    view.assign(wstr);
-    return view.toCodepoints(utf8str_step_grapheme_forward(view.text(), view.toBytes(pos)));
-}
-
-size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos)
-{
-    const size_t n = wstr.size();
-    if (pos == 0)
-        return 0;
-    if (pos > n)
-        return n;
-
-    ALUtf8View view;
-    view.assign(wstr);
-    return view.toCodepoints(utf8str_step_grapheme_backward(view.text(), view.toBytes(pos)));
-}
-
-size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos)
-{
-    const size_t n = wstr.size();
-    if (n == 0 || pos == 0)
-        return 0;
-    if (pos >= n)
-        return n;
-
-    ALUtf8View view;
-    view.assign(wstr);
-    return view.toCodepoints(utf8str_grapheme_align_backward(view.text(), view.toBytes(pos)));
-}
-
-size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos)
-{
-    const size_t n = wstr.size();
-    if (pos >= n)
-        return n;
-    if (pos == 0)
-        return 0;
-
-    ALUtf8View view;
-    view.assign(wstr);
-    return view.toCodepoints(utf8str_grapheme_align_forward(view.text(), view.toBytes(pos)));
-}
-
-size_t wstring_step_word_forward(LLWStringView wstr, size_t pos)
-{
-    const size_t n = wstr.size();
-    if (pos >= n)
-        return n;
-
-    ALUtf8View view;
-    view.assign(wstr);
-    return view.toCodepoints(utf8str_step_word_forward(view.text(), view.toBytes(pos)));
-}
-
 namespace
 {
     // Casing runs in the root locale rather than the user's: Turkish would
@@ -1759,29 +1516,6 @@ void LLStringUtilBase<char>::toLower(std::string& string)
     utf8str_convert_case(string, &ucasemap_utf8ToLower);
 }
 
-// UTF-8 is where ICU cases, so the wide forms go through it rather than carry a
-// second implementation. Both conversions are simdutf's, and the pair costs
-// less than the case pass they bracket.
-template<>
-void LLStringUtilBase<llwchar>::toUpper(std::basic_string<llwchar>& string)
-{
-    if (string.empty())
-        return;
-    std::string utf8 = wstring_to_utf8str(string);
-    LLStringUtilBase<char>::toUpper(utf8);
-    string = utf8str_to_wstring(utf8);
-}
-
-template<>
-void LLStringUtilBase<llwchar>::toLower(std::basic_string<llwchar>& string)
-{
-    if (string.empty())
-        return;
-    std::string utf8 = wstring_to_utf8str(string);
-    LLStringUtilBase<char>::toLower(utf8);
-    string = utf8str_to_wstring(utf8);
-}
-
 size_t utf8str_bytes_from_cased_bytes(std::string_view utf8str, size_t cased_bytes, bool to_upper)
 {
     const UCaseMap* csm = case_map();
@@ -1822,70 +1556,6 @@ size_t utf8str_bytes_from_cased_bytes(std::string_view utf8str, size_t cased_byt
         spent += (size_t)cased;
     }
     return (size_t)at;
-}
-
-void wstring_tolower_indexed(LLWStringView wstr, LLWString& out_str, std::vector<size_t>* out_map)
-{
-    out_str.clear();
-    if (out_map)
-    {
-        out_map->clear();
-    }
-
-    // One codepoint at a time on purpose: an offset has to survive the fold, so
-    // no mapping may be allowed to depend on its neighbours. The longest
-    // expansion Unicode defines is three UTF-16 units, and the buffer is
-    // checked against what ICU reports regardless.
-    UChar src[2];
-    UChar folded[8];
-    for (size_t i = 0; i < wstr.size(); ++i)
-    {
-        const llwchar cp = wstr[i];
-        int32_t src_length = 0;
-        if (cp > 0xFFFF && cp <= 0x10FFFF)
-        {
-            const llwchar rest = cp - 0x10000;
-            src[src_length++] = (UChar)(0xD800 + (rest >> 10));
-            src[src_length++] = (UChar)(0xDC00 + (rest & 0x3FF));
-        }
-        else
-        {
-            src[src_length++] = cp <= 0xFFFF ? (UChar)cp : (UChar)0xFFFD;
-        }
-
-        UErrorCode status = U_ZERO_ERROR;
-        const int32_t produced = u_strToLower(folded, (int32_t)std::size(folded),
-                                              src, src_length, "", &status);
-        if (U_FAILURE(status) || produced <= 0 || produced > (int32_t)std::size(folded))
-        {
-            // Would not fit, or ICU declined: keep the codepoint as it stands
-            // rather than dropping it.
-            out_str.push_back(cp);
-            if (out_map)
-            {
-                out_map->push_back(i);
-            }
-            continue;
-        }
-
-        for (int32_t k = 0; k < produced; ++k)
-        {
-            llwchar out = folded[k];
-            // A fold that produced an astral codepoint comes back as the pair
-            // ICU works in, and has to be put together again.
-            if (out >= 0xD800 && out <= 0xDBFF && k + 1 < produced
-                && folded[k + 1] >= 0xDC00 && folded[k + 1] <= 0xDFFF)
-            {
-                out = 0x10000 + ((out - 0xD800) << 10) + (folded[k + 1] - 0xDC00);
-                ++k;
-            }
-            out_str.push_back(out);
-            if (out_map)
-            {
-                out_map->push_back(i);
-            }
-        }
-    }
 }
 
 void utf8str_line_break_opportunities(std::string_view utf8str, std::vector<size_t>& out)
@@ -2035,61 +1705,6 @@ size_t utf8str_caret_word_backward(std::string_view utf8str, size_t byte_pos)
 
 // --- the wide adapters -----------------------------------------------------
 
-void wstring_line_break_opportunities(LLWStringView wstr, std::vector<size_t>& out)
-{
-    out.clear();
-    if (wstr.empty())
-        return;
-
-    // Measurement work, run per frame over whole paragraphs, so the view and
-    // the byte offsets it produces are kept between calls rather than rebuilt.
-    // None of these walkers reenter.
-    thread_local ALUtf8View view;
-    thread_local std::vector<size_t> byte_breaks;
-    view.assign(wstr);
-
-    utf8str_line_break_opportunities(view.text(), byte_breaks);
-    out.reserve(byte_breaks.size());
-    for (const size_t b : byte_breaks)
-    {
-        out.push_back(view.toCodepoints(b));
-    }
-}
-
-std::pair<size_t, size_t> wstring_word_range_at(LLWStringView wstr, size_t pos)
-{
-    const size_t n = wstr.size();
-    if (pos >= n)
-        return { n, n };
-
-    ALUtf8View view;
-    view.assign(wstr);
-    const auto range = utf8str_word_range_at(view.text(), view.toBytes(pos));
-    return { view.toCodepoints(range.first), view.toCodepoints(range.second) };
-}
-
-std::pair<size_t, size_t> wstring_next_word_range(LLWStringView wstr, size_t pos)
-{
-    const size_t n = wstr.size();
-    if (pos >= n)
-        return { n, n };
-
-    ALUtf8View view;
-    view.assign(wstr);
-    const auto range = utf8str_next_word_range(view.text(), view.toBytes(pos));
-    return { view.toCodepoints(range.first), view.toCodepoints(range.second) };
-}
-
-size_t wstring_step_word_backward(LLWStringView wstr, size_t pos)
-{
-    if (pos == 0)
-        return 0;
-
-    ALUtf8View view;
-    view.assign(wstr);
-    return view.toCodepoints(utf8str_step_word_backward(view.text(), view.toBytes(pos)));
-}
-
 namespace
 {
 
@@ -2120,17 +1735,6 @@ std::pair<size_t, size_t> emoji_range_at(VIEW text, size_t pos,
         : std::make_pair(pos, pos);
 }
 
-}
-
-std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos,
-                                                 const EmojiClusterList& clusters)
-{
-    return emoji_range_at(wstr, pos, clusters);
-}
-
-std::pair<size_t, size_t> wstring_emoji_range_at(LLWStringView wstr, size_t pos)
-{
-    return wstring_emoji_range_at(wstr, pos, wstring_find_emoji_clusters(wstr));
 }
 
 std::pair<size_t, size_t> utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos,
@@ -2217,28 +1821,6 @@ std::wstring ll_convert_string_to_wide(const char* in, size_t len, unsigned int 
 
     // construct string<wchar_t> from our temporary output buffer
     return {&w_out[0]};
-}
-
-LLWString ll_convert_wide_to_wstring(const wchar_t* in, size_t len)
-{
-    // Windows wchar_t is 16-bit UTF-16LE — same layout as char16_t.
-    return utf_convert_with_replacement<char16_t, char32_t>(
-        reinterpret_cast<const char16_t*>(in), len,
-        &simdutf::validate_utf16le_with_errors,
-        &simdutf::utf32_length_from_utf16le,
-        &simdutf::convert_valid_utf16le_to_utf32,
-        static_cast<char32_t>(LL_UNKNOWN_CHAR));
-}
-
-std::wstring ll_convert_wstring_to_wide(const llwchar* in, size_t len)
-{
-    const auto utf16 = utf_convert_with_replacement<char32_t, char16_t>(
-        in, len,
-        &simdutf::validate_utf32_with_errors,
-        &simdutf::utf16_length_from_utf32,
-        &simdutf::convert_valid_utf32_to_utf16le,
-        static_cast<char16_t>(LL_UNKNOWN_CHAR));
-    return { reinterpret_cast<const wchar_t*>(utf16.data()), utf16.size() };
 }
 
 std::string ll_convert_string_to_utf8_string(const std::string& in)
@@ -2580,28 +2162,6 @@ namespace
         return slot;
     }
 
-    // Collation is a sort's inner loop, so the UTF-16 it needs is built into a
-    // buffer that outlives the call rather than a fresh allocation each time.
-    int32_t to_utf16_scratch(LLWStringView src, std::vector<UChar>& out)
-    {
-        out.clear();
-        out.reserve(src.size());
-        for (const llwchar cp : src)
-        {
-            if (cp > 0xFFFF && cp <= 0x10FFFF)
-            {
-                const llwchar rest = cp - 0x10000;
-                out.push_back((UChar)(0xD800 + (rest >> 10)));
-                out.push_back((UChar)(0xDC00 + (rest & 0x3FF)));
-            }
-            else
-            {
-                out.push_back(cp <= 0xFFFF ? (UChar)cp : (UChar)0xFFFD);
-            }
-        }
-        return (int32_t)out.size();
-    }
-
     // With no collator to be had, order by codepoint. It is the wrong order,
     // but it is still a total order, which is what a sort needs before it
     // needs anything else.
@@ -2637,33 +2197,11 @@ namespace
             return result;
         return (S32)a.compare(b);
     }
-
-    S32 collate_wide(LLWStringView a, LLWStringView b, CollatorKind kind)
-    {
-        UCollator* coll = collator(kind);
-        if (!coll)
-            return (a < b) ? -1 : ((b < a) ? 1 : 0);
-
-        thread_local std::vector<UChar> lhs;
-        thread_local std::vector<UChar> rhs;
-        const int32_t lhs_length = to_utf16_scratch(a, lhs);
-        const int32_t rhs_length = to_utf16_scratch(b, rhs);
-
-        const S32 result = (S32)ucol_strcoll(coll, lhs.data(), lhs_length, rhs.data(), rhs_length);
-        if (0 != result || !orders_rather_than_equates(kind))
-            return result;
-        return (a < b) ? -1 : ((b < a) ? 1 : 0);
-    }
 }
 
 S32 LLStringOps::collate(const char* a, const char* b)
 {
     return collate_utf8(a, b, CollatorKind::Plain);
-}
-
-S32 LLStringOps::collate(const llwchar* a, const llwchar* b)
-{
-    return collate_wide(a, b, CollatorKind::Plain);
 }
 
 // Malformed UTF-8 counts as unprintable, which is what it is.
@@ -2835,24 +2373,6 @@ S32 LLStringUtilBase<char>::compareInsensitive(std::string_view lhs, std::string
 }
 
 template<>
-S32 LLStringUtilBase<llwchar>::compareInsensitive(const llwchar* lhs, const llwchar* rhs)
-{
-    if (lhs == rhs)
-        return 0;
-    if (!lhs || !lhs[0])
-        return (!rhs || !rhs[0]) ? 0 : 1;
-    if (!rhs || !rhs[0])
-        return -1;
-    return collate_wide(lhs, rhs, CollatorKind::Caseless);
-}
-
-template<>
-S32 LLStringUtilBase<llwchar>::compareInsensitive(LLWStringView lhs, LLWStringView rhs)
-{
-    return collate_wide(lhs, rhs, CollatorKind::Caseless);
-}
-
-template<>
 S32 LLStringUtilBase<char>::compareDict(std::string_view a, std::string_view b)
 {
     return collate_utf8(a, b, CollatorKind::Dictionary);
@@ -2862,18 +2382,6 @@ template<>
 S32 LLStringUtilBase<char>::compareDictInsensitive(std::string_view a, std::string_view b)
 {
     return collate_utf8(a, b, CollatorKind::DictionaryCaseless);
-}
-
-template<>
-S32 LLStringUtilBase<llwchar>::compareDict(LLWStringView a, LLWStringView b)
-{
-    return collate_wide(a, b, CollatorKind::Dictionary);
-}
-
-template<>
-S32 LLStringUtilBase<llwchar>::compareDictInsensitive(LLWStringView a, LLWStringView b)
-{
-    return collate_wide(a, b, CollatorKind::DictionaryCaseless);
 }
 
 void LLStringOps::setupDatetimeInfo (bool daylight)

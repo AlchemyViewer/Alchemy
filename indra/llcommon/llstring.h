@@ -188,7 +188,6 @@ public:
     // out the same on every platform and an accented letter sorts beside the
     // letter it decorates rather than past the end of the alphabet.
     static S32  collate(const char* a, const char* b);
-    static S32  collate(const llwchar* a, const llwchar* b);
 
     static void setupDatetimeInfo(bool pacific_daylight_time);
 
@@ -408,8 +407,6 @@ public:
      * @brief Unsafe way to make ascii characters. You should probably
      * only call this when interacting with the host operating system.
      * The 1 byte std::string does not work correctly.
-     * The 2 and 4 byte std::string probably work, so LLWStringUtil::_makeASCII
-     * should work.
      */
     static void _makeASCII(string_type& string);
 
@@ -482,9 +479,6 @@ template<class T> const std::basic_string<T> LLStringUtilBase<T>::null;
 template<class T> std::string LLStringUtilBase<T>::sLocale;
 
 typedef LLStringUtilBase<char> LLStringUtil;
-typedef LLStringUtilBase<llwchar> LLWStringUtil;
-typedef std::u32string LLWString;
-typedef std::u32string_view LLWStringView;
 
 //@ Use this where we want to disallow input in the form of "foo"
 //  This is used to catch places where english text is embedded in the code
@@ -650,27 +644,13 @@ LL_COMMON_API std::string rawstr_to_utf8(std::string_view raw);
 // https://docs.microsoft.com/en-us/windows/desktop/winprog/windows-data-types
 typedef std::u16string llutf16string;
 
-ll_convert_forms(ll_convert_alias, LLWString, llutf16string, utf16str_to_wstring);
-ll_convert_forms(ll_convert_alias, llutf16string, LLWString, wstring_to_utf16str);
-ll_convert_forms(ll_convert_alias,     LLWString,     std::string,   utf8str_to_wstring);
-
-// Same function, better name. JC
-inline LLWString utf8string_to_wstring(const std::string& utf8_string) { return utf8str_to_wstring(utf8_string); }
-
 LL_COMMON_API std::ptrdiff_t wchar_to_utf8chars(llwchar inchar, char* outchars);
 
-ll_convert_forms(ll_convert_alias,     std::string, LLWString,     wstring_to_utf8str);
 ll_convert_forms(ll_convert_alias, std::string, llutf16string, utf16str_to_utf8str);
-
-// an older alias for utf16str_to_utf8str(llutf16string)
-inline std::string wstring_to_utf8str(const llutf16string &utf16str) { return utf16str_to_utf8str(utf16str);}
 
 // Convert to/from u8string
 ll_convert_forms(ll_convert_alias, std::string, std::u8string, u8str_to_str);
 ll_convert_forms(ll_convert_alias, std::u8string, std::string, str_to_u8str);
-
-// Length of this UTF32 string in bytes when transformed to UTF8
-LL_COMMON_API S32 wstring_utf8_length(const LLWString& wstr);
 
 // Length in bytes of this wide char in a UTF8 string
 LL_COMMON_API S32 wchar_utf8_length(const llwchar wc);
@@ -679,13 +659,9 @@ LL_COMMON_API std::string wchar_utf8_preview(const llwchar wc);
 
 LL_COMMON_API std::string utf8str_tolower(std::string_view utf8str);
 
-// Length in utf16string (UTF-16) of wlen wchars beginning at woffset.
-LL_COMMON_API S32 wstring_utf16_length(const LLWString & wstr, S32 woffset, S32 wlen);
-
-// The same two over UTF-8, where the offsets and lengths that describe the text
-// count BYTES and only the UTF-16 length counts code units. The Win32 IME
-// speaks UTF-16 and the editors speak UTF-8, so every offset crossing that
-// boundary goes through one of these.
+// Offsets and lengths that describe the text count BYTES; only the UTF-16
+// length counts code units. The Win32 IME speaks UTF-16 and the editors speak
+// UTF-8, so every offset crossing that boundary goes through one of these.
 LL_COMMON_API S32 utf8str_utf16_length(std::string_view utf8str, S32 byte_offset, S32 byte_len);
 
 // Bytes of the longest substring starting at byte_offset whose UTF-16 form does
@@ -694,16 +670,6 @@ LL_COMMON_API S32 utf8str_utf16_length(std::string_view utf8str, S32 byte_offset
 // case the count stops short of it.
 LL_COMMON_API S32 utf8str_length_from_utf16_length(std::string_view utf8str, S32 byte_offset,
                                                    S32 utf16_length, bool *unaligned = nullptr);
-
-// Length in wstring (i.e., llwchar count) of a part of a wstring specified by utf16 length (i.e., utf16 units.)
-LL_COMMON_API S32 wstring_wstring_length_from_utf16_length(const LLWString & wstr, S32 woffset, S32 utf16_length, bool *unaligned = nullptr);
-
-// Length in wstring (i.e., llwchar count) of a part of a wstring specified by utf8 length (i.e., bytes.)
-// Use this to bring a byte offset produced against the UTF-8 form of some text -- a std::string::find
-// result, a network-supplied span -- into the codepoint indices the LLWString form uses. When non-null,
-// *unaligned reports that utf8_length landed inside a multi-byte sequence rather than on a codepoint
-// boundary, in which case the returned count stops short of that codepoint.
-LL_COMMON_API S32 wstring_wstring_length_from_utf8_length(LLWStringView wstr, S32 woffset, S32 utf8_length, bool *unaligned = nullptr);
 
 /**
  * @brief Properly truncate a utf8 string to a maximum byte count.
@@ -761,111 +727,32 @@ LL_COMMON_API std::string utf8str_removeCRLF(std::string_view utf8str);
 LL_COMMON_API std::string utf8str_showBytesUTF8(std::string_view utf8str);
 
 
-LL_COMMON_API bool wstring_remove_emojis(LLWString& wstr);
-
 LL_COMMON_API bool utf8str_remove_emojis(std::string& utf8str);
 
-// Half-open ranges of multi-codepoint emoji clusters, in ascending order.
-// The unit is whatever the producer was handed: codepoints from
-// wstring_find_emoji_clusters, bytes from utf8str_find_emoji_clusters. Both
-// walk the same rules; only the positions they count in differ.
+// Half-open byte ranges of multi-codepoint emoji clusters, in ascending order.
 using EmojiClusterList = std::vector<std::pair<size_t, size_t>>;
 
-// Locate contiguous ranges [begin, end) of wstr that form a multi-code-point
-// emoji cluster — ZWJ families, VS15/VS16 presentation selectors, skin-tone
-// modifiers, regional indicator flag pairs, keycap sequences (digit/#/* + FE0F
-// + 20E3), and tag sequences (e.g., subdivision flags). Isolated emoji that
-// render correctly through the 1:1 FT_Get_Char_Index path are intentionally
-// skipped.
+// Locate contiguous byte ranges [begin, end) of utf8str that form a
+// multi-code-point emoji cluster — ZWJ families, VS15/VS16 presentation
+// selectors, skin-tone modifiers, regional indicator flag pairs, keycap
+// sequences (digit/#/* + FE0F + 20E3), and tag sequences (e.g., subdivision
+// flags). Isolated emoji that render correctly through the 1:1
+// FT_Get_Char_Index path are intentionally skipped.
 //
 // This answers "which spans are one emoji", which is a different question from
 // "where are the grapheme boundaries" — the latter is UAX #29 and lives in
-// wstring_step_grapheme_* / wstring_grapheme_align_* below. Do not substitute
+// utf8str_step_grapheme_* / utf8str_grapheme_align_* below. Do not substitute
 // one for the other: ALFontShaping::shape_all_sub_runs drives face selection
 // off these ranges, so feeding it grapheme clusters would route accented Latin
 // and Hangul onto the emoji face.
 LL_COMMON_API EmojiClusterList
-wstring_find_emoji_clusters(LLWStringView wstr);
-
-// The same walk over UTF-8, reporting byte ranges. Neither form converts: the
-// rules are written against a decoding cursor and instantiated twice, so the
-// two can only ever disagree about where a position is counted from.
-LL_COMMON_API EmojiClusterList
 utf8str_find_emoji_clusters(std::string_view utf8str);
 
 // Cost note: the single-argument emoji helpers rebuild the cluster list
-// internally on every call (an O(N) scan of `wstr`). Fine for one-off lookups;
-// expensive in tight loops over the same text. Callers making several queries
-// on the same wstring should call wstring_find_emoji_clusters once and feed the
-// result into the two-argument overload, amortising the scan across the batch.
-
-// Cursor stepping over grapheme clusters: move to the nearest cluster boundary
-// strictly after / before `pos`, so the caret never splits a ZWJ family, flag
-// pair, keycap, tag subdivision, Hangul syllable, Indic conjunct or a base and
-// its combining marks. Clamped to [0, size].
-//
-// These implement UAX #29 in full via ICU, and are unrelated to the emoji
-// cluster list below — that answers "is this an emoji", which UAX #29 does not.
-//
-// Cost is one pass over the line containing `pos`, converting it to the UTF-16
-// ICU reads. Stage B removes that conversion.
-LL_COMMON_API size_t wstring_step_grapheme_forward(LLWStringView wstr, size_t pos);
-LL_COMMON_API size_t wstring_step_grapheme_backward(LLWStringView wstr, size_t pos);
-
-// Snap `pos` onto a grapheme cluster boundary when it sits strictly inside a
-// cluster. The backward variant snaps to the cluster's start, the forward
-// variant to its end; a position already on a boundary is returned unchanged.
-// Intended for places that compute a position through some other rule — word
-// walks, pixel hit-testing — and need to nudge onto the nearest safe edge in a
-// chosen direction without the step that wstring_step_grapheme_* applies.
-//
-// Callers asking "what emoji does pos belong to?" want wstring_emoji_range_at,
-// which is inclusive of the leading boundary and aware of single-codepoint
-// pictographs.
-LL_COMMON_API size_t wstring_grapheme_align_backward(LLWStringView wstr, size_t pos);
-LL_COMMON_API size_t wstring_grapheme_align_forward(LLWStringView wstr, size_t pos);
-
-// The same walkers over UTF-8, where the position and the answer are byte
-// offsets into the caller's own string. These are the implementation: ICU reads
-// UTF-8 where it lies, so they need neither a conversion nor an index map, and
-// the wide forms above are adapters that convert once and map the answer back.
-// Stage B retires the wide half.
-//
-// Every contract above holds here word for word, byte offsets in place of
-// codepoint indices.
-// An LLWString as the UTF-8 that the byte-offset APIs work in, with the map
-// back to codepoint indices. Every wide entry point that still exists — in
-// llcommon, in llrender's font measurement, in llui's widgets — is an adapter
-// over its narrow counterpart through this, so there is one implementation
-// rather than two. Stage B deletes it along with the wide entry points, leaving
-// every walker and every measurement reading the caller's own bytes.
-//
-// Reusable: assign() overwrites, so a caller measuring repeatedly can keep one
-// of these rather than rebuilding the map per call.
-class LL_COMMON_API ALUtf8View
-{
-public:
-    void assign(LLWStringView wstr);
-
-    // The same map over text that is already UTF-8. Nothing is converted, only
-    // indexed, so this is the form to reach for when an interface still counts
-    // codepoints over text that no longer stores them -- the IME's, above all.
-    void assign(std::string_view utf8str);
-
-    std::string_view text() const { return mUtf8; }
-
-    // A codepoint index into the original string, as a byte offset. Indices
-    // past the end give the end, which is what a clamped range wants.
-    size_t toBytes(size_t pos) const;
-
-    // A byte offset that came back out, as a codepoint index. Only codepoint
-    // boundaries are ever reported, so the search always lands on one.
-    size_t toCodepoints(size_t byte_pos) const;
-
-private:
-    std::string         mUtf8;
-    std::vector<size_t> mOffsets;   // one per codepoint, plus the end
-};
+// internally on every call (an O(N) scan). Fine for one-off lookups; expensive
+// in tight loops over the same text. Callers making several queries on the same
+// string should call utf8str_find_emoji_clusters once and feed the result into
+// the two-argument overload, amortising the scan across the batch.
 
 // One decoded codepoint and the byte position just past it. Off the end of the
 // text, `cp` is 0 and `next` is the position handed in — read that as "nothing
@@ -891,6 +778,12 @@ LL_COMMON_API std::string utf8str_from_cp(llwchar cp);
 // bytes count one each, so this never disagrees with a walk over the same text.
 LL_COMMON_API size_t utf8str_codepoint_count(std::string_view utf8str);
 
+// The inverse: where the character at `index` begins, in bytes. An index past
+// the end gives the end, as a clamped range wants, so the pair round-trips.
+// One walk, no index map -- reach for ALUtf8View only when the same text is
+// indexed repeatedly.
+LL_COMMON_API size_t utf8str_offset_from_codepoint_index(std::string_view utf8str, size_t index);
+
 // Whether the bytes are well-formed UTF-8: shortest forms, no surrogate halves,
 // nothing past U+10FFFF. Worth asking before utf8str_sanitize where the answer
 // is nearly always yes and the caller already holds the text -- sanitize has to
@@ -905,10 +798,44 @@ LL_COMMON_API bool utf8str_is_valid(std::string_view utf8str);
 // the input unchanged when it is already valid, which is the case that matters.
 LL_COMMON_API std::string utf8str_sanitize(std::string_view utf8str);
 
+// Every position below is a byte offset into the caller's own string, and so
+// is every answer. ICU reads UTF-8 where it lies, so none of these convert or
+// build an index map.
+
+// Cursor stepping over grapheme clusters: move to the nearest cluster boundary
+// strictly after / before `byte_pos`, so the caret never splits a ZWJ family,
+// flag pair, keycap, tag subdivision, Hangul syllable, Indic conjunct or a base
+// and its combining marks. Clamped to [0, size].
+//
+// These implement UAX #29 in full via ICU, and are unrelated to the emoji
+// cluster list above — that answers "is this an emoji", which UAX #29 does not.
+//
+// Cost is one pass over the line containing `byte_pos`.
 LL_COMMON_API size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos);
+
+// Snap `byte_pos` onto a grapheme cluster boundary when it sits strictly inside
+// a cluster. The backward variant snaps to the cluster's start, the forward
+// variant to its end; a position already on a boundary is returned unchanged.
+// Intended for places that compute a position through some other rule — word
+// walks, pixel hit-testing — and need to nudge onto the nearest safe edge in a
+// chosen direction without the step that utf8str_step_grapheme_* applies.
+//
+// Callers asking "what emoji does byte_pos belong to?" want
+// utf8str_emoji_range_at, which is inclusive of the leading boundary and aware
+// of single-codepoint pictographs.
 LL_COMMON_API size_t utf8str_grapheme_align_backward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_grapheme_align_forward(std::string_view utf8str, size_t byte_pos);
+
+// Word stepping in the sense a text cursor means it: land on the start of a
+// word rather than in the gap before it, so ctrl+arrow steps over whitespace
+// runs instead of stopping in them. Neither direction crosses a newline; a
+// position already at a line's edge is returned unchanged.
+//
+// UAX #29 word boundaries, which see apostrophes inside a word, numbers with
+// separators, and scripts that do not space their words -- none of which an
+// alphanumeric-or-underscore test can. Word boundaries always fall on grapheme
+// boundaries, so no separate cluster snap is needed afterwards.
 LL_COMMON_API size_t utf8str_step_word_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_step_word_backward(std::string_view utf8str, size_t byte_pos);
 
@@ -920,36 +847,22 @@ LL_COMMON_API size_t utf8str_step_word_backward(std::string_view utf8str, size_t
 // this, so it lives here rather than once in each of them.
 LL_COMMON_API size_t utf8str_caret_word_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_caret_word_backward(std::string_view utf8str, size_t byte_pos);
-LL_COMMON_API std::pair<size_t, size_t> utf8str_word_range_at(std::string_view utf8str, size_t byte_pos);
-LL_COMMON_API std::pair<size_t, size_t> utf8str_next_word_range(std::string_view utf8str, size_t byte_pos);
-LL_COMMON_API void utf8str_line_break_opportunities(std::string_view utf8str, std::vector<size_t>& out);
 
-// Word stepping in the sense a text cursor means it: land on the start of a
-// word rather than in the gap before it, so ctrl+arrow steps over whitespace
-// runs instead of stopping in them. Neither direction crosses a newline; a
-// position already at a line's edge is returned unchanged.
-//
-// UAX #29 word boundaries, which see apostrophes inside a word, numbers with
-// separators, and scripts that do not space their words -- none of which an
-// alphanumeric-or-underscore test can. Word boundaries always fall on grapheme
-// boundaries, so no separate cluster snap is needed afterwards.
-LL_COMMON_API size_t wstring_step_word_forward(LLWStringView wstr, size_t pos);
-LL_COMMON_API size_t wstring_step_word_backward(LLWStringView wstr, size_t pos);
-
-// Which word is at `pos`, and where the next one starts -- the other question
-// callers ask of word segmentation, as against "where do I move to" above.
+// Which word is at `byte_pos`, and where the next one starts -- the other
+// question callers ask of word segmentation, as against "where do I move to"
+// above.
 //
 // Ranges are half-open and taken from UAX #29, so a contraction is one word and
 // a script that does not space its words still segments. Whitespace and
 // punctuation are segments too; a segment counts as a word only when it holds
-// an alphanumeric, and wstring_word_range_at returns an empty range at `pos`
-// when the position is not inside one. wstring_next_word_range crosses lines
-// and returns an empty range at the end of the text.
-LL_COMMON_API std::pair<size_t, size_t> wstring_word_range_at(LLWStringView wstr, size_t pos);
-LL_COMMON_API std::pair<size_t, size_t> wstring_next_word_range(LLWStringView wstr, size_t pos);
+// an alphanumeric, and utf8str_word_range_at returns an empty range at
+// `byte_pos` when the position is not inside one. utf8str_next_word_range
+// crosses lines and returns an empty range at the end of the text.
+LL_COMMON_API std::pair<size_t, size_t> utf8str_word_range_at(std::string_view utf8str, size_t byte_pos);
+LL_COMMON_API std::pair<size_t, size_t> utf8str_next_word_range(std::string_view utf8str, size_t byte_pos);
 
-// Positions in `wstr` where UAX #14 permits a line to end, written to `out` in
-// ascending order and expressed as where the next line would begin. The
+// Positions in `utf8str` where UAX #14 permits a line to end, written to `out`
+// in ascending order and expressed as where the next line would begin. The
 // string's own end is always one of them; 0 never is. `out` is cleared first.
 //
 // The caller owns the buffer so a wrapping loop can keep one around rather than
@@ -958,20 +871,7 @@ LL_COMMON_API std::pair<size_t, size_t> wstring_next_word_range(LLWStringView ws
 // UAX #14 is what knows that a line may not begin with closing punctuation, that
 // a non-breaking space is glue, and where CJK may be split; none of that is
 // visible to a test for spaces plus a hand-written ideograph range.
-LL_COMMON_API void wstring_line_break_opportunities(LLWStringView wstr, std::vector<size_t>& out);
-
-// Lowercase `wstr` for comparison, optionally recording where each output
-// codepoint came from. out_map, when asked for, ends up the same length as
-// out_str: out_map[i] is the index in `wstr` of the codepoint that produced
-// out_str[i]. An offset found in the lowercased copy therefore maps back to the
-// original exactly, which matters because lowercasing is not length-preserving
-// -- U+0130 becomes i plus a combining dot, so every index after it shifts.
-//
-// Conversion is per codepoint rather than whole-string, so a search and the
-// text it searches agree. That gives up context-sensitive casing (a final sigma
-// stays sigma), which is what a case-insensitive search wants anyway.
-LL_COMMON_API void wstring_tolower_indexed(LLWStringView wstr, LLWString& out_str,
-                                           std::vector<size_t>* out_map = nullptr);
+LL_COMMON_API void utf8str_line_break_opportunities(std::string_view utf8str, std::vector<size_t>& out);
 
 // Bytes of `utf8str` whose cased UTF-8 encoding fills exactly `cased_bytes`
 // bytes. This maps an offset produced against a cased copy of some text back
@@ -998,25 +898,18 @@ inline bool utf8str_is_ascii(std::string_view utf8str)
     return true;
 }
 
-// Return the half-open codepoint range of the emoji cluster (or single
-// pictograph codepoint) that contains `pos`. Returns an empty range with
-// first == second when `pos` lies on a non-pictograph codepoint or out of
-// bounds. Used by tooltip lookup to recover the full cluster from a hit-test
-// position. Symmetric in spirit to wstring_grapheme_align_*, but inclusive of
-// cluster boundaries and aware of single pictographs (BMP and astral) that
-// wstring_find_emoji_clusters skips. Single-codepoint detection uses
-// LLStringOps::isPictographBase, so © / ® / ☦ / ⚓ / ❤ all qualify; bare
-// extenders (ZWJ, VS-15/16, keycap combiner, skin-tone modifiers, tag chars)
-// do not.
-LL_COMMON_API std::pair<size_t, size_t>
-wstring_emoji_range_at(LLWStringView wstr, size_t pos);
-LL_COMMON_API std::pair<size_t, size_t>
-wstring_emoji_range_at(LLWStringView wstr, size_t pos,
-                       const EmojiClusterList& clusters);
-
-// The same lookup over UTF-8, taking and reporting byte offsets. A `byte_pos`
-// that is not a character start belongs to no pictograph and so reports an
-// empty range, as an out-of-bounds position does.
+// Return the half-open byte range of the emoji cluster (or single pictograph
+// codepoint) that contains `byte_pos`. Any byte inside a cluster reports that
+// whole cluster, character start or not -- a hit test lands on a pixel.
+// Outside a cluster the answer is an empty range with first == second, which
+// is what a non-pictograph, a byte inside a character, and a position out of
+// bounds all give. Used by tooltip lookup to recover the full cluster from a
+// hit-test position. Symmetric in spirit to
+// utf8str_grapheme_align_*, but inclusive of cluster boundaries and aware of
+// single pictographs (BMP and astral) that utf8str_find_emoji_clusters skips.
+// Single-codepoint detection uses LLStringOps::isPictographBase, so
+// © / ® / ☦ / ⚓ / ❤ all qualify; bare extenders (ZWJ, VS-15/16, keycap
+// combiner, skin-tone modifiers, tag chars) do not.
 LL_COMMON_API std::pair<size_t, size_t>
 utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API std::pair<size_t, size_t>
@@ -1030,7 +923,6 @@ utf8str_emoji_range_at(std::string_view utf8str, size_t byte_pos,
 
 /**
  * @brief Convert a wide string to/from std::string
- * Convert a Windows wide string to/from our LLWString
  *
  * This replaces the unsafe W2A macro from ATL.
  */
@@ -1069,8 +961,6 @@ aliasmacro(OUTSTR, const INSTR::value_type*, longname(in))
 
 ll_convert_cp_forms(ll_convert_alias, std::string, std::wstring, ll_convert_wide_to_string);
 ll_convert_cp_forms(ll_convert_alias, std::wstring, std::string, ll_convert_string_to_wide);
-ll_convert_forms(ll_convert_alias, LLWString, std::wstring, ll_convert_wide_to_wstring);
-ll_convert_forms(ll_convert_alias, std::wstring, LLWString, ll_convert_wstring_to_wide);
 
 /**
  * Converts incoming string into utf8 string
@@ -1196,7 +1086,6 @@ namespace LLStringFn
 
 ////////////////////////////////////////////////////////////
 // NOTE: LLStringUtil::format, getTokens, and support functions moved to llstring.cpp.
-// There is no LLWStringUtil::format implementation currently.
 // Calling these for anything other than LLStringUtil will produce link errors.
 
 ////////////////////////////////////////////////////////////
@@ -1581,15 +1470,11 @@ bool LLStringUtilBase<T>::isEqualInsensitiveASCII(string_view_type lhs, string_v
 // cases both sides on every comparison in a sort.
 template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareInsensitive(const char* lhs, const char* rhs);
 template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareInsensitive(std::string_view lhs, std::string_view rhs);
-template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareInsensitive(const llwchar* lhs, const llwchar* rhs);
-template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareInsensitive(LLWStringView lhs, LLWStringView rhs);
 
 // Collation is ICU's, so these are defined in llstring.cpp where it is
-// reachable. Only char and llwchar are ever asked for.
+// reachable.
 template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareDict(std::string_view a, std::string_view b);
 template<> LL_COMMON_API S32 LLStringUtilBase<char>::compareDictInsensitive(std::string_view a, std::string_view b);
-template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareDict(LLWStringView a, LLWStringView b);
-template<> LL_COMMON_API S32 LLStringUtilBase<llwchar>::compareDictInsensitive(LLWStringView a, LLWStringView b);
 
 // Puts compareDict() in a form appropriate for LL container classes to use for sorting.
 // static
@@ -1633,16 +1518,6 @@ void LLStringUtilBase<T>::toLower(string_type& string)
             (T(*)(T)) &LLStringOps::toLower);
     }
 }
-
-// The wide forms convert the whole string at once rather than mapping each
-// codepoint through towlower/towupper, which is locale-dependent and cannot
-// express a mapping that is not one-to-one -- uppercasing sharp s to SS, or
-// lowercasing U+0130 to i plus a combining dot. Both therefore change length,
-// so a caller holding an offset across the conversion needs
-// wstring_tolower_indexed instead. Defined in llstring.cpp, which is where
-// ICU is reachable.
-template<> LL_COMMON_API void LLStringUtilBase<llwchar>::toUpper(std::basic_string<llwchar>& string);
-template<> LL_COMMON_API void LLStringUtilBase<llwchar>::toLower(std::basic_string<llwchar>& string);
 
 // The narrow forms case UTF-8 in place of running tolower/toupper over each
 // byte, which left every non-ASCII character alone. Pure-ASCII input is

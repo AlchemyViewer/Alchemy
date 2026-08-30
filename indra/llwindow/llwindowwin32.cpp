@@ -4655,7 +4655,7 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
         return;
     }
     bool needs_update = false;
-    LLWString result_string;      // iterated per codepoint, never handed to the preeditor
+    std::string result_string;    // decoded per character below, never handed to the preeditor
     std::string preedit_string;
     S32 preedit_string_utf16_length = 0;
     LLPreeditor::segment_lengths_t preedit_segment_lengths;
@@ -4678,7 +4678,7 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
             size = LLWinImm::getCompositionString(himc, GCS_RESULTSTR, data, size);
             if (size > 0)
             {
-                result_string = ll_convert_wide_to_wstring(std::wstring(data, size / sizeof(WCHAR)));
+                result_string = ll_convert<std::string>(std::wstring(data, size / sizeof(WCHAR)));
             }
             delete[] data;
             needs_update = true;
@@ -4791,9 +4791,14 @@ void LLWindowWin32::handleCompositionMessage(const U32 indexes)
 
         if (result_string.length() > 0)
         {
-            for (LLWString::const_iterator i = result_string.begin(); i != result_string.end(); i++)
+            // A keystroke is one character, so the committed string is fed
+            // through one character at a time -- the only place these bytes
+            // are read as anything but bytes.
+            for (size_t i = 0; i < result_string.size(); )
             {
-                mPreeditor->handleUnicodeCharHere(*i);
+                const LLCodepointAt at = utf8str_decode_at(result_string, i);
+                mPreeditor->handleUnicodeCharHere(at.cp);
+                i = at.next;
             }
         }
 

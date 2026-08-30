@@ -107,13 +107,24 @@ namespace
         return ft;
     }
 
-    // Build an LLWString from a parameter pack of llwchars. Avoids an
+    // Build a codepoint sequence from a parameter pack. Avoids an
     // initializer_list dance at the call sites.
     template <typename... Cps>
-    LLWString wstr(Cps... cps)
+    std::u32string wstr(Cps... cps)
     {
-        const llwchar arr[] = { static_cast<llwchar>(cps)... };
-        return LLWString(arr, sizeof...(Cps));
+        const char32_t arr[] = { static_cast<char32_t>(cps)... };
+        return std::u32string(arr, sizeof...(Cps));
+    }
+
+    // llstring holds no UTF-32 any more, so the encode lives here.
+    std::string encode(std::u32string_view u32)
+    {
+        std::string out;
+        for (char32_t cp : u32)
+        {
+            utf8str_append_cp(out, (llwchar)cp);
+        }
+        return out;
     }
 
     // A test string in both representations. The sequences under test are
@@ -124,16 +135,16 @@ namespace
     // value the shaper actually produces.
     struct Text
     {
-        LLWString           wide;
+        std::u32string      wide;
         std::string         utf8;
         std::vector<size_t> offsets;   // one per codepoint, plus the end
 
-        explicit Text(LLWString ws) : wide(std::move(ws))
+        explicit Text(std::u32string ws) : wide(std::move(ws))
         {
             offsets.reserve(wide.size() + 1);
             for (size_t k = 0; k <= wide.size(); ++k)
-                offsets.push_back(wstring_to_utf8str(wide.substr(0, k)).size());
-            utf8 = wstring_to_utf8str(wide);
+                offsets.push_back(encode(wide.substr(0, k)).size());
+            utf8 = encode(wide);
         }
 
         size_t at(size_t cp) const { return offsets[llmin(cp, offsets.size() - 1)]; }
