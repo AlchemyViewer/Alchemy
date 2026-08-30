@@ -19,6 +19,8 @@
 #include "lltrans.h"
 #include "rlvhandler.h"
 
+#include <fmt/format.h>
+
 static const size_t num_collision_sounds = 28;
 const LLUUID collision_sounds[num_collision_sounds] =
 {

@@ -72,6 +72,8 @@
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b)
 #include "rlvactions.h"
 #include "rlvcommon.h"
+
+#include <fmt/format.h>
 // [/RLVa:KB]
 
 class ALChatBarGestureObserver final : public LLGestureManagerObserver

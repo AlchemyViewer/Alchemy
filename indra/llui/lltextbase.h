@@ -445,10 +445,8 @@ public:
     // used by LLTextSegment layout code
     bool                    getWordWrap() const { return mWordWrap; }
     bool                    getUseEllipses() const { return mUseEllipses; }
-    bool                    getUseEmoji() const { return mUseEmoji; }
     void                    setUseEmoji(bool value) { mUseEmoji = value; }
     bool                    getUseColor() const { return mUseColor; }
-    void                    setUseColor(bool value) { mUseColor = value; }
     bool                    truncate(); // returns true of truncation occurred
 
     bool                    isContentTrusted() const { return mTrustedContent; }
@@ -503,7 +501,6 @@ public:
     S32                     getVPad() const { return mVPad; }
     S32                     getHPad() const { return mHPad; }
     F32                     getLineSpacingMult() const { return mLineSpacingMult; }
-    S32                     getLineSpacingPixels() const { return mLineSpacingPixels; } // only for multiline
 
     S32                     getDocIndexFromLocalCoord( S32 local_x, S32 local_y, bool round, bool hit_past_end_of_line = true) const;
     LLRect                  getLocalRectFromDocIndex(S32 pos) const;
@@ -740,7 +737,6 @@ protected:
 
     void                            appendTextImpl(const std::string &new_text, const LLStyle::Params& input_params = LLStyle::Params(), bool force_slurl = false);
     void                            appendAndHighlightTextImpl(const std::string &new_text, S32 highlight_part, const LLStyle::Params& style_params, e_underline underline_link = e_underline::UNDERLINE_ALWAYS);
-    S32 normalizeUri(std::string& uri);
 
 protected:
     // virtual

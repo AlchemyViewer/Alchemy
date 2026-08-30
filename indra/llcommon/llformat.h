@@ -28,7 +28,12 @@
 #ifndef LL_LLFORMAT_H
 #define LL_LLFORMAT_H
 
-#include <fmt/format.h>
+// No <fmt/format.h> here. Nothing this header declares needs it -- both
+// functions below are printf-style and take a const char* -- and this header
+// reaches every translation unit in the viewer through llstring.h, llfile.h
+// and linden_common.h. Carrying fmt to all of them so that fourteen files can
+// use it costs a quarter of a megabyte of preprocessed text each; those files
+// include it themselves.
 
 // Use as follows:
 // LL_INFOS() << llformat("Test:%d (%.2f %.2f)", idx, x, y) << LL_ENDL;

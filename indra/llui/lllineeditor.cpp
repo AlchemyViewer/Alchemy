@@ -157,8 +157,6 @@ LLLineEditor::LLLineEditor(const LLLineEditor::Params& p)
     mIsSelecting( false ),
     mSelectionStart( 0 ),
     mSelectionEnd( 0 ),
-    mLastSelectionX(-1),
-    mLastSelectionY(-1),
     mLastSelectionStart(-1),
     mLastSelectionEnd(-1),
     mBorderThickness( 0 ),
@@ -1029,11 +1027,6 @@ bool LLLineEditor::handleHover(S32 x, S32 y, MASK mask)
 
     if( (hasMouseCapture()) && mIsSelecting )
     {
-        if (x != mLastSelectionX || y != mLastSelectionY)
-        {
-            mLastSelectionX = x;
-            mLastSelectionY = y;
-        }
         // Scroll if mouse cursor outside of bounds
         if (mScrollTimer.hasExpired())
         {

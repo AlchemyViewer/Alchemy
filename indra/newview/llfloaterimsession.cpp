@@ -71,6 +71,8 @@
 // [RLVa:KB] - Checked: 2013-05-10 (RLVa-1.4.9)
 #include "rlvactions.h"
 #include "rlvcommon.h"
+
+#include <fmt/format.h>
 // [/RLVa:KB]
 
 const F32 ME_TYPING_TIMEOUT = 4.0f;

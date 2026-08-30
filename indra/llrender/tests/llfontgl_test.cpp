@@ -1280,6 +1280,14 @@ namespace tut
             {
                 if (g.cluster < n) expected += 6;
             }
+            // What this does NOT cover: a clip that tests one glyph of a
+            // cluster and then emits the rest of it unconditionally keeps the
+            // quads and the count agreeing while painting past the edge. The
+            // obvious check -- getWidthF32Bytes(s, 0, n) against the budget --
+            // does not work, because the clip compares scaled pixels against
+            // its own start_x while getWidthF32Bytes divides the scale back
+            // out. Testing the drawn extent wants the vertex positions out of
+            // the capture, not a re-measurement.
             ensure_equals("quads drawn match the bytes reported", verts, expected);
             if (n > 0 && n < total) ++checked;
         }

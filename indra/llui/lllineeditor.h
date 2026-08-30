@@ -395,8 +395,6 @@ protected:
     bool        mIsSelecting;               // Selection for clipboard operations
     S32         mSelectionStart;
     S32         mSelectionEnd;
-    S32         mLastSelectionX;
-    S32         mLastSelectionY;
     S32         mLastSelectionStart;
     S32         mLastSelectionEnd;
 

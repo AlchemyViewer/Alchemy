@@ -2807,20 +2807,6 @@ void LLTextEditor::appendWidget(const LLInlineViewSegment::Params& params, const
     }
 }
 
-void LLTextEditor::removeTextFromEnd(S32 num_chars)
-{
-    if (num_chars <= 0) return;
-
-    remove(getLengthBytes() - num_chars, num_chars, false);
-
-    S32 len = getLengthBytes();
-    setCursorPos (llclamp(mCursorPos, 0, len));
-    mSelectionStart = llclamp(mSelectionStart, 0, len);
-    mSelectionEnd = llclamp(mSelectionEnd, 0, len);
-
-    needsScroll();
-}
-
 //----------------------------------------------------------------------------
 
 void LLTextEditor::onSpellCheckPerformed()

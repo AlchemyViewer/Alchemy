@@ -77,6 +77,7 @@
 // [/RLVa:KB]
 #include "alchatcommand.h"
 
+#include <fmt/format.h>
 #include <map>
 
 S32 LLFloaterIMNearbyChat::sLastSpecialChatChannel = 0;

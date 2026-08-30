@@ -190,7 +190,6 @@ public:
 
     // Removes text from the end of document
     // Does not change highlight or cursor position.
-    void            removeTextFromEnd(S32 num_chars);
 
     bool            tryToRevertToPristineState();
 
@@ -224,10 +223,8 @@ public:
     void            showEmojiHelper();
     void            hideEmojiHelper();
     void            setShowEmojiHelper(bool show);
-    bool            getShowEmojiHelper() const { return mShowEmojiHelper; }
 // [RLVa:KB]
     void            setShowChatMentionPicker(bool show) { mShowChatMentionPicker = show; }
-    bool            getShowChatMentionPicker() const { return mShowChatMentionPicker; }
 // [/RLVa:KB]
     void            setPassDelete(bool b) { mPassDelete = b; }
 
@@ -271,8 +268,8 @@ protected:
     // Undoable operations
     void            addChar(llwchar c); // at mCursorPos
     S32             addChar(S32 pos, llwchar wc);
-    void            addLineBreakChar(bool group_together = false);
     S32             overwriteChar(S32 pos, llwchar wc);
+    void            addLineBreakChar(bool group_together = false);
     void            removeChar();
     S32             removeChar(S32 pos);
     S32             insert(S32 pos, std::string_view utf8str, bool group_with_next_op, LLTextSegmentPtr segment);

@@ -707,7 +707,19 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                     // Testing per glyph clips between two glyphs of the same
                     // cluster, which paints a base without its mark and then
                     // reports the whole cluster as undrawn.
-                    if (sg.cluster != open_cluster)
+                    //
+                    // Only a cluster that actually carries several glyphs needs
+                    // the walk, and most do not -- every Latin cluster is one
+                    // glyph. Walking regardless costs a second
+                    // getGlyphInfoByIndex and a second placement for every
+                    // glyph drawn, both of which the emission below is about to
+                    // do anyway. The single-glyph case is tested further down
+                    // from the values it already has.
+                    const bool starts_cluster = (sg.cluster != open_cluster);
+                    const bool shares_cluster = starts_cluster
+                        && (sg_index + 1) < run_glyphs.size()
+                        && run_glyphs[sg_index + 1].cluster == sg.cluster;
+                    if (shares_cluster)
                     {
                         if (!cluster_fits(sg_index, cur_render_x))
                         {
@@ -715,6 +727,9 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                             overflow_cluster_local = sg.cluster;
                             break;
                         }
+                    }
+                    if (starts_cluster)
+                    {
                         open_cluster = sg.cluster;
                     }
 
@@ -780,6 +795,17 @@ S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F3
                     const F32 glyph_x = (F32)(dest_int_x + slot.mXBearing);
                     const F32 glyph_y = (F32)ll_round(pen_y) + (F32)slot.mYBearing;
 
+                    // The other half of the cluster test above. One glyph
+                    // carrying a cluster means its own extent is the cluster's,
+                    // so the answer is the lookup and the placement already
+                    // done rather than a second pass over the same glyph.
+                    if (starts_cluster && !shares_cluster
+                        && (start_x + scaled_max_pixels) < (glyph_x + (F32)slot.mWidth))
+                    {
+                        overflow = true;
+                        overflow_cluster_local = sg.cluster;
+                        break;
+                    }
 
                     if (batch_image)
                     {
@@ -1384,8 +1410,20 @@ S32 LLFontGL::maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 ma
     // next line would begin, so they line up with what the clip below wants.
     // The buffer outlives the call so a wrapping loop does not allocate per
     // line; nothing re-enters this function while `breaks` is live.
+    // Only the word-boundary styles ever read the result. ANYWHERE is the
+    // default argument, and asking ICU to enumerate every break in the slice
+    // so the answer can be discarded is a rule-engine pass over the whole
+    // measurement window for nothing.
     static thread_local std::vector<size_t> breaks;
-    utf8str_line_break_opportunities(utf8text.substr(0, (size_t)measure_end), breaks);
+    const bool wants_breaks = (end_on_word_boundary != ANYWHERE);
+    if (wants_breaks)
+    {
+        utf8str_line_break_opportunities(utf8text.substr(0, (size_t)measure_end), breaks);
+    }
+    else
+    {
+        breaks.clear();
+    }
     size_t break_idx = 0;
     const bool use_shaped = !shape_glyphs->empty();
     // shape_glyphs points into the shape LRU until the loop's last use.
