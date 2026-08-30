@@ -356,8 +356,22 @@ private:
     // item goes off-screen (see setVisible), so only on-screen items hold vertex
     // buffers and their MSVC per-std::list sentinel allocations. Null until first
     // drawn, after being hidden, or (for the suffix) when there is no suffix.
+    // Created on first draw: inventory holds thousands of items and most are
+    // never shown. Both are keyed on mLabelGeneration, which is bumped
+    // wherever the label or the suffix is rebuilt -- one counter for both,
+    // because a rebuild of the cheaper one is the safe direction.
     std::unique_ptr<LLFontTextCache> mLabelFontBuffer;
     std::unique_ptr<LLFontTextCache> mSuffixFontBuffer;
+    U32                              mLabelGeneration = 0;
+
+    LLFontTextCache& labelCache();
+    LLFontTextCache& suffixCache();
+
+    // A span of this item's label or suffix, measured through its own cache.
+    // Inventory measures both several times per item per frame while a search
+    // filter is matching.
+    S32 labelWidth(const LLFontGL* font, S32 offset, S32 max_bytes);
+    S32 suffixWidth(const LLFontGL* font, S32 offset, S32 max_bytes);
     LLFontGL* pLabelFont{nullptr};
 };
 
