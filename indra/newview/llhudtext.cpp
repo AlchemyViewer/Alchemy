@@ -279,7 +279,7 @@ void LLHUDText::addLine(const std::string &text_utf8,
                 F32 max_pixels = HUD_TEXT_MAX_WIDTH_NO_BUBBLE;
                 S32 segment_length = font->maxDrawableBytes(std::string_view(*iter).substr(line_length), max_pixels, S32_MAX, LLFontGL::WORD_BOUNDARY_IF_POSSIBLE);
                 LLHUDTextSegment segment(iter->substr(line_length, segment_length), style, color, font);
-                mTextSegments.push_back(segment);
+                mTextSegments.push_back(std::move(segment));
                 line_length += segment_length;
             }
             while (line_length != iter->size());
@@ -609,37 +609,19 @@ void LLHUDText::shift(const LLVector3& offset)
 }
 
 //static
-// called when UI scale changes, to flush font width caches
 void LLHUDText::reshape()
 {
-    TextObjectIterator text_it;
-    for (text_it = sTextObjects.begin(); text_it != sTextObjects.end(); ++text_it)
-    {
-        LLHUDText* textp = (*text_it);
-        std::vector<LLHUDTextSegment>::iterator segment_iter;
-        for (segment_iter = textp->mTextSegments.begin();
-             segment_iter != textp->mTextSegments.end(); ++segment_iter )
-        {
-            segment_iter->clearFontWidthMap();
-        }
-    }
+    // Nothing to flush: a segment's cache compares the scale and DPI it
+    // measured at against the current ones, so a UI scale change invalidates
+    // it wherever it is, without a sweep over every object in the world.
 }
 
 //============================================================================
 
 F32 LLHUDText::LLHUDTextSegment::getWidth(const LLFontGL* font)
 {
-    std::map<const LLFontGL*, F32>::iterator iter = mFontWidthMap.find(font);
-    if (iter != mFontWidthMap.end())
-    {
-        return iter->second;
-    }
-    else
-    {
-        F32 width = font->getWidthF32(mText);
-        mFontWidthMap[font] = width;
-        return width;
-    }
+    mFontCache.setSource(this, 0);
+    return mFontCache.getWidthBytes(font, mText, 0, S32_MAX, false);
 }
 
 // [RLVa:KB] - Checked: RLVa-2.0.3

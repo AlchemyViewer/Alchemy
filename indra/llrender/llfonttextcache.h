@@ -109,6 +109,13 @@ public:
     LLFontTextCache();
     ~LLFontTextCache();
 
+    // Movable so a cache can live in a vector of whatever it caches for;
+    // never copyable, because a captured GPU buffer has one owner.
+    LLFontTextCache(const LLFontTextCache&) = delete;
+    LLFontTextCache& operator=(const LLFontTextCache&) = delete;
+    LLFontTextCache(LLFontTextCache&&) = default;
+    LLFontTextCache& operator=(LLFontTextCache&&) = default;
+
     void reset();
 
     // Name the text being drawn, before drawing it. Everything else the buffer

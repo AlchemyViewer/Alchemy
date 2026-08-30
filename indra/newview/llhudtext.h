@@ -62,15 +62,19 @@ protected:
         {}
         F32 getWidth(const LLFontGL* font);
         const std::string& getText() const { return mText; }
-        void clearFontWidthMap() { mFontWidthMap.clear(); }
 
         LLColor4                mColor;
         LLFontGL::StyleFlags    mStyle;
         const LLFontGL*         mFont;
-        LLFontTextCache      mFontBuffer;
     private:
         std::string             mText;
-        std::map<const LLFontGL*, F32> mFontWidthMap;
+
+        // The width of this segment's text, kept between frames. A segment is
+        // measured once per frame per font to place it, and its text never
+        // changes -- segments are rebuilt wholesale, not edited. The cache
+        // notices a font or scale change for itself, which is what the manual
+        // sweep on reshape used to be for.
+        mutable LLFontTextCache mFontCache;
     };
 
 public:
