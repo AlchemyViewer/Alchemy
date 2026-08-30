@@ -139,8 +139,6 @@ LLFontGlyphInfo::LLFontGlyphInfo(U32 index, EFontGlyphType glyph_type)
     mYAdvance(0.f),     // In pixels
     mXBearing(0),       // Distance from baseline to left in pixels
     mYBearing(0),       // Distance from baseline to top in pixels
-    mLsbDelta(0),
-    mRsbDelta(0),
     mPhaseCount(1)
 {
     // mPhaseSlots default-construct (zeroed PhaseSlot per element).
@@ -156,8 +154,6 @@ LLFontGlyphInfo::LLFontGlyphInfo(const LLFontGlyphInfo& fgi)
     , mYAdvance(fgi.mYAdvance)
     , mXBearing(fgi.mXBearing)
     , mYBearing(fgi.mYBearing)
-    , mLsbDelta(fgi.mLsbDelta)
-    , mRsbDelta(fgi.mRsbDelta)
     , mPhaseSlots(fgi.mPhaseSlots)
     , mPhaseCount(fgi.mPhaseCount)
 {
@@ -200,12 +196,6 @@ LLFontFreetype::~LLFontFreetype()
 hb_font_t* LLFontFreetype::getHbFont() const
 {
     return mFace ? mFace->getHbFont() : nullptr;
-    // We deliberately do NOT override HarfBuzz's glyph_h_advance_func to
-    // apply the autohinter rsb/lsb correction that getXKerning uses for
-    // the legacy codepoint path. GPOS positioning emitted by HB supersedes
-    // that correction's purpose, and threading it into HB's stateless
-    // per-glyph callback would require a per-shaper "previous slot" cache
-    // that doesn't fit the HB API model.
 }
 
 bool LLFontFreetype::isFixedWidth() const
@@ -610,91 +600,6 @@ F32 LLFontFreetype::getXAdvance(const LLFontGlyphInfo* glyph) const
     return glyph->mXAdvance;
 }
 
-F32 LLFontFreetype::getXKerning(llwchar char_left, llwchar char_right) const
-{
-    if (getFTFace() == nullptr)
-        return 0.0;
-
-    //llassert(!mIsFallback);
-    LLFontGlyphInfo* left_glyph_info = getGlyphInfo(char_left, EFontGlyphType::Unspecified);;
-    // Kern this puppy.
-    LLFontGlyphInfo* right_glyph_info = getGlyphInfo(char_right, EFontGlyphType::Unspecified);
-
-    return getXKerning(left_glyph_info, right_glyph_info);
-}
-
-F32 LLFontFreetype::getXKerning(const LLFontGlyphInfo* left_glyph_info, const LLFontGlyphInfo* right_glyph_info) const
-{
-    if (getFTFace() == nullptr)
-        return 0.0;
-
-    // Kerning is defined within one face: the legacy 'kern' table maps
-    // pairs of THAT face's glyph indices. Probe the table of the face that
-    // owns both glyphs — historically this always probed the head's table,
-    // which fed it foreign indices whenever the glyphs came from a fallback
-    // (benign for GPOS-era fonts, which ship no legacy kern table, but
-    // wrong in principle and garbage-prone on old fonts — and it silently
-    // dropped real kerning for pairs that DO share a fallback face, e.g.
-    // two CJK glyphs). A mixed-face pair has no defined kerning at all.
-    if (!left_glyph_info || !right_glyph_info)
-        return 0.f;
-    const ALFontFace* source_face = left_glyph_info->mSourceFace;
-    if (!source_face || source_face != right_glyph_info->mSourceFace)
-        return 0.f;
-    ALFT_Face kern_face = source_face->face();
-    if (!kern_face)
-        return 0.f;
-
-    U32 left_glyph = left_glyph_info->mGlyphIndex;
-    U32 right_glyph = right_glyph_info->mGlyphIndex;
-
-    FT_Vector  delta;
-
-    // UNFITTED gives subpixel-precise kerning when callers maintain a
-    // fractional pen accumulator (mUseSubpixelPen — autohinted/unhinted
-    // faces). DEFAULT grid-fits to integer pixels, which is what callers
-    // want when they round per glyph (native-hinted faces). The pen policy
-    // is the head's: it owns the layout loop the result feeds.
-    const FT_UInt kern_mode = mUseSubpixelPen ? FT_KERNING_UNFITTED : FT_KERNING_DEFAULT;
-    llverify(!FT_Get_Kerning(kern_face, left_glyph, right_glyph, kern_mode, &delta));
-
-    // Apply the FreeType auto-hinter's subpixel side-bearing correction between
-    // adjacent glyphs. The lsb/rsb deltas are populated only when the autohinter
-    // ran; for native-hinted (DEFAULT) and unhinted (NO_HINTING) loads they're
-    // always zero and the correction is meaningless.
-    F32 delta_correction = 0.0f;
-    if (mHinting == EFontHinting::FORCE_AUTOHINT)
-    {
-        // delta_diff is in 26.6 fixed point: the autohinter's net shift in
-        // inter-glyph spacing (positive = hinter pushed glyphs apart).
-        S32 delta_diff = left_glyph_info->mRsbDelta - right_glyph_info->mLsbDelta;
-        if (mUseSubpixelPen)
-        {
-            // Fractional pen accumulator can absorb the exact sub-pixel
-            // shift. FreeType reference: "you can apply the values directly
-            // as a fractional adjustment" when sub-pixel positioning is in
-            // use. Sign matches the integer pattern below — delta_diff > 0
-            // moves the next glyph leftward to compensate for the hinter's
-            // outward shift.
-            delta_correction = -(F32)delta_diff / 64.0f;
-        }
-        else
-        {
-            // Integer pen: ±1 pixel jump at FreeType's documented thresholds
-            // (ftautoh / glyph-to-bitmap example). The discrete clamp is the
-            // best approximation of the fractional shift when the pen can't
-            // hold sub-pixel state.
-            if (delta_diff >= 32)
-                delta_correction = -1.0f;
-            else if (delta_diff < -32)
-                delta_correction = 1.0f;
-        }
-    }
-
-    // FT_Get_Kerning returns delta.x in 26.6 fixed-point regardless of mode;
-    // the mode only controls whether values are grid-fitted to integer pixels.
-    return (F32)(delta.x * (1.f / 64.f)) + delta_correction;
-}
 
 LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* fontp, U32 glyph_index, EFontGlyphType requested_glyph_type, EFontGlyphType& out_bitmap_glyph_type) const
 {
@@ -798,11 +703,6 @@ LLFontGlyphInfo* LLFontFreetype::renderAndCreateGlyph(const LLFontFreetype* font
             gi->mHeight = height;
             gi->mXBearing = slot.mXBearing;
             gi->mYBearing = slot.mYBearing;
-            // FreeType fills these when the glyph has been auto-hinted; they describe
-            // how much the hinter nudged the left/right side bearings (in 26.6 pixels).
-            // Keep them so inter-glyph spacing can be corrected in getXKerning().
-            gi->mLsbDelta = (S32)fontp->getFTFace()->glyph->lsb_delta;
-            gi->mRsbDelta = (S32)fontp->getFTFace()->glyph->rsb_delta;
             // Convert these from 26.6 units to float pixels.
             gi->mXAdvance = fontp->getFTFace()->glyph->advance.x / 64.f;
             gi->mYAdvance = fontp->getFTFace()->glyph->advance.y / 64.f;

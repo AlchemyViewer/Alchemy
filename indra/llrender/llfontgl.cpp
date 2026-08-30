@@ -1453,10 +1453,10 @@ S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 s
     // render() lays down -- and the caller scrolls a field by them.
     const size_t measure_end = utf8str_step_grapheme_forward(utf8text, (size_t)start);
 
-    // Pre-shape [0, measure_end) and collect the advance each cluster carries.
-    // Walking backward through that substitutes for the legacy
-    // fgi->mXAdvance + getXKerning chain. Ligatures and ZWJ clusters get their
-    // full advance attributed to the cluster's first character.
+    // Pre-shape [0, measure_end) and collect the advance each cluster carries,
+    // so the backward sweep below has something to walk. Ligatures and ZWJ
+    // clusters get their full advance attributed to the cluster's first
+    // character.
     //
     // Sparse on purpose, one entry per cluster in ascending byte order: a table
     // indexed by position would now be one float per BYTE rather than one per
