@@ -289,18 +289,7 @@ public:
     void    setAllChildrenEnabled(bool b, bool recursive = false);
 
     virtual void    setVisible(bool visible);
-    // Sets the flag alone, without the notifications setVisible sends -- for
-    // hiding a child from a single draw pass. It still settles any layout owed,
-    // because a view that is visible must have a laid out subtree under it
-    // however it came to be visible.
-    void            setVisibleDirect(bool visible)
-    {
-        mVisible = visible;
-        if (visible && hasDeferredReshape())
-        {
-            applyDeferredReshape();
-        }
-    }
+    void            setVisibleDirect(bool visible) { mVisible = visible; }
     const bool&     getVisible() const          { return mVisible; }
     virtual void    setEnabled(bool enabled);
     bool            getEnabled() const          { return mEnabled; }
@@ -595,12 +584,6 @@ private:
         return handleUnicodeChar(uni_char, from_parent);
     }
 
-    // Lay out this view's own children for a resize it slept through, and
-    // forget the debt. Called on the way to being shown; cheap to ask.
-    bool        hasDeferredReshape() const { return mDeferredReshapeWidth || mDeferredReshapeHeight; }
-    void        applyDeferredReshape();
-    void        deferReshape(S32 width, S32 height);
-
     LLView*     mParentView;
     child_list_t mChildList;
 
@@ -608,20 +591,6 @@ private:
     bool        mVisible;
     LLRect      mRect;
     LLRect      mBoundingRect;
-
-    // How much this view has been resized by since the last time it laid its
-    // children out. Non-zero only while hidden: a resize sets the rect of a
-    // hidden view but does not walk what is under it, because nothing under it
-    // is drawn or hit tested until it is shown, and showing it settles the
-    // debt. An unopened inventory tab is a whole folder tree that a drag would
-    // otherwise reshape to nobody.
-    //
-    // Held as the size delta rather than the target size because that is what
-    // a reshape spends: every follows rule adds the delta to an edge, so a
-    // resize by A and then by B leaves children exactly where one resize by
-    // A+B would, and the debt can simply accumulate.
-    S32         mDeferredReshapeWidth = 0;
-    S32         mDeferredReshapeHeight = 0;
 
     std::string mLayout;
     std::string mName;
