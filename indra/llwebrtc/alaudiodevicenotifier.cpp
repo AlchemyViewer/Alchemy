@@ -308,10 +308,13 @@ enum
 enum
 {
     // Event integer: facility in low bits, type in bits 4-5.
-    PA_SUBSCRIPTION_EVENT_TYPE_MASK = 0x0030,
-    PA_SUBSCRIPTION_EVENT_NEW       = 0x0000,
-    PA_SUBSCRIPTION_EVENT_CHANGE    = 0x0010,
-    PA_SUBSCRIPTION_EVENT_REMOVE    = 0x0020,
+    PA_SUBSCRIPTION_EVENT_FACILITY_MASK = 0x000F,
+    PA_SUBSCRIPTION_EVENT_SINK          = 0x0000,
+    PA_SUBSCRIPTION_EVENT_SOURCE        = 0x0001,
+    PA_SUBSCRIPTION_EVENT_TYPE_MASK     = 0x0030,
+    PA_SUBSCRIPTION_EVENT_NEW           = 0x0000,
+    PA_SUBSCRIPTION_EVENT_CHANGE        = 0x0010,
+    PA_SUBSCRIPTION_EVENT_REMOVE        = 0x0020,
 };
 
 // Sinks and sources cover endpoints coming and going, cards cover a device
@@ -503,10 +506,10 @@ class ALPulseNotifier final : public ALAudioDeviceNotifier
         ALPulseNotifier* self = static_cast<ALPulseNotifier*>(context);
 
         const int eventType = event & PA_SUBSCRIPTION_EVENT_TYPE_MASK;
-        const int facility  = event & ~PA_SUBSCRIPTION_EVENT_TYPE_MASK;
+        const int facility  = event & PA_SUBSCRIPTION_EVENT_FACILITY_MASK;
 
-        const bool isSinkOrSource = (facility == PA_SUBSCRIPTION_MASK_SINK) ||
-                                    (facility == PA_SUBSCRIPTION_MASK_SOURCE);
+        const bool isSinkOrSource = (facility == PA_SUBSCRIPTION_EVENT_SINK) ||
+                                    (facility == PA_SUBSCRIPTION_EVENT_SOURCE);
         if (isSinkOrSource && eventType == PA_SUBSCRIPTION_EVENT_CHANGE)
         {
             return;
