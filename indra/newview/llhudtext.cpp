@@ -100,6 +100,17 @@ LLHUDText::LLHUDText(const U8 type) :
     sAllTextObjectsDirty = true;
 }
 
+void LLHUDText::releaseTextObjects()
+{
+    // The set stays: it is the authority on what exists, and each object text
+    // drops its own place in it as it is marked dead. These are derived from
+    // it and are only held between frames to save rebuilding them.
+    sAllTextObjects.clear();
+    sAllTextObjectsDirty = true;
+    sVisibleTextObjects.clear();
+    sVisibleHUDTextObjects.clear();
+}
+
 const std::vector<LLPointer<LLHUDText> >& LLHUDText::getAllTextObjects()
 {
     if (sAllTextObjectsDirty)

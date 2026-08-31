@@ -172,6 +172,14 @@ public:
     static void reshape();
     static void setDisplayText(bool flag) { sDisplayText = flag ; }
 
+    // Let go of the lists the per-frame passes keep. They hold references, so
+    // a tag they still name outlives the sweep that marked it dead and is
+    // destroyed at static-destruction time instead -- after the GL context,
+    // while its lines still hold the vertex buffers they shaped. Called from
+    // LLHUDObject::cleanupHUDObjects, which is where every tag is marked dead
+    // and where the last reference should be dropped.
+    static void releaseTextObjects();
+
 protected:
     LLHUDNameTag(const U8 type);
 

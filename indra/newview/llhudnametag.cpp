@@ -111,6 +111,16 @@ LLHUDNameTag::LLHUDNameTag(const U8 type)
     mRoundedRectTopImgp = LLUI::getUIImage("Rounded_Rect_Top");
 }
 
+void LLHUDNameTag::releaseTextObjects()
+{
+    // The set stays: it is the authority on what exists, and each tag drops
+    // its own place in it as it is marked dead. These two are derived from it
+    // and are only held between frames to save rebuilding them.
+    sAllTextObjects.clear();
+    sAllTextObjectsDirty = true;
+    sVisibleTextObjects.clear();
+}
+
 const std::vector<LLPointer<LLHUDNameTag> >& LLHUDNameTag::getAllTextObjects()
 {
     if (sAllTextObjectsDirty)
