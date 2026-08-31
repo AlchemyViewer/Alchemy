@@ -348,6 +348,16 @@ private:
     static LLUIImagePtr sFavoriteContentImg;
     static LLFontGL* sSuffixFont;
 
+public:
+    // How many items re-measured their label during the arrange in progress.
+    // That measurement goes straight to the font, so it is a HarfBuzz shape
+    // apiece, and it is preceded by a suffix refresh that queries the model.
+    // Reported as the value on LLFolderView::arrange's profiler zone, which is
+    // the only way to tell a cheap arrange from one that measured everything.
+    static S32 sArrangeRemeasures;
+
+private:
+
     // Returns a shared, immutable style for the given params, deduplicated across
     // all items (there are only a handful of distinct param sets). Main-thread only.
     static const LLFolderViewItemStyle* internStyle(const Params& p);

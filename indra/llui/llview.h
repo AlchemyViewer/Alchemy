@@ -310,6 +310,14 @@ public:
     // a raw value, because that enum belongs to a class built on top of this
     // one.
     void            applyTransparencyType(U8 transparency_type);
+
+    // Every view LLView::reshape has entered since a caller last zeroed it, so
+    // a layout pass can report how much of the tree it moved.
+    static S32      sReshapeCount;
+
+    // Views the last push actually descended into. An open inventory keeps the
+    // items of its closed folders hidden, and they are most of a floater.
+    static S32      sTransparencyViewsWalked;
     virtual void    setEnabled(bool enabled);
     bool            getEnabled() const          { return mEnabled; }
     /// 'available' in this context means 'visible and enabled': in other

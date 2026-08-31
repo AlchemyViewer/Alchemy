@@ -250,6 +250,9 @@ void LLView::setRect(const LLRect& rect)
     updateBoundingRect();
 }
 
+S32 LLView::sTransparencyViewsWalked = 0;
+S32 LLView::sReshapeCount = 0;
+
 void LLView::applyTransparencyType(U8 transparency_type)
 {
     if (!getVisible())
@@ -266,6 +269,7 @@ void LLView::applyTransparencyType(U8 transparency_type)
         return;
     }
     mHasPendingTransparency = false;
+    ++sTransparencyViewsWalked;
 
     // isCtrl is a virtual returning a constant where dynamic_cast walks the
     // RTTI graph, and this is asked once per view. The pairing with static_cast
@@ -662,6 +666,10 @@ void LLView::setVisible(bool visible)
 {
     if ( mVisible != visible )
     {
+        // Only a real change is named: this is asked constantly and answers
+        // "no" almost every time.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("set visible");
+
         mVisible = visible;
 
         // Spend the transparency a floater left here while this was hidden.
@@ -684,6 +692,12 @@ void LLView::setVisible(bool visible)
 // virtual
 void LLView::onVisibilityChange ( bool new_visibility )
 {
+    // Recurses into every visible descendant, so a floater opening or closing
+    // walks the whole of itself. Reports how wide this level is; the depth
+    // shows as nesting.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("visibility change");
+    LL_PROFILE_ZONE_NUM(mChildList.size());
+
     bool old_visibility;
     bool log_visibility_change = LLViewerEventRecorder::instance().getLoggingStatus();
     for (LLView* viewp : mChildList)
@@ -1471,6 +1485,7 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
         // thousands of them (an inventory) walks all of them per reshape.
         LL_PROFILE_ZONE_NAMED_CATEGORY_UI("view reshape");
         LL_PROFILE_ZONE_NUM(mChildList.size());
+        ++sReshapeCount;
 
         // adjust our rectangle
         mRect.mRight = getRect().mLeft + width;

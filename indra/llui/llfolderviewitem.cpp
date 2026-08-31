@@ -65,6 +65,7 @@ LLUIImagePtr LLFolderViewItem::sSelectionImg;
 LLUIImagePtr LLFolderViewItem::sFavoriteImg;
 LLUIImagePtr LLFolderViewItem::sFavoriteContentImg;
 LLFontGL* LLFolderViewItem::sSuffixFont = nullptr;
+S32 LLFolderViewItem::sArrangeRemeasures = 0;
 LLUIColor LLFolderViewItem::sFavoriteColor;
 bool LLFolderViewItem::sColorSetInitialized = false;
 
@@ -497,6 +498,7 @@ S32 LLFolderViewItem::arrange( S32* width, S32* height )
             // it is purely visual, so it is fine to do at our laisure
             refreshSuffix();
         }
+        ++sArrangeRemeasures;
         // getLabelFont() is the cached font for mLabelStyle; sSuffixFont is the cached NORMAL-style
         // font. Both avoid the per-call sFonts map lookup that getLabelFontForStyle() does.
         mLabelWidth = getLabelXPos() + getLabelFont()->getWidth(mLabel) + sSuffixFont->getWidth(mLabelSuffix) + mLabelPaddingRight;

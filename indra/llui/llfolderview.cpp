@@ -323,6 +323,14 @@ void LLFolderView::openTopLevelFolders()
 // conform show folder state works
 S32 LLFolderView::arrange( S32* unused_width, S32* unused_height )
     {
+    // Lays out the whole item tree, and had no zone of its own, so whatever it
+    // costs was charged to whichever caller happened to contain it. The value
+    // is how many items re-measured their label -- a shape apiece, plus a
+    // model query for the suffix -- which is what separates an arrange that
+    // only moved things from one that measured the entire inventory.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("folder view arrange");
+    LLFolderViewItem::sArrangeRemeasures = 0;
+
     mMinWidth = 0;
     S32 target_height;
 
@@ -340,6 +348,7 @@ S32 LLFolderView::arrange( S32* unused_width, S32* unused_height )
     // move item renamer text field to item's new position
     updateRenamerPosition();
 
+    LL_PROFILE_ZONE_NUM(LLFolderViewItem::sArrangeRemeasures);
     return ll_round(mTargetHeight);
 }
 
