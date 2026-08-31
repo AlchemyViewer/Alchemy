@@ -251,7 +251,7 @@ void LLView::setRect(const LLRect& rect)
 }
 
 S32 LLView::sTransparencyViewsWalked = 0;
-S32 LLView::sReshapeCount = 0;
+S32 LLView::sReshapeDepth = 0;
 
 void LLView::applyTransparencyType(U8 transparency_type)
 {
@@ -1478,15 +1478,16 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
     S32 delta_width = width - getRect().getWidth();
     S32 delta_height = height - getRect().getHeight();
 
+    // Every view a cascade touches resolves to the same near-root ancestor and
+    // so asks for the same screen region; the walk that finds it is the cost,
+    // and in an inventory it is a pointer chase through twenty scattered views,
+    // fifteen hundred times. So the region is claimed once, here at the top,
+    // and updateBoundingRect stays quiet while this is running.
+    const bool outermost_reshape = (sReshapeDepth == 0);
+    ++sReshapeDepth;
+
     if (delta_width || delta_height || sForceReshape)
     {
-        // Named so a resize says how much of the view tree it walked: this
-        // recurses into every child whose size changed, and a panel holding
-        // thousands of them (an inventory) walks all of them per reshape.
-        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("view reshape");
-        LL_PROFILE_ZONE_NUM(mChildList.size());
-        ++sReshapeCount;
-
         // adjust our rectangle
         mRect.mRight = getRect().mLeft + width;
         mRect.mTop = getRect().mBottom + height;
@@ -1565,6 +1566,12 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
     }
 
     updateBoundingRect();
+
+    --sReshapeDepth;
+    if (outermost_reshape && (delta_width || delta_height || sForceReshape))
+    {
+        dirtyRect();
+    }
 }
 
 LLRect LLView::calcBoundingRect()
@@ -1624,7 +1631,13 @@ void LLView::updateBoundingRect()
         getParent()->updateBoundingRect();
     }
 
-    if (mBoundingRect != cur_rect)
+    // A view that is not on screen has no screen region to repaint, and this is
+    // where a resize spends most of itself: dirtyRect walks to a near-root
+    // ancestor and takes its screen rect, and dragging an inventory floater's
+    // edge resizes two hundred thousand items, nearly all of them inside closed
+    // folders. Being shown marks the region itself -- see setVisible -- so the
+    // repaint is asked for at the moment there is something to repaint.
+    if (mBoundingRect != cur_rect && getVisible() && sReshapeDepth == 0)
     {
         dirtyRect();
     }

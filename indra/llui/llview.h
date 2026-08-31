@@ -311,9 +311,10 @@ public:
     // one.
     void            applyTransparencyType(U8 transparency_type);
 
-    // Every view LLView::reshape has entered since a caller last zeroed it, so
-    // a layout pass can report how much of the tree it moved.
-    static S32      sReshapeCount;
+    // How deep in a reshape the current call is. Non-zero means a cascade is
+    // running and the region it dirties is being accounted for at the top of
+    // it; see updateBoundingRect.
+    static S32      sReshapeDepth;
 
     // Views the last push actually descended into. An open inventory keeps the
     // items of its closed folders hidden, and they are most of a floater.
