@@ -112,6 +112,7 @@ void LLFontTextCache::dropDerived()
     // Regenerating this list is expensive
     mShadowBufferList.clear();
     mForegroundBufferList.clear();
+    mHasCapture = false;
     for (WidthSlot& slot : mWidthSlots)
     {
         slot.valid = false;
@@ -277,7 +278,7 @@ S32 LLFontTextCache::renderImpl(
         && ((derive_shadow_alpha(color, shadow) == 0) !=
             (derive_shadow_alpha(mLastColor, mLastShadow) == 0));
 
-    if (mShadowBufferList.empty() && mForegroundBufferList.empty())
+    if (!mHasCapture)
     {
         genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
             style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color);
@@ -369,9 +370,16 @@ void LLFontTextCache::genBuffers(
     {
         gGL.beginList(&mForegroundBufferList);
     }
+    // Where the text ended is recorded whether or not this caller wanted it.
+    // A replay has only the recorded value to answer with, and the callers of
+    // one cache do not all ask the same question -- a measurement that skips
+    // right_x would otherwise leave the next draw replaying a stale one.
+    F32 local_right_x = x;
+    F32* const right_x_out = right_x ? right_x : &local_right_x;
     mChars = font_render(fontp, text, begin_offset, x, y, color, halign, valign,
-        style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color, pass_boundary);
+        style, shadow, max_bytes, max_pixels, right_x_out, use_ellipses, use_color, pass_boundary);
     gGL.endList();
+    mHasCapture = true;
 
     // Detect whether any captured batch sampled the color (RGBA emoji) atlas.
     // Mixed strings can't be recolored cheaply because emoji glyphs use a
@@ -437,10 +445,7 @@ void LLFontTextCache::genBuffers(
     mLastUseEllipses = use_ellipses;
     mLastUseColor = use_color;
 
-    if (right_x)
-    {
-        mLastRightX = *right_x;
-    }
+    mLastRightX = *right_x_out;
 }
 
 void LLFontTextCache::recolorBuffers(

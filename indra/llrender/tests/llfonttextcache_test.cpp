@@ -747,4 +747,71 @@ namespace tut
         ensure("a draw somewhere else still rebuilds",
                after_real_change > after_moves);
     }
+
+    // Text that shapes to no geometry settles too. A cell with nothing in it
+    // and a string clipped to no width both leave the capture empty, which
+    // reads exactly like a cache that has never been asked to build one --
+    // and a scroll list draws a cell per column whether or not it holds
+    // anything. Such a piece of text reshaped itself on every frame it stayed
+    // on screen, and the count is the only place it showed.
+    template<> template<>
+    void llfonttextcache_render_object::test<10>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not present in test data dir");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font available", font != nullptr);
+
+        ll_test::FontStateScope scope;
+        font->generateASCIIglyphs();
+
+        // Settles a cache the same way the viewer does: draw until the count
+        // stops moving, since a first draw can rasterize glyphs and bump the
+        // font's generation under the geometry it just captured.
+        auto settle = [](auto&& draw) -> bool
+        {
+            for (int i = 0; i < 8; ++i)
+            {
+                const U64 before_draw = LLFontTextCache::regenCount();
+                draw();
+                if (LLFontTextCache::regenCount() == before_draw)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        const std::string nothing;
+        LLFontTextCache blank;
+        ensure("an empty cell stops rebuilding", settle([&]()
+        {
+            blank.setSource(&nothing, 0);
+            blank.renderBytes(font, nothing, 0, 12.f, 34.f, LLColor4::white,
+                              LLFontGL::LEFT, LLFontGL::BASELINE,
+                              LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+        }));
+
+        const std::string clipped = "Nothing of this fits";
+        LLFontTextCache narrow;
+        ensure("text with no room to draw stops rebuilding", settle([&]()
+        {
+            narrow.setSource(&clipped, 0);
+            narrow.renderBytes(font, clipped, 0, 12.f, 34.f, LLColor4::white,
+                               LLFontGL::LEFT, LLFontGL::BASELINE,
+                               LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                               S32_MAX, /*max_pixels=*/0);
+        }));
+
+        // Still a cache, not a switch that was left off: give it something to
+        // draw and it builds again.
+        const U64 before_visible = LLFontTextCache::regenCount();
+        narrow.setSource(&clipped, 0);
+        narrow.renderBytes(font, clipped, 0, 12.f, 34.f, LLColor4::white,
+                           LLFontGL::LEFT, LLFontGL::BASELINE,
+                           LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                           S32_MAX, /*max_pixels=*/2000);
+        ensure("room to draw rebuilds",
+               LLFontTextCache::regenCount() > before_visible);
+    }
 }

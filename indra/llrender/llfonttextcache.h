@@ -301,6 +301,13 @@ private:
     // fall through to full genBuffers on color change.
     bool mLastUsesColorAtlas = false;
 
+    // Whether a capture has been taken, which is not the same as holding
+    // geometry. Text clipped to no width, or a cell with nothing in it, shapes
+    // and measures and then emits no vertices at all. Reading that off the
+    // lists instead answers "nothing generated yet", so such a piece of text
+    // shapes itself again on every frame it stays on screen.
+    bool mHasCapture = false;
+
     // Snapshot of LLFontGL::sEnableShaderShadow at genBuffers time. Required
     // because LLVertexBufferData doesn't capture shader uniforms; renderBuffers
     // must re-push shadowMode before replaying mShadowBufferList and reset
