@@ -813,6 +813,13 @@ void LLHUDNameTag::updateAll()
 
     for (S32 i = 0; i < NUM_OVERLAP_ITERATIONS; i++)
     {
+        // Nothing here moves a tag except an overlap, so a pass that finds
+        // none leaves the arrangement exactly as the next pass would find it,
+        // and the one after that. Stopping is the same answer, reached
+        // sooner: tags that have spread apart -- which is what these
+        // iterations are for -- pay one pass instead of ten.
+        bool any_overlap = false;
+
         for (src_it = sVisibleTextObjects.begin(); src_it != sVisibleTextObjects.end(); ++src_it)
         {
             LLHUDNameTag* src_textp = (*src_it);
@@ -825,6 +832,7 @@ void LLHUDNameTag::updateAll()
 
                 if (src_textp->mSoftScreenRect.overlaps(dst_textp->mSoftScreenRect))
                 {
+                    any_overlap = true;
                     LLRectf intersect_rect = src_textp->mSoftScreenRect;
                     intersect_rect.intersectWith(dst_textp->mSoftScreenRect);
                     intersect_rect.stretch(-BUFFER_SIZE * 0.5f);
@@ -865,6 +873,11 @@ void LLHUDNameTag::updateAll()
                     dst_textp->mTargetPositionOffset = dst_textp->updateScreenPos(dst_textp->mTargetPositionOffset);
                 }
             }
+        }
+
+        if (!any_overlap)
+        {
+            break;
         }
     }
     }
