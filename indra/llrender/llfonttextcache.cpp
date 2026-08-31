@@ -247,6 +247,15 @@ S32 LLFontTextCache::renderImpl(
     // glyph and bump the font's cache generation mid-draw, and the value worth
     // recording is the one the captured geometry was built against.
     const bool env_moved = environmentMoved(fontp);
+    if (env_moved)
+    {
+        // The widths came off the same glyphs, and this call has just consumed
+        // the notice that they moved. They go now, or the next measurement is
+        // answered from a slot filled before the atlas grew under it. What
+        // follows rebuilds the geometry regardless, so nothing dropped here is
+        // wanted again.
+        dropDerived();
+    }
 
     // Geometry-invalidating params: any change forces full genBuffers.
     const bool geometry_invalid =
@@ -553,14 +562,12 @@ F32 LLFontTextCache::cachedWidth(
     llassert(sameTextAsRecorded(utf8text));
 
     // Everything the whole cache depends on. A change here says nothing
-    // measured earlier is worth keeping, whatever span it was for.
+    // measured earlier is worth keeping, whatever span it was for -- and
+    // nothing captured for the draw either, which asks this same question and
+    // would be told nothing had moved.
     if (environmentMoved(fontp))
     {
-        for (WidthSlot& slot : mWidthSlots)
-        {
-            slot.valid = false;
-        }
-        mNextWidthSlot = 0;
+        dropDerived();
     }
     else
     {

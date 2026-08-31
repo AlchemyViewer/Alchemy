@@ -814,4 +814,63 @@ namespace tut
         ensure("room to draw rebuilds",
                LLFontTextCache::regenCount() > before_visible);
     }
+
+    // A width and a draw come off the same glyphs, so the state the font
+    // rasterizes at invalidates both. Asking whether it moved also records
+    // that it has, which means only the first of the two to ask is told --
+    // and a measurement taken before the draw is very common: the highlight
+    // box, the ellipsis fit, the auto-resize. Without the other half being
+    // dropped alongside, the draw was told nothing had moved and replayed a
+    // capture whose glyphs had been rebuilt underneath it.
+    template<> template<>
+    void llfonttextcache_render_object::test<11>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not present in test data dir");
+        LLFontGL* font = LLFontGL::getFontSansSerif();
+        ensure("font available", font != nullptr);
+
+        ll_test::FontStateScope scope;
+        font->generateASCIIglyphs();
+
+        const std::string s = "Measured, then drawn";
+        LLFontTextCache vb;
+
+        auto draw = [&]()
+        {
+            vb.setSource(&s, 0);
+            vb.renderBytes(font, s, 0, 12.f, 34.f, LLColor4::white,
+                           LLFontGL::LEFT, LLFontGL::BASELINE,
+                           LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+        };
+        auto measure = [&]()
+        {
+            vb.setSource(&s, 0);
+            return vb.getWidthBytes(font, s, 0, S32_MAX, false);
+        };
+
+        bool settled = false;
+        for (int i = 0; i < 8 && !settled; ++i)
+        {
+            const U64 before_draw = LLFontTextCache::regenCount();
+            measure();
+            draw();
+            settled = (LLFontTextCache::regenCount() == before_draw);
+        }
+        ensure("measure then draw eventually replays", settled);
+
+        const S32 saved_res_gen = LLFontGL::sResolutionGeneration;
+        ++LLFontGL::sResolutionGeneration;
+
+        // The measurement asks first and is the one told.
+        measure();
+        const U64 before_stale_draw = LLFontTextCache::regenCount();
+        draw();
+        const U64 after_stale_draw = LLFontTextCache::regenCount();
+
+        LLFontGL::sResolutionGeneration = saved_res_gen;
+
+        ensure("a draw after a measurement saw the same change rebuilds",
+               after_stale_draw > before_stale_draw);
+    }
 }
