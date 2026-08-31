@@ -272,10 +272,8 @@ void LLHUDNameTag::renderText()
     // scale screen size of borders down
     //RN: for now, text on hud objects is never occluded
 
-    LLVector3 x_pixel_vec;
-    LLVector3 y_pixel_vec;
-
-    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+    const LLVector3& x_pixel_vec = mPixelRightVec;
+    const LLVector3& y_pixel_vec = mPixelUpVec;
 
     LLVector3 width_vec = mWidth * x_pixel_vec;
     LLVector3 height_vec = mHeight * y_pixel_vec;
@@ -572,6 +570,7 @@ void LLHUDNameTag::updateVisibility()
     if (!mSourceObject)
     {
         //LL_WARNS() << "LLHUDNameTag::updateScreenPos -- mSourceObject is NULL!" << LL_ENDL;
+        LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, mPixelUpVec, mPixelRightVec);
         mVisible = true;
         sVisibleTextObjects.push_back(LLPointer<LLHUDNameTag> (this));
         return;
@@ -612,14 +611,13 @@ void LLHUDNameTag::updateVisibility()
         return;
     }
 
-    LLVector3 x_pixel_vec;
-    LLVector3 y_pixel_vec;
-
-    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
+    // Taken here, where the position it is derived from has just settled, and
+    // read from everywhere else this frame.
+    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, mPixelUpVec, mPixelRightVec);
 
     LLVector3 render_position = mPositionAgent +
-            (x_pixel_vec * mPositionOffset.mV[VX]) +
-            (y_pixel_vec * mPositionOffset.mV[VY]);
+            (mPixelRightVec * mPositionOffset.mV[VX]) +
+            (mPixelUpVec * mPositionOffset.mV[VY]);
 
     mOffscreen = false;
     if (!LLViewerCamera::getInstance()->sphereInFrustum(render_position, mRadius))
@@ -643,10 +641,7 @@ LLVector2 LLHUDNameTag::updateScreenPos(const LLVector2 &offset)
 {
     LLCoordGL screen_pos;
     LLVector2 screen_pos_vec;
-    LLVector3 x_pixel_vec;
-    LLVector3 y_pixel_vec;
-    LLViewerCamera::getInstance()->getPixelVectors(mPositionAgent, y_pixel_vec, x_pixel_vec);
-    LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * x_pixel_vec) + (offset.mV[VY] * y_pixel_vec);
+    LLVector3 world_pos = mPositionAgent + (offset.mV[VX] * mPixelRightVec) + (offset.mV[VY] * mPixelUpVec);
     if (!LLViewerCamera::getInstance()->projectPosAgentToScreen(world_pos, screen_pos, false) && mVisibleOffScreen)
     {
         // bubble off-screen, so find a spot for it along screen edge

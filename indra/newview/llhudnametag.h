@@ -174,6 +174,14 @@ private:
     const LLFontGL* mBoldFontp;
     LLRectf         mSoftScreenRect;
     LLVector3       mPositionAgent;
+    // How far a screen pixel reaches in the world at this tag's position,
+    // taken once per frame alongside the position it is derived from.
+    // Deriving it costs a tangent and three window lookups, and the overlap
+    // pass below asks for a tag's screen rectangle once per overlapping
+    // neighbour per iteration -- thousands of times over, for an answer that
+    // cannot change while the frame is being built.
+    LLVector3       mPixelUpVec;
+    LLVector3       mPixelRightVec;
     LLVector2       mPositionOffset;
     LLVector2       mTargetPositionOffset;
     F32             mMass;
