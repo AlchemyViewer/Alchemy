@@ -559,8 +559,6 @@ F32 LLFontTextCache::cachedWidth(
         return measure();
     }
 
-    llassert(sameTextAsRecorded(utf8text));
-
     // Everything the whole cache depends on. A change here says nothing
     // measured earlier is worth keeping, whatever span it was for -- and
     // nothing captured for the draw either, which asks this same question and
@@ -607,6 +605,10 @@ F32 LLFontTextCache::getWidthBytes(
     {
         return 0.f;
     }
+    // One source, one text: see sameTextAsRecorded. Asked here rather than in
+    // cachedWidth below, which takes a measurement to run and not the text to
+    // run it on -- and so could only name a variable it does not have.
+    llassert(sameTextAsRecorded(utf8text));
     return cachedWidth(fontp, begin_offset, max_bytes, no_padding,
                        [&] { return fontp->getWidthF32Bytes(utf8text, begin_offset, max_bytes, no_padding); });
 }
