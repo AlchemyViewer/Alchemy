@@ -4005,8 +4005,17 @@ F32 LLNormalTextSegment::draw(S32 start, S32 end, S32 selection_start, S32 selec
     }
     else
     {
-        mLinePieces.clear();
-        mNextLinePiece = 0;
+        // Nothing of this segment lands on this line. Let go of what it holds,
+        // but only where the pass has not already drawn a piece of it: the
+        // cursor names which piece comes next, and resetting it partway
+        // through hands the pieces still to come the slots the pieces already
+        // drawn are using, so every one of them rebuilds and none of them ever
+        // settles.
+        if (mLastDrawPass != mEditor.getDrawPass())
+        {
+            mLinePieces.clear();
+            mNextLinePiece = 0;
+        }
     }
     return draw_rect.mLeft;
 }
