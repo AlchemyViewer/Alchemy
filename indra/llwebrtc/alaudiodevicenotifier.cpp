@@ -258,10 +258,33 @@ namespace
 // straight, say -- then goes without notifications instead of failing to load.
 // PipeWire is reached the same way, through its PulseAudio compatibility layer.
 struct pa_threaded_mainloop;
-struct pa_mainloop_api;
 struct pa_context;
 struct pa_operation;
 struct pa_spawn_api;
+
+// pa_mainloop_api is a vtable struct.  We only use quit(), so the rest are
+// void* padding to keep the layout ABI-compatible.
+struct pa_mainloop_api
+{
+    void* userdata;
+
+    void* _io_new;
+    void* _io_enable;
+    void* _io_free;
+    void* _io_set_destroy;
+
+    void* _time_new;
+    void* _time_restart;
+    void* _time_free;
+    void* _time_set_destroy;
+
+    void* _defer_new;
+    void* _defer_enable;
+    void* _defer_free;
+    void* _defer_set_destroy;
+
+    void (*quit)(pa_mainloop_api*, int);
+};
 
 using pa_context_notify_cb_t    = void (*)(pa_context*, void*);
 using pa_context_success_cb_t   = void (*)(pa_context*, int, void*);
@@ -280,6 +303,15 @@ enum
     PA_SUBSCRIPTION_MASK_SOURCE = 0x0002u,
     PA_SUBSCRIPTION_MASK_SERVER = 0x0080u,
     PA_SUBSCRIPTION_MASK_CARD   = 0x0200u,
+};
+
+enum
+{
+    // Event integer: facility in low bits, type in bits 4-5.
+    PA_SUBSCRIPTION_EVENT_TYPE_MASK = 0x0030,
+    PA_SUBSCRIPTION_EVENT_NEW       = 0x0000,
+    PA_SUBSCRIPTION_EVENT_CHANGE    = 0x0010,
+    PA_SUBSCRIPTION_EVENT_REMOVE    = 0x0020,
 };
 
 // Sinks and sources cover endpoints coming and going, cards cover a device
@@ -462,9 +494,25 @@ class ALPulseNotifier final : public ALAudioDeviceNotifier
         self->mPulse.mainloop_signal(self->mMainloop, 0);
     }
 
-    static void onSubscribedEvent(pa_context*, int, uint32_t, void* context)
+    // Drop CHANGE events on sinks/sources -- these are the transient stream
+    // state changes WebRTC's own StopRecording/StartRecording produces, and
+    // forwarding them would create a feedback loop.  NEW/REMOVE on those
+    // facilities and all card/server events are genuine topology changes.
+    static void onSubscribedEvent(pa_context*, int event, uint32_t, void* context)
     {
-        static_cast<ALPulseNotifier*>(context)->mObserver->OnDevicesUpdated();
+        ALPulseNotifier* self = static_cast<ALPulseNotifier*>(context);
+
+        const int eventType = event & PA_SUBSCRIPTION_EVENT_TYPE_MASK;
+        const int facility  = event & ~PA_SUBSCRIPTION_EVENT_TYPE_MASK;
+
+        const bool isSinkOrSource = (facility == PA_SUBSCRIPTION_MASK_SINK) ||
+                                    (facility == PA_SUBSCRIPTION_MASK_SOURCE);
+        if (isSinkOrSource && eventType == PA_SUBSCRIPTION_EVENT_CHANGE)
+        {
+            return;
+        }
+
+        self->mObserver->OnDevicesUpdated();
     }
 
     Observer*             mObserver;
