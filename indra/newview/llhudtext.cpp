@@ -60,6 +60,8 @@ const F32 HUD_TEXT_MAX_WIDTH_NO_BUBBLE = 1000.f;
 const F32 MAX_DRAW_DISTANCE = 300.f;
 
 std::set<LLPointer<LLHUDText> > LLHUDText::sTextObjects;
+std::vector<LLPointer<LLHUDText> > LLHUDText::sAllTextObjects;
+bool LLHUDText::sAllTextObjectsDirty = true;
 std::vector<LLPointer<LLHUDText> > LLHUDText::sVisibleTextObjects;
 std::vector<LLPointer<LLHUDText> > LLHUDText::sVisibleHUDTextObjects;
 bool LLHUDText::sDisplayText = true ;
@@ -95,6 +97,17 @@ LLHUDText::LLHUDText(const U8 type) :
     mRadius = 0.1f;
     LLPointer<LLHUDText> ptr(this);
     sTextObjects.insert(ptr);
+    sAllTextObjectsDirty = true;
+}
+
+const std::vector<LLPointer<LLHUDText> >& LLHUDText::getAllTextObjects()
+{
+    if (sAllTextObjectsDirty)
+    {
+        sAllTextObjects.assign(sTextObjects.begin(), sTextObjects.end());
+        sAllTextObjectsDirty = false;
+    }
+    return sAllTextObjects;
 }
 
 LLHUDText::~LLHUDText()
@@ -535,10 +548,9 @@ void LLHUDText::updateAll()
     sVisibleTextObjects.clear();
     sVisibleHUDTextObjects.clear();
 
-    TextObjectIterator text_it;
-    for (text_it = sTextObjects.begin(); text_it != sTextObjects.end(); ++text_it)
+    for (const LLPointer<LLHUDText>& text_ptr : getAllTextObjects())
     {
-        LLHUDText* textp = (*text_it);
+        LLHUDText* textp = text_ptr;
         textp->mTargetPositionOffset.clearVec();
         // Visibility first, and a size only for what survives it. Deciding
         // visibility does not read the size -- it works from the distance,
@@ -588,6 +600,7 @@ void LLHUDText::markDead()
     // till the end of the function
     LLPointer<LLHUDText> ptr(this);
     sTextObjects.erase(ptr);
+    sAllTextObjectsDirty = true;
     LLHUDObject::markDead();
 }
 

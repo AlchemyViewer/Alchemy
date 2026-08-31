@@ -61,6 +61,8 @@ const F32 LOD_1_SCREEN_COVERAGE = 0.30f;
 const F32 LOD_2_SCREEN_COVERAGE = 0.40f;
 
 std::set<LLPointer<LLHUDNameTag> > LLHUDNameTag::sTextObjects;
+std::vector<LLPointer<LLHUDNameTag> > LLHUDNameTag::sAllTextObjects;
+bool LLHUDNameTag::sAllTextObjectsDirty = true;
 std::vector<LLPointer<LLHUDNameTag> > LLHUDNameTag::sVisibleTextObjects;
 bool LLHUDNameTag::sDisplayText = true ;
 const F32 LLHUDNameTag::NAMETAG_MAX_WIDTH = 298.f;
@@ -103,9 +105,20 @@ LLHUDNameTag::LLHUDNameTag(const U8 type)
 {
     LLPointer<LLHUDNameTag> ptr(this);
     sTextObjects.insert(ptr);
+    sAllTextObjectsDirty = true;
 
     mRoundedRectImgp = LLUI::getUIImage("Rounded_Rect");
     mRoundedRectTopImgp = LLUI::getUIImage("Rounded_Rect_Top");
+}
+
+const std::vector<LLPointer<LLHUDNameTag> >& LLHUDNameTag::getAllTextObjects()
+{
+    if (sAllTextObjectsDirty)
+    {
+        sAllTextObjects.assign(sTextObjects.begin(), sTextObjects.end());
+        sAllTextObjectsDirty = false;
+    }
+    return sAllTextObjects;
 }
 
 LLHUDNameTag::~LLHUDNameTag()
@@ -744,10 +757,9 @@ void LLHUDNameTag::updateAll()
         // is not, so the two counts want telling apart.
         LL_PROFILE_ZONE_NAMED_CATEGORY_UI("nametag size and visibility");
         LL_PROFILE_ZONE_NUM(sTextObjects.size());
-        TextObjectIterator text_it;
-        for (text_it = sTextObjects.begin(); text_it != sTextObjects.end(); ++text_it)
+        for (const LLPointer<LLHUDNameTag>& text_ptr : getAllTextObjects())
         {
-            LLHUDNameTag* textp = (*text_it);
+            LLHUDNameTag* textp = text_ptr;
             textp->mTargetPositionOffset.clearVec();
             // No size here. Deciding visibility does not read one -- it works
             // from the distance and from the radius the last draw left behind
@@ -916,6 +928,7 @@ S32 LLHUDNameTag::getMaxLines()
 void LLHUDNameTag::markDead()
 {
     sTextObjects.erase(LLPointer<LLHUDNameTag>(this));
+    sAllTextObjectsDirty = true;
     LLHUDObject::markDead();
 }
 

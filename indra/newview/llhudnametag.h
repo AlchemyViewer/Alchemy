@@ -200,6 +200,15 @@ private:
 
     static bool    sDisplayText ;
     static std::set<LLPointer<LLHUDNameTag> > sTextObjects;
+    // The same tags in one run of memory, for the passes that visit all of
+    // them every frame. The set stays the authority on what exists -- it is
+    // what insertion and removal work against, and removal can happen while a
+    // pass is running -- so this is rebuilt from it only when it changes, and
+    // holds its own references so a removal mid-pass cannot pull a tag out
+    // from under one.
+    static std::vector<LLPointer<LLHUDNameTag> > sAllTextObjects;
+    static bool sAllTextObjectsDirty;
+    static const std::vector<LLPointer<LLHUDNameTag> >& getAllTextObjects();
     static std::vector<LLPointer<LLHUDNameTag> > sVisibleTextObjects;
 //  static std::vector<LLPointer<LLHUDNameTag> > sVisibleHUDTextObjects;
     typedef std::set<LLPointer<LLHUDNameTag> >::iterator TextObjectIterator;
