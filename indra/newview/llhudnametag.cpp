@@ -405,12 +405,32 @@ void LLHUDNameTag::renderText()
 void LLHUDNameTag::setString(const std::string &text_utf8)
 {
     mTextSegments.clear();
+    mLineSegmentCounts.clear();
     addLine(text_utf8, mColor);
 }
 
 void LLHUDNameTag::clearString()
 {
     mTextSegments.clear();
+    mLineSegmentCounts.clear();
+}
+
+void LLHUDNameTag::setLineColor(S32 line_index, const LLColor4& color)
+{
+    if (line_index < 0 || line_index >= (S32)mLineSegmentCounts.size())
+    {
+        return;
+    }
+    S32 first = 0;
+    for (S32 i = 0; i < line_index; ++i)
+    {
+        first += mLineSegmentCounts[i];
+    }
+    const S32 count = llmin(mLineSegmentCounts[line_index], (S32)mTextSegments.size() - first);
+    for (S32 i = 0; i < count; ++i)
+    {
+        mTextSegments[first + i].mColor = color;
+    }
 }
 
 
@@ -421,6 +441,9 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
                         const bool use_ellipses,
                         F32 max_pixels)
 {
+    // Recorded whether or not this line produces anything, so the line
+    // numbering a caller sees matches the order it added them in.
+    const S32 segments_before = (S32)mTextSegments.size();
     if (!text_utf8.empty())
     {
         // Wrapping shapes the text to find where it breaks, and every segment
@@ -491,6 +514,7 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
             ++iter;
         }
     }
+    mLineSegmentCounts.push_back((S32)mTextSegments.size() - segments_before);
 }
 
 void LLHUDNameTag::setLabel(const std::string &label_utf8)

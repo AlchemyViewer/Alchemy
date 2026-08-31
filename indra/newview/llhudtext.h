@@ -131,13 +131,14 @@ public:
     friend class LLHUDObject;
     /*virtual*/ F32 getDistance() const { return mLastDistance; }
     bool getVisible() { return mVisible; }
+    bool getHidden() const { return mHidden; }
+    void setHidden( bool hide ) { mHidden = hide; }
+    void setOnHUDAttachment(bool on_hud) { mOnHUDAttachment = on_hud; }
 
     // Drop what every line of this text has shaped, keeping the lines. Called
     // when it leaves the screen, so only what is on it holds geometry.
     void releaseTextGeometry();
-    bool getHidden() const { return mHidden; }
-    void setHidden( bool hide ) { mHidden = hide; }
-    void setOnHUDAttachment(bool on_hud) { mOnHUDAttachment = on_hud; }
+
     void shift(const LLVector3& offset);
 
     static void shiftAll(const LLVector3& offset);

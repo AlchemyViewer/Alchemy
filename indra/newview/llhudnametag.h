@@ -106,6 +106,15 @@ public:
     static const F32 HUD_TEXT_MAX_WIDTH; // 190px
 
 public:
+    // How many lines have been added since the text was last cleared, and a
+    // way to recolour one of them without disturbing what it has shaped. A
+    // line that wraps becomes several segments, so a caller that added it has
+    // no other way to find them again. Chat bubbles fade continuously while
+    // their text stands still, and rebuilding for a colour reshaped every
+    // line of every chatting avatar on screen, every frame.
+    S32 getNumLines() const { return (S32)mLineSegmentCounts.size(); }
+    void setLineColor(S32 line_index, const LLColor4& color);
+
     // Set entire string, eliminating existing lines
     void setString(const std::string& text_utf8);
 
@@ -146,12 +155,13 @@ public:
     /*virtual*/ F32 getDistance() const { return mLastDistance; }
     S32  getLOD() const { return mLOD; }
     bool getVisible() const { return mVisible; }
+    bool getHidden() const { return mHidden; }
+    void setHidden( bool hide ) { mHidden = hide; }
 
     // Drop what every line of this tag has shaped, keeping the lines. Called
     // when the tag leaves the screen, so only what is on it holds geometry.
     void releaseTextGeometry();
-    bool getHidden() const { return mHidden; }
-    void setHidden( bool hide ) { mHidden = hide; }
+
     void shift(const LLVector3& offset);
     F32 getWorldHeight() const;
 
@@ -205,6 +215,9 @@ private:
     F32             mRadius;
     std::vector<LLHUDTextSegment> mTextSegments;
     std::vector<LLHUDTextSegment> mLabelSegments;
+    // Segments produced by each addLine, in call order. One line wraps into
+    // as many as it needs, and this is what maps a line back to them.
+    std::vector<S32>              mLineSegmentCounts;
 //  LLFrameTimer    mResizeTimer;
     ETextAlignment  mTextAlignment;
     EVertAlignment  mVertAlignment;
