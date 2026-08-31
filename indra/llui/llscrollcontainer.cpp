@@ -187,6 +187,7 @@ void LLScrollContainer::scrollVertical( S32 new_pos )
 void LLScrollContainer::reshape(S32 width, S32 height,
                                         bool called_from_parent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     LLUICtrl::reshape( width, height, called_from_parent );
 
     mInnerRect = getLocalRect();
@@ -593,6 +594,10 @@ bool LLScrollContainer::addChild(LLView* view, S32 tab_group)
 
 void LLScrollContainer::updateScroll()
 {
+    // Reached several times over in one layout: from this container's reshape,
+    // from every getContentWindowRect a scrolled view asks for, and again from
+    // draw. It had no zone, so all of that was charged to whatever contained it.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     if (!getVisible() || !mScrolledView)
     {
         return;
@@ -727,6 +732,7 @@ LLRect LLScrollContainer::getVisibleContentRect()
 
 LLRect LLScrollContainer::getContentWindowRect()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     updateScroll();
     LLRect scroller_view_rect;
     S32 visible_width = 0;

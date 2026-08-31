@@ -366,6 +366,10 @@ void LLFolderView::filter( LLFolderViewFilter& filter )
 void LLFolderView::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    // Named, because a floater can hold several of these and show one -- the
+    // inventory keeps four in a tab container -- and a capture that says only
+    // how many reshapes happened cannot say how many were for nobody.
+    LL_PROFILE_ZONE_TEXT(getName().c_str(), getName().length());
 
     LLRect scroll_rect;
     if (mScrollContainer)

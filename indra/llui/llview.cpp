@@ -251,6 +251,7 @@ void LLView::setRect(const LLRect& rect)
 }
 
 S32 LLView::sTransparencyViewsWalked = 0;
+S32 LLView::sReshapeCount = 0;
 S32 LLView::sReshapeDepth = 0;
 
 void LLView::applyTransparencyType(U8 transparency_type)
@@ -1488,6 +1489,8 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
 
     if (delta_width || delta_height || sForceReshape)
     {
+        ++sReshapeCount;
+
         // adjust our rectangle
         mRect.mRight = getRect().mLeft + width;
         mRect.mTop = getRect().mBottom + height;

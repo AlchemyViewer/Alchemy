@@ -311,6 +311,12 @@ public:
     // one.
     void            applyTransparencyType(U8 transparency_type);
 
+    // Every view LLView::reshape has entered since a caller last zeroed it, so
+    // a layout pass can report how much of the tree it moved. Counts only what
+    // reached this class: a subclass that answers a reshape itself, as a folder
+    // view item does for anything out of sight, is not seen here.
+    static S32      sReshapeCount;
+
     // How deep in a reshape the current call is. Non-zero means a cascade is
     // running and the region it dirties is being accounted for at the top of
     // it; see updateBoundingRect.
