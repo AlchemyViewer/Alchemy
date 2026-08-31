@@ -230,9 +230,13 @@ public:
     static U64 regenCount() { return sRegenCount; }
 private:
 
-    // Everything derived from the text, thrown away without forgetting which
-    // text it was for. reset() is this plus forgetting the name, which is what
-    // an outside caller wants and what naming the source does not.
+    // Everything held here is derived from the font and the state it
+    // rasterizes at, so a change to that kills all of it -- the measured
+    // widths and the captured geometry alike. Both halves ask that question
+    // and the answer records itself, so whichever asks first is the only one
+    // told: each has to throw away the other's work as well, or the second
+    // goes on answering from glyphs that have moved in the atlas underneath
+    // it.
     void dropDerived();
 
     // The cache check is the same whichever unit the caller measures in;
@@ -240,6 +244,22 @@ private:
     template <typename MEASURE>
     F32 cachedWidth(const LLFontGL* fontp, S32 begin_offset, S32 max_bytes,
                     bool no_padding, MEASURE&& measure);
+
+    // Which input stopped a draw from being a replay. Each gets its own zone
+    // at the call, because a capture that says a thousand rebuilds happened
+    // does not say whether the text moved, the window scaled or a colour
+    // faded -- and those are three different fixes.
+    enum class RegenReason
+    {
+        None,
+        NoCapture,
+        FontState,
+        Position,
+        Span,
+        Style,
+        ShadowGate,
+        Color
+    };
 
     struct WidthSlot
     {

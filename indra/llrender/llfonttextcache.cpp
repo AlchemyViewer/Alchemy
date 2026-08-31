@@ -247,37 +247,6 @@ S32 LLFontTextCache::renderImpl(
     // glyph and bump the font's cache generation mid-draw, and the value worth
     // recording is the one the captured geometry was built against.
     const bool env_moved = environmentMoved(fontp);
-    if (env_moved)
-    {
-        // The widths came off the same glyphs, and this call has just consumed
-        // the notice that they moved. They go now, or the next measurement is
-        // answered from a slot filled before the atlas grew under it. What
-        // follows rebuilds the geometry regardless, so nothing dropped here is
-        // wanted again.
-        dropDerived();
-    }
-
-    // Geometry-invalidating params: any change forces full genBuffers.
-    const bool geometry_invalid =
-            env_moved
-         || mLastX != x
-         || mLastY != y
-         || mLastHalign != halign
-         || mLastValign != valign
-         || mLastOffset != begin_offset
-         || mLastMaxBytes != max_bytes
-         || mLastMaxPixels != max_pixels
-         || mLastStyle != style
-         || mLastShadow != shadow // shadow-type change also alters dark-text gate threshold
-         // Both reach genBuffers and change what it emits -- ellipses replace
-         // the tail of an overflowing string, and use_color decides whether the
-         // caller's colour reaches the vertices at all. Neither was compared,
-         // so a caller flipping one without reset() replayed the old geometry.
-         || mLastUseEllipses != use_ellipses
-         || mLastUseColor != use_color;
-    // Where the UI origin sits is deliberately absent. It moves the text
-    // without changing a glyph, and the geometry is built relative to it, so
-    // a scroll or a floater drag replays rather than rebuilds.
 
     // Crossing the dark-text gate (luminance 0.35) toggles whether shadow
     // geometry was emitted at all, which is geometry-affecting. Detect with a
@@ -287,15 +256,45 @@ S32 LLFontTextCache::renderImpl(
         && ((derive_shadow_alpha(color, shadow) == 0) !=
             (derive_shadow_alpha(mLastColor, mLastShadow) == 0));
 
+    // What stopped this from being a replay, asked in one place so the answer
+    // can be named. Where the UI origin sits is deliberately absent from all
+    // of it: it moves the text without changing a glyph, and the geometry is
+    // built relative to it, so a scroll or a floater drag replays.
+    RegenReason reason = RegenReason::None;
     if (!mHasCapture)
     {
-        genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
-            style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color);
+        // Nothing captured yet, or something threw the capture away -- a new
+        // text through setSource, a widget hiding, an explicit reset.
+        reason = RegenReason::NoCapture;
     }
-    else if (geometry_invalid || gate_crossed)
+    else if (env_moved)
     {
-        genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
-            style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color);
+        reason = RegenReason::FontState;
+    }
+    else if (mLastX != x || mLastY != y)
+    {
+        reason = RegenReason::Position;
+    }
+    else if (mLastOffset != begin_offset || mLastMaxBytes != max_bytes || mLastMaxPixels != max_pixels)
+    {
+        reason = RegenReason::Span;
+    }
+    else if (mLastHalign != halign
+          || mLastValign != valign
+          || mLastStyle != style
+          || mLastShadow != shadow // shadow-type change also alters dark-text gate threshold
+          // Both reach genBuffers and change what it emits -- ellipses replace
+          // the tail of an overflowing string, and use_color decides whether the
+          // caller's colour reaches the vertices at all. Neither was compared,
+          // so a caller flipping one without reset() replayed the old geometry.
+          || mLastUseEllipses != use_ellipses
+          || mLastUseColor != use_color)
+    {
+        reason = RegenReason::Style;
+    }
+    else if (gate_crossed)
+    {
+        reason = RegenReason::ShadowGate;
     }
     else if (mLastColor != color)
     {
@@ -314,17 +313,45 @@ S32 LLFontTextCache::renderImpl(
             }
             return mChars;
         }
+        reason = RegenReason::Color;
+    }
+
+    if (env_moved)
+    {
+        // Read after the reason above, so a first draw still reports itself as
+        // one. The widths came off the same glyphs and this call has just
+        // consumed the notice that they moved, so they go now -- otherwise the
+        // next measurement is answered from a slot filled before the atlas
+        // grew under it. Whichever reason was reached leads to a rebuild, so
+        // nothing here can turn a draw into a replay of what it just dropped.
+        dropDerived();
+    }
+
+    auto regen = [&]()
+    {
         genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
             style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color);
-    }
-    else
-    {
-        renderBuffers();
+    };
 
+    // One zone per reason. Tracy groups by zone name, so a reason carried as
+    // zone text would have to be read one instance at a time; named, the
+    // breakdown is the statistics view.
+    switch (reason)
+    {
+    case RegenReason::None:
+        renderBuffers();
         if (right_x)
         {
             *right_x = mLastRightX;
         }
+        break;
+    case RegenReason::NoCapture:  { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: no capture");  regen(); break; }
+    case RegenReason::FontState:  { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: font state");  regen(); break; }
+    case RegenReason::Position:   { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: position");    regen(); break; }
+    case RegenReason::Span:       { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: span");        regen(); break; }
+    case RegenReason::Style:      { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: style");       regen(); break; }
+    case RegenReason::ShadowGate: { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: shadow gate"); regen(); break; }
+    case RegenReason::Color:      { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: colour");      regen(); break; }
     }
     return mChars;
 }
