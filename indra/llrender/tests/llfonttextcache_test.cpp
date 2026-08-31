@@ -380,6 +380,50 @@ namespace tut
         ensure("one character in is narrower than two", w1 < w4);
     }
 
+    // The guard that says a cache is being asked about the text it was named
+    // for. It reads a bounded sample rather than the whole string, because a
+    // text widget names its entire document here and then asks about spans of
+    // it -- hashing all of what it is handed made every width a reflow asked
+    // for cost the length of the document, in every build that keeps asserts.
+    // The strings it exists to separate are still separated: a field's bullets
+    // are a different length from the text behind them, and two labels differ
+    // at one end or the other. Two long strings differing only in the middle
+    // read as the same text, deliberately, and this is the whole of what that
+    // bound gives up.
+    template<> template<>
+    void llfonttextcache_object::test<13>()
+    {
+        ALFontCacheKey key;
+        ensure("the first text asked about is the one recorded",
+               key.sameTextAsRecorded("Inventory"));
+        ensure("and reads as the same text when asked again",
+               key.sameTextAsRecorded("Inventory"));
+
+        // What a password field does: one bullet per character, three bytes
+        // apiece, over text that is one byte per character.
+        ensure("a substituted string is not the text behind it",
+               !key.sameTextAsRecorded("\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2"));
+
+        // Same length, differing at the front and at the back -- the second is
+        // what a sample taken only from the front would miss.
+        ALFontCacheKey front;
+        ensure("records", front.sameTextAsRecorded("Received Items"));
+        ensure("a different string of the same length is caught",
+               !front.sameTextAsRecorded("Xeceived Items"));
+
+        ALFontCacheKey back;
+        const std::string common(64, 'a');
+        ensure("records", back.sameTextAsRecorded(common + "tail"));
+        ensure("a difference past the sampled front is caught",
+               !back.sameTextAsRecorded(common + "tai1"));
+
+        // Naming a new source is what clears the recorded text, so the next
+        // string asked about becomes the one this is holding.
+        key.forgetSource();
+        ensure("a forgotten source records whatever is asked next",
+               key.sameTextAsRecorded("\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2"));
+    }
+
     // ===================================================================
     // Render-path tests — exercise LLFontTextCache::render() through
     // a real compiled gUIProgram. The fixture ctor binds the stub UI

@@ -93,22 +93,47 @@ public:
     // slots are keyed on the span and not on the bytes, so a caller that shows
     // this cache a second string is handed the first one's answer for that
     // span -- a password field's bullets and the text behind them are the
-    // shape of the mistake. Hashed rather than kept as a view: the text may
-    // have moved between calls, and a stale view could not be compared safely.
-    // Debug only; llassert compiles the call away with it.
+    // shape of the mistake. Fingerprinted rather than kept as a view: the text
+    // may have moved between calls, and a stale view could not be compared
+    // safely. Debug only; llassert compiles the call away with it.
     bool sameTextAsRecorded(std::string_view text)
     {
-        const size_t hash = std::hash<std::string_view>{}(text);
+        const size_t print = fingerprint(text);
         if (!mTextHashed)
         {
-            mTextHash = hash;
+            mTextHash = print;
             mTextHashed = true;
             return true;
         }
-        return hash == mTextHash;
+        return print == mTextHash;
     }
 
 private:
+    // The length and both ends, never the middle. A text widget names its
+    // whole document here and then asks about spans of it, so hashing all of
+    // what it is handed costs the length of the document per query -- on the
+    // path of every width a reflow asks for, in every build that keeps
+    // asserts. Bounded, it is a constant, and it still separates the strings
+    // this exists to separate: a field's bullets are a different length from
+    // the text behind them, and two labels differ within their first bytes.
+    static size_t fingerprint(std::string_view text)
+    {
+        constexpr size_t SAMPLE = 32;
+        const std::hash<std::string_view> hasher;
+        size_t print = text.size();
+        const auto mix = [&print, &hasher](std::string_view part)
+        {
+            print ^= hasher(part) + 0x9e3779b9U + (print << 6) + (print >> 2);
+        };
+        mix(text.substr(0, SAMPLE));
+        if (text.size() > SAMPLE)
+        {
+            mix(text.substr(text.size() - SAMPLE));
+        }
+        return print;
+    }
+
+
     const void*     mOwner = nullptr;   // never dereferenced, only compared
     U32             mVersion = 0;
     size_t          mTextHash = 0;
