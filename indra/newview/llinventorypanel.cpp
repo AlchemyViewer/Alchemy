@@ -259,6 +259,14 @@ void LLInventoryPanel::initFromParams(const LLInventoryPanel::Params& params)
     // save off copy of params
     mParams = params;
 
+    // Merge the type defaults into the item and folder templates now, once.
+    // Every view this panel builds is a copy of one of these with a handful of
+    // fields changed, and the factory would otherwise re-derive the same merge
+    // for each -- an inventory builds a view per item it holds, which reaches
+    // six figures.
+    mParams.item.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewItem>());
+    mParams.folder.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewFolder>());
+
     initFolderRoot();
 
     // Initialize base class params.
@@ -1086,7 +1094,7 @@ LLFolderViewFolder * LLInventoryPanel::createFolderViewFolder(LLInvFVBridge * br
     params.font_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultColor);
     params.font_highlight_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultHighlightColor);
 
-    return LLUICtrlFactory::create<LLFolderViewFolder>(params);
+    return LLUICtrlFactory::createFromTemplate<LLFolderViewFolder>(params);
 }
 
 LLFolderViewItem * LLInventoryPanel::createFolderViewItem(LLInvFVBridge * bridge)
@@ -1114,7 +1122,7 @@ LLFolderViewItem * LLInventoryPanel::createFolderViewItem(LLInvFVBridge * bridge
     params.font_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultColor);
     params.font_highlight_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultHighlightColor);
 
-    return LLUICtrlFactory::create<LLFolderViewItem>(params);
+    return LLUICtrlFactory::createFromTemplate<LLFolderViewItem>(params);
 }
 
 LLFolderViewItem* LLInventoryPanel::buildNewViews(const LLUUID& id)

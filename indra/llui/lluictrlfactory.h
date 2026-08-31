@@ -131,11 +131,24 @@ public:
     void pushFileName(const std::string& name);
     void popFileName();
 
+    // For a caller building many widgets from one template: merge the defaults
+    // into the template once and come here, rather than have create() derive
+    // the same merge for every widget. The block must already carry them.
+    template<typename T>
+    static T* createFromTemplate(const typename T::Params& params, LLView* parent = NULL)
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+        T* widget = createWidgetImpl<T>(params, parent);
+        if (widget)
+        {
+            widget->postBuild();
+        }
+        return widget;
+    }
+
     template<typename T>
     static T* create(typename T::Params& params, LLView* parent = NULL)
     {
-        // createWidgetImpl() below carries its own zone, so this one's self
-        // time is the fillFrom merge over the block's parameter table.
         LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
         params.fillFrom(instance().mParamDefaultsMap.obtain<
                         ParamDefaults<typename T::Params, 0> >().get());
@@ -214,11 +227,24 @@ private:
         LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
         T* widget = NULL;
 
-        if (!params.validateBlock())
+#if !LL_RELEASE_FOR_DOWNLOAD
         {
-            LL_WARNS() << getInstance()->getCurFileName() << ": Invalid parameter block for " << typeid(T).name() << LL_ENDL;
-            //return NULL;
+            // Says whether a widget's parameters make sense, and then does
+            // nothing with the answer but write a line -- note the return
+            // below it, commented out long ago. It is a check on XUI, which is
+            // fixed by the time anyone ships, so it runs where a XUI author
+            // can still act on it.
+            //
+            // It is not free: setting any parameter clears the block's
+            // validated flag, so every widget built walks its whole chain of
+            // validators, bases included, to reach that warning.
+            if (!params.validateBlock())
+            {
+                LL_WARNS() << getInstance()->getCurFileName() << ": Invalid parameter block for " << typeid(T).name() << LL_ENDL;
+                //return NULL;
+            }
         }
+#endif
 
         widget = new T(params);
 
