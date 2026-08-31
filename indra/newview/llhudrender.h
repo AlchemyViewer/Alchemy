@@ -57,13 +57,20 @@ public:
     // so a caller with one line need not ask.
     bool visible() const { return mVisible; }
 
+    // `cache` holds the shaped glyphs for this line between frames. The
+    // position it is drawn at is split below into a matrix translate and a
+    // sub-pixel remainder, and only the remainder reaches the font -- so a
+    // line whose projected position has not moved within a pixel replays what
+    // it built last time, and one that has moved rebuilds exactly as it did
+    // before. Pass nothing to shape it every time.
     void draw(std::string_view utf8text,
               const LLFontGL& font,
               const U8 style,
               const LLFontGL::ShadowType shadow,
               const F32 x_offset,
               const F32 y_offset,
-              const LLColor4& color);
+              const LLColor4& color,
+              LLFontTextCache* cache = nullptr);
 
 private:
     LLVector3 mPosAgent;

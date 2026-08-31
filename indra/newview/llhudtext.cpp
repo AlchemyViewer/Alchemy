@@ -225,7 +225,7 @@ void LLHUDText::renderText()
             text_color = segment_iter->mColor;
             text_color.mV[VALPHA] *= alpha_factor;
 
-            scope.draw(segment_iter->getText(), *fontp, style, shadow, x_offset, y_offset, text_color);
+            segment_iter->draw(scope, *fontp, style, shadow, x_offset, y_offset, text_color);
         }
     }
     /// Reset the default color to white.  The renderer expects this to be the default.
@@ -557,10 +557,18 @@ void LLHUDText::updateAll()
         // the draw-distance limit and the radius the last draw left behind --
         // while measuring walks every segment of every object text in the
         // scene, most of which is behind the camera or past the limit.
+        const bool was_visible = textp->getVisible();
         textp->updateVisibility();
         if (textp->getVisible())
         {
             textp->updateSize();
+        }
+        else if (was_visible)
+        {
+            // Going out of sight is worth the shaped glyphs; staying out of
+            // sight is not worth asking again, which is why this reads the
+            // change rather than the state.
+            textp->releaseTextGeometry();
         }
     }
 
@@ -655,6 +663,25 @@ F32 LLHUDText::LLHUDTextSegment::getWidth(const LLFontGL* font)
 {
     mFontCache.setSource(this, 0);
     return mFontCache.getWidthBytes(font, mText, 0, S32_MAX, false);
+}
+
+void LLHUDText::releaseTextGeometry()
+{
+    for (const LLHUDTextSegment& segment : mTextSegments)
+    {
+        segment.releaseGeometry();
+    }
+}
+
+void LLHUDText::LLHUDTextSegment::draw(LLHUDTextScope& scope, const LLFontGL& font, U8 style,
+                                       LLFontGL::ShadowType shadow, F32 x_offset, F32 y_offset,
+                                       const LLColor4& color) const
+{
+    // Named the same way the measurement names it, and about the same text.
+    // A segment holds one string for as long as it exists, so the version
+    // never moves; segments are replaced rather than edited.
+    mFontCache.setSource(this, 0);
+    scope.draw(mText, font, style, shadow, x_offset, y_offset, color, &mFontCache);
 }
 
 // [RLVa:KB] - Checked: RLVa-2.0.3

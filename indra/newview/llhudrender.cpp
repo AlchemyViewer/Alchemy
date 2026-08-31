@@ -100,7 +100,8 @@ void LLHUDTextScope::draw(std::string_view utf8text,
                           const U8 style,
                           const LLFontGL::ShadowType shadow,
                           const F32 x_offset, const F32 y_offset,
-                          const LLColor4& color)
+                          const LLColor4& color,
+                          LLFontTextCache* cache)
 {
     if (!mVisible || utf8text.empty())
     {
@@ -139,9 +140,19 @@ void LLHUDTextScope::draw(std::string_view utf8text,
     LLUI::translate(int_x, int_y, hud_text_z);
 
     F32 right_x;
-    font.renderBytes(utf8text, 0, frac_x, 1.f + frac_y, color, LLFontGL::LEFT, LLFontGL::BASELINE,
-                     style, shadow, static_cast<S32>(utf8text.length()), 1000, &right_x,
-                     /*use_ellipses*/false, /*use_color*/true);
+    if (cache)
+    {
+        cache->renderBytes(&font, utf8text, 0, frac_x, 1.f + frac_y, color,
+                           LLFontGL::LEFT, LLFontGL::BASELINE,
+                           style, shadow, static_cast<S32>(utf8text.length()), 1000, &right_x,
+                           /*use_ellipses*/false, /*use_color*/true);
+    }
+    else
+    {
+        font.renderBytes(utf8text, 0, frac_x, 1.f + frac_y, color, LLFontGL::LEFT, LLFontGL::BASELINE,
+                         style, shadow, static_cast<S32>(utf8text.length()), 1000, &right_x,
+                         /*use_ellipses*/false, /*use_color*/true);
+    }
 }
 
 void hud_render_text(std::string_view utf8text, const LLVector3 &pos_agent,

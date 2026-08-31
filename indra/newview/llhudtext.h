@@ -42,6 +42,7 @@
 // Renders a 2D text billboard floating at the location specified.
 class LLDrawable;
 class LLHUDText;
+class LLHUDTextScope;
 
 struct lltextobject_further_away
 {
@@ -63,17 +64,27 @@ protected:
         F32 getWidth(const LLFontGL* font);
         const std::string& getText() const { return mText; }
 
+        // Draws this line through the scope, from the same cache the width
+        // came out of -- one piece of text, one place its work is kept.
+        void draw(LLHUDTextScope& scope, const LLFontGL& font, U8 style,
+                  LLFontGL::ShadowType shadow, F32 x_offset, F32 y_offset,
+                  const LLColor4& color) const;
+
+        // Let go of the shaped glyphs, keeping the segment. For text that has
+        // gone off screen and may come back.
+        void releaseGeometry() const { mFontCache.reset(); }
+
         LLColor4                mColor;
         LLFontGL::StyleFlags    mStyle;
         const LLFontGL*         mFont;
     private:
         std::string             mText;
 
-        // The width of this segment's text, kept between frames. A segment is
-        // measured once per frame per font to place it, and its text never
-        // changes -- segments are rebuilt wholesale, not edited. The cache
-        // notices a font or scale change for itself, which is what the manual
-        // sweep on reshape used to be for.
+        // What this segment's text costs to measure and to draw, kept between
+        // frames. A segment is measured once per frame per font to place it
+        // and then drawn, and its text never changes -- segments are rebuilt
+        // wholesale, not edited. The cache notices a font or scale change for
+        // itself, which is what the manual sweep on reshape used to be for.
         mutable LLFontTextCache mFontCache;
     };
 
@@ -120,6 +131,10 @@ public:
     friend class LLHUDObject;
     /*virtual*/ F32 getDistance() const { return mLastDistance; }
     bool getVisible() { return mVisible; }
+
+    // Drop what every line of this text has shaped, keeping the lines. Called
+    // when it leaves the screen, so only what is on it holds geometry.
+    void releaseTextGeometry();
     bool getHidden() const { return mHidden; }
     void setHidden( bool hide ) { mHidden = hide; }
     void setOnHUDAttachment(bool on_hud) { mOnHUDAttachment = on_hud; }
