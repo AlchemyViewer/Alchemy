@@ -26,6 +26,8 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include <fmt/format.h>
+
 #include "llpaneltopinfobar.h"
 
 #include "llagent.h"
@@ -38,7 +40,6 @@
 #include "llnotificationsutil.h"
 #include "llparcel.h"
 #include "llslurl.h"
-#include "llstatusbar.h"
 #include "lltrans.h"
 #include "llviewercontrol.h"
 #include "llviewerinventory.h"
@@ -59,7 +60,10 @@ private:
     {
         if (mTopInfoBar)
         {
-            mTopInfoBar->updateParcelIcons();
+            // The whole readout, not just the icons. The parcel's name is half
+            // of what the location text says, and a rename used to reach it
+            // only because the text was rebuilt on every frame anyway.
+            mTopInfoBar->update();
         }
     }
 
@@ -93,6 +97,9 @@ LLPanelTopInfoBar::~LLPanelTopInfoBar()
     {
         mShowCoordsCtrlConnection.disconnect();
     }
+
+    mRegionInfoConnection.disconnect();
+    mHealthConnection.disconnect();
 }
 
 void LLPanelTopInfoBar::initParcelIcons()
@@ -174,6 +181,15 @@ bool LLPanelTopInfoBar::postBuild()
     mParcelMgrConnection = gAgent.addParcelChangedCallback(
             boost::bind(&LLPanelTopInfoBar::onAgentParcelChange, this));
 
+    // An estate manager changing the region's maturity rating, or renaming it,
+    // arrives on a handshake and moves neither the parcel nor the region we
+    // are standing in -- so no other callback here sees it.
+    mRegionInfoConnection = LLViewerRegion::setRegionInfoChangedCallback(
+        boost::bind(&LLPanelTopInfoBar::onRegionInfoChanged, this, _1));
+
+    mHealthConnection = gAgent.addHealthChangedCallback(
+        boost::bind(&LLPanelTopInfoBar::setHealth, this, _1));
+
     setVisibleCallback(boost::bind(&LLPanelTopInfoBar::onVisibilityChanged, this, _2));
 
     return true;
@@ -181,12 +197,7 @@ bool LLPanelTopInfoBar::postBuild()
 
 void LLPanelTopInfoBar::onNavBarShowParcelPropertiesCtrlChanged()
 {
-    std::string new_text;
-
-    // don't need to have separate show_coords variable; if user requested the coords to be shown
-    // they will be added during the next call to the draw() method.
-    buildLocationString(new_text, false);
-    setParcelInfoText(new_text);
+    refreshParcelInfoText();
 }
 
 // when panel is shown, all minimized floaters should be shifted downwards to prevent overlapping of
@@ -217,26 +228,62 @@ boost::signals2::connection LLPanelTopInfoBar::setResizeCallback( const resize_s
 
 void LLPanelTopInfoBar::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     updateParcelInfoText();
-    updateHealth();
 
     LLPanel::draw();
 }
 
-void LLPanelTopInfoBar::buildLocationString(std::string& loc_str, bool show_coords)
+void LLPanelTopInfoBar::refreshParcelInfoText()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    // Recorded whether or not the text turns out to have moved: draw() reads
+    // this to decide whether to come back here, and a caller that rebuilt
+    // without recording would put the readout straight back onto the
+    // per-frame path.
+    LLAgentUI::getDisplayPos(mDisplayPosX, mDisplayPosY, mDisplayPosZ);
+
+    static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
     LLAgentUI::ELocationFormat format =
         (show_coords ? LLAgentUI::LOCATION_FORMAT_FULL : LLAgentUI::LOCATION_FORMAT_NO_COORDS);
 
-    if (!LLAgentUI::buildLocationString(loc_str, format))
+    if (!LLAgentUI::buildLocationString(mLocationScratch, format))
     {
-        loc_str = "???";
+        // Between a region crossing and the parcel properties that follow it
+        // there is no parcel to name. Keep the last good string rather than
+        // flashing a placeholder at every crossing: a refresh follows when the
+        // parcel arrives, and the placeholder is only right before the first
+        // one ever does.
+        if (!mParcelInfoText->getText().empty())
+        {
+            return;
+        }
+        mLocationScratch = "???";
     }
+
+    // The mean of any span of this plot is the fraction of rebuilds that were
+    // worth making -- the number the gate in draw() is sized against. The text
+    // box is asked rather than a copy of it being kept: it hands back a
+    // reference to what it is already holding.
+    LL_PROFILE_PLOT("topinfo location changed",
+                    (int64_t)(mLocationScratch != mParcelInfoText->getText()));
+
+    // Second gate, because the rounding buckets are 2 m at a walk and 4 m in
+    // flight: the integers draw() compared can move without the text moving.
+    if (mLocationScratch == mParcelInfoText->getText())
+    {
+        return;
+    }
+
+    setParcelInfoText(mLocationScratch);
 }
 
 void LLPanelTopInfoBar::setParcelInfoText(const std::string& new_text)
 {
-    LLRect old_rect = getRect();
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     const LLFontGL* font = mParcelInfoText->getFont();
     S32 new_text_width = font->getWidth(new_text);
 
@@ -247,41 +294,58 @@ void LLPanelTopInfoBar::setParcelInfoText(const std::string& new_text)
 
     mParcelInfoText->reshape(rect.getWidth(), rect.getHeight(), true);
     mParcelInfoText->setRect(rect);
-    layoutParcelIcons();
 
-    if (old_rect != getRect())
-    {
-        mResizeSignal();
-    }
+    // Nothing above this line touches the panel's own rect -- only the text
+    // box's, which is a child. layoutParcelIcons is where the panel is
+    // resized, and it is the one place that announces it. Comparing the rect
+    // here as well meant one text change fired the resize signal twice, and
+    // the listener on it ends in a full reshape of the chiclet bar.
+    layoutParcelIcons();
 }
 
 void LLPanelTopInfoBar::update()
 {
-    std::string new_text;
-
-    // don't need to have separate show_coords variable; if user requested the coords to be shown
-    // they will be added during the next call to the draw() method.
-    buildLocationString(new_text, false);
-    setParcelInfoText(new_text);
+    refreshParcelInfoText();
 
     updateParcelIcons();
+
+    // Health has a signal now, but nothing replays the last value to a panel
+    // that was not listening when it arrived. This is the sync for that.
+    setHealth(gAgent.getHealth());
 }
 
 void LLPanelTopInfoBar::updateParcelInfoText()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
-
-    if (show_coords)
+    if (!show_coords)
     {
-        std::string new_text;
-
-        buildLocationString(new_text, show_coords);
-        setParcelInfoText(new_text);
+        // Without coordinates in it the readout has no time-varying input at
+        // all: every other thing it names arrives on a callback.
+        return;
     }
+
+    // The one input to this readout with no callback behind it is the agent's
+    // own position, and the readout prints it rounded -- to 2 m at a walk, 4 m
+    // in flight. Three integers answer whether the text can have moved.
+    // Building the text to find out costs a format, five allocations, a
+    // shaping pass and a segment rebuild of the text box, and for all but a
+    // couple of frames a second the answer is no.
+    S32 pos_x, pos_y, pos_z;
+    LLAgentUI::getDisplayPos(pos_x, pos_y, pos_z);
+    if (pos_x == mDisplayPosX && pos_y == mDisplayPosY && pos_z == mDisplayPosZ)
+    {
+        return;
+    }
+
+    refreshParcelInfoText();
 }
 
 void LLPanelTopInfoBar::updateParcelIcons()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
 
     LLViewerRegion* agent_region = gAgent.getRegion();
@@ -341,26 +405,32 @@ void LLPanelTopInfoBar::updateParcelIcons()
     }
 }
 
-void LLPanelTopInfoBar::updateHealth()
+void LLPanelTopInfoBar::setHealth(S32 health)
 {
-    static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
-
-    // *FIXME: Status bar owns health information, should be in agent
-    if (show_icons && gStatusBar)
+    if (health == mLastHealth)
     {
-        static S32 last_health = -1;
-        S32 health = gStatusBar->getHealth();
-        if (health != last_health)
-        {
-            std::string text = llformat("%d%%", health);
-            mDamageText->setText(text);
-            last_health = health;
-        }
+        return;
     }
+    mLastHealth = health;
+    mDamageText->setText(fmt::format("{}%", health));
+}
+
+void LLPanelTopInfoBar::onRegionInfoChanged(LLViewerRegion* regionp)
+{
+    // Fires for every region that hands us a handshake, including neighbours
+    // coming into view. Only the one being displayed matters.
+    if (regionp != gAgent.getRegion())
+    {
+        return;
+    }
+
+    refreshParcelInfoText();
 }
 
 void LLPanelTopInfoBar::layoutParcelIcons()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     LLRect old_rect = getRect();
 
     // TODO: remove hard-coded values and read them as xml parameters

@@ -46,9 +46,18 @@ public:
 
     static void buildSLURL(LLSLURL& slurl, const bool escaped = true);
     //build location string using the current position of gAgent.
-    static bool buildLocationString(std::string& str, ELocationFormat fmt = LOCATION_FORMAT_LANDMARK);
+    static bool buildLocationString(std::string& str, ELocationFormat format = LOCATION_FORMAT_LANDMARK);
     //build location string using a region position of the avatar.
-    static bool buildLocationString(std::string& str, ELocationFormat fmt,const LLVector3& agent_pos_region);
+    static bool buildLocationString(std::string& str, ELocationFormat format,const LLVector3& agent_pos_region);
+
+    // The agent's position as the location readouts print it: whole metres,
+    // and snapped to 2 or 4 of them as the agent speeds up. A readout can ask
+    // for this and compare it against what it last drew to find out whether
+    // its text could have moved, which costs three integers -- where building
+    // the text to find out costs a format, several allocations and a shaping
+    // pass. The rounding lives here so the two can never disagree.
+    static void getDisplayPos(S32& pos_x, S32& pos_y, S32& pos_z);
+    static void getDisplayPos(const LLVector3& agent_pos_region, S32& pos_x, S32& pos_y, S32& pos_z);
     /**
      * @brief Check whether  the agent is in neighborhood of the pole  Within same region
      * @return true if the agent is in neighborhood.

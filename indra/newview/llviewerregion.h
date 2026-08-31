@@ -211,7 +211,7 @@ public:
 
     void setSimAccess(U8 sim_access)            { mSimAccess = sim_access; }
     U8 getSimAccess() const                     { return mSimAccess; }
-    const std::string getSimAccessString() const;
+    const std::string& getSimAccessString() const;
 
     // Homestead-related getters; there are no setters as nobody should be
     // setting them other than the individual message handler which is a member
@@ -290,6 +290,19 @@ public:
     void setCapabilitiesReceived(bool received);
     void setCapabilitiesError();
     boost::signals2::connection setCapabilitiesReceivedCallback(const caps_received_signal_t::slot_type& cb);
+
+    // Fired when a region's own description changes underneath it: its name or
+    // its maturity rating, which arrive on a handshake long after the region
+    // was created and which nothing else announced. An estate manager changing
+    // the rating, or renaming the region, reaches the UI through this and
+    // through nothing else.
+    //
+    // Static, and carrying the region, because what listens to this is
+    // displaying the *agent's* region -- a per-instance signal would have to be
+    // reconnected on every crossing, and the crossing is the case that gets
+    // forgotten. Listeners that care about one region compare the argument.
+    typedef boost::signals2::signal<void(LLViewerRegion*)> region_info_signal_t;
+    static boost::signals2::connection setRegionInfoChangedCallback(const region_info_signal_t::slot_type& cb);
 
     static bool isSpecialCapabilityName(std::string_view name);
     void logActiveCapabilities() const;
@@ -611,6 +624,8 @@ public:
 
     caps_received_signal_t mCapabilitiesReceivedSignal;
     caps_received_signal_t mSimulatorFeaturesReceivedSignal;
+
+    static region_info_signal_t sRegionInfoChangedSignal;
 
     LLSD mSimulatorFeatures;
     U32  mWhisperRange = 10;

@@ -38,6 +38,7 @@
 #include "lleventtimer.h"
 #include "llfile.h"
 #include "llfontgl.h"
+#include "llfonttextcache.h"
 #include "lllivefile.h"
 #include "llviewertexturelist.h"
 #include "llgroupmgr.h"
@@ -1709,6 +1710,18 @@ bool LLAppViewer::doFrame()
     // pauses viewer (ex: macOS doesn't call oneFrame),
     // so stop tracking on exit.
     pauseMainloopTimeout();
+
+    // How much text the UI reshaped this frame rather than replaying. The
+    // whole point of the text caches is that this number stops moving once
+    // the UI settles, and a widget that rewrites its label every frame is
+    // invisible in a capture except as its contribution here.
+    {
+        static U64 sLastRegenCount = 0;
+        const U64 regen = LLFontTextCache::regenCount();
+        LL_PROFILE_PLOT("text cache regens", (int64_t)(regen - sLastRegenCount));
+        sLastRegenCount = regen;
+    }
+
     LL_PROFILER_FRAME_END;
 
     return ! LLApp::isRunning();
@@ -6659,8 +6672,8 @@ void LLAppViewer::setMasterSystemAudioMute(bool mute)
 //virtual
 bool LLAppViewer::getMasterSystemAudioMute()
 {
-    // Cached, because the status bar asks this on every frame it draws to keep
-    // its volume button in step, and looking a setting up by its name hashes
+    // Cached, because this is a menu item's check state, asked on every frame
+    // a menu holding it is open, and looking a setting up by its name hashes
     // the name and walks the map. The control keeps itself current.
     static LLCachedControl<bool> mute_audio(gSavedSettings, "MuteAudio", false);
     return mute_audio;

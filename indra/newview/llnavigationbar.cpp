@@ -350,6 +350,8 @@ void LLNavigationBar::setVisible(bool visible)
 
 void LLNavigationBar::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     if (isBackgroundVisible())
     {
         static LLUIColor color_drop_shadow = LLUIColorTable::instance().getColor("ColorDropShadow");

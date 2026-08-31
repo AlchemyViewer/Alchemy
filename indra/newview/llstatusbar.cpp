@@ -118,7 +118,6 @@ LLStatusBar::LLStatusBar(const LLRect& rect)
     mBalance(0),
     mBalanceClicked(false),
     mObscureBalance(false),
-    mHealth(100),
     mSquareMetersCredit(0),
     mSquareMetersCommitted(0),
     mFilterEdit(NULL),          // Edit for filtering
@@ -191,6 +190,10 @@ bool LLStatusBar::postBuild()
     mBtnVolume = getChild<LLButton>( "volume_btn" );
     mBtnVolume->setClickedCallback( onClickVolume, this );
     mBtnVolume->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterVolume, this));
+    // The per-frame poll that used to write this is gone, so the button starts
+    // out of step with a setting restored from the last session unless it is
+    // shunted into state once here.
+    mBtnVolume->setToggleState(LLAppViewer::instance()->getMasterSystemAudioMute());
 
     mMediaToggle = getChild<LLButton>("media_toggle_btn");
     mMediaToggle->setClickedCallback( &LLStatusBar::onClickMediaToggle, this );
@@ -274,6 +277,8 @@ bool LLStatusBar::postBuild()
 // Per-frame updates of visibility
 void LLStatusBar::refresh()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     // update clock every 10 seconds
     static LLCachedControl<bool> show_clock(gSavedSettings, "ShowStatusBarTime", false);
     static LLCachedControl<bool> show_clock_seconds(gSavedSettings, "ShowStatusBarSeconds", false);
@@ -298,10 +303,6 @@ void LLStatusBar::refresh()
     {
         gMenuBarView->reshape(MENU_RIGHT, gMenuBarView->getRect().getHeight());
     }
-
-    // update the master volume button state
-    bool mute_audio = LLAppViewer::instance()->getMasterSystemAudioMute();
-    mBtnVolume->setToggleState(mute_audio);
 
     // What the media button says is worth asking about several times a second,
     // not several times a frame. Answering it walks every media impl in the
@@ -382,11 +383,11 @@ void LLStatusBar::setBalance(S32 balance)
     }
     else
     {
-        string_args["[AMT]"] = llformat("%s", money_str.c_str());
+        string_args["[AMT]"] = money_str;
     }
     std::string label_str = getString("buycurrencylabel", string_args);
     mBoxBalance->setValue(label_str);
-    mBoxBalance->setToolTipArg(LLStringExplicit("[AMT]"), llformat("%s", money_str.c_str()));
+    mBoxBalance->setToolTipArg(LLStringExplicit("[AMT]"), money_str);
 
     updateBalancePanelPosition();
 
@@ -438,40 +439,11 @@ void LLStatusBar::sendMoneyBalanceRequest()
 }
 
 
-void LLStatusBar::setHealth(S32 health)
-{
-    //LL_INFOS() << "Setting health to: " << buffer << LL_ENDL;
-    if( mHealth > health )
-    {
-        if (mHealth > (health + gSavedSettings.getF32("UISndHealthReductionThreshold")))
-        {
-            if (isAgentAvatarValid())
-            {
-                if (gAgentAvatarp->getSex() == SEX_FEMALE)
-                {
-                    make_ui_sound("UISndHealthReductionF");
-                }
-                else
-                {
-                    make_ui_sound("UISndHealthReductionM");
-                }
-            }
-        }
-    }
-
-    mHealth = health;
-}
-
 S32 LLStatusBar::getBalance() const
 {
     return mBalance;
 }
 
-
-S32 LLStatusBar::getHealth() const
-{
-    return mHealth;
-}
 
 void LLStatusBar::setLandCredit(S32 credit)
 {
@@ -725,7 +697,11 @@ bool can_afford_transaction(S32 cost)
 
 void LLStatusBar::onVolumeChanged(const LLSD& newvalue)
 {
-    refresh();
+    // The setting this rides on is the one the button reports, so the button
+    // is written here rather than read back out of the settings store on every
+    // frame. Both ways the value moves -- the button itself, and a script or
+    // the menu -- end up at this control, so both end up here.
+    mBtnVolume->setToggleState(newvalue.asBoolean());
 }
 
 void LLStatusBar::onVoiceChanged(const LLSD& newvalue)
@@ -735,7 +711,6 @@ void LLStatusBar::onVoiceChanged(const LLSD& newvalue)
         // Second instance starts with "VoiceMute_Off" icon, fix it
         mBtnVolume->setImageUnselected(LLUI::getUIImage("Audio_Off"));
     }
-    refresh();
 }
 
 void LLStatusBar::onObscureBalanceChanged(const LLSD& newvalue)

@@ -4278,10 +4278,7 @@ void process_health_message(LLMessageSystem *mesgsys, void **user_data)
 
     mesgsys->getF32Fast(_PREHASH_HealthData, _PREHASH_Health, health);
 
-    if (gStatusBar)
-    {
-        gStatusBar->setHealth((S32)health);
-    }
+    gAgent.setHealth((S32)health);
 }
 
 

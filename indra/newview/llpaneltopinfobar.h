@@ -34,6 +34,7 @@ class LLButton;
 class LLTextBox;
 class LLIconCtrl;
 class LLParcelChangeObserver;
+class LLViewerRegion;
 
 class LLPanelTopInfoBar : public LLPanel, public LLSingleton<LLPanelTopInfoBar>, private LLDestroyClass<LLPanelTopInfoBar>
 {
@@ -63,7 +64,7 @@ public:
 
 // [RLVa:KB] - Checked: 2014-03-23 (RLVa-1.4.10)
     /**
-     * Shorthand to call updateParcelInfoText() and updateParcelIcons().
+     * Shorthand to call refreshParcelInfoText() and updateParcelIcons().
      */
     void update();
 // [/RLV:KB]
@@ -138,9 +139,16 @@ private:
     void updateParcelIcons();
 
     /**
-     * Updates health information (mDamageText).
+     * Writes health information (mDamageText). Driven by the agent's change
+     * signal rather than read back out of it every frame.
      */
-    void updateHealth();
+    void setHealth(S32 health);
+
+    /**
+     * The region's name and its maturity rating are both in the readout, and
+     * both arrive on a handshake that moves nothing else this panel watches.
+     */
+    void onRegionInfoChanged(LLViewerRegion* regionp);
 
     /**
      * Lays out all parcel icons starting from right edge of the mParcelInfoText + 11px
@@ -154,9 +162,13 @@ private:
     S32 layoutWidget(LLUICtrl* ctrl, S32 left);
 
     /**
-     * Generates location string and returns it in the loc_str parameter.
+     * Builds the readout and pushes it at the widget, but only if it would
+     * differ from what is already on screen. Every path that writes the text
+     * goes through here, and every one of them builds the same string: a
+     * caller that left the coordinates out used to be corrected by the next
+     * frame's unconditional rebuild, and there is no longer one to correct it.
      */
-    void buildLocationString(std::string& loc_str, bool show_coords);
+    void refreshParcelInfoText();
 
     /**
      * Sets new value to the mParcelInfoText and updates the size of the top bar.
@@ -183,6 +195,25 @@ private:
     boost::signals2::connection mParcelPropsCtrlConnection;
     boost::signals2::connection mShowCoordsCtrlConnection;
     boost::signals2::connection mParcelMgrConnection;
+    boost::signals2::connection mRegionInfoConnection;
+    boost::signals2::connection mHealthConnection;
+
+    // The rounded position baked into the text on screen. draw() compares the
+    // agent's current one against this to decide whether the readout can have
+    // moved; S32_MIN cannot be a real coordinate, so the first draw always
+    // builds.
+    S32 mDisplayPosX = S32_MIN;
+    S32 mDisplayPosY = S32_MIN;
+    S32 mDisplayPosZ = S32_MIN;
+
+    // Reused rather than declared per call, so a readout that rebuilds twice a
+    // second stops asking the allocator for the same string every time.
+    std::string mLocationScratch;
+
+    // Per instance, not per process: this used to be a function-local static
+    // in the poll, which meant a panel rebuilt after the value moved kept the
+    // stale compare and never wrote its label again.
+    S32 mLastHealth = -1;
 
     resize_signal_t mResizeSignal;
 };

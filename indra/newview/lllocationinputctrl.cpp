@@ -26,6 +26,8 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include <fmt/format.h>
+
 // file includes
 #include "lllocationinputctrl.h"
 
@@ -54,7 +56,6 @@
 #include "llpathfindingnavmeshstatus.h"
 #include "llteleporthistory.h"
 #include "llslurl.h"
-#include "llstatusbar.h"            // getHealth()
 #include "lltrans.h"
 #include "llviewerinventory.h"
 #include "llviewerparcelmgr.h"
@@ -169,6 +170,15 @@ private:
     {
         if (mInput)
         {
+            // The text as well as the icons. The parcel's name is half of what
+            // the location field says, and a rename used to reach the field
+            // only because the field was rebuilt on every frame anyway.
+            //
+            // Not refresh(): this fires for any parcel whose properties
+            // arrive, including one merely selected in About Land, and the
+            // landmark button that refresh() also updates depends on the
+            // parcel the agent is standing in. That has its own callback.
+            mInput->refreshLocation();
             mInput->refreshParcelIcons();
         }
     }
@@ -423,6 +433,13 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
             boost::bind(&LLLocationInputCtrl::onLocationHistoryChanged, this,_1));
 
     mRegionCrossingSlot = gAgent.addRegionChangedCallback(boost::bind(&LLLocationInputCtrl::onRegionBoundaryCrossed, this));
+    // An estate manager changing the region's maturity rating, or renaming it,
+    // arrives on a handshake and moves neither the parcel nor the region we
+    // are standing in -- so no other callback here sees it.
+    mRegionInfoConnection = LLViewerRegion::setRegionInfoChangedCallback(
+        boost::bind(&LLLocationInputCtrl::onRegionInfoChanged, this, _1));
+    mHealthConnection = gAgent.addHealthChangedCallback(
+        boost::bind(&LLLocationInputCtrl::setHealth, this, _1));
     createNavMeshStatusListenerForCurrentRegion();
 
     mRemoveLandmarkObserver = new LLRemoveLandmarkObserver(this);
@@ -450,6 +467,8 @@ LLLocationInputCtrl::~LLLocationInputCtrl()
     delete mParcelChangeObserver;
 
     mRegionCrossingSlot.disconnect();
+    mRegionInfoConnection.disconnect();
+    mHealthConnection.disconnect();
     mNavMeshSlot.disconnect();
     mCoordinatesControlConnection.disconnect();
     mParcelPropertiesControlConnection.disconnect();
@@ -601,17 +620,25 @@ void LLLocationInputCtrl::onFocusLost()
 
 void LLLocationInputCtrl::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
     if(!hasFocus() && show_coords)
     {
-        refreshLocation();
+        // The one input to this readout with no callback behind it is the
+        // agent's own position, and the readout prints it rounded -- to 2 m at
+        // a walk, 4 m in flight. Three integers answer whether the text can
+        // have moved. Building the text to find out costs a format, five
+        // allocations and a shaping pass, and for all but a couple of frames a
+        // second the answer is no.
+        S32 pos_x, pos_y, pos_z;
+        LLAgentUI::getDisplayPos(pos_x, pos_y, pos_z);
+        if (pos_x != mDisplayPosX || pos_y != mDisplayPosY || pos_z != mDisplayPosZ)
+        {
+            refreshLocation();
+        }
     }
 
-    static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
-    if (show_icons)
-    {
-        refreshHealth();
-    }
     LLComboBox::draw();
 }
 
@@ -630,7 +657,9 @@ void LLLocationInputCtrl::reshape(S32 width, S32 height, bool called_from_parent
 
     if (isHumanReadableLocationVisible)
     {
-        refreshMaturityButton();
+        // Only the placement: the region's rating has not changed, the space
+        // the text leaves for its icon has.
+        positionMaturityButton();
     }
 }
 
@@ -685,6 +714,22 @@ void LLLocationInputCtrl::onAgentParcelChange()
 void LLLocationInputCtrl::onRegionBoundaryCrossed()
 {
     createNavMeshStatusListenerForCurrentRegion();
+    // The region's name and its maturity rating are both in the readout, and
+    // both just changed. This reached the field only through the per-frame
+    // rebuild before -- crossing a region usually crosses a parcel too, and
+    // that is what happened to refresh it.
+    refresh();
+}
+
+void LLLocationInputCtrl::onRegionInfoChanged(LLViewerRegion* regionp)
+{
+    // Fires for every region that hands us a handshake, including neighbours
+    // coming into view. Only the one being displayed matters.
+    if (regionp == gAgent.getRegion())
+    {
+        updateMaturityButtonImage();
+        refreshLocation();
+    }
 }
 
 void LLLocationInputCtrl::onNavMeshStatusChange(const LLPathfindingNavMeshStatus &pNavMeshStatus)
@@ -787,24 +832,39 @@ void LLLocationInputCtrl::refresh()
     mInfoBtn->setEnabled(!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWLOC));
 // [/RLVa:KB]
 
+    updateMaturityButtonImage();
     refreshLocation();          // update location string
     refreshParcelIcons();
     updateAddLandmarkButton();  // indicate whether current parcel has been landmarked
+
+    // Health has a signal now, but nothing replays the last value to a panel
+    // that was not listening when it arrived. This is the sync for that.
+    setHealth(gAgent.getHealth());
 }
 
 void LLLocationInputCtrl::refreshLocation()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     // Is one of our children focused?
     if (LLUICtrl::hasFocus() || mButton->hasFocus() || mList->hasFocus() ||
         (mTextEntry && mTextEntry->hasFocus()) ||
         (mAddLandmarkBtn->hasFocus()))
     {
-        LL_WARNS() << "Location input should not be refreshed when having focus" << LL_ENDL;
+        // Not a fault. Refreshes arrive on parcel, region and setting changes
+        // now, and any of them can land while the user is part-way through
+        // typing an address -- which is exactly when the field must be left
+        // alone. It gets rewritten on focus loss.
+        LL_DEBUGS("Navbar") << "Location refresh skipped: the field has focus" << LL_ENDL;
         return;
     }
 
-    // Update location field.
-    std::string location_name;
+    // Recorded whether or not the text turns out to have moved: draw() reads
+    // this to decide whether to come back here, and a caller that rebuilt
+    // without recording would put the readout straight back onto the
+    // per-frame path.
+    LLAgentUI::getDisplayPos(mDisplayPosX, mDisplayPosY, mDisplayPosZ);
+
     // Cached: this is reached from draw, on every frame the setting is on, and
     // looking a setting up by its name is a hash of the name and a walk of the
     // map. The draw asks the same question through LLUICachedControl to decide
@@ -815,16 +875,45 @@ void LLLocationInputCtrl::refreshLocation()
             ? LLAgentUI::LOCATION_FORMAT_FULL
             : LLAgentUI::LOCATION_FORMAT_NO_COORDS);
 
-    if (!LLAgentUI::buildLocationString(location_name, format))
+    if (!LLAgentUI::buildLocationString(mLocationScratch, format))
     {
-        location_name = "???";
+        // Between a region crossing and the parcel properties that follow it
+        // there is no parcel to name. Keep the last good string rather than
+        // flashing a placeholder at every crossing: a refresh follows when the
+        // parcel arrives, and the placeholder is only right before the first
+        // one ever does.
+        if (!mHumanReadableLocation.empty())
+        {
+            return;
+        }
+        mLocationScratch = "???";
     }
+    // The mean of any span of this plot is the fraction of rebuilds that
+    // produced different text -- the number draw()'s gate is sized against.
+    LL_PROFILE_PLOT("navbar location changed",
+                    (int64_t)(mLocationScratch != mHumanReadableLocation));
+
+    // Second gate, because the rounding buckets are 2 m at a walk and 4 m in
+    // flight: the integers draw() compared can move without the text moving.
+    //
+    // The question is asked of the field and not of mHumanReadableLocation,
+    // which is a record of what this function last built rather than of what
+    // is on screen. Two things put something else there: the SLURL the user
+    // clicks for, and whatever the user typed before giving up focus. Putting
+    // the readable text back over both is this function's other job, and a
+    // gate that compared its own last answer would skip doing it.
+    if (mTextEntry && mTextEntry->getText() == mLocationScratch)
+    {
+        return;
+    }
+
     // store human-readable location to compare it in changeLocationPresentation()
-    mHumanReadableLocation = location_name;
-    setText(location_name);
+    mHumanReadableLocation = mLocationScratch;
+    setText(mHumanReadableLocation);
     isHumanReadableLocationVisible = true;
 
-    refreshMaturityButton();
+    // Only the placement: the text is what changed, not the region's rating.
+    positionMaturityButton();
 }
 
 // returns new right edge
@@ -843,6 +932,8 @@ static S32 layout_widget(LLUICtrl* widget, S32 right)
 
 void LLLocationInputCtrl::refreshParcelIcons()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     // Our "cursor" moving right to left
     S32 x = mAddLandmarkBtn->getRect().mLeft;
 
@@ -930,77 +1021,78 @@ void LLLocationInputCtrl::refreshParcelIcons()
     }
 }
 
-void LLLocationInputCtrl::refreshHealth()
+void LLLocationInputCtrl::setHealth(S32 health)
 {
-    // *FIXME: Status bar owns health information, should be in agent
-    if (gStatusBar)
+    if (health == mLastHealth)
     {
-        static S32 last_health = -1;
-        S32 health = gStatusBar->getHealth();
-        if (health != last_health)
-        {
-            std::string text = llformat("%d%%", health);
-            mDamageText->setText(text);
-            last_health = health;
-        }
+        return;
     }
+    mLastHealth = health;
+    mDamageText->setText(fmt::format("{}%", health));
 }
 
-void LLLocationInputCtrl::refreshMaturityButton()
+void LLLocationInputCtrl::updateMaturityButtonImage()
 {
-    // Updating maturity rating icon.
     LLViewerRegion* region = gAgent.getRegion();
     if (!region)
         return;
 
     U8 sim_access = region->getSimAccess();
-
-    if (mLastSimAccess != sim_access)
+    if (mLastSimAccess == sim_access)
     {
-        mLastSimAccess = sim_access;
-
-        bool button_visible = true;
-        LLPointer<LLUIImage> rating_image = NULL;
-        std::string rating_tooltip;
-
-        switch(sim_access)
-        {
-        case SIM_ACCESS_PG:
-            rating_image = mIconMaturityGeneral;
-            rating_tooltip = LLTrans::getString("LocationCtrlGeneralIconTooltip");
-            break;
-
-        case SIM_ACCESS_ADULT:
-            rating_image = mIconMaturityAdult;
-            rating_tooltip = LLTrans::getString("LocationCtrlAdultIconTooltip");
-            break;
-
-        case SIM_ACCESS_MATURE:
-            rating_image = mIconMaturityModerate;
-            rating_tooltip = LLTrans::getString("LocationCtrlModerateIconTooltip");
-            break;
-
-        default:
-            button_visible = false;
-            break;
-        }
-
-        mMaturityButton->setVisible(button_visible);
-        mMaturityButton->setToolTip(rating_tooltip);
-        if(rating_image)
-        {
-            mMaturityButton->setImageUnselected(rating_image);
-            mMaturityButton->setImagePressed(rating_image);
-        }
+        return;
     }
-    if (mMaturityButton->getVisible())
+    mLastSimAccess = sim_access;
+
+    LLPointer<LLUIImage> rating_image = NULL;
+    std::string rating_tooltip;
+
+    switch(sim_access)
     {
-        positionMaturityButton();
+    case SIM_ACCESS_PG:
+        rating_image = mIconMaturityGeneral;
+        rating_tooltip = LLTrans::getString("LocationCtrlGeneralIconTooltip");
+        break;
+
+    case SIM_ACCESS_ADULT:
+        rating_image = mIconMaturityAdult;
+        rating_tooltip = LLTrans::getString("LocationCtrlAdultIconTooltip");
+        break;
+
+    case SIM_ACCESS_MATURE:
+        rating_image = mIconMaturityModerate;
+        rating_tooltip = LLTrans::getString("LocationCtrlModerateIconTooltip");
+        break;
+
+    default:
+        // No icon for this rating, so there is nothing to place either.
+        mMaturityRatingShown = false;
+        mMaturityButton->setVisible(false);
+        return;
     }
+
+    mMaturityRatingShown = true;
+    mMaturityButton->setToolTip(rating_tooltip);
+    mMaturityButton->setImageUnselected(rating_image);
+    mMaturityButton->setImagePressed(rating_image);
+
+    positionMaturityButton();
 }
 
 void LLLocationInputCtrl::positionMaturityButton()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    // Whether this region's rating has an icon at all, which is not the same
+    // question as whether the button is on screen: the last line of this
+    // function hides it when the text leaves no room, and reading that back as
+    // the gate is what used to keep the icon hidden after the field was made
+    // wide again.
+    if (!mMaturityRatingShown)
+    {
+        return;
+    }
+
     const LLFontGL* font = mTextEntry->getFont();
     if (!font)
         return;

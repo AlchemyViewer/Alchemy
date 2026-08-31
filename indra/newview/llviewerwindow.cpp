@@ -6254,13 +6254,8 @@ void LLViewerWindow::drawMouselookInstructions()
             const bool allow_damage = vpm->allowAgentDamage(gAgent.getRegion(), vpm->getAgentParcel());
             if (allow_damage)
             {
-                S32 health = -1;
-                if (gStatusBar)
-                {
-                    health = gStatusBar->getHealth();
-                }
                 font->renderUTF8(
-                    llformat("HP: %d%%", health), 0,
+                    llformat("HP: %d%%", gAgent.getHealth()), 0,
                     text_pos_start + 300,
                     INSTRUCTIONS_TOP_PAD,
                     LLColor4(1.0f, 1.0f, 1.0f, 0.5f),

@@ -78,8 +78,6 @@ public:
     // Reply at process_money_balance_reply()
     static void sendMoneyBalanceRequest();
 
-    void        setHealth(S32 percent);
-
     void setLandCredit(S32 credit);
     void setLandCommitted(S32 committed);
 
@@ -89,7 +87,6 @@ public:
 
     // ACCESSORS
     S32         getBalance() const;
-    S32         getHealth() const;
 
     bool isUserTiered() const;
     S32 getSquareMetersCredit() const;
@@ -156,7 +153,6 @@ private:
     bool            mBalanceClicked;
     bool            mObscureBalance;
     LLTimer         mBalanceClickTimer;
-    S32             mHealth;
     S32             mSquareMetersCredit;
     S32             mSquareMetersCommitted;
     LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
