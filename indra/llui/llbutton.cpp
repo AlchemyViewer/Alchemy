@@ -421,7 +421,14 @@ bool LLButton::postBuild()
 
 void LLButton::onVisibilityChange(bool new_visibility)
 {
-    mFontBuffer.reset();
+    // Going out of sight is worth releasing the captured geometry for. Coming
+    // into sight is not the moment to throw away what is about to be drawn --
+    // and this is called on every visible descendant of whatever changed, so a
+    // floater opening used to reset every button in it.
+    if (!new_visibility)
+    {
+        mFontBuffer.reset();
+    }
     return LLUICtrl::onVisibilityChange(new_visibility);
 }
 

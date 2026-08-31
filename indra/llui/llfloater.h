@@ -560,6 +560,11 @@ private:
     bool            mButtonsEnabled[BUTTON_COUNT];
     F32             mButtonScale;
     bool            mAutoFocus;
+
+    // What was last pushed onto every control under this floater. Starts as
+    // TT_DEFAULT because that is what a control is constructed holding, so the
+    // first push is never the one skipped.
+    ETypeTransparency mAppliedTransparency { TT_DEFAULT };
     LLHandle<LLFloater> mSnappedTo;
 
     LLHandle<LLFloater> mHostHandle;

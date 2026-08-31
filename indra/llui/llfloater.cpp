@@ -719,7 +719,15 @@ void LLFloater::openFloater(const LLSD& key)
 {
     LL_INFOS() << "Opening floater " << getName() << " full path: " << getPathname() << LL_ENDL;
 
-    LLViewerEventRecorder::instance().logVisibilityChange( getPathname(), getName(), true,"floater"); // Last param is event subtype or empty string
+    // getPathname builds a string by walking to the root. The recorder is
+    // asked only when it is listening: it took its arguments by value and
+    // dropped them on its first line, so every open paid to build a pathname
+    // nobody read.
+    LLViewerEventRecorder& recorder = LLViewerEventRecorder::instance();
+    if (recorder.getLoggingStatus())
+    {
+        recorder.logVisibilityChange(getPathname(), getName(), true, "floater");
+    }
 
     mKey = key; // in case we need to open ourselves again
 
@@ -768,7 +776,13 @@ void LLFloater::openFloater(const LLSD& key)
 void LLFloater::closeFloater(bool app_quitting)
 {
     LL_INFOS() << "Closing floater " << getName() << LL_ENDL;
-    LLViewerEventRecorder::instance().logVisibilityChange( getPathname(), getName(), false,"floater"); // Last param is event subtype or empty string
+
+    LLViewerEventRecorder& recorder = LLViewerEventRecorder::instance();
+    if (recorder.getLoggingStatus())
+    {
+        recorder.logVisibilityChange(getPathname(), getName(), false, "floater");
+    }
+
     if (app_quitting)
     {
         LLFloater::sQuitting = true;
@@ -2248,23 +2262,31 @@ void    LLFloater::drawShadow(LLPanel* panel)
 void LLFloater::updateTransparency(LLView* view, ETypeTransparency transparency_type)
 {
     if (!view) return;
-    child_list_t children = *view->getChildList();
-    child_list_t::iterator it = children.begin();
 
-    LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view);
-    if (ctrl)
-    {
-        ctrl->setTransparencyType(transparency_type);
-    }
-
-    for(; it != children.end(); ++it)
-    {
-        updateTransparency(*it, transparency_type);
-    }
+    // The walk itself belongs to LLView: it has to stop at hidden views and
+    // resume when they are shown, and setVisible is the only place that knows.
+    view->applyTransparencyType((U8)transparency_type);
 }
 
 void LLFloater::updateTransparency(ETypeTransparency transparency_type)
 {
+    // Reached several times on a single open: setFocus ends with it,
+    // setFrontmost ends with it, and the two reach each other -- setFocus
+    // brings itself to front, which focuses, which sets transparency again.
+    // Each pass walks the floater to hand every control a value.
+    //
+    // Asked for the value already pushed, that walk assigns each control what
+    // it is already holding. The one thing it would reach is a control added
+    // since the last pass, still holding the constructed default -- which it
+    // was holding before this call too, and goes on holding until the floater
+    // actually changes between active and inactive. That pass is a change, so
+    // it is never the one skipped.
+    if (mAppliedTransparency == transparency_type)
+    {
+        return;
+    }
+    mAppliedTransparency = transparency_type;
+
     updateTransparency(this, transparency_type);
 }
 

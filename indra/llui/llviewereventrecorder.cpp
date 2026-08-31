@@ -124,7 +124,7 @@ void LLViewerEventRecorder::updateMouseEventInfo(S32 local_x, S32 local_y, S32 g
   LL_DEBUGS() << "LLViewerEventRecorder::updateMouseEventInfo after updatemouseeventinfo - local_x|global x   "<< this->local_x << " " << this->global_x  << "local/global y " << this->local_y << " " << this->global_y << " mname: " << mName << " xui: " << xui << LL_ENDL;
 }
 
-void LLViewerEventRecorder::logVisibilityChange(std::string xui, std::string name, bool visibility, std::string event_subtype) {
+void LLViewerEventRecorder::logVisibilityChange(const std::string& xui, const std::string& name, bool visibility, const std::string& event_subtype) {
 
     if (!logEvents) return;
 

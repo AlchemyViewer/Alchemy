@@ -289,8 +289,27 @@ public:
     void    setAllChildrenEnabled(bool b, bool recursive = false);
 
     virtual void    setVisible(bool visible);
-    void            setVisibleDirect(bool visible) { mVisible = visible; }
+    // Sets the flag alone, without the notifications setVisible sends -- for
+    // hiding a child from a single draw pass. It still settles a transparency
+    // left waiting, because a view that is visible must be holding one however
+    // it came to be visible, and nothing else would come along to give it.
+    void            setVisibleDirect(bool visible)
+    {
+        mVisible = visible;
+        if (visible && mHasPendingTransparency)
+        {
+            applyTransparencyType(mPendingTransparency);
+        }
+    }
     const bool&     getVisible() const          { return mVisible; }
+
+    // Push a floater's transparency down this subtree. Hidden views are left
+    // holding it rather than descended into -- nothing under one draws, so
+    // nothing under one is reading a transparency until it is shown, and
+    // setVisible is where that is settled. Takes LLUICtrl::ETypeTransparency as
+    // a raw value, because that enum belongs to a class built on top of this
+    // one.
+    void            applyTransparencyType(U8 transparency_type);
     virtual void    setEnabled(bool enabled);
     bool            getEnabled() const          { return mEnabled; }
     /// 'available' in this context means 'visible and enabled': in other
@@ -586,6 +605,11 @@ private:
 
     LLView*     mParentView;
     child_list_t mChildList;
+
+    // The transparency a floater tried to give this view while it was hidden,
+    // kept until it is shown. See applyTransparencyType.
+    U8          mPendingTransparency = 0;
+    bool        mHasPendingTransparency = false;
 
     // location in pixels, relative to surrounding structure, bottom,left=0,0
     bool        mVisible;

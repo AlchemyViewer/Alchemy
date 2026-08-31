@@ -55,7 +55,10 @@ public:
   void logKeyEvent(KEY key, MASK mask);
   void logKeyUnicodeEvent(llwchar uni_char);
 
-  void logVisibilityChange(std::string xui, std::string name, bool visibility, std::string event_subtype);
+  // Callers build a pathname to pass here, which walks a view to the root, so
+  // ask getLoggingStatus() before building one: this drops everything it is
+  // given on its first line when nothing is listening, which is the usual case.
+  void logVisibilityChange(const std::string& xui, const std::string& name, bool visibility, const std::string& event_subtype);
 
   void clear_xui();
   std::string get_xui();

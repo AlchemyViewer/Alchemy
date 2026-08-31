@@ -250,6 +250,37 @@ void LLView::setRect(const LLRect& rect)
     updateBoundingRect();
 }
 
+void LLView::applyTransparencyType(U8 transparency_type)
+{
+    if (!getVisible())
+    {
+        // Stop here and keep the value. Nothing beneath a hidden view is drawn,
+        // so nothing beneath it is reading a transparency, and an inventory
+        // holds two hundred thousand such views to show a few dozen.
+        //
+        // Safe to leave stale where a deferred layout was not: a transparency
+        // is read by the control that holds it and by nothing else, so no view
+        // sizes itself from another view's.
+        mPendingTransparency = transparency_type;
+        mHasPendingTransparency = true;
+        return;
+    }
+    mHasPendingTransparency = false;
+
+    // isCtrl is a virtual returning a constant where dynamic_cast walks the
+    // RTTI graph, and this is asked once per view. The pairing with static_cast
+    // is how the rest of llui asks it.
+    if (isCtrl())
+    {
+        static_cast<LLUICtrl*>(this)->setTransparencyType((LLUICtrl::ETypeTransparency)transparency_type);
+    }
+
+    for (LLView* child : mChildList)
+    {
+        child->applyTransparencyType(transparency_type);
+    }
+}
+
 void LLView::setUseBoundingRect( bool use_bounding_rect )
 {
     if (mUseBoundingRect != use_bounding_rect)
@@ -632,6 +663,12 @@ void LLView::setVisible(bool visible)
     if ( mVisible != visible )
     {
         mVisible = visible;
+
+        // Spend the transparency a floater left here while this was hidden.
+        if (visible && mHasPendingTransparency)
+        {
+            applyTransparencyType(mPendingTransparency);
+        }
 
         // notify children of visibility change if root, or part of visible hierarchy
         if (!getParent() || getParent()->isInVisibleChain())
