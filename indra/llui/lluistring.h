@@ -106,7 +106,10 @@ public:
     S32 lengthBytes() const { return static_cast<S32>(getUpdatedResult().size()); }
 
     void clear();
-    void clearArgs() { if (mArgs) mArgs->clear(); }
+    // Dropping the arguments brings the placeholders back, which is a change
+    // to the result like any other. Announced as one, or a cache keyed on the
+    // version goes on showing the substituted text.
+    void clearArgs() { if (mArgs && !mArgs->empty()) { mArgs->clear(); dirty(); } }
 
     // These utility functions are included for text editing.
     // They do not affect mOrig and do not perform argument substitution.

@@ -188,4 +188,27 @@ namespace tut
         ensure_equals("and the placeholder is gone",
                       message.getString(), std::string("y and "));
     }
+
+    // Dropping the arguments brings the placeholders back, which is a change
+    // to the result and has to be announced as one. Dropping none of them is
+    // not.
+    template<> template<>
+    void object::test<8>()
+    {
+        LLUIString greeting("Hello [NAME]");
+        greeting.setArg("[NAME]", "Alice");
+        ensure_equals("the argument substitutes",
+                      greeting.getString(), std::string("Hello Alice"));
+
+        const U32 settled = greeting.getGeneration();
+        greeting.clearArgs();
+        ensure("clearing arguments is a change", greeting.getGeneration() > settled);
+        ensure_equals("and the placeholder is back",
+                      greeting.getString(), std::string("Hello [NAME]"));
+
+        const U32 cleared = greeting.getGeneration();
+        greeting.clearArgs();
+        ensure_equals("clearing none of them is not a change",
+                      greeting.getGeneration(), cleared);
+    }
 }
