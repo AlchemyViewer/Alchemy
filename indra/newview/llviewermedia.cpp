@@ -1582,7 +1582,12 @@ bool LLViewerMedia::hasParcelMedia()
 //////////////////////////////////////////////////////////////////////////////////////////
 bool LLViewerMedia::hasParcelAudio()
 {
-    return !LLViewerMedia::getParcelAudioURL().empty();
+    // Asked, not fetched. getParcelAudioURL returns the URL by value, and the
+    // status bar asks this twice a frame -- once for whether the media button
+    // is enabled and once, through isParcelAudioPlaying, for what it shows --
+    // so a question about whether a string is empty was copying it, twice,
+    // every frame the viewer ran.
+    return !LLViewerParcelMgr::getInstance()->getAgentParcel()->getMusicURL().empty();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
