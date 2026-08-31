@@ -48,6 +48,86 @@
 #include "llviewercontrol.h"  // HACK for destinations guide on startup
 #include "llinventorymodel.h" // HACK to disable starter avatars button for NUX
 
+#include "llviewerparcelmgr.h"
+#include "llvoiceclient.h"
+#include "rlvhandler.h"
+
+namespace
+{
+    // Everything a toolbar button's availability or pressed state is derived
+    // from, watched in one place.
+    //
+    // A button's state comes from a predicate named in commands.xml and looked
+    // up in the enable-callback registry, so a toolbar cannot know what any of
+    // them reads. This is where that is written down instead. Reading the
+    // eleven predicates the shipped commands use, they bottom out in six
+    // things:
+    //
+    //   floater visibility -- Floater.IsOpen, Floater.CanShow,
+    //     Avatar.IsMyProfileOpen, and half of Build.EnabledOrActive.
+    //     Watched by LLFloater::setVisible itself, not here.
+    //   voice -- Agent.IsMicrophoneOn is the push-to-talk state, which already
+    //     had a signal of its own; the channel and connection state behind
+    //     Agent.IsActionAllowed comes through the status observer.
+    //   the parcel -- allowAgentBuild for Build.EnabledOrActive, allowAgentVoice
+    //     for Agent.IsActionAllowed.
+    //   RLV -- RLV.EnableIfNot, RlvActions::canBuild, and the attachment locks
+    //     that gate View.EnableHUDAttachments.
+    //   LLPipeline::sShowHUDAttachments -- View.CheckHUDAttachments, toggled by
+    //     the one action that owns it.
+    //   the marketplace status -- Marketplace.Enabled.
+    //
+    // A command whose predicate reads something not on that list gets a button
+    // that never changes, so extending this is part of adding one.
+    class ALToolBarStateWatcher final
+    :   public LLParcelObserver
+    ,   public LLVoiceClientStatusObserver
+    {
+    public:
+        ALToolBarStateWatcher()
+        {
+            LLViewerParcelMgr::getInstance()->addObserver(this);
+
+            // Voice is a parameterised singleton, so asking for it before it has
+            // been given its pump is an error rather than a construction. It is
+            // made in LLAppViewer::init and the toolbars are built at
+            // STATE_WORLD_INIT, so it is there -- asked rather than assumed,
+            // because nothing here would notice if that order changed.
+            if (LLVoiceClient::instanceExists())
+            {
+                LLVoiceClient::getInstance()->addObserver(this);
+                mMicrophone = LLVoiceClient::getInstance()->MicroChangedCallback(
+                    []() { LLToolBar::requestRefresh(); });
+            }
+
+            // Connected whether or not RLV is on: gRlvHandler is a plain global,
+            // the signal simply never fires while it is off, and it can be
+            // turned on after this -- asking isEnabled here would answer for
+            // the moment the toolbars were built and never again.
+            mRlvBehaviour = gRlvHandler.setBehaviourToggleCallback(
+                [](ERlvBehaviour, ERlvParamType) { LLToolBar::requestRefresh(); });
+        }
+
+        ~ALToolBarStateWatcher() override
+        {
+            LLViewerParcelMgr::getInstance()->removeObserver(this);
+            if (LLVoiceClient::instanceExists())
+            {
+                LLVoiceClient::getInstance()->removeObserver(this);
+            }
+        }
+
+        void changed() override { LLToolBar::requestRefresh(); }
+        void onChange(EStatusType, const LLSD&, bool) override { LLToolBar::requestRefresh(); }
+
+    private:
+        boost::signals2::scoped_connection mMicrophone;
+        boost::signals2::scoped_connection mRlvBehaviour;
+    };
+
+    std::unique_ptr<ALToolBarStateWatcher> sStateWatcher;
+}
+
 LLToolBarView* gToolBarView = NULL;
 
 static LLDefaultChildRegistry::Register<LLToolBarView> r("toolbar_view");
@@ -133,11 +213,15 @@ void LLToolBarView::initFromParams(const LLToolBarView::Params& p)
 
 LLToolBarView::~LLToolBarView()
 {
+    sStateWatcher.reset();
     saveToolbars();
 }
 
 bool LLToolBarView::postBuild()
 {
+    // Made once the toolbars exist to be refreshed, and let go of with them.
+    sStateWatcher = std::make_unique<ALToolBarStateWatcher>();
+
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT] = getChild<LLToolBar>("toolbar_left");
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_LEFT);
     mAutoHideEdges[LLToolBarEnums::TOOLBAR_LEFT].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getParent());

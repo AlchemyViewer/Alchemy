@@ -67,7 +67,11 @@ public:
 
     void reshape(S32 width, S32 height, bool called_from_parent = true);
     void setEnabled(bool enabled);
-    void setCommandId(const LLCommandId& id) { mId = id; }
+    // Takes the command with the id, so the two cannot come apart. Commands are
+    // registered once from commands.xml and never removed, so what is kept here
+    // outlives the button; the alternative was looking the id up in the manager
+    // on every frame this button drew.
+    void setCommandId(const LLCommandId& id);
     LLCommandId getCommandId() const { return mId; }
 
     void setStartDragCallback(tool_startdrag_callback_t cb)   { mStartDragItemCallback  = cb; }
@@ -85,6 +89,7 @@ private:
     void callIfEnabled(LLUICtrl::commit_callback_t commit, LLUICtrl* ctrl, const LLSD& param );
 
     LLCommandId     mId;
+    LLCommand*      mCommand { nullptr };   // owned by LLCommandManager, outlives this
     S32             mMouseDownX;
     S32             mMouseDownY;
     LLUI::RangeS32  mWidthRange;
@@ -180,6 +185,17 @@ class LLToolBar
 {
     friend class LLToolBarButton;
 public:
+
+    // Say that something a toolbar button's availability or pressed state could
+    // be derived from has changed, so the bars ask their buttons again on the
+    // next idle instead of reusing what they last worked out.
+    //
+    // Deliberately one number for every toolbar and every cause: what a button
+    // reads is decided by a predicate named in commands.xml and looked up in
+    // the enable-callback registry, so there is no way from here to know which
+    // buttons a given change reaches. Bumping it costs one pass over the
+    // buttons of the visible bars.
+    static void requestRefresh() { ++sRefreshGeneration; }
 
     class LLCenterLayoutPanel : public LLLayoutPanel
     {
@@ -292,7 +308,9 @@ private:
 
     void initFromParams(const Params&);
     void createContextMenu();
-    void updateLayoutAsNeeded();
+    // Returns whether it laid anything out, which tells the caller whether
+    // this bar moved.
+    bool updateLayoutAsNeeded();
     void createButtons();
     void resizeButtonsInRow(std::vector<LLToolBarButton*>& buttons_in_row, S32 max_row_girth);
     bool isButtonTypeChecked(const LLSD& userdata);
@@ -343,6 +361,18 @@ private:
     LLHandle<class LLView>          mRemoveButtonHandle;
 
     LLToolBarButton*                mRightMouseTargetButton;
+
+    // Settles what every button on this bar shows: whether its command is
+    // available, and whether it is running. Registered as an idle callback by
+    // the constructor rather than reached from draw, because it runs a
+    // predicate per button and draw is every frame.
+    static void                     onIdleUpdateButtonStates(void* userdata);
+    void                            updateButtonStates();
+
+    // Where this bar had reached the last time it asked. Starts behind the
+    // count below, so a bar asks once before it first draws.
+    U32                             mRefreshedGeneration { 0 };
+    static U32                      sRefreshGeneration;
 
     bool                            mNeedsLayout;
     bool                            mModified;

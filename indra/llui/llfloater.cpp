@@ -48,6 +48,7 @@
 #include "llmenugl.h"   // MENU_BAR_HEIGHT
 #include "llmodaldialog.h"
 #include "lltextbox.h"
+#include "lltoolbar.h"  // LLToolBar::requestRefresh
 #include "llresmgr.h"
 #include "llui.h"
 #include "llwindow.h"
@@ -662,7 +663,21 @@ LLControlGroup* LLFloater::getControlGroup()
 
 void LLFloater::setVisible( bool visible )
 {
+    const bool was_visible = getVisible();
+
     LLPanel::setVisible(visible); // calls onVisibilityChange()
+
+    // Most of what decides whether a toolbar button looks pressed is whether
+    // some floater is open, so this is the change those buttons are waiting
+    // for. Only on the transition: this is reached with the value the floater
+    // already holds often enough, and saying so every time would leave the
+    // toolbars asking their buttons on every frame again, which is the whole
+    // of what the count is for.
+    if (was_visible != visible)
+    {
+        LLToolBar::requestRefresh();
+    }
+
     if( visible && mFirstLook )
     {
         mFirstLook = false;

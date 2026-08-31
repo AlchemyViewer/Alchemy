@@ -111,6 +111,7 @@
 #include "llstatusbar.h"
 #include "llterrainpaintmap.h"
 #include "lltextureview.h"
+#include "lltoolbar.h"
 #include "lltoolbarview.h"
 #include "lltoolcomp.h"
 #include "lltoolmgr.h"
@@ -9975,6 +9976,10 @@ class LLViewShowHUDAttachments : public view_listener_t
 // [/RLVa:KB]
 
         LLPipeline::sShowHUDAttachments = !LLPipeline::sShowHUDAttachments;
+        // Two toolbar predicates read this flag, and this is the only place a
+        // person changes it -- the rest are snapshot code hiding HUDs around a
+        // capture and putting them back.
+        LLToolBar::requestRefresh();
         return true;
     }
 };
