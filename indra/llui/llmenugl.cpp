@@ -1672,7 +1672,14 @@ void LLMenuItemBranchDownGL::draw( void )
     // Munus are all of the same size, so fixed offset works here,
     // but it won't work if somebody decides to use different font
     // todo: adjust logic to work of rect and font height
-    getFont()->renderBytes( mLabel.getString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
+    //
+    // Through the cache, as the items inside a menu are. These are the names
+    // along the top of the window, drawn on every frame the viewer runs, and
+    // going to the font direct meant shaping every one of them on every one of
+    // those frames. A colour that changes on hover is rewritten over the
+    // glyphs rather than reshaping them.
+    mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+    mLabelBuffer.renderBytes( getFont(), mLabel.getString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
                    LLFontGL::HCENTER, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false);
 
 
