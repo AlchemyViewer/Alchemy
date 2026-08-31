@@ -540,8 +540,16 @@ void LLHUDText::updateAll()
     {
         LLHUDText* textp = (*text_it);
         textp->mTargetPositionOffset.clearVec();
-        textp->updateSize();
+        // Visibility first, and a size only for what survives it. Deciding
+        // visibility does not read the size -- it works from the distance,
+        // the draw-distance limit and the radius the last draw left behind --
+        // while measuring walks every segment of every object text in the
+        // scene, most of which is behind the camera or past the limit.
         textp->updateVisibility();
+        if (textp->getVisible())
+        {
+            textp->updateSize();
+        }
     }
 
     // sort back to front for rendering purposes

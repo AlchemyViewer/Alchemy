@@ -760,7 +760,13 @@ void LLHUDNameTag::updateAll()
         {
             LLHUDNameTag* textp = (*text_it);
             textp->mTargetPositionOffset.clearVec();
-            textp->updateSize();
+            // No size here. Deciding visibility does not read one -- it works
+            // from the distance and from the radius the last draw left behind
+            // -- and every tag that survives is sized again below once its
+            // level of detail is known, which is what decides how many lines
+            // there are to measure. Sizing here measured every tag in the
+            // region to arrive at a number that was either thrown away or
+            // recomputed.
             textp->updateVisibility();
         }
     }
