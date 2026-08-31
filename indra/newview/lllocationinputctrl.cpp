@@ -805,8 +805,13 @@ void LLLocationInputCtrl::refreshLocation()
 
     // Update location field.
     std::string location_name;
+    // Cached: this is reached from draw, on every frame the setting is on, and
+    // looking a setting up by its name is a hash of the name and a walk of the
+    // map. The draw asks the same question through LLUICachedControl to decide
+    // whether to call this at all.
+    static LLCachedControl<bool> show_coordinates(gSavedSettings, "NavBarShowCoordinates", false);
     LLAgentUI::ELocationFormat format =
-        (gSavedSettings.getBOOL("NavBarShowCoordinates")
+        (show_coordinates
             ? LLAgentUI::LOCATION_FORMAT_FULL
             : LLAgentUI::LOCATION_FORMAT_NO_COORDS);
 
