@@ -150,6 +150,7 @@ private:
     LLView      *mBalanceBG;
     LLFrameTimer    mClockUpdateTimer;
     LLFrameTimer    mFPSUpdateTimer;
+    LLFrameTimer    mMediaUpdateTimer;
 
     S32             mBalance;
     bool            mBalanceClicked;
