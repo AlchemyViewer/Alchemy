@@ -149,6 +149,8 @@ public:
     template<typename T>
     static T* create(typename T::Params& params, LLView* parent = NULL)
     {
+        // createWidgetImpl below carries its own zone, so this one's self time
+        // is the fillFrom merge over the block's parameter table.
         LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
         params.fillFrom(instance().mParamDefaultsMap.obtain<
                         ParamDefaults<typename T::Params, 0> >().get());
@@ -238,6 +240,10 @@ private:
             // It is not free: setting any parameter clears the block's
             // validated flag, so every widget built walks its whole chain of
             // validators, bases included, to reach that warning.
+            //
+            // Scoped: a second zone in the function's own scope redeclares the
+            // first one's variable, which only fails to compile with Tracy on.
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("widget validate");
             if (!params.validateBlock())
             {
                 LL_WARNS() << getInstance()->getCurFileName() << ": Invalid parameter block for " << typeid(T).name() << LL_ENDL;
@@ -246,9 +252,21 @@ private:
         }
 #endif
 
-        widget = new T(params);
+        {
+            // The widget's own constructor, named by type: a composite widget
+            // builds its children through this same factory, so the time here
+            // is a total, and which types and how many is the question a
+            // duration alone cannot answer.
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("widget construct");
+            const char* const type_name = typeid(T).name();
+            LL_PROFILE_ZONE_TEXT(type_name, strlen(type_name));
+            widget = new T(params);
+        }
 
-        widget->initFromParams(params);
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("widget initFromParams");
+            widget->initFromParams(params);
+        }
 
         if (parent)
         {
