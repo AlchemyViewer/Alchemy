@@ -276,6 +276,10 @@ void LLHUDText::addLine(const std::string &text_utf8,
 {
     if (!text_utf8.empty())
     {
+        // Wrapping shapes the text to find where it breaks, and every segment
+        // it produces is a fresh cache.
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+        LL_PROFILE_ZONE_NUM(text_utf8.size());
         // use default font for segment if custom font not specified
         if (!font)
         {
