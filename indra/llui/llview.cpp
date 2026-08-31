@@ -633,6 +633,14 @@ void LLView::setVisible(bool visible)
     {
         mVisible = visible;
 
+        // Lay out what was skipped while this was hidden, before anyone is told
+        // it is here: a view that has just been shown is about to be drawn,
+        // measured and clicked on, and all three want its children in place.
+        if (visible)
+        {
+            applyDeferredReshape();
+        }
+
         // notify children of visibility change if root, or part of visible hierarchy
         if (!getParent() || getParent()->isInVisibleChain())
         {
@@ -1423,6 +1431,19 @@ void LLView::drawChild(LLView* childp, S32 x_offset, S32 y_offset, bool force_dr
 
 void LLView::reshape(S32 width, S32 height, bool called_from_parent)
 {
+    // A resize slept through while hidden is still owed to the children, and
+    // this is the reshape that will pay it: rewind to the size they were last
+    // laid out against, so the delta below covers everything since. Every
+    // reshape passes here, so a debt can never be applied twice and can never
+    // be stranded by one that arrives from somewhere else.
+    if (hasDeferredReshape())
+    {
+        mRect.mRight = getRect().mLeft + getRect().getWidth() - mDeferredReshapeWidth;
+        mRect.mTop = getRect().mBottom + getRect().getHeight() - mDeferredReshapeHeight;
+        mDeferredReshapeWidth = 0;
+        mDeferredReshapeHeight = 0;
+    }
+
     // compute how much things changed and apply reshape logic to children
     S32 delta_width = width - getRect().getWidth();
     S32 delta_height = height - getRect().getHeight();
@@ -1498,7 +1519,18 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
                 || child_rect.getHeight() != viewp->getRect().getHeight()
                 || sForceReshape)
             {
-                viewp->reshape(child_rect.getWidth(), child_rect.getHeight());
+                // A hidden child is given its new size but not laid out: what
+                // is under it is neither drawn nor hit tested, so the walk can
+                // wait until it is shown. sForceReshape means a relayout of
+                // everything and is answered in full.
+                if (viewp->getVisible() || sForceReshape)
+                {
+                    viewp->reshape(child_rect.getWidth(), child_rect.getHeight());
+                }
+                else
+                {
+                    viewp->deferReshape(child_rect.getWidth(), child_rect.getHeight());
+                }
             }
         }
     }
@@ -1513,6 +1545,33 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
     }
 
     updateBoundingRect();
+}
+
+// Take the new size without laying anything out under it, and remember by how
+// much. The rect itself is never allowed to fall behind: siblings, layouts and
+// this view's own parent read it whether it is on screen or not. Only the walk
+// beneath it waits.
+void LLView::deferReshape(S32 width, S32 height)
+{
+    mDeferredReshapeWidth  += width - getRect().getWidth();
+    mDeferredReshapeHeight += height - getRect().getHeight();
+
+    mRect.mRight = getRect().mLeft + width;
+    mRect.mTop = getRect().mBottom + height;
+
+    updateBoundingRect();
+}
+
+// Settle the debt by asking for the size this view already is. reshape rewinds
+// past what is owed, so the delta it computes is exactly the resize the
+// children slept through.
+void LLView::applyDeferredReshape()
+{
+    if (!hasDeferredReshape())
+    {
+        return;
+    }
+    reshape(getRect().getWidth(), getRect().getHeight());
 }
 
 LLRect LLView::calcBoundingRect()
