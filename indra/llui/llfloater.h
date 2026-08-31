@@ -561,10 +561,13 @@ private:
     F32             mButtonScale;
     bool            mAutoFocus;
 
-    // What was last pushed onto every control under this floater. Starts as
-    // TT_DEFAULT because that is what a control is constructed holding, so the
-    // first push is never the one skipped.
+    // What was last pushed onto every control under this floater, and the
+    // shape the view tree was in when it was pushed. Starts as TT_DEFAULT
+    // because that is what a control is constructed holding, and building the
+    // floater moves the tree count, so the first push is never the one
+    // skipped.
     ETypeTransparency mAppliedTransparency { TT_DEFAULT };
+    U32               mAppliedTreeGeneration { 0 };
     LLHandle<LLFloater> mSnappedTo;
 
     LLHandle<LLFloater> mHostHandle;

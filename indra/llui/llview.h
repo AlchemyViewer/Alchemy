@@ -325,6 +325,14 @@ public:
     // Views the last push actually descended into. An open inventory keeps the
     // items of its closed folders hidden, and they are most of a floater.
     static S32      sTransparencyViewsWalked;
+
+    // Bumped whenever a view is given a parent. A pass that pushes a value
+    // down a subtree can skip pushing the value it pushed last time, but only
+    // while the subtree is the one it pushed to: a view added since is holding
+    // whatever it was constructed with. Unsigned because it is only compared
+    // for equality and must be allowed to wrap; a lap costs one redundant
+    // pass. See LLFloater::updateTransparency.
+    static U32      sTreeGeneration;
     virtual void    setEnabled(bool enabled);
     bool            getEnabled() const          { return mEnabled; }
     /// 'available' in this context means 'visible and enabled': in other

@@ -252,6 +252,7 @@ void LLView::setRect(const LLRect& rect)
 S32 LLView::sTransparencyViewsWalked = 0;
 S32 LLView::sReshapeCount = 0;
 S32 LLView::sReshapeDepth = 0;
+U32 LLView::sTreeGeneration = 0;
 
 void LLView::applyTransparencyType(U8 transparency_type)
 {
@@ -358,6 +359,9 @@ bool LLView::addChild(LLView* child, S32 tab_group)
 
     // add to front of child list, as normal
     mChildList.push_front(child);
+    // Said before the subtree is walked for anything else, so a pass that
+    // skipped its work last time knows the tree has moved under it.
+    ++sTreeGeneration;
 
     // add to tab order list
     if (tab_group != 0)

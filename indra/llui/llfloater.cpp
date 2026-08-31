@@ -2329,16 +2329,19 @@ void LLFloater::updateTransparency(ETypeTransparency transparency_type)
     // Each pass walks the floater to hand every control a value.
     //
     // Asked for the value already pushed, that walk assigns each control what
-    // it is already holding. The one thing it would reach is a control added
-    // since the last pass, still holding the constructed default -- which it
-    // was holding before this call too, and goes on holding until the floater
-    // actually changes between active and inactive. That pass is a change, so
-    // it is never the one skipped.
-    if (mAppliedTransparency == transparency_type)
+    // it is already holding -- with one exception, which is why the tree's own
+    // count is compared beside the value. A control built since the last pass
+    // is holding the transparency it was constructed with, and skipping on the
+    // value alone would leave it holding that until the floater next changed
+    // between active and inactive. A list rebuilt while its floater sits
+    // unfocused is that case, and it draws opaque in a faded floater.
+    if (mAppliedTransparency == transparency_type
+        && mAppliedTreeGeneration == LLView::sTreeGeneration)
     {
         return;
     }
     mAppliedTransparency = transparency_type;
+    mAppliedTreeGeneration = LLView::sTreeGeneration;
 
     LL_PROFILE_ZONE_NAMED_CATEGORY_UI("floater update transparency");
     LLView::sTransparencyViewsWalked = 0;
