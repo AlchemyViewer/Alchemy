@@ -207,6 +207,13 @@ public:
     void            setText(const LLStringExplicit &new_text);
 
     const std::string& getText() const override { return mText.getString(); }
+
+    // Bumped whenever getText() could have moved. Anything outside this class
+    // caching work derived from the field's text -- a measured width, shaped
+    // glyphs -- names the field and this counter as its source, rather than
+    // keeping a copy of the text to compare against.
+    U32             getTextGeneration() const { return mText.getGeneration(); }
+
     std::string getConvertedText() const; // trimmed text with paragraphs converted to newlines
 
     // Named for its unit. Every offset this class takes and hands back --

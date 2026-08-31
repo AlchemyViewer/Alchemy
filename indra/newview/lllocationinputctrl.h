@@ -32,6 +32,8 @@
 #include "lltextbox.h"      // Params
 #include "lllocationhistory.h"
 #include "llpathfindingnavmesh.h"
+#include "llfonttextcache.h"
+#include "alparceliconstrip.h"
 
 class LLLandmark;
 
@@ -110,27 +112,13 @@ public:
     LLLineEditor*           getTextEntry() const { return mTextEntry; }
     void                    handleLoginComplete();
 
-    bool isNavMeshDirty() { return mIsNavMeshDirty; }
+    bool isNavMeshDirty() const { return mParcelIcons.isNavMeshDirty(); }
 
 // [RLVa:KB] - Checked: 2014-03-23 (RLVa-1.4.10)
     void                    refresh();
 // [/RLVa:KB]
 
 private:
-
-    enum EParcelIcon
-    {
-        VOICE_ICON = 0,
-        FLY_ICON,                 // 1
-        PUSH_ICON,                // 2
-        BUILD_ICON,               // 3
-        SCRIPTS_ICON,             // 4
-        DAMAGE_ICON,              // 5
-        SEE_AVATARS_ICON,         // 6
-        PATHFINDING_DIRTY_ICON,   // 7
-        PATHFINDING_DISABLED_ICON,// 8
-        ICON_COUNT                // 9 total
-    };
 
     friend class LLUICtrlFactory;
     LLLocationInputCtrl(const Params&);
@@ -145,9 +133,6 @@ private:
 //  void                    refresh();
     void                    refreshLocation();
     void                    refreshParcelIcons();
-    // Write the health percentage text field. Driven by the agent's change
-    // signal rather than read back out of it every frame.
-    void                    setHealth(S32 health);
     // Split, because the two halves have nothing in common but the widget.
     // Which rating to show is a property of the region and changes when the
     // region does; where the icon sits depends only on how wide the text
@@ -180,7 +165,9 @@ private:
     bool                    onLocationContextMenuItemEnabled(const LLSD& userdata);
     void                    onLocationContextMenuItemClicked(const LLSD& userdata);
     void                    callbackRebakeRegion(const LLSD& notification, const LLSD& response);
-    void                    onParcelIconClick(EParcelIcon icon);
+    // Only the pathfinding pair: rebaking needs a notification callback bound
+    // to this control, so the strip leaves these two to their owner.
+    void                    onPathfindingIconClick(ALParcelIconStrip::EIcon icon);
 
     void                    createNavMeshStatusListenerForCurrentRegion();
 
@@ -192,8 +179,7 @@ private:
     S32                     mAddLandmarkHPad;   // pad to left of landmark star
 
     LLButton*   mMaturityButton;
-    LLIconCtrl* mParcelIcon[ICON_COUNT];
-    LLTextBox* mDamageText;
+    ALParcelIconStrip mParcelIcons;
 
     LLAddLandmarkObserver*      mAddLandmarkObserver;
     LLRemoveLandmarkObserver*   mRemoveLandmarkObserver;
@@ -207,7 +193,6 @@ private:
     boost::signals2::connection mRegionInfoConnection;
     boost::signals2::connection mHealthConnection;
     LLPathfindingNavMesh::navmesh_slot_t mNavMeshSlot;
-    bool mIsNavMeshDirty = false;
     LLUIImage* mLandmarkImageOn;
     LLUIImage* mLandmarkImageOff;
     LLPointer<LLUIImage> mIconMaturityGeneral;
@@ -243,10 +228,13 @@ private:
     // second stops asking the allocator for the same string every time.
     std::string mLocationScratch;
 
-    // Per instance, not per process: this used to be a function-local static
-    // in the poll, which meant a panel rebuilt after the value moved kept the
-    // stale compare and never wrote its label again.
-    S32 mLastHealth = -1;
+    // Where the maturity icon sits depends on how wide the location text
+    // came out, and extracting that from a font shapes the whole string. The
+    // window and the navigation bar's own splitter both reshape this control
+    // on every frame of a drag, asking the same question of the same text
+    // each time.
+    LLFontTextCache mMaturityWidthCache;
+
 };
 
 #endif

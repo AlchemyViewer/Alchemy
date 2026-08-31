@@ -47,6 +47,7 @@ class LLPanelPresetsCameraPulldown;
 class LLPanelPresetsPulldown;
 class LLPanelVolumePulldown;
 class LLPanelNearByMedia;
+class LLPanelPulldown;
 class LLIconCtrl;
 class LLSearchEditor;
 
@@ -105,6 +106,17 @@ private:
     void onVoiceChanged(const LLSD& newvalue);
     void onObscureBalanceChanged(const LLSD& newvalue);
 
+    // Built on first hover rather than at login. Six pull-downs meant six XUI
+    // documents parsed and six widget trees built during startup, for panels
+    // that stay invisible until the pointer reaches their button -- and most
+    // of which a given session never opens at all.
+    template <typename T>
+    T* ensurePulldown(T*& slot);
+
+    // Places one under its button and shows it, hiding whichever other one was
+    // up. `centered` picks between the two alignments these six used.
+    void showPulldown(LLPanelPulldown* shown, const LLView* anchor, bool centered);
+
     void onMouseEnterPresetsCamera();
     void onMouseEnterPresets();
     void onMouseEnterQuickSettings();
@@ -155,12 +167,15 @@ private:
     LLTimer         mBalanceClickTimer;
     S32             mSquareMetersCredit;
     S32             mSquareMetersCommitted;
-    LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown;
-    LLPanelPresetsPulldown* mPanelPresetsPulldown;
-    ALPanelAOPulldown* mPanelAOPulldown;
-    ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown;
-    LLPanelVolumePulldown* mPanelVolumePulldown;
-    LLPanelNearByMedia* mPanelNearByMedia;
+    // Null until first hovered. getNearbyMediaPanel() below hands out the last
+    // of these and its one caller already reads null as "the user has not
+    // touched the media controls", which is exactly true of one never built.
+    LLPanelPresetsCameraPulldown* mPanelPresetsCameraPulldown = nullptr;
+    LLPanelPresetsPulldown* mPanelPresetsPulldown = nullptr;
+    ALPanelAOPulldown* mPanelAOPulldown = nullptr;
+    ALPanelQuickSettingsPulldown* mPanelQuickSettingsPulldown = nullptr;
+    LLPanelVolumePulldown* mPanelVolumePulldown = nullptr;
+    LLPanelNearByMedia* mPanelNearByMedia = nullptr;
 };
 
 // *HACK: Status bar owns your cached money balance. JC

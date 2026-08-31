@@ -229,7 +229,6 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
     mInfoBtn(NULL),
     mRegionCrossingSlot(),
     mNavMeshSlot(),
-    mIsNavMeshDirty(false),
     mLandmarkImageOn(NULL),
     mLandmarkImageOff(NULL),
     mIconMaturityGeneral(NULL),
@@ -319,75 +318,43 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
 
     // Parcel property icons
     // Must be mouse-opaque so cursor stays as an arrow when hovering to
-    // see tooltip.
-    LLIconCtrl::Params voice_icon = p.voice_icon;
-    voice_icon.tool_tip = LLTrans::getString("LocationCtrlVoiceTooltip");
-    voice_icon.mouse_opaque = true;
-    mParcelIcon[VOICE_ICON] = LLUICtrlFactory::create<LLIconCtrl>(voice_icon);
-    mParcelIcon[VOICE_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, VOICE_ICON));
-    addChild(mParcelIcon[VOICE_ICON]);
+    // see tooltip. Tooltips and the click handlers that are the same in both
+    // panels come from the strip's initIcons below; the order these are added
+    // in is the order they were added in before.
+    auto make_icon = [this](const LLIconCtrl::Params& base, ALParcelIconStrip::EIcon slot)
+    {
+        LLIconCtrl::Params params = base;
+        params.mouse_opaque = true;
+        LLIconCtrl* ctrl = LLUICtrlFactory::create<LLIconCtrl>(params);
+        mParcelIcons.setIcon(slot, ctrl);
+        addChild(ctrl);
+        return ctrl;
+    };
 
-    LLIconCtrl::Params fly_icon = p.fly_icon;
-    fly_icon.tool_tip = LLTrans::getString("LocationCtrlFlyTooltip");
-    fly_icon.mouse_opaque = true;
-    mParcelIcon[FLY_ICON] = LLUICtrlFactory::create<LLIconCtrl>(fly_icon);
-    mParcelIcon[FLY_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, FLY_ICON));
-    addChild(mParcelIcon[FLY_ICON]);
+    make_icon(p.voice_icon,   ALParcelIconStrip::ICON_VOICE);
+    make_icon(p.fly_icon,     ALParcelIconStrip::ICON_FLY);
+    make_icon(p.push_icon,    ALParcelIconStrip::ICON_PUSH);
+    make_icon(p.build_icon,   ALParcelIconStrip::ICON_BUILD);
+    make_icon(p.scripts_icon, ALParcelIconStrip::ICON_SCRIPTS);
+    make_icon(p.damage_icon,  ALParcelIconStrip::ICON_DAMAGE);
 
-    LLIconCtrl::Params push_icon = p.push_icon;
-    push_icon.tool_tip = LLTrans::getString("LocationCtrlPushTooltip");
-    push_icon.mouse_opaque = true;
-    mParcelIcon[PUSH_ICON] = LLUICtrlFactory::create<LLIconCtrl>(push_icon);
-    mParcelIcon[PUSH_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, PUSH_ICON));
-    addChild(mParcelIcon[PUSH_ICON]);
-
-    LLIconCtrl::Params build_icon = p.build_icon;
-    build_icon.tool_tip = LLTrans::getString("LocationCtrlBuildTooltip");
-    build_icon.mouse_opaque = true;
-    mParcelIcon[BUILD_ICON] = LLUICtrlFactory::create<LLIconCtrl>(build_icon);
-    mParcelIcon[BUILD_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, BUILD_ICON));
-    addChild(mParcelIcon[BUILD_ICON]);
-
-    LLIconCtrl::Params scripts_icon = p.scripts_icon;
-    scripts_icon.tool_tip = LLTrans::getString("LocationCtrlScriptsTooltip");
-    scripts_icon.mouse_opaque = true;
-    mParcelIcon[SCRIPTS_ICON] = LLUICtrlFactory::create<LLIconCtrl>(scripts_icon);
-    mParcelIcon[SCRIPTS_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, SCRIPTS_ICON));
-    addChild(mParcelIcon[SCRIPTS_ICON]);
-
-    LLIconCtrl::Params damage_icon = p.damage_icon;
-    damage_icon.tool_tip = LLTrans::getString("LocationCtrlDamageTooltip");
-    damage_icon.mouse_opaque = true;
-    mParcelIcon[DAMAGE_ICON] = LLUICtrlFactory::create<LLIconCtrl>(damage_icon);
-    mParcelIcon[DAMAGE_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, DAMAGE_ICON));
-    addChild(mParcelIcon[DAMAGE_ICON]);
-
-    LLIconCtrl::Params pathfinding_dirty_icon = p.pathfinding_dirty_icon;
-    pathfinding_dirty_icon.tool_tip = LLTrans::getString("LocationCtrlPathfindingDirtyTooltip");
-    pathfinding_dirty_icon.mouse_opaque = true;
-    mParcelIcon[PATHFINDING_DIRTY_ICON] = LLUICtrlFactory::create<LLIconCtrl>(pathfinding_dirty_icon);
-    mParcelIcon[PATHFINDING_DIRTY_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, PATHFINDING_DIRTY_ICON));
-    addChild(mParcelIcon[PATHFINDING_DIRTY_ICON]);
-
-    LLIconCtrl::Params pathfinding_disabled_icon = p.pathfinding_disabled_icon;
-    pathfinding_disabled_icon.tool_tip = LLTrans::getString("LocationCtrlPathfindingDisabledTooltip");
-    pathfinding_disabled_icon.mouse_opaque = true;
-    mParcelIcon[PATHFINDING_DISABLED_ICON] = LLUICtrlFactory::create<LLIconCtrl>(pathfinding_disabled_icon);
-    mParcelIcon[PATHFINDING_DISABLED_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, PATHFINDING_DISABLED_ICON));
-    addChild(mParcelIcon[PATHFINDING_DISABLED_ICON]);
+    make_icon(p.pathfinding_dirty_icon, ALParcelIconStrip::ICON_PATHFINDING_DIRTY)
+        ->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onPathfindingIconClick, this,
+                                           ALParcelIconStrip::ICON_PATHFINDING_DIRTY));
+    make_icon(p.pathfinding_disabled_icon, ALParcelIconStrip::ICON_PATHFINDING_DISABLED)
+        ->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onPathfindingIconClick, this,
+                                           ALParcelIconStrip::ICON_PATHFINDING_DISABLED));
 
     LLTextBox::Params damage_text = p.damage_text;
     damage_text.tool_tip = LLTrans::getString("LocationCtrlDamageTooltip");
     damage_text.mouse_opaque = true;
-    mDamageText = LLUICtrlFactory::create<LLTextBox>(damage_text);
-    addChild(mDamageText);
+    LLTextBox* damage_ctrl = LLUICtrlFactory::create<LLTextBox>(damage_text);
+    addChild(damage_ctrl);
+    mParcelIcons.setDamageText(damage_ctrl);
 
-    LLIconCtrl::Params see_avatars_icon = p.see_avatars_icon;
-    see_avatars_icon.tool_tip = LLTrans::getString("LocationCtrlSeeAVsTooltip");
-    see_avatars_icon.mouse_opaque = true;
-    mParcelIcon[SEE_AVATARS_ICON] = LLUICtrlFactory::create<LLIconCtrl>(see_avatars_icon);
-    mParcelIcon[SEE_AVATARS_ICON]->setMouseDownCallback(boost::bind(&LLLocationInputCtrl::onParcelIconClick, this, SEE_AVATARS_ICON));
-    addChild(mParcelIcon[SEE_AVATARS_ICON]);
+    make_icon(p.see_avatars_icon, ALParcelIconStrip::ICON_SEE_AVATARS);
+
+    mParcelIcons.initIcons();
 
     // Register callbacks and load the location field context menu (NB: the order matters).
     LLUICtrl::CommitCallbackRegistry::currentRegistrar().add("Navbar.Action", boost::bind(&LLLocationInputCtrl::onLocationContextMenuItemClicked, this, _2));
@@ -439,7 +406,7 @@ LLLocationInputCtrl::LLLocationInputCtrl(const LLLocationInputCtrl::Params& p)
     mRegionInfoConnection = LLViewerRegion::setRegionInfoChangedCallback(
         boost::bind(&LLLocationInputCtrl::onRegionInfoChanged, this, _1));
     mHealthConnection = gAgent.addHealthChangedCallback(
-        boost::bind(&LLLocationInputCtrl::setHealth, this, _1));
+        [this](S32 health) { mParcelIcons.setHealth(health); });
     createNavMeshStatusListenerForCurrentRegion();
 
     mRemoveLandmarkObserver = new LLRemoveLandmarkObserver(this);
@@ -734,7 +701,7 @@ void LLLocationInputCtrl::onRegionInfoChanged(LLViewerRegion* regionp)
 
 void LLLocationInputCtrl::onNavMeshStatusChange(const LLPathfindingNavMeshStatus &pNavMeshStatus)
 {
-    mIsNavMeshDirty = pNavMeshStatus.isValid() && (pNavMeshStatus.getStatus() != LLPathfindingNavMeshStatus::kComplete);
+    mParcelIcons.setNavMeshDirty(pNavMeshStatus.isValid() && (pNavMeshStatus.getStatus() != LLPathfindingNavMeshStatus::kComplete));
     refreshParcelIcons();
 }
 
@@ -839,7 +806,7 @@ void LLLocationInputCtrl::refresh()
 
     // Health has a signal now, but nothing replays the last value to a panel
     // that was not listening when it arrived. This is the sync for that.
-    setHealth(gAgent.getHealth());
+    mParcelIcons.setHealth(gAgent.getHealth());
 }
 
 void LLLocationInputCtrl::refreshLocation()
@@ -948,68 +915,14 @@ void LLLocationInputCtrl::refreshParcelIcons()
 
     x = layout_widget(mForSaleBtn, x);
 
-    if (gSavedSettings.getBOOL("NavBarShowParcelProperties"))
+    static LLCachedControl<bool> show_icons(gSavedSettings, "NavBarShowParcelProperties", false);
+    mParcelIcons.update(show_icons);
+
+    if (show_icons)
     {
-        LLParcel* current_parcel;
-        LLViewerRegion* selection_region = vpm->getSelectionRegion();
-        LLParcel* selected_parcel = vpm->getParcelSelection()->getParcel();
-
-        // If agent is in selected parcel we use its properties because
-        // they are updated more often by LLViewerParcelMgr than agent parcel properties.
-        // See LLViewerParcelMgr::processParcelProperties().
-        // This is needed to reflect parcel restrictions changes without having to leave
-        // the parcel and then enter it again. See EXT-2987
-        if (selected_parcel && selected_parcel->getLocalID() == agent_parcel->getLocalID()
-                && selection_region == agent_region)
-        {
-            current_parcel = selected_parcel;
-        }
-        else
-        {
-            current_parcel = agent_parcel;
-        }
-
-        bool allow_voice    = vpm->allowAgentVoice(agent_region, current_parcel);
-        bool allow_fly      = vpm->allowAgentFly(agent_region, current_parcel);
-        bool allow_push     = vpm->allowAgentPush(agent_region, current_parcel);
-        bool allow_build    = vpm->allowAgentBuild(current_parcel); // true when anyone is allowed to build. See EXT-4610.
-        bool allow_scripts  = vpm->allowAgentScripts(agent_region, current_parcel);
-        bool allow_damage   = vpm->allowAgentDamage(agent_region, current_parcel);
-        bool see_avs        = current_parcel->getSeeAVs();
-        bool pathfinding_dynamic_enabled = agent_region->dynamicPathfindingEnabled();
-
-        // Most icons are "block this ability"
-        mParcelIcon[VOICE_ICON]->setVisible(   !allow_voice );
-        mParcelIcon[FLY_ICON]->setVisible(     !allow_fly );
-        mParcelIcon[PUSH_ICON]->setVisible(    !allow_push );
-        mParcelIcon[BUILD_ICON]->setVisible(   !allow_build );
-        mParcelIcon[SCRIPTS_ICON]->setVisible( !allow_scripts );
-        mParcelIcon[DAMAGE_ICON]->setVisible(  allow_damage );
-        mParcelIcon[PATHFINDING_DIRTY_ICON]->setVisible(mIsNavMeshDirty);
-        mParcelIcon[PATHFINDING_DISABLED_ICON]->setVisible(!mIsNavMeshDirty && !pathfinding_dynamic_enabled);
-
-        mDamageText->setVisible(allow_damage);
-        mParcelIcon[SEE_AVATARS_ICON]->setVisible( !see_avs );
-
         // Padding goes to left of both landmark star and for sale btn
         x -= mAddLandmarkHPad;
-
-        // Slide the parcel icons rect from right to left, adjusting rectangles
-        for (S32 i = 0; i < ICON_COUNT; ++i)
-        {
-            x = layout_widget(mParcelIcon[i], x);
-            x -= mIconHPad;
-        }
-        x = layout_widget(mDamageText, x);
-        x -= mIconHPad;
-    }
-    else
-    {
-        for (S32 i = 0; i < ICON_COUNT; ++i)
-        {
-            mParcelIcon[i]->setVisible(false);
-        }
-        mDamageText->setVisible(false);
+        x = mParcelIcons.layout(x, ALParcelIconStrip::LAYOUT_LEFTWARD, mIconHPad);
     }
 
     if (mTextEntry)
@@ -1021,15 +934,6 @@ void LLLocationInputCtrl::refreshParcelIcons()
     }
 }
 
-void LLLocationInputCtrl::setHealth(S32 health)
-{
-    if (health == mLastHealth)
-    {
-        return;
-    }
-    mLastHealth = health;
-    mDamageText->setText(fmt::format("{}%", health));
-}
 
 void LLLocationInputCtrl::updateMaturityButtonImage()
 {
@@ -1101,7 +1005,16 @@ void LLLocationInputCtrl::positionMaturityButton()
     mTextEntry->getTextPadding(&left_pad, &right_pad);
 
     // Calculate the right edge of rendered text + a whitespace.
-    left_pad = left_pad + font->getWidth(mTextEntry->getText()) + font->getWidth(" ");
+    //
+    // Through the cache, naming the field and its own version counter as the
+    // source: a reshape asks this of text that has not changed, and does so on
+    // every frame of a drag. The trailing space is left uncached -- it is one
+    // glyph, the shaping cache answers it, and a second slot keyed on a
+    // different string would break this cache's one-source rule.
+    mMaturityWidthCache.setSource(mTextEntry, mTextEntry->getTextGeneration());
+    const S32 text_width = llceil(mMaturityWidthCache.getWidthBytes(
+        font, mTextEntry->getText(), 0, S32_MAX, false));
+    left_pad = left_pad + text_width + font->getWidth(" ");
 
     LLRect rect = mMaturityButton->getRect();
     mMaturityButton->setRect(rect.setOriginAndSize(left_pad, rect.mBottom, rect.getWidth(), rect.getHeight()));
@@ -1350,65 +1263,25 @@ void LLLocationInputCtrl::callbackRebakeRegion(const LLSD& notification, const L
     }
 }
 
-void LLLocationInputCtrl::onParcelIconClick(EParcelIcon icon)
+void LLLocationInputCtrl::onPathfindingIconClick(ALParcelIconStrip::EIcon icon)
 {
-    switch (icon)
+    if (icon == ALParcelIconStrip::ICON_PATHFINDING_DISABLED)
     {
-    case VOICE_ICON:
-        LLNotificationsUtil::add("NoVoice");
-        break;
-    case FLY_ICON:
-        LLNotificationsUtil::add("NoFly");
-        break;
-    case PUSH_ICON:
-        LLNotificationsUtil::add("PushRestricted");
-        break;
-    case BUILD_ICON:
-        LLNotificationsUtil::add("NoBuild");
-        break;
-    case PATHFINDING_DIRTY_ICON:
-        if (LLPathfindingManager::getInstance() != NULL)
-        {
-            LLMenuOptionPathfindingRebakeNavmesh *rebakeInstance = LLMenuOptionPathfindingRebakeNavmesh::getInstance();
-            if (rebakeInstance && rebakeInstance->canRebakeRegion() && (rebakeInstance->getMode() == LLMenuOptionPathfindingRebakeNavmesh::kRebakeNavMesh_Available))
-            {
-                LLNotificationsUtil::add("PathfindingDirtyRebake", LLSD(), LLSD(),
-                                         boost::bind(&LLLocationInputCtrl::callbackRebakeRegion, this, _1, _2));
-                break;
-            }
-        }
-        LLNotificationsUtil::add("PathfindingDirty");
-        break;
-    case PATHFINDING_DISABLED_ICON:
         LLNotificationsUtil::add("DynamicPathfindingDisabled");
-        break;
-    case SCRIPTS_ICON:
+        return;
+    }
+
+    if (LLPathfindingManager::getInstance() != NULL)
     {
-        LLViewerRegion* region = gAgent.getRegion();
-        if(region && region->getRegionFlag(REGION_FLAGS_ESTATE_SKIP_SCRIPTS))
+        LLMenuOptionPathfindingRebakeNavmesh *rebakeInstance = LLMenuOptionPathfindingRebakeNavmesh::getInstance();
+        if (rebakeInstance && rebakeInstance->canRebakeRegion() && (rebakeInstance->getMode() == LLMenuOptionPathfindingRebakeNavmesh::kRebakeNavMesh_Available))
         {
-            LLNotificationsUtil::add("ScriptsStopped");
+            LLNotificationsUtil::add("PathfindingDirtyRebake", LLSD(), LLSD(),
+                                     boost::bind(&LLLocationInputCtrl::callbackRebakeRegion, this, _1, _2));
+            return;
         }
-        else if(region && region->getRegionFlag(REGION_FLAGS_SKIP_SCRIPTS))
-        {
-            LLNotificationsUtil::add("ScriptsNotRunning");
-        }
-        else
-        {
-            LLNotificationsUtil::add("NoOutsideScripts");
-        }
-        break;
     }
-    case DAMAGE_ICON:
-        LLNotificationsUtil::add("NotSafe");
-        break;
-    case SEE_AVATARS_ICON:
-        LLNotificationsUtil::add("SeeAvatars");
-        break;
-    case ICON_COUNT:
-        break;
-    // no default to get compiler warning when a new icon gets added
-    }
+    LLNotificationsUtil::add("PathfindingDirty");
 }
 
 void LLLocationInputCtrl::createNavMeshStatusListenerForCurrentRegion()

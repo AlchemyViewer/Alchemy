@@ -29,6 +29,7 @@
 
 #include "llpanel.h"
 #include "llinitdestroyclass.h"
+#include "alparceliconstrip.h"
 
 class LLButton;
 class LLTextBox;
@@ -73,20 +74,9 @@ private:
 
     friend class LLParcelChangeObserver;
 
-    enum EParcelIcon
-    {
-        VOICE_ICON = 0,
-        FLY_ICON,           // 1
-        PUSH_ICON,          // 2
-        BUILD_ICON,         // 3
-        SCRIPTS_ICON,       // 4
-        DAMAGE_ICON,        // 5
-        SEE_AVATARS_ICON,   // 6
-        ICON_COUNT          // 7 total
-    };
 
     /**
-     * Initializes parcel icons controls. Called from the constructor.
+     * Hands the strip its icon controls. Called from the constructor.
      */
     void initParcelIcons();
 
@@ -95,7 +85,6 @@ private:
     /**
      * Handles clicks on the parcel icons.
      */
-    void onParcelIconClick(EParcelIcon icon);
 
 
     /**
@@ -134,15 +123,9 @@ private:
     void updateParcelInfoText();
 
     /**
-     * Updates parcel icons (mParcelIcon[]).
+     * Reads the parcel and writes the icons' visibility, then lays them out.
      */
     void updateParcelIcons();
-
-    /**
-     * Writes health information (mDamageText). Driven by the agent's change
-     * signal rather than read back out of it every frame.
-     */
-    void setHealth(S32 health);
 
     /**
      * The region's name and its maturity rating are both in the readout, and
@@ -155,11 +138,6 @@ private:
      * (see screenshots in EXT-5808 for details).
      */
     void layoutParcelIcons();
-
-    /**
-     * Lays out a widget. Widget's rect mLeft becomes equal to the 'left' argument.
-     */
-    S32 layoutWidget(LLUICtrl* ctrl, S32 left);
 
     /**
      * Builds the readout and pushes it at the widget, but only if it would
@@ -188,8 +166,7 @@ private:
 
     LLButton*               mInfoBtn;
     LLTextBox*              mParcelInfoText;
-    LLTextBox*              mDamageText;
-    LLIconCtrl*             mParcelIcon[ICON_COUNT];
+    ALParcelIconStrip       mParcelIcons;
     LLParcelChangeObserver* mParcelChangedObserver;
 
     boost::signals2::connection mParcelPropsCtrlConnection;
@@ -209,11 +186,6 @@ private:
     // Reused rather than declared per call, so a readout that rebuilds twice a
     // second stops asking the allocator for the same string every time.
     std::string mLocationScratch;
-
-    // Per instance, not per process: this used to be a function-local static
-    // in the poll, which meant a panel rebuilt after the value moved kept the
-    // stale compare and never wrote its label again.
-    S32 mLastHealth = -1;
 
     resize_signal_t mResizeSignal;
 };

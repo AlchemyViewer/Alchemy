@@ -36,6 +36,7 @@
 #include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
 #include "lllandmarkactions.h"
+#include "lliconctrl.h"
 #include "lllocationinputctrl.h"
 #include "llnotificationsutil.h"
 #include "llparcel.h"
@@ -104,31 +105,17 @@ LLPanelTopInfoBar::~LLPanelTopInfoBar()
 
 void LLPanelTopInfoBar::initParcelIcons()
 {
-    mParcelIcon[VOICE_ICON] = getChild<LLIconCtrl>("voice_icon");
-    mParcelIcon[FLY_ICON] = getChild<LLIconCtrl>("fly_icon");
-    mParcelIcon[PUSH_ICON] = getChild<LLIconCtrl>("push_icon");
-    mParcelIcon[BUILD_ICON] = getChild<LLIconCtrl>("build_icon");
-    mParcelIcon[SCRIPTS_ICON] = getChild<LLIconCtrl>("scripts_icon");
-    mParcelIcon[DAMAGE_ICON] = getChild<LLIconCtrl>("damage_icon");
-    mParcelIcon[SEE_AVATARS_ICON] = getChild<LLIconCtrl>("see_avatars_icon");
-
-    mParcelIcon[VOICE_ICON]->setToolTip(LLTrans::getString("LocationCtrlVoiceTooltip"));
-    mParcelIcon[FLY_ICON]->setToolTip(LLTrans::getString("LocationCtrlFlyTooltip"));
-    mParcelIcon[PUSH_ICON]->setToolTip(LLTrans::getString("LocationCtrlPushTooltip"));
-    mParcelIcon[BUILD_ICON]->setToolTip(LLTrans::getString("LocationCtrlBuildTooltip"));
-    mParcelIcon[SCRIPTS_ICON]->setToolTip(LLTrans::getString("LocationCtrlScriptsTooltip"));
-    mParcelIcon[DAMAGE_ICON]->setToolTip(LLTrans::getString("LocationCtrlDamageTooltip"));
-    mParcelIcon[SEE_AVATARS_ICON]->setToolTip(LLTrans::getString("LocationCtrlSeeAVsTooltip"));
-
-    mParcelIcon[VOICE_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, VOICE_ICON));
-    mParcelIcon[FLY_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, FLY_ICON));
-    mParcelIcon[PUSH_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, PUSH_ICON));
-    mParcelIcon[BUILD_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, BUILD_ICON));
-    mParcelIcon[SCRIPTS_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, SCRIPTS_ICON));
-    mParcelIcon[DAMAGE_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, DAMAGE_ICON));
-    mParcelIcon[SEE_AVATARS_ICON]->setMouseDownCallback(boost::bind(&LLPanelTopInfoBar::onParcelIconClick, this, SEE_AVATARS_ICON));
-
-    mDamageText->setText(LLStringExplicit("100%"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_VOICE,       getChild<LLIconCtrl>("voice_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_FLY,         getChild<LLIconCtrl>("fly_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_PUSH,        getChild<LLIconCtrl>("push_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_BUILD,       getChild<LLIconCtrl>("build_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_SCRIPTS,     getChild<LLIconCtrl>("scripts_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_DAMAGE,      getChild<LLIconCtrl>("damage_icon"));
+    mParcelIcons.setIcon(ALParcelIconStrip::ICON_SEE_AVATARS, getChild<LLIconCtrl>("see_avatars_icon"));
+    // The pathfinding pair belongs to the navigation bar; this panel has no
+    // controls for them and leaves those two slots empty.
+    mParcelIcons.setDamageText(getChild<LLTextBox>("damage_text"));
+    mParcelIcons.initIcons();
 }
 
 void LLPanelTopInfoBar::handleLoginComplete()
@@ -157,7 +144,6 @@ bool LLPanelTopInfoBar::postBuild()
 
     mParcelInfoText = getChild<LLTextBox>("parcel_info_text");
     mParcelInfoText->setClickedCallback(boost::bind(&LLPanelTopInfoBar::onParcelInfoTextClicked, this));
-    mDamageText = getChild<LLTextBox>("damage_text");
 
     initParcelIcons();
 
@@ -188,7 +174,7 @@ bool LLPanelTopInfoBar::postBuild()
         boost::bind(&LLPanelTopInfoBar::onRegionInfoChanged, this, _1));
 
     mHealthConnection = gAgent.addHealthChangedCallback(
-        boost::bind(&LLPanelTopInfoBar::setHealth, this, _1));
+        [this](S32 health) { mParcelIcons.setHealth(health); });
 
     setVisibleCallback(boost::bind(&LLPanelTopInfoBar::onVisibilityChanged, this, _2));
 
@@ -311,7 +297,7 @@ void LLPanelTopInfoBar::update()
 
     // Health has a signal now, but nothing replays the last value to a panel
     // that was not listening when it arrived. This is the sync for that.
-    setHealth(gAgent.getHealth());
+    mParcelIcons.setHealth(gAgent.getHealth());
 }
 
 void LLPanelTopInfoBar::updateParcelInfoText()
@@ -346,74 +332,11 @@ void LLPanelTopInfoBar::updateParcelIcons()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
-
-    LLViewerRegion* agent_region = gAgent.getRegion();
-    LLParcel* agent_parcel = vpm->getAgentParcel();
-    if (!agent_region || !agent_parcel)
-        return;
-
     static LLUICachedControl<bool> show_icons("NavBarShowParcelProperties", false);
-    if (show_icons)
-    {
-        LLParcel* current_parcel;
-        LLViewerRegion* selection_region = vpm->getSelectionRegion();
-        LLParcel* selected_parcel = vpm->getParcelSelection()->getParcel();
-
-        // If agent is in selected parcel we use its properties because
-        // they are updated more often by LLViewerParcelMgr than agent parcel properties.
-        // See LLViewerParcelMgr::processParcelProperties().
-        // This is needed to reflect parcel restrictions changes without having to leave
-        // the parcel and then enter it again. See EXT-2987
-        if (selected_parcel && selected_parcel->getLocalID() == agent_parcel->getLocalID()
-                && selection_region == agent_region)
-        {
-            current_parcel = selected_parcel;
-        }
-        else
-        {
-            current_parcel = agent_parcel;
-        }
-
-        bool allow_voice    = vpm->allowAgentVoice(agent_region, current_parcel);
-        bool allow_fly      = vpm->allowAgentFly(agent_region, current_parcel);
-        bool allow_push     = vpm->allowAgentPush(agent_region, current_parcel);
-        bool allow_build    = vpm->allowAgentBuild(current_parcel); // true when anyone is allowed to build. See EXT-4610.
-        bool allow_scripts  = vpm->allowAgentScripts(agent_region, current_parcel);
-        bool allow_damage   = vpm->allowAgentDamage(agent_region, current_parcel);
-        bool see_avs        = current_parcel->getSeeAVs();
-
-        // Most icons are "block this ability"
-        mParcelIcon[VOICE_ICON]->setVisible(   !allow_voice );
-        mParcelIcon[FLY_ICON]->setVisible(     !allow_fly );
-        mParcelIcon[PUSH_ICON]->setVisible(    !allow_push );
-        mParcelIcon[BUILD_ICON]->setVisible(   !allow_build );
-        mParcelIcon[SCRIPTS_ICON]->setVisible( !allow_scripts );
-        mParcelIcon[DAMAGE_ICON]->setVisible(  allow_damage );
-        mDamageText->setVisible(allow_damage);
-        mParcelIcon[SEE_AVATARS_ICON]->setVisible( !see_avs );
-
-        layoutParcelIcons();
-    }
-    else
-    {
-        for (S32 i = 0; i < ICON_COUNT; ++i)
-        {
-            mParcelIcon[i]->setVisible(false);
-        }
-        mDamageText->setVisible(false);
-    }
+    mParcelIcons.update(show_icons);
+    layoutParcelIcons();
 }
 
-void LLPanelTopInfoBar::setHealth(S32 health)
-{
-    if (health == mLastHealth)
-    {
-        return;
-    }
-    mLastHealth = health;
-    mDamageText->setText(fmt::format("{}%", health));
-}
 
 void LLPanelTopInfoBar::onRegionInfoChanged(LLViewerRegion* regionp)
 {
@@ -436,18 +359,14 @@ void LLPanelTopInfoBar::layoutParcelIcons()
     // TODO: remove hard-coded values and read them as xml parameters
     static const int FIRST_ICON_HPAD = 32;
     static const int LAST_ICON_HPAD = 11;
+    static const int ICON_HPAD = 2;
 
-    S32 left = mParcelInfoText->getRect().mRight + FIRST_ICON_HPAD;
-
-    left = layoutWidget(mDamageText, left);
-
-    for (int i = ICON_COUNT - 1; i >= 0; --i)
-    {
-        left = layoutWidget(mParcelIcon[i], left);
-    }
+    const S32 right = mParcelIcons.layout(mParcelInfoText->getRect().mRight + FIRST_ICON_HPAD,
+                                          ALParcelIconStrip::LAYOUT_RIGHTWARD,
+                                          ICON_HPAD);
 
     LLRect rect = getRect();
-    rect.set(rect.mLeft, rect.mTop, left + LAST_ICON_HPAD, rect.mBottom);
+    rect.set(rect.mLeft, rect.mTop, right + LAST_ICON_HPAD, rect.mBottom);
     setRect(rect);
 
     if (old_rect != getRect())
@@ -456,68 +375,7 @@ void LLPanelTopInfoBar::layoutParcelIcons()
     }
 }
 
-S32 LLPanelTopInfoBar::layoutWidget(LLUICtrl* ctrl, S32 left)
-{
-    // TODO: remove hard-coded values and read them as xml parameters
-    static const int ICON_HPAD = 2;
 
-    if (ctrl->getVisible())
-    {
-        LLRect rect = ctrl->getRect();
-        rect.mRight = left + rect.getWidth();
-        rect.mLeft = left;
-
-        ctrl->setRect(rect);
-        left += rect.getWidth() + ICON_HPAD;
-    }
-
-    return left;
-}
-
-void LLPanelTopInfoBar::onParcelIconClick(EParcelIcon icon)
-{
-    switch (icon)
-    {
-    case VOICE_ICON:
-        LLNotificationsUtil::add("NoVoice");
-        break;
-    case FLY_ICON:
-        LLNotificationsUtil::add("NoFly");
-        break;
-    case PUSH_ICON:
-        LLNotificationsUtil::add("PushRestricted");
-        break;
-    case BUILD_ICON:
-        LLNotificationsUtil::add("NoBuild");
-        break;
-    case SCRIPTS_ICON:
-    {
-        LLViewerRegion* region = gAgent.getRegion();
-        if(region && region->getRegionFlag(REGION_FLAGS_ESTATE_SKIP_SCRIPTS))
-        {
-            LLNotificationsUtil::add("ScriptsStopped");
-        }
-        else if(region && region->getRegionFlag(REGION_FLAGS_SKIP_SCRIPTS))
-        {
-            LLNotificationsUtil::add("ScriptsNotRunning");
-        }
-        else
-        {
-            LLNotificationsUtil::add("NoOutsideScripts");
-        }
-        break;
-    }
-    case DAMAGE_ICON:
-        LLNotificationsUtil::add("NotSafe");
-        break;
-    case SEE_AVATARS_ICON:
-        LLNotificationsUtil::add("SeeAvatars");
-        break;
-    case ICON_COUNT:
-        break;
-    // no default to get compiler warning when a new icon gets added
-    }
-}
 
 void LLPanelTopInfoBar::onAgentParcelChange()
 {

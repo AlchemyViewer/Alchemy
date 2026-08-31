@@ -191,6 +191,7 @@ set(viewer_SOURCE_FILES
     allegacynotificationwellwindow.cpp
     alobjectproperties.cpp
     alpanelaomini.cpp
+    alparceliconstrip.cpp
     alpanelaopulldown.cpp
     alpanelavatarlegacy.cpp
     alpanelclassified.cpp
@@ -972,6 +973,7 @@ set(viewer_HEADER_FILES
     allegacynotificationwellwindow.h
     alobjectproperties.h
     alpanelaomini.h
+    alparceliconstrip.h
     alpanelaopulldown.h
     alpanelavatarlegacy.h
     alpanelclassified.h
