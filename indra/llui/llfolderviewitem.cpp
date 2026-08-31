@@ -392,8 +392,12 @@ void LLFolderViewItem::refresh()
 {
     LLFolderViewModelItem& vmi = *getViewModelItem();
 
-    mLabel = vmi.getDisplayName();
-    ++mLabelGeneration;
+    // A refresh is asked for whenever anything about the item might have
+    // moved, and usually nothing has: the name comes back the same string it
+    // already was. The version is what the shaped glyphs are keyed on, so
+    // bumping it for an identical name throws the label's geometry away and
+    // shapes it again on the next draw.
+    setLabelText(vmi.getDisplayName());
     mIsFavorite = vmi.isFavorite() && !vmi.isItemInTrash();
     // icons are slightly expensive to get, can be optimized
     // see LLInventoryIcon::getIcon()
@@ -407,8 +411,7 @@ void LLFolderViewItem::refresh()
         // Can do a number of expensive checks, like checking active motions, wearables or friend list
         mLabelStyle = vmi.getLabelStyle();
         pLabelFont = nullptr; // refresh can be called from a coro, don't use getLabelFontForStyle, coro trips font list tread safety
-        mLabelSuffix = vmi.getLabelSuffix();
-        ++mLabelGeneration;
+        setLabelSuffixText(vmi.getLabelSuffix());
     }
 
     // Dirty the filter flag of the model from the view (CHUI-849)
@@ -436,8 +439,7 @@ void LLFolderViewItem::refreshSuffix()
         // Can do a number of expensive checks, like checking active motions, wearables or friend list
         mLabelStyle = vmi->getLabelStyle();
         pLabelFont = nullptr;
-        mLabelSuffix = vmi->getLabelSuffix();
-        ++mLabelGeneration;
+        setLabelSuffixText(vmi->getLabelSuffix());
     }
 
     mLabelWidthDirty = true;
@@ -1094,6 +1096,24 @@ void LLFolderViewItem::reshape(S32 width, S32 height, bool called_from_parent)
     }
 
     LLView::reshape(width, height, called_from_parent);
+}
+
+void LLFolderViewItem::setLabelText(std::string label)
+{
+    if (mLabel != label)
+    {
+        mLabel = std::move(label);
+        ++mLabelGeneration;
+    }
+}
+
+void LLFolderViewItem::setLabelSuffixText(std::string suffix)
+{
+    if (mLabelSuffix != suffix)
+    {
+        mLabelSuffix = std::move(suffix);
+        ++mLabelGeneration;
+    }
 }
 
 LLFontTextCache& LLFolderViewItem::labelCache()

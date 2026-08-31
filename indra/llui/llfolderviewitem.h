@@ -387,6 +387,12 @@ private:
     LLFontTextCache& labelCache();
     LLFontTextCache& suffixCache();
 
+    // Take a new label or suffix, and count it only if it is one. A refresh
+    // asks the model for both whenever anything about the item might have
+    // changed, and the answer is almost always the string already held.
+    void setLabelText(std::string label);
+    void setLabelSuffixText(std::string suffix);
+
     // A span of this item's label or suffix, measured through its own cache.
     // Inventory measures both several times per item per frame while a search
     // filter is matching.
