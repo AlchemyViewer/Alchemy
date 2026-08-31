@@ -34,6 +34,15 @@
 #include "llui.h"   // LLUIImage
 #include "lluictrlfactory.h"
 
+namespace
+{
+    // Where left-aligned cell text starts. Named because the draw and the
+    // search highlight both have to place themselves from it, and a highlight
+    // sitting one pixel off the text it is behind is not something anyone
+    // would look twice at.
+    const S32 TEXT_LEFT_PAD = 1;
+}
+
 //static
 LLScrollListCell* LLScrollListCell::create(const LLScrollListCell::Params& cell_p)
 {
@@ -304,10 +313,10 @@ LLScrollListText::LLScrollListText(const LLScrollListCell::Params& p)
 }
 
 //virtual
-void LLScrollListText::highlightText(S32 offset, S32 num_chars)
+void LLScrollListText::highlightText(S32 byte_offset, S32 num_bytes)
 {
-    mHighlightOffset = offset;
-    mHighlightCount = llmax(0, num_chars);
+    mHighlightOffset = byte_offset;
+    mHighlightCount = llmax(0, num_bytes);
 }
 
 //virtual
@@ -441,22 +450,27 @@ void LLScrollListText::draw(const LLColor4& color, const LLColor4& highlight_col
 
     if (mHighlightCount > 0)
     {
-        // Highlight text
+        // Where the match sits: the left edge of the text, as the alignment
+        // below places it, plus the width of what comes before the match.
+        //
+        // Both halves used to be one measurement with the pen position in the
+        // begin-offset slot -- a pixel count read as a byte index. What that
+        // measured was the text from a byte or two in, for as many bytes as
+        // the match started at, which happens to be nothing at all when the
+        // match is at the start of the cell. That is the case a type-ahead
+        // search produces, and it is why this went unseen.
+        const S32 prefix = cachedWidth(0, mHighlightOffset);
         S32 left = 0;
         switch(mFontAlignment)
         {
         case LLFontGL::LEFT:
-            // Start one character in, as this has always done -- not one byte
-            // in, which would land inside the first character whenever it is
-            // multi-byte and measure a replacement glyph instead of it.
-            left = cachedWidth((S32)utf8str_decode_at(mText.getString(), 0).next,
-                               mHighlightOffset);
+            left = TEXT_LEFT_PAD + prefix;
             break;
         case LLFontGL::RIGHT:
-            left = getWidth() - cachedWidth(mHighlightOffset, S32_MAX);
+            left = getWidth() - cachedWidth() + prefix;
             break;
         case LLFontGL::HCENTER:
-            left = (getWidth() - cachedWidth()) / 2;
+            left = (getWidth() - cachedWidth()) / 2 + prefix;
             break;
         }
         LLRect highlight_rect(left - 2,
@@ -473,7 +487,7 @@ void LLScrollListText::draw(const LLColor4& color, const LLColor4& highlight_col
     switch(mFontAlignment)
     {
     case LLFontGL::LEFT:
-        start_x = 1.f;
+        start_x = (F32)TEXT_LEFT_PAD;
         break;
     case LLFontGL::RIGHT:
         start_x = (F32)getWidth();
@@ -696,17 +710,24 @@ void LLScrollListIconText::draw(const LLColor4& color, const LLColor4& highlight
 
     if (mHighlightCount > 0)
     {
+        // The same reading as the plain text cell above, and the icon moves
+        // the text rather than the match within it: the icon's width belongs
+        // to where the text begins, which is what the alignment below says,
+        // and not to the offset the match sits at. Right-aligned it was
+        // subtracted from a left edge the icon does not move, and centred it
+        // was subtracted where the draw adds it.
+        const S32 prefix = cachedWidth(0, mHighlightOffset);
         S32 left = 0;
         switch (mFontAlignment)
         {
         case LLFontGL::LEFT:
-            left = cachedWidth(icon_space + 1, mHighlightOffset);
+            left = icon_space + TEXT_LEFT_PAD + prefix;
             break;
         case LLFontGL::RIGHT:
-            left = getWidth() - cachedWidth(mHighlightOffset, S32_MAX) - icon_space;
+            left = getWidth() - cachedWidth() + prefix;
             break;
         case LLFontGL::HCENTER:
-            left = (getWidth() - cachedWidth() - icon_space) / 2;
+            left = (getWidth() + icon_space - cachedWidth()) / 2 + prefix;
             break;
         }
         LLRect highlight_rect(left - 2,
@@ -724,8 +745,8 @@ void LLScrollListIconText::draw(const LLColor4& color, const LLColor4& highlight
     switch (mFontAlignment)
     {
     case LLFontGL::LEFT:
-        start_text_x = icon_space + 1.f;
-        start_icon_x = 1;
+        start_text_x = (F32)(icon_space + TEXT_LEFT_PAD);
+        start_icon_x = TEXT_LEFT_PAD;
         break;
     case LLFontGL::RIGHT:
         start_text_x = (F32)getWidth();

@@ -130,7 +130,10 @@ public:
     virtual void            setToolTip(const std::string &str) { mToolTip = str; }
     virtual bool            getVisible() const { return true; }
     virtual void            setWidth(S32 width) { mWidth = width; }
-    virtual void            highlightText(S32 offset, S32 num_chars) {}
+    // Which run of this cell's own text a search matched. Both count BYTES of
+    // it -- what the scroll list's searches hand over, and what the widths
+    // the highlight is drawn from are measured in. The name said characters.
+    virtual void            highlightText(S32 byte_offset, S32 num_bytes) {}
     virtual bool            isText() const { return false; }
     virtual bool            needsToolTip() const { return ! mToolTip.empty(); }
     virtual void            setColor(const LLColor4&) {}
@@ -177,7 +180,7 @@ public:
     /*virtual*/ const LLSD getValue() const;
     /*virtual*/ const LLSD getAltValue() const;
     /*virtual*/ bool    getVisible() const;
-    /*virtual*/ void    highlightText(S32 offset, S32 num_chars);
+    /*virtual*/ void    highlightText(S32 byte_offset, S32 num_bytes);
 
     /*virtual*/ void    setColor(const LLColor4&);
     /*virtual*/ bool    isText() const;
