@@ -31,7 +31,6 @@
 #include "llview.h"
 
 #include <sstream>
-#include <boost/tokenizer.hpp>
 #include <boost/bind.hpp>
 
 #include "llrender.h"
@@ -145,7 +144,7 @@ LLView::LLView(const LLView::Params& p)
     mFromXUI(p.from_xui),
     mIsFocusRoot(p.focus_root),
     mLastVisible(false),
-    mHoverCursor(getCursorFromString(p.hover_cursor)),
+    mHoverCursor(getCursorFromString(p.hover_cursor())),
     mEnabled(p.enabled),
     mMouseOpaque(p.mouse_opaque),
     mSoundFlags(p.sound_flags),
@@ -2472,38 +2471,35 @@ void LLView::parseFollowsFlags(const LLView::Params& params)
     {
         setFollows(FOLLOWS_NONE);
 
-        std::string follows = params.follows.string;
+        // Split in place. This runs for every widget a floater builds, and a
+        // boost::tokenizer here copied the whole attribute and then allocated
+        // a std::string for each of the two or three names inside it, to
+        // compare each against five short literals and throw it away.
+        // Bound through a reference: if the accessor ever returns by value, a
+        // view taken straight off it would outlive what it points at.
+        const std::string& follows_str = params.follows.string;
+        const std::string_view follows = follows_str;
 
-        typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-        boost::char_separator<char> sep("|");
-        tokenizer tokens(follows, sep);
-        tokenizer::iterator token_iter = tokens.begin();
-
-        while(token_iter != tokens.end())
+        U32 flags = FOLLOWS_NONE;
+        for (size_t start = 0; start <= follows.size(); )
         {
-            const std::string& token_str = *token_iter;
-            if (token_str == "left")
+            const size_t bar = follows.find('|', start);
+            const std::string_view token =
+                follows.substr(start, bar == std::string_view::npos ? std::string_view::npos : bar - start);
+
+            if      (token == "left")   { flags |= FOLLOWS_LEFT; }
+            else if (token == "right")  { flags |= FOLLOWS_RIGHT; }
+            else if (token == "top")    { flags |= FOLLOWS_TOP; }
+            else if (token == "bottom") { flags |= FOLLOWS_BOTTOM; }
+            else if (token == "all")    { flags |= FOLLOWS_ALL; }
+
+            if (bar == std::string_view::npos)
             {
-                setFollowsLeft();
+                break;
             }
-            else if (token_str == "right")
-            {
-                setFollowsRight();
-            }
-            else if (token_str == "top")
-            {
-                setFollowsTop();
-            }
-            else if (token_str == "bottom")
-            {
-                setFollowsBottom();
-            }
-            else if (token_str == "all")
-            {
-                setFollowsAll();
-            }
-            ++token_iter;
+            start = bar + 1;
         }
+        setFollows(flags);
     }
     else if (params.follows.flags.isChosen())
     {
