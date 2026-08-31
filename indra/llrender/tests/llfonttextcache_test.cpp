@@ -697,11 +697,13 @@ namespace tut
         LLFontGL::sCurOrigin.set(0, 0);
 
         LLFontTextCache vb;
-        vb.setSource(&s, 0);
 
         // Same text, at whatever place in its own coordinates it is asked for.
+        // Named before every draw, which is how a widget uses this -- it holds
+        // no copy of the text and cannot see a change for itself.
         auto draw_at = [&](F32 x)
         {
+            vb.setSource(&s, 0);
             vb.renderBytes(font, s, 0, x, 34.f, LLColor4::white,
                            LLFontGL::LEFT, LLFontGL::BASELINE,
                            LLFontGL::NORMAL, LLFontGL::NO_SHADOW);

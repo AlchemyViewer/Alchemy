@@ -148,9 +148,14 @@ public:
     // cannot. Callers that never change their text may skip it.
     void setSource(const void* owner, U32 version)
     {
+        // Drop the work, not the name: asking whether the source moved is what
+        // records it, and reset() forgets it again. A caller that names its
+        // text before every draw -- which is what this is for -- then looked
+        // like a different text on every one of them, and nothing it drew was
+        // ever replayed.
         if (sourceMoved(owner, version))
         {
-            reset();
+            dropDerived();
         }
     }
 
@@ -224,6 +229,11 @@ public:
     // settles, and nothing outside it can otherwise see whether it did.
     static U64 regenCount() { return sRegenCount; }
 private:
+
+    // Everything derived from the text, thrown away without forgetting which
+    // text it was for. reset() is this plus forgetting the name, which is what
+    // an outside caller wants and what naming the source does not.
+    void dropDerived();
 
     // The cache check is the same whichever unit the caller measures in;
     // only the call that fills it differs.

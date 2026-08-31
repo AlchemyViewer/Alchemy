@@ -106,7 +106,7 @@ LLFontTextCache::~LLFontTextCache()
     reset();
 }
 
-void LLFontTextCache::reset()
+void LLFontTextCache::dropDerived()
 {
     // Todo: some form of debug only frequecy check&assert to see if this is happening too often.
     // Regenerating this list is expensive
@@ -117,6 +117,11 @@ void LLFontTextCache::reset()
         slot.valid = false;
     }
     mNextWidthSlot = 0;
+}
+
+void LLFontTextCache::reset()
+{
+    dropDerived();
     forgetSource();
 }
 
