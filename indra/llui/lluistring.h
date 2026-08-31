@@ -120,6 +120,12 @@ private:
     // controls lazy evaluation
     mutable bool    mNeedsResult { true };
 
+    // The edit helpers above change the result and deliberately leave the
+    // original alone, so the two can hold different text. Assigning the
+    // original its own value is how a field is put back, and has to rebuild
+    // even though the original did not move.
+    mutable bool    mResultEdited { false };
+
     // Not mutable: updateResult() recomputes what the last change already
     // announced, so producing the result must not count as a change.
     U32             mGeneration { 0 };

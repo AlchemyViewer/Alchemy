@@ -40,6 +40,14 @@ LLUIString::LLUIString(const std::string& instring, const LLStringUtil::format_m
 
 void LLUIString::assign(const std::string& s)
 {
+    // Assigning the value already held substitutes to the same result. A panel
+    // that refreshes a readout every frame assigns most of its labels what
+    // they already said, and announcing that as a change costs every cache
+    // keyed on this text the glyphs it had shaped.
+    if (mOrig == s && !mResultEdited)
+    {
+        return;
+    }
     mOrig = s;
     dirty();
 }
@@ -62,12 +70,29 @@ void LLUIString::setArgs(const LLSD& sd)
     {
         setArg(sd_it->first, sd_it->second.asString());
     }
-    dirty();
 }
 
 void LLUIString::setArg(const std::string& key, const std::string& replacement)
 {
-    getArgs()[key] = replacement;
+    // Same reasoning as assign: an argument set to what it already holds
+    // leaves the substitution identical. The map's comparator is transparent,
+    // so probing it by view costs nothing where operator[] would have built
+    // the key whether or not it was needed -- and would have inserted an empty
+    // one, which is not the same as the name never having been given.
+    LLStringUtil::format_map_t& args = getArgs();
+    const auto it = args.find(std::string_view(key));
+    if (it != args.end())
+    {
+        if (it->second() == replacement)
+        {
+            return;
+        }
+        it->second = replacement;
+    }
+    else
+    {
+        args.emplace(key, replacement);
+    }
     dirty();
 }
 
@@ -77,6 +102,7 @@ void LLUIString::truncate(S32 max_bytes)
     if (result.size() > (size_t)max_bytes)
     {
         ++mGeneration;
+        mResultEdited = true;
         // Back off to a whole character. A byte count can fall between a
         // letter and its accent, or inside a flag or a family.
         result.resize(utf8str_grapheme_align_backward(result, (size_t)max_bytes));
@@ -87,12 +113,14 @@ void LLUIString::erase(S32 byte_idx, S32 byte_len)
 {
     getUpdatedResult().erase(byte_idx, byte_len);
     ++mGeneration;
+    mResultEdited = true;
 }
 
 void LLUIString::insert(S32 byte_idx, std::string_view chars)
 {
     getUpdatedResult().insert(byte_idx, chars);
     ++mGeneration;
+    mResultEdited = true;
 }
 
 void LLUIString::replace(S32 byte_idx, llwchar wc)
@@ -104,6 +132,7 @@ void LLUIString::replace(S32 byte_idx, llwchar wc)
     const auto at = utf8str_decode_at(result, (size_t)byte_idx);
     result.replace((size_t)byte_idx, at.next - (size_t)byte_idx, utf8str_from_cp(wc));
     ++mGeneration;
+    mResultEdited = true;
 }
 
 void LLUIString::clear()
@@ -111,6 +140,7 @@ void LLUIString::clear()
     // Keep Args
     mOrig.clear();
     mResult.clear();
+    mResultEdited = false;
     ++mGeneration;
 }
 
@@ -125,6 +155,9 @@ void LLUIString::updateResult() const
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     mNeedsResult = false;
+    // The result is the original's again, whatever the edit helpers had made
+    // of it.
+    mResultEdited = false;
 
     // optimize for empty strings (don't attempt string replacement)
     if (mOrig.empty())
