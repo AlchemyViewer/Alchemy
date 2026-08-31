@@ -143,7 +143,7 @@ private:
     void                    addLocationHistoryEntry(const std::string& title, const LLSD& value);
     void                    rebuildLocationHistory(const std::string& filter = LLStringUtil::null);
     bool                    findTeleportItemsByTitle(const LLTeleportHistoryItem& item, const std::string& filter);
-    void                    setText(const LLStringExplicit& text);
+    void                    setText(ALStringViewExplicit text);
     void                    updateAddLandmarkButton();
     void                    updateAddLandmarkTooltip();
     void                    updateContextMenu();

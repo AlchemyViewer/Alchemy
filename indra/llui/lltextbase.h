@@ -479,7 +479,10 @@ public:
 
     // Text accessors
     // TODO: add optional style parameter
-    virtual void            setText(const LLStringExplicit &utf8str , const LLStyle::Params& input_params = LLStyle::Params()); // uses default style
+    // By view. Every implementation below copies what it is given, because
+    // it has to validate and truncate it; taking an owning string as well
+    // meant the caller copied it first so the callee could copy it again.
+    virtual void            setText(ALStringViewExplicit utf8str , const LLStyle::Params& input_params = LLStyle::defaultParams()); // uses default style
     /*virtual*/ const std::string& getText() const override;
     void                    setMaxTextLength(S32 length) { mMaxTextByteLength = length; }
     S32                     getMaxTextLength() const { return mMaxTextByteLength; }

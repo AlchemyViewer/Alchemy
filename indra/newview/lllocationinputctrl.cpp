@@ -539,7 +539,7 @@ void LLLocationInputCtrl::onTextEntry(LLLineEditor* line_editor)
  *
  * This is faster than setTextEntry().
  */
-void LLLocationInputCtrl::setText(const LLStringExplicit& text)
+void LLLocationInputCtrl::setText(ALStringViewExplicit text)
 {
     if (mTextEntry)
     {

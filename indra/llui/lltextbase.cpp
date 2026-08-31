@@ -1683,8 +1683,9 @@ void LLTextBase::onVisibilityChange( bool new_visibility )
 //virtual
 void LLTextBase::setValue(const LLSD& value )
 {
-    static const LLStyle::Params input_params = LLStyle::Params();
-    setText(value.asString(), input_params);
+    // No style of its own, so this resolves to LLStyle::defaultParams() and
+    // stays eligible for the guard in LLTextBox::setText.
+    setText(value.asString());
 }
 
 //virtual
@@ -2442,7 +2443,7 @@ void LLTextBase::createUrlContextMenu(S32 x, S32 y, const std::string &in_url)
     }
 }
 
-void LLTextBase::setText(const LLStringExplicit &utf8str, const LLStyle::Params& input_params)
+void LLTextBase::setText(ALStringViewExplicit utf8str, const LLStyle::Params& input_params)
 {
     beforeValueChange();
     // Can insert a lot of different segments, don't want to spam events.

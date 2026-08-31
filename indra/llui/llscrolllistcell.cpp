@@ -394,9 +394,9 @@ void LLScrollListText::setColor(const LLColor4& color)
     mUseColor = true;
 }
 
-void LLScrollListText::setText(const LLStringExplicit& text)
+void LLScrollListText::setText(ALStringViewExplicit text)
 {
-    mText = text;
+    mText.assign(text);
 }
 
 void LLScrollListText::setFontStyle(const U8 font_style)

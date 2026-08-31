@@ -74,7 +74,7 @@ public:
 
     /*virtual*/ void    draw();
 
-    void setText(const LLStringExplicit &new_text) { mSearchEditor->setText(new_text); }
+    void setText(ALStringViewExplicit new_text) { mSearchEditor->setText(new_text); }
     const std::string& getText() const      { return mSearchEditor->getText(); }
 
     // LLUICtrl interface

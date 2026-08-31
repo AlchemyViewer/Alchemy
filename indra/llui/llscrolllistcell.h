@@ -191,7 +191,7 @@ public:
     void            setTextWidth(S32 value);
     virtual void    setWidth(S32 width);
 
-    void            setText(const LLStringExplicit& text);
+    void            setText(ALStringViewExplicit text);
     void            setFontStyle(const U8 font_style);
     void            setAlignment(LLFontGL::HAlign align);
 

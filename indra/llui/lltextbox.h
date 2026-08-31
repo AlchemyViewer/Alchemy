@@ -54,7 +54,7 @@ public:
 
     void setEnabled(bool enabled) override;
 
-    void setText(const LLStringExplicit& text, const LLStyle::Params& input_params = LLStyle::Params()) override;
+    void setText(ALStringViewExplicit text, const LLStyle::Params& input_params = LLStyle::defaultParams()) override;
 
     void setRightAlign() { mHAlign = LLFontGL::RIGHT; }
     void setHAlign(LLFontGL::HAlign align) { mHAlign = align; }
@@ -75,6 +75,9 @@ protected:
     void onUrlLabelUpdated(const std::string& url, const std::string& label);
 
     LLUIString          mText;
+
+    // Whether the document currently carries a style someone asked for.
+    bool                mLastSetTextStyled = false;
     callback_t          mClickedCallback;
     bool                mShowCursorHand;
 

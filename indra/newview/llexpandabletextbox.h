@@ -53,7 +53,7 @@ protected:
 
         // adds or removes "More" link as needed
         /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
-        /*virtual*/ void setText(const LLStringExplicit& text, const LLStyle::Params& input_params = LLStyle::Params());
+        /*virtual*/ void setText(ALStringViewExplicit text, const LLStyle::Params& input_params = LLStyle::defaultParams());
         void setTextBase(const std::string& text) { LLTextBase::setText(text); }
 
         /**

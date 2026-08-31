@@ -204,7 +204,7 @@ public:
     const std::string&  getLabel()  { return mLabel.getString(); }
 
     void            setDefaultText() { setText(mDefaultText); }
-    void            setText(const LLStringExplicit &new_text);
+    void            setText(ALStringViewExplicit new_text);
 
     const std::string& getText() const override { return mText.getString(); }
 
@@ -361,7 +361,7 @@ public:
     /*virtual*/ S32     getPreeditFontSize() const override;
     /*virtual*/ const std::string& getPreeditStringUtf8() const override { return getText(); }
 
-    void            setText(const LLStringExplicit &new_text, bool use_size_limit);
+    void            setText(ALStringViewExplicit new_text, bool use_size_limit);
 
     void            setContextMenu(LLContextMenu* new_context_menu);
 
