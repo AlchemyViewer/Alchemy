@@ -1052,6 +1052,48 @@ void LLFolderViewItem::setVisible(bool visible)
         mSuffixFontBuffer.reset();
     }
     LLView::setVisible(visible);
+
+    // Take the width that was skipped while this was out of sight. An item is
+    // as wide as the folder holding it, by construction -- arrange says so
+    // where it declines to change one. Done after the flag is set, so the
+    // reshape below takes the visible path rather than skipping itself again.
+    if (visible && mParentFolder && getRect().getWidth() != mParentFolder->getRect().getWidth())
+    {
+        reshape(mParentFolder->getRect().getWidth(), getRect().getHeight());
+    }
+}
+
+void LLFolderViewItem::reshape(S32 width, S32 height, bool called_from_parent)
+{
+    if (!getVisible())
+    {
+        // Out of sight, so not drawn, hit tested, or measured -- a folder sizes
+        // itself from its children's labels, never from their rectangles, so
+        // nothing reads what is skipped here. Not even the rect is taken: this
+        // runs once per item of every shut folder, and setVisible settles the
+        // width at the moment there is a reason to have one.
+        return;
+    }
+
+    // A shut folder holds every one of its items hidden, and a plain item holds
+    // nothing at all, so the walk below would step over thousands of views to
+    // leave each exactly as it found it. Take the size and stop.
+    //
+    // This is what a resize costs in an inventory: dragging the floater's edge
+    // reached two hundred thousand items to change the few dozen on screen.
+    //
+    // Asked the same way draw asks it: a folder shut a moment ago is still
+    // animating closed, and its items are still on screen while it does.
+    if (!showsChildren())
+    {
+        LLRect own_rect = getRect();
+        own_rect.mRight = own_rect.mLeft + width;
+        own_rect.mTop = own_rect.mBottom + height;
+        setRect(own_rect);
+        return;
+    }
+
+    LLView::reshape(width, height, called_from_parent);
 }
 
 LLFontTextCache& LLFolderViewItem::labelCache()
@@ -2516,7 +2558,7 @@ void LLFolderViewFolder::draw()
     LLFolderViewItem::draw();
 
     // draw children if root folder, or any other folder that is open or animating to closed state
-    if( getRoot() == this || (isOpen() || mCurHeight != mTargetHeight ))
+    if( getRoot() == this || showsChildren() )
     {
         LLView::draw();
     }

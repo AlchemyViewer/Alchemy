@@ -295,6 +295,12 @@ public:
     virtual void setOpen(bool open = true) {};
     virtual bool isOpen() const { return false; }
 
+    // Whether anything below this view is on screen. An item has no children
+    // at all; a folder has them while it is open, and still has them while it
+    // animates shut. Draw and reshape have to agree on this, or a folder is
+    // drawn collapsing with children nobody is laying out.
+    virtual bool showsChildren() const { return false; }
+
     virtual LLFolderView*   getRoot();
     virtual const LLFolderView* getRoot() const;
     bool            isDescendantOf( const LLFolderViewFolder* potential_ancestor );
@@ -326,6 +332,10 @@ public:
 
     // Releases cached text geometry when hidden so off-screen items hold no font buffers.
     virtual void setVisible(bool visible);
+
+    // Sizes itself and stops when out of sight; setVisible settles the width
+    // afterwards. See the definition for why nothing reads what is skipped.
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
     //  virtual void handleDropped();
     virtual void draw();
@@ -515,6 +525,7 @@ public:
 
     // Get the current state of the folder.
     virtual bool isOpen() const { return mIsOpen; }
+    bool showsChildren() const override { return isOpen() || mCurHeight != mTargetHeight; }
 
     // special case if an object is dropped on the child.
     bool handleDragAndDropFromChild(MASK mask,
