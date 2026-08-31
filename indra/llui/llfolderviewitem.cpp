@@ -282,8 +282,8 @@ bool LLFolderViewItem::postBuild()
         // lazy getLabelSuffix(), it is however needed as it sets
         // search string, which can later determine visibility.
         // Refreshing a search string also requires a filter reset.
-        mLabel = vmi->getDisplayName();
-        mIsFavorite = vmi->isFavorite() && !vmi->isItemInTrash();
+        setLabelText(vmi->getDisplayName());
+        setFavorite(vmi->isFavorite() && !vmi->isItemInTrash());
 
         // Dirty the filter flag of the model from the view (CHUI-849)
         vmi->dirtyFilter();
@@ -398,7 +398,7 @@ void LLFolderViewItem::refresh()
     // bumping it for an identical name throws the label's geometry away and
     // shapes it again on the next draw.
     setLabelText(vmi.getDisplayName());
-    mIsFavorite = vmi.isFavorite() && !vmi.isItemInTrash();
+    setFavorite(vmi.isFavorite() && !vmi.isItemInTrash());
     // icons are slightly expensive to get, can be optimized
     // see LLInventoryIcon::getIcon()
     mIcon = vmi.getIcon();
@@ -409,8 +409,10 @@ void LLFolderViewItem::refresh()
     {
         // Very Expensive!
         // Can do a number of expensive checks, like checking active motions, wearables or friend list
-        mLabelStyle = vmi.getLabelStyle();
-        pLabelFont = nullptr; // refresh can be called from a coro, don't use getLabelFontForStyle, coro trips font list tread safety
+        // setLabelStyle only drops the cached font when the style moved; refresh
+        // can be called from a coro, and getLabelFontForStyle trips the font
+        // list's thread safety, so the font is never looked up from here.
+        setLabelStyle(vmi.getLabelStyle());
         setLabelSuffixText(vmi.getLabelSuffix());
     }
 
@@ -431,14 +433,13 @@ void LLFolderViewItem::refreshSuffix()
     mIconOpen = vmi->getIconOpen();
     mIconOverlay = vmi->getIconOverlay();
 
-    mIsFavorite = vmi->isFavorite() && !vmi->isItemInTrash();
+    setFavorite(vmi->isFavorite() && !vmi->isItemInTrash());
 
     if (mRoot->useLabelSuffix())
     {
         // Very Expensive!
         // Can do a number of expensive checks, like checking active motions, wearables or friend list
-        mLabelStyle = vmi->getLabelStyle();
-        pLabelFont = nullptr;
+        setLabelStyle(vmi->getLabelStyle());
         setLabelSuffixText(vmi->getLabelSuffix());
     }
 
@@ -500,14 +501,34 @@ S32 LLFolderViewItem::arrange( S32* width, S32* height )
             // it is purely visual, so it is fine to do at our laisure
             refreshSuffix();
         }
-        ++sArrangeRemeasures;
-        // getLabelFont() is the cached font for mLabelStyle; sSuffixFont is the cached NORMAL-style
-        // font. Both avoid the per-call sFonts map lookup that getLabelFontForStyle() does.
-        mLabelWidth = getLabelXPos() + getLabelFont()->getWidth(mLabel) + sSuffixFont->getWidth(mLabelSuffix) + mLabelPaddingRight;
         mLabelWidthDirty = false;
-        if (mIsFavorite)
+
+        // The flag says a refresh ran, not that it found anything. The model
+        // is asked for the name and the suffix whenever anything about the
+        // item might have moved and hands back the strings already held, so
+        // everything the width is derived from is compared here instead: the
+        // two strings and the font through the counter that tracks them, the
+        // state the font would be measured at, and where the label starts.
+        //
+        // Measuring is a shape of both strings, and a filter or an inventory
+        // update dirties every item in the tree.
+        const S32 resolution = LLFontGL::sResolutionGeneration;
+        if (mLabelWidthGeneration != mLabelGeneration
+            || mLabelWidthIndentation != mIndentation
+            || mLabelWidthResolution != resolution)
         {
-            mLabelWidth += FAVORITE_IMAGE_SIZE + FAVORITE_IMAGE_PAD;
+            mLabelWidthGeneration = mLabelGeneration;
+            mLabelWidthIndentation = mIndentation;
+            mLabelWidthResolution = resolution;
+
+            ++sArrangeRemeasures;
+            // getLabelFont() is the cached font for mLabelStyle; sSuffixFont is the cached NORMAL-style
+            // font. Both avoid the per-call sFonts map lookup that getLabelFontForStyle() does.
+            mLabelWidth = getLabelXPos() + getLabelFont()->getWidth(mLabel) + sSuffixFont->getWidth(mLabelSuffix) + mLabelPaddingRight;
+            if (mIsFavorite)
+            {
+                mLabelWidth += FAVORITE_IMAGE_SIZE + FAVORITE_IMAGE_PAD;
+            }
         }
     }
 
@@ -1112,6 +1133,31 @@ void LLFolderViewItem::setLabelSuffixText(std::string suffix)
     if (mLabelSuffix != suffix)
     {
         mLabelSuffix = std::move(suffix);
+        ++mLabelGeneration;
+    }
+}
+
+void LLFolderViewItem::setLabelStyle(LLFontGL::StyleFlags style)
+{
+    if (mLabelStyle != style)
+    {
+        mLabelStyle = style;
+        // The font this picks out is what the label is measured and shaped
+        // with, so both the cached pointer and the work derived from it go.
+        pLabelFont = nullptr;
+        ++mLabelGeneration;
+    }
+}
+
+void LLFolderViewItem::setFavorite(bool favorite)
+{
+    if (mIsFavorite != favorite)
+    {
+        mIsFavorite = favorite;
+        // Not a change to the text, but a change to how wide the item is: the
+        // mark is drawn beside the label and the width has to leave room for
+        // it. One counter answers both questions, and losing a label's glyphs
+        // over a star is a price paid when someone marks one.
         ++mLabelGeneration;
     }
 }

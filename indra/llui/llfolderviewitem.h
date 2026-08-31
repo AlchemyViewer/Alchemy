@@ -360,10 +360,12 @@ private:
 
 public:
     // How many items re-measured their label during the arrange in progress.
-    // That measurement goes straight to the font, so it is a HarfBuzz shape
-    // apiece, and it is preceded by a suffix refresh that queries the model.
-    // Reported as the value on LLFolderView::arrange's profiler zone, which is
-    // the only way to tell a cheap arrange from one that measured everything.
+    // That measurement goes straight to the font, so it is a HarfBuzz shape of
+    // both strings apiece, and it counts the items that found an input had
+    // moved -- not the ones a refresh merely asked about, which is most of
+    // them. Reported as the value on LLFolderView::arrange's profiler zone,
+    // which is the only way to tell a cheap arrange from one that measured
+    // everything.
     static S32 sArrangeRemeasures;
 
 private:
@@ -378,20 +380,36 @@ private:
     // drawn, after being hidden, or (for the suffix) when there is no suffix.
     // Created on first draw: inventory holds thousands of items and most are
     // never shown. Both are keyed on mLabelGeneration, which is bumped
-    // wherever the label or the suffix is rebuilt -- one counter for both,
-    // because a rebuild of the cheaper one is the safe direction.
+    // wherever anything that decides what this item's text looks like is
+    // rebuilt -- either string, the style that picks the font they are drawn
+    // in, the favourite mark that takes room beside them. One counter for all
+    // of it, because a rebuild the change did not need is the safe direction.
     std::unique_ptr<LLFontTextCache> mLabelFontBuffer;
     std::unique_ptr<LLFontTextCache> mSuffixFontBuffer;
     U32                              mLabelGeneration = 0;
 
+    // What mLabelWidth was measured from. The strings and the font are the
+    // counter above; the other two are read where they live. Measuring is a
+    // shape of both strings, and the flag that asks for it says only that a
+    // refresh ran -- see arrange.
+    //
+    // The resolution starts where the font's own count cannot, so an item that
+    // has never measured always does.
+    U32                              mLabelWidthGeneration = 0;
+    S32                              mLabelWidthIndentation = 0;
+    S32                              mLabelWidthResolution = -1;
+
     LLFontTextCache& labelCache();
     LLFontTextCache& suffixCache();
 
-    // Take a new label or suffix, and count it only if it is one. A refresh
-    // asks the model for both whenever anything about the item might have
-    // changed, and the answer is almost always the string already held.
+    // Take a new label, suffix, style or favourite mark, and count it only if
+    // it is one. A refresh asks the model for all of them whenever anything
+    // about the item might have changed, and the answer is almost always what
+    // is already held.
     void setLabelText(std::string label);
     void setLabelSuffixText(std::string suffix);
+    void setLabelStyle(LLFontGL::StyleFlags style);
+    void setFavorite(bool favorite);
 
     // A span of this item's label or suffix, measured through its own cache.
     // Inventory measures both several times per item per frame while a search
