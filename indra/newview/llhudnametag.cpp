@@ -328,9 +328,13 @@ void LLHUDNameTag::renderText()
 
     F32 y_offset = (F32)mOffsetY;
 
+    // One scope for the label and the text alike. What it sets up -- the pixel
+    // basis at this position, the viewport, and the 2D projection the font
+    // draws under -- is per position, and both are drawn at the same one.
+    LLHUDTextScope scope(render_position, false);
+
     // Render label
     {
-        LLHUDTextScope scope(render_position, false);
         for(std::vector<LLHUDTextSegment>::iterator segment_iter = mLabelSegments.begin();
             segment_iter != mLabelSegments.end(); ++segment_iter )
         {
@@ -368,7 +372,6 @@ void LLHUDNameTag::renderText()
             start_segment = llmax((S32)0, (S32)mTextSegments.size() - max_lines);
         }
 
-        LLHUDTextScope scope(render_position, false);
         for (std::vector<LLHUDTextSegment>::iterator segment_iter = mTextSegments.begin() + start_segment;
              segment_iter != mTextSegments.end(); ++segment_iter )
         {
@@ -708,9 +711,9 @@ LLVector2 LLHUDNameTag::updateScreenPos(const LLVector2 &offset)
 
 void LLHUDNameTag::updateSize()
 {
-    // Asked twice per tag per frame: once before the level of detail is
-    // decided and once after, because the level decides how many lines are
-    // measured. The count is the segments it walks.
+    // Asked once per visible tag per frame, after the level of detail is
+    // decided, because the level is what says how many lines are measured.
+    // The count is the segments it walks.
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     LL_PROFILE_ZONE_NUM(mTextSegments.size() + mLabelSegments.size());
     static LLCachedControl<F32> name_tag_hpad(gSavedSettings, "NameTagHPad", 16.f);
