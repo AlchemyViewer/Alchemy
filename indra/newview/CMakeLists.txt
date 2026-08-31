@@ -157,6 +157,7 @@ set(viewer_SOURCE_FILES
     alassetblocklist.cpp
     alavataractions.cpp
     alavatargroups.cpp
+    alchatautocomplete.cpp
     alchatbar.cpp
     alchatcommand.cpp
     alcheatcodes.cpp
@@ -938,6 +939,7 @@ set(viewer_HEADER_FILES
     alassetblocklist.h
     alavataractions.h
     alavatargroups.h
+    alchatautocomplete.h
     alchatbar.h
     alchatcommand.h
     alclassifieditem.h

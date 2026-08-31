@@ -43,7 +43,7 @@ bool LLFloaterGestureAutocompletePicker::postBuild()
 {
     mGestureList = getChild<LLScrollListCtrl>("gesture_list");
     mGestureList->setCommitOnKeyboardMovement(false);
-    mGestureList->setCommitCallback(boost::bind(&LLFloaterGestureAutocompletePicker::commitSelected, this));
+    mGestureList->setCommitCallback(boost::bind(&LLFloaterGestureAutocompletePicker::commitSelected, this, false));
 
     return LLFloater::postBuild();
 }
@@ -101,6 +101,8 @@ bool LLFloaterGestureAutocompletePicker::handleKey(KEY key, MASK mask, bool call
                 mGestureList->scrollToShowSelected();
                 return true;
             case KEY_RETURN:
+                commitSelected(true);
+                return true;
             case KEY_TAB:
                 commitSelected();
                 return true;
@@ -131,7 +133,7 @@ void LLFloaterGestureAutocompletePicker::goneFromFront()
     LLGestureAutocompleteHelper::instance().hideHelper();
 }
 
-bool LLFloaterGestureAutocompletePicker::commitSelected()
+bool LLFloaterGestureAutocompletePicker::commitSelected(bool return_key)
 {
     LLScrollListItem* item = mGestureList->getFirstSelected();
 
@@ -147,8 +149,7 @@ bool LLFloaterGestureAutocompletePicker::commitSelected()
         return false;
     }
 
-    setValue(value);
-    onCommit();
+    LLGestureAutocompleteHelper::instance().onCommit(value, return_key);
 
     return true;
 }
