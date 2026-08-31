@@ -29,6 +29,7 @@
 #define LL_LLUISTRING_H
 
 #include "llstring.h"
+#include <memory>
 #include <string>
 
 // Use this class to store translated text that may have arguments
@@ -58,10 +59,24 @@ class LLUIString
 public:
     // These methods all perform appropriate argument substitution
     // and modify mOrig where appropriate
-    LLUIString() : mArgs(NULL), mNeedsResult(false) {}
+    LLUIString() : mNeedsResult(false) {}
     LLUIString(const std::string& instring, const LLStringUtil::format_map_t& args);
-    LLUIString(const std::string& instring) : mArgs(NULL) { assign(instring); }
-    ~LLUIString() { delete mArgs; }
+    LLUIString(const std::string& instring) { assign(instring); }
+
+    // The arguments are owned, so a copy needs a set of its own: a map shared
+    // between two strings is deleted by whichever of them goes out of scope
+    // first.
+    //
+    // An assignment also has to move this string's own version on. Anything
+    // caching work derived from the text -- shaped glyphs, a measured width --
+    // keys on that number together with this object's address, and an
+    // assignment leaves the address where it was. Whatever count the other
+    // string happens to be on says nothing about what was last drawn from
+    // this one, and can even repeat a number this one has already issued.
+    LLUIString(const LLUIString& other);
+    LLUIString& operator=(const LLUIString& other);
+    LLUIString(LLUIString&& other) noexcept = default;
+    LLUIString& operator=(LLUIString&& other) noexcept;
 
     void assign(const std::string& instring);
     LLUIString& operator=(const std::string& s) { assign(s); return *this; }
@@ -115,7 +130,7 @@ private:
 
     std::string mOrig;
     mutable std::string mResult;
-    LLStringUtil::format_map_t* mArgs;
+    std::unique_ptr<LLStringUtil::format_map_t> mArgs;
 
     // controls lazy evaluation
     mutable bool    mNeedsResult { true };

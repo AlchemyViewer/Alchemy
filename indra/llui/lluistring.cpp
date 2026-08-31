@@ -33,9 +33,50 @@
 
 LLUIString::LLUIString(const std::string& instring, const LLStringUtil::format_map_t& args)
 :   mOrig(instring),
-    mArgs(new LLStringUtil::format_map_t(args))
+    mArgs(std::make_unique<LLStringUtil::format_map_t>(args))
 {
     dirty();
+}
+
+LLUIString::LLUIString(const LLUIString& other)
+:   mOrig(other.mOrig),
+    mResult(other.mResult),
+    mArgs(other.mArgs ? std::make_unique<LLStringUtil::format_map_t>(*other.mArgs) : nullptr),
+    mNeedsResult(other.mNeedsResult),
+    mResultEdited(other.mResultEdited),
+    mGeneration(other.mGeneration)
+{
+    // A new string at an address of its own, which nothing has drawn from
+    // yet -- so there is no count here to carry on from, and the other's
+    // serves as well as any.
+}
+
+LLUIString& LLUIString::operator=(const LLUIString& other)
+{
+    if (this != &other)
+    {
+        mOrig = other.mOrig;
+        mResult = other.mResult;
+        mArgs = other.mArgs ? std::make_unique<LLStringUtil::format_map_t>(*other.mArgs) : nullptr;
+        mNeedsResult = other.mNeedsResult;
+        mResultEdited = other.mResultEdited;
+        ++mGeneration;
+    }
+    return *this;
+}
+
+LLUIString& LLUIString::operator=(LLUIString&& other) noexcept
+{
+    if (this != &other)
+    {
+        mOrig = std::move(other.mOrig);
+        mResult = std::move(other.mResult);
+        mArgs = std::move(other.mArgs);
+        mNeedsResult = other.mNeedsResult;
+        mResultEdited = other.mResultEdited;
+        ++mGeneration;
+    }
+    return *this;
 }
 
 void LLUIString::assign(const std::string& s)
@@ -187,7 +228,7 @@ LLStringUtil::format_map_t& LLUIString::getArgs()
 {
     if (!mArgs)
     {
-        mArgs = new LLStringUtil::format_map_t;
+        mArgs = std::make_unique<LLStringUtil::format_map_t>();
     }
     return *mArgs;
 }
