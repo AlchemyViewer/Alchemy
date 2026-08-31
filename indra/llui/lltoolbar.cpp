@@ -148,7 +148,7 @@ LLToolBar::LLToolBar(const LLToolBar::Params& p)
     // than in draw. A read-only bar never asks, so it never registers.
     if (!mReadOnly)
     {
-        gIdleCallbacks.addFunction(&LLToolBar::onIdleUpdateButtonStates, this);
+        gIdleCallbacks.addFunction(&LLToolBar::onIdleUpdate, this);
     }
 }
 
@@ -156,7 +156,7 @@ LLToolBar::~LLToolBar()
 {
     if (!mReadOnly)
     {
-        gIdleCallbacks.deleteFunction(&LLToolBar::onIdleUpdateButtonStates, this);
+        gIdleCallbacks.deleteFunction(&LLToolBar::onIdleUpdate, this);
     }
 
     auto menu = mPopupMenuHandle.get();
@@ -172,20 +172,25 @@ LLToolBar::~LLToolBar()
 }
 
 // static
-void LLToolBar::onIdleUpdateButtonStates(void* userdata)
+void LLToolBar::onIdleUpdate(void* userdata)
 {
-    static_cast<LLToolBar*>(userdata)->updateButtonStates();
-}
+    LLToolBar* toolbar = static_cast<LLToolBar*>(userdata);
 
-void LLToolBar::updateButtonStates()
-{
-    // Nothing under a bar nobody can see is worth asking about, and this used
-    // to be reached from draw, which is where that was decided for free.
-    if (!isInVisibleChain())
+    // Nothing under a bar nobody can see needs settling, and this all used to
+    // be reached from draw, which is where that was decided for free.
+    if (!toolbar->isInVisibleChain())
     {
         return;
     }
 
+    // States first. A button that gains or loses its pressed look resizes
+    // itself, and the pass after this is what places it.
+    toolbar->updateButtonStates();
+    toolbar->updateLayoutAsNeeded();
+}
+
+void LLToolBar::updateButtonStates()
+{
     // Asking a button whether its command is available or running means running
     // whatever predicate commands.xml named for it, and most of those look a
     // floater up in the registry by name. Asked only when something that could
@@ -823,9 +828,9 @@ int LLToolBar::getRankFromPosition(const LLCommandId& id)
     return rank;
 }
 
-bool LLToolBar::updateLayoutAsNeeded()
+void LLToolBar::updateLayoutAsNeeded()
 {
-    if (!mNeedsLayout) return false;
+    if (!mNeedsLayout) return;
 
     LLView::EOrientation orientation = getOrientation(mSideType);
 
@@ -1005,7 +1010,6 @@ bool LLToolBar::updateLayoutAsNeeded()
 
     // don't clear flag until after we've resized ourselves, to avoid laying out every frame
     mNeedsLayout = false;
-    return true;
 }
 
 bool LLToolBar::postBuild()
@@ -1016,20 +1020,17 @@ bool LLToolBar::postBuild()
 
 void LLToolBar::draw()
 {
-    // The enabled and pressed state of every button used to be worked out here,
-    // which meant running a predicate apiece on every frame a bar drew. It is
-    // settled in updateButtonStates now, off an idle callback, which runs ahead
-    // of the draw for the frame -- so what is shown is no older than it was.
-
-    if (updateLayoutAsNeeded())
-    {
-        // Laying out can move this bar, and the matrix the parent pushed was
-        // built from where it used to be. Only then: the three calls below walk
-        // the UI origin stack, and a bar that did not move does not need them.
-        LLUI::popMatrix();
-        LLUI::pushMatrix();
-        LLUI::translate((F32)getRect().mLeft, (F32)getRect().mBottom);
-    }
+    // What every button shows, and where every button sits, are both settled
+    // on an idle callback now -- see onIdleUpdate. Idle runs ahead of the
+    // display for the frame, so nothing here is older than it was.
+    //
+    // Laying out moves and resizes this bar, and it used to do that from right
+    // here, after the parent had already pushed a matrix translated to where
+    // the bar was before. So the three lines that stood here popped that
+    // matrix, pushed another, and translated again with the new rectangle --
+    // correct, and balanced against the parent's own pop, but a view reaching
+    // into its caller's frame to repair a translation the caller had made in
+    // good faith. A bar that does not move while being drawn needs none of it.
 
     // Position the caret
     // Todo: This shouldn't be on draw, but, as example, on hover

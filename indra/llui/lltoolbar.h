@@ -308,9 +308,11 @@ private:
 
     void initFromParams(const Params&);
     void createContextMenu();
-    // Returns whether it laid anything out, which tells the caller whether
-    // this bar moved.
-    bool updateLayoutAsNeeded();
+    // Moves and resizes this bar as well as its buttons, so it is run from the
+    // idle callback rather than from draw -- a view that relocates itself while
+    // being drawn leaves the matrix its parent pushed pointing at where it used
+    // to be.
+    void updateLayoutAsNeeded();
     void createButtons();
     void resizeButtonsInRow(std::vector<LLToolBarButton*>& buttons_in_row, S32 max_row_girth);
     bool isButtonTypeChecked(const LLSD& userdata);
@@ -362,11 +364,11 @@ private:
 
     LLToolBarButton*                mRightMouseTargetButton;
 
-    // Settles what every button on this bar shows: whether its command is
-    // available, and whether it is running. Registered as an idle callback by
-    // the constructor rather than reached from draw, because it runs a
-    // predicate per button and draw is every frame.
-    static void                     onIdleUpdateButtonStates(void* userdata);
+    // Settles what every button on this bar shows and where it sits. Registered
+    // as an idle callback by the constructor rather than reached from draw:
+    // deciding what a button shows runs a predicate apiece, and placing them
+    // moves the bar itself. Neither belongs on every frame.
+    static void                     onIdleUpdate(void* userdata);
     void                            updateButtonStates();
 
     // Where this bar had reached the last time it asked. Starts behind the
