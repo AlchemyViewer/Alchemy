@@ -172,9 +172,6 @@ bool LLHUDNameTag::lineSegmentIntersect(const LLVector4a& start, const LLVector4
     LLVector3 width_vec = mWidth * x_pixel_vec;
     LLVector3 height_vec = mHeight * y_pixel_vec;
 
-    LLCoordGL screen_pos;
-    LLViewerCamera::getInstance()->projectPosAgentToScreen(position, screen_pos, false);
-
     LLVector2 screen_offset;
     screen_offset = updateScreenPos(mPositionOffset);
 
@@ -279,9 +276,6 @@ void LLHUDNameTag::renderText()
     LLVector3 height_vec = mHeight * y_pixel_vec;
 
     mRadius = (width_vec + height_vec).magVec() * 0.5f;
-
-    LLCoordGL screen_pos;
-    LLViewerCamera::getInstance()->projectPosAgentToScreen(mPositionAgent, screen_pos, false);
 
     LLVector2 screen_offset = updateScreenPos(mPositionOffset);
 
