@@ -118,6 +118,8 @@ void LLHUDText::renderText()
         return;
     }
 
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(mTextSegments.size());
 
     LLGLState gls_blend(GL_BLEND, true);
 
@@ -487,6 +489,8 @@ LLVector2 LLHUDText::updateScreenPos(LLVector2 &offset)
 
 void LLHUDText::updateSize()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(mTextSegments.size());
     F32 height = 0.f;
     F32 width = 0.f;
 
@@ -521,6 +525,11 @@ void LLHUDText::updateSize()
 
 void LLHUDText::updateAll()
 {
+    // Every object text in the scene, whether or not any of it is on screen.
+    // Object text is per-prim and there is no bound on how many carry it, so
+    // the count is what says whether this is worth anything.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(sTextObjects.size());
     // iterate over all text objects, calculate their restoration forces,
     // and add them to the visible set if they are on screen and close enough
     sVisibleTextObjects.clear();
@@ -576,6 +585,8 @@ void LLHUDText::markDead()
 
 void LLHUDText::renderAllHUD()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(sVisibleHUDTextObjects.size());
     LLGLState::checkStates();
 
     {

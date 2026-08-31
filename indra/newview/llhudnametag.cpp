@@ -238,7 +238,7 @@ void LLHUDNameTag::renderText()
     }
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-
+    LL_PROFILE_ZONE_NUM(mTextSegments.size() + mLabelSegments.size());
 
     LLColor4 shadow_color(0.f, 0.f, 0.f, 1.f);
     F32 alpha_factor = 1.f;
@@ -418,6 +418,11 @@ void LLHUDNameTag::addLine(const std::string &text_utf8,
 {
     if (!text_utf8.empty())
     {
+        // Wrapping shapes the text to find where it breaks, and every segment
+        // it produces is a fresh cache. Named because a tag rebuilt on a frame
+        // pays this and a tag that was left alone does not.
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+        LL_PROFILE_ZONE_NUM(text_utf8.size());
         // use default font for segment if custom font not specified
         if (!font)
         {
@@ -677,6 +682,11 @@ LLVector2 LLHUDNameTag::updateScreenPos(const LLVector2 &offset)
 
 void LLHUDNameTag::updateSize()
 {
+    // Asked twice per tag per frame: once before the level of detail is
+    // decided and once after, because the level decides how many lines are
+    // measured. The count is the segments it walks.
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(mTextSegments.size() + mLabelSegments.size());
     static LLCachedControl<F32> name_tag_hpad(gSavedSettings, "NameTagHPad", 16.f);
     static LLCachedControl<F32> name_tag_vpad(gSavedSettings, "NameTagVPad", 12.f);
     static LLCachedControl<F32> name_tag_linepad(gSavedSettings, "NameTagLinePad", 3.f); // aka "leading"
@@ -734,23 +744,34 @@ void LLHUDNameTag::updateSize()
 void LLHUDNameTag::updateAll()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    LL_PROFILE_ZONE_NUM(sTextObjects.size());
     // iterate over all text objects, calculate their restoration forces,
     // and add them to the visible set if they are on screen and close enough
     sVisibleTextObjects.clear();
 
-    TextObjectIterator text_it;
-    for (text_it = sTextObjects.begin(); text_it != sTextObjects.end(); ++text_it)
     {
-        LLHUDNameTag* textp = (*text_it);
-        textp->mTargetPositionOffset.clearVec();
-        textp->updateSize();
-        textp->updateVisibility();
+        // Every tag that exists, on screen or not. What separates this from
+        // the passes below is that they are over the visible set and this one
+        // is not, so the two counts want telling apart.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("nametag size and visibility");
+        LL_PROFILE_ZONE_NUM(sTextObjects.size());
+        TextObjectIterator text_it;
+        for (text_it = sTextObjects.begin(); text_it != sTextObjects.end(); ++text_it)
+        {
+            LLHUDNameTag* textp = (*text_it);
+            textp->mTargetPositionOffset.clearVec();
+            textp->updateSize();
+            textp->updateVisibility();
+        }
     }
 
     // sort back to front for rendering purposes
     std::sort(sVisibleTextObjects.begin(), sVisibleTextObjects.end(), llhudnametag_further_away());
 
     // iterate from front to back, and set LOD based on current screen coverage
+    {
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("nametag lod");
+    LL_PROFILE_ZONE_NUM(sVisibleTextObjects.size());
     F32 screen_area = (F32)(gViewerWindow->getWindowWidthScaled() * gViewerWindow->getWindowHeightScaled());
     F32 current_screen_area = 0.f;
     std::vector<LLPointer<LLHUDNameTag> >::reverse_iterator r_it;
@@ -778,6 +799,7 @@ void LLHUDNameTag::updateAll()
         textp->mTargetPositionOffset = textp->updateScreenPos(LLVector2::zero);
         current_screen_area += (F32)(textp->mSoftScreenRect.getWidth() * textp->mSoftScreenRect.getHeight());
     }
+    }
 
     LLTrace::CountStatHandle<>* camera_vel_stat = LLViewerCamera::getVelocityStat();
     F32 camera_vel = (F32)LLTrace::get_frame_recording().getLastRecording().getPerSec(*camera_vel_stat);
@@ -785,6 +807,12 @@ void LLHUDNameTag::updateAll()
     {
         return;
     }
+
+    // Every visible tag against every other, several times over. The count is
+    // the visible set; the work is that number squared, per iteration.
+    {
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("nametag overlap");
+    LL_PROFILE_ZONE_NUM(sVisibleTextObjects.size());
 
     VisibleTextObjectIterator src_it;
 
@@ -843,6 +871,7 @@ void LLHUDNameTag::updateAll()
                 }
             }
         }
+    }
     }
 
     VisibleTextObjectIterator this_object_it;
