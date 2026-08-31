@@ -716,7 +716,16 @@ void LLFolderView::draw()
     }
     else if (mShowEmptyMessage)
     {
-        mStatusTextBox->setValue(getFolderViewModel()->getStatusText(mItems.empty() && mFolders.empty()));
+        // Set only when it says something different. Setting a text widget
+        // tears its document down and builds it again -- every segment, the
+        // URL and highlight parsing, the reflow -- and this runs on every
+        // frame an empty panel is drawn, to arrive at the same sentence it
+        // already showed.
+        const std::string& status_text = getFolderViewModel()->getStatusText(mItems.empty() && mFolders.empty());
+        if (status_text != mStatusTextBox->getText())
+        {
+            mStatusTextBox->setValue(status_text);
+        }
         mStatusTextBox->setVisible( true );
 
         // firstly reshape message textbox with current size. This is necessary to
