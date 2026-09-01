@@ -681,7 +681,7 @@ const std::string& LLFolderViewItem::getName( void ) const
     return getViewModelItem() ? getViewModelItem()->getName() : noName;
 }
 
-const std::string LLFolderViewItem::getToolTip() const
+std::string LLFolderViewItem::getToolTip() const
 {
     // Return the item name as tooltip without storing it
     if (!LLView::sDebugUnicode)

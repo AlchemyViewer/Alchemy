@@ -267,7 +267,7 @@ public:
     // Override to provide lazy tooltip generation without memory overhead
     // Inventory can consist of millions of items, yet most stay invisible,
     // much less need to show a tooltip, so avoid storing tooltips.
-    virtual const std::string getToolTip() const;
+    std::string getToolTip() const override;
 
     // This method returns the label displayed on the view. This
     // method was primarily added to allow sorting on the folder

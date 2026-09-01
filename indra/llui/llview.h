@@ -240,7 +240,7 @@ public:
     ECursorType getHoverCursor() const { return mHoverCursor; }
 
     static F32 getTooltipTimeout();
-    virtual const std::string getToolTip() const;
+    virtual std::string getToolTip() const;
     virtual const std::string& getText() const { return LLStringUtil::null; }
     virtual const LLFontGL* getFont() const { return nullptr; }
 
@@ -371,7 +371,7 @@ public:
     virtual LLRect getSnapRect() const;
     LLRect getLocalSnapRect() const;
 
-    std::string getLayout() { return mLayout; }
+    const std::string& getLayout() const   { return mLayout; }
 
     // Override and return required size for this object. 0 for width/height means don't care.
     virtual LLRect getRequiredRect();

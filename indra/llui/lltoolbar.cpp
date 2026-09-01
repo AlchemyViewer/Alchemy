@@ -1437,7 +1437,7 @@ void LLToolBarButton::setEnabled(bool enabled)
 // [/RLVa:KB]
 }
 
-const std::string LLToolBarButton::getToolTip() const
+std::string LLToolBarButton::getToolTip() const
 {
     std::string tooltip;
 

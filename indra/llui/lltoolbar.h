@@ -83,7 +83,7 @@ public:
 
     void onCommit();
 
-    virtual const std::string getToolTip() const;
+    std::string getToolTip() const override;
 
 private:
     void callIfEnabled(LLUICtrl::commit_callback_t commit, LLUICtrl* ctrl, const LLSD& param );

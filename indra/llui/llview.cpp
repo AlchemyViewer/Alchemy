@@ -1016,7 +1016,7 @@ F32 LLView::getTooltipTimeout()
 }
 
 // virtual
-const std::string LLView::getToolTip() const
+std::string LLView::getToolTip() const
 {
     if (sDebugUnicode)
     {
