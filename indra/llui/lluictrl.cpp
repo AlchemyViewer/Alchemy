@@ -933,17 +933,17 @@ bool LLUICtrl::findHelpTopic(std::string& help_topic_out)
             LLPanel *subpanel = NULL;
 
             // does the panel have a sub-panel with a help topic?
-            bfs_tree_iterator_t it = beginTreeBFS();
+            bfs_tree_iterator_t it = ctrl->beginTreeBFS();
             // skip ourselves
             ++it;
-            for (; it != endTreeBFS(); ++it)
+            for (; it != ctrl->endTreeBFS(); ++it)
             {
                 child = *it;
                 // do we have a panel with a help topic?
-                LLPanel *panel = dynamic_cast<LLPanel *>(child);
-                if (panel && panel->isInVisibleChain() && !panel->getHelpTopic().empty())
+                LLPanel *child_panel = dynamic_cast<LLPanel *>(child);
+                if (child_panel && child_panel->isInVisibleChain() && !child_panel->getHelpTopic().empty())
                 {
-                    subpanel = panel;
+                    subpanel = child_panel;
                     break;
                 }
             }
@@ -957,10 +957,10 @@ bool LLUICtrl::findHelpTopic(std::string& help_topic_out)
             // does the panel have an active tab with a help topic?
             LLPanel *tab_panel = NULL;
 
-            it = beginTreeBFS();
+            it = ctrl->beginTreeBFS();
             // skip ourselves
             ++it;
-            for (; it != endTreeBFS(); ++it)
+            for (; it != ctrl->endTreeBFS(); ++it)
             {
                 child = *it;
                 LLPanel *curTabPanel = NULL;
