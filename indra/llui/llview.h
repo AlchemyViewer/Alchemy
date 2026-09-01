@@ -354,8 +354,26 @@ public:
     // A one-deep save slot for a caller that hides a set of views and then puts
     // them back: LLFloaterView for the snapshot, LLFloaterReg for mouselook.
     // Nesting the two loses the outer one's saved value.
-    void            pushVisible(bool visible)   { mLastVisible = mVisible; setVisible(visible); }
-    void            popVisible()                { setVisible(mLastVisible); }
+    void            pushVisible(bool visible)
+    {
+        mSavedVisible = mVisible ? SAVED_VISIBLE : SAVED_HIDDEN;
+        setVisible(visible);
+    }
+
+    // A view nobody saved has nothing to put back. popVisibleAll walks the
+    // child list as it stands when the pop runs, so a floater opened while the
+    // set was hidden arrives here never having been pushed -- and what it would
+    // otherwise read is the value every view is constructed with, which would
+    // hide it.
+    void            popVisible()
+    {
+        if (mSavedVisible != SAVED_NOTHING)
+        {
+            const bool was_visible = (mSavedVisible == SAVED_VISIBLE);
+            mSavedVisible = SAVED_NOTHING;
+            setVisible(was_visible);
+        }
+    }
 
     U32         getFollows() const              { return mReshapeFlags; }
     bool        followsLeft() const             { return mReshapeFlags & FOLLOWS_LEFT; }
@@ -695,7 +713,12 @@ private:
     bool        mFromXUI;
     bool        mIsFocusRoot;
     bool        mUseBoundingRect; // hit test against bounding rectangle that includes all child elements
-    bool        mLastVisible;
+    // What pushVisible saved, and whether it saved anything. One value rather
+    // than a bool and a flag beside it: they say one thing between them, and
+    // the flag on its own was eight bytes once alignment had its say.
+    enum ESavedVisible : U8 { SAVED_NOTHING = 0, SAVED_HIDDEN, SAVED_VISIBLE };
+    ESavedVisible mSavedVisible { SAVED_NOTHING };
+
     bool        mInDraw;
 
     static LLWindow* sWindow;   // All root views must know about their window.

@@ -145,7 +145,6 @@ LLView::LLView(const LLView::Params& p)
     mReshapeFlags(FOLLOWS_NONE),
     mFromXUI(p.from_xui),
     mIsFocusRoot(p.focus_root),
-    mLastVisible(false),
     mHoverCursor(getCursorFromString(p.hover_cursor())),
     mEnabled(p.enabled),
     mMouseOpaque(p.mouse_opaque),
