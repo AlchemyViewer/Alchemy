@@ -1319,6 +1319,11 @@ void LLView::drawChildren()
         S32 origin_x, origin_y;
         localPointToScreen(0, 0, &origin_x, &origin_y);
 
+        // Whatever this view knows about its children that the two tests below
+        // do not. Null for all but the few views that override it.
+        const LLRect cull_rect = getChildCullRectScreen();
+        const bool   has_cull  = cull_rect.notEmpty();
+
         ++sDepth;
 
         for (child_list_reverse_iter_t child_iter = mChildList.rbegin(); child_iter != mChildList.rend();)  // ++child_iter)
@@ -1340,7 +1345,9 @@ void LLView::drawChildren()
                 LLRect screen_rect = viewp->getRect();
                 screen_rect.translate(origin_x, origin_y);
 
-                if ( rootp->getLocalRect().overlaps(screen_rect)  && sDirtyRect.overlaps(screen_rect))
+                if ( rootp->getLocalRect().overlaps(screen_rect)
+                  && sDirtyRect.overlaps(screen_rect)
+                  && (!has_cull || cull_rect.overlaps(screen_rect)))
                 {
                     LLUI::pushMatrix();
                     {

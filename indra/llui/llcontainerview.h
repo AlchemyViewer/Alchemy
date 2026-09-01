@@ -83,7 +83,15 @@ public:
     void setScrollContainer(LLScrollContainer* scroll) {mScrollContainer = scroll;}
 
  private:
+    LLRect getChildCullRectScreen() override;
+
+    // The scroll container this view is scrolled *by*, found in postBuild --
+    // these views are built straight from XUI, with no code in between to hand
+    // one over. Null unless the container scrolls this view itself: only then
+    // does its window govern this view's size, and a section nested inside a
+    // scrolled view sizes to its own contents as it always has.
     LLScrollContainer* mScrollContainer;
+
     void arrange(S32 width, S32 height, bool called_from_parent = true);
     bool mShowLabel;
 

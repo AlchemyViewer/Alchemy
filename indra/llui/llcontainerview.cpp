@@ -69,9 +69,37 @@ LLContainerView::~LLContainerView()
 
 bool LLContainerView::postBuild()
 {
+    // Parenting happens before postBuild, so the chain is there to look at.
+    // Only a container that is scrolled directly takes the scroll container:
+    // a section nested inside one would otherwise be told the whole window's
+    // height is its minimum, and every section would fill the window.
+    mScrollContainer = dynamic_cast<LLScrollContainer*>(getParent());
+
     setDisplayChildren(mDisplayChildren);
     reshape(getRect().getWidth(), getRect().getHeight(), false);
     return true;
+}
+
+LLRect LLContainerView::getChildCullRectScreen()
+{
+    if (!mScrollContainer)
+    {
+        return LLRect::null;
+    }
+
+    // Everything scrolled out of the window is still on screen and still in the
+    // dirty region, so the general cull keeps all of it. It only stops being
+    // visible at the scissor, which is after each child has drawn itself.
+    //
+    // getContentWindowRect runs updateScroll, which can translate the scrolled
+    // view -- this one. It is only reached from that view's own drawChildren,
+    // which the container enters from its draw() right after running
+    // updateScroll itself, so the position is already settled and the second
+    // run translates by nothing. An empty rect culls nothing, which is the
+    // right answer for a window with no room in it.
+    LLRect visible;
+    mScrollContainer->localRectToScreen(mScrollContainer->getContentWindowRect(), &visible);
+    return visible;
 }
 
 bool LLContainerView::addChild(LLView* child, S32 tab_group)

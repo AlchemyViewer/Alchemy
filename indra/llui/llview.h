@@ -578,6 +578,16 @@ public:
     LLSD getInfo(void);
 
 protected:
+    // A screen-space bound on which children are worth drawing at all, for a
+    // view that knows something the general cull cannot. The general cull only
+    // asks whether a child is on screen and in the dirty region; a view that is
+    // scrolled inside a window has most of its children failing neither test
+    // and scissored away only after drawing themselves. LLRect::null leaves the
+    // general cull as the only one, which is every view that does not override.
+    //
+    // Asked once per parent per draw, not once per child.
+    virtual LLRect  getChildCullRectScreen() { return LLRect::null; }
+
     void            drawDebugRect();
     void            drawChild(LLView* childp, S32 x_offset = 0, S32 y_offset = 0, bool force_draw = false);
     void            drawChildren();
