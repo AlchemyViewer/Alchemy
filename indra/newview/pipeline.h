@@ -96,6 +96,7 @@ public:
     void createGLBuffers();
     void createLUTBuffers();
     void setupGradingLUT();
+    void setupLensDirt();
     /// Re-bake the tone curve lookup row from the four RenderColorGradeCurve*
     /// settings. Runs from colorCorrect when mToneCurveLutDirty is set: once
     /// per change, never per frame.
@@ -856,6 +857,16 @@ public:
         // mBloomMip[0] is full-res extract; subsequent levels are halved.
         LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
         U32                         bloomMipCount = 0;
+
+        // Cross-screen filter ping-pong. Allocated on the first frame the
+        // effect is actually on and released again when it is switched off, so
+        // the strength control can stay a live slider -- wiring a slider to a
+        // reallocation handler would fire on every mouse-move.
+        LLRenderTarget              crossFilter[3];
+        // The height the targets were last (re)built for -- kept even when
+        // the build FAILED, so an impossible size is not retried every frame;
+        // pair it with isComplete() to tell the two states apart.
+        U32                         crossFilterHeight = 0;
     };
 
     // main full resoltuion render target
@@ -1017,6 +1028,9 @@ public:
     U32                 mSMAASearchMap = 0;
     U32                 mSMAASampleMap = 0;
 
+    // Lens dirt plate. Zero when no plate is loaded, which is also the signal
+    // to force the strength uniform to 0 so the sampler is never read unbound.
+    U32                 mLensDirtMap = 0;
     // Tone curve LUT: a 512x1 RGBA16 row (ALToneCurveSet::LUT_SIZE) whose R, G
     // and B texels hold master(channel(x)) for each channel. A raw GL name
     // like the SMAA maps above: created empty in createGLBuffers, filled by

@@ -444,6 +444,7 @@ install(
   PATTERN "windlight" EXCLUDE
   PATTERN "filters" EXCLUDE
   PATTERN "colorlut" EXCLUDE
+  PATTERN "lensdirt" EXCLUDE
   PATTERN "looks" EXCLUDE
   PATTERN "poses" EXCLUDE
   PATTERN "dictionaries" EXCLUDE
@@ -455,6 +456,7 @@ foreach(
   windlight
   filters
   colorlut
+  lensdirt
   looks
   poses
 )
