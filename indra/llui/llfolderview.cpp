@@ -2000,14 +2000,16 @@ void LLFolderView::updateRenamerPosition()
 // Update visibility and availability (i.e. enabled/disabled) of context menu items.
 void LLFolderView::updateMenuOptions(LLMenuGL* menu)
 {
-    const LLView::child_list_t *list = menu->getChildList();
+    // Claims made for the last menu this built stop counting here.
+    LLMenuItemGL::beginContextBuild();
 
-    LLView::child_list_t::const_iterator menu_itor;
-    for (menu_itor = list->begin(); menu_itor != list->end(); ++menu_itor)
+    // Back to the all-visible, all-enabled baseline the passes below narrow.
+    // setVisible only does work where it changes something, so an entry the
+    // last build left visible costs nothing.
+    for (LLView* menu_item : *menu->getChildList())
     {
-        (*menu_itor)->setVisible(false);
-        (*menu_itor)->pushVisible(true);
-        (*menu_itor)->setEnabled(true);
+        menu_item->setVisible(true);
+        menu_item->setEnabled(true);
     }
 
     // Successively filter out invalid options

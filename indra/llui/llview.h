@@ -351,9 +351,11 @@ public:
     virtual void    onVisibilityChange ( bool new_visibility );
     virtual void    onUpdateScrollToChild(const LLUICtrl * cntrl);
 
+    // A one-deep save slot for a caller that hides a set of views and then puts
+    // them back: LLFloaterView for the snapshot, LLFloaterReg for mouselook.
+    // Nesting the two loses the outer one's saved value.
     void            pushVisible(bool visible)   { mLastVisible = mVisible; setVisible(visible); }
     void            popVisible()                { setVisible(mLastVisible); }
-    bool            getLastVisible()    const   { return mLastVisible; }
 
     U32         getFollows() const              { return mReshapeFlags; }
     bool        followsLeft() const             { return mReshapeFlags & FOLLOWS_LEFT; }

@@ -183,6 +183,26 @@ public:
     void setDrawTextDisabled(bool disabled) { mDrawTextDisabled = disabled; }
     bool getDrawTextDisabled() const { return mDrawTextDisabled; }
 
+    // Context menu building. A context menu object outlives the build, and a
+    // multi-selection gives each selected item its own pass at it, so an entry
+    // one pass showed has to survive a later pass that does not name it: a
+    // pass that shows an entry claims it, and an entry left unclaimed is
+    // hidden.
+    //
+    // The claim is stamped with the build that made it rather than cleared
+    // between builds, because the entries a build reaches and the entries its
+    // reset pass reaches are not the same set -- a reset walks a menu's own
+    // children while the passes descend into submenus. A claim left in a
+    // submenu by an earlier build would otherwise keep that entry on screen
+    // for the rest of the session.
+    //
+    // The two static forms take an LLView so a caller walking a menu's child
+    // list does not have to cast; anything that is not a menu entry is never
+    // claimed.
+    static void beginContextBuild()                     { ++sContextBuild; }
+    static void claimContextEntry(LLView* view);
+    static bool contextEntryClaimed(const LLView* view);
+
 protected:
     void setHover(bool hover) { mGotHover = hover; }
 
@@ -236,6 +256,12 @@ private:
     // Font for this item
     const LLFontGL* mFont;
     bool mDrawTextDisabled;
+
+    // Which context menu build last claimed this entry; see beginContextBuild.
+    // Unsigned because it is only ever compared for equality and must be
+    // allowed to wrap; a lap costs one entry shown once too often.
+    U32 mContextBuild;
+    static U32 sContextBuild;
 
     KEY mJumpKey;
 };

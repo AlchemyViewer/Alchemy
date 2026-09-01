@@ -147,8 +147,25 @@ LLMenuItemGL::Params::Params()
 }
 
 // Default constructor
+U32 LLMenuItemGL::sContextBuild = 1;
+
+void LLMenuItemGL::claimContextEntry(LLView* view)
+{
+    if (LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(view))
+    {
+        item->mContextBuild = sContextBuild;
+    }
+}
+
+bool LLMenuItemGL::contextEntryClaimed(const LLView* view)
+{
+    const LLMenuItemGL* item = dynamic_cast<const LLMenuItemGL*>(view);
+    return item && item->mContextBuild == sContextBuild;
+}
+
 LLMenuItemGL::LLMenuItemGL(const LLMenuItemGL::Params& p)
 :   LLUICtrl(p),
+    mContextBuild(0),
     mJumpKey(p.jump_key),
     mAllowKeyRepeat(p.allow_key_repeat),
     mHighlight( false ),
