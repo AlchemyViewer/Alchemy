@@ -1876,7 +1876,7 @@ bool LLFloater::handleMouseUp(S32 x, S32 y, MASK mask)
     LL_DEBUGS() << "LLFloater::handleMouseUp calling LLPanel (really LLView)'s handleMouseUp (first initialized xui to: " << getPathname() << " )" << LL_ENDL;
     bool handled = LLPanel::handleMouseUp(x,y,mask); // Not implemented in LLPanel so this actually calls LLView
     if (handled) {
-        LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
+        LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,this);
     }
     return handled;
 }
@@ -1904,7 +1904,7 @@ bool LLFloater::handleMouseDown(S32 x, S32 y, MASK mask)
         bringToFront( x, y );
         bool handled = LLPanel::handleMouseDown( x, y, mask );
         if (handled) {
-            LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
+            LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,this);
         }
         return handled;
     }

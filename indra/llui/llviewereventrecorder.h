@@ -41,13 +41,19 @@
 
 #include "llsingleton.h" // includes llerror which we need here so we can skip the include here
 
+class LLView;
+
 class LLViewerEventRecorder : public LLSimpleton<LLViewerEventRecorder>
 {
 public:
     LLViewerEventRecorder();
     ~LLViewerEventRecorder();
 
-  void updateMouseEventInfo(S32 local_x,S32 local_y, S32 global_x, S32 global_y,  std::string mName);
+  // Takes the view rather than its pathname. Building one walks the view to
+  // the root assembling a string, and this records nothing at all unless
+  // logging is on -- which it is not, in any session that is not being
+  // recorded.
+  void updateMouseEventInfo(S32 local_x,S32 local_y, S32 global_x, S32 global_y, const LLView* view);
   void setMouseLocalCoords(S32 x,S32 y);
   void setMouseGlobalCoords(S32 x,S32 y);
 

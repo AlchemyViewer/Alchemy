@@ -27,6 +27,7 @@
 
 #include "llviewereventrecorder.h"
 #include "llui.h"
+#include "llview.h"
 #include "llleap.h"
 
 LLViewerEventRecorder::LLViewerEventRecorder() {
@@ -96,7 +97,7 @@ void LLViewerEventRecorder::setMouseGlobalCoords(S32 x, S32 y) {
   global_y=y;
 }
 
-void LLViewerEventRecorder::updateMouseEventInfo(S32 local_x, S32 local_y, S32 global_x, S32 global_y, std::string mName) {
+void LLViewerEventRecorder::updateMouseEventInfo(S32 local_x, S32 local_y, S32 global_x, S32 global_y, const LLView* view) {
     if (!logEvents) return;
 
   LLView * target_view = LLUI::getInstance()->resolvePath(LLUI::getInstance()->getRootView(), xui);
@@ -104,6 +105,7 @@ void LLViewerEventRecorder::updateMouseEventInfo(S32 local_x, S32 local_y, S32 g
     LL_DEBUGS() << "LLViewerEventRecorder::updateMouseEventInfo - xui path on file at moment is NOT valid - so DO NOT record these local coords" << LL_ENDL;
     return;
   }
+  const std::string mName = LLView::getPathname(view);
   LL_DEBUGS() << "LLViewerEventRecorder::updateMouseEventInfo b4 updatemouseeventinfo - local_x|global x   "<< this->local_x << " " << this->global_x  << "local/global y " << this->local_y << " " << this->global_y << " mname: " << mName << " xui: " << xui << LL_ENDL;
 
 

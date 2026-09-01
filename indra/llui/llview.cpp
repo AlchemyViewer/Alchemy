@@ -858,7 +858,7 @@ LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDA
             LL_DEBUGS() << "LLView::childrenHandleMouseEvent calling updatemouseeventinfo - local_x|global x  "<< local_x << " " << x   << "local/global y " << local_y << " " << y << LL_ENDL;
             LL_DEBUGS() << "LLView::childrenHandleMouseEvent  getPathname for viewp result: " << viewp->getPathname() << "for this view: " << getPathname() << LL_ENDL;
 
-            LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,getPathname());
+            LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,this);
 
             // This is NOT event recording related
             viewp->logMouseEvent();
