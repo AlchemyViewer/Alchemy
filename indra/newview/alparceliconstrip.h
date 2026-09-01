@@ -97,7 +97,7 @@ public:
 
     // Place the visible controls starting from `edge`, returning the far edge.
     // Padding is spent only on controls actually placed.
-    S32 layout(S32 edge, EDirection direction, S32 icon_pad) const;
+    S32 layout(S32 edge, EDirection direction, S32 icon_pad);
 
     // Per instance. Both panels used a function-local static for this, so one
     // rebuilt after the value moved kept the stale compare and never wrote its

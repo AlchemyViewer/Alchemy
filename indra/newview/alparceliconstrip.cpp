@@ -86,8 +86,15 @@ namespace
 
 void ALParcelIconStrip::setIcon(EIcon icon, LLIconCtrl* ctrl)
 {
-    llassert(icon >= 0 && icon < ICON_COUNT);
-    mIcons[icon] = ctrl;
+    // Refused rather than asserted: llassert is nothing in a release build, and
+    // what is behind it is a write into a fixed-size member array.
+    const S32 index = static_cast<S32>(icon);
+    if (index < 0 || index >= ICON_COUNT)
+    {
+        llassert(false);
+        return;
+    }
+    mIcons[index] = ctrl;
 }
 
 void ALParcelIconStrip::initIcons()
@@ -184,7 +191,7 @@ void ALParcelIconStrip::setVisibleIf(EIcon icon, bool visible)
     }
 }
 
-S32 ALParcelIconStrip::layout(S32 edge, EDirection direction, S32 icon_pad) const
+S32 ALParcelIconStrip::layout(S32 edge, EDirection direction, S32 icon_pad)
 {
     // Both panels put the same thing in the same place: the damage percentage
     // furthest from the location text, then the icons in reverse index order
