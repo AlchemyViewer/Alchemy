@@ -31,6 +31,9 @@
 #include "llframetimer.h"
 #include "lltracerecording.h"
 
+#include <array>
+#include <string_view>
+
 class LLStatBar : public LLView
 {
 public:
@@ -72,8 +75,33 @@ public:
     /*virtual*/ LLRect getRequiredRect();   // Return the height of this object, given the set options.
 
 private:
+    // One formatted number. The value line and the tick labels are rebuilt
+    // every frame, so they are formatted in place and handed to the font as a
+    // view rather than through the allocator.
+    typedef std::array<char, 64> text_buf_t;
+
+    static std::string_view bufView(const text_buf_t& buf, size_t written);
+    static std::string_view formatTickLabel(text_buf_t& buf, F32 tick_value, S32 decimal_digits);
+
+    // A tick's label, collected while the bar geometry is being batched and
+    // drawn once that batch closes. Text bound between two rects splits the
+    // batch on both sides of itself, and a labelled tick would do that several
+    // times per bar. The capacity is far past what the label spacing allows
+    // across a bar of any width the UI can give one.
+    struct TickLabel
+    {
+        text_buf_t mText;
+        U32        mLength;
+        F32        mX;
+        F32        mY;
+    };
+    typedef std::array<TickLabel, 24> tick_label_list_t;
+
+    void batchRect( S32 left, S32 top, S32 right, S32 bottom, const LLColor4& color ) const;
     void drawLabelAndValue( F32 mean, std::string &unit_label, LLRect &bar_rect, S32 decimal_digits );
-    void drawTicks( F32 min, F32 max, F32 value_scale, LLRect &bar_rect );
+    void updateBarRange( F32 min, F32 max );
+    U32  drawTickMarks( F32 value_scale, LLRect &bar_rect, tick_label_list_t& labels );
+    void drawTickLabels( const tick_label_list_t& labels, U32 num_labels );
 
     F32          mTargetMinBar,
                  mTargetMaxBar,

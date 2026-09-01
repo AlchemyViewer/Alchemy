@@ -38,7 +38,6 @@
 #include "lltracerecording.h"
 #include "llcriticaldamp.h"
 #include "lltooltip.h"
-#include "lllocalcliprect.h"
 #include "lltrans.h"
 
 #include <fmt/format.h>
@@ -157,23 +156,60 @@ void calc_auto_scale_range(F32& min, F32& max, F32& tick)
     max = out_max;
 }
 
-// Tick labels and the label/value line are rebuilt every frame, so they are
-// formatted in place and handed to the font as a view. The buffer belongs to
-// the caller and has to outlive the view.
-typedef std::array<char, 64> stat_text_buf_t;
-
-static std::string_view buf_view(const stat_text_buf_t& buf, size_t written)
+// The buffer belongs to the caller and has to outlive the view.
+std::string_view LLStatBar::bufView(const text_buf_t& buf, size_t written)
 {
     // format_to_n reports what the format *would* have taken, snprintf-style.
     return std::string_view(buf.data(), llmin(written, buf.size()));
 }
 
 // A tick that lands on a whole number reads better without a fraction.
-static std::string_view format_tick_label(stat_text_buf_t& buf, F32 tick_value, S32 decimal_digits)
+std::string_view LLStatBar::formatTickLabel(text_buf_t& buf, F32 tick_value, S32 decimal_digits)
 {
     const int digits = is_approx_equal((F32)(S32)tick_value, tick_value) ? 0 : (int)decimal_digits;
     const auto result = fmt::format_to_n(buf.data(), buf.size(), "{:.{}f}", tick_value, digits);
-    return buf_view(buf, result.size);
+    return bufView(buf, result.size);
+}
+
+// Emits a filled rect into the batch the caller has open, wound the way
+// gl_rect_2d winds one. gl_rect_2d itself cannot be used inside a batch: it
+// unbinds the texture slot first, and unbind() flushes, so every rect drawn
+// through it becomes its own draw call.
+//
+// The colour rides on the vertices. That holds because the nested-UI pass runs
+// under gUIProgram, whose vertex shader takes diffuse_color as an attribute; a
+// program without that attribute routes gGL.color4f to a uniform instead, and
+// the whole batch would come out the last colour set.
+//
+// Coordinates are clamped to the widget rather than scissored to it. Several of
+// them are derived from stat values and are unbounded until something bounds
+// them; a scissor is what used to, at the price of a glScissor and a flush on
+// the way in and another pair on the way out. Each axis clamps on its own, so a
+// rect handed its edges the other way round stays that way round.
+void LLStatBar::batchRect( S32 left, S32 top, S32 right, S32 bottom, const LLColor4& color ) const
+{
+    const S32 max_x = getRect().getWidth();
+    const S32 max_y = getRect().getHeight();
+
+    left   = llclamp(left,   0, max_x);
+    right  = llclamp(right,  0, max_x);
+    top    = llclamp(top,    0, max_y);
+    bottom = llclamp(bottom, 0, max_y);
+
+    if (left == right || top == bottom)
+    {
+        return;
+    }
+
+    gGL.color4fv(color.mV);
+
+    gGL.vertex2i(left,  top);
+    gGL.vertex2i(left,  bottom);
+    gGL.vertex2i(right, bottom);
+
+    gGL.vertex2i(left,  top);
+    gGL.vertex2i(right, bottom);
+    gGL.vertex2i(right, top);
 }
 
 LLStatBar::Params::Params()
@@ -322,8 +358,6 @@ void LLStatBar::draw()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    LLLocalClipRect _(getLocalRect());
-
     LLTrace::PeriodicRecording& frame_recording = LLTrace::get_frame_recording();
     LLTrace::Recording& last_frame_recording = frame_recording.getLastRecording();
 
@@ -444,12 +478,19 @@ void LLStatBar::draw()
     {
         mLastDisplayValueTimer.reset();
     }
-    drawLabelAndValue(display_value, unit_label, bar_rect, decimal_digits);
     mLastDisplayValue = display_value;
+
+    // All of the bar's geometry goes into one batch and every string is drawn
+    // after it closes. Untextured geometry and glyphs cannot share a draw --
+    // each rect has to unbind the font atlas and each string has to bind it
+    // back -- so interleaving them costs a draw call per switch. Kept in the
+    // painter order the bar has always had: ticks under the background, then
+    // the min/max span, the samples, and the mean line on top.
+    tick_label_list_t tick_labels;
+    U32               num_tick_labels = 0;
 
     if (mDisplayBar && mStat.valid)
     {
-        // Draw the tick marks.
         LLGLSUIDefault gls_ui;
         gGL.getTextureSlot(0)->unbind();
 
@@ -465,10 +506,14 @@ void LLStatBar::draw()
                 : (bar_rect.getWidth())/(mCurMaxBar - mCurMinBar);
         }
 
-        drawTicks(min, max, value_scale, bar_rect);
+        updateBarRange(min, max);
+
+        gGL.begin(LLRender::TRIANGLES);
+
+        num_tick_labels = drawTickMarks(value_scale, bar_rect, tick_labels);
 
         // draw background bar.
-        gl_rect_2d(bar_rect.mLeft, bar_rect.mTop, bar_rect.mRight, bar_rect.mBottom, LLColor4(0.f, 0.f, 0.f, 0.25f));
+        batchRect(bar_rect.mLeft, bar_rect.mTop, bar_rect.mRight, bar_rect.mBottom, LLColor4(0.f, 0.f, 0.f, 0.25f));
 
         // draw values
         if (!llisnan(display_value) && frame_recording.getNumRecordedPeriods() != 0)
@@ -484,11 +529,11 @@ void LLStatBar::draw()
             S32 end = (S32) ((max - mCurMinBar) * value_scale);
             if (mOrientation == HORIZONTAL)
             {
-                gl_rect_2d(bar_rect.mLeft, end, bar_rect.mRight, begin, LLColor4(1.f, 0.f, 0.f, 0.25f));
+                batchRect(bar_rect.mLeft, end, bar_rect.mRight, begin, LLColor4(1.f, 0.f, 0.f, 0.25f));
             }
             else // VERTICAL
             {
-                gl_rect_2d(begin, bar_rect.mTop, end, bar_rect.mBottom, LLColor4(1.f, 0.f, 0.f, 0.25f));
+                batchRect(begin, bar_rect.mTop, end, bar_rect.mBottom, LLColor4(1.f, 0.f, 0.f, 0.25f));
             }
 
             F32 span = (mOrientation == HORIZONTAL)
@@ -498,11 +543,12 @@ void LLStatBar::draw()
             if (mDisplayHistory && mStat.valid)
             {
                 const S32 num_values = static_cast<S32>(frame_recording.getNumRecordedPeriods()) - 1;
+                const F32 max_x = (F32)getRect().getWidth();
+                const F32 max_y = (F32)getRect().getHeight();
                 F32 min_value = 0.f,
                     max_value = 0.f;
 
                 gGL.color4f(1.f, 0.f, 0.f, 1.f);
-                gGL.begin(LLRender::TRIANGLES);
                 const S32 max_frame = llmin(num_frames, num_values);
                 U32 num_samples = 0;
                 for (S32 i = 1; i <= max_frame; i++)
@@ -533,30 +579,42 @@ void LLStatBar::draw()
 
                     if (!num_samples) continue;
 
+                    // These go in as vertices rather than through batchRect, so
+                    // they take the same clamp to the widget it applies. min and
+                    // max come straight off the stat and are what needs it.
                     F32 min = (min_value  - mCurMinBar) * value_scale;
                     F32 max = llmax(min + 1, (max_value - mCurMinBar) * value_scale);
                     if (mOrientation == HORIZONTAL)
                     {
-                        gGL.vertex2f((F32)bar_rect.mRight - offset, max);
-                        gGL.vertex2f((F32)bar_rect.mRight - offset, min);
-                        gGL.vertex2f((F32)bar_rect.mRight - offset - 1, min);
+                        const F32 lo = llclamp(min, 0.f, max_y);
+                        const F32 hi = llclamp(max, 0.f, max_y);
+                        const F32 x0 = llclamp((F32)bar_rect.mRight - offset,       0.f, max_x);
+                        const F32 x1 = llclamp((F32)bar_rect.mRight - offset - 1.f, 0.f, max_x);
 
-                        gGL.vertex2f((F32)bar_rect.mRight - offset, max);
-                        gGL.vertex2f((F32)bar_rect.mRight - offset - 1, min);
-                        gGL.vertex2f((F32)bar_rect.mRight - offset - 1, max);
+                        gGL.vertex2f(x0, hi);
+                        gGL.vertex2f(x0, lo);
+                        gGL.vertex2f(x1, lo);
+
+                        gGL.vertex2f(x0, hi);
+                        gGL.vertex2f(x1, lo);
+                        gGL.vertex2f(x1, hi);
                     }
                     else
                     {
-                        gGL.vertex2f(min, (F32)bar_rect.mBottom + offset + 1);
-                        gGL.vertex2f(min, (F32)bar_rect.mBottom + offset);
-                        gGL.vertex2f(max, (F32)bar_rect.mBottom + offset);
+                        const F32 lo = llclamp(min, 0.f, max_x);
+                        const F32 hi = llclamp(max, 0.f, max_x);
+                        const F32 y0 = llclamp((F32)bar_rect.mBottom + offset,       0.f, max_y);
+                        const F32 y1 = llclamp((F32)bar_rect.mBottom + offset + 1.f, 0.f, max_y);
 
-                        gGL.vertex2f(min, (F32)bar_rect.mBottom + offset + 1);
-                        gGL.vertex2f(max, (F32)bar_rect.mBottom + offset);
-                        gGL.vertex2f(max, (F32)bar_rect.mBottom + offset + 1);
+                        gGL.vertex2f(lo, y1);
+                        gGL.vertex2f(lo, y0);
+                        gGL.vertex2f(hi, y0);
+
+                        gGL.vertex2f(lo, y1);
+                        gGL.vertex2f(hi, y0);
+                        gGL.vertex2f(hi, y1);
                     }
                 }
-                gGL.end();
             }
             else
             {
@@ -565,11 +623,11 @@ void LLStatBar::draw()
                 // draw current
                 if (mOrientation == HORIZONTAL)
                 {
-                    gl_rect_2d(bar_rect.mLeft, end, bar_rect.mRight, begin, LLColor4(1.f, 0.f, 0.f, 1.f));
+                    batchRect(bar_rect.mLeft, end, bar_rect.mRight, begin, LLColor4(1.f, 0.f, 0.f, 1.f));
                 }
                 else
                 {
-                    gl_rect_2d(begin, bar_rect.mTop, end, bar_rect.mBottom, LLColor4(1.f, 0.f, 0.f, 1.f));
+                    batchRect(begin, bar_rect.mTop, end, bar_rect.mBottom, LLColor4(1.f, 0.f, 0.f, 1.f));
                 }
             }
 
@@ -579,15 +637,20 @@ void LLStatBar::draw()
                 const S32 end = (S32) ((mean - mCurMinBar) * value_scale) + 1;
                 if (mOrientation == HORIZONTAL)
                 {
-                    gl_rect_2d(bar_rect.mLeft - 2, begin, bar_rect.mRight + 2, end, LLColor4(0.f, 1.f, 0.f, 1.f));
+                    batchRect(bar_rect.mLeft - 2, begin, bar_rect.mRight + 2, end, LLColor4(0.f, 1.f, 0.f, 1.f));
                 }
                 else
                 {
-                    gl_rect_2d(begin, bar_rect.mTop + 2, end, bar_rect.mBottom - 2, LLColor4(0.f, 1.f, 0.f, 1.f));
+                    batchRect(begin, bar_rect.mTop + 2, end, bar_rect.mBottom - 2, LLColor4(0.f, 1.f, 0.f, 1.f));
                 }
             }
         }
+
+        gGL.end();
     }
+
+    drawLabelAndValue(display_value, unit_label, bar_rect, decimal_digits);
+    drawTickLabels(tick_labels, num_tick_labels);
 
     LLView::draw();
 }
@@ -674,13 +737,13 @@ void LLStatBar::drawLabelAndValue( F32 value, std::string &label, LLRect &bar_re
 
     static std::string na_string = LLTrans::getString("na");
 
-    stat_text_buf_t  value_buf;
+    text_buf_t       value_buf;
     std::string_view value_str(na_string);
     if (!llisnan(value))
     {
         const auto result = fmt::format_to_n(value_buf.data(), value_buf.size(),
                                              "{:10.{}f} {}", value, (int)decimal_digits, label);
-        value_str = buf_view(value_buf, result.size);
+        value_str = bufView(value_buf, result.size);
     }
 
     // The label is left-aligned from the left edge and the value is right-aligned
@@ -694,13 +757,16 @@ void LLStatBar::drawLabelAndValue( F32 value, std::string &label, LLRect &bar_re
         LLFontGL::LEFT, LLFontGL::TOP, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
         S32_MAX, label_max_pixels, NULL, /*use_ellipses=*/true);
 
-    // Draw the current value (right-aligned at the bar's right edge for both orientations).
+    // Draw the current value (right-aligned at the bar's right edge for both
+    // orientations). Capped at the width it has to run back through, so a value
+    // too wide for the widget is ellipsized rather than drawn off the left edge.
     font->renderBytes(value_str, 0, (F32)bar_rect.mRight, (F32)getRect().getHeight(),
         LLColor4(1.f, 1.f, 1.f, 1.f),
-        LLFontGL::RIGHT, LLFontGL::TOP);
+        LLFontGL::RIGHT, LLFontGL::TOP, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+        S32_MAX, bar_rect.mRight, NULL, /*use_ellipses=*/true);
 }
 
-void LLStatBar::drawTicks( F32 min, F32 max, F32 value_scale, LLRect &bar_rect )
+void LLStatBar::updateBarRange( F32 min, F32 max )
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -724,81 +790,129 @@ void LLStatBar::drawTicks( F32 min, F32 max, F32 value_scale, LLRect &bar_rect )
             mTickSpacing = calc_tick_value(mTargetMinBar, mTargetMaxBar);
         }
     }
+}
+
+U32 LLStatBar::drawTickMarks( F32 value_scale, LLRect &bar_rect, tick_label_list_t& labels )
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    U32 num_labels = 0;
+
+    if (mTickSpacing <= 0.f || value_scale <= 0.f)
+    {
+        return num_labels;
+    }
 
     // start counting from actual min, not current, animating min, so that ticks don't float between numbers
     // ensure ticks always hit 0
     S32 last_tick = S32_MIN;
     S32 last_label = S32_MIN;
-    if (mTickSpacing > 0.f && value_scale > 0.f)
+
+    const S32 MIN_TICK_SPACING  = mOrientation == HORIZONTAL ? 20 : 30;
+    const S32 MIN_LABEL_SPACING = mOrientation == HORIZONTAL ? 30 : 60;
+    const S32 TICK_LENGTH = STAT_BAR_TICK_LENGTH;
+    const S32 TICK_WIDTH = 1;
+
+    F32 start = mCurMinBar < 0.f
+        ? llceil(-mCurMinBar / mTickSpacing) * -mTickSpacing
+        : 0.f;
+
+    // A tick spacing negligible beside the values it steps through stops
+    // advancing them in F32, so the walk needs a bound of its own to fall
+    // back on when passing mCurMaxBar can never happen.
+    const S32 MAX_TICKS = 1024;
+
+    // One tick is drawn past mCurMaxBar so part of its label stays visible.
+    // The test is latched here, before the spacing test below can skip the
+    // rest of the body, so a run of too-close ticks cannot outlive it.
+    bool past_max = false;
+    F32 tick_value = start;
+    for (S32 tick_idx = 0; !past_max && tick_idx < MAX_TICKS; tick_idx++, tick_value += mTickSpacing)
     {
-        const S32 MIN_TICK_SPACING  = mOrientation == HORIZONTAL ? 20 : 30;
-        const S32 MIN_LABEL_SPACING = mOrientation == HORIZONTAL ? 30 : 60;
-        const S32 TICK_LENGTH = STAT_BAR_TICK_LENGTH;
-        const S32 TICK_WIDTH = 1;
+        past_max = tick_value > mCurMaxBar;
 
-        F32 start = mCurMinBar < 0.f
-            ? llceil(-mCurMinBar / mTickSpacing) * -mTickSpacing
-            : 0.f;
-
-        // A tick spacing negligible beside the values it steps through stops
-        // advancing them in F32, so the walk needs a bound of its own to fall
-        // back on when passing mCurMaxBar can never happen.
-        const S32 MAX_TICKS = 1024;
-
-        // One tick is drawn past mCurMaxBar so part of its label stays visible.
-        // The test is latched here, before the spacing test below can skip the
-        // rest of the body, so a run of too-close ticks cannot outlive it.
-        bool past_max = false;
-        F32 tick_value = start;
-        for (S32 tick_idx = 0; !past_max && tick_idx < MAX_TICKS; tick_idx++, tick_value += mTickSpacing)
+        // clamp to S32_MAX / 2 to avoid floating point to integer overflow resulting in S32_MIN
+        const S32 tick_begin = llfloor(llmin((F32)(S32_MAX / 2), (tick_value - mCurMinBar)*value_scale));
+        const S32 tick_end = tick_begin + TICK_WIDTH;
+        if (tick_begin < last_tick + MIN_TICK_SPACING)
         {
-            past_max = tick_value > mCurMaxBar;
+            continue;
+        }
+        last_tick = tick_begin;
 
-            // clamp to S32_MAX / 2 to avoid floating point to integer overflow resulting in S32_MIN
-            const S32 tick_begin = llfloor(llmin((F32)(S32_MAX / 2), (tick_value - mCurMinBar)*value_scale));
-            const S32 tick_end = tick_begin + TICK_WIDTH;
-            if (tick_begin < last_tick + MIN_TICK_SPACING)
+        // Past the collection capacity a tick keeps its mark and loses its
+        // label, which is the same thing the spacing rule does to it.
+        const bool draw_label = tick_begin > last_label + MIN_LABEL_SPACING
+                             && num_labels < labels.size();
+        if (mOrientation == HORIZONTAL)
+        {
+            if (draw_label)
             {
-                continue;
-            }
-            last_tick = tick_begin;
+                batchRect(bar_rect.mLeft, tick_end, bar_rect.mRight - TICK_LENGTH, tick_begin, LLColor4(1.f, 1.f, 1.f, 0.25f));
 
-            const bool draw_label = tick_begin > last_label + MIN_LABEL_SPACING;
-            if (mOrientation == HORIZONTAL)
-            {
-                if (draw_label)
-                {
-                    gl_rect_2d(bar_rect.mLeft, tick_end, bar_rect.mRight - TICK_LENGTH, tick_begin, LLColor4(1.f, 1.f, 1.f, 0.25f));
-                    stat_text_buf_t label_buf;
-                    LLFontGL::getFontMonospace()->renderBytes(format_tick_label(label_buf, tick_value, mDecimalDigits), 0, (F32)bar_rect.mRight, (F32)tick_begin,
-                        LLColor4(1.f, 1.f, 1.f, 0.5f),
-                        LLFontGL::LEFT, LLFontGL::VCENTER);
-                    last_label = tick_begin;
-                }
-                else
-                {
-                    gl_rect_2d(bar_rect.mLeft, tick_end, bar_rect.mRight - TICK_LENGTH/2, tick_begin, LLColor4(1.f, 1.f, 1.f, 0.1f));
-                }
+                TickLabel& label = labels[num_labels++];
+                label.mLength = (U32)formatTickLabel(label.mText, tick_value, mDecimalDigits).size();
+                label.mX      = (F32)bar_rect.mRight;
+                label.mY      = (F32)tick_begin;
+                last_label    = tick_begin;
             }
             else
             {
-                if (draw_label)
-                {
-                    gl_rect_2d(tick_begin, bar_rect.mTop, tick_end, bar_rect.mBottom - TICK_LENGTH, LLColor4(1.f, 1.f, 1.f, 0.25f));
-                    stat_text_buf_t label_buf;
-                    const std::string_view tick_label = format_tick_label(label_buf, tick_value, mDecimalDigits);
-                    const S32 tick_label_width = LLFontGL::getFontMonospace()->getWidthBytes(tick_label, 0, S32_MAX);
-                    S32 label_pos = tick_begin - ll_round((F32)tick_label_width * ((F32)tick_begin / (F32)bar_rect.getWidth()));
-                    LLFontGL::getFontMonospace()->renderBytes(tick_label, 0, (F32)label_pos, (F32)(bar_rect.mBottom - TICK_LENGTH),
-                        LLColor4(1.f, 1.f, 1.f, 0.5f),
-                        LLFontGL::LEFT, LLFontGL::TOP);
-                    last_label = label_pos;
-                }
-                else
-                {
-                    gl_rect_2d(tick_begin, bar_rect.mTop, tick_end, bar_rect.mBottom - TICK_LENGTH/2, LLColor4(1.f, 1.f, 1.f, 0.1f));
-                }
+                batchRect(bar_rect.mLeft, tick_end, bar_rect.mRight - TICK_LENGTH/2, tick_begin, LLColor4(1.f, 1.f, 1.f, 0.1f));
             }
         }
+        else
+        {
+            if (draw_label)
+            {
+                batchRect(tick_begin, bar_rect.mTop, tick_end, bar_rect.mBottom - TICK_LENGTH, LLColor4(1.f, 1.f, 1.f, 0.25f));
+
+                TickLabel& label = labels[num_labels++];
+                const std::string_view text = formatTickLabel(label.mText, tick_value, mDecimalDigits);
+                label.mLength = (U32)text.size();
+
+                // Slide the label left as it nears the far edge, so the last one
+                // ends at the bar's end instead of running past it.
+                const S32 tick_label_width = LLFontGL::getFontMonospace()->getWidthBytes(text, 0, S32_MAX);
+                const S32 label_pos = tick_begin - ll_round((F32)tick_label_width * ((F32)tick_begin / (F32)bar_rect.getWidth()));
+                label.mX   = (F32)label_pos;
+                label.mY   = (F32)(bar_rect.mBottom - TICK_LENGTH);
+                last_label = label_pos;
+            }
+            else
+            {
+                batchRect(tick_begin, bar_rect.mTop, tick_end, bar_rect.mBottom - TICK_LENGTH/2, LLColor4(1.f, 1.f, 1.f, 0.1f));
+            }
+        }
+    }
+
+    return num_labels;
+}
+
+void LLStatBar::drawTickLabels( const tick_label_list_t& labels, U32 num_labels )
+{
+    if (!num_labels)
+    {
+        return;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
+    // Horizontal ticks run up the left edge and label to the right of the bar;
+    // vertical ticks run along the bottom and label beneath it.
+    const LLFontGL::VAlign valign = (mOrientation == HORIZONTAL) ? LLFontGL::VCENTER : LLFontGL::TOP;
+    LLFontGL* font  = LLFontGL::getFontMonospace();
+    const S32 right = getRect().getWidth();
+
+    for (U32 i = 0; i < num_labels; i++)
+    {
+        const TickLabel& label = labels[i];
+        // Each label is capped at the room left between it and the widget's
+        // edge, which is what the scissor used to take care of.
+        const S32 max_pixels = llmax(0, right - (S32)label.mX);
+        font->renderBytes(std::string_view(label.mText.data(), label.mLength), 0, label.mX, label.mY,
+            LLColor4(1.f, 1.f, 1.f, 0.5f),
+            LLFontGL::LEFT, valign, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+            S32_MAX, max_pixels, NULL, /*use_ellipses=*/true);
     }
 }
