@@ -540,9 +540,9 @@ public:
     //static LLFontGL::HAlign selectFontHAlign(LLXMLNodePtr node);
 
     // focuses the item in the list after the currently-focused item, wrapping if necessary
-    static  bool focusNext(LLView::child_list_t & result);
+    static  bool focusNext(viewList_t & result);
     // focuses the item in the list before the currently-focused item, wrapping if necessary
-    static  bool focusPrev(LLView::child_list_t & result);
+    static  bool focusPrev(viewList_t & result);
 
     // returns query for iterating over controls in tab order
     static const LLViewQuery & getTabOrderQuery();

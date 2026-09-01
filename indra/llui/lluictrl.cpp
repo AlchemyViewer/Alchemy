@@ -806,7 +806,7 @@ bool LLUICtrl::focusFirstItem(bool /*prefer_text_fields*/, bool focus_flash)
     // text fields can only narrow that answer: LLTextInputFilter is a
     // prefilter, its result is a subset of this one's, and a subset of nothing
     // is nothing.
-    const child_list_t result = getTabOrderQuery().run(this);
+    const viewList_t result = getTabOrderQuery().run(this);
     if (result.empty())
     {
         return false;
@@ -826,29 +826,32 @@ bool LLUICtrl::focusFirstItem(bool /*prefer_text_fields*/, bool focus_flash)
 }
 
 
+// The shared query is only copied when a filter is going to be added to the
+// copy. It holds two lists, and taking one to leave it as it was found is the
+// usual case.
+static viewList_t runTabOrderQuery(LLUICtrl* root, bool text_fields_only)
+{
+    static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
+    if (text_fields_only || tab_to_text_fields_only)
+    {
+        LLViewQuery query = LLView::getTabOrderQuery();
+        query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
+        return query.run(root);
+    }
+    return LLView::getTabOrderQuery().run(root);
+}
+
 bool LLUICtrl::focusNextItem(bool text_fields_only)
 {
     // this assumes that this method is called on the focus root.
-    LLViewQuery query = getTabOrderQuery();
-    static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
-    if(text_fields_only || tab_to_text_fields_only)
-    {
-        query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
-    }
-    child_list_t result = query(this);
+    viewList_t result = runTabOrderQuery(this, text_fields_only);
     return focusNext(result);
 }
 
 bool LLUICtrl::focusPrevItem(bool text_fields_only)
 {
     // this assumes that this method is called on the focus root.
-    LLViewQuery query = getTabOrderQuery();
-    static LLUICachedControl<bool> tab_to_text_fields_only ("TabToTextFieldsOnly", false);
-    if(text_fields_only || tab_to_text_fields_only)
-    {
-        query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
-    }
-    child_list_t result = query(this);
+    viewList_t result = runTabOrderQuery(this, text_fields_only);
     return focusPrev(result);
 }
 

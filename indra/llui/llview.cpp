@@ -558,21 +558,21 @@ LLRect LLView::getRequiredRect()
 
 bool LLView::focusNextRoot()
 {
-    LLView::child_list_t result = LLView::getFocusRootsQuery().run(this);
+    viewList_t result = LLView::getFocusRootsQuery().run(this);
     return LLView::focusNext(result);
 }
 
 bool LLView::focusPrevRoot()
 {
-    LLView::child_list_t result = LLView::getFocusRootsQuery().run(this);
+    viewList_t result = LLView::getFocusRootsQuery().run(this);
     return LLView::focusPrev(result);
 }
 
 // static
-bool LLView::focusNext(LLView::child_list_t & result)
+bool LLView::focusNext(viewList_t & result)
 {
-    LLView::child_list_reverse_iter_t focused = result.rend();
-    for(LLView::child_list_reverse_iter_t iter = result.rbegin();
+    viewList_t::reverse_iterator focused = result.rend();
+    for(viewList_t::reverse_iterator iter = result.rbegin();
         iter != result.rend();
         ++iter)
     {
@@ -582,7 +582,7 @@ bool LLView::focusNext(LLView::child_list_t & result)
             break;
         }
     }
-    LLView::child_list_reverse_iter_t next = focused;
+    viewList_t::reverse_iterator next = focused;
     next = (next == result.rend()) ? result.rbegin() : ++next;
     while(next != focused)
     {
@@ -605,10 +605,10 @@ bool LLView::focusNext(LLView::child_list_t & result)
 }
 
 // static
-bool LLView::focusPrev(LLView::child_list_t & result)
+bool LLView::focusPrev(viewList_t & result)
 {
-    LLView::child_list_iter_t focused = result.end();
-    for(LLView::child_list_iter_t iter = result.begin();
+    viewList_t::iterator focused = result.end();
+    for(viewList_t::iterator iter = result.begin();
         iter != result.end();
         ++iter)
     {
@@ -618,7 +618,7 @@ bool LLView::focusPrev(LLView::child_list_t & result)
             break;
         }
     }
-    LLView::child_list_iter_t next = focused;
+    viewList_t::iterator next = focused;
     next = (next == result.end()) ? result.begin() : ++next;
     while(next != focused)
     {
@@ -2177,9 +2177,13 @@ private:
 class SortByTabOrder : public LLQuerySorter, public LLSingleton<SortByTabOrder>
 {
     LLSINGLETON_EMPTY_CTOR(SortByTabOrder);
-    /*virtual*/ void sort(LLView * parent, LLView::child_list_t &children) const override
+    /*virtual*/ void sort(LLView * parent, viewList_t &children) const override
     {
-        children.sort(CompareByTabOrder(parent->getTabOrder(), parent->getDefaultTabGroup()));
+        // Stable: the comparator answers equal for two views in the same tab
+        // group, and what orders those is the order they were added in, which
+        // is what the caller handed over. std::sort would shuffle them.
+        std::stable_sort(children.begin(), children.end(),
+                         CompareByTabOrder(parent->getTabOrder(), parent->getDefaultTabGroup()));
     }
 };
 
@@ -2201,7 +2205,7 @@ const LLViewQuery & LLView::getTabOrderQuery()
 class LLFocusRootsFilter : public LLQueryFilter, public LLSingleton<LLFocusRootsFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLFocusRootsFilter);
-    /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override
+    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override
     {
         return filterResult_t(view->isCtrl() && view->isFocusRoot(), !view->isFocusRoot());
     }

@@ -27,22 +27,31 @@
 #ifndef LL_LLVIEWQUERY_H
 #define LL_LLVIEWQUERY_H
 
-#include <list>
+#include <vector>
 
 #include "llsingleton.h"
 #include "llui.h"
 
 class LLView;
 
-typedef std::list<LLView *>         viewList_t;
+// A vector: this is filled by a walk of the whole view tree, so the list it
+// used to be paid a node allocation for every view that passed a filter, and
+// a sentinel node for every view that was asked. A leaf now costs nothing.
+typedef std::vector<LLView *>       viewList_t;
 typedef std::pair<bool, bool>       filterResult_t;
 
 // Abstract base class for all query filters.
+//
+// The second argument used to be the children themselves, and every filter in
+// the tree asked it one question: are there any? Handing over the container to
+// have emptiness read off it also tied the query's result type to the type of a
+// view's child list, since a prefilter is passed one and a postfilter the
+// other.
 class LLQueryFilter
 {
 public:
     virtual ~LLQueryFilter() {};
-    virtual filterResult_t operator() (const LLView* const view, const viewList_t & children) const = 0;
+    virtual filterResult_t operator() (const LLView* const view, bool has_children) const = 0;
 };
 
 class LLQuerySorter
@@ -55,43 +64,43 @@ public:
 class LLLeavesFilter : public LLQueryFilter, public LLSingleton<LLLeavesFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLLeavesFilter);
-    /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
+    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override;
 };
 
 class LLRootsFilter : public LLQueryFilter, public LLSingleton<LLRootsFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLRootsFilter);
-    /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
+    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override;
 };
 
 class LLVisibleFilter : public LLQueryFilter, public LLSingleton<LLVisibleFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLVisibleFilter);
-    /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
+    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override;
 };
 
 class LLEnabledFilter : public LLQueryFilter, public LLSingleton<LLEnabledFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLEnabledFilter);
-    /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
+    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override;
 };
 
 class LLTabStopFilter : public LLQueryFilter, public LLSingleton<LLTabStopFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLTabStopFilter);
-    /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
+    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override;
 };
 
 class LLCtrlFilter : public LLQueryFilter, public LLSingleton<LLCtrlFilter>
 {
     LLSINGLETON_EMPTY_CTOR(LLCtrlFilter);
-    /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const override;
+    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override;
 };
 
 template <class T>
 class LLWidgetTypeFilter : public LLQueryFilter
 {
-    /*virtual*/ filterResult_t operator() (const LLView* const view, const viewList_t & children) const
+    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const
     {
         return filterResult_t(dynamic_cast<const T*>(view) != NULL, true);
     }
@@ -102,7 +111,7 @@ class LLWidgetTypeFilter : public LLQueryFilter
 class LLViewQuery
 {
 public:
-    typedef std::list<const LLQueryFilter*>     filterList_t;
+    typedef std::vector<const LLQueryFilter*>   filterList_t;
     typedef filterList_t::iterator              filterList_iter_t;
     typedef filterList_t::const_iterator        filterList_const_iter_t;
 
@@ -126,11 +135,15 @@ public:
 
 private:
 
-    // Both lists by reference. They were taken by value, and this runs at every
-    // node of a recursive walk over a whole view tree, so each node copied its
-    // own child list and the filter list -- a heap allocation per element, for
-    // nothing. A folder tree made that hundreds of thousands of allocations.
-    filterResult_t runFilters(LLView * view, const viewList_t& children, const filterList_t& filters) const;
+    // The filter list by reference. It was taken by value, and this runs at
+    // every node of a recursive walk over a whole view tree, so each node
+    // allocated a copy of it to read it -- for nothing. A folder tree made that
+    // hundreds of thousands of allocations.
+    filterResult_t runFilters(LLView * view, bool has_children, const filterList_t& filters) const;
+
+    // What run() is, appending rather than returning, so a node of the walk
+    // does not build a container to have it emptied into its parent's.
+    void runInto(LLView * view, viewList_t& result) const;
 
     filterList_t mPreFilters;
     filterList_t mPostFilters;
