@@ -794,64 +794,30 @@ bool LLUICtrl::getIsChrome() const
 }
 
 
-bool LLUICtrl::focusFirstItem(bool prefer_text_fields, bool focus_flash)
+bool LLUICtrl::focusFirstItem(bool /*prefer_text_fields*/, bool focus_flash)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    // try to select default tab group child
-    LLViewQuery query = getTabOrderQuery();
-    child_list_t result = query(this);
-    if(result.size() > 0)
+    // The tab order query answers for the whole subtree, so a preference for
+    // text fields can only narrow that answer: LLTextInputFilter is a
+    // prefilter, its result is a subset of this one's, and a subset of nothing
+    // is nothing.
+    const child_list_t result = getTabOrderQuery().run(this);
+    if (result.empty())
     {
-        LLUICtrl * ctrl = static_cast<LLUICtrl*>(result.back());
-        if(!ctrl->hasFocus())
-        {
-            ctrl->setFocus(true);
-            ctrl->onTabInto();
-            if(focus_flash)
-            {
-                gFocusMgr.triggerFocusFlash();
-            }
-        }
-        return true;
+        return false;
     }
-    // search for text field first
-    if(prefer_text_fields)
+
+    LLUICtrl* ctrl = static_cast<LLUICtrl*>(result.back());
+    if (!ctrl->hasFocus())
     {
-        LLViewQuery query = getTabOrderQuery();
-        query.addPreFilter(LLUICtrl::LLTextInputFilter::getInstance());
-        child_list_t result = query(this);
-        if(result.size() > 0)
+        ctrl->setFocus(true);
+        ctrl->onTabInto();
+        if (focus_flash)
         {
-            LLUICtrl * ctrl = static_cast<LLUICtrl*>(result.back());
-            if(!ctrl->hasFocus())
-            {
-                ctrl->setFocus(true);
-                ctrl->onTabInto();
-                if(focus_flash)
-                {
-                    gFocusMgr.triggerFocusFlash();
-                }
-            }
-            return true;
+            gFocusMgr.triggerFocusFlash();
         }
     }
-    // no text field found, or we don't care about text fields
-    result = getTabOrderQuery().run(this);
-    if(result.size() > 0)
-    {
-        LLUICtrl * ctrl = static_cast<LLUICtrl*>(result.back());
-        if(!ctrl->hasFocus())
-        {
-            ctrl->setFocus(true);
-            ctrl->onTabInto();
-            if(focus_flash)
-            {
-                gFocusMgr.triggerFocusFlash();
-            }
-        }
-        return true;
-    }
-    return false;
+    return true;
 }
 
 
