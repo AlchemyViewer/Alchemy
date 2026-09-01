@@ -225,11 +225,8 @@ void LLPanelTopInfoBar::refreshParcelInfoText()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    // Recorded whether or not the text turns out to have moved: draw() reads
-    // this to decide whether to come back here, and a caller that rebuilt
-    // without recording would put the readout straight back onto the
-    // per-frame path.
-    LLAgentUI::getDisplayPos(mDisplayPosX, mDisplayPosY, mDisplayPosZ);
+    S32 pos_x, pos_y, pos_z;
+    LLAgentUI::getDisplayPos(pos_x, pos_y, pos_z);
 
     static LLUICachedControl<bool> show_coords("NavBarShowCoordinates", false);
     LLAgentUI::ELocationFormat format =
@@ -242,6 +239,11 @@ void LLPanelTopInfoBar::refreshParcelInfoText()
         // flashing a placeholder at every crossing: a refresh follows when the
         // parcel arrives, and the placeholder is only right before the first
         // one ever does.
+        //
+        // The position is deliberately not recorded here. What draw() compares
+        // it against is the position the text on screen was built from, and
+        // the text on screen is now older than this one -- recording it would
+        // tell draw() the readout was current and stop it coming back.
         if (!mParcelInfoText->getText().empty())
         {
             return;
@@ -249,16 +251,26 @@ void LLPanelTopInfoBar::refreshParcelInfoText()
         mLocationScratch = "???";
     }
 
-    // The mean of any span of this plot is the fraction of rebuilds that were
-    // worth making -- the number the gate in draw() is sized against. The text
-    // box is asked rather than a copy of it being kept: it hands back a
-    // reference to what it is already holding.
-    LL_PROFILE_PLOT("topinfo location changed",
-                    (int64_t)(mLocationScratch != mParcelInfoText->getText()));
+    // Recorded whether or not the text turns out to have moved, because from
+    // here on the string is the one this position produces: draw() reads this
+    // to decide whether to come back, and not recording it would put the
+    // readout straight back onto the per-frame path.
+    mDisplayPosX = pos_x;
+    mDisplayPosY = pos_y;
+    mDisplayPosZ = pos_z;
 
+    // The text box is asked rather than a copy of it being kept: it hands back
+    // a reference to what it is already holding.
+    //
     // Second gate, because the rounding buckets are 2 m at a walk and 4 m in
     // flight: the integers draw() compared can move without the text moving.
-    if (mLocationScratch == mParcelInfoText->getText())
+    const bool text_moved = mLocationScratch != mParcelInfoText->getText();
+
+    // The mean of any span of this plot is the fraction of rebuilds that were
+    // worth making -- the number the gate in draw() is sized against.
+    LL_PROFILE_PLOT("topinfo location changed", (int64_t)text_moved);
+
+    if (!text_moved)
     {
         return;
     }

@@ -826,11 +826,8 @@ void LLLocationInputCtrl::refreshLocation()
         return;
     }
 
-    // Recorded whether or not the text turns out to have moved: draw() reads
-    // this to decide whether to come back here, and a caller that rebuilt
-    // without recording would put the readout straight back onto the
-    // per-frame path.
-    LLAgentUI::getDisplayPos(mDisplayPosX, mDisplayPosY, mDisplayPosZ);
+    S32 pos_x, pos_y, pos_z;
+    LLAgentUI::getDisplayPos(pos_x, pos_y, pos_z);
 
     // Cached: this is reached from draw, on every frame the setting is on, and
     // looking a setting up by its name is a hash of the name and a walk of the
@@ -849,16 +846,25 @@ void LLLocationInputCtrl::refreshLocation()
         // flashing a placeholder at every crossing: a refresh follows when the
         // parcel arrives, and the placeholder is only right before the first
         // one ever does.
+        //
+        // The position is deliberately not recorded here. What draw() compares
+        // it against is the position the text on screen was built from, and
+        // the text on screen is now older than this one -- recording it would
+        // tell draw() the readout was current and stop it coming back.
         if (!mHumanReadableLocation.empty())
         {
             return;
         }
         mLocationScratch = "???";
     }
-    // The mean of any span of this plot is the fraction of rebuilds that
-    // produced different text -- the number draw()'s gate is sized against.
-    LL_PROFILE_PLOT("navbar location changed",
-                    (int64_t)(mLocationScratch != mHumanReadableLocation));
+
+    // Recorded whether or not the text turns out to have moved, because from
+    // here on the string is the one this position produces: draw() reads this
+    // to decide whether to come back, and not recording it would put the
+    // readout straight back onto the per-frame path.
+    mDisplayPosX = pos_x;
+    mDisplayPosY = pos_y;
+    mDisplayPosZ = pos_z;
 
     // Second gate, because the rounding buckets are 2 m at a walk and 4 m in
     // flight: the integers draw() compared can move without the text moving.
@@ -869,7 +875,14 @@ void LLLocationInputCtrl::refreshLocation()
     // clicks for, and whatever the user typed before giving up focus. Putting
     // the readable text back over both is this function's other job, and a
     // gate that compared its own last answer would skip doing it.
-    if (mTextEntry && mTextEntry->getText() == mLocationScratch)
+    const bool text_moved = !mTextEntry || mTextEntry->getText() != mLocationScratch;
+
+    // The mean of any span of this plot is the fraction of rebuilds that
+    // produced different text -- the number draw()'s gate is sized against.
+    // The same predicate the gate uses, so the two cannot drift apart.
+    LL_PROFILE_PLOT("navbar location changed", (int64_t)text_moved);
+
+    if (!text_moved)
     {
         return;
     }
