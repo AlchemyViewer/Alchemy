@@ -42,7 +42,6 @@
 #include "llui.h"
 #include "lluistring.h"
 #include "llviewquery.h"
-#include "lluistring.h"
 #include "llcursortypes.h"
 #include "lluictrlfactory.h"
 #include "lltreeiterators.h"
@@ -62,8 +61,6 @@ constexpr U32   FOLLOWS_ALL     = 0x33;
 
 constexpr bool  MOUSE_OPAQUE = true;
 constexpr bool  NOT_MOUSE_OPAQUE = false;
-
-constexpr U32 GL_NAME_UI_RESERVED = 2;
 
 
 // maintains render state during traversal of UI tree
@@ -739,7 +736,6 @@ public:
     static bool sDebugKeys;
     static bool sDebugMouseHandling;
     static std::string sMouseHandlerMessage;
-    static S32  sSelectID;
     static std::set<LLView*> sPreviewHighlightedElements;   // DEV-16869
     static bool sHighlightingDiffs;                         // DEV-16869
     static LLView* sPreviewClickedElement;                  // DEV-16869
