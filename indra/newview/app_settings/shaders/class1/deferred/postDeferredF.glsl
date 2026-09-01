@@ -108,6 +108,50 @@ uniform float uBokehCatEye;              // 0 disables; higher clips harder towa
 uniform float uBokehFringeAmount;        // 0 disables
 uniform vec3  uBokehFringeNearTint;      // applied in front of the focal plane
 uniform vec3  uBokehFringeFarTint;       // applied behind it
+uniform float uBokehSpherical;           // -1 creamy .. 0 flat disc .. +1 soap bubble
+uniform float uBokehFieldStretch;        // 0 disables; + tangential (swirl), - radial (coma)
+uniform float uBokehFieldFalloff;        // how fast the stretch grows toward the corners
+uniform float uBokehComaAsymmetry;       // 0 disables; ramps with field radius
+
+// The floor keeps the shape weight strictly positive. Two reasons, both
+// measured rather than defensive. A rim-bright profile drives the inner disc
+// toward zero, and near a depth edge the outer rings are all rejected by the
+// `sc > min_sc` test -- so the surviving samples would carry almost no weight
+// and the pixel would fall back to its own colour while its neighbour blurred
+// normally, which reads as speckle along every defocus transition. And a
+// creamy profile lands exactly 0.0 on the outermost ring, the largest one, so
+// its samples were fetched, tinted and multiplied away: 40% of all taps at 4px
+// of blur. At 0.15 the centre-tap share tracks the unaberrated baseline to
+// within a percent at every blur size, and both profiles still read correctly.
+const float BOKEH_SHAPE_FLOOR = 0.15;
+
+// How much this sample counts, before its radiance is weighed. Both aberrations
+// are per-sample scalars on the same accumulation, so they combine into one
+// branchless expression -- cheaper than gating each, and it avoids a divergent
+// branch on `apod`, which varies per fragment through the blur-size fade.
+//
+// Spherical aberration redistributes weight across the disc. The gather is
+// close to area-uniform -- ring sample counts grow with radius while rings stay
+// one pixel apart -- so a per-sample weight is very nearly the bokeh's radial
+// profile. Not exactly: int(sc*3.7) truncates a fraction of a sample from every
+// ring, which biases density by up to 5% at small radii, and the outermost ring
+// sits at radius_norm 1.0 where a continuous integral would half-weight it. The
+// continuous form of (2r^2 - 1) has an area-weighted mean of zero, so the mean
+// weight is 1 in the limit; the discrete walk deviates by up to a quarter at
+// 3-4px of blur. It does not matter while the gather normalises by `w`, and it
+// would matter a great deal if that normalisation were ever removed.
+//
+// `apod` arrives multiplied by -cof_sign and by the blur-size fade. `coma_vec`
+// carries the comatic bias as one vector: its direction is the axis and its
+// length is the strength, both baked per fragment.
+float bokehShapeWeight(float radius_norm, vec2 samp_dir, float apod, vec2 coma_vec)
+{
+    float sw = 1.0
+             + apod * (2.0 * radius_norm * radius_norm - 1.0)
+             + dot(samp_dir, coma_vec) * radius_norm;
+
+    return max(sw, BOKEH_SHAPE_FLOOR);
+}
 
 // 1.0 if this sample falls inside the aperture, 0.0 if a blade or the cat's-eye
 // clip excludes it. `radius_norm` is the sample's position across the disc,
@@ -190,21 +234,21 @@ vec3 bokehFringe(vec3 c, float radius_norm, float cof_sign)
 // One accumulate body shared by both gathers, so the near and far fields can
 // never weight samples differently -- a one-sided edit to the clamp or fringe
 // would otherwise show up as a subtle front/back blur mismatch.
-void dofAccumulate(inout vec4 diff, inout float w, vec4 s, float radius_norm, float cof_sign)
+void dofAccumulate(inout vec4 diff, inout float w, vec4 s, float radius_norm, float cof_sign, float shape_w)
 {
     vec3 c = bokehClamp(s.rgb);
 #if DOF_SHAPED
     c = bokehFringe(c, radius_norm, cof_sign);
 #endif
     vec4  cs = vec4(c, s.a);
-    float wg = bokehWeight(cs.rgb);
+    float wg = bokehWeight(cs.rgb) * shape_w;
 
     diff += wg*cs;
 
     w += wg;
 }
 
-void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc, float radius_norm, float cof_sign)
+void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc, float radius_norm, float cof_sign, float shape_w)
 {
     vec4 s = texture(diffuseRect, tc);
 
@@ -212,13 +256,13 @@ void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc, float radi
 
     if (sc > min_sc) //sampled pixel is more "out of focus" than current sample radius
     {
-        dofAccumulate(diff, w, s, radius_norm, cof_sign);
+        dofAccumulate(diff, w, s, radius_norm, cof_sign, shape_w);
     }
 }
 
-void dofSampleNear(inout vec4 diff, inout float w, float min_sc, vec2 tc, float radius_norm, float cof_sign)
+void dofSampleNear(inout vec4 diff, inout float w, float min_sc, vec2 tc, float radius_norm, float cof_sign, float shape_w)
 {
-    dofAccumulate(diff, w, texture(diffuseRect, tc), radius_norm, cof_sign);
+    dofAccumulate(diff, w, texture(diffuseRect, tc), radius_norm, cof_sign, shape_w);
 }
 
 vec3 clampHDRRange(vec3 color);
@@ -230,8 +274,6 @@ void main()
     vec4 diff = texture(diffuseRect, vary_fragcoord.xy);
 
     {
-        float w = 1.0;
-
         float sc = (diff.a*2.0-1.0)*max_cof;
 
         float PI = 3.14159265358979323846264;
@@ -244,25 +286,46 @@ void main()
         float cof_sign   = (sc < 0.0) ? -1.0 : 1.0;
 
 #if DOF_SHAPED
-        // Where this fragment sits in the frame, measured the way every other
-        // radial effect in the stack measures it: aspect-corrected, then
-        // normalised over the half-diagonal so the corner reads 1.0 on any
-        // viewport shape. Measured in raw UV instead, "distance from the
-        // optical axis" reaches 1.0 at the left edge of a 21:9 frame and 1.0
-        // at its top edge, which are nowhere near the same distance -- and the
-        // effects keyed off it then follow the viewport rectangle rather than
-        // the lens's image circle.
-        float dof_aspect = screen_res.x / max(screen_res.y, 1.0);
-        vec2  dof_ascale = max(vec2(dof_aspect, 1.0 / max(dof_aspect, 1e-4)), 1.0);
-        vec2  field_vec  = (vary_fragcoord.xy - 0.5) * dof_ascale;
-        float field_len  = length(field_vec);
-        vec2  field_dir  = (field_len > 1e-5) ? (field_vec / field_len) : vec2(0.0);
-        float field_r    = clamp(field_len / (0.5 * length(dof_ascale)), 0.0, 1.0);
+        vec2  cat_offset   = vec2(0.0);
+        vec2  ax           = vec2(1.0, 0.0);
+        vec2  ay           = vec2(0.0, 1.0);
+        vec2  coma_vec     = vec2(0.0);
+        float apod_signed  = 0.0;
+        float ring_density = 1.0;
 
-        // Offset of the barrel opening for optical vignetting, growing with
-        // distance from the optical axis. Constant across the disc, so it is
-        // computed once per fragment rather than per sample.
-        vec2 cat_offset = field_dir * (field_r * uBokehCatEye);
+        // Everything below is only read by the gather loops, so fragments that
+        // are in focus -- most of the frame at a mild setting -- skip the lot.
+        // It matters more than it looks: the block carries several divides, two
+        // square roots and a smoothstep, where before these effects existed it
+        // was two scalar assignments.
+        if (abs(sc) > 0.5)
+        {
+            // Where this fragment sits in the frame, measured the way every
+            // other radial effect in the stack measures it: aspect-corrected,
+            // then normalised over the half-diagonal so the corner reads 1.0 on
+            // any viewport shape. Measured in raw UV instead, "distance from
+            // the optical axis" reaches 1.0 at the left edge of a 21:9 frame
+            // and 1.0 at its top edge, which are nowhere near the same distance
+            // -- and the effects keyed off it then follow the viewport
+            // rectangle rather than the lens's image circle.
+            float dof_aspect = screen_res.x / max(screen_res.y, 1.0);
+            vec2  dof_ascale = max(vec2(dof_aspect, 1.0 / max(dof_aspect, 1e-4)), 1.0);
+            vec2  field_vec  = (vary_fragcoord.xy - 0.5) * dof_ascale;
+            float field_len  = length(field_vec);
+            vec2  field_dir  = (field_len > 1e-5) ? (field_vec / field_len) : vec2(0.0);
+            float field_r    = clamp(field_len / (0.5 * length(dof_ascale)), 0.0, 1.0);
+
+            // Aberrations fade in with blur size. One ring cannot carry a
+            // radial profile: below about 1.5px the disc is a single ring
+            // sitting at radius_norm 1.0, so a shaped weight there is applied
+            // to every surviving sample at once and the blur either collapses
+            // or goes one-sided. Fading to zero leaves those pixels behaving
+            // exactly as they do without the effect.
+            float shape_fade = smoothstep(1.5, 4.0, max_radius);
+
+            // Offset of the barrel opening for optical vignetting, growing with
+            // distance from the optical axis.
+            cat_offset = field_dir * (field_r * uBokehCatEye);
 
         // Anamorphic deformation. A cylindrical element squeezes the image on
         // one axis, and out-of-focus highlights inherit that squeeze as ovals
@@ -271,15 +334,112 @@ void main()
         // diaphragm is whatever shape it is, and the cylinder stretches the
         // disc that results, so blades and cat's-eye slivers stretch with it.
         //
-        // The CPU sends this area-preserving (the two axes multiply to 1), so
-        // the control changes the shape of the blur without also changing how
-        // much of it there is.
-        vec2  anam         = uBokehAnamorphic;
-        float ring_density = max(anam.x, anam.y);
+            // The CPU sends the anamorphic squeeze area-preserving (the two
+            // axes multiply to 1), so the control changes the shape of the blur
+            // without also changing how much of it there is.
+            //
+            // Anamorphic alone is a diagonal matrix, which is what this used to
+            // be as two scalars. Field stretch adds a second squeeze on the
+            // radial axis, so the pair becomes a general 2x2 carried as its two
+            // column vectors. With field stretch off it reduces to (anam.x, 0)
+            // and (0, anam.y) -- the old behaviour, bit for bit.
+            if (uBokehFieldStretch != 0.0 && field_len > 1e-5)
+            {
+                // Stretch across the radius for swirl, along it for coma. The
+                // sqrt makes the axes s and 1/s, so the deformation is
+                // area-preserving and a highlight keeps its brightness as it
+                // deforms. max() on the falloff because a zero exponent would
+                // make pow() return 1.0 everywhere and stretch the on-axis disc
+                // as hard as the corners.
+                vec2  u = (uBokehFieldStretch > 0.0)
+                        ? vec2(-field_dir.y, field_dir.x)   // across the radius
+                        : field_dir;                        // along it
+                float s = sqrt(1.0 + abs(uBokehFieldStretch)
+                                    * pow(field_r, max(uBokehFieldFalloff, 1.0)));
+
+                // A symmetric stretch by s along u is (1/s)I + (s - 1/s)uu^T.
+                // field_dir is already the unit vector the rotation would have
+                // rebuilt, so there is no angle to recover and no trig here.
+                float k = s - 1.0 / s;
+                ax = vec2(1.0 / s + k * u.x * u.x, k * u.x * u.y);
+                ay = vec2(k * u.x * u.y, 1.0 / s + k * u.y * u.y);
+            }
+
+            // Anamorphic applied outermost: the cylindrical element squeezes
+            // the whole image, including whatever shape the field aberration
+            // has already produced.
+            ax *= uBokehAnamorphic;
+            ay *= uBokehAnamorphic;
+
+            // Largest singular value of the basis -- how far its widest axis
+            // has been stretched. Ring sample counts scale by it so a deformed
+            // disc does not thin out into visible rings. This reduces exactly
+            // to max(anam.x, anam.y) when there is no field stretch, which is
+            // what the line used to be, and it cannot be replaced by
+            // max(old, new) once field stretch is live: the two stretch axes
+            // can oppose, and the true maximum then sits *below* max(anam).
+            // Capped because it multiplies the tap count directly, and the only
+            // other bound on it is a pair of CPU clamps two files away.
+            float bF = dot(ax, ax) + dot(ay, ay);
+            float bD = ax.x * ay.y - ax.y * ay.x;
+            ring_density = min(sqrt(max(0.5 * (bF + sqrt(max(bF * bF - 4.0 * bD * bD, 0.0))), 1e-4)), 3.0);
+
+            // Spherical aberration. Multiplied by -cof_sign, not cof_sign:
+            // cof_sign is +1 in front of the focal plane, so anchoring the
+            // control to the foreground would invert it for the background --
+            // and the background is the only field the default build renders,
+            // since RenderDepthOfFieldNearBlur defaults off and compiles the
+            // near gather out. Positive now means a bright rim behind focus,
+            // which is what the setting says it means.
+            apod_signed = uBokehSpherical * shape_fade * -cof_sign;
+
+            // Comatic asymmetry, as one vector: direction is the bias axis,
+            // length is the strength.
+            //
+            // Two things here are easy to get backwards, and both were.
+            //
+            // This pass is a *gather*: a fragment reads its neighbours, so a
+            // point source renders as the weight function mirrored through the
+            // origin. Favouring outward samples therefore deposits light on the
+            // inward side and the comet points at the frame centre. The axis is
+            // negated so the rendered flare runs outward, the way real coma and
+            // this setting's own description both say it should.
+            //
+            // And the axis has to be measured in the disc's *parameter* space,
+            // because that is where the samples are chosen. The screen-space
+            // centroid is M times the parameter-space centroid, so biasing
+            // along M^T(field) lands the comet along M M^T(field) -- 41 degrees
+            // off with a strong anamorphic squeeze. Biasing along the inverse
+            // instead puts it back exactly on the field direction. det(M) is
+            // the anamorphic product, which the CPU sends as 1 and which is
+            // positive regardless, so the adjugate serves and the 1/det drops
+            // out in the normalise.
+            if (uBokehComaAsymmetry != 0.0 && field_len > 1e-5)
+            {
+                vec2  g  = vec2(ay.y * field_dir.x - ay.x * field_dir.y,
+                                ax.x * field_dir.y - ax.y * field_dir.x);
+                float gl = length(g);
+                if (gl > 1e-5)
+                {
+                    coma_vec = -(g / gl)
+                             * (uBokehComaAsymmetry * field_r * shape_fade);
+                }
+            }
+        }
 #else
-        const vec2  anam         = vec2(1.0);
         const float ring_density = 1.0;
 #endif
+
+        // The centre tap is the sample at radius_norm 0, so it carries that
+        // position's weight rather than a bare 1.0. Leaving it unweighted is
+        // what let a rim-bright profile bleed the sharp image through wherever
+        // the surrounding ring samples were rejected.
+#if DOF_SHAPED
+        float w = bokehShapeWeight(0.0, vec2(0.0), apod_signed, coma_vec);
+#else
+        float w = 1.0;
+#endif
+        diff *= w;
 
         // sample quite uniformly spaced points within a circle, for a circular 'bokeh'
 #if FRONT_BLUR
@@ -298,9 +458,22 @@ void main()
                         continue;   // blade or barrel clips this one
                     }
 #endif
-                    float samp_x = sc*sin(ang) * anam.x;
-                    float samp_y = sc*cos(ang) * anam.y;
-                    dofSampleNear(diff, w, sc, vary_fragcoord.xy + (vec2(samp_x,samp_y) / screen_res), rn, cof_sign);
+                    // Below the reject, not above it: a clipped sample should
+                    // not pay for trig it never uses, and apertureMask derives
+                    // its own sin/cos only on the cat's-eye path.
+                    float sa = sin(ang), ca = cos(ang);
+#if DOF_SHAPED
+                    vec2  samp    = sc * (sa * ax + ca * ay);
+                    float shape_w = bokehShapeWeight(rn, vec2(sa, ca), apod_signed, coma_vec);
+#else
+                    // Deliberately the plain axis-aligned form rather than the
+                    // basis above: this is the path every DoF user without a
+                    // shaped effect takes, and it should not pay for a general
+                    // 2x2 on the strength of the compiler folding it back down.
+                    vec2  samp    = vec2(sc * sa, sc * ca);
+                    float shape_w = 1.0;
+#endif
+                    dofSampleNear(diff, w, sc, vary_fragcoord.xy + (samp / screen_res), rn, cof_sign, shape_w);
                 }
                 sc -= 1.0;
             }
@@ -324,9 +497,22 @@ void main()
                         continue;   // blade or barrel clips this one
                     }
 #endif
-                    float samp_x = sc*sin(ang) * anam.x;
-                    float samp_y = sc*cos(ang) * anam.y;
-                    dofSample(diff, w, sc, vary_fragcoord.xy + (vec2(samp_x,samp_y) / screen_res), rn, cof_sign);
+                    // Below the reject, not above it: a clipped sample should
+                    // not pay for trig it never uses, and apertureMask derives
+                    // its own sin/cos only on the cat's-eye path.
+                    float sa = sin(ang), ca = cos(ang);
+#if DOF_SHAPED
+                    vec2  samp    = sc * (sa * ax + ca * ay);
+                    float shape_w = bokehShapeWeight(rn, vec2(sa, ca), apod_signed, coma_vec);
+#else
+                    // Deliberately the plain axis-aligned form rather than the
+                    // basis above: this is the path every DoF user without a
+                    // shaped effect takes, and it should not pay for a general
+                    // 2x2 on the strength of the compiler folding it back down.
+                    vec2  samp    = vec2(sc * sa, sc * ca);
+                    float shape_w = 1.0;
+#endif
+                    dofSample(diff, w, sc, vary_fragcoord.xy + (samp / screen_res), rn, cof_sign, shape_w);
                 }
                 sc -= 1.0;
             }
