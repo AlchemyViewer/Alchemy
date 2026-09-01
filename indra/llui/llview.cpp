@@ -191,7 +191,12 @@ LLView::~LLView()
         gFocusMgr.removeMouseCaptureWithoutCallback( this );
     }
 
+    // Counted as a teardown, because the region this view's children are about
+    // to vacate sits inside the one already claimed above, and deleteAllChildren
+    // would otherwise claim it a second time.
+    ++sDeleteDepth;
     deleteAllChildren();
+    --sDeleteDepth;
 
     if (mParentView != NULL)
     {
@@ -655,6 +660,8 @@ void LLView::deleteAllChildren()
     // clear out the control ordering
     mTabOrder.clear();
 
+    const bool had_children = !mChildList.empty();
+
     ++sDeleteDepth;
     while (!mChildList.empty())
     {
@@ -674,9 +681,19 @@ void LLView::deleteAllChildren()
     }
     --sDeleteDepth;
 
-    // Outside the count: this view is what is left of the subtree, so this is
-    // the call that claims the region all of it vacated.
+    // Outside the count, so a view that does use a bounding rect shrinks to
+    // what is left of it and tells its parent.
     updateBoundingRect();
+
+    // The region the children vacated. The call above cannot claim it: a view
+    // that does not use a bounding rect reports its own rect, which losing its
+    // children does not move, so it finds nothing there to compare. Nor do the
+    // children claim it -- a view deleted inside the count leaves the region to
+    // whatever is taking the subtree down.
+    if (had_children && getVisible() && sDeleteDepth == 0)
+    {
+        dirtyRect();
+    }
 }
 
 void LLView::setAllChildrenEnabled(bool b, bool recursive /*= false*/)
