@@ -299,7 +299,7 @@ public:
 
     bool                showAllResults() const;
 
-    Match getFilterMatch(LLFolderViewModelItem* item) const override;
+    Match getFilterMatch(LLFolderViewModelItem* item) const;
     // +-------------------------------------------------------------------+
     // + Presentation
     // +-------------------------------------------------------------------+

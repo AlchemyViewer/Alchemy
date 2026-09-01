@@ -335,7 +335,7 @@ public:
 
     // Sizes itself and stops when out of sight; setVisible settles the width
     // afterwards. See the definition for why nothing reads what is skipped.
-    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
 
     //  virtual void handleDropped();
     virtual void draw();
@@ -549,7 +549,7 @@ public:
 
     // Get the current state of the folder.
     virtual bool isOpen() const { return mIsOpen; }
-    bool showsChildren() const override { return isOpen() || mCurHeight != mTargetHeight; }
+    virtual bool showsChildren() const { return isOpen() || mCurHeight != mTargetHeight; }
 
     // special case if an object is dropped on the child.
     bool handleDragAndDropFromChild(MASK mask,
