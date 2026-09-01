@@ -1000,10 +1000,17 @@ void LLStatBar::drawTickLabels( const tick_label_list_t& labels, U32 num_labels 
     for (U32 i = 0; i < num_labels; i++)
     {
         const TickLabel& label = labels[i];
-        // Each label is capped at the room left between it and the widget's
-        // edge, which is what the scissor used to take care of.
-        const S32 max_pixels = llmax(0, right - (S32)label.mX);
-        font->renderBytes(std::string_view(label.mText.data(), label.mLength), 0, label.mX, label.mY,
+
+        // The last label of a vertical bar is slid left to keep its end inside
+        // the bar, and a label wider than the bar slides past the left edge
+        // doing it. Both ends are held, which is what the scissor used to do:
+        // the start is pulled back to the edge, and the cap is measured from
+        // wherever it ends up rather than from where it asked to be -- a
+        // negative x would otherwise ask for more room than the widget has.
+        const F32 x = llmax(0.f, label.mX);
+        const S32 max_pixels = llmax(0, right - (S32)x);
+
+        font->renderBytes(std::string_view(label.mText.data(), label.mLength), 0, x, label.mY,
             LLColor4(1.f, 1.f, 1.f, 0.5f),
             LLFontGL::LEFT, valign, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
             S32_MAX, max_pixels, NULL, /*use_ellipses=*/true);
