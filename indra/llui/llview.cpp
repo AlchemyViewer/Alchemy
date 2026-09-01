@@ -209,6 +209,8 @@ LLView::~LLView()
         mDefaultWidgets = NULL;
     }
 
+    delete mChildList;
+    delete mTabOrder;
     delete mToolTipMsg;
 }
 
@@ -295,7 +297,7 @@ void LLView::applyTransparencyType(U8 transparency_type)
         static_cast<LLUICtrl*>(this)->setTransparencyType((LLUICtrl::ETypeTransparency)transparency_type);
     }
 
-    for (LLView* child : mChildList)
+    for (LLView* child : children())
     {
         child->applyTransparencyType(transparency_type);
     }
@@ -330,10 +332,10 @@ void LLView::sendChildToFront(LLView* child)
     {
         // minor optimization, but more importantly,
         //  won't temporarily create an empty list
-        if (child != mChildList.front())
+        if (child != mChildList->front())
         {
-            mChildList.remove( child );
-            mChildList.push_front(child);
+            mChildList->remove( child );
+            mChildList->push_front(child);
         }
     }
 }
@@ -345,10 +347,10 @@ void LLView::sendChildToBack(LLView* child)
     {
         // minor optimization, but more importantly,
         //  won't temporarily create an empty list
-        if (child != mChildList.back())
+        if (child != mChildList->back())
         {
-            mChildList.remove( child );
-            mChildList.push_back(child);
+            mChildList->remove( child );
+            mChildList->push_back(child);
         }
     }
 }
@@ -373,7 +375,7 @@ bool LLView::addChild(LLView* child, S32 tab_group)
     }
 
     // add to front of child list, as normal
-    mChildList.push_front(child);
+    childList().push_front(child);
     // Said before the subtree is walked for anything else, so a pass that
     // skipped its work last time knows the tree has moved under it.
     ++sTreeGeneration;
@@ -381,7 +383,7 @@ bool LLView::addChild(LLView* child, S32 tab_group)
     // add to tab order list
     if (tab_group != 0)
     {
-        mTabOrder.insert(tab_order_pair_t(child, tab_group));
+        tabOrder().insert(tab_order_pair_t(child, tab_group));
     }
 
     child->mParentView = this;
@@ -416,12 +418,11 @@ void LLView::removeChild(LLView* child)
     {
         // if we are removing an item we are currently iterating over, that would be bad
         llassert(!child->mInDraw);
-        mChildList.remove( child );
+        mChildList->remove( child );
         child->mParentView = NULL;
-        child_tab_order_t::iterator found = mTabOrder.find(child);
-        if (found != mTabOrder.end())
+        if (mTabOrder)
         {
-            mTabOrder.erase(found);
+            mTabOrder->erase(child);
         }
     }
     else
@@ -658,26 +659,32 @@ bool LLView::focusPrev(viewList_t & result)
 void LLView::deleteAllChildren()
 {
     // clear out the control ordering
-    mTabOrder.clear();
+    if (mTabOrder)
+    {
+        mTabOrder->clear();
+    }
 
-    const bool had_children = !mChildList.empty();
+    const bool had_children = mChildList && !mChildList->empty();
 
     ++sDeleteDepth;
-    while (!mChildList.empty())
+    if (mChildList)
     {
-        LLView* viewp = mChildList.front();
-        // Pop before deleting. The child's destructor (and its children's
-        // destructors, e.g. LLFloater::~LLFloater deleting mDragHandle and
-        // mResizeBar/mResizeHandle explicitly) call ~LLView(), which calls
-        // mParentView->removeChild(this). If viewp is still at the front of
-        // the list at that point, removeChild() erases it -- but pop_front()
-        // below then removes whatever is now at the front instead, leaving the
-        // originally-next entry as a dangling pointer in mChildList.
-        // Popping first means removeChild() finds mParentView == NULL and
-        // takes the no-op warning branch, keeping the list consistent.
-        mChildList.pop_front();
-        viewp->mParentView = NULL;
-        delete viewp;
+        while (!mChildList->empty())
+        {
+            LLView* viewp = mChildList->front();
+            // Pop before deleting. The child's destructor (and its children's
+            // destructors, e.g. LLFloater::~LLFloater deleting mDragHandle and
+            // mResizeBar/mResizeHandle explicitly) call ~LLView(), which calls
+            // mParentView->removeChild(this). If viewp is still at the front of
+            // the list at that point, removeChild() erases it -- but pop_front()
+            // below then removes whatever is now at the front instead, leaving the
+            // originally-next entry as a dangling pointer in mChildList.
+            // Popping first means removeChild() finds mParentView == NULL and
+            // takes the no-op warning branch, keeping the list consistent.
+            mChildList->pop_front();
+            viewp->mParentView = NULL;
+            delete viewp;
+        }
     }
     --sDeleteDepth;
 
@@ -698,14 +705,14 @@ void LLView::deleteAllChildren()
 
 void LLView::setAllChildrenEnabled(bool b, bool recursive /*= false*/)
 {
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         viewp->setEnabled(b);
     }
 
     if (recursive)
     {
-        for (LLView* viewp : mChildList)
+        for (LLView* viewp : children())
         {
             viewp->setAllChildrenEnabled(b, recursive);
         }
@@ -747,11 +754,11 @@ void LLView::onVisibilityChange ( bool new_visibility )
     // walks the whole of itself. Reports how wide this level is; the depth
     // shows as nesting.
     LL_PROFILE_ZONE_NAMED_CATEGORY_UI("visibility change");
-    LL_PROFILE_ZONE_NUM(mChildList.size());
+    LL_PROFILE_ZONE_NUM(getChildCount());
 
     bool old_visibility;
     bool log_visibility_change = LLViewerEventRecorder::instance().getLoggingStatus();
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         if (!viewp)
         {
@@ -860,7 +867,7 @@ LLView* LLView::childrenHandleCharEvent(std::string_view desc, const METHOD& met
 {
     if ( getVisible() && getEnabled() )
     {
-        for (LLView* viewp : mChildList)
+        for (LLView* viewp : children())
         {
             if ((viewp->*method)(c, mask, true))
             {
@@ -879,7 +886,7 @@ LLView* LLView::childrenHandleCharEvent(std::string_view desc, const METHOD& met
 template <typename METHOD, typename XDATA>
 LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDATA extra, bool allow_mouse_block)
 {
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -908,7 +915,7 @@ LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDA
 
 LLView* LLView::childrenHandleToolTip(S32 x, S32 y, MASK mask)
 {
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -940,7 +947,7 @@ LLView* LLView::childrenHandleDragAndDrop(S32 x, S32 y, MASK mask,
     // default to not accepting drag and drop, will be overridden by handler
     *accept = ACCEPT_NO;
 
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -966,7 +973,7 @@ LLView* LLView::childrenHandleDragAndDrop(S32 x, S32 y, MASK mask,
 
 LLView* LLView::childrenHandleHover(S32 x, S32 y, MASK mask)
 {
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -994,7 +1001,7 @@ LLView* LLView::childFromPoint(S32 x, S32 y, bool recur)
     if (!getVisible())
         return NULL;
 
-    for (LLView* viewp : mChildList)
+    for (LLView* viewp : children())
     {
         S32 local_x = x - viewp->getRect().mLeft;
         S32 local_y = y - viewp->getRect().mBottom;
@@ -1350,7 +1357,7 @@ void LLView::draw()
 
 void LLView::drawChildren()
 {
-    if (!mChildList.empty())
+    if (mChildList && !mChildList->empty())
     {
         LLView* rootp = LLUI::getInstance()->getRootView();
 
@@ -1369,9 +1376,9 @@ void LLView::drawChildren()
 
         ++sDepth;
 
-        for (child_list_reverse_iter_t child_iter = mChildList.rbegin(); child_iter != mChildList.rend();)  // ++child_iter)
+        for (child_list_const_reverse_iter_t child_iter = mChildList->rbegin(); child_iter != mChildList->rend();)  // ++child_iter)
         {
-            child_list_reverse_iter_t child = child_iter++;
+            child_list_const_reverse_iter_t child = child_iter++;
             LLView *viewp = *child;
 
             if (viewp == NULL)
@@ -1496,7 +1503,7 @@ void LLView::drawDebugRect()
         gGL.end();
 
         // Draw the name if it's not a leaf node or not in editing or preview mode
-        if (mChildList.size()
+        if (getChildCount()
             && !is_previewed
             && sDebugRectsShowNames)
         {
@@ -1573,7 +1580,7 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
         mRect.mTop = getRect().mBottom + height;
 
         // move child views according to reshape flags
-        for (LLView* viewp : mChildList)
+        for (LLView* viewp : children())
         {
             if (viewp != NULL)
             {
@@ -1658,7 +1665,7 @@ LLRect LLView::calcBoundingRect()
 {
     LLRect local_bounding_rect = LLRect::null;
 
-    for (LLView* childp : mChildList)
+    for (LLView* childp : children())
     {
         // ignore invisible and "top" children when calculating bounding rect
         // such as combobox popups
@@ -1834,7 +1841,7 @@ LLView* LLView::findChildView(std::string_view name, bool recurse) const
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     // Look for direct children *first*
-    for (LLView* childp : mChildList)
+    for (LLView* childp : children())
     {
         llassert(childp);
         if (childp->getName() == name)
@@ -1845,7 +1852,7 @@ LLView* LLView::findChildView(std::string_view name, bool recurse) const
     if (recurse)
     {
         // Look inside each child as well.
-        for (LLView* childp : mChildList)
+        for (LLView* childp : children())
         {
             llassert(childp);
             LLView* viewp = childp->findChildView(name, recurse);
@@ -1945,8 +1952,9 @@ LLView* LLView::getRootView()
 
 LLView* LLView::findPrevSibling(LLView* child)
 {
-    child_list_t::iterator prev_it = std::find(mChildList.begin(), mChildList.end(), child);
-    if (prev_it != mChildList.end() && prev_it != mChildList.begin())
+    const child_list_t& list = children();
+    child_list_const_iter_t prev_it = std::find(list.begin(), list.end(), child);
+    if (prev_it != list.end() && prev_it != list.begin())
     {
         return *(--prev_it);
     }
@@ -1955,13 +1963,14 @@ LLView* LLView::findPrevSibling(LLView* child)
 
 LLView* LLView::findNextSibling(LLView* child)
 {
-    child_list_t::iterator next_it = std::find(mChildList.begin(), mChildList.end(), child);
-    if (next_it != mChildList.end())
+    const child_list_t& list = children();
+    child_list_const_iter_t next_it = std::find(list.begin(), list.end(), child);
+    if (next_it != list.end())
     {
         next_it++;
     }
 
-    return (next_it != mChildList.end()) ? *next_it : NULL;
+    return (next_it != list.end()) ? *next_it : NULL;
 }
 
 
@@ -2843,6 +2852,38 @@ LLView::root_to_view_iterator_t LLView::endRootToView()
 }
 
 
+LLView::child_list_t& LLView::childList()
+{
+    if (!mChildList)
+    {
+        mChildList = new child_list_t();
+    }
+    return *mChildList;
+}
+
+LLView::child_tab_order_t& LLView::tabOrder()
+{
+    if (!mTabOrder)
+    {
+        mTabOrder = new child_tab_order_t();
+    }
+    return *mTabOrder;
+}
+
+const LLView::child_list_t& LLView::children() const
+{
+    // Shared, and const: a view with no children has nothing of its own to
+    // walk, and allocating a list to say so is what this avoids.
+    static const child_list_t no_children;
+    return mChildList ? *mChildList : no_children;
+}
+
+const LLView::child_tab_order_t& LLView::getTabOrder() const
+{
+    static const child_tab_order_t no_tab_order;
+    return mTabOrder ? *mTabOrder : no_tab_order;
+}
+
 // only create maps on demand, as they incur heap allocation/deallocation cost
 // when a view is constructed/deconstructed
 LLView& LLView::getDefaultWidgetContainer() const
@@ -2867,7 +2908,7 @@ S32 LLView::notifyParent(const LLSD& info)
 bool    LLView::notifyChildren(const LLSD& info)
 {
     bool ret = false;
-    for (LLView* childp : mChildList)
+    for (LLView* childp : children())
     {
         ret = ret || childp->notifyChildren(info);
     }

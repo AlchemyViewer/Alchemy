@@ -257,7 +257,7 @@ public:
 
     virtual bool    postBuild() { return true; }
 
-    const child_tab_order_t& getTabOrder() const        { return mTabOrder; }
+    const child_tab_order_t& getTabOrder() const;
 
     void setDefaultTabGroup(S32 d)              { mDefaultTabGroup = d; }
     S32 getDefaultTabGroup() const              { return mDefaultTabGroup; }
@@ -382,11 +382,11 @@ public:
 
     LLView*     getRootView();
     LLView*     getParent() const               { return mParentView; }
-    LLView*     getFirstChild() const           { return (mChildList.empty()) ? NULL : *(mChildList.begin()); }
+    LLView*     getFirstChild() const           { return (mChildList && !mChildList->empty()) ? mChildList->front() : nullptr; }
     LLView*     findPrevSibling(LLView* child);
     LLView*     findNextSibling(LLView* child);
-    S32         getChildCount() const           { return (S32)mChildList.size(); }
-    template<class _Pr3> void sortChildren(_Pr3 _Pred) { mChildList.sort(_Pred); }
+    S32         getChildCount() const           { return mChildList ? (S32)mChildList->size() : 0; }
+    template<class _Pr3> void sortChildren(_Pr3 _Pred) { if (mChildList) mChildList->sort(_Pred); }
     bool        hasAncestor(const LLView* parentp) const;
     bool        hasChild(std::string_view childname, bool recurse = false) const;
     bool        childHasKeyboardFocus( std::string_view childname ) const;
@@ -465,9 +465,9 @@ public:
 
     LLControlVariable *findControl(std::string_view name);
 
-    const child_list_t* getChildList() const { return &mChildList; }
-    child_list_const_iter_t beginChild() const { return mChildList.begin(); }
-    child_list_const_iter_t endChild() const { return mChildList.end(); }
+    const child_list_t* getChildList() const { return &children(); }
+    child_list_const_iter_t beginChild() const { return children().begin(); }
+    child_list_const_iter_t endChild() const { return children().end(); }
 
     // LLMouseHandler functions
     //  Default behavior is to pass events to children
@@ -643,7 +643,11 @@ private:
     }
 
     LLView*     mParentView;
-    child_list_t mChildList;
+    // Allocated on the first child. MSVC's std::list allocates a sentinel node
+    // in its default constructor, so a view that never has one was paying a
+    // heap allocation and a pointer's worth of list to say so -- and an open
+    // inventory holds two hundred thousand views with no children at all.
+    child_list_t* mChildList { nullptr };
 
     // The transparency a floater tried to give this view while it was hidden,
     // kept until it is shown. See applyTransparencyType.
@@ -660,7 +664,10 @@ private:
 
     U32         mReshapeFlags;
 
-    child_tab_order_t mTabOrder;
+    // Allocated on the first child given a tab group, which almost none are.
+    // std::map allocates a head node in its default constructor for the same
+    // reason std::list allocates a sentinel.
+    child_tab_order_t* mTabOrder { nullptr };
     S32         mDefaultTabGroup;
     S32         mLastTabGroup;
 
@@ -686,6 +693,15 @@ private:
     mutable LLView* mDefaultWidgets;
 
     LLView& getDefaultWidgetContainer() const;
+
+    // The containers above, allocated if this is the first caller to need one.
+    child_list_t&      childList();
+    child_tab_order_t& tabOrder();
+
+    // What there is to read. A view with no children shares one empty list
+    // rather than owning one, so every caller that only walks the children
+    // works whether or not any were ever added.
+    const child_list_t& children() const;
 
     // tooltip holder is allocated on demand; most widgets never set one
     LLUIString& getOrCreateToolTipMsg();
