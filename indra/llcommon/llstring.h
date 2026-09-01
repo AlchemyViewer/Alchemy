@@ -841,10 +841,10 @@ LL_COMMON_API size_t utf8str_step_word_backward(std::string_view utf8str, size_t
 
 // Word movement as a caret means it, which is the pair above plus one thing:
 // those stay inside the line the offset sits on, so a caret already at a line
-// edge has nowhere to go and does not move at all. Crossing the break first is
-// what carries ctrl+left and ctrl+right into the neighbouring line rather than
-// stalling on every newline in the document. Both text widgets want exactly
-// this, so it lives here rather than once in each of them.
+// edge has nowhere to go and does not move at all. Crossing the break when the
+// walker stalls carries ctrl+left and ctrl+right into the neighbouring line
+// without skipping a word at an ordinary caret position. Both text widgets
+// want exactly this, so it lives here rather than once in each of them.
 LL_COMMON_API size_t utf8str_caret_word_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_caret_word_backward(std::string_view utf8str, size_t byte_pos);
 

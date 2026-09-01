@@ -1764,14 +1764,20 @@ size_t utf8str_step_word_backward(std::string_view utf8str, size_t byte_pos)
 
 size_t utf8str_caret_word_forward(std::string_view utf8str, size_t byte_pos)
 {
-    return utf8str_step_word_forward(utf8str,
-                                     utf8str_step_grapheme_forward(utf8str, byte_pos));
+    const size_t at = llmin(byte_pos, utf8str.size());
+    const size_t next = utf8str_step_word_forward(utf8str, at);
+    return next != at ? next : utf8str_step_grapheme_forward(utf8str, at);
 }
 
 size_t utf8str_caret_word_backward(std::string_view utf8str, size_t byte_pos)
 {
+    const size_t at = llmin(byte_pos, utf8str.size());
+    const size_t previous = utf8str_step_word_backward(utf8str, at);
+    if (previous != at)
+        return previous;
+
     return utf8str_step_word_backward(utf8str,
-                                      utf8str_step_grapheme_backward(utf8str, byte_pos));
+                                      utf8str_step_grapheme_backward(utf8str, at));
 }
 
 // --- the wide adapters -----------------------------------------------------

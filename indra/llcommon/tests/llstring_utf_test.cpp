@@ -200,21 +200,6 @@ namespace
         throw tut::failure(oss.str());
     }
 
-    void ensure_u16string_equals(const std::string& msg,
-                                 const llutf16string& actual,
-                                 const llutf16string& expected)
-    {
-        if (actual == expected) return;
-
-        std::ostringstream oss;
-        oss << msg << ": llutf16string mismatch (actual.size=" << actual.size()
-            << " expected.size=" << expected.size() << ")\n  actual: ";
-        oss << std::hex << std::uppercase;
-        for (char16_t c : actual) oss << (U32)c << ' ';
-        oss << "\n  expect: ";
-        for (char16_t c : expected) oss << (U32)c << ' ';
-        throw tut::failure(oss.str());
-    }
 }
 
 namespace tut
@@ -477,7 +462,7 @@ namespace tut
     template<> template<>
     void llstring_utf_object_t::test<40>()
     {
-        for (const std::string bad : { std::string("\x80"), std::string("\xFF") })
+        for (const std::string& bad : { std::string("\x80"), std::string("\xFF") })
         {
             ensure("rejected outright", !utf8str_is_valid(bad));
 
@@ -2796,6 +2781,14 @@ namespace tut
         ensure_equals("backward agrees mid-line",
                       utf8str_caret_word_backward(lines, 7),
                       utf8str_step_word_backward(lines, 7));
+
+        // A caret already at the edge of a word must not skip the adjacent
+        // word, and a caret inside a word must land at that word's start.
+        const std::string adjacent = "foo bar";
+        ensure_equals("forward from a word end reaches the adjacent word",
+                      utf8str_caret_word_forward(adjacent, 3), size_t(4));
+        ensure_equals("backward from inside a word reaches its start",
+                      utf8str_caret_word_backward(adjacent, 5), size_t(4));
 
         // On the break the raw walker has nowhere to go and says so.
         ensure_equals("the raw walker stalls on the newline",
