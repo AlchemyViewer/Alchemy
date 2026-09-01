@@ -197,8 +197,8 @@
 #define LL_PROFILE_PLOT(name, val)                              TracyPlot(name, val)
 #define LL_PROFILE_PLOT_CONFIG(name, format, step, fill, color) TracyPlotConfig(name, format, step, fill, color)
 #else
-#define LL_PROFILE_PLOT(name, val)                              (void)(name); (void)(val);
-#define LL_PROFILE_PLOT_CONFIG(name, format, step, fill, color) (void)(name);
+#define LL_PROFILE_PLOT(name, val)                              do { (void)(name); (void)(val); } while (0)
+#define LL_PROFILE_PLOT_CONFIG(name, format, step, fill, color) do { (void)(name); } while (0)
 #endif
 
 #if LL_PROFILER_ENABLE_RENDER_DOC
