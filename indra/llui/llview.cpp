@@ -1409,7 +1409,7 @@ void LLView::dirtyRect()
 //Draw a box for debugging.
 void LLView::drawDebugRect()
 {
-    std::set<LLView*>::iterator preview_iter = std::find(sPreviewHighlightedElements.begin(), sPreviewHighlightedElements.end(), this); // figure out if it's a previewed element
+    const bool is_previewed = sPreviewHighlightedElements.count(this) != 0;
 
     LLUI::pushMatrix();
     {
@@ -1425,7 +1425,7 @@ void LLView::drawDebugRect()
 
         // draw red rectangle for the border
         LLColor4 border_color(0.25f, 0.25f, 0.25f, 1.f);
-        if(preview_iter != sPreviewHighlightedElements.end())
+        if (is_previewed)
         {
             if(LLView::sPreviewClickedElement && this == sPreviewClickedElement)
             {
@@ -1460,7 +1460,7 @@ void LLView::drawDebugRect()
 
         // Draw the name if it's not a leaf node or not in editing or preview mode
         if (mChildList.size()
-            && preview_iter == sPreviewHighlightedElements.end()
+            && !is_previewed
             && sDebugRectsShowNames)
         {
             S32 x, y;
