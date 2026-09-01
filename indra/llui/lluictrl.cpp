@@ -105,14 +105,6 @@ LLUICtrl::LLUICtrl(const LLUICtrl::Params& p, const LLViewModelPtr& viewmodel)
     mTentative(false),
     mViewModel(viewmodel),
     mCommitSignal(NULL),
-    mValidateSignal(NULL),
-    mMouseEnterSignal(NULL),
-    mMouseLeaveSignal(NULL),
-    mMouseDownSignal(NULL),
-    mMouseUpSignal(NULL),
-    mRightMouseDownSignal(NULL),
-    mRightMouseUpSignal(NULL),
-    mDoubleClickSignal(NULL),
     mTransparencyType(TT_DEFAULT)
 {
 }
@@ -245,14 +237,7 @@ LLUICtrl::~LLUICtrl()
     }
 
     delete mCommitSignal;
-    delete mValidateSignal;
-    delete mMouseEnterSignal;
-    delete mMouseLeaveSignal;
-    delete mMouseDownSignal;
-    delete mMouseUpSignal;
-    delete mRightMouseDownSignal;
-    delete mRightMouseUpSignal;
-    delete mDoubleClickSignal;
+    delete mRareSignals;
 
     // scoped_connection members disconnect from any bound control variables here
     delete mControlVariables;
@@ -323,18 +308,18 @@ LLUICtrl::enable_signal_t::slot_type LLUICtrl::initEnableCallback(const EnableCa
 // virtual
 void LLUICtrl::onMouseEnter(S32 x, S32 y, MASK mask)
 {
-    if (mMouseEnterSignal)
+    if (commit_signal_t* signal = mouseEnterSignal())
     {
-        (*mMouseEnterSignal)(this, getValue());
+        (*signal)(this, getValue());
     }
 }
 
 // virtual
 void LLUICtrl::onMouseLeave(S32 x, S32 y, MASK mask)
 {
-    if(mMouseLeaveSignal)
+    if (commit_signal_t* signal = mouseLeaveSignal())
     {
-        (*mMouseLeaveSignal)(this, getValue());
+        (*signal)(this, getValue());
     }
 }
 
@@ -346,9 +331,9 @@ bool LLUICtrl::handleMouseDown(S32 x, S32 y, MASK mask)
 
     bool handled  = LLView::handleMouseDown(x,y,mask);
 
-    if (mMouseDownSignal)
+    if (mouse_signal_t* signal = mouseDownSignal())
     {
-        (*mMouseDownSignal)(this,x,y,mask);
+        (*signal)(this,x,y,mask);
     }
     LL_DEBUGS() << "LLUICtrl::handleMousedown - handled is returning as: " << handled << "    " << LL_ENDL;
 
@@ -368,9 +353,9 @@ bool LLUICtrl::handleMouseUp(S32 x, S32 y, MASK mask)
     if (handled) {
         LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-56,-56,this);
     }
-    if (mMouseUpSignal)
+    if (mouse_signal_t* signal = mouseUpSignal())
     {
-        (*mMouseUpSignal)(this,x,y,mask);
+        (*signal)(this,x,y,mask);
     }
 
     LL_DEBUGS() << "LLUICtrl::handleMouseUp - handled for xui " << getPathname() << "  -  is returning as: " << handled << "   " << LL_ENDL;
@@ -382,9 +367,9 @@ bool LLUICtrl::handleMouseUp(S32 x, S32 y, MASK mask)
 bool LLUICtrl::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     bool handled  = LLView::handleRightMouseDown(x,y,mask);
-    if (mRightMouseDownSignal)
+    if (mouse_signal_t* signal = rightMouseDownSignal())
     {
-        (*mRightMouseDownSignal)(this,x,y,mask);
+        (*signal)(this,x,y,mask);
     }
     return handled;
 }
@@ -393,9 +378,9 @@ bool LLUICtrl::handleRightMouseDown(S32 x, S32 y, MASK mask)
 bool LLUICtrl::handleRightMouseUp(S32 x, S32 y, MASK mask)
 {
     bool handled  = LLView::handleRightMouseUp(x,y,mask);
-    if(mRightMouseUpSignal)
+    if (mouse_signal_t* signal = rightMouseUpSignal())
     {
-        (*mRightMouseUpSignal)(this,x,y,mask);
+        (*signal)(this,x,y,mask);
     }
     return handled;
 }
@@ -403,9 +388,9 @@ bool LLUICtrl::handleRightMouseUp(S32 x, S32 y, MASK mask)
 bool LLUICtrl::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
     bool handled = LLView::handleDoubleClick(x, y, mask);
-    if (mDoubleClickSignal)
+    if (mouse_signal_t* signal = doubleClickSignal())
     {
-        (*mDoubleClickSignal)(this, x, y, mask);
+        (*signal)(this, x, y, mask);
     }
     return handled;
 }
@@ -499,6 +484,27 @@ bool LLUICtrl::postBuild()
     }
 
     return LLView::postBuild();
+}
+
+LLUICtrl::RareSignals::~RareSignals()
+{
+    delete mValidate;
+    delete mMouseEnter;
+    delete mMouseLeave;
+    delete mMouseDown;
+    delete mMouseUp;
+    delete mRightMouseDown;
+    delete mRightMouseUp;
+    delete mDoubleClick;
+}
+
+LLUICtrl::RareSignals& LLUICtrl::rareSignals()
+{
+    if (!mRareSignals)
+    {
+        mRareSignals = new RareSignals();
+    }
+    return *mRareSignals;
 }
 
 LLUICtrl::ControlVariables& LLUICtrl::getControlVars()
@@ -982,9 +988,10 @@ boost::signals2::connection LLUICtrl::setCommitCallback( std::function<void (LLU
 
 boost::signals2::connection LLUICtrl::setValidateBeforeCommit( std::function<bool (const LLSD& data)> cb )
 {
-    if (!mValidateSignal) mValidateSignal = new enable_signal_t();
+    enable_signal_t*& signal = rareSignals().mValidate;
+    if (!signal) signal = new enable_signal_t();
 
-    return mValidateSignal->connect(boost::bind(cb, boost::placeholders::_2));
+    return signal->connect(boost::bind(cb, boost::placeholders::_2));
 }
 
 // virtual
@@ -1053,58 +1060,66 @@ boost::signals2::connection LLUICtrl::setCommitCallback( const commit_signal_t::
 
 boost::signals2::connection LLUICtrl::setValidateCallback( const enable_signal_t::slot_type& cb )
 {
-    if (!mValidateSignal) mValidateSignal = new enable_signal_t();
+    enable_signal_t*& signal = rareSignals().mValidate;
+    if (!signal) signal = new enable_signal_t();
 
-    return mValidateSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setMouseEnterCallback( const commit_signal_t::slot_type& cb )
 {
-    if (!mMouseEnterSignal) mMouseEnterSignal = new commit_signal_t();
+    commit_signal_t*& signal = rareSignals().mMouseEnter;
+    if (!signal) signal = new commit_signal_t();
 
-    return mMouseEnterSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setMouseLeaveCallback( const commit_signal_t::slot_type& cb )
 {
-    if (!mMouseLeaveSignal) mMouseLeaveSignal = new commit_signal_t();
+    commit_signal_t*& signal = rareSignals().mMouseLeave;
+    if (!signal) signal = new commit_signal_t();
 
-    return mMouseLeaveSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setMouseDownCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mMouseDownSignal) mMouseDownSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mMouseDown;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mMouseDownSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setMouseUpCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mMouseUpSignal) mMouseUpSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mMouseUp;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mMouseUpSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setRightMouseDownCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mRightMouseDownSignal) mRightMouseDownSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mRightMouseDown;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mRightMouseDownSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setRightMouseUpCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mRightMouseUpSignal) mRightMouseUpSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mRightMouseUp;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mRightMouseUpSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLUICtrl::setDoubleClickCallback( const mouse_signal_t::slot_type& cb )
 {
-    if (!mDoubleClickSignal) mDoubleClickSignal = new mouse_signal_t();
+    mouse_signal_t*& signal = rareSignals().mDoubleClick;
+    if (!signal) signal = new mouse_signal_t();
 
-    return mDoubleClickSignal->connect(cb);
+    return signal->connect(cb);
 }
 
 void LLUICtrl::addInfo(LLSD & info)

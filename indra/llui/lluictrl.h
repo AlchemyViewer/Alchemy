@@ -300,18 +300,40 @@ protected:
 
     static bool controlListener(const LLSD& newvalue, LLHandle<LLUICtrl> handle, std::string type);
 
+    // Almost every control has one of these; the viewer connects one at 858
+    // call sites.
     commit_signal_t*        mCommitSignal;
-    enable_signal_t*        mValidateSignal;
 
-    commit_signal_t*        mMouseEnterSignal;
-    commit_signal_t*        mMouseLeaveSignal;
+    // The other eight, which almost no control has: the mouse callbacks are
+    // connected at a couple of hundred call sites between them and the
+    // validate callback at four. Eight pointers on every control to say so
+    // cost more than the block the first of them allocates.
+    struct RareSignals
+    {
+        enable_signal_t* mValidate { nullptr };
+        commit_signal_t* mMouseEnter { nullptr };
+        commit_signal_t* mMouseLeave { nullptr };
+        mouse_signal_t*  mMouseDown { nullptr };
+        mouse_signal_t*  mMouseUp { nullptr };
+        mouse_signal_t*  mRightMouseDown { nullptr };
+        mouse_signal_t*  mRightMouseUp { nullptr };
+        mouse_signal_t*  mDoubleClick { nullptr };
 
-    mouse_signal_t*     mMouseDownSignal;
-    mouse_signal_t*     mMouseUpSignal;
-    mouse_signal_t*     mRightMouseDownSignal;
-    mouse_signal_t*     mRightMouseUpSignal;
+        ~RareSignals();
+    };
 
-    mouse_signal_t*     mDoubleClickSignal;
+    RareSignals* mRareSignals { nullptr };
+    RareSignals& rareSignals(); // allocates
+
+    // Null unless something connected that callback.
+    enable_signal_t* validateSignal() const       { return mRareSignals ? mRareSignals->mValidate : nullptr; }
+    commit_signal_t* mouseEnterSignal() const     { return mRareSignals ? mRareSignals->mMouseEnter : nullptr; }
+    commit_signal_t* mouseLeaveSignal() const     { return mRareSignals ? mRareSignals->mMouseLeave : nullptr; }
+    mouse_signal_t*  mouseDownSignal() const      { return mRareSignals ? mRareSignals->mMouseDown : nullptr; }
+    mouse_signal_t*  mouseUpSignal() const        { return mRareSignals ? mRareSignals->mMouseUp : nullptr; }
+    mouse_signal_t*  rightMouseDownSignal() const { return mRareSignals ? mRareSignals->mRightMouseDown : nullptr; }
+    mouse_signal_t*  rightMouseUpSignal() const   { return mRareSignals ? mRareSignals->mRightMouseUp : nullptr; }
+    mouse_signal_t*  doubleClickSignal() const    { return mRareSignals ? mRareSignals->mDoubleClick : nullptr; }
 
     LLViewModelPtr  mViewModel;
 

@@ -242,15 +242,15 @@ public:
 
     virtual bool handleMouseDown(S32 x, S32 y, MASK mask)
     {
-        if (mMouseDownSignal)
-            (*mMouseDownSignal)(this, x, y, mask);
+        if (mouse_signal_t* signal = mouseDownSignal())
+            (*signal)(this, x, y, mask);
         return LLMenuItemCallGL::handleMouseDown(x, y, mask);
     }
 
     virtual bool handleMouseUp(S32 x, S32 y, MASK mask)
     {
-        if (mMouseUpSignal)
-            (*mMouseUpSignal)(this, x, y, mask);
+        if (mouse_signal_t* signal = mouseUpSignal())
+            (*signal)(this, x, y, mask);
         return LLMenuItemCallGL::handleMouseUp(x, y, mask);
     }
 

@@ -153,7 +153,7 @@ bool LLMenuButton::handleMouseDown(S32 x, S32 y, MASK mask)
 
 void LLMenuButton::toggleMenu()
 {
-    if (mValidateSignal && !(*mValidateSignal)(this, LLSD()))
+    if (enable_signal_t* signal = validateSignal(); signal && !(*signal)(this, LLSD()))
     {
         return;
     }

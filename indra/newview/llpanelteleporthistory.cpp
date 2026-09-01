@@ -173,10 +173,13 @@ S32 LLTeleportHistoryFlatItem::notify(const LLSD& info)
 {
     if(info.has("detach"))
     {
-        delete mMouseDownSignal;
-        mMouseDownSignal = NULL;
-        delete mRightMouseDownSignal;
-        mRightMouseDownSignal = NULL;
+        if (mRareSignals)
+        {
+            delete mRareSignals->mMouseDown;
+            mRareSignals->mMouseDown = nullptr;
+            delete mRareSignals->mRightMouseDown;
+            mRareSignals->mRightMouseDown = nullptr;
+        }
         return 1;
     }
     return 0;

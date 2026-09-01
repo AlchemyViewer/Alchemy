@@ -1536,7 +1536,8 @@ bool LLTabContainer::selectTab(S32 which)
         cbdata = selected_tuple->mTabPanel->getName();
 
     bool result = false;
-    if (!mValidateSignal || (*mValidateSignal)(this, cbdata))
+    enable_signal_t* signal = validateSignal();
+    if (!signal || (*signal)(this, cbdata))
     {
         result = setTab(which);
         if (result && mCommitSignal)

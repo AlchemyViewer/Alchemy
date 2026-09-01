@@ -380,7 +380,8 @@ void LLMultiSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata)
         if( self->mMultiSlider->getMinValue() <= val && val <= self->mMultiSlider->getMaxValue() )
         {
             self->setCurSliderValue( val );  // set the value temporarily so that the callback can retrieve it.
-            if( !self->mValidateSignal || (*(self->mValidateSignal))( self, val ) )
+            enable_signal_t* signal = self->validateSignal();
+            if( !signal || (*signal)( self, val ) )
             {
                 success = true;
             }
@@ -414,7 +415,8 @@ void LLMultiSliderCtrl::onSliderCommit(LLUICtrl* ctrl, const LLSD& userdata)
     F32 new_val = self->mMultiSlider->getCurSliderValue();
 
     self->mCurValue = new_val;  // set the value temporarily so that the callback can retrieve it.
-    if( !self->mValidateSignal || (*(self->mValidateSignal))( self, new_val ) )
+    enable_signal_t* signal = self->validateSignal();
+    if( !signal || (*signal)( self, new_val ) )
     {
         success = true;
     }

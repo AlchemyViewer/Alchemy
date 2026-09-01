@@ -976,8 +976,8 @@ bool LLLineEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     // delay cursor flashing
     mKeystrokeTimer.reset();
 
-    if (mMouseDownSignal)
-        (*mMouseDownSignal)(this,x,y,mask);
+    if (mouse_signal_t* signal = mouseDownSignal())
+        (*signal)(this,x,y,mask);
 
     return true;
 }
@@ -1104,8 +1104,8 @@ bool LLLineEditor::handleMouseUp(S32 x, S32 y, MASK mask)
     }
 
     // We won't call LLUICtrl::handleMouseUp to avoid double calls of  childrenHandleMouseUp().Just invoke the signal manually.
-    if (mMouseUpSignal)
-        (*mMouseUpSignal)(this,x,y, mask);
+    if (mouse_signal_t* signal = mouseUpSignal())
+        (*signal)(this,x,y, mask);
     return handled;
 }
 
