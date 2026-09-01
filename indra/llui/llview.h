@@ -152,7 +152,7 @@ public:
     };
 
     // most widgets are valid children of LLView
-    typedef LLDefaultChildRegistry child_registry_t;
+    using child_registry_t = LLDefaultChildRegistry;
 
     void initFromParams(const LLView::Params&);
 
@@ -188,19 +188,19 @@ public:
         SNAP_BOTTOM
     };
 
-    typedef std::list<LLView*> child_list_t;
-    typedef child_list_t::iterator                  child_list_iter_t;
-    typedef child_list_t::const_iterator            child_list_const_iter_t;
-    typedef child_list_t::reverse_iterator          child_list_reverse_iter_t;
-    typedef child_list_t::const_reverse_iterator    child_list_const_reverse_iter_t;
+    using child_list_t = std::list<LLView*>;
+    using child_list_iter_t = child_list_t::iterator;
+    using child_list_const_iter_t = child_list_t::const_iterator;
+    using child_list_reverse_iter_t = child_list_t::reverse_iterator;
+    using child_list_const_reverse_iter_t = child_list_t::const_reverse_iterator;
 
-    typedef std::pair<LLView *, S32>                tab_order_pair_t;
+    using tab_order_pair_t = std::pair<LLView *, S32>;
     // this structure primarily sorts by the tab group, secondarily by the insertion ordinal (lastly by the value of the pointer)
-    typedef std::map<const LLView*, S32>        child_tab_order_t;
-    typedef child_tab_order_t::iterator                 child_tab_order_iter_t;
-    typedef child_tab_order_t::const_iterator           child_tab_order_const_iter_t;
-    typedef child_tab_order_t::reverse_iterator         child_tab_order_reverse_iter_t;
-    typedef child_tab_order_t::const_reverse_iterator   child_tab_order_const_reverse_iter_t;
+    using child_tab_order_t = std::map<const LLView*, S32>;
+    using child_tab_order_iter_t = child_tab_order_t::iterator;
+    using child_tab_order_const_iter_t = child_tab_order_t::const_iterator;
+    using child_tab_order_reverse_iter_t = child_tab_order_t::reverse_iterator;
+    using child_tab_order_const_reverse_iter_t = child_tab_order_t::const_reverse_iterator;
 
     virtual ~LLView();
 
@@ -232,7 +232,7 @@ public:
     void        setFollowsAll()                 { mReshapeFlags |= FOLLOWS_ALL; }
 
     void        setSoundFlags(U8 flags)         { mSoundFlags = flags; }
-    void        setName(std::string name)           { mName = name; }
+    void        setName(std::string name)           { mName = std::move(name); }
     void        setUseBoundingRect( bool use_bounding_rect );
     bool        getUseBoundingRect() const;
 
@@ -413,20 +413,20 @@ public:
     bool        childHasKeyboardFocus( std::string_view childname ) const;
 
     // these iterators are used for collapsing various tree traversals into for loops
-    typedef LLTreeDFSIter<LLView, child_list_const_iter_t> tree_iterator_t;
+    using tree_iterator_t = LLTreeDFSIter<LLView, child_list_const_iter_t>;
     tree_iterator_t beginTreeDFS();
     tree_iterator_t endTreeDFS();
 
-    typedef LLTreeDFSPostIter<LLView, child_list_const_iter_t> tree_post_iterator_t;
+    using tree_post_iterator_t = LLTreeDFSPostIter<LLView, child_list_const_iter_t>;
     tree_post_iterator_t beginTreeDFSPost();
     tree_post_iterator_t endTreeDFSPost();
 
-    typedef LLTreeBFSIter<LLView, child_list_const_iter_t> bfs_tree_iterator_t;
+    using bfs_tree_iterator_t = LLTreeBFSIter<LLView, child_list_const_iter_t>;
     bfs_tree_iterator_t beginTreeBFS();
     bfs_tree_iterator_t endTreeBFS();
 
 
-    typedef LLTreeDownIter<LLView> root_to_view_iterator_t;
+    using root_to_view_iterator_t = LLTreeDownIter<LLView>;
     root_to_view_iterator_t beginRootToView();
     root_to_view_iterator_t endRootToView();
 
@@ -468,11 +468,11 @@ public:
     bool getFromXUI() const { return mFromXUI; }
     void setFromXUI(bool b) { mFromXUI = b; }
 
-    typedef enum e_hit_test_type
+    enum EHitTestType
     {
         HIT_TEST_USE_BOUNDING_RECT,
         HIT_TEST_IGNORE_BOUNDING_RECT
-    }EHitTestType;
+    };
 
     bool parentPointInView(S32 x, S32 y, EHitTestType type = HIT_TEST_USE_BOUNDING_RECT) const;
     bool pointInView(S32 x, S32 y, EHitTestType type = HIT_TEST_USE_BOUNDING_RECT) const;
@@ -554,12 +554,13 @@ public:
             }
             parent = parent->getParent();
         }
-        return NULL;
+        return nullptr;
     }
 
     //////////////////////////////////////////////
     // statics
     //////////////////////////////////////////////
+
     // focuses the item in the list after the currently-focused item, wrapping if necessary
     static  bool focusNext(viewList_t & result);
     // focuses the item in the list before the currently-focused item, wrapping if necessary
@@ -681,7 +682,7 @@ private:
 
     LLUIString* mToolTipMsg { nullptr }; // allocated lazily; null when no tooltip is set
 
-    typedef std::map<std::string, LLView*> default_widget_map_t;
+    using default_widget_map_t = std::map<std::string, LLView*>;
     // allocate this map no demand, as it is rarely needed
     mutable LLView* mDefaultWidgets;
 
@@ -735,7 +736,7 @@ private:
     LLUIString& getOrCreateToolTipMsg();
 
     // This allows special mouse-event targeting logic for testing.
-    typedef std::function<bool(const LLView*, S32 x, S32 y)> DrilldownFunc;
+    using DrilldownFunc = std::function<bool(const LLView*, S32 x, S32 y)>;
     static DrilldownFunc sDrilldown;
 
 public:

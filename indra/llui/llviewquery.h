@@ -37,8 +37,8 @@ class LLView;
 // A vector: this is filled by a walk of the whole view tree, so the list it
 // used to be paid a node allocation for every view that passed a filter, and
 // a sentinel node for every view that was asked. A leaf now costs nothing.
-typedef std::vector<LLView *>       viewList_t;
-typedef std::pair<bool, bool>       filterResult_t;
+using viewList_t = std::vector<LLView *>;
+using filterResult_t = std::pair<bool, bool>;
 
 // Abstract base class for all query filters.
 //
@@ -102,7 +102,7 @@ class LLWidgetTypeFilter : public LLQueryFilter
 {
     /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const
     {
-        return filterResult_t(dynamic_cast<const T*>(view) != NULL, true);
+        return filterResult_t(dynamic_cast<const T*>(view) != nullptr, true);
     }
 
 };
@@ -111,9 +111,9 @@ class LLWidgetTypeFilter : public LLQueryFilter
 class LLViewQuery
 {
 public:
-    typedef std::vector<const LLQueryFilter*>   filterList_t;
-    typedef filterList_t::iterator              filterList_iter_t;
-    typedef filterList_t::const_iterator        filterList_const_iter_t;
+    using filterList_t = std::vector<const LLQueryFilter*>;
+    using filterList_iter_t = filterList_t::iterator;
+    using filterList_const_iter_t = filterList_t::const_iterator;
 
     LLViewQuery() : mPreFilters(), mPostFilters(), mSorterp() {}
     virtual ~LLViewQuery() {}
