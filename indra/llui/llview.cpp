@@ -80,9 +80,7 @@ std::vector<LLViewDrawContext*> LLViewDrawContext::sDrawContextStack;
 // now calls directly.
 LLView::DrilldownFunc LLView::sDrilldown;
 
-//#if LL_DEBUG
 bool LLView::sIsDrawing = false;
-//#endif
 
 // Compiler optimization, generate extern template
 template class LLView* LLView::getChild<class LLView>(
@@ -2603,20 +2601,6 @@ void LLView::parseFollowsFlags(const LLView::Params& params)
     }
 }
 
-
-// static
-//LLFontGL::HAlign LLView::selectFontHAlign(LLXMLNodePtr node)
-//{
-//  LLFontGL::HAlign gl_hfont_align = LLFontGL::LEFT;
-//
-//  if (node->hasAttribute("halign"))
-//  {
-//      std::string horizontal_align_name;
-//      node->getAttributeString("halign", horizontal_align_name);
-//      gl_hfont_align = LLFontGL::hAlignFromName(horizontal_align_name);
-//  }
-//  return gl_hfont_align;
-//}
 
 // Return the rectangle of the last-constructed child,
 // if present and a first-class widget (eg, not a close box or drag handle)

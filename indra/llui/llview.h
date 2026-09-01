@@ -160,13 +160,12 @@ protected:
     LLView(const LLView::Params&);
     friend class LLUICtrlFactory;
 
-private:
     // widgets in general are not copyable
-    LLView(const LLView& other);
+    LLView(const LLView&) = delete;
+    LLView& operator=(const LLView&) = delete;
+
 public:
-//#if LL_DEBUG
     static bool sIsDrawing;
-//#endif
     enum ESoundFlags
     {
         SILENT = 0,
@@ -561,8 +560,6 @@ public:
     //////////////////////////////////////////////
     // statics
     //////////////////////////////////////////////
-    //static LLFontGL::HAlign selectFontHAlign(LLXMLNodePtr node);
-
     // focuses the item in the list after the currently-focused item, wrapping if necessary
     static  bool focusNext(viewList_t & result);
     // focuses the item in the list before the currently-focused item, wrapping if necessary
