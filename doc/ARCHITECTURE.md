@@ -88,8 +88,10 @@ The deferred rendering pipeline is orchestrated by `LLPipeline` (`indra/newview/
 2. **Shadows** (`renderGeomShadow()`) — 4 sun shadow cascades + 2 spot light shadow maps
 3. **Deferred Lighting** (`renderDeferredLighting()`) — Sun, point lights (up to 16 batched), spot lights, with reflection probe influence
 4. **Post-Deferred** (`renderGeomPostDeferred()`) — Alpha, water, atmospheric haze
-5. **Post-Processing** — Luminance/exposure, bloom, DoF, tonemapping, color grading, AA, screen effects
-6. **Finalize** (`renderFinalize()`) — Final blit with vignette, film grain, dithering, chromatic aberration
+5. **Post-Processing** — Luminance/exposure, depth of field, bloom, then one pass doing tonemapping, color grading and the bloom composite together, then AA and CAS
+6. **Finalize** (`renderFinalize()`) — Final blit with lens distortion, vignette, film grain, dithering, CVD compensation
+
+Depth of field runs **before** bloom and before the tonemapper, on linear HDR. Gathering over display-space values gathers over already-compressed highlights, and bloom-after-defocus is the optical order, so a defocused highlight blooms as a soft disc rather than a sharp core on a blurred background.
 
 **GBuffer layout** (MRT attachments on `deferredScreen`):
 - frag_data[0]: Base color (GL_RGBA)
@@ -101,18 +103,21 @@ The deferred rendering pipeline is orchestrated by `LLPipeline` (`indra/newview/
 - `mMainRT` — Full resolution for main scene
 - `mAuxillaryRT` — 512×512 for reflection probes and dynamic texture bakes
 - `mHeroProbeRT` — High-res hero probe rendering
-- Additional targets: `mSceneMap` (SSR input), `mLuminanceMap`/`mExposureMap` (auto-exposure), `mPostPingMap`/`mPostPongMap` (post-process ping-pong), `mFXAAMap`, `mSMAABlendBuffer`, `mGlow[3]` (bloom pyramid), `mWaterDis` (refraction), `mSpotShadow[2]`, `mPbrBrdfLut`
+- Additional targets: `mSceneMap` (SSR input), `mLuminanceMap`/`mExposureMap` (auto-exposure), `postPingMap`/`postPongMap` (post-process ping-pong), `mFXAAMap`, `mSMAABlendBuffer`, `bloomMip[BLOOM_MAX_MIPS]` (HDR bloom pyramid, up to 7 levels, live count in `bloomMipCount`), `dofSharp`/`dofBlur` (depth of field, allocated only when `RenderDepthOfField` is on), `crossFilter[3]` (cross-screen filter scratch and accumulator, allocated lazily on the first frame the effect is enabled and released when it is switched off — `crossFilterHeight` guards the state), `mWaterDis` (refraction), `mSpotShadow[2]`, `mPbrBrdfLut`
+- `mGlow[3]` is the **legacy non-HDR glow chain**, not the bloom pyramid, and lives outside the pack. So does `mLensDirtMap`, which is a bare GL texture name rather than an `LLRenderTarget`.
 
 **Post-processing chain:**
 - **Auto-exposure:** Progressive histogram (`gLuminanceProgram`, `gExposureProgram`) with history fade
-- **Bloom:** Bright-area extraction → 3-level glow pyramid (`mGlow[3]`) with warmth correction
-- **Depth of Field:** Circle-of-confusion via `gDeferredCoFProgram`, combine via `gDeferredDoFCombineProgram`. Settings: `CameraFNumber`, `CameraFocalLength`, `CameraMaxCoF`
+- **Bloom:** Bright-area extraction → downsample/upsample pyramid over `bloomMip[]` with warmth correction and optional halation carried in alpha. The additive composite is **not** a pass of its own: it is folded into `colorCorrect`'s `BLOOM_COMPOSITE` permutation. `compositeBloomHDR` is a standalone equivalent that nothing currently calls
+- **Cross-screen (star) filter:** `gCrossFilterProgram` streaks every thresholded highlight, seeded from `bloomMip[0]` and accumulated through `crossFilter[0..2]`. One strictly one-sided three-pass chain per arm, at strides that tile the reachable offsets exactly once — the tiling is load-bearing and the shader explains why. Composited in `colorCorrect` alongside the pyramid, so it inherits bloom strength
+- **Depth of Field:** three passes — circle of confusion (`gDeferredCoFProgram`, writing sharp linear colour plus signed CoF in alpha to `dofSharp`), a gather blur at `CameraDoFResScale` into `dofBlur`, and a combine (`gDeferredDoFCombineProgram`) back over `mRT->screen` under `setColorMask(true, false)` so the legacy prim-glow alpha tag survives. The gather has four compile-time variants over two axes, `FRONT_BLUR` × `DOF_SHAPED`: `gDeferredPostProgram`, `gDeferredPostProgramNoNear`, `gDeferredPostProgramShaped`, `gDeferredPostProgramNoNearShaped`. Optics: `CameraFNumber`, `CameraFocalLength`, `CameraFieldOfView`, `CameraMaxCoF`, `CameraDoFResScale`
+- **Bokeh shaping** (inside the `DOF_SHAPED` gather): polygonal aperture (`RenderBokehApertureBlades`, `Rotation`, `Curvature`), anamorphic squeeze, cat's-eye optical vignetting, defocus fringing, and the lens aberrations — spherical (`RenderBokehSphericalAberration`), field stretch for swirl and coma (`RenderBokehFieldStretch`, `FieldFalloff`) and comatic asymmetry. The CPU picks a shaped variant only when one of them is actually doing something
 - **Screen Space Reflections:** Class 3+ feature, iterative ray marching
 - **Tonemapping:** ACES, Reinhard, Filmic, AGX — selectable via `AlchemyRenderTonemapType`
 - **Color Grading:** 3D LUT-based (`gDeferredPostGammaCorrectCGLutProgram`, `mCGLut`)
 - **Anti-aliasing:** FXAA (1-pass, `gFXAAProgram[4]`) or SMAA (3-pass edge detect → blend weights → neighborhood blend, `gSMAAEdgeDetectProgram[4]`/`gSMAABlendWeightsProgram[4]`/`gSMAANeighborhoodBlendProgram[4]`). CAS (Contrast Adaptive Sharpening) via `gCASProgram`
-- **Final blit effects** (`blitWithEffectsF.glsl` in `shaders/class1/alchemy/`): Vignette (configurable shape/softness/color), film grain (luma/color/coarse/photon styles), TPDF dithering, CVD compensation/preview
-- **Chromatic aberration** (`colorCorrectF.glsl` in `shaders/class1/alchemy/`): Per-channel offset with amount, falloff, angle, anisotropy controls
+- **Final blit effects** (`blitWithEffectsF.glsl` in `shaders/class1/alchemy/`): geometric lens distortion (Brown-Conrady radial `k1`/`k2` and tangential `p1`/`p2`, anamorphic squeeze, decentring, with the auto-fit rescale solved on the CPU and out-of-frame samples masked to black), vignette (configurable shape/softness/color), film grain (luma/color/coarse/photon styles), TPDF dithering, CVD compensation/preview. Distortion warps the world view only — overlays drawn after the blit do not follow it
+- **Effects inside `colorCorrectF.glsl`** (`shaders/class1/alchemy/`), which runs in every variant including the no-post ones and so gates them itself: chromatic aberration (per-channel offset with amount, falloff, angle, anisotropy), the five-component lens flare, the bloom and cross-filter composite, and lens dirt — a grime plate multiplied by the accumulated flare and bloom terms, so it only lights up where something already is
 
 Post-processing settings are exposed in the Lightbox floater (`ALFloaterLightBox`); see `doc/LIGHTBOX.md` for how to add UI sections for new effects.
 
@@ -126,9 +131,9 @@ GLSL shaders live in `indra/newview/app_settings/shaders/` organized by quality 
 - **`class1/`** — Base shaders (all hardware)
 - **`class2/`** — Mid-tier features
 - **`class3/`** — Advanced features (SSR, high-quality lighting)
-- Categories: `deferred/`, `objects/`, `environment/`, `alchemy/` (Alchemy post-processing), `windlight/`, `avatar/`, `interface/`
+- Categories: `deferred/`, `objects/`, `environment/`, `alchemy/` (Alchemy post-processing), `effects/` (glow, the bloom pyramid, the cross-screen filter), `windlight/`, `avatar/`, `interface/`
 
-Key shader groups: GBuffer write (`gDeferredDiffuseProgram`, `gDeferredPBROpaqueProgram`, `gDeferredBumpProgram`, `gDeferredMaterialProgram[]`, etc.), deferred lighting (`gDeferredSunProgram`, `gDeferredLightProgram`, `gDeferredMultiLightProgram[16]`, `gDeferredSpotLightProgram`), shadows (`gDeferredShadowProgram` and variants), environment (`gDeferredWLSkyProgram`, `gWaterProgram`, `gHazeProgram`), post-processing (tonemap, FXAA, SMAA, CAS, bloom, DoF programs).
+Key shader groups: GBuffer write (`gDeferredDiffuseProgram`, `gDeferredPBROpaqueProgram`, `gDeferredBumpProgram`, `gDeferredMaterialProgram[]`, etc.), deferred lighting (`gDeferredSunProgram`, `gDeferredLightProgram`, `gDeferredMultiLightProgram[16]`, `gDeferredSpotLightProgram`), shadows (`gDeferredShadowProgram` and variants), environment (`gDeferredWLSkyProgram`, `gWaterProgram`, `gHazeProgram`), post-processing (tonemap, FXAA, SMAA, CAS, the bloom pyramid programs, `gCrossFilterProgram`, and the four-variant DoF gather set).
 
 ### Draw Pool & Spatial System
 
