@@ -36,6 +36,9 @@
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
 
+#include <utility>
+#include <vector>
+
 static LLDefaultChildRegistry::Register<LLContainerView> r1("container_view");
 
 #include "llpanel.h"
@@ -171,6 +174,8 @@ void LLContainerView::draw()
 
 void LLContainerView::reshape(S32 width, S32 height, bool called_from_parent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     LLRect scroller_rect;
     scroller_rect.setOriginAndSize(0, 0, width, height);
 
@@ -217,10 +222,23 @@ void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
         total_height += label_row_height();
     }
 
+    // The rows and their heights are collected once and kept. Placing a row
+    // needs the total before it can put the first one down, so there are two
+    // walks either way -- but getRequiredRect recurses the whole subtree under
+    // each child, and asking twice walked all of it twice. Nothing moves in
+    // between: a row's required height follows from its own state, not from
+    // where this view then puts it.
+    //
+    // Carrying the views alongside their heights rather than re-filtering the
+    // child list is what keeps the second walk from having to agree with the
+    // first about which of them are visible.
+    std::vector<std::pair<LLView*, S32>> rows;
+
     if (mDisplayChildren)
     {
         // Determine total height
         S32 child_height = 0;
+        rows.reserve(getChildList()->size());
         for (child_list_const_iter_t child_iter = getChildList()->begin();
              child_iter != getChildList()->end(); ++child_iter)
         {
@@ -230,8 +248,9 @@ void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
             {
                 continue;
             }
-            LLRect child_rect = childp->getRequiredRect();
-            child_height += child_rect.getHeight();
+            const S32 height_required = childp->getRequiredRect().getHeight();
+            rows.emplace_back(childp, height_required);
+            child_height += height_required;
             child_height += 2;
         }
         total_height += child_height;
@@ -261,25 +280,31 @@ void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
 
     S32 bottom = top;
 
-    if (mDisplayChildren)
+    // Iterate through all rows, and put in container from top down.
+    for (const auto& [childp, height_required] : rows)
     {
-        // Iterate through all children, and put in container from top down.
-        for (child_list_const_iter_t child_iter = getChildList()->begin();
-             child_iter != getChildList()->end(); ++child_iter)
+        bottom -= height_required;
+        LLRect r(left, bottom + height_required, right, bottom);
+
+        // Whether the row needs relaying has to be asked before setRect, which
+        // applies the new size itself and would leave nothing to compare.
+        const bool resized = childp->getRect().getWidth()  != r.getWidth()
+                          || childp->getRect().getHeight() != r.getHeight();
+
+        childp->setRect(r);
+
+        // A row that only moved is already laid out: its contents sit in its
+        // own coordinates. LLView::reshape reaches the same conclusion from the
+        // deltas, but a row that is itself a container overrides it and
+        // re-arranges its whole subtree regardless -- so one section opening
+        // used to re-lay every other section in the floater, unchanged or not.
+        if (resized || LLView::sForceReshape)
         {
-            LLView *childp = *child_iter;
-            if (!childp->getVisible())
-            {
-                continue;
-            }
-            LLRect child_rect = childp->getRequiredRect();
-            bottom -= child_rect.getHeight();
-            LLRect r(left, bottom + child_rect.getHeight(), right, bottom);
-            childp->setRect(r);
-            childp->reshape(right - left, top - bottom);
-            top = bottom - 2;
-            bottom = top;
+            childp->reshape(r.getWidth(), r.getHeight());
         }
+
+        top = bottom - 2;
+        bottom = top;
     }
 
     if (!called_from_parent)
