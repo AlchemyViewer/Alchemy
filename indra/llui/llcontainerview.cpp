@@ -43,6 +43,16 @@ static LLDefaultChildRegistry::Register<LLContainerView> r1("container_view");
 static ContainerViewRegistry::Register<LLStatView> r2("stat_view");
 static ContainerViewRegistry::Register<LLPanel> r3("panel", &LLPanel::fromXML);
 
+// Padding above and below the label line. The row the label sits in is sized
+// from the live monospace metrics, the same way LLStatBar sizes its own rows,
+// so a taller face grows the reserve instead of clipping into it.
+const S32 CONTAINER_LABEL_VPAD = 4;
+
+static S32 label_row_height()
+{
+    return LLFontGL::getFontMonospace()->getLineHeight() + CONTAINER_LABEL_VPAD;
+}
+
 LLContainerView::LLContainerView(const LLContainerView::Params& p)
 :   LLView(p),
     mShowLabel(p.show_label),
@@ -88,7 +98,8 @@ bool LLContainerView::handleMouseDown(S32 x, S32 y, MASK mask)
     }
     if (!handled)
     {
-        if( mShowLabel && (y >= getRect().getHeight() - 10) )
+        // The whole label row toggles the section, so the target matches what is drawn.
+        if( mShowLabel && (y >= getRect().getHeight() - label_row_height()) )
         {
             setDisplayChildren(!mDisplayChildren);
             reshape(getRect().getWidth(), getRect().getHeight(), false);
@@ -111,6 +122,8 @@ bool LLContainerView::handleMouseUp(S32 x, S32 y, MASK mask)
 
 void LLContainerView::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     {
         gGL.getTextureSlot(0)->unbind();
 
@@ -161,34 +174,33 @@ void LLContainerView::reshape(S32 width, S32 height, bool called_from_parent)
 
 void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     // Determine the sizes and locations of all contained views
     S32 total_height = 0;
-    S32 top, left, right, bottom;
-    //LLView *childp;
 
     // These will be used for the children
-    left = 10;
-    top = getRect().getHeight() - 4;
-    right = width - 2;
-    bottom = top;
+    const S32 left  = 10;
+    const S32 right = width - 2;
 
     // Leave some space for the top label/grab handle
     if (mShowLabel)
     {
-        total_height += 20;
+        total_height += label_row_height();
     }
 
     if (mDisplayChildren)
     {
         // Determine total height
-        U32 child_height = 0;
+        S32 child_height = 0;
         for (child_list_const_iter_t child_iter = getChildList()->begin();
              child_iter != getChildList()->end(); ++child_iter)
         {
             LLView *childp = *child_iter;
+            // A hidden child is not drawn, so it does not reserve a row either.
             if (!childp->getVisible())
             {
-                LL_WARNS() << "Incorrect visibility!" << LL_ENDL;
+                continue;
             }
             LLRect child_rect = childp->getRequiredRect();
             child_height += child_rect.getHeight();
@@ -213,13 +225,13 @@ void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
     my_rect.mRight = my_rect.mLeft + width;
     setRect(my_rect);
 
-    top = total_height;
+    S32 top = total_height;
     if (mShowLabel)
     {
-        top -= 20;
+        top -= label_row_height();
     }
 
-    bottom = top;
+    S32 bottom = top;
 
     if (mDisplayChildren)
     {
@@ -228,6 +240,10 @@ void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
              child_iter != getChildList()->end(); ++child_iter)
         {
             LLView *childp = *child_iter;
+            if (!childp->getVisible())
+            {
+                continue;
+            }
             LLRect child_rect = childp->getRequiredRect();
             bottom -= child_rect.getHeight();
             LLRect r(left, bottom + child_rect.getHeight(), right, bottom);
@@ -250,9 +266,10 @@ void LLContainerView::arrange(S32 width, S32 height, bool called_from_parent)
 
 LLRect LLContainerView::getRequiredRect()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+
     LLRect req_rect;
-    //LLView *childp;
-    U32 total_height = 0;
+    S32 total_height = 0;
 
     // Determine the sizes and locations of all contained views
 
@@ -260,18 +277,23 @@ LLRect LLContainerView::getRequiredRect()
 
     if (mShowLabel)
     {
-        total_height = 20;
+        total_height = label_row_height();
     }
 
 
     if (mDisplayChildren)
     {
         // Determine total height
-        U32 child_height = 0;
+        S32 child_height = 0;
         for (child_list_const_iter_t child_iter = getChildList()->begin();
              child_iter != getChildList()->end(); ++child_iter)
         {
             LLView *childp = *child_iter;
+            // Matches arrange(): a hidden child reserves no row.
+            if (!childp->getVisible())
+            {
+                continue;
+            }
             LLRect child_rect = childp->getRequiredRect();
             child_height += child_rect.getHeight();
             child_height += 2;
