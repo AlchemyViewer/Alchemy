@@ -75,8 +75,10 @@ S32     LLView::sLastLeftXML = S32_MIN;
 S32     LLView::sLastBottomXML = S32_MIN;
 std::vector<LLViewDrawContext*> LLViewDrawContext::sDrawContextStack;
 
-LLView::DrilldownFunc LLView::sDrilldown =
-    boost::bind(&LLView::pointInView, _1, _2, _3, HIT_TEST_USE_BOUNDING_RECT);
+// Empty until a test installs one; see LLView::TemporaryDrilldownFunc. The
+// answer it used to hold as a default is pointInView, which visibleAndContains
+// now calls directly.
+LLView::DrilldownFunc LLView::sDrilldown;
 
 //#if LL_DEBUG
 bool LLView::sIsDrawing = false;
@@ -798,8 +800,13 @@ void LLView::onMouseLeave(S32 x, S32 y, MASK mask)
 
 bool LLView::visibleAndContains(S32 local_x, S32 local_y)
 {
-    return sDrilldown(this, local_x, local_y)
-        && getVisible();
+    // Visibility first. It is a bool read where the other is a rect test, and
+    // most of the children of a large tree are hidden -- an open inventory
+    // keeps the items of its closed folders that way. Both tests are pure, so
+    // asking them in either order reaches the same answer.
+    return getVisible()
+        && (sDrilldown ? sDrilldown(this, local_x, local_y)
+                       : pointInView(local_x, local_y, HIT_TEST_USE_BOUNDING_RECT));
 }
 
 bool LLView::visibleEnabledAndContains(S32 local_x, S32 local_y)
