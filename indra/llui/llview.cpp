@@ -411,7 +411,9 @@ void LLView::removeChild(LLView* child)
     }
     else
     {
+        // Nothing left this view, so nothing about it has changed shape.
         LL_WARNS() << "\"" << child->getName() << "\" is not a child of " << getName() << LL_ENDL;
+        return;
     }
     updateBoundingRect();
 }
