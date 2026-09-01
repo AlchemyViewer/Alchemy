@@ -34,7 +34,6 @@ uniform sampler2D diffuseRect;
 //[ENGINE_BLOCK Matrices]
 uniform vec2 screen_res;
 uniform float max_cof;
-uniform float res_scale;
 
 in vec2 vary_fragcoord;
 
@@ -82,8 +81,8 @@ float bokehWeight(vec3 c)
     if (uBokehHighlightGain <= 0.0)
         return 1.0;
 
-    float luma = max(max(c.r, c.g), c.b);
-    return 1.0 + uBokehHighlightGain * max(luma - uBokehHighlightThreshold, 0.0);
+    float peak = max(max(c.r, c.g), c.b);
+    return 1.0 + uBokehHighlightGain * max(peak - uBokehHighlightThreshold, 0.0);
 }
 
 #if DOF_SHAPED
@@ -224,9 +223,11 @@ vec3 bokehFringe(vec3 c, float radius_norm, float cof_sign)
 #endif
 
 // Note the centre sample in main() is deliberately neither clamped nor
-// reweighted. It is this pixel's own value, and when the pixel is in focus the
-// gather loops never run at all -- clamping it there would clip in-focus
-// highlights, which is the opposite of what the clamp is for.
+// radiance-weighted. It is this pixel's own value, and when the pixel is in
+// focus the gather loops never run at all -- clamping it there would clip
+// in-focus highlights, which is the opposite of what the clamp is for. It IS
+// shape-weighted, so a rim-bright profile does not leave the sharp image
+// bleeding through the middle of the disc; see the centre tap in main().
 //
 // radius_norm and cof_sign are only read in the shaped build; the unshaped one
 // discards them along with the fringe call.
@@ -260,7 +261,7 @@ void dofSample(inout vec4 diff, inout float w, float min_sc, vec2 tc, float radi
     }
 }
 
-void dofSampleNear(inout vec4 diff, inout float w, float min_sc, vec2 tc, float radius_norm, float cof_sign, float shape_w)
+void dofSampleNear(inout vec4 diff, inout float w, vec2 tc, float radius_norm, float cof_sign, float shape_w)
 {
     dofAccumulate(diff, w, texture(diffuseRect, tc), radius_norm, cof_sign, shape_w);
 }
@@ -473,7 +474,7 @@ void main()
                     vec2  samp    = vec2(sc * sa, sc * ca);
                     float shape_w = 1.0;
 #endif
-                    dofSampleNear(diff, w, sc, vary_fragcoord.xy + (samp / screen_res), rn, cof_sign, shape_w);
+                    dofSampleNear(diff, w, vary_fragcoord.xy + (samp / screen_res), rn, cof_sign, shape_w);
                 }
                 sc -= 1.0;
             }
