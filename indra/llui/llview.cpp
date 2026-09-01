@@ -581,7 +581,7 @@ bool LLView::focusNext(LLView::child_list_t & result)
         {
             next = result.rbegin();
         }
-        if ((*next)->isCtrl() && ((LLUICtrl*)*next)->hasTabStop())
+        if ((*next)->isCtrl() && static_cast<LLUICtrl*>(*next)->hasTabStop())
         {
             LLUICtrl * ctrl = static_cast<LLUICtrl*>(*next);
             ctrl->setFocus(true);
@@ -617,7 +617,11 @@ bool LLView::focusPrev(LLView::child_list_t & result)
         {
             next = result.begin();
         }
-        if((*next)->isCtrl())
+        // The tab stop test is what focusNext asks. The tab order query
+        // prefilters on it, so the two agree there whichever way it is asked;
+        // the focus roots query does not, and that is the path Ctrl-Shift-Tab
+        // takes.
+        if ((*next)->isCtrl() && static_cast<LLUICtrl*>(*next)->hasTabStop())
         {
             LLUICtrl * ctrl = static_cast<LLUICtrl*>(*next);
             if (!ctrl->hasFocus())
