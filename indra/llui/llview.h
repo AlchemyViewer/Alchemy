@@ -373,7 +373,11 @@ public:
     virtual LLRect getSnapRect() const;
     LLRect getLocalSnapRect() const;
 
-    const std::string& getLayout() const   { return mLayout; }
+    // Whether this view's rect params were written top-edge-relative. Only the
+    // exact word "topleft" ever meant that; every other value, including the
+    // handful of XUI files carrying something meant for follows, reads as the
+    // historical bottom-left.
+    bool isLayoutTopLeft() const                { return mLayoutTopLeft; }
 
     // Override and return required size for this object. 0 for width/height means don't care.
     virtual LLRect getRequiredRect();
@@ -659,7 +663,7 @@ private:
     LLRect      mRect;
     LLRect      mBoundingRect;
 
-    std::string mLayout;
+    bool        mLayoutTopLeft { false };
     std::string mName;
 
     U32         mReshapeFlags;

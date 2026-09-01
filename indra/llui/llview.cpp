@@ -2552,7 +2552,7 @@ void LLView::initFromParams(const LLView::Params& params)
         setName(params.name());
     }
 
-    mLayout = params.layout();
+    mLayoutTopLeft = (params.layout() == "topleft");
 }
 
 void LLView::parseFollowsFlags(const LLView::Params& params)
@@ -2652,7 +2652,7 @@ void LLView::applyXUILayout(LLView::Params& p, LLView* parent, LLRect layout_rec
     // the default is also "topleft".  JC
     if (p.layout().empty())
     {
-        p.layout = parent->getLayout();
+        p.layout = parent->isLayoutTopLeft() ? "topleft" : "bottomleft";
     }
 
     if (layout_rect.isEmpty())
