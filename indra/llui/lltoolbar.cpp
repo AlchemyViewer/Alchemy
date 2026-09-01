@@ -144,20 +144,16 @@ LLToolBar::LLToolBar(const LLToolBar::Params& p)
     mButtonParams[LLToolBarEnums::BTNTYPE_ICONS_ONLY_SMALL] = p.button_icon_small;
     mButtonParams[LLToolBarEnums::BTNTYPE_TEXT_ONLY] = p.button_text;
 
-    // Whether a button's command is available or running is asked here rather
-    // than in draw. A read-only bar never asks, so it never registers.
-    if (!mReadOnly)
-    {
-        gIdleCallbacks.addFunction(&LLToolBar::onIdleUpdate, this);
-    }
+    // Whether a button's command is available or running, and where the buttons
+    // sit, are both asked here rather than in draw. Every bar registers: only
+    // the first of those is a read-only bar's business, but a bar that is never
+    // laid out never places its buttons at all.
+    gIdleCallbacks.addFunction(&LLToolBar::onIdleUpdate, this);
 }
 
 LLToolBar::~LLToolBar()
 {
-    if (!mReadOnly)
-    {
-        gIdleCallbacks.deleteFunction(&LLToolBar::onIdleUpdate, this);
-    }
+    gIdleCallbacks.deleteFunction(&LLToolBar::onIdleUpdate, this);
 
     auto menu = mPopupMenuHandle.get();
     if (menu)
@@ -185,7 +181,14 @@ void LLToolBar::onIdleUpdate(void* userdata)
 
     // States first. A button that gains or loses its pressed look resizes
     // itself, and the pass after this is what places it.
-    toolbar->updateButtonStates();
+    //
+    // Only an editable bar has states to ask about; every bar has to be placed.
+    // This is the division draw() made before the work moved here, and losing
+    // it left the read-only bars with a layout flag nothing ever consumed.
+    if (!toolbar->mReadOnly)
+    {
+        toolbar->updateButtonStates();
+    }
     toolbar->updateLayoutAsNeeded();
 }
 
@@ -1438,7 +1441,7 @@ const std::string LLToolBarButton::getToolTip() const
 {
     std::string tooltip;
 
-    if (labelIsTruncated() || getCurrentLabel().empty())
+    if (mCommand && (labelIsTruncated() || getCurrentLabel().empty()))
     {
         tooltip = LLTrans::getString(mCommand->labelRef()) + " -- " + LLView::getToolTip();
     }

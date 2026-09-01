@@ -88,17 +88,7 @@ namespace
         {
             LLViewerParcelMgr::getInstance()->addObserver(this);
 
-            // Voice is a parameterised singleton, so asking for it before it has
-            // been given its pump is an error rather than a construction. It is
-            // made in LLAppViewer::init and the toolbars are built at
-            // STATE_WORLD_INIT, so it is there -- asked rather than assumed,
-            // because nothing here would notice if that order changed.
-            if (LLVoiceClient::instanceExists())
-            {
-                LLVoiceClient::getInstance()->addObserver(this);
-                mMicrophone = LLVoiceClient::getInstance()->MicroChangedCallback(
-                    []() { LLToolBar::requestRefresh(); });
-            }
+            attachVoice();
 
             // Connected whether or not RLV is on: gRlvHandler is a plain global,
             // the signal simply never fires while it is off, and it can be
@@ -111,18 +101,41 @@ namespace
         ~ALToolBarStateWatcher() override
         {
             LLViewerParcelMgr::getInstance()->removeObserver(this);
-            if (LLVoiceClient::instanceExists())
+            if (mVoiceAttached && LLVoiceClient::instanceExists())
             {
                 LLVoiceClient::getInstance()->removeObserver(this);
             }
         }
 
-        void changed() override { LLToolBar::requestRefresh(); }
+        // Parcel changes are the one signal here that does not depend on voice,
+        // so they are also where a voice client that was not there when the
+        // toolbars were built gets picked up. Without this, missing it once
+        // meant the microphone and voice-permission buttons had no refresh
+        // source for the rest of the session.
+        void changed() override { attachVoice(); LLToolBar::requestRefresh(); }
         void onChange(EStatusType, const LLSD&, bool) override { LLToolBar::requestRefresh(); }
 
     private:
+        // Voice is a parameterised singleton, so asking for it before it has
+        // been given its pump is an error rather than a construction. It is
+        // made in LLAppViewer::init and the toolbars are built at
+        // STATE_WORLD_INIT, so it is normally already there -- asked rather
+        // than assumed, and retried rather than given up on.
+        void attachVoice()
+        {
+            if (mVoiceAttached || !LLVoiceClient::instanceExists())
+            {
+                return;
+            }
+            mVoiceAttached = true;
+            LLVoiceClient::getInstance()->addObserver(this);
+            mMicrophone = LLVoiceClient::getInstance()->MicroChangedCallback(
+                []() { LLToolBar::requestRefresh(); });
+        }
+
         boost::signals2::scoped_connection mMicrophone;
         boost::signals2::scoped_connection mRlvBehaviour;
+        bool mVoiceAttached = false;
     };
 
     std::unique_ptr<ALToolBarStateWatcher> sStateWatcher;
