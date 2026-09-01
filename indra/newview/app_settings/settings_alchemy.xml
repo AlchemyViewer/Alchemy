@@ -1946,13 +1946,13 @@
         <key>RenderLensDirtTexture</key>
         <map>
             <key>Comment</key>
-            <string>Which lens dirt plate to use. Greyscale images dropped into the user 'lensdirt' folder appear alongside the bundled ones and take priority over a bundled file of the same name. Leave empty for none.</string>
+            <string>Which grime plate the lens dirt effect uses, from app_settings/lensdirt. Four ship: Subtle is a clean lens that has been outdoors, Dirty is one nobody has wiped in a while, Extreme is filthy, and Damaged adds scratches and coating chips on top of the grime. Drop your own greyscale image in the same folder and it appears in the list; single-channel and colour images both work. Plates are cover-fitted rather than stretched, so a speck stays a speck on any window shape.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>String</string>
             <key>Value</key>
-            <string>DefaultDirt.png</string>
+            <string>Dirty.png</string>
         </map>
         <key>RenderLensDirtBloomResponse</key>
         <map>

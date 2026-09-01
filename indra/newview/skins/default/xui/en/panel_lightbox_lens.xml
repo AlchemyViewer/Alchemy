@@ -3214,7 +3214,7 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 height="18"
 				 max_chars="200"
 				 name="lensdirt_combo"
-				 tool_tip="Which dirt plate to use. Greyscale images dropped into your 'lensdirt' folder appear here the next time the Lightbox opens."
+				 tool_tip="Which dirt plate to use. Subtle through Extreme are the same grime at rising density; Damaged adds scratches and coating chips. Greyscale images dropped into your 'lensdirt' folder appear here the next time the Lightbox opens."
 				 control_name="RenderLensDirtTexture">
 					<combo_box.item
 					 label="None"
