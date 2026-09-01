@@ -2778,7 +2778,7 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 top_pad="8"
 				 right="-32"
 				 height="16"
-				 label="Spikes"
+				 label="Spike Pairs"
 				 label_width="140"
 				 can_edit_text="true"
 				 decimal_digits="0"
@@ -2786,7 +2786,7 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 min_val="1"
 				 max_val="32"
 				 name="flare_starburst_spikes"
-				 tool_tip="Number of aperture-like spikes; real lenses show twice the blade count"
+				 tool_tip="Draws twice this many spikes - half the blade count, or all of it if odd"
 				 control_name="RenderLensFlareStarburstSpikes" />
 				<button
 				 follows="top|right"

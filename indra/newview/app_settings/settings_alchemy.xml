@@ -2757,7 +2757,7 @@
         <key>RenderLensFlareStarburstSpikes</key>
         <map>
             <key>Comment</key>
-            <string>Number of aperture-like spikes in the starburst. Real cameras typically show 2x the blade count (6-blade = 12 spikes, etc). Range 1 to 32.</string>
+            <string>Angular frequency of the starburst rather than a literal spike count - it draws two opposed spikes per cycle, so the star carries twice this many primary spikes (the default 4 gives 8, matching an 8-blade iris) with fainter secondary rays between them. Real lenses show one spike per aperture blade when the blade count is even and two per blade when it is odd, so use half the blade count for an even iris (6 blades = 3) and the blade count itself for an odd one (7 blades = 7). Range 1 to 32.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
