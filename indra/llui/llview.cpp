@@ -33,6 +33,7 @@
 #include <sstream>
 #include <boost/bind.hpp>
 
+#include "llfontgl.h"
 #include "llrender.h"
 #include "llevent.h"
 #include "llfocusmgr.h"

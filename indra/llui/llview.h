@@ -33,7 +33,6 @@
 
 #include "stdtypes.h"
 #include "llcoord.h"
-#include "llfontgl.h"
 #include "llhandle.h"
 #include "llmortician.h"
 #include "llmousehandler.h"
@@ -51,6 +50,7 @@
 #include <list>
 
 class LLSD;
+class LLFontGL;
 
 constexpr U32   FOLLOWS_NONE    = 0x00;
 constexpr U32   FOLLOWS_LEFT    = 0x01;
