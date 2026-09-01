@@ -32,12 +32,35 @@
 
 const F32 FOCUS_FADE_TIME = 0.3f;
 
-LLFocusableElement::LLFocusableElement() :
-    mFocusLostCallback(nullptr),
-    mFocusReceivedCallback(nullptr),
-    mFocusChangedCallback(nullptr),
-    mTopLostCallback(nullptr)
+LLFocusableElement::LLFocusableElement()
 {
+}
+
+LLFocusableElement::FocusCallbacks::~FocusCallbacks()
+{
+    auto free_signal = [](focus_signal_t*& signal)
+        {
+            if (signal)
+            {
+                signal->disconnect_all_slots();
+                delete signal;
+                signal = nullptr;
+            }
+        };
+
+    free_signal(mFocusLost);
+    free_signal(mFocusReceived);
+    free_signal(mFocusChanged);
+    free_signal(mTopLost);
+}
+
+LLFocusableElement::FocusCallbacks& LLFocusableElement::focusCallbacks()
+{
+    if (!mFocusCallbacks)
+    {
+        mFocusCallbacks = new FocusCallbacks();
+    }
+    return *mFocusCallbacks;
 }
 
 // virtual
@@ -73,37 +96,27 @@ bool LLFocusableElement::wantsReturnKey() const
 // virtual
 LLFocusableElement::~LLFocusableElement()
 {
-    auto free_signal = [&](focus_signal_t*& signal)
-        {
-            if (signal)
-            {
-                signal->disconnect_all_slots();
-                delete signal;
-                signal = nullptr;
-            }
-        };
-
-    free_signal(mFocusLostCallback);
-    free_signal(mFocusReceivedCallback);
-    free_signal(mFocusChangedCallback);
-    free_signal(mTopLostCallback);
+    delete mFocusCallbacks;
+    mFocusCallbacks = nullptr;
 }
 
 void LLFocusableElement::onFocusReceived()
 {
-    if (mFocusReceivedCallback) (*mFocusReceivedCallback)(this);
-    if (mFocusChangedCallback) (*mFocusChangedCallback)(this);
+    if (!mFocusCallbacks) return;
+    if (mFocusCallbacks->mFocusReceived) (*mFocusCallbacks->mFocusReceived)(this);
+    if (mFocusCallbacks->mFocusChanged) (*mFocusCallbacks->mFocusChanged)(this);
 }
 
 void LLFocusableElement::onFocusLost()
 {
-    if (mFocusLostCallback) (*mFocusLostCallback)(this);
-    if (mFocusChangedCallback) (*mFocusChangedCallback)(this);
+    if (!mFocusCallbacks) return;
+    if (mFocusCallbacks->mFocusLost) (*mFocusCallbacks->mFocusLost)(this);
+    if (mFocusCallbacks->mFocusChanged) (*mFocusCallbacks->mFocusChanged)(this);
 }
 
 void LLFocusableElement::onTopLost()
 {
-    if (mTopLostCallback) (*mTopLostCallback)(this);
+    if (mFocusCallbacks && mFocusCallbacks->mTopLost) (*mFocusCallbacks->mTopLost)(this);
 }
 
 bool LLFocusableElement::hasFocus() const
@@ -117,26 +130,30 @@ void LLFocusableElement::setFocus(bool b)
 
 boost::signals2::connection LLFocusableElement::setFocusLostCallback( const focus_signal_t::slot_type& cb)
 {
-    if (!mFocusLostCallback) mFocusLostCallback = new focus_signal_t();
-    return mFocusLostCallback->connect(cb);
+    focus_signal_t*& signal = focusCallbacks().mFocusLost;
+    if (!signal) signal = new focus_signal_t();
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLFocusableElement::setFocusReceivedCallback(const focus_signal_t::slot_type& cb)
 {
-    if (!mFocusReceivedCallback) mFocusReceivedCallback = new focus_signal_t();
-    return mFocusReceivedCallback->connect(cb);
+    focus_signal_t*& signal = focusCallbacks().mFocusReceived;
+    if (!signal) signal = new focus_signal_t();
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLFocusableElement::setFocusChangedCallback(const focus_signal_t::slot_type& cb)
 {
-    if (!mFocusChangedCallback) mFocusChangedCallback = new focus_signal_t();
-    return mFocusChangedCallback->connect(cb);
+    focus_signal_t*& signal = focusCallbacks().mFocusChanged;
+    if (!signal) signal = new focus_signal_t();
+    return signal->connect(cb);
 }
 
 boost::signals2::connection LLFocusableElement::setTopLostCallback(const focus_signal_t::slot_type& cb)
 {
-    if (!mTopLostCallback) mTopLostCallback = new focus_signal_t();
-    return mTopLostCallback->connect(cb);
+    focus_signal_t*& signal = focusCallbacks().mTopLost;
+    if (!signal) signal = new focus_signal_t();
+    return signal->connect(cb);
 }
 
 

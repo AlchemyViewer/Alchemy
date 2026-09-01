@@ -72,10 +72,24 @@ public:
 protected:
     virtual void    onFocusReceived();
     virtual void    onFocusLost();
-    focus_signal_t*  mFocusLostCallback;
-    focus_signal_t*  mFocusReceivedCallback;
-    focus_signal_t*  mFocusChangedCallback;
-    focus_signal_t*  mTopLostCallback;
+
+private:
+    // Four signals of which a view almost always has none. Focus callbacks are
+    // set on a handful of controls, and every LLView in the viewer inherits
+    // this class -- an open inventory holds two hundred thousand of them. The
+    // block is allocated by whichever callback is connected first.
+    struct FocusCallbacks
+    {
+        focus_signal_t* mFocusLost { nullptr };
+        focus_signal_t* mFocusReceived { nullptr };
+        focus_signal_t* mFocusChanged { nullptr };
+        focus_signal_t* mTopLost { nullptr };
+
+        ~FocusCallbacks();
+    };
+
+    FocusCallbacks* mFocusCallbacks { nullptr };
+    FocusCallbacks& focusCallbacks();
 };
 
 
