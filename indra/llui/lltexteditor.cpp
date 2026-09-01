@@ -1133,7 +1133,8 @@ bool LLTextEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
             setCursorPos((S32)word.second);
             mSelectionEnd = mCursorPos;
         }
-        else if ((mCursorPos < (S32)text.length()) && !LLStringOps::isSpace( text[mCursorPos]) )
+        else if ((mCursorPos < (S32)text.length())
+                 && !LLStringOps::isSpace(utf8str_decode_at(text, (size_t)mCursorPos).cp))
         {
             // Single non-word, non-space, non-emoji char (punctuation etc.) —
             // select the lone glyph. Step one grapheme to be defensive about
