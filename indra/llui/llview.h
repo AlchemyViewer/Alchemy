@@ -319,6 +319,13 @@ public:
     // it; see updateBoundingRect.
     static S32      sReshapeDepth;
 
+    // How deep in a subtree teardown the current delete is. Everything under
+    // the outermost one is going away with it, so the region they vacate is
+    // the region it vacates, claimed once where the teardown started. A view
+    // deleted from a parent that survives is a teardown of depth zero and
+    // claims its own region as before.
+    static S32      sDeleteDepth;
+
     // Views the last push actually descended into. An open inventory keeps the
     // items of its closed folders hidden, and they are most of a floater.
     static S32      sTransparencyViewsWalked;

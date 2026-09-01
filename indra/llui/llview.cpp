@@ -168,7 +168,14 @@ LLView::LLView(const LLView::Params& p)
 
 LLView::~LLView()
 {
-    dirtyRect();
+    // Nothing off screen has a region to repaint, and a view already inside a
+    // subtree teardown has had its region claimed at the top of it. The parent
+    // link is cut before a child is deleted, so what dirtyRect could work out
+    // for one of those is its own rect read as if it were the screen's.
+    if (getVisible() && sDeleteDepth == 0)
+    {
+        dirtyRect();
+    }
     //LL_INFOS() << "Deleting view " << mName << ":" << (void*) this << LL_ENDL;
     if (LLView::sIsDrawing)
     {
@@ -254,6 +261,7 @@ void LLView::setRect(const LLRect& rect)
 S32 LLView::sTransparencyViewsWalked = 0;
 S32 LLView::sReshapeCount = 0;
 S32 LLView::sReshapeDepth = 0;
+S32 LLView::sDeleteDepth = 0;
 U32 LLView::sTreeGeneration = 0;
 
 void LLView::applyTransparencyType(U8 transparency_type)
@@ -647,6 +655,7 @@ void LLView::deleteAllChildren()
     // clear out the control ordering
     mTabOrder.clear();
 
+    ++sDeleteDepth;
     while (!mChildList.empty())
     {
         LLView* viewp = mChildList.front();
@@ -663,6 +672,10 @@ void LLView::deleteAllChildren()
         viewp->mParentView = NULL;
         delete viewp;
     }
+    --sDeleteDepth;
+
+    // Outside the count: this view is what is left of the subtree, so this is
+    // the call that claims the region all of it vacated.
     updateBoundingRect();
 }
 
@@ -1687,7 +1700,7 @@ void LLView::updateBoundingRect()
     // edge resizes two hundred thousand items, nearly all of them inside closed
     // folders. Being shown marks the region itself -- see setVisible -- so the
     // repaint is asked for at the moment there is something to repaint.
-    if (mBoundingRect != cur_rect && getVisible() && sReshapeDepth == 0)
+    if (mBoundingRect != cur_rect && getVisible() && sReshapeDepth == 0 && sDeleteDepth == 0)
     {
         dirtyRect();
     }
