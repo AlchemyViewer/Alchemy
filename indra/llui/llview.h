@@ -646,55 +646,59 @@ private:
         return handleUnicodeChar(uni_char, from_parent);
     }
 
+    // Declared largest-first, and every small member together at the end. They
+    // were interleaved with the pointers and rects, and on a 64-bit build each
+    // one of them opened a hole big enough to hold whatever came next: a bool
+    // ahead of a std::string cost eight bytes, not one.
+
     LLView*     mParentView;
+
     // Allocated on the first child. MSVC's std::list allocates a sentinel node
     // in its default constructor, so a view that never has one was paying a
     // heap allocation and a pointer's worth of list to say so -- and an open
     // inventory holds two hundred thousand views with no children at all.
     child_list_t* mChildList { nullptr };
 
+    // Allocated on the first child given a tab group, which almost none are.
+    // std::map allocates a head node in its default constructor for the same
+    // reason std::list allocates a sentinel.
+    child_tab_order_t* mTabOrder { nullptr };
+
+    LLUIString* mToolTipMsg { nullptr }; // allocated lazily; null when no tooltip is set
+
+    typedef std::map<std::string, LLView*> default_widget_map_t;
+    // allocate this map no demand, as it is rarely needed
+    mutable LLView* mDefaultWidgets;
+
+    // location in pixels, relative to surrounding structure, bottom,left=0,0
+    LLRect      mRect;
+    LLRect      mBoundingRect;
+
+    std::string mName;
+
+    U32         mReshapeFlags;
+    S32         mDefaultTabGroup;
+    S32         mLastTabGroup;
+
+    U8          mSoundFlags;
+
     // The transparency a floater tried to give this view while it was hidden,
     // kept until it is shown. See applyTransparencyType.
     U8          mPendingTransparency = 0;
     bool        mHasPendingTransparency = false;
 
-    // location in pixels, relative to surrounding structure, bottom,left=0,0
     bool        mVisible;
-    LLRect      mRect;
-    LLRect      mBoundingRect;
-
     bool        mLayoutTopLeft { false };
-    std::string mName;
-
-    U32         mReshapeFlags;
-
-    // Allocated on the first child given a tab group, which almost none are.
-    // std::map allocates a head node in its default constructor for the same
-    // reason std::list allocates a sentinel.
-    child_tab_order_t* mTabOrder { nullptr };
-    S32         mDefaultTabGroup;
-    S32         mLastTabGroup;
-
     bool        mEnabled;       // Enabled means "accepts input that has an effect on the state of the application."
                                 // A disabled view, for example, may still have a scrollbar that responds to mouse events.
     bool        mMouseOpaque;   // Opaque views handle all mouse events that are over their rect.
-    LLUIString* mToolTipMsg { nullptr }; // allocated lazily; null when no tooltip is set
-
-    U8          mSoundFlags;
     bool        mFromXUI;
-
     bool        mIsFocusRoot;
     bool        mUseBoundingRect; // hit test against bounding rectangle that includes all child elements
-
     bool        mLastVisible;
-
     bool        mInDraw;
 
     static LLWindow* sWindow;   // All root views must know about their window.
-
-    typedef std::map<std::string, LLView*> default_widget_map_t;
-    // allocate this map no demand, as it is rarely needed
-    mutable LLView* mDefaultWidgets;
 
     LLView& getDefaultWidgetContainer() const;
 
