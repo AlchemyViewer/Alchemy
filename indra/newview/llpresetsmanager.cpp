@@ -43,6 +43,7 @@
 #include "llagentcamera.h"
 #include "llfile.h"
 
+#if !LL_RELEASE_FOR_DOWNLOAD
 // The Looks whitelist, the settings declarations, and the bundled Look files
 // must stay in lockstep by hand, and every consumer fails silent on drift:
 // loadLooksPreset writes only keys present in BOTH the whitelist and the
@@ -94,16 +95,21 @@ static void audit_bundled_looks(const std::vector<std::string>& whitelist)
         }
     }
 }
+#endif // !LL_RELEASE_FOR_DOWNLOAD
 
 LLPresetsManager::LLPresetsManager()
 {
     copyDefaultLooks();
 
+#if !LL_RELEASE_FOR_DOWNLOAD
+    // Developer check, not a runtime one: it verifies that files in the source
+    // tree agree with each other, which a shipped build can do nothing about.
     {
         std::vector<std::string> looks_whitelist;
         getLooksControlNames(looks_whitelist);
         audit_bundled_looks(looks_whitelist);
     }
+#endif
 
     // Connect preset signals
     startWatching(PRESETS_GRAPHIC);

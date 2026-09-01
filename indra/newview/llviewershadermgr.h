@@ -145,6 +145,10 @@ extern LLGLSLShader         gBloomCompositeProgram;
 // chain's exact base-N tiling has one source of truth instead of three sites
 // that each hard-coded 4 or 63.
 constexpr S32               CROSS_FILTER_TAPS = 4;
+// Shared by the generation gate and the composite, which read the same setting
+// in two different files and must agree, or the effect changes brightness
+// between "is it on" and "how bright".
+constexpr F32               CROSS_FILTER_MAX_STRENGTH = 32.f;
 extern LLGLSLShader         gCrossFilterProgram;
 
 //interface shaders

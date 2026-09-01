@@ -37,11 +37,10 @@
 
 /*[EXTRA_CODE_HERE]*/
 
-// Alpha is written explicitly rather than left to a vec3 output. The bloom
-// pyramid carries halation in its alpha when RenderBloomHalation is on, and
-// has no alpha at all (R11F_G11F_B10F) when it is off. Declaring vec4 and
-// writing 0.0 means the final additive draw into bloomMip[0] leaves halation
-// untouched in the first case and is harmlessly discarded in the second.
+// Alpha is written explicitly rather than left to a vec3 output, and zero is
+// the deliberate value: every target in the chain is R11F_G11F_B10F and has no
+// alpha to keep, so the write is discarded. Declaring vec4 keeps the output
+// shape stable if a future target ever does carry one.
 out vec4 frag_color;
 
 uniform sampler2D diffuseMap;
@@ -52,7 +51,6 @@ uniform float uCrossLength;       // base step in texels; around 1 keeps the cha
 uniform float uCrossFalloff;      // per-step attenuation; > 1 decays faster
 uniform float uCrossChromatic;    // 0 = white streaks, 1 = full dispersion
 uniform float uCrossPassScale;    // 1, TAPS, TAPS^2 across the three iterations
-uniform float uCrossStrength;     // 1.0 for intermediate passes, the user value on the last
 
 in vec2 vary_texcoord0;
 
@@ -149,5 +147,5 @@ void main()
     // and falloff shapes the arm without also setting its brightness.
     accum /= max(total_w, 1e-4);
 
-    frag_color = vec4(accum * uCrossStrength, 0.0);
+    frag_color = vec4(accum, 0.0);
 }

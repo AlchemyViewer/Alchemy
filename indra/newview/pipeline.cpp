@@ -1643,7 +1643,7 @@ void LLPipeline::createLUTBuffers()
 //
 //  - Unlike the grading LUT, one- and two-component images are accepted. A
 //    dirt plate is a scalar mask; greyscale is the natural authoring format
-//    and the bundled plate uses it.
+//    and the bundled plates use it.
 //  - Unlike the SMAA sample-map loader, the *internal* format is derived from
 //    the component count rather than hardcoded to GL_RGB8. A greyscale plate
 //    through that path would cost three times the memory it needs.
@@ -7985,11 +7985,11 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 // directly, which keeps two couplings that were previously free:
                 // the streaks stay scaled by bloom strength, and they keep
                 // lighting the lens dirt through lens_light.
-                static LLCachedControl<F32> streak_strength(gSavedSettings, "RenderCrossFilterStrength", 0.f);
+                static LLCachedControl<F32> streak_strength_setting(gSavedSettings, "RenderCrossFilterStrength", 0.f);
                 const bool streaks_live = (mRT->crossFilterHeight != 0)
                                        && mRT->crossFilter[2].isComplete();
                 const F32  streaks      = (streaks_live && !gSnapshotNoPost)
-                                        ? llclamp(streak_strength(), 0.f, 32.f) * strength_gate
+                                        ? llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH) * strength_gate
                                         : 0.f;
                 shader->uniform1f(LLShaderMgr::CROSS_STRENGTH, streaks);
                 if (streaks > 0.f)
@@ -8681,7 +8681,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         }
     }
 
-    // ---- Cross-screen (star) filter, part 1 of 2 -------------------------
+    // ---- Cross-screen (star) filter ---------------------------------------
     //
     // Streaks every thresholded highlight, the way an etched glass filter
     // diffracts any bright point in frame. Distinct from the lens flare
@@ -8691,7 +8691,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
     // read *before* the upsample walk mutates the mips, but the result has to
     // be added *after* it, or the walk would smear the streaks back through
     // the pyramid.
-    static LLCachedControl<F32> cross_strength(gSavedSettings, "RenderCrossFilterStrength", 0.f);
+    static LLCachedControl<F32> streak_strength_setting(gSavedSettings, "RenderCrossFilterStrength", 0.f);
     static LLCachedControl<S32> cross_points(gSavedSettings, "RenderCrossFilterPoints", 4);
     static LLCachedControl<F32> cross_angle(gSavedSettings, "RenderCrossFilterAngle", 0.f);
     static LLCachedControl<F32> cross_length(gSavedSettings, "RenderCrossFilterLength", 1.f);
@@ -8700,7 +8700,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
     // Streaks ride the bloom pyramid and are scaled by bloom strength where
     // they are composited, so at strength 0 they are invisible -- and the whole
-    // thirteen-draw chain was still running to produce them. Folding the bloom
+    // twelve-draw chain was still running to produce them. Folding the bloom
     // strength into the gate reuses the release path below rather than adding a
     // second one.
     //
@@ -8711,7 +8711,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
     const F32  streak_strength = (no_post || bloom_strength_gate() <= 0.f)
                                ? 0.f
-                               : llclamp(cross_strength(), 0.f, 32.f);
+                               : llclamp(streak_strength_setting(), 0.f, CROSS_FILTER_MAX_STRENGTH);
     const bool streaks_on      = (streak_strength > 0.f) && gCrossFilterProgram.isComplete();
     bool       streaks_ready   = false;
 
@@ -8747,9 +8747,8 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         //
         // Cost scales with RenderBloomResolutionScale, which sizes the whole
         // pyramid -- lowering it makes the streaks cheaper and softer together.
-        // Streak at half the source's resolution.
         //
-        // Thirteen passes at four arms is a lot of fill at full resolution, and
+        // Twelve passes at four arms is a lot of fill at full resolution, and
         // quartering the area is the cheapest lever that does not touch arm
         // count or reach. The source stays mip 0, so the *point* being streaked
         // is still the sharp extract rather than a pre-blurred mip -- what is
@@ -8774,8 +8773,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
             // bloomMip[0] would work for the first arm and then feed the second
             // arm its own output.
             //
-            // No alpha on any of them: streaks carry no halation payload, and
-            // the final draw writes 0 there so the pyramid alpha survives.
+            // No alpha on any of them: streaks carry no halation payload.
             bool ok = true;
             for (U32 i = 0; i < 3 && ok; ++i)
             {
@@ -8785,7 +8783,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
             if (ok)
             {
                 mRT->crossFilterHeight = streak_h;
-                LL_INFOS() << "Cross filter streaking at " << streak_w << "x" << streak_h << LL_ENDL;
+                LL_DEBUGS("Pipeline") << "Cross filter streaking at " << streak_w << "x" << streak_h << LL_ENDL;
             }
             else
             {
@@ -8876,7 +8874,6 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
                                                   1.f / (F32)streak_w,
                                                   1.f / (F32)streak_h);
                     gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_PASS_SCALE, scales[pass]);
-                    gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_STRENGTH, 1.f);
 
                     mScreenTriangleVB->setBuffer();
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -8956,8 +8953,10 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
 // Composite the bloom pyramid (mBloomMip[0]) additively into the pre-tonemap
 // scene buffer. Halation rides in the alpha channel and is tinted at composite.
-// The main render path folds this into colorCorrectF (BLOOM_COMPOSITE); this
-// function is retained for standalone use (e.g. offline capture paths).
+// The main render path folds this into colorCorrectF (BLOOM_COMPOSITE). This
+// function has never had a caller anywhere in the tree; it is kept as a
+// standalone equivalent, but note it is no longer equivalent -- cross-filter
+// streaks are composited only in colorCorrectF, so this path would drop them.
 void LLPipeline::compositeBloomHDR(LLRenderTarget* scene)
 {
     LL_PROFILE_GPU_ZONE("bloom hdr composite");
@@ -9577,7 +9576,6 @@ void LLPipeline::renderDoF()
 
                 post_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
                 post_program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
-                post_program.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
 
                 // Gather weighting. Defaults are a plain energy-conserving
                 // average plus a firefly ceiling; the highlight boost is
@@ -9756,8 +9754,7 @@ void LLPipeline::renderFinalize()
         // is folded into colorCorrect's tonemap variants (BLOOM_COMPOSITE
         // permutation) so we avoid a separate fullscreen pass over the scene
         // buffer. The legacy alpha-tagged prim-glow signal is carried into the
-        // extract pass, so prim glow survives the migration. compositeBloomHDR
-        // is preserved for standalone use cases.
+        // extract pass, so prim glow survives the migration.
         generateBloomHDR(&mRT->screen);
     }
 
