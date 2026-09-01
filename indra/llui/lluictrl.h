@@ -188,7 +188,16 @@ public:
     void setMakeVisibleControlVariable(LLControlVariable* control);
     void setMakeInvisibleControlVariable(LLControlVariable* control);
 
-    void setFunctionName(const std::string& function_name);
+    // The name of the registered callback this control fires, kept for the
+    // UIUsage debug log and read by nothing else. A shipping build does not
+    // carry it at all; inline, so the assignment goes away with the member
+    // rather than becoming a call that discards its argument.
+    void setFunctionName(const std::string& function_name)
+    {
+#if !LL_RELEASE_FOR_DOWNLOAD
+        mFunctionName = function_name;
+#endif
+    }
 
     virtual void    setTentative(bool b);
     virtual bool    getTentative() const;
@@ -306,7 +315,9 @@ protected:
 
     LLViewModelPtr  mViewModel;
 
+#if !LL_RELEASE_FOR_DOWNLOAD
     std::string mFunctionName;
+#endif
 
     static F32 sActiveControlTransparency;
     static F32 sInactiveControlTransparency;

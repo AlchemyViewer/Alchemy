@@ -485,10 +485,12 @@ bool LLButton::handleMouseDown(S32 x, S32 y, MASK mask)
             setFocus(true);
         }
 
+#if !LL_RELEASE_FOR_DOWNLOAD
         if (!mFunctionName.empty())
         {
             LL_DEBUGS("UIUsage") << "calling mouse down function " << mFunctionName << LL_ENDL;
         }
+#endif
 
         /*
          * ATTENTION! This call fires another mouse down callback.

@@ -421,14 +421,12 @@ void LLUICtrl::onCommit()
 {
     if (mCommitSignal)
     {
+#if !LL_RELEASE_FOR_DOWNLOAD
         if (!mFunctionName.empty())
         {
             LL_DEBUGS("UIUsage") << "calling commit function " << mFunctionName << LL_ENDL;
         }
-        else
-        {
-            //LL_DEBUGS("UIUsage") << "calling commit function " << "UNKNOWN" << LL_ENDL;
-        }
+#endif
         (*mCommitSignal)(this, getValue());
     }
 }
@@ -633,11 +631,6 @@ void LLUICtrl::setMakeInvisibleControlVariable(LLControlVariable* control)
         vars.mMakeInvisibleControlConnection = control->getSignal()->connect(boost::bind(&controlListener, _2, getHandle(), std::string("invisible")));
         setVisible(!(control->getValue().asBoolean()));
     }
-}
-
-void LLUICtrl::setFunctionName(const std::string& function_name)
-{
-    mFunctionName = function_name;
 }
 
 // static
