@@ -244,10 +244,25 @@ void main()
         float cof_sign   = (sc < 0.0) ? -1.0 : 1.0;
 
 #if DOF_SHAPED
+        // Where this fragment sits in the frame, measured the way every other
+        // radial effect in the stack measures it: aspect-corrected, then
+        // normalised over the half-diagonal so the corner reads 1.0 on any
+        // viewport shape. Measured in raw UV instead, "distance from the
+        // optical axis" reaches 1.0 at the left edge of a 21:9 frame and 1.0
+        // at its top edge, which are nowhere near the same distance -- and the
+        // effects keyed off it then follow the viewport rectangle rather than
+        // the lens's image circle.
+        float dof_aspect = screen_res.x / max(screen_res.y, 1.0);
+        vec2  dof_ascale = max(vec2(dof_aspect, 1.0 / max(dof_aspect, 1e-4)), 1.0);
+        vec2  field_vec  = (vary_fragcoord.xy - 0.5) * dof_ascale;
+        float field_len  = length(field_vec);
+        vec2  field_dir  = (field_len > 1e-5) ? (field_vec / field_len) : vec2(0.0);
+        float field_r    = clamp(field_len / (0.5 * length(dof_ascale)), 0.0, 1.0);
+
         // Offset of the barrel opening for optical vignetting, growing with
         // distance from the optical axis. Constant across the disc, so it is
         // computed once per fragment rather than per sample.
-        vec2 cat_offset = (vary_fragcoord.xy - 0.5) * 2.0 * uBokehCatEye;
+        vec2 cat_offset = field_dir * (field_r * uBokehCatEye);
 
         // Anamorphic deformation. A cylindrical element squeezes the image on
         // one axis, and out-of-focus highlights inherit that squeeze as ovals

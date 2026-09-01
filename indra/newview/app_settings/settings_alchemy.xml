@@ -3245,7 +3245,7 @@
         <key>RenderBokehCatEyeAmount</key>
         <map>
             <key>Comment</key>
-            <string>Optical vignetting, also called cat's eye. Toward the frame edges the lens barrel clips the aperture, squeezing round bokeh into lens-shaped slivers that lean away from the centre while the middle of the frame stays round. 0 disables. 0.3 is a natural fast-prime look; 0.7 is heavy. Range 0 to 1.</string>
+            <string>Optical vignetting, also called cat's eye. Toward the frame edges the lens barrel clips the aperture, squeezing round bokeh into lens-shaped slivers that lean away from the centre while the middle of the frame stays round. Strength follows distance from the centre of the image circle, so on a wide display the sides clip well before the top and bottom do. 0 disables. 0.45 is a natural fast-prime look; 0.9 is heavy. Range 0 to 1.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
