@@ -479,19 +479,24 @@ bool LLUICtrl::postBuild()
     {
         std::vector<LLUICtrl*> childrenToMoveToFront;
 
-        for (LLView::child_list_const_iter_t child_it = beginChild(); child_it != endChild(); ++child_it)
+        for (LLView* childp : *getChildList())
         {
-            LLUICtrl* uictrl = dynamic_cast<LLUICtrl*>(*child_it);
-
-            if (uictrl && uictrl->mRequestsFront)
+            // isCtrl is a virtual returning a constant where dynamic_cast
+            // walks the RTTI graph, and this asks it of every child of every
+            // panel the viewer builds.
+            if (childp->isCtrl())
             {
-                childrenToMoveToFront.push_back(uictrl);
+                LLUICtrl* uictrl = static_cast<LLUICtrl*>(childp);
+                if (uictrl->mRequestsFront)
+                {
+                    childrenToMoveToFront.push_back(uictrl);
+                }
             }
         }
 
-        for (std::vector<LLUICtrl*>::iterator it = childrenToMoveToFront.begin(); it != childrenToMoveToFront.end(); ++it)
+        for (LLUICtrl* uictrl : childrenToMoveToFront)
         {
-            sendChildToFront(*it);
+            sendChildToFront(uictrl);
         }
     }
 
