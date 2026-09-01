@@ -33,14 +33,8 @@
 extern S32 STATUS_BAR_HEIGHT;
 
 class LLButton;
-class LLLineEditor;
-class LLMessageSystem;
 class LLTextBox;
-class LLTextEditor;
-class LLUICtrl;
-class LLUUID;
 class LLFrameTimer;
-class LLStatGraph;
 class ALPanelAOPulldown;
 class ALPanelQuickSettingsPulldown;
 class LLPanelPresetsCameraPulldown;
@@ -48,7 +42,6 @@ class LLPanelPresetsPulldown;
 class LLPanelVolumePulldown;
 class LLPanelNearByMedia;
 class LLPanelPulldown;
-class LLIconCtrl;
 class LLSearchEditor;
 
 namespace ll

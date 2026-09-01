@@ -27,6 +27,14 @@
 #ifndef LLAGENTUI_H
 #define LLAGENTUI_H
 
+// Self-contained: everything below is spelled in these types, and a header
+// that only compiles behind the viewer's precompiled header cannot be
+// included by anything that does not use it -- a test, for one.
+#include "stdtypes.h"
+#include "v3math.h"
+
+#include <string>
+
 class LLSLURL;
 
 class LLAgentUI

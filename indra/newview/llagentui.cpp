@@ -31,7 +31,7 @@
 // Library includes
 #include "llparcel.h"
 
-#include <fmt/format.h>
+#include "alagentlocationformat.h"
 
 // Viewer includes
 #include "llagent.h"
@@ -144,91 +144,11 @@ bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat format,con
             format = LOCATION_FORMAT_NO_COORDS;
     }
 // [/RLVa:KB]
-    // The region hands this back by reference; only the separator in front of
-    // it is decided here.
+    // The region hands this back by reference.
     const std::string& sim_access_string = region->getSimAccessString();
-    const std::string_view access_sep = sim_access_string.empty() ? "" : " - ";
 
-    // Formatted into the caller's buffer rather than a local that is then
-    // copied out. Callers keep the buffer between rebuilds, so a warm one
-    // stops asking the allocator anything at all.
-    str.clear();
-    auto out = std::back_inserter(str);
-
-    if( parcel_name.empty() )
-    {
-        // the parcel doesn't have a name
-        switch (format)
-        {
-        case LOCATION_FORMAT_LANDMARK:
-            // On a character boundary, not a byte one: the printf this
-            // replaced used "%.100s", which cuts a multi-byte character in
-            // half and leaves the name ending in a replacement glyph.
-            str = utf8str_truncate(region_name, 100);
-            break;
-        case LOCATION_FORMAT_NORMAL:
-            str = region_name;
-            break;
-        case LOCATION_FORMAT_NORMAL_COORDS:
-        case LOCATION_FORMAT_NO_MATURITY:
-            fmt::format_to(out, "{} ({}, {}, {})",
-                region_name,
-                pos_x, pos_y, pos_z);
-            break;
-        case LOCATION_FORMAT_NO_COORDS:
-            fmt::format_to(out, "{}{}{}",
-                region_name,
-                access_sep,
-                sim_access_string);
-            break;
-        case LOCATION_FORMAT_FULL:
-            fmt::format_to(out, "{} ({}, {}, {}){}{}",
-                region_name,
-                pos_x, pos_y, pos_z,
-                access_sep,
-                sim_access_string);
-            break;
-        }
-    }
-    else
-    {
-        // the parcel has a name, so include it in the landmark name
-        switch (format)
-        {
-        case LOCATION_FORMAT_LANDMARK:
-            str = utf8str_truncate(parcel_name, 100);
-            break;
-        case LOCATION_FORMAT_NORMAL:
-            fmt::format_to(out, "{}, {}", parcel_name, region_name);
-            break;
-        case LOCATION_FORMAT_NORMAL_COORDS:
-            fmt::format_to(out, "{} ({}, {}, {})",
-                parcel_name,
-                pos_x, pos_y, pos_z);
-            break;
-        case LOCATION_FORMAT_NO_MATURITY:
-            fmt::format_to(out, "{}, {} ({}, {}, {})",
-                parcel_name,
-                region_name,
-                pos_x, pos_y, pos_z);
-            break;
-        case LOCATION_FORMAT_NO_COORDS:
-            fmt::format_to(out, "{}, {}{}{}",
-                parcel_name,
-                region_name,
-                access_sep,
-                sim_access_string);
-            break;
-        case LOCATION_FORMAT_FULL:
-            fmt::format_to(out, "{}, {} ({}, {}, {}){}{}",
-                parcel_name,
-                region_name,
-                pos_x, pos_y, pos_z,
-                access_sep,
-                sim_access_string);
-            break;
-        }
-    }
+    ALAgentLocationFormat::format(str, format, parcel_name, region_name,
+                                  sim_access_string, pos_x, pos_y, pos_z);
     return true;
 }
 bool LLAgentUI::buildLocationString(std::string& str, ELocationFormat format)

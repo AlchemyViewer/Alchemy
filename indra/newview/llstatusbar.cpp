@@ -102,13 +102,6 @@ S32 STATUS_BAR_HEIGHT = 26;
 extern S32 MENU_BAR_HEIGHT;
 
 
-// TODO: these values ought to be in the XML too
-const S32 SIM_STAT_WIDTH = 8;
-const LLColor4 SIM_OK_COLOR(0.f, 1.f, 0.f, 1.f);
-const LLColor4 SIM_WARN_COLOR(1.f, 1.f, 0.f, 1.f);
-const LLColor4 SIM_FULL_COLOR(1.f, 0.f, 0.f, 1.f);
-const F32 ICON_TIMER_EXPIRY     = 3.f; // How long the balance and health icons should flash after a change.
-
 static void onClickVolume(void*);
 
 LLStatusBar::LLStatusBar(const LLRect& rect)
@@ -266,10 +259,12 @@ void LLStatusBar::refresh()
         sendMoneyBalanceRequest();
     }
 
-    LLRect r;
+    // Reshape the menu bar to its content's width. Kept as a poll: the bar
+    // does arrange itself when it is told its items moved, but the only thing
+    // that tells it is the menu search filter, and this catches whatever else
+    // hides a top-level menu without saying so. The walk stops at the first
+    // visible item from the right, so it costs an int compare.
     const S32 MENU_RIGHT = gMenuBarView->getRightmostMenuEdge();
-
-    // reshape menu bar to its content's width
     if (MENU_RIGHT != gMenuBarView->getRect().getWidth())
     {
         gMenuBarView->reshape(MENU_RIGHT, gMenuBarView->getRect().getHeight());
