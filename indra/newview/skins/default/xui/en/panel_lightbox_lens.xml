@@ -360,6 +360,493 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
+		 height="168"
+		 name="atab_sec_bokeh"
+		 title="Bokeh"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="139"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_bokeh">
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 width="140"
+				 height="15"
+				 name="bokeh_blades_label"
+				 value="Aperture" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="bokeh_blades_combo"
+				 tool_tip="Shape of out-of-focus highlights. Circular is the idealised lens; real diaphragms have blades and produce visible polygons"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehApertureBlades">
+					<combo_box.item
+					 label="Circular"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="3 blades"
+					 name="3"
+					 value="3" />
+					<combo_box.item
+					 label="5 blades"
+					 name="5"
+					 value="5" />
+					<combo_box.item
+					 label="6 blades"
+					 name="6"
+					 value="6" />
+					<combo_box.item
+					 label="7 blades"
+					 name="7"
+					 value="7" />
+					<combo_box.item
+					 label="8 blades"
+					 name="8"
+					 value="8" />
+					<combo_box.item
+					 label="9 blades"
+					 name="9"
+					 value="9" />
+					<combo_box.item
+					 label="11 blades"
+					 name="11"
+					 value="11" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_blades_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehApertureBlades" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Anamorphic"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0.25"
+				 max_val="4"
+				 name="bokeh_anamorphic"
+				 tool_tip="Stretches defocused highlights into ovals the way an anamorphic lens does. 1.0 is round; above 1 is taller than wide. Area preserving, so it changes the shape of the blur without changing its strength"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehAnamorphicSqueeze" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_anamorphic_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehAnamorphicSqueeze" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Highlight Gain"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="4"
+				 name="bokeh_highlight_gain"
+				 tool_tip="Extra weight on bright samples, making defocused highlights read as distinct discs. 0 is a plain average"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehHighlightGain" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_highlight_gain_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehHighlightGain" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Cat's Eye"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="bokeh_cat_eye"
+				 tool_tip="Optical vignetting; squeezes bokeh into lens-shaped slivers toward the frame edges while the centre stays round"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehCatEyeAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_cat_eye_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehCatEyeAmount" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_bokeh_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_bokeh" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="254"
+		 name="atab_sec_bokeh_adv"
+		 title="Bokeh - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="225"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_bokeh_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Highlight Threshold"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.1"
+				 min_val="0"
+				 max_val="8"
+				 name="bokeh_highlight_threshold"
+				 tool_tip="Brightness where the highlight boost starts. 0 boosts everything; raising it restricts the effect to genuine highlights"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehHighlightThreshold" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_highlight_threshold_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehHighlightThreshold" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Firefly Clamp"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="8"
+				 min_val="0"
+				 max_val="1024"
+				 name="bokeh_highlight_clamp"
+				 tool_tip="Caps how much a single bright sample may contribute to a neighbouring disc. Lower stops glints shimmering as the camera moves; 0 disables the cap"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehHighlightClamp" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_highlight_clamp_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehHighlightClamp" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Blade Rotation"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="360"
+				 name="bokeh_blade_rotation"
+				 tool_tip="Rotates the aperture polygon. No effect on a circular aperture"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehApertureRotation" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_blade_rotation_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehApertureRotation" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Blade Curvature"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="bokeh_blade_curvature"
+				 tool_tip="Rounds the blades back toward a circle, as a rounded diaphragm does when held open. No effect on a circular aperture"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehApertureCurvature" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_blade_curvature_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehApertureCurvature" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Defocus Fringe"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="bokeh_fringe_amount"
+				 tool_tip="Colour cast on the rim of defocused highlights, flipping hue either side of focus. Separate from the frame-wide Chromatic Aberration section"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehFringeAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_fringe_amount_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehFringeAmount" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 width="140"
+				 height="15"
+				 name="bokeh_fringe_near_label"
+				 value="Near tint" />
+				<color_swatch
+				 can_apply_immediately="true"
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-18"
+				 width="60"
+				 height="24"
+				 label_height="0"
+				 name="bokeh_fringe_near_tint"
+				 tool_tip="Cast on highlights in front of the focal plane"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehFringeNearTint" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-21"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_fringe_near_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehFringeNearTint" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="12"
+				 width="140"
+				 height="15"
+				 name="bokeh_fringe_far_label"
+				 value="Far tint" />
+				<color_swatch
+				 can_apply_immediately="true"
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-18"
+				 width="60"
+				 height="24"
+				 label_height="0"
+				 name="bokeh_fringe_far_tint"
+				 tool_tip="Cast on highlights behind the focal plane"
+				 enabled_control="RenderDepthOfField"
+				 control_name="RenderBokehFringeFarTint" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-21"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="bokeh_fringe_far_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderBokehFringeFarTint" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_bokeh_adv_reset"
+				 tool_tip="Reset the advanced bokeh settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_bokeh_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
 		 height="142"
 		 name="atab_sec_bloom"
 		 title="Bloom (HDR)"
@@ -2484,6 +2971,378 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 					<button.commit_callback
 					 function="LightBox.ResetSection"
 					 parameter="sec_ca" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="142"
+		 name="atab_sec_distortion"
+		 title="Distortion"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_distortion">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Amount"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="distortion_amount"
+				 tool_tip="Overall lens distortion strength; 0 disables. Only the world view bends - nametags, outlines and UI stay straight."
+				 control_name="RenderLensDistortionAmount" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="distortion_amount_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDistortionAmount" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Barrel / Pincushion"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 text_width="56"
+				 name="distortion_k1"
+				 tool_tip="Negative bows straight lines outward (barrel, the wide-angle look); positive bows them inward (pincushion)"
+				 control_name="RenderLensDistortionK1" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="distortion_k1_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDistortionK1" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Anamorphic Squeeze"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="2.5"
+				 name="distortion_squeeze"
+				 tool_tip="Horizontal desqueeze; 1.0 is a spherical lens, 2.0 matches anamorphic cinema"
+				 control_name="RenderLensDistortionSqueeze" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="distortion_squeeze_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDistortionSqueeze" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_distortion_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_distortion" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="170"
+		 name="atab_sec_distortion_adv"
+		 title="Distortion - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="141"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_distortion_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Secondary Bend"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.25"
+				 max_val="0.25"
+				 text_width="56"
+				 name="distortion_k2"
+				 tool_tip="Shapes the bend toward the corners. Small non-zero values give the moustache distortion of real wide-angle lenses, where the bend reverses near the frame edge."
+				 control_name="RenderLensDistortionK2" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="distortion_k2_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDistortionK2" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="distortion_fit_label"
+				 value="Rescale" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="distortion_fit_combo"
+				 tool_tip="How the bent image is rescaled: none leaves pincushion showing black corners, Fit scales until nothing goes black, Fill keeps the whole frame visible and may letterbox the corners"
+				 control_name="RenderLensDistortionFit">
+					<combo_box.item
+					 label="None"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Fit (no black)"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Fill (keep all)"
+					 name="2"
+					 value="2" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="distortion_fit_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDistortionFit" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="110"
+				 height="15"
+				 name="distortion_center_label"
+				 tool_tip="Offset of the optical axis from the frame center"
+				 value="Center" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="68"
+				 height="18"
+				 label="X"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="vec3_RenderLensDistortionCenter_0">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="Y"
+				 label_width="10"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="vec3_RenderLensDistortionCenter_1">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="distortion_center_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDistortionCenter" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="10"
+				 width="110"
+				 height="15"
+				 name="distortion_tangential_label"
+				 tool_tip="Decentering terms p1 and p2, modelling a lens element mounted slightly off-axis. Realistic values are tiny."
+				 value="Tangential" />
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="110"
+				 top_pad="-16"
+				 width="68"
+				 height="18"
+				 label="P1"
+				 label_width="18"
+				 decimal_digits="3"
+				 increment="0.001"
+				 min_val="-0.05"
+				 max_val="0.05"
+				 name="vec3_RenderLensDistortionTangential_0">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<spinner
+				 follows="left|top"
+				 layout="topleft"
+				 left_delta="72"
+				 top_delta="0"
+				 width="68"
+				 height="18"
+				 label="P2"
+				 label_width="18"
+				 decimal_digits="3"
+				 increment="0.001"
+				 min_val="-0.05"
+				 max_val="0.05"
+				 name="vec3_RenderLensDistortionTangential_1">
+					<spinner.commit_callback
+					 function="LightBox.CommitVec3" />
+				</spinner>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="distortion_tangential_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDistortionTangential" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_distortion_adv_reset"
+				 tool_tip="Reset the advanced distortion settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_distortion_adv" />
 				</button>
 			</panel>
 		</accordion_tab>

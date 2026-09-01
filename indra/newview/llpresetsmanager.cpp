@@ -608,6 +608,30 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderChromaticAberrationOffsetRY",
         "RenderChromaticAberrationOffsetBX",
         "RenderChromaticAberrationOffsetBY",
+        // Lens distortion
+        "RenderLensDistortionAmount",
+        "RenderLensDistortionK1",
+        "RenderLensDistortionK2",
+        "RenderLensDistortionSqueeze",
+        "RenderLensDistortionFit",
+        "RenderLensDistortionCenter",
+        "RenderLensDistortionTangential",
+        // Bokeh aesthetics. The camera optics themselves (CameraFNumber,
+        // CameraFocalLength and friends) are deliberately absent from this
+        // list -- a Look is an aesthetic, not a shot setup -- and
+        // RenderBokehHighlightClamp stays out for a third reason: it is a
+        // firefly guard like RenderBloomFireflyClamp, a stability control
+        // rather than a look.
+        "RenderBokehHighlightGain",
+        "RenderBokehHighlightThreshold",
+        "RenderBokehApertureBlades",
+        "RenderBokehApertureRotation",
+        "RenderBokehApertureCurvature",
+        "RenderBokehAnamorphicSqueeze",
+        "RenderBokehCatEyeAmount",
+        "RenderBokehFringeAmount",
+        "RenderBokehFringeNearTint",
+        "RenderBokehFringeFarTint",
         // Vignette
         "RenderVignetteAmount",
         "RenderVignetteCenter",

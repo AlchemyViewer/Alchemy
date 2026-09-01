@@ -927,13 +927,40 @@ bool LLPipeline::allocateScreenBufferInternal(U32 resX, U32 resY)
 
     mRT->deferredScreen.shareDepthBuffer(mRT->screen);
 
-    if (shadow_detail > 0 || ssao || RenderDepthOfField)
-    { //only need mRT->deferredLight for shadows OR ssao OR dof
+    if (shadow_detail > 0 || ssao)
+    { //only need mRT->deferredLight for shadows OR ssao
         if (!mRT->deferredLight.allocate(resX, resY, screenFormat)) return false;
     }
     else
     {
         mRT->deferredLight.release();
+    }
+
+    // Depth of field scratch, owned by the DoF pass.
+    //
+    // Main pack only, written as a positive identity test so the intent is
+    // the code: renderDoF is gated on !gCubeSnapshot and never runs for the
+    // auxillary (512^2) or hero probe packs, so allocating there is pure
+    // waste. Note the bloom/postPing block below casts a *wider*, pre-existing
+    // net (it excludes only the hero probe) -- that is not the pattern to copy
+    // for new full-frame post targets. Released outright whenever DoF is off,
+    // so the feature costs no VRAM rather than merely little.
+    //
+    // DoF used to borrow deferredLight for the sharp+CoF copy. It no longer
+    // does: that buffer is the SSAO / sun-shadow factor every deferred lighting
+    // shader samples, and widening it to RGBA16F for the non-HDR case would
+    // have doubled a frame-wide bandwidth cost to serve one pass at the end of
+    // the frame. Dropping RenderDepthOfField from the condition above also
+    // hands ~15-30 MB back to anyone running DoF with shadows and SSAO off.
+    if (RenderDepthOfField && mRT == &mMainRT)
+    {
+        if (!mRT->dofSharp.allocate(resX, resY, GL_RGBA16F)) return false;
+        if (!mRT->dofBlur.allocate(resX, resY, GL_R11F_G11F_B10F)) return false;
+    }
+    else
+    {
+        mRT->dofSharp.release();
+        mRT->dofBlur.release();
     }
 
     U32 post_color_fmt = hdr ? GL_RGB10_A2 : GL_RGBA8;
@@ -1365,6 +1392,8 @@ void LLPipeline::releaseScreenBuffers()
         rt.deferredLight.release();
         rt.postPingMap.release();
         rt.postPongMap.release();
+        rt.dofSharp.release();
+        rt.dofBlur.release();
         for (U32 i = 0; i < BLOOM_MAX_MIPS; i++)
         {
             rt.bloomMip[i].release();
@@ -8471,7 +8500,6 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
             shader->unbind();
         }
     }
-
     // Upsample chain: mip[i] -> mip[i-1] with additive blend. Walks from the
     // smallest mip back up to mip 0, leaving the final bloom in mBloomMip[0].
     {
@@ -8502,6 +8530,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         gBloomUpsampleProgram.unbind();
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
+
 }
 
 // Composite the bloom pyramid (mBloomMip[0]) additively into the pre-tonemap
@@ -8900,7 +8929,22 @@ void LLPipeline::combineGlow(LLRenderTarget* src, LLRenderTarget* dst)
     dst->flush();
 }
 
-void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
+// Depth of field, run pre-tonemap on linear HDR and in place on mRT->screen.
+//
+// The three passes are: CoF (sharp copy + signed circle-of-confusion packed
+// into alpha), a reduced-resolution gather blur, then a combine that mixes the
+// two by CoF. The combine writes back into mRT->screen under
+// setColorMask(true, false).
+//
+// That mask is the whole reason this can run before the tonemapper without
+// touching a shader. mRT->screen.a carries the legacy alpha-tagged prim glow,
+// which bloomExtractF reads in the HDR path and -- after colorCorrect passes
+// alpha straight through -- glowExtractF reads as its *only* live key in the
+// non-HDR path. dofCombineF's alpha output is CoF-flavoured garbage, so letting
+// it land would feed circle-of-confusion into the glow key on every frame.
+// Masking alpha off preserves prim glow exactly and leaves every alpha contract
+// in the chain unchanged.
+void LLPipeline::renderDoF()
 {
     LL_PROFILE_GPU_ZONE("dof");
     {
@@ -9026,17 +9070,17 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
             blur_constant /= 1000.f; // convert to meters for shader
             F32 magnification = focal_length / (subject_distance - focal_length);
 
-            { // build diffuse+bloom+CoF
-                mRT->deferredLight.bindTarget();
+            { // build sharp copy + CoF
+                mRT->dofSharp.bindTarget();
 
                 gDeferredCoFProgram.bind();
 
-                gDeferredCoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
+                gDeferredCoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->screen, ALSamplers::PointMirror);
                 gDeferredCoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
 
                 gDeferredCoFProgram.uniform1f(LLShaderMgr::DEFERRED_DEPTH_CUTOFF, RenderEdgeDepthCutoff);
                 gDeferredCoFProgram.uniform1f(LLShaderMgr::DEFERRED_NORM_CUTOFF, RenderEdgeNormCutoff);
-                gDeferredCoFProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
+                gDeferredCoFProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
                 gDeferredCoFProgram.uniform1f(LLShaderMgr::DOF_FOCAL_DISTANCE, -subject_distance / 1000.f);
                 gDeferredCoFProgram.uniform1f(LLShaderMgr::DOF_BLUR_CONSTANT, blur_constant);
                 gDeferredCoFProgram.uniform1f(LLShaderMgr::DOF_TAN_PIXEL_ANGLE, tanf(1.f / LLDrawable::sCurPixelAngle));
@@ -9047,64 +9091,141 @@ void LLPipeline::renderDoF(LLRenderTarget* src, LLRenderTarget* dst)
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
                 gDeferredCoFProgram.unbind();
-                mRT->deferredLight.flush();
+                mRT->dofSharp.flush();
             }
 
             U32 dof_width = (U32)(mRT->screen.getWidth() * CameraDoFResScale);
             U32 dof_height = (U32)(mRT->screen.getHeight() * CameraDoFResScale);
 
-            { // perform DoF sampling at half-res (preserve alpha channel)
-                src->bindTarget();
+            { // gather blur at CameraDoFResScale into dedicated scratch
+                // Writes to its own target now rather than in place, so the
+                // alpha-preserving colour mask this pass used to need is gone:
+                // the CoF it reads still lives in dofSharp.a, untouched.
+                mRT->dofBlur.bindTarget();
                 glViewport(0, 0, dof_width, dof_height);
 
-                gGL.setColorMask(true, false);
-
                 static LLCachedControl<bool> RenderDepthOfFieldNearBlur(gSavedSettings, "RenderDepthOfFieldNearBlur", false);
-                LLGLSLShader& post_program = RenderDepthOfFieldNearBlur ? gDeferredPostProgram : gDeferredPostProgramNoNear;
+
+                // Shaped aperture, anamorphic deformation, optical vignetting
+                // and defocus fringing all live in the innermost sample loop,
+                // so they are compiled out rather than branched over. One
+                // define covers them all: the shaped variant is bound only
+                // when at least one is actually doing something, and within it
+                // each gates on its own uniform the way the lens flare's
+                // sub-effects do. `shaped` below must stay in lockstep with
+                // the effects inside the shader's DOF_SHAPED block -- an
+                // effect missing from it is a dead control whenever it is the
+                // only one active.
+                static LLCachedControl<S32> bokeh_blades(gSavedSettings, "RenderBokehApertureBlades", 0);
+                static LLCachedControl<F32> bokeh_rotation(gSavedSettings, "RenderBokehApertureRotation", 0.f);
+                static LLCachedControl<F32> bokeh_curvature(gSavedSettings, "RenderBokehApertureCurvature", 0.f);
+                static LLCachedControl<F32> bokeh_anamorphic(gSavedSettings, "RenderBokehAnamorphicSqueeze", 1.f);
+                static LLCachedControl<F32> bokeh_cat_eye(gSavedSettings, "RenderBokehCatEyeAmount", 0.f);
+                static LLCachedControl<F32> bokeh_fringe(gSavedSettings, "RenderBokehFringeAmount", 0.f);
+                static LLCachedControl<LLColor3> bokeh_fringe_near(gSavedSettings, "RenderBokehFringeNearTint", LLColor3(1.f, 0.85f, 1.f));
+                static LLCachedControl<LLColor3> bokeh_fringe_far(gSavedSettings, "RenderBokehFringeFarTint", LLColor3(0.85f, 1.f, 0.9f));
+
+                const S32 blades  = llclamp(bokeh_blades(), 0, 11);
+                const F32 cat_eye = llclamp(bokeh_cat_eye(), 0.f, 1.f);
+                const F32 fringe  = llclamp(bokeh_fringe(), 0.f, 1.f);
+                const F32 squeeze = llclamp(bokeh_anamorphic(), 0.25f, 4.f);
+                const bool anamorphic = (squeeze < 0.999f) || (squeeze > 1.001f);
+                const bool shaped = (blades >= 3) || (cat_eye > 0.f) || (fringe > 0.f) || anamorphic;
+
+                LLGLSLShader& post_program = RenderDepthOfFieldNearBlur
+                    ? (shaped ? gDeferredPostProgramShaped : gDeferredPostProgram)
+                    : (shaped ? gDeferredPostProgramNoNearShaped : gDeferredPostProgramNoNear);
 
                 post_program.bind();
-                post_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->deferredLight, ALSamplers::PointMirror);
+                post_program.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->dofSharp, ALSamplers::PointMirror);
 
-                post_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
+                post_program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
                 post_program.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
                 post_program.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
+
+                // Gather weighting. Defaults are a plain energy-conserving
+                // average plus a firefly ceiling; the highlight boost is
+                // opt-in. See the note above dofSample for why the old
+                // `0.25 + r+g+b` weight could not survive the move to linear.
+                static LLCachedControl<F32> bokeh_threshold(gSavedSettings, "RenderBokehHighlightThreshold", 0.f);
+                static LLCachedControl<F32> bokeh_gain(gSavedSettings, "RenderBokehHighlightGain", 0.f);
+                static LLCachedControl<F32> bokeh_clamp(gSavedSettings, "RenderBokehHighlightClamp", 64.f);
+                post_program.uniform1f(LLShaderMgr::BOKEH_HIGHLIGHT_THRESHOLD, llmax(bokeh_threshold(), 0.f));
+                post_program.uniform1f(LLShaderMgr::BOKEH_HIGHLIGHT_GAIN, llmax(bokeh_gain(), 0.f));
+                post_program.uniform1f(LLShaderMgr::BOKEH_HIGHLIGHT_CLAMP, llmax(bokeh_clamp(), 0.f));
+
+                // Shaped-aperture uniforms. Skipped entirely for the unshaped
+                // programs, where they are not in the linked binary anyway --
+                // the setters would no-op, but the sector bake would still run.
+                if (shaped)
+                {
+                    // A regular N-gon's inscribed radius at angle theta is
+                    //   cos(pi/N) / cos(mod(theta + rot, 2pi/N) - pi/N)
+                    // so the sector geometry is baked once here and the loop is
+                    // left with the single cosine it genuinely needs per sample.
+                    const F32 sides       = (F32)llmax(blades, 3);
+                    const F32 half_sector = F_PI / sides;
+                    post_program.uniform1i(LLShaderMgr::BOKEH_BLADES, blades);
+                    post_program.uniform1f(LLShaderMgr::BOKEH_APERTURE_ROTATION,
+                                           llclamp(bokeh_rotation(), 0.f, 360.f) * DEG_TO_RAD);
+                    post_program.uniform1f(LLShaderMgr::BOKEH_APERTURE_CURVATURE, llclamp(bokeh_curvature(), 0.f, 1.f));
+                    post_program.uniform3f(LLShaderMgr::BOKEH_APERTURE_CONST,
+                                           half_sector, 2.f * half_sector, cosf(half_sector));
+                    // Anamorphic stretch, sent area-preserving: the two axes
+                    // multiply to 1, so the slider changes the shape of the
+                    // blur without also changing how much of it there is.
+                    // Above 1 is taller than wide, the classic anamorphic oval;
+                    // below 1 is wider than tall.
+                    const F32 anam_root = sqrtf(squeeze);
+                    post_program.uniform2f(LLShaderMgr::BOKEH_ANAMORPHIC, 1.f / anam_root, anam_root);
+                    post_program.uniform1f(LLShaderMgr::BOKEH_CAT_EYE, cat_eye);
+                    post_program.uniform1f(LLShaderMgr::BOKEH_FRINGE_AMOUNT, fringe);
+                    post_program.uniform3fv(LLShaderMgr::BOKEH_FRINGE_NEAR_TINT, 1, bokeh_fringe_near().mV);
+                    post_program.uniform3fv(LLShaderMgr::BOKEH_FRINGE_FAR_TINT, 1, bokeh_fringe_far().mV);
+                }
 
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
                 post_program.unbind();
 
-                src->flush();
-                gGL.setColorMask(true, true);
+                mRT->dofBlur.flush();
             }
 
-            { // combine result based on alpha
+            { // combine result based on alpha, back into the scene buffer
+                mRT->screen.bindTarget();
+                glViewport(0, 0, mRT->screen.getWidth(), mRT->screen.getHeight());
 
-                dst->bindTarget();
-                glViewport(0, 0, dst->getWidth(), dst->getHeight());
+                // Colour only. See the note above renderDoF: screen.a is the
+                // prim-glow tag, and dofCombineF's alpha is CoF garbage.
+                gGL.setColorMask(true, false);
 
                 gDeferredDoFCombineProgram.bind();
-                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
-                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mRT->deferredLight, ALSamplers::PointMirror);
+                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, &mRT->dofBlur, ALSamplers::PointMirror);
+                gDeferredDoFCombineProgram.bindTexture(LLShaderMgr::DEFERRED_LIGHT, &mRT->dofSharp, ALSamplers::PointMirror);
 
-                gDeferredDoFCombineProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)dst->getWidth(), (GLfloat)dst->getHeight());
+                gDeferredDoFCombineProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (GLfloat)mRT->screen.getWidth(), (GLfloat)mRT->screen.getHeight());
                 gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_MAX_COF, CameraMaxCoF);
                 gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_RES_SCALE, CameraDoFResScale);
-                gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_WIDTH, (dof_width - 1) / (F32)src->getWidth());
-                gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_HEIGHT, (dof_height - 1) / (F32)src->getHeight());
+                // Normalised against the target the blur actually rendered
+                // into. Identical to the screen dimensions today because
+                // dofBlur is allocated full-res and merely used at a reduced
+                // viewport -- which is exactly why it must be written against
+                // dofBlur rather than left to rot if that ever changes.
+                gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_WIDTH, (dof_width - 1) / (F32)mRT->dofBlur.getWidth());
+                gDeferredDoFCombineProgram.uniform1f(LLShaderMgr::DOF_HEIGHT, (dof_height - 1) / (F32)mRT->dofBlur.getHeight());
 
                 mScreenTriangleVB->setBuffer();
                 mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
                 gDeferredDoFCombineProgram.unbind();
 
-                dst->flush();
+                mRT->screen.flush();
+                gGL.setColorMask(true, true);
             }
         }
-        else
-        {
-            copyRenderTarget(src, dst);
-        }
+        // No else: the pass is in place on mRT->screen, so when DoF is off
+        // there is nothing to copy and nothing to swap.
     }
 }
 
@@ -9138,22 +9259,61 @@ void LLPipeline::renderFinalize()
         generateLuminance(&mRT->screen, &mLuminanceMap);
 
         generateExposure(&mLuminanceMap, &mExposureMap);
-
-        // HDR bloom runs pre-tonemap against the linear scene buffer. The pyramid
-        // is generated here; the additive composite is folded into colorCorrect's
-        // tonemap variants (BLOOM_COMPOSITE permutation) so we avoid a separate
-        // fullscreen pass over the scene buffer. The legacy alpha-tagged prim-glow
-        // signal is carried into the extract pass, so prim glow survives the
-        // migration. compositeBloomHDR is preserved for standalone use cases.
-        generateBloomHDR(&mRT->screen);
     }
 
     // Read any pending scene probe here, while the buffer still holds linear
-    // radiance. One line later it has been white balanced, graded and
-    // tonemapped, and a sample taken then would describe the grade rather than
-    // the scene -- which is no use to a tool whose whole job is to decide what
-    // the grade should be.
+    // radiance and is still sharp. One line later it has been white balanced,
+    // graded and tonemapped, and a sample taken then would describe the grade
+    // rather than the scene -- which is no use to a tool whose whole job is to
+    // decide what the grade should be. It has to precede DoF for the same
+    // reason: a sample from a defocused pixel describes the blur, not the scene.
     serviceScenePixelProbe(&mRT->screen);
+
+    // Depth of field, in place on mRT->screen.
+    //
+    // Ahead of both the tonemapper and bloom. Pre-tonemap because gathering
+    // over display-space values is gathering over already-compressed
+    // highlights, which is why stock bokeh reads flat and why postDeferredF
+    // carried a weighting hack to fake the pop back. Pre-bloom because that is
+    // the optical order -- defocus happens at the aperture, veiling glare in
+    // the glass after it -- so a defocused highlight blooms as a soft disc
+    // instead of a sharp core floating on a blurred background.
+    //
+    // The residual, worth knowing before chasing it: the legacy alpha-tagged
+    // glow term reads the sharp glow tag over blurred RGB, so a defocused
+    // glowing prim's alpha-glow contribution hugs its sharp silhouette. The
+    // RGB-threshold term, which dominates in HDR, follows the blur correctly.
+    // If that reads badly in world, swapping this block with generateBloomHDR
+    // below restores bloom-first, at the cost of sharp bloom cores on
+    // defocused lights.
+    //
+    // SSR, luminance and exposure stay above deliberately: reflections keep
+    // their detail, and a blur conserves mean energy so metering is unaffected.
+    static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
+    if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot)
+    {
+        renderDoF();
+
+        // renderDoF calls setup3DViewport and runs a reduced viewport
+        // internally, so restore the world view before anything else draws.
+        gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
+        gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
+        gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
+        gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
+        glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+    }
+
+    if (hdr)
+    {
+        // HDR bloom runs pre-tonemap against the linear scene buffer -- now the
+        // defocused one. The pyramid is generated here; the additive composite
+        // is folded into colorCorrect's tonemap variants (BLOOM_COMPOSITE
+        // permutation) so we avoid a separate fullscreen pass over the scene
+        // buffer. The legacy alpha-tagged prim-glow signal is carried into the
+        // extract pass, so prim glow survives the migration. compositeBloomHDR
+        // is preserved for standalone use cases.
+        generateBloomHDR(&mRT->screen);
+    }
 
     // Handles tonemap, colorgrading, and gamma correction in one pass. In the HDR
     // path, this also applies eye adaptation and bloom. In the non-HDR path, this
@@ -9194,19 +9354,6 @@ void LLPipeline::renderFinalize()
     if (!hdr)
     {
         combineGlow(sourceBuffer, targetBuffer);
-        std::swap(sourceBuffer, targetBuffer);
-    }
-
-    gGLViewport[0] = gViewerWindow->getWorldViewRectRaw().mLeft;
-    gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
-    gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
-    gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
-    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
-
-    static LLCachedControl<bool> RenderDepthOfFieldInEditMode(gSavedSettings, "RenderDepthOfFieldInEditMode", false);
-    if (RenderDepthOfField && (RenderDepthOfFieldInEditMode || !LLToolMgr::getInstance()->inBuildMode()) && !gCubeSnapshot)
-    {
-        renderDoF(sourceBuffer, targetBuffer);
         std::swap(sourceBuffer, targetBuffer);
     }
 
@@ -9294,6 +9441,199 @@ void LLPipeline::renderFinalize()
         // than a look, and an 8-bit PNG wants it whether or not the rest is
         // wanted.
         const bool clean_plate = gSnapshotNoPost;
+
+        // Lens distortion
+        //
+        // Precompute shader-friendly forms once on the CPU: fold the master
+        // amount into every coefficient, pre-reciprocate the squeeze, and
+        // solve the auto-fit scale. The shader is then one gate followed by
+        // pure polynomial evaluation -- no per-pixel divides, no solve.
+        //
+        // Sign convention, worth stating because it is easy to get backwards:
+        // this is a gather, so the shader asks "where does this output pixel
+        // come from". Under that map a coefficient below 1 pulls the sample
+        // toward the centre, which stretches the middle of the source out to
+        // the frame edge -- barrel. So negative k1 reads as barrel and
+        // positive as pincushion, matching a lens profile, and it is
+        // *pincushion* that pushes samples off the source and would show
+        // black corners without a fit.
+        static LLCachedControl<F32> distort_amount(gSavedSettings, "RenderLensDistortionAmount", 0.0f, "[0, 1] default 0.");
+        static LLCachedControl<F32> distort_k1(gSavedSettings, "RenderLensDistortionK1", -0.2f);
+        static LLCachedControl<F32> distort_k2(gSavedSettings, "RenderLensDistortionK2", 0.0f);
+        static LLCachedControl<F32> distort_squeeze(gSavedSettings, "RenderLensDistortionSqueeze", 1.0f);
+        static LLCachedControl<S32> distort_fit(gSavedSettings, "RenderLensDistortionFit", 1);
+        static LLCachedControl<LLVector3> distort_center(gSavedSettings, "RenderLensDistortionCenter", LLVector3(0.f, 0.f, 0.f));
+        static LLCachedControl<LLVector3> distort_tangential(gSavedSettings, "RenderLensDistortionTangential", LLVector3(0.f, 0.f, 0.f));
+
+        const F32 distort = clean_plate ? 0.f : llclamp(distort_amount(), 0.f, 1.f);
+        gBlitWithEffectsProgram.uniform1f(LLShaderMgr::LENS_DISTORT_AMOUNT, distort);
+
+        // Zeroing the master both hits the shader's early-out and skips the
+        // whole solve below, exactly as the lens flare does with its strength.
+        if (distort > 0.f)
+        {
+            // Every shape parameter fades with the master amount, each toward
+            // its own neutral: the polynomial coefficients and decentering
+            // toward 0, the squeeze toward 1. Scaling only the coefficients
+            // was a shipped bug -- with a non-neutral squeeze dialled in,
+            // dragging Amount off zero made the radial bend fade in smoothly
+            // while the full anamorphic stretch snapped on in a single frame.
+            const F32 k1 = llclamp(distort_k1(), -0.5f, 0.5f) * distort;
+            const F32 k2 = llclamp(distort_k2(), -0.25f, 0.25f) * distort;
+            const F32 p1 = llclamp(distort_tangential().mV[0], -0.05f, 0.05f) * distort;
+            const F32 p2 = llclamp(distort_tangential().mV[1], -0.05f, 0.05f) * distort;
+            const F32 cx = llclamp(distort_center().mV[0], -0.5f, 0.5f) * distort;
+            const F32 cy = llclamp(distort_center().mV[1], -0.5f, 0.5f) * distort;
+            const F32 squeeze = 1.f + (llclamp(distort_squeeze(), 0.5f, 2.5f) - 1.f) * distort;
+
+            // Same aspect basis the shader uses, and the same one the CA path
+            // derives from uResolution -- one component stays 1.0 and the
+            // other carries the ratio, so radial distance is measured in
+            // physical units and the corners really are further out than the
+            // edge midpoints.
+            const F32 res_w  = (F32)gViewerWindow->getWorldViewRectRaw().getWidth();
+            const F32 res_h  = (F32)gViewerWindow->getWorldViewRectRaw().getHeight();
+            const F32 aspect = res_w / llmax(res_h, 1.f);
+            const F32 axis_x = llmax(aspect, 1.f);
+            const F32 axis_y = llmax(1.f / llmax(aspect, 1e-4f), 1.f);
+            const F32 sq_x   = 1.f / squeeze;
+            const F32 sq_y   = 1.f;
+
+            // The shader's warp with the fit scale left at 1. Scale is a pure
+            // multiplier on the result, so solving for it afterwards is exact
+            // rather than iterative.
+            auto base_offset = [&](F32 u, F32 v, F32& out_x, F32& out_y)
+            {
+                const F32 qx = (u - 0.5f - cx) * axis_x;
+                const F32 qy = (v - 0.5f - cy) * axis_y;
+                const F32 r2 = qx * qx + qy * qy;
+                const F32 radial = 1.f + r2 * (k1 + r2 * k2);
+                const F32 tx = 2.f * p1 * qx * qy + p2 * (r2 + 2.f * qx * qx);
+                const F32 ty = p1 * (r2 + 2.f * qy * qy) + 2.f * p2 * qx * qy;
+                out_x = (qx * radial + tx) / axis_x * sq_x;
+                out_y = (qy * radial + ty) / axis_y * sq_y;
+            };
+
+            // Scale at which the ray from the optical axis along `base` leaves
+            // the source frame -- a two-slab exit test. Below that scale the
+            // sample is inside the image; above it, off the edge and black.
+            const F32 origin_x = 0.5f + cx;
+            const F32 origin_y = 0.5f + cy;
+            auto exit_scale = [&](F32 bx, F32 by) -> F32
+            {
+                F32 best = 1e30f;
+                if (bx > 1e-6f || bx < -1e-6f)
+                {
+                    best = llmin(best, ((bx > 0.f ? 1.f : 0.f) - origin_x) / bx);
+                }
+                if (by > 1e-6f || by < -1e-6f)
+                {
+                    best = llmin(best, ((by > 0.f ? 1.f : 0.f) - origin_y) / by);
+                }
+                return best;
+            };
+
+            F32 fit_scale = 1.f;
+            const S32 fit_mode = llclamp(distort_fit(), 0, 2);
+            if (fit_mode != 0)
+            {
+                // Walk the frame boundary densely instead of probing only the
+                // corners and edge midpoints.
+                //
+                // With a non-zero secondary coefficient the radial polynomial
+                // 1 + k1*r^2 + k2*r^4 stops being monotonic in r -- that
+                // non-monotonicity *is* the moustache bend -- so the largest
+                // outward displacement along an edge can fall between two
+                // sparse probes. Eight probes let that region escape the solve,
+                // which showed up as curved black arcs along the edges at
+                // extreme settings even in Fit mode. Dense sampling is also
+                // what keeps this honest once the tangential terms are
+                // non-zero, since those break the clean radial structure a
+                // corners-dominate argument leans on.
+                //
+                // Sixty-four evaluations of a short polynomial, once a frame,
+                // and only while distortion is enabled.
+                const S32 probes_per_edge = 16;
+
+                // Fit (1): the smallest exit scale over every probe with a
+                // satisfiable constraint, so nothing that scaling can save
+                // ever goes black. Not quite "nothing goes black anywhere":
+                // with the optical axis pinned on the frame edge, fold-over
+                // can fling a pixel straight off that edge, and no positive
+                // scale brings it back -- Fit degrades to best-effort there
+                // rather than collapsing the whole frame chasing an
+                // impossible constraint.
+                // Fill (2): the largest, so every probe is reachable -- the
+                // whole source stays visible, at the cost of black corners.
+                F32 solved = (fit_mode == 1) ? 1e30f : 0.f;
+
+                auto consider_probe = [&](F32 u, F32 v)
+                {
+                    F32 bx, by;
+                    base_offset(u, v, bx, by);
+                    const F32 s = exit_scale(bx, by);
+                    // >= 1e30 is no constraint at all (base ~ 0 near the
+                    // optical axis); ~0 is the unsatisfiable case above.
+                    if (s < 1e-4f || s >= 1e30f)
+                    {
+                        return;
+                    }
+                    solved = (fit_mode == 1) ? llmin(solved, s) : llmax(solved, s);
+                };
+
+                for (S32 edge = 0; edge < 4; ++edge)
+                {
+                    for (S32 i = 0; i < probes_per_edge; ++i)
+                    {
+                        // t == 0 lands exactly on a corner, so all four corners
+                        // are still probed; the rest subdivide each edge.
+                        const F32 t = (F32)i / (F32)probes_per_edge;
+                        switch (edge)
+                        {
+                            case 0:  consider_probe(t, 0.f);        break;  // top
+                            case 1:  consider_probe(1.f, t);        break;  // right
+                            case 2:  consider_probe(1.f - t, 1.f);  break;  // bottom
+                            default: consider_probe(0.f, 1.f - t);  break;  // left
+                        }
+                    }
+                }
+
+                // Fit also probes the interior. Boundary-only probing assumes
+                // the binding constraint lies on the frame edge, which holds
+                // while the polynomial is monotonic over the frame -- but
+                // strong barrel folds it over (the radial factor goes negative
+                // past its turning point), and then an interior pixel can be
+                // flung further than any boundary pixel. Verified numerically:
+                // at clamp-edge settings a boundary-only solve passed all 64
+                // probes while a mid-frame island escaped. A 15x15 grid
+                // catches every satisfiable interior bind for a few hundred
+                // cheap evaluations. Fit only: Fill takes the max, which the
+                // near-axis interior would poison with huge exit scales.
+                if (fit_mode == 1)
+                {
+                    const S32 grid = 15;
+                    for (S32 gy = 1; gy <= grid; ++gy)
+                    {
+                        for (S32 gx = 1; gx <= grid; ++gx)
+                        {
+                            consider_probe((F32)gx / (F32)(grid + 1),
+                                           (F32)gy / (F32)(grid + 1));
+                        }
+                    }
+                }
+
+                if (solved > 0.f && solved < 1e30f)
+                {
+                    fit_scale = llclamp(solved, 0.1f, 10.f);
+                }
+            }
+
+            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::LENS_DISTORT_K, k1, k2);
+            gBlitWithEffectsProgram.uniform1f(LLShaderMgr::LENS_DISTORT_SCALE, fit_scale);
+            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::LENS_DISTORT_SQUEEZE, sq_x, sq_y);
+            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::LENS_DISTORT_CENTER, cx, cy);
+            gBlitWithEffectsProgram.uniform2f(LLShaderMgr::LENS_DISTORT_TANGENTIAL, p1, p2);
+        }
 
         // Vignette
         static LLCachedControl<F32> vignette_amount(gSavedSettings, "RenderVignetteAmount", 0.0f, "[0, 1] default 0.");

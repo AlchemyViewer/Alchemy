@@ -148,7 +148,10 @@ public:
     void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
     void generateSMAABuffers(LLRenderTarget* src);
     void applySMAA(LLRenderTarget* src, LLRenderTarget* dst);
-    void renderDoF(LLRenderTarget* src, LLRenderTarget* dst);
+    // Operates in place on mRT->screen: the combine writes colour back under a
+    // mask that leaves the prim-glow alpha untouched, so callers neither pass
+    // buffers nor swap afterwards.
+    void renderDoF();
     void copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst);
     void combineGlow(LLRenderTarget* src, LLRenderTarget* dst);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
@@ -822,6 +825,23 @@ public:
         // tonemapped and gamma corrected render ready for post
         LLRenderTarget          postPingMap;
         LLRenderTarget          postPongMap;
+
+        // Depth of field scratch, owned by the DoF pass alone.
+        //
+        // DoF runs pre-tonemap on linear HDR, so it cannot borrow postPingMap
+        // (GL_RGB10_A2 under HDR). It deliberately does not borrow
+        // deferredLight either: that is the SSAO / sun-shadow factor buffer
+        // every deferred lighting shader samples, and widening it to RGBA16F
+        // to serve one late pass would double a frame-wide bandwidth cost on
+        // exactly the low-end hardware this DoF path exists for.
+        //
+        // dofSharp is RGBA16F because it carries the sharp linear copy plus
+        // the signed CoF in alpha. dofBlur drops alpha entirely -- the combine
+        // reads CoF from dofSharp and its own alpha output is discarded by the
+        // colour mask -- so it uses the pyramid's R11F_G11F_B10F and costs half.
+        // Both are main-pack only and released whenever DoF is off.
+        LLRenderTarget          dofSharp;
+        LLRenderTarget          dofBlur;
 
         //sun shadow map
         LLRenderTarget          shadow[4];

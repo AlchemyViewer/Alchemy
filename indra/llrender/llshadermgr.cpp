@@ -1991,6 +1991,28 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uRefWipeMode");
     mReservedUniforms.push_back("uRefWipePos");
 
+    // Geometric lens distortion
+    mReservedUniforms.push_back("uLensDistortAmount");
+    mReservedUniforms.push_back("uLensDistortK");
+    mReservedUniforms.push_back("uLensDistortScale");
+    mReservedUniforms.push_back("uLensDistortSqueeze");
+    mReservedUniforms.push_back("uLensDistortCenter");
+    mReservedUniforms.push_back("uLensDistortTangential");
+
+    // Bokeh
+    mReservedUniforms.push_back("uBokehHighlightThreshold");
+    mReservedUniforms.push_back("uBokehHighlightGain");
+    mReservedUniforms.push_back("uBokehHighlightClamp");
+    mReservedUniforms.push_back("uBokehBlades");
+    mReservedUniforms.push_back("uBokehApertureRotation");
+    mReservedUniforms.push_back("uBokehApertureCurvature");
+    mReservedUniforms.push_back("uBokehApertureConst");
+    mReservedUniforms.push_back("uBokehAnamorphic");
+    mReservedUniforms.push_back("uBokehCatEye");
+    mReservedUniforms.push_back("uBokehFringeAmount");
+    mReservedUniforms.push_back("uBokehFringeNearTint");
+    mReservedUniforms.push_back("uBokehFringeFarTint");
+
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");
 

@@ -217,6 +217,8 @@ LLGLSLShader            gDeferredEmissiveProgram;
 LLGLSLShader            gDeferredEmissiveIndexedProgram; // multi-material indexed legacy glow
 LLGLSLShader            gDeferredPostProgram;
 LLGLSLShader            gDeferredPostProgramNoNear;
+LLGLSLShader            gDeferredPostProgramShaped;
+LLGLSLShader            gDeferredPostProgramNoNearShaped;
 LLGLSLShader            gDeferredCoFProgram;
 LLGLSLShader            gDeferredDoFCombineProgram;
 LLGLSLShader            gExposureProgram;
@@ -1265,6 +1267,9 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredEmissiveProgram.unload();
         gDeferredEmissiveIndexedProgram.unload();
         gDeferredPostProgram.unload();
+        gDeferredPostProgramNoNear.unload();
+        gDeferredPostProgramShaped.unload();
+        gDeferredPostProgramNoNearShaped.unload();
         gDeferredCoFProgram.unload();
         gDeferredDoFCombineProgram.unload();
         gExposureProgram.unload();
@@ -2945,32 +2950,45 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        gDeferredPostProgram.mName = "Deferred Post Shader";
-        gDeferredPostProgram.mFeatures.isDeferred = true;
-        gDeferredPostProgram.mShaderFiles.clear();
-        gDeferredPostProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
-        gDeferredPostProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredPostProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredPostProgram.clearPermutations();
-        gDeferredPostProgram.addPermutation("FRONT_BLUR", "1");
+        // Four DoF gather variants across two orthogonal axes. Both are value
+        // tests in the shader, so the "off" build defines the symbol as "0"
+        // rather than omitting it -- omitting it would make #if FRONT_BLUR a
+        // compile error rather than a false branch.
+        struct PostVariant
+        {
+            LLGLSLShader* shader;
+            const char*   name;
+            const char*   front_blur;
+            const char*   dof_shaped;
+        };
 
-        success = gDeferredPostProgram.createShader();
-        llassert(success);
-    }
+        const PostVariant post_variants[] =
+        {
+            { &gDeferredPostProgram,             "Deferred Post Shader",                            "1", "0" },
+            { &gDeferredPostProgramNoNear,       "Deferred Post Shader No Near Blur",               "0", "0" },
+            { &gDeferredPostProgramShaped,       "Deferred Post Shader Shaped",                     "1", "1" },
+            { &gDeferredPostProgramNoNearShaped, "Deferred Post Shader No Near Blur Shaped",        "0", "1" },
+        };
 
-    if (success)
-    {
-        gDeferredPostProgramNoNear.mName = "Deferred Post Shader No Near Blur";
-        gDeferredPostProgramNoNear.mFeatures.isDeferred = true;
-        gDeferredPostProgramNoNear.mShaderFiles.clear();
-        gDeferredPostProgramNoNear.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
-        gDeferredPostProgramNoNear.mShaderFiles.push_back(make_pair("deferred/postDeferredF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredPostProgramNoNear.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredPostProgramNoNear.clearPermutations();
-        gDeferredPostProgramNoNear.addPermutation("FRONT_BLUR", "0");
+        for (const PostVariant& variant : post_variants)
+        {
+            variant.shader->mName = variant.name;
+            variant.shader->mFeatures.isDeferred = true;
+            variant.shader->mShaderFiles.clear();
+            variant.shader->mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+            variant.shader->mShaderFiles.push_back(make_pair("deferred/postDeferredF.glsl", GL_FRAGMENT_SHADER));
+            variant.shader->mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+            variant.shader->clearPermutations();
+            variant.shader->addPermutation("FRONT_BLUR", variant.front_blur);
+            variant.shader->addPermutation("DOF_SHAPED", variant.dof_shaped);
 
-        success = gDeferredPostProgramNoNear.createShader();
-        llassert(success);
+            success = variant.shader->createShader();
+            llassert(success);
+            if (!success)
+            {
+                break;
+            }
+        }
     }
 
     if (success)

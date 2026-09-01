@@ -1866,6 +1866,91 @@
             <key>Value</key>
             <real>0.0</real>
         </map>
+        <key>RenderLensDistortionAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Overall strength of the geometric lens distortion. 0 disables the effect entirely. 0.25 is a subtle wide-angle bend; 1.0 applies the shape coefficients in full. Only the world view is warped - nametags, selection outlines and UI are drawn afterwards and stay straight. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDistortionK1</key>
+        <map>
+            <key>Comment</key>
+            <string>Primary radial distortion coefficient. Negative values give barrel distortion (straight lines bow outward, the wide-angle look); positive values give pincushion (lines bow inward, common on telephoto). -0.2 is a mild wide angle, -0.4 approaches a fisheye look. Has no effect until Amount is raised. Range -0.5 to 0.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>-0.2</real>
+        </map>
+        <key>RenderLensDistortionK2</key>
+        <map>
+            <key>Comment</key>
+            <string>Secondary radial distortion coefficient, shaping the falloff toward the corners. Leave at 0 for a simple bend; small non-zero values reproduce the moustache distortion of real wide-angle lenses, where the bend reverses direction near the frame edge. Range -0.25 to 0.25.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDistortionSqueeze</key>
+        <map>
+            <key>Comment</key>
+            <string>Anamorphic desqueeze factor. 1.0 is a spherical lens and does nothing. 1.33 and 2.0 match the common anamorphic formats, stretching the image horizontally the way a desqueezed cinema frame looks. Range 0.5 to 2.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDistortionFit</key>
+        <map>
+            <key>Comment</key>
+            <string>How the warped image is rescaled - 0 = none (pincushion can show black corners), 1 = fit (scaled so nothing ever goes black; the usual choice), 2 = fill (scaled so the whole undistorted frame stays visible, which can letterbox the corners)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>RenderLensDistortionCenter</key>
+        <map>
+            <key>Comment</key>
+            <string>[-0.5, 0.5] Offset of the optical axis from the frame center, x and y, z component unused. Non-zero values decenter the distortion the way a shifted or tilted lens does. Leave at zero for a centered lens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
+        <key>RenderLensDistortionTangential</key>
+        <map>
+            <key>Comment</key>
+            <string>[-0.05, 0.05] Brown-Conrady tangential (decentering) coefficients p1 and p2 in x and y, z component unused. These model a lens element mounted slightly off-axis and shear the image rather than bending it radially. Realistic values are tiny - below 0.01. Leave at zero unless deliberately faking a misaligned lens.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.0</real>
+                <real>0.0</real>
+                <real>0.0</real>
+            </array>
+        </map>
         <key>RenderColorGrade</key>
         <map>
             <key>Comment</key>
@@ -2969,6 +3054,135 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>RenderBokehHighlightGain</key>
+        <map>
+            <key>Comment</key>
+            <string>Extra weight given to bright samples inside the defocus blur, which makes out-of-focus highlights read as distinct bokeh discs rather than a smooth blur. 0 is a plain average and is also the cheapest. 0.5 is a gentle lift; 2.0 is a strong cinematic pop. Range 0 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehHighlightThreshold</key>
+        <map>
+            <key>Comment</key>
+            <string>Brightness above which the highlight boost starts to apply. 0 boosts the whole range; raising it restricts the effect to genuine highlights and leaves midtones averaging normally. Only has an effect when Highlight Gain is above 0. Range 0 to 8.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehHighlightClamp</key>
+        <map>
+            <key>Comment</key>
+            <string>Ceiling on how much radiance a single sample may contribute to a neighbouring bokeh disc. A specular glint can carry thousands of times the brightness of its surroundings; uncapped it spreads into a large blob that flickers as the camera moves. The in-focus pixel keeps its full intensity either way - only its contribution to the blur is capped. 0 disables the cap. Range 0 to 1024.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>64.0</real>
+        </map>
+        <key>RenderBokehApertureBlades</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of aperture blades shaping the out-of-focus highlights. 0 gives the perfectly round bokeh of an idealised lens. 5 to 9 reproduce real diaphragms, where the discs become visible polygons - 6 is the most common on stills lenses. Values below 3 are treated as circular. Range 0 to 11.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderBokehApertureRotation</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotation of the aperture polygon in degrees. Only has an effect when Aperture Blades is 3 or more. Range 0 to 360.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehApertureCurvature</key>
+        <map>
+            <key>Comment</key>
+            <string>Rounds the aperture blades back toward a circle. 0 gives hard straight-edged polygons; 1 is fully round, matching a rounded diaphragm held wide open. Only has an effect when Aperture Blades is 3 or more. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehAnamorphicSqueeze</key>
+        <map>
+            <key>Comment</key>
+            <string>Stretches out-of-focus highlights into ovals, the way the cylindrical element of an anamorphic lens does. 1.0 is a round spherical-lens disc. Above 1 gives taller-than-wide ovals, the classic anamorphic signature; below 1 gives wider-than-tall. The stretch preserves area, so this changes the shape of the blur without changing how strong it is. Range 0.25 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderBokehCatEyeAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Optical vignetting, also called cat's eye. Toward the frame edges the lens barrel clips the aperture, squeezing round bokeh into lens-shaped slivers that lean away from the centre while the middle of the frame stays round. 0 disables. 0.3 is a natural fast-prime look; 0.7 is heavy. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFringeAmount</key>
+        <map>
+            <key>Comment</key>
+            <string>Longitudinal chromatic aberration - the colour cast real glass leaves on the rim of an out-of-focus highlight, which flips hue either side of the focal plane. 0 disables. 0.2 is a subtle uncorrected-lens feel; 0.6 is strong. This is separate from the frame-wide fringe under Chromatic Aberration, which appears whether or not anything is defocused. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFringeNearTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Colour cast on highlights in front of the focal plane. The default light magenta matches the usual signature of uncorrected glass; swap with the far tint to reverse the effect.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>1.0</real>
+                <real>0.85</real>
+                <real>1.0</real>
+            </array>
+        </map>
+        <key>RenderBokehFringeFarTint</key>
+        <map>
+            <key>Comment</key>
+            <string>Colour cast on highlights behind the focal plane. The default light green is the counterpart to the near tint; a real lens shifts hue in opposite directions either side of focus.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Color3</string>
+            <key>Value</key>
+            <array>
+                <real>0.85</real>
+                <real>1.0</real>
+                <real>0.9</real>
+            </array>
         </map>
         <key>AllowNoCopyRezRestoreToWorld</key>
         <map>

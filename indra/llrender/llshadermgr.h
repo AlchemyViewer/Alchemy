@@ -519,6 +519,33 @@ public:
         REFERENCE_WIPE_MODE,                //  "uRefWipeMode"
         REFERENCE_WIPE_POS,                 //  "uRefWipePos"
 
+        // Geometric lens distortion — Brown-Conrady, applied in the final blit.
+        // New families are appended here rather than inserted among the blocks
+        // above: this list and the string table in llshadermgr.cpp are parallel
+        // and ordinal-coupled, so appending keeps every later index stable.
+        LENS_DISTORT_AMOUNT,                //  "uLensDistortAmount"  master gate; 0 = off
+        LENS_DISTORT_K,                     //  "uLensDistortK"       (k1, k2) pre-multiplied by amount on CPU
+        LENS_DISTORT_SCALE,                 //  "uLensDistortScale"   auto-fit rescale (direct multiplier), solved on CPU
+        LENS_DISTORT_SQUEEZE,               //  "uLensDistortSqueeze" (1 / squeeze, 1) pre-reciprocated on CPU
+        LENS_DISTORT_CENTER,                //  "uLensDistortCenter"  decentering offset from frame centre
+        LENS_DISTORT_TANGENTIAL,            //  "uLensDistortTangential" (p1, p2) pre-multiplied by amount on CPU
+
+        // Bokeh — depth of field gather weighting (postDeferredF)
+        BOKEH_HIGHLIGHT_THRESHOLD,          //  "uBokehHighlightThreshold" luma where the boost starts
+        BOKEH_HIGHLIGHT_GAIN,               //  "uBokehHighlightGain"      0 = plain average, the fast path
+        BOKEH_HIGHLIGHT_CLAMP,              //  "uBokehHighlightClamp"     per-sample radiance ceiling; <= 0 disables
+
+        // Bokeh — shaped aperture and defocus fringing (DOF_SHAPED builds only)
+        BOKEH_BLADES,                       //  "uBokehBlades"             0 = circular, 3..11 = polygon
+        BOKEH_APERTURE_ROTATION,            //  "uBokehApertureRotation"   radians, converted from degrees on CPU
+        BOKEH_APERTURE_CURVATURE,           //  "uBokehApertureCurvature"  0 straight blades, 1 fully round
+        BOKEH_APERTURE_CONST,               //  "uBokehApertureConst"      (pi/N, 2pi/N, cos(pi/N)) baked on CPU
+        BOKEH_ANAMORPHIC,                   //  "uBokehAnamorphic"         area-preserving (x, y) stretch baked on CPU
+        BOKEH_CAT_EYE,                      //  "uBokehCatEye"             optical vignetting strength
+        BOKEH_FRINGE_AMOUNT,                //  "uBokehFringeAmount"
+        BOKEH_FRINGE_NEAR_TINT,             //  "uBokehFringeNearTint"
+        BOKEH_FRINGE_FAR_TINT,              //  "uBokehFringeFarTint"
+
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 
