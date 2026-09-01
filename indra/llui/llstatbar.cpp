@@ -64,7 +64,7 @@ const S32 STAT_BAR_TEXT_VPAD   = 2;  // breathing room beneath a text line
 const S32 STAT_BAR_TICK_LENGTH = 4;  // tick-mark length drawn past the bar
 const S32 STAT_BAR_MIN_BAR     = 5;  // smallest drawn bar thickness
 
-F32 calc_tick_value(F32 min, F32 max)
+F32 LLStatBar::calcTickValue(F32 min, F32 max)
 {
     F32 range = max - min;
     const S32 DIVISORS[] = {6, 8, 10, 4, 5};
@@ -100,7 +100,7 @@ F32 calc_tick_value(F32 min, F32 max)
     return is_approx_equal(range, 0.f) ? 0.f : range / best_divisor;
 }
 
-void calc_auto_scale_range(F32& min, F32& max, F32& tick)
+void LLStatBar::calcAutoScaleRange(F32& min, F32& max, F32& tick)
 {
     // The displayed range always contains zero, so bar lengths read as magnitudes.
     // Both bounds come from the incoming pair; deriving max from the already
@@ -254,16 +254,25 @@ LLStatBar::LLStatBar(const Params& p)
     mAutoScaleMin(!p.bar_min.isProvided()),
     mTickSpacing(p.tick_spacing),
     mLastDisplayValue(0.f),
-    mStatType(STAT_NONE)
+    mStatType(STAT_NONE),
+    mCachedMin(0.f),
+    mCachedMax(0.f),
+    mCachedMean(0.f),
+    mCachedDecimalDigits(p.decimal_digits),
+    mCachedShowsCurrent(false),
+    mHaveAggregates(false),
+    mValueTextLength(0),
+    mValueWidth(0)
 {
     mFloatingTargetMinBar = mTargetMinBar;
     mFloatingTargetMaxBar = mTargetMaxBar;
+    mNotApplicable        = LLTrans::getString("na");
 
     mStat.valid = NULL;
     // tick value will be automatically calculated later
     if (!p.tick_spacing.isProvided() && p.bar_min.isProvided() && p.bar_max.isProvided())
     {
-        mTickSpacing = calc_tick_value(mTargetMinBar, mTargetMaxBar);
+        mTickSpacing = calcTickValue(mTargetMinBar, mTargetMaxBar);
     }
 
     setStat(p.stat);
@@ -361,17 +370,27 @@ void LLStatBar::draw()
     LLTrace::PeriodicRecording& frame_recording = LLTrace::get_frame_recording();
     LLTrace::Recording& last_frame_recording = frame_recording.getLastRecording();
 
-    std::string unit_label;
-    F32         current         = 0,
-                min             = 0,
-                max             = 0,
-                mean            = 0,
-                display_value   = 0;
-    S32         num_frames      = mDisplayHistory
+    F32         current         = 0;
+    const S32   num_frames      = mDisplayHistory
                                 ? mNumHistoryFrames
                                 : mNumShortHistoryFrames;
-    S32         num_rapid_changes = 0;
-    S32         decimal_digits = mDecimalDigits;
+
+    // Every aggregate below walks every recorded period. The value line they
+    // feed only changes on MEAN_VALUE_UPDATE_TIME, so they are recomputed on
+    // that cadence; only the bar reads any of them more often than that.
+    //
+    // min and max are read every frame the bar is drawn -- they place its span
+    // and drive its auto-scaling, and sampling those at the value line's
+    // cadence would step the range instead of easing it. With the bar hidden
+    // nothing reads them at all, so they are not computed.
+    const bool refresh_value = !mHaveAggregates
+                            || mLastDisplayValueTimer.getElapsedTimeF32() >= MEAN_VALUE_UPDATE_TIME;
+    const bool refresh_range = mDisplayBar || refresh_value;
+
+    if (refresh_value)
+    {
+        mLastDisplayValueTimer.reset();
+    }
 
     switch(mStatType)
     {
@@ -379,18 +398,20 @@ void LLStatBar::draw()
         {
             const LLTrace::StatType<LLTrace::CountAccumulator>& count_stat = *mStat.countStatp;
 
-            unit_label    = std::string(count_stat.getUnitLabel()) + "/s";
-            current       = (F32)last_frame_recording.getPerSec(count_stat);
-            min           = (F32)frame_recording.getPeriodMinPerSec(count_stat, num_frames);
-            max           = (F32)frame_recording.getPeriodMaxPerSec(count_stat, num_frames);
-            mean          = (F32)frame_recording.getPeriodMeanPerSec(count_stat, num_frames);
-            if (mShowMedian)
+            current = (F32)last_frame_recording.getPerSec(count_stat);
+            if (refresh_range)
             {
-                display_value = (F32)frame_recording.getPeriodMedianPerSec(count_stat, num_frames);
+                mCachedMin  = (F32)frame_recording.getPeriodMinPerSec(count_stat, num_frames);
+                mCachedMax  = (F32)frame_recording.getPeriodMaxPerSec(count_stat, num_frames);
+                mCachedMean = (F32)frame_recording.getPeriodMeanPerSec(count_stat, num_frames);
             }
-            else
+            if (refresh_value)
             {
-                display_value = mean;
+                mLastDisplayValue    = mShowMedian
+                                     ? (F32)frame_recording.getPeriodMedianPerSec(count_stat, num_frames)
+                                     : mCachedMean;
+                mCachedDecimalDigits = mDecimalDigits;
+                mCachedShowsCurrent  = false;
             }
         }
         break;
@@ -398,47 +419,77 @@ void LLStatBar::draw()
         {
             const LLTrace::StatType<LLTrace::EventAccumulator>& event_stat = *mStat.eventStatp;
 
-            unit_label        = mUnitLabel.empty() ? event_stat.getUnitLabel() : mUnitLabel;
-            current           = (F32)last_frame_recording.getLastValue(event_stat);
-            min               = (F32)frame_recording.getPeriodMin(event_stat, num_frames);
-            max               = (F32)frame_recording.getPeriodMax(event_stat, num_frames);
-            mean              = (F32)frame_recording.getPeriodMean(event_stat, num_frames);
-            display_value     = mean;
+            current = (F32)last_frame_recording.getLastValue(event_stat);
+            if (refresh_range)
+            {
+                mCachedMin  = (F32)frame_recording.getPeriodMin(event_stat, num_frames);
+                mCachedMax  = (F32)frame_recording.getPeriodMax(event_stat, num_frames);
+                mCachedMean = (F32)frame_recording.getPeriodMean(event_stat, num_frames);
+            }
+            if (refresh_value)
+            {
+                mLastDisplayValue    = mCachedMean;
+                mCachedDecimalDigits = mDecimalDigits;
+                mCachedShowsCurrent  = false;
+            }
         }
         break;
     case STAT_SAMPLE:
         {
             const LLTrace::StatType<LLTrace::SampleAccumulator>& sample_stat = *mStat.sampleStatp;
 
-            unit_label        = mUnitLabel.empty() ? sample_stat.getUnitLabel() : mUnitLabel;
-            current           = (F32)last_frame_recording.getLastValue(sample_stat);
-            min               = (F32)frame_recording.getPeriodMin(sample_stat, num_frames);
-            max               = (F32)frame_recording.getPeriodMax(sample_stat, num_frames);
-            mean              = (F32)frame_recording.getPeriodMean(sample_stat, num_frames);
-            num_rapid_changes = calc_num_rapid_changes(frame_recording, sample_stat, RAPID_CHANGE_WINDOW);
+            current = (F32)last_frame_recording.getLastValue(sample_stat);
+            if (refresh_range)
+            {
+                mCachedMin  = (F32)frame_recording.getPeriodMin(sample_stat, num_frames);
+                mCachedMax  = (F32)frame_recording.getPeriodMax(sample_stat, num_frames);
+                mCachedMean = (F32)frame_recording.getPeriodMean(sample_stat, num_frames);
+            }
+            if (refresh_value)
+            {
+                mCachedDecimalDigits = mDecimalDigits;
+                mCachedShowsCurrent  = false;
 
-            if (mShowMedian)
-            {
-                display_value = (F32)frame_recording.getPeriodMedian(sample_stat, num_frames);
-            }
-            else if (num_rapid_changes / RAPID_CHANGE_WINDOW.value() > MAX_RAPID_CHANGES_PER_SEC)
-            {
-                display_value = mean;
-            }
-            else
-            {
-                display_value = current;
-                // always display current value, don't rate limit
-                mLastDisplayValue = current;
-                if (is_approx_equal((F32)(S32)display_value, display_value))
+                // Which of the three the row shows is decided here and held
+                // until the next refresh. It turns on a count over a window a
+                // second wide, which does not move faster than that anyway.
+                const S32 num_rapid_changes = calc_num_rapid_changes(frame_recording, sample_stat, RAPID_CHANGE_WINDOW);
+                if (mShowMedian)
                 {
-                    decimal_digits = 0;
+                    mLastDisplayValue = (F32)frame_recording.getPeriodMedian(sample_stat, num_frames);
+                }
+                else if (num_rapid_changes / RAPID_CHANGE_WINDOW.value() > MAX_RAPID_CHANGES_PER_SEC)
+                {
+                    mLastDisplayValue = mCachedMean;
+                }
+                else
+                {
+                    mCachedShowsCurrent = true;
                 }
             }
         }
         break;
     default:
         break;
+    }
+
+    mHaveAggregates = true;
+
+    const F32 min  = mCachedMin;
+    const F32 max  = mCachedMax;
+    const F32 mean = mCachedMean;
+
+    // A value that is not changing fast is shown as it stands, frame by frame,
+    // rather than held to the refresh cadence.
+    F32 display_value  = mCachedShowsCurrent ? current : mLastDisplayValue;
+    S32 decimal_digits = mCachedDecimalDigits;
+    if (mCachedShowsCurrent)
+    {
+        mLastDisplayValue = current;
+        if (is_approx_equal((F32)(S32)display_value, display_value))
+        {
+            decimal_digits = 0;
+        }
     }
 
     // Reserve a full text line at the top for the label/value so descenders
@@ -468,17 +519,6 @@ void LLStatBar::draw()
 
     mCurMaxBar = LLSmoothInterpolation::lerp(mCurMaxBar, mTargetMaxBar, 0.05f);
     mCurMinBar = LLSmoothInterpolation::lerp(mCurMinBar, mTargetMinBar, 0.05f);
-
-    // rate limited updates
-    if (mLastDisplayValueTimer.getElapsedTimeF32() < MEAN_VALUE_UPDATE_TIME)
-    {
-        display_value = mLastDisplayValue;
-    }
-    else
-    {
-        mLastDisplayValueTimer.reset();
-    }
-    mLastDisplayValue = display_value;
 
     // All of the bar's geometry goes into one batch and every string is drawn
     // after it closes. Untextured geometry and glyphs cannot share a draw --
@@ -649,7 +689,7 @@ void LLStatBar::draw()
         gGL.end();
     }
 
-    drawLabelAndValue(display_value, unit_label, bar_rect, decimal_digits);
+    drawLabelAndValue(display_value, mDisplayUnitLabel, bar_rect, decimal_digits);
     drawTickLabels(tick_labels, num_tick_labels);
 
     LLView::draw();
@@ -681,6 +721,28 @@ void LLStatBar::setStat(const std::string& stat_name)
         mStat.valid = nullptr;
         mStatType = STAT_NONE;
     }
+
+    // A count is always reported as a rate and names its own unit; the other two
+    // take this widget's override where it has one.
+    switch (mStatType)
+    {
+    case STAT_COUNT:
+        mDisplayUnitLabel = std::string(mStat.countStatp->getUnitLabel()) + "/s";
+        break;
+    case STAT_EVENT:
+        mDisplayUnitLabel = mUnitLabel.empty() ? mStat.eventStatp->getUnitLabel() : mUnitLabel;
+        break;
+    case STAT_SAMPLE:
+        mDisplayUnitLabel = mUnitLabel.empty() ? mStat.sampleStatp->getUnitLabel() : mUnitLabel;
+        break;
+    default:
+        mDisplayUnitLabel.clear();
+        break;
+    }
+
+    // The stat behind the row changed, so nothing measured from the old one stands.
+    mHaveAggregates  = false;
+    mValueTextLength = 0;
 }
 
 void LLStatBar::setRange(F32 bar_min, F32 bar_max)
@@ -689,7 +751,7 @@ void LLStatBar::setRange(F32 bar_min, F32 bar_max)
     mTargetMaxBar       = llmax(bar_min, bar_max);
     mFloatingTargetMinBar = mTargetMinBar;
     mFloatingTargetMaxBar = mTargetMaxBar;
-    mTickSpacing    = calc_tick_value(mTargetMinBar, mTargetMaxBar);
+    mTickSpacing    = calcTickValue(mTargetMinBar, mTargetMaxBar);
 }
 
 LLRect LLStatBar::getRequiredRect()
@@ -729,16 +791,14 @@ LLRect LLStatBar::getRequiredRect()
     return rect;
 }
 
-void LLStatBar::drawLabelAndValue( F32 value, std::string &label, LLRect &bar_rect, S32 decimal_digits )
+void LLStatBar::drawLabelAndValue( F32 value, const std::string &label, LLRect &bar_rect, S32 decimal_digits )
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     LLFontGL* font = LLFontGL::getFontMonospace();
 
-    static std::string na_string = LLTrans::getString("na");
-
     text_buf_t       value_buf;
-    std::string_view value_str(na_string);
+    std::string_view value_str(mNotApplicable);
     if (!llisnan(value))
     {
         const auto result = fmt::format_to_n(value_buf.data(), value_buf.size(),
@@ -749,9 +809,18 @@ void LLStatBar::drawLabelAndValue( F32 value, std::string &label, LLRect &bar_re
     // The label is left-aligned from the left edge and the value is right-aligned
     // at the bar's right edge, both on the same line. Reserve the value's width so
     // a long label is ellipsized instead of overprinting the value.
+    //
+    // Measuring is a shaping pass and the value only changes on the refresh
+    // cadence, so the width is kept until the bytes it was taken from move.
+    // Comparing them costs a few tens of bytes against that pass.
     static const S32 LABEL_VALUE_GAP = 4;
-    const S32 value_width = font->getWidth(value_str);
-    const S32 label_max_pixels = llmax(0, bar_rect.mRight - value_width - LABEL_VALUE_GAP);
+    if (value_str != std::string_view(mValueText.data(), mValueTextLength))
+    {
+        mValueTextLength = (U32)llmin(value_str.size(), mValueText.size());
+        memcpy(mValueText.data(), value_str.data(), mValueTextLength);
+        mValueWidth = font->getWidth(value_str);
+    }
+    const S32 label_max_pixels = llmax(0, bar_rect.mRight - mValueWidth - LABEL_VALUE_GAP);
 
     font->renderBytes(mLabel.getString(), 0, 0.f, (F32)getRect().getHeight(), LLColor4(1.f, 1.f, 1.f, 1.f),
         LLFontGL::LEFT, LLFontGL::TOP, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
@@ -778,7 +847,7 @@ void LLStatBar::updateBarRange( F32 min, F32 max )
         F32 range_min = mAutoScaleMin ? mFloatingTargetMinBar : mTargetMinBar;
         F32 range_max = mAutoScaleMax ? mFloatingTargetMaxBar : mTargetMaxBar;
         F32 tick_value = 0.f;
-        calc_auto_scale_range(range_min, range_max, tick_value);
+        calcAutoScaleRange(range_min, range_max, tick_value);
         if (mAutoScaleMin) { mTargetMinBar = range_min; }
         if (mAutoScaleMax) { mTargetMaxBar = range_max; }
         if (mAutoScaleMin && mAutoScaleMax)
@@ -787,7 +856,7 @@ void LLStatBar::updateBarRange( F32 min, F32 max )
         }
         else
         {
-            mTickSpacing = calc_tick_value(mTargetMinBar, mTargetMaxBar);
+            mTickSpacing = calcTickValue(mTargetMinBar, mTargetMaxBar);
         }
     }
 }
