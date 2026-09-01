@@ -259,14 +259,6 @@ void LLInventoryPanel::initFromParams(const LLInventoryPanel::Params& params)
     // save off copy of params
     mParams = params;
 
-    // Merge the type defaults into the item and folder templates now, once.
-    // Every view this panel builds is a copy of one of these with a handful of
-    // fields changed, and the factory would otherwise re-derive the same merge
-    // for each -- an inventory builds a view per item it holds, which reaches
-    // six figures.
-    mParams.item.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewItem>());
-    mParams.folder.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewFolder>());
-
     initFolderRoot();
 
     // Initialize base class params.
@@ -1087,6 +1079,8 @@ void LLInventoryPanel::initRootContent()
 
 LLFolderViewFolder * LLInventoryPanel::createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop)
 {
+    ensureViewTemplates();
+
     LLFolderViewFolder::Params params(mParams.folder);
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
@@ -1111,8 +1105,22 @@ LLFolderViewFolder * LLInventoryPanel::createFolderViewFolder(LLInvFVBridge * br
     return LLUICtrlFactory::createFromTemplate<LLFolderViewFolder>(params);
 }
 
+void LLInventoryPanel::ensureViewTemplates()
+{
+    if (mViewTemplatesMerged)
+    {
+        return;
+    }
+    mViewTemplatesMerged = true;
+
+    mParams.item.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewItem>());
+    mParams.folder.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewFolder>());
+}
+
 LLFolderViewItem * LLInventoryPanel::createFolderViewItem(LLInvFVBridge * bridge)
 {
+    ensureViewTemplates();
+
     LLFolderViewItem::Params params(mParams.item);
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
