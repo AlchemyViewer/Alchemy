@@ -1310,6 +1310,15 @@ void LLView::drawChildren()
     if (!mChildList.empty())
     {
         LLView* rootp = LLUI::getInstance()->getRootView();
+
+        // Where this view sits on screen. Every child's screen rect is its own
+        // rect offset by exactly this, so asking each child for its own -- one
+        // walk of the parent chain to the root per child -- recomputes a
+        // prefix all of them share. This is the whole of the UI's per-frame
+        // cull, so it is once per parent rather than once per child.
+        S32 origin_x, origin_y;
+        localPointToScreen(0, 0, &origin_x, &origin_y);
+
         ++sDepth;
 
         for (child_list_reverse_iter_t child_iter = mChildList.rbegin(); child_iter != mChildList.rend();)  // ++child_iter)
@@ -1324,7 +1333,13 @@ void LLView::drawChildren()
 
             if (viewp->getVisible() && viewp->getRect().isValid())
             {
-                LLRect screen_rect = viewp->calcScreenRect();
+                // Same answer as viewp->calcScreenRect(), reached without the
+                // walk: this view's own rect already contributed to origin_*
+                // above, and the child's is the only term left.
+                llassert(viewp->mParentView == this);
+                LLRect screen_rect = viewp->getRect();
+                screen_rect.translate(origin_x, origin_y);
+
                 if ( rootp->getLocalRect().overlaps(screen_rect)  && sDirtyRect.overlaps(screen_rect))
                 {
                     LLUI::pushMatrix();
@@ -1661,9 +1676,16 @@ void LLView::updateBoundingRect()
 
 LLRect LLView::calcScreenRect() const
 {
-    LLRect screen_rect;
-    localPointToScreen(0, 0, &screen_rect.mLeft, &screen_rect.mBottom);
-    localPointToScreen(getRect().getWidth(), getRect().getHeight(), &screen_rect.mRight, &screen_rect.mTop);
+    // One walk of the parent chain, not two. Both corners are offset from the
+    // screen by the same amount -- the second localPointToScreen was walking
+    // to the root again to add the width and height to an answer it already
+    // had -- and this is asked once per visible child per frame by
+    // drawChildren.
+    S32 origin_x, origin_y;
+    localPointToScreen(0, 0, &origin_x, &origin_y);
+
+    LLRect screen_rect = getRect();
+    screen_rect.translate(origin_x - screen_rect.mLeft, origin_y - screen_rect.mBottom);
     return screen_rect;
 }
 
@@ -1825,15 +1847,14 @@ void LLView::localPointToScreen(S32 local_x, S32 local_y, S32* screen_x, S32* sc
     *screen_x = local_x;
     *screen_y = local_y;
 
-    const LLView* cur = this;
-    do
+    // By reference: two of this rect's four fields are wanted and getRect
+    // hands back the whole thing, once per level of the tree.
+    for (const LLView* cur = this; cur; cur = cur->mParentView)
     {
-        LLRect cur_rect = cur->getRect();
+        const LLRect& cur_rect = cur->getRect();
         *screen_x += cur_rect.mLeft;
         *screen_y += cur_rect.mBottom;
-        cur = cur->mParentView;
     }
-    while( cur );
 }
 
 void LLView::screenRectToLocal(const LLRect& screen, LLRect* local) const
