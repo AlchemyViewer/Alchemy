@@ -311,6 +311,7 @@ if(BUILD_TESTING)
   # INTEGRATION TESTS
   set(test_libs llui llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
   set(test_project llui)
+  LL_ADD_INTEGRATION_TEST(llstatbar "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(lluistring "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llemojidictionary llemojidictionary.cpp "${test_libs}" "${test_project}")
