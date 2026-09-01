@@ -57,12 +57,37 @@ const F32Seconds RAPID_CHANGE_WINDOW(1.f);
 
 // Stat bar vertical layout, in UI pixels. The label/value line at the top and
 // (for VERTICAL bars) the tick-label row along the bottom are each one monospace
-// line tall. Deriving the reserves from the live font line height keeps taller
-// faces (e.g. the current default) from clipping descenders or tick labels the
-// way the old fixed 14/15/20px constants did.
+// line tall. The reserves are taken from the live font line height, so a taller
+// face grows them rather than clipping its own descenders and tick labels.
 const S32 STAT_BAR_TEXT_VPAD   = 2;  // breathing room beneath a text line
 const S32 STAT_BAR_TICK_LENGTH = 4;  // tick-mark length drawn past the bar
 const S32 STAT_BAR_MIN_BAR     = 5;  // smallest drawn bar thickness
+
+// Powers of ten over the exponents the tick search below walks, so its inner
+// loop reads one instead of calling pow. Filled from pow itself, once, so a
+// table entry is bit-for-bit the value the loop used to compute for itself.
+//
+// The range covers what the search can ask for: it starts at one minus the
+// count of whole digits in a float, and a float has at most 39 of them and runs
+// to 5. Anything outside still gets an answer, from pow.
+static const S32 POW10_MIN_EXP = -38;
+static const S32 POW10_COUNT   = 45;
+
+static F64 pow10(S32 exponent)
+{
+    static const std::array<F64, POW10_COUNT> table = []
+    {
+        std::array<F64, POW10_COUNT> t{};
+        for (S32 i = 0; i < POW10_COUNT; i++)
+        {
+            t[i] = pow(10.0, (F64)(i + POW10_MIN_EXP));
+        }
+        return t;
+    }();
+
+    const S32 index = exponent - POW10_MIN_EXP;
+    return (index >= 0 && index < POW10_COUNT) ? table[index] : pow(10.0, (F64)exponent);
+}
 
 F32 LLStatBar::calcTickValue(F32 min, F32 max)
 {
@@ -83,7 +108,7 @@ F32 LLStatBar::calcTickValue(F32 min, F32 max)
                              : llceil(logf(first_tick_magnitude) * OO_LN10);
         for (S32 digit_count = -(num_whole_digits - 1); digit_count < 6; digit_count++)
         {
-            F32 test_tick_value = min + (possible_tick_value * (F32)pow(10.0, digit_count));
+            F32 test_tick_value = min + (possible_tick_value * (F32)pow10(digit_count));
 
             if (is_approx_equal((F32)(S32)test_tick_value, test_tick_value))
             {
@@ -121,7 +146,7 @@ void LLStatBar::calcAutoScaleRange(F32& min, F32& max, F32& tick)
                             : llceil(logf(llabs(min)) * OO_LN10);
 
     const S32 num_digits = llmax(num_digits_max, num_digits_min);
-    const F32 power_of_10 = (F32)pow(10.0, num_digits - 1);
+    const F32 power_of_10 = (F32)pow10(num_digits - 1);
     const F32 starting_max = power_of_10 * ((max < 0.f) ? -1 : 1);
     const F32 starting_min = power_of_10 * ((min < 0.f) ? -1 : 1);
 
@@ -495,8 +520,7 @@ void LLStatBar::draw()
     // Reserve a full text line at the top for the label/value so descenders
     // ('g', 'y', 'p', 'q') clear the bar below instead of spilling into it, and
     // (for VERTICAL bars) a tick mark plus a text line at the bottom so the
-    // tick labels aren't cut off. Both reserves track the live font metrics;
-    // the old fixed 15/20px were tuned for a shorter monospace face.
+    // tick labels aren't cut off. Both reserves track the live font metrics.
     LLFontGL* font = LLFontGL::getFontMonospace();
     const S32 text_height       = font->getLineHeight() + STAT_BAR_TEXT_VPAD;
     const S32 tick_label_height = STAT_BAR_TICK_LENGTH + text_height;
