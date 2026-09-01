@@ -2033,6 +2033,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uBokehFieldFalloff");
     mReservedUniforms.push_back("uBokehComaAsymmetry");
 
+    mReservedUniforms.push_back("crossFilterMap");
+
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");
 

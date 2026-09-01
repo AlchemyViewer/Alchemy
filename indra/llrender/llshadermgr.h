@@ -568,6 +568,8 @@ public:
         BOKEH_FIELD_FALLOFF,                //  "uBokehFieldFalloff"   exponent on normalised field radius
         BOKEH_COMA_ASYMMETRY,               //  "uBokehComaAsymmetry"
 
+        CROSS_FILTER_MAP,                   //  "crossFilterMap"       streak accumulator, composited in colorCorrect
+
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 

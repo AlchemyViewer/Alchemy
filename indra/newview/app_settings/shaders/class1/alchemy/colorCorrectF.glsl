@@ -47,6 +47,8 @@ uniform sampler2D depthMap;
 // halation signal rides in the alpha channel; otherwise the pyramid is RGB-only.
 uniform sampler2D bloomMap;
 uniform float bloom_strength;
+uniform sampler2D crossFilterMap;   // streak accumulator; uCrossStrength gates it
+uniform float     uCrossStrength;   // 0 when the filter is off or unbound
 #ifdef BLOOM_HALATION
 uniform float halation_strength;
 uniform vec3  halation_tint;
@@ -146,6 +148,16 @@ void main()
     #else
         vec3 bloom_term = bloom_sample.rgb * bloom_strength;
     #endif
+        // Cross-filter streaks, composited here instead of in a pass of their
+        // own. Added to bloom_term rather than to diff so they inherit both of
+        // the couplings they had while they lived inside the pyramid: bloom
+        // strength scales them, and they light the lens dirt below.
+        if (uCrossStrength > 0.0)
+        {
+            bloom_term += texture(crossFilterMap, vary_fragcoord).rgb
+                        * uCrossStrength * bloom_strength;
+        }
+
         diff.rgb   += bloom_term;
         lens_light += bloom_term * uLensDirtBloomResponse;
     }

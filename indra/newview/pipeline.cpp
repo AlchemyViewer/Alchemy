@@ -7956,6 +7956,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // the composite no longer needs its own pass. When HDR is off the shader
         // variant lacks the sampler and bindTexture is a no-op via getTextureChannel.
         S32 bloom_channel = -1;
+        S32 cross_channel = -1;
         if (mRT->bloomMipCount > 0)
         {
             bloom_channel = shader->bindTexture(LLShaderMgr::BLOOM_SAMPLER, &mRT->bloomMip[0], ALSamplers::BilinearMirror);
@@ -7972,6 +7973,31 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
                 shader->uniform1f(LLShaderMgr::HALATION_STRENGTH, llmax(halation_strength(), 0.0f) * strength_gate);
                 const LLColor3& tint = halation_tint();
                 shader->uniform3f(LLShaderMgr::HALATION_TINT, tint.mV[0], tint.mV[1], tint.mV[2]);
+
+                // Cross-filter streaks fold in here rather than in a fullscreen
+                // pass of their own. That pass existed only to add a half-size
+                // buffer into bloomMip[0], which cost a full-resolution
+                // read-modify-write of the pyramid top every frame; this pass
+                // already samples that pyramid, so one more sampler replaces all
+                // of it.
+                //
+                // Added to bloom_term inside the shader rather than to the scene
+                // directly, which keeps two couplings that were previously free:
+                // the streaks stay scaled by bloom strength, and they keep
+                // lighting the lens dirt through lens_light.
+                static LLCachedControl<F32> streak_strength(gSavedSettings, "RenderCrossFilterStrength", 0.f);
+                const bool streaks_live = (mRT->crossFilterHeight != 0)
+                                       && mRT->crossFilter[2].isComplete();
+                const F32  streaks      = (streaks_live && !gSnapshotNoPost)
+                                        ? llclamp(streak_strength(), 0.f, 32.f) * strength_gate
+                                        : 0.f;
+                shader->uniform1f(LLShaderMgr::CROSS_STRENGTH, streaks);
+                if (streaks > 0.f)
+                {
+                    cross_channel = shader->bindTexture(LLShaderMgr::CROSS_FILTER_MAP,
+                                                        &mRT->crossFilter[2],
+                                                        ALSamplers::BilinearClamp);
+                }
             }
         }
 
@@ -8426,6 +8452,10 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         {
             gGL.getTextureSlot(exposure_channel)->unbind();
         }
+        if (cross_channel > -1)
+        {
+            gGL.getTextureSlot(cross_channel)->unbind();
+        }
         if (bloom_channel > -1)
         {
             gGL.getTextureSlot(bloom_channel)->unbind();
@@ -8668,7 +8698,20 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
     static LLCachedControl<F32> cross_falloff(gSavedSettings, "RenderCrossFilterFalloff", 1.5f);
     static LLCachedControl<F32> cross_chromatic(gSavedSettings, "RenderCrossFilterChromatic", 0.f);
 
-    const F32  streak_strength = no_post ? 0.f : llclamp(cross_strength(), 0.f, 32.f);
+    // Streaks ride the bloom pyramid and are scaled by bloom strength where
+    // they are composited, so at strength 0 they are invisible -- and the whole
+    // thirteen-draw chain was still running to produce them. Folding the bloom
+    // strength into the gate reuses the release path below rather than adding a
+    // second one.
+    //
+    // Only the streaks, not the pyramid: generateLuminance binds bloomMip[0] as
+    // the emissive term for auto-exposure, so skipping the pyramid would meter
+    // the scene against a stale buffer.
+    static LLCachedControl<F32> bloom_strength_gate(gSavedSettings, "RenderBloomStrength", 0.325f);
+
+    const F32  streak_strength = (no_post || bloom_strength_gate() <= 0.f)
+                               ? 0.f
+                               : llclamp(cross_strength(), 0.f, 32.f);
     const bool streaks_on      = (streak_strength > 0.f) && gCrossFilterProgram.isComplete();
     bool       streaks_ready   = false;
 
@@ -8797,14 +8840,6 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
             gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_FALLOFF, expf(tightness * 6.f / max_step));
             gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_CHROMATIC, llclamp(cross_chromatic(), 0.f, 1.f));
 
-            // Clear the accumulator once; every arm adds into it.
-            {
-                LLGLDisable blend(GL_BLEND);
-                mRT->crossFilter[2].bindTarget();
-                mRT->crossFilter[2].clear();
-                mRT->crossFilter[2].flush();
-            }
-
             // One three-pass chain per arm, each strictly one-sided.
             //
             // Streaking every direction in a single pass is what produced the
@@ -8849,8 +8884,7 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
 
                 // Two scratch passes overwrite; blending stays off. No clear:
                 // the fullscreen triangle writes every texel with blending
-                // disabled, so a clear would be pure redundant fill (the
-                // accumulator clear above is the only load-bearing one).
+                // disabled, so a clear would be pure redundant fill.
                 {
                     LLGLDisable blend(GL_BLEND);
                     for (S32 pass = 0; pass < 2; ++pass)
@@ -8861,9 +8895,15 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
                     }
                 }
 
-                // The arm's last pass adds into the shared accumulator.
+                // The arm's last pass adds into the shared accumulator -- except
+                // the first, which overwrites it. The fullscreen triangle covers
+                // every texel, so arm 0 establishes the buffer and the clear this
+                // used to need was the same redundant fill the scratch passes
+                // already avoid. It does couple correctness to the first
+                // iteration running, which holds because `arms` is clamped to at
+                // least 2 above.
                 {
-                    LLGLEnable blend(GL_BLEND);
+                    LLGLState blend(GL_BLEND, arm > 0);
                     gGL.setSceneBlendType(LLRender::BT_ADD);
 
                     dests[2]->bindTarget();
@@ -8909,45 +8949,9 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
 
-    // ---- Cross-screen filter, part 2 of 2 --------------------------------
-    //
-    // The arms are already summed in crossFilter[2]; this just adds them into
-    // mip 0 so they join the finished bloom rather than costing a separate
-    // composite pass. The user strength lands here, on the one draw whose
-    // output is kept.
-    //
-    // Reuses the streak shader with a zero step length, which collapses every
-    // tap onto the centre and makes it a plain weighted copy. Dispersion is
-    // forced off for the same reason: with no offset, a non-zero value would
-    // tint by tap index rather than by distance along an arm.
-    if (streaks_ready)
-    {
-        LLGLEnable blend(GL_BLEND);
-        gGL.setSceneBlendType(LLRender::BT_ADD);
-
-        LLRenderTarget* src = &mRT->crossFilter[2];
-
-        mRT->bloomMip[0].bindTarget();
-
-        gCrossFilterProgram.bind();
-        gCrossFilterProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, src, ALSamplers::BilinearClamp);
-        gCrossFilterProgram.uniform2f(LLShaderMgr::CROSS_TEXEL,
-                                      1.f / (F32)src->getWidth(),
-                                      1.f / (F32)src->getHeight());
-        gCrossFilterProgram.uniform2f(LLShaderMgr::CROSS_DIR, 1.f, 0.f);
-        gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_LENGTH, 0.f);
-        gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_CHROMATIC, 0.f);
-        gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_PASS_SCALE, 1.f);
-        gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_STRENGTH, streak_strength);
-
-        mScreenTriangleVB->setBuffer();
-        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-
-        gCrossFilterProgram.unbind();
-        mRT->bloomMip[0].flush();
-
-        gGL.setSceneBlendType(LLRender::BT_ALPHA);
-    }
+    // The summed arms stay in crossFilter[2]. colorCorrect samples them
+    // alongside the pyramid, so there is no composite pass here to write them
+    // into mip 0.
 }
 
 // Composite the bloom pyramid (mBloomMip[0]) additively into the pre-tonemap
