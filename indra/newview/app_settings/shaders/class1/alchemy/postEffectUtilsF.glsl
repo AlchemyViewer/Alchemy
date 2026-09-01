@@ -900,6 +900,50 @@ vec2 applyLensDistortion(vec2 uv)
     return warped + 0.5 + uLensDistortCenter;
 }
 
+// =============================================================================
+// Lens dirt — grime on the front element, lit by whatever is already glowing
+// =============================================================================
+//
+// Contributes nothing on its own. Dirt is only visible where light is already
+// falling on it, so this takes the bloom and flare terms as its input rather
+// than the scene: point the camera at a flat wall and the lens looks clean no
+// matter how high the strength goes, exactly as a real one does. It is also
+// what makes the effect cheap -- the cost rides on effects that are already
+// running.
+//
+// Tier 3 (uniform branch) rather than a compile-time permutation, because this
+// file is a shared object attached to all nine post programs and no
+// per-program define can reach it. The strength is forced to 0 by the CPU
+// whenever no plate is loaded, so the sampler is never read unbound.
+//
+// Single-channel plates are swizzled R -> RGB at upload, so mono and colour
+// plates both arrive here as plain RGB.
+
+uniform sampler2D uLensDirtMap;
+uniform float     uLensDirtStrength;   // 0 disables
+
+vec3 applyLensDirt(vec2 uv, vec3 lens_light)
+{
+    if (uLensDirtStrength <= 0.0)
+        return vec3(0.0);
+
+    // Cover-fit the plate rather than stretching it to the frame.
+    //
+    // Plates are authored square, so sampling with raw screen UV scales them to
+    // whatever aspect the window happens to be -- on an ultrawide that turns
+    // every round mote into a long ellipse and the whole plate reads as smeared
+    // glass rather than dirt. Scaling the shorter axis instead keeps the plate
+    // at its authored aspect and crops the overhang, so a speck stays a speck
+    // at any window shape. The cost is that a very wide frame sees only a band
+    // of the plate, which is why the bundled one spreads its detail evenly
+    // rather than composing for the centre.
+    vec2 cover = uResolution / max(max(uResolution.x, uResolution.y), 1.0);
+    vec2 duv   = (uv - 0.5) * cover + 0.5;
+
+    return lens_light * texture(uLensDirtMap, duv).rgb * uLensDirtStrength;
+}
+
+
 // Companion to the above: 1.0 inside the frame, 0.0 outside, so the call site
 // can resolve out-of-frame samples to black instead of smearing the edge texel
 // across the corners. Branchless, and identically 1.0 when distortion is off

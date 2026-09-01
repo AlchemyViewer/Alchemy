@@ -565,6 +565,72 @@
             <key>Value</key>
             <real>1.0</real>
         </map>
+        <key>RenderCrossFilterAngle</key>
+        <map>
+            <key>Comment</key>
+            <string>Rotation of the whole star in degrees, as if turning the filter in its thread. Range 0 to 360.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderCrossFilterChromatic</key>
+        <map>
+            <key>Comment</key>
+            <string>Rainbow dispersion along the arms. A real star filter is a diffraction grating, and a grating separates wavelengths by angle, so the tips of the streaks go coloured while the core stays white. 0 gives clean white spokes. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderCrossFilterFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly each arm fades along its length. Higher values fade sooner and keep the star tight around the highlight; values near 1 give long even spokes. Range 1.01 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.5</real>
+        </map>
+        <key>RenderCrossFilterLength</key>
+        <map>
+            <key>Comment</key>
+            <string>How far the arms reach. Length and falloff work together - a long streak with a fast falloff still fades out early, which is usually what reads best. Range 0.05 to 3.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderCrossFilterPoints</key>
+        <map>
+            <key>Comment</key>
+            <string>Number of arms on each star. 4 is the classic cross filter, 6 and 8 match the denser gratings. Odd counts give an asymmetric star, since the arms are spread evenly rather than in opposed pairs. Range 2 to 12.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
+        <key>RenderCrossFilterStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the cross-screen (star) filter - the etched glass filter that diffracts every bright point in frame into a star. 0 disables. 0.5 is a restrained night-city look; 2.0 is a full 1970s starburst. Unlike the starburst under Lens Flare, which is locked to the sun, this streaks every highlight. Streaks ride on the bloom pyramid, so bloom strength 0 silences them. HDR only. Range 0 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
         <key>RenderDynamicExposureCoefficient</key>
         <map>
             <key>Comment</key>
@@ -818,6 +884,50 @@
             <string>F32</string>
             <key>Value</key>
             <real>1.3</real>
+        </map>
+        <key>RenderLensDirtBloomResponse</key>
+        <map>
+            <key>Comment</key>
+            <string>How strongly bloom lights up the dirt. 0 means bloom passes through a clean lens; 1 is the full response. Raise it for hazy sunlit shots where the grime should catch everything. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtFlareResponse</key>
+        <map>
+            <key>Comment</key>
+            <string>How strongly the lens flare lights up the dirt. 0 means the flare passes through a clean lens; 1 is the full response. This is the response that reads most like a real lens, since flare and grime share the same front element. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the lens dirt overlay - grime on the front element catching bloom and flare, the way a real lens lights up when something bright is in frame. 0 disables. 0.3 is a subtle used-lens feel; 1.0 is a filthy one. Only lights up where there is already bloom or flare to catch, so a flat scene stays clean no matter how high this goes. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderLensDirtTexture</key>
+        <map>
+            <key>Comment</key>
+            <string>Which lens dirt plate to use. Greyscale images dropped into the user 'lensdirt' folder appear alongside the bundled ones and take priority over a bundled file of the same name. Leave empty for none.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>DefaultDirt.png</string>
         </map>
         <key>RenderLensDistortionAmount</key>
         <map>

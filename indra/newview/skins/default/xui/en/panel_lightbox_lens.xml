@@ -1262,6 +1262,307 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
+		 height="142"
+		 name="atab_sec_crossfilter"
+		 title="Cross Filter"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_crossfilter">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Strength"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="32"
+				 name="crossfilter_strength"
+				 tool_tip="Streaks every bright point in frame into a star, the way an etched glass filter does. Rides on the bloom pyramid, so bloom strength 0 silences it"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderCrossFilterStrength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="crossfilter_strength_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderCrossFilterStrength" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="crossfilter_points_label"
+				 value="Points" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="crossfilter_points_combo"
+				 tool_tip="Number of arms on each star. Arms are spread evenly, so odd counts give an asymmetric star"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderCrossFilterPoints">
+					<combo_box.item
+					 label="2 (line)"
+					 name="2"
+					 value="2" />
+					<combo_box.item
+					 label="3"
+					 name="3"
+					 value="3" />
+					<combo_box.item
+					 label="4 (cross)"
+					 name="4"
+					 value="4" />
+					<combo_box.item
+					 label="6"
+					 name="6"
+					 value="6" />
+					<combo_box.item
+					 label="8"
+					 name="8"
+					 value="8" />
+					<combo_box.item
+					 label="12"
+					 name="12"
+					 value="12" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="crossfilter_points_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderCrossFilterPoints" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Length"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.25"
+				 max_val="2"
+				 name="crossfilter_length"
+				 tool_tip="How far the arms reach. 1.0 is the tuned value; the range stops where the arms would start breaking into a lattice"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderCrossFilterLength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="crossfilter_length_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderCrossFilterLength" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_crossfilter_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_crossfilter" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="142"
+		 name="atab_sec_crossfilter_adv"
+		 title="Cross Filter - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="113"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_crossfilter_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Angle"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="360"
+				 name="crossfilter_angle"
+				 tool_tip="Rotates the whole star, as if turning the filter in its thread"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderCrossFilterAngle" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="crossfilter_angle_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderCrossFilterAngle" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Falloff"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.1"
+				 max_val="3"
+				 name="crossfilter_falloff"
+				 tool_tip="How quickly each arm fades along its length. Low gives long even spokes, high keeps the star tight. Shape only - brightness is Strength"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderCrossFilterFalloff" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="crossfilter_falloff_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderCrossFilterFalloff" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Dispersion"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="crossfilter_chromatic"
+				 tool_tip="Rainbow spread along the arms. A real star filter is a diffraction grating, so the tips go coloured while the core stays white"
+				 enabled_control="RenderHDREnabled"
+				 control_name="RenderCrossFilterChromatic" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="crossfilter_chromatic_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderCrossFilterChromatic" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_crossfilter_adv_reset"
+				 tool_tip="Reset the advanced cross filter settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_crossfilter_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
 		 height="165"
 		 name="atab_sec_glow"
 		 title="Glow (Legacy)"
@@ -2672,6 +2973,195 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 					<button.commit_callback
 					 function="LightBox.ResetSection"
 					 parameter="sec_flare_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="168"
+		 name="atab_sec_lensdirt"
+		 title="Lens Dirt"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="139"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_lensdirt">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Strength"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="lensdirt_strength"
+				 tool_tip="How strongly grime on the front element catches light. Only shows where there is already bloom or flare to catch, so a flat scene stays clean"
+				 control_name="RenderLensDirtStrength" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_strength_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtStrength" />
+				</button>
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="lensdirt_plate_label"
+				 value="Plate" />
+				<combo_box
+				 allow_text_entry="true"
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 max_chars="200"
+				 name="lensdirt_combo"
+				 tool_tip="Which dirt plate to use. Greyscale images dropped into your 'lensdirt' folder appear here the next time the Lightbox opens."
+				 control_name="RenderLensDirtTexture">
+					<combo_box.item
+					 label="None"
+					 name="dirt_none"
+					 value="" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_plate_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtTexture" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Bloom Response"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="lensdirt_bloom_response"
+				 tool_tip="How much bloom lights up the dirt. 0 lets bloom pass through a clean lens"
+				 control_name="RenderLensDirtBloomResponse" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_bloom_response_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtBloomResponse" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Flare Response"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="lensdirt_flare_response"
+				 tool_tip="How much the lens flare lights up the dirt. Flare and grime share the same front element, so this is the response that reads most like a real lens"
+				 control_name="RenderLensDirtFlareResponse" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_flare_response_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtFlareResponse" />
+				</button>
+				<button
+				 follows="left|top"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 left="8"
+				 top_pad="10"
+				 label="Open Folder"
+				 name="lensdirt_open_folder"
+				 tool_tip="Open your lens dirt folder in the file browser. Drop greyscale plates there; new files are listed the next time the Lightbox opens.">
+					<button.commit_callback
+					 function="LightBox.OpenLensDirtFolder" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_delta="0"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_lensdirt_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_lensdirt" />
 				</button>
 			</panel>
 		</accordion_tab>

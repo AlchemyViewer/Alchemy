@@ -96,6 +96,7 @@ public:
     void createGLBuffers();
     void createLUTBuffers();
     void setupGradingLUT();
+    void setupLensDirt();
 
     //allocate the largest screen buffer possible up to resX, resY
     //returns true if full size buffer allocated, false if some other size is allocated
@@ -850,6 +851,16 @@ public:
         // mBloomMip[0] is full-res extract; subsequent levels are halved.
         LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
         U32                         bloomMipCount = 0;
+
+        // Cross-screen filter ping-pong. Allocated on the first frame the
+        // effect is actually on and released again when it is switched off, so
+        // the strength control can stay a live slider -- wiring a slider to a
+        // reallocation handler would fire on every mouse-move.
+        LLRenderTarget              crossFilter[3];
+        // The height the targets were last (re)built for -- kept even when
+        // the build FAILED, so an impossible size is not retried every frame;
+        // pair it with isComplete() to tell the two states apart.
+        U32                         crossFilterHeight = 0;
     };
 
     // main full resoltuion render target
@@ -1004,6 +1015,10 @@ public:
     U32                 mSMAAAreaMap = 0;
     U32                 mSMAASearchMap = 0;
     U32                 mSMAASampleMap = 0;
+
+    // Lens dirt plate. Zero when no plate is loaded, which is also the signal
+    // to force the strength uniform to 0 so the sampler is never read unbound.
+    U32                 mLensDirtMap = 0;
 
     LLColor4            mSunDiffuse;
     LLColor4            mMoonDiffuse;

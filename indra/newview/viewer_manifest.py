@@ -104,6 +104,9 @@ class ViewerManifest(LLManifest):
                 # ... and the entire color grading LUT directory
                 self.path("colorlut")
 
+                # ... and the bundled lens dirt plates
+                self.path("lensdirt")
+
                 # ... and the bundled starter Looks
                 self.path("looks")
 

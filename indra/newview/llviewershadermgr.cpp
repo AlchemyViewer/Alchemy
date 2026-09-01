@@ -170,6 +170,7 @@ LLGLSLShader            gBloomDownsampleProgram;
 LLGLSLShader            gBloomDownsampleFirstProgram;
 LLGLSLShader            gBloomUpsampleProgram;
 LLGLSLShader            gBloomCompositeProgram;
+LLGLSLShader            gCrossFilterProgram;
 
 // Deferred rendering shaders
 LLGLSLShader            gDeferredImpostorProgram;
@@ -1112,6 +1113,7 @@ bool LLViewerShaderMgr::loadShadersEffects()
         gBloomDownsampleFirstProgram.unload();
         gBloomUpsampleProgram.unload();
         gBloomCompositeProgram.unload();
+        gCrossFilterProgram.unload();
         return true;
     }
 
@@ -1197,6 +1199,18 @@ bool LLViewerShaderMgr::loadShadersEffects()
         gBloomUpsampleProgram.mShaderFiles.push_back(make_pair("effects/bloomUpsampleF.glsl", GL_FRAGMENT_SHADER));
         gBloomUpsampleProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
         success = gBloomUpsampleProgram.createShader();
+    }
+
+    if (success)
+    {
+        gCrossFilterProgram.mName = "Cross Screen Filter";
+        gCrossFilterProgram.mShaderFiles.clear();
+        gCrossFilterProgram.mShaderFiles.push_back(make_pair("effects/glowExtractV.glsl", GL_VERTEX_SHADER));
+        gCrossFilterProgram.mShaderFiles.push_back(make_pair("effects/crossFilterF.glsl", GL_FRAGMENT_SHADER));
+        gCrossFilterProgram.mShaderLevel = mShaderLevel[SHADER_EFFECT];
+        gCrossFilterProgram.clearPermutations();
+        gCrossFilterProgram.addPermutation("CROSS_TAPS", std::to_string(CROSS_FILTER_TAPS));
+        success = gCrossFilterProgram.createShader();
     }
 
     if (success)

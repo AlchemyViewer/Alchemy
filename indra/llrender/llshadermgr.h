@@ -546,6 +546,21 @@ public:
         BOKEH_FRINGE_NEAR_TINT,             //  "uBokehFringeNearTint"
         BOKEH_FRINGE_FAR_TINT,              //  "uBokehFringeFarTint"
 
+        // Lens dirt — grime on the front element, lit by bloom and flare
+        LENS_DIRT_MAP,                      //  "uLensDirtMap"
+        LENS_DIRT_STRENGTH,                 //  "uLensDirtStrength"        0 disables; forced to 0 when no plate loaded
+        LENS_DIRT_BLOOM_RESPONSE,           //  "uLensDirtBloomResponse"
+        LENS_DIRT_FLARE_RESPONSE,           //  "uLensDirtFlareResponse"
+
+        // Cross-screen (star) filter — streaks every thresholded highlight
+        CROSS_TEXEL,                        //  "uCrossTexel"          1 / source size
+        CROSS_DIR,                          //  "uCrossDir"            unit arm direction, one chain per arm
+        CROSS_LENGTH,                       //  "uCrossLength"
+        CROSS_FALLOFF,                      //  "uCrossFalloff"
+        CROSS_CHROMATIC,                    //  "uCrossChromatic"
+        CROSS_PASS_SCALE,                   //  "uCrossPassScale"      1, 4, 16 across the passes
+        CROSS_STRENGTH,                     //  "uCrossStrength"       1.0 until the final composite
+
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 

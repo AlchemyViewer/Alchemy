@@ -655,6 +655,7 @@ void LLPipeline::init()
 
     gSavedSettings.getControl("RenderColorGrade")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupGradingLUT, this));
     gSavedSettings.getControl("RenderColorGradeLUT")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupGradingLUT, this));
+    gSavedSettings.getControl("RenderLensDirtTexture")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupLensDirt, this));
 }
 
 LLPipeline::~LLPipeline()
@@ -1311,6 +1312,12 @@ void LLPipeline::releaseGLBuffers()
         mSMAASearchMap = 0;
     }
 
+    if (mLensDirtMap)
+    {
+        LLImageGL::deleteTextures(1, &mLensDirtMap);
+        mLensDirtMap = 0;
+    }
+
     releaseLUTBuffers();
 
     mWaterDis.release();
@@ -1399,6 +1406,11 @@ void LLPipeline::releaseScreenBuffers()
             rt.bloomMip[i].release();
         }
         rt.bloomMipCount = 0;
+        for (U32 i = 0; i < 3; ++i)
+        {
+            rt.crossFilter[i].release();
+        }
+        rt.crossFilterHeight = 0;
     };
     release_pack(mMainRT);
     release_pack(mAuxillaryRT);
@@ -1563,6 +1575,7 @@ void LLPipeline::createGLBuffers()
     createLUTBuffers();
 
     setupGradingLUT();
+    setupLensDirt();
 
     gBumpImageList.restoreGL();
 }
@@ -1618,6 +1631,108 @@ void LLPipeline::createLUTBuffers()
     mLuminanceMap.allocate(256, 256, GL_R16F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_AUTO);
 
     mLastExposure.allocate(1, 1, GL_R16F);
+}
+
+// Lens dirt plate loader.
+//
+// Modelled on setupGradingLUT below -- same user-then-bundled search order,
+// same per-format decode -- but simpler, since this is a plain 2D image with
+// no .cube path and no cube-strip geometry to validate.
+//
+// Two deliberate departures from the loaders it borrows from:
+//
+//  - Unlike the grading LUT, one- and two-component images are accepted. A
+//    dirt plate is a scalar mask; greyscale is the natural authoring format
+//    and the bundled plate uses it.
+//  - Unlike the SMAA sample-map loader, the *internal* format is derived from
+//    the component count rather than hardcoded to GL_RGB8. A greyscale plate
+//    through that path would cost three times the memory it needs.
+void LLPipeline::setupLensDirt()
+{
+    if (mLensDirtMap)
+    {
+        LLImageGL::deleteTextures(1, &mLensDirtMap);
+        mLensDirtMap = 0;
+    }
+
+    const std::string dirt_name = gSavedSettings.getString("RenderLensDirtTexture");
+    if (dirt_name.empty())
+    {
+        return;     // "None" — strength is forced to 0 at bind time
+    }
+
+    // User directory wins, so a user plate can shadow a bundled one by name.
+    std::string dirt_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "lensdirt", dirt_name);
+    if (!LLFile::isfile(dirt_path))
+    {
+        dirt_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "lensdirt", dirt_name);
+    }
+    if (!LLFile::isfile(dirt_path))
+    {
+        LL_WARNS() << "Lens dirt plate not found: " << dirt_name << LL_ENDL;
+        return;
+    }
+
+    // One factory call instead of a hand-rolled extension switch: the codec
+    // table in llimage already knows every format this loader accepts, and a
+    // second copy of the dispatch (setupGradingLUT carries the first) is a
+    // list that silently drifts from it.
+    LLPointer<LLImageFormatted> plate_image = LLImageFormatted::createFromExtension(dirt_path);
+    if (plate_image.isNull())
+    {
+        LL_WARNS() << "Unsupported lens dirt format at " << dirt_path << LL_ENDL;
+        return;
+    }
+
+    LLPointer<LLImageRaw> raw_image = new LLImageRaw;
+    const bool decoded = plate_image->load(dirt_path) && plate_image->decode(raw_image, 0.0f);
+
+    if (!decoded)
+    {
+        LL_WARNS() << "Failed to decode lens dirt plate: " << dirt_path << LL_ENDL;
+        return;
+    }
+
+    if (raw_image->getWidth() > gGLManager.mGLMaxTextureSize ||
+        raw_image->getHeight() > gGLManager.mGLMaxTextureSize)
+    {
+        LL_WARNS() << "Lens dirt plate exceeds the maximum texture size: " << dirt_path << LL_ENDL;
+        return;
+    }
+
+    U32 primary_format  = 0;
+    U32 internal_format = 0;
+    switch (raw_image->getComponents())
+    {
+        case 1: primary_format = GL_RED;  internal_format = GL_R8;    break;
+        case 2: primary_format = GL_RG;   internal_format = GL_RG8;   break;
+        case 3: primary_format = GL_RGB;  internal_format = GL_RGB8;  break;
+        case 4: primary_format = GL_RGBA; internal_format = GL_RGBA8; break;
+        default:
+            LL_WARNS() << "Lens dirt plate has an unusable component count: "
+                       << raw_image->getComponents() << LL_ENDL;
+            return;
+    }
+
+    LLImageGL::generateTextures(1, &mLensDirtMap);
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mLensDirtMap);
+    LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE),
+                                 internal_format,
+                                 raw_image->getWidth(), raw_image->getHeight(),
+                                 primary_format, GL_UNSIGNED_BYTE, raw_image->getData());
+
+    if (raw_image->getComponents() < 3)
+    {
+        // A one- or two-channel plate is a scalar mask, but GL_R8 samples as
+        // (r, 0, 0, 1) -- read as colour that would tint every speck pure red.
+        // Swizzling green and blue to red replicates the mask across RGB, so
+        // the shader can treat mono and colour plates through one code path.
+        const U32 tex_target = ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE);
+        glTexParameteri(tex_target, GL_TEXTURE_SWIZZLE_G, GL_RED);
+        glTexParameteri(tex_target, GL_TEXTURE_SWIZZLE_B, GL_RED);
+    }
+
+    stop_glerror();
 }
 
 void LLPipeline::setupGradingLUT()
@@ -8006,6 +8121,37 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             }
         }
 
+        // Lens dirt
+        //
+        // Forced off whenever no plate is loaded, so the shader's early-out
+        // fires and the sampler is never read unbound -- the same guard the
+        // grading LUT and the reference still use. Also off under a clean
+        // plate: dirt is a look, not a quantisation aid.
+        S32 dirt_channel = -1;
+        {
+            static LLCachedControl<F32> lens_dirt_strength(gSavedSettings, "RenderLensDirtStrength", 0.f);
+            static LLCachedControl<F32> lens_dirt_bloom(gSavedSettings, "RenderLensDirtBloomResponse", 1.f);
+            static LLCachedControl<F32> lens_dirt_flare(gSavedSettings, "RenderLensDirtFlareResponse", 1.f);
+
+            const F32 dirt_strength = (clean_plate || !mLensDirtMap)
+                                    ? 0.f
+                                    : llclamp(lens_dirt_strength(), 0.f, 2.f);
+
+            shader->uniform1f(LLShaderMgr::LENS_DIRT_STRENGTH, dirt_strength);
+            shader->uniform1f(LLShaderMgr::LENS_DIRT_BLOOM_RESPONSE, llclamp(lens_dirt_bloom(), 0.f, 2.f));
+            shader->uniform1f(LLShaderMgr::LENS_DIRT_FLARE_RESPONSE, llclamp(lens_dirt_flare(), 0.f, 2.f));
+
+            if (dirt_strength > 0.f)
+            {
+                dirt_channel = shader->enableTexture(LLShaderMgr::LENS_DIRT_MAP);
+                if (dirt_channel > -1)
+                {
+                    gGL.getTextureSlot(dirt_channel)->bindManual(ALTextureSlot::TT_TEXTURE, mLensDirtMap,
+                                                                 gGL.getSampler(ALSamplers::BilinearClamp));
+                }
+            }
+        }
+
         if (apply_tonemap)
         {
             // Exposure parameters
@@ -8272,6 +8418,10 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         {
             mCGLut->unbind(cglut_channel);
         }
+        if (dirt_channel > -1)
+        {
+            gGL.getTextureSlot(dirt_channel)->unbind();
+        }
         if (exposure_channel > -1)
         {
             gGL.getTextureSlot(exposure_channel)->unbind();
@@ -8500,6 +8650,234 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
             shader->unbind();
         }
     }
+
+    // ---- Cross-screen (star) filter, part 1 of 2 -------------------------
+    //
+    // Streaks every thresholded highlight, the way an etched glass filter
+    // diffracts any bright point in frame. Distinct from the lens flare
+    // starburst, which is locked to the sun and drawn procedurally around it.
+    //
+    // Split across the upsample chain on purpose: the streak input has to be
+    // read *before* the upsample walk mutates the mips, but the result has to
+    // be added *after* it, or the walk would smear the streaks back through
+    // the pyramid.
+    static LLCachedControl<F32> cross_strength(gSavedSettings, "RenderCrossFilterStrength", 0.f);
+    static LLCachedControl<S32> cross_points(gSavedSettings, "RenderCrossFilterPoints", 4);
+    static LLCachedControl<F32> cross_angle(gSavedSettings, "RenderCrossFilterAngle", 0.f);
+    static LLCachedControl<F32> cross_length(gSavedSettings, "RenderCrossFilterLength", 1.f);
+    static LLCachedControl<F32> cross_falloff(gSavedSettings, "RenderCrossFilterFalloff", 1.5f);
+    static LLCachedControl<F32> cross_chromatic(gSavedSettings, "RenderCrossFilterChromatic", 0.f);
+
+    const F32  streak_strength = no_post ? 0.f : llclamp(cross_strength(), 0.f, 32.f);
+    const bool streaks_on      = (streak_strength > 0.f) && gCrossFilterProgram.isComplete();
+    bool       streaks_ready   = false;
+
+    if (!streaks_on)
+    {
+        // Release rather than merely skip. Allocating lazily is only worth
+        // anything if switching the effect off gives the memory back, and doing
+        // it here rather than from a settings commit signal keeps one teardown
+        // path, inside the render loop, where the targets are owned. It also
+        // lets the strength control stay a live slider: wiring a slider to a
+        // reallocation handler would fire on every mouse-move.
+        if (mRT->crossFilterHeight != 0)
+        {
+            for (U32 i = 0; i < 3; ++i)
+            {
+                mRT->crossFilter[i].release();
+            }
+            mRT->crossFilterHeight = 0;
+        }
+    }
+    else
+    {
+        // Streak from mip 0, which at this point in the pass still holds the
+        // raw thresholded extract: the downsample chain writes mips 1 and up
+        // and leaves mip 0 untouched, so it is the sharpest and cleanest
+        // "which pixels are bright" answer available.
+        //
+        // This used to pick a half-resolution mip to save fill. That made the
+        // arms visibly fat, and not merely because of the upscale: mip 1 is a
+        // 13-tap downsample, so the highlight being streaked had already been
+        // smeared into a blob before the streak ever started, and a streak can
+        // be no thinner than the point it is drawn from.
+        //
+        // Cost scales with RenderBloomResolutionScale, which sizes the whole
+        // pyramid -- lowering it makes the streaks cheaper and softer together.
+        // Streak at half the source's resolution.
+        //
+        // Thirteen passes at four arms is a lot of fill at full resolution, and
+        // quartering the area is the cheapest lever that does not touch arm
+        // count or reach. The source stays mip 0, so the *point* being streaked
+        // is still the sharp extract rather than a pre-blurred mip -- what is
+        // lost is arm resolution, not arm origin.
+        //
+        // The first pass gets a proper box downsample for free: a half-res texel
+        // centre lands exactly on the corner between two full-res texels, so the
+        // bilinear fetch averages the 2x2 group rather than point-sampling it.
+        const U32 streak_w = llmax(1u, mRT->bloomMip[0].getWidth() / 2);
+        const U32 streak_h = llmax(1u, mRT->bloomMip[0].getHeight() / 2);
+
+        if (mRT->crossFilterHeight != streak_h)
+        {
+            for (U32 i = 0; i < 3; ++i)
+            {
+                mRT->crossFilter[i].release();
+            }
+
+            // Three targets, not two: each arm needs its own ping-pong chain,
+            // and the arms have to accumulate somewhere that is neither the
+            // chain's scratch nor its source. Accumulating straight into
+            // bloomMip[0] would work for the first arm and then feed the second
+            // arm its own output.
+            //
+            // No alpha on any of them: streaks carry no halation payload, and
+            // the final draw writes 0 there so the pyramid alpha survives.
+            bool ok = true;
+            for (U32 i = 0; i < 3 && ok; ++i)
+            {
+                ok = mRT->crossFilter[i].allocate(streak_w, streak_h, GL_R11F_G11F_B10F);
+            }
+
+            if (ok)
+            {
+                mRT->crossFilterHeight = streak_h;
+                LL_INFOS() << "Cross filter streaking at " << streak_w << "x" << streak_h << LL_ENDL;
+            }
+            else
+            {
+                for (U32 i = 0; i < 3; ++i)
+                {
+                    mRT->crossFilter[i].release();
+                }
+                // Latch the failure by recording the size anyway. Zeroing the
+                // height here made the allocation retry -- and this warning
+                // repeat -- every frame while VRAM stayed exhausted, exactly
+                // when per-frame GL allocation churn hurts most. Recording the
+                // attempted size means the next retry happens only when the
+                // size changes (resize, bloom scale) or the effect is toggled,
+                // and streaks_ready below stays false through isComplete().
+                mRT->crossFilterHeight = streak_h;
+                LL_WARNS() << "Could not allocate cross filter targets; effect disabled until the size changes" << LL_ENDL;
+            }
+        }
+
+        // isComplete() distinguishes "built at this size" from "failed at this
+        // size" -- crossFilterHeight alone can no longer tell them apart.
+        streaks_ready = (mRT->crossFilterHeight == streak_h) && mRT->crossFilter[2].isComplete();
+
+        if (streaks_ready)
+        {
+            const F32 angle_rad = llclamp(cross_angle(), 0.f, 360.f) * DEG_TO_RAD;
+            const S32 arms      = llclamp(cross_points(), 2, 12);
+
+            gCrossFilterProgram.bind();
+
+            // Base step in texels of the streak target, near 1 by design: it
+            // multiplies every offset, so at 2 the chain lands on even texels
+            // only and real gaps open between them. Reach comes from the three
+            // quadrupling passes (0..63 texels), not from scaling this up.
+            gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_LENGTH, llclamp(cross_length(), 0.25f, 2.f));
+
+            // Falloff is authored as a 0..1.5 tightness and converted here to
+            // the exponential base the shader wants.
+            //
+            // Exposing that base directly was a mistake. Weights are
+            // pow(base, -step_index) and step_index reaches 63 across the
+            // chain, so base 1.5 attenuates the far taps by 1e-11 -- the arms
+            // simply vanished -- and everything usable lived between 1.0 and
+            // roughly 1.1. Well over nine tenths of the shipped range did
+            // nothing but turn the effect off. This maps the whole slider onto
+            // that band: the value is how many e-folds of brightness are lost
+            // between the core and the tip of an arm, over six.
+            const F32 tightness = llclamp(cross_falloff(), 0.1f, 3.f);
+            // The chain's exact reach, TAPS^3 - 1, derived from the same constant
+            // the shader compiles against -- see CROSS_FILTER_TAPS.
+            const F32 max_step  = (F32)(CROSS_FILTER_TAPS * CROSS_FILTER_TAPS * CROSS_FILTER_TAPS - 1);
+            gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_FALLOFF, expf(tightness * 6.f / max_step));
+            gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_CHROMATIC, llclamp(cross_chromatic(), 0.f, 1.f));
+
+            // Clear the accumulator once; every arm adds into it.
+            {
+                LLGLDisable blend(GL_BLEND);
+                mRT->crossFilter[2].bindTarget();
+                mRT->crossFilter[2].clear();
+                mRT->crossFilter[2].flush();
+            }
+
+            // One three-pass chain per arm, each strictly one-sided.
+            //
+            // Streaking every direction in a single pass is what produced the
+            // spikes: a tap could run forward in one pass and backward in the
+            // next, so net offsets became +/-i +/-4j +/-16k with independent
+            // signs and their weights tracked how far the path travelled rather
+            // than where it ended. Per-arm chains restore the base-4 tiling the
+            // whole construction depends on.
+            for (S32 arm = 0; arm < arms; ++arm)
+            {
+                const F32 theta = angle_rad + (2.f * F_PI * (F32)arm) / (F32)arms;
+                const F32 dir_x = cosf(theta);
+                const F32 dir_y = sinf(theta);
+                gCrossFilterProgram.uniform2f(LLShaderMgr::CROSS_DIR, dir_x, dir_y);
+
+                LLRenderTarget* sources[3] = { &mRT->bloomMip[0], &mRT->crossFilter[0], &mRT->crossFilter[1] };
+                LLRenderTarget* dests[3]   = { &mRT->crossFilter[0], &mRT->crossFilter[1], &mRT->crossFilter[2] };
+                const F32       scales[3]  = { 1.f, (F32)CROSS_FILTER_TAPS,
+                                               (F32)(CROSS_FILTER_TAPS * CROSS_FILTER_TAPS) };
+
+                auto streak_pass = [&](S32 pass)
+                {
+                    LLRenderTarget* src = sources[pass];
+
+                    gCrossFilterProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, src, ALSamplers::BilinearClamp);
+                    // Always the *streak target's* texel, never the source's.
+                    // The base-4 tiling only holds if every pass steps in the
+                    // same unit, and pass 0 reads a full-resolution mip while
+                    // the rest read half-resolution scratch -- using each
+                    // source's own texel would double the stride midway through
+                    // the chain and break the tiling that the whole
+                    // construction depends on.
+                    gCrossFilterProgram.uniform2f(LLShaderMgr::CROSS_TEXEL,
+                                                  1.f / (F32)streak_w,
+                                                  1.f / (F32)streak_h);
+                    gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_PASS_SCALE, scales[pass]);
+                    gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_STRENGTH, 1.f);
+
+                    mScreenTriangleVB->setBuffer();
+                    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+                };
+
+                // Two scratch passes overwrite; blending stays off. No clear:
+                // the fullscreen triangle writes every texel with blending
+                // disabled, so a clear would be pure redundant fill (the
+                // accumulator clear above is the only load-bearing one).
+                {
+                    LLGLDisable blend(GL_BLEND);
+                    for (S32 pass = 0; pass < 2; ++pass)
+                    {
+                        dests[pass]->bindTarget();
+                        streak_pass(pass);
+                        dests[pass]->flush();
+                    }
+                }
+
+                // The arm's last pass adds into the shared accumulator.
+                {
+                    LLGLEnable blend(GL_BLEND);
+                    gGL.setSceneBlendType(LLRender::BT_ADD);
+
+                    dests[2]->bindTarget();
+                    streak_pass(2);
+                    dests[2]->flush();
+
+                    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+                }
+            }
+
+            gCrossFilterProgram.unbind();
+        }
+    }
+
     // Upsample chain: mip[i] -> mip[i-1] with additive blend. Walks from the
     // smallest mip back up to mip 0, leaving the final bloom in mBloomMip[0].
     {
@@ -8531,6 +8909,45 @@ void LLPipeline::generateBloomHDR(LLRenderTarget* src)
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
 
+    // ---- Cross-screen filter, part 2 of 2 --------------------------------
+    //
+    // The arms are already summed in crossFilter[2]; this just adds them into
+    // mip 0 so they join the finished bloom rather than costing a separate
+    // composite pass. The user strength lands here, on the one draw whose
+    // output is kept.
+    //
+    // Reuses the streak shader with a zero step length, which collapses every
+    // tap onto the centre and makes it a plain weighted copy. Dispersion is
+    // forced off for the same reason: with no offset, a non-zero value would
+    // tint by tap index rather than by distance along an arm.
+    if (streaks_ready)
+    {
+        LLGLEnable blend(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ADD);
+
+        LLRenderTarget* src = &mRT->crossFilter[2];
+
+        mRT->bloomMip[0].bindTarget();
+
+        gCrossFilterProgram.bind();
+        gCrossFilterProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, src, ALSamplers::BilinearClamp);
+        gCrossFilterProgram.uniform2f(LLShaderMgr::CROSS_TEXEL,
+                                      1.f / (F32)src->getWidth(),
+                                      1.f / (F32)src->getHeight());
+        gCrossFilterProgram.uniform2f(LLShaderMgr::CROSS_DIR, 1.f, 0.f);
+        gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_LENGTH, 0.f);
+        gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_CHROMATIC, 0.f);
+        gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_PASS_SCALE, 1.f);
+        gCrossFilterProgram.uniform1f(LLShaderMgr::CROSS_STRENGTH, streak_strength);
+
+        mScreenTriangleVB->setBuffer();
+        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+        gCrossFilterProgram.unbind();
+        mRT->bloomMip[0].flush();
+
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    }
 }
 
 // Composite the bloom pyramid (mBloomMip[0]) additively into the pre-tonemap

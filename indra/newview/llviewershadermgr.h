@@ -140,6 +140,12 @@ extern LLGLSLShader         gBloomDownsampleProgram;
 extern LLGLSLShader         gBloomDownsampleFirstProgram;
 extern LLGLSLShader         gBloomUpsampleProgram;
 extern LLGLSLShader         gBloomCompositeProgram;
+// Taps per cross-filter pass. Injected into crossFilterF.glsl as CROSS_TAPS
+// and used by pipeline.cpp for the pass strides and the falloff remap, so the
+// chain's exact base-N tiling has one source of truth instead of three sites
+// that each hard-coded 4 or 63.
+constexpr S32               CROSS_FILTER_TAPS = 4;
+extern LLGLSLShader         gCrossFilterProgram;
 
 //interface shaders
 extern LLGLSLShader         gHighlightProgram;

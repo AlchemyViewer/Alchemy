@@ -43,9 +43,51 @@
 #include "llagentcamera.h"
 #include "llfile.h"
 
+// The Looks whitelist, the settings declarations, and the bundled Look files
+// must stay in lockstep by hand, and every consumer fails silent on drift:
+// loadLooksPreset writes only keys present in BOTH the whitelist and the
+// file, so a bundled Look that falls behind quietly stops resetting the keys
+// it lacks -- and "Neutral" stops meaning neutral. Say so loudly at startup
+// instead. One parse of a handful of small files, once per session.
+static void audit_bundled_looks(const std::vector<std::string>& whitelist)
+{
+    const std::string app_dir = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, PRESETS_LOOKS);
+    std::string file;
+    LLDirIterator look_iter(app_dir, "*.xml");
+    while (look_iter.next(file))
+    {
+        llifstream look_stream(gDirUtilp->add(app_dir, file));
+        if (!look_stream.is_open())
+        {
+            continue;
+        }
+        LLSD look;
+        LLSDSerialize::fromXML(look, look_stream);
+        if (!look.isMap())
+        {
+            LL_WARNS("Presets") << "Bundled Look '" << file << "' is not a settings map" << LL_ENDL;
+            continue;
+        }
+        for (const std::string& name : whitelist)
+        {
+            if (!look.has(name))
+            {
+                LL_WARNS("Presets") << "Bundled Look '" << file << "' is missing whitelisted key '"
+                                    << name << "'; applying it will leave that setting untouched" << LL_ENDL;
+            }
+        }
+    }
+}
+
 LLPresetsManager::LLPresetsManager()
 {
     copyDefaultLooks();
+
+    {
+        std::vector<std::string> looks_whitelist;
+        getLooksControlNames(looks_whitelist);
+        audit_bundled_looks(looks_whitelist);
+    }
 
     // Connect preset signals
     startWatching(PRESETS_GRAPHIC);
@@ -632,6 +674,18 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderBokehFringeAmount",
         "RenderBokehFringeNearTint",
         "RenderBokehFringeFarTint",
+        // Cross-screen filter
+        "RenderCrossFilterStrength",
+        "RenderCrossFilterPoints",
+        "RenderCrossFilterAngle",
+        "RenderCrossFilterLength",
+        "RenderCrossFilterFalloff",
+        "RenderCrossFilterChromatic",
+        // Lens dirt
+        "RenderLensDirtStrength",
+        "RenderLensDirtTexture",
+        "RenderLensDirtBloomResponse",
+        "RenderLensDirtFlareResponse",
         // Vignette
         "RenderVignetteAmount",
         "RenderVignetteCenter",

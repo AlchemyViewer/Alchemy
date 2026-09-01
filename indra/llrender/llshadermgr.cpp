@@ -2013,6 +2013,21 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uBokehFringeNearTint");
     mReservedUniforms.push_back("uBokehFringeFarTint");
 
+    // Lens dirt
+    mReservedUniforms.push_back("uLensDirtMap");
+    mReservedUniforms.push_back("uLensDirtStrength");
+    mReservedUniforms.push_back("uLensDirtBloomResponse");
+    mReservedUniforms.push_back("uLensDirtFlareResponse");
+
+    // Cross-screen filter
+    mReservedUniforms.push_back("uCrossTexel");
+    mReservedUniforms.push_back("uCrossDir");
+    mReservedUniforms.push_back("uCrossLength");
+    mReservedUniforms.push_back("uCrossFalloff");
+    mReservedUniforms.push_back("uCrossChromatic");
+    mReservedUniforms.push_back("uCrossPassScale");
+    mReservedUniforms.push_back("uCrossStrength");
+
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");
 
