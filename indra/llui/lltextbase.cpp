@@ -2223,7 +2223,7 @@ std::pair<S32, S32> LLTextBase::getVisibleLines(bool require_fully_visible)
 
 LLTextViewModel* LLTextBase::getViewModel() const
 {
-    return (LLTextViewModel*)mViewModel.get();
+    return (LLTextViewModel*)viewModel();
 }
 
 void LLTextBase::addDocumentChild(LLView* view)

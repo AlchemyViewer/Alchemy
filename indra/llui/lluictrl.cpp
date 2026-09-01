@@ -103,7 +103,7 @@ LLUICtrl::LLUICtrl(const LLUICtrl::Params& p, const LLViewModelPtr& viewmodel)
     mRequestsFront(p.requests_front),
     mTabStop(false),
     mTentative(false),
-    mViewModel(viewmodel),
+    mViewModelStorage(viewmodel),
     mCommitSignal(NULL),
     mTransparencyType(TT_DEFAULT)
 {
@@ -425,29 +425,41 @@ bool LLUICtrl::isCtrl() const
 //virtual
 void LLUICtrl::setValue(const LLSD& value)
 {
-    mViewModel->setValue(value);
+    viewModel()->setValue(value);
 }
 
 //virtual
 LLSD LLUICtrl::getValue() const
 {
-    return mViewModel->getValue();
+    // A control that was never given a model was never given a value, which is
+    // the same answer a model it had never been asked to hold one would give.
+    return mViewModelStorage.isNull() ? LLSD() : mViewModelStorage->getValue();
 }
 
 /// When two widgets are displaying the same data (e.g. during a skin
 /// change), share their ViewModel.
 void    LLUICtrl::shareViewModelFrom(const LLUICtrl& other)
 {
-    // Because mViewModel is an LLViewModelPtr, this assignment will quietly
-    // dispose of the previous LLViewModel -- unless it's already shared by
-    // somebody else.
-    mViewModel = other.mViewModel;
+    // Because this is an LLViewModelPtr, the assignment will quietly dispose of
+    // the previous LLViewModel -- unless it's already shared by somebody else.
+    // Asked through the accessor, so that sharing from a control that has not
+    // needed a model yet shares one rather than leaving both to make their own.
+    mViewModelStorage = other.viewModelPtr();
 }
 
 //virtual
 LLViewModel* LLUICtrl::getViewModel() const
 {
-    return mViewModel;
+    return viewModel();
+}
+
+const LLViewModelPtr& LLUICtrl::viewModelPtr() const
+{
+    if (mViewModelStorage.isNull())
+    {
+        mViewModelStorage = new LLViewModel();
+    }
+    return mViewModelStorage;
 }
 
 //virtual
@@ -753,13 +765,13 @@ bool LLUICtrl::acceptsTextInput() const
 //virtual
 bool LLUICtrl::isDirty() const
 {
-    return mViewModel->isDirty();
+    return !mViewModelStorage.isNull() && mViewModelStorage->isDirty();
 };
 
 //virtual
 void LLUICtrl::resetDirty()
 {
-    mViewModel->resetDirty();
+    if (!mViewModelStorage.isNull()) mViewModelStorage->resetDirty();
 }
 
 // virtual

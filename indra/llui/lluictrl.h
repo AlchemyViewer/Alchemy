@@ -138,7 +138,7 @@ protected:
     friend class LLUICtrlFactory;
     static const Params& getDefaultParams();
     LLUICtrl(const Params& p = getDefaultParams(),
-             const LLViewModelPtr& viewmodel=LLViewModelPtr(new LLViewModel));
+             const LLViewModelPtr& viewmodel=LLViewModelPtr());
 
     commit_signal_t::slot_type initCommitCallback(const CommitCallbackParam& cb);
     enable_signal_t::slot_type initEnableCallback(const EnableCallbackParam& cb);
@@ -335,7 +335,15 @@ protected:
     mouse_signal_t*  rightMouseUpSignal() const   { return mRareSignals ? mRareSignals->mRightMouseUp : nullptr; }
     mouse_signal_t*  doubleClickSignal() const    { return mRareSignals ? mRareSignals->mDoubleClick : nullptr; }
 
-    LLViewModelPtr  mViewModel;
+    // Created on first use. The model holds the control's value, and most
+    // controls never have one -- panels, icons, buttons that carry no value --
+    // so the default argument on the constructor was allocating one apiece for
+    // nothing. Named apart from what it was so that every place reaching past
+    // it has to be looked at rather than silently reading a null.
+    const LLViewModelPtr& viewModelPtr() const;
+    LLViewModel* viewModel() const { return viewModelPtr().get(); }
+
+    mutable LLViewModelPtr mViewModelStorage;
 
 #if !LL_RELEASE_FOR_DOWNLOAD
     std::string mFunctionName;

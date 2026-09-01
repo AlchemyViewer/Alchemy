@@ -262,7 +262,7 @@ void LLFloaterSettingsPicker::onSelectionChange(const LLFloaterSettingsPicker::i
                 }
                 setSettingsItemId(bridge_model->getItem()->getUUID(), false);
                 asset_id = bridge_model->getItem()->getAssetUUID();
-                mViewModel->setDirty(); // *TODO: shouldn't we be using setValue() here?
+                viewModel()->setDirty(); // *TODO: shouldn't we be using setValue() here?
                 is_item = true;
 
                 if (user_action)
@@ -438,7 +438,7 @@ void LLFloaterSettingsPicker::setSettingsItemId(const LLUUID &settings_id, bool 
     if (mSettingItemID != settings_id && mActive)
     {
         mNoCopySettingsSelected = false;
-        mViewModel->setDirty(); // *TODO: shouldn't we be using setValue() here?
+        viewModel()->setDirty(); // *TODO: shouldn't we be using setValue() here?
         mSettingItemID = settings_id;
         if (mSettingItemID.isNull())
         {
