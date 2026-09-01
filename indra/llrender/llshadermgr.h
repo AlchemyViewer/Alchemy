@@ -561,6 +561,13 @@ public:
         CROSS_PASS_SCALE,                   //  "uCrossPassScale"      1, 4, 16 across the passes
         CROSS_STRENGTH,                     //  "uCrossStrength"       1.0 until the final composite
 
+        // Lens aberrations -- bokeh shape contributed by the glass rather than
+        // by the iris, so these sit alongside the aperture controls above
+        BOKEH_SPHERICAL,                    //  "uBokehSpherical"      signed; the sign flips across focus
+        BOKEH_FIELD_STRETCH,                //  "uBokehFieldStretch"   + tangential (swirl), - radial (coma)
+        BOKEH_FIELD_FALLOFF,                //  "uBokehFieldFalloff"   exponent on normalised field radius
+        BOKEH_COMA_ASYMMETRY,               //  "uBokehComaAsymmetry"
+
         // End Alchemy Effects Stack
         TEXT_SHADOW_MODE,                   //  "textShadowMode"
 

@@ -3245,7 +3245,7 @@
         <key>RenderBokehCatEyeAmount</key>
         <map>
             <key>Comment</key>
-            <string>Optical vignetting, also called cat's eye. Toward the frame edges the lens barrel clips the aperture, squeezing round bokeh into lens-shaped slivers that lean away from the centre while the middle of the frame stays round. Strength follows distance from the centre of the image circle, so on a wide display the sides clip well before the top and bottom do. 0 disables. 0.45 is a natural fast-prime look; 0.9 is heavy. Range 0 to 1.</string>
+            <string>Optical vignetting, also called cat's eye. Toward the frame edges the lens barrel clips the aperture, squeezing round bokeh into lens-shaped slivers that lean away from the centre while the middle of the frame stays round. Strength follows distance from the centre of the image circle, so on a wide display the sides clip well before the top and bottom do. 0 disables. 0.45 is a natural fast-prime look; 1.0 is heavy. The range runs past the old maximum because measuring from the image circle lowered the offset everywhere -- a value tuned before that change wants roughly half again as much. Range 0 to 1.5.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -3293,6 +3293,50 @@
                 <real>1.0</real>
                 <real>0.9</real>
             </array>
+        </map>
+        <key>RenderBokehSphericalAberration</key>
+        <map>
+            <key>Comment</key>
+            <string>Spherical aberration - how the light inside an out-of-focus highlight is spread across it. 0 is the evenly lit disc of a perfectly corrected lens. Positive brightens the rim and hollows out the middle, the soap-bubble look; negative fills the middle and softens the edge, the creamy look. The sign flips either side of the focal plane exactly as it does in real glass, so a lens with bright-rimmed background bokeh has bright-centred foreground bokeh. Needs a few pixels of blur before there is any shape to work with, and fades out below that. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFieldStretch</key>
+        <map>
+            <key>Comment</key>
+            <string>Field aberration - stretches out-of-focus highlights toward the frame edges while the centre stays round. 0 disables. Positive stretches them across the radius so they line up along circles and the frame appears to swirl, the look of old fast portrait glass; negative stretches them along the radius into comet shapes. Area-preserving, so highlights change shape without changing brightness. Range -1 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFieldFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly field aberration builds from the centre of the frame toward the corners. 1 spreads it fairly evenly across the frame; higher values keep the middle clean and concentrate the deformation at the edges. Shape control only; use RenderBokehFieldStretch to toggle the effect. Range 1 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>RenderBokehComaAsymmetry</key>
+        <map>
+            <key>Comment</key>
+            <string>Comatic asymmetry - draws each out-of-focus highlight into a comet whose tail points away from the centre of frame, the way a real lens flares off-axis. Zero on the optical axis and strongest in the corners, and it follows the highlight's actual shape, so it stays aligned with an anamorphic squeeze or a swirl rather than drifting off them. 0 disables. Pairs with RenderBokehFieldStretch, which supplies the elongation the tail runs along. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
         </map>
         <key>AllowNoCopyRezRestoreToWorld</key>
         <map>

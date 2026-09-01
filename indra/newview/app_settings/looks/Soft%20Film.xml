@@ -74,7 +74,7 @@
         <key>RenderBloomScatter</key>
         <map>
             <key>Comment</key>
-            <string>Bloom upsample tent-filter radius multiplier. 1.0 = adjacent-texel taps. Values &gt;1 widen the bloom per octave; &gt;~2.5 starts to alias because the tent skips source texels.</string>
+            <string>Bloom upsample tent-filter radius multiplier. 1.0 = adjacent-texel taps. Values >1 widen the bloom per octave; >~2.5 starts to alias because the tent skips source texels.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -151,7 +151,40 @@
         <key>RenderBokehCatEyeAmount</key>
         <map>
             <key>Comment</key>
-            <string>Optical vignetting, also called cat's eye. Toward the frame edges the lens barrel clips the aperture, squeezing round bokeh into lens-shaped slivers that lean away from the centre while the middle of the frame stays round. Strength follows distance from the centre of the image circle, so on a wide display the sides clip well before the top and bottom do. 0 disables. 0.45 is a natural fast-prime look; 0.9 is heavy. Range 0 to 1.</string>
+            <string>Optical vignetting, also called cat's eye. Toward the frame edges the lens barrel clips the aperture, squeezing round bokeh into lens-shaped slivers that lean away from the centre while the middle of the frame stays round. Strength follows distance from the centre of the image circle, so on a wide display the sides clip well before the top and bottom do. 0 disables. 0.45 is a natural fast-prime look; 1.0 is heavy. The range runs past the old maximum because measuring from the image circle lowered the offset everywhere -- a value tuned before that change wants roughly half again as much. Range 0 to 1.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehComaAsymmetry</key>
+        <map>
+            <key>Comment</key>
+            <string>Comatic asymmetry - draws each out-of-focus highlight into a comet whose tail points away from the centre of frame, the way a real lens flares off-axis. Zero on the optical axis and strongest in the corners, and it follows the highlight's actual shape, so it stays aligned with an anamorphic squeeze or a swirl rather than drifting off them. 0 disables. Pairs with RenderBokehFieldStretch, which supplies the elongation the tail runs along. Range 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehFieldFalloff</key>
+        <map>
+            <key>Comment</key>
+            <string>How quickly field aberration builds from the centre of the frame toward the corners. 1 spreads it fairly evenly across the frame; higher values keep the middle clean and concentrate the deformation at the edges. Shape control only; use RenderBokehFieldStretch to toggle the effect. Range 1 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>2.0</real>
+        </map>
+        <key>RenderBokehFieldStretch</key>
+        <map>
+            <key>Comment</key>
+            <string>Field aberration - stretches out-of-focus highlights toward the frame edges while the centre stays round. 0 disables. Positive stretches them across the radius so they line up along circles and the frame appears to swirl, the look of old fast portrait glass; negative stretches them along the radius into comet shapes. Area-preserving, so highlights change shape without changing brightness. Range -1 to 1.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -215,6 +248,17 @@
         <map>
             <key>Comment</key>
             <string>Brightness above which the highlight boost starts to apply. 0 boosts the whole range; raising it restricts the effect to genuine highlights and leaves midtones averaging normally. Only has an effect when Highlight Gain is above 0. Range 0 to 8.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>RenderBokehSphericalAberration</key>
+        <map>
+            <key>Comment</key>
+            <string>Spherical aberration - how the light inside an out-of-focus highlight is spread across it. 0 is the evenly lit disc of a perfectly corrected lens. Positive brightens the rim and hollows out the middle, the soap-bubble look; negative fills the middle and softens the edge, the creamy look. The sign flips either side of the focal plane exactly as it does in real glass, so a lens with bright-rimmed background bokeh has bright-centred foreground bokeh. Needs a few pixels of blur before there is any shape to work with, and fades out below that. Range -1 to 1.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -346,7 +390,7 @@
         <key>RenderColorGradeBrightness</key>
         <map>
             <key>Comment</key>
-            <string>Shifts the whole image lighter or darker. Range -0.5 to 0.5; small values (&#177;0.05) are already noticeable.</string>
+            <string>Shifts the whole image lighter or darker. Range -0.5 to 0.5; small values (±0.05) are already noticeable.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -590,7 +634,7 @@
         <key>RenderCrossFilterFalloff</key>
         <map>
             <key>Comment</key>
-            <string>How quickly each arm fades along its length. Higher values fade sooner and keep the star tight around the highlight; values near 1 give long even spokes. Range 1.01 to 4.</string>
+            <string>How quickly each arm fades along its length, measured as how much brightness is lost between the core of a highlight and the tip of its arm. Low values give long even spokes; high values keep the star tight around the highlight. This changes only the shape of the arms - brightness belongs to Strength. Range 0.1 to 3.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -601,7 +645,7 @@
         <key>RenderCrossFilterLength</key>
         <map>
             <key>Comment</key>
-            <string>How far the arms reach. Length and falloff work together - a long streak with a fast falloff still fades out early, which is usually what reads best. Range 0.05 to 3.</string>
+            <string>Spacing of the samples that build each arm, which sets how far the star reaches. 1.0 is the tuned value and gives a clean continuous streak; higher spreads the arms further, and lower draws them in tight. The range stops at 2 because beyond that the samples building each arm stop overlapping and the streak breaks up into a repeating lattice rather than getting longer. Length and falloff work together - a long streak with a fast falloff still fades out early, which is usually what reads best. Range 0.25 to 2.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -623,7 +667,7 @@
         <key>RenderCrossFilterStrength</key>
         <map>
             <key>Comment</key>
-            <string>Strength of the cross-screen (star) filter - the etched glass filter that diffracts every bright point in frame into a star. 0 disables. 0.5 is a restrained night-city look; 2.0 is a full 1970s starburst. Unlike the starburst under Lens Flare, which is locked to the sun, this streaks every highlight. Streaks ride on the bloom pyramid, so bloom strength 0 silences them. HDR only. Range 0 to 4.</string>
+            <string>Strength of the cross-screen (star) filter - the etched glass filter that diffracts every bright point in frame into a star. 0 disables. The arms carry a highlight's light spread along their length, so they are much dimmer than the core and this generally wants a large value - try 8 and work outward. Unlike the starburst under Lens Flare, which is locked to the sun, this streaks every highlight. Streaks ride on the bloom pyramid, so bloom strength 0 silences them. HDR only. Range 0 to 32.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

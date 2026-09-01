@@ -9523,8 +9523,9 @@ void LLPipeline::renderDoF()
 
                 static LLCachedControl<bool> RenderDepthOfFieldNearBlur(gSavedSettings, "RenderDepthOfFieldNearBlur", false);
 
-                // Shaped aperture, anamorphic deformation, optical vignetting
-                // and defocus fringing all live in the innermost sample loop,
+                // Shaped aperture, anamorphic deformation, optical vignetting,
+                // defocus fringing and the two aberrations all live in the
+                // innermost sample loop,
                 // so they are compiled out rather than branched over. One
                 // define covers them all: the shaped variant is bound only
                 // when at least one is actually doing something, and within it
@@ -9541,13 +9542,27 @@ void LLPipeline::renderDoF()
                 static LLCachedControl<F32> bokeh_fringe(gSavedSettings, "RenderBokehFringeAmount", 0.f);
                 static LLCachedControl<LLColor3> bokeh_fringe_near(gSavedSettings, "RenderBokehFringeNearTint", LLColor3(1.f, 0.85f, 1.f));
                 static LLCachedControl<LLColor3> bokeh_fringe_far(gSavedSettings, "RenderBokehFringeFarTint", LLColor3(0.85f, 1.f, 0.9f));
+                static LLCachedControl<F32> bokeh_spherical(gSavedSettings, "RenderBokehSphericalAberration", 0.f);
+                static LLCachedControl<F32> bokeh_field(gSavedSettings, "RenderBokehFieldStretch", 0.f);
+                static LLCachedControl<F32> bokeh_field_falloff(gSavedSettings, "RenderBokehFieldFalloff", 2.f);
+                static LLCachedControl<F32> bokeh_coma(gSavedSettings, "RenderBokehComaAsymmetry", 0.f);
 
                 const S32 blades  = llclamp(bokeh_blades(), 0, 11);
-                const F32 cat_eye = llclamp(bokeh_cat_eye(), 0.f, 1.f);
+                const F32 cat_eye = llclamp(bokeh_cat_eye(), 0.f, 1.5f);
                 const F32 fringe  = llclamp(bokeh_fringe(), 0.f, 1.f);
                 const F32 squeeze = llclamp(bokeh_anamorphic(), 0.25f, 4.f);
+                const F32 spherical = llclamp(bokeh_spherical(), -1.f, 1.f);
+                const F32 field     = llclamp(bokeh_field(), -1.f, 1.f);
+                const F32 coma      = llclamp(bokeh_coma(), 0.f, 1.f);
                 const bool anamorphic = (squeeze < 0.999f) || (squeeze > 1.001f);
-                const bool shaped = (blades >= 3) || (cat_eye > 0.f) || (fringe > 0.f) || anamorphic;
+                // Comatic asymmetry earns its place here even though it reads
+                // like a modifier: it biases the disc along the field
+                // direction, which exists whether or not anything stretched
+                // it, so it is a standalone effect rather than a shape control
+                // for the stretch. RenderBokehFieldFalloff genuinely is one and
+                // is deliberately absent.
+                const bool shaped = (blades >= 3) || (cat_eye > 0.f) || (fringe > 0.f) || anamorphic
+                                 || (spherical != 0.f) || (field != 0.f) || (coma > 0.f);
 
                 LLGLSLShader& post_program = RenderDepthOfFieldNearBlur
                     ? (shaped ? gDeferredPostProgramShaped : gDeferredPostProgram)
@@ -9599,6 +9614,16 @@ void LLPipeline::renderDoF()
                     post_program.uniform1f(LLShaderMgr::BOKEH_FRINGE_AMOUNT, fringe);
                     post_program.uniform3fv(LLShaderMgr::BOKEH_FRINGE_NEAR_TINT, 1, bokeh_fringe_near().mV);
                     post_program.uniform3fv(LLShaderMgr::BOKEH_FRINGE_FAR_TINT, 1, bokeh_fringe_far().mV);
+
+                    // Aberrations. Spherical goes up raw: the shader folds in
+                    // both the sign of the circle of confusion and the
+                    // blur-size fade, because both depend on the fragment
+                    // rather than on the frame.
+                    post_program.uniform1f(LLShaderMgr::BOKEH_SPHERICAL, spherical);
+                    post_program.uniform1f(LLShaderMgr::BOKEH_FIELD_STRETCH, field);
+                    post_program.uniform1f(LLShaderMgr::BOKEH_FIELD_FALLOFF,
+                                           llclamp(bokeh_field_falloff(), 1.f, 4.f));
+                    post_program.uniform1f(LLShaderMgr::BOKEH_COMA_ASYMMETRY, coma);
                 }
 
                 mScreenTriangleVB->setBuffer();

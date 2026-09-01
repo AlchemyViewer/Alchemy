@@ -74,6 +74,22 @@ static void audit_bundled_looks(const std::vector<std::string>& whitelist)
             {
                 LL_WARNS("Presets") << "Bundled Look '" << file << "' is missing whitelisted key '"
                                     << name << "'; applying it will leave that setting untouched" << LL_ENDL;
+                continue;
+            }
+
+            // Presence was never the only way these files rot. Each Look
+            // carries a full copy of every setting's Comment, and nothing reads
+            // those copies -- loadLooksPreset takes only Value -- so a reworded
+            // description in settings_alchemy.xml leaves three stale duplicates
+            // behind with no symptom at all until someone diffs them by hand.
+            // Five had already drifted that way before this check existed.
+            const LLControlVariable* ctrl = gSavedSettings.getControl(name).get();
+            if (ctrl && look[name].isMap() && look[name].has("Comment")
+                && look[name]["Comment"].asString() != ctrl->getComment())
+            {
+                LL_WARNS("Presets") << "Bundled Look '" << file << "' has a stale Comment for '"
+                                    << name << "'; it no longer matches the setting's own description"
+                                    << LL_ENDL;
             }
         }
     }
@@ -674,6 +690,11 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderBokehFringeAmount",
         "RenderBokehFringeNearTint",
         "RenderBokehFringeFarTint",
+        // Aberrations contributed by the glass rather than the iris
+        "RenderBokehSphericalAberration",
+        "RenderBokehFieldStretch",
+        "RenderBokehFieldFalloff",
+        "RenderBokehComaAsymmetry",
         // Cross-screen filter
         "RenderCrossFilterStrength",
         "RenderCrossFilterPoints",

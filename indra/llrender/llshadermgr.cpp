@@ -2028,6 +2028,11 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uCrossPassScale");
     mReservedUniforms.push_back("uCrossStrength");
 
+    mReservedUniforms.push_back("uBokehSpherical");
+    mReservedUniforms.push_back("uBokehFieldStretch");
+    mReservedUniforms.push_back("uBokehFieldFalloff");
+    mReservedUniforms.push_back("uBokehComaAsymmetry");
+
     // Text Shadow
     mReservedUniforms.push_back("textShadowMode");
 
