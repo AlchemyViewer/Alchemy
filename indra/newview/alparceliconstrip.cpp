@@ -65,17 +65,20 @@ namespace
             return edge;
         }
 
+        // Moved, never resized. Assigning one edge and then asking the rect how
+        // wide it is measures it half-way through the move -- getWidth is
+        // mRight - mLeft -- and stretches the control across to wherever it
+        // was standing. translate cannot express that mistake.
         LLRect rect = ctrl->getRect();
+
         if (direction == ALParcelIconStrip::LAYOUT_RIGHTWARD)
         {
-            rect.mLeft = edge;
-            rect.mRight = edge + rect.getWidth();
+            rect.translate(edge - rect.mLeft, 0);
             ctrl->setRect(rect);
             return rect.mRight + pad;
         }
 
-        rect.mRight = edge;
-        rect.mLeft = edge - rect.getWidth();
+        rect.translate(edge - rect.mRight, 0);
         ctrl->setRect(rect);
         return rect.mLeft - pad;
     }
