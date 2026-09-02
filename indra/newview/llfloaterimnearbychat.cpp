@@ -75,9 +75,8 @@
 #include "rlvcommon.h"
 #include "rlvhandler.h"
 // [/RLVa:KB]
+#include "alchatautocomplete.h"
 #include "alchatcommand.h"
-
-#include <map>
 
 S32 LLFloaterIMNearbyChat::sLastSpecialChatChannel = 0;
 
@@ -86,67 +85,6 @@ static LLFloaterIMNearbyChatListener sChatListener;
 constexpr S32 EXPANDED_HEIGHT = 266;
 constexpr S32 COLLAPSED_HEIGHT = 60;
 constexpr S32 EXPANDED_MIN_HEIGHT = 150;
-constexpr size_t MAX_GESTURE_AUTOCOMPLETE_ROWS = 50;
-
-namespace
-{
-bool buildGestureAutocompleteRows(
-    const std::string& prefix,
-    std::vector<LLGestureAutocompleteHelper::Row>& rows,
-    size_t& total)
-{
-    rows.clear();
-    total = 0;
-
-    // Wait for at least one character after the slash before offering matches.
-    if (prefix.size() < 2 || prefix[0] != '/' || prefix.find_first_of(" \t") != std::string::npos)
-    {
-        return false;
-    }
-
-    std::string lower_prefix = prefix;
-    LLStringUtil::toLower(lower_prefix);
-
-    std::map<std::string, std::string> unique;
-    const LLGestureMgr::item_map_t& active = LLGestureMgr::instance().getActiveGestures();
-
-    for (const auto& entry : active)
-    {
-        LLMultiGesture* gesture = entry.second;
-
-        if (!gesture || gesture->getTrigger().empty() || gesture->getTrigger()[0] != '/')
-        {
-            continue;
-        }
-
-        std::string lower_trigger = gesture->getTrigger();
-        LLStringUtil::toLower(lower_trigger);
-
-        if (lower_trigger.compare(0, lower_prefix.size(), lower_prefix) != 0)
-        {
-            continue;
-        }
-
-        unique.emplace(
-            gesture->getTrigger(),
-            gesture->mName);
-    }
-
-    for (const auto& [trigger, name] : unique)
-    {
-        if (rows.size() >= MAX_GESTURE_AUTOCOMPLETE_ROWS)
-        {
-            break;
-        }
-
-        rows.push_back({ trigger, trigger, name });
-    }
-
-    total = unique.size();
-
-    return total > 0;
-}
-}
 
 // legacy callback glue
 //void send_chat_from_viewer(const std::string& utf8_out_text, EChatType type, S32 channel);
@@ -656,65 +594,21 @@ void LLFloaterIMNearbyChat::onChatBoxKeystroke()
 
     KEY key = gKeyboard->currentKey();
 
-    static LLCachedControl<bool> autocomplete_gestures(gSavedSettings, "ChatAutocompleteGestures", true);
-
-    if (autocomplete_gestures)
-    {
-        std::vector<LLGestureAutocompleteHelper::Row> rows;
-        size_t total = 0;
-        const std::string utf8_trigger = wstring_to_utf8str(raw_text);
-
-        if (buildGestureAutocompleteRows(utf8_trigger, rows, total))
+    ALChatAutocomplete::update(
+        mInputEditor,
+        wstring_to_utf8str(raw_text),
+        key,
+        [this](const LLGestureAutocompleteHelper::Row& row, ALChatAutocomplete::CommitAction action)
         {
-            LLGestureAutocompleteHelper::instance().showHelper(
-                mInputEditor,
-                rows,
-                total,
-                [this](std::string trigger)
-                {
-                    mInputEditor->setText(trigger + " ");
-                    mInputEditor->endOfDoc();
-                });
-            return;
-        }
-
-        LLGestureAutocompleteHelper::instance().hideHelper(mInputEditor);
-    }
-    // Ignore "special" keys, like backspace, arrows, etc.
-    if (autocomplete_gestures
-        && length > 1
-        && raw_text[0] == '/'
-        && key < KEY_SPECIAL)
-    {
-        // we're starting a gesture, attempt to autocomplete
-
-        std::string utf8_trigger = wstring_to_utf8str(raw_text);
-        std::string utf8_out_str(utf8_trigger);
-
-        if (LLGestureMgr::instance().matchPrefix(utf8_trigger, &utf8_out_str))
-        {
-            std::string rest_of_match = utf8_out_str.substr(utf8_trigger.size());
-            if (!rest_of_match.empty())
+            if (action == ALChatAutocomplete::CommitAction::SUBMIT)
             {
-                mInputEditor->setText(utf8_trigger + rest_of_match); // keep original capitalization for user-entered part
-                // Select to end of line, starting from the character
-                // after the last one the user typed.
-                mInputEditor->selectByCursorPosition(static_cast<S32>(utf8_out_str.size() - rest_of_match.size()), static_cast<S32>(utf8_out_str.size()));
+                sendChat(CHAT_TYPE_NORMAL);
+                return;
             }
 
-        }
-        else if (matchChatTypeTrigger(utf8_trigger, &utf8_out_str))
-        {
-            std::string rest_of_match = utf8_out_str.substr(utf8_trigger.size());
-            mInputEditor->setText(utf8_trigger + rest_of_match + " "); // keep original capitalization for user-entered part
+            mInputEditor->setText(row.value + " ");
             mInputEditor->endOfDoc();
-        }
-
-        //LL_INFOS() << "GESTUREDEBUG " << trigger
-        //  << " len " << length
-        //  << " outlen " << out_str.getLength()
-        //  << LL_ENDL;
-    }
+        });
 }
 
 // static

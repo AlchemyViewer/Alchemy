@@ -44,6 +44,7 @@
 #include "lltrans.h"
 #include "llchatentry.h"
 
+#include "alchatautocomplete.h"
 #include "alchatcommand.h"
 #include "llagent.h"
 #include "llbutton.h"
@@ -475,36 +476,21 @@ void ALChatBar::onInputEditorKeystroke(LLTextEditor* caller)
 
     KEY key = gKeyboard->currentKey();
 
-    // Ignore "special" keys, like backspace, arrows, etc.
-    // Ignore "special" keys, like backspace, arrows, etc.
-    if (gSavedSettings.getBOOL("ChatAutocompleteGestures")
-        && length > 1
-        && raw_text[0] == '/'
-        && key < KEY_SPECIAL)
-    {
-        // we're starting a gesture, attempt to autocomplete
-
-        std::string utf8_trigger = wstring_to_utf8str(raw_text);
-        std::string utf8_out_str(utf8_trigger);
-
-        if (LLGestureMgr::instance().matchPrefix(utf8_trigger, &utf8_out_str))
+    ALChatAutocomplete::update(
+        mInputEditor,
+        wstring_to_utf8str(raw_text),
+        key,
+        [this](const LLGestureAutocompleteHelper::Row& row, ALChatAutocomplete::CommitAction action)
         {
-            std::string rest_of_match = utf8_out_str.substr(utf8_trigger.size());
-            if (!rest_of_match.empty())
+            if (action == ALChatAutocomplete::CommitAction::SUBMIT)
             {
-                mInputEditor->setText(utf8_trigger + rest_of_match); // keep original capitalization for user-entered part
-                // Select to end of line, starting from the character
-                // after the last one the user typed.
-                mInputEditor->selectByCursorPosition(static_cast<S32>(utf8_out_str.size() - rest_of_match.size()), static_cast<S32>(utf8_out_str.size()));
+                sendChat(CHAT_TYPE_NORMAL);
+                return;
             }
 
-        }
-
-        //LL_INFOS() << "GESTUREDEBUG " << trigger
-        //  << " len " << length
-        //  << " outlen " << out_str.getLength()
-        //  << LL_ENDL;
-    }
+            mInputEditor->setText(row.value + " ");
+            mInputEditor->endOfDoc();
+        });
 }
 
 // static

@@ -51,9 +51,81 @@
 #include "llvolume.h"
 #include "llvolumemessage.h"
 
+#include <iterator>
+
+namespace
+{
+constexpr char COMMAND_AO[] = "AlchemyChatCommandAnimationOverride";
+constexpr char COMMAND_CALC[] = "AlchemyChatCommandCalc";
+constexpr char COMMAND_CLEAR[] = "AlchemyChatCommandClearNearby";
+constexpr char COMMAND_DRAW_DISTANCE[] = "AlchemyChatCommandDrawDistance";
+constexpr char COMMAND_ENABLE[] = "AlchemyChatCommandEnable";
+constexpr char COMMAND_GROUND[] = "AlchemyChatCommandGround";
+constexpr char COMMAND_HEIGHT[] = "AlchemyChatCommandHeight";
+constexpr char COMMAND_HOME[] = "AlchemyChatCommandHome";
+constexpr char COMMAND_HOVER_HEIGHT[] = "AlchemyChatCommandHoverHeight";
+constexpr char COMMAND_MAP_TO[] = "AlchemyChatCommandMapto";
+constexpr char COMMAND_POSITION[] = "AlchemyChatCommandPos";
+constexpr char COMMAND_REGION_MESSAGE[] = "AlchemyChatCommandRegionMessage";
+constexpr char COMMAND_RESYNC_ANIMATIONS[] = "AlchemyChatCommandResyncAnim";
+constexpr char COMMAND_REZ_PLATFORM[] = "AlchemyChatCommandRezPlat";
+constexpr char COMMAND_SET_CHAT_CHANNEL[] = "AlchemyChatCommandSetChatChannel";
+constexpr char COMMAND_SET_HOME[] = "AlchemyChatCommandSetHome";
+constexpr char COMMAND_TELEPORT_TO_CAMERA[] = "AlchemyChatCommandTeleportToCam";
+constexpr char DICE_ROLL_TRIGGER[] = "/droll";
+constexpr char SEND_MENU_TRIGGER[] = "/sendmenu";
+
+struct ConfiguredCommand
+{
+    const char* setting;
+    const char* description;
+    bool accepts_arguments;
+};
+
+constexpr ConfiguredCommand CONFIGURED_COMMANDS[] = {
+    { COMMAND_AO, "Animation override: on|off|sit [on|off]", true },
+    { COMMAND_CALC, "Calculate: expression", true },
+    { COMMAND_CLEAR, "Clear nearby chat", false },
+    { COMMAND_DRAW_DISTANCE, "Set draw distance: meters", true },
+    { COMMAND_GROUND, "Teleport to ground", false },
+    { COMMAND_HEIGHT, "Teleport to height: meters", true },
+    { COMMAND_HOME, "Teleport home", false },
+    { COMMAND_HOVER_HEIGHT, "Set hover height: meters", true },
+    { COMMAND_MAP_TO, "Teleport to region: name", true },
+    { COMMAND_POSITION, "Teleport to position: x y z", true },
+    { COMMAND_REGION_MESSAGE, "Send region message: message", true },
+    { COMMAND_RESYNC_ANIMATIONS, "Resync animations", false },
+    { COMMAND_REZ_PLATFORM, "Rez a platform: [size]", true },
+    { COMMAND_SET_CHAT_CHANNEL, "Set nearby chat channel: channel", true },
+    { COMMAND_SET_HOME, "Set home location", false },
+    { COMMAND_TELEPORT_TO_CAMERA, "Teleport to camera", false },
+};
+}
+
+std::vector<ALChatCommand::AutocompleteCommand> ALChatCommand::getAutocompleteCommands()
+{
+    if (!gSavedSettings.getBOOL(COMMAND_ENABLE))
+    {
+        return {};
+    }
+
+    std::vector<AutocompleteCommand> commands;
+    commands.reserve(std::size(CONFIGURED_COMMANDS) + 2);
+    for (const ConfiguredCommand& command : CONFIGURED_COMMANDS)
+    {
+        commands.push_back({
+            gSavedSettings.getString(command.setting),
+            command.description,
+            command.accepts_arguments });
+    }
+    commands.push_back({ DICE_ROLL_TRIGGER, "Roll a die: [sides]", true });
+    commands.push_back({ SEND_MENU_TRIGGER, "Reply to a dialog menu: channel button", true });
+    return commands;
+}
+
 bool ALChatCommand::parseCommand(std::string data)
 {
-    static LLCachedControl<bool> enableChatCmd(gSavedSettings, "AlchemyChatCommandEnable", true);
+    static LLCachedControl<bool> enableChatCmd(gSavedSettings, COMMAND_ENABLE, true);
     if (enableChatCmd)
     {
         utf8str_tolower(data);
@@ -62,22 +134,22 @@ bool ALChatCommand::parseCommand(std::string data)
 
         if (!(input >> cmd))    return false;
 
-        static LLCachedControl<std::string> sDrawDistanceCommand(gSavedSettings, "AlchemyChatCommandDrawDistance", "/dd");
-        static LLCachedControl<std::string> sHeightCommand(gSavedSettings, "AlchemyChatCommandHeight", "/gth");
-        static LLCachedControl<std::string> sGroundCommand(gSavedSettings, "AlchemyChatCommandGround", "/flr");
-        static LLCachedControl<std::string> sPosCommand(gSavedSettings, "AlchemyChatCommandPos", "/pos");
-        static LLCachedControl<std::string> sRezPlatCommand(gSavedSettings, "AlchemyChatCommandRezPlat", "/plat");
-        static LLCachedControl<std::string> sHomeCommand(gSavedSettings, "AlchemyChatCommandHome", "/home");
-        static LLCachedControl<std::string> sSetHomeCommand(gSavedSettings, "AlchemyChatCommandSetHome", "/sethome");
-        static LLCachedControl<std::string> sCalcCommand(gSavedSettings, "AlchemyChatCommandCalc", "/calc");
-        static LLCachedControl<std::string> sMaptoCommand(gSavedSettings, "AlchemyChatCommandMapto", "/mapto");
-        static LLCachedControl<std::string> sClearCommand(gSavedSettings, "AlchemyChatCommandClearNearby", "/clr");
-        static LLCachedControl<std::string> sRegionMsgCommand(gSavedSettings, "AlchemyChatCommandRegionMessage", "/regionmsg");
-        static LLCachedControl<std::string> sSetNearbyChatChannelCmd(gSavedSettings, "AlchemyChatCommandSetChatChannel", "/setchannel");
-        static LLCachedControl<std::string> sResyncAnimCommand(gSavedSettings, "AlchemyChatCommandResyncAnim", "/resync");
-        static LLCachedControl<std::string> sTeleportToCam(gSavedSettings, "AlchemyChatCommandTeleportToCam", "/tp2cam");
-        static LLCachedControl<std::string> sHoverHeight(gSavedSettings, "AlchemyChatCommandHoverHeight", "/hover");
-        static LLCachedControl<std::string> sAOCommand(gSavedSettings, "AlchemyChatCommandAnimationOverride", "/ao");
+        static LLCachedControl<std::string> sDrawDistanceCommand(gSavedSettings, COMMAND_DRAW_DISTANCE, "/dd");
+        static LLCachedControl<std::string> sHeightCommand(gSavedSettings, COMMAND_HEIGHT, "/gth");
+        static LLCachedControl<std::string> sGroundCommand(gSavedSettings, COMMAND_GROUND, "/flr");
+        static LLCachedControl<std::string> sPosCommand(gSavedSettings, COMMAND_POSITION, "/pos");
+        static LLCachedControl<std::string> sRezPlatCommand(gSavedSettings, COMMAND_REZ_PLATFORM, "/plat");
+        static LLCachedControl<std::string> sHomeCommand(gSavedSettings, COMMAND_HOME, "/home");
+        static LLCachedControl<std::string> sSetHomeCommand(gSavedSettings, COMMAND_SET_HOME, "/sethome");
+        static LLCachedControl<std::string> sCalcCommand(gSavedSettings, COMMAND_CALC, "/calc");
+        static LLCachedControl<std::string> sMaptoCommand(gSavedSettings, COMMAND_MAP_TO, "/mapto");
+        static LLCachedControl<std::string> sClearCommand(gSavedSettings, COMMAND_CLEAR, "/clr");
+        static LLCachedControl<std::string> sRegionMsgCommand(gSavedSettings, COMMAND_REGION_MESSAGE, "/regionmsg");
+        static LLCachedControl<std::string> sSetNearbyChatChannelCmd(gSavedSettings, COMMAND_SET_CHAT_CHANNEL, "/setchannel");
+        static LLCachedControl<std::string> sResyncAnimCommand(gSavedSettings, COMMAND_RESYNC_ANIMATIONS, "/resync");
+        static LLCachedControl<std::string> sTeleportToCam(gSavedSettings, COMMAND_TELEPORT_TO_CAMERA, "/tp2cam");
+        static LLCachedControl<std::string> sHoverHeight(gSavedSettings, COMMAND_HOVER_HEIGHT, "/hover");
+        static LLCachedControl<std::string> sAOCommand(gSavedSettings, COMMAND_AO, "/ao");
 
         if (cmd == utf8str_tolower(sDrawDistanceCommand()))  // dd
         {
@@ -216,7 +288,7 @@ bool ALChatCommand::parseCommand(std::string data)
             }
             return true;
         }
-        else if (cmd == "/droll")
+        else if (cmd == DICE_ROLL_TRIGGER)
         {
             S32 dice_sides;
             if (!(input >> dice_sides))
@@ -326,7 +398,7 @@ bool ALChatCommand::parseCommand(std::string data)
                 }
             }
         }
-        else if (cmd == "/sendmenu")
+        else if (cmd == SEND_MENU_TRIGGER)
         {
             S32 channel;
             if (!(input >> channel))

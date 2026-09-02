@@ -11,6 +11,7 @@ target_sources(llui
     llbadgeholder.cpp
     llbadgeowner.cpp
     llbutton.cpp
+    llchatautocompletemodel.cpp
     llchatentry.cpp
     llchatmentionhelper.cpp
     llcheckboxctrl.cpp
@@ -121,6 +122,7 @@ target_sources(llui
     llbadgeowner.h
     llbutton.h
     llcallbackmap.h
+    llchatautocompletemodel.h
     llchatentry.h
     llchat.h
     llchatmentionhelper.h
@@ -297,6 +299,7 @@ if(BUILD_TESTING)
   set(test_libs llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
 
   SET(llui_TEST_SOURCE_FILES
+      llchatautocompletemodel.cpp
       llurlmatch.cpp
       )
   set_property( SOURCE ${llui_TEST_SOURCE_FILES} PROPERTY LL_TEST_ADDITIONAL_LIBRARIES ${test_libs})
