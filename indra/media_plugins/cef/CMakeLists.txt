@@ -203,6 +203,7 @@ elseif (LINUX)
   )
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${VIEWER_STAGING_DIR}/bin/llplugin"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_RESOURCE_FILES} "${VIEWER_STAGING_DIR}/bin/llplugin"
     COMMAND_EXPAND_LISTS
   )
