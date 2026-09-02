@@ -164,7 +164,6 @@ protected:
 
     // For now assuming all colors are the same in derived classes.
     static LLUIColor            sFgColor;
-    static LLUIColor            sFgDisabledColor;
     static LLUIColor            sHighlightBgColor;
     static LLUIColor            sFlashBgColor;
     static LLUIColor            sFocusOutlineColor;
@@ -476,7 +475,6 @@ protected:
     S32         mFavoritesDirtyFlags { 0 };
 
     bool        mIsOpen;
-    bool        mExpanderHighlighted;
     bool        mIsFolderComplete; // indicates that some children were not loaded/added yet
     bool        mAreChildrenInited; // indicates that no children were initialized
 

@@ -71,8 +71,6 @@ std::set<LLView*> LLView::sPreviewHighlightedElements;
 bool LLView::sHighlightingDiffs = false;
 LLView* LLView::sPreviewClickedElement = nullptr;
 bool    LLView::sDrawPreviewHighlights = false;
-S32     LLView::sLastLeftXML = S32_MIN;
-S32     LLView::sLastBottomXML = S32_MIN;
 std::vector<LLViewDrawContext*> LLViewDrawContext::sDrawContextStack;
 
 // Empty until a test installs one; see LLView::TemporaryDrilldownFunc. The

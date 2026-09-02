@@ -724,8 +724,6 @@ private:
 
     bool        mInDraw;
 
-    static LLWindow* sWindow;   // All root views must know about their window.
-
     LLView& getDefaultWidgetContainer() const;
 
     // The containers above, allocated if this is the first caller to need one.
@@ -799,8 +797,6 @@ public:
     static bool sHighlightingDiffs;                         // DEV-16869
     static LLView* sPreviewClickedElement;                  // DEV-16869
     static bool sDrawPreviewHighlights;
-    static S32 sLastLeftXML;
-    static S32 sLastBottomXML;
     static bool sForceReshape;
 };
 

@@ -1397,7 +1397,6 @@ bool LLFolderViewItem::isInSelection() const
 LLFolderViewFolder::LLFolderViewFolder( const LLFolderViewItem::Params& p ):
     LLFolderViewItem( p ),
     mIsOpen(false),
-    mExpanderHighlighted(false),
     mCurHeight(0.f),
     mTargetHeight(0.f),
     mAutoOpenCountdown(0.f),
@@ -2642,7 +2641,6 @@ void LLFolderViewFolder::draw()
         LLView::draw();
     }
 
-    mExpanderHighlighted = false;
 }
 
 // this does prefix traversal, as folders are listed above their contents
