@@ -486,6 +486,11 @@ public:
 
     LLControlVariable *findControl(std::string_view name);
 
+    // Walk it, do not keep it. A view with no children has no list of its own
+    // and this hands back a shared empty one, so two childless views return
+    // the same pointer, and a pointer taken before the first addChild goes on
+    // pointing at the empty one after children arrive. Both are fine for the
+    // caller that iterates and lets go, which is every caller today.
     const child_list_t* getChildList() const { return &children(); }
     child_list_const_iter_t beginChild() const { return children().begin(); }
     child_list_const_iter_t endChild() const { return children().end(); }
