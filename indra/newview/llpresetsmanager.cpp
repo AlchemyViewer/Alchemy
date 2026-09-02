@@ -710,9 +710,15 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderCrossFilterChromatic",
         // Lens dirt
         "RenderLensDirtStrength",
-        "RenderLensDirtTexture",
         "RenderLensDirtBloomResponse",
         "RenderLensDirtFlareResponse",
+        "RenderLensDirtGrime",
+        "RenderLensDirtMoteScale",
+        "RenderLensDirtSmudge",
+        "RenderLensDirtScratches",
+        "RenderLensDirtSeed",
+        "RenderLensDirtToe",
+        "RenderLensDirtGain",
         // Vignette
         "RenderVignetteAmount",
         "RenderVignetteCenter",

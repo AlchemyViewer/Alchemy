@@ -97,12 +97,11 @@ public:
                             const std::vector<std::string>& extensions,
                             const std::string& setting_name);
     void populateLUTCombo();
-    void populateLensDirtCombo();
     void openUserAssetFolder(const std::string& dir_name);
     /// Open the user's LUT folder in the platform file browser, creating it
     /// first if this is its first use.
     void onClickOpenLUTFolder();
-    void onClickOpenLensDirtFolder();
+    void onLensDirtSliderHeld(bool held);
     void updateTonemapperRows();
     /// Freeze the frame about to be presented, and switch the wipe on so the
     /// grab is visibly a grab.

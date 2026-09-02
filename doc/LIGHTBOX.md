@@ -100,8 +100,8 @@ The floater's C++ provides:
 - `LightBox.CommitSplitToneGraph` — the split-tone band graph's handle, which
   writes `RenderSplitToneBalance`.
 - `LightBox.PickWhiteBalance` — arms the eyedropper.
-- `LightBox.OpenLUTFolder` / `LightBox.OpenLensDirtFolder` — reveal the user's
-  asset folder for that picker, creating it on first use.
+- `LightBox.OpenLUTFolder` — reveals the user's colour-LUT folder, creating it
+  on first use.
 - The Looks bar and tonemapper-row greying (effect-specific, already done).
 
 **Asset-picker rows are a third kind of dropdown**, distinct from the enum
@@ -117,8 +117,17 @@ The helper's closing `selectByValue` is load-bearing rather than cosmetic —
 with `allow_text_entry` nothing else restores the saved value when the floater
 opens. And the extension whitelist must list only what the loader can actually
 decode, or the picker offers files that silently fail. Pair it with an
-`openUserAssetFolder(dir_name)` button so the folder is discoverable; adding a
-third picker is two calls.
+`openUserAssetFolder(dir_name)` button so the folder is discoverable.
+
+The colour LUT is currently the only picker — the lens dirt plate that shared
+these helpers is generated now. Both stay parameterised by directory anyway,
+because the shape is the shared part and collapsing them back to a constant
+only has to be undone for the next asset. Before reaching for a picker at all,
+ask whether the asset could be generated instead: a texture a shader can draw
+into a render target once needs no file, no packaging entry, no extension
+whitelist and no fitting to the window, and it can be put on sliders. See
+`generateLensDirt` in pipeline.cpp for the shape — gate, cached parameter set,
+allocate, draw, release when the effect goes off.
 
 The last four are examples of the per-control cost: a graph or a tool needs
 something to interpret its input, so it gets one callback and one `setup*`
@@ -837,6 +846,12 @@ only; apply per row, not on the parent panel. Reference patterns:
   exactly that reason. The one deliberate exception is dither,
   which is a quantisation aid rather than a look and which an 8-bit PNG wants
   either way.
+- **A generation pass is a third case, and gating it is a mistake.**
+  `generateLensDirt` deliberately ignores `gSnapshotNoPost`: the flag is true
+  for the single frame a no-post snapshot is taken, so releasing the plate for
+  it would buy a full regeneration on the very next frame — a hitch every time
+  someone takes one. What has to be gated is the *use* of the plate, in
+  `colorCorrect`, not its production.
 
 Two things that only show up on screen, both of which did:
 

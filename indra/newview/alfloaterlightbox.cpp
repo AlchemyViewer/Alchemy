@@ -177,7 +177,8 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.CommitSplitToneGraph", std::bind(&ALFloaterLightBox::onCommitSplitToneGraph, this));
     mCommitCallbackRegistrar.add("LightBox.PickWhiteBalance", std::bind(&ALFloaterLightBox::onClickWhiteBalancePicker, this));
     mCommitCallbackRegistrar.add("LightBox.OpenLUTFolder", std::bind(&ALFloaterLightBox::onClickOpenLUTFolder, this));
-    mCommitCallbackRegistrar.add("LightBox.OpenLensDirtFolder", std::bind(&ALFloaterLightBox::onClickOpenLensDirtFolder, this));
+    mCommitCallbackRegistrar.add("LightBox.LensDirtSliderDown", std::bind(&ALFloaterLightBox::onLensDirtSliderHeld, this, true));
+    mCommitCallbackRegistrar.add("LightBox.LensDirtSliderUp", std::bind(&ALFloaterLightBox::onLensDirtSliderHeld, this, false));
     mCommitCallbackRegistrar.add("LightBox.LookSelected", std::bind(&ALFloaterLightBox::onLookSelected, this));
     mCommitCallbackRegistrar.add("LightBox.LookSave", std::bind(&ALFloaterLightBox::onClickLookSave, this));
     mCommitCallbackRegistrar.add("LightBox.LookSaveAs", std::bind(&ALFloaterLightBox::onClickLookSaveAs, this));
@@ -213,7 +214,6 @@ ALFloaterLightBox::~ALFloaterLightBox()
 bool ALFloaterLightBox::postBuild()
 {
     populateLUTCombo();
-    populateLensDirtCombo();
 
     mTonemapConnection = gSavedSettings.getControl("AlchemyRenderTonemapType")->getSignal()->connect(
         [this](LLControlVariable*, const LLSD&, const LLSD&) { updateTonemapperRows(); });
@@ -378,13 +378,10 @@ void ALFloaterLightBox::populateLUTCombo()
     populateAssetCombo("colorlut_combo", "colorlut", LUT_EXTENSIONS, "RenderColorGradeLUT");
 }
 
-void ALFloaterLightBox::populateLensDirtCombo()
-{
-    // No .cube here: setupLensDirt loads plain 2D images only.
-    static const std::vector<std::string> DIRT_EXTENSIONS = { "tga", "png", "jpg", "jpeg", "bmp", "webp" };
-    populateAssetCombo("lensdirt_combo", "lensdirt", DIRT_EXTENSIONS, "RenderLensDirtTexture");
-}
-
+// Parameterised by directory even though the colour LUT is once again the only
+// caller: the lens dirt plate that shared it is generated now. Kept general
+// because the shape is the shared part -- user folder, created on demand -- and
+// collapsing it back to a constant only has to be undone for the next asset.
 void ALFloaterLightBox::openUserAssetFolder(const std::string& dir_name)
 {
     // The user's folder, not the bundled one: it is the half of the pair that
@@ -397,14 +394,22 @@ void ALFloaterLightBox::openUserAssetFolder(const std::string& dir_name)
     gDirUtilp->openDir(dir);
 }
 
+// The lens dirt plate is regenerated whenever one of its parameters changes,
+// and at full resolution that is too expensive to do on every frame of a slider
+// drag. Rather than guess when a drag has ended from a timer, say so: the
+// renderer holds off while this is raised and rebuilds once on release.
+//
+// Only the generation sliders carry these. Strength and the two response
+// controls are applied per frame at composite time and rebuild nothing, so
+// holding them off would only make them feel broken.
+void ALFloaterLightBox::onLensDirtSliderHeld(bool held)
+{
+    gPipeline.mLensDirtSliderHeld = held;
+}
+
 void ALFloaterLightBox::onClickOpenLUTFolder()
 {
     openUserAssetFolder("colorlut");
-}
-
-void ALFloaterLightBox::onClickOpenLensDirtFolder()
-{
-    openUserAssetFolder("lensdirt");
 }
 
 void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)

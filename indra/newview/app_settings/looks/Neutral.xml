@@ -951,6 +951,72 @@
             <key>Value</key>
             <real>1.0</real>
         </map>
+        <key>RenderLensDirtGain</key>
+        <map>
+            <key>Comment</key>
+            <string>Overall brightness of the generated dirt plate, applied after the tone curve. Mostly a trim for Toe: raise it when a high Toe has crushed the plate too far. Range 0.5 to 2.5.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtGrime</key>
+        <map>
+            <key>Comment</key>
+            <string>How much muck is on the glass. Scales every layer of dust and grit at once, so this is the master density. Starting points, with Smudge and Toe to match: a lens that has been outdoors 0.45 / 0.5 / 1.8, one nobody has wiped in a while 1.0 / 1.0 / 1.6, a damaged one 0.95 / 0.9 / 1.2 with scratches, and filthy 1.9 / 1.5 / 1.2. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtMoteScale</key>
+        <map>
+            <key>Comment</key>
+            <string>Size of the dust motes. Above 1 the specks grow and thin out, which reads as a lens that has picked up a few big flecks rather than an even film; below 1 they shrink and multiply into finer grime. Range 0.5 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderLensDirtScratches</key>
+        <map>
+            <key>Comment</key>
+            <string>How many scratches cross the glass. 0 is undamaged; around 16 reads as a well-used lens with coating chips. Scratches are straight and bright where dust is soft and scattered, so a few go a long way. Range 0 to 32.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>RenderLensDirtSeed</key>
+        <map>
+            <key>Comment</key>
+            <string>Reshuffles the grime - every value lays the dirt out differently at the same settings. It also moves the overall density by twenty or thirty percent, because dirt pools rather than spreading evenly and where it pools changes with the seed. If a plate comes out dirtier than the last, that is this and not Grime. Range 0 to 999.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>7</integer>
+        </map>
+        <key>RenderLensDirtSmudge</key>
+        <map>
+            <key>Comment</key>
+            <string>Strength of the wipe marks - the broad, soft smears a cloth leaves behind, as opposed to the discrete specks. Raise it for a lens cleaned in a hurry. Range 0 to 2.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
         <key>RenderLensDirtStrength</key>
         <map>
             <key>Comment</key>
@@ -962,16 +1028,16 @@
             <key>Value</key>
             <real>0.0</real>
         </map>
-        <key>RenderLensDirtTexture</key>
+        <key>RenderLensDirtToe</key>
         <map>
             <key>Comment</key>
-            <string>Which grime plate the lens dirt effect uses, from app_settings/lensdirt. Four ship: Subtle is a clean lens that has been outdoors, Dirty is one nobody has wiped in a while, Extreme is filthy, and Damaged adds scratches and coating chips on top of the grime. Drop your own greyscale image in the same folder and it appears in the list; single-channel and colour images both work. Plates are cover-fitted rather than stretched, so a speck stays a speck on any window shape.</string>
+            <string>Shapes the low end of the plate - how much of the faint grime survives into the result. Lower values keep the midtones dirt actually lives in; higher values crush them and leave only the brightest specks, which reads clean no matter how high Strength goes. Range 0.6 to 4.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>String</string>
+            <string>F32</string>
             <key>Value</key>
-            <string>Dirty.png</string>
+            <real>1.6</real>
         </map>
         <key>RenderLensDistortionAmount</key>
         <map>

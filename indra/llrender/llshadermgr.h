@@ -552,6 +552,17 @@ public:
         LENS_DIRT_BLOOM_RESPONSE,           //  "uLensDirtBloomResponse"
         LENS_DIRT_FLARE_RESPONSE,           //  "uLensDirtFlareResponse"
 
+        // Lens dirt generation — read only by the plate generator, which runs
+        // when a parameter moves rather than per frame
+        LENS_DIRT_RESOLUTION,               //  "uDirtResolution"      plate size; only the ratio is read
+        LENS_DIRT_SEED,                     //  "uDirtSeed"
+        LENS_DIRT_GRIME,                    //  "uDirtGrime"           master density
+        LENS_DIRT_MOTE_SCALE,               //  "uDirtMoteScale"
+        LENS_DIRT_SMUDGE,                   //  "uDirtSmudge"
+        LENS_DIRT_SCRATCHES,                //  "uDirtScratches"       0 for undamaged glass
+        LENS_DIRT_TOE,                      //  "uDirtToe"             tone curve exponent
+        LENS_DIRT_GAIN,                     //  "uDirtGain"            tone curve gain
+
         // Cross-screen (star) filter — streaks every thresholded highlight
         CROSS_TEXEL,                        //  "uCrossTexel"          1 / source size
         CROSS_DIR,                          //  "uCrossDir"            unit arm direction, one chain per arm

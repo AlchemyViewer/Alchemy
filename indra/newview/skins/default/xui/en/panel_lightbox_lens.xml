@@ -3150,14 +3150,14 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="168"
+		 height="191"
 		 name="atab_sec_lensdirt"
 		 title="Lens Dirt"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="139"
+			 height="162"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -3195,47 +3195,306 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderLensDirtStrength" />
 				</button>
-				<text
-				 follows="left|top"
+				<slider
+				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
 				 top_pad="9"
-				 width="140"
-				 height="15"
-				 name="lensdirt_plate_label"
-				 value="Plate" />
-				<combo_box
-				 allow_text_entry="true"
-				 follows="left|top|right"
-				 layout="topleft"
-				 left_delta="140"
-				 top_pad="-16"
 				 right="-32"
-				 height="18"
-				 max_chars="200"
-				 name="lensdirt_combo"
-				 tool_tip="Which dirt plate to use. Subtle through Extreme are the same grime at rising density; Damaged adds scratches and coating chips. Greyscale images dropped into your 'lensdirt' folder appear here the next time the Lightbox opens."
-				 control_name="RenderLensDirtTexture">
-					<combo_box.item
-					 label="None"
-					 name="dirt_none"
-					 value="" />
-				</combo_box>
+				 height="16"
+				 label="Grime"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="lensdirt_grime"
+				 tool_tip="How much muck is on the glass. Scales every layer of dust and grit at once"
+				 control_name="RenderLensDirtGrime">
+					<slider.mouse_down_callback
+					 function="LightBox.LensDirtSliderDown" />
+					<slider.mouse_up_callback
+					 function="LightBox.LensDirtSliderUp" />
+				</slider>
 				<button
 				 follows="top|right"
 				 layout="topleft"
 				 height="18"
 				 width="18"
 				 right="-8"
-				 top_pad="-18"
+				 top_pad="-17"
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="center"
-				 name="lensdirt_plate_rst"
+				 name="lensdirt_grime_rst"
 				 tool_tip="Reset to default">
 					<button.commit_callback
 					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDirtTexture" />
+					 parameter="RenderLensDirtGrime" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Mote Size"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="2"
+				 name="lensdirt_mote_scale"
+				 tool_tip="Size of the dust specks. Above 1 they grow and thin out; below 1 they shrink into finer grime"
+				 control_name="RenderLensDirtMoteScale">
+					<slider.mouse_down_callback
+					 function="LightBox.LensDirtSliderDown" />
+					<slider.mouse_up_callback
+					 function="LightBox.LensDirtSliderUp" />
+				</slider>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_mote_scale_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtMoteScale" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Smudge"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="lensdirt_smudge"
+				 tool_tip="Strength of the broad wipe marks a cloth leaves behind, as opposed to the discrete specks"
+				 control_name="RenderLensDirtSmudge">
+					<slider.mouse_down_callback
+					 function="LightBox.LensDirtSliderDown" />
+					<slider.mouse_up_callback
+					 function="LightBox.LensDirtSliderUp" />
+				</slider>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_smudge_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtSmudge" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Scratches"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="32"
+				 name="lensdirt_scratches"
+				 tool_tip="How many scratches cross the glass. 0 is undamaged. They are straight and bright where dust is soft, so a few go a long way"
+				 control_name="RenderLensDirtScratches">
+					<slider.mouse_down_callback
+					 function="LightBox.LensDirtSliderDown" />
+					<slider.mouse_up_callback
+					 function="LightBox.LensDirtSliderUp" />
+				</slider>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_scratches_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtScratches" />
+				</button>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_lensdirt_reset"
+				 tool_tip="Reset this section to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_lensdirt" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="191"
+		 name="atab_sec_lensdirt_adv"
+		 title="Lens Dirt - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="162"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_lensdirt_adv">
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="8"
+				 right="-32"
+				 height="16"
+				 label="Seed"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="999"
+				 name="lensdirt_seed"
+				 tool_tip="Reshuffles the grime. Also moves the overall density a little, since dirt pools rather than spreading evenly and where it pools changes with the seed"
+				 control_name="RenderLensDirtSeed">
+					<slider.mouse_down_callback
+					 function="LightBox.LensDirtSliderDown" />
+					<slider.mouse_up_callback
+					 function="LightBox.LensDirtSliderUp" />
+				</slider>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_seed_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtSeed" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Toe"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.6"
+				 max_val="4"
+				 name="lensdirt_toe"
+				 tool_tip="How much of the faint grime survives. Higher values crush the midtones and leave only the brightest specks, which reads clean whatever Strength is set to"
+				 control_name="RenderLensDirtToe">
+					<slider.mouse_down_callback
+					 function="LightBox.LensDirtSliderDown" />
+					<slider.mouse_up_callback
+					 function="LightBox.LensDirtSliderUp" />
+				</slider>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_toe_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtToe" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Gain"
+				 label_width="140"
+				 can_edit_text="true"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.5"
+				 max_val="2.5"
+				 name="lensdirt_gain"
+				 tool_tip="Overall brightness of the generated plate, applied after the toe. Mostly a trim for Toe"
+				 control_name="RenderLensDirtGain">
+					<slider.mouse_down_callback
+					 function="LightBox.LensDirtSliderDown" />
+					<slider.mouse_up_callback
+					 function="LightBox.LensDirtSliderUp" />
+				</slider>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="lensdirt_gain_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderLensDirtGain" />
 				</button>
 				<slider
 				 follows="left|top|right"
@@ -3304,35 +3563,22 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 					 parameter="RenderLensDirtFlareResponse" />
 				</button>
 				<button
-				 follows="left|top"
-				 layout="topleft"
-				 height="18"
-				 width="100"
-				 left="8"
-				 top_pad="10"
-				 label="Open Folder"
-				 name="lensdirt_open_folder"
-				 tool_tip="Open your lens dirt folder in the file browser. Drop greyscale plates there; new files are listed the next time the Lightbox opens.">
-					<button.commit_callback
-					 function="LightBox.OpenLensDirtFolder" />
-				</button>
-				<button
 				 follows="top|right"
 				 layout="topleft"
 				 height="18"
 				 width="100"
 				 right="-8"
-				 top_delta="0"
+				 top_pad="10"
 				 label="Reset All"
 				 halign="left"
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="right"
-				 name="sec_lensdirt_reset"
+				 name="sec_lensdirt_adv_reset"
 				 tool_tip="Reset this section to defaults">
 					<button.commit_callback
 					 function="LightBox.ResetSection"
-					 parameter="sec_lensdirt" />
+					 parameter="sec_lensdirt_adv" />
 				</button>
 			</panel>
 		</accordion_tab>

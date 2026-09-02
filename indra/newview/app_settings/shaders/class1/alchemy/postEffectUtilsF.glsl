@@ -927,20 +927,13 @@ vec3 applyLensDirt(vec2 uv, vec3 lens_light)
     if (uLensDirtStrength <= 0.0)
         return vec3(0.0);
 
-    // Cover-fit the plate rather than stretching it to the frame.
+    // Sampled with raw screen UV, and there is no fitting to do: the plate is
+    // generated at the frame's own aspect, so a mote is already round on the
+    // display it was made for. The square plates this replaced needed a
+    // cover-fit and gave up the frame's edges to get it.
     //
-    // Plates are authored square, so sampling with raw screen UV scales them to
-    // whatever aspect the window happens to be -- on an ultrawide that turns
-    // every round mote into a long ellipse and the whole plate reads as smeared
-    // glass rather than dirt. Scaling the shorter axis instead keeps the plate
-    // at its authored aspect and crops the overhang, so a speck stays a speck
-    // at any window shape. The cost is that a very wide frame sees only a band
-    // of the plate, which is why the bundled one spreads its detail evenly
-    // rather than composing for the centre.
-    vec2 cover = uResolution / max(max(uResolution.x, uResolution.y), 1.0);
-    vec2 duv   = (uv - 0.5) * cover + 0.5;
-
-    return lens_light * texture(uLensDirtMap, duv).rgb * uLensDirtStrength;
+    // Single channel -- dirt is a scalar mask, and the generator writes one.
+    return lens_light * texture(uLensDirtMap, uv).r * uLensDirtStrength;
 }
 
 

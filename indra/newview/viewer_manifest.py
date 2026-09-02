@@ -105,7 +105,6 @@ class ViewerManifest(LLManifest):
                 self.path("colorlut")
 
                 # ... and the bundled lens dirt plates
-                self.path("lensdirt")
 
                 # ... and the bundled starter Looks
                 self.path("looks")

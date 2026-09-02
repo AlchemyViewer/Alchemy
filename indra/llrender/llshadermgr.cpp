@@ -2019,6 +2019,16 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uLensDirtBloomResponse");
     mReservedUniforms.push_back("uLensDirtFlareResponse");
 
+    // Lens dirt generation
+    mReservedUniforms.push_back("uDirtResolution");
+    mReservedUniforms.push_back("uDirtSeed");
+    mReservedUniforms.push_back("uDirtGrime");
+    mReservedUniforms.push_back("uDirtMoteScale");
+    mReservedUniforms.push_back("uDirtSmudge");
+    mReservedUniforms.push_back("uDirtScratches");
+    mReservedUniforms.push_back("uDirtToe");
+    mReservedUniforms.push_back("uDirtGain");
+
     // Cross-screen filter
     mReservedUniforms.push_back("uCrossTexel");
     mReservedUniforms.push_back("uCrossDir");

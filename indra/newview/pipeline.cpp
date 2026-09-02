@@ -40,6 +40,7 @@
 #include "llimagewebp.h"
 #include "llaudioengine.h" // For debugging.
 #include "llerror.h"
+#include "llfocusmgr.h"
 #include "llviewercontrol.h"
 #include "llfasttimer.h"
 #include "llfontgl.h"
@@ -655,7 +656,6 @@ void LLPipeline::init()
 
     gSavedSettings.getControl("RenderColorGrade")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupGradingLUT, this));
     gSavedSettings.getControl("RenderColorGradeLUT")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupGradingLUT, this));
-    gSavedSettings.getControl("RenderLensDirtTexture")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupLensDirt, this));
 }
 
 LLPipeline::~LLPipeline()
@@ -1312,11 +1312,11 @@ void LLPipeline::releaseGLBuffers()
         mSMAASearchMap = 0;
     }
 
-    if (mLensDirtMap)
-    {
-        LLImageGL::deleteTextures(1, &mLensDirtMap);
-        mLensDirtMap = 0;
-    }
+    // Clearing the recorded parameters matters as much as the release: they are
+    // what generateLensDirt compares against, so leaving them set would make it
+    // decide nothing had changed and skip rebuilding the plate it no longer has.
+    mLensDirtMap.release();
+    mLensDirtParams = LensDirtParams();
 
     releaseLUTBuffers();
 
@@ -1575,7 +1575,6 @@ void LLPipeline::createGLBuffers()
     createLUTBuffers();
 
     setupGradingLUT();
-    setupLensDirt();
 
     gBumpImageList.restoreGL();
 }
@@ -1633,105 +1632,146 @@ void LLPipeline::createLUTBuffers()
     mLastExposure.allocate(1, 1, GL_R16F);
 }
 
-// Lens dirt plate loader.
+// Lens dirt plate generator.
 //
-// Modelled on setupGradingLUT below -- same user-then-bundled search order,
-// same per-format decode -- but simpler, since this is a plain 2D image with
-// no .cube path and no cube-strip geometry to validate.
+// The plate used to be one of four bundled images picked from a list. Generating
+// it makes it resolution-independent -- built at the frame's own aspect, so a
+// mote stays round on an ultrawide without the cover-fit the square plates
+// needed -- and puts the grime itself on sliders instead of shipping fixed looks
+// and hoping one fits the shot.
 //
-// Two deliberate departures from the loaders it borrows from:
-//
-//  - Unlike the grading LUT, one- and two-component images are accepted. A
-//    dirt plate is a scalar mask; greyscale is the natural authoring format
-//    and the bundled plates use it.
-//  - Unlike the SMAA sample-map loader, the *internal* format is derived from
-//    the component count rather than hardcoded to GL_RGB8. A greyscale plate
-//    through that path would cost three times the memory it needs.
-void LLPipeline::setupLensDirt()
+// This is not a per-frame pass. It runs when a parameter moves or the window
+// resizes, and that budget is what lets the shader afford four cellular layers,
+// two fBm fields and up to LENS_DIRT_MAX_LINES segment distance fields per
+// pixel. The per-frame cost of the effect is still the one texture fetch in
+// colorCorrect.
+void LLPipeline::generateLensDirt()
 {
-    if (mLensDirtMap)
-    {
-        LLImageGL::deleteTextures(1, &mLensDirtMap);
-        mLensDirtMap = 0;
-    }
+    static LLCachedControl<F32> dirt_strength(gSavedSettings, "RenderLensDirtStrength", 0.f);
+    static LLCachedControl<S32> dirt_seed(gSavedSettings, "RenderLensDirtSeed", 7);
+    static LLCachedControl<F32> dirt_grime(gSavedSettings, "RenderLensDirtGrime", 1.f);
+    static LLCachedControl<F32> dirt_mote_scale(gSavedSettings, "RenderLensDirtMoteScale", 1.f);
+    static LLCachedControl<F32> dirt_smudge(gSavedSettings, "RenderLensDirtSmudge", 1.f);
+    static LLCachedControl<S32> dirt_scratches(gSavedSettings, "RenderLensDirtScratches", 0);
+    static LLCachedControl<F32> dirt_toe(gSavedSettings, "RenderLensDirtToe", 1.6f);
+    static LLCachedControl<F32> dirt_gain(gSavedSettings, "RenderLensDirtGain", 1.f);
 
-    const std::string dirt_name = gSavedSettings.getString("RenderLensDirtTexture");
-    if (dirt_name.empty())
-    {
-        return;     // "None" — strength is forced to 0 at bind time
-    }
+    // Deliberately not gated on gSnapshotNoPost. That flag is true for the one
+    // frame a no-post snapshot is taken, so releasing the plate for it would
+    // buy a full regeneration on the very next frame -- a hitch every time
+    // someone takes one. colorCorrect already forces the strength uniform to 0
+    // under a clean plate, which is the gate that actually matters.
+    const bool dirt_on = (dirt_strength() > 0.f) && gLensDirtGenProgram.isComplete();
 
-    // User directory wins, so a user plate can shadow a bundled one by name.
-    std::string dirt_path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "lensdirt", dirt_name);
-    if (!LLFile::isfile(dirt_path))
+    if (!dirt_on)
     {
-        dirt_path = gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "lensdirt", dirt_name);
-    }
-    if (!LLFile::isfile(dirt_path))
-    {
-        LL_WARNS() << "Lens dirt plate not found: " << dirt_name << LL_ENDL;
+        // Release rather than merely skip, the same way the cross filter does:
+        // allocating lazily is only worth anything if switching the effect off
+        // gives the memory back. Doing it here rather than from a commit signal
+        // keeps one teardown path, inside the render loop where the target is
+        // owned, and lets the strength control stay a live slider -- wiring a
+        // slider to a reallocation handler would fire on every mouse-move.
+        if (mLensDirtMap.isComplete() || mLensDirtParams != LensDirtParams())
+        {
+            mLensDirtMap.release();
+            mLensDirtParams = LensDirtParams();
+        }
         return;
     }
 
-    // One factory call instead of a hand-rolled extension switch: the codec
-    // table in llimage already knows every format this loader accepts, and a
-    // second copy of the dispatch (setupGradingLUT carries the first) is a
-    // list that silently drifts from it.
-    LLPointer<LLImageFormatted> plate_image = LLImageFormatted::createFromExtension(dirt_path);
-    if (plate_image.isNull())
+    // The frame's own resolution. There is no fitting to do when the plate is
+    // made at the shape it will be read at, and at GL_R8 even a 4K plate is
+    // about 8 MB -- cheap for something only allocated while the effect is on.
+    //
+    // Generating at full resolution is only affordable because the rebuild is
+    // debounced below. Capping the plate instead would bound the cost of one
+    // rebuild but not the number of them, which is the part that hurts.
+    const U32 gen_w = llmax(1u, mRT->screen.getWidth());
+    const U32 gen_h = llmax(1u, mRT->screen.getHeight());
+
+    LensDirtParams want;
+    want.width      = gen_w;
+    want.height     = gen_h;
+    want.seed       = (F32)llclamp(dirt_seed(), 0, 999);
+    want.grime      = llclamp(dirt_grime(), 0.f, 2.f);
+    want.mote_scale = llclamp(dirt_mote_scale(), 0.5f, 2.f);
+    want.smudge     = llclamp(dirt_smudge(), 0.f, 2.f);
+    want.scratches  = llclamp(dirt_scratches(), 0, LENS_DIRT_MAX_LINES);
+    want.toe        = llclamp(dirt_toe(), 0.6f, 4.f);
+    want.gain       = llclamp(dirt_gain(), 0.5f, 2.5f);
+
+    // Compared before the target is inspected, so a plate that failed to
+    // allocate is not retried -- and this warning not repeated -- every frame
+    // while VRAM stays exhausted. The next attempt happens when something
+    // actually moves, and the bind site keeps the effect off through
+    // isComplete() until one succeeds.
+    if (want == mLensDirtParams)
     {
-        LL_WARNS() << "Unsupported lens dirt format at " << dirt_path << LL_ENDL;
         return;
     }
 
-    LLPointer<LLImageRaw> raw_image = new LLImageRaw;
-    const bool decoded = plate_image->load(dirt_path) && plate_image->decode(raw_image, 0.0f);
-
-    if (!decoded)
+    // Hold off while a generation slider is being dragged. A drag changes a
+    // parameter every frame, and at full resolution rebuilding on each one is a
+    // stutter rather than a preview -- the slower the machine, the more of the
+    // drag it stutters through, which is backwards. The rebuild instead lands
+    // once, on release, which is where the result is being looked for anyway.
+    //
+    // Only a drag is held off, which is the whole reason this is a UI signal
+    // rather than a settle timer: a typed value, a reset button, applying a
+    // Look, undo, and a window resize all arrive here with no slider down and
+    // rebuild on the spot, where a timer would have made every one of them wait
+    // for no reason. The first plate is never held off either -- until one
+    // exists the effect is simply absent, and a pause reads as a bug.
+    //
+    // The capture test is a failsafe rather than part of the logic. LLSlider
+    // raises the flag from handleMouseDown and lowers it from handleMouseUp,
+    // but it implements no onMouseCaptureLost, so a capture stolen mid-drag
+    // would otherwise leave the flag stuck and the plate frozen until something
+    // else moved. No captor means no drag, whatever the flag says.
+    if (mLensDirtSliderHeld && gFocusMgr.getMouseCapture() != nullptr)
     {
-        LL_WARNS() << "Failed to decode lens dirt plate: " << dirt_path << LL_ENDL;
         return;
     }
 
-    if (raw_image->getWidth() > gGLManager.mGLMaxTextureSize ||
-        raw_image->getHeight() > gGLManager.mGLMaxTextureSize)
-    {
-        LL_WARNS() << "Lens dirt plate exceeds the maximum texture size: " << dirt_path << LL_ENDL;
-        return;
-    }
+    mLensDirtParams = want;
 
-    U32 primary_format  = 0;
-    U32 internal_format = 0;
-    switch (raw_image->getComponents())
+    // Everything above is a comparison; the zone starts where the work does.
+    LL_PROFILE_GPU_ZONE("lens dirt generate");
+
+    if (mLensDirtMap.getWidth() != gen_w || mLensDirtMap.getHeight() != gen_h)
     {
-        case 1: primary_format = GL_RED;  internal_format = GL_R8;    break;
-        case 2: primary_format = GL_RG;   internal_format = GL_RG8;   break;
-        case 3: primary_format = GL_RGB;  internal_format = GL_RGB8;  break;
-        case 4: primary_format = GL_RGBA; internal_format = GL_RGBA8; break;
-        default:
-            LL_WARNS() << "Lens dirt plate has an unusable component count: "
-                       << raw_image->getComponents() << LL_ENDL;
+        mLensDirtMap.release();
+        if (!mLensDirtMap.allocate(gen_w, gen_h, GL_R8))
+        {
+            LL_WARNS() << "Could not allocate the lens dirt plate; effect disabled until the parameters change" << LL_ENDL;
             return;
+        }
+        LL_DEBUGS("Pipeline") << "Lens dirt plate at " << gen_w << "x" << gen_h << LL_ENDL;
     }
 
-    LLImageGL::generateTextures(1, &mLensDirtMap);
-    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mLensDirtMap);
-    LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE),
-                                 internal_format,
-                                 raw_image->getWidth(), raw_image->getHeight(),
-                                 primary_format, GL_UNSIGNED_BYTE, raw_image->getData());
+    gLensDirtGenProgram.bind();
 
-    if (raw_image->getComponents() < 3)
+    gLensDirtGenProgram.uniform2f(LLShaderMgr::LENS_DIRT_RESOLUTION, (F32)gen_w, (F32)gen_h);
+    gLensDirtGenProgram.uniform1f(LLShaderMgr::LENS_DIRT_SEED, want.seed);
+    gLensDirtGenProgram.uniform1f(LLShaderMgr::LENS_DIRT_GRIME, want.grime);
+    gLensDirtGenProgram.uniform1f(LLShaderMgr::LENS_DIRT_MOTE_SCALE, want.mote_scale);
+    gLensDirtGenProgram.uniform1f(LLShaderMgr::LENS_DIRT_SMUDGE, want.smudge);
+    gLensDirtGenProgram.uniform1i(LLShaderMgr::LENS_DIRT_SCRATCHES, want.scratches);
+    gLensDirtGenProgram.uniform1f(LLShaderMgr::LENS_DIRT_TOE, want.toe);
+    gLensDirtGenProgram.uniform1f(LLShaderMgr::LENS_DIRT_GAIN, want.gain);
+
+    // No clear: the fullscreen triangle writes every texel with blending off,
+    // so clearing first would be pure redundant fill.
     {
-        // A one- or two-channel plate is a scalar mask, but GL_R8 samples as
-        // (r, 0, 0, 1) -- read as colour that would tint every speck pure red.
-        // Swizzling green and blue to red replicates the mask across RGB, so
-        // the shader can treat mono and colour plates through one code path.
-        const U32 tex_target = ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE);
-        glTexParameteri(tex_target, GL_TEXTURE_SWIZZLE_G, GL_RED);
-        glTexParameteri(tex_target, GL_TEXTURE_SWIZZLE_B, GL_RED);
+        LLGLDisable blend(GL_BLEND);
+
+        mLensDirtMap.bindTarget();
+        mScreenTriangleVB->setBuffer();
+        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+        mLensDirtMap.flush();
     }
 
+    gLensDirtGenProgram.unbind();
     stop_glerror();
 }
 
@@ -8149,17 +8189,18 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
         // Lens dirt
         //
-        // Forced off whenever no plate is loaded, so the shader's early-out
-        // fires and the sampler is never read unbound -- the same guard the
-        // grading LUT and the reference still use. Also off under a clean
-        // plate: dirt is a look, not a quantisation aid.
+        // Forced off whenever there is no plate -- generateLensDirt allocates
+        // only while the effect is on, and gives the memory back when it is
+        // not -- so the shader's early-out fires and the sampler is never read
+        // unbound, the same guard the grading LUT and the reference still use.
+        // Also off under a clean plate: dirt is a look, not a quantisation aid.
         S32 dirt_channel = -1;
         {
             static LLCachedControl<F32> lens_dirt_strength(gSavedSettings, "RenderLensDirtStrength", 0.f);
             static LLCachedControl<F32> lens_dirt_bloom(gSavedSettings, "RenderLensDirtBloomResponse", 1.f);
             static LLCachedControl<F32> lens_dirt_flare(gSavedSettings, "RenderLensDirtFlareResponse", 1.f);
 
-            const F32 dirt_strength = (clean_plate || !mLensDirtMap)
+            const F32 dirt_strength = (clean_plate || !mLensDirtMap.isComplete())
                                     ? 0.f
                                     : llclamp(lens_dirt_strength(), 0.f, 2.f);
 
@@ -8169,12 +8210,9 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
             if (dirt_strength > 0.f)
             {
-                dirt_channel = shader->enableTexture(LLShaderMgr::LENS_DIRT_MAP);
-                if (dirt_channel > -1)
-                {
-                    gGL.getTextureSlot(dirt_channel)->bindManual(ALTextureSlot::TT_TEXTURE, mLensDirtMap,
-                                                                 gGL.getSampler(ALSamplers::BilinearClamp));
-                }
+                dirt_channel = shader->bindTexture(LLShaderMgr::LENS_DIRT_MAP,
+                                                   &mLensDirtMap,
+                                                   ALSamplers::BilinearClamp);
             }
         }
 
@@ -9761,6 +9799,10 @@ void LLPipeline::renderFinalize()
     // Handles tonemap, colorgrading, and gamma correction in one pass. In the HDR
     // path, this also applies eye adaptation and bloom. In the non-HDR path, this
     // is just a linear copy with color correction.
+    // Ahead of colorCorrect, which samples the plate, and outside the bloom
+    // block above because the dirt is lit by the lens flare as well as by bloom.
+    generateLensDirt();
+
     colorCorrect(&mRT->screen, &mRT->postPingMap, hdr, true);
 
     LLVertexBuffer::unbind();
