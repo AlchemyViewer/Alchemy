@@ -97,16 +97,6 @@ class LLCtrlFilter : public LLQueryFilter, public LLSingleton<LLCtrlFilter>
     /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const override;
 };
 
-template <class T>
-class LLWidgetTypeFilter : public LLQueryFilter
-{
-    /*virtual*/ filterResult_t operator() (const LLView* const view, bool has_children) const
-    {
-        return filterResult_t(dynamic_cast<const T*>(view) != nullptr, true);
-    }
-
-};
-
 // Algorithm for flattening
 class LLViewQuery
 {
