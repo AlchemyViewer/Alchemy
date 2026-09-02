@@ -615,6 +615,9 @@ protected:
 
 public:
 
+    // Every child is a floater; anything else is refused.
+    bool addChild(LLView* child, S32 tab_group = 0) override;
+
     /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
     /*virtual*/ void draw();
     /*virtual*/ LLRect getSnapRect() const;
