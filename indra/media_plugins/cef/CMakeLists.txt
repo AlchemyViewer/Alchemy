@@ -211,10 +211,12 @@ elseif (LINUX)
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_RESOURCE_DIR}/locales" "${VIEWER_STAGING_DIR}/bin/llplugin/locales"
   )
 
-  add_custom_command(
-    TARGET media_plugin_cef POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${VIEWER_STAGING_DIR}/lib"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_BIN_FILES} "${VIEWER_STAGING_DIR}/lib"
-    COMMAND_EXPAND_LISTS
-  )
+  if (CEF_BIN_FILES)
+    add_custom_command(
+      TARGET media_plugin_cef POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${VIEWER_STAGING_DIR}/lib"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_BIN_FILES} "${VIEWER_STAGING_DIR}/lib"
+      COMMAND_EXPAND_LISTS
+    )
+  endif ()
 endif ()
