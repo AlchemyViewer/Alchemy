@@ -267,6 +267,12 @@ def verify_port(shader_path):
 
     py = open(__file__, encoding='utf-8').read()
     py_body = _span(py, r'    mscale = max\(', r'    return np\.clip\([^\n]*\n')
+    if py_body is None:
+        # These anchors are in this very file, so losing them means build() was
+        # restructured -- which is the drift this check exists to report. Say so
+        # rather than dying in re.sub with a TypeError.
+        print("could not find build() in %s -- the mirror has been restructured" % __file__)
+        return False
     py_body = re.sub(r'#[^\n]*', '', py_body)
 
     a, b = _floats(glsl_body), _floats(py_body)
@@ -307,6 +313,15 @@ def main():
     ap.add_argument("--skip-port-check", action="store_true",
                     help="measure without first checking the mirror against the shader")
     args = ap.parse_args()
+
+    # Zero or negative on any of these produces an empty plate or an empty
+    # sample set, and the failure surfaces much later as a ZeroDivisionError out
+    # of the averaging or an IndexError out of describe(). argparse can say what
+    # is actually wrong instead.
+    if args.width < 1 or args.height < 1:
+        ap.error("--width and --height must be at least 1")
+    if args.seeds < 1:
+        ap.error("--seeds must be at least 1")
 
     if not args.skip_port_check and not verify_port(args.shader):
         return 2
