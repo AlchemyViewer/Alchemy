@@ -115,6 +115,7 @@ public:
 
     // LLView interface
     /*virtual*/ bool    isPanel() const;
+    U32                 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::PANEL; }
     /*virtual*/ void    draw();
     /*virtual*/ bool    handleKeyHere( KEY key, MASK mask );
     /*virtual*/ void    onVisibilityChange ( bool new_visibility );

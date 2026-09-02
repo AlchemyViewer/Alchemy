@@ -1261,7 +1261,7 @@ bool LLFloater::canSnapTo(const LLView* other_view)
 
     if (other_view != getParent())
     {
-        const LLFloater* other_floaterp = dynamic_cast<const LLFloater*>(other_view);
+        const LLFloater* other_floaterp = other_view->as<LLFloater>();
         if (other_floaterp
             && other_floaterp->getSnapTarget() == getHandle()
             && mDependents.find(other_floaterp->getHandle()) != mDependents.end())
@@ -1283,7 +1283,7 @@ void LLFloater::setSnappedTo(const LLView* snap_view)
     else
     {
         //RN: assume it's a floater as it must be a sibling to our parent floater
-        const LLFloater* floaterp = dynamic_cast<const LLFloater*>(snap_view);
+        const LLFloater* floaterp = snap_view->as<LLFloater>();
         if (floaterp)
         {
             setSnapTarget(floaterp->getHandle());
@@ -1298,7 +1298,7 @@ void LLFloater::handleReshape(const LLRect& new_rect, bool by_user)
 
     if (by_user && !getHost())
     {
-        LLFloaterView * floaterVp = dynamic_cast<LLFloaterView*>(getParent());
+        LLFloaterView * floaterVp = getParentAs<LLFloaterView>();
         if (floaterVp)
         {
             floaterVp->adjustToFitScreen(this, !isMinimized());
@@ -1605,7 +1605,7 @@ void LLFloater::setFocus( bool b )
     if (b)
     {
         // only push focused floaters to front of stack if not in midst of ctrl-tab cycle
-        LLFloaterView * parent = dynamic_cast<LLFloaterView *>(getParent());
+        LLFloaterView * parent = getParentAs<LLFloaterView>();
         if (!getHost() && parent && !parent->getCycleMode())
         {
             if (!isFrontmost())
@@ -1940,7 +1940,7 @@ void LLFloater::bringToFront( S32 x, S32 y )
         }
         else
         {
-            LLFloaterView* parent = dynamic_cast<LLFloaterView*>( getParent() );
+            LLFloaterView* parent = getParentAs<LLFloaterView>();
             if (parent)
             {
                 parent->bringToFront(this, !getIsChrome());
@@ -1993,7 +1993,7 @@ void LLFloater::setFrontmost(bool take_focus, bool restore)
     {
         // there are more than one floater view
         // so we need to query our parent directly
-        LLFloaterView * parent = dynamic_cast<LLFloaterView*>( getParent() );
+        LLFloaterView * parent = getParentAs<LLFloaterView>();
         if (parent)
         {
             parent->bringToFront(this, take_focus, restore);
@@ -2691,7 +2691,7 @@ LLFloaterView::LLFloaterView (const Params& p)
 
 bool LLFloaterView::addChild(LLView* child, S32 tab_group)
 {
-    if (child && !dynamic_cast<LLFloater*>(child))
+    if (child && !child->as<LLFloater>())
     {
         LL_WARNS() << "\"" << child->getName() << "\" is not a floater and cannot be a child of " << getName() << LL_ENDL;
         return false;

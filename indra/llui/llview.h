@@ -45,6 +45,7 @@
 #include "lluictrlfactory.h"
 #include "lltreeiterators.h"
 #include "llfocusmgr.h"
+#include "alviewkind.h"
 
 #include <functional>
 #include <list>
@@ -210,6 +211,37 @@ public:
     virtual bool isCtrl() const;
 
     virtual bool isPanel() const;
+
+    // The kinds this view is, from ALViewKind. A virtual returning a
+    // constant: while a view is being destroyed it answers for whatever base
+    // is left standing, which is what dynamic_cast says of it then.
+    virtual U32 kindMask() const { return 0; }
+
+    // This view as a T, or null. A mask test and a static_cast for a kind
+    // ALViewKindOf names; dynamic_cast for any other type.
+    template <class T> T* as()
+    {
+        if constexpr (ALViewKindOf<T>::bits != 0)
+        {
+            return (kindMask() & ALViewKindOf<T>::bits) ? static_cast<T*>(this) : nullptr;
+        }
+        else
+        {
+            return dynamic_cast<T*>(this);
+        }
+    }
+
+    template <class T> const T* as() const
+    {
+        return const_cast<LLView*>(this)->as<T>();
+    }
+
+    // The parent as a T, or null when there is none or it is not one.
+    template <class T> T* getParentAs() const
+    {
+        LLView* parent = getParent();
+        return parent ? parent->as<T>() : nullptr;
+    }
 
     //
     // MANIPULATORS
@@ -550,14 +582,12 @@ public:
 
     template <class T> T* getParentByType() const
     {
-        LLView* parent = getParent();
-        while(parent)
+        for (LLView* parent = getParent(); parent; parent = parent->getParent())
         {
-            if (dynamic_cast<T*>(parent))
+            if (T* found = parent->as<T>())
             {
-                return static_cast<T*>(parent);
+                return found;
             }
-            parent = parent->getParent();
         }
         return nullptr;
     }
