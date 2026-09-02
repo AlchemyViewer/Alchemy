@@ -102,12 +102,17 @@ public:
     // Mouse Captor
     void            setMouseCapture(LLMouseHandler* new_captor);    // new_captor = NULL to release the mouse.
     LLMouseHandler* getMouseCapture() const { return mMouseCaptor; }
+    LLView*         getMouseCaptureView() const { return mMouseCaptorView; }
     void            removeMouseCaptureWithoutCallback( const LLMouseHandler* captor );
     bool            childHasMouseCapture( const LLView* parent ) const;
 
     // Keyboard Focus
     void            setKeyboardFocus(LLFocusableElement* new_focus, bool lock = false, bool keystrokes_only = false);       // new_focus = NULL to release the focus.
     LLFocusableElement*     getKeyboardFocus() const { return mKeyboardFocus; }
+    // The focused element as a view, or null when it is not one.
+    LLView*         getKeyboardFocusView() const { return mKeyboardFocusView; }
+    // As a control, or null when it is not one.
+    LLUICtrl*       getKeyboardFocusCtrl() const;
     LLFocusableElement*     getLastKeyboardFocus() const { return mLastKeyboardFocus; }
     bool            childHasKeyboardFocus( const LLView* parent ) const;
     void            removeKeyboardFocusWithoutCallback( const LLFocusableElement* focus );
@@ -150,9 +155,14 @@ private:
 
     // Mouse Captor
     LLMouseHandler*     mMouseCaptor;               // Mouse events are premptively routed to this object
+    LLView*             mMouseCaptorView;           // the same object as a view, or null when it is not one
 
     // Keyboard Focus
+    // The view is kept beside the element because every control that draws
+    // asks whether it has focus, and reaching the view from the element is a
+    // cross-cast. Both are written together, in the two places either is.
     LLFocusableElement* mKeyboardFocus;             // Keyboard events are preemptively routed to this object
+    LLView*             mKeyboardFocusView;         // the same object as a view, or null when it is not one
     LLFocusableElement* mLastKeyboardFocus;         // who last had focus
     LLFocusableElement* mDefaultKeyboardFocus;
     bool                mKeystrokesOnly;

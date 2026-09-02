@@ -1773,7 +1773,7 @@ bool LLView::hasAncestor(const LLView* parentp) const
 
 bool LLView::childHasKeyboardFocus(std::string_view childname) const
 {
-    LLView *focus = dynamic_cast<LLView *>(gFocusMgr.getKeyboardFocus());
+    LLView* focus = gFocusMgr.getKeyboardFocusView();
 
     while (focus != nullptr)
     {

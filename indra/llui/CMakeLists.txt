@@ -315,6 +315,7 @@ if(BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llemojidictionary llemojidictionary.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llxuiparser "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llfocusmgr "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(lllayoutstack "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfloater "" "${test_libs}" "${test_project}")
 
