@@ -618,6 +618,61 @@
             <key>Value</key>
             <string>/tp2cam</string>
         </map>
+        <key>AlchemyChatIRCColorsEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Use IRC-style deterministic colors for local chat names and text.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyChatIRCColorNameTags</key>
+        <map>
+            <key>Comment</key>
+            <string>Overwrite each other agent's name tag with their IRC-style per-agent chat color.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>AlchemyChatIRCAgentSaturation</key>
+        <map>
+            <key>Comment</key>
+            <string>Saturation of the per-agent IRC-style chat colors (0-1).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.7</real>
+        </map>
+        <key>AlchemyChatIRCAgentLightness</key>
+        <map>
+            <key>Comment</key>
+            <string>Lightness of the per-agent IRC-style chat colors (0-1).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.9</real>
+        </map>
+        <key>AlchemyChatIRCNameLightness</key>
+        <map>
+            <key>Comment</key>
+            <string>Lightness of the displayed name in IRC-style chat colors; shares the chat color's hue and saturation (0-1).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.7</real>
+        </map>
         <key>AlchemyChatMarkUnnamedObjects</key>
         <map>
             <key>Comment</key>
