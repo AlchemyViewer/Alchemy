@@ -185,7 +185,7 @@ public:
 
     void            appendWidget(const LLInlineViewSegment::Params& params, const std::string& text, bool allow_undo);
     // Non-undoable
-    void            setText(ALStringViewExplicit utf8str, const LLStyle::Params& input_params = LLStyle::defaultParams());
+    void            setText(ALStringViewExplicit utf8str, const LLStyle::Params& input_params = LLStyle::defaultParams()) override;
 
 
     // Removes text from the end of document
