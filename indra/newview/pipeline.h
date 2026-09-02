@@ -96,7 +96,7 @@ public:
     void createGLBuffers();
     void createLUTBuffers();
     void setupGradingLUT();
-    void setupLensDirt();
+    void generateLensDirt();
     /// Re-bake the tone curve lookup row from the four RenderColorGradeCurve*
     /// settings. Runs from colorCorrect when mToneCurveLutDirty is set: once
     /// per change, never per frame.
@@ -1028,9 +1028,39 @@ public:
     U32                 mSMAASearchMap = 0;
     U32                 mSMAASampleMap = 0;
 
-    // Lens dirt plate. Zero when no plate is loaded, which is also the signal
-    // to force the strength uniform to 0 so the sampler is never read unbound.
-    U32                 mLensDirtMap = 0;
+    // Lens dirt plate, generated rather than loaded -- see generateLensDirt.
+    // Nothing is allocated until the effect is switched on, and the memory goes
+    // back when it is switched off, so an incomplete target is also the signal
+    // to force the strength uniform to 0 and leave the sampler unread.
+    LLRenderTarget      mLensDirtMap;
+
+    // What the current plate was generated from. Comparing the whole set each
+    // frame is what triggers a rebuild, which covers parameter edits and window
+    // resizes through one test and needs no commit-signal plumbing. It also
+    // records a *failed* attempt, so a plate that could not be allocated is
+    // retried when something changes rather than on every frame.
+    struct LensDirtParams
+    {
+        U32 width      = 0;
+        U32 height     = 0;
+        F32 seed       = -1.f;
+        F32 grime      = -1.f;
+        F32 mote_scale = -1.f;
+        F32 smudge     = -1.f;
+        S32 scratches  = -1;
+        F32 toe        = -1.f;
+        F32 gain       = -1.f;
+
+        bool operator==(const LensDirtParams&) const = default;
+    };
+    LensDirtParams      mLensDirtParams;
+
+    // Raised by the Lightbox while one of the generation sliders is being
+    // dragged. The plate is full-resolution, so rebuilding on every frame of a
+    // drag is a stutter rather than a preview -- and worse the slower the
+    // machine, which is backwards. Holding off means the rebuild lands once, on
+    // release, which is also where the user expects to see the result.
+    bool                mLensDirtSliderHeld = false;
     // Tone curve LUT: a 512x1 RGBA16 row (ALToneCurveSet::LUT_SIZE) whose R, G
     // and B texels hold master(channel(x)) for each channel. A raw GL name
     // like the SMAA maps above: created empty in createGLBuffers, filled by
