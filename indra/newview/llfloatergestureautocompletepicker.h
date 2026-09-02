@@ -41,7 +41,7 @@ public:
     void goneFromFront() override;
 
 private:
-    bool commitSelected();
+    bool commitSelected(bool return_key = false);
 
     LLScrollListCtrl* mGestureList;
 };

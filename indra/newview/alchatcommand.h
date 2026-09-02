@@ -22,8 +22,19 @@
 
 #include "linden_common.h"
 
+#include <string>
+#include <vector>
+
 namespace ALChatCommand
 {
+    struct AutocompleteCommand
+    {
+        std::string trigger;
+        std::string description;
+        bool accepts_arguments;
+    };
+
+    std::vector<AutocompleteCommand> getAutocompleteCommands();
     bool parseCommand(std::string data);
 };
 

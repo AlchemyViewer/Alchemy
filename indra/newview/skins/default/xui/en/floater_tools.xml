@@ -2686,7 +2686,7 @@ even though the user gets a free copy.
              max_val="1"
              min_val="0"
              name="Light Intensity"
-             top_pad="26"
+             top_pad="12"
              width="128" />
           <spinner bottom_delta="0"
                    decimal_digits="3"
