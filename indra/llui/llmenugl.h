@@ -199,7 +199,16 @@ public:
     // The two static forms take an LLView so a caller walking a menu's child
     // list does not have to cast; anything that is not a menu entry is never
     // claimed.
-    static void beginContextBuild()                     { ++sContextBuild; }
+    static void beginContextBuild()
+    {
+        // Never 0: that is what a menu item is constructed holding, so a
+        // generation of 0 would read every entry ever built as claimed and
+        // hide none of them.
+        if (++sContextBuild == 0)
+        {
+            ++sContextBuild;
+        }
+    }
     static void claimContextEntry(LLView* view);
     static bool contextEntryClaimed(const LLView* view);
 
