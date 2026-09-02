@@ -126,7 +126,6 @@ protected:
     LLFolderView*               mRoot;
     LLPointer<LLFolderViewModelItem> mViewModelItem;
     LLUIImagePtr                mIcon,
-                                mIconOpen,
                                 mIconOverlay;
     // Shared, interned const layout + colors (see LLFolderViewItemStyle).
     const LLFolderViewItemStyle* mStyle;
@@ -143,7 +142,6 @@ protected:
     S32                         mDragStartX = 0;
     S32                         mDragStartY = 0;
     S32                         mCutGeneration;
-    F32                         mControlLabelRotation;
     LLFontGL::StyleFlags        mLabelStyle;
 
     bool                        mLabelWidthDirty;
@@ -176,6 +174,10 @@ protected:
     static LLUIColor            sSuffixColor;
     static LLUIColor            sSearchStatusColor;
     static LLUIColor            sFavoriteColor;
+
+    // Read by LLFolderViewFolder::drawOpenFolderArrow as well as by this class.
+    static S32                  sTopPad;
+    static LLUIImagePtr         sFolderArrowImg;
 
 
     // this is an internal method used for adding items to folders. A
@@ -347,7 +349,17 @@ public:
 
     //  virtual void handleDropped();
     virtual void draw();
-    void drawOpenFolderArrow();
+
+    // The disclosure triangle, and which icon the row shows. Only a folder has
+    // either: a plain item's arrow is gated on hasVisibleChildren() and
+    // isFolderComplete(), which are false and true for one respectively, and
+    // its open icon on a rotation only a folder ever turns. So the members
+    // behind them live on the folder, and an item answers for itself.
+    virtual void drawOpenFolderArrow() {}
+    virtual LLUIImagePtr getDrawIcon() const { return mIcon; }
+
+    // Read the open icon from the model, for the one subclass that has one.
+    virtual void refreshOpenIcon(const LLFolderViewModelItem& vmi) {}
     void drawFavoriteIcon();
     void drawHighlight(bool showContent, bool hasKeyboardFocus, const LLUIColor& selectColor, const LLUIColor& flashColor, const LLUIColor& outlineColor, const LLUIColor& mouseOverColor);
     void drawLabel(const LLFontGL* font, const F32 x, const F32 y, const LLColor4& color, F32 &right_x);
@@ -359,8 +371,6 @@ public:
 
 private:
     static std::map<U8, LLFontGL*> sFonts; // map of styles to fonts
-    static S32 sTopPad;
-    static LLUIImagePtr sFolderArrowImg;
     static LLUIImagePtr sSelectionImg;
     static LLUIImagePtr sFavoriteImg;
     static LLUIImagePtr sFavoriteContentImg;
@@ -453,14 +463,20 @@ public:
 protected:
     items_t mItems;
     folders_t mFolders;
+    LLUIImagePtr mIconOpen;
 
-    bool        mIsOpen;
-    bool        mExpanderHighlighted;
     F32         mCurHeight;
     F32         mTargetHeight;
     F32         mAutoOpenCountdown;
     S32         mLastArrangeGeneration;
     S32         mLastCalculatedWidth;
+    // How far round the disclosure triangle is turned, and with it whether the
+    // open icon is the one to draw. updateLabelRotation is the only writer.
+    F32         mControlLabelRotation;
+    S32         mFavoritesDirtyFlags { 0 };
+
+    bool        mIsOpen;
+    bool        mExpanderHighlighted;
     bool        mIsFolderComplete; // indicates that some children were not loaded/added yet
     bool        mAreChildrenInited; // indicates that no children were initialized
 
@@ -521,7 +537,6 @@ private:
     constexpr static S32 FAVORITE_ADDED = 1;
     constexpr static S32 FAVORITE_REMOVED = 2;
     constexpr static S32 FAVORITE_CLEANUP = 4;
-    S32 mFavoritesDirtyFlags { 0 };
 public:
 
     // destroys this folder, and all children
@@ -595,6 +610,11 @@ public:
                                        EAcceptance* accept,
                                        std::string& tooltip_msg);
     virtual void draw();
+
+    // The disclosure triangle and the open icon: only a folder has either.
+    void drawOpenFolderArrow() override;
+    LLUIImagePtr getDrawIcon() const override;
+    void refreshOpenIcon(const LLFolderViewModelItem& vmi) override;
 
     folders_t::iterator getFoldersBegin() { return mFolders.begin(); }
     folders_t::iterator getFoldersEnd() { return mFolders.end(); }

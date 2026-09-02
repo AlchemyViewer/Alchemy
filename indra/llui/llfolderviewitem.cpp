@@ -233,7 +233,6 @@ LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
     mHasVisibleChildren(false),
     mStyle(internStyle(p)),
     mIndentation(0),
-    mControlLabelRotation(0.f),
     mDragAndDropTarget(false),
     mLabel(p.name), // will be immediately reset in postBuild()
     mRoot(p.root),
@@ -402,7 +401,7 @@ void LLFolderViewItem::refresh()
     // icons are slightly expensive to get, can be optimized
     // see LLInventoryIcon::getIcon()
     mIcon = vmi.getIcon();
-    mIconOpen = vmi.getIconOpen();
+    refreshOpenIcon(vmi);
     mIconOverlay = vmi.getIconOverlay();
 
     if (mRoot->useLabelSuffix())
@@ -430,7 +429,7 @@ void LLFolderViewItem::refreshSuffix()
     // icons are slightly expensive to get, can be optimized
     // see LLInventoryIcon::getIcon()
     mIcon = vmi->getIcon();
-    mIconOpen = vmi->getIconOpen();
+    refreshOpenIcon(*vmi);
     mIconOverlay = vmi->getIconOverlay();
 
     setFavorite(vmi->isFavorite() && !vmi->isItemInTrash());
@@ -877,7 +876,7 @@ bool LLFolderViewItem::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
     return handled;
 }
 
-void LLFolderViewItem::drawOpenFolderArrow()
+void LLFolderViewFolder::drawOpenFolderArrow()
 {
     //--------------------------------------------------------------------------------//
     // Draw open folder arrow
@@ -889,6 +888,22 @@ void LLFolderViewItem::drawOpenFolderArrow()
             mIndentation, getRect().getHeight() - mStyle->arrowSize - mStyle->arrowPadTop - sTopPad,
             mStyle->arrowSize, mStyle->arrowSize, mControlLabelRotation, sFolderArrowImg->getImage(), sFgColor);
     }
+}
+
+LLUIImagePtr LLFolderViewFolder::getDrawIcon() const
+{
+    // The same test the item's draw used to make inline: an open folder shows
+    // the open icon, and the rotation is what says it is open.
+    if (!mIconOpen.isNull() && (llabs(mControlLabelRotation) > 80))
+    {
+        return mIconOpen;
+    }
+    return mIcon;
+}
+
+void LLFolderViewFolder::refreshOpenIcon(const LLFolderViewModelItem& vmi)
+{
+    mIconOpen = vmi.getIconOpen();
 }
 
 void LLFolderViewItem::drawFavoriteIcon()
@@ -1225,13 +1240,10 @@ void LLFolderViewItem::draw()
     //
     const S32 icon_x = mIndentation + mStyle->arrowSize + mStyle->textPad;
     const S32 rect_height = getRect().getHeight();
-    if (!mIconOpen.isNull() && (llabs(mControlLabelRotation) > 80)) // For open folders
+    const LLUIImagePtr icon = getDrawIcon();
+    if (icon)
     {
-        mIconOpen->draw(icon_x, rect_height - mIconOpen->getHeight() - sTopPad + 1);
-    }
-    else if (mIcon)
-    {
-        mIcon->draw(icon_x, rect_height - mIcon->getHeight() - sTopPad + 1);
+        icon->draw(icon_x, rect_height - icon->getHeight() - sTopPad + 1);
     }
 
     if (mIconOverlay && getRoot()->showItemLinkOverlays())
@@ -1391,6 +1403,7 @@ LLFolderViewFolder::LLFolderViewFolder( const LLFolderViewItem::Params& p ):
     mAutoOpenCountdown(0.f),
     mIsFolderComplete(false), // folder might have children that are not loaded yet.
     mAreChildrenInited(false), // folder might have children that are not built yet.
+    mControlLabelRotation(0.f),
     mLastArrangeGeneration( -1 ),
     mLastCalculatedWidth(0),
     mFavoritesDirtyFlags(0)
