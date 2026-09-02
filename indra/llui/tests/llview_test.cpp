@@ -25,7 +25,6 @@
 #include "linden_common.h"
 
 #include "../llview.h"
-#include "../llviewereventrecorder.h"
 
 #include "../test/lltut.h"
 
@@ -49,18 +48,6 @@ namespace tut
 
     struct llview_data
     {
-        llview_data()
-        {
-            // LLView::onVisibilityChange asks the event recorder whether it is
-            // logging, and LLSimpleton::instance() dereferences whatever is
-            // there without checking. The viewer creates this at startup; a
-            // test that changes a view's visibility has to do the same.
-            if (!LLViewerEventRecorder::instanceExists())
-            {
-                LLViewerEventRecorder::createInstance();
-            }
-        }
-
         // A view of the given name and rect. Views are parented into a tree by
         // the tests and deleted with their root.
         static TestView* view(const std::string& name,

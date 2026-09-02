@@ -264,7 +264,6 @@ using namespace LL;
 
 #include "llinventoryicon.h"
 #include "llcoproceduremanager.h"
-#include "llviewereventrecorder.h"
 
 
 #include "alstreaminfo.h"
@@ -1023,8 +1022,6 @@ bool LLAppViewer::init()
     }
     LL_INFOS("InitInfo") << "Cache initialization is done." << LL_ENDL ;
 
-    // Initialize event recorder
-    LLViewerEventRecorder::createInstance();
     LLWatchdog::getInstance(); // Initialize watchdog timer
 
     //
@@ -2222,7 +2219,6 @@ bool LLAppViewer::cleanup()
     LLEnvironment::deleteSingleton();
     LLSelectMgr::deleteSingleton();
     LLViewerStatsRecorder::deleteSingleton();
-    LLViewerEventRecorder::deleteSingleton();
     LLWorld::deleteSingleton();
     LLVoiceClient::deleteSingleton();
     LLUI::deleteSingleton();
@@ -3001,11 +2997,6 @@ bool LLAppViewer::initConfiguration()
                 }
             }
         }
-    }
-
-    if (clp.hasOption("logevents"))
-    {
-        LLViewerEventRecorder::instance().setEventLoggingOn();
     }
 
     std::string CmdLineChannel(gSavedSettings.getString("CmdLineChannel"));

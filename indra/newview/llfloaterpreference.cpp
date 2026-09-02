@@ -78,7 +78,6 @@
 #include "lluri.h"
 #include "llviewercontrol.h"
 #include "llviewercamera.h"
-#include "llviewereventrecorder.h"
 #include "llviewermenufile.h"
 #include "llviewermessage.h"
 #include "llviewerwindow.h"

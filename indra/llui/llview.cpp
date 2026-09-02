@@ -47,7 +47,6 @@
 #include "lltooltip.h"
 #include "llsdutil.h"
 #include "llsdserialize.h"
-#include "llviewereventrecorder.h"
 #include "llkeyboard.h"
 // for ui edit hack
 #include "llbutton.h"
@@ -755,7 +754,6 @@ void LLView::onVisibilityChange ( bool new_visibility )
     LL_PROFILE_ZONE_NUM(getChildCount());
 
     bool old_visibility;
-    bool log_visibility_change = LLViewerEventRecorder::instance().getLoggingStatus();
     for (LLView* viewp : children())
     {
         if (!viewp)
@@ -766,26 +764,9 @@ void LLView::onVisibilityChange ( bool new_visibility )
         // only views that are themselves visible will have their overall visibility affected by their ancestors
         old_visibility=viewp->getVisible();
 
-        if(log_visibility_change)
-        {
-        if (old_visibility!=new_visibility)
-        {
-            LLViewerEventRecorder::instance().logVisibilityChange( viewp->getPathname(), viewp->getName(), new_visibility,"widget");
-        }
-        }
-
         if (old_visibility)
         {
             viewp->onVisibilityChange ( new_visibility );
-        }
-
-        if(log_visibility_change)
-        {
-            // Consider changing returns to confirm success and know which widget grabbed it
-            // For now assume success and log at highest xui possible
-            // NOTE we log actual state - which may differ if it somehow failed to set visibility
-            LL_DEBUGS() << "LLView::handleVisibilityChange   - now: " << getVisible()  << " xui: " << viewp->getPathname() << " name: " << viewp->getName() << LL_ENDL;
-
         }
     }
 }
@@ -897,11 +878,6 @@ LLView* LLView::childrenHandleMouseEvent(const METHOD& method, S32 x, S32 y, XDA
         if ((viewp->*method)( local_x, local_y, extra )
             || (allow_mouse_block && viewp->blockMouseEvent( local_x, local_y )))
         {
-            LL_DEBUGS() << "LLView::childrenHandleMouseEvent calling updatemouseeventinfo - local_x|global x  "<< local_x << " " << x   << "local/global y " << local_y << " " << y << LL_ENDL;
-            LL_DEBUGS() << "LLView::childrenHandleMouseEvent  getPathname for viewp result: " << viewp->getPathname() << "for this view: " << getPathname() << LL_ENDL;
-
-            LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,this);
-
             // This is NOT event recording related
             viewp->logMouseEvent();
 
@@ -1201,11 +1177,6 @@ bool LLView::handleUnicodeChar(llwchar uni_char, bool called_from_parent)
     {
         // Upward traversal
         handled = mParentView->handleUnicodeChar(uni_char, false);
-    }
-
-    if (handled)
-    {
-        LLViewerEventRecorder::instance().logKeyUnicodeEvent(uni_char);
     }
 
     return handled;

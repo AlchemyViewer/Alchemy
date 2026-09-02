@@ -2381,8 +2381,6 @@
   <string>Quando ativado, mostrar o nome do avatar no Discord Rich Presence.</string>
   <key>ShowDiscordActivityState</key>
   <string>Quando ativado, mostrar a localização no Discord Rich Presence.</string>
-  <key>ShowEventRecorderMenuItems</key>
-  <string>Se as opções de menu do Gravador de Eventos - Iniciar / Parar gravação - devem aparecer no menu Desenvolver (atualmente).</string>
   <key>ShowFavoritesOnLogin</key>
   <string>Define se os favoritos do último usuário logado serão salvos ao sair e exibidos na tela de login.</string>
   <key>ShowGestureButton</key>

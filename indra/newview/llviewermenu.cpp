@@ -37,7 +37,6 @@
 #include "llinventorypanel.h"
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
-#include "llviewereventrecorder.h"
 #include "v4coloru.h"
 
 // newview includes
@@ -2452,44 +2451,6 @@ class LLAdvancedPurgeShaderCache : public view_listener_t
         return true;
     }
 };
-
-////////////////////
-// EVENT Recorder //
-///////////////////
-
-
-class LLAdvancedViewerEventRecorder : public view_listener_t
-{
-    bool handleEvent(const LLSD& userdata)
-    {
-        std::string command = userdata.asString();
-        if ("start playback" == command)
-        {
-            LL_INFOS() << "Event Playback starting" << LL_ENDL;
-            LLViewerEventRecorder::instance().playbackRecording();
-            LL_INFOS() << "Event Playback completed" << LL_ENDL;
-        }
-        else if ("stop playback" == command)
-        {
-            // Future
-        }
-        else if ("start recording" == command)
-        {
-            LLViewerEventRecorder::instance().setEventLoggingOn();
-            LL_INFOS() << "Event recording started" << LL_ENDL;
-        }
-        else if ("stop recording" == command)
-        {
-            LLViewerEventRecorder::instance().setEventLoggingOff();
-            LL_INFOS() << "Event recording stopped" << LL_ENDL;
-        }
-
-        return true;
-    }
-};
-
-
-
 
 /////////////////
 // AGENT PILOT //
@@ -10530,8 +10491,6 @@ void initialize_menus()
     // Don't prepend MenuName.Foo because these can be used in any menu.
     enable.add("IsGodCustomerService", boost::bind(&is_god_customer_service));
 
-    enable.add("displayViewerEventRecorderMenuItems",boost::bind(&LLViewerEventRecorder::displayViewerEventRecorderMenuItems,&LLViewerEventRecorder::instance()));
-
     view_listener_t::addEnable(new LLUploadCostCalculator(), "Upload.CalculateCosts");
 
     view_listener_t::addEnable(new LLUpdateMembershipLabel(), "Membership.UpdateLabel");
@@ -10810,7 +10769,6 @@ void initialize_menus()
     view_listener_t::addMenu(new LLAdvancedAgentPilot(), "Advanced.AgentPilot");
     view_listener_t::addMenu(new LLAdvancedToggleAgentPilotLoop(), "Advanced.ToggleAgentPilotLoop");
     view_listener_t::addMenu(new LLAdvancedCheckAgentPilotLoop(), "Advanced.CheckAgentPilotLoop");
-    view_listener_t::addMenu(new LLAdvancedViewerEventRecorder(), "Advanced.EventRecorder");
 
     // Advanced > Debugging
     view_listener_t::addMenu(new LLAdvancedForceErrorBreakpoint(), "Advanced.ForceErrorBreakpoint");

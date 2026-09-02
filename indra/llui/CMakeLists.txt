@@ -105,7 +105,6 @@ target_sources(llui
     llviewmodel.cpp
     llview.cpp
     llviewquery.cpp
-    llviewereventrecorder.cpp
     llvirtualtrackball.cpp
     llwindowshade.cpp
     llxuiparser.cpp
@@ -229,7 +228,6 @@ target_sources(llui
     llviewinject.h
     llviewmodel.h
     llview.h
-    llviewereventrecorder.h
     llviewquery.h
     llvirtualtrackball.h
     llwindowshade.h

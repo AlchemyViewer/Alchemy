@@ -29,7 +29,6 @@
 // mini-map floater, etc.
 
 #include "linden_common.h"
-#include "llviewereventrecorder.h"
 #include "llfloater.h"
 
 #include "llfocusmgr.h"
@@ -744,12 +743,6 @@ void LLFloater::openFloater(const LLSD& key)
         // every open paid for a pathname nobody read.
         LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater log");
         LL_INFOS() << "Opening floater " << getName() << " full path: " << getPathname() << LL_ENDL;
-
-        LLViewerEventRecorder& recorder = LLViewerEventRecorder::instance();
-        if (recorder.getLoggingStatus())
-        {
-            recorder.logVisibilityChange(getPathname(), getName(), true, "floater");
-        }
     }
 
     mKey = key; // in case we need to open ourselves again
@@ -832,12 +825,6 @@ void LLFloater::closeFloater(bool app_quitting)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_UI("close floater log");
         LL_INFOS() << "Closing floater " << getName() << LL_ENDL;
-
-        LLViewerEventRecorder& recorder = LLViewerEventRecorder::instance();
-        if (recorder.getLoggingStatus())
-        {
-            recorder.logVisibilityChange(getPathname(), getName(), false, "floater");
-        }
     }
 
     if (app_quitting)
@@ -1874,11 +1861,7 @@ bool LLFloater::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
 bool LLFloater::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     LL_DEBUGS() << "LLFloater::handleMouseUp calling LLPanel (really LLView)'s handleMouseUp (first initialized xui to: " << getPathname() << " )" << LL_ENDL;
-    bool handled = LLPanel::handleMouseUp(x,y,mask); // Not implemented in LLPanel so this actually calls LLView
-    if (handled) {
-        LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,this);
-    }
-    return handled;
+    return LLPanel::handleMouseUp(x, y, mask); // Not implemented in LLPanel so this actually calls LLView
 }
 
 // virtual
@@ -1902,11 +1885,7 @@ bool LLFloater::handleMouseDown(S32 x, S32 y, MASK mask)
     else
     {
         bringToFront( x, y );
-        bool handled = LLPanel::handleMouseDown( x, y, mask );
-        if (handled) {
-            LLViewerEventRecorder::instance().updateMouseEventInfo(x,y,-55,-55,this);
-        }
-        return handled;
+        return LLPanel::handleMouseDown(x, y, mask);
     }
 }
 
