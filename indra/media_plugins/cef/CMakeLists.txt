@@ -201,11 +201,7 @@ elseif (LINUX)
     "${CEF_RESOURCE_DIR}/resources.pak"
     "${CEF_RESOURCE_DIR}/icudtl.dat"
   )
-  add_custom_command(
-    TARGET media_plugin_cef POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_RESOURCE_FILES} "${VIEWER_STAGING_DIR}/bin/llplugin"
-    COMMAND_EXPAND_LISTS
-  )
+
   add_custom_command(
     TARGET media_plugin_cef POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_RESOURCE_DIR}/locales" "${VIEWER_STAGING_DIR}/bin/llplugin/locales"
