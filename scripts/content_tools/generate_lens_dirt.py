@@ -350,7 +350,13 @@ def main():
     if worst >= 0.35:
         print("\nAt least one preset is off its target histogram by more than a third.")
         print("Adjust its toe/gain in PRESETS -- lower toe keeps more midtone.")
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    # The drift check is only worth having if something can act on it, so
+    # the verdict reaches the exit status and a regeneration or packaging
+    # step can refuse a plate that missed its histogram.
+    sys.exit(main())
