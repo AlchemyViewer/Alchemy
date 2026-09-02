@@ -61,6 +61,7 @@ static const S32 HEADER_CHECKBOX_HEIGHT = 16;
 
 static LLDefaultChildRegistry::Register<LLAccordionCtrlTab> t1("accordion_tab");
 
+// Built by the tab, for the tab: its parent is always the tab.
 class LLAccordionCtrlTab::LLAccordionCtrlTabHeader : public LLUICtrl
 {
 public:
@@ -228,7 +229,7 @@ void LLAccordionCtrlTab::LLAccordionCtrlTabHeader::draw()
     F32 alpha = getCurrentTransparency();
     gl_rect_2d(0, 0, width - 1, height - 1, mHeaderBGColor.get() % alpha, true);
 
-    LLAccordionCtrlTab* parent = dynamic_cast<LLAccordionCtrlTab*>(getParent());
+    LLAccordionCtrlTab* parent = static_cast<LLAccordionCtrlTab*>(getParent());
     bool collapsible = parent && parent->getCollapsible();
     bool expanded = parent && parent->getDisplayChildren();
 
@@ -358,7 +359,7 @@ bool LLAccordionCtrlTab::LLAccordionCtrlTabHeader::handleDragAndDrop(S32 x, S32 
                                                                      EAcceptance* accept,
                                                                      std::string& tooltip_msg)
 {
-    LLAccordionCtrlTab* parent = dynamic_cast<LLAccordionCtrlTab*>(getParent());
+    LLAccordionCtrlTab* parent = static_cast<LLAccordionCtrlTab*>(getParent());
 
     if (parent && !parent->getDisplayChildren() && parent->getCollapsible() && parent->canOpenClose())
     {
