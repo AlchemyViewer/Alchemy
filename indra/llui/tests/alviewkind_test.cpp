@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../llfloater.h"
+#include "../lllayoutstack.h"
 #include "../lluictrl.h"
 #include "../lluictrlfactory.h"
 
@@ -108,6 +109,23 @@ namespace tut
             p.rect = LLRect(0, 100, 200, 0);
             return new TestFloater(p);
         }
+
+        static LLLayoutStack* stack()
+        {
+            LLLayoutStack::Params p;
+            p.name = "stack";
+            p.rect = LLRect(0, 100, 300, 0);
+            p.orientation = LLLayoutStack::HORIZONTAL;
+            return LLUICtrlFactory::create<LLLayoutStack>(p);
+        }
+
+        static LLLayoutPanel* panel()
+        {
+            LLLayoutPanel::Params p;
+            p.name = "panel";
+            p.rect = LLRect(0, 100, 100, 0);
+            return LLUICtrlFactory::create<LLLayoutPanel>(p);
+        }
     };
 
     typedef test_group<alviewkind_data> alviewkind_test;
@@ -151,6 +169,16 @@ namespace tut
 
         const LLView* cf = f;
         ensure("a const view answers the same", cf->as<LLFloater>() == f);
+
+        std::unique_ptr<LLLayoutStack> s(stack());
+        LLLayoutPanel* lp = panel();
+        s->addPanel(lp);
+        ensure("a layout stack is a layout stack", s->as<LLLayoutStack>() == s.get());
+        ensure("a layout stack is not a control", s->as<LLUICtrl>() == nullptr);
+        ensure("a layout panel is a layout panel", lp->as<LLLayoutPanel>() == lp);
+        ensure("a layout panel is a panel", lp->as<LLPanel>() == lp);
+        ensure("a layout panel is not a layout stack", lp->as<LLLayoutStack>() == nullptr);
+        ensure("its parent is its stack", lp->getParentAs<LLLayoutStack>() == s.get());
 
         fv.reset();
         gFloaterView = nullptr;

@@ -31,6 +31,8 @@ class LLUICtrl;
 class LLPanel;
 class LLFloater;
 class LLFloaterView;
+class LLLayoutStack;
+class LLLayoutPanel;
 
 // The kinds LLView::as<T>() answers with a mask test and a static_cast.
 // A class that is one of these ORs its bit into kindMask() on top of its
@@ -44,6 +46,8 @@ struct ALViewKind
         PANEL        = 1u << 1,
         FLOATER      = 1u << 2,
         FLOATER_VIEW = 1u << 3,
+        LAYOUT_STACK = 1u << 4,
+        LAYOUT_PANEL = 1u << 5,
     };
 };
 
@@ -56,5 +60,7 @@ template <> struct ALViewKindOf<LLUICtrl>     { static constexpr U32 bits = ALVi
 template <> struct ALViewKindOf<LLPanel>      { static constexpr U32 bits = ALViewKind::PANEL; };
 template <> struct ALViewKindOf<LLFloater>    { static constexpr U32 bits = ALViewKind::FLOATER; };
 template <> struct ALViewKindOf<LLFloaterView> { static constexpr U32 bits = ALViewKind::FLOATER_VIEW; };
+template <> struct ALViewKindOf<LLLayoutStack> { static constexpr U32 bits = ALViewKind::LAYOUT_STACK; };
+template <> struct ALViewKindOf<LLLayoutPanel> { static constexpr U32 bits = ALViewKind::LAYOUT_PANEL; };
 
 #endif // AL_ALVIEWKIND_H

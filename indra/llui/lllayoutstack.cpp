@@ -97,7 +97,7 @@ LLLayoutPanel::~LLLayoutPanel()
     // is no longer a layout panel, and the stack cannot tell it from any other
     // view: the entry in its panel list would outlive the panel. Leave now,
     // while still one. A parent already tearing down has cut the link.
-    if (LLLayoutStack* stackp = dynamic_cast<LLLayoutStack*>(getParent()))
+    if (LLLayoutStack* stackp = getParentAs<LLLayoutStack>())
     {
         stackp->removeChild(this);
     }
@@ -168,7 +168,7 @@ void LLLayoutPanel::setVisible( bool visible )
 {
     if (visible != getVisible())
     {
-        LLLayoutStack* stackp = dynamic_cast<LLLayoutStack*>(getParent());
+        LLLayoutStack* stackp = getParentAs<LLLayoutStack>();
         if (stackp)
         {
             stackp->mNeedsLayout = true;
@@ -185,7 +185,7 @@ void LLLayoutPanel::reshape( S32 width, S32 height, bool called_from_parent /*= 
     {
         mTargetDim = (mOrientation == LLLayoutStack::HORIZONTAL) ? width : height;
         mTargetDim = llmin(mTargetDim, mMaxDim);
-        LLLayoutStack* stackp = dynamic_cast<LLLayoutStack*>(getParent());
+        LLLayoutStack* stackp = getParentAs<LLLayoutStack>();
         if (stackp)
         {
             stackp->mNeedsLayout = true;
@@ -196,7 +196,7 @@ void LLLayoutPanel::reshape( S32 width, S32 height, bool called_from_parent /*= 
 
 void LLLayoutPanel::handleReshape(const LLRect& new_rect, bool by_user)
 {
-    LLLayoutStack* stackp = dynamic_cast<LLLayoutStack*>(getParent());
+    LLLayoutStack* stackp = getParentAs<LLLayoutStack>();
     if (stackp)
     {
         if (by_user)
@@ -316,7 +316,7 @@ void LLLayoutStack::deleteAllChildren()
 // virtual
 void LLLayoutStack::removeChild(LLView* view)
 {
-    if (LLLayoutPanel* embedded_panelp = dynamic_cast<LLLayoutPanel*>(view))
+    if (LLLayoutPanel* embedded_panelp = view->as<LLLayoutPanel>())
     {
         auto it = std::find(mPanels.begin(), mPanels.end(), embedded_panelp);
         if (it != mPanels.end())
@@ -329,11 +329,12 @@ void LLLayoutStack::removeChild(LLView* view)
             embedded_panelp->mResizeBar = nullptr;
         }
     }
-    else if (LLResizeBar* resize_bar = dynamic_cast<LLResizeBar*>(view))
+    else
     {
+        // A resize bar, if it is one of ours, is known by address.
         for (LLLayoutPanel* p : mPanels)
         {
-            if (p->mResizeBar == resize_bar)
+            if (p->mResizeBar == view)
             {
                 p->mResizeBar = nullptr;
             }
@@ -356,7 +357,7 @@ bool LLLayoutStack::postBuild()
 // virtual
 bool LLLayoutStack::addChild(LLView* child, S32 tab_group)
 {
-    LLLayoutPanel* panelp = dynamic_cast<LLLayoutPanel*>(child);
+    LLLayoutPanel* panelp = child->as<LLLayoutPanel>();
     if (panelp)
     {
         panelp->setOrientation(mOrientation);
