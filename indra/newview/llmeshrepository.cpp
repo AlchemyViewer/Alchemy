@@ -4558,25 +4558,9 @@ void LLMeshRepository::unregisterMesh(LLVOVolume* vobj, const LLVolumeParams& me
         llassert(!param_iter->second.mVolumes.contains(vobj));
         if (param_iter->second.mVolumes.empty())
         {
-            // Remove the associated pending request from the submission queue
-            // so it is not dispatched after all tracking data is gone.
-            // getRequest() locks the weak_ptr stored in MeshLoadData; a non-null
-            // result means the request is still queued in mPendingRequests (if it
-            // had already been submitted and released, lock() returns null and
-            // we correctly skip the scan).
-            const std::shared_ptr<PendingRequestBase> req = param_iter->second.getRequest();
-            if (req)
-            {
-                auto it = std::find(mPendingRequests.begin(), mPendingRequests.end(), req);
-                if (it != mPendingRequests.end())
-                {
-                    if (req->getRequestType() == MESH_REQUEST_LOD)
-                    {
-                        LLMeshRepository::sLODPending--;
-                    }
-                    mPendingRequests.erase(it);
-                }
-            }
+            // Erasing the entry untracks any request still queued in mPendingRequests;
+            // the submit loop in notifyLoadedMeshes() discards it there rather than
+            // paying an O(queue) scan for every dying object here.
             lod.erase(param_iter);
         }
     }
@@ -4595,19 +4579,7 @@ void LLMeshRepository::unregisterSkinInfo(const LLUUID& mesh_id, LLVOVolume* vob
         llassert(!skin_pair_iter->second.mVolumes.contains(vobj));
         if (skin_pair_iter->second.mVolumes.empty())
         {
-            // Same as unregisterMesh: pull the pending request out of the queue
-            // before dropping the tracking entry so we don't submit a request
-            // that has no listener left. getRequest() locks the weak_ptr; null
-            // means it was already submitted and released, so no scan is needed.
-            const std::shared_ptr<PendingRequestBase> req = skin_pair_iter->second.getRequest();
-            if (req)
-            {
-                auto it = std::find(mPendingRequests.begin(), mPendingRequests.end(), req);
-                if (it != mPendingRequests.end())
-                {
-                    mPendingRequests.erase(it);
-                }
-            }
+            // As in unregisterMesh(): a request still queued is dropped at submit.
             mLoadingSkins.erase(skin_pair_iter);
         }
     }
@@ -5070,9 +5042,9 @@ void LLMeshRepository::notifyLoadedMeshes()
     // submission run. Any submission entry point added here must take mMutex itself.
     for (const std::shared_ptr<PendingRequestBase>& req_p : submit_batch)
     {
-        // If all tracked volumes were unregistered while this request was still
-        // queued, mTrackedData will be null and there is nothing left to notify.
-        // Skip rather than dereferencing a potentially stale object.
+        // A request whose last waiting volume unregistered while it sat in the queue
+        // has no tracked data left. This is the one place such requests are dropped;
+        // unregisterMesh()/unregisterSkinInfo() leave them queued on purpose.
         if (!req_p || !req_p->hasTrackedData())
         {
             // Keep sLODPending balanced with the increment in loadMesh().

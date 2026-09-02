@@ -336,12 +336,6 @@ public:
             request->setScoreDirty();
         }
     }
-
-    // Returns the associated pending request if it is still alive (i.e. still
-    // sitting in mPendingRequests and not yet submitted). Returns null once
-    // the request has been submitted and released from that vector.
-    std::shared_ptr<PendingRequestBase> getRequest() const { return mRequest.lock(); }
-
     boost::unordered_set<LLVOVolume*> mVolumes;
 private:
     std::weak_ptr<PendingRequestBase> mRequest;
