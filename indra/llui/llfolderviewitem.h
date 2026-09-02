@@ -117,28 +117,40 @@ protected:
 
     LLFolderViewItem(const Params& p);
 
-    std::string                 mLabel;
-    S32                         mLabelWidth;
-    bool                        mLabelWidthDirty;
-    bool                        mIsFavorite;
-    bool                        mHasFavorites;
-    S32                         mLabelPaddingRight;
+    // Declared largest first, with every small member together at the end. They
+    // were interleaved, and on a 64-bit build a bool or an S32 sitting between
+    // two pointers opens a hole the size of what comes next -- which an open
+    // inventory pays two hundred thousand times.
+
     LLFolderViewFolder*         mParentFolder;
+    LLFolderView*               mRoot;
     LLPointer<LLFolderViewModelItem> mViewModelItem;
-    LLFontGL::StyleFlags        mLabelStyle;
-    std::string                 mLabelSuffix;
-    bool                        mSuffixNeedsRefresh; //suffix and icons
     LLUIImagePtr                mIcon,
                                 mIconOpen,
                                 mIconOverlay;
     // Shared, interned const layout + colors (see LLFolderViewItemStyle).
     const LLFolderViewItemStyle* mStyle;
-    S32                         mIndentation;
-    S32                         mDragStartX,
-                                mDragStartY;
 
+    std::string                 mLabel;
+    std::string                 mLabelSuffix;
+
+    S32                         mLabelWidth;
+    S32                         mLabelPaddingRight;
+    S32                         mIndentation;
+    // Where a drag on this item began. Written by handleMouseDown before
+    // handleHover, which is the only reader, can run -- it asks for mouse
+    // capture first -- but a member that is read at all is worth starting.
+    S32                         mDragStartX = 0;
+    S32                         mDragStartY = 0;
+    S32                         mCutGeneration;
     F32                         mControlLabelRotation;
-    LLFolderView*               mRoot;
+    LLFontGL::StyleFlags        mLabelStyle;
+
+    bool                        mLabelWidthDirty;
+    bool                        mIsFavorite;
+    bool                        mHasFavorites;
+    bool                        mSuffixNeedsRefresh; //suffix and icons
+    bool                        mIsSelected;
     bool                        mHasVisibleChildren,
                                 mIsCurSelection,
                                 mDragAndDropTarget,
@@ -149,8 +161,6 @@ protected:
                                 mDoubleClickOverride,
                                 mSelectPending,
                                 mIsItemCut;
-
-    S32                         mCutGeneration;
 
     static bool                 sColorSetInitialized;
 
@@ -180,8 +190,6 @@ protected:
 
     static LLFontGL* getLabelFontForStyle(U8 style);
     const LLFontGL* getLabelFont();
-
-    bool                        mIsSelected;
 
 public:
     static void initClass();
@@ -386,6 +394,9 @@ private:
     // of it, because a rebuild the change did not need is the safe direction.
     std::unique_ptr<LLFontTextCache> mLabelFontBuffer;
     std::unique_ptr<LLFontTextCache> mSuffixFontBuffer;
+    // The font mLabelStyle resolves to, worked out once and dropped whenever
+    // the style moves.
+    LLFontGL*                        pLabelFont { nullptr };
     U32                              mLabelGeneration = 0;
 
     // What mLabelWidth was measured from. The strings and the font are the
@@ -416,7 +427,6 @@ private:
     // filter is matching.
     S32 labelWidth(const LLFontGL* font, S32 offset, S32 max_bytes);
     S32 suffixWidth(const LLFontGL* font, S32 offset, S32 max_bytes);
-    LLFontGL* pLabelFont{nullptr};
 };
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
