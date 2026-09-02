@@ -194,4 +194,30 @@ elseif (DARWIN)
 
 elseif (LINUX)
   target_link_options(media_plugin_cef PRIVATE  "LINKER:--build-id" "LINKER:-rpath,'$ORIGIN:$ORIGIN/../../lib'")
+
+  set(CEF_RESOURCE_FILES
+    "${CEF_RESOURCE_DIR}/chrome_100_percent.pak"
+    "${CEF_RESOURCE_DIR}/chrome_200_percent.pak"
+    "${CEF_RESOURCE_DIR}/resources.pak"
+    "${CEF_RESOURCE_DIR}/icudtl.dat"
+  )
+  add_custom_command(
+    TARGET media_plugin_cef POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${VIEWER_STAGING_DIR}/bin/llplugin"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_RESOURCE_FILES} "${VIEWER_STAGING_DIR}/bin/llplugin"
+    COMMAND_EXPAND_LISTS
+  )
+  add_custom_command(
+    TARGET media_plugin_cef POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${CEF_RESOURCE_DIR}/locales" "${VIEWER_STAGING_DIR}/bin/llplugin/locales"
+  )
+
+  if (CEF_BIN_FILES)
+    add_custom_command(
+      TARGET media_plugin_cef POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${VIEWER_STAGING_DIR}/lib"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CEF_BIN_FILES} "${VIEWER_STAGING_DIR}/lib"
+      COMMAND_EXPAND_LISTS
+    )
+  endif ()
 endif ()
