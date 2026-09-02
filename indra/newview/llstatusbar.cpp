@@ -193,6 +193,14 @@ bool LLStatusBar::postBuild()
     mMediaToggle->setClickedCallback( &LLStatusBar::onClickMediaToggle, this );
     mMediaToggle->setMouseEnterCallback(boost::bind(&LLStatusBar::onMouseEnterNearbyMedia, this));
 
+    // Built here rather than on first hover, unlike the other five. Its
+    // constructor is the only thing in the viewer listening for
+    // ParcelMediaAutoPlayEnable, and that listener initialises
+    // LLViewerParcelAskPlay and cancels a pending ask-to-play notification
+    // when the setting moves -- neither of which is the media panel's own
+    // business, and neither of which can wait for the user to hover a button.
+    ensurePulldown(mPanelNearByMedia);
+
     mBalanceBG = getChild<LLView>("balance_bg");
     LLHints::getInstance()->registerHintTarget("linden_balance", mBalanceBG->getHandle());
 
