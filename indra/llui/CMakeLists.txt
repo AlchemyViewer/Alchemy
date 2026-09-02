@@ -315,4 +315,14 @@ if(BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llemojidictionary llemojidictionary.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llxuiparser "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(lllayoutstack "" "${test_libs}" "${test_project}")
+
+  # Tests that build widgets above LLView stand up a UI over the source
+  # tree's skins and fonts; this is where it is.
+  foreach(ui_test lllayoutstack)
+    if (TARGET INTEGRATION_TEST_${ui_test})
+      target_compile_definitions(INTEGRATION_TEST_${ui_test} PRIVATE
+          "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\"")
+    endif()
+  endforeach()
 endif()

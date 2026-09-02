@@ -92,6 +92,15 @@ void LLLayoutPanel::initFromParams(const Params& p)
 LLLayoutPanel::~LLLayoutPanel()
 {
     gFocusMgr.removeKeyboardFocusWithoutCallback(this);
+
+    // ~LLView takes a child out of its parent, but by the time it runs this
+    // is no longer a layout panel, and the stack cannot tell it from any other
+    // view: the entry in its panel list would outlive the panel. Leave now,
+    // while still one. A parent already tearing down has cut the link.
+    if (LLLayoutStack* stackp = dynamic_cast<LLLayoutStack*>(getParent()))
+    {
+        stackp->removeChild(this);
+    }
 }
 
 F32 LLLayoutPanel::getAutoResizeFactor() const
