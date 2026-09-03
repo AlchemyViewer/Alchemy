@@ -1085,7 +1085,7 @@ void LLFolderView::paste()
         for (selected_it = mSelectedItems.begin(); selected_it != mSelectedItems.end(); ++selected_it)
         {
             LLFolderViewItem* item = *selected_it;
-            LLFolderViewFolder* folder = dynamic_cast<LLFolderViewFolder*>(item);
+            LLFolderViewFolder* folder = item->as<LLFolderViewFolder>();
             if (folder == NULL)
             {
                 folder = item->getParentFolder();
@@ -2071,8 +2071,7 @@ bool LLFolderView::isFolderSelected()
     selected_items_t::iterator item_iter;
     for (item_iter = mSelectedItems.begin(); item_iter != mSelectedItems.end(); ++item_iter)
     {
-        LLFolderViewFolder* folder = dynamic_cast<LLFolderViewFolder*>(*item_iter);
-        if (folder != NULL)
+        if ((*item_iter)->as<LLFolderViewFolder>())
         {
             return true;
         }
