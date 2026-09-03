@@ -423,7 +423,7 @@ public:
         // Lens Flare
         LENS_FLARE_STRENGTH,                //  "uLensFlareStrength"
         LENS_FLARE_SUN_POS,                 //  "uLensFlareSunPos"
-        LENS_FLARE_SUN_VISIBILITY,          //  "uLensFlareSunVisibility"
+        LENS_FLARE_SUN_VISIBILITY,          //  "uLensFlareSunVisibility"  CPU screen-edge fade, an input to the state pass
         LENS_FLARE_STREAK_LENGTH,           //  "uLensFlareStreakLength"
         LENS_FLARE_STREAK_FALLOFF,          //  "uLensFlareStreakFalloff"
         LENS_FLARE_STREAK_WIDTH,            //  "uLensFlareStreakWidth"
@@ -439,13 +439,14 @@ public:
         LENS_FLARE_HALO_RADIUS,             //  "uLensFlareHaloRadius"
         LENS_FLARE_HALO_WIDTH,              //  "uLensFlareHaloWidth"
         LENS_FLARE_HALO,                    //  "uLensFlareHalo"
-        LENS_FLARE_OCCLUSION_RADIUS,        //  "uLensFlareOcclusionRadius"
+        LENS_FLARE_OCCLUSION_RADIUS,        //  "uLensFlareOcclusionRadius"  probe radius, fraction of screen height
         LENS_FLARE_STARBURST,               //  "uLensFlareStarburst"
         LENS_FLARE_STARBURST_SPIKES,        //  "uLensFlareStarburstSpikes"
         LENS_FLARE_STARBURST_SHARPNESS,     //  "uLensFlareStarburstSharpness"
         LENS_FLARE_STARBURST_FALLOFF,       //  "uLensFlareStarburstFalloff"
-        LENS_FLARE_OCCLUSION_TAPS,          //  "uLensFlareOcclusionTaps"
         LENS_FLARE_LIGHT_COLOR,             //  "uLensFlareLightColor"
+        LENS_FLARE_STATE_MAP,               //  "uLensFlareStateMap"    2x1 written by generateLensFlareState
+        LENS_FLARE_FADE_PARAMS,             //  "uLensFlareFadeParams"  (tau_in, tau_out, slew_in, slew_out)
 
         // Color Correction LUT
         COLOR_GRADE_LUT,                    //  "uColorGradeLut"

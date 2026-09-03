@@ -1916,8 +1916,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uLensFlareStarburstSpikes");
     mReservedUniforms.push_back("uLensFlareStarburstSharpness");
     mReservedUniforms.push_back("uLensFlareStarburstFalloff");
-    mReservedUniforms.push_back("uLensFlareOcclusionTaps");
     mReservedUniforms.push_back("uLensFlareLightColor");
+    mReservedUniforms.push_back("uLensFlareStateMap");
+    mReservedUniforms.push_back("uLensFlareFadeParams");
 
     // Color Correction LUT
     mReservedUniforms.push_back("uColorGradeLut");

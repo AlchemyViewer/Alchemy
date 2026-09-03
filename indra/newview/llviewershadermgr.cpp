@@ -222,6 +222,7 @@ LLGLSLShader            gDeferredDoFCombineProgram;
 LLGLSLShader            gExposureProgram;
 LLGLSLShader            gExposureProgramNoFade;
 LLGLSLShader            gLuminanceProgram;
+LLGLSLShader            gLensFlareStateProgram;
 LLGLSLShader            gFXAAProgram[4];
 LLGLSLShader            gSMAAEdgeDetectProgram[4];
 LLGLSLShader            gSMAABlendWeightsProgram[4];
@@ -1270,6 +1271,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gExposureProgram.unload();
         gExposureProgramNoFade.unload();
         gLuminanceProgram.unload();
+        gLensFlareStateProgram.unload();
 
         for (auto i = 0; i < 4; ++i)
         {
@@ -2735,6 +2737,20 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gExposureProgramNoFade.mShaderFiles.push_back(make_pair("deferred/exposureF.glsl", GL_FRAGMENT_SHADER));
         gExposureProgramNoFade.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         success = gExposureProgramNoFade.createShader();
+        llassert(success);
+    }
+
+    if (success)
+    {
+        // Sun coverage, colour and the filtered flare drive, 2x1, read by the
+        // colour-correct programs through uLensFlareStateMap.
+        gLensFlareStateProgram.mName = "Lens Flare State";
+        gLensFlareStateProgram.mShaderFiles.clear();
+        gLensFlareStateProgram.clearPermutations();
+        gLensFlareStateProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gLensFlareStateProgram.mShaderFiles.push_back(make_pair("alchemy/lensFlareStateF.glsl", GL_FRAGMENT_SHADER));
+        gLensFlareStateProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = gLensFlareStateProgram.createShader();
         llassert(success);
     }
 
