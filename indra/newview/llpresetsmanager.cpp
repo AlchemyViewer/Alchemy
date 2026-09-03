@@ -597,8 +597,8 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderLensFlareStarburstSpikes",
         "RenderLensFlareStarburstSharpness",
         "RenderLensFlareStarburstLength",
-        "RenderLensFlareOcclusionRadius",
-        "RenderLensFlareOcclusionTaps",
+        "RenderLensFlareOcclusionScale",
+        "RenderLensFlareFadeTime",
         // Chromatic aberration
         "RenderChromaticAberrationStrength",
         "RenderChromaticAberrationFalloff",

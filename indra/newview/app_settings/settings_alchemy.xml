@@ -2592,27 +2592,27 @@
             <key>Value</key>
             <real>0.25</real>
         </map>
-        <key>RenderLensFlareOcclusionRadius</key>
+        <key>RenderLensFlareOcclusionScale</key>
         <map>
             <key>Comment</key>
-            <string>How wide the sun-occlusion test samples the scene depth. Larger values let thin geometry (foliage, wires) dim the flare more gracefully. Range 0.005 to 0.1.</string>
+            <string>Size of the sun-occlusion probe as a multiple of the sun disc; it follows zoom and the sky's sun scale. Below 1 only the core of the disc counts, above 1 objects near the sun start to dim the flare. Range 0.25 to 4.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>0.02</real>
+            <real>1.0</real>
         </map>
-        <key>RenderLensFlareOcclusionTaps</key>
+        <key>RenderLensFlareFadeTime</key>
         <map>
             <key>Comment</key>
-            <string>Number of depth samples for sun-occlusion testing. Higher values give smoother partial occlusion transitions at a small performance cost. Range 1 to 32.</string>
+            <string>Seconds for the lens flare to fade in when the sun is revealed; it fades out in 0.6 of this, and never faster whatever passes in front of the sun. Longer is calmer through foliage and fences. Range 0.1 to 1.5.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>S32</string>
+            <string>F32</string>
             <key>Value</key>
-            <integer>9</integer>
+            <real>0.35</real>
         </map>
         <key>RenderParcelSelectionToMaxHeight</key>
         <map>

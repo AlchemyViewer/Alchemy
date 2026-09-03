@@ -2108,17 +2108,16 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 top_pad="8"
 				 right="-32"
 				 height="16"
-				 label="Radius"
+				 label="Size"
 				 label_width="140"
 				 can_edit_text="true"
-				 decimal_digits="3"
-				 text_width="56"
-				 increment="0.001"
-				 min_val="0.005"
-				 max_val="0.1"
-				 name="flare_occlusion_radius"
-				 tool_tip="Width of the sun-occlusion depth test; larger lets thin geometry dim the flare gracefully"
-				 control_name="RenderLensFlareOcclusionRadius" />
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0.25"
+				 max_val="4"
+				 name="flare_occlusion_scale"
+				 tool_tip="Occlusion probe as a multiple of the sun disc; larger lets objects near the sun dim the flare sooner"
+				 control_name="RenderLensFlareOcclusionScale" />
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -2129,11 +2128,11 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="center"
-				 name="flare_occlusion_radius_rst"
+				 name="flare_occlusion_scale_rst"
 				 tool_tip="Reset to default">
 					<button.commit_callback
 					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareOcclusionRadius" />
+					 parameter="RenderLensFlareOcclusionScale" />
 				</button>
 				<slider
 				 follows="left|top|right"
@@ -2142,16 +2141,16 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 top_pad="9"
 				 right="-32"
 				 height="16"
-				 label="Samples"
+				 label="Fade"
 				 label_width="140"
 				 can_edit_text="true"
-				 decimal_digits="0"
-				 increment="1"
-				 min_val="1"
-				 max_val="32"
-				 name="flare_occlusion_taps"
-				 tool_tip="Depth samples for occlusion testing; more gives smoother transitions at slight cost"
-				 control_name="RenderLensFlareOcclusionTaps" />
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0.1"
+				 max_val="1.5"
+				 name="flare_fade_time"
+				 tool_tip="Seconds for the flare to fade in when the sun is revealed; it fades out faster. Longer is calmer through foliage"
+				 control_name="RenderLensFlareFadeTime" />
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -2162,11 +2161,11 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="center"
-				 name="flare_occlusion_taps_rst"
+				 name="flare_fade_time_rst"
 				 tool_tip="Reset to default">
 					<button.commit_callback
 					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensFlareOcclusionTaps" />
+					 parameter="RenderLensFlareFadeTime" />
 				</button>
 				<button
 				 follows="top|right"
