@@ -400,11 +400,27 @@ bool HttpPolicy::stageAfterCompletion(const HttpOpRequest::ptr_t &op)
     // This op is done, finalize it delivering it to the reply queue...
     if (! op->mStatus)
     {
-        LL_WARNS(LOG_CORE) << "HTTP request " << op->getHandle()
-                           << " failed after " << op->mPolicyRetries
-                           << " retries.  Reason:  " << op->mStatus.toString()
-                           << " (" << op->mStatus.toTerseString() << ")"
-                           << LL_ENDL;
+        // A 4xx is the server's answer about this one resource, and the
+        // requester reports the ones it cares about; transport failures and
+        // 5xx are the policy layer's to shout about.
+        const bool client_error = op->mStatus.isHttpStatus()
+            && op->mStatus.getStatus() >= 400 && op->mStatus.getStatus() < 500;
+        if (client_error)
+        {
+            LL_DEBUGS(LOG_CORE) << "HTTP request " << op->getHandle()
+                                << " failed after " << op->mPolicyRetries
+                                << " retries.  Reason:  " << op->mStatus.toString()
+                                << " (" << op->mStatus.toTerseString() << ")"
+                                << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS(LOG_CORE) << "HTTP request " << op->getHandle()
+                               << " failed after " << op->mPolicyRetries
+                               << " retries.  Reason:  " << op->mStatus.toString()
+                               << " (" << op->mStatus.toTerseString() << ")"
+                               << LL_ENDL;
+        }
     }
     else if (op->mPolicyRetries)
     {

@@ -1575,8 +1575,10 @@ bool LLTextureFetchWorker::doWork(S32 param)
                     // Allowed, we'll accept whatever data we have as complete.
                     mHaveAllData = true;
                 }
-                else
+                else if (mFTType != FTT_MAP_TILE)
                 {
+                    // Map tiles that do not exist come back 403 from the CDN;
+                    // that is the expected answer for open water, not a failure.
                     LL_INFOS(LOG_TXT) << "HTTP GET failed for: " << mUrl
                                       << " Status: " << mGetStatus.toTerseString()
                                       << " Reason: '" << mGetReason << "'"
@@ -1606,7 +1608,10 @@ bool LLTextureFetchWorker::doWork(S32 param)
                 resetFormattedData();
                 setState(DONE);
                 releaseHttpSemaphore();
-                LL_WARNS(LOG_TXT) << mID << " abort: fail harder" << LL_ENDL;
+                if (mFTType != FTT_MAP_TILE)
+                {
+                    LL_WARNS(LOG_TXT) << mID << " abort: fail harder" << LL_ENDL;
+                }
                 return true; // failed
             }
 

@@ -329,7 +329,9 @@ namespace {
 
         virtual bool enabled() override
         {
-            return LLError::getEnabledLogTypesMask() & 0x10;
+            // debugger_print() is a no-op without a debugger, but every enabled
+            // recorder is handed a freshly formatted copy of each line first.
+            return (LLError::getEnabledLogTypesMask() & 0x10) && IsDebuggerPresent();
         }
 
         virtual void recordMessage(LLError::ELevel level,

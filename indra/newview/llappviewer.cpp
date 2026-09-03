@@ -6152,7 +6152,7 @@ void LLAppViewer::idleNameCache()
 //
 
 
-constexpr F32 CHECK_MESSAGES_DEFAULT_MAX_TIME = 0.020f; // 50 ms = 50 fps (just for messages!)
+constexpr F32 CHECK_MESSAGES_DEFAULT_MAX_TIME = 0.020f; // 20 ms per frame, just for messages
 static F32 CheckMessagesMaxTime = CHECK_MESSAGES_DEFAULT_MAX_TIME;
 
 void LLAppViewer::idleNetwork()
