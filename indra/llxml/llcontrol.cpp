@@ -105,6 +105,60 @@ settings_vec_t getCount_v;
 F64 start_time = 0;
 std::string SETTINGS_PROFILE = "settings_profile.log";
 
+namespace
+{
+// llsd_equals, except that an Integer and a Real holding the same number are
+// equal. For a setting they are one value: a point list that arrived as
+// [[0,0],[1,1]] from the notation parser or a hand edit is the same curve as
+// its real-typed default, and must count as at default and as unchanged.
+bool llsd_settings_equal(const LLSD& a, const LLSD& b)
+{
+    const bool a_number = a.isInteger() || a.isReal();
+    const bool b_number = b.isInteger() || b.isReal();
+    if (a_number && b_number)
+    {
+        return a.asReal() == b.asReal();
+    }
+    if (a.type() != b.type())
+    {
+        return false;
+    }
+    if (a.isArray())
+    {
+        if (a.size() != b.size())
+        {
+            return false;
+        }
+        LLSD::array_const_iterator ai = a.beginArray();
+        LLSD::array_const_iterator bi = b.beginArray();
+        for (; ai != a.endArray() && bi != b.endArray(); ++ai, ++bi)
+        {
+            if (!llsd_settings_equal(*ai, *bi))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (a.isMap())
+    {
+        if (a.size() != b.size())
+        {
+            return false;
+        }
+        for (LLSD::map_const_iterator it = a.beginMap(); it != a.endMap(); ++it)
+        {
+            if (!b.has(it->first) || !llsd_settings_equal(it->second, b[it->first]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    return llsd_equals(a, b);
+}
+} // namespace
+
 bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
 {
     bool result = false;
@@ -140,11 +194,12 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
         result = a.asString() == b.asString();
         break;
     case TYPE_LLSD:
-        // Deep, strict equality (types, lengths, and reals bit for bit). Without
-        // this case an LLSD-typed control compared as "always changed", so a
-        // write of the value it already held fired the commit signal, dirtied
-        // whatever watched it, and marked the control as never at its default.
-        result = llsd_equals(a, b);
+        // Deep equality by value. Without this case an LLSD-typed control
+        // compared as "always changed": a write of the value it already held
+        // fired the commit signal and dirtied whatever watched it, the control
+        // was never at its default and so was always persisted, and a reset
+        // from a value equal to the default still counted as a change.
+        result = llsd_settings_equal(a, b);
         break;
     default:
         break;
