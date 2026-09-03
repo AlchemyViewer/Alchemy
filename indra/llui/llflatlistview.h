@@ -58,6 +58,7 @@ class LLFlatListView : public LLScrollContainer, public LLEditMenuHandler
     LOG_CLASS(LLFlatListView);
 public:
     AL_VIEW_TYPE(LLFlatListView, LLScrollContainer);
+    LLView* asView() override { return this; }
 
     /**
      * Abstract comparator for comparing flat list items in a form of LLPanel

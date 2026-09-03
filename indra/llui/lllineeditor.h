@@ -60,6 +60,7 @@ class LLLineEditor
 {
 public:
     AL_VIEW_TYPE(LLLineEditor, LLUICtrl);
+    LLView* asView() override { return this; }
 
     typedef std::function<void (LLLineEditor* caller)> keystroke_callback_t;
 

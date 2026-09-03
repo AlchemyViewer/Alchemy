@@ -82,6 +82,7 @@ class FSFloaterPoser final : public LLFloater, public LLEditMenuHandler
     FSFloaterPoser(const LLSD &key);
 public:
     AL_VIEW_TYPE(FSFloaterPoser, LLFloater);
+    LLView* asView() override { return this; }
 
     void updatePosedBones(const std::string& jointName, const LLQuaternion& rotation, const LLVector3& position, const LLVector3& scale);
     LLQuaternion getManipGimbalRotation(const std::string& jointName);

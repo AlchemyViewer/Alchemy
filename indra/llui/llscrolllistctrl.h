@@ -55,6 +55,7 @@ class LLScrollListCtrl : public LLUICtrl, public LLEditMenuHandler,
 {
 public:
     AL_VIEW_TYPE(LLScrollListCtrl, LLUICtrl);
+    LLView* asView() override { return this; }
 
     typedef enum e_selection_type
     {

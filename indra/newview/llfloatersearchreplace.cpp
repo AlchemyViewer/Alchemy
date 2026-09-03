@@ -117,7 +117,7 @@ bool LLFloaterSearchReplace::handleKeyHere(KEY key, MASK mask)
         // Check if one of our children currently has keyboard focus and if so route edit accellerators to it
         if (gFocusMgr.childHasKeyboardFocus(this))
         {
-            LLView* pEditView = dynamic_cast<LLView*>(LLEditMenuHandler::gEditMenuHandler);
+            LLView* pEditView = LLEditMenuHandler::gEditMenuHandler ? LLEditMenuHandler::gEditMenuHandler->asView() : nullptr;
             if ( (pEditView) && (pEditView->hasAncestor(this)) && (gEditMenu) && (gEditMenu->handleAcceleratorKey(key, mask)) )
             {
                 return true;

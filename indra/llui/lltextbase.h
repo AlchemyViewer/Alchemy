@@ -343,6 +343,7 @@ class LLTextBase
 {
 public:
     AL_VIEW_TYPE(LLTextBase, LLUICtrl);
+    LLView* asView() override { return this; }
 
     friend class LLTextSegment;
     friend class LLNormalTextSegment;

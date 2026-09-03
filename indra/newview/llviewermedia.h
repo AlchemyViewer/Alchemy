@@ -351,6 +351,7 @@ public:
     /*virtual*/ void handleMediaEvent(LLPluginClassMedia* plugin, LLPluginClassMediaOwner::EMediaEvent);
 
     // LLEditMenuHandler overrides
+    LLView* asView() override { return nullptr; }
     /*virtual*/ void    undo();
     /*virtual*/ bool    canUndo() const;
 

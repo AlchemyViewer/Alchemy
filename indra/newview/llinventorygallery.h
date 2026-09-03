@@ -50,6 +50,7 @@ class LLInventoryGallery final : public LLPanel, public LLEditMenuHandler
 {
 public:
     AL_VIEW_TYPE(LLInventoryGallery, LLPanel);
+    LLView* asView() override { return this; }
 
     typedef boost::signals2::signal<void(const LLUUID&)> selection_change_signal_t;
     typedef std::function<void(const LLUUID&)> selection_change_callback_t;

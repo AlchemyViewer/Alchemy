@@ -87,6 +87,7 @@ class LLFolderView : public LLFolderViewFolder, public LLEditMenuHandler
 {
 public:
     AL_VIEW_TYPE(LLFolderView, LLFolderViewFolder);
+    LLView* asView() override { return this; }
 
     struct Params : public LLInitParam::Block<Params, LLFolderViewFolder::Params>
     {
