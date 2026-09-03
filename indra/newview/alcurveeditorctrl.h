@@ -51,7 +51,14 @@
  *
  * A drag fires the commit callback on every mouse move (so the preview tracks
  * the pointer, which is the whole point of a graph) with @ref getActiveHandle
- * naming which one moved.
+ * naming which one moved. A press that never moves commits nothing.
+ *
+ * With @c points_editable set, a double-click on empty plot area asks for a
+ * point there and a double-click on a handle asks for its removal. The widget
+ * still owns no curve: it reports the request through @ref getAction and the
+ * consumer decides against its own model whether to honour it, then hands back
+ * a new handle list. Handles under the pointer are drawn brighter so the
+ * target of a double-click is visible before it is clicked.
  */
 class ALCurveEditorCtrl final : public LLUICtrl
 {
@@ -86,6 +93,16 @@ public:
         Optional<S32>       handle_radius;
         Optional<F32>       curve_width;
         Optional<bool>      draw_diagonal;
+        /// Double-click adds a point on empty plot area and removes the handle
+        /// under the pointer, reported through getAction(). Off by default: a
+        /// graph whose handles stand for fixed things (the split-tone bands)
+        /// has nothing to add.
+        Optional<bool>        points_editable;
+        /// Comma-separated names of the settings this graph edits. The widget
+        /// never reads them; they exist so a consumer that resets a section by
+        /// walking its widgets can find settings that are not bound through
+        /// control_name (an LLSD point list cannot be).
+        Optional<std::string> edited_settings;
 
         Params();
     };
@@ -97,6 +114,8 @@ public:
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    void onMouseLeave(S32 x, S32 y, MASK mask) override;
 
     /// The curve to plot. Passing an empty function draws handles only.
     void setCurve(curve_fn_t fn) { mCurve = std::move(fn); }
@@ -114,14 +133,43 @@ public:
     void clearFillCurves() { mFills.clear(); }
     void addFillCurve(curve_fn_t fn, const LLColor4& color);
 
-    void setHandles(std::vector<Handle> handles) { mHandles = std::move(handles); }
+    void setHandles(std::vector<Handle> handles)
+    {
+        mHandles = std::move(handles);
+        // A shorter list must not leave the highlight pointing past its end.
+        if (mHoverIndex >= (S32)mHandles.size())
+        {
+            mHoverIndex = -1;
+        }
+    }
     const std::vector<Handle>& getHandles() const { return mHandles; }
 
     /// Which handle the pointer is dragging, or -1 between drags. Valid inside
     /// the commit callback; that is how a consumer tells one handle's move
-    /// from another's without diffing the whole list.
+    /// from another's without diffing the whole list. During an ACTION_REMOVE
+    /// it names the handle to remove.
     S32 getActiveHandle() const { return mDragIndex; }
     std::string getActiveHandleName() const;
+
+    /// What the commit callback is being asked to do. Valid only inside the
+    /// callback; ACTION_NONE between commits.
+    ///  - ACTION_DRAG:   getActiveHandle() moved; read its new mX / mY.
+    ///  - ACTION_ADD:    a point is wanted at getActionX() / getActionY().
+    ///  - ACTION_REMOVE: getActiveHandle() names the handle to remove.
+    enum EAction
+    {
+        ACTION_NONE,
+        ACTION_DRAG,
+        ACTION_ADD,
+        ACTION_REMOVE,
+    };
+    EAction getAction() const  { return mAction; }
+    F32     getActionX() const { return mActionX; }
+    F32     getActionY() const { return mActionY; }
+
+    /// The settings named in XUI as the ones this graph edits. See the
+    /// edited_settings param.
+    const std::vector<std::string>& getEditedSettingNames() const { return mSettingNames; }
 
 private:
     /// Graph coordinates (0..1, y up) to local widget pixels and back. The
@@ -161,6 +209,19 @@ private:
     S32 mDragIndex = -1;
     S32 mGrabOffsetX = 0;
     S32 mGrabOffsetY = 0;
+
+    bool mPointsEditable = false;
+    std::vector<std::string> mSettingNames;
+    EAction mAction = ACTION_NONE;
+    F32 mActionX = 0.f;
+    F32 mActionY = 0.f;
+    /// Handle under the pointer between drags, or -1.
+    S32 mHoverIndex = -1;
+    /// Pointer position at the last drag commit, so a press that does not
+    /// move never commits: the viewer calls a captured widget's handleHover
+    /// every frame, not only on motion.
+    S32 mLastPointerX = -1;
+    S32 mLastPointerY = -1;
 };
 
 #endif // AL_CURVEEDITORCTRL_H

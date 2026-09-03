@@ -247,49 +247,95 @@
             <key>Value</key>
             <real>1.0</real>
         </map>
-        <key>RenderColorGradeCurveShoulder</key>
+        <key>RenderColorGradeCurveAmount</key>
         <map>
             <key>Comment</key>
-            <string>Per-channel filmic curve shoulder point (RGB). Pixels at or above this input level flatten toward white. Lower values (around 0.85) give a tighter roll-off.</string>
+            <string>How much of the tone curves is applied. 0 leaves the image untouched, 1 applies the curves fully. Range 0 to 1, default 1.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Color3</string>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>RenderColorGradeCurveBlue</key>
+        <map>
+            <key>Comment</key>
+            <string>Tone curve for the blue channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16; [[0,0],[1,1]] is no change.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
             <key>Value</key>
             <array>
-                <real>1.0</real>
-                <real>1.0</real>
-                <real>1.0</real>
+                <array>
+                    <real>0.0</real>
+                    <real>0.0</real>
+                </array>
+                <array>
+                    <real>1.0</real>
+                    <real>1.0</real>
+                </array>
             </array>
         </map>
-        <key>RenderColorGradeCurveStrength</key>
+        <key>RenderColorGradeCurveGreen</key>
         <map>
             <key>Comment</key>
-            <string>Per-channel curve blend strength (RGB). 0 disables; 0.4 is typical film, differing values per channel create cross-process looks.</string>
+            <string>Tone curve for the green channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16; [[0,0],[1,1]] is no change.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Color3</string>
+            <string>LLSD</string>
             <key>Value</key>
             <array>
-                <real>0.0</real>
-                <real>0.0</real>
-                <real>0.0</real>
+                <array>
+                    <real>0.0</real>
+                    <real>0.0</real>
+                </array>
+                <array>
+                    <real>1.0</real>
+                    <real>1.0</real>
+                </array>
             </array>
         </map>
-        <key>RenderColorGradeCurveToe</key>
+        <key>RenderColorGradeCurveMaster</key>
         <map>
             <key>Comment</key>
-            <string>Per-channel filmic curve toe point (RGB). Pixels at or below this input level flatten toward black. Try (0.05, 0.05, 0.1) to lift shadow blues.</string>
+            <string>Tone curve applied to every channel, after the per-channel curves. An array of [input, output] control points, both 0 to 1, sorted by input with the first at input 0 and the last at input 1, at most 16; a monotone cubic spline passes through them. [[0,0],[1,1]] is a straight line (no change). Edited in the Lightbox Tone Curve graph.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Color3</string>
+            <string>LLSD</string>
             <key>Value</key>
             <array>
-                <real>0.0</real>
-                <real>0.0</real>
-                <real>0.0</real>
+                <array>
+                    <real>0.0</real>
+                    <real>0.0</real>
+                </array>
+                <array>
+                    <real>1.0</real>
+                    <real>1.0</real>
+                </array>
+            </array>
+        </map>
+        <key>RenderColorGradeCurveRed</key>
+        <map>
+            <key>Comment</key>
+            <string>Tone curve for the red channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16; [[0,0],[1,1]] is no change.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <array>
+                <array>
+                    <real>0.0</real>
+                    <real>0.0</real>
+                </array>
+                <array>
+                    <real>1.0</real>
+                    <real>1.0</real>
+                </array>
             </array>
         </map>
         <key>RenderColorGradeGain</key>
@@ -984,6 +1030,17 @@
                 <real>0.44</real>
             </array>
         </map>
+        <key>RenderSplitToneHighlightWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>How far above the split point, in luma from 0 to 1, the highlight tint ramps from nothing to full strength. Range 0.02 (a hard edge) to 0.5 (very soft). Default 0.35, the value that was fixed in the shader before it became a setting.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.35</real>
+        </map>
         <key>RenderSplitToneMidtoneAmount</key>
         <map>
             <key>Comment</key>
@@ -1024,6 +1081,17 @@
                 <real>0.48</real>
                 <real>0.55</real>
             </array>
+        </map>
+        <key>RenderSplitToneShadowWidth</key>
+        <map>
+            <key>Comment</key>
+            <string>How far below the split point, in luma from 0 to 1, the shadow tint ramps from nothing to full strength. Range 0.02 (a hard edge) to 0.5 (very soft). Default 0.35, the value that was fixed in the shader before it became a setting.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.35</real>
         </map>
         <key>RenderTonemapACESWhite</key>
         <map>

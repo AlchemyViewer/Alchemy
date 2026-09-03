@@ -147,6 +147,15 @@ void collectBoundControls(LLView* viewp, std::set<std::string>& keys)
             {
                 keys.insert(setting);
             }
+            // A graph that edits settings not bound through control_name (an
+            // LLSD point list cannot be) names them in XUI; enrol those too.
+            if (auto* graphp = dynamic_cast<ALCurveEditorCtrl*>(ctrlp))
+            {
+                for (const std::string& name : graphp->getEditedSettingNames())
+                {
+                    keys.insert(name);
+                }
+            }
         }
         collectBoundControls(childp, keys);
     }
@@ -174,6 +183,8 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.CommitVec3", std::bind(&ALFloaterLightBox::onCommitVec3, this, std::placeholders::_1));
     mCommitCallbackRegistrar.add("LightBox.CommitToneCurve", std::bind(&ALFloaterLightBox::onCommitToneCurve, this));
     mCommitCallbackRegistrar.add("LightBox.RefreshToneCurve", std::bind(&ALFloaterLightBox::refreshToneCurve, this));
+    mCommitCallbackRegistrar.add("LightBox.ResetToneCurveChannel", std::bind(&ALFloaterLightBox::onClickResetToneCurveChannel, this));
+    mCommitCallbackRegistrar.add("LightBox.ToneCurvePreset", std::bind(&ALFloaterLightBox::onToneCurvePreset, this, std::placeholders::_2));
     mCommitCallbackRegistrar.add("LightBox.CommitSplitToneGraph", std::bind(&ALFloaterLightBox::onCommitSplitToneGraph, this));
     mCommitCallbackRegistrar.add("LightBox.PickWhiteBalance", std::bind(&ALFloaterLightBox::onClickWhiteBalancePicker, this));
     mCommitCallbackRegistrar.add("LightBox.OpenLUTFolder", std::bind(&ALFloaterLightBox::onClickOpenLUTFolder, this));
@@ -966,69 +977,67 @@ void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
 
 namespace
 {
-// The three settings the tone curve graph edits, and the order the handles
-// are built in. Kept together so the graph and the spinner rows below it can
-// never disagree about which key is which.
-const char* const TONE_CURVE_TOE      = "RenderColorGradeCurveToe";
-const char* const TONE_CURVE_SHOULDER = "RenderColorGradeCurveShoulder";
-const char* const TONE_CURVE_STRENGTH = "RenderColorGradeCurveStrength";
+// The four curve settings, indexed by ALToneCurveSet::EChannel: master first,
+// then red, green, blue. Loaded fresh on every refresh and commit rather than
+// mirrored in a member: the settings are the truth, and undo, Looks and Debug
+// Settings all write them behind the floater's back.
+const char* const TONE_CURVE_SETTINGS[ALToneCurveSet::CH_COUNT] = {
+    "RenderColorGradeCurveMaster",
+    "RenderColorGradeCurveRed",
+    "RenderColorGradeCurveGreen",
+    "RenderColorGradeCurveBlue" };
+
+const char* toneCurveSettingName(ALToneCurveSet::EChannel channel)
+{
+    return TONE_CURVE_SETTINGS[channel];
+}
+
+ALToneCurveSet loadToneCurveSet()
+{
+    ALToneCurveSet curves;
+    for (S32 c = 0; c < ALToneCurveSet::CH_COUNT; ++c)
+    {
+        const ALToneCurveSet::EChannel channel = static_cast<ALToneCurveSet::EChannel>(c);
+        curves.setCurveFromLLSD(channel, gSavedSettings.getLLSD(toneCurveSettingName(channel)));
+    }
+    return curves;
+}
+
+// Ghosts of the channels not being edited, and the solid handle colour of the
+// one that is: the same three hues, dim and bright.
+const LLColor4 CHANNEL_TINT[3] = {
+    LLColor4(0.8f, 0.25f, 0.25f, 0.55f),
+    LLColor4(0.25f, 0.8f, 0.35f, 0.55f),
+    LLColor4(0.35f, 0.5f, 0.9f, 0.55f) };
+const LLColor4 CHANNEL_SOLID[3] = {
+    LLColor4(0.9f, 0.3f, 0.3f, 1.f),
+    LLColor4(0.3f, 0.85f, 0.4f, 1.f),
+    LLColor4(0.4f, 0.55f, 0.95f, 1.f) };
+// What a channel actually gets once Master is applied after it.
+const LLColor4 COMPOSITE_TINT(0.85f, 0.85f, 0.85f, 0.4f);
 
 // The split-toning settings the band graph reads. The tints colour the bands,
-// the amounts fade them, and the balance is the only one the graph writes.
-const char* const SPLIT_TONE_SHADOW         = "RenderSplitToneShadowTint";
-const char* const SPLIT_TONE_MIDTONE        = "RenderSplitToneMidtoneTint";
-const char* const SPLIT_TONE_HIGHLIGHT      = "RenderSplitToneHighlightTint";
-const char* const SPLIT_TONE_AMOUNT         = "RenderSplitToneAmount";
-const char* const SPLIT_TONE_MIDTONE_AMOUNT = "RenderSplitToneMidtoneAmount";
-const char* const SPLIT_TONE_BALANCE        = "RenderSplitToneBalance";
+// the amounts fade them, and the balance and the two widths are what its
+// three handles write.
+const char* const SPLIT_TONE_SHADOW          = "RenderSplitToneShadowTint";
+const char* const SPLIT_TONE_MIDTONE         = "RenderSplitToneMidtoneTint";
+const char* const SPLIT_TONE_HIGHLIGHT       = "RenderSplitToneHighlightTint";
+const char* const SPLIT_TONE_AMOUNT          = "RenderSplitToneAmount";
+const char* const SPLIT_TONE_MIDTONE_AMOUNT  = "RenderSplitToneMidtoneAmount";
+const char* const SPLIT_TONE_BALANCE         = "RenderSplitToneBalance";
+const char* const SPLIT_TONE_SHADOW_WIDTH    = "RenderSplitToneShadowWidth";
+const char* const SPLIT_TONE_HIGHLIGHT_WIDTH = "RenderSplitToneHighlightWidth";
+
+// The range the sliders offer, and what an edge handle is clamped into. The
+// renderer itself only floors a width (ALCurveModel::SPLIT_TONE_MIN_WIDTH),
+// so Debug Settings can still ask for more; the graph and the render agree
+// either way, because both go through the model.
+constexpr F32 SPLIT_TONE_WIDTH_MIN = 0.02f;
+constexpr F32 SPLIT_TONE_WIDTH_MAX = 0.5f;
 
 LLColor3 getColor3(const char* key)
 {
     return gSavedSettings.getColor3(key);
-}
-
-// Write one component, or all three when channel is negative. Rebuilds the
-// whole array the way onCommitVec3 does, so an untouched component keeps its
-// value rather than being re-derived from a rounded read-back.
-void setColor3Component(const char* key, S32 channel, F32 value)
-{
-    LLControlVariable* controlp = gSavedSettings.getControl(key);
-    if (!controlp)
-    {
-        return;
-    }
-    const LLSD current = controlp->getValue();
-    LLSD updated = LLSD::emptyArray();
-    for (S32 i = 0; i < 3; ++i)
-    {
-        const bool touched = (channel < 0) || (channel == i);
-        updated.append(LLSD::Real(touched ? value : current[i].asReal()));
-    }
-    controlp->set(updated);
-}
-
-/// Where the curve departs furthest from the identity. That is the most
-/// sensitive place to read strength back from a dragged handle -- solving
-/// k = (y - x) / (s - x) anywhere the two are close would amplify a pixel of
-/// pointer movement into a wild swing -- and it is also where the eye reads
-/// the curve's effect, so it is where the handle belongs.
-F32 findMaxDeviation(F32 toe, F32 shoulder)
-{
-    constexpr S32 SAMPLES = 64;
-    F32 best_x = 0.5f;
-    F32 best_gap = -1.f;
-    for (S32 i = 1; i < SAMPLES; ++i)
-    {
-        const F32 x = (F32)i / (F32)SAMPLES;
-        // The pure curve at full strength: the deviation the blend scales.
-        const F32 gap = fabsf(ALCurveModel::smoothstep(x, toe, shoulder, 1.f) - x);
-        if (gap > best_gap)
-        {
-            best_gap = gap;
-            best_x = x;
-        }
-    }
-    return best_x;
 }
 } // namespace
 
@@ -1047,17 +1056,27 @@ void ALFloaterLightBox::setupToneCurve()
     mToneCurveChannel = findChild<LLComboBox>("tone_curve_channel");
     if (mToneCurveChannel)
     {
-        // Start linked. Without an explicit selection an unselected combo
+        // Start on Master. Without an explicit selection an unselected combo
         // reads back as 0, which would silently mean "red only".
         mToneCurveChannel->selectByValue(LLSD(-1));
     }
 
-    for (const char* key : { TONE_CURVE_TOE, TONE_CURVE_SHOULDER, TONE_CURVE_STRENGTH })
+    for (const char* key : TONE_CURVE_SETTINGS)
     {
         if (LLControlVariable* controlp = gSavedSettings.getControl(key))
         {
             mToneCurveConnections.emplace_back(controlp->getSignal()->connect(
                 [this](LLControlVariable*, const LLSD&, const LLSD&) { refreshToneCurve(); }));
+        }
+    }
+
+    // The graph names the settings it edits in XUI so the section's Reset All
+    // can find them; a typo there fails silently, so say so once.
+    for (const std::string& name : mToneCurve->getEditedSettingNames())
+    {
+        if (!gSavedSettings.getControl(name))
+        {
+            LL_WARNS() << "tone_curve_graph names an unknown setting: " << name << LL_ENDL;
         }
     }
 
@@ -1071,69 +1090,51 @@ void ALFloaterLightBox::refreshToneCurve()
         return;
     }
 
-    const LLColor3 toe = getColor3(TONE_CURVE_TOE);
-    const LLColor3 shoulder = getColor3(TONE_CURVE_SHOULDER);
-    const LLColor3 strength = getColor3(TONE_CURVE_STRENGTH);
+    const ALToneCurveSet curves = loadToneCurveSet();
+    const ALToneCurveSet::EChannel channel = ALToneCurveSet::channelFromCombo(getToneCurveChannel());
+    // A copy: the lambdas below outlive this call.
+    const ALCurveModel selected = curves.curve(channel);
 
-    // Linked edits all three at once and shows one curve; a single channel
-    // shows its own curve solid with the other two behind it, so you can see
-    // how far apart you have pulled them.
-    const S32 channel = getToneCurveChannel();
-    const S32 plotted = (channel < 0) ? 0 : channel;
-
-    const F32 t = toe.mV[plotted];
-    const F32 s = shoulder.mV[plotted];
-    const F32 k = strength.mV[plotted];
-
-    mToneCurve->setCurve([t, s, k](F32 x) { return ALCurveModel::smoothstep(x, t, s, k); });
+    // The selected curve alone is what is drawn solid. Its points are the
+    // handles, so what is seen is exactly what a drag edits.
+    mToneCurve->setCurve([selected](F32 x) { return selected.evaluate(x); });
 
     mToneCurve->clearGhostCurves();
-    if (channel >= 0)
+    if (channel != ALToneCurveSet::CH_MASTER &&
+        !ALToneCurveSet::isIdentityCurve(curves.curve(ALToneCurveSet::CH_MASTER)))
     {
-        static const LLColor4 channel_tint[3] = {
-            LLColor4(0.8f, 0.25f, 0.25f, 0.55f),
-            LLColor4(0.25f, 0.8f, 0.35f, 0.55f),
-            LLColor4(0.35f, 0.5f, 0.9f, 0.55f) };
-        for (S32 i = 0; i < 3; ++i)
+        // What this channel actually gets once Master is applied after it.
+        mToneCurve->addGhostCurve([curves, channel](F32 x) { return curves.evaluate(channel, x); }, COMPOSITE_TINT);
+    }
+    for (S32 i = 0; i < 3; ++i)
+    {
+        const ALToneCurveSet::EChannel other = static_cast<ALToneCurveSet::EChannel>(ALToneCurveSet::CH_RED + i);
+        if (other == channel || ALToneCurveSet::isIdentityCurve(curves.curve(other)))
         {
-            if (i == channel)
-            {
-                continue;
-            }
-            const F32 gt = toe.mV[i];
-            const F32 gs = shoulder.mV[i];
-            const F32 gk = strength.mV[i];
-            mToneCurve->addGhostCurve(
-                [gt, gs, gk](F32 x) { return ALCurveModel::smoothstep(x, gt, gs, gk); },
-                channel_tint[i]);
+            continue;
         }
+        const ALCurveModel ghost = curves.curve(other);
+        mToneCurve->addGhostCurve([ghost](F32 x) { return ghost.evaluate(x); }, CHANNEL_TINT[i]);
     }
 
-    const F32 strength_x = findMaxDeviation(t, s);
-
+    // One handle per point, in point order: getActiveHandle() is then the
+    // point index, which is the whole contract onCommitToneCurve relies on.
     std::vector<ALCurveEditorCtrl::Handle> handles;
-    ALCurveEditorCtrl::Handle h;
-
-    h.mName = "toe";
-    h.mX = t;
-    h.mY = ALCurveModel::smoothstep(t, t, s, k);
-    h.mLockY = true;
-    handles.push_back(h);
-
-    h = ALCurveEditorCtrl::Handle();
-    h.mName = "shoulder";
-    h.mX = s;
-    h.mY = ALCurveModel::smoothstep(s, t, s, k);
-    h.mLockY = true;
-    handles.push_back(h);
-
-    h = ALCurveEditorCtrl::Handle();
-    h.mName = "strength";
-    h.mX = strength_x;
-    h.mY = ALCurveModel::smoothstep(strength_x, t, s, k);
-    h.mLockX = true;
-    handles.push_back(h);
-
+    const std::vector<ALCurveModel::Point>& points = selected.getPoints();
+    for (size_t i = 0; i < points.size(); ++i)
+    {
+        ALCurveEditorCtrl::Handle h;
+        const bool endpoint = (i == 0 || i + 1 == points.size());
+        h.mName = endpoint ? "end" : "point";
+        h.mX = points[i].mX;
+        h.mY = points[i].mY;
+        // The model pins the ends too; the lock stops the pointer fighting it.
+        h.mLockX = endpoint;
+        h.mColor = (channel == ALToneCurveSet::CH_MASTER)
+                       ? LLColor4::white
+                       : CHANNEL_SOLID[channel - ALToneCurveSet::CH_RED];
+        handles.push_back(h);
+    }
     mToneCurve->setHandles(std::move(handles));
 }
 
@@ -1143,54 +1144,109 @@ void ALFloaterLightBox::onCommitToneCurve()
     {
         return;
     }
-
-    const std::string which = mToneCurve->getActiveHandleName();
-    const S32 index = mToneCurve->getActiveHandle();
-    if (which.empty() || index < 0 || index >= (S32)mToneCurve->getHandles().size())
+    const ALCurveEditorCtrl::EAction action = mToneCurve->getAction();
+    if (action == ALCurveEditorCtrl::ACTION_NONE)
     {
         return;
     }
-    const ALCurveEditorCtrl::Handle handle = mToneCurve->getHandles()[index];
 
-    const S32 channel = getToneCurveChannel();
-    const S32 read = (channel < 0) ? 0 : channel;
-    const F32 toe = getColor3(TONE_CURVE_TOE).mV[read];
-    const F32 shoulder = getColor3(TONE_CURVE_SHOULDER).mV[read];
-    const F32 strength = getColor3(TONE_CURVE_STRENGTH).mV[read];
+    const ALToneCurveSet::EChannel channel = ALToneCurveSet::channelFromCombo(getToneCurveChannel());
+    LLControlVariable* controlp = gSavedSettings.getControl(toneCurveSettingName(channel));
+    if (!controlp)
+    {
+        return;
+    }
 
-    // Writing a setting re-enters through its signal; let the write land, then
-    // rebuild the handles once from the values that actually stuck. Scoped so
-    // no early return can ever leave the flag stuck and the graph dead -- and
-    // the scope must close before the refresh below, which reads the same
-    // flag and would otherwise skip the rebuild it exists to do.
+    ALToneCurveSet curves = loadToneCurveSet();
+    ALCurveModel& curve = curves.curve(channel);
+
+    bool changed = false;
+    switch (action)
+    {
+        case ALCurveEditorCtrl::ACTION_DRAG:
+        {
+            const S32 index = mToneCurve->getActiveHandle();
+            if (index < 0 || index >= curve.getPointCount() || index >= (S32)mToneCurve->getHandles().size())
+            {
+                return;
+            }
+            // By value: the refresh below replaces the handle list.
+            const ALCurveEditorCtrl::Handle handle = mToneCurve->getHandles()[index];
+            // Clamps into the neighbours' gap; the ends stay pinned.
+            curve.movePoint(index, handle.mX, handle.mY);
+            changed = true;
+            break;
+        }
+        case ALCurveEditorCtrl::ACTION_ADD:
+            // Past the cap the click is simply ignored, which is the honest
+            // answer; the tooltip states the limit.
+            changed = curve.addPoint(mToneCurve->getActionX(), mToneCurve->getActionY()) >= 0;
+            break;
+        case ALCurveEditorCtrl::ACTION_REMOVE:
+            // False for an endpoint or a two-point curve.
+            changed = curve.removePoint(mToneCurve->getActiveHandle());
+            break;
+        default:
+            break;
+    }
+
+    if (!changed)
+    {
+        // Put the handle back where the model kept the point.
+        refreshToneCurve();
+        return;
+    }
+
+    // One setting per commit: that is what lets the history coalesce a drag
+    // into a single undo step. Writing a setting re-enters through its
+    // signal; let the write land, then rebuild the handles once from the
+    // values that actually stuck. Scoped so no early return can leave the
+    // flag stuck, and closed before the refresh below, which reads it.
     {
         ScopedTrue updating(mToneCurveUpdating);
-
-        if (which == "toe")
-        {
-            // Held at or below the shoulder. The shader tolerates the inversion
-            // (its reciprocal is guarded) but it renders as a hard step with no
-            // visible cause; the spinners remain the way to ask for that.
-            setColor3Component(TONE_CURVE_TOE, channel, llmin(handle.mX, shoulder));
-        }
-        else if (which == "shoulder")
-        {
-            setColor3Component(TONE_CURVE_SHOULDER, channel, llmax(handle.mX, toe));
-        }
-        else if (which == "strength")
-        {
-            // The handle rides the curve at a fixed x, so its height is
-            // mix(x, s, k) and k falls straight out of it.
-            const F32 x = handle.mX;
-            const F32 s = ALCurveModel::smoothstep(x, toe, shoulder, 1.f);
-            const F32 gap = s - x;
-            if (fabsf(gap) > 1e-3f)
-            {
-                setColor3Component(TONE_CURVE_STRENGTH, channel, llclamp((handle.mY - x) / gap, 0.f, 1.f));
-            }
-        }
+        controlp->set(ALToneCurveSet::pointsToLLSD(curve.getPoints()));
     }
     refreshToneCurve();
+}
+
+void ALFloaterLightBox::onClickResetToneCurveChannel()
+{
+    // resetToDefault fires the setting's signal, which refreshes the graph.
+    const ALToneCurveSet::EChannel channel = ALToneCurveSet::channelFromCombo(getToneCurveChannel());
+    if (LLControlVariable* controlp = gSavedSettings.getControl(toneCurveSettingName(channel)))
+    {
+        controlp->resetToDefault(true);
+    }
+}
+
+void ALFloaterLightBox::onToneCurvePreset(const LLSD& userdata)
+{
+    // Point lists, both axes 0..1, with the ends at x = 0 and 1 as the model
+    // pins them. Modest on purpose: a preset is a starting shape.
+    typedef std::vector<ALCurveModel::Point> points_t;
+    static const std::map<std::string, points_t> presets = {
+        { "linear",   { { 0.f, 0.f }, { 1.f, 1.f } } },
+        { "soft_s",   { { 0.f, 0.f }, { 0.25f, 0.21f }, { 0.75f, 0.79f }, { 1.f, 1.f } } },
+        { "strong_s", { { 0.f, 0.f }, { 0.25f, 0.16f }, { 0.75f, 0.84f }, { 1.f, 1.f } } },
+        { "fade",     { { 0.f, 0.08f }, { 0.3f, 0.32f }, { 1.f, 1.f } } },
+        { "matte",    { { 0.f, 0.08f }, { 0.3f, 0.32f }, { 0.75f, 0.76f }, { 1.f, 0.94f } } },
+    };
+    const auto found = presets.find(userdata.asString());
+    if (found == presets.end())
+    {
+        return;
+    }
+
+    ALCurveModel curve;
+    curve.setPoints(found->second);
+
+    // One setting, the selected curve; its signal refreshes the graph. No
+    // re-entry guard: nothing is mid-drag.
+    const ALToneCurveSet::EChannel channel = ALToneCurveSet::channelFromCombo(getToneCurveChannel());
+    if (LLControlVariable* controlp = gSavedSettings.getControl(toneCurveSettingName(channel)))
+    {
+        controlp->set(ALToneCurveSet::pointsToLLSD(curve.getPoints()));
+    }
 }
 
 void ALFloaterLightBox::setupSplitToneGraph()
@@ -1201,12 +1257,13 @@ void ALFloaterLightBox::setupSplitToneGraph()
         return;
     }
 
-    // Every input, not just the balance: the tints decide what colour a band
-    // is drawn in and the amounts decide how solid, so a graph that only
-    // watched the balance would sit there showing a tint the renderer had
-    // already stopped applying.
+    // Every input, not just the three the handles write: the tints decide
+    // what colour a band is drawn in and the amounts decide how solid, so a
+    // graph that only watched its own settings would sit there showing a
+    // tint the renderer had already stopped applying.
     for (const char* key : { SPLIT_TONE_SHADOW, SPLIT_TONE_MIDTONE, SPLIT_TONE_HIGHLIGHT,
-                             SPLIT_TONE_AMOUNT, SPLIT_TONE_MIDTONE_AMOUNT, SPLIT_TONE_BALANCE })
+                             SPLIT_TONE_AMOUNT, SPLIT_TONE_MIDTONE_AMOUNT, SPLIT_TONE_BALANCE,
+                             SPLIT_TONE_SHADOW_WIDTH, SPLIT_TONE_HIGHLIGHT_WIDTH })
     {
         if (LLControlVariable* controlp = gSavedSettings.getControl(key))
         {
@@ -1228,6 +1285,11 @@ void ALFloaterLightBox::refreshSplitToneGraph()
     const F32 mid = ALCurveModel::splitToneMid(gSavedSettings.getF32(SPLIT_TONE_BALANCE));
     const F32 amount     = llclamp(gSavedSettings.getF32(SPLIT_TONE_AMOUNT), 0.f, 1.f);
     const F32 mid_amount = llclamp(gSavedSettings.getF32(SPLIT_TONE_MIDTONE_AMOUNT), 0.f, 1.f);
+    // Not clamped to the slider range: the model floors a width the way the
+    // renderer does, so the bands show what is actually being applied even
+    // when Debug Settings asked for something the sliders would not.
+    const F32 ws = gSavedSettings.getF32(SPLIT_TONE_SHADOW_WIDTH);
+    const F32 wh = gSavedSettings.getF32(SPLIT_TONE_HIGHLIGHT_WIDTH);
 
     // A band wears the tint it applies. Normalised the way pipeline.cpp
     // normalises it, so what the graph shows is the hue the renderer will
@@ -1249,50 +1311,94 @@ void ALFloaterLightBox::refreshSplitToneGraph()
         // Alpha follows the amount, so a band the renderer is ignoring fades
         // instead of sitting at full strength claiming otherwise. It never
         // reaches zero: where the bands lie is worth seeing even when nothing
-        // is being applied, and that is what the balance handle moves.
+        // is being applied, and that is what the handles move.
         out.mV[VALPHA] = 0.16f + 0.44f * strength;
         return out;
     };
 
     mSplitToneGraph->clearFillCurves();
     mSplitToneGraph->addFillCurve(
-        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mShadow; },
+        [mid, ws, wh](F32 l) { return ALCurveModel::splitToneWeights(l, mid, ws, wh).mShadow; },
         band_color(SPLIT_TONE_SHADOW, amount));
     mSplitToneGraph->addFillCurve(
-        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mMidtone; },
+        [mid, ws, wh](F32 l) { return ALCurveModel::splitToneWeights(l, mid, ws, wh).mMidtone; },
         band_color(SPLIT_TONE_MIDTONE, mid_amount));
     mSplitToneGraph->addFillCurve(
-        [mid](F32 l) { return ALCurveModel::splitToneWeights(l, mid).mHighlight; },
+        [mid, ws, wh](F32 l) { return ALCurveModel::splitToneWeights(l, mid, ws, wh).mHighlight; },
         band_color(SPLIT_TONE_HIGHLIGHT, amount));
 
-    // The handle rides the peak of the midtone band, which is exactly where the
-    // two ramps cross and hand over -- the split point the setting names. Held
-    // to the horizontal, because moving it up or down would mean nothing.
-    ALCurveEditorCtrl::Handle handle;
-    handle.mName = "balance";
-    handle.mX = mid;
-    handle.mY = 1.f;
-    handle.mLockY = true;
-    mSplitToneGraph->setHandles({ handle });
+    // Three handles along the top edge, all held to the horizontal because
+    // moving any of them up or down would mean nothing. Balance first, so a
+    // tie in the hit test goes to the split point. It rides the peak of the
+    // midtone band, where the two ramps hand over. The edges are the corners
+    // where the shadow band starts to fall away and where the highlight band
+    // reaches full strength; when a ramp runs off the plot its handle parks at
+    // the edge while the setting keeps the true width, and a drag from there
+    // still writes the distance to the split.
+    ALCurveEditorCtrl::Handle balance;
+    balance.mName = "balance";
+    balance.mX = mid;
+    balance.mY = 1.f;
+    balance.mLockY = true;
+
+    ALCurveEditorCtrl::Handle shadow_edge;
+    shadow_edge.mName = "shadow_edge";
+    shadow_edge.mX = llclamp(mid - ws, 0.f, 1.f);
+    shadow_edge.mY = 1.f;
+    shadow_edge.mLockY = true;
+    shadow_edge.mColor = band_color(SPLIT_TONE_SHADOW, amount);
+    shadow_edge.mColor.mV[VALPHA] = 1.f;
+
+    ALCurveEditorCtrl::Handle highlight_edge;
+    highlight_edge.mName = "highlight_edge";
+    highlight_edge.mX = llclamp(mid + wh, 0.f, 1.f);
+    highlight_edge.mY = 1.f;
+    highlight_edge.mLockY = true;
+    highlight_edge.mColor = band_color(SPLIT_TONE_HIGHLIGHT, amount);
+    highlight_edge.mColor.mV[VALPHA] = 1.f;
+
+    mSplitToneGraph->setHandles({ balance, shadow_edge, highlight_edge });
 }
 
 void ALFloaterLightBox::onCommitSplitToneGraph()
 {
-    if (!mSplitToneGraph || mSplitToneGraph->getHandles().empty())
+    // Only a drag means anything here. The graph never asks for points, but a
+    // future XUI that set points_editable must not turn a double-click into a
+    // balance write.
+    if (!mSplitToneGraph || mSplitToneGraph->getAction() != ALCurveEditorCtrl::ACTION_DRAG)
     {
         return;
     }
+    const S32 index = mSplitToneGraph->getActiveHandle();
+    if (index < 0 || index >= (S32)mSplitToneGraph->getHandles().size())
+    {
+        return;
+    }
+    const ALCurveEditorCtrl::Handle handle = mSplitToneGraph->getHandles()[index];
+    const F32 mid = ALCurveModel::splitToneMid(gSavedSettings.getF32(SPLIT_TONE_BALANCE));
 
-    // Dragged past either end, the balance clamps and the refresh below puts
-    // the handle back where the setting actually landed, rather than leaving it
-    // parked somewhere the renderer will not follow.
-    const F32 mid = mSplitToneGraph->getHandles()[0].mX;
-
-    // Scoped for the same reason onCommitToneCurve's guard is, and closed
-    // before the refresh for the same reason too.
+    // Dragged past its range, the value clamps and the refresh below puts the
+    // handle back where the setting actually landed, rather than leaving it
+    // parked somewhere the renderer will not follow. One setting per handle:
+    // the balance drag moves both edges by writing only the balance, which is
+    // what keeps a drag one undo step.
+    //
+    // Scoped for the same reason the tone curve guard is, and closed before
+    // the refresh for the same reason too.
     {
         ScopedTrue updating(mSplitToneUpdating);
-        gSavedSettings.setF32(SPLIT_TONE_BALANCE, ALCurveModel::splitToneBalance(mid));
+        if (handle.mName == "balance")
+        {
+            gSavedSettings.setF32(SPLIT_TONE_BALANCE, ALCurveModel::splitToneBalance(handle.mX));
+        }
+        else if (handle.mName == "shadow_edge")
+        {
+            gSavedSettings.setF32(SPLIT_TONE_SHADOW_WIDTH, llclamp(mid - handle.mX, SPLIT_TONE_WIDTH_MIN, SPLIT_TONE_WIDTH_MAX));
+        }
+        else if (handle.mName == "highlight_edge")
+        {
+            gSavedSettings.setF32(SPLIT_TONE_HIGHLIGHT_WIDTH, llclamp(handle.mX - mid, SPLIT_TONE_WIDTH_MIN, SPLIT_TONE_WIDTH_MAX));
+        }
     }
     refreshSplitToneGraph();
 }

@@ -55,6 +55,7 @@
 #include "alsamplerstate.h"
 #include "aluniformbuffer.h"
 #include "alwhitebalancesolver.h"
+#include "alcurvemodel.h"
 #include "llrender.h"
 #include "llstartup.h"
 #include "llwindow.h"   // swapBuffers()
@@ -654,6 +655,19 @@ void LLPipeline::init()
 
     gSavedSettings.getControl("RenderColorGrade")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupGradingLUT, this));
     gSavedSettings.getControl("RenderColorGradeLUT")->getCommitSignal()->connect(boost::bind(&LLPipeline::setupGradingLUT, this));
+
+    // Tone curve: a commit only marks the lookup row dirty. The bake itself
+    // runs from colorCorrect -- see bakeToneCurveLut for why not here.
+    for (const char* name : { "RenderColorGradeCurveMaster", "RenderColorGradeCurveRed",
+                              "RenderColorGradeCurveGreen",  "RenderColorGradeCurveBlue" })
+    {
+        cntrl_ptr = gSavedSettings.getControl(name);
+        if (cntrl_ptr.notNull())
+        {
+            cntrl_ptr->getCommitSignal()->connect(
+                [this](LLControlVariable*, const LLSD&, const LLSD&) { mToneCurveLutDirty = true; });
+        }
+    }
 }
 
 LLPipeline::~LLPipeline()
@@ -1290,6 +1304,13 @@ void LLPipeline::releaseGLBuffers()
         mSMAASearchMap = 0;
     }
 
+    if (mToneCurveLut)
+    {
+        LLImageGL::deleteTextures(1, &mToneCurveLut);
+        mToneCurveLut = 0;
+    }
+    mToneCurveLutDirty = true;
+
     releaseLUTBuffers();
 
     mWaterDis.release();
@@ -1538,6 +1559,23 @@ void LLPipeline::createGLBuffers()
                 raw_image->getHeight(), format, GL_UNSIGNED_BYTE, raw_image->getData());
             stop_glerror();
         }
+    }
+
+    if (!mToneCurveLut)
+    {
+        // Allocated empty; bakeToneCurveLut fills it on the next colorCorrect,
+        // and nothing samples it before then because uToneCurveAmount stays 0
+        // until a bake reports a non-identity curve. RGBA16 rather than RGBA8
+        // so the filter interpolates 16-bit samples instead of banding an
+        // 8-bit display, and a sized format because allocateTexture2D takes
+        // nothing else. One-shot: re-bakes go through setManualSubImage.
+        LLImageGL::generateTextures(1, &mToneCurveLut);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mToneCurveLut);
+        LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), GL_RGBA16,
+                                     ALToneCurveSet::LUT_SIZE, 1, GL_RGBA, GL_UNSIGNED_SHORT, nullptr);
+        gGL.getTextureSlot(0)->unbind();
+        stop_glerror();
+        mToneCurveLutDirty = true;   // fresh storage holds nothing
     }
 
     createLUTBuffers();
@@ -1807,6 +1845,57 @@ void LLPipeline::setupGradingLUT()
     }
 }
 
+
+// Runs lazily from colorCorrect rather than from the settings signal for
+// three reasons. setShaders() releases and recreates the texture behind the
+// settings' back, and only a bake that runs on the way to drawing can refill
+// it. A Look apply or an undo writes four curve settings in a row and a drag
+// on the graph commits per mouse move, so one bake per rendered frame is the
+// natural rate and the dirty flag coalesces the rest. And colorCorrect is the
+// one place guaranteed a current context with nothing of its own bound yet --
+// the upload borrows texture slot 0.
+void LLPipeline::bakeToneCurveLut()
+{
+    LL_PROFILE_ZONE_SCOPED;
+    mToneCurveLutDirty = false;
+
+    // Once per change, so a name lookup is fine and no cached control is
+    // needed. controlExists keeps a build whose settings lag behind from
+    // asserting inside LLControlGroup.
+    ALToneCurveSet curves;
+    auto load = [&curves](ALToneCurveSet::EChannel c, const char* name)
+    {
+        if (gSavedSettings.controlExists(name))
+        {
+            curves.setCurveFromLLSD(c, gSavedSettings.getLLSD(name));
+        }
+    };
+    load(ALToneCurveSet::CH_MASTER, "RenderColorGradeCurveMaster");
+    load(ALToneCurveSet::CH_RED,    "RenderColorGradeCurveRed");
+    load(ALToneCurveSet::CH_GREEN,  "RenderColorGradeCurveGreen");
+    load(ALToneCurveSet::CH_BLUE,   "RenderColorGradeCurveBlue");
+
+    mToneCurveIdentity = curves.isIdentity();
+    if (mToneCurveIdentity || !mToneCurveLut)
+    {
+        // Identity never reaches the shader (colorCorrect uploads amount 0), so
+        // stale texels are harmless; and with no texture there is nowhere to
+        // bake. The flag stays clear either way: a recreated texture sets it
+        // again itself.
+        return;
+    }
+
+    std::vector<U16> texels;
+    curves.bake(texels, ALToneCurveSet::LUT_SIZE);
+
+    // setManualSubImage writes whatever is bound on the active unit. Slot 0 is
+    // the convention every raw-name upload in this file uses.
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, mToneCurveLut);
+    LLImageGL::setManualSubImage(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), 0,
+                                 ALToneCurveSet::LUT_SIZE, 1, GL_RGBA, GL_UNSIGNED_SHORT, texels.data());
+    gGL.getTextureSlot(0)->unbind();
+    stop_glerror();
+}
 
 void LLPipeline::restoreGL()
 {
@@ -7911,6 +8000,12 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 {
     LL_PROFILE_GPU_ZONE("colorcorrect");
 
+    if (mToneCurveLutDirty)
+    {
+        // Borrows slot 0, so it has to run before anything below is bound.
+        bakeToneCurveLut();
+    }
+
     dst->bindTarget();
     {
         LLGLDepthTest depth(GL_FALSE, GL_FALSE);
@@ -8206,6 +8301,7 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
         // Color correction LUT
         S32 cglut_channel = -1;
+        S32 tone_curve_channel = -1;
         if (color_grade)
         {
             // Per-section bypass. Uploading a group's identity rather than its
@@ -8284,6 +8380,8 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             static LLCachedControl<F32>      split_midtone_amount(gSavedSettings, "RenderSplitToneMidtoneAmount", 0.f);
             static LLCachedControl<F32>      split_balance(gSavedSettings, "RenderSplitToneBalance", 0.f);
             static LLCachedControl<F32>      split_amount(gSavedSettings, "RenderSplitToneAmount", 0.f);
+            static LLCachedControl<F32>      split_shadow_width(gSavedSettings, "RenderSplitToneShadowWidth", 0.35f);
+            static LLCachedControl<F32>      split_highlight_width(gSavedSettings, "RenderSplitToneHighlightWidth", 0.35f);
 
             constexpr F32 CG_LUMA_R = 0.2126f, CG_LUMA_G = 0.7152f, CG_LUMA_B = 0.0722f;
             auto tint_to_ratio = [](const LLColor3& tint, F32 out[3]) {
@@ -8297,12 +8395,17 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             tint_to_ratio(split_shadow_tint(),    shadow_ratio);
             tint_to_ratio(split_highlight_tint(), highlight_ratio);
             tint_to_ratio(split_midtone_tint(),   midtone_ratio);
-            const F32 tone_balance = llclamp(split_balance(), -1.0f, 1.0f);
+            // Ramps as {scale, bias}. The balance -> mid map and the width floor
+            // live in ALCurveModel, so the Lightbox graph draws what this uploads.
+            const F32 tone_mid = ALCurveModel::splitToneMid(split_balance());
+            const ALCurveModel::SplitToneRamp shadow_ramp    = ALCurveModel::splitToneShadowRamp(tone_mid, split_shadow_width());
+            const ALCurveModel::SplitToneRamp highlight_ramp = ALCurveModel::splitToneHighlightRamp(tone_mid, split_highlight_width());
             shader->uniform3fv(LLShaderMgr::SPLIT_TONE_SHADOW_RATIO,    1, shadow_ratio);
             shader->uniform3fv(LLShaderMgr::SPLIT_TONE_HIGHLIGHT_RATIO, 1, highlight_ratio);
             shader->uniform3fv(LLShaderMgr::SPLIT_TONE_MIDTONE_RATIO,   1, midtone_ratio);
             shader->uniform1f(LLShaderMgr::SPLIT_TONE_MIDTONE_AMOUNT, skip_split ? 0.f : llclamp(split_midtone_amount(), 0.0f, 1.0f));
-            shader->uniform1f(LLShaderMgr::SPLIT_TONE_MID,            0.5f + tone_balance * 0.4f);
+            shader->uniform2f(LLShaderMgr::SPLIT_TONE_SHADOW_RAMP,    shadow_ramp.mScale,    shadow_ramp.mBias);
+            shader->uniform2f(LLShaderMgr::SPLIT_TONE_HIGHLIGHT_RAMP, highlight_ramp.mScale, highlight_ramp.mBias);
             shader->uniform1f(LLShaderMgr::SPLIT_TONE_AMOUNT,         skip_split ? 0.f : llclamp(split_amount(), 0.0f, 1.0f));
 
             // --- Display-space grading ---
@@ -8337,25 +8440,34 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
             shader->uniform1f(LLShaderMgr::COLOR_GRADE_VIBRANCE,          skip_basic ? 0.f : llclamp(cg_vibrance(),   -1.0f, 1.0f));
             shader->uniform1f(LLShaderMgr::COLOR_GRADE_HUE_SHIFT_NORM,    skip_basic ? 0.f : llclamp(cg_hue_shift(), -180.0f, 180.0f) / 360.0f);
 
-            // Per-channel filmic curves. Per-channel `(shoulder - toe)` is
-            // pre-inverted on the CPU so the shader avoids three divisions.
-            static LLCachedControl<LLColor3> cg_curve_toe(gSavedSettings, "RenderColorGradeCurveToe", LLColor3(0.f, 0.f, 0.f));
-            static LLCachedControl<LLColor3> cg_curve_shoulder(gSavedSettings, "RenderColorGradeCurveShoulder", LLColor3(1.f, 1.f, 1.f));
-            static LLCachedControl<LLColor3> cg_curve_strength(gSavedSettings, "RenderColorGradeCurveStrength", LLColor3(0.f, 0.f, 0.f));
-            const LLColor3 curve_toe      = cg_curve_toe();
-            const LLColor3 curve_shoulder = cg_curve_shoulder();
-            const LLColor3 curve_strength = cg_curve_strength();
-            const F32 curve_inv_range[3] = {
-                1.0f / llmax(curve_shoulder.mV[0] - curve_toe.mV[0], 1e-4f),
-                1.0f / llmax(curve_shoulder.mV[1] - curve_toe.mV[1], 1e-4f),
-                1.0f / llmax(curve_shoulder.mV[2] - curve_toe.mV[2], 1e-4f) };
-            const F32 curve_strength_arr[3] = {
-                llclamp(curve_strength.mV[0], 0.0f, 1.0f),
-                llclamp(curve_strength.mV[1], 0.0f, 1.0f),
-                llclamp(curve_strength.mV[2], 0.0f, 1.0f) };
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_TOE,       1, curve_toe.mV);
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_INV_RANGE, 1, curve_inv_range);
-            shader->uniform3fv(LLShaderMgr::COLOR_GRADE_CURVE_STRENGTH,  1, skip_curve ? IDENTITY_ZEROS : curve_strength_arr);
+            // --- Tone curve (step 12) ---
+            // Baked into mToneCurveLut by bakeToneCurveLut when a curve setting
+            // commits; per frame this is a bind and three uniforms. Amount 0 is
+            // the shader's fast path and doubles as the bypass identity, so a
+            // bypassed section, an all-identity stack, a zero Amount and a
+            // missing texture all land there with nothing bound -- the same
+            // shape as the 3D LUT above.
+            static LLCachedControl<F32> cg_curve_amount(gSavedSettings, "RenderColorGradeCurveAmount", 1.f);
+            const F32  curve_amount = llclamp(cg_curve_amount(), 0.f, 1.f);
+            const bool curve_active = !skip_curve && !mToneCurveIdentity && mToneCurveLut != 0 && curve_amount > 0.f;
+            if (curve_active)
+            {
+                tone_curve_channel = shader->enableTexture(LLShaderMgr::COLOR_GRADE_CURVE_LUT);
+                if (tone_curve_channel > -1)
+                {
+                    // Clamp: a lookup table must saturate past its ends (see bindBrdfLut).
+                    gGL.getTextureSlot(tone_curve_channel)->bindManual(ALTextureSlot::TT_TEXTURE, mToneCurveLut,
+                                                                        gGL.getSampler(ALSamplers::BilinearClamp));
+                }
+                F32 lut_scale, lut_bias;
+                ALToneCurveSet::lutScaleBias(ALToneCurveSet::LUT_SIZE, lut_scale, lut_bias);
+                shader->uniform2f(LLShaderMgr::COLOR_GRADE_CURVE_LUT_SCALE, lut_scale, lut_bias);
+                shader->uniform1f(LLShaderMgr::COLOR_GRADE_CURVE_AMOUNT, curve_amount);
+            }
+            else
+            {
+                shader->uniform1f(LLShaderMgr::COLOR_GRADE_CURVE_AMOUNT, 0.f); // fast path; sampler unread
+            }
         }
 
         mScreenTriangleVB->setBuffer();
@@ -8364,6 +8476,10 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         if (cglut_channel > -1 && mCGLut.notNull())
         {
             mCGLut->unbind(cglut_channel);
+        }
+        if (tone_curve_channel > -1)
+        {
+            gGL.getTextureSlot(tone_curve_channel)->unbind();
         }
         if (exposure_channel > -1)
         {

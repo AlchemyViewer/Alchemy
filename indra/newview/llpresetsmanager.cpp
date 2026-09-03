@@ -545,9 +545,11 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderColorGradeLift",
         "RenderColorGradeGamma",
         "RenderColorGradeGain",
-        "RenderColorGradeCurveToe",
-        "RenderColorGradeCurveShoulder",
-        "RenderColorGradeCurveStrength",
+        "RenderColorGradeCurveMaster",
+        "RenderColorGradeCurveRed",
+        "RenderColorGradeCurveGreen",
+        "RenderColorGradeCurveBlue",
+        "RenderColorGradeCurveAmount",
         // Split toning
         "RenderSplitToneAmount",
         "RenderSplitToneBalance",
@@ -555,6 +557,8 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderSplitToneHighlightTint",
         "RenderSplitToneMidtoneTint",
         "RenderSplitToneMidtoneAmount",
+        "RenderSplitToneShadowWidth",
+        "RenderSplitToneHighlightWidth",
         // HDR bloom aesthetics (not the structural mip/resolution knobs)
         "RenderBloomStrength",
         "RenderBloomThreshold",

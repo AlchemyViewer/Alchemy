@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<toggleable_menu
+ layout="topleft"
+ mouse_opaque="false"
+ name="menu_lightbox_curve_presets"
+ visible="false">
+    <menu_item_call
+     label="Linear"
+     layout="topleft"
+     name="linear">
+        <menu_item_call.on_click
+         function="LightBox.ToneCurvePreset"
+         parameter="linear" />
+    </menu_item_call>
+    <menu_item_call
+     label="Soft S"
+     layout="topleft"
+     name="soft_s">
+        <menu_item_call.on_click
+         function="LightBox.ToneCurvePreset"
+         parameter="soft_s" />
+    </menu_item_call>
+    <menu_item_call
+     label="Strong S"
+     layout="topleft"
+     name="strong_s">
+        <menu_item_call.on_click
+         function="LightBox.ToneCurvePreset"
+         parameter="strong_s" />
+    </menu_item_call>
+    <menu_item_call
+     label="Fade"
+     layout="topleft"
+     name="fade">
+        <menu_item_call.on_click
+         function="LightBox.ToneCurvePreset"
+         parameter="fade" />
+    </menu_item_call>
+    <menu_item_call
+     label="Matte"
+     layout="topleft"
+     name="matte">
+        <menu_item_call.on_click
+         function="LightBox.ToneCurvePreset"
+         parameter="matte" />
+    </menu_item_call>
+</toggleable_menu>

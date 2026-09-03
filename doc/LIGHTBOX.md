@@ -29,9 +29,10 @@ statics), so edits preview live with no glue code.
 | Looks preset system + whitelist | `indra/newview/llpresetsmanager.{h,cpp}` |
 | Bundled starter Looks | `indra/newview/app_settings/looks/` |
 | Colour wheel widget + its maths | `indra/newview/alcolorwheel{ctrl,model}.{h,cpp}` |
-| Curve/band graph widget + its maths | `indra/newview/alcurve{editorctrl,model}.{h,cpp}` |
+| Curve/band graph widget + its maths (the spline, the split-tone ramps, and the `ALToneCurveSet` the renderer bakes) | `indra/newview/alcurve{editorctrl,model}.{h,cpp}` |
 | Scopes floater + measurement | `indra/newview/alfloaterscopes.{h,cpp}`, `alscopedata.{h,cpp}` |
 | Scope pane assignment menu | `.../menu_scopes_pane.xml` |
+| Tone curve preset menu | `.../menu_lightbox_curve_presets.xml` |
 | Undo/redo stack | `indra/newview/algradehistory.{h,cpp}` |
 | White-balance map and its inverse | `indra/newview/alwhitebalancesolver.{h,cpp}` |
 | Scene colour picker tool | `indra/newview/altoolscenepicker.{h,cpp}` |
@@ -96,15 +97,21 @@ The floater's C++ provides:
   glance that the warm end has been pulled and the cool end left alone. Eight
   spinners read as a form to be filled in.
 - `LightBox.CommitToneCurve` / `LightBox.RefreshToneCurve` — the tone curve
-  graph's handle commit and its channel-selector refresh.
-- `LightBox.CommitSplitToneGraph` — the split-tone band graph's handle, which
-  writes `RenderSplitToneBalance`.
+  graph's commit, which interprets a drag, an added point or a removed point
+  against the curve the channel combo selects and writes that one setting,
+  and the combo's refresh.
+- `LightBox.ResetToneCurveChannel` / `LightBox.ToneCurvePreset` — the reset
+  glyph beside the combo (the selected curve only) and the preset menu
+  (`parameter` = preset id), each one write to the selected curve.
+- `LightBox.CommitSplitToneGraph` — the split-tone band graph's handles: the
+  middle one writes `RenderSplitToneBalance`, the two edges write
+  `RenderSplitToneShadowWidth` and `RenderSplitToneHighlightWidth`.
 - `LightBox.PickWhiteBalance` — arms the eyedropper.
 - The Looks bar and tonemapper-row greying (effect-specific, already done).
 
-The last four are examples of the per-control cost: a graph or a tool needs
-something to interpret its input, so it gets one callback and one `setup*`
-call in `postBuild`. Both graphs follow the same shape — `setupX` connects to
+The graph and picker callbacks are examples of the per-control cost: a graph
+or a tool needs something to interpret its input, so it gets one callback and
+one `setup*` call in `postBuild`. Both graphs follow the same shape — `setupX` connects to
 the settings' signals and calls `refreshX`; `refreshX` rebuilds the plot and
 handles from the settings; `onCommitX` writes the setting and calls `refreshX`
 again behind a re-entry guard. Copy that shape rather than inventing another.
@@ -314,7 +321,8 @@ editable channel fields, all driving one Vector3 setting.
 
 **`curve_editor`** — a graph with draggable handles, used for the tone curve and
 the split-tone bands. It owns no curve: a consumer hands it a sampling function
-and a handle list, which is why one widget serves both.
+and a handle list, which is why one widget serves both. The tone curve also
+lets the user add and remove points; that is a param, not a second widget:
 
 ```xml
 <curve_editor
@@ -332,14 +340,47 @@ and a handle list, which is why one widget serves both.
 - `draw_diagonal="true"` draws the identity, which is meaningful for a tone
   curve and meaningless for anything else.
 - `grid_divisions` sets the backing grid; `curve_samples` how finely the
-  sampling function is evaluated across the width; `handle_radius` and
-  `curve_width` the hit target and the stroke. Colours are `background_color`,
-  `border_color`, `grid_color`, `curve_color`, `handle_color`.
+  sampling function is evaluated across the width (the tone curve raises it
+  to 192, because a sharp toe facets on a tall graph at the default 96);
+  `handle_radius` and `curve_width` the hit target and the stroke. Colours are
+  `background_color`, `border_color`, `grid_color`, `curve_color`,
+  `handle_color`. A handle's own `mColor` fills its disc; the ring is the
+  widget's `handle_color`, and the ring is what the hover highlight brightens,
+  so a coloured handle stays recognisable under it.
+- `points_editable="true"` turns on the gestures: a double-click on empty plot
+  area asks for a point there, a double-click on a handle asks for its
+  removal. **Asks**, because the widget still owns no curve. The commit
+  callback reads `getAction()` — `ACTION_DRAG`, `ACTION_ADD` (with
+  `getActionX()`/`getActionY()`) or `ACTION_REMOVE` (with `getActiveHandle()`
+  naming the target) — decides against its own model whether to honour it,
+  and hands back a new handle list. The model refuses an endpoint removal and
+  a 17th point; the floater then just refreshes, which puts the handle back.
+- **A press that does not move never commits.** The viewer calls a captured
+  widget's `handleHover` every frame, not only on motion, so without the
+  no-motion guard a plain click on any handle rewrote its value at pixel
+  resolution once per frame — a dirty Look and an undo step for a click, and
+  the first half of every double-click. Keep that guard if you touch the
+  drag.
+- `edited_settings="A,B,C"` names the settings the graph edits. The widget
+  never reads them; the section's Reset All walker does, because those
+  settings are not bound through `control_name` (an LLSD point list cannot
+  be) and would otherwise be invisible to it. A typo is silent, so
+  `setupToneCurve` warns once for a name that is not a control.
 
-**Graph maths belongs in the model, next to a test.** `ALCurveModel` mirrors the
-shader's own functions, and `alcurvemodel_test` transcribes the GLSL
-independently and compares. A graph that merely illustrates the shader is worse
-than none: it will be believed. If you plot something new, transcribe it.
+**Graph maths belongs in the model, next to a test.** `ALCurveModel` holds the
+split-tone ramps in exactly the `{scale, bias}` form pipeline.cpp uploads, and
+`ALToneCurveSet` is what `LLPipeline::bakeToneCurveLut` bakes into the tone
+curve texture; `alcurvemodel_test` transcribes the GLSL independently — the
+ramps, and the half-texel fetch through GL's linear filter — and compares. A
+graph that merely illustrates the shader is worse than none: it will be
+believed. If you plot something new, transcribe it.
+
+The tone curve is four monotone splines, master and one per channel, stored as
+LLSD arrays of `[x, y]` pairs and composited as `master(channel(x))`. The
+renderer never evaluates them: the CPU bakes a 512-texel RGBA16 row on a dirty
+flag and the shader does one clamped fetch per channel behind an amount that is
+0 whenever the section is bypassed, every curve is straight, or the texture is
+missing. That is the same shape as the 3D LUT and is documented in §4e.
 
 **The two of them draw with `gl_polyline_2d` and `gl_polyfill_2d`**
 (`llrender2dutils`), added for this work and available to anything else that
@@ -576,6 +617,24 @@ every upload silently does nothing, and the shader reads the uniform as zero.
 That surfaces as a rendering fault — a black screen, in the case that prompted
 this — a long way from the cause.
 
+**A step that needs a texture follows the tone curve LUT, not the 3D LUT.**
+`LLPipeline::bakeToneCurveLut` is the pattern: a raw GL name allocated empty in
+`createGLBuffers` (one-shot, immutable storage), released in `releaseGLBuffers`,
+a dirty flag set from the settings' commit signals in `init()`, and the bake
+itself run lazily at the top of `colorCorrect` — before that pass binds
+anything, because the upload borrows texture slot 0 — through
+`LLImageGL::setManualSubImage`. Lazy rather than in the signal handler because
+`setShaders()` releases and recreates every GL buffer behind the settings'
+back, and only a bake that runs on the way to drawing refills the texture. The
+3D LUT (`mCGLut`) is the older shape and is released only by reassignment; do
+not copy that. Bind the texture with a **clamp** sampler
+(`ALSamplers::BilinearClamp`): a lookup table must saturate past its ends.
+
+The step's identity for the bypass block is an amount of 0. That leaves the
+sampler unread, so nothing needs binding on its unit — which is only safe
+because the read sits behind a branch on a uniform. Do not rewrite such a
+branch as a `mix` by zero.
+
 Two rules follow. **Declare an array uniform by its bare name**, with no `[0]`:
 `mapUniform` strips the subscript from whatever GL reports before matching, so a
 name carrying one can never match. (`initAttribsAndUniforms` now refuses such a
@@ -596,18 +655,24 @@ The recorder needs no shadow copy of the settings: `LLControlVariable`'s commit
 signal carries the **previous** value as its third argument, and only fires when
 the value actually changed (`setValue` and `resetToDefault` both gate on
 `llsd_compare`), so a commit that rewrites the same value cannot leave a
-do-nothing step on the stack.
+do-nothing step on the stack. That holds for LLSD-typed settings — the curve
+point lists — only because `llsd_compare` grew a `TYPE_LLSD` case with the
+tone curve work; before it, every write to such a setting counted as a change.
 
 Two rules if you add a control:
 
 - **One user gesture must be one step.** A drag emits a commit per mouse-move,
   and the history collapses those by coalescing successive writes *to the same
   control* inside 500 ms. Every interactive control here writes exactly one
-  setting per commit — the tone-curve graph picks toe *or* shoulder *or*
-  strength, the band graph writes only balance — which is what makes that
-  enough. **A control that wrote two settings per commit would defeat it**, and
-  produce one undo step per setting per mouse-move. If you need one, the fix is
-  in `ALGradeHistory`, not in the caller.
+  setting per commit — the tone-curve graph writes the one curve the channel
+  combo selects, whether the gesture was a drag, an added point, a removed
+  point or a preset; the band graph writes balance *or* one width per handle,
+  and a balance drag moves both edges by writing only the balance — which is
+  what makes that enough. Two gestures on the same curve inside 500 ms
+  coalesce into one step, which is acceptable. **A control that wrote two
+  settings per commit would defeat it**, and produce one undo step per setting
+  per mouse-move. If you need one, the fix is in `ALGradeHistory`, not in the
+  caller.
 - **A discrete action that moves many controls needs `ScopedHistoryGroup`.**
   Reset All, applying a Look and Look revert each wrap one, so they undo in a
   single step. Note that a group deliberately does *not* coalesce, so it must
@@ -856,7 +921,9 @@ source of truth for save, dirty-watching, and the whitelist-filtered apply.
 Skip it and Looks silently won't carry the effect. Do **not** add: Scene-tab
 keys, `Persist=0` keys, structural buffer-shape knobs, or debug toggles.
 A startup `LL_WARNS("Presets")` fires for whitelist names that stop existing,
-so renames get caught.
+so renames get caught. LLSD-typed keys (the tone curve point lists) round-trip
+as arrays like any other value; Debug Settings shows them read-only as
+notation, so the graph, the presets and Looks are their only editors.
 
 Bundled starter Looks live in `app_settings/looks/` as full whitelist
 snapshots ({Comment, Persist, Type, Value} per key, URI-escaped filenames).
@@ -894,7 +961,19 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
   confirm it rides the reachable boundary rather than freezing or jumping, and
   that the number shown is the clamped one.
 - For a graph: drag each handle to its limit and confirm the setting clamps and
-  the handle is put back where the setting actually landed.
+  the handle is put back where the setting actually landed. A plain click on a
+  handle must not mark the Look `*` or add an undo step.
+- For the tone curve: double-click empty space to add a point and drag it;
+  double-click it to remove it; confirm both end points refuse removal and the
+  17th point is refused; confirm a drag, an add, a remove and a preset are each
+  one Ctrl+Z step; switch channel and confirm the handles and ghosts swap;
+  change graphics preset with a curve active and confirm the image keeps it
+  (the texture is recreated and re-baked); untick the section header and set
+  Amount to 0 and confirm both bypass.
+- For the split-tone edges: drag each past the balance handle and confirm the
+  width clamps at 0.02 and the handle is put back; at a low balance with a wide
+  shadow ramp the left handle parks at the plot edge while the slider keeps the
+  true width — that is expected, not a stuck handle.
 - For anything measured (scopes, vectorscope): change the thing it measures and
   confirm the readout moves the way the control says it should.
 - For a section switch: **untick** it (ticked is on) and confirm the image

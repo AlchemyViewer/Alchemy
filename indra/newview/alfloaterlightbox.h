@@ -85,11 +85,18 @@ public:
     void refreshVec3Row(const std::string& setting_name);
     void setupToneCurve();
     void refreshToneCurve();
+    /// Interpret the graph's action (drag, add, remove) against the selected
+    /// curve and write that curve's setting: exactly one setting per commit.
     void onCommitToneCurve();
-    /// Which channel the tone curve graph edits: -1 for all three, else 0..2.
+    /// Reset the curve the channel combo selects, and nothing else.
+    void onClickResetToneCurveChannel();
+    /// Replace the selected curve with a named preset; parameter = preset id.
+    void onToneCurvePreset(const LLSD& userdata);
+    /// The channel combo's value: -1 for Master, else 0..2 for R, G, B.
     S32  getToneCurveChannel() const;
     void setupSplitToneGraph();
     void refreshSplitToneGraph();
+    /// Write balance or one of the two widths, by which handle moved.
     void onCommitSplitToneGraph();
     /// Arm the scene picker; the click that follows sets Temperature and Tint.
     void onClickWhiteBalancePicker();
@@ -173,8 +180,10 @@ public:
     LLComboBox* mLooksCombo = nullptr;
     bool mVec3Updating = false;
 
-    // Tone curve graph. Optional: the floater builds without it, so the XUI
-    // can drop the graph and keep the spinners.
+    // Tone curve graph. Optional: the floater builds without it. The four
+    // curve settings are read fresh on every refresh and commit rather than
+    // mirrored here -- undo, Looks and Debug Settings all write them behind
+    // the floater's back.
     std::vector<boost::signals2::scoped_connection> mToneCurveConnections;
     ALCurveEditorCtrl* mToneCurve = nullptr;
     LLComboBox* mToneCurveChannel = nullptr;

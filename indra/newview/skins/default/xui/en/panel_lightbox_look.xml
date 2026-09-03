@@ -1240,7 +1240,7 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="409"
+		 height="461"
 		 name="atab_sec_split"
 		 title="Split Toning"
 		 fit_panel="true">
@@ -1256,7 +1256,7 @@ Row conventions:
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="380"
+			 height="432"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1319,7 +1319,7 @@ Row conventions:
 				 grid_divisions="4"
 				 draw_diagonal="false"
 				 name="split_tone_graph"
-				 tool_tip="Which tones each tint reaches. Drag the handle to slide the split point between shadows and highlights -- it is the Balance slider below. Each band is drawn in the colour it applies and fades as its amount drops."
+				 tool_tip="Which tones each tint reaches. Drag the middle handle to slide the split point (the Balance slider); drag the left and right handles to set how far the shadow and highlight tints reach (the Width sliders). Each band is drawn in the colour it applies and fades as its amount drops."
 				 enabled_control="RenderColorGrade">
 					<curve_editor.commit_callback
 					 function="LightBox.CommitSplitToneGraph" />
@@ -1428,6 +1428,76 @@ Row conventions:
 					<button.commit_callback
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderSplitToneBalance" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Shadow width"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.02"
+				 max_val="0.5"
+				 name="split_shadow_width"
+				 tool_tip="How far below the split point the shadow tint reaches full strength. 0.02 is a hard edge, 0.5 a very soft one. The left handle on the graph."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneShadowWidth" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="split_shadow_width_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSplitToneShadowWidth" />
+				</button>
+				<slider
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 right="-32"
+				 height="16"
+				 label="Highlight width"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0.02"
+				 max_val="0.5"
+				 name="split_highlight_width"
+				 tool_tip="How far above the split point the highlight tint reaches full strength. 0.02 is a hard edge, 0.5 a very soft one. The right handle on the graph."
+				 enabled_control="RenderColorGrade"
+				 control_name="RenderSplitToneHighlightWidth" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-17"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="split_highlight_width_rst"
+				 tool_tip="Reset to default">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="RenderSplitToneHighlightWidth" />
 				</button>
 				<button
 				 follows="top|right"
@@ -1586,7 +1656,7 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="296"
+		 height="285"
 		 name="atab_sec_curve"
 		 title="Tone Curve"
 		 fit_panel="true">
@@ -1602,7 +1672,7 @@ Row conventions:
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="267"
+			 height="256"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -1624,11 +1694,11 @@ Row conventions:
 				 width="120"
 				 height="18"
 				 name="tone_curve_channel"
-				 tool_tip="Which channel the graph edits. Linked moves all three together; a single channel shows the other two behind it."
+				 tool_tip="Which curve the graph edits. Master applies to all three channels after their own curves; a channel shows its combined result and any other shaped channel behind it."
 				 enabled_control="RenderColorGrade">
 					<combo_box.item
-					 label="Linked"
-					 name="linked"
+					 label="Master"
+					 name="master"
 					 value="-1" />
 					<combo_box.item
 					 label="Red"
@@ -1645,258 +1715,88 @@ Row conventions:
 					<combo_box.commit_callback
 					 function="LightBox.RefreshToneCurve" />
 				</combo_box>
+				<menu_button
+				 follows="left|top"
+				 layout="topleft"
+				 left_pad="6"
+				 top_delta="0"
+				 width="84"
+				 height="18"
+				 label="Presets"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Arrow_Small_Down"
+				 image_overlay_alignment="right"
+				 menu_filename="menu_lightbox_curve_presets.xml"
+				 menu_position="bottomleft"
+				 name="tone_curve_presets"
+				 tool_tip="Replace the selected curve with a starting shape"
+				 enabled_control="RenderColorGrade" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_delta="0"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="tone_curve_channel_rst"
+				 tool_tip="Reset the selected curve to a straight line">
+					<button.commit_callback
+					 function="LightBox.ResetToneCurveChannel" />
+				</button>
 				<curve_editor
 				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
 				 top_pad="8"
 				 right="-8"
-				 height="120"
+				 height="160"
+				 curve_samples="192"
+				 points_editable="true"
+				 edited_settings="RenderColorGradeCurveMaster,RenderColorGradeCurveRed,RenderColorGradeCurveGreen,RenderColorGradeCurveBlue"
 				 name="tone_curve_graph"
-				 tool_tip="Drag the lower handle to set the toe, the upper one the shoulder, and the middle one to blend the curve in. The straight line is no change. Held so the toe cannot pass the shoulder; the spinners below can still ask for that."
+				 tool_tip="Drag a point to shape the selected curve. Double-click empty space to add a point (up to 16), double-click a point to remove it; the two end points move only up and down. The straight line is no change. Behind the curve: what the channel gets once Master is applied, and any other channel that is not straight."
 				 enabled_control="RenderColorGrade">
 					<curve_editor.commit_callback
 					 function="LightBox.CommitToneCurve" />
 				</curve_editor>
-				<text
-				 follows="left|top"
+				<slider
+				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
 				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="curve_toe_label"
-				 tool_tip="Per-channel toe: input at or below this level flattens toward black"
-				 value="Toe" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="R"
-				 label_width="10"
+				 right="-32"
+				 height="16"
+				 label="Amount"
+				 label_width="140"
+				 can_edit_text="true"
+				 text_width="56"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
 				 max_val="1"
+				 name="curve_amount"
+				 tool_tip="How much of the curves is applied. 0 leaves the image untouched, 1 applies them fully."
 				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeCurveToe_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="G"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeCurveToe_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="B"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeCurveToe_2">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
+				 control_name="RenderColorGradeCurveAmount" />
 				<button
 				 follows="top|right"
 				 layout="topleft"
 				 height="18"
 				 width="18"
 				 right="-8"
-				 top_delta="0"
+				 top_pad="-17"
 				 scale_image="true"
 				 image_overlay="Refresh_Off"
 				 image_overlay_alignment="center"
-				 name="curve_toe_rst"
+				 name="curve_amount_rst"
 				 tool_tip="Reset to default">
 					<button.commit_callback
 					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeCurveToe" />
-				</button>
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="curve_shoulder_label"
-				 tool_tip="Per-channel shoulder: input at or above this level flattens toward white; around 0.85 gives a tighter roll-off"
-				 value="Shoulder" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="R"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeCurveShoulder_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="G"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeCurveShoulder_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="B"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeCurveShoulder_2">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="curve_shoulder_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeCurveShoulder" />
-				</button>
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="curve_strength_label"
-				 tool_tip="Per-channel curve blend: 0 disables, 0.4 is typical film; unequal channels create cross-process looks"
-				 value="Strength" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="R"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeCurveStrength_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="G"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeCurveStrength_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="B"
-				 label_width="10"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 enabled_control="RenderColorGrade"
-				 name="vec3_RenderColorGradeCurveStrength_2">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="curve_strength_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderColorGradeCurveStrength" />
+					 parameter="RenderColorGradeCurveAmount" />
 				</button>
 				<button
 				 follows="top|right"
@@ -1904,7 +1804,7 @@ Row conventions:
 				 height="18"
 				 width="100"
 				 right="-8"
-				 top_pad="12"
+				 top_pad="10"
 				 label="Reset All"
 				 halign="left"
 				 scale_image="true"

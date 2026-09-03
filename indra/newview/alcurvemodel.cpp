@@ -1,6 +1,6 @@
 /**
  * @file alcurvemodel.cpp
- * @brief Curve shapes for the curve editor widget
+ * @brief Curve shapes for the curve editor widget and the tone curve bake
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -31,40 +31,55 @@
 #include <algorithm>
 #include <cmath>
 
+// =============================================================================
+// Split-tone ramps
+// =============================================================================
+
 // static
-F32 ALCurveModel::smoothstep(F32 x, F32 toe, F32 shoulder, F32 strength)
+ALCurveModel::SplitToneRamp ALCurveModel::splitToneRamp(F32 edge0, F32 width)
 {
-    // cg_sCurve, colorGradeUtilF.glsl. The reciprocal is guarded the same way
-    // pipeline.cpp guards it when it uploads uCurveInvRange, so a shoulder at
-    // or below the toe degenerates identically on both sides: the ramp becomes
-    // a step at the toe rather than a division by zero.
-    const F32 inv_range = 1.f / llmax(shoulder - toe, 1e-4f);
-    const F32 t = llclamp((x - toe) * inv_range, 0.f, 1.f);
-    const F32 s = t * t * (3.f - 2.f * t);
-    const F32 k = llclamp(strength, 0.f, 1.f);
-    return x + (s - x) * k;
+    // The reciprocal is guarded here and nowhere else, so the upload in
+    // pipeline.cpp and the bands the Lightbox draws degenerate identically: a
+    // zero width is a step at edge0, not a division by zero.
+    const F32 w = llmax(width, SPLIT_TONE_MIN_WIDTH);
+    SplitToneRamp ramp;
+    ramp.mScale = 1.f / w;
+    ramp.mBias  = -edge0 / w;
+    return ramp;
 }
 
-namespace
+// static
+ALCurveModel::SplitToneRamp ALCurveModel::splitToneShadowRamp(F32 mid, F32 width)
 {
-/// GLSL's smoothstep: the clamped Hermite, edges given rather than derived.
-/// Guarded against a zero-width pair, which GLSL leaves undefined; ours are
-/// always SPLIT_TONE_HALF_WIDTH apart, so the guard never engages in practice
-/// and exists so a future caller cannot make it divide by zero.
-F32 hermiteStep(F32 edge0, F32 edge1, F32 x)
+    // Floor before forming the left edge, so edge0 + w lands on mid exactly.
+    // Flooring inside splitToneRamp alone would leave the ramp ending short
+    // of the split for a sub-floor width, and the shadow and highlight bands
+    // would then overlap there.
+    const F32 w = llmax(width, SPLIT_TONE_MIN_WIDTH);
+    return splitToneRamp(mid - w, w);
+}
+
+// static
+ALCurveModel::SplitToneRamp ALCurveModel::splitToneHighlightRamp(F32 mid, F32 width)
 {
-    const F32 t = llclamp((x - edge0) / llmax(edge1 - edge0, 1e-6f), 0.f, 1.f);
+    return splitToneRamp(mid, width);
+}
+
+// static
+F32 ALCurveModel::splitToneRampValue(F32 l, const SplitToneRamp& ramp)
+{
+    // cg_ramp, colorGradeUtilF.glsl.
+    const F32 t = llclamp(l * ramp.mScale + ramp.mBias, 0.f, 1.f);
     return t * t * (3.f - 2.f * t);
 }
-} // namespace
 
 // static
-ALCurveModel::SplitToneWeights ALCurveModel::splitToneWeights(F32 l, F32 mid)
+ALCurveModel::SplitToneWeights ALCurveModel::splitToneWeights(F32 l, F32 mid, F32 shadow_width, F32 highlight_width)
 {
     // applySplitToning, colorGradeUtilF.glsl.
     SplitToneWeights w;
-    w.mHighlight = hermiteStep(mid, mid + SPLIT_TONE_HALF_WIDTH, l);
-    w.mShadow    = 1.f - hermiteStep(mid - SPLIT_TONE_HALF_WIDTH, mid, l);
+    w.mHighlight = splitToneRampValue(l, splitToneHighlightRamp(mid, highlight_width));
+    w.mShadow    = 1.f - splitToneRampValue(l, splitToneShadowRamp(mid, shadow_width));
     w.mMidtone   = llmax(1.f - w.mHighlight - w.mShadow, 0.f);
     return w;
 }
@@ -81,12 +96,9 @@ F32 ALCurveModel::splitToneBalance(F32 mid)
     return llclamp((mid - 0.5f) / 0.4f, -1.f, 1.f);
 }
 
-void ALCurveModel::setSmoothstep(F32 toe, F32 shoulder, F32 strength)
-{
-    mToe = toe;
-    mShoulder = shoulder;
-    mStrength = strength;
-}
+// =============================================================================
+// Control points
+// =============================================================================
 
 void ALCurveModel::setPoints(std::vector<Point> points)
 {
@@ -102,6 +114,11 @@ void ALCurveModel::setPoints(std::vector<Point> points)
 
 S32 ALCurveModel::addPoint(F32 x, F32 y)
 {
+    if (getPointCount() >= MAX_POINTS)
+    {
+        return -1;
+    }
+
     Point p;
     p.mX = llclamp(x, 0.f, 1.f);
     p.mY = llclamp(y, 0.f, 1.f);
@@ -209,16 +226,22 @@ void ALCurveModel::normalize()
             mPoints[i].mX = llmin(floor_x, 1.f);
         }
     }
+
+    // Cap, keeping both ends: the last point is the one pinned to x = 1, so
+    // dropping it would leave a locked curve that no longer spans the domain.
+    if (mPoints.size() > static_cast<size_t>(MAX_POINTS))
+    {
+        mPoints.erase(mPoints.begin() + (MAX_POINTS - 1), mPoints.end() - 1);
+    }
 }
+
+// =============================================================================
+// Evaluation
+// =============================================================================
 
 F32 ALCurveModel::evaluate(F32 x) const
 {
     x = llclamp(x, 0.f, 1.f);
-
-    if (mKind == KIND_SMOOTHSTEP)
-    {
-        return smoothstep(x, mToe, mShoulder, mStrength);
-    }
 
     const size_t n = mPoints.size();
     if (n == 0)
@@ -331,9 +354,173 @@ void ALCurveModel::sample(std::vector<F32>& out, S32 count) const
         return;
     }
     out.reserve(count);
-    const F32 step = 1.f / static_cast<F32>(count - 1);
     for (S32 i = 0; i < count; ++i)
     {
-        out.push_back(evaluate(static_cast<F32>(i) * step));
+        // A division rather than a multiplied step, so the last sample sits
+        // on exactly 1 and the ends of a baked row read back exactly.
+        out.push_back(evaluate(static_cast<F32>(i) / static_cast<F32>(count - 1)));
     }
+}
+
+// =============================================================================
+// ALToneCurveSet
+// =============================================================================
+
+// static
+ALToneCurveSet::EChannel ALToneCurveSet::channelFromCombo(S32 combo_value)
+{
+    switch (combo_value)
+    {
+        case 0:  return CH_RED;
+        case 1:  return CH_GREEN;
+        case 2:  return CH_BLUE;
+        default: return CH_MASTER;
+    }
+}
+
+namespace
+{
+bool isFiniteNumber(const LLSD& v, F32& out)
+{
+    // Reject by type rather than trusting asReal(): a string converts to 0
+    // silently, and a map to 0 too, and either would plant a point at the
+    // origin instead of being noticed.
+    if (v.type() != LLSD::TypeReal && v.type() != LLSD::TypeInteger)
+    {
+        return false;
+    }
+    const F64 d = v.asReal();
+    if (!std::isfinite(d))
+    {
+        return false;
+    }
+    out = static_cast<F32>(d);
+    return true;
+}
+} // namespace
+
+// static
+bool ALToneCurveSet::pointsFromLLSD(const LLSD& sd, std::vector<ALCurveModel::Point>& out)
+{
+    out = { { 0.f, 0.f }, { 1.f, 1.f } };
+    if (!sd.isArray())
+    {
+        return false;
+    }
+
+    std::vector<ALCurveModel::Point> points;
+    for (LLSD::array_const_iterator it = sd.beginArray(); it != sd.endArray(); ++it)
+    {
+        const LLSD& pair = *it;
+        if (!pair.isArray() || pair.size() < 2)
+        {
+            continue;
+        }
+        ALCurveModel::Point p;
+        if (!isFiniteNumber(pair[0], p.mX) || !isFiniteNumber(pair[1], p.mY))
+        {
+            continue;
+        }
+        points.push_back(p);
+    }
+
+    if (points.size() < 2)
+    {
+        return false;
+    }
+    out = std::move(points);
+    return true;
+}
+
+// static
+LLSD ALToneCurveSet::pointsToLLSD(const std::vector<ALCurveModel::Point>& points)
+{
+    LLSD out = LLSD::emptyArray();
+    for (const ALCurveModel::Point& p : points)
+    {
+        LLSD pair = LLSD::emptyArray();
+        pair.append(LLSD::Real(p.mX));
+        pair.append(LLSD::Real(p.mY));
+        out.append(pair);
+    }
+    return out;
+}
+
+// static
+LLSD ALToneCurveSet::identityLLSD()
+{
+    return pointsToLLSD({ { 0.f, 0.f }, { 1.f, 1.f } });
+}
+
+bool ALToneCurveSet::setCurveFromLLSD(EChannel c, const LLSD& sd)
+{
+    std::vector<ALCurveModel::Point> points;
+    const bool ok = pointsFromLLSD(sd, points);
+    mCurves[c].setPoints(std::move(points));
+    return ok;
+}
+
+LLSD ALToneCurveSet::getCurveAsLLSD(EChannel c) const
+{
+    return pointsToLLSD(mCurves[c].getPoints());
+}
+
+F32 ALToneCurveSet::evaluate(EChannel c, F32 x) const
+{
+    if (c == CH_MASTER)
+    {
+        return mCurves[CH_MASTER].evaluate(x);
+    }
+    return mCurves[CH_MASTER].evaluate(mCurves[c].evaluate(x));
+}
+
+// static
+bool ALToneCurveSet::isIdentityCurve(const ALCurveModel& curve)
+{
+    for (const ALCurveModel::Point& p : curve.getPoints())
+    {
+        if (fabsf(p.mY - p.mX) >= IDENTITY_EPS)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool ALToneCurveSet::isIdentity() const
+{
+    for (const ALCurveModel& curve : mCurves)
+    {
+        if (!isIdentityCurve(curve))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+void ALToneCurveSet::bake(std::vector<U16>& out, S32 size) const
+{
+    size = llmax(size, 2);
+    out.assign(static_cast<size_t>(size) * 4, ALPHA_OPAQUE);
+    for (S32 i = 0; i < size; ++i)
+    {
+        // Division, not a multiplied step: i / (size - 1) is exactly 1 for the
+        // last texel, so the top of the row is the curve's value at 1 and not
+        // at a float short of it.
+        const F32 x = static_cast<F32>(i) / static_cast<F32>(size - 1);
+        for (S32 c = 0; c < 3; ++c)
+        {
+            const F32 y = llclamp(evaluate(static_cast<EChannel>(CH_RED + c), x), 0.f, 1.f);
+            out[static_cast<size_t>(i) * 4 + c] = static_cast<U16>(y * 65535.f + 0.5f);
+        }
+    }
+}
+
+// static
+void ALToneCurveSet::lutScaleBias(S32 size, F32& scale, F32& bias)
+{
+    size = llmax(size, 2);
+    scale = 1.f - 1.f / static_cast<F32>(size);
+    bias  = 0.5f / static_cast<F32>(size);
 }

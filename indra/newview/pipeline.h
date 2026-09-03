@@ -96,6 +96,10 @@ public:
     void createGLBuffers();
     void createLUTBuffers();
     void setupGradingLUT();
+    /// Re-bake the tone curve lookup row from the four RenderColorGradeCurve*
+    /// settings. Runs from colorCorrect when mToneCurveLutDirty is set: once
+    /// per change, never per frame.
+    void bakeToneCurveLut();
 
     //allocate the largest screen buffer possible up to resX, resY
     //returns true if full size buffer allocated, false if some other size is allocated
@@ -992,6 +996,14 @@ public:
     U32                 mSMAAAreaMap = 0;
     U32                 mSMAASearchMap = 0;
     U32                 mSMAASampleMap = 0;
+
+    // Tone curve LUT: a 512x1 RGBA16 row (ALToneCurveSet::LUT_SIZE) whose R, G
+    // and B texels hold master(channel(x)) for each channel. A raw GL name
+    // like the SMAA maps above: created empty in createGLBuffers, filled by
+    // bakeToneCurveLut, released in releaseGLBuffers.
+    U32                 mToneCurveLut = 0;
+    bool                mToneCurveLutDirty = true;   // settings changed, or the texture was recreated, since the last bake
+    bool                mToneCurveIdentity = true;   // the last bake found all four curves on the diagonal
 
     LLColor4            mSunDiffuse;
     LLColor4            mMoonDiffuse;
