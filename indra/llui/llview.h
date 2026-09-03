@@ -215,7 +215,7 @@ public:
     // The kinds this view is, from ALViewKind. A virtual returning a
     // constant: while a view is being destroyed it answers for whatever base
     // is left standing, which is what dynamic_cast says of it then.
-    virtual U32 kindMask() const { return 0; }
+    virtual U64 kindMask() const { return 0; }
 
     // This view as a T, or null. A mask test and a static_cast for a kind
     // ALViewKindOf names; dynamic_cast for any other type.

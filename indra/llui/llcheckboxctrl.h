@@ -80,6 +80,8 @@ public:
 
     virtual ~LLCheckBoxCtrl();
 
+    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::CHECK_BOX; }
+
 protected:
     LLCheckBoxCtrl(const Params&);
     friend class LLUICtrlFactory;

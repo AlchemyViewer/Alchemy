@@ -131,6 +131,8 @@ public:
 
     /*virtual*/ ~LLTabContainer();
 
+    U64 kindMask() const override { return LLPanel::kindMask() | ALViewKind::TAB_CONTAINER; }
+
     // from LLView
     /*virtual*/ void setValue(const LLSD& value);
 

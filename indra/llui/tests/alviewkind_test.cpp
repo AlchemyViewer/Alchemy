@@ -24,11 +24,21 @@
 
 #include "linden_common.h"
 
+#include "../llbutton.h"
+#include "../llcheckboxctrl.h"
+#include "../llcombobox.h"
 #include "../llfloater.h"
 #include "../lllayoutstack.h"
+#include "../lllineeditor.h"
 #include "../llmenugl.h"
+#include "../llscrolllistctrl.h"
+#include "../llspinctrl.h"
+#include "../lltabcontainer.h"
+#include "../lltextbox.h"
 #include "../lluictrl.h"
 #include "../lluictrlfactory.h"
+
+#include <type_traits>
 
 #include "alheadlessui_fixture.h"
 
@@ -283,5 +293,56 @@ namespace tut
         ensure("the parent item is held as one", menu->getParentMenuItem() == item);
         delete item;
         ensure("and let go when it dies", menu->getParentMenuItem() == nullptr);
+    }
+
+    // The mask is 64 bits wide, at the virtual and in the table alike.
+    static_assert(std::is_same_v<decltype(std::declval<const LLView&>().kindMask()), U64>);
+    static_assert(std::is_same_v<std::remove_cv_t<decltype(ALViewKindOf<LLButton>::bits)>, U64>);
+    static_assert(ALViewKindOf<LLTabContainer>::bits > ALViewKindOf<LLFolderViewFolder>::bits);
+
+    // The widget types the name lookups ask for most: each is itself, a
+    // control, and none of the others. A check box, a combo box and a scroll
+    // list measure text as they are built, which the fixture's fonts cannot
+    // answer without GL textures, so those three are not built here; each
+    // of their overrides names LLUICtrl as its immediate base.
+    template<> template<>
+    void alviewkind_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLButton::Params bp;         bp.name = "button";
+        LLTextBox::Params tp;        tp.name = "text";
+        LLLineEditor::Params lp;     lp.name = "line";
+        LLSpinCtrl::Params spp;      spp.name = "spin";
+        LLTabContainer::Params tcp;  tcp.name = "tabs";
+
+        std::unique_ptr<LLButton>         button(LLUICtrlFactory::create<LLButton>(bp));
+        std::unique_ptr<LLTextBox>        text(LLUICtrlFactory::create<LLTextBox>(tp));
+        std::unique_ptr<LLLineEditor>     line(LLUICtrlFactory::create<LLLineEditor>(lp));
+        std::unique_ptr<LLSpinCtrl>       spin(LLUICtrlFactory::create<LLSpinCtrl>(spp));
+        std::unique_ptr<LLTabContainer>   tabs(LLUICtrlFactory::create<LLTabContainer>(tcp));
+
+        ensure("a button is a button", button->as<LLButton>() == button.get());
+        ensure("a text box is a text box", text->as<LLTextBox>() == text.get());
+        ensure("a line editor is a line editor", line->as<LLLineEditor>() == line.get());
+        ensure("a spin control is a spin control", spin->as<LLSpinCtrl>() == spin.get());
+        ensure("a tab container is a tab container", tabs->as<LLTabContainer>() == tabs.get());
+
+        ensure("a button is a control", button->as<LLUICtrl>() == button.get());
+        ensure("a spin control is a control, through its float base", spin->as<LLUICtrl>() == spin.get());
+        ensure("a tab container is a panel", tabs->as<LLPanel>() == tabs.get());
+        ensure("a text box is a text base, the slow way", text->as<LLTextBase>() == text.get());
+
+        ensure("a button is not a text box", button->as<LLTextBox>() == nullptr);
+        ensure("a text box is not a line editor", text->as<LLLineEditor>() == nullptr);
+        ensure("a line editor is not a spin control", line->as<LLSpinCtrl>() == nullptr);
+        ensure("a spin control is not a tab container", spin->as<LLTabContainer>() == nullptr);
+        ensure("a tab container is not a button", tabs->as<LLButton>() == nullptr);
+        ensure("a button is not a panel", button->as<LLPanel>() == nullptr);
+        ensure("none of them is a check box", button->as<LLCheckBoxCtrl>() == nullptr && line->as<LLCheckBoxCtrl>() == nullptr);
+        ensure("none of them is a combo box or a scroll list", spin->as<LLComboBox>() == nullptr && tabs->as<LLScrollListCtrl>() == nullptr);
     }
 }

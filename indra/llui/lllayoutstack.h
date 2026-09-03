@@ -66,7 +66,7 @@ public:
 
     typedef LayoutStackRegistry child_registry_t;
 
-    U32 kindMask() const override { return LLView::kindMask() | ALViewKind::LAYOUT_STACK; }
+    U64 kindMask() const override { return LLView::kindMask() | ALViewKind::LAYOUT_STACK; }
 
     virtual ~LLLayoutStack();
 
@@ -152,7 +152,7 @@ public:
 
     ~LLLayoutPanel();
 
-    U32 kindMask() const override { return LLPanel::kindMask() | ALViewKind::LAYOUT_PANEL; }
+    U64 kindMask() const override { return LLPanel::kindMask() | ALViewKind::LAYOUT_PANEL; }
 
     void initFromParams(const Params& p);
 

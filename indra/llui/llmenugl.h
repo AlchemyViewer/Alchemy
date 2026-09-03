@@ -90,7 +90,7 @@ protected:
     LLMenuItemGL(const Params&);
     friend class LLUICtrlFactory;
 public:
-    U32 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::MENU_ITEM; }
+    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::MENU_ITEM; }
 
     // LLView overrides
     /*virtual*/ void onVisibilityChange(bool new_visibility);
@@ -293,7 +293,7 @@ public:
 
     LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params& p = LLMenuItemSeparatorGL::Params());
 
-    U32 kindMask() const override { return LLMenuItemGL::kindMask() | ALViewKind::MENU_SEPARATOR; }
+    U64 kindMask() const override { return LLMenuItemGL::kindMask() | ALViewKind::MENU_SEPARATOR; }
 
     /*virtual*/ void draw( void );
     /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
@@ -494,7 +494,7 @@ protected:
 public:
     virtual ~LLMenuGL( void );
 
-    U32 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::MENU; }
+    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::MENU; }
 
     // LLView Functionality
     /*virtual*/ bool handleUnicodeCharHere( llwchar uni_char );
@@ -774,7 +774,7 @@ protected:
 public:
     virtual ~LLContextMenu() {}
 
-    U32 kindMask() const override { return LLMenuGL::kindMask() | ALViewKind::CONTEXT_MENU; }
+    U64 kindMask() const override { return LLMenuGL::kindMask() | ALViewKind::CONTEXT_MENU; }
 
     // LLView Functionality
     // can't set visibility directly, must call show or hide
@@ -849,7 +849,7 @@ public:
     LLMenuBarGL( const Params& p );
     virtual ~LLMenuBarGL();
 
-    U32 kindMask() const override { return LLMenuGL::kindMask() | ALViewKind::MENU_BAR; }
+    U64 kindMask() const override { return LLMenuGL::kindMask() | ALViewKind::MENU_BAR; }
 
     /*virtual*/ bool handleAcceleratorKey(KEY key, MASK mask);
     /*virtual*/ bool handleKeyHere(KEY key, MASK mask);

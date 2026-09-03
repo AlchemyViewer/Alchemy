@@ -93,6 +93,8 @@ public:
 
 
     virtual ~LLComboBox();
+
+    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::COMBO_BOX; }
     /*virtual*/ bool postBuild();
 
 protected:

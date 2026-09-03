@@ -204,7 +204,7 @@ public:
 
     virtual ~LLFolderViewItem( void );
 
-    U32 kindMask() const override { return LLView::kindMask() | ALViewKind::FOLDER_VIEW_ITEM; }
+    U64 kindMask() const override { return LLView::kindMask() | ALViewKind::FOLDER_VIEW_ITEM; }
 
     // addToFolder() returns true if it succeeds. false otherwise
     virtual void addToFolder(LLFolderViewFolder* folder);
@@ -492,7 +492,7 @@ public:
 
     virtual ~LLFolderViewFolder( void );
 
-    U32 kindMask() const override { return LLFolderViewItem::kindMask() | ALViewKind::FOLDER_VIEW_FOLDER; }
+    U64 kindMask() const override { return LLFolderViewItem::kindMask() | ALViewKind::FOLDER_VIEW_FOLDER; }
 
     LLFolderViewItem* getNextFromChild( LLFolderViewItem*, bool include_children = true );
     LLFolderViewItem* getPreviousFromChild( LLFolderViewItem*, bool include_children = true  );

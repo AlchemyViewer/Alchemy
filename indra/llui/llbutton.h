@@ -157,6 +157,8 @@ protected:
 public:
 
     ~LLButton();
+
+    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::BUTTON; }
     // For backward compatability only
     typedef std::function<void(void*)> button_callback_t;
 

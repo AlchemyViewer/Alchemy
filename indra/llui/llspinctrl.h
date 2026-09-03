@@ -61,6 +61,8 @@ protected:
 public:
     virtual ~LLSpinCtrl() {} // Children all cleaned up by default view destructor.
 
+    U64 kindMask() const override { return LLF32UICtrl::kindMask() | ALViewKind::SPIN_CTRL; }
+
     virtual void    forceSetValue(const LLSD& value ) ;
     virtual void    setValue(const LLSD& value );
             F32     get() const { return getValueF32(); }

@@ -154,7 +154,7 @@ public:
     // LLView interface
     /*virtual*/ bool    setLabelArg( const std::string& key, const LLStringExplicit& text ) override;
     /*virtual*/ bool    isCtrl() const override;
-    U32                 kindMask() const override { return LLView::kindMask() | ALViewKind::CTRL; }
+    U64                 kindMask() const override { return LLView::kindMask() | ALViewKind::CTRL; }
     /*virtual*/ void    onMouseEnter(S32 x, S32 y, MASK mask) override;
     /*virtual*/ void    onMouseLeave(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool    canFocusChildren() const override;

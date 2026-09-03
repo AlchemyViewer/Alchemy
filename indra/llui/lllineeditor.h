@@ -126,6 +126,8 @@ protected:
 public:
     virtual ~LLLineEditor();
 
+    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::LINE_EDITOR; }
+
     // mousehandler overrides
     /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool    handleMouseUp(S32 x, S32 y, MASK mask) override;

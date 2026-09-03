@@ -264,7 +264,7 @@ public:
     // Note: We may eventually have to move that method up the hierarchy to LLFolderViewItem.
     LLHandle<LLFolderView>  getHandle() const { return getDerivedHandle<LLFolderView>(); }
 
-    U32 kindMask() const override { return LLFolderViewFolder::kindMask() | ALViewKind::FOLDER_VIEW; }
+    U64 kindMask() const override { return LLFolderViewFolder::kindMask() | ALViewKind::FOLDER_VIEW; }
 
 private:
     void updateMenuOptions(LLMenuGL* menu);

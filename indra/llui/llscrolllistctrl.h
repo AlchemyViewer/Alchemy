@@ -163,6 +163,8 @@ protected:
 public:
     virtual ~LLScrollListCtrl();
 
+    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::SCROLL_LIST; }
+
     S32             isEmpty() const;
 
     void            deleteAllItems() { clearRows(); }
