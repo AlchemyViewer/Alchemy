@@ -133,13 +133,13 @@ LLFolderViewItem * LLInboxInventoryPanel::createFolderViewItem(LLInvFVBridge * b
 
 void LLInboxInventoryPanel::onRemoveItemFreshness(const LLUUID& item_id)
 {
-    LLInboxFolderViewFolder* inbox_folder_view = dynamic_cast<LLInboxFolderViewFolder*>(getFolderByID(item_id));
+    LLInboxFolderViewFolder* inbox_folder_view = ALViewType::as<LLInboxFolderViewFolder>(getFolderByID(item_id));
     if(inbox_folder_view)
     {
         inbox_folder_view->setFresh(false);
     }
 
-    LLInboxFolderViewItem* inbox_item_view = dynamic_cast<LLInboxFolderViewItem*>(getItemByID(item_id));
+    LLInboxFolderViewItem* inbox_item_view = ALViewType::as<LLInboxFolderViewItem>(getItemByID(item_id));
     if(inbox_item_view)
     {
         inbox_item_view->setFresh(false);

@@ -246,7 +246,7 @@ void LLPanelOutfitsInventory::onSave()
 //static
 LLPanelOutfitsInventory* LLPanelOutfitsInventory::findInstance()
 {
-    return dynamic_cast<LLPanelOutfitsInventory*>(LLFloaterSidePanelContainer::getPanel("appearance", "panel_outfits_inventory"));
+    return LLFloaterSidePanelContainer::getPanel<LLPanelOutfitsInventory>("appearance", "panel_outfits_inventory");
 }
 
 void LLPanelOutfitsInventory::openApearanceTab(const std::string& tab_name)

@@ -71,7 +71,7 @@ public:
     void fire(const LLUUID &inv_item)
     {
         // inv_item can be null for some reason
-        LLSidepanelItemInfo* sidepanel = dynamic_cast<LLSidepanelItemInfo*>(mHandle.get());
+        LLSidepanelItemInfo* sidepanel = ALViewType::as<LLSidepanelItemInfo>(mHandle.get());
         if (sidepanel)
         {
             // sidepanel waits only for most recent update

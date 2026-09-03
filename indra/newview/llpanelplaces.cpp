@@ -430,7 +430,7 @@ void LLPanelPlaces::onOpen(const LLSD& key)
             LLUUID item_id = key["item_id"];
 
             LLLandmarksPanel* landmarks_panel =
-                dynamic_cast<LLLandmarksPanel*>(mTabContainer->getPanelByName("Landmarks"));
+                ALViewType::as<LLLandmarksPanel>(mTabContainer->getPanelByName("Landmarks"));
             if (landmarks_panel && item_id.notNull())
             {
                 LLLandmark* landmark = LLLandmarkActions::getLandmark(item_id, boost::bind(&LLLandmarksPanel::doCreatePick, landmarks_panel, _1, item_id));
@@ -664,7 +664,7 @@ void LLPanelPlaces::onFilterEdit(const std::string& search_string, bool force_fi
 
 void LLPanelPlaces::onTabSelected()
 {
-    mActivePanel = dynamic_cast<LLPanelPlacesTab*>(mTabContainer->getCurrentPanel());
+    mActivePanel = ALViewType::as<LLPanelPlacesTab>(mTabContainer->getCurrentPanel());
     if (!mActivePanel || !mTabsCreated)
         return;
 
@@ -1101,7 +1101,7 @@ void LLPanelPlaces::togglePlaceInfoPanel(bool visible)
                 }
             }
 
-            LLLandmarksPanel* landmarks_panel = dynamic_cast<LLLandmarksPanel*>(mTabContainer->getPanelByName(tab_panel_name));
+            LLLandmarksPanel* landmarks_panel = ALViewType::as<LLLandmarksPanel>(mTabContainer->getPanelByName(tab_panel_name));
             if (landmarks_panel)
             {
                 // If a landmark info is being closed we open the landmarks tab
@@ -1226,7 +1226,7 @@ void LLPanelPlaces::createTabs()
 
     mTabContainer->selectFirstTab();
 
-    mActivePanel = dynamic_cast<LLPanelPlacesTab*>(mTabContainer->getCurrentPanel());
+    mActivePanel = ALViewType::as<LLPanelPlacesTab>(mTabContainer->getCurrentPanel());
 
     if (mActivePanel)
     {

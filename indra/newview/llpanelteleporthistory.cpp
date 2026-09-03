@@ -441,9 +441,8 @@ bool LLTeleportHistoryPanel::postBuild()
     {
         for (child_list_const_iter_t iter = mHistoryAccordion->beginChild(); iter != mHistoryAccordion->endChild(); iter++)
         {
-            if (dynamic_cast<LLAccordionCtrlTab*>(*iter))
+            if (LLAccordionCtrlTab* tab = (*iter)->as<LLAccordionCtrlTab>())
             {
-                LLAccordionCtrlTab* tab = (LLAccordionCtrlTab*)*iter;
                 tab->setRightMouseDownCallback(boost::bind(&LLTeleportHistoryPanel::onAccordionTabRightClick, this, _1, _2, _3, _4));
                 tab->setDisplayChildren(false);
                 tab->setDropDownStateChangedCallback(boost::bind(&LLTeleportHistoryPanel::onAccordionExpand, this, _1, _2));

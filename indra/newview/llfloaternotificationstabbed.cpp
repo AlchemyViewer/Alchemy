@@ -155,7 +155,7 @@ void LLFloaterNotificationsTabbed::initChannel()
 {
     LLNotificationsUI::LLScreenChannelBase* channel = LLNotificationsUI::LLChannelManager::getInstance()->findChannelByID(
         LLNotificationsUI::NOTIFICATION_CHANNEL_UUID);
-    mChannel = dynamic_cast<LLNotificationsUI::LLScreenChannel*>(channel);
+    mChannel = ALViewType::as<LLNotificationsUI::LLScreenChannel>(channel);
     if(NULL == mChannel)
     {
         LL_WARNS() << "LLSysWellWindow::initChannel() - could not get a requested screen channel" << LL_ENDL;

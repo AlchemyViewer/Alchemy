@@ -1504,7 +1504,7 @@ void LLPanelProfileClassified::onTextureSelected()
 void LLPanelProfileClassified::updateTabLabel(const std::string& title)
 {
     setLabel(title);
-    LLTabContainer* parent = dynamic_cast<LLTabContainer*>(getParent());
+    LLTabContainer* parent = getParentAs<LLTabContainer>();
     if (parent)
     {
         parent->setCurrentTabName(title);

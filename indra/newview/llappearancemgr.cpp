@@ -4380,7 +4380,7 @@ void show_created_outfit(LLUUID& folder_id, bool show_panel = true)
 
     }
     LLOutfitsList *outfits_list =
-        dynamic_cast<LLOutfitsList*>(LLFloaterSidePanelContainer::getPanel("appearance", "outfitslist_tab"));
+        LLFloaterSidePanelContainer::getPanel<LLOutfitsList>("appearance", "outfitslist_tab");
     if (outfits_list)
     {
         outfits_list->setSelectedOutfitByUUID(folder_id);

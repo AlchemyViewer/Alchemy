@@ -662,7 +662,7 @@ void LLToolBarView::onToolBarButtonAdded(LLView* button)
 
         if (incoming_floater && incoming_floater->isShown())
         {
-            LLCallDialog* incoming = dynamic_cast<LLCallDialog *>(incoming_floater);
+            LLCallDialog* incoming = incoming_floater->as<LLCallDialog>();
             llassert(incoming);
 
             LLDockControl* dock_control = incoming->getDockControl();
@@ -674,7 +674,7 @@ void LLToolBarView::onToolBarButtonAdded(LLView* button)
 
         if (outgoing_floater && outgoing_floater->isShown())
         {
-            LLCallDialog* outgoing = dynamic_cast<LLCallDialog *>(outgoing_floater);
+            LLCallDialog* outgoing = outgoing_floater->as<LLCallDialog>();
             llassert(outgoing);
 
             LLDockControl* dock_control = outgoing->getDockControl();

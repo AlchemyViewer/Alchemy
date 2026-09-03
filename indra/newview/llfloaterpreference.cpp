@@ -1116,7 +1116,7 @@ void LLFloaterPreference::onUIFontFileEntered(LLUICtrl* ctrl, const LLSD& userda
 {
     const std::string family = userdata.asString();
     if (family.empty()) return;
-    LLLineEditor* editor = dynamic_cast<LLLineEditor*>(ctrl);
+    LLLineEditor* editor = ALViewType::as<LLLineEditor>(ctrl);
     if (!editor) return;
     const std::string raw = editor->getText();
     setFontOverride(family, raw);
@@ -2567,7 +2567,7 @@ void LLFloaterPreference::updateClickActionControls()
         iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreferenceControls* panel = dynamic_cast<LLPanelPreferenceControls*>(view);
+        LLPanelPreferenceControls* panel = view->as<LLPanelPreferenceControls>();
         if (panel)
         {
             panel->setKeyBind("walk_to",
@@ -2606,7 +2606,7 @@ void LLFloaterPreference::updateClickActionViews()
         iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreferenceControls* panel = dynamic_cast<LLPanelPreferenceControls*>(view);
+        LLPanelPreferenceControls* panel = view->as<LLPanelPreferenceControls>();
         if (panel)
         {
             click_to_walk = panel->canKeyBindHandle("walk_to",
@@ -2868,7 +2868,7 @@ void LLPanelPreference::saveSettings()
         LLView* curview = view_stack.front();
         view_stack.pop_front();
 
-        LLColorSwatchCtrl* color_swatch = dynamic_cast<LLColorSwatchCtrl *>(curview);
+        LLColorSwatchCtrl* color_swatch = curview->as<LLColorSwatchCtrl>();
         if (color_swatch)
         {
             mSavedColors[color_swatch->getName()] = color_swatch->get();

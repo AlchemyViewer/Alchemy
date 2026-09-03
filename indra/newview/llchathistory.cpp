@@ -1698,7 +1698,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                 // Note: it might be better to simply add a "pending offer" flag somewhere
                 for (auto& panel : LLToastNotifyPanel::instance_snapshot())
                 {
-                    LLIMToastNotifyPanel * imtoastp = dynamic_cast<LLIMToastNotifyPanel *>(&panel);
+                    LLIMToastNotifyPanel * imtoastp = panel.as<LLIMToastNotifyPanel>();
                     const std::string& notification_name = panel.getNotificationName();
                     if (notification_name == "OfferFriendship"
                         && panel.isControlPanelEnabled()

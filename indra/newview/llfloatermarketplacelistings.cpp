@@ -1041,7 +1041,7 @@ void LLFloaterItemProperties::onOpen(const LLSD& key)
     // Tell the panel which item it needs to visualize
     LLPanel* panel = findChild<LLPanel>("sidepanel");
 
-    LLSidepanelItemInfo* item_panel = dynamic_cast<LLSidepanelItemInfo*>(panel);
+    LLSidepanelItemInfo* item_panel = ALViewType::as<LLSidepanelItemInfo>(panel);
     if (item_panel)
     {
         item_panel->setItemID(key["id"].asUUID());

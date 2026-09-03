@@ -433,7 +433,7 @@ void LLCOFWearables::onAccordionTabStateChanged(LLUICtrl* ctrl, const LLSD& expa
     mBodyParts->resetSelection(true);
 
     bool tab_selection_changed = false;
-    LLAccordionCtrlTab* tab = dynamic_cast<LLAccordionCtrlTab*>(ctrl);
+    LLAccordionCtrlTab* tab = ALViewType::as<LLAccordionCtrlTab>(ctrl);
     if (tab && tab != mLastSelectedTab)
     {
         mLastSelectedTab = tab;

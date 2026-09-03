@@ -1198,7 +1198,7 @@ void LLFloaterModelPreview::initDecompControls()
 
 
                 LLUICtrl* ctrl = getChild<LLUICtrl>(name);
-                if (LLSliderCtrl* slider = dynamic_cast<LLSliderCtrl*>(ctrl))
+                if (LLSliderCtrl* slider = ALViewType::as<LLSliderCtrl>(ctrl))
                 {
                     slider->setMinValue(param[i].mDetails.mRange.mLow.mFloat);
                     slider->setMaxValue(param[i].mDetails.mRange.mHigh.mFloat);
@@ -1247,7 +1247,7 @@ void LLFloaterModelPreview::initDecompControls()
 
 
                 LLUICtrl* ctrl = getChild<LLUICtrl>(name);
-                if (LLSliderCtrl* slider = dynamic_cast<LLSliderCtrl*>(ctrl))
+                if (LLSliderCtrl* slider = ALViewType::as<LLSliderCtrl>(ctrl))
                 {
                     slider->setMinValue((F32)param[i].mDetails.mRange.mLow.mIntOrEnumValue);
                     slider->setMaxValue((F32)param[i].mDetails.mRange.mHigh.mIntOrEnumValue);

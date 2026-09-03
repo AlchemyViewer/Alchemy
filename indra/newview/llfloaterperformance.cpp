@@ -656,7 +656,7 @@ bool LLFloaterPerformance::isActionChecked(const LLSD& userdata, const LLUUID& a
 
 void LLFloaterPerformance::onAvatarListRightClick(LLUICtrl* ctrl, S32 x, S32 y)
 {
-    LLNameListCtrl* list = dynamic_cast<LLNameListCtrl*>(ctrl);
+    LLNameListCtrl* list = ALViewType::as<LLNameListCtrl>(ctrl);
     if (!list) return;
     list->selectItemAt(x, y, MASK_NONE);
     uuid_vec_t selected_uuids;

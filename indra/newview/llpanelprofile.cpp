@@ -1057,7 +1057,7 @@ bool LLPanelProfileSecondLife::hasUnsavedChanges()
     LLFloater *floater = mFloaterPermissionsHandle.get();
     if (floater)
     {
-        LLFloaterProfilePermissions* perm = dynamic_cast<LLFloaterProfilePermissions*>(floater);
+        LLFloaterProfilePermissions* perm = floater->as<LLFloaterProfilePermissions>();
         if (perm && perm->hasUnsavedChanges())
         {
             return true;
@@ -1072,7 +1072,7 @@ void LLPanelProfileSecondLife::commitUnsavedChanges()
     LLFloater *floater = mFloaterPermissionsHandle.get();
     if (floater)
     {
-        LLFloaterProfilePermissions* perm = dynamic_cast<LLFloaterProfilePermissions*>(floater);
+        LLFloaterProfilePermissions* perm = floater->as<LLFloaterProfilePermissions>();
         if (perm && perm->hasUnsavedChanges())
         {
             perm->onApplyRights();

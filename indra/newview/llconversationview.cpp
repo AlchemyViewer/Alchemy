@@ -486,7 +486,7 @@ LLConversationViewParticipant* LLConversationViewSession::findParticipant(const 
     items_t::const_iterator iter;
     for (iter = getItemsBegin(); iter != getItemsEnd(); iter++)
     {
-        participant = dynamic_cast<LLConversationViewParticipant*>(*iter);
+        participant = (*iter)->as<LLConversationViewParticipant>();
         if (participant->hasSameValue(participant_id))
         {
             break;
@@ -554,7 +554,7 @@ void LLConversationViewSession::updateConversationIndicators()
     items_t::const_iterator iter;
     for (iter = getItemsBegin(); iter != getItemsEnd(); iter++)
     {
-        participant = dynamic_cast<LLConversationViewParticipant*>(*iter);
+        participant = (*iter)->as<LLConversationViewParticipant>();
         if (participant)
         {
             participant->allowSpeakingIndicator(is_active_channel);

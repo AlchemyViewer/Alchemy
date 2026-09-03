@@ -111,7 +111,7 @@ bool LLSidepanelAppearance::postBuild()
         mFilterEditor->setCommitCallback(boost::bind(&LLSidepanelAppearance::onFilterEdit, this, _2));
     }
 
-    mPanelOutfitsInventory = dynamic_cast<LLPanelOutfitsInventory *>(getChild<LLPanel>("panel_outfits_inventory"));
+    mPanelOutfitsInventory = getChild<LLPanel>("panel_outfits_inventory")->as<LLPanelOutfitsInventory>();
 
     mOutfitEdit = getChild<LLPanel>("panel_outfit_edit")->as<LLPanelOutfitEdit>();
     if (mOutfitEdit)

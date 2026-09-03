@@ -728,7 +728,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
             return false;
 
         // Identify the menu item hovered and the side to drop
-        LLFavoriteLandmarkMenuItem* target_item = dynamic_cast<LLFavoriteLandmarkMenuItem*>(overflow_menu->childFromPoint(x, y));
+        LLFavoriteLandmarkMenuItem* target_item = ALViewType::as<LLFavoriteLandmarkMenuItem>(overflow_menu->childFromPoint(x, y));
         if (target_item)
         {
             insert_before = true;
@@ -740,7 +740,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
             auto end = overflow_menu->getChildList()->end();
             auto check = [](const LLView* child) -> bool
                 {
-                    return dynamic_cast<const LLFavoriteLandmarkMenuItem*>(child);
+                    return ALViewType::as<LLFavoriteLandmarkMenuItem>(child) != nullptr;
                 };
             // Menu items are placed in the backward order, so the bottom goes first
             auto it = std::find_if(begin, end, check);

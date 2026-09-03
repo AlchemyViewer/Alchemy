@@ -1085,7 +1085,7 @@ void LLFloaterIMSessionTab::processChatHistoryStyleUpdate(bool clean_messages/* 
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin();
             iter != inst_list.end(); ++iter)
     {
-        LLFloaterIMSession* floater = dynamic_cast<LLFloaterIMSession*>(*iter);
+        LLFloaterIMSession* floater = (*iter)->as<LLFloaterIMSession>();
         if (floater)
         {
             floater->reloadMessages(clean_messages);
@@ -1106,7 +1106,7 @@ void LLFloaterIMSessionTab::reloadEmptyFloaters()
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin();
         iter != inst_list.end(); ++iter)
     {
-        LLFloaterIMSession* floater = dynamic_cast<LLFloaterIMSession*>(*iter);
+        LLFloaterIMSession* floater = (*iter)->as<LLFloaterIMSession>();
         if (floater && floater->getLastChatMessageIndex() == -1)
         {
             floater->reloadMessages(true);

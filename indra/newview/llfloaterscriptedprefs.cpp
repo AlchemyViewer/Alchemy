@@ -58,6 +58,6 @@ void LLFloaterScriptEdPrefs::applyUIColor(LLUICtrl* ctrl, const LLSD& param)
 
 void LLFloaterScriptEdPrefs::getUIColor(LLUICtrl* ctrl, const LLSD& param)
 {
-    LLColorSwatchCtrl* color_swatch = dynamic_cast<LLColorSwatchCtrl*>(ctrl);
+    LLColorSwatchCtrl* color_swatch = ALViewType::as<LLColorSwatchCtrl>(ctrl);
     color_swatch->setOriginal(LLUIColorTable::instance().getColor(param.asString()));
 }

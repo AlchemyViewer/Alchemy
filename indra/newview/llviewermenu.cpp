@@ -6401,7 +6401,7 @@ void handle_spellcheck_replace_with_suggestion(const LLUICtrl* ctrl, const LLSD&
 
 bool visible_spellcheck_suggestion(LLUICtrl* ctrl, const LLSD& param)
 {
-    LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(ctrl);
+    LLMenuItemGL* item = ALViewType::as<LLMenuItemGL>(ctrl);
     const LLContextMenu* menu = (item) ? item->getParentAs<LLContextMenu>() : NULL;
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (!spellcheck_handler) || (!spellcheck_handler->getSpellCheck()) )
@@ -7965,7 +7965,7 @@ static bool onEnableAttachmentLabel(LLUICtrl* ctrl, const LLSD& data)
     bool fRlvEnable = true;
 // [/RLVa:KB]
     std::string label;
-    LLMenuItemGL* menu = dynamic_cast<LLMenuItemGL*>(ctrl);
+    LLMenuItemGL* menu = ALViewType::as<LLMenuItemGL>(ctrl);
     if (menu)
     {
         const LLViewerJointAttachment *attachment = get_if_there(gAgentAvatarp->mAttachmentPoints, data["index"].asInteger(), (LLViewerJointAttachment*)NULL);

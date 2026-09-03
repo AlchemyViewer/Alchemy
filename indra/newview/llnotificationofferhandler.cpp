@@ -193,7 +193,7 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
         // HACK: if we're dealing with a notification embedded in IM, update it
         // otherwise remove its toast
         //
-        if (dynamic_cast<LLIMToastNotifyPanel*>(panelp.get()))
+        if (ALViewType::as<LLIMToastNotifyPanel>(panelp.get()))
         {
             panelp->updateNotification();
         }
