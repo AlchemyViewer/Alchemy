@@ -89,7 +89,7 @@ protected:
 private:
     void cleanup();
 
-    LLHandle<LLView>        mMenuHandle;
+    LLHandle<LLToggleableMenu> mMenuHandle;
     bool                    mIsMenuShown;
     EMenuPosition           mMenuPosition;
     S32                     mX;

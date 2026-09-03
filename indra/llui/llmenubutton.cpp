@@ -84,7 +84,7 @@ void LLMenuButton::hideMenu()
 
 LLToggleableMenu* LLMenuButton::getMenu()
 {
-    return dynamic_cast<LLToggleableMenu*>(mMenuHandle.get());
+    return mMenuHandle.get();
 }
 
 void LLMenuButton::setMenu(const std::string& menu_filename, EMenuPosition position /*MP_TOP_LEFT*/)
