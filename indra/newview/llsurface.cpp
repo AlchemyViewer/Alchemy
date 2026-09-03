@@ -1147,7 +1147,7 @@ void LLSurface::setWaterHeight(F32 height)
         mWaterObjp->setPositionRegion(water_pos_region);
         if (changed)
         {
-            LLWorld::getInstance()->updateWaterObjects();
+            LLWorld::getInstance()->requestWaterObjectsUpdate();
         }
     }
     else

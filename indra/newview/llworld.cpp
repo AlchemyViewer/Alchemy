@@ -116,6 +116,7 @@ LLWorld::LLWorld() :
 void LLWorld::resetClass()
 {
     mHoleWaterObjects.clear();
+    mWaterObjectsDirty = false;
     gObjectList.destroy();
     gSky.cleanup(); // references an object
     for(region_list_t::iterator region_it = mRegionList.begin(); region_it != mRegionList.end(); )
@@ -141,6 +142,7 @@ void LLWorld::resetClass()
 
 LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     LL_INFOS() << "Add region with handle: " << region_handle << " on host " << host << LL_ENDL;
     LLViewerRegion *regionp = getRegionFromHandle(region_handle);
     std::string seedUrl;
@@ -240,7 +242,7 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
         }
     }
 
-    updateWaterObjects();
+    requestWaterObjectsUpdate();
 
     return regionp;
 }
@@ -248,6 +250,7 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
 
 void LLWorld::removeRegion(const LLHost &host)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     F32 x, y;
 
     LLViewerRegion *regionp = getRegion(host);
@@ -294,7 +297,7 @@ void LLWorld::removeRegion(const LLHost &host)
 
     mRegionRemovedSignal(regionp);
 
-    updateWaterObjects();
+    requestWaterObjectsUpdate();
 
     //double check all objects of this region are removed.
     gObjectList.clearAllMapObjectsInRegion(regionp) ;
@@ -618,6 +621,11 @@ LLVector3 LLWorld::resolveLandNormalGlobal(const LLVector3d &pos_global)
 
 void LLWorld::updateVisibilities()
 {
+    if (mWaterObjectsDirty)
+    {
+        updateWaterObjects();
+    }
+
     F32 cur_far_clip = LLViewerCamera::getInstance()->getFar();
 
     // Go through the culled list and check for visible regions (region is visible if land is visible)
@@ -866,7 +874,7 @@ void LLWorld::setLandFarClip(const F32 far_clip)
 
     if (need_water_objects_update)
     {
-        updateWaterObjects();
+        requestWaterObjectsUpdate();
     }
 }
 
@@ -904,8 +912,14 @@ void LLWorld::clearEdgeWaterObjects()
     }
 }
 
+void LLWorld::requestWaterObjectsUpdate()
+{
+    mWaterObjectsDirty = true;
+}
+
 void LLWorld::updateWaterObjects()
 {
+    mWaterObjectsDirty = false;
     if (!gAgent.getRegion())
     {
         return;

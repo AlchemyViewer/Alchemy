@@ -631,7 +631,9 @@ void LLFloaterRegionInfo::sRefreshFromRegion(LLViewerRegion* region)
 {
     if (region != gAgent.getRegion()) { return; }
 
-    LLFloaterRegionInfo* floater = LLFloaterReg::getTypedInstance<LLFloaterRegionInfo>("region_info");
+    // A floater that has never been opened cannot be visible, so there is
+    // nothing to refresh; getTypedInstance would build it from XUI to find that out.
+    LLFloaterRegionInfo* floater = LLFloaterReg::findTypedInstance<LLFloaterRegionInfo>("region_info");
     if (!floater) { return; }
 
     if (floater->getVisible() && region == gAgent.getRegion())

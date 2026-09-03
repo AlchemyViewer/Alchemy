@@ -153,6 +153,9 @@ public:
 
     LLViewerTexture *getDefaultWaterTexture();
     void updateWaterObjects();
+    // Rebuild the hole and edge water once, on the next updateVisibilities(),
+    // however many regions arrive or leave before then.
+    void requestWaterObjectsUpdate();
 
     void waterHeightRegionInfo(std::string const& sim_name, F32 water_height);
     void shiftRegions(const LLVector3& offset);
@@ -241,6 +244,7 @@ private:
     //
 
     std::list<LLPointer<LLVOWater> > mHoleWaterObjects;
+    bool mWaterObjectsDirty = false;
     static const S32 EDGE_WATER_OBJECTS_COUNT = 8;
     LLPointer<LLVOWater> mEdgeWaterObjects[EDGE_WATER_OBJECTS_COUNT];
 
