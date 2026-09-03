@@ -31,6 +31,7 @@
 
 // Project includes
 #include "lluiimage.h"
+#include "llframetimer.h"
 #include <algorithm>
 
 // Static member initialization
@@ -89,58 +90,88 @@ S32 LLUIImage::getHeight() const
     return ll_round((F32)mImage->getHeight(0) * mClipRegion.getHeight());
 }
 
-buffer_data_list_t* LLUIImage::findDisplayList(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, bool solid_color) const
+void LLUIImage::drawCached(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, bool solid_color) const
 {
     LLImageGL* gl_image = mImage->getGLTexture();
     if (!gl_image)
     {
-        return nullptr;
+        // Nothing to record against until the texture exists, and nothing to draw.
+        return;
     }
 
-    LLVector3 ui_translation = gGL.getUITranslation();
-    LLVector3 ui_scale = gGL.getUIScale();
-    LLGLuint tex_name = gl_image->getTexName();
+    // The GL name stands for the texture's current state: a discard change or a
+    // recreation renames it, and recordings made against the old name lapse.
+    const LLVector3 ui_scale = gGL.getUIScale();
+    const PackedKey key = PackedKey::create(width, height, color, solid_color, ui_scale, gl_image->getTexName());
 
-    auto key = PackedKey::create(x, y, width, height, color, solid_color, ui_translation, ui_scale, tex_name);
+    // Where the image sits on screen, in the units the recording's vertices are
+    // in. It goes through the modelview rather than into the vertices, which is
+    // what lets one recording serve every position.
+    LLVector3 offset = gGL.getUITranslation();
+    offset.mV[VX] += (F32)x;
+    offset.mV[VY] += (F32)y;
+    offset.scaleVec(ui_scale);
+
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.pushMatrix();
+    gGL.translatef(offset.mV[VX], offset.mV[VY], 0.f);
 
     auto it = mDisplayLists.find(key);
     if (it != mDisplayLists.end())
     {
-        it->second.last_used = std::chrono::steady_clock::now();
-        return &it->second.list;
+        it->second.last_used = LLFrameTimer::getTotalSeconds();
+        replayDisplayList(it->second.list, color, solid_color);
     }
-    return nullptr;
+    else
+    {
+        recordDisplayList(key, width, height, color, solid_color);
+    }
+
+    gGL.popMatrix();
 }
 
-buffer_data_list_t* LLUIImage::genDisplayList(S32 x, S32 y, S32 width, S32 height, const LLColor4& color, bool solid_color) const
+// static
+void LLUIImage::replayDisplayList(buffer_data_list_t& list, const LLColor4& color, bool solid_color)
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    LLImageGL* gl_image = mImage->getGLTexture();
-    if (!gl_image)
+    if (solid_color)
     {
-        // Don't cache when texture hasn't been created yet
-        // draw just aborts in this case, so don't draw either.
-        return nullptr;
+        gSolidColorProgram.bind();
     }
 
-    LLVector3 ui_translation = gGL.getUITranslation();
-    LLVector3 ui_scale = gGL.getUIScale();
+    gGL.color4fv(color.mV); // for the shader
 
-    // Get the GL texture name - this uniquely identifies the current texture state
-    // including discard level changes, texture recreation, etc.
-    LLGLuint tex_name = gl_image->getTexName();
+    for (LLVertexBufferData& buffer : list)
+    {
+        buffer.draw();
+    }
 
-    auto key = PackedKey::create(x, y, width, height, color, solid_color, ui_translation, ui_scale, tex_name);
+    if (solid_color)
+    {
+        gUIProgram.bind();
+    }
+}
+
+void LLUIImage::recordDisplayList(const PackedKey& key, S32 width, S32 height, const LLColor4& color, bool solid_color) const
+{
+    LL_PROFILE_ZONE_SCOPED;
 
     CachedDisplayList cached;
-    cached.last_used = std::chrono::steady_clock::now();
+    cached.last_used = LLFrameTimer::getTotalSeconds();
 
-    // Generate the display list by capturing the draw commands
+    // Recorded at the origin under the UI scale alone. The offset the view tree
+    // accumulated is already on the modelview; baked into the vertices as well it
+    // would both double up and tie the recording to this one position.
+    const LLVector3 ui_scale = gGL.getUIScale();
+    gGL.pushUIMatrix();
+    gGL.loadUIIdentity();
+    gGL.scaleUI(ui_scale.mV[VX], ui_scale.mV[VY], ui_scale.mV[VZ]);
+
     gGL.beginList(&cached.list);
 
     gl_draw_scaled_image_with_border(
-        x, y,
+        0, 0,
         width, height,
         mImage,
         color,
@@ -151,17 +182,16 @@ buffer_data_list_t* LLUIImage::genDisplayList(S32 x, S32 y, S32 width, S32 heigh
 
     gGL.endList();
 
-    // Insert into cache
-    // emplace, since we only call genDisplayList if key was not found.
-    auto result = mDisplayLists.emplace(key, std::move(cached));
+    gGL.popUIMatrix();
 
-    // Register for cleanup on first buffer creation
+    // emplace: a key is only recorded once it has failed to be found.
+    mDisplayLists.emplace(key, std::move(cached));
+
+    // Register for cleanup on first recording
     if (mDisplayLists.size() == 1)
     {
         sImageList.push_back(const_cast<LLUIImage*>(this));
     }
-
-    return &result.first->second.list;
 }
 
 void LLUIImage::invalidateDisplayLists()
@@ -194,8 +224,8 @@ void LLUIImage::cleanupDisplayLists()
     }
 
     // Time threshold for cleaning up unused display lists (global cleanup)
-    constexpr std::chrono::seconds DISPLAY_LIST_TIMEOUT{ 2 };
-    auto now = std::chrono::steady_clock::now();
+    constexpr F64 DISPLAY_LIST_TIMEOUT = 2.0;
+    const F64 now = LLFrameTimer::getTotalSeconds();
 
     // Remove display lists that haven't been used recently
     for (auto it = mDisplayLists.begin(); it != mDisplayLists.end(); )
