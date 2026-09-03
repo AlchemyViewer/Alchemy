@@ -738,7 +738,7 @@ void disable_context_entries_if_present(LLMenuGL& menu,
         std::string name = menu_item->getName();
 
         // descend into split menus:
-        LLMenuItemBranchGL* branchp = dynamic_cast<LLMenuItemBranchGL*>(menu_item);
+        LLMenuItemBranchGL* branchp = menu_item->as<LLMenuItemBranchGL>();
         if ((name == "More") && branchp)
         {
             disable_context_entries_if_present(*branchp->getBranch(), disabled_entries);
@@ -784,7 +784,7 @@ void hide_context_entries(LLMenuGL& menu,
         std::string name = menu_item->getName();
 
         // descend into split menus:
-        LLMenuItemBranchGL* branchp = dynamic_cast<LLMenuItemBranchGL*>(menu_item);
+        LLMenuItemBranchGL* branchp = menu_item->as<LLMenuItemBranchGL>();
         if (((name == "More") || (name == "create_new")) && branchp)
         {
             hide_context_entries(*branchp->getBranch(), entries_to_show, disabled_entries);

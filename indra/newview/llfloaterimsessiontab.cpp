@@ -1131,7 +1131,7 @@ void LLFloaterIMSessionTab::updateCallBtnState(bool callIsActive)
 
 void LLFloaterIMSessionTab::onSlide(LLFloaterIMSessionTab* self)
 {
-    LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(self->getHost());
+    LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(self->getHost());
     bool should_be_expanded = false;
     if (host_floater)
     {
@@ -1163,7 +1163,7 @@ void LLFloaterIMSessionTab::onSlide(LLFloaterIMSessionTab* self)
 
 void LLFloaterIMSessionTab::onCollapseToLine(LLFloaterIMSessionTab* self)
 {
-    LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(self->getHost());
+    LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(self->getHost());
     if (!host_floater)
     {
         bool expand = self->isMessagePaneExpanded();
@@ -1230,7 +1230,7 @@ void LLFloaterIMSessionTab::onOpen(const LLSD& key)
 {
     if (!checkIfTornOff())
     {
-        if(LLFloaterIMContainer* host_floater = dynamic_cast<LLFloaterIMContainer*>(getHost()))
+        if(LLFloaterIMContainer* host_floater = ALViewType::as<LLFloaterIMContainer>(getHost()))
         {
             // Show the messages pane when opening a floater hosted in the Conversations
             host_floater->collapseMessagesPane(false);

@@ -241,7 +241,7 @@ void LLPanelGroup::reshape(S32 width, S32 height, bool called_from_parent )
 
 void LLPanelGroup::onBackBtnClick()
 {
-    ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
+    ALFloaterGroupProfile* parent = getParentAs<ALFloaterGroupProfile>();
     if (parent)
     {
         parent->closeHostedFloater();
@@ -336,7 +336,7 @@ void LLPanelGroup::update(LLGroupChange gc)
     if(gdatap)
     {
         {
-            ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
+            ALFloaterGroupProfile* parent = getParentAs<ALFloaterGroupProfile>();
             if (parent)
             {
                 parent->setGroupName(gdatap->mName);

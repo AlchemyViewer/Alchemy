@@ -173,7 +173,7 @@ void LLPanelGroupCreate::addMembershipRow(const std::string &name)
 
 void LLPanelGroupCreate::onBackBtnClick()
 {
-    ALFloaterGroupProfile* parent = dynamic_cast<ALFloaterGroupProfile*>(getParent());
+    ALFloaterGroupProfile* parent = getParentAs<ALFloaterGroupProfile>();
     if(parent)
     {
         parent->closeHostedFloater();

@@ -300,8 +300,7 @@ public:
     {
         if (params.size() < 1) return false;
 
-        LLFloaterPreference* prefsfloater = dynamic_cast<LLFloaterPreference*>
-            (LLFloaterReg::showInstance("preferences"));
+        LLFloaterPreference* prefsfloater = LLFloaterReg::showTypedInstance<LLFloaterPreference>("preferences");
 
         if (prefsfloater)
         {

@@ -97,7 +97,7 @@ void LLFloaterSearchReplace::onClose(bool fQuiting)
 
 bool LLFloaterSearchReplace::hasAccelerators() const
 {
-    const LLView* pView = dynamic_cast<LLTextEditor*>(m_EditorHandle.get());
+    const LLView* pView = ALViewType::as<LLTextEditor>(m_EditorHandle.get());
     while (pView)
     {
         if (pView->hasAccelerators())
@@ -182,7 +182,7 @@ LLFloaterSearchReplace* LLFloaterSearchReplace::findInstance()
 
 LLTextEditor* LLFloaterSearchReplace::getEditor() const
 {
-    return dynamic_cast<LLTextEditor*>(m_EditorHandle.get());
+    return ALViewType::as<LLTextEditor>(m_EditorHandle.get());
 }
 
 void LLFloaterSearchReplace::refreshHighlight()

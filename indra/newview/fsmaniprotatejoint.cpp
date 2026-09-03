@@ -1100,7 +1100,7 @@ bool FSManipRotateJoint::handleMouseUp(S32 x, S32 y, MASK mask)
     }
     else if (mHighlightedJoint)
     {
-        auto* poser = dynamic_cast<FSFloaterPoser*>(LLFloaterReg::findInstance("fs_poser"));
+        auto* poser = LLFloaterReg::findTypedInstance<FSFloaterPoser>("fs_poser");
         if (poser)
             poser->selectJointByName(mHighlightedJoint->getName());
 
@@ -1524,7 +1524,7 @@ LLQuaternion FSManipRotateJoint::getSelectedJointWorldRotation()
     if (!mJoint || !mAvatar)
         return joinRot;
 
-    auto* poser = dynamic_cast<FSFloaterPoser*>(LLFloaterReg::findInstance("fs_poser"));
+    auto* poser = LLFloaterReg::findTypedInstance<FSFloaterPoser>("fs_poser");
     if (!poser)
         return joinRot;
 

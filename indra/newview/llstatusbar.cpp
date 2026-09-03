@@ -648,7 +648,7 @@ void collectChildren( LLMenuGL *aMenu, ll::statusbar::SearchableItemPtr aParentM
         pItem->mLabel = utf8str_tolower( pMenu->ll::ui::SearchableControl::getSearchText() );
         aParentMenu->mChildren.push_back( pItem );
 
-        LLMenuItemBranchGL *pBranch = dynamic_cast< LLMenuItemBranchGL* >( pMenu );
+        LLMenuItemBranchGL *pBranch = pMenu->as<LLMenuItemBranchGL>();
         if( pBranch )
             collectChildren( pBranch->getBranch(), pItem );
     }

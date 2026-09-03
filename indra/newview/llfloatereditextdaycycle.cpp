@@ -1147,17 +1147,17 @@ void LLFloaterEditExtDayCycle::updateSkyTabs(const LLSettingsSkyPtr_t &p_sky)
     LLTabContainer* tab_container = mSkyTabLayoutContainer->getChild<LLTabContainer>(TABS_SKYS); //can't extract panels directly, since they are in 'tuple'
 
     LLPanelSettingsSky* panel;
-    panel = dynamic_cast<LLPanelSettingsSky*>(tab_container->findChildView("atmosphere_panel"));
+    panel = tab_container->findChild<LLPanelSettingsSky>("atmosphere_panel");
     if (panel)
     {
         panel->setSky(p_sky);
     }
-    panel = dynamic_cast<LLPanelSettingsSky*>(tab_container->findChildView("clouds_panel"));
+    panel = tab_container->findChild<LLPanelSettingsSky>("clouds_panel");
     if (panel)
     {
         panel->setSky(p_sky);
     }
-    panel = dynamic_cast<LLPanelSettingsSky*>(tab_container->findChildView("moon_panel"));
+    panel = tab_container->findChild<LLPanelSettingsSky>("moon_panel");
     if (panel)
     {
         panel->setSky(p_sky);
