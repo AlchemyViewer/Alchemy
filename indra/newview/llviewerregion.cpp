@@ -104,7 +104,7 @@ const U32 DEFAULT_MAX_REGION_WIDE_PRIM_COUNT = 15000;
 bool LLViewerRegion::sVOCacheCullingEnabled = false;
 S32  LLViewerRegion::sLastCameraUpdated = 0;
 S32  LLViewerRegion::sNewObjectCreationThrottle = -1;
-LLViewerRegion::vocache_entry_map_t LLViewerRegion::sRegionCacheCleanup;
+std::vector<LLPointer<LLVOCacheEntry>> LLViewerRegion::sRegionCacheCleanup;
 LLViewerRegion::region_info_signal_t LLViewerRegion::sRegionInfoChangedSignal;
 
 typedef boost::unordered_map<std::string, std::string, ll::string_hash, std::equal_to<>> CapabilityMap;
@@ -833,8 +833,13 @@ void LLViewerRegion::saveObjectCache()
     }
     else
     {
-        // Map of LLVOCacheEntry takes time to release, store map for cleanup on idle
-        sRegionCacheCleanup.insert(mImpl->mCacheMap.begin(), mImpl->mCacheMap.end());
+        // Releasing tens of thousands of entries at once is a visible hitch, so
+        // the pointers are handed to idleCleanup to drop a batch at a time.
+        sRegionCacheCleanup.reserve(sRegionCacheCleanup.size() + mImpl->mCacheMap.size());
+        for (auto& [local_id, entry] : mImpl->mCacheMap)
+        {
+            sRegionCacheCleanup.push_back(std::move(entry));
+        }
         mImpl->mCacheMap.clear();
         // TODO - probably need to do the same for overrides cache
     }
@@ -1700,10 +1705,14 @@ void LLViewerRegion::idleUpdate(F32 max_update_time)
 // static
 void LLViewerRegion::idleCleanup(F32 max_update_time)
 {
+    // Reading the timer costs more than releasing an entry, so it is checked
+    // once per batch rather than once per entry.
+    constexpr size_t BATCH = 256;
     LLTimer update_timer;
     while (!sRegionCacheCleanup.empty() && (max_update_time - update_timer.getElapsedTimeF32() > 0))
     {
-        sRegionCacheCleanup.erase(sRegionCacheCleanup.begin());
+        const size_t drop = llmin(BATCH, sRegionCacheCleanup.size());
+        sRegionCacheCleanup.resize(sRegionCacheCleanup.size() - drop);
     }
 }
 
@@ -1766,6 +1775,11 @@ void LLViewerRegion::killInvisibleObjects(F32 max_time)
     {
         return;
     }
+
+    // LLVOCacheEntry::isAnyVisible answers true for every entry while the
+    // eviction it once drove is switched off, so the walk below cannot kill
+    // anything; it is kept for the day that is switched back on.
+    return;
 
     LLTimer update_timer;
     LLVector4a camera_origin;

@@ -636,8 +636,10 @@ public:
     U32  mSayRange = 20;
     U32  mShoutRange = 100;
 
-    typedef std::map<U32, LLPointer<LLVOCacheEntry> >      vocache_entry_map_t;
-    static vocache_entry_map_t sRegionCacheCleanup;
+    // Entries of a region that has gone, released a batch at a time from idle
+    // so that a large cache does not free tens of thousands of objects in one
+    // frame. Only the pointers move here; nothing is copied or re-counted.
+    static std::vector<LLPointer<LLVOCacheEntry>> sRegionCacheCleanup;
 
     // the materials capability throttle
     LLFrameTimer mMaterialsCapThrottleTimer;
