@@ -248,7 +248,7 @@ void LLPanelGroup::onBackBtnClick()
     }
     else
     {
-        LLSideTrayPanelContainer* parent = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+        LLSideTrayPanelContainer* parent = getParentAs<LLSideTrayPanelContainer>();
         if (parent)
         {
             parent->openPreviousPanel();

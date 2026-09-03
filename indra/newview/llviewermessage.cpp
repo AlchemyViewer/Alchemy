@@ -907,7 +907,7 @@ private:
      */
     void done()
     {
-        LLInventoryPanel* active_panel = dynamic_cast<LLInventoryPanel*>(mActivePanel.get());
+        LLInventoryPanel* active_panel = ALViewType::as<LLInventoryPanel>(mActivePanel.get());
 
         // if selection is not changed since watch started lets hightlight new items.
         if (active_panel && !isSelectionChanged())
@@ -1014,7 +1014,7 @@ private:
 
 void LLViewerInventoryMoveObserver::changed(U32 mask)
 {
-    LLInventoryPanel* active_panel = dynamic_cast<LLInventoryPanel*>(mActivePanel.get());
+    LLInventoryPanel* active_panel = ALViewType::as<LLInventoryPanel>(mActivePanel.get());
 
     if (NULL == active_panel)
     {

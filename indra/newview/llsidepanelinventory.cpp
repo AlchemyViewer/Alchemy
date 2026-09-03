@@ -586,7 +586,7 @@ void LLSidepanelInventory::cleanup()
     LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end();)
     {
-        LLFloaterSidePanelContainer* iv = dynamic_cast<LLFloaterSidePanelContainer*>(*iter++);
+        LLFloaterSidePanelContainer* iv = (*iter++)->as<LLFloaterSidePanelContainer>();
         if (iv)
         {
             iv->cleanup();

@@ -534,7 +534,7 @@ bool LLFloaterUIPreview::postBuild()
 // Callback for language combo box selection: refresh current floater when you change languages
 void LLFloaterUIPreview::onLanguageComboSelect(LLUICtrl* ctrl)
 {
-    LLComboBox* caller = dynamic_cast<LLComboBox*>(ctrl);
+    LLComboBox* caller = ALViewType::as<LLComboBox>(ctrl);
     if (!caller)
         return;
     if(caller->getName() == std::string("language_select_combo"))

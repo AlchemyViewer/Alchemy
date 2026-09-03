@@ -902,7 +902,7 @@ void LLChicletPanel::draw()
     for( ; getChildList()->end() != it; ++it)
     {
         LLView* child = *it;
-        if(child == dynamic_cast<LLView*>(mScrollArea))
+        if(child == mScrollArea)
         {
             LLLocalClipRect clip(mScrollArea->getRect());
             drawChild(mScrollArea);

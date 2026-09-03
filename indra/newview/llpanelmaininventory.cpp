@@ -501,7 +501,7 @@ void LLPanelMainInventory::newFolderWindow(LLUUID folder_id, LLUUID item_to_sele
     LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end();)
     {
-        LLFloaterSidePanelContainer* inventory_container = dynamic_cast<LLFloaterSidePanelContainer*>(*iter++);
+        LLFloaterSidePanelContainer* inventory_container = (*iter++)->as<LLFloaterSidePanelContainer>();
         if (inventory_container)
         {
             LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
@@ -2015,7 +2015,7 @@ void LLPanelMainInventory::onCustomAction(const LLSD& userdata)
         LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
         for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end();)
         {
-            LLFloaterSidePanelContainer* iv = dynamic_cast<LLFloaterSidePanelContainer*>(*iter++);
+            LLFloaterSidePanelContainer* iv = (*iter++)->as<LLFloaterSidePanelContainer>();
             if (iv)
             {
                 iv->closeFloater();
@@ -2622,7 +2622,7 @@ void LLPanelMainInventory::updateNavButtons()
 
 LLSidepanelInventory* LLPanelMainInventory::getParentSidepanelInventory()
 {
-    LLFloaterSidePanelContainer* inventory_container = dynamic_cast<LLFloaterSidePanelContainer*>(gFloaterView->getParentFloater(this));
+    LLFloaterSidePanelContainer* inventory_container = ALViewType::as<LLFloaterSidePanelContainer>(gFloaterView->getParentFloater(this));
     if(inventory_container)
     {
         return dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));

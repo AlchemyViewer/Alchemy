@@ -249,7 +249,7 @@ private:
         if (flat_list_handle.isDead() || inventory_panel_handle.isDead()) return;
 
         LLWearableItemsList* flat_list = flat_list_handle.get()->as<LLWearableItemsList>();
-        LLInventoryPanel* inventory_panel = dynamic_cast<LLInventoryPanel*>(inventory_panel_handle.get());
+        LLInventoryPanel* inventory_panel = inventory_panel_handle.get()->as<LLInventoryPanel>();
 
         if (!flat_list || !inventory_panel) return;
 
@@ -290,7 +290,7 @@ private:
         if (flat_list_handle.isDead() || inventory_panel_handle.isDead()) return false;
 
         LLWearableItemsList* flat_list = flat_list_handle.get()->as<LLWearableItemsList>();
-        LLInventoryPanel* inventory_panel = dynamic_cast<LLInventoryPanel*>(inventory_panel_handle.get());
+        LLInventoryPanel* inventory_panel = inventory_panel_handle.get()->as<LLInventoryPanel>();
 
         if (!inventory_panel || !flat_list) return false;
 
@@ -340,7 +340,7 @@ private:
     {
         if (inventory_panel_handle.isDead()) return false;
 
-        LLInventoryPanel* inventory_panel = dynamic_cast<LLInventoryPanel*>(inventory_panel_handle.get());
+        LLInventoryPanel* inventory_panel = inventory_panel_handle.get()->as<LLInventoryPanel>();
 
         // Enable sorting by type only for the flat list of items
         // because inventory panel doesn't support this kind of sorting.

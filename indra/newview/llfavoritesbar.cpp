@@ -156,9 +156,10 @@ private:
  * in createButtons function but landmark data is not available when Favorites Bar is
  * created. Thats why we are requesting landmark data after
  */
-class LLFavoriteLandmarkButton : public LLButton
+class LLFavoriteLandmarkButton final : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLFavoriteLandmarkButton, LLButton);
 
     bool handleToolTip(S32 x, S32 y, MASK mask)
     {
@@ -221,9 +222,10 @@ private:
  * in showDropDownMenu function but landmark data is not available when Favorites Bar is
  * created. Thats why we are requesting landmark data after
  */
-class LLFavoriteLandmarkMenuItem : public LLMenuItemCallGL
+class LLFavoriteLandmarkMenuItem final : public LLMenuItemCallGL
 {
 public:
+    AL_VIEW_TYPE(LLFavoriteLandmarkMenuItem, LLMenuItemCallGL);
     bool handleToolTip(S32 x, S32 y, MASK mask)
     {
         std::string region_name = mLandmarkInfoGetter.getName();
@@ -283,9 +285,10 @@ private:
  * because otherwise LLToolDragAndDrop will initiate drag and drop operation
  * with the world.
  */
-class LLFavoriteLandmarkToggleableMenu : public LLToggleableMenu
+class LLFavoriteLandmarkToggleableMenu final : public LLToggleableMenu
 {
 public:
+    AL_VIEW_TYPE(LLFavoriteLandmarkToggleableMenu, LLToggleableMenu);
     // virtual
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type,
         void* cargo_data, EAcceptance* accept, std::string& tooltip_msg) override
@@ -501,7 +504,7 @@ bool LLFavoritesBarCtrl::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
             else // Drag to the toolbar itself
             {
                 // Drag to a landmark button?
-                if (LLFavoriteLandmarkButton* dest = dynamic_cast<LLFavoriteLandmarkButton*>(findChildByLocalCoords(x, y)))
+                if (LLFavoriteLandmarkButton* dest = ALViewType::as<LLFavoriteLandmarkButton>(findChildByLocalCoords(x, y)))
                 {
                     setLandingTab(dest);
                 }
@@ -751,7 +754,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
     else
     {
         // Identify the button hovered and the side to drop
-        LLFavoriteLandmarkButton* hovered_button = dynamic_cast<LLFavoriteLandmarkButton*>(mLandingTab);
+        LLFavoriteLandmarkButton* hovered_button = ALViewType::as<LLFavoriteLandmarkButton>(mLandingTab);
         if (hovered_button)
         {
             insert_before = true;
@@ -759,7 +762,7 @@ bool LLFavoritesBarCtrl::findDragAndDropTarget(LLUUID& target_id, bool& insert_b
         else
         {
             // Choose the right landmark button
-            hovered_button = dynamic_cast<LLFavoriteLandmarkButton*>(mLastTab);
+            hovered_button = ALViewType::as<LLFavoriteLandmarkButton>(mLastTab);
             if (!hovered_button) [[unlikely]]
                 return false;
 
@@ -949,7 +952,7 @@ void LLFavoritesBarCtrl::updateButtons(bool force_update)
         //lets find first changed button
         while (child_it != childs->end() && first_changed_item_index < mItems.size())
         {
-            LLFavoriteLandmarkButton* button = dynamic_cast<LLFavoriteLandmarkButton*> (*child_it);
+            LLFavoriteLandmarkButton* button = (*child_it)->as<LLFavoriteLandmarkButton>();
             if (button)
             {
                 const LLViewerInventoryItem *item = mItems[first_changed_item_index].get();
@@ -979,7 +982,7 @@ void LLFavoritesBarCtrl::updateButtons(bool force_update)
             //lets remove other landmarks button and rebuild it
             child_list_const_iter_t cur_it = child_it++;
             LLFavoriteLandmarkButton* button =
-                    dynamic_cast<LLFavoriteLandmarkButton*> (*cur_it);
+                    (*cur_it)->as<LLFavoriteLandmarkButton>();
             if (button)
             {
                 if (mLastTab == button)
@@ -1030,7 +1033,7 @@ void LLFavoritesBarCtrl::updateButtons(bool force_update)
         {
             // mMoreTextBox was removed, so LLFavoriteLandmarkButtons
             // should be the only ones in the list
-            mLastTab = dynamic_cast<LLFavoriteLandmarkButton*>(childs->back());
+            mLastTab = childs->back()->as<LLFavoriteLandmarkButton>();
         }
 
         mFirstDropDownItem = j;

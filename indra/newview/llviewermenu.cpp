@@ -6383,7 +6383,7 @@ class LLEditDelete : public view_listener_t
 
 void handle_spellcheck_replace_with_suggestion(const LLUICtrl* ctrl, const LLSD& param)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (!spellcheck_handler) || (!spellcheck_handler->getSpellCheck()) )
     {
@@ -6402,7 +6402,7 @@ void handle_spellcheck_replace_with_suggestion(const LLUICtrl* ctrl, const LLSD&
 bool visible_spellcheck_suggestion(LLUICtrl* ctrl, const LLSD& param)
 {
     LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(ctrl);
-    const LLContextMenu* menu = (item) ? dynamic_cast<const LLContextMenu*>(item->getParent()) : NULL;
+    const LLContextMenu* menu = (item) ? item->getParentAs<LLContextMenu>() : NULL;
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (!spellcheck_handler) || (!spellcheck_handler->getSpellCheck()) )
     {
@@ -6421,7 +6421,7 @@ bool visible_spellcheck_suggestion(LLUICtrl* ctrl, const LLSD& param)
 
 void handle_spellcheck_add_to_dictionary(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (spellcheck_handler) && (spellcheck_handler->canAddToDictionary()) )
     {
@@ -6431,14 +6431,14 @@ void handle_spellcheck_add_to_dictionary(const LLUICtrl* ctrl)
 
 bool enable_spellcheck_add_to_dictionary(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     return (spellcheck_handler) && (spellcheck_handler->canAddToDictionary());
 }
 
 void handle_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     if ( (spellcheck_handler) && (spellcheck_handler->canAddToIgnore()) )
     {
@@ -6448,7 +6448,7 @@ void handle_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 
 bool enable_spellcheck_add_to_ignore(const LLUICtrl* ctrl)
 {
-    const LLContextMenu* menu = dynamic_cast<const LLContextMenu*>(ctrl->getParent());
+    const LLContextMenu* menu = ctrl->getParentAs<LLContextMenu>();
     const LLSpellCheckMenuHandler* spellcheck_handler = (menu) ? dynamic_cast<const LLSpellCheckMenuHandler*>(menu->getSpawningView()) : NULL;
     return (spellcheck_handler) && (spellcheck_handler->canAddToIgnore());
 }

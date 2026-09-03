@@ -2041,7 +2041,7 @@ LLInventoryPanel* LLInventoryPanel::getActiveInventoryPanel(bool auto_open)
     LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end(); ++iter)
     {
-        LLFloaterSidePanelContainer* inventory_floater = dynamic_cast<LLFloaterSidePanelContainer*>(*iter);
+        LLFloaterSidePanelContainer* inventory_floater = (*iter)->as<LLFloaterSidePanelContainer>();
         inventory_panel = inventory_floater->findChild<LLSidepanelInventory>("main_panel");
 
         if (inventory_floater && inventory_panel && inventory_floater->getVisible())
@@ -2164,7 +2164,7 @@ void LLInventoryPanel::setSFViewAndOpenFolder(const LLInventoryPanel* panel, con
     LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end(); ++iter)
     {
-        LLFloaterSidePanelContainer* inventory_floater = dynamic_cast<LLFloaterSidePanelContainer*>(*iter);
+        LLFloaterSidePanelContainer* inventory_floater = (*iter)->as<LLFloaterSidePanelContainer>();
         LLSidepanelInventory* sidepanel_inventory = inventory_floater->findChild<LLSidepanelInventory>("main_panel");
 
         LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();

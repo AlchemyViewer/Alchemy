@@ -3855,7 +3855,7 @@ void LLViewerWindow::updateUI()
 
     LLUICtrl* top_ctrl = gFocusMgr.getTopCtrl();
     LLMouseHandler* mouse_captor = gFocusMgr.getMouseCapture();
-    LLView* captor_view = dynamic_cast<LLView*>(mouse_captor);
+    LLView* captor_view = gFocusMgr.getMouseCaptureView();
 
     //FIXME: only include captor and captor's ancestors if mouse is truly over them --RN
 
@@ -4271,7 +4271,7 @@ void LLViewerWindow::updateLayout()
                 && tool != LLToolCompGun::getInstance()                 // not coming out of mouselook
                 && !suppress_toolbox                                    // not override in third person
                 && LLToolMgr::getInstance()->getCurrentToolset()->isShowFloaterTools()
-                && (!captor || dynamic_cast<LLView*>(captor) != NULL)))                     // not dragging
+                && (!captor || gFocusMgr.getMouseCaptureView() != NULL)))                     // not dragging
         {
             // Force floater tools to be visible (unless minimized)
             if (!gFloaterTools->getVisible())

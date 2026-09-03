@@ -659,7 +659,7 @@ void    LLNavigationBar::showTeleportHistoryMenu(LLUICtrl* btn_ctrl)
     mTeleportHistoryMenu->updateParent(LLMenuGL::sMenuContainer);
     const S32 MENU_SPAWN_PAD = -1;
     LLMenuGL::showPopup(btn_ctrl, mTeleportHistoryMenu, 0, MENU_SPAWN_PAD);
-    LLButton* nav_button = dynamic_cast<LLButton*>(btn_ctrl);
+    LLButton* nav_button = ALViewType::as<LLButton>(btn_ctrl);
     if(nav_button)
     {
         if(mHistoryMenuConnection.connected())

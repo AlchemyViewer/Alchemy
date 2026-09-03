@@ -1643,7 +1643,7 @@ bool LLPanelPeople::notifyChildren(const LLSD& info)
 {
     if (info.has("task-panel-action") && info["task-panel-action"].asString() == "handle-tri-state")
     {
-        LLSideTrayPanelContainer* container = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+        LLSideTrayPanelContainer* container = getParentAs<LLSideTrayPanelContainer>();
         if (!container)
         {
             LL_WARNS() << "Cannot find People panel container" << LL_ENDL;

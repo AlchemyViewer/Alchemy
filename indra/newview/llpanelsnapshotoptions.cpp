@@ -73,7 +73,7 @@ bool LLPanelSnapshotOptions::postBuild()
 
 void LLPanelSnapshotOptions::openPanel(const std::string& panel_name)
 {
-    LLSideTrayPanelContainer* parent = dynamic_cast<LLSideTrayPanelContainer*>(getParent());
+    LLSideTrayPanelContainer* parent = getParentAs<LLSideTrayPanelContainer>();
     if (!parent)
     {
         LL_WARNS() << "Cannot find panel container" << LL_ENDL;

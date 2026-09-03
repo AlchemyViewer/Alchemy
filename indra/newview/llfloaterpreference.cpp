@@ -1098,7 +1098,7 @@ void LLFloaterPreference::onUIFontSelected(LLUICtrl* ctrl, const LLSD& userdata)
 {
     const std::string family = userdata.asString();
     if (family.empty()) return;
-    LLComboBox* combo = dynamic_cast<LLComboBox*>(ctrl);
+    LLComboBox* combo = ALViewType::as<LLComboBox>(ctrl);
     if (!combo) return;
     const std::string value = combo->getValue().asString();
     setFontOverride(family, value);
@@ -3247,7 +3247,7 @@ void LLPanelPreferenceSound::populateOutputDeviceCombo()
     combo->setCommitCallback(
         [setting_key](LLUICtrl* ctrl, const LLSD&)
         {
-            if (auto* c = dynamic_cast<LLComboBox*>(ctrl))
+            if (auto* c = ALViewType::as<LLComboBox>(ctrl))
             {
                 const std::string id = c->getSelectedValue().asString();
                 // Persist for next launch …

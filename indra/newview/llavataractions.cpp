@@ -545,7 +545,7 @@ void LLAvatarActions::showClassified(const LLUUID& avatar_id, const LLUUID& clas
         else
         {
             LLFloaterProfile* profilefloater =
-                dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", avatar_id)));
+                LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", avatar_id));
             if (profilefloater)
             {
                 profilefloater->showClassified(classified_id, edit);
@@ -568,7 +568,7 @@ void LLAvatarActions::createClassified()
     else
     {
         LLFloaterProfile* profilefloater =
-            dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+            LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", gAgent.getID()));
         if (profilefloater)
         {
             profilefloater->createClassified();
@@ -608,7 +608,7 @@ void LLAvatarActions::createPick(const LLPickData& data)
     else
     {
         LLFloaterProfile* floater =
-            dynamic_cast<LLFloaterProfile*>(LLFloaterReg::showInstance("profile", LLSD().with("id", gAgent.getID())));
+            LLFloaterReg::showTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", gAgent.getID()));
         if (floater)
         {
             floater->createPick(data);
@@ -1271,7 +1271,7 @@ void LLAvatarActions::shareWithAvatars(LLView * panel)
     using namespace action_give_inventory;
 
     LLFloater* root_floater = gFloaterView->getParentFloater(panel);
-    LLInventoryPanel* inv_panel = dynamic_cast<LLInventoryPanel*>(panel);
+    LLInventoryPanel* inv_panel = ALViewType::as<LLInventoryPanel>(panel);
     LLFloaterAvatarPicker* picker =
         LLFloaterAvatarPicker::show(boost::bind(give_inventory, _1, _2, inv_panel), true, false, false, root_floater->getName());
     if (!picker)

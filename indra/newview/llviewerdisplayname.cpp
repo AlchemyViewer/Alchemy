@@ -209,7 +209,7 @@ class LLDisplayNameUpdate : public LLHTTPNode
             LLViewerDisplayName::sNameChangedSignal();
         }
 
-        LLFloaterProfile* profile_floater = dynamic_cast<LLFloaterProfile*>(LLFloaterReg::findInstance("profile", LLSD().with("id", agent_id)));
+        LLFloaterProfile* profile_floater = LLFloaterReg::findTypedInstance<LLFloaterProfile>("profile", LLSD().with("id", agent_id));
         if (profile_floater)
         {
             profile_floater->refreshName();
