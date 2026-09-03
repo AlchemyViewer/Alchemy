@@ -929,24 +929,52 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
     std::vector<std::string> allowed;
     getLooksControlNames(allowed);
 
+    auto carries = [&params](const std::string& ctrl_name)
+    {
+        if (!params.has(ctrl_name))
+        {
+            return false;
+        }
+        const LLSD& entry = params[ctrl_name];
+        return entry.isMap() && entry.has("Value");
+    };
+
     S32 applied = 0;
     mIgnoreChangedSignal = true;
     for (const std::string& ctrl_name : allowed)
     {
-        if (!params.has(ctrl_name))
-        {
-            continue;
-        }
-        const LLSD& entry = params[ctrl_name];
-        if (!entry.isMap() || !entry.has("Value"))
+        if (!carries(ctrl_name))
         {
             continue;
         }
         LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
         if (ctrl)
         {
-            ctrl->set(entry["Value"]);
+            ctrl->set(params[ctrl_name]["Value"]);
             ++applied;
+        }
+    }
+
+    if (applied > 0)
+    {
+        // A Look is a full snapshot of the whitelist. A key the file does not
+        // carry was saved before that key existed, so the Look never had it:
+        // apply its default rather than leave whatever the previous grade
+        // set, or a seeded copy of Neutral that predates a setting keeps that
+        // setting and stops meaning neutral. Only once something applied,
+        // so a file with no recognised keys fails below without touching
+        // anything. resetToDefault fires only on a real change.
+        for (const std::string& ctrl_name : allowed)
+        {
+            if (carries(ctrl_name))
+            {
+                continue;
+            }
+            LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
+            if (ctrl)
+            {
+                ctrl->resetToDefault(true);
+            }
         }
     }
     mIgnoreChangedSignal = false;

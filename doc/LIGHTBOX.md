@@ -927,12 +927,14 @@ notation, so the graph, the presets and Looks are their only editors.
 
 Bundled starter Looks live in `app_settings/looks/` as full whitelist
 snapshots ({Comment, Persist, Type, Value} per key, URI-escaped filenames).
-**Add your keys to all three at their defaults**, or applying a bundled Look
-will leave the new effect at whatever the user had rather than clearing it —
-`loadLooksPreset` writes only keys present in *both* the whitelist and the file,
-so a missing key is a silent no-op and "Neutral" stops meaning neutral. To
-refresh them after tuning: save the Look in the viewer, then copy the saved file
-from `<user_settings>/presets/looks/` over the bundled one.
+**Add your keys to all three at their defaults**, so the files stay complete
+snapshots of the whitelist. `loadLooksPreset` applies the whitelisted keys the
+file carries and resets to default every whitelisted key it lacks, so a Look
+saved before a key existed applies that key at its default — which is what
+keeps "Neutral" neutral for a user whose seeded copies predate the key. A file
+with no recognised keys fails before anything is reset. To refresh the bundled
+files after tuning: save the Look in the viewer, then copy the saved file from
+`<user_settings>/presets/looks/` over the bundled one.
 
 A Look whose settings have since changed is shown as `Name *` in the combo, via
 the `look_name_modified` string — **on the name, not beside it**. A detached
