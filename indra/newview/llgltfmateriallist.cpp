@@ -245,8 +245,8 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
                 }
             }
 
-            region->cacheFullUpdateGLTFOverride(cache);
             LL_DEBUGS("GLTF") << "GLTF Material Override: " << cache.mObjectId << " " << cache.mLocalId << " " << cache.mRegionHandle << " (sides:" << (cache.mSides.size()) << ")" << LL_ENDL;
+            region->cacheFullUpdateGLTFOverride(std::move(cache));
         }
 
     }

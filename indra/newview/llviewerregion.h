@@ -390,7 +390,7 @@ public:
     eCacheUpdateResult cacheFullUpdate(LLDataPackerBinaryBuffer &dp, U32 flags);
     eCacheUpdateResult cacheFullUpdate(LLViewerObject* objectp, LLDataPackerBinaryBuffer &dp, U32 flags);
 
-    void cacheFullUpdateGLTFOverride(const LLGLTFOverrideCacheEntry &override_data);
+    void cacheFullUpdateGLTFOverride(LLGLTFOverrideCacheEntry override_data);
 
     LLVOCacheEntry* getCacheEntryForOctree(U32 local_id);
     LLVOCacheEntry* getCacheEntry(U32 local_id, bool valid = true);

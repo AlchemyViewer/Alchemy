@@ -790,9 +790,23 @@ void LLViewerRegion::loadObjectCache()
     if(LLVOCache::instanceExists())
     {
         LLVOCache & vocache = LLVOCache::instance();
-        // Without this a "corrupted" vocache persists until a cache clear or other rewrite. Mark as dirty hereif read fails to force a rewrite.
-        mCacheDirty = !vocache.readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap);
-        vocache.readGenericExtrasFromCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mImpl->mCacheMap);
+        // A read that fails marks the cache dirty so it is rewritten rather
+        // than left corrupted; a file that yielded nothing is dropped now.
+        const bool cache_ok = vocache.readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap);
+        mCacheDirty = !cache_ok;
+        if (!cache_ok && mImpl->mCacheMap.empty())
+        {
+            vocache.removeEntry(mHandle);
+        }
+
+        // Overrides mean nothing without the objects they belong to, so a bad
+        // extras file takes the object cache with it and the simulator sends
+        // both afresh.
+        if (!vocache.readGenericExtrasFromCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mImpl->mCacheMap))
+        {
+            mImpl->mGLTFOverridesLLSD.clear();
+            vocache.removeGenericExtrasForHandle(mHandle);
+        }
 
         if (mImpl->mCacheMap.empty())
         {
@@ -2860,8 +2874,6 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
         {
             LL_DEBUGS("AnimatedObjects") << " got dupe for local_id " << local_id << LL_ENDL;
 
-            // Record a hit
-            entry->recordDupe();
             result = CACHE_UPDATE_DUPE;
         }
         else //CRC changed
@@ -2907,12 +2919,12 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLViewerObjec
     return result;
 }
 
-void LLViewerRegion::cacheFullUpdateGLTFOverride(const LLGLTFOverrideCacheEntry &override_data)
+void LLViewerRegion::cacheFullUpdateGLTFOverride(LLGLTFOverrideCacheEntry override_data)
 {
     U32 local_id = override_data.mLocalId;
     if (override_data.mSides.size() > 0)
     { // empty override means overrides were removed from this object
-        mImpl->mGLTFOverridesLLSD[local_id] = override_data;
+        mImpl->mGLTFOverridesLLSD[local_id] = std::move(override_data);
     }
     else
     {

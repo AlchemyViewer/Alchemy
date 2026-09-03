@@ -131,7 +131,6 @@ public:
     S32 writeToBuffer(U8 *data_buffer) const;
     LLDataPackerBinaryBuffer *getDP() const;
     void recordHit();
-    void recordDupe() { mDupeCount++; }
 
     /*virtual*/ void setOctreeEntry(LLViewerOctreeEntry* entry);
 
@@ -183,8 +182,7 @@ protected:
     U32                         mCRC;
     U32                         mUpdateFlags; //receive from sim
     S32                         mHitCount;
-    S32                         mDupeCount;
-    S32                         mCRCChangeCount;
+    S32                         mCRCChangeCount;    // in memory only, for dumpCache
     mutable LLDataPackerBinaryBuffer    mDP;
     U8                          *mBuffer;
 
@@ -297,7 +295,9 @@ public:
     void removeCache(ELLPath location, bool started = false) ;
 
     bool readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_entry_map_t& cache_entry_map) ;
-    void readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map);
+    // Neither read touches the region or the object list; each reports whether
+    // the file was usable and leaves removal to the caller.
+    bool readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map);
 
     void writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled);
     void writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, bool dirty_cache, bool removal_enabled);

@@ -34,9 +34,12 @@
 #include "llagentcamera.h"
 #include "llmemory.h"
 #include "llsdserialize.h"
+#include "llmemorystream.h"
 #include "llworld.h" // For LLWorld::getInstance()
 
 #include <fmt/xchar.h>
+
+#include <sstream>
 
 //static variables
 U32 LLVOCacheEntry::sMinFrameRange = 0;
@@ -46,7 +49,8 @@ F32 LLVOCacheEntry::sFrontPixelThreshold = 1.0f;
 F32 LLVOCacheEntry::sRearPixelThreshold = 1.0f;
 bool LLVOCachePartition::sNeedsOcclusionCheck = false;
 
-const S32 ENTRY_HEADER_SIZE = 6 * sizeof(S32);
+// local id, CRC, hit count, body size
+const S32 ENTRY_HEADER_SIZE = 4 * sizeof(S32);
 const S32 MAX_ENTRY_BODY_SIZE = 10000;
 
 bool check_write(LLFile* apr_file, void* src, S32 n_bytes)
@@ -57,7 +61,7 @@ bool check_write(LLFile* apr_file, void* src, S32 n_bytes)
 
 // Material Override Cache needs a version label, so we can upgrade this later.
 const std::string LLGLTFOverrideCacheEntry::VERSION_LABEL = {"GLTFCacheVer"};
-const int LLGLTFOverrideCacheEntry::VERSION = 1;
+const int LLGLTFOverrideCacheEntry::VERSION = 2;
 
 bool LLGLTFOverrideCacheEntry::fromLLSD(const LLSD& data)
 {
@@ -161,7 +165,6 @@ LLVOCacheEntry::LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &
     mCRC(crc),
     mUpdateFlags(-1),
     mHitCount(0),
-    mDupeCount(0),
     mCRCChangeCount(0),
     mState(INACTIVE),
     mSceneContrib(0.f),
@@ -180,7 +183,6 @@ LLVOCacheEntry::LLVOCacheEntry()
     mCRC(0),
     mUpdateFlags(-1),
     mHitCount(0),
-    mDupeCount(0),
     mCRCChangeCount(0),
     mBuffer(NULL),
     mState(INACTIVE),
@@ -213,9 +215,7 @@ LLVOCacheEntry::LLVOCacheEntry(const U8*& cursor, const U8* end)
         memcpy(&mLocalID, cursor, sizeof(U32));
         memcpy(&mCRC, cursor + sizeof(U32), sizeof(U32));
         memcpy(&mHitCount, cursor + (2 * sizeof(U32)), sizeof(S32));
-        memcpy(&mDupeCount, cursor + (3 * sizeof(U32)), sizeof(S32));
-        memcpy(&mCRCChangeCount, cursor + (4 * sizeof(U32)), sizeof(S32));
-        memcpy(&size, cursor + (5 * sizeof(U32)), sizeof(S32));
+        memcpy(&size, cursor + (3 * sizeof(U32)), sizeof(S32));
 
         // A bogus size means the rest of the file is bogus too; the caller
         // discards it, so there is nothing to skip past.
@@ -238,7 +238,6 @@ LLVOCacheEntry::LLVOCacheEntry(const U8*& cursor, const U8* end)
         mLocalID = 0;
         mCRC = 0;
         mHitCount = 0;
-        mDupeCount = 0;
         mCRCChangeCount = 0;
         mBuffer = NULL;
         mEntry = NULL;
@@ -412,7 +411,6 @@ void LLVOCacheEntry::dump() const
     LL_INFOS() << "local " << mLocalID
         << " crc " << mCRC
         << " hits " << mHitCount
-        << " dupes " << mDupeCount
         << " change " << mCRCChangeCount
         << LL_ENDL;
 }
@@ -430,9 +428,7 @@ S32 LLVOCacheEntry::writeToBuffer(U8 *data_buffer) const
     memcpy(data_buffer, &mLocalID, sizeof(U32));
     memcpy(data_buffer + sizeof(U32), &mCRC, sizeof(U32));
     memcpy(data_buffer + (2 * sizeof(U32)), &mHitCount, sizeof(S32));
-    memcpy(data_buffer + (3 * sizeof(U32)), &mDupeCount, sizeof(S32));
-    memcpy(data_buffer + (4 * sizeof(U32)), &mCRCChangeCount, sizeof(S32));
-    memcpy(data_buffer + (5 * sizeof(U32)), &size, sizeof(S32));
+    memcpy(data_buffer + (3 * sizeof(U32)), &size, sizeof(S32));
     memcpy(data_buffer + ENTRY_HEADER_SIZE, (void*)mBuffer, size);
 
     return ENTRY_HEADER_SIZE + size;
@@ -1598,141 +1594,157 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
         }
     }
 
-    if(!success)
-    {
-        if(cache_entry_map.empty())
-        {
-            removeEntry(iter->second) ;
-        }
-    }
-
     LL_PROFILE_ZONE_NUM(cache_entry_map.size());
     LL_DEBUGS("GLTF", "VOCache") << "Read " << cache_entry_map.size() << " entries from object cache " << filename << ", expected " << num_entries << ", success=" << (success?"True":"False") << LL_ENDL;
     return success;
 }
 
 // We now pass in the cache entry map, so that we can remove entries from extras that are no longer in the primary cache.
-void LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map)
+// Returns false when the file is present but unusable; the caller decides what
+// to remove, so this can run anywhere without reaching into the region or the
+// object list.
+bool LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     int loaded= 0;
     int discarded = 0;
-    // get ViewerRegion pointer from handle
-    LLViewerRegion* pRegion = LLWorld::getInstance()->getRegionFromHandle(handle);
     if(!mEnabled)
     {
         LL_WARNS() << "Not reading cache for handle " << handle << "): Cache is currently disabled." << LL_ENDL;
-        return ;
+        return true;
     }
     llassert_always(mInitialized);
 
-    handle_entry_map_t::iterator iter = mHandleEntryMap.find(handle) ;
-    if(iter == mHandleEntryMap.end()) //no cache
+    if(mHandleEntryMap.find(handle) == mHandleEntryMap.end()) //no cache
     {
         LL_WARNS() << "No handle map entry for " << handle << LL_ENDL;
-        return;
+        return true;
     }
 
-    std::filesystem::path filename(getObjectCacheExtrasFilename(handle));
-    llifstream in(filename, std::ios::in | std::ios::binary);
+    // An override is kept only when the primary cache holds its object, so an
+    // empty primary cache means there is nothing here worth parsing.
+    if (cache_entry_map.empty())
+    {
+        return true;
+    }
 
-    std::string line;
-    std::getline(in, line);
-    if(!in.good())
+    // The file is thousands of small LLSD documents, each handed to a fresh
+    // parser, so it is read once and parsed from memory.
+    std::string contents;
+    {
+        std::error_code ec;
+        LLFile file(getObjectCacheExtrasFilename(handle), LLFile::in|LLFile::binary, ec);
+        const S64 size = (file && !ec) ? file.size(ec) : 0;
+        if (size <= 0 || ec)
+        {
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
+            return false;
+        }
+        contents.resize((size_t)size);
+        if (file.read(contents.data(), size, ec) != size || ec)
+        {
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
+            return false;
+        }
+    }
+    const U8* cursor = reinterpret_cast<const U8*>(contents.data());
+    const U8* end = cursor + contents.size();
+
+    // The version is a text line so that a reader of an earlier format rejects
+    // the file by version instead of parsing what follows.
+    const U8* eol = static_cast<const U8*>(memchr(cursor, '\n', contents.size()));
+    if (!eol)
     {
         LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
+        return false;
     }
-    // file formats need versions, let's add one. legacy cache files will be considered version 0
-    // This will make it easier to upgrade/revise later.
-    int versionNumber=0;
+    std::string line(reinterpret_cast<const char*>(cursor), (size_t)(eol - cursor));
+    cursor = eol + 1;
+
+    int versionNumber = 0;
     if (line.compare(0, LLGLTFOverrideCacheEntry::VERSION_LABEL.length(), LLGLTFOverrideCacheEntry::VERSION_LABEL) == 0)
     {
-        std::string versionStr = line.substr(LLGLTFOverrideCacheEntry::VERSION_LABEL.length()+1); // skip the version label and ':'
-        versionNumber = std::stol(versionStr);
+        try
+        {
+            versionNumber = std::stol(line.substr(LLGLTFOverrideCacheEntry::VERSION_LABEL.length() + 1)); // skip the version label and ':'
+        }
+        catch (std::logic_error&)  // either invalid_argument or out_of_range
+        {
+            versionNumber = 0;
+        }
     }
-    // For future versions we may call a legacy handler here, but realistically we'll just consider this cache out of date.
-    // The important thing is to make sure it gets removed.
+    // An older or newer format is simply out of date; the caller drops it.
     if(versionNumber != LLGLTFOverrideCacheEntry::VERSION)
     {
         LL_WARNS() << "Unexpected version number " << versionNumber << " for extras cache for handle " << handle << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
+        return false;
     }
 
     LL_DEBUGS("VOCache") << "Reading extras cache for handle " << handle << ", version " << versionNumber << LL_ENDL;
-    std::getline(in, line);
-    if(!LLUUID::validate(line))
+
+    if ((size_t)(end - cursor) < UUID_BYTES + sizeof(U32))
     {
-        LL_WARNS() << "Failed reading extras cache for handle" << handle << ". invalid uuid line: '" << line << "'" << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
+        LL_WARNS() << "Failed reading extras cache for handle " << handle << ": truncated header" << LL_ENDL;
+        return false;
     }
 
-    LLUUID cache_id(line);
+    LLUUID cache_id;
+    memcpy(cache_id.mData, cursor, UUID_BYTES);
+    cursor += UUID_BYTES;
     if(cache_id != id)
     {
         // if the cache id doesn't match the expected region we should just kill the file.
         LL_WARNS() << "Cache ID doesn't match for this region, deleting it" << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
+        return false;
     }
 
-    U32 num_entries;  // if removal was enabled during write num_entries might be wrong
-    std::getline(in, line);
-    if(!in.good())
-    {
-        LL_WARNS() << "Failed reading extras cache for handle " << handle << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
-    }
-    try
-    {
-        num_entries = std::stol(line);
-    }
-    catch(std::logic_error&)  // either invalid_argument or out_of_range
-    {
-        LL_WARNS() << "Failed reading extras cache for handle " << handle << ". unreadable num_entries" << LL_ENDL;
-        in.close();
-        removeGenericExtrasForHandle(handle);
-        return;
-    }
+    U32 num_entries = 0;
+    memcpy(&num_entries, cursor, sizeof(U32));
+    cursor += sizeof(U32);
 
     LL_DEBUGS("GLTF") << "Beginning reading extras cache for handle " << handle << " from " << getObjectCacheExtrasFilename(handle) << LL_ENDL;
 
     LLSD entry_llsd;
-    for (U32 i = 0; i < num_entries && !in.eof(); i++)
+    for (U32 i = 0; i < num_entries; i++)
     {
-        static const U32 max_size = 4096;
-        bool success = LLSDSerialize::deserialize(entry_llsd, in, max_size);
-        // check bool(in) this time since eof is not a failure condition here
-        if(!success || !in)
+        U32 length = 0;
+        if ((size_t)(end - cursor) < sizeof(U32))
         {
-            LL_WARNS() << "Failed reading extras cache for handle " << handle << ", entry number " << i << " cache patrtial load only." << LL_ENDL;
-            in.close();
-            removeGenericExtrasForHandle(handle);
-            break;
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << ", entry number " << i << ": file truncated" << LL_ENDL;
+            return false;
+        }
+        memcpy(&length, cursor, sizeof(U32));
+        cursor += sizeof(U32);
+        if (length == 0 || (size_t)(end - cursor) < length)
+        {
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << ", entry number " << i << ": file truncated" << LL_ENDL;
+            return false;
+        }
+
+        // Each record carries its own length, so one that fails to parse is
+        // stepped over instead of costing the rest of the file.
+        LLMemoryStream record(cursor, (S32)length);
+        const bool parsed = LLSDSerialize::fromBinary(entry_llsd, record, length) != LLSDParser::PARSE_FAILURE;
+        cursor += length;
+        if (!parsed)
+        {
+            LL_WARNS() << "Failed reading extras cache for handle " << handle << ", entry number " << i << ": unreadable record skipped" << LL_ENDL;
+            discarded++;
+            continue;
         }
 
         LLGLTFOverrideCacheEntry entry;
-        entry.fromLLSD(entry_llsd);
+        if (!entry.fromLLSD(entry_llsd))
+        {
+            discarded++;
+            continue;
+        }
         U32 local_id = entry_llsd["local_id"].asInteger();
         // only add entries that exist in the primary cache
         // this is a self-healing test that avoids us polluting the cache with entries that are no longer valid based on the main cache.
         if(cache_entry_map.find(local_id)!= cache_entry_map.end())
         {
-            // attempt to backfill a null objectId, though these shouldn't be in the persisted cache really
-            if(entry.mObjectId.isNull() && pRegion)
-            {
-                gObjectList.getUUIDFromLocal( entry.mObjectId, local_id, pRegion->getHost().getAddress(), pRegion->getHost().getPort() );
-            }
-            cache_extras_entry_map[local_id] = entry;
+            cache_extras_entry_map[local_id] = std::move(entry);
             loaded++;
         }
         else
@@ -1742,6 +1754,7 @@ void LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
     }
     LL_PROFILE_ZONE_NUM(loaded);
     LL_DEBUGS("GLTF") << "Completed reading extras cache for handle " << handle << ", " << loaded << " loaded, " << discarded << " discarded" << LL_ENDL;
+    return true;
 }
 
 void LLVOCache::purgeEntries(U32 size)
@@ -1915,50 +1928,38 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
     }
 
     std::filesystem::path filename = getObjectCacheExtrasFilename(handle);
-    llofstream out(filename, std::ios::out | std::ios::binary);
-    if(!out.good())
-    {
-        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
-        removeGenericExtrasForHandle(handle);
-        return;
-    }
-    // It is good practice to version file formats so let's add one.
-    // legacy versions will be treated as version 0.
-    out << LLGLTFOverrideCacheEntry::VERSION_LABEL << ":" << LLGLTFOverrideCacheEntry::VERSION << '\n';
-
-    out << id << '\n';
-    if(!out.good())
-    {
-        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
-        removeGenericExtrasForHandle(handle);
-        return;
-    }
-    // Because we don't write out all the entries we need to record a placeholder and rewrite this later
-    auto num_entries_placeholder = out.tellp();
-    out << std::setw(10) << std::setfill('0') << 0 << '\n';
-    if(!out.good())
-    {
-        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
-        removeGenericExtrasForHandle(handle);
-        return;
-    }
 
     // get ViewerRegion pointer from handle
     LLViewerRegion* pRegion = LLWorld::getInstance()->getRegionFromHandle(handle);
 
+    // Laid out in memory first and written once: a text version line an older
+    // reader can reject, the cache id, the count of records actually written,
+    // then each record as its length followed by its LLSD in binary form.
+    std::string data;
+    data.reserve(64 + cache_extras_entry_map.size() * 256);
+    data += LLGLTFOverrideCacheEntry::VERSION_LABEL;
+    data += ':';
+    data += std::to_string(LLGLTFOverrideCacheEntry::VERSION);
+    data += '\n';
+    data.append(reinterpret_cast<const char*>(id.mData), UUID_BYTES);
+    const size_t count_offset = data.size();
+    data.append(sizeof(U32), '\0');
+
     U32 num_entries = 0;
     U32 skipped = 0;
     size_t inmem_entries = cache_extras_entry_map.size();
-    for (auto [local_id, entry] : cache_extras_entry_map)
+    std::ostringstream record;
+    for (const auto& [local_id, entry] : cache_extras_entry_map)
     {
         // Only write out GLTFOverrides that we can actually apply again on import.
         // worst case we have an extra cache miss.
         // Note: A null mObjectId is valid when in memory as we might have a data race between GLTF of the object itself.
         // This remains a valid state to persist as it is consistent with the localid checks on import with the main cache.
         // the mObjectId will be updated if/when the local object is updated from the gObject list (due to full update)
-        if(entry.mObjectId.isNull() && pRegion)
+        LLUUID object_id = entry.mObjectId;
+        if(object_id.isNull() && pRegion)
         {
-            gObjectList.getUUIDFromLocal( entry.mObjectId, local_id, pRegion->getHost().getAddress(), pRegion->getHost().getPort() );
+            gObjectList.getUUIDFromLocal( object_id, local_id, pRegion->getHost().getAddress(), pRegion->getHost().getPort() );
         }
 
         if( entry.mSides.size() > 0 &&
@@ -1967,15 +1968,15 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
         {
             LLSD entry_llsd = entry.toLLSD();
             entry_llsd["local_id"] = (S32)local_id;
-            LLSDSerialize::serialize(entry_llsd, out, LLSDSerialize::LLSD_XML);
-            out << '\n';
-            if(!out.good())
-            {
-                // We're not in a good place when this happens so we might as well nuke the file.
-                LL_WARNS() << "Failed writing extras cache for handle " << handle << ". Corrupted cache file " << filename << " removed." << LL_ENDL;
-                removeGenericExtrasForHandle(handle);
-                return;
-            }
+            entry_llsd["object_id"] = object_id;
+
+            record.str(std::string());
+            record.clear();
+            LLSDSerialize::toBinary(entry_llsd, record);
+            const std::string bytes = record.str();
+            const U32 length = (U32)bytes.size();
+            data.append(reinterpret_cast<const char*>(&length), sizeof(U32));
+            data += bytes;
             num_entries++;
         }
         else
@@ -1983,12 +1984,14 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
             skipped++;
         }
     }
-    // Rewrite the placeholder
-    out.seekp(num_entries_placeholder);
-    out << std::setw(10) << std::setfill('0') << num_entries << '\n';
-    if(!out.good())
+    memcpy(data.data() + count_offset, &num_entries, sizeof(U32));
+
+    std::error_code ec;
+    LLFile file(filename, LLFile::out|LLFile::trunc|LLFile::binary, ec);
+    if (ec || !file || !check_write(&file, data.data(), (S32)data.size()))
     {
-        LL_WARNS() << "Failed writing extras cache for handle " << handle << LL_ENDL;
+        // We're not in a good place when this happens so we might as well nuke the file.
+        LL_WARNS() << "Failed writing extras cache for handle " << handle << ". Corrupted cache file " << filename << " removed." << LL_ENDL;
         removeGenericExtrasForHandle(handle);
         return;
     }
