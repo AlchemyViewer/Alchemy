@@ -3763,7 +3763,7 @@ void append_xui_tooltip(LLView* viewp, LLToolTip::Params& params)
 
             params.styled_message.add().text(viewp->getName());
 
-            LLPanel* panelp = dynamic_cast<LLPanel*>(viewp);
+            LLPanel* panelp = viewp->as<LLPanel>();
             if (panelp && !panelp->getXMLFilename().empty())
             {
                 params.styled_message.add()

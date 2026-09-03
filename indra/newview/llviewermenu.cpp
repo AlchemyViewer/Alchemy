@@ -7333,7 +7333,7 @@ void handle_edit_outfit()
 
 void handle_now_wearing()
 {
-    LLSidepanelAppearance *panel_appearance = dynamic_cast<LLSidepanelAppearance *>(LLFloaterSidePanelContainer::getPanel("appearance"));
+    LLSidepanelAppearance *panel_appearance = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
     if (panel_appearance && panel_appearance->isInVisibleChain() && panel_appearance->isCOFPanelVisible())
     {
         LLFloaterReg::findInstance("appearance")->closeFloater();

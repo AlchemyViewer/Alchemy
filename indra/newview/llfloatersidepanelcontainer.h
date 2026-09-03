@@ -89,12 +89,12 @@ public:
     template <typename T>
     static T* findPanel(std::string_view floater_name, std::string_view panel_name = sMainPanelName)
     {
-        return dynamic_cast<T*>(findPanel(floater_name, panel_name));
+        return ALViewType::as<T>(findPanel(floater_name, panel_name));
     }
     template <typename T>
     static T* getPanel(std::string_view floater_name, std::string_view panel_name = sMainPanelName)
     {
-        T* panel = dynamic_cast<T*>(getPanel(floater_name, panel_name));
+        T* panel = ALViewType::as<T>(getPanel(floater_name, panel_name));
         if (!panel)
         {
             LL_WARNS() << "Child named \"" << panel_name << "\" of type " << typeid(T*).name() << " not found" << LL_ENDL;

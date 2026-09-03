@@ -417,8 +417,7 @@ void LLPanelOutfitsInventory::onWearablesLoading()
 // static
 LLSidepanelAppearance* LLPanelOutfitsInventory::getAppearanceSP()
 {
-    LLSidepanelAppearance* panel_appearance =
-        dynamic_cast<LLSidepanelAppearance*>(LLFloaterSidePanelContainer::getPanel("appearance"));
+    LLSidepanelAppearance* panel_appearance = LLFloaterSidePanelContainer::getPanel<LLSidepanelAppearance>("appearance");
     return panel_appearance;
 }
 

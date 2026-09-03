@@ -545,7 +545,7 @@ void LLFloaterCamera::fillFlatlistFromPanel (LLFlatListView* list, LLPanel* pane
     for ( ; iter != end; ++iter)
     {
         LLView* view = *iter;
-        LLPanel* item = dynamic_cast<LLPanel*>(view);
+        LLPanel* item = view->as<LLPanel>();
         if (panel)
             list->addItem(item);
     }

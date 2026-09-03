@@ -335,7 +335,7 @@ void LLOutfitsList::onHighlightBaseOutfit(LLUUID base_id, LLUUID prev_id)
 
 void LLOutfitsList::onListSelectionChange(LLUICtrl* ctrl)
 {
-    LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(ctrl);
+    LLWearableItemsList* list = ALViewType::as<LLWearableItemsList>(ctrl);
     if (!list) return;
 
     LLViewerInventoryItem *item = gInventory.getItem(list->getSelectedUUID());
@@ -376,7 +376,7 @@ void LLOutfitsList::onSetSelectedOutfitByUUID(const LLUUID& outfit_uuid)
             LLOutfitAccordionCtrlTab* tab = iter->second;
             if (!tab) continue;
 
-            LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
+            LLWearableItemsList* list = ALViewType::as<LLWearableItemsList>(tab->getAccordionView());
             if (!list) continue;
 
             tab->setFocus(true);
@@ -587,7 +587,7 @@ void LLOutfitsList::onRefreshComplete(LLUICtrl* ctrl, LLOutfitAccordionCtrlTab* 
     if (!ctrl || getFilterSubString().empty())
         return;
 
-    LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
+    LLWearableItemsList* list = ALViewType::as<LLWearableItemsList>(tab->getAccordionView());
     if (list != ctrl)
     {
         llassert(false);
@@ -612,7 +612,7 @@ void LLOutfitsList::onFilterSubStringChanged(const std::string& new_string, cons
         LLOutfitAccordionCtrlTab* tab = iter++->second;
         if (!tab) continue;
 
-        LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
+        LLWearableItemsList* list = ALViewType::as<LLWearableItemsList>(tab->getAccordionView());
         if (list)
         {
             list->setFilterSubString(new_string, tab->getDisplayChildren());
@@ -653,7 +653,7 @@ void LLOutfitsList::applyFilterToTab(
 {
     LL_PROFILE_ZONE_SCOPED;
     if (!tab) return;
-    LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
+    LLWearableItemsList* list = ALViewType::as<LLWearableItemsList>(tab->getAccordionView());
     if (!list) return;
 
     std::string title = tab->getTitle();
@@ -739,7 +739,7 @@ void LLOutfitsList::wearSelectedItems()
 
 void LLOutfitsList::onWearableItemsListRightClick(LLUICtrl* ctrl, S32 x, S32 y)
 {
-    LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(ctrl);
+    LLWearableItemsList* list = ALViewType::as<LLWearableItemsList>(ctrl);
     if (!list) return;
 
     uuid_vec_t selected_uuids;
@@ -792,7 +792,7 @@ void LLOutfitsList::onCOFChanged()
         LLOutfitAccordionCtrlTab* tab = (map_iter++)->second;
         if (!tab) continue;
 
-        LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
+        LLWearableItemsList* list = ALViewType::as<LLWearableItemsList>(tab->getAccordionView());
         if (!list) continue;
 
         // Every list updates the labels of changed items  or
@@ -874,7 +874,7 @@ void LLOutfitsList::onChangeSortOrder(const LLSD& userdata)
                 const LLUUID& category_id = outfit.first;
                 if (!tab) continue;
 
-                LLWearableItemsList* list = dynamic_cast<LLWearableItemsList*>(tab->getAccordionView());
+                LLWearableItemsList* list = ALViewType::as<LLWearableItemsList>(tab->getAccordionView());
                 if (list)
                 {
                     list->setForceRefresh(true);

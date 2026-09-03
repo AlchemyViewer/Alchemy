@@ -777,7 +777,7 @@ void LLConversationViewParticipant::addToFolder(LLFolderViewFolder* folder)
         {
             addToSession(vmi->getUUID());
         }
-        LLConversationViewSession* session = dynamic_cast<LLConversationViewSession*>(prnt);
+        LLConversationViewSession* session = prnt->as<LLConversationViewSession>();
         if (session)
         {
             allowSpeakingIndicator(session->isInActiveVoiceChannel());

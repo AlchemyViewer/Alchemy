@@ -868,14 +868,14 @@ LLWearableItemsList::ContextMenu::ContextMenu()
 
 void LLWearableItemsList::ContextMenu::show(LLView* spawning_view, const uuid_vec_t& uuids, S32 x, S32 y)
 {
-    mParent = dynamic_cast<LLWearableItemsList*>(spawning_view);
+    mParent = ALViewType::as<LLWearableItemsList>(spawning_view);
     LLListContextMenu::show(spawning_view, uuids, x, y);
     mParent = NULL; // to avoid dereferencing an invalid pointer
 }
 
 void LLWearableItemsList::ContextMenu::show(LLView* spawning_view, LLWearableType::EType w_type, S32 x, S32 y)
 {
-    mParent = dynamic_cast<LLWearableItemsList*>(spawning_view);
+    mParent = ALViewType::as<LLWearableItemsList>(spawning_view);
     LLContextMenu* menup = mMenuHandle.get();
     if (menup)
     {

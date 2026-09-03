@@ -467,7 +467,7 @@ void LLSidepanelAppearance::refreshCurrentOutfitName(const std::string& name)
     LLAppViewer::instance()->postToMainCoro(
         [handle, name_copy]()
         {
-            LLSidepanelAppearance* self = dynamic_cast<LLSidepanelAppearance*>(handle.get());
+            LLSidepanelAppearance* self = ALViewType::as<LLSidepanelAppearance>(handle.get());
             if (self)
             {
                 self->refreshCurrentOutfitNameImpl(name_copy);
@@ -507,7 +507,7 @@ void LLSidepanelAppearance::refreshCurrentOutfitNameImpl(const std::string& name
 void LLSidepanelAppearance::editWearable(LLViewerWearable *wearable, LLView *data, bool disable_camera_switch)
 {
     LLFloaterSidePanelContainer::showPanel("appearance", LLSD());
-    LLSidepanelAppearance *panel = dynamic_cast<LLSidepanelAppearance*>(data);
+    LLSidepanelAppearance *panel = ALViewType::as<LLSidepanelAppearance>(data);
     if (panel)
     {
         panel->showWearableEditPanel(wearable, disable_camera_switch);

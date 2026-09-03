@@ -78,7 +78,7 @@ void LLFloaterSidePanelContainer::closeFloater(bool app_quitting)
             LLFloater *parent = gFloaterView->getParentFloater(panel_outfit_edit);
             if (parent == this)
             {
-                LLSidepanelAppearance* panel_appearance = dynamic_cast<LLSidepanelAppearance*>(mMainPanel);
+                LLSidepanelAppearance* panel_appearance = ALViewType::as<LLSidepanelAppearance>(mMainPanel);
                 if (panel_appearance)
                 {
                     LLPanelEditWearable *edit_wearable_ptr = panel_appearance->getWearable();
@@ -113,7 +113,7 @@ void LLFloaterSidePanelContainer::onClickCloseBtn(bool app_quitting)
             LLFloater* parent = gFloaterView->getParentFloater(panel_outfit_edit);
             if (parent == this)
             {
-                LLSidepanelAppearance* panel_appearance = dynamic_cast<LLSidepanelAppearance*>(getPanel("appearance"));
+                LLSidepanelAppearance* panel_appearance = getPanel<LLSidepanelAppearance>("appearance");
                 if (panel_appearance)
                 {
                     LLPanelEditWearable* edit_wearable_ptr = panel_appearance->getWearable();
@@ -188,7 +188,7 @@ LLPanel* LLFloaterSidePanelContainer::openChildPanel(std::string_view panel_name
         container->openPanel(panel_name, params);
         panel = container->getCurrentPanel();
     }
-    else if ((panel = dynamic_cast<LLPanel*>(view)) != NULL)
+    else if ((panel = view->as<LLPanel>()) != NULL)
     {
         panel->onOpen(params);
     }

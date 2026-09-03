@@ -248,7 +248,7 @@ private:
     {
         if (flat_list_handle.isDead() || inventory_panel_handle.isDead()) return;
 
-        LLWearableItemsList* flat_list = dynamic_cast<LLWearableItemsList*>(flat_list_handle.get());
+        LLWearableItemsList* flat_list = flat_list_handle.get()->as<LLWearableItemsList>();
         LLInventoryPanel* inventory_panel = dynamic_cast<LLInventoryPanel*>(inventory_panel_handle.get());
 
         if (!flat_list || !inventory_panel) return;
@@ -289,7 +289,7 @@ private:
     {
         if (flat_list_handle.isDead() || inventory_panel_handle.isDead()) return false;
 
-        LLWearableItemsList* flat_list = dynamic_cast<LLWearableItemsList*>(flat_list_handle.get());
+        LLWearableItemsList* flat_list = flat_list_handle.get()->as<LLWearableItemsList>();
         LLInventoryPanel* inventory_panel = dynamic_cast<LLInventoryPanel*>(inventory_panel_handle.get());
 
         if (!inventory_panel || !flat_list) return false;

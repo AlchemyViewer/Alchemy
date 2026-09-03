@@ -1543,10 +1543,10 @@ bool LLFloaterUIPreview::overlapIgnorable(LLView* viewp)
 }
 
 // *HACK: these are the only two container types as of 8/08, per Richard
-// This is using dynamic casts because there is no object-oriented way to tell which elements are containers.
+// It asks by type because there is no object-oriented way to tell which elements are containers.
 bool LLFloaterUIPreview::containerType(LLView* viewp)
 {
-    return NULL != dynamic_cast<LLPanel*>(viewp) || NULL != dynamic_cast<LLLayoutStack*>(viewp);
+    return ALViewType::as<LLPanel>(viewp) || ALViewType::as<LLLayoutStack>(viewp);
 }
 
 // Check if two llview's rectangles overlap, with some tolerance
