@@ -1910,6 +1910,11 @@ void LLMenuGL::setCanTearOff(bool tear_off)
 
 bool LLMenuGL::addChild(LLView* view, S32 tab_group)
 {
+    if (!view)
+    {
+        return false;
+    }
+
     if (LLMenuGL* menup = view->as<LLMenuGL>())
     {
         return appendMenu(menup);
@@ -1928,6 +1933,11 @@ bool LLMenuGL::addChild(LLView* view, S32 tab_group)
 // Add an item to the context menu branch
 bool LLMenuGL::addContextChild(LLView* view, S32 tab_group)
 {
+    if (!view)
+    {
+        return false;
+    }
+
     if (LLContextMenu* context = view->as<LLContextMenu>())
     {
         return appendContextSubMenu(context);

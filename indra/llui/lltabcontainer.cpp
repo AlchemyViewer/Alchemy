@@ -369,11 +369,14 @@ LLView* LLTabContainer::findChildView(std::string_view name, bool recurse) const
 
 bool LLTabContainer::addChild(LLView* view, S32 tab_group)
 {
-    LLPanel* panelp = dynamic_cast<LLPanel*>(view);
-
-    if (panelp)
+    if (!view)
     {
-        addTabPanel(TabPanelParams().panel(panelp).label(panelp->getLabel()).is_placeholder(dynamic_cast<LLPlaceHolderPanel*>(view) != NULL));
+        return false;
+    }
+
+    if (LLPanel* panelp = view->as<LLPanel>())
+    {
+        addTabPanel(TabPanelParams().panel(panelp).label(panelp->getLabel()).is_placeholder(view->as<LLPlaceHolderPanel>() != nullptr));
         return true;
     }
     else
