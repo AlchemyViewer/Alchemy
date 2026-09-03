@@ -4075,7 +4075,9 @@ void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj)
         {
             iter->second.mObjectId = obj->getID();
         }
-        llassert(iter->second.mGLTFMaterial.size() == iter->second.mSides.size());
+        // An entry loaded from the cache carries only the override LLSD until
+        // an object actually needs the materials.
+        iter->second.materialize();
 
         for (auto& side : iter->second.mGLTFMaterial)
         {

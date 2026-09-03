@@ -104,13 +104,10 @@ bool LLGLTFOverrideCacheEntry::fromLLSD(const LLSD& data)
             sides.size() != 0 &&
             sides.size() == gltf_llsd.size())
         {
+            mSides.reserve(sides.size());
             for (int i = 0; i < sides.size(); ++i)
             {
-                S32 side_idx = sides[i].asInteger();
-                mSides[side_idx] = gltf_llsd[i];
-                LLGLTFMaterial* override_mat = new LLGLTFMaterial();
-                override_mat->applyOverrideLLSD(gltf_llsd[i]);
-                mGLTFMaterial[side_idx] = override_mat;
+                mSides[sides[i].asInteger()] = gltf_llsd[i];
             }
         }
         else
@@ -119,16 +116,24 @@ bool LLGLTFOverrideCacheEntry::fromLLSD(const LLSD& data)
         }
     }
 
-    llassert(mSides.size() == mGLTFMaterial.size());
-#ifdef SHOW_ASSERT
-    for (auto const & side : mSides)
-    {
-        // check that mSides and mGLTFMaterial have exactly the same keys present
-        llassert(mGLTFMaterial.count(side.first) == 1);
-    }
-#endif
-
     return true;
+}
+
+void LLGLTFOverrideCacheEntry::materialize()
+{
+    if (!mGLTFMaterial.empty() || mSides.empty())
+    {
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+
+    mGLTFMaterial.reserve(mSides.size());
+    for (const auto& [side, override_llsd] : mSides)
+    {
+        LLGLTFMaterial* override_mat = new LLGLTFMaterial();
+        override_mat->applyOverrideLLSD(override_llsd);
+        mGLTFMaterial[side] = override_mat;
+    }
 }
 
 LLSD LLGLTFOverrideCacheEntry::toLLSD() const
@@ -143,11 +148,8 @@ LLSD LLGLTFOverrideCacheEntry::toLLSD() const
     data["object_id"] = mObjectId;
     data["local_id"] = (LLSD::Integer) mLocalId;
 
-    llassert(mSides.size() == mGLTFMaterial.size());
     for (auto const & side : mSides)
     {
-        // check that mSides and mGLTFMaterial have exactly the same keys present
-        llassert(mGLTFMaterial.count(side.first) == 1);
         data["sides"].append(LLSD::Integer(side.first));
         data["gltf_llsd"].append(side.second);
     }
@@ -1962,9 +1964,9 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
             gObjectList.getUUIDFromLocal( object_id, local_id, pRegion->getHost().getAddress(), pRegion->getHost().getPort() );
         }
 
-        if( entry.mSides.size() > 0 &&
-            entry.mSides.size() == entry.mGLTFMaterial.size()
-          )
+        // The file holds the override LLSD; the materials are rebuilt from it
+        // on load, so whether they were built here does not matter.
+        if (!entry.mSides.empty())
         {
             LLSD entry_llsd = entry.toLLSD();
             entry_llsd["local_id"] = (S32)local_id;

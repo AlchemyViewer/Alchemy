@@ -47,11 +47,15 @@ public:
     static const int VERSION;
     bool fromLLSD(const LLSD& data);
     LLSD toLLSD() const;
+    // Build mGLTFMaterial from mSides if it has not been built. Loading the
+    // cache leaves the materials unbuilt, since most cached objects are never
+    // created; the first apply to an object builds them.
+    void materialize();
 
     LLUUID mObjectId;
     U32    mLocalId = 0;
     boost::unordered_map<S32, LLSD> mSides; //override LLSD per side
-    boost::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side
+    boost::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side, empty until materialize()
     U64 mRegionHandle = 0;
 };
 
