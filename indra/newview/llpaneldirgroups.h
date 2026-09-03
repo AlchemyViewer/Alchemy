@@ -29,9 +29,11 @@
 
 #include "llpaneldirbrowser.h"
 
-class LLPanelDirGroups : public LLPanelDirBrowser
+class LLPanelDirGroups final : public LLPanelDirBrowser
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirGroups, LLPanelDirBrowser);
+
     LLPanelDirGroups();
     virtual ~LLPanelDirGroups();
 

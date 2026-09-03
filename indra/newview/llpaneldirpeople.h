@@ -31,9 +31,11 @@
 class LLLineEditor;
 class LLFloaterDirectory;
 
-class LLPanelDirPeople : public LLPanelDirBrowser
+class LLPanelDirPeople final : public LLPanelDirBrowser
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirPeople, LLPanelDirBrowser);
+
     LLPanelDirPeople();
     virtual ~LLPanelDirPeople();
 

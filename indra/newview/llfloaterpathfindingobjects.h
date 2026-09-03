@@ -52,6 +52,8 @@ class LLTextBase;
 class LLFloaterPathfindingObjects : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPathfindingObjects, LLFloater);
+
     virtual void onOpen(const LLSD &pKey);
     virtual void onClose(bool pIsAppQuitting);
     virtual void draw();

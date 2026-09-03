@@ -37,9 +37,11 @@
 class LLButton;
 class LLTextBox;
 
-class LLInventoryLinkReplaceDropTarget : public LLLineEditor
+class LLInventoryLinkReplaceDropTarget final : public LLLineEditor
 {
 public:
+    AL_VIEW_TYPE(LLInventoryLinkReplaceDropTarget, LLLineEditor);
+
     struct Params : public LLInitParam::Block<Params, LLLineEditor::Params>
     {
         Params()
@@ -78,11 +80,13 @@ private:
 };
 
 
-class LLFloaterLinkReplace : public LLFloater, LLEventTimer
+class LLFloaterLinkReplace final : public LLFloater, LLEventTimer
 {
     LOG_CLASS(LLFloaterLinkReplace);
 
 public:
+    AL_VIEW_TYPE(LLFloaterLinkReplace, LLFloater);
+
     LLFloaterLinkReplace(const LLSD& key);
     virtual ~LLFloaterLinkReplace();
 

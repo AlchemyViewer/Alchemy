@@ -51,6 +51,8 @@ class LLToggleableMenu;
 class ALPanelProfileLegacy final : public ALPanelProfileLegacyTab
 {
 public:
+    AL_VIEW_TYPE(ALPanelProfileLegacy, ALPanelProfileLegacyTab);
+
     ALPanelProfileLegacy();
     bool postBuild() override;
     void onOpen(const LLSD& key) override;

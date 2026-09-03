@@ -32,9 +32,11 @@
 
 class LLAvatarName;
 
-class LLPanelGroupBulkBan : public LLPanelGroupBulk
+class LLPanelGroupBulkBan final : public LLPanelGroupBulk
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupBulkBan, LLPanelGroupBulk);
+
     LLPanelGroupBulkBan(const LLUUID& group_id);
     ~LLPanelGroupBulkBan() {}
 

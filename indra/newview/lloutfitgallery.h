@@ -44,9 +44,11 @@ class LLOutfitGalleryGearMenu;
 class LLOutfitGalleryContextMenu;
 class LLOutfitGallerySortMenu;
 
-class LLOutfitGallery : public LLOutfitListBase
+class LLOutfitGallery final : public LLOutfitListBase
 {
 public:
+    AL_VIEW_TYPE(LLOutfitGallery, LLOutfitListBase);
+
     friend class LLOutfitGalleryGearMenu;
     friend class LLOutfitGallerySortMenu;
     friend class LLOutfitGalleryContextMenu;
@@ -226,9 +228,11 @@ private:
     bool hasDefaultImage();
 };
 
-class LLOutfitGalleryItem : public LLPanel
+class LLOutfitGalleryItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLOutfitGalleryItem, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {};
 

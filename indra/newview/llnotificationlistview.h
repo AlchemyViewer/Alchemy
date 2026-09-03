@@ -33,10 +33,12 @@
 /**
  * Notification list
  */
-class LLNotificationListView : public LLFlatListView
+class LLNotificationListView final : public LLFlatListView
 {
     LOG_CLASS(LLNotificationListView);
 public:
+    AL_VIEW_TYPE(LLNotificationListView, LLFlatListView);
+
     struct Params : public LLInitParam::Block<Params, LLFlatListView::Params> {};
 
     LLNotificationListView(const Params& p);

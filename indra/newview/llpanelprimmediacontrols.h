@@ -41,9 +41,11 @@ class LLViewerMediaImpl;
 class LLWindowShade;
 class LLLineEditor;
 
-class LLPanelPrimMediaControls : public LLPanel
+class LLPanelPrimMediaControls final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPrimMediaControls, LLPanel);
+
     LLPanelPrimMediaControls();
     virtual ~LLPanelPrimMediaControls();
     bool postBuild() override;

@@ -33,9 +33,10 @@
 class LLMotion;
 class LLTextBox;
 
-class LLPreviewAnim : public LLPreview
+class LLPreviewAnim final : public LLPreview
 {
 public:
+    AL_VIEW_TYPE(LLPreviewAnim, LLPreview);
 
     LLPreviewAnim(const LLSD& key);
     bool postBuild() override;

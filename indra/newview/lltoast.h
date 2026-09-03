@@ -74,6 +74,7 @@ class LLToast : public LLModalDialog, public LLInstanceTracker<LLToast>
 {
     friend class LLToastLifeTimer;
 public:
+    AL_VIEW_TYPE(LLToast, LLModalDialog);
 
     typedef std::function<void (LLToast* toast)> toast_callback_t;
     typedef boost::signals2::signal<void (LLToast* toast)> toast_signal_t;

@@ -34,6 +34,7 @@
 class LLFloaterModelUploadBase : public LLFloater, public LLUploadPermissionsObserver, public LLWholeModelFeeObserver, public LLWholeModelUploadObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterModelUploadBase, LLFloater);
 
     LLFloaterModelUploadBase(const LLSD& key);
 

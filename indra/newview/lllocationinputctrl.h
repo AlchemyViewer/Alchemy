@@ -51,7 +51,7 @@ class LLViewerRegion;
  *
  * @see LLNavigationBar
  */
-class LLLocationInputCtrl
+class LLLocationInputCtrl final
 :   public LLComboBox
 {
     LOG_CLASS(LLLocationInputCtrl);
@@ -60,6 +60,8 @@ class LLLocationInputCtrl
     friend class LLParcelChangeObserver;
 
 public:
+    AL_VIEW_TYPE(LLLocationInputCtrl, LLComboBox);
+
     struct Params
     :   public LLInitParam::Block<Params, LLComboBox::Params>
     {

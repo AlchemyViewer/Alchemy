@@ -36,10 +36,12 @@
 #ifndef LL_LLSPLITBUTTON_H
 #define LL_LLSPLITBUTTON_H
 
-class LLSplitButton
+class LLSplitButton final
     :   public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLSplitButton, LLUICtrl);
+
     typedef enum e_arrow_position
     {
         LEFT,

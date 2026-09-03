@@ -48,9 +48,11 @@ class LLFloaterMarketplaceListings;
 // Class LLPanelMarketplaceListings
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLPanelMarketplaceListings : public LLPanel
+class LLPanelMarketplaceListings final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelMarketplaceListings, LLPanel);
+
     LLPanelMarketplaceListings();
     bool postBuild();
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,
@@ -90,9 +92,11 @@ private:
 // Class LLFloaterMarketplaceListings
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLFloaterMarketplaceListings : public LLFloater
+class LLFloaterMarketplaceListings final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterMarketplaceListings, LLFloater);
+
     LLFloaterMarketplaceListings(const LLSD& key);
     ~LLFloaterMarketplaceListings();
 
@@ -148,10 +152,12 @@ private:
 //-----------------------------------------------------------------------------
 // LLFloaterAssociateListing
 //-----------------------------------------------------------------------------
-class LLFloaterAssociateListing : public LLFloater
+class LLFloaterAssociateListing final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterAssociateListing, LLFloater);
+
     virtual bool postBuild();
     virtual bool handleKeyHere(KEY key, MASK mask);
 
@@ -178,9 +184,11 @@ private:
 // get the validation triggered on the server and display the html report.
 // *TODO : morph into an html/text window using the pattern in llfloatertos
 
-class LLFloaterMarketplaceValidation : public LLFloater
+class LLFloaterMarketplaceValidation final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterMarketplaceValidation, LLFloater);
+
     LLFloaterMarketplaceValidation(const LLSD& key);
     virtual ~LLFloaterMarketplaceValidation();
 
@@ -213,9 +221,11 @@ private:
 // LLFloaterItemProperties
 //-----------------------------------------------------------------------------
 
-class LLFloaterItemProperties : public LLFloater
+class LLFloaterItemProperties final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterItemProperties, LLFloater);
+
     LLFloaterItemProperties(const LLSD& key);
     virtual ~LLFloaterItemProperties();
 
@@ -225,9 +235,11 @@ public:
 private:
 };
 
-class LLMultiItemProperties : public LLMultiFloater
+class LLMultiItemProperties final : public LLMultiFloater
 {
 public:
+    AL_VIEW_TYPE(LLMultiItemProperties, LLMultiFloater);
+
     LLMultiItemProperties(const LLSD& key);
 };
 

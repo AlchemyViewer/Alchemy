@@ -39,9 +39,11 @@ class LLProgressBar;
 class LLTextBox;
 struct SearchQuery;
 
-class ALPanelSearchWeb : public LLPanel, public LLViewerMediaObserver
+class ALPanelSearchWeb final : public LLPanel, public LLViewerMediaObserver
 {
 public:
+    AL_VIEW_TYPE(ALPanelSearchWeb, LLPanel);
+
     ALPanelSearchWeb();
     bool postBuild() override;
     void loadUrl(const SearchQuery& query);

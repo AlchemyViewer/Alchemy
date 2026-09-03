@@ -36,10 +36,13 @@ class LLImageRaw;
 class LLTextBox;
 class LLRadioGroup;
 
-class LLFloater360Capture:
+class LLFloater360Capture final:
     public LLFloater,
     public LLViewerMediaObserver
 {
+public:
+    AL_VIEW_TYPE(LLFloater360Capture, LLFloater);
+private:
         friend class LLFloaterReg;
 
     private:

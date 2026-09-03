@@ -44,9 +44,11 @@ class LLUICtrl;
 class LLVector3;
 class LLSearchEditor;
 
-class LLFloaterPathfindingLinksets : public LLFloaterPathfindingObjects
+class LLFloaterPathfindingLinksets final : public LLFloaterPathfindingObjects
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPathfindingLinksets, LLFloaterPathfindingObjects);
+
     static void  openLinksetsWithSelectedObjects();
 
 protected:

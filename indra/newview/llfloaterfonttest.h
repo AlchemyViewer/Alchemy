@@ -30,9 +30,12 @@
 
 #include "llfloater.h"
 
-class LLFloaterFontTest:
+class LLFloaterFontTest final:
     public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterFontTest, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     LLFloaterFontTest(const LLSD& key);

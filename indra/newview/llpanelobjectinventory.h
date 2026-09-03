@@ -45,9 +45,11 @@ class LLViewerObject;
 // particular task's inventory.
 //
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLPanelObjectInventory : public LLPanel, public LLVOInventoryListener
+class LLPanelObjectInventory final : public LLPanel, public LLVOInventoryListener
 {
 public:
+    AL_VIEW_TYPE(LLPanelObjectInventory, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Optional<bool> show_root_folder;

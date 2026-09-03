@@ -31,10 +31,11 @@
 
 class LLMediaCtrl;
 
-class LLFloaterHUD : public LLFloater
+class LLFloaterHUD final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterHUD, LLFloater);
 
     bool postBuild() override;
 

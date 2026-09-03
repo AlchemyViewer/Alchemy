@@ -146,8 +146,9 @@ private:
 
 };
 
-struct MainPanel : public LLPanel
+struct MainPanel final : public LLPanel
 {
+    AL_VIEW_TYPE(MainPanel, LLPanel);
 };
 
 static const U32 MAX_SNAPSHOT_IMAGE_SIZE = 7680; // max snapshot image size 7680 * 7680 UHDTV2

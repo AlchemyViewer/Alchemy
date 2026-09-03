@@ -32,9 +32,11 @@
 class LLUICtrl;
 class LLPanelDirBrowser;
 
-class LLPanelDirEvents : public LLPanelDirBrowser
+class LLPanelDirEvents final : public LLPanelDirBrowser
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirEvents, LLPanelDirBrowser);
+
     LLPanelDirEvents();
     virtual ~LLPanelDirEvents();
 

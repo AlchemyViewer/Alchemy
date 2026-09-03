@@ -39,10 +39,12 @@ class LLObjectSelection;
 
 typedef LLSafeHandle<LLObjectSelection> LLObjectSelectionHandle;
 
-class LLFloaterBuildOptions
+class LLFloaterBuildOptions final
     :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterBuildOptions, LLFloater);
+
     bool postBuild() override;
 
     void onOpen(const LLSD& key) override;

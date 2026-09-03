@@ -57,6 +57,8 @@ public:
 class ALPanelBlockList final : public LLPanel, public LLMuteListObserver, public ALPanelBlockBase
 {
 public:
+    AL_VIEW_TYPE(ALPanelBlockList, LLPanel);
+
     ALPanelBlockList();
     ~ALPanelBlockList();
 
@@ -114,6 +116,8 @@ protected:
 class ALPanelDerenderList final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelDerenderList, LLPanel);
+
     ALPanelDerenderList();
     ~ALPanelDerenderList();
 
@@ -153,6 +157,8 @@ protected:
 class ALPanelAssetBlocklist final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelAssetBlocklist, LLPanel);
+
     ALPanelAssetBlocklist();
     ~ALPanelAssetBlocklist();
 
@@ -193,6 +199,8 @@ class ALPanelAvatarRendering final : public LLPanel, public LLMuteListObserver, 
 {
     friend class ALPanelAvatarRenderingContextMenu;
 public:
+    AL_VIEW_TYPE(ALPanelAvatarRendering, LLPanel);
+
     ALPanelAvatarRendering();
     ~ALPanelAvatarRendering();
 
@@ -249,6 +257,8 @@ protected:
 class ALFloaterBlocked final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALFloaterBlocked, LLFloater);
+
     ALFloaterBlocked(const LLSD& sdKey);
     ~ALFloaterBlocked();
 

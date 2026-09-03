@@ -29,12 +29,14 @@
 
 #include "llfloater.h"
 
-class LLFloaterInventorySettings
+class LLFloaterInventorySettings final
     :    public LLFloater
 {
     friend class LLFloaterReg;
 
 public:
+    AL_VIEW_TYPE(LLFloaterInventorySettings, LLFloater);
+
     bool postBuild() override;
 
 private:

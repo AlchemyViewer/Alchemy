@@ -44,6 +44,8 @@ class LLSysWellChiclet;
 class LLSysWellWindow : public LLTransientDockableFloater
 {
 public:
+    AL_VIEW_TYPE(LLSysWellWindow, LLTransientDockableFloater);
+
     LOG_CLASS(LLSysWellWindow);
 
     LLSysWellWindow(const LLSD& key);
@@ -101,9 +103,11 @@ protected:
  *
  * It contains a list list of all active IM sessions.
  */
-class LLIMWellWindow : public LLSysWellWindow, LLInitClass<LLIMWellWindow>
+class LLIMWellWindow final : public LLSysWellWindow, LLInitClass<LLIMWellWindow>
 {
 public:
+    AL_VIEW_TYPE(LLIMWellWindow, LLSysWellWindow);
+
     LLIMWellWindow(const LLSD& key);
     ~LLIMWellWindow();
 

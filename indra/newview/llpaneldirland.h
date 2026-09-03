@@ -32,9 +32,11 @@
 class LLUICtrl;
 class LLPanelDirBrowser;
 
-class LLPanelDirLand : public LLPanelDirBrowser
+class LLPanelDirLand final : public LLPanelDirBrowser
 {
 public:
+    AL_VIEW_TYPE(LLPanelDirLand, LLPanelDirBrowser);
+
     LLPanelDirLand();
     /*virtual*/ ~LLPanelDirLand();
 

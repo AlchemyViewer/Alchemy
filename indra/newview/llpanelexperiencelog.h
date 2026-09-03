@@ -31,10 +31,11 @@
 #include "llpanel.h"
 class LLScrollListCtrl;
 
-class LLPanelExperienceLog
+class LLPanelExperienceLog final
     : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelExperienceLog, LLPanel);
 
     LLPanelExperienceLog();
 

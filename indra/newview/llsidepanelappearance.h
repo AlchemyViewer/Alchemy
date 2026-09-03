@@ -40,10 +40,12 @@ class LLViewerWearable;
 class LLPanelOutfitsInventory;
 class LLLoadingIndicator;
 
-class LLSidepanelAppearance : public LLPanel
+class LLSidepanelAppearance final : public LLPanel
 {
     LOG_CLASS(LLSidepanelAppearance);
 public:
+    AL_VIEW_TYPE(LLSidepanelAppearance, LLPanel);
+
     LLSidepanelAppearance();
     virtual ~LLSidepanelAppearance();
 

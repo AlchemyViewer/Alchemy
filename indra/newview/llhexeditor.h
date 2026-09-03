@@ -23,9 +23,10 @@
 #include "llundo.h"
 #include "lleditmenuhandler.h"
 
-class LLHexEditor : public LLUICtrl, public LLEditMenuHandler
+class LLHexEditor final : public LLUICtrl, public LLEditMenuHandler
 {
 public:
+    AL_VIEW_TYPE(LLHexEditor, LLUICtrl);
 
     struct Params : LLInitParam::Block<Params, LLUICtrl::Params>
     { };

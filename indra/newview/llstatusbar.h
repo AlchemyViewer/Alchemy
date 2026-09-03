@@ -51,10 +51,12 @@ namespace ll
         struct SearchData;
     }
 }
-class LLStatusBar
+class LLStatusBar final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLStatusBar, LLPanel);
+
     LLStatusBar(const LLRect& rect );
     /*virtual*/ ~LLStatusBar();
 

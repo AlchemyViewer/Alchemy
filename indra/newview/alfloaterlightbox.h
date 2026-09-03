@@ -54,6 +54,8 @@ class LLSpinCtrl;
 class ALFloaterLightBox final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALFloaterLightBox, LLFloater);
+
     ALFloaterLightBox(const LLSD& key);
     ~ALFloaterLightBox() override;
     bool postBuild() override;

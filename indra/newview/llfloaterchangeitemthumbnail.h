@@ -39,9 +39,11 @@ class LLUICtrl;
 class LLViewerInventoryItem;
 class LLViewerFetchedTexture;
 
-class LLFloaterChangeItemThumbnail : public LLFloater, public LLInventoryObserver, public LLVOInventoryListener
+class LLFloaterChangeItemThumbnail final : public LLFloater, public LLInventoryObserver, public LLVOInventoryListener
 {
 public:
+    AL_VIEW_TYPE(LLFloaterChangeItemThumbnail, LLFloater);
+
     LLFloaterChangeItemThumbnail(const LLSD& key);
     ~LLFloaterChangeItemThumbnail();
 

@@ -74,10 +74,12 @@ enum EReportType
     CS_REQUEST_REPORT = 4
 };
 
-class LLFloaterReporter
+class LLFloaterReporter final
 :   public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterReporter, LLFloater);
+
     LLFloaterReporter(const LLSD& key);
     /*virtual*/ ~LLFloaterReporter();
     /*virtual*/ bool postBuild();

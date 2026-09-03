@@ -33,9 +33,11 @@
 
 class LLJoint;
 
-class LLMorphView : public LLView
+class LLMorphView final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLMorphView, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Params()

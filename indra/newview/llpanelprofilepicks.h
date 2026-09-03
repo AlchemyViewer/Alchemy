@@ -43,10 +43,12 @@ class LLTextEditor;
 /**
 * Panel for displaying Avatar's picks.
 */
-class LLPanelProfilePicks
+class LLPanelProfilePicks final
     : public LLPanelProfilePropertiesProcessorTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfilePicks, LLPanelProfilePropertiesProcessorTab);
+
     LLPanelProfilePicks();
     /*virtual*/ ~LLPanelProfilePicks();
 
@@ -96,11 +98,12 @@ private:
 };
 
 
-class LLPanelProfilePick
+class LLPanelProfilePick final
     : public LLPanelProfilePropertiesProcessorTab
     , public LLRemoteParcelInfoObserver
 {
 public:
+    AL_VIEW_TYPE(LLPanelProfilePick, LLPanelProfilePropertiesProcessorTab);
 
     // Creates new panel
     static LLPanelProfilePick* create();

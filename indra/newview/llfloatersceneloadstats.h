@@ -29,8 +29,11 @@
 
 #include "llfloater.h"
 
-class LLFloaterSceneLoadStats : public LLFloater
+class LLFloaterSceneLoadStats final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterSceneLoadStats, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     LLFloaterSceneLoadStats(const LLSD& key);

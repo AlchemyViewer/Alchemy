@@ -31,9 +31,12 @@
 
 class LLMediaCtrl;
 
-class LLFloaterAvatarWelcomePack:
+class LLFloaterAvatarWelcomePack final:
     public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterAvatarWelcomePack, LLFloater);
+private:
     friend class LLFloaterReg;
 
     private:

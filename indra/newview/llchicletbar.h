@@ -34,7 +34,7 @@ class LLIMChiclet;
 class LLLayoutPanel;
 class LLLayoutStack;
 
-class LLChicletBar
+class LLChicletBar final
     : public LLSingleton<LLChicletBar>
     , public LLPanel
 {
@@ -42,6 +42,7 @@ class LLChicletBar
     LOG_CLASS(LLChicletBar);
 
 public:
+    AL_VIEW_TYPE(LLChicletBar, LLPanel);
 
     bool postBuild() override;
 

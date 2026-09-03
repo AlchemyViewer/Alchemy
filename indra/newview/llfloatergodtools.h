@@ -51,11 +51,12 @@ class LLTabContainer;
 class LLTextBox;
 class LLMessageSystem;
 
-class LLFloaterGodTools
+class LLFloaterGodTools final
     : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterGodTools, LLFloater);
 
     enum EGodPanel
     {
@@ -120,10 +121,12 @@ public:
 // LLPanelRegionTools
 //-----------------------------------------------------------------------------
 
-class LLPanelRegionTools
+class LLPanelRegionTools final
 : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelRegionTools, LLPanel);
+
     LLPanelRegionTools();
     /*virtual*/ ~LLPanelRegionTools();
 
@@ -182,10 +185,12 @@ protected:
 // LLPanelGridTools
 //-----------------------------------------------------------------------------
 
-class LLPanelGridTools
+class LLPanelGridTools final
 : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelGridTools, LLPanel);
+
     LLPanelGridTools();
     virtual ~LLPanelGridTools();
 
@@ -206,10 +211,12 @@ protected:
 // LLPanelObjectTools
 //-----------------------------------------------------------------------------
 
-class LLPanelObjectTools
+class LLPanelObjectTools final
 : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelObjectTools, LLPanel);
+
     LLPanelObjectTools();
     /*virtual*/ ~LLPanelObjectTools();
 
@@ -248,9 +255,11 @@ protected:
 // LLPanelRequestTools
 //-----------------------------------------------------------------------------
 
-class LLPanelRequestTools : public LLPanel
+class LLPanelRequestTools final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelRequestTools, LLPanel);
+
     LLPanelRequestTools();
     /*virtual*/ ~LLPanelRequestTools();
 

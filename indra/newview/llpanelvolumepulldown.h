@@ -32,9 +32,11 @@
 
 #include "llpanelpulldown.h"
 
-class LLPanelVolumePulldown : public LLPanelPulldown
+class LLPanelVolumePulldown final : public LLPanelPulldown
 {
  public:
+    AL_VIEW_TYPE(LLPanelVolumePulldown, LLPanelPulldown);
+
     LLPanelVolumePulldown();
     bool postBuild() override;
 

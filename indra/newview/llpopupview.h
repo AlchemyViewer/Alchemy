@@ -29,9 +29,11 @@
 
 #include "llpanel.h"
 
-class LLPopupView : public LLPanel
+class LLPopupView final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPopupView, LLPanel);
+
     LLPopupView(const Params& p = LLPanel::Params());
     ~LLPopupView();
 

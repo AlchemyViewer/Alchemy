@@ -40,9 +40,11 @@ class LLComboBox;
 class LLSpinCtrl;
 class LLAvatarName;
 
-class LLPanelGroupGeneral : public LLPanelGroupTab
+class LLPanelGroupGeneral final : public LLPanelGroupTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupGeneral, LLPanelGroupTab);
+
     LLPanelGroupGeneral();
     virtual ~LLPanelGroupGeneral();
 

@@ -37,11 +37,12 @@
 class LLObjectSelection;
 class LLPanelObjectInventory;
 
-class LLFloaterOpenObject
+class LLFloaterOpenObject final
 : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterOpenObject, LLFloater);
 
     void dirty();
 

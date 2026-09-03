@@ -40,10 +40,12 @@ class LLChatBarGestureObserver;
 class LLComboBox;
 
 
-class LLChatBar
+class LLChatBar final
 :   public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLChatBar, LLPanel);
+
     // constructor for inline chat-bars (e.g. hosted in chat history window)
     LLChatBar();
     ~LLChatBar();

@@ -41,6 +41,8 @@ struct LLNetListItem
 class LLFloaterMessageBuilder final : public LLFloater, public LLEventTimer
 {
 public:
+    AL_VIEW_TYPE(LLFloaterMessageBuilder, LLFloater);
+
     LLFloaterMessageBuilder(const LLSD &);
     ~LLFloaterMessageBuilder() = default;
     bool postBuild() override;

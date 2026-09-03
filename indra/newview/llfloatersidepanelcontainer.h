@@ -40,8 +40,11 @@
  * drag an inventory item from My Inventory window to a docked IM window,
  * i.e. share the item (see VWR-22891).
  */
-class LLFloaterSidePanelContainer : public LLFloater
+class LLFloaterSidePanelContainer final : public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterSidePanelContainer, LLFloater);
+private:
 private:
     static const std::string sMainPanelName;
 

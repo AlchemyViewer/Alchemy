@@ -49,9 +49,11 @@ class LLWearingGearMenu;
  * a flat list view.
  * Starts fetching necessary inventory content on first opening.
  */
-class LLPanelWearing : public LLPanelAppearanceTab
+class LLPanelWearing final : public LLPanelAppearanceTab
 {
 public:
+    AL_VIEW_TYPE(LLPanelWearing, LLPanelAppearanceTab);
+
     LLPanelWearing();
     virtual ~LLPanelWearing();
 

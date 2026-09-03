@@ -33,9 +33,11 @@
 
 class LLPanel;
 
-class ALLegacyNotificationWellWindow : public LLSysWellWindow
+class ALLegacyNotificationWellWindow final : public LLSysWellWindow
 {
 public:
+    AL_VIEW_TYPE(ALLegacyNotificationWellWindow, LLSysWellWindow);
+
     ALLegacyNotificationWellWindow(const LLSD& key);
     static ALLegacyNotificationWellWindow* getInstance(const LLSD& key = LLSD());
 

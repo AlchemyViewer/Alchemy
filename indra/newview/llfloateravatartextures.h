@@ -34,9 +34,11 @@
 
 class LLTextureCtrl;
 
-class LLFloaterAvatarTextures : public LLFloater
+class LLFloaterAvatarTextures final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterAvatarTextures, LLFloater);
+
     LLFloaterAvatarTextures(const LLSD& id);
     virtual ~LLFloaterAvatarTextures();
 

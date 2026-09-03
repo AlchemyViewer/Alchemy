@@ -40,9 +40,11 @@
  *
  * @see LLLandmarksPanel for example of usage of this class.
  */
-class LLDragAndDropButton : public LLButton
+class LLDragAndDropButton final : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLDragAndDropButton, LLButton);
+
     struct Params : public LLInitParam::Block<Params, LLButton::Params> {};
 
     LLDragAndDropButton(const Params& params);

@@ -36,9 +36,11 @@ class LLImageRaw;
 class LLProfileImageCtrl;
 
 #if 0   // Alchemy: Moved to standalone handler in llprofileimagectrl.cpp
-class LLProfileImageCtrl: public LLIconCtrl
+class LLProfileImageCtrl final: public LLIconCtrl
 {
 public:
+    AL_VIEW_TYPE(LLProfileImageCtrl, LLIconCtrl);
+
     struct Params: public LLInitParam::Block<Params, LLIconCtrl::Params>
     {
     };
@@ -76,9 +78,11 @@ private:
 };
 #endif // 0
 
-class LLFloaterProfileTexture : public LLFloater
+class LLFloaterProfileTexture final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterProfileTexture, LLFloater);
+
     LLFloaterProfileTexture(LLView* owner);
     ~LLFloaterProfileTexture();
 

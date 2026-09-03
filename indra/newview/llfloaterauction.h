@@ -42,10 +42,12 @@ class LLParcelSelection;
 class LLParcel;
 class LLViewerRegion;
 
-class LLFloaterAuction : public LLFloater
+class LLFloaterAuction final : public LLFloater
 {
     friend class LLFloaterReg;
 public:
+    AL_VIEW_TYPE(LLFloaterAuction, LLFloater);
+
     // LLFloater interface
     void onOpen(const LLSD& key) override;
     void draw() override;

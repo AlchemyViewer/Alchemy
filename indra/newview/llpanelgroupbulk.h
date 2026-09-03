@@ -38,6 +38,8 @@ class LLPanelGroupBulkImpl;
 class LLPanelGroupBulk : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelGroupBulk, LLPanel);
+
     LLPanelGroupBulk(const LLUUID& group_id);
     /*virtual*/ ~LLPanelGroupBulk();
 

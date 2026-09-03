@@ -36,6 +36,8 @@ class LLFrameTimer;
 class LLPanelPulldown : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPulldown, LLPanel);
+
     LLPanelPulldown();
     void onMouseEnter(S32 x, S32 y, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;

@@ -44,10 +44,12 @@
  *
  * @see setNameFilter()
  */
-class LLGroupList: public LLFlatListViewEx, public LLOldEvents::LLSimpleListener
+class LLGroupList final: public LLFlatListViewEx, public LLOldEvents::LLSimpleListener
 {
     LOG_CLASS(LLGroupList);
 public:
+    AL_VIEW_TYPE(LLGroupList, LLFlatListViewEx);
+
     struct Params : public LLInitParam::Block<Params, LLFlatListViewEx::Params>
     {
         Optional<bool> for_agent;
@@ -97,10 +99,12 @@ class LLButton;
 class LLGroupIconCtrl;
 class LLTextBox;
 
-class LLGroupListItem : public LLPanel
+class LLGroupListItem final : public LLPanel
     , public LLGroupMgrObserver
 {
 public:
+    AL_VIEW_TYPE(LLGroupListItem, LLPanel);
+
     LLGroupListItem(bool for_agent, bool show_icons);
     ~LLGroupListItem();
     /*virtual*/ bool postBuild();

@@ -43,9 +43,11 @@ class LLNameBox;
 class LLViewerObject;
 class LLTextBase;
 
-class LLSidepanelTaskInfo : public LLPanel
+class LLSidepanelTaskInfo final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLSidepanelTaskInfo, LLPanel);
+
     LLSidepanelTaskInfo();
     virtual ~LLSidepanelTaskInfo();
 

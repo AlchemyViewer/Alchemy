@@ -34,10 +34,12 @@ class LLPanelMediaSettingsGeneral;
 class LLPanelMediaSettingsSecurity;
 class LLPanelMediaSettingsPermissions;
 
-class LLFloaterMediaSettings :
+class LLFloaterMediaSettings final :
     public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterMediaSettings, LLFloater);
+
     LLFloaterMediaSettings(const LLSD& key);
     ~LLFloaterMediaSettings();
 

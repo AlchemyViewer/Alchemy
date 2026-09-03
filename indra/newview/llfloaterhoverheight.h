@@ -29,9 +29,11 @@
 
 #include "llfloater.h"
 
-class LLFloaterHoverHeight: public LLFloater
+class LLFloaterHoverHeight final: public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterHoverHeight, LLFloater);
+
     LLFloaterHoverHeight(const LLSD& key);
     bool postBuild();
 

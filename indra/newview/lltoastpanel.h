@@ -41,6 +41,8 @@
  */
 class LLToastPanel : public LLPanel {
 public:
+    AL_VIEW_TYPE(LLToastPanel, LLPanel);
+
     LLToastPanel(const LLNotificationPtr&);
     virtual ~LLToastPanel() = 0;
 
@@ -70,6 +72,8 @@ class LLCheckBoxCtrl;
 class LLCheckBoxToastPanel : public LLToastPanel
 {
 public:
+    AL_VIEW_TYPE(LLCheckBoxToastPanel, LLToastPanel);
+
     LLCheckBoxToastPanel(const LLNotificationPtr& p_ntf);
     virtual ~LLCheckBoxToastPanel() {};
 

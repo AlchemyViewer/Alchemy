@@ -181,8 +181,10 @@ private:
 };
 //============================================================================
 
-struct LLPlaceHolderPanel : public LLPanel
+struct LLPlaceHolderPanel final : public LLPanel
 {
+    AL_VIEW_TYPE(LLPlaceHolderPanel, LLPanel);
+
     // create dummy param block to register with "placeholder" nane
     struct Params : public LLPanel::Params{};
     LLPlaceHolderPanel(const Params& p) : LLPanel(p)

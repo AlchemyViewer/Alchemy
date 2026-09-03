@@ -37,7 +37,7 @@ class LLIconCtrl;
 class LLParcelChangeObserver;
 class LLViewerRegion;
 
-class LLPanelTopInfoBar : public LLPanel, public LLSingleton<LLPanelTopInfoBar>, private LLDestroyClass<LLPanelTopInfoBar>
+class LLPanelTopInfoBar final : public LLPanel, public LLSingleton<LLPanelTopInfoBar>, private LLDestroyClass<LLPanelTopInfoBar>
 {
     LLSINGLETON(LLPanelTopInfoBar);
     ~LLPanelTopInfoBar();
@@ -46,6 +46,8 @@ class LLPanelTopInfoBar : public LLPanel, public LLSingleton<LLPanelTopInfoBar>,
     friend class LLDestroyClass<LLPanelTopInfoBar>;
 
 public:
+    AL_VIEW_TYPE(LLPanelTopInfoBar, LLPanel);
+
     typedef boost::signals2::signal<void ()> resize_signal_t;
 
     bool postBuild() override;

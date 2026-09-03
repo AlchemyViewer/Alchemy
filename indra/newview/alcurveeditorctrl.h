@@ -56,6 +56,8 @@
 class ALCurveEditorCtrl final : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(ALCurveEditorCtrl, LLUICtrl);
+
     /// A draggable point on the graph.
     struct Handle
     {

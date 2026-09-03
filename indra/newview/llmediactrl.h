@@ -39,7 +39,7 @@ class LLContextMenu;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-class LLMediaCtrl :
+class LLMediaCtrl final :
     public LLPanel,
     public LLViewerMediaObserver,
     public LLViewerMediaEventEmitter,
@@ -47,6 +47,7 @@ class LLMediaCtrl :
 {
     LOG_CLASS(LLMediaCtrl);
 public:
+    AL_VIEW_TYPE(LLMediaCtrl, LLPanel);
 
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {

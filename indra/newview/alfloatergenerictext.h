@@ -36,6 +36,8 @@
 class ALFloaterGenericText final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(ALFloaterGenericText, LLFloater);
+
     ALFloaterGenericText(const LLSD& key);
     bool postBuild() override;
 private:

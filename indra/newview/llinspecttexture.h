@@ -34,9 +34,11 @@ namespace LLInspectTextureUtil
     LLToolTip* createInventoryToolTip(LLToolTip::Params p);
 }
 
-class LLTextureToolTip : public LLToolTip
+class LLTextureToolTip final : public LLToolTip
 {
 public:
+    AL_VIEW_TYPE(LLTextureToolTip, LLToolTip);
+
     LLTextureToolTip(const LLToolTip::Params& p);
     ~LLTextureToolTip();
 

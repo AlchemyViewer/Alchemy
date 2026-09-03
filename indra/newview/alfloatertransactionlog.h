@@ -37,9 +37,11 @@ class LLAvatarName;
 class LLScrollListCtrl;
 class LLTextBase;
 
-class ALFloaterTransactionLog : public LLFloater
+class ALFloaterTransactionLog final : public LLFloater
 {
   public:
+    AL_VIEW_TYPE(ALFloaterTransactionLog, LLFloater);
+
     ALFloaterTransactionLog(const LLSD& key);
     bool postBuild();
     void addTransaction(const LLDate& date, const LLUUID& sender, S32 amount, bool incoming);

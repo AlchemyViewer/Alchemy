@@ -572,6 +572,8 @@ protected:
 class LLCallDialog : public LLDockableFloater
 {
 public:
+    AL_VIEW_TYPE(LLCallDialog, LLDockableFloater);
+
     LLCallDialog(const LLSD& payload);
     virtual ~LLCallDialog();
 
@@ -608,9 +610,11 @@ private:
     LLDockControl::DocAt getDockControlPos(const std::string& toolbarButtonName);
 };
 
-class LLIncomingCallDialog : public LLCallDialog
+class LLIncomingCallDialog final : public LLCallDialog
 {
 public:
+    AL_VIEW_TYPE(LLIncomingCallDialog, LLCallDialog);
+
     LLIncomingCallDialog(const LLSD& payload);
     ~LLIncomingCallDialog()
     {
@@ -641,9 +645,11 @@ private:
     /*virtual*/ void onLifetimeExpired();
 };
 
-class LLOutgoingCallDialog : public LLCallDialog
+class LLOutgoingCallDialog final : public LLCallDialog
 {
 public:
+    AL_VIEW_TYPE(LLOutgoingCallDialog, LLCallDialog);
+
     LLOutgoingCallDialog(const LLSD& payload);
 
     /*virtual*/ bool postBuild();

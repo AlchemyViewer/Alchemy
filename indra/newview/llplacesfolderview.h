@@ -32,9 +32,10 @@
 
 class LLLandmarksPanel;
 
-class LLPlacesFolderView : public LLFolderView
+class LLPlacesFolderView final : public LLFolderView
 {
 public:
+    AL_VIEW_TYPE(LLPlacesFolderView, LLFolderView);
 
     struct Params : public LLInitParam::Block<Params, LLFolderView::Params>
     {

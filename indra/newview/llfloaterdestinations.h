@@ -30,9 +30,12 @@
 
 #include "llfloater.h"
 
-class LLFloaterDestinations:
+class LLFloaterDestinations final:
     public LLFloater
 {
+public:
+    AL_VIEW_TYPE(LLFloaterDestinations, LLFloater);
+private:
     friend class LLFloaterReg;
 private:
     LLFloaterDestinations(const LLSD& key);

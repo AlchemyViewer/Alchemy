@@ -42,6 +42,8 @@ class LLPanelSettingsSky : public LLSettingsEditPanel
     LOG_CLASS(LLPanelSettingsSky);
 
 public:
+    AL_VIEW_TYPE(LLPanelSettingsSky, LLSettingsEditPanel);
+
                             LLPanelSettingsSky();
 
     virtual void            setSettings(const LLSettingsBase::ptr_t &settings) override   { setSky(std::static_pointer_cast<LLSettingsSky>(settings)); }
@@ -53,11 +55,13 @@ protected:
     LLSettingsSky::ptr_t  mSkySettings;
 };
 
-class LLPanelSettingsSkyAtmosTab : public LLPanelSettingsSky
+class LLPanelSettingsSkyAtmosTab final : public LLPanelSettingsSky
 {
     LOG_CLASS(LLPanelSettingsSkyAtmosTab);
 
 public:
+    AL_VIEW_TYPE(LLPanelSettingsSkyAtmosTab, LLPanelSettingsSky);
+
                             LLPanelSettingsSkyAtmosTab();
 
     virtual bool            postBuild() override;
@@ -84,11 +88,13 @@ private:
 
 };
 
-class LLPanelSettingsSkyCloudTab : public LLPanelSettingsSky
+class LLPanelSettingsSkyCloudTab final : public LLPanelSettingsSky
 {
     LOG_CLASS(LLPanelSettingsSkyCloudTab);
 
 public:
+    AL_VIEW_TYPE(LLPanelSettingsSkyCloudTab, LLPanelSettingsSky);
+
                             LLPanelSettingsSkyCloudTab();
 
     virtual bool            postBuild() override;
@@ -108,11 +114,13 @@ private:
     void                    onCloudDetailChanged();
 };
 
-class LLPanelSettingsSkySunMoonTab : public LLPanelSettingsSky
+class LLPanelSettingsSkySunMoonTab final : public LLPanelSettingsSky
 {
     LOG_CLASS(LLPanelSettingsSkySunMoonTab);
 
 public:
+    AL_VIEW_TYPE(LLPanelSettingsSkySunMoonTab, LLPanelSettingsSky);
+
                             LLPanelSettingsSkySunMoonTab();
 
     virtual bool            postBuild() override;
@@ -137,11 +145,13 @@ private:
 };
 
 // single subtab of the density settings tab
-class LLPanelSettingsSkyDensityTab : public LLPanelSettingsSky
+class LLPanelSettingsSkyDensityTab final : public LLPanelSettingsSky
 {
     LOG_CLASS(LLPanelSettingsSkyDensityTab);
 
 public:
+    AL_VIEW_TYPE(LLPanelSettingsSkyDensityTab, LLPanelSettingsSky);
+
     LLPanelSettingsSkyDensityTab();
 
     virtual bool postBuild() override;

@@ -36,11 +36,13 @@ struct LLEmojiDescriptor;
 struct LLEmojiSearchResult;
 struct LLEmojiVariant;
 
-class LLFloaterEmojiPicker : public LLFloater
+class LLFloaterEmojiPicker final : public LLFloater
 {
     using super = LLFloater;
 
 public:
+    AL_VIEW_TYPE(LLFloaterEmojiPicker, LLFloater);
+
     // The callback function will be called with an emoji char.
     typedef std::function<void(llwchar)> pick_callback_t;
     typedef std::function<void ()> close_callback_t;

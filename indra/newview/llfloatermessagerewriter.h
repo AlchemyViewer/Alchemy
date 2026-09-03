@@ -24,6 +24,8 @@
 class LLFloaterMessageRewriter final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterMessageRewriter, LLFloater);
+
     LLFloaterMessageRewriter(const LLSD& key);
     ~LLFloaterMessageRewriter() = default;
     bool postBuild() override;

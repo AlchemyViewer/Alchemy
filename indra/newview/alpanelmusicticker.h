@@ -29,6 +29,8 @@ class LLTextBox;
 class ALPanelMusicTicker final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALPanelMusicTicker, LLPanel);
+
     ALPanelMusicTicker();   //ctor
     ~ALPanelMusicTicker();
 

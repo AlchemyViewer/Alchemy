@@ -75,9 +75,11 @@ typedef enum
     } EGraphicsSettings;
 
 // Floater to control preferences (display, audio, bandwidth, general.
-class LLFloaterPreference : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
+class LLFloaterPreference final : public LLFloater, public LLAvatarPropertiesObserver, public LLConversationLogObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPreference, LLFloater);
+
     LLFloaterPreference(const LLSD& key);
     ~LLFloaterPreference();
 
@@ -298,6 +300,8 @@ private:
 class LLPanelPreference : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLPanelPreference, LLPanel);
+
     LLPanelPreference();
     /*virtual*/ bool postBuild();
 
@@ -342,9 +346,11 @@ private:
     LOG_CLASS(LLPanelPreference);
 };
 
-class LLPanelPreferenceGraphics : public LLPanelPreference
+class LLPanelPreferenceGraphics final : public LLPanelPreference
 {
 public:
+    AL_VIEW_TYPE(LLPanelPreferenceGraphics, LLPanelPreference);
+
     bool postBuild();
     void draw();
     void cancel(const std::vector<std::string> settings_to_skip = {});
@@ -365,10 +371,12 @@ private:
 // populated at panel-open time from the active FAudio engine's device
 // enumeration. The control_name binding writes the user's pick to
 // AudioFAudioOutputDevice; the engine reads it at next launch.
-class LLPanelPreferenceSound : public LLPanelPreference
+class LLPanelPreferenceSound final : public LLPanelPreference
 {
     LOG_CLASS(LLPanelPreferenceSound);
 public:
+    AL_VIEW_TYPE(LLPanelPreferenceSound, LLPanelPreference);
+
     bool postBuild() override;
 
 private:
@@ -388,10 +396,12 @@ private:
     boost::signals2::scoped_connection mDevicesChangedConn;
 };
 
-class LLPanelPreferenceControls : public LLPanelPreference, public LLKeyBindResponderInterface
+class LLPanelPreferenceControls final : public LLPanelPreference, public LLKeyBindResponderInterface
 {
     LOG_CLASS(LLPanelPreferenceControls);
 public:
+    AL_VIEW_TYPE(LLPanelPreferenceControls, LLPanelPreference);
+
     LLPanelPreferenceControls();
     virtual ~LLPanelPreferenceControls();
 
@@ -455,9 +465,11 @@ class LLAvatarComplexityControls
     LOG_CLASS(LLAvatarComplexityControls);
 };
 
-class LLFloaterPreferenceProxy : public LLFloater
+class LLFloaterPreferenceProxy final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterPreferenceProxy, LLFloater);
+
     LLFloaterPreferenceProxy(const LLSD& key);
     ~LLFloaterPreferenceProxy();
 
