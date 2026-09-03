@@ -27,6 +27,7 @@
 
 #include "stdtypes.h"
 
+class LLView;
 class LLUICtrl;
 class LLPanel;
 class LLFloater;
@@ -61,6 +62,10 @@ struct ALViewKind
         MENU_SEPARATOR = 1u << 10,
         FOLDER_VIEW  = 1u << 11,
     };
+
+    // A view as a T, or null for a null view. Defined beside LLView, so a
+    // header that names a view without seeing it can still ask.
+    template <class T> static T* as(LLView* view);
 };
 
 // The bit for a T, or zero. A T with no entry is reached by dynamic_cast,

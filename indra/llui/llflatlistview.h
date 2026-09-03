@@ -193,7 +193,7 @@ public:
     template<class T>
     T* getTypedItemByValue(const LLSD& value) const
     {
-        return dynamic_cast<T*>(getItemByValue(value));
+        return ALViewKind::as<T>(getItemByValue(value));
     }
 
     /**

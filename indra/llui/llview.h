@@ -560,8 +560,7 @@ public:
     template <class T> T* findChild(std::string_view name, bool recurse = true) const
     {
         LLView* child = findChildView(name, recurse);
-        T* result = dynamic_cast<T*>(child);
-        return result;
+        return ALViewKind::as<T>(child);
     }
 
     template <class T> T* getChild(std::string_view name, bool recurse = true) const;
@@ -577,7 +576,7 @@ public:
     template <class T> T* getDefaultWidget(std::string_view name) const
     {
         LLView* widgetp = getDefaultWidgetContainer().findChildView(name);
-        return dynamic_cast<T*>(widgetp);
+        return ALViewKind::as<T>(widgetp);
     }
 
     template <class T> T* getParentByType() const
@@ -842,7 +841,7 @@ struct TypeValues<LLView::EOrientation> : public LLInitParam::TypeValuesHelper<L
 template <class T> T* LLView::getChild(std::string_view name, bool recurse) const
 {
     LLView* child = findChildView(name, recurse);
-    T* result = dynamic_cast<T*>(child);
+    T* result = ALViewKind::as<T>(child);
     if (!result)
     {
         // did we find *something* with that name?
@@ -868,6 +867,11 @@ template <class T> T* LLView::getChild(std::string_view name, bool recurse) cons
         }
     }
     return result;
+}
+
+template <class T> T* ALViewKind::as(LLView* view)
+{
+    return view ? view->as<T>() : nullptr;
 }
 
 // Compiler optimization - don't generate these specializations inline,
