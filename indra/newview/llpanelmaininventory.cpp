@@ -505,7 +505,7 @@ void LLPanelMainInventory::newFolderWindow(LLUUID folder_id, LLUUID item_to_sele
         LLFloaterSidePanelContainer* inventory_container = (*iter++)->as<LLFloaterSidePanelContainer>();
         if (inventory_container)
         {
-            LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+            LLSidepanelInventory* sidepanel_inventory = inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
             if (sidepanel_inventory)
             {
                 LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -528,7 +528,7 @@ void LLPanelMainInventory::newFolderWindow(LLUUID folder_id, LLUUID item_to_sele
     LLFloaterSidePanelContainer* inventory_container = LLFloaterReg::showTypedInstance<LLFloaterSidePanelContainer>("inventory", LLSD(instance_num));
     if(inventory_container)
     {
-        LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+        LLSidepanelInventory* sidepanel_inventory = inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
         if (sidepanel_inventory)
         {
             LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -1956,7 +1956,7 @@ void LLPanelMainInventory::onCustomAction(const LLSD& userdata)
             LLFloaterSidePanelContainer* inventory_container = newWindow();
             if (inventory_container)
             {
-                LLSidepanelInventory* sidepanel_inventory = dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+                LLSidepanelInventory* sidepanel_inventory = inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
                 if (sidepanel_inventory)
                 {
                     LLPanelMainInventory* main_inventory = sidepanel_inventory->getMainInventoryPanel();
@@ -2626,7 +2626,7 @@ LLSidepanelInventory* LLPanelMainInventory::getParentSidepanelInventory()
     LLFloaterSidePanelContainer* inventory_container = ALViewType::as<LLFloaterSidePanelContainer>(gFloaterView->getParentFloater(this));
     if(inventory_container)
     {
-        return dynamic_cast<LLSidepanelInventory*>(inventory_container->findChild<LLPanel>("main_panel", true));
+        return inventory_container->findChild<LLSidepanelInventory>("main_panel", true);
     }
     return NULL;
 }

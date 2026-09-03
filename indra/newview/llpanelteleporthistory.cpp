@@ -511,7 +511,7 @@ void LLTeleportHistoryPanel::onShowOnMap()
     if (!mLastSelectedFlatlList)
         return;
 
-    LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+    LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
 
     if(!itemp)
         return;
@@ -531,7 +531,7 @@ void LLTeleportHistoryPanel::onShowProfile()
     if (!mLastSelectedFlatlList)
         return;
 
-    LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+    LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
 
     if(!itemp)
         return;
@@ -545,7 +545,7 @@ void LLTeleportHistoryPanel::onTeleport()
     if (!mLastSelectedFlatlList)
         return;
 
-    LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+    LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
     if(!itemp)
         return;
 
@@ -899,7 +899,7 @@ void LLTeleportHistoryPanel::showTeleportHistory()
 void LLTeleportHistoryPanel::handleItemSelect(LLFlatListView* selected)
 {
     mLastSelectedFlatlList = selected;
-    LLTeleportHistoryFlatItem* item = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+    LLTeleportHistoryFlatItem* item = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
     if (item)
         mLastSelectedItemIndex = item->getIndex();
 
@@ -1066,7 +1066,7 @@ void LLTeleportHistoryPanel::onGearMenuAction(const LLSD& userdata)
     S32 index = -1;
     if (mLastSelectedFlatlList)
     {
-        LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+        LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
         if (itemp)
         {
             index = itemp->getIndex();
@@ -1158,7 +1158,7 @@ bool LLTeleportHistoryPanel::isActionEnabled(const LLSD& userdata) const
         {
             return false;
         }
-        LLTeleportHistoryFlatItem* itemp = dynamic_cast<LLTeleportHistoryFlatItem *> (mLastSelectedFlatlList->getSelectedItem());
+        LLTeleportHistoryFlatItem* itemp = ALViewType::as<LLTeleportHistoryFlatItem>(mLastSelectedFlatlList->getSelectedItem());
 // [RLVa:KB]
         if ("teleport" == command_name)
         {

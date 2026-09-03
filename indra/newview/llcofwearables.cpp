@@ -106,7 +106,7 @@ protected:
         {
             LLPanelDummyClothingListItem* item;
 
-            item = dynamic_cast<LLPanelDummyClothingListItem*>(mCOFWearables->getSelectedItem());
+            item = ALViewType::as<LLPanelDummyClothingListItem>(mCOFWearables->getSelectedItem());
             if (item)
             {
                 return item->getWearableType();
@@ -181,8 +181,7 @@ protected:
     static void replaceWearable(const LLUUID& item_id)
     {
         LLPanelOutfitEdit   * panel_outfit_edit =
-                        dynamic_cast<LLPanelOutfitEdit*> (LLFloaterSidePanelContainer::getPanel("appearance",
-                                "panel_outfit_edit"));
+                        LLFloaterSidePanelContainer::getPanel<LLPanelOutfitEdit>("appearance", "panel_outfit_edit");
         if (panel_outfit_edit != NULL)
         {
             panel_outfit_edit->onReplaceMenuItemClicked(item_id);
@@ -250,7 +249,7 @@ protected:
         LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable_registrar;
         LLUUID selected_id = mUUIDs.back();
 
-        LLPanelOutfitEdit* panel_oe = dynamic_cast<LLPanelOutfitEdit*>(LLFloaterSidePanelContainer::getPanel("appearance", "panel_outfit_edit"));
+        LLPanelOutfitEdit* panel_oe = LLFloaterSidePanelContainer::getPanel<LLPanelOutfitEdit>("appearance", "panel_outfit_edit");
         registrar.add("BodyPart.Replace", boost::bind(&LLPanelOutfitEdit::onReplaceMenuItemClicked, panel_oe, selected_id));
         registrar.add("BodyPart.Edit", boost::bind(LLAgentWearables::editWearable, selected_id));
         registrar.add("BodyPart.Create", boost::bind(&CofBodyPartContextMenu::createNew, this, selected_id));

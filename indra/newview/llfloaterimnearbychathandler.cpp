@@ -397,7 +397,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
         LLToast* toast = m_active_toasts[0].get();
         if (toast)
         {
-            LLFloaterIMNearbyChatToastPanel* panel = dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(toast->getPanel());
+            LLFloaterIMNearbyChatToastPanel* panel = ALViewType::as<LLFloaterIMNearbyChatToastPanel>(toast->getPanel());
 
             if (panel && panel->messageID() == fromID && panel->getFromName() == from && panel->canAddText())
             {
@@ -451,7 +451,7 @@ void LLFloaterIMNearbyChatScreenChannel::addChat(LLSD& chat)
     }
 
 
-    LLFloaterIMNearbyChatToastPanel* panel = dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(toast->getPanel());
+    LLFloaterIMNearbyChatToastPanel* panel = ALViewType::as<LLFloaterIMNearbyChatToastPanel>(toast->getPanel());
     if (!panel)
         return;
     panel->init(chat);
@@ -636,7 +636,7 @@ void LLFloaterIMNearbyChatScreenChannel::updateToastWidth()
     for(toast_vec_t::iterator itActive = m_active_toasts.begin(); itActive != m_active_toasts.end(); ++itActive)
     {
         LLToast* pToast = (*itActive).get();
-        LLFloaterIMNearbyChatToastPanel* pToastPanel = (pToast) ? dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(pToast->getPanel()) : NULL;
+        LLFloaterIMNearbyChatToastPanel* pToastPanel = (pToast) ? ALViewType::as<LLFloaterIMNearbyChatToastPanel>(pToast->getPanel()) : NULL;
         if (!pToastPanel)
             continue;
 
@@ -655,7 +655,7 @@ void LLFloaterIMNearbyChatScreenChannel::updateToastWidth()
     for(toast_list_t::iterator itPool = m_toast_pool.begin(); itPool != m_toast_pool.end(); ++itPool)
     {
         LLToast* pToast = (*itPool).get();
-        LLFloaterIMNearbyChatToastPanel* pToastPanel = (pToast) ? dynamic_cast<LLFloaterIMNearbyChatToastPanel*>(pToast->getPanel()) : NULL;
+        LLFloaterIMNearbyChatToastPanel* pToastPanel = (pToast) ? ALViewType::as<LLFloaterIMNearbyChatToastPanel>(pToast->getPanel()) : NULL;
         if (!pToastPanel)
             continue;
 

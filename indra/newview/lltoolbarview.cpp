@@ -237,19 +237,19 @@ bool LLToolBarView::postBuild()
 
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT] = getChild<LLToolBar>("toolbar_left");
     mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_LEFT);
-    mAutoHideEdges[LLToolBarEnums::TOOLBAR_LEFT].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getParent());
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_LEFT].panel = mToolbars[LLToolBarEnums::TOOLBAR_LEFT]->getParentAs<LLLayoutPanel>();
 
     mToolbars[LLToolBarEnums::TOOLBAR_RIGHT] = getChild<LLToolBar>("toolbar_right");
     mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_RIGHT);
-    mAutoHideEdges[LLToolBarEnums::TOOLBAR_RIGHT].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getParent());
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_RIGHT].panel = mToolbars[LLToolBarEnums::TOOLBAR_RIGHT]->getParentAs<LLLayoutPanel>();
 
     mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM] = getChild<LLToolBar>("toolbar_bottom");
     mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_BOTTOM);
-    mAutoHideEdges[LLToolBarEnums::TOOLBAR_BOTTOM].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getParent());
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_BOTTOM].panel = mToolbars[LLToolBarEnums::TOOLBAR_BOTTOM]->getParentAs<LLLayoutPanel>();
 
     mToolbars[LLToolBarEnums::TOOLBAR_TOP] = getChild<LLToolBar>("toolbar_top");
     mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getCenterLayoutPanel()->setLocationId(LLToolBarEnums::TOOLBAR_TOP);
-    mAutoHideEdges[LLToolBarEnums::TOOLBAR_TOP].panel = dynamic_cast<LLLayoutPanel*>(mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getParent());
+    mAutoHideEdges[LLToolBarEnums::TOOLBAR_TOP].panel = mToolbars[LLToolBarEnums::TOOLBAR_TOP]->getParentAs<LLLayoutPanel>();
 
     mBottomToolbarPanel = getChild<LLView>("bottom_toolbar_panel");
 
@@ -707,7 +707,7 @@ void LLToolBarView::onToolBarButtonRemoved(LLView* button)
 
         if (incoming_floater && incoming_floater->isShown())
         {
-            LLDockableFloater* incoming = dynamic_cast<LLDockableFloater *>(incoming_floater);
+            LLDockableFloater* incoming = incoming_floater->as<LLDockableFloater>();
             llassert(incoming);
 
             LLDockControl* dock_control = incoming->getDockControl();
@@ -716,7 +716,7 @@ void LLToolBarView::onToolBarButtonRemoved(LLView* button)
 
         if (outgoing_floater && outgoing_floater->isShown())
         {
-            LLDockableFloater* outgoing = dynamic_cast<LLDockableFloater *>(outgoing_floater);
+            LLDockableFloater* outgoing = outgoing_floater->as<LLDockableFloater>();
             llassert(outgoing);
 
             LLDockControl* dock_control = outgoing->getDockControl();

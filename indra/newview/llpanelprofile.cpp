@@ -1045,7 +1045,7 @@ void LLPanelProfileSecondLife::setProfileImageUploaded(const LLUUID &image_asset
     LLFloater *floater = mFloaterProfileTextureHandle.get();
     if (floater)
     {
-        LLFloaterProfileTexture * texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture * texture_view = floater->as<LLFloaterProfileTexture>();
         texture_view->loadAsset(mSecondLifePic->getImageAssetId());
     }
 
@@ -1799,7 +1799,7 @@ void LLPanelProfileSecondLife::onShowAgentProfileTexture()
     }
     else // already open
     {
-        LLFloaterProfileTexture * texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture * texture_view = floater->as<LLFloaterProfileTexture>();
         texture_view->setMinimized(false);
         texture_view->setVisibleAndFrontmost(true);
         if (mSecondLifePic->getImageAssetId().notNull())
@@ -1889,7 +1889,7 @@ void LLPanelProfileSecondLife::onCommitProfileImage(const LLUUID& id)
     LLFloater* floater = mFloaterProfileTextureHandle.get();
     if (floater)
     {
-        LLFloaterProfileTexture* texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture* texture_view = floater->as<LLFloaterProfileTexture>();
         if (texture_view)
         {
             if (id.isNull())
@@ -2322,7 +2322,7 @@ void LLPanelProfileFirstLife::onShowAgentFirstlifeTexture()
     }
     else // already open
     {
-        LLFloaterProfileTexture* texture_view = dynamic_cast<LLFloaterProfileTexture*>(floater);
+        LLFloaterProfileTexture* texture_view = floater->as<LLFloaterProfileTexture>();
         texture_view->setMinimized(false);
         texture_view->setVisibleAndFrontmost(true);
         if (mPicture->getImageAssetId().notNull())

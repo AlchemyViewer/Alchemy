@@ -328,7 +328,7 @@ void LLPreview::hide(const LLUUID& item_uuid, bool no_saving /* = false */ )
     LLFloater* floater = LLFloaterReg::findInstance("preview", LLSD(item_uuid));
     if (!floater) floater = LLFloaterReg::findInstance("preview_avatar", LLSD(item_uuid));
 
-    LLPreview* preview = dynamic_cast<LLPreview*>(floater);
+    LLPreview* preview = ALViewType::as<LLPreview>(floater);
     if (preview)
     {
         if ( no_saving )
@@ -345,7 +345,7 @@ void LLPreview::dirty(const LLUUID& item_uuid)
     LLFloater* floater = LLFloaterReg::findInstance("preview", LLSD(item_uuid));
     if (!floater) floater = LLFloaterReg::findInstance("preview_avatar", LLSD(item_uuid));
 
-    LLPreview* preview = dynamic_cast<LLPreview*>(floater);
+    LLPreview* preview = ALViewType::as<LLPreview>(floater);
     if(preview)
     {
         preview->mDirty = true;
@@ -604,7 +604,7 @@ LLMultiPreview::LLMultiPreview()
 void LLMultiPreview::onOpen(const LLSD& key)
 {
     // Floater could be something else than LLPreview, eg LLFloaterProfile.
-    LLPreview* frontmost_preview = dynamic_cast<LLPreview*>(mTabContainer->getCurrentPanel());
+    LLPreview* frontmost_preview = ALViewType::as<LLPreview>(mTabContainer->getCurrentPanel());
 
     if (frontmost_preview && frontmost_preview->getAssetStatus() == LLPreview::PREVIEW_ASSET_UNLOADED)
     {
@@ -619,7 +619,7 @@ void LLMultiPreview::handleReshape(const LLRect& new_rect, bool by_user)
     if(new_rect.getWidth() != getRect().getWidth() || new_rect.getHeight() != getRect().getHeight())
     {
         // Floater could be something else than LLPreview, eg LLFloaterProfile.
-        LLPreview* frontmost_preview = dynamic_cast<LLPreview*>(mTabContainer->getCurrentPanel());
+        LLPreview* frontmost_preview = ALViewType::as<LLPreview>(mTabContainer->getCurrentPanel());
 
         if (frontmost_preview)
         {
@@ -633,7 +633,7 @@ void LLMultiPreview::handleReshape(const LLRect& new_rect, bool by_user)
 void LLMultiPreview::tabOpen(LLFloater* opened_floater, bool from_click)
 {
     // Floater could be something else than LLPreview, eg LLFloaterProfile.
-    LLPreview* opened_preview = dynamic_cast<LLPreview*>(opened_floater);
+    LLPreview* opened_preview = ALViewType::as<LLPreview>(opened_floater);
 
     if (opened_preview && opened_preview->getAssetStatus() == LLPreview::PREVIEW_ASSET_UNLOADED)
     {

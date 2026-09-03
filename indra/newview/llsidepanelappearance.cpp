@@ -113,7 +113,7 @@ bool LLSidepanelAppearance::postBuild()
 
     mPanelOutfitsInventory = dynamic_cast<LLPanelOutfitsInventory *>(getChild<LLPanel>("panel_outfits_inventory"));
 
-    mOutfitEdit = dynamic_cast<LLPanelOutfitEdit*>(getChild<LLPanel>("panel_outfit_edit"));
+    mOutfitEdit = getChild<LLPanel>("panel_outfit_edit")->as<LLPanelOutfitEdit>();
     if (mOutfitEdit)
     {
         LLButton* back_btn = mOutfitEdit->getChild<LLButton>("back_btn");

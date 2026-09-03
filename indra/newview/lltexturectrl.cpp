@@ -1930,7 +1930,7 @@ void LLTextureCtrl::setCanApplyImmediately(bool b)
 
 void LLTextureCtrl::setCanApply(bool can_preview, bool can_apply)
 {
-    LLFloaterTexturePicker* floaterp = dynamic_cast<LLFloaterTexturePicker*>(mFloaterHandle.get());
+    LLFloaterTexturePicker* floaterp = ALViewType::as<LLFloaterTexturePicker>(mFloaterHandle.get());
     if( floaterp )
     {
         floaterp->setCanApply(can_preview, can_apply);
@@ -2069,7 +2069,7 @@ void LLTextureCtrl::showPicker(bool take_focus)
             mInventoryPickType);
         mFloaterHandle = floaterp->getHandle();
 
-        LLFloaterTexturePicker* texture_floaterp = dynamic_cast<LLFloaterTexturePicker*>(floaterp);
+        LLFloaterTexturePicker* texture_floaterp = floaterp->as<LLFloaterTexturePicker>();
         if (texture_floaterp && mOnTextureSelectedCallback)
         {
             texture_floaterp->setTextureSelectedCallback(mOnTextureSelectedCallback);
@@ -2265,7 +2265,7 @@ void LLTextureCtrl::onFloaterCommit(ETexturePickOp op, LLPickerSource source, co
 void LLTextureCtrl::setOnTextureSelectedCallback(texture_selected_callback cb)
 {
     mOnTextureSelectedCallback = cb;
-    LLFloaterTexturePicker* floaterp = dynamic_cast<LLFloaterTexturePicker*>(mFloaterHandle.get());
+    LLFloaterTexturePicker* floaterp = ALViewType::as<LLFloaterTexturePicker>(mFloaterHandle.get());
     if (floaterp)
     {
         floaterp->setTextureSelectedCallback(cb);
@@ -2275,7 +2275,7 @@ void LLTextureCtrl::setOnTextureSelectedCallback(texture_selected_callback cb)
 void LLTextureCtrl::setAllowLocalTexture(bool b)
 {
     mAllowLocalTexture = b;
-    LLFloaterTexturePicker* picker_floater = dynamic_cast<LLFloaterTexturePicker*>(mFloaterHandle.get());
+    LLFloaterTexturePicker* picker_floater = ALViewType::as<LLFloaterTexturePicker>(mFloaterHandle.get());
     if (picker_floater)
     {
         picker_floater->setLocalTextureEnabled(mAllowLocalTexture);

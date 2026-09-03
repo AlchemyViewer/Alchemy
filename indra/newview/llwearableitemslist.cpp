@@ -791,7 +791,7 @@ void LLWearableItemsList::updateChangedItems(const uuid_vec_t& changed_items_uui
     while (pairs_iter != pairs_end)
     {
         LLPanel* panel = (*(pairs_iter++))->first;
-        LLPanelInventoryListItemBase* item = dynamic_cast<LLPanelInventoryListItemBase*>(panel);
+        LLPanelInventoryListItemBase* item = panel->as<LLPanelInventoryListItemBase>();
         if (!item)
             continue;
 

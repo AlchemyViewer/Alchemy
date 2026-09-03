@@ -823,7 +823,7 @@ void LLPanelOutfitEdit::onVisibilityChanged(const LLSD &in_visible_chain)
 
 void LLPanelOutfitEdit::onAddWearableClicked(void)
 {
-    LLPanelDummyClothingListItem* item = dynamic_cast<LLPanelDummyClothingListItem*>(mCOFWearables->getSelectedItem());
+    LLPanelDummyClothingListItem* item = ALViewType::as<LLPanelDummyClothingListItem>(mCOFWearables->getSelectedItem());
 
     if(item)
     {
@@ -905,11 +905,11 @@ LLWearableType::EType LLPanelOutfitEdit::getCOFWearablesSelectionType() const
         LLPanel* item = selected_items.front();
 
         // LLPanelDummyClothingListItem is lower then LLPanelInventoryListItemBase in hierarchy tree
-        if (LLPanelDummyClothingListItem* dummy_item = dynamic_cast<LLPanelDummyClothingListItem*>(item))
+        if (LLPanelDummyClothingListItem* dummy_item = item->as<LLPanelDummyClothingListItem>())
         {
             type = dummy_item->getWearableType();
         }
-        else if (LLPanelInventoryListItemBase* real_item = dynamic_cast<LLPanelInventoryListItemBase*>(item))
+        else if (LLPanelInventoryListItemBase* real_item = item->as<LLPanelInventoryListItemBase>())
         {
             type = real_item->getWearableType();
         }
@@ -1050,7 +1050,7 @@ void LLPanelOutfitEdit::filterWearablesBySelectedItem(void)
     bool nothing_selected = ids.empty();
     bool one_selected = ids.size() == 1;
     bool more_than_one_selected = ids.size() > 1;
-    bool is_dummy_item = (ids.size() && dynamic_cast<LLPanelDummyClothingListItem*>(mCOFWearables->getSelectedItem()));
+    bool is_dummy_item = (ids.size() && ALViewType::as<LLPanelDummyClothingListItem>(mCOFWearables->getSelectedItem()));
 
     // selected, expanded accordion tabs and selection in flat list view determine filtering when no item is selected in COF
     // selection in flat list view participates in determining filtering because of EXT-7963

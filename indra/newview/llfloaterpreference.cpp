@@ -1170,7 +1170,7 @@ void LLFloaterPreference::saveSettings()
     for ( ; iter != end; ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreference* panel = dynamic_cast<LLPanelPreference*>(view);
+        LLPanelPreference* panel = view->as<LLPanelPreference>();
         if (panel)
             panel->saveSettings();
     }
@@ -1191,7 +1191,7 @@ void LLFloaterPreference::apply()
          iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreference* panel = dynamic_cast<LLPanelPreference*>(view);
+        LLPanelPreference* panel = view->as<LLPanelPreference>();
         if (panel)
             panel->apply();
     }
@@ -1255,7 +1255,7 @@ void LLFloaterPreference::cancel(const std::vector<std::string> settings_to_skip
         iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreference* panel = dynamic_cast<LLPanelPreference*>(view);
+        LLPanelPreference* panel = view->as<LLPanelPreference>();
         if (panel)
             panel->cancel(settings_to_skip);
     }
@@ -1525,7 +1525,7 @@ void LLFloaterPreference::setRecommendedSettings()
     for ( ; iter != end; ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreference* panel = dynamic_cast<LLPanelPreference*>(view);
+        LLPanelPreference* panel = view->as<LLPanelPreference>();
         if (panel)
         {
             panel->setHardwareDefaults();

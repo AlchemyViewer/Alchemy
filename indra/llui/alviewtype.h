@@ -70,6 +70,7 @@ struct ALViewType
     // A view as a T, or null for a null view. Defined beside LLView, so a
     // header that names a view without seeing it can still ask.
     template <class T> static T* as(LLView* view);
+    template <class T> static const T* as(const LLView* view);
 
     U32 mDepth;
     const char* mName;

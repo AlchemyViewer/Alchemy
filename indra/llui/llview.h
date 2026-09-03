@@ -878,6 +878,11 @@ template <class T> T* ALViewType::as(LLView* view)
     return view ? view->as<T>() : nullptr;
 }
 
+template <class T> const T* ALViewType::as(const LLView* view)
+{
+    return view ? view->as<T>() : nullptr;
+}
+
 // Compiler optimization - don't generate these specializations inline,
 // require explicit specialization.  See llbutton.cpp for an example.
 #ifndef LLVIEW_CPP

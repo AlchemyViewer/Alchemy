@@ -285,8 +285,8 @@ public:
 
     virtual bool compare(const LLPanel* item1, const LLPanel* item2) const
     {
-        const LLPanelInventoryListItemBase* wearable_item1 = dynamic_cast<const LLPanelInventoryListItemBase*>(item1);
-        const LLPanelInventoryListItemBase* wearable_item2 = dynamic_cast<const LLPanelInventoryListItemBase*>(item2);
+        const LLPanelInventoryListItemBase* wearable_item1 = ALViewType::as<LLPanelInventoryListItemBase>(item1);
+        const LLPanelInventoryListItemBase* wearable_item2 = ALViewType::as<LLPanelInventoryListItemBase>(item2);
 
         if (!wearable_item1 || !wearable_item2)
         {

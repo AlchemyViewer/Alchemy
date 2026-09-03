@@ -1212,7 +1212,7 @@ void LLPanelPeople::onTabSelected(const LLSD& param)
 
 void LLPanelPeople::onAvatarListDoubleClicked(LLUICtrl* ctrl)
 {
-    LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+    LLAvatarListItem* item = ALViewType::as<LLAvatarListItem>(ctrl);
     if(!item)
     {
         return;
@@ -1262,7 +1262,7 @@ void LLPanelPeople::onAvatarListCommitted(LLAvatarList* list)
 
 void LLPanelPeople::onNearbyListDoubleClicked(LLUICtrl* ctrl)
 {
-    LLAvatarListItem* item = dynamic_cast<LLAvatarListItem*>(ctrl);
+    LLAvatarListItem* item = ALViewType::as<LLAvatarListItem>(ctrl);
     if(!item)
     {
         return;
