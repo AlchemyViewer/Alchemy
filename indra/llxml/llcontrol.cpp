@@ -44,6 +44,7 @@
 #include "llrect.h"
 #include "llxmltree.h"
 #include "llsdserialize.h"
+#include "llsdutil.h"
 #include "llfile.h"
 #include "lltimer.h"
 #include "lldir.h"
@@ -137,6 +138,13 @@ bool LLControlVariable::llsd_compare(const LLSD& a, const LLSD & b)
         break;
     case TYPE_STRING:
         result = a.asString() == b.asString();
+        break;
+    case TYPE_LLSD:
+        // Deep, strict equality (types, lengths, and reals bit for bit). Without
+        // this case an LLSD-typed control compared as "always changed", so a
+        // write of the value it already held fired the commit signal, dirtied
+        // whatever watched it, and marked the control as never at its default.
+        result = llsd_equals(a, b);
         break;
     default:
         break;
