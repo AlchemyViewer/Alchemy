@@ -319,7 +319,7 @@ void LLFloaterPerformance::populateHUDList()
                 LLScrollListItem* obj = mHUDList->addElement(item);
                 if (obj)
                 {
-                    LLScrollListText* value_text = dynamic_cast<LLScrollListText*>(obj->getColumn(1));
+                    LLScrollListText* value_text = obj->getColumn<LLScrollListText>(1);
                     if (value_text)
                     {
                         value_text->setAlignment(LLFontGL::HCENTER);
@@ -410,7 +410,7 @@ void LLFloaterPerformance::populateObjectList()
                     LLScrollListItem* obj = mObjectList->addElement(item);
                     if (obj)
                     {
-                        LLScrollListText* value_text = dynamic_cast<LLScrollListText*>(obj->getColumn(1));
+                        LLScrollListText* value_text = obj->getColumn<LLScrollListText>(1);
                         if (value_text)
                         {
                             value_text->setAlignment(LLFontGL::HCENTER);
@@ -472,12 +472,12 @@ void LLFloaterPerformance::populateNearbyList()
             LLScrollListItem* av_item = mNearbyList->addElement(item);
             if(av_item)
             {
-                LLScrollListText* value_text = dynamic_cast<LLScrollListText*>(av_item->getColumn(1));
+                LLScrollListText* value_text = av_item->getColumn<LLScrollListText>(1);
                 if (value_text)
                 {
                     value_text->setAlignment(LLFontGL::HCENTER);
                 }
-                LLScrollListText* name_text = dynamic_cast<LLScrollListText*>(av_item->getColumn(2));
+                LLScrollListText* name_text = av_item->getColumn<LLScrollListText>(2);
                 if (name_text)
                 {
                     if (avatar->isSelf())
@@ -490,7 +490,7 @@ void LLFloaterPerformance::populateNearbyList()
                         if (is_slow || LLVOAvatar::AOA_JELLYDOLL == avatar->getOverallAppearance())
                         {
                             color = "LabelDisabledColor";
-                            LLScrollListBar* bar = dynamic_cast<LLScrollListBar*>(av_item->getColumn(0));
+                            LLScrollListBar* bar = av_item->getColumn<LLScrollListBar>(0);
                             if (bar)
                             {
                                 bar->setColor(LLUIColorTable::instance().getColor(color));

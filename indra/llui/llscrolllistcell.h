@@ -35,6 +35,7 @@
 #include "v4color.h"
 #include "llui.h"
 #include "llgltexture.h"
+#include "alviewtype.h"
 
 #include "lllineeditor.h"
 // [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
@@ -57,6 +58,23 @@ class LLUIImage;
 class LLScrollListCell
 {
 public:
+    // The same ancestor table the views keep, so a cell is asked its kind in
+    // one compare: cell->as<LLScrollListText>(), or item->getColumn<T>(i).
+    using ALViewSelf = LLScrollListCell;
+    static constexpr ALViewType sViewType{nullptr, "LLScrollListCell"};
+    virtual const ALViewType* viewType() const { return &sViewType; }
+
+    template <class T> T* as()
+    {
+        static_assert(ALViewTypeOf<T>::declared, "T has no AL_VIEW_TYPE declaration");
+        return viewType()->isA(T::sViewType) ? static_cast<T*>(this) : nullptr;
+    }
+    template <class T> const T* as() const
+    {
+        static_assert(ALViewTypeOf<T>::declared, "T has no AL_VIEW_TYPE declaration");
+        return viewType()->isA(T::sViewType) ? static_cast<const T*>(this) : nullptr;
+    }
+
 // [SL:KB] - Patch: Control-ScrollList | Checked: Catznip-5.2
     typedef boost::function<void(LLScrollListCell* cell)> commit_callback_t;
     typedef boost::signals2::signal<void(LLScrollListCell* cell)> commit_signal_t;
@@ -150,9 +168,10 @@ private:
     std::string mToolTip;
 };
 
-class LLScrollListSpacer : public LLScrollListCell
+class LLScrollListSpacer final : public LLScrollListCell
 {
 public:
+    AL_VIEW_TYPE(LLScrollListSpacer, LLScrollListCell);
     LLScrollListSpacer(const LLScrollListCell::Params& p) : LLScrollListCell(p) {}
     /*virtual*/ ~LLScrollListSpacer() {};
     /*virtual*/ void            draw(const LLColor4& color, const LLColor4& highlight_color) {}
@@ -164,6 +183,7 @@ public:
 class LLScrollListText : public LLScrollListCell
 {
 public:
+    AL_VIEW_TYPE(LLScrollListText, LLScrollListCell);
     LLScrollListText(const LLScrollListCell::Params&);
     /*virtual*/ ~LLScrollListText();
 
@@ -220,9 +240,10 @@ protected:
 /*
  * Cell displaying an image. AT the moment, this is specifically UI image
  */
-class LLScrollListIcon : public LLScrollListCell
+class LLScrollListIcon final : public LLScrollListCell
 {
 public:
+    AL_VIEW_TYPE(LLScrollListIcon, LLScrollListCell);
     LLScrollListIcon(const LLScrollListCell::Params& p);
     /*virtual*/ ~LLScrollListIcon();
     /*virtual*/ void    draw(const LLColor4& color, const LLColor4& highlight_color) override;
@@ -246,9 +267,10 @@ private:
 };
 
 
-class LLScrollListBar : public LLScrollListCell
+class LLScrollListBar final : public LLScrollListCell
 {
 public:
+    AL_VIEW_TYPE(LLScrollListBar, LLScrollListCell);
     LLScrollListBar(const LLScrollListCell::Params& p);
     /*virtual*/ ~LLScrollListBar();
     /*virtual*/ void    draw(const LLColor4& color, const LLColor4& highlight_color);
@@ -268,9 +290,10 @@ private:
 /*
  * An interactive cell containing a check box.
  */
-class LLScrollListCheck : public LLScrollListCell
+class LLScrollListCheck final : public LLScrollListCell
 {
 public:
+    AL_VIEW_TYPE(LLScrollListCheck, LLScrollListCell);
     LLScrollListCheck( const LLScrollListCell::Params&);
     /*virtual*/ ~LLScrollListCheck();
     /*virtual*/ void    draw(const LLColor4& color, const LLColor4& highlight_color);
@@ -291,9 +314,10 @@ private:
 // [/SL:KB]
 };
 
-class LLScrollListDate : public LLScrollListText
+class LLScrollListDate final : public LLScrollListText
 {
 public:
+    AL_VIEW_TYPE(LLScrollListDate, LLScrollListText);
     LLScrollListDate( const LLScrollListCell::Params& p );
     virtual void    setValue(const LLSD& value);
     virtual const LLSD getValue() const;
@@ -306,9 +330,10 @@ private:
 * Cell displaying icon and text.
 */
 
-class LLScrollListIconText : public LLScrollListText
+class LLScrollListIconText final : public LLScrollListText
 {
 public:
+    AL_VIEW_TYPE(LLScrollListIconText, LLScrollListText);
     LLScrollListIconText(const LLScrollListCell::Params& p);
     /*virtual*/ ~LLScrollListIconText();
     /*virtual*/ void    draw(const LLColor4& color, const LLColor4& highlight_color);
@@ -330,9 +355,10 @@ private:
     S32                     mPad;
 };
 
-class LLScrollListLineEditor : public LLScrollListCell
+class LLScrollListLineEditor final : public LLScrollListCell
 {
 public:
+    AL_VIEW_TYPE(LLScrollListLineEditor, LLScrollListCell);
     LLScrollListLineEditor( const LLScrollListCell::Params&);
     /*virtual*/ ~LLScrollListLineEditor();
     void    draw(const LLColor4& color, const LLColor4& highlight_color) override;

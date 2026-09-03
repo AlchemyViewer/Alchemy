@@ -611,7 +611,7 @@ void LLPanelGroupSubTab::buildActionCategory(LLScrollListCtrl* ctrl,
 
         LLScrollListItem* title_row = ctrl->addElement(row, ADD_BOTTOM, action_set->mActionSetData);
 
-        LLScrollListText* name_textp = dynamic_cast<LLScrollListText*>(title_row->getColumn(2)); //?? I have no idea fix getColumn(1) return column spacer...
+        LLScrollListText* name_textp = title_row->getColumn<LLScrollListText>(2); //?? I have no idea fix getColumn(1) return column spacer...
         if (name_textp)
             name_textp->setFontStyle(LLFontGL::BOLD);
 

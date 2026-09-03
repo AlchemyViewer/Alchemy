@@ -2757,7 +2757,7 @@ void FSFloaterPoser::refreshTextHighlightingOnAvatarScrollList()
             icon_cell->setValue(getIconNameForAvatar(listAvatar));
 
         // setFontStyle only exists on LLScrollListText.
-        if (auto* name_cell = dynamic_cast<LLScrollListText*>(listItem->getColumn(COL_NAME)))
+        if (auto* name_cell = listItem->getColumn<LLScrollListText>(COL_NAME))
             name_cell->setFontStyle(mPoserAnimator.isPosingAvatar(listAvatar) ? LLFontGL::BOLD : LLFontGL::NORMAL);
     }
 }
@@ -2798,7 +2798,7 @@ void FSFloaterPoser::addBoldToScrollList(LLScrollListCtrl* list, LLVOAvatar* ava
         if (LLScrollListCell* icon_cell = listItem->getColumn(COL_ICON))
             icon_cell->setValue(getScrollListIconForJoint(avatar, *poserJoint));
 
-        if (auto* name_cell = dynamic_cast<LLScrollListText*>(listItem->getColumn(COL_NAME)))
+        if (auto* name_cell = listItem->getColumn<LLScrollListText>(COL_NAME))
             name_cell->setFontStyle(mPoserAnimator.isPosingAvatarJoint(avatar, *poserJoint) ? LLFontGL::BOLD : LLFontGL::NORMAL);
     }
 }

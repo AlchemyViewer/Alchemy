@@ -332,7 +332,7 @@ LLScrollListItem* LLPanelNearByMedia::addListItem(const LLUUID &id)
     LLScrollListItem* new_item = mMediaList->addElement(row);
     if (NULL != new_item)
     {
-        LLScrollListCheck* scroll_list_check = dynamic_cast<LLScrollListCheck*>(new_item->getColumn(CHECKBOX_COLUMN));
+        LLScrollListCheck* scroll_list_check = new_item->getColumn<LLScrollListCheck>(CHECKBOX_COLUMN);
         if (scroll_list_check)
         {
             LLCheckBoxCtrl *check = scroll_list_check->getCheckBox();
@@ -515,7 +515,7 @@ void LLPanelNearByMedia::updateListItem(LLScrollListItem* item,
             if (mDebugInfoVisible) font_style |= LLFontGL::BOLD;
         }
         cell->setColor(cell_color);
-        LLScrollListText *text_cell = dynamic_cast<LLScrollListText*> (cell);
+        LLScrollListText *text_cell = cell->as<LLScrollListText>();
         if (text_cell)
         {
             text_cell->setFontStyle(font_style);

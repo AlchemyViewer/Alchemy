@@ -121,6 +121,11 @@ public:
     S32     getNumColumns() const;
 
     LLScrollListCell *getColumn(const S32 i) const;
+    template <class T> T* getColumn(const S32 i) const
+    {
+        LLScrollListCell* cell = getColumn(i);
+        return cell ? cell->as<T>() : nullptr;
+    }
 
     std::string getContentsCSV() const;
 

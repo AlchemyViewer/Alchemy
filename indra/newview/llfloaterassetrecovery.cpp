@@ -96,7 +96,7 @@ void LLFloaterAssetRecovery::onBtnRecover()
     std::vector<LLScrollListItem*> items = pListCtrl->getAllData(); LLSD sdFiles;
     for (std::vector<LLScrollListItem*>::const_iterator itItem = items.begin(); itItem != items.end(); ++itItem)
     {
-        LLScrollListCheck* pCheckColumn = dynamic_cast<LLScrollListCheck*>((*itItem)->getColumn(0));
+        LLScrollListCheck* pCheckColumn = (*itItem)->getColumn<LLScrollListCheck>(0);
         if (!pCheckColumn)
             continue;
 
