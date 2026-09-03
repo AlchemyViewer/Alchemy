@@ -35,7 +35,7 @@
 #include "llrect.h"
 
 
-class LLSpinCtrl
+class LLSpinCtrl final
 : public LLF32UICtrl
 {
 public:

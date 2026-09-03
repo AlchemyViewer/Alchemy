@@ -377,7 +377,7 @@ private:
 // EFFICIENT because it may need to be checked a lot.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLMenuItemCheckGL
+class LLMenuItemCheckGL final
 :   public LLMenuItemCallGL
 {
 public:
@@ -764,7 +764,7 @@ private:
 // A context menu
 //-----------------------------------------------------------------------------
 
-class LLContextMenu
+class LLContextMenu final
 : public LLMenuGL
 {
 public:
@@ -817,7 +817,7 @@ protected:
 // class LLContextMenuBranch
 // A branch to another context menu
 //-----------------------------------------------------------------------------
-class LLContextMenuBranch : public LLMenuItemGL
+class LLContextMenuBranch final : public LLMenuItemGL
 {
 public:
     AL_VIEW_TYPE(LLContextMenuBranch, LLMenuItemGL);
@@ -853,7 +853,7 @@ protected:
 // A menu bar displays menus horizontally.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLMenuBarGL : public LLMenuGL
+class LLMenuBarGL final : public LLMenuGL
 {
 public:
     AL_VIEW_TYPE(LLMenuBarGL, LLMenuGL);
@@ -948,7 +948,7 @@ private:
 // Floater that hosts a menu
 // https://wiki.lindenlab.com/mediawiki/index.php?title=LLTearOffMenu&oldid=81344
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-class LLTearOffMenu : public LLFloater
+class LLTearOffMenu final : public LLFloater
 {
 public:
     AL_VIEW_TYPE(LLTearOffMenu, LLFloater);
@@ -982,7 +982,7 @@ private:
 // This class represents a separator.
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class LLMenuItemTearOffGL : public LLMenuItemGL
+class LLMenuItemTearOffGL final : public LLMenuItemGL
 {
 public:
     AL_VIEW_TYPE(LLMenuItemTearOffGL, LLMenuItemGL);

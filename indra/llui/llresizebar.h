@@ -29,7 +29,7 @@
 
 #include "llview.h"
 
-class LLResizeBar : public LLView
+class LLResizeBar final : public LLView
 {
 public:
     AL_VIEW_TYPE(LLResizeBar, LLView);

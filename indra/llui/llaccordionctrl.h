@@ -37,7 +37,7 @@
 
 class LLAccordionCtrlTab;
 
-class LLAccordionCtrl: public LLPanel
+class LLAccordionCtrl final: public LLPanel
 {
 public:
     AL_VIEW_TYPE(LLAccordionCtrl, LLPanel);

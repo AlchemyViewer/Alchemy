@@ -34,7 +34,7 @@
 
 #include "lltexteditor.h"
 
-class LLChatEntry : public LLTextEditor
+class LLChatEntry final : public LLTextEditor
 {
 public:
     AL_VIEW_TYPE(LLChatEntry, LLTextEditor);

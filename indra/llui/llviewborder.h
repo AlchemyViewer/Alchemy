@@ -29,7 +29,7 @@
 
 #include "llview.h"
 
-class LLViewBorder : public LLView
+class LLViewBorder final : public LLView
 {
 public:
     AL_VIEW_TYPE(LLViewBorder, LLView);

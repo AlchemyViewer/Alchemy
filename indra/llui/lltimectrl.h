@@ -34,7 +34,7 @@
 
 class LLLineEditor;
 
-class LLTimeCtrl
+class LLTimeCtrl final
 : public LLUICtrl
 {
     LOG_CLASS(LLTimeCtrl);

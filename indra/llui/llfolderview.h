@@ -63,7 +63,7 @@ class LLTextBox;
  * Used for updating vertical scroll bar visibility in inventory panel.
  * See LLScrollContainer::calcVisibleSize().
  */
-class LLFolderViewScrollContainer : public LLScrollContainer
+class LLFolderViewScrollContainer final : public LLScrollContainer
 {
 public:
     AL_VIEW_TYPE(LLFolderViewScrollContainer, LLScrollContainer);

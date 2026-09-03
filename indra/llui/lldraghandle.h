@@ -109,7 +109,7 @@ private:
 
 
 // Use this one for traditional top-of-window draggers
-class LLDragHandleTop
+class LLDragHandleTop final
 : public LLDragHandle
 {
 public:
@@ -131,7 +131,7 @@ private:
 
 
 // Use this for left-side, vertical text draggers
-class LLDragHandleLeft
+class LLDragHandleLeft final
 : public LLDragHandle
 {
 public:

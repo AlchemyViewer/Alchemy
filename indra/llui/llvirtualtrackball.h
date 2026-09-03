@@ -35,7 +35,7 @@
 #include "lltextbox.h"
 #include "llbutton.h"
 
-class LLVirtualTrackball
+class LLVirtualTrackball final
     : public LLUICtrl
 {
 public:

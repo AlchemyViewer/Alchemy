@@ -34,7 +34,7 @@
 class LLLayoutPanel;
 class LLTextBox;
 
-class LLWindowShade : public LLUICtrl
+class LLWindowShade final : public LLUICtrl
 {
 public:
     AL_VIEW_TYPE(LLWindowShade, LLUICtrl);

@@ -32,7 +32,7 @@
 #include "llcoord.h"
 
 
-class LLResizeHandle : public LLView
+class LLResizeHandle final : public LLView
 {
 public:
     AL_VIEW_TYPE(LLResizeHandle, LLView);

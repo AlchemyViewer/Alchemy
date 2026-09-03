@@ -45,7 +45,7 @@
  * @see start()
  * @see stop()
  */
-class LLLoadingIndicator
+class LLLoadingIndicator final
 : public LLUICtrl
 {
     LOG_CLASS(LLLoadingIndicator);

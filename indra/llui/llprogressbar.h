@@ -31,7 +31,7 @@
 #include "lluictrl.h"
 #include "lluiimage.h"
 
-class LLProgressBar
+class LLProgressBar final
     : public LLUICtrl
 {
 public:

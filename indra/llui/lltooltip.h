@@ -36,7 +36,7 @@
 //
 // Classes
 //
-class LLToolTipView : public LLView
+class LLToolTipView final : public LLView
 {
 public:
     AL_VIEW_TYPE(LLToolTipView, LLView);
@@ -137,7 +137,7 @@ protected:
 };
 
 // used for the inspector tooltips which need different background images etc.
-class LLInspector : public LLToolTip
+class LLInspector final : public LLToolTip
 {
 public:
     AL_VIEW_TYPE(LLInspector, LLToolTip);

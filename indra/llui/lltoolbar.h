@@ -43,7 +43,7 @@ typedef std::function<void (S32 x, S32 y, LLToolBarButton* button)> tool_startdr
 typedef std::function<bool (S32 x, S32 y, const LLUUID& uuid, LLAssetType::EType type)> tool_handledrag_callback_t;
 typedef std::function<bool (void* data, EDragAndDropType cargo_type, S32 x, S32 y, LLToolBar* toolbar)> tool_handledrop_callback_t;
 
-class LLToolBarButton : public LLButton
+class LLToolBarButton final : public LLButton
 {
     friend class LLToolBar;
 public:
@@ -182,7 +182,7 @@ namespace LLInitParam
 }
 
 
-class LLToolBar
+class LLToolBar final
 :   public LLUICtrl
 {
     friend class LLToolBarButton;

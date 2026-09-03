@@ -35,7 +35,7 @@
 #include "lltextbox.h"
 #include "lllineeditor.h"
 
-class LLXYVector
+class LLXYVector final
     : public LLUICtrl
 {
 public:

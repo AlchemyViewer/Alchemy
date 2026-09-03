@@ -35,7 +35,7 @@
 class LLLayoutPanel;
 
 
-class LLLayoutStack : public LLView, public LLInstanceTracker<LLLayoutStack>
+class LLLayoutStack final : public LLView, public LLInstanceTracker<LLLayoutStack>
 {
 public:
     AL_VIEW_TYPE(LLLayoutStack, LLView);

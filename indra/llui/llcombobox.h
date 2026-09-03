@@ -271,7 +271,7 @@ private:
 };
 
 // A combo box with icons for the list of items.
-class LLIconsComboBox
+class LLIconsComboBox final
 :   public LLComboBox
 {
 public:

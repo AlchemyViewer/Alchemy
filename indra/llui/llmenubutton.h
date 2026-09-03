@@ -31,7 +31,7 @@
 
 class LLToggleableMenu;
 
-class LLMenuButton
+class LLMenuButton final
 : public LLButton
 {
     LOG_CLASS(LLMenuButton);

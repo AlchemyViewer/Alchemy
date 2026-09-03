@@ -89,7 +89,7 @@ namespace LLInitParam
 // Classes
 //
 
-class LLBadge
+class LLBadge final
 : public LLUICtrl
 {
 public:

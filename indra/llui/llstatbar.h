@@ -34,7 +34,7 @@
 #include <array>
 #include <string_view>
 
-class LLStatBar : public LLView
+class LLStatBar final : public LLView
 {
 public:
     AL_VIEW_TYPE(LLStatBar, LLView);

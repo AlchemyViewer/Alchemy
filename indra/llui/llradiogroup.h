@@ -36,7 +36,7 @@
  * buttons (usually radio buttons).  Automatically handles the mutex
  * condition by highlighting only one button at a time.
  */
-class LLRadioGroup
+class LLRadioGroup final
 :   public LLUICtrl, public LLCtrlSelectionInterface
 {
 public:

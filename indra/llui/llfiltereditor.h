@@ -38,7 +38,7 @@
 
 #include "llsearcheditor.h"
 
-class LLFilterEditor : public LLSearchEditor
+class LLFilterEditor final : public LLSearchEditor
 {
 public:
     AL_VIEW_TYPE(LLFilterEditor, LLSearchEditor);

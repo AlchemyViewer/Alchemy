@@ -42,7 +42,7 @@ class LLLineEditor;
 class LLSlider;
 
 
-class LLMultiSliderCtrl : public LLF32UICtrl
+class LLMultiSliderCtrl final : public LLF32UICtrl
 {
 public:
     AL_VIEW_TYPE(LLMultiSliderCtrl, LLF32UICtrl);

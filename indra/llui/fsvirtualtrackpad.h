@@ -33,7 +33,7 @@
 #include "lluictrl.h"
 #include "llpanel.h"
 
-class FSVirtualTrackpad
+class FSVirtualTrackpad final
     : public LLUICtrl
 {
 public:

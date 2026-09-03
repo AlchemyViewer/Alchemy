@@ -35,7 +35,7 @@
 //
 // Classes
 //
-class LLScrollbar
+class LLScrollbar final
 : public LLUICtrl
 {
 public:

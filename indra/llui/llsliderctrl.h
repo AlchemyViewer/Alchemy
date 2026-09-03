@@ -35,7 +35,7 @@
 #include "lllineeditor.h"
 
 
-class LLSliderCtrl: public LLF32UICtrl, public ll::ui::SearchableControl
+class LLSliderCtrl final: public LLF32UICtrl, public ll::ui::SearchableControl
 {
 public:
     AL_VIEW_TYPE(LLSliderCtrl, LLF32UICtrl);

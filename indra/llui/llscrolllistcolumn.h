@@ -37,7 +37,7 @@ class LLScrollListColumn;
 class LLResizeBar;
 class LLScrollListCtrl;
 
-class LLScrollColumnHeader : public LLButton
+class LLScrollColumnHeader final : public LLButton
 {
 public:
     AL_VIEW_TYPE(LLScrollColumnHeader, LLButton);

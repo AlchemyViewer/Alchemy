@@ -49,7 +49,7 @@ public:
 /*
  * A set of panels that are displayed in a sequence inside a scroll container.
  */
-class LLScrollingPanelList : public LLUICtrl
+class LLScrollingPanelList final : public LLUICtrl
 {
 public:
     AL_VIEW_TYPE(LLScrollingPanelList, LLUICtrl);
