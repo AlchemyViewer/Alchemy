@@ -456,7 +456,7 @@ void LLInvFVBridge::navigateToFolder(bool new_window, bool change_mode)
         }
         else
         {
-            LLInventorySingleFolderPanel* panel = dynamic_cast<LLInventorySingleFolderPanel*>(mInventoryPanel.get());
+            LLInventorySingleFolderPanel* panel = ALViewType::as<LLInventorySingleFolderPanel>(mInventoryPanel.get());
             if (!panel || !getInventoryModel() || mUUID.isNull())
             {
                 return;
@@ -802,7 +802,7 @@ void hide_context_entries(LLMenuGL& menu,
         // between two separators).
         if (found)
         {
-            const bool is_entry_separator = (dynamic_cast<LLMenuItemSeparatorGL *>(menu_item) != NULL);
+            const bool is_entry_separator = (menu_item->as<LLMenuItemSeparatorGL>() != NULL);
             found = !(is_entry_separator && is_previous_entry_separator);
             is_previous_entry_separator = is_entry_separator;
         }

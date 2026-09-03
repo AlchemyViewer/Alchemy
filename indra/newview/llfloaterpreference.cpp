@@ -2481,7 +2481,7 @@ void LLFloaterPreference::onClickAdvanced()
          iter != tabcontainer->getChildList()->end(); ++iter)
     {
         LLView* view = *iter;
-        LLPanelPreferenceGraphics* panel = dynamic_cast<LLPanelPreferenceGraphics*>(view);
+        LLPanelPreferenceGraphics* panel = view->as<LLPanelPreferenceGraphics>();
         if (panel)
         {
             panel->resetDirtyChilds();

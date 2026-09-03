@@ -1206,7 +1206,7 @@ void LLFloaterModelPreview::initDecompControls()
                     slider->setValue(param[i].mDefault.mFloat);
                     slider->setCommitCallback(onPhysicsParamCommit, (void*) &param[i]);
                 }
-                else if (LLSpinCtrl* spinner = dynamic_cast<LLSpinCtrl*>(ctrl))
+                else if (LLSpinCtrl* spinner = ALViewType::as<LLSpinCtrl>(ctrl))
                 {
                     bool is_retain_ctrl = "Retain%" == name;
                     float coefficient = is_retain_ctrl ? (F32)RETAIN_COEFFICIENT : 1.f;

@@ -986,7 +986,7 @@ void LLPanelEditWearable::onCommitSexChange()
 
 void LLPanelEditWearable::onTexturePickerCommit(const LLUICtrl* ctrl)
 {
-        const LLTextureCtrl* texture_ctrl = dynamic_cast<const LLTextureCtrl*>(ctrl);
+        const LLTextureCtrl* texture_ctrl = ALViewType::as<LLTextureCtrl>(ctrl);
         if (!texture_ctrl)
         {
                 LL_WARNS() << "got commit signal from not LLTextureCtrl." << LL_ENDL;

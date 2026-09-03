@@ -343,7 +343,7 @@ bool LLGroupList::handleEvent(LLPointer<LLOldEvents::LLEvent> event, const LLSD&
             getItems(items);
             for (std::vector<LLPanel*>::iterator it = items.begin(); it != items.end(); ++it)
             {
-                LLGroupListItem* item = dynamic_cast<LLGroupListItem*>(*it);
+                LLGroupListItem* item = (*it)->as<LLGroupListItem>();
                 if (item && item->getGroupID() == group_id)
                 {
                     item->setVisibleInProfile(visible);

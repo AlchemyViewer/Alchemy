@@ -124,7 +124,7 @@ bool LLSidepanelAppearance::postBuild()
 
     }
 
-    mEditWearable = dynamic_cast<LLPanelEditWearable*>(getChild<LLPanel>("panel_edit_wearable"));
+    mEditWearable = getChild<LLPanel>("panel_edit_wearable")->as<LLPanelEditWearable>();
     if (mEditWearable)
     {
         LLButton* edit_wearable_back_btn = mEditWearable->getChild<LLButton>("back_btn");

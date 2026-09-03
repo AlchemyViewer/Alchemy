@@ -820,7 +820,7 @@ void LLOutfitsList::sortOutfits()
 
 void LLOutfitsList::onOutfitRightClick(LLUICtrl* ctrl, S32 x, S32 y, const LLUUID& cat_id)
 {
-    LLOutfitAccordionCtrlTab* tab = dynamic_cast<LLOutfitAccordionCtrlTab*>(ctrl);
+    LLOutfitAccordionCtrlTab* tab = ALViewType::as<LLOutfitAccordionCtrlTab>(ctrl);
     if (mOutfitMenu && is_tab_header_clicked(tab, y) && cat_id.notNull())
     {
         // Focus tab header to trigger tab selection change.

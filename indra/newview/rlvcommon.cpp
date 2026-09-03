@@ -792,7 +792,7 @@ void RlvUtil::sendIMMessage(const LLUUID& idRecipient, const std::string& strMsg
 // Checked: 2015-05-25 (RLVa-1.5.0)
 bool rlvMenuMainToggleVisible(LLUICtrl* pMenuCtrl)
 {
-    LLMenuItemCheckGL* pMenuItem = dynamic_cast<LLMenuItemCheckGL*>(pMenuCtrl);
+    LLMenuItemCheckGL* pMenuItem = ALViewType::as<LLMenuItemCheckGL>(pMenuCtrl);
     if (pMenuItem)
     {
         static std::string strLabel = pMenuItem->getLabel();

@@ -1539,9 +1539,9 @@ void LLFloaterUIPreview::findOverlapsInChildren(LLView* parent)
 // *NOTE: If a list of elements which have localizable content were created, this function should return false if viewp's class is in that list.
 bool LLFloaterUIPreview::overlapIgnorable(LLView* viewp)
 {
-    return  NULL != dynamic_cast<LLDragHandle*>(viewp) ||
-            NULL != dynamic_cast<LLViewBorder*>(viewp) ||
-            NULL != dynamic_cast<LLResizeBar*>(viewp);
+    return  ALViewType::as<LLDragHandle>(viewp) ||
+            ALViewType::as<LLViewBorder>(viewp) ||
+            ALViewType::as<LLResizeBar>(viewp);
 }
 
 // *HACK: these are the only two container types as of 8/08, per Richard

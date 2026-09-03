@@ -182,7 +182,7 @@ public:
 
     /*virtual*/ bool    handleHover(S32 x, S32 y, MASK mask)
     {
-        LLFavoritesBarCtrl* fb = dynamic_cast<LLFavoritesBarCtrl*>(getParent());
+        LLFavoritesBarCtrl* fb = getParentAs<LLFavoritesBarCtrl>();
 
         if (fb)
         {

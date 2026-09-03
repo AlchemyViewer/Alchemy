@@ -1008,9 +1008,9 @@ LLFlatListView* LLTeleportHistoryPanel::getFlatListViewFromTab(LLAccordionCtrlTa
 {
     for (child_list_const_iter_t iter = tab->beginChild(); iter != tab->endChild(); iter++)
     {
-        if (dynamic_cast<LLFlatListView*>(*iter))
+        if (LLFlatListView* list = (*iter)->as<LLFlatListView>())
         {
-            return (LLFlatListView*)*iter; // There should be one scroll list per tab.
+            return list; // There should be one scroll list per tab.
         }
     }
 

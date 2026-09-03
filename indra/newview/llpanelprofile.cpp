@@ -2456,7 +2456,7 @@ bool LLPanelProfile::postBuild()
 
 void LLPanelProfile::onTabChange()
 {
-    LLPanelProfileTab* active_panel = dynamic_cast<LLPanelProfileTab*>(mTabContainer->getCurrentPanel());
+    LLPanelProfileTab* active_panel = ALViewType::as<LLPanelProfileTab>(mTabContainer->getCurrentPanel());
     if (active_panel)
     {
         active_panel->updateData();

@@ -871,7 +871,7 @@ void LLPanelMainInventory::onFilterEdit(const std::string& search_string )
     LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end(); ++iter)
     {
-        LLPanelMainInventory* iv = dynamic_cast<LLPanelMainInventory*>(*iter);
+        LLPanelMainInventory* iv = (*iter)->as<LLPanelMainInventory>();
         if (iv)
         {
             if (gFocusMgr.childHasKeyboardFocus(iv))

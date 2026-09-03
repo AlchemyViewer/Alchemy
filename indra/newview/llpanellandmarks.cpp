@@ -440,7 +440,7 @@ void LLLandmarksPanel::initLandmarksPanel(LLPlacesInventoryPanel* inventory_list
     bool sorting_order = gSavedSettings.getBOOL("LandmarksSortedByDate");
     updateSortOrder(inventory_list, sorting_order);
 
-    LLPlacesFolderView* root_folder = dynamic_cast<LLPlacesFolderView*>(inventory_list->getRootFolder());
+    LLPlacesFolderView* root_folder = ALViewType::as<LLPlacesFolderView>(inventory_list->getRootFolder());
     if (root_folder)
     {
         if (mGearFolderMenu)

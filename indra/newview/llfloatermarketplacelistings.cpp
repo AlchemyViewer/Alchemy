@@ -1052,7 +1052,7 @@ void LLFloaterItemProperties::onOpen(const LLSD& key)
         item_panel->setParentFloater(this);
     }
 
-    LLSidepanelTaskInfo* task_panel = dynamic_cast<LLSidepanelTaskInfo*>(panel);
+    LLSidepanelTaskInfo* task_panel = ALViewType::as<LLSidepanelTaskInfo>(panel);
     if (task_panel)
     {
         task_panel->setObjectSelection(LLSelectMgr::getInstance()->getSelection());

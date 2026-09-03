@@ -114,7 +114,7 @@ bool LLAlertHandler::processNotification(const LLNotificationPtr& notification, 
     LLToast::Params p;
     p.notif_id = notification->getID();
     p.notification = notification;
-    p.panel = dynamic_cast<LLToastPanel*>(alert_dialog);
+    p.panel = alert_dialog;
     p.enable_hide_btn = false;
     p.can_fade = false;
     p.is_modal = mIsModal;

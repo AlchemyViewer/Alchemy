@@ -1135,7 +1135,7 @@ void LLFloaterEditExtDayCycle::updateTabs()
 void LLFloaterEditExtDayCycle::updateWaterTabs(const LLSettingsWaterPtr_t &p_water)
 {
     LLView* tab_container = mWaterTabLayoutContainer->getChild<LLView>(TABS_WATER); //can't extract panels directly, since it is in 'tuple'
-    LLPanelSettingsWaterMainTab* panel = dynamic_cast<LLPanelSettingsWaterMainTab*>(tab_container->findChildView("water_panel"));
+    LLPanelSettingsWaterMainTab* panel = tab_container->findChild<LLPanelSettingsWaterMainTab>("water_panel");
     if (panel)
     {
         panel->setWater(p_water);

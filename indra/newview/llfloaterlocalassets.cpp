@@ -510,8 +510,7 @@ protected:
     void doUpload(const std::string& path) override
     {
         // Hand the file to the standard Model upload floater (LOD/physics/cost).
-        if (LLFloaterModelPreview* fmp =
-                dynamic_cast<LLFloaterModelPreview*>(LLFloaterReg::showInstance("upload_model")))
+        if (LLFloaterModelPreview* fmp = LLFloaterReg::showTypedInstance<LLFloaterModelPreview>("upload_model"))
         {
             fmp->loadModel(LLModel::LOD_HIGH, path);
         }
@@ -1617,7 +1616,7 @@ void LLFloaterLocalAssets::dropFiles(const std::vector<std::string>& paths)
         }
 
         // The tab panels are LLPanelLocalAssetBase (anon-namespace, visible here).
-        if (LLPanelLocalAssetBase* panel = dynamic_cast<LLPanelLocalAssetBase*>(mTabs->getPanelByName(tab_name)))
+        if (LLPanelLocalAssetBase* panel = ALViewType::as<LLPanelLocalAssetBase>(mTabs->getPanelByName(tab_name)))
         {
             mTabs->selectTabPanel(panel);
             panel->loadFile(path); // decode + add (+ persist) via the manager

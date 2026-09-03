@@ -1467,7 +1467,7 @@ LLMediaCtrl* LLMediaCtrlListener::findMediaCtrl(const std::string& path)
     {
         return nullptr;
     }
-    return dynamic_cast<LLMediaCtrl*>(view);
+    return view->as<LLMediaCtrl>();
 }
 
 void LLMediaCtrlListener::getMediaInfo(const LLSD& request)

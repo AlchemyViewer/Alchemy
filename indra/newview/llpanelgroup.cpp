@@ -524,7 +524,7 @@ bool LLPanelGroup::apply(LLPanelGroupTab* tab)
         //we skip refreshing group after ew manually apply changes since its very annoying
         //for those who are editing group
 
-        LLPanelGroupRoles * roles_tab = dynamic_cast<LLPanelGroupRoles*>(tab);
+        LLPanelGroupRoles * roles_tab = tab->as<LLPanelGroupRoles>();
         if (roles_tab)
         {
             LLGroupMgr* gmgrp = LLGroupMgr::getInstance();

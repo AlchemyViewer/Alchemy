@@ -645,15 +645,15 @@ void LLMultiPreview::tabOpen(LLFloater* opened_floater, bool from_click)
     if ( (pSearchFloater) && (pSearchFloater->getDependee() == this) )
     {
         LLPreviewNotecard* pPreviewNotecard = NULL; LLPreviewLSL* pPreviewScript = NULL; LLLiveLSLEditor* pPreviewScriptLive = NULL;
-        if ((pPreviewNotecard = dynamic_cast<LLPreviewNotecard*>(opened_preview)) != NULL)
+        if ((pPreviewNotecard = ALViewType::as<LLPreviewNotecard>(opened_preview)) != NULL)
         {
             LLFloaterSearchReplace::show(pPreviewNotecard->getEditor());
         }
-        else if ((pPreviewScript = dynamic_cast<LLPreviewLSL*>(opened_preview)) != NULL)
+        else if ((pPreviewScript = ALViewType::as<LLPreviewLSL>(opened_preview)) != NULL)
         {
             LLFloaterSearchReplace::show(pPreviewScript->getEditor());
         }
-        else if ((pPreviewScriptLive = dynamic_cast<LLLiveLSLEditor*>(opened_preview)) != NULL)
+        else if ((pPreviewScriptLive = ALViewType::as<LLLiveLSLEditor>(opened_preview)) != NULL)
         {
             LLFloaterSearchReplace::show(pPreviewScriptLive->getEditor());
         }

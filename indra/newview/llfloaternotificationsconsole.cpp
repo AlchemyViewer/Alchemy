@@ -95,7 +95,7 @@ void LLNotificationChannelPanel::toggleClick(void *user_data)
 
     LLButton* header_button = self->getChild<LLButton>("header");
 
-    LLLayoutStack* stack = dynamic_cast<LLLayoutStack*>(self->getParent());
+    LLLayoutStack* stack = self->getParentAs<LLLayoutStack>();
     if (stack)
     {
         stack->collapsePanel(self, header_button->getToggleState());

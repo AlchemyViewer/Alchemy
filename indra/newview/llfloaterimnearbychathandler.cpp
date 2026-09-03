@@ -853,7 +853,7 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
     }
     */
 
-    LLFloaterIMNearbyChatScreenChannel* channel = dynamic_cast<LLFloaterIMNearbyChatScreenChannel*>(mChannel.get());
+    LLFloaterIMNearbyChatScreenChannel* channel = ALViewType::as<LLFloaterIMNearbyChatScreenChannel>(mChannel.get());
 
     if(channel)
     {

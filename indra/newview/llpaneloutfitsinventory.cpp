@@ -347,7 +347,7 @@ void LLPanelOutfitsInventory::initTabPanels()
 void LLPanelOutfitsInventory::onTabChange()
 {
     if (!mAppearanceTabs) return;
-    mActivePanel = dynamic_cast<LLPanelAppearanceTab*>(mAppearanceTabs->getCurrentPanel());
+    mActivePanel = ALViewType::as<LLPanelAppearanceTab>(mAppearanceTabs->getCurrentPanel());
     if (!mActivePanel) return;
 
     mActivePanel->checkFilterSubString();

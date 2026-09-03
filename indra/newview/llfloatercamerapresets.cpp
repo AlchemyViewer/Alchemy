@@ -78,7 +78,7 @@ void LLFloaterCameraPresets::populateList()
 
 void LLFloaterCameraPresets::onSelectionChange()
 {
-    LLCameraPresetFlatItem* selected_preset = dynamic_cast<LLCameraPresetFlatItem*>(mPresetList->getSelectedItem());
+    LLCameraPresetFlatItem* selected_preset = ALViewType::as<LLCameraPresetFlatItem>(mPresetList->getSelectedItem());
     if(selected_preset)
     {
         LLFloaterCamera::switchToPreset(selected_preset->getPresetName());

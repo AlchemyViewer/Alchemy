@@ -739,7 +739,7 @@ public:
     {
         if (!info_ctrl) return;
 
-        LLChatHistoryHeader* header = dynamic_cast<LLChatHistoryHeader*>(info_ctrl->getParent());
+        LLChatHistoryHeader* header = info_ctrl->getParentAs<LLChatHistoryHeader>();
         if (!header) return;
 
         header->showInspector();

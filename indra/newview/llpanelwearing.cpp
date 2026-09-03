@@ -546,7 +546,7 @@ void LLPanelWearing::onWearableItemsListRightClick(LLUICtrl* ctrl, S32 x, S32 y)
 
 void LLPanelWearing::onTempAttachmentsListRightClick(LLUICtrl* ctrl, S32 x, S32 y)
 {
-    LLScrollListCtrl* list = dynamic_cast<LLScrollListCtrl*>(ctrl);
+    LLScrollListCtrl* list = ALViewType::as<LLScrollListCtrl>(ctrl);
     if (!list) return;
     list->selectItemAt(x, y, MASK_NONE);
     uuid_vec_t selected_uuids;

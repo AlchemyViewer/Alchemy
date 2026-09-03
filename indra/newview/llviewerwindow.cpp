@@ -1506,7 +1506,7 @@ LLWindowCallbacks::DragNDropResult LLViewerWindow::handleDragNDropFile(LLWindow 
                             {
                                 files.push_back(dragItem.second);
                             }
-                            if (LLFloaterLocalAssets* laf = dynamic_cast<LLFloaterLocalAssets*>(la))
+                            if (LLFloaterLocalAssets* laf = la->as<LLFloaterLocalAssets>())
                             {
                                 laf->dropFiles(files);
                             }

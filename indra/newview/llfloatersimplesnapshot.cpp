@@ -552,7 +552,7 @@ void LLFloaterSimpleSnapshot::update()
     for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin();
         iter != inst_list.end(); ++iter)
     {
-        LLFloaterSimpleSnapshot* floater = dynamic_cast<LLFloaterSimpleSnapshot*>(*iter);
+        LLFloaterSimpleSnapshot* floater = (*iter)->as<LLFloaterSimpleSnapshot>();
         if (floater)
         {
             floater->impl->updateLivePreview();

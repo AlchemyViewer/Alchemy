@@ -141,7 +141,7 @@ bool LLPanelGroupRoles::postBuild()
     for (S32 i = 0; i < mSubTabContainer->getTabCount(); ++i)
     {
         LLPanel* panel = mSubTabContainer->getPanelByIndex(i);
-        LLPanelGroupSubTab* subtabp = dynamic_cast<LLPanelGroupSubTab*>(panel);
+        LLPanelGroupSubTab* subtabp = ALViewType::as<LLPanelGroupSubTab>(panel);
         if (!subtabp)
         {
             LL_WARNS() << "Invalid subtab panel: " << panel->getName() << LL_ENDL;
@@ -2429,7 +2429,7 @@ struct ActionCBData
 
 void LLPanelGroupRolesSubTab::handleActionCheck(LLUICtrl* ctrl, bool force)
 {
-    LLCheckBoxCtrl* check = dynamic_cast<LLCheckBoxCtrl*>(ctrl);
+    LLCheckBoxCtrl* check = ALViewType::as<LLCheckBoxCtrl>(ctrl);
     if (!check)
         return;
 
