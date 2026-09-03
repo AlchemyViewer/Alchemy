@@ -32,6 +32,8 @@
 class LLViewBorder : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLViewBorder, LLView);
+
     typedef enum e_bevel { BEVEL_IN, BEVEL_OUT, BEVEL_BRIGHT, BEVEL_NONE } EBevel ;
     typedef enum e_style { STYLE_LINE, STYLE_TEXTURE } EStyle;
 

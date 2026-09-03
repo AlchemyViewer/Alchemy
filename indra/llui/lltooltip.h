@@ -39,6 +39,8 @@
 class LLToolTipView : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLToolTipView, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Params();
@@ -59,6 +61,7 @@ public:
 class LLToolTip : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLToolTip, LLPanel);
 
     struct StyledText : public LLInitParam::Block<StyledText>
     {
@@ -137,6 +140,8 @@ protected:
 class LLInspector : public LLToolTip
 {
 public:
+    AL_VIEW_TYPE(LLInspector, LLToolTip);
+
     struct Params : public LLInitParam::Block<Params, LLToolTip::Params>
     {};
 };

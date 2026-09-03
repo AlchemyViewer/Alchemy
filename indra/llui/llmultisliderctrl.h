@@ -45,6 +45,8 @@ class LLSlider;
 class LLMultiSliderCtrl : public LLF32UICtrl
 {
 public:
+    AL_VIEW_TYPE(LLMultiSliderCtrl, LLF32UICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLF32UICtrl::Params>
     {
         Optional<S32>           label_width,

@@ -42,6 +42,8 @@
 class LLSearchEditor : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLSearchEditor, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLLineEditor::Params>
     {
         Optional<LLButton::Params>  search_button,

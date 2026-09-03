@@ -37,6 +37,8 @@ class LLMenuButton
     LOG_CLASS(LLMenuButton);
 
 public:
+    AL_VIEW_TYPE(LLMenuButton, LLButton);
+
     typedef enum e_menu_position
     {
         MP_TOP_LEFT,

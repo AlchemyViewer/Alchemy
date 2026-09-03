@@ -35,6 +35,8 @@
 class LLStatGraph : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLStatGraph, LLView);
+
     struct ThresholdParams : public LLInitParam::Block<ThresholdParams>
     {
         Mandatory<F32>  value;

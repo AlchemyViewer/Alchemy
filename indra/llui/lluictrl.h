@@ -48,6 +48,8 @@ class LLUICtrl
     : public LLView, public boost::signals2::trackable
 {
 public:
+    AL_VIEW_TYPE(LLUICtrl, LLView);
+
     using commit_callback_t = std::function<void (LLUICtrl* ctrl, const LLSD& param)>;
     using commit_signal_t = boost::signals2::signal<void (LLUICtrl* ctrl, const LLSD& param)>;
     // *TODO: add xml support for this type of signal in the future
@@ -154,7 +156,6 @@ public:
     // LLView interface
     /*virtual*/ bool    setLabelArg( const std::string& key, const LLStringExplicit& text ) override;
     /*virtual*/ bool    isCtrl() const override;
-    U64                 kindMask() const override { return LLView::kindMask() | ALViewKind::CTRL; }
     /*virtual*/ void    onMouseEnter(S32 x, S32 y, MASK mask) override;
     /*virtual*/ void    onMouseLeave(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool    canFocusChildren() const override;

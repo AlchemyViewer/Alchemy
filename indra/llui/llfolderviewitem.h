@@ -71,6 +71,8 @@ struct LLFolderViewItemStyle
 class LLFolderViewItem : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLFolderViewItem, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Optional<LLUIImage*>                        favorite_image,
@@ -204,7 +206,6 @@ public:
 
     virtual ~LLFolderViewItem( void );
 
-    U64 kindMask() const override { return LLView::kindMask() | ALViewKind::FOLDER_VIEW_ITEM; }
 
     // addToFolder() returns true if it succeeds. false otherwise
     virtual void addToFolder(LLFolderViewFolder* folder);
@@ -450,6 +451,10 @@ private:
 
 class LLFolderViewFolder : public LLFolderViewItem
 {
+public:
+    AL_VIEW_TYPE(LLFolderViewFolder, LLFolderViewItem);
+
+private:
 protected:
     LLFolderViewFolder( const LLFolderViewItem::Params& );
     friend class LLUICtrlFactory;
@@ -492,7 +497,6 @@ public:
 
     virtual ~LLFolderViewFolder( void );
 
-    U64 kindMask() const override { return LLFolderViewItem::kindMask() | ALViewKind::FOLDER_VIEW_FOLDER; }
 
     LLFolderViewItem* getNextFromChild( LLFolderViewItem*, bool include_children = true );
     LLFolderViewItem* getPreviousFromChild( LLFolderViewItem*, bool include_children = true  );

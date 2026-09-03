@@ -59,6 +59,7 @@ class LLLineEditor
 : public LLUICtrl, public LLEditMenuHandler, protected LLPreeditor, public LLSpellCheckMenuHandler
 {
 public:
+    AL_VIEW_TYPE(LLLineEditor, LLUICtrl);
 
     typedef std::function<void (LLLineEditor* caller)> keystroke_callback_t;
 
@@ -126,7 +127,6 @@ protected:
 public:
     virtual ~LLLineEditor();
 
-    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::LINE_EDITOR; }
 
     // mousehandler overrides
     /*virtual*/ bool    handleMouseDown(S32 x, S32 y, MASK mask) override;

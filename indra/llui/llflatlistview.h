@@ -57,6 +57,7 @@ class LLFlatListView : public LLScrollContainer, public LLEditMenuHandler
 {
     LOG_CLASS(LLFlatListView);
 public:
+    AL_VIEW_TYPE(LLFlatListView, LLScrollContainer);
 
     /**
      * Abstract comparator for comparing flat list items in a form of LLPanel
@@ -193,7 +194,7 @@ public:
     template<class T>
     T* getTypedItemByValue(const LLSD& value) const
     {
-        return ALViewKind::as<T>(getItemByValue(value));
+        return ALViewType::as<T>(getItemByValue(value));
     }
 
     /**
@@ -543,6 +544,8 @@ private:
 class LLFlatListViewEx : public LLFlatListView
 {
 public:
+    AL_VIEW_TYPE(LLFlatListViewEx, LLFlatListView);
+
     LOG_CLASS(LLFlatListViewEx);
 
     struct Params : public LLInitParam::Block<Params, LLFlatListView::Params>

@@ -37,6 +37,8 @@ class FSVirtualTrackpad
     : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(FSVirtualTrackpad, LLUICtrl);
+
     struct Params
         : public LLInitParam::Block<Params, LLUICtrl::Params>
     {

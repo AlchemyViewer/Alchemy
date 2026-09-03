@@ -38,6 +38,7 @@ class LLLayoutPanel;
 class LLLayoutStack : public LLView, public LLInstanceTracker<LLLayoutStack>
 {
 public:
+    AL_VIEW_TYPE(LLLayoutStack, LLView);
 
     struct LayoutStackRegistry : public LLChildRegistry<LayoutStackRegistry>
     {
@@ -66,7 +67,6 @@ public:
 
     typedef LayoutStackRegistry child_registry_t;
 
-    U64 kindMask() const override { return LLView::kindMask() | ALViewKind::LAYOUT_STACK; }
 
     virtual ~LLLayoutStack();
 
@@ -139,6 +139,8 @@ class LLLayoutPanel : public LLPanel
 friend class LLLayoutStack;
 friend class LLUICtrlFactory;
 public:
+    AL_VIEW_TYPE(LLLayoutPanel, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Optional<S32>           expanded_min_dim,
@@ -152,7 +154,6 @@ public:
 
     ~LLLayoutPanel();
 
-    U64 kindMask() const override { return LLPanel::kindMask() | ALViewKind::LAYOUT_PANEL; }
 
     void initFromParams(const Params& p);
 

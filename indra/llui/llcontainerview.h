@@ -42,6 +42,8 @@ struct ContainerViewRegistry : public LLChildRegistry<ContainerViewRegistry>
 class LLContainerView : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLContainerView, LLView);
+
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Optional<std::string> label;

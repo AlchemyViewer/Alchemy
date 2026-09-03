@@ -48,6 +48,8 @@ class LLComboBox
 , public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLComboBox, LLUICtrl);
+
     typedef enum e_preferred_position
     {
         ABOVE,
@@ -94,7 +96,6 @@ public:
 
     virtual ~LLComboBox();
 
-    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::COMBO_BOX; }
     /*virtual*/ bool postBuild();
 
 protected:
@@ -274,6 +275,8 @@ class LLIconsComboBox
 :   public LLComboBox
 {
 public:
+    AL_VIEW_TYPE(LLIconsComboBox, LLComboBox);
+
     struct Params
     :   public LLInitParam::Block<Params, LLComboBox::Params>
     {

@@ -39,6 +39,8 @@ class LLSpinCtrl
 : public LLF32UICtrl
 {
 public:
+    AL_VIEW_TYPE(LLSpinCtrl, LLF32UICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLF32UICtrl::Params>
     {
         Optional<S32> label_width;
@@ -61,7 +63,6 @@ protected:
 public:
     virtual ~LLSpinCtrl() {} // Children all cleaned up by default view destructor.
 
-    U64 kindMask() const override { return LLF32UICtrl::kindMask() | ALViewKind::SPIN_CTRL; }
 
     virtual void    forceSetValue(const LLSD& value ) ;
     virtual void    setValue(const LLSD& value );

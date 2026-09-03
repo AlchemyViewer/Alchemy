@@ -39,6 +39,8 @@
 class LLScrollingPanel : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLScrollingPanel, LLPanel);
+
     LLScrollingPanel(const LLPanel::Params& params) : LLPanel(params) {}
     virtual void updatePanel(bool allow_modify) = 0;
 };
@@ -50,6 +52,8 @@ public:
 class LLScrollingPanelList : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLScrollingPanelList, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<bool> is_horizontal;

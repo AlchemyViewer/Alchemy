@@ -1,5 +1,5 @@
 /**
- * @file alviewkind_test.cpp
+ * @file alviewtype_test.cpp
  * @brief Tests for asking a view what it is
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -28,6 +28,7 @@
 #include "../llcheckboxctrl.h"
 #include "../llcombobox.h"
 #include "../llfloater.h"
+#include "../llfolderview.h"
 #include "../lllayoutstack.h"
 #include "../lllineeditor.h"
 #include "../llmenugl.h"
@@ -85,7 +86,7 @@ namespace tut
         }
     };
 
-    struct alviewkind_data
+    struct alviewtype_data
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
 
@@ -139,14 +140,14 @@ namespace tut
         }
     };
 
-    typedef test_group<alviewkind_data> alviewkind_test;
-    typedef alviewkind_test::object     alviewkind_object;
-    tut::alviewkind_test alviewkind_testgroup("alviewkind");
+    typedef test_group<alviewtype_data> alviewtype_test;
+    typedef alviewtype_test::object     alviewtype_object;
+    tut::alviewtype_test alviewtype_testgroup("alviewtype");
 
     // Each class answers for itself and every base that is a kind, and for
     // nothing else. A type with no kind is still answered, the slow way.
     template<> template<>
-    void alviewkind_object::test<1>()
+    void alviewtype_object::test<1>()
     {
         if (!ui.ok())
         {
@@ -197,7 +198,7 @@ namespace tut
 
     // The parent as a kind, and the nearest ancestor of a kind.
     template<> template<>
-    void alviewkind_object::test<2>()
+    void alviewtype_object::test<2>()
     {
         if (!ui.ok())
         {
@@ -226,7 +227,7 @@ namespace tut
     // dynamic_cast does: by the time ~LLView takes it out of its parent, a
     // control is no longer one. A member bit would still say it was.
     template<> template<>
-    void alviewkind_object::test<3>()
+    void alviewtype_object::test<3>()
     {
         if (!ui.ok())
         {
@@ -251,7 +252,7 @@ namespace tut
     // The menu kinds: a bar and a context menu are menus, a separator is an
     // item, and a menu's parent item is held as one.
     template<> template<>
-    void alviewkind_object::test<4>()
+    void alviewtype_object::test<4>()
     {
         if (!ui.ok())
         {
@@ -295,10 +296,26 @@ namespace tut
         ensure("and let go when it dies", menu->getParentMenuItem() == nullptr);
     }
 
-    // The mask is 64 bits wide, at the virtual and in the table alike.
-    static_assert(std::is_same_v<decltype(std::declval<const LLView&>().kindMask()), U64>);
-    static_assert(std::is_same_v<std::remove_cv_t<decltype(ALViewKindOf<LLButton>::bits)>, U64>);
-    static_assert(ALViewKindOf<LLTabContainer>::bits > ALViewKindOf<LLFolderViewFolder>::bits);
+    // Each class's place in the hierarchy is fixed at compile time, and a
+    // class that made no declaration of its own is known not to have one.
+    static_assert(LLView::sViewType.mDepth == 0);
+    static_assert(LLUICtrl::sViewType.mDepth == 1);
+    static_assert(LLPanel::sViewType.mDepth == 2);
+    static_assert(LLFloater::sViewType.mDepth == 3);
+    static_assert(LLFolderView::sViewType.mDepth == 3);
+    static_assert(LLSpinCtrl::sViewType.mDepth == 3);
+    static_assert(ALViewTypeOf<LLButton>::declared);
+    static_assert(!ALViewTypeOf<TestCtrl>::declared);
+
+    // The ancestor chain is the one the class heads declare, and the
+    // is-a test reads it the same way at compile time as at run time.
+    static_assert(LLPanel::sViewType.mAncestors[0] == &LLView::sViewType);
+    static_assert(LLPanel::sViewType.mAncestors[1] == &LLUICtrl::sViewType);
+    static_assert(LLFloater::sViewType.mAncestors[2] == &LLPanel::sViewType);
+    static_assert(LLFloater::sViewType.isA(LLPanel::sViewType));
+    static_assert(LLFloater::sViewType.isA(LLFloater::sViewType));
+    static_assert(!LLPanel::sViewType.isA(LLFloater::sViewType));
+    static_assert(!LLFloaterView::sViewType.isA(LLPanel::sViewType));
 
     // The widget types the name lookups ask for most: each is itself, a
     // control, and none of the others. A check box, a combo box and a scroll
@@ -306,7 +323,7 @@ namespace tut
     // answer without GL textures, so those three are not built here; each
     // of their overrides names LLUICtrl as its immediate base.
     template<> template<>
-    void alviewkind_object::test<5>()
+    void alviewtype_object::test<5>()
     {
         if (!ui.ok())
         {

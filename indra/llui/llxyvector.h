@@ -39,6 +39,8 @@ class LLXYVector
     : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLXYVector, LLUICtrl);
+
     struct Params
         : public LLInitParam::Block<Params, LLUICtrl::Params>
     {

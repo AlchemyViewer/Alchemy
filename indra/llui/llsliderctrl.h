@@ -38,6 +38,8 @@
 class LLSliderCtrl: public LLF32UICtrl, public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLSliderCtrl, LLF32UICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLF32UICtrl::Params>
     {
         Optional<std::string>   orientation;

@@ -39,6 +39,8 @@ class LLTextBox;
 class LLDragHandle : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLDragHandle, LLView);
+
     struct Params
     :   public LLInitParam::Block<Params, LLView::Params>
     {
@@ -110,6 +112,10 @@ private:
 class LLDragHandleTop
 : public LLDragHandle
 {
+public:
+    AL_VIEW_TYPE(LLDragHandleTop, LLDragHandle);
+
+private:
 protected:
     LLDragHandleTop(const Params& p) : LLDragHandle(p) {}
     friend class LLUICtrlFactory;
@@ -128,6 +134,10 @@ private:
 class LLDragHandleLeft
 : public LLDragHandle
 {
+public:
+    AL_VIEW_TYPE(LLDragHandleLeft, LLDragHandle);
+
+private:
 protected:
     LLDragHandleLeft(const Params& p) : LLDragHandle(p) {}
     friend class LLUICtrlFactory;

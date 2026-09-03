@@ -35,7 +35,7 @@
 #include "lldir.h"
 #include "llsingleton.h"
 #include "llheteromap.h"
-#include "alviewkind.h"
+#include "alviewtype.h"
 
 class LLView;
 void deleteView(LLView*); // Inside LLView.cpp, avoid having to potentially delete an incomplete type here.
@@ -185,7 +185,7 @@ public:
             LLView* view = getInstance()->createFromXML(root_node, parent, filename, registry);
             if (view)
             {
-                widget = ALViewKind::as<T>(view);
+                widget = ALViewType::as<T>(view);
                 // not of right type, so delete it
                 if (!widget)
                 {

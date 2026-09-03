@@ -39,6 +39,7 @@ class LLScrollbar
 : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLScrollbar, LLUICtrl);
 
     typedef std::function<void (S32, LLScrollbar*)> callback_t;
     struct Params

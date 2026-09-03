@@ -41,6 +41,8 @@ struct StatViewRegistry : public LLChildRegistry<StatViewRegistry>
 class LLStatView : public LLContainerView
 {
 public:
+    AL_VIEW_TYPE(LLStatView, LLContainerView);
+
     struct Params : public LLInitParam::Block<Params, LLContainerView::Params>
     {
         Optional<std::string> setting;

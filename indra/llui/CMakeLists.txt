@@ -114,7 +114,7 @@ target_sources(llui
     FILE_SET HEADERS
     FILES
     altextcaret.h
-    alviewkind.h
+    alviewtype.h
     fsvirtualtrackpad.h
     llaccordionctrl.h
     llaccordionctrltab.h
@@ -319,11 +319,11 @@ if(BUILD_TESTING)
   LL_ADD_INTEGRATION_TEST(llfocusmgr "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(lllayoutstack "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfloater "" "${test_libs}" "${test_project}")
-  LL_ADD_INTEGRATION_TEST(alviewkind "" "${test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(alviewtype "" "${test_libs}" "${test_project}")
 
   # Tests that build widgets above LLView stand up a UI over the source
   # tree's skins and fonts; this is where it is.
-  foreach(ui_test lllayoutstack llfloater alviewkind)
+  foreach(ui_test lllayoutstack llfloater alviewtype)
     if (TARGET INTEGRATION_TEST_${ui_test})
       target_compile_definitions(INTEGRATION_TEST_${ui_test} PRIVATE
           "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\"")

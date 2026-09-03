@@ -34,6 +34,8 @@
 class LLSlider : public LLF32UICtrl
 {
 public:
+    AL_VIEW_TYPE(LLSlider, LLF32UICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLF32UICtrl::Params>
     {
         Optional<std::string> orientation;

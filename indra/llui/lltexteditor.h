@@ -51,6 +51,8 @@ class LLTextEditor :
     protected LLPreeditor
 {
 public:
+    AL_VIEW_TYPE(LLTextEditor, LLTextBase);
+
     struct Params : public LLInitParam::Block<Params, LLTextBase::Params>
     {
         Optional<std::string>   default_text;

@@ -40,6 +40,7 @@ class LLRadioGroup
 :   public LLUICtrl, public LLCtrlSelectionInterface
 {
 public:
+    AL_VIEW_TYPE(LLRadioGroup, LLUICtrl);
 
     struct ItemParams : public LLInitParam::Block<ItemParams, LLCheckBoxCtrl::Params>
     {

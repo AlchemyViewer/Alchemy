@@ -60,6 +60,8 @@ public:
 class LLMenuItemGL: public LLUICtrl, public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemGL, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<std::string>   shortcut;
@@ -90,7 +92,6 @@ protected:
     LLMenuItemGL(const Params&);
     friend class LLUICtrlFactory;
 public:
-    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::MENU_ITEM; }
 
     // LLView overrides
     /*virtual*/ void onVisibilityChange(bool new_visibility);
@@ -285,6 +286,8 @@ private:
 class LLMenuItemSeparatorGL : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemSeparatorGL, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {
         Optional<EnableCallbackParam > on_visible;
@@ -293,7 +296,6 @@ public:
 
     LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params& p = LLMenuItemSeparatorGL::Params());
 
-    U64 kindMask() const override { return LLMenuItemGL::kindMask() | ALViewKind::MENU_SEPARATOR; }
 
     /*virtual*/ void draw( void );
     /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
@@ -318,6 +320,8 @@ private:
 class LLMenuItemCallGL : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemCallGL, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {
         Optional<EnableCallbackParam > on_enable;
@@ -377,6 +381,8 @@ class LLMenuItemCheckGL
 :   public LLMenuItemCallGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemCheckGL, LLMenuItemCallGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemCallGL::Params>
     {
         Optional<EnableCallbackParam > on_check;
@@ -431,6 +437,8 @@ class LLMenuGL
 :   public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLMenuGL, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<KEY>                   jump_key;
@@ -494,7 +502,6 @@ protected:
 public:
     virtual ~LLMenuGL( void );
 
-    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::MENU; }
 
     // LLView Functionality
     /*virtual*/ bool handleUnicodeCharHere( llwchar uni_char );
@@ -692,6 +699,8 @@ private:
 class LLMenuItemBranchGL : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemBranchGL, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {
         Optional<LLMenuGL*> branch;
@@ -759,6 +768,8 @@ class LLContextMenu
 : public LLMenuGL
 {
 public:
+    AL_VIEW_TYPE(LLContextMenu, LLMenuGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuGL::Params>
     {
         Params()
@@ -774,7 +785,6 @@ protected:
 public:
     virtual ~LLContextMenu() {}
 
-    U64 kindMask() const override { return LLMenuGL::kindMask() | ALViewKind::CONTEXT_MENU; }
 
     // LLView Functionality
     // can't set visibility directly, must call show or hide
@@ -810,6 +820,8 @@ protected:
 class LLContextMenuBranch : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLContextMenuBranch, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {
         Mandatory<LLContextMenu*> branch;
@@ -844,12 +856,13 @@ protected:
 class LLMenuBarGL : public LLMenuGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuBarGL, LLMenuGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuGL::Params>
     {};
     LLMenuBarGL( const Params& p );
     virtual ~LLMenuBarGL();
 
-    U64 kindMask() const override { return LLMenuGL::kindMask() | ALViewKind::MENU_BAR; }
 
     /*virtual*/ bool handleAcceleratorKey(KEY key, MASK mask);
     /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
@@ -892,6 +905,8 @@ private:
 class LLMenuHolderGL : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLMenuHolderGL, LLPanel);
+
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {};
     LLMenuHolderGL(const Params& p);
@@ -936,6 +951,8 @@ private:
 class LLTearOffMenu : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLTearOffMenu, LLFloater);
+
     static LLTearOffMenu* create(LLMenuGL* menup);
     virtual ~LLTearOffMenu();
 
@@ -968,6 +985,8 @@ private:
 class LLMenuItemTearOffGL : public LLMenuItemGL
 {
 public:
+    AL_VIEW_TYPE(LLMenuItemTearOffGL, LLMenuItemGL);
+
     struct Params : public LLInitParam::Block<Params, LLMenuItemGL::Params>
     {};
 

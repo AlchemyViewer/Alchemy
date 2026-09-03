@@ -40,6 +40,8 @@ class LLScrollListCtrl;
 class LLScrollColumnHeader : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLScrollColumnHeader, LLButton);
+
     struct Params : public LLInitParam::Block<Params, LLButton::Params>
     {
         Mandatory<LLScrollListColumn*> column;

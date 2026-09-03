@@ -66,6 +66,8 @@ class LLTextBox;
 class LLFolderViewScrollContainer : public LLScrollContainer
 {
 public:
+    AL_VIEW_TYPE(LLFolderViewScrollContainer, LLScrollContainer);
+
     /*virtual*/ ~LLFolderViewScrollContainer() {};
     /*virtual*/ const LLRect getScrolledViewRect() const;
 
@@ -84,6 +86,8 @@ protected:
 class LLFolderView : public LLFolderViewFolder, public LLEditMenuHandler
 {
 public:
+    AL_VIEW_TYPE(LLFolderView, LLFolderViewFolder);
+
     struct Params : public LLInitParam::Block<Params, LLFolderViewFolder::Params>
     {
         Mandatory<LLPanel*>     parent_panel;
@@ -264,7 +268,6 @@ public:
     // Note: We may eventually have to move that method up the hierarchy to LLFolderViewItem.
     LLHandle<LLFolderView>  getHandle() const { return getDerivedHandle<LLFolderView>(); }
 
-    U64 kindMask() const override { return LLFolderViewFolder::kindMask() | ALViewKind::FOLDER_VIEW; }
 
 private:
     void updateMenuOptions(LLMenuGL* menu);

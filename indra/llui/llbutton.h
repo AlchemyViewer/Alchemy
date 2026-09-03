@@ -67,6 +67,8 @@ class LLButton
 , public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLButton, LLUICtrl);
+
     struct Params
     :   public LLInitParam::Block<Params, LLUICtrl::Params>
     {
@@ -158,7 +160,6 @@ public:
 
     ~LLButton();
 
-    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::BUTTON; }
     // For backward compatability only
     typedef std::function<void(void*)> button_callback_t;
 

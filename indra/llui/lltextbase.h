@@ -342,6 +342,8 @@ class LLTextBase
     public ll::ui::SearchableControl
 {
 public:
+    AL_VIEW_TYPE(LLTextBase, LLUICtrl);
+
     friend class LLTextSegment;
     friend class LLNormalTextSegment;
     friend class LLEmbeddedItemSegment;

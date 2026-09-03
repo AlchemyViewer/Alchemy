@@ -54,6 +54,8 @@ class LLScrollListCtrl : public LLUICtrl, public LLEditMenuHandler,
     public LLCtrlListInterface, public LLCtrlScrollInterface
 {
 public:
+    AL_VIEW_TYPE(LLScrollListCtrl, LLUICtrl);
+
     typedef enum e_selection_type
     {
         ROW, // default
@@ -163,7 +165,6 @@ protected:
 public:
     virtual ~LLScrollListCtrl();
 
-    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::SCROLL_LIST; }
 
     S32             isEmpty() const;
 

@@ -39,6 +39,8 @@ class LLModalDialog;
 class LLModalDialog : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLModalDialog, LLFloater);
+
     LLModalDialog( const LLSD& key, bool modal = true );
     virtual     ~LLModalDialog();
 

@@ -47,6 +47,8 @@ class LLToolBarButton : public LLButton
 {
     friend class LLToolBar;
 public:
+    AL_VIEW_TYPE(LLToolBarButton, LLButton);
+
     struct Params : public LLInitParam::Block<Params, LLButton::Params>
     {
         Optional<LLUI::RangeS32::Params>    button_width;
@@ -185,6 +187,7 @@ class LLToolBar
 {
     friend class LLToolBarButton;
 public:
+    AL_VIEW_TYPE(LLToolBar, LLUICtrl);
 
     // Say that something a toolbar button's availability or pressed state could
     // be derived from has changed, so the bars ask their buttons again on the

@@ -45,7 +45,7 @@
 #include "lluictrlfactory.h"
 #include "lltreeiterators.h"
 #include "llfocusmgr.h"
-#include "alviewkind.h"
+#include "alviewtype.h"
 
 #include <functional>
 #include <list>
@@ -212,18 +212,20 @@ public:
 
     virtual bool isPanel() const;
 
-    // The kinds this view is, from ALViewKind. A virtual returning a
-    // constant: while a view is being destroyed it answers for whatever base
-    // is left standing, which is what dynamic_cast says of it then.
-    virtual U64 kindMask() const { return 0; }
+    // What this view is: its class's place in the hierarchy. A virtual, so
+    // that while a view is being destroyed it answers for whatever base is
+    // left standing, which is what dynamic_cast says of it then.
+    using ALViewSelf = LLView;
+    static constexpr ALViewType sViewType{nullptr, "LLView"};
+    virtual const ALViewType* viewType() const { return &sViewType; }
 
-    // This view as a T, or null. A mask test and a static_cast for a kind
-    // ALViewKindOf names; dynamic_cast for any other type.
+    // This view as a T, or null: one compare for a class that declared its
+    // type with AL_VIEW_TYPE, dynamic_cast for any other.
     template <class T> T* as()
     {
-        if constexpr (ALViewKindOf<T>::bits != 0)
+        if constexpr (ALViewTypeOf<T>::declared)
         {
-            return (kindMask() & ALViewKindOf<T>::bits) ? static_cast<T*>(this) : nullptr;
+            return viewType()->isA(T::sViewType) ? static_cast<T*>(this) : nullptr;
         }
         else
         {
@@ -560,7 +562,7 @@ public:
     template <class T> T* findChild(std::string_view name, bool recurse = true) const
     {
         LLView* child = findChildView(name, recurse);
-        return ALViewKind::as<T>(child);
+        return ALViewType::as<T>(child);
     }
 
     template <class T> T* getChild(std::string_view name, bool recurse = true) const;
@@ -576,7 +578,7 @@ public:
     template <class T> T* getDefaultWidget(std::string_view name) const
     {
         LLView* widgetp = getDefaultWidgetContainer().findChildView(name);
-        return ALViewKind::as<T>(widgetp);
+        return ALViewType::as<T>(widgetp);
     }
 
     template <class T> T* getParentByType() const
@@ -841,7 +843,7 @@ struct TypeValues<LLView::EOrientation> : public LLInitParam::TypeValuesHelper<L
 template <class T> T* LLView::getChild(std::string_view name, bool recurse) const
 {
     LLView* child = findChildView(name, recurse);
-    T* result = ALViewKind::as<T>(child);
+    T* result = ALViewType::as<T>(child);
     if (!result)
     {
         // did we find *something* with that name?
@@ -869,7 +871,7 @@ template <class T> T* LLView::getChild(std::string_view name, bool recurse) cons
     return result;
 }
 
-template <class T> T* ALViewKind::as(LLView* view)
+template <class T> T* ALViewType::as(LLView* view)
 {
     return view ? view->as<T>() : nullptr;
 }

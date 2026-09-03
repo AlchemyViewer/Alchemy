@@ -55,6 +55,8 @@ class LLUIImage;
 class LLPanel : public LLUICtrl, public LLBadgeHolder
 {
 public:
+    AL_VIEW_TYPE(LLPanel, LLUICtrl);
+
     struct LocalizedString : public LLInitParam::Block<LocalizedString>
     {
         Mandatory<std::string>  name;
@@ -115,7 +117,6 @@ public:
 
     // LLView interface
     /*virtual*/ bool    isPanel() const;
-    U64                 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::PANEL; }
     /*virtual*/ void    draw();
     /*virtual*/ bool    handleKeyHere( KEY key, MASK mask );
     /*virtual*/ void    onVisibilityChange ( bool new_visibility );

@@ -34,6 +34,7 @@ class LLTextBox :
     public LLTextBase
 {
 public:
+    AL_VIEW_TYPE(LLTextBox, LLTextBase);
 
     // *TODO: Add callback to Params
     typedef std::function<void (void)> callback_t;
@@ -48,7 +49,6 @@ protected:
 public:
     ~LLTextBox() override;
 
-    U64 kindMask() const override { return LLTextBase::kindMask() | ALViewKind::TEXT_BOX; }
 
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;

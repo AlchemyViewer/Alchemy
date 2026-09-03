@@ -126,6 +126,7 @@ class LLFloater : public LLPanel, public LLInstanceTracker<LLFloater>
     friend class LLMultiFloater;
 
 public:
+    AL_VIEW_TYPE(LLFloater, LLPanel);
 
     struct KeyCompare
     {
@@ -294,7 +295,6 @@ public:
     static bool     isMinimized(const LLFloater* floater);
     bool            isFirstLook() const { return mFirstLook; } // EXT-2653: This function is necessary to prevent overlapping for secondary showed toasts
     virtual bool    isFrontmost();
-    U64             kindMask() const override { return LLPanel::kindMask() | ALViewKind::FLOATER; }
     bool            isDependent() const { return !mDependeeHandle.isDead(); }
     void            setCanMinimize(bool can_minimize);
 // [SL:KB] - Patch: UI-FloaterCollapse | Checked: Catznip-5.2
@@ -608,6 +608,8 @@ const S32 FLOATER_MIN_VISIBLE_PIXELS = 16;
 class LLFloaterView : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLFloaterView, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>{};
 
 protected:
@@ -618,7 +620,6 @@ public:
 
     // Every child is a floater; anything else is refused.
     bool addChild(LLView* child, S32 tab_group = 0) override;
-    U64 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::FLOATER_VIEW; }
 
     /*virtual*/ void reshape(S32 width, S32 height, bool called_from_parent = true);
     /*virtual*/ void draw();

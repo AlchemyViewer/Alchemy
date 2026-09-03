@@ -37,6 +37,7 @@
 class LLStatBar : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLStatBar, LLView);
 
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {

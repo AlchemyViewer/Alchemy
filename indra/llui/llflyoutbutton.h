@@ -37,6 +37,8 @@
 class LLFlyoutButton : public LLComboBox
 {
 public:
+    AL_VIEW_TYPE(LLFlyoutButton, LLComboBox);
+
     struct Params : public LLInitParam::Block<Params, LLComboBox::Params>
     {
         Optional<LLButton::Params> action_button;

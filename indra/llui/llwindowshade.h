@@ -37,6 +37,8 @@ class LLTextBox;
 class LLWindowShade : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLWindowShade, LLUICtrl);
+
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<LLUIImage*>            bg_image;

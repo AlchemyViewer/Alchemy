@@ -39,6 +39,8 @@ class LLVirtualTrackball
     : public LLUICtrl
 {
 public:
+    AL_VIEW_TYPE(LLVirtualTrackball, LLUICtrl);
+
     enum ThumbMode
     {
         SUN,

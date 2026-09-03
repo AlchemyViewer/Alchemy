@@ -37,6 +37,7 @@
 class LLChatEntry : public LLTextEditor
 {
 public:
+    AL_VIEW_TYPE(LLChatEntry, LLTextEditor);
 
     struct Params : public LLInitParam::Block<Params, LLTextEditor::Params>
     {

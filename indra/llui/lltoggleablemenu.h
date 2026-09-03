@@ -32,6 +32,8 @@
 class LLToggleableMenu : public LLMenuGL
 {
 public:
+    AL_VIEW_TYPE(LLToggleableMenu, LLMenuGL);
+
     //adding blank params to work around registration issue
     //where LLToggleableMenu was owning the LLMenuGL param
     //and menu.xml was never loaded

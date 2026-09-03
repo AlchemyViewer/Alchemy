@@ -38,6 +38,8 @@ class LLTabTuple;
 class LLTabContainer : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLTabContainer, LLPanel);
+
     enum TabPosition
     {
         TOP,
@@ -131,7 +133,6 @@ public:
 
     /*virtual*/ ~LLTabContainer();
 
-    U64 kindMask() const override { return LLPanel::kindMask() | ALViewKind::TAB_CONTAINER; }
 
     // from LLView
     /*virtual*/ void setValue(const LLSD& value);

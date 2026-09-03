@@ -41,6 +41,8 @@
 class LLFilterEditor : public LLSearchEditor
 {
 public:
+    AL_VIEW_TYPE(LLFilterEditor, LLSearchEditor);
+
     struct Params : public LLInitParam::Block<Params, LLSearchEditor::Params>
     {};
     virtual ~LLFilterEditor() {}

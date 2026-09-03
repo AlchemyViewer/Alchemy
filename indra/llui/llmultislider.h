@@ -35,6 +35,8 @@ class LLUICtrlFactory;
 class LLMultiSlider : public LLF32UICtrl
 {
 public:
+    AL_VIEW_TYPE(LLMultiSlider, LLF32UICtrl);
+
     struct SliderParams : public LLInitParam::Block<SliderParams>
     {
         Optional<std::string>   name;
