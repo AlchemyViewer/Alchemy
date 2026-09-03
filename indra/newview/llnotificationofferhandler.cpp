@@ -149,7 +149,7 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
             p.force_show = notification->getOfferFromAgent();
             p.can_fade = notification->canFadeToast();
 
-            LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+            LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(mChannel.get());
             if(channel)
             {
                 if (LLChannelManager::getInstance()->getStartUpToastInited() && notification->getOfferFromAgent())
@@ -224,7 +224,7 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
         //   -> the one and only time we need to decrease the unread IM count is when we've clicked any of the buttons on the *toast*
         //   -> since LLIMFloater::updateMessages() hides the toast when we open the IM (which resets the unread count to 0) we should
         //      *only* decrease the unread IM count if there's a visible toast since the unread count will be at 0 otherwise anyway
-        LLScreenChannel* pChannel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+        LLScreenChannel* pChannel = ALViewType::as<LLScreenChannel>(mChannel.get());
         LLToast* pToast = (pChannel) ? pChannel->getToastByNotificationID(notification->getID()) : NULL;
         if ( (pToast) && (!pToast->getCanBeStored()) )
 // [/SL:KB]

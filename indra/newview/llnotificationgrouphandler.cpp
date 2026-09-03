@@ -83,7 +83,7 @@ bool LLGroupHandler::processNotification(const LLNotificationPtr& notification, 
     p.panel = notify_box;
     p.on_delete_toast = boost::bind(&LLGroupHandler::onDeleteToast, this, _1);
 
-    LLScreenChannel* channel = dynamic_cast<LLScreenChannel*>(mChannel.get());
+    LLScreenChannel* channel = ALViewType::as<LLScreenChannel>(mChannel.get());
     if(channel)
         channel->addToast(p);
 

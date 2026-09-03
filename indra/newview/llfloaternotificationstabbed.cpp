@@ -340,7 +340,7 @@ void LLFloaterNotificationsTabbed::closeAllOnCurrentTab()
     std::vector<LLPanel*>::iterator iter = items.begin();
     for (; iter != items.end(); ++iter)
     {
-        LLNotificationListItem* notify_item = dynamic_cast<LLNotificationListItem*>(*iter);
+        LLNotificationListItem* notify_item = (*iter)->as<LLNotificationListItem>();
         if (notify_item)
             onItemClose(notify_item);
     }
@@ -354,7 +354,7 @@ void LLFloaterNotificationsTabbed::collapseAllOnCurrentTab()
     std::vector<LLPanel*>::iterator iter = items.begin();
     for (; iter != items.end(); ++iter)
     {
-        LLNotificationListItem* notify_item = dynamic_cast<LLNotificationListItem*>(*iter);
+        LLNotificationListItem* notify_item = (*iter)->as<LLNotificationListItem>();
         if (notify_item)
             notify_item->setExpanded(false);
     }
@@ -545,7 +545,7 @@ void LLNotificationSeparator::getItemsFromList(std::vector<LLNotificationListIte
     std::vector<LLPanel*>::iterator it = list_items.begin();
     for (; it != list_items.end(); ++it)
     {
-        LLNotificationListItem* notify_item = dynamic_cast<LLNotificationListItem*>(*it);
+        LLNotificationListItem* notify_item = (*it)->as<LLNotificationListItem>();
         if (notify_item)
             items.push_back(notify_item);
     }
