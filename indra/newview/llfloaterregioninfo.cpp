@@ -181,9 +181,10 @@ void unpack_request_params(
 }
 */
 
-class LLPanelRegionEnvironment : public LLPanelEnvironmentInfo
+class LLPanelRegionEnvironment final : public LLPanelEnvironmentInfo
 {
 public:
+    AL_VIEW_TYPE(LLPanelRegionEnvironment, LLPanelEnvironmentInfo);
                         LLPanelRegionEnvironment();
     virtual             ~LLPanelRegionEnvironment();
 

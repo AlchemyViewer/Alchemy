@@ -40,12 +40,13 @@
 /**
  * The panel provides UI for saving snapshot to a local folder.
  */
-class LLPanelSnapshotLocal
+class LLPanelSnapshotLocal final
 :   public LLPanelSnapshot
 {
     LOG_CLASS(LLPanelSnapshotLocal);
 
 public:
+    AL_VIEW_TYPE(LLPanelSnapshotLocal, LLPanelSnapshot);
     LLPanelSnapshotLocal();
     bool postBuild() override;
     void onOpen(const LLSD& key) override;

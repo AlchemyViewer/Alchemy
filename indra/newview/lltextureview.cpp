@@ -136,9 +136,10 @@ static S32 required_view_width()
 
 ////////////////////////////////////////////////////////////////////////////
 
-class LLTextureBar : public LLView
+class LLTextureBar final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLTextureBar, LLView);
     LLPointer<LLViewerFetchedTexture> mImagep;
     S32 mHilite;
 
@@ -409,9 +410,10 @@ LLRect LLTextureBar::getRequiredRect()
 
 ////////////////////////////////////////////////////////////////////////////
 
-class LLAvatarTexBar : public LLView
+class LLAvatarTexBar final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLAvatarTexBar, LLView);
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Mandatory<LLTextureView*>   texture_view;
@@ -518,9 +520,10 @@ LLRect LLAvatarTexBar::getRequiredRect()
 
 ////////////////////////////////////////////////////////////////////////////
 
-class LLGLTexMemBar : public LLView
+class LLGLTexMemBar final : public LLView
 {
 public:
+    AL_VIEW_TYPE(LLGLTexMemBar, LLView);
     struct Params : public LLInitParam::Block<Params, LLView::Params>
     {
         Mandatory<LLTextureView*>   texture_view;

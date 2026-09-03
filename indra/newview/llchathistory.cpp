@@ -123,9 +123,10 @@ public:
 };
 LLObjectIMHandler gObjectIMHandler;
 
-class LLChatHistoryHeader: public LLPanel
+class LLChatHistoryHeader final: public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLChatHistoryHeader, LLPanel);
     LLChatHistoryHeader()
     :   LLPanel(),
         mInfoCtrl(NULL),

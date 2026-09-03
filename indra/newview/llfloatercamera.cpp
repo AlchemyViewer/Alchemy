@@ -273,9 +273,10 @@ void activate_camera_tool()
     LLToolMgr::getInstance()->setTransientTool(LLToolCamera::getInstance());
 };
 
-class LLCameraInfoPanel : public LLPanel
+class LLCameraInfoPanel final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLCameraInfoPanel, LLPanel);
     typedef std::function<LLVector3()> get_vector_t;
 
     LLCameraInfoPanel(

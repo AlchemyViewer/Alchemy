@@ -38,9 +38,10 @@ using namespace LLNotificationsUI;
 /**
  * Represents inspectable toast .
  */
-class LLInspectToast: public LLInspect
+class LLInspectToast final: public LLInspect
 {
 public:
+    AL_VIEW_TYPE(LLInspectToast, LLInspect);
 
     LLInspectToast(const LLSD& notification_idl);
     virtual ~LLInspectToast();

@@ -130,9 +130,10 @@ public:
 };
 
 
-class LLFloaterUIPreview : public LLFloater
+class LLFloaterUIPreview final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterUIPreview, LLFloater);
     // Setup
     LLFloaterUIPreview(const LLSD& key);
     virtual ~LLFloaterUIPreview();
@@ -263,9 +264,10 @@ private:
 
 // Implementation of previewed floater
 // Used to override draw and mouse handler
-class LLPreviewedFloater : public LLFloater
+class LLPreviewedFloater final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLPreviewedFloater, LLFloater);
     LLPreviewedFloater(LLFloaterUIPreview* floater, const Params& params)
         : LLFloater(LLSD(), params),
           mFloaterUIPreview(floater)

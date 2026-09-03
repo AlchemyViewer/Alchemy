@@ -2357,9 +2357,10 @@ bool LLInventoryPanel::isSelectionRemovable()
 /* Recent Inventory Panel related class                                 */
 /************************************************************************/
 static const LLRecentInventoryBridgeBuilder RECENT_ITEMS_BUILDER;
-class LLInventoryRecentItemsPanel : public LLInventoryPanel
+class LLInventoryRecentItemsPanel final : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLInventoryRecentItemsPanel, LLInventoryPanel);
     struct Params : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {};
 
@@ -2388,9 +2389,10 @@ LLInventoryRecentItemsPanel::LLInventoryRecentItemsPanel( const Params& params)
 /* Favorites Inventory Panel related class                              */
 /************************************************************************/
 static const LLFavoritesInventoryBridgeBuilder FAVORITES_BUILDER;
-class LLInventoryFavoritesItemsPanel : public LLInventoryPanel
+class LLInventoryFavoritesItemsPanel final : public LLInventoryPanel
 {
 public:
+    AL_VIEW_TYPE(LLInventoryFavoritesItemsPanel, LLInventoryPanel);
     struct Params : public LLInitParam::Block<Params, LLInventoryPanel::Params>
     {};
 

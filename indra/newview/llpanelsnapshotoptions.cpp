@@ -35,12 +35,13 @@
 /**
  * Provides several ways to save a snapshot.
  */
-class LLPanelSnapshotOptions
+class LLPanelSnapshotOptions final
 :   public LLPanel
 {
     LOG_CLASS(LLPanelSnapshotOptions);
 
 public:
+    AL_VIEW_TYPE(LLPanelSnapshotOptions, LLPanel);
     LLPanelSnapshotOptions();
     bool postBuild() override;
 

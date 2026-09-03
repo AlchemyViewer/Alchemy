@@ -3025,9 +3025,10 @@ void LLPanelPreference::setHardwareDefaults()
 {
 }
 
-class LLPanelPreferencePrivacy : public LLPanelPreference
+class LLPanelPreferencePrivacy final : public LLPanelPreference
 {
 public:
+    AL_VIEW_TYPE(LLPanelPreferencePrivacy, LLPanelPreference);
     LLPanelPreferencePrivacy()
     {
         mAccountIndependentSettings.push_back("AutoDisengageMic");

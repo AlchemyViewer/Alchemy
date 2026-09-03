@@ -76,9 +76,10 @@ static LLPanelInjector<LLPanelMainInventory> t_inventory("panel_main_inventory")
 /// LLFloaterInventoryFinder
 ///----------------------------------------------------------------------------
 
-class LLFloaterInventoryFinder : public LLFloater
+class LLFloaterInventoryFinder final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterInventoryFinder, LLFloater);
     LLFloaterInventoryFinder(LLPanelMainInventory* inventory_view);
     void draw();
     bool postBuild();

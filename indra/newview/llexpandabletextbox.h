@@ -46,9 +46,10 @@ protected:
      * Extended text box. "More" link will appear at end of text if
      * text is too long to fit into text box size.
      */
-    class LLTextBoxEx : public LLTextEditor
+    class LLTextBoxEx final : public LLTextEditor
     {
     public:
+        AL_VIEW_TYPE(LLTextBoxEx, LLTextEditor);
         struct Params : public LLInitParam::Block<Params, LLTextEditor::Params>
         {
             Params();

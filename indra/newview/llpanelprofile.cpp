@@ -507,11 +507,12 @@ LLAgentHandler gAgentHandler;
 /// LLFloaterProfilePermissions
 ///----------------------------------------------------------------------------
 
-class LLFloaterProfilePermissions
+class LLFloaterProfilePermissions final
     : public LLFloater
     , public LLFriendObserver
 {
 public:
+    AL_VIEW_TYPE(LLFloaterProfilePermissions, LLFloater);
     LLFloaterProfilePermissions(LLView * owner, const LLUUID &avatar_id);
     ~LLFloaterProfilePermissions();
     bool postBuild() override;

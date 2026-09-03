@@ -37,9 +37,10 @@
 const S32 NOTIFICATION_PANEL_HEADER_HEIGHT = 20;
 const S32 HEADER_PADDING = 38;
 
-class LLNotificationChannelPanel : public LLLayoutPanel
+class LLNotificationChannelPanel final : public LLLayoutPanel
 {
 public:
+    AL_VIEW_TYPE(LLNotificationChannelPanel, LLLayoutPanel);
     LLNotificationChannelPanel(const Params& p);
     ~LLNotificationChannelPanel();
     bool postBuild();

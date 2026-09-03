@@ -174,9 +174,10 @@ bool LLLiveLSLFile::loadFile()
 /// ---------------------------------------------------------------------------
 /// LLFloaterScriptSearch
 /// ---------------------------------------------------------------------------
-class LLFloaterScriptSearch : public LLFloater
+class LLFloaterScriptSearch final : public LLFloater
 {
 public:
+    AL_VIEW_TYPE(LLFloaterScriptSearch, LLFloater);
     LLFloaterScriptSearch(LLScriptEdCore* editor_core);
     ~LLFloaterScriptSearch();
 

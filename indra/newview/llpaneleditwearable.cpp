@@ -404,9 +404,10 @@ LLEditWearableDictionary::PickerControlEntry::PickerControlEntry(ETextureIndex t
 /**
  * Class to prevent hack in LLButton's constructor and use paddings declared in xml.
  */
-class LLLabledBackButton : public LLButton
+class LLLabledBackButton final : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLLabledBackButton, LLButton);
         struct Params : public LLInitParam::Block<Params, LLButton::Params>
         {
                 Params() {}

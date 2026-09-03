@@ -72,9 +72,10 @@
 /**
  * Item look varies depending on the type (backward/current/forward).
  */
-class LLTeleportHistoryMenuItem : public LLMenuItemCallGL
+class LLTeleportHistoryMenuItem final : public LLMenuItemCallGL
 {
 public:
+    AL_VIEW_TYPE(LLTeleportHistoryMenuItem, LLMenuItemCallGL);
     typedef enum e_item_type
     {
         TYPE_BACKWARD,

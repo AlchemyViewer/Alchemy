@@ -58,9 +58,10 @@ static const U32 ADD_LIMIT = 50;
 
 static const std::string COLLAPSED_BY_USER = "collapsed_by_user";
 
-class LLTeleportHistoryFlatItem : public LLPanel
+class LLTeleportHistoryFlatItem final : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(LLTeleportHistoryFlatItem, LLPanel);
     LLTeleportHistoryFlatItem(S32 index, LLToggleableMenu *menu, const std::string &region_name,
                                              LLDate date, const std::string &hl);
     virtual ~LLTeleportHistoryFlatItem();

@@ -71,10 +71,11 @@ static LLFloaterIMNearbyChatToastPanel* createToastPanel()
 //LLFloaterIMNearbyChatScreenChannel
 //-----------------------------------------------------------------------------------------------
 
-class LLFloaterIMNearbyChatScreenChannel: public LLScreenChannelBase
+class LLFloaterIMNearbyChatScreenChannel final: public LLScreenChannelBase
 {
     LOG_CLASS(LLFloaterIMNearbyChatScreenChannel);
 public:
+    AL_VIEW_TYPE(LLFloaterIMNearbyChatScreenChannel, LLScreenChannelBase);
     typedef std::vector<LLHandle<LLToast> > toast_vec_t;
     typedef std::list<LLHandle<LLToast> > toast_list_t;
 
@@ -212,10 +213,11 @@ protected:
 
 // We're deriving from LLToast to be able to override onClose()
 // in order to handle closing nearby chat toasts properly.
-class LLFloaterIMNearbyChatToast : public LLToast
+class LLFloaterIMNearbyChatToast final : public LLToast
 {
     LOG_CLASS(LLFloaterIMNearbyChatToast);
 public:
+    AL_VIEW_TYPE(LLFloaterIMNearbyChatToast, LLToast);
     LLFloaterIMNearbyChatToast(const LLToast::Params& p, LLFloaterIMNearbyChatScreenChannel* nc_channelp)
     :   LLToast(p),
         mNearbyChatScreenChannelp(nc_channelp)
