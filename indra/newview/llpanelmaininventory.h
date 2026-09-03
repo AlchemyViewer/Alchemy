@@ -158,7 +158,6 @@ protected:
     static void onFoldersByName(void *user_data);
     static bool checkFoldersByName(void *user_data);
 
-    static bool incrementalFind(LLFolderViewItem* first_item, const char *find_text, bool backward);
     void onFilterSelected();
 
     const std::string getFilterSubString();

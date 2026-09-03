@@ -863,46 +863,6 @@ void LLPanelMainInventory::onFilterEdit(const std::string& search_string )
 }
 
 
- //static
- bool LLPanelMainInventory::incrementalFind(LLFolderViewItem* first_item, const char *find_text, bool backward)
- {
-    LLPanelMainInventory* active_view = NULL;
-
-    LLFloaterReg::const_instance_list_t& inst_list = LLFloaterReg::getFloaterList("inventory");
-    for (LLFloaterReg::const_instance_list_t::const_iterator iter = inst_list.begin(); iter != inst_list.end(); ++iter)
-    {
-        LLPanelMainInventory* iv = (*iter)->as<LLPanelMainInventory>();
-        if (iv)
-        {
-            if (gFocusMgr.childHasKeyboardFocus(iv))
-            {
-                active_view = iv;
-                break;
-            }
-        }
-    }
-
-    if (!active_view)
-    {
-        return false;
-    }
-
-    std::string search_string(find_text);
-
-    if (search_string.empty())
-    {
-        return false;
-    }
-
-    if (active_view->getPanel() &&
-        active_view->getPanel()->getRootFolder()->search(first_item, search_string, backward))
-    {
-        return true;
-    }
-
-    return false;
- }
-
 void LLPanelMainInventory::onFilterSelected()
 {
     // Find my index
