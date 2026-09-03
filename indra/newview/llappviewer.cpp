@@ -1414,9 +1414,6 @@ bool LLAppViewer::doFrame()
         }
 
         LLTrace::get_thread_recorder()->pullFromChildren();
-
-        //clear call stack records
-        LL_CLEAR_CALLSTACKS();
     }
     {
         {
@@ -2215,7 +2212,6 @@ bool LLAppViewer::cleanup()
 
     ll_close_fail_log();
 
-    LLError::LLCallStacks::cleanup();
     LLEnvironment::deleteSingleton();
     LLSelectMgr::deleteSingleton();
     LLViewerStatsRecorder::deleteSingleton();

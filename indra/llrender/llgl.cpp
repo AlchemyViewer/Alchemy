@@ -43,7 +43,6 @@
 #include "llmath.h"
 #include "m4math.h"
 #include "llstring.h"
-#include "llstacktrace.h"
 
 #include "llglheaders.h"
 #include "llglslshader.h"
@@ -650,8 +649,6 @@ void ll_fail(std::string msg)
         gFailLog << LLError::utcTime() << " " << msg << std::endl;
 
         gFailLog << "Stack Trace:" << std::endl;
-
-        ll_get_stack_trace(lines);
 
         for(size_t i = 0; i < lines.size(); ++i)
         {
