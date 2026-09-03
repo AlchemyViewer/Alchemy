@@ -90,6 +90,8 @@ protected:
     LLMenuItemGL(const Params&);
     friend class LLUICtrlFactory;
 public:
+    U32 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::MENU_ITEM; }
+
     // LLView overrides
     /*virtual*/ void onVisibilityChange(bool new_visibility);
     /*virtual*/ bool handleHover(S32 x, S32 y, MASK mask);
@@ -291,6 +293,8 @@ public:
 
     LLMenuItemSeparatorGL(const LLMenuItemSeparatorGL::Params& p = LLMenuItemSeparatorGL::Params());
 
+    U32 kindMask() const override { return LLMenuItemGL::kindMask() | ALViewKind::MENU_SEPARATOR; }
+
     /*virtual*/ void draw( void );
     /*virtual*/ bool handleMouseDown(S32 x, S32 y, MASK mask);
     /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask);
@@ -490,6 +494,8 @@ protected:
 public:
     virtual ~LLMenuGL( void );
 
+    U32 kindMask() const override { return LLUICtrl::kindMask() | ALViewKind::MENU; }
+
     // LLView Functionality
     /*virtual*/ bool handleUnicodeCharHere( llwchar uni_char );
     /*virtual*/ bool handleHover( S32 x, S32 y, MASK mask );
@@ -581,8 +587,8 @@ public:
     // Whether to drop shadow menu bar
     void setDropShadowed( const bool shadowed );
 
-    void setParentMenuItem( LLMenuItemGL* parent_menu_item ) { mParentMenuItem = parent_menu_item->getHandle(); }
-    LLMenuItemGL* getParentMenuItem() const { return dynamic_cast<LLMenuItemGL*>(mParentMenuItem.get()); }
+    void setParentMenuItem( LLMenuItemGL* parent_menu_item ) { mParentMenuItem = parent_menu_item->getDerivedHandle<LLMenuItemGL>(); }
+    LLMenuItemGL* getParentMenuItem() const { return mParentMenuItem.get(); }
 
     void setTornOff(bool torn_off);
     bool getTornOff() { return mTornOff; }
@@ -658,7 +664,7 @@ private:
 
     LLUIColor       mBackgroundColor;
     bool            mBgVisible;
-    LLHandle<LLView> mParentMenuItem;
+    LLHandle<LLMenuItemGL> mParentMenuItem;
     LLUIString      mLabel;
     bool mDropShadowed;     //  Whether to drop shadow
     bool            mHasSelection;
@@ -768,6 +774,8 @@ protected:
 public:
     virtual ~LLContextMenu() {}
 
+    U32 kindMask() const override { return LLMenuGL::kindMask() | ALViewKind::CONTEXT_MENU; }
+
     // LLView Functionality
     // can't set visibility directly, must call show or hide
     virtual void    setVisible          (bool visible);
@@ -841,6 +849,8 @@ public:
     LLMenuBarGL( const Params& p );
     virtual ~LLMenuBarGL();
 
+    U32 kindMask() const override { return LLMenuGL::kindMask() | ALViewKind::MENU_BAR; }
+
     /*virtual*/ bool handleAcceleratorKey(KEY key, MASK mask);
     /*virtual*/ bool handleKeyHere(KEY key, MASK mask);
     /*virtual*/ bool handleJumpKey(KEY key);
@@ -901,7 +911,7 @@ public:
 
     virtual bool handleKey(KEY key, MASK mask, bool called_from_parent);
     virtual const LLRect getMenuRect() const { return getLocalRect(); }
-    LLView*const getVisibleMenu() const;
+    LLMenuGL* getVisibleMenu() const;
     virtual bool hasVisibleMenu() const {return getVisibleMenu() != NULL;}
 
     static void setActivatedItem(LLMenuItemGL* item);

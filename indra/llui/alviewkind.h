@@ -33,6 +33,11 @@ class LLFloater;
 class LLFloaterView;
 class LLLayoutStack;
 class LLLayoutPanel;
+class LLMenuGL;
+class LLMenuBarGL;
+class LLContextMenu;
+class LLMenuItemGL;
+class LLMenuItemSeparatorGL;
 
 // The kinds LLView::as<T>() answers with a mask test and a static_cast.
 // A class that is one of these ORs its bit into kindMask() on top of its
@@ -48,6 +53,11 @@ struct ALViewKind
         FLOATER_VIEW = 1u << 3,
         LAYOUT_STACK = 1u << 4,
         LAYOUT_PANEL = 1u << 5,
+        MENU         = 1u << 6,
+        MENU_BAR     = 1u << 7,
+        CONTEXT_MENU = 1u << 8,
+        MENU_ITEM    = 1u << 9,
+        MENU_SEPARATOR = 1u << 10,
     };
 };
 
@@ -62,5 +72,10 @@ template <> struct ALViewKindOf<LLFloater>    { static constexpr U32 bits = ALVi
 template <> struct ALViewKindOf<LLFloaterView> { static constexpr U32 bits = ALViewKind::FLOATER_VIEW; };
 template <> struct ALViewKindOf<LLLayoutStack> { static constexpr U32 bits = ALViewKind::LAYOUT_STACK; };
 template <> struct ALViewKindOf<LLLayoutPanel> { static constexpr U32 bits = ALViewKind::LAYOUT_PANEL; };
+template <> struct ALViewKindOf<LLMenuGL>      { static constexpr U32 bits = ALViewKind::MENU; };
+template <> struct ALViewKindOf<LLMenuBarGL>   { static constexpr U32 bits = ALViewKind::MENU_BAR; };
+template <> struct ALViewKindOf<LLContextMenu> { static constexpr U32 bits = ALViewKind::CONTEXT_MENU; };
+template <> struct ALViewKindOf<LLMenuItemGL>  { static constexpr U32 bits = ALViewKind::MENU_ITEM; };
+template <> struct ALViewKindOf<LLMenuItemSeparatorGL> { static constexpr U32 bits = ALViewKind::MENU_SEPARATOR; };
 
 #endif // AL_ALVIEWKIND_H

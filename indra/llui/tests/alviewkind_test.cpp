@@ -26,6 +26,7 @@
 
 #include "../llfloater.h"
 #include "../lllayoutstack.h"
+#include "../llmenugl.h"
 #include "../lluictrl.h"
 #include "../lluictrlfactory.h"
 
@@ -235,5 +236,52 @@ namespace tut
         parent->addChild(c);
         delete c;
         ensure("a dying control leaving is not", !parent->mLeaverWasCtrl);
+    }
+
+    // The menu kinds: a bar and a context menu are menus, a separator is an
+    // item, and a menu's parent item is held as one.
+    template<> template<>
+    void alviewkind_object::test<4>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        LLMenuGL::Params mp;
+        mp.name = "menu";
+        std::unique_ptr<LLMenuGL> menu(LLUICtrlFactory::create<LLMenuGL>(mp));
+        LLMenuBarGL::Params bp;
+        bp.name = "bar";
+        std::unique_ptr<LLMenuBarGL> bar(LLUICtrlFactory::create<LLMenuBarGL>(bp));
+        LLContextMenu::Params cp;
+        cp.name = "context";
+        std::unique_ptr<LLContextMenu> context(LLUICtrlFactory::create<LLContextMenu>(cp));
+        LLMenuItemCallGL::Params ip;
+        ip.name = "item";
+        LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(ip);
+        LLMenuItemSeparatorGL::Params sp;
+        sp.name = "separator";
+        std::unique_ptr<LLMenuItemSeparatorGL> separator(LLUICtrlFactory::create<LLMenuItemSeparatorGL>(sp));
+
+        ensure("a menu is a menu", menu->as<LLMenuGL>() == menu.get());
+        ensure("a menu is not a bar", menu->as<LLMenuBarGL>() == nullptr);
+        ensure("a menu is not a context menu", menu->as<LLContextMenu>() == nullptr);
+        ensure("a menu is not an item", menu->as<LLMenuItemGL>() == nullptr);
+        ensure("a bar is a menu", bar->as<LLMenuGL>() == bar.get());
+        ensure("a bar is a bar", bar->as<LLMenuBarGL>() == bar.get());
+        ensure("a context menu is a menu", context->as<LLMenuGL>() == context.get());
+        ensure("a context menu is a context menu", context->as<LLContextMenu>() == context.get());
+        ensure("a context menu is not a bar", context->as<LLMenuBarGL>() == nullptr);
+        ensure("an item is an item", item->as<LLMenuItemGL>() == item);
+        ensure("an item is not a separator", item->as<LLMenuItemSeparatorGL>() == nullptr);
+        ensure("an item is not a menu", item->as<LLMenuGL>() == nullptr);
+        ensure("a separator is an item", separator->as<LLMenuItemGL>() == separator.get());
+        ensure("a separator is a separator", separator->as<LLMenuItemSeparatorGL>() == separator.get());
+
+        menu->setParentMenuItem(item);
+        ensure("the parent item is held as one", menu->getParentMenuItem() == item);
+        delete item;
+        ensure("and let go when it dies", menu->getParentMenuItem() == nullptr);
     }
 }
