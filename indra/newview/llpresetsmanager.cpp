@@ -30,6 +30,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llpresetsmanager.h"
+#include "alcurvemodel.h"
 
 #include "lldiriterator.h"
 #include "llfloater.h"
@@ -545,10 +546,10 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "RenderColorGradeLift",
         "RenderColorGradeGamma",
         "RenderColorGradeGain",
-        "RenderColorGradeCurveMaster",
-        "RenderColorGradeCurveRed",
-        "RenderColorGradeCurveGreen",
-        "RenderColorGradeCurveBlue",
+        ALToneCurveSet::settingName(ALToneCurveSet::CH_MASTER),
+        ALToneCurveSet::settingName(ALToneCurveSet::CH_RED),
+        ALToneCurveSet::settingName(ALToneCurveSet::CH_GREEN),
+        ALToneCurveSet::settingName(ALToneCurveSet::CH_BLUE),
         "RenderColorGradeCurveAmount",
         // Split toning
         "RenderSplitToneAmount",
@@ -955,18 +956,23 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
         }
     }
 
-    if (applied > 0)
+    // A Look is a full snapshot of the whitelist, so a whitelisted key the
+    // file does not mention was saved before that key existed and the Look
+    // never had it: apply its default rather than leave whatever the previous
+    // grade set, or a seeded copy of Neutral that predates a setting keeps it
+    // and stops meaning neutral. Three fences keep that from doing damage.
+    // Only a file carrying at least half the whitelist counts as a snapshot,
+    // so a truncated or hand-trimmed file applies what it has and touches
+    // nothing else. A key that is present but malformed is skipped, as it
+    // always was, rather than reset. And the master switch is left alone: a
+    // file that omits it was edited by hand, and its other keys are evidently
+    // meant to be seen. resetToDefault fires only on a real change.
+    const bool snapshot = applied * 2 >= static_cast<S32>(allowed.size());
+    if (snapshot)
     {
-        // A Look is a full snapshot of the whitelist. A key the file does not
-        // carry was saved before that key existed, so the Look never had it:
-        // apply its default rather than leave whatever the previous grade
-        // set, or a seeded copy of Neutral that predates a setting keeps that
-        // setting and stops meaning neutral. Only once something applied,
-        // so a file with no recognised keys fails below without touching
-        // anything. resetToDefault fires only on a real change.
         for (const std::string& ctrl_name : allowed)
         {
-            if (carries(ctrl_name))
+            if (params.has(ctrl_name) || ctrl_name == "RenderColorGrade")
             {
                 continue;
             }
