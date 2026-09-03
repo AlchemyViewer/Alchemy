@@ -1684,7 +1684,7 @@ LLUICtrl* LLFavoritesBarCtrl::findChildByLocalCoords(S32 x, S32 y)
             // This makes the hit a bit less finicky than hitting directly on the button itself
             if (x <= rect.mRight)
             {
-                ctrl = dynamic_cast<LLUICtrl*>(*i);
+                ctrl = (*i)->as<LLUICtrl>();
                 break;
             }
         }

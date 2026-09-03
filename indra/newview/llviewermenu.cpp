@@ -4364,7 +4364,7 @@ void handle_reset_interest_lists()
 
 void handle_dump_focus()
 {
-    LLUICtrl *ctrl = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl *ctrl = gFocusMgr.getKeyboardFocusCtrl();
 
     LL_INFOS() << "Keyboard focus " << (ctrl ? ctrl->getName() : "(none)") << LL_ENDL;
 }

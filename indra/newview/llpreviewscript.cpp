@@ -224,7 +224,7 @@ LLFloaterScriptSearch::LLFloaterScriptSearch(LLScriptEdCore* editor_core)
     LLView* viewp = (LLView*)editor_core;
     while(viewp)
     {
-        LLFloater* floaterp = dynamic_cast<LLFloater*>(viewp);
+        LLFloater* floaterp = viewp->as<LLFloater>();
         if (floaterp)
         {
             floaterp->addDependentFloater(this);
@@ -1009,7 +1009,7 @@ void LLScriptEdCore::onBtnDynamicHelp()
     {
         live_help_floater = new LLFloater(LLSD());
         live_help_floater->buildFromFile("floater_lsl_guide.xml");
-        LLFloater* parent = dynamic_cast<LLFloater*>(getParent());
+        LLFloater* parent = getParentAs<LLFloater>();
         llassert(parent);
         if (parent)
             parent->addDependentFloater(live_help_floater, true);

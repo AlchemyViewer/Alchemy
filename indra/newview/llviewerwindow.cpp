@@ -4154,12 +4154,12 @@ void LLViewerWindow::updateUI()
                     }
                     // only report xui names for LLUICtrls,
                     // and blacklist the various containers we don't care about
-                    else if (dynamic_cast<LLUICtrl*>(viewp)
+                    else if (viewp->as<LLUICtrl>()
                             && viewp != gMenuHolder
                             && viewp != gFloaterView
                             && viewp != gConsole)
                     {
-                        if (dynamic_cast<LLFloater*>(viewp))
+                        if (viewp->as<LLFloater>())
                         {
                             // constrain search to descendants of this (frontmost) floater
                             // by resetting iterator
@@ -4362,7 +4362,7 @@ void LLViewerWindow::updateKeyboardFocus()
     }
 
     // clean up current focus
-    LLUICtrl* cur_focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
+    LLUICtrl* cur_focus = gFocusMgr.getKeyboardFocusCtrl();
     if (cur_focus)
     {
         bool is_in_visible_chain = cur_focus->isInVisibleChain();

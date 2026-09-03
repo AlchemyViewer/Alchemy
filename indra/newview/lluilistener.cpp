@@ -93,7 +93,7 @@ void LLUIListener::getValue(const LLSD&event) const
 
     const LLView* root = LLUI::getInstance()->getRootView();
     const LLView* view = LLUI::getInstance()->resolvePath(root, event["path"].asString());
-    const LLUICtrl* ctrl(dynamic_cast<const LLUICtrl*>(view));
+    const LLUICtrl* ctrl(view ? view->as<LLUICtrl>() : nullptr);
 
     if (ctrl)
     {

@@ -1365,7 +1365,7 @@ bool LLPreviewedFloater::handleToolTip(S32 x, S32 y, MASK mask)
         }
         // only report xui names for LLUICtrls, not the various container LLViews
 
-        else if (dynamic_cast<LLUICtrl*>(viewp))
+        else if (viewp->as<LLUICtrl>())
         {
             // if we are in a new part of the tree (not a descendent of current tooltip_view)
             // then push the results for tooltip_view and start with a new potential view

@@ -146,7 +146,7 @@ LLFloaterSearchReplace* LLFloaterSearchReplace::show(LLTextEditor* pEditor)
     LLView* pView = pEditor->getParent();
     while (pView)
     {
-        pDependeeNew = dynamic_cast<LLFloater*>(pView);
+        pDependeeNew = pView->as<LLFloater>();
         if (pDependeeNew)
         {
             if (pDependeeNew != pDependeeOld)

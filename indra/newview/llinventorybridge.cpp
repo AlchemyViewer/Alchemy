@@ -3631,7 +3631,7 @@ void LLFolderBridge::performAction(LLInventoryModel* model, std::string action)
 {
     if ("open" == action)
     {
-        LLFolderViewFolder *f = dynamic_cast<LLFolderViewFolder   *>(mInventoryPanel.get()->getItemByID(mUUID));
+        LLFolderViewFolder *f = mInventoryPanel.get()->getFolderByID(mUUID);
         if (f)
         {
             f->toggleOpen();

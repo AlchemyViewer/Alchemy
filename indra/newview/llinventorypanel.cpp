@@ -563,15 +563,15 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
     LLFolderViewModelItemInventory* viewmodel_item =
         static_cast<LLFolderViewModelItemInventory*>(view_item ? view_item->getViewModelItem() : NULL);
 
-    // LLFolderViewFolder is derived from LLFolderViewItem so dynamic_cast from item
-    // to folder is the fast way to get a folder without searching through folders tree.
+    // LLFolderViewFolder is derived from LLFolderViewItem so asking the item its
+    // kind is the fast way to get a folder without searching through folders tree.
     LLFolderViewFolder* view_folder = NULL;
 
     // Check requires as this item might have already been deleted
     // as a child of its deleted parent.
     if (model_item && view_item)
     {
-        view_folder = dynamic_cast<LLFolderViewFolder*>(view_item);
+        view_folder = view_item->as<LLFolderViewFolder>();
     }
 
     // if folder is not fully initialized (likely due to delayed load on idle)
@@ -637,7 +637,7 @@ void LLInventoryPanel::itemChanged(const LLUUID& item_id, U32 mask, const LLInve
 
         viewmodel_item =
             static_cast<LLFolderViewModelItemInventory*>(view_item ? view_item->getViewModelItem() : NULL);
-        view_folder = dynamic_cast<LLFolderViewFolder *>(view_item);
+        view_folder = ALViewType::as<LLFolderViewFolder>(view_item);
     }
 
     //////////////////////////////
@@ -1212,7 +1212,7 @@ LLFolderViewItem* LLInventoryPanel::buildViewsTree(const LLUUID& id,
         if (root_id == id)
         {
             // We insert an extra level that's seen by the UI but has no influence on the model
-            parent_folder = dynamic_cast<LLFolderViewFolder*>(folder_view_item);
+            parent_folder = ALViewType::as<LLFolderViewFolder>(folder_view_item);
             folder_view_item = NULL;
             allow_drop = mParams.allow_drop_on_root;
             create_root = true;
@@ -1377,7 +1377,7 @@ LLFolderViewItem* LLInventoryPanel::buildViewsTree(const LLUUID& id,
         const S32 MIN_ITEMS_PER_CALL = 500;
         const S32 starting_item_count = static_cast<S32>(mItemMap.size());
 
-        LLFolderViewFolder *parentp = dynamic_cast<LLFolderViewFolder*>(folder_view_item);
+        LLFolderViewFolder *parentp = folder_view_item->as<LLFolderViewFolder>();
         bool done = true;
 
         if(categories)
@@ -1476,7 +1476,7 @@ void LLInventoryPanel::openStartFolderOrMyInventory()
     // Find My Inventory folder and open it up by name
     for (LLView *child = mFolderRoot.get()->getFirstChild(); child; child = mFolderRoot.get()->findNextSibling(child))
     {
-        LLFolderViewFolder *fchild = dynamic_cast<LLFolderViewFolder*>(child);
+        LLFolderViewFolder *fchild = child->as<LLFolderViewFolder>();
         if (fchild
             && fchild->getViewModelItem()
             // Is this right? Name might be localized,
@@ -2231,7 +2231,7 @@ LLFolderViewItem* LLInventoryPanel::getItemByID(const LLUUID& id)
 LLFolderViewFolder* LLInventoryPanel::getFolderByID(const LLUUID& id)
 {
     LLFolderViewItem* item = getItemByID(id);
-    return dynamic_cast<LLFolderViewFolder*>(item);
+    return ALViewType::as<LLFolderViewFolder>(item);
 }
 
 

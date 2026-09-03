@@ -214,7 +214,7 @@ bool LLSidepanelInventory::postBuild()
 
     gSavedSettings.getControl("InventoryDisplayInbox")->getCommitSignal()->connect(boost::bind(&handleInventoryDisplayInboxChanged));
 
-    LLFloater *floater = dynamic_cast<LLFloater*>(getParent());
+    LLFloater *floater = getParentAs<LLFloater>();
     if (floater && floater->getKey().isUndefined() && !sLoginCompleted)
     {
         // Prefill inventory for primary inventory floater
