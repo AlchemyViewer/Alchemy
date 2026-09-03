@@ -908,7 +908,7 @@ S32 LLAccordionCtrlTab::notifyParent(const LLSD& info)
     }
     else if (info.has("scrollToShowRect"))
     {
-        LLAccordionCtrl* parent = dynamic_cast<LLAccordionCtrl*>(getParent());
+        LLAccordionCtrl* parent = getParentAs<LLAccordionCtrl>();
         if (parent && parent->getFitParent())
         {
             //  EXT-8285 ('No attachments worn' text appears at the bottom of blank 'Attachments' accordion)

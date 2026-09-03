@@ -63,6 +63,7 @@ namespace tut
 
     struct TestCtrl : public LLUICtrl
     {
+        AL_VIEW_TYPE(TestCtrl, LLUICtrl);
         TestCtrl(const LLUICtrl::Params& p) : LLUICtrl(p) {}
     };
 
@@ -172,12 +173,12 @@ namespace tut
         std::unique_ptr<TestCtrl> c(ctrl("ctrl"));
         ensure("a control is a control", c->as<LLUICtrl>() == c.get());
         ensure("a control is not a panel", c->as<LLPanel>() == nullptr);
-        ensure("its own type has no kind and is still found", c->as<TestCtrl>() == c.get());
+        ensure("a class declared in a test is found like any other", c->as<TestCtrl>() == c.get());
 
         std::unique_ptr<TestView> v(view("plain"));
         ensure("a plain view is a view", v->as<LLView>() == v.get());
         ensure("a plain view is not a control", v->as<LLUICtrl>() == nullptr);
-        ensure("nor any type with no kind that it is not", v->as<TestCtrl>() == nullptr);
+        ensure("nor the test's own class", v->as<TestCtrl>() == nullptr);
 
         const LLView* cf = f;
         ensure("a const view answers the same", cf->as<LLFloater>() == f);
@@ -305,7 +306,8 @@ namespace tut
     static_assert(LLFolderView::sViewType.mDepth == 3);
     static_assert(LLSpinCtrl::sViewType.mDepth == 3);
     static_assert(ALViewTypeOf<LLButton>::declared);
-    static_assert(!ALViewTypeOf<TestCtrl>::declared);
+    static_assert(ALViewTypeOf<TestCtrl>::declared);
+    static_assert(!ALViewTypeOf<AskingView>::declared);   // and would not compile in as<>()
 
     // The ancestor chain is the one the class heads declare, and the
     // is-a test reads it the same way at compile time as at run time.
@@ -351,7 +353,7 @@ namespace tut
         ensure("a button is a control", button->as<LLUICtrl>() == button.get());
         ensure("a spin control is a control, through its float base", spin->as<LLUICtrl>() == spin.get());
         ensure("a tab container is a panel", tabs->as<LLPanel>() == tabs.get());
-        ensure("a text box is a text base, the slow way", text->as<LLTextBase>() == text.get());
+        ensure("a text box is a text base", text->as<LLTextBase>() == text.get());
 
         ensure("a button is not a text box", button->as<LLTextBox>() == nullptr);
         ensure("a text box is not a line editor", text->as<LLLineEditor>() == nullptr);

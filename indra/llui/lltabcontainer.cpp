@@ -96,9 +96,11 @@ public:
  * @file lltabcontainer.cpp
  * @brief class implements LLButton with LLIconCtrl on it
  */
-class LLCustomButtonIconCtrl : public LLButton
+class LLCustomButtonIconCtrl final : public LLButton
 {
 public:
+    AL_VIEW_TYPE(LLCustomButtonIconCtrl, LLButton);
+
     struct Params
     :   public LLInitParam::Block<Params, LLButton::Params>
     {
@@ -1703,7 +1705,7 @@ void LLTabContainer::setTabImage(LLPanel* child, LLIconCtrl* icon)
 
     if(tuple)
     {
-        button = dynamic_cast<LLCustomButtonIconCtrl*>(tuple->mButton);
+        button = ALViewType::as<LLCustomButtonIconCtrl>(tuple->mButton);
         if(button)
         {
             hasButton = true;
@@ -1731,7 +1733,7 @@ void LLTabContainer::reshapeTuple(LLTabTuple* tuple)
 
         if(mCustomIconCtrlUsed)
         {
-            LLCustomButtonIconCtrl* button = dynamic_cast<LLCustomButtonIconCtrl*>(tuple->mButton);
+            LLCustomButtonIconCtrl* button = ALViewType::as<LLCustomButtonIconCtrl>(tuple->mButton);
             LLIconCtrl* icon_ctrl = button ? button->getIconCtrl() : NULL;
             image_overlay_width = icon_ctrl ? icon_ctrl->getRect().getWidth() : 0;
         }

@@ -1321,7 +1321,7 @@ void LLButton::addImageAttributeToXML(LLXMLNodePtr node,
 void LLButton::toggleFloaterAndSetToggleState(LLUICtrl* ctrl, const LLSD& sdname)
 {
     bool floater_vis = LLFloaterReg::toggleInstance(sdname.asString());
-    LLButton* button = dynamic_cast<LLButton*>(ctrl);
+    LLButton* button = ALViewType::as<LLButton>(ctrl);
     if (button)
         button->setToggleState(floater_vis);
 }
@@ -1330,7 +1330,7 @@ void LLButton::toggleFloaterAndSetToggleState(LLUICtrl* ctrl, const LLSD& sdname
 // Gets called once
 void LLButton::setFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 {
-    LLButton* button = dynamic_cast<LLButton*>(ctrl);
+    LLButton* button = ALViewType::as<LLButton>(ctrl);
     if (!button)
         return;
     // Get the visibility control name for the floater
@@ -1344,7 +1344,7 @@ void LLButton::setFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 // static
 void LLButton::setDockableFloaterToggle(LLUICtrl* ctrl, const LLSD& sdname)
 {
-    LLButton* button = dynamic_cast<LLButton*>(ctrl);
+    LLButton* button = ALViewType::as<LLButton>(ctrl);
     if (!button)
         return;
     // Get the visibility control name for the floater

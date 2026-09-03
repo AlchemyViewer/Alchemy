@@ -76,7 +76,7 @@ bool LLContainerView::postBuild()
     // Only a container that is scrolled directly takes the scroll container:
     // a section nested inside one would otherwise be told the whole window's
     // height is its minimum, and every section would fill the window.
-    mScrollContainer = dynamic_cast<LLScrollContainer*>(getParent());
+    mScrollContainer = getParentAs<LLScrollContainer>();
 
     setDisplayChildren(mDisplayChildren);
     reshape(getRect().getWidth(), getRect().getHeight(), false);

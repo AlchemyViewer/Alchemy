@@ -130,9 +130,11 @@ private:
     bool confirmCloseAll(const LLSD& notification, const LLSD& response);
     void closeAllImpl();
 
-    class ObjectRowPanel: public LLPanel
+    class ObjectRowPanel final: public LLPanel
     {
     public:
+        AL_VIEW_TYPE(ObjectRowPanel, LLPanel);
+
         ObjectRowPanel(const LLUUID& notification_id, bool new_message = false);
         virtual ~ObjectRowPanel();
         /*virtual*/ void onMouseEnter(S32 x, S32 y, MASK mask);

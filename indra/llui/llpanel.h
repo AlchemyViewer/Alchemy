@@ -117,6 +117,7 @@ public:
 
     // LLView interface
     /*virtual*/ bool    isPanel() const;
+    LLView*             badgeHolderView() override { return this; }
     /*virtual*/ void    draw();
     /*virtual*/ bool    handleKeyHere( KEY key, MASK mask );
     /*virtual*/ void    onVisibilityChange ( bool new_visibility );

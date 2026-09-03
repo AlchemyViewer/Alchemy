@@ -306,7 +306,7 @@ bool LLPanel::handleKeyHere( KEY key, MASK mask )
     // If RETURN was pressed and something has focus, call onCommit()
     if (!handled && cur_focus && key == KEY_RETURN && mask == MASK_NONE)
     {
-        LLButton* focused_button = dynamic_cast<LLButton*>(cur_focus);
+        LLButton* focused_button = cur_focus->as<LLButton>();
         if (focused_button && focused_button->getCommitOnReturn())
         {
             // current focus is a return-capturing button,

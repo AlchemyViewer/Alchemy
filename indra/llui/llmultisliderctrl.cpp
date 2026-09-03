@@ -363,7 +363,7 @@ void LLMultiSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata)
     if (!ctrl)
         return;
 
-    LLMultiSliderCtrl* self = dynamic_cast<LLMultiSliderCtrl*>(ctrl->getParent());
+    LLMultiSliderCtrl* self = ctrl->getParentAs<LLMultiSliderCtrl>();
     llassert(self);
     if (!self) // cast failed - wrong type! :O
         return;
@@ -406,7 +406,7 @@ void LLMultiSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata)
 // static
 void LLMultiSliderCtrl::onSliderCommit(LLUICtrl* ctrl, const LLSD& userdata)
 {
-    LLMultiSliderCtrl* self = dynamic_cast<LLMultiSliderCtrl*>(ctrl->getParent());
+    LLMultiSliderCtrl* self = ctrl->getParentAs<LLMultiSliderCtrl>();
     if (!self)
         return;
 

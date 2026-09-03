@@ -68,6 +68,9 @@ public:
     virtual bool    wantsKeyUpKeyDown() const;
     virtual bool    wantsReturnKey() const;
 
+    // The element as a view, or null for one that is not.
+    virtual LLView* asView() { return nullptr; }
+
     virtual void    onTopLost();    // called when registered as top ctrl and user clicks elsewhere
 protected:
     virtual void    onFocusReceived();

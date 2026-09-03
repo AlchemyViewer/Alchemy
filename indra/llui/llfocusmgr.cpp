@@ -223,9 +223,9 @@ void LLFocusMgr::setKeyboardFocus(LLFocusableElement* new_focus, bool lock, bool
     static bool focus_dirty;
     focus_dirty = false;
 
-    // The one cross-cast per focus change. Everything that asks afterwards
-    // reads the view kept beside the element.
-    LLView* new_focus_view = dynamic_cast<LLView*>(new_focus);
+    // Asked once per focus change. Everything that asks afterwards reads the
+    // view kept beside the element.
+    LLView* new_focus_view = new_focus ? new_focus->asView() : nullptr;
 
     if (mLockedView &&
         (new_focus == nullptr ||

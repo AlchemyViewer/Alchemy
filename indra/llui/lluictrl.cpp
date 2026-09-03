@@ -902,7 +902,7 @@ bool LLUICtrl::findHelpTopic(std::string& help_topic_out)
     // or tab with a help_topic string defined
     while (ctrl)
     {
-        LLPanel *panel = dynamic_cast<LLPanel *>(ctrl);
+        LLPanel *panel = ctrl->as<LLPanel>();
 
         if (panel)
         {
@@ -918,7 +918,7 @@ bool LLUICtrl::findHelpTopic(std::string& help_topic_out)
             {
                 child = *it;
                 // do we have a panel with a help topic?
-                LLPanel *child_panel = dynamic_cast<LLPanel *>(child);
+                LLPanel *child_panel = child->as<LLPanel>();
                 if (child_panel && child_panel->isInVisibleChain() && !child_panel->getHelpTopic().empty())
                 {
                     subpanel = child_panel;
@@ -944,17 +944,17 @@ bool LLUICtrl::findHelpTopic(std::string& help_topic_out)
                 LLPanel *curTabPanel = nullptr;
 
                 // do we have a tab container?
-                LLTabContainer *tab = dynamic_cast<LLTabContainer *>(child);
+                LLTabContainer *tab = child->as<LLTabContainer>();
                 if (tab && tab->getVisible())
                 {
                     curTabPanel = tab->getCurrentPanel();
                 }
 
                 // do we have an accordion tab?
-                LLAccordionCtrlTab* accordion = dynamic_cast<LLAccordionCtrlTab *>(child);
+                LLAccordionCtrlTab* accordion = child->as<LLAccordionCtrlTab>();
                 if (accordion && accordion->getDisplayChildren())
                 {
-                    curTabPanel = dynamic_cast<LLPanel *>(accordion->getAccordionView());
+                    curTabPanel = ALViewType::as<LLPanel>(accordion->getAccordionView());
                 }
 
                 // if we found a valid tab, does it have a help topic?

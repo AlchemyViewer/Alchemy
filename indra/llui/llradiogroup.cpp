@@ -46,9 +46,11 @@ static LLDefaultChildRegistry::Register<LLRadioGroup> r1("radio_group");
  * buttons (usually radio buttons).  Automatically handles the mutex
  * condition by highlighting only one button at a time.
  */
-class LLRadioCtrl : public LLCheckBoxCtrl
+class LLRadioCtrl final : public LLCheckBoxCtrl
 {
 public:
+    AL_VIEW_TYPE(LLRadioCtrl, LLCheckBoxCtrl);
+
     typedef LLRadioGroup::ItemParams Params;
     /*virtual*/ ~LLRadioCtrl();
     /*virtual*/ void setValue(const LLSD& value);
@@ -305,7 +307,7 @@ bool LLRadioGroup::handleKeyHere(KEY key, MASK mask)
 void LLRadioGroup::onClickButton(LLUICtrl* ctrl)
 {
     // LL_INFOS() << "LLRadioGroup::onClickButton" << LL_ENDL;
-    LLRadioCtrl* clicked_radio = dynamic_cast<LLRadioCtrl*>(ctrl);
+    LLRadioCtrl* clicked_radio = ALViewType::as<LLRadioCtrl>(ctrl);
     if (!clicked_radio)
         return;
     S32 index = 0;

@@ -219,19 +219,16 @@ public:
     static constexpr ALViewType sViewType{nullptr, "LLView"};
     virtual const ALViewType* viewType() const { return &sViewType; }
 
-    // This view as a T, or null: one compare for a class that declared its
-    // type with AL_VIEW_TYPE, dynamic_cast for any other.
+    // This view as a T, or null: one compare. Every view class declares its
+    // type with AL_VIEW_TYPE; asking for one that has not is an error here
+    // rather than a slower answer.
     template <class T> T* as()
     {
-        if constexpr (ALViewTypeOf<T>::declared)
-        {
-            return viewType()->isA(T::sViewType) ? static_cast<T*>(this) : nullptr;
-        }
-        else
-        {
-            return dynamic_cast<T*>(this);
-        }
+        static_assert(ALViewTypeOf<T>::declared, "T has no AL_VIEW_TYPE declaration");
+        return viewType()->isA(T::sViewType) ? static_cast<T*>(this) : nullptr;
     }
+
+    LLView* asView() override { return this; }
 
     template <class T> const T* as() const
     {

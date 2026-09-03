@@ -324,7 +324,7 @@ void LLSliderCtrl::updateSliderRect()
 // static
 void LLSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata )
 {
-    LLSliderCtrl* self = dynamic_cast<LLSliderCtrl*>(ctrl->getParent());
+    LLSliderCtrl* self = ctrl->getParentAs<LLSliderCtrl>();
     if (!self)
         return;
 
@@ -368,7 +368,7 @@ void LLSliderCtrl::onEditorCommit( LLUICtrl* ctrl, const LLSD& userdata )
 // static
 void LLSliderCtrl::onSliderCommit( LLUICtrl* ctrl, const LLSD& userdata )
 {
-    LLSliderCtrl* self = dynamic_cast<LLSliderCtrl*>(ctrl->getParent());
+    LLSliderCtrl* self = ctrl->getParentAs<LLSliderCtrl>();
     if (!self)
         return;
 

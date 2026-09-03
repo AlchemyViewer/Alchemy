@@ -3370,7 +3370,7 @@ void LLFloaterView::syncFloaterTabOrder()
     LLModalDialog* modal_dialog = NULL;
     for ( child_list_const_iter_t child_it = getChildList()->begin(); child_it != getChildList()->end(); ++child_it)
     {
-        LLModalDialog* dialog = dynamic_cast<LLModalDialog*>(*child_it);
+        LLModalDialog* dialog = (*child_it)->as<LLModalDialog>();
         if (dialog && dialog->isModal() && dialog->getVisible())
         {
             modal_dialog = dialog;
