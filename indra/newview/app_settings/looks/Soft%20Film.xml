@@ -261,7 +261,7 @@
         <key>RenderColorGradeCurveBlue</key>
         <map>
             <key>Comment</key>
-            <string>Tone curve for the blue channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16; [[0,0],[1,1]] is no change.</string>
+            <string>Tone curve for the blue channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16 from the graph and 64 from a file; [[0,0],[1,1]] is no change.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -281,7 +281,7 @@
         <key>RenderColorGradeCurveGreen</key>
         <map>
             <key>Comment</key>
-            <string>Tone curve for the green channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16; [[0,0],[1,1]] is no change.</string>
+            <string>Tone curve for the green channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16 from the graph and 64 from a file; [[0,0],[1,1]] is no change.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -301,7 +301,7 @@
         <key>RenderColorGradeCurveMaster</key>
         <map>
             <key>Comment</key>
-            <string>Tone curve applied to every channel, after the per-channel curves. An array of [input, output] control points, both 0 to 1, sorted by input with the first at input 0 and the last at input 1, at most 16; a monotone cubic spline passes through them. [[0,0],[1,1]] is a straight line (no change). Edited in the Lightbox Tone Curve graph.</string>
+            <string>Tone curve applied to every channel, after the per-channel curves. An array of [input, output] control points, both 0 to 1, sorted by input with the first at input 0 and the last at input 1, up to 16 from the graph and 64 from a file; a monotone cubic spline passes through them. [[0,0],[1,1]] is a straight line (no change). Edited in the Lightbox Tone Curve graph.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -321,7 +321,7 @@
         <key>RenderColorGradeCurveRed</key>
         <map>
             <key>Comment</key>
-            <string>Tone curve for the red channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16; [[0,0],[1,1]] is no change.</string>
+            <string>Tone curve for the red channel only, applied before the Master curve. Same format as RenderColorGradeCurveMaster: [input, output] points in 0..1, up to 16 from the graph and 64 from a file; [[0,0],[1,1]] is no change.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

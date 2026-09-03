@@ -658,10 +658,9 @@ void LLPipeline::init()
 
     // Tone curve: a commit only marks the lookup row dirty. The bake itself
     // runs from colorCorrect -- see bakeToneCurveLut for why not here.
-    for (const char* name : { "RenderColorGradeCurveMaster", "RenderColorGradeCurveRed",
-                              "RenderColorGradeCurveGreen",  "RenderColorGradeCurveBlue" })
+    for (S32 c = 0; c < ALToneCurveSet::CH_COUNT; ++c)
     {
-        cntrl_ptr = gSavedSettings.getControl(name);
+        cntrl_ptr = gSavedSettings.getControl(ALToneCurveSet::settingName(static_cast<ALToneCurveSet::EChannel>(c)));
         if (cntrl_ptr.notNull())
         {
             cntrl_ptr->getCommitSignal()->connect(
@@ -1863,17 +1862,15 @@ void LLPipeline::bakeToneCurveLut()
     // needed. controlExists keeps a build whose settings lag behind from
     // asserting inside LLControlGroup.
     ALToneCurveSet curves;
-    auto load = [&curves](ALToneCurveSet::EChannel c, const char* name)
+    for (S32 c = 0; c < ALToneCurveSet::CH_COUNT; ++c)
     {
+        const ALToneCurveSet::EChannel channel = static_cast<ALToneCurveSet::EChannel>(c);
+        const char* name = ALToneCurveSet::settingName(channel);
         if (gSavedSettings.controlExists(name))
         {
-            curves.setCurveFromLLSD(c, gSavedSettings.getLLSD(name));
+            curves.setCurveFromLLSD(channel, gSavedSettings.getLLSD(name));
         }
-    };
-    load(ALToneCurveSet::CH_MASTER, "RenderColorGradeCurveMaster");
-    load(ALToneCurveSet::CH_RED,    "RenderColorGradeCurveRed");
-    load(ALToneCurveSet::CH_GREEN,  "RenderColorGradeCurveGreen");
-    load(ALToneCurveSet::CH_BLUE,   "RenderColorGradeCurveBlue");
+    }
 
     mToneCurveIdentity = curves.isIdentity();
     if (mToneCurveIdentity || !mToneCurveLut)

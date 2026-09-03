@@ -149,7 +149,6 @@ public:
     /// from another's without diffing the whole list. During an ACTION_REMOVE
     /// it names the handle to remove.
     S32 getActiveHandle() const { return mDragIndex; }
-    std::string getActiveHandleName() const;
 
     /// What the commit callback is being asked to do. Valid only inside the
     /// callback; ACTION_NONE between commits.

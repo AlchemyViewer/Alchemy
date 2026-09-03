@@ -1319,7 +1319,7 @@ Row conventions:
 				 grid_divisions="4"
 				 draw_diagonal="false"
 				 name="split_tone_graph"
-				 tool_tip="Which tones each tint reaches. Drag the middle handle to slide the split point (the Balance slider); drag the left and right handles to set how far the shadow and highlight tints reach (the Width sliders). Each band is drawn in the colour it applies and fades as its amount drops."
+				 tool_tip="Which tones each tint reaches. Drag the middle handle to slide the split point (the Balance slider); drag the left and right handles to set how far the shadow and highlight tints reach (the Width sliders). Each band is drawn in the colour it applies and fades as its amount drops. A handle held at the edge of the graph is locked; use its Width slider."
 				 enabled_control="RenderColorGrade">
 					<curve_editor.commit_callback
 					 function="LightBox.CommitSplitToneGraph" />

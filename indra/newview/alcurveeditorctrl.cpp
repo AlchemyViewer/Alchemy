@@ -90,18 +90,6 @@ void ALCurveEditorCtrl::addFillCurve(curve_fn_t fn, const LLColor4& color)
     mFills.emplace_back(std::move(fn), color);
 }
 
-std::string ALCurveEditorCtrl::getActiveHandleName() const
-{
-    if (mDragIndex < 0 || mDragIndex >= (S32)mHandles.size())
-    {
-        return std::string();
-    }
-    // By value on purpose: a consumer typically reacts to the commit by
-    // writing a setting and calling setHandles(), which would leave a
-    // reference into the old vector dangling.
-    return mHandles[mDragIndex].mName;
-}
-
 LLRect ALCurveEditorCtrl::plotRect() const
 {
     LLRect rect = getLocalRect();
@@ -281,13 +269,18 @@ bool ALCurveEditorCtrl::handleDoubleClick(S32 x, S32 y, MASK mask)
         mDragIndex = -1;
         mHoverIndex = -1;   // the list may be one shorter; the next hover re-finds it
     }
-    else
+    else if (plotRect().pointInRect(x, y))
     {
         pixelToGraph(x, y, mActionX, mActionY);
         mAction = ACTION_ADD;
         onCommit();
         mAction = ACTION_NONE;
+        mHoverIndex = -1;   // the list may be one longer; the next hover re-finds it
     }
+    // A double-click on the frame outside the plot asks for nothing. The plot
+    // is inset by the handle radius, and pixelToGraph clamps, so a click out
+    // there would resolve to an exact axis extreme and plant a point on the
+    // edge -- a click that missed the graph, not a request for a point.
 
     setFocus(true);
     return true;

@@ -355,6 +355,10 @@ lets the user add and remove points; that is a param, not a second widget:
   naming the target) — decides against its own model whether to honour it,
   and hands back a new handle list. The model refuses an endpoint removal and
   a 17th point; the floater then just refreshes, which puts the handle back.
+  A double-click on the frame outside the plot is ignored, and an add at an
+  edge lands one gap inside the pinned end rather than on it. A file may
+  carry up to 64 points, which the editor keeps but will not add to; more
+  than that is rejected as garbage and renders as no curve.
 - **A press that does not move never commits.** The viewer calls a captured
   widget's `handleHover` every frame, not only on motion, so without the
   no-motion guard a plain click on any handle rewrote its value at pixel
@@ -658,6 +662,8 @@ the value actually changed (`setValue` and `resetToDefault` both gate on
 do-nothing step on the stack. That holds for LLSD-typed settings — the curve
 point lists — only because `llsd_compare` grew a `TYPE_LLSD` case with the
 tone curve work; before it, every write to such a setting counted as a change.
+Numbers compare as numbers there, so an integer-typed list from a hand edit or
+the notation parser is the same value as its real-typed default.
 
 Two rules if you add a control:
 
@@ -929,10 +935,13 @@ Bundled starter Looks live in `app_settings/looks/` as full whitelist
 snapshots ({Comment, Persist, Type, Value} per key, URI-escaped filenames).
 **Add your keys to all three at their defaults**, so the files stay complete
 snapshots of the whitelist. `loadLooksPreset` applies the whitelisted keys the
-file carries and resets to default every whitelisted key it lacks, so a Look
-saved before a key existed applies that key at its default — which is what
-keeps "Neutral" neutral for a user whose seeded copies predate the key. A file
-with no recognised keys fails before anything is reset. To refresh the bundled
+file carries and resets to default every whitelisted key it does not mention,
+so a Look saved before a key existed applies that key at its default — which
+is what keeps "Neutral" neutral for a user whose seeded copies predate the
+key. Three fences: only a file carrying at least half the whitelist counts as
+a snapshot (a truncated or hand-trimmed file applies what it has and touches
+nothing else), a key that is present but malformed is skipped as it always
+was, and the `RenderColorGrade` master switch is never reset by absence. To refresh the bundled
 files after tuning: save the Look in the viewer, then copy the saved file from
 `<user_settings>/presets/looks/` over the bundled one.
 
@@ -973,9 +982,10 @@ deleted stays deleted. Nothing is ever copied over a file that already exists.
   (the texture is recreated and re-baked); untick the section header and set
   Amount to 0 and confirm both bypass.
 - For the split-tone edges: drag each past the balance handle and confirm the
-  width clamps at 0.02 and the handle is put back; at a low balance with a wide
-  shadow ramp the left handle parks at the plot edge while the slider keeps the
-  true width — that is expected, not a stuck handle.
+  width clamps at the slider's range and the handle is put back; at a low
+  balance with a wide shadow ramp the left handle is held at the plot edge,
+  locked and dimmed, while the slider keeps the true width — the slider is
+  the control for it, and dragging the held handle writes nothing.
 - For anything measured (scopes, vectorscope): change the thing it measures and
   confirm the readout moves the way the control says it should.
 - For a section switch: **untick** it (ticked is on) and confirm the image

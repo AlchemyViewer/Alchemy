@@ -64,10 +64,16 @@ public:
     /// never have zero width and the Hermite division stays finite.
     static constexpr F32 MIN_POINT_GAP = 1e-3f;
 
-    /// Hard cap on control points. A tone curve is single digits; sixteen is
-    /// room for an eccentric one without letting a setting of arbitrary size
-    /// through setPoints. addPoint returns -1 at the cap.
+    /// Cap on the points the editor will add: a tone curve is single digits,
+    /// and sixteen is room for an eccentric one. addPoint returns -1 at it.
     static constexpr S32 MAX_POINTS = 16;
+
+    /// Cap on the points a stored curve may carry. A file can only come from
+    /// outside the editor, so it is allowed more than the editor adds, and a
+    /// curve of that size still renders exactly what the file describes; past
+    /// this it is rejected as garbage rather than silently reshaped. Far below
+    /// 1 / MIN_POINT_GAP, so the separation pass can always make room.
+    static constexpr S32 MAX_STORED_POINTS = 64;
 
     ALCurveModel() = default;
 
@@ -77,14 +83,17 @@ public:
     /// editor does and what keeps a drag predictable.
     /// @{
 
-    /// Replace the point list. Sorted, separated, clamped and capped on the
-    /// way in; fewer than two points resets to the identity ramp.
+    /// Replace the point list. Sorted, separated, clamped and capped at
+    /// MAX_STORED_POINTS on the way in; fewer than two points resets to the
+    /// identity ramp.
     void setPoints(std::vector<Point> points);
     const std::vector<Point>& getPoints() const { return mPoints; }
     S32 getPointCount() const { return static_cast<S32>(mPoints.size()); }
 
     /// Insert a point, returning its index after ordering, or -1 when the
-    /// curve already holds MAX_POINTS.
+    /// curve already holds MAX_POINTS. While the endpoints are locked the
+    /// point is kept strictly inside them, so an add at an edge lands beside
+    /// the end rather than on it.
     S32 addPoint(F32 x, F32 y);
 
     /// Remove a point. Refuses to leave fewer than two, and refuses to remove
@@ -172,8 +181,8 @@ public:
     /// @}
 
 private:
-    /// Sort by x, clamp, push apart any pair closer than MIN_POINT_GAP, and
-    /// cap at MAX_POINTS keeping both ends.
+    /// Sort by x, clamp, cap at MAX_STORED_POINTS keeping both ends, and push
+    /// apart any pair closer than MIN_POINT_GAP.
     void normalize();
 
     std::vector<Point> mPoints{ { 0.f, 0.f }, { 1.f, 1.f } };
@@ -223,6 +232,11 @@ public:
     /// The channel combo's value space: -1 is Master, 0..2 are R, G, B.
     static EChannel channelFromCombo(S32 combo_value);
 
+    /// The gSavedSettings key each curve lives in. The one list the renderer,
+    /// the Lightbox and the Looks whitelist all iterate, so a channel cannot be
+    /// renamed in one of them and silently dropped by another.
+    static const char* settingName(EChannel c);
+
     ALCurveModel&       curve(EChannel c)       { return mCurves[c]; }
     const ALCurveModel& curve(EChannel c) const { return mCurves[c]; }
 
@@ -230,9 +244,10 @@ public:
     /// @{
 
     /// Read an array of [x, y] pairs. Entries that are not a two-element array
-    /// of finite numbers are skipped; if fewer than two survive, @a out is the
-    /// identity pair and the result is false. Survivors are not yet sorted or
-    /// clamped -- setPoints does that.
+    /// of finite numbers are skipped; if fewer than two survive, or more than
+    /// ALCurveModel::MAX_STORED_POINTS, @a out is the identity pair and the
+    /// result is false. Survivors are not yet sorted or clamped -- setPoints
+    /// does that.
     static bool pointsFromLLSD(const LLSD& sd, std::vector<ALCurveModel::Point>& out);
     static LLSD pointsToLLSD(const std::vector<ALCurveModel::Point>& points);
     static LLSD identityLLSD();

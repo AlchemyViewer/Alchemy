@@ -325,6 +325,9 @@ namespace tut
         ensure_equals("refused past the cap", mCurve.addPoint(0.123f, 0.5f), -1);
         ensure_equals("count unchanged", mCurve.getPointCount(), ALCurveModel::MAX_POINTS);
 
+        // A stored curve may carry more than the editor adds, and keeps every
+        // point: truncating a file would render a shape the file does not
+        // describe. The stored cap is a backstop for absurd input only.
         std::vector<ALCurveModel::Point> many;
         for (S32 i = 0; i < 20; ++i)
         {
@@ -332,7 +335,18 @@ namespace tut
             many.push_back(ALCurveModel::Point{ x, x * 0.5f });
         }
         mCurve.setPoints(many);
-        ensure_equals("setPoints capped", mCurve.getPointCount(), ALCurveModel::MAX_POINTS);
+        ensure_equals("twenty stored points survive", mCurve.getPointCount(), 20);
+        ensure_approximately_equals("interior point kept", mCurve.getPoints()[15].mX, 15.f / 19.f, 5);
+        ensure_equals("but no further adds", mCurve.addPoint(0.123f, 0.5f), -1);
+
+        std::vector<ALCurveModel::Point> absurd;
+        for (S32 i = 0; i < 100; ++i)
+        {
+            const F32 x = (F32)i / 99.f;
+            absurd.push_back(ALCurveModel::Point{ x, x * 0.5f });
+        }
+        mCurve.setPoints(absurd);
+        ensure_equals("setPoints capped at the stored limit", mCurve.getPointCount(), ALCurveModel::MAX_STORED_POINTS);
         ensure_approximately_equals("first point kept at 0", mCurve.getPoints().front().mX, 0.f, 6);
         ensure_approximately_equals("last point kept at 1", mCurve.getPoints().back().mX, 1.f, 6);
         ensure_approximately_equals("and it is the original last point", mCurve.getPoints().back().mY, 0.5f, 5);
@@ -683,7 +697,8 @@ namespace tut
             ensure("y clamped", p.mY >= 0.f && p.mY <= 1.f);
         }
 
-        // Too many points are capped with the ends pinned.
+        // More points than the editor adds are kept as long as a file could
+        // reasonably hold them; past the stored limit the list is garbage.
         LLSD many = LLSD::emptyArray();
         for (S32 i = 0; i < 40; ++i)
         {
@@ -691,10 +706,20 @@ namespace tut
             many.append(pair(LLSD::Real(x), LLSD::Real(x * x)));
         }
         ensure("parsed", set.setCurveFromLLSD(ALToneCurveSet::CH_BLUE, many));
-        const auto& capped = set.curve(ALToneCurveSet::CH_BLUE).getPoints();
-        ensure_equals("capped", (S32)capped.size(), ALCurveModel::MAX_POINTS);
-        ensure_approximately_equals("first at 0", capped.front().mX, 0.f, 6);
-        ensure_approximately_equals("last at 1", capped.back().mX, 1.f, 6);
+        const auto& kept = set.curve(ALToneCurveSet::CH_BLUE).getPoints();
+        ensure_equals("all forty kept", (S32)kept.size(), 40);
+        ensure_approximately_equals("first at 0", kept.front().mX, 0.f, 6);
+        ensure_approximately_equals("last at 1", kept.back().mX, 1.f, 6);
+        ensure_approximately_equals("shape honoured", set.curve(ALToneCurveSet::CH_BLUE).evaluate(0.5f), 0.25f, 4);
+
+        LLSD absurd = LLSD::emptyArray();
+        for (S32 i = 0; i <= ALCurveModel::MAX_STORED_POINTS; ++i)
+        {
+            const F64 x = (F64)i / ALCurveModel::MAX_STORED_POINTS;
+            absurd.append(pair(LLSD::Real(x), LLSD::Real(x)));
+        }
+        ensure("past the stored limit is refused", !set.setCurveFromLLSD(ALToneCurveSet::CH_BLUE, absurd));
+        ensure_equals("and renders as no curve", set.curve(ALToneCurveSet::CH_BLUE).getPointCount(), 2);
     }
 
     // Composite order: the channel curve first, then master on its output.
@@ -858,5 +883,65 @@ namespace tut
         ensure_equals("identity is two points", (S32)ident.size(), 2);
         ensure_approximately_equals("from the origin", (F32)ident[0][0].asReal(), 0.f, 6);
         ensure_approximately_equals("to the corner", (F32)ident[1][1].asReal(), 1.f, 6);
+    }
+
+    // An add at either edge lands one gap inside the pinned end, never on it,
+    // so the curve still ends where the end says and the end stays the end.
+    template<> template<>
+    void curve_object::test<32>()
+    {
+        ensure("added at the right edge", mCurve.addPoint(1.f, 0.03f) >= 0);
+        ensure_equals("three points", mCurve.getPointCount(), 3);
+        ensure_approximately_equals("interior, one gap inside", mCurve.getPoints()[1].mX, 1.f - ALCurveModel::MIN_POINT_GAP, 5);
+        ensure_approximately_equals("the end is still the end", mCurve.getPoints().back().mX, 1.f, 6);
+        ensure_approximately_equals("and still at its height", mCurve.getPoints().back().mY, 1.f, 6);
+        ensure_approximately_equals("evaluate(1) is the end", mCurve.evaluate(1.f), 1.f, 6);
+
+        ensure("added at the left edge", mCurve.addPoint(0.f, 0.9f) >= 0);
+        ensure_approximately_equals("the start is still the start", mCurve.getPoints().front().mX, 0.f, 6);
+        ensure_approximately_equals("and at its height", mCurve.getPoints().front().mY, 0.f, 6);
+        ensure_approximately_equals("interior, one gap inside", mCurve.getPoints()[1].mX, ALCurveModel::MIN_POINT_GAP, 5);
+        ensure_approximately_equals("evaluate(0) is the start", mCurve.evaluate(0.f), 0.f, 6);
+    }
+
+    // Points piled up on the top edge are pushed down, not left coincident:
+    // the separation pass works from both ends.
+    template<> template<>
+    void curve_object::test<33>()
+    {
+        mCurve.setPoints(pts({ { 0.f, 0.f }, { 1.f, 0.2f }, { 1.f, 0.4f }, { 1.f, 0.6f }, { 1.f, 1.f } }));
+        const auto& p = mCurve.getPoints();
+        ensure_equals("all kept", (S32)p.size(), 5);
+        for (size_t i = 1; i < p.size(); ++i)
+        {
+            ensure("separated", p[i].mX - p[i - 1].mX >= ALCurveModel::MIN_POINT_GAP - 1e-6f);
+        }
+        ensure_approximately_equals("the end is still at 1", p.back().mX, 1.f, 6);
+        ensure_approximately_equals("evaluate(1) is the end", mCurve.evaluate(1.f), 1.f, 6);
+
+        std::vector<F32> s;
+        mCurve.sample(s, 1025);
+        for (size_t i = 1; i < s.size(); ++i)
+        {
+            ensure("finite", std::isfinite(s[i]));
+            ensure("monotone", s[i] >= s[i - 1] - 1e-5f);
+        }
+    }
+
+    // The setting names are one list: distinct, and channel-shaped.
+    template<> template<>
+    void curve_object::test<34>()
+    {
+        for (S32 c = 0; c < ALToneCurveSet::CH_COUNT; ++c)
+        {
+            const std::string name = ALToneCurveSet::settingName((ALToneCurveSet::EChannel)c);
+            ensure("named for the curve", name.rfind("RenderColorGradeCurve", 0) == 0);
+            for (S32 d = 0; d < c; ++d)
+            {
+                ensure("distinct", name != ALToneCurveSet::settingName((ALToneCurveSet::EChannel)d));
+            }
+        }
+        ensure_equals("master", std::string(ALToneCurveSet::settingName(ALToneCurveSet::CH_MASTER)),
+                      std::string("RenderColorGradeCurveMaster"));
     }
 }

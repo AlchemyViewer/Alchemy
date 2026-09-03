@@ -122,6 +122,13 @@ S32 ALCurveModel::addPoint(F32 x, F32 y)
     Point p;
     p.mX = llclamp(x, 0.f, 1.f);
     p.mY = llclamp(y, 0.f, 1.f);
+    if (mEndpointsLocked)
+    {
+        // Strictly inside the pinned ends. A point at exactly 1 would sort
+        // after the right end and then be the one pinned there, leaving the
+        // old end interior and the curve ending on the new height.
+        p.mX = llclamp(p.mX, MIN_POINT_GAP, 1.f - MIN_POINT_GAP);
+    }
 
     auto it = std::upper_bound(mPoints.begin(), mPoints.end(), p,
                                [](const Point& a, const Point& b) { return a.mX < b.mX; });
@@ -214,10 +221,22 @@ void ALCurveModel::normalize()
         mPoints.back().mX = 1.f;
     }
 
-    // Push coincident points apart from the left. Walking left to right keeps
-    // the ordering the sort established; the trailing clamp to 1 can only
-    // matter if a caller supplied more points than 1/MIN_POINT_GAP allows, in
-    // which case the tail collapses onto 1 and evaluate() still terminates.
+    // Cap first, keeping both ends: the last point is the one pinned to x = 1,
+    // so dropping it would leave a locked curve that no longer spans the
+    // domain. Only a caller feeding setPoints directly can reach this; the
+    // LLSD path rejects an oversized list outright.
+    if (mPoints.size() > static_cast<size_t>(MAX_STORED_POINTS))
+    {
+        mPoints.erase(mPoints.begin() + (MAX_STORED_POINTS - 1), mPoints.end() - 1);
+    }
+
+    // Push coincident points apart: left to right, then right to left for
+    // whatever the first pass could only pile up against 1. A pinned end is
+    // already at 1 before this runs, so a second point there has nowhere to
+    // go on the first pass; the second moves it, and any run behind it, down
+    // instead. Both passes keep the order the sort established, and
+    // MAX_STORED_POINTS gaps fit in the domain many times over, so the clamps
+    // at 0 and 1 never engage in practice.
     for (size_t i = 1; i < mPoints.size(); ++i)
     {
         const F32 floor_x = mPoints[i - 1].mX + MIN_POINT_GAP;
@@ -226,12 +245,16 @@ void ALCurveModel::normalize()
             mPoints[i].mX = llmin(floor_x, 1.f);
         }
     }
-
-    // Cap, keeping both ends: the last point is the one pinned to x = 1, so
-    // dropping it would leave a locked curve that no longer spans the domain.
-    if (mPoints.size() > static_cast<size_t>(MAX_POINTS))
+    if (mPoints.size() >= 2)
     {
-        mPoints.erase(mPoints.begin() + (MAX_POINTS - 1), mPoints.end() - 1);
+        for (size_t i = mPoints.size() - 1; i-- > 0;)
+        {
+            const F32 ceil_x = mPoints[i + 1].mX - MIN_POINT_GAP;
+            if (mPoints[i].mX > ceil_x)
+            {
+                mPoints[i].mX = llmax(ceil_x, 0.f);
+            }
+        }
     }
 }
 
@@ -378,6 +401,17 @@ ALToneCurveSet::EChannel ALToneCurveSet::channelFromCombo(S32 combo_value)
     }
 }
 
+// static
+const char* ALToneCurveSet::settingName(EChannel c)
+{
+    static const char* const NAMES[CH_COUNT] = {
+        "RenderColorGradeCurveMaster",
+        "RenderColorGradeCurveRed",
+        "RenderColorGradeCurveGreen",
+        "RenderColorGradeCurveBlue" };
+    return NAMES[c];
+}
+
 namespace
 {
 bool isFiniteNumber(const LLSD& v, F32& out)
@@ -424,8 +458,11 @@ bool ALToneCurveSet::pointsFromLLSD(const LLSD& sd, std::vector<ALCurveModel::Po
         points.push_back(p);
     }
 
-    if (points.size() < 2)
+    if (points.size() < 2 || points.size() > static_cast<size_t>(ALCurveModel::MAX_STORED_POINTS))
     {
+        // Too few is not a curve; too many is not a curve the editor could
+        // have made, and truncating it would render something the file does
+        // not describe. Identity is the honest answer for both.
         return false;
     }
     out = std::move(points);

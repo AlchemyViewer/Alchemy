@@ -49,6 +49,7 @@ class LLComboBox;
 class LLSettingsDay;
 class LLSettingsSky;
 class LLSettingsWater;
+class LLSliderCtrl;
 class LLSpinCtrl;
 
 class ALFloaterLightBox final : public LLFloater
@@ -193,6 +194,10 @@ public:
     // remain the full interface if the XUI drops it.
     std::vector<boost::signals2::scoped_connection> mSplitToneConnections;
     ALCurveEditorCtrl* mSplitToneGraph = nullptr;
+    /// The width sliders, whose min_val/max_val are the range the edge
+    /// handles clamp into, so the XUI stays the single home of that range.
+    LLSliderCtrl* mSplitShadowWidthSlider = nullptr;
+    LLSliderCtrl* mSplitHighlightWidthSlider = nullptr;
     bool mSplitToneUpdating = false;
 
     // Undo. The history is a member, so it lives and dies with the floater:
