@@ -2473,12 +2473,38 @@ void LLViewerRegion::getInfo(LLSD& info)
     info["Region"]["Handle"]["y"] = (LLSD::Integer)y;
 }
 
+void LLViewerRegion::queryPBRTerrainFeatures()
+{
+    if (getCapability("ModifyRegion").empty())
+    {
+        LLFloaterRegionInfo::sRefreshFromRegion(this);
+        return;
+    }
+
+    LLPBRTerrainFeatures::queueQuery(*this, [](LLUUID region_id, bool success, const LLModifyRegion& composition_changes)
+    {
+        if (!success) { return; }
+        LLViewerRegion* region = LLWorld::getInstance()->getRegionFromID(region_id);
+        if (!region) { return; }
+        LLVLComposition* compp = region->getComposition();
+        if (!compp) { return; }
+        compp->apply(composition_changes);
+        LLFloaterRegionInfo::sRefreshFromRegion(region);
+    });
+}
+
 void LLViewerRegion::requestSimulatorFeatures()
 {
     LL_DEBUGS("SimulatorFeatures") << "region " << getName() << " ptr " << this
                                    << " trying to request SimulatorFeatures" << LL_ENDL;
     // kick off a request for simulator features
-    std::string url = getCapability("SimulatorFeatures");
+    // setCapability() calls this the moment the cap is installed, before the
+    // full set has been declared received, so look it up without that guard.
+    std::string url;
+    if (auto iter = mImpl->mCapabilities.find("SimulatorFeatures"); iter != mImpl->mCapabilities.end())
+    {
+        url = iter->second;
+    }
     if (!url.empty())
     {
         std::string coroname =
@@ -3260,23 +3286,27 @@ void LLViewerRegion::unpackRegionHandshake()
             compp->setParamsReady();
         }
 
-        std::string cap = getCapability("ModifyRegion"); // needed for queueQuery
-        if (cap.empty())
+        // Capabilities arrive over HTTP after the seed-cap round trip, so the
+        // first handshake for a region always precedes them. Query the PBR
+        // terrain composition now if the cap is here, otherwise once it is.
+        if (capabilitiesReceived())
         {
-            LLFloaterRegionInfo::sRefreshFromRegion(this);
+            queryPBRTerrainFeatures();
         }
         else
         {
-            LLPBRTerrainFeatures::queueQuery(*this, [](LLUUID region_id, bool success, const LLModifyRegion& composition_changes)
+            LLFloaterRegionInfo::sRefreshFromRegion(this);
+            if (!mTerrainQueryOnCaps)
             {
-                if (!success) { return; }
-                LLViewerRegion* region = LLWorld::getInstance()->getRegionFromID(region_id);
-                if (!region) { return; }
-                LLVLComposition* compp = region->getComposition();
-                if (!compp) { return; }
-                compp->apply(composition_changes);
-                LLFloaterRegionInfo::sRefreshFromRegion(region);
-            });
+                mTerrainQueryOnCaps = true;
+                setCapabilitiesReceivedCallback([](const LLUUID&, LLViewerRegion* region)
+                {
+                    if (region)
+                    {
+                        region->queryPBRTerrainFeatures();
+                    }
+                });
+            }
         }
     }
 
@@ -3621,7 +3651,7 @@ std::string LLViewerRegion::getCapability(std::string_view name) const
 {
     if (!capabilitiesReceived() && (name != "Seed") && (name != "ObjectMedia"))
     {
-        LL_WARNS() << "getCapability called before caps received for " << name << LL_ENDL;
+        LL_WARNS("Capabilities") << "getCapability called before caps received for " << name << LL_ENDL;
     }
 
     CapabilityMap::const_iterator iter = mImpl->mCapabilities.find(name);
@@ -3637,7 +3667,7 @@ bool LLViewerRegion::isCapabilityAvailable(std::string_view name) const
 {
     if (!capabilitiesReceived() && (name != "Seed") && (name != "ObjectMedia"))
     {
-        LL_WARNS() << "isCapabilityAvailable called before caps received for " << name << LL_ENDL;
+        LL_WARNS("Capabilities") << "isCapabilityAvailable called before caps received for " << name << LL_ENDL;
     }
 
     if (!mImpl->mCapabilities.contains(name))

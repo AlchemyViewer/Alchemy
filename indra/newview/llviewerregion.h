@@ -356,6 +356,9 @@ public:
 
     // has region received its simulator features list? Requires an additional query after caps received.
     void requestSimulatorFeatures();
+    // Fetch the region's PBR terrain composition through the ModifyRegion cap
+    // and apply it; refreshes the region floater when the cap is absent.
+    void queryPBRTerrainFeatures();
     void setSimulatorFeaturesReceived(bool);
     bool simulatorFeaturesReceived() const;
     boost::signals2::connection setSimulatorFeaturesReceivedCallback(const caps_received_signal_t::slot_type& cb);
@@ -604,6 +607,7 @@ public:
     } eCababilitiesState;
 
     eCababilitiesState  mCapabilitiesState;
+    bool                mTerrainQueryOnCaps = false; // terrain query deferred until caps arrive
 
     typedef std::map<U32, std::vector<U32> > orphan_list_t;
     orphan_list_t mOrphanMap;
