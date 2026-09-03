@@ -101,7 +101,10 @@ protected:
     ~LLVOCacheEntry();
 public:
     LLVOCacheEntry(U32 local_id, U32 crc, LLDataPackerBinaryBuffer &dp);
-    LLVOCacheEntry(LLFile* apr_file);
+    // Decode one entry from a cache file held in memory. On success the cursor
+    // is left at the next entry; on failure the entry has a zero local id and
+    // the cursor is untouched.
+    LLVOCacheEntry(const U8*& cursor, const U8* end);
     LLVOCacheEntry();
 
     void updateEntry(U32 crc, LLDataPackerBinaryBuffer &dp);

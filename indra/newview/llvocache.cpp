@@ -49,12 +49,6 @@ bool LLVOCachePartition::sNeedsOcclusionCheck = false;
 const S32 ENTRY_HEADER_SIZE = 6 * sizeof(S32);
 const S32 MAX_ENTRY_BODY_SIZE = 10000;
 
-bool check_read(LLFile* apr_file, void* src, S32 n_bytes)
-{
-    std::error_code ec;
-    return apr_file->read(src, n_bytes, ec) == n_bytes && !ec;
-}
-
 bool check_write(LLFile* apr_file, void* src, S32 n_bytes)
 {
     std::error_code ec;
@@ -198,7 +192,7 @@ LLVOCacheEntry::LLVOCacheEntry()
     mDP.assignBuffer(mBuffer, 0);
 }
 
-LLVOCacheEntry::LLVOCacheEntry(LLFile* apr_file)
+LLVOCacheEntry::LLVOCacheEntry(const U8*& cursor, const U8* end)
 :   LLViewerOctreeEntryData(LLViewerOctreeEntry::LLVOCACHEENTRY),
     mBuffer(NULL),
     mUpdateFlags(-1),
@@ -209,47 +203,34 @@ LLVOCacheEntry::LLVOCacheEntry(LLFile* apr_file)
     mBSphereRadius(-1.0f)
 {
     S32 size = -1;
-    bool success;
-    static U8 data_buffer[ENTRY_HEADER_SIZE];
+    const size_t avail = (size_t)(end - cursor);
+    bool success = avail >= (size_t)ENTRY_HEADER_SIZE;
 
     mDP.assignBuffer(mBuffer, 0);
 
-    success = check_read(apr_file, (void *)data_buffer, ENTRY_HEADER_SIZE);
     if (success)
     {
-        memcpy(&mLocalID, data_buffer, sizeof(U32));
-        memcpy(&mCRC, data_buffer + sizeof(U32), sizeof(U32));
-        memcpy(&mHitCount, data_buffer + (2 * sizeof(U32)), sizeof(S32));
-        memcpy(&mDupeCount, data_buffer + (3 * sizeof(U32)), sizeof(S32));
-        memcpy(&mCRCChangeCount, data_buffer + (4 * sizeof(U32)), sizeof(S32));
-        memcpy(&size, data_buffer + (5 * sizeof(U32)), sizeof(S32));
+        memcpy(&mLocalID, cursor, sizeof(U32));
+        memcpy(&mCRC, cursor + sizeof(U32), sizeof(U32));
+        memcpy(&mHitCount, cursor + (2 * sizeof(U32)), sizeof(S32));
+        memcpy(&mDupeCount, cursor + (3 * sizeof(U32)), sizeof(S32));
+        memcpy(&mCRCChangeCount, cursor + (4 * sizeof(U32)), sizeof(S32));
+        memcpy(&size, cursor + (5 * sizeof(U32)), sizeof(S32));
 
-        // Corruption in the cache entries
-        if ((size > MAX_ENTRY_BODY_SIZE) || (size < 1))
+        // A bogus size means the rest of the file is bogus too; the caller
+        // discards it, so there is nothing to skip past.
+        if ((size > MAX_ENTRY_BODY_SIZE) || (size < 1) || (avail - ENTRY_HEADER_SIZE) < (size_t)size)
         {
-            // We've got a bogus size, skip reading it.
-            // We won't bother seeking, because the rest of this file
-            // is likely bogus, and will be tossed anyway.
-            LL_WARNS() << "Bogus cache entry, size " << size << ", aborting!" << LL_ENDL;
+            LL_WARNS() << "Bogus cache entry, size " << size << " with " << avail << " bytes left, aborting!" << LL_ENDL;
             success = false;
         }
     }
-    if(success && size > 0)
+    if(success)
     {
         mBuffer = new U8[size];
-        success = check_read(apr_file, mBuffer, size);
-
-        if(success)
-        {
-            mDP.assignBuffer(mBuffer, size);
-        }
-        else
-        {
-            // Improve logging around vocache
-            LL_WARNS() << "Error loading cache entry for " << mLocalID << ", size " << size << " aborting!" << LL_ENDL;
-            delete[] mBuffer ;
-            mBuffer = NULL ;
-        }
+        memcpy(mBuffer, cursor + ENTRY_HEADER_SIZE, size);
+        mDP.assignBuffer(mBuffer, size);
+        cursor += ENTRY_HEADER_SIZE + size;
     }
 
     if(!success)
@@ -1401,55 +1382,44 @@ void LLVOCache::readCacheHeader()
         std::error_code ec;
         LLFile apr_file(mHeaderFilePath, LLFile::in|LLFile::binary, ec);
 
-        //read the meta element
-        success = check_read(&apr_file, &mMetaInfo, sizeof(HeaderMetaInfo)) ;
+        // The header is a fixed-size file: the meta record followed by
+        // MAX_NUM_OBJECT_ENTRIES slots. One read takes all of it.
+        constexpr size_t header_size = sizeof(HeaderMetaInfo) + MAX_NUM_OBJECT_ENTRIES * sizeof(HeaderEntryInfo);
+        std::vector<U8> data(header_size);
+        const S64 got = (apr_file && !ec) ? apr_file.read(data.data(), (S64)header_size, ec) : -1;
+        success = !ec && got >= (S64)sizeof(HeaderMetaInfo);
 
         if(success)
         {
-            HeaderEntryInfo* entry = NULL ;
+            const U8* cursor = data.data();
+            const U8* end = cursor + (size_t)got;
+            memcpy(&mMetaInfo, cursor, sizeof(HeaderMetaInfo));
+            cursor += sizeof(HeaderMetaInfo);
+
             mNumEntries = 0 ;
             U32 num_read = 0 ;
             while(num_read++ < MAX_NUM_OBJECT_ENTRIES)
             {
-                if(!entry)
-                {
-                    entry = new HeaderEntryInfo() ;
-                }
-                success = check_read(&apr_file, entry, sizeof(HeaderEntryInfo));
-
-                if(!success) //failed
+                if ((size_t)(end - cursor) < sizeof(HeaderEntryInfo))
                 {
                     LL_WARNS() << "Error reading cache header entry. (entry_index=" << mNumEntries << ")" << LL_ENDL;
-                    delete entry ;
-                    entry = NULL ;
+                    success = false;
                     break ;
                 }
-                else if(entry->mTime == INVALID_TIME)
+                HeaderEntryInfo record;
+                memcpy(&record, cursor, sizeof(HeaderEntryInfo));
+                cursor += sizeof(HeaderEntryInfo);
+                if(record.mTime == INVALID_TIME)
                 {
                     continue ; //an empty entry
                 }
 
+                HeaderEntryInfo* entry = new HeaderEntryInfo(record);
                 entry->mIndex = mNumEntries++ ;
                 mHeaderEntryQueue.insert(entry) ;
                 mHandleEntryMap[entry->mHandle] = entry ;
-                entry = NULL ;
-            }
-            if(entry)
-            {
-                delete entry ;
             }
         }
-
-        //---------
-        //debug code
-        //----------
-        //std::string name ;
-        //for(header_entry_queue_t::iterator iter = mHeaderEntryQueue.begin() ; success && iter != mHeaderEntryQueue.end(); ++iter)
-        //{
-        //  getObjectCacheFilename((*iter)->mHandle, name) ;
-        //  LL_INFOS() << name << LL_ENDL ;
-        //}
-        //-----------
     }
     else
     {
@@ -1484,31 +1454,35 @@ void LLVOCache::writeCacheHeader()
 
     bool success = true ;
     {
-        std::error_code ec;
-        LLFile apr_file(mHeaderFilePath, LLFile::out|LLFile::binary|LLFile::trunc, ec);
+        std::vector<U8> data;
+        data.reserve(sizeof(HeaderMetaInfo) + MAX_NUM_OBJECT_ENTRIES * sizeof(HeaderEntryInfo));
+        auto append = [&data](const void* src, size_t n)
+        {
+            const U8* p = static_cast<const U8*>(src);
+            data.insert(data.end(), p, p + n);
+        };
 
-        //write the meta element
-        success = check_write(&apr_file, &mMetaInfo, sizeof(HeaderMetaInfo)) ;
+        append(&mMetaInfo, sizeof(HeaderMetaInfo));
 
         mNumEntries = 0 ;
-        for(header_entry_queue_t::iterator iter = mHeaderEntryQueue.begin() ; success && iter != mHeaderEntryQueue.end(); ++iter)
+        for(header_entry_queue_t::iterator iter = mHeaderEntryQueue.begin() ; iter != mHeaderEntryQueue.end(); ++iter)
         {
             (*iter)->mIndex = mNumEntries++ ;
-            success = check_write(&apr_file, (void*)*iter, sizeof(HeaderEntryInfo));
+            append(*iter, sizeof(HeaderEntryInfo));
         }
 
         mNumEntries = static_cast<U32>(mHeaderEntryQueue.size());
-        if(success && mNumEntries < MAX_NUM_OBJECT_ENTRIES)
+        HeaderEntryInfo empty{};
+        empty.mTime = INVALID_TIME ;
+        for(U32 i = mNumEntries ; i < MAX_NUM_OBJECT_ENTRIES ; i++)
         {
-            HeaderEntryInfo entry{};
-            entry.mTime = INVALID_TIME ;
-            for(S32 i = mNumEntries ; success && i < MAX_NUM_OBJECT_ENTRIES ; i++)
-            {
-                //fill the cache with the default entry.
-                success = check_write(&apr_file, &entry, sizeof(HeaderEntryInfo)) ;
-
-            }
+            //fill the cache with the default entry.
+            append(&empty, sizeof(HeaderEntryInfo));
         }
+
+        std::error_code ec;
+        LLFile apr_file(mHeaderFilePath, LLFile::out|LLFile::binary|LLFile::trunc, ec);
+        success = !ec && bool(apr_file) && check_write(&apr_file, data.data(), (S32)data.size());
     }
 
     if(!success)
@@ -1532,6 +1506,7 @@ bool LLVOCache::updateEntry(const HeaderEntryInfo* entry)
 // this in turn forces a rewrite after a partial read due to corruption.
 bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_entry_map_t& cache_entry_map)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     if(!mEnabled)
     {
         LL_WARNS() << "Not reading cache for handle " << handle << "): Cache is currently disabled." << LL_ENDL;
@@ -1553,6 +1528,8 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
         LLUUID cache_id;
         filename = getObjectCacheFilename(handle);
 
+        // The file is read whole and decoded from memory: a region's cache
+        // runs to tens of thousands of entries, and LLFile is unbuffered.
         std::error_code ec;
         LLFile apr_file(filename, LLFile::in|LLFile::binary, ec);
         if (!apr_file || ec)
@@ -1560,19 +1537,26 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
             success = false;
         }
 
-        S64 file_size = apr_file.size(ec);
-        if (0 >= file_size || ec)
+        const S64 file_size = success ? apr_file.size(ec) : 0;
+        if (file_size < (S64)(UUID_BYTES + sizeof(S32)) || ec)
         {
             success = false;
         }
 
+        std::vector<U8> data;
         if (success)
         {
-            success = check_read(&apr_file, cache_id.mData, UUID_BYTES);
+            data.resize((size_t)file_size);
+            success = apr_file.read(data.data(), file_size, ec) == file_size && !ec;
         }
 
         if(success)
         {
+            const U8* cursor = data.data();
+            const U8* end = cursor + data.size();
+
+            memcpy(cache_id.mData, cursor, UUID_BYTES);
+            cursor += UUID_BYTES;
             if(cache_id != id)
             {
                 LL_INFOS() << "Cache ID doesn't match for this region, discarding"<< LL_ENDL;
@@ -1581,21 +1565,29 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
 
             if(success)
             {
-                success = check_read(&apr_file, &num_entries, sizeof(S32)) ;
+                memcpy(&num_entries, cursor, sizeof(S32));
+                cursor += sizeof(S32);
 
-                if(success)
+                S32 i = 0;
+                for (; i < num_entries && cursor < end; i++)
                 {
-                    for (S32 i = 0; i < num_entries && file_size > apr_file.tell(ec); i++)
+                    LLPointer<LLVOCacheEntry> entry = new LLVOCacheEntry(cursor, end);
+                    if (!entry->getLocalID())
                     {
-                        LLPointer<LLVOCacheEntry> entry = new LLVOCacheEntry(&apr_file);
-                        if (!entry->getLocalID())
-                        {
-                            LL_WARNS() << "Aborting cache file load for " << filename << ", cache file corruption!" << LL_ENDL;
-                            success = false ;
-                            break ;
-                        }
-                        cache_entry_map[entry->getLocalID()] = entry;
+                        LL_WARNS() << "Aborting cache file load for " << filename << ", cache file corruption!" << LL_ENDL;
+                        success = false ;
+                        break ;
                     }
+                    cache_entry_map[entry->getLocalID()] = entry;
+                }
+
+                // A file shorter than its own count is truncated. Fail it so
+                // the region marks the cache dirty and rewrites it, rather than
+                // carrying the truncation for good.
+                if (success && i != num_entries)
+                {
+                    LL_WARNS() << "Object cache " << filename << " holds " << i << " of " << num_entries << " entries, rewriting" << LL_ENDL;
+                    success = false;
                 }
             }
         }
@@ -1609,6 +1601,7 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
         }
     }
 
+    LL_PROFILE_ZONE_NUM(cache_entry_map.size());
     LL_DEBUGS("GLTF", "VOCache") << "Read " << cache_entry_map.size() << " entries from object cache " << filename << ", expected " << num_entries << ", success=" << (success?"True":"False") << LL_ENDL;
     return success;
 }
@@ -1616,6 +1609,7 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
 // We now pass in the cache entry map, so that we can remove entries from extras that are no longer in the primary cache.
 void LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     int loaded= 0;
     int discarded = 0;
     // get ViewerRegion pointer from handle
@@ -1741,6 +1735,7 @@ void LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
             discarded++;
         }
     }
+    LL_PROFILE_ZONE_NUM(loaded);
     LL_DEBUGS("GLTF") << "Completed reading extras cache for handle " << handle << ", " << loaded << " loaded, " << discarded << " discarded" << LL_ENDL;
 }
 
@@ -1761,6 +1756,8 @@ void LLVOCache::purgeEntries(U32 size)
 
 void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    LL_PROFILE_ZONE_NUM(cache_entry_map.size());
     std::filesystem::path filename = getObjectCacheFilename(handle);
     if(!mEnabled)
     {
@@ -1822,65 +1819,48 @@ void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry:
     //write to cache file
     bool success = true ;
     {
-        std::error_code ec;
-        LLFile apr_file(filename, LLFile::in|LLFile::out|LLFile::trunc|LLFile::binary, ec);
+        // The whole file is laid out in memory first, so the entry count in
+        // the header is the number actually written -- with removal enabled
+        // that is fewer than the map holds -- and the disk sees one write.
+        std::vector<U8> data;
+        data.reserve(UUID_BYTES + sizeof(S32) + cache_entry_map.size() * (ENTRY_HEADER_SIZE + 512));
+        data.insert(data.end(), id.mData, id.mData + UUID_BYTES);
+        const size_t count_offset = data.size();
+        data.resize(data.size() + sizeof(S32));
 
-        success = check_write(&apr_file, (void*)id.mData, UUID_BYTES);
-
-        if(success)
+        S32 num_entries = 0;
+        for (LLVOCacheEntry::vocache_entry_map_t::const_iterator iter = cache_entry_map.begin(); success && iter != cache_entry_map.end(); ++iter)
         {
-            S32 num_entries = static_cast<S32>(cache_entry_map.size()); // if removal is enabled num_entries might be wrong
-            success = check_write(&apr_file, &num_entries, sizeof(S32));
-            if (success)
+            if (!removal_enabled || iter->second->isValid())
             {
-                const S32 buffer_size = 32768; //should be large enough for couple MAX_ENTRY_BODY_SIZE
-                U8 data_buffer[buffer_size]; // generaly entries are fairly small, so collect them and drop onto disk in one go
-                S32 size_in_buffer = 0;
-
-                // This can have a lot of entries, so might be better to dump them into buffer first and write in one go.
-                for (LLVOCacheEntry::vocache_entry_map_t::const_iterator iter = cache_entry_map.begin(); success && iter != cache_entry_map.end(); ++iter)
+                const LLDataPackerBinaryBuffer* dp = iter->second->getDP();
+                const S32 body = dp ? dp->getBufferSize() : 0;
+                if (body < 1 || body > MAX_ENTRY_BODY_SIZE)
                 {
-                    if (!removal_enabled || iter->second->isValid())
-                    {
-                        S32 size = iter->second->writeToBuffer(data_buffer + size_in_buffer);
-
-                        if (size > ENTRY_HEADER_SIZE) // body is minimum of 1
-                        {
-                            size_in_buffer += size;
-                        }
-                        else
-                        {
-                            LL_WARNS() << "Failed to write cache entry to buffer for " << filename << ", entry number " << iter->second->getLocalID() << LL_ENDL;
-                            success = false;
-                            break;
-                        }
-
-                        // Make sure we have space in buffer for next element
-                        if (buffer_size - size_in_buffer < MAX_ENTRY_BODY_SIZE + ENTRY_HEADER_SIZE)
-                        {
-                            success = check_write(&apr_file, (void*)data_buffer, size_in_buffer);
-                            size_in_buffer = 0;
-                            if (!success)
-                            {
-                                LL_WARNS() << "Failed to write cache to disk " << filename << LL_ENDL;
-                                break;
-                            }
-                        }
-                    }
+                    LL_WARNS() << "Failed to write cache entry to buffer for " << filename << ", entry number " << iter->second->getLocalID() << LL_ENDL;
+                    success = false;
+                    break;
                 }
 
-                if (success && size_in_buffer > 0)
-                {
-                    // final write
-                    success = check_write(&apr_file, (void*)data_buffer, size_in_buffer);
-                    if(!success)
-                    {
-                        LL_WARNS() << "Failed to write cache entry to disk " << filename << LL_ENDL;
-                    }
-                    size_in_buffer = 0;
-                }
-                LL_DEBUGS("VOCache") << "Wrote " << num_entries << " entries to the primary VOCache file " << filename << ". success = " << (success ? "True":"False") << LL_ENDL;
+                const size_t pos = data.size();
+                data.resize(pos + ENTRY_HEADER_SIZE + body);
+                iter->second->writeToBuffer(data.data() + pos);
+                num_entries++;
             }
+        }
+
+        if (success)
+        {
+            memcpy(data.data() + count_offset, &num_entries, sizeof(S32));
+
+            std::error_code ec;
+            LLFile apr_file(filename, LLFile::in|LLFile::out|LLFile::trunc|LLFile::binary, ec);
+            success = !ec && bool(apr_file) && check_write(&apr_file, data.data(), (S32)data.size());
+            if(!success)
+            {
+                LL_WARNS() << "Failed to write cache to disk " << filename << LL_ENDL;
+            }
+            LL_DEBUGS("VOCache") << "Wrote " << num_entries << " entries to the primary VOCache file " << filename << ". success = " << (success ? "True":"False") << LL_ENDL;
         }
     }
 
