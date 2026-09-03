@@ -67,10 +67,8 @@ bool LLGLTFOverrideCacheEntry::fromLLSD(const LLSD& data)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
-    llassert(data.has("local_id"));
-    llassert(data.has("object_id"));
-    llassert(data.has("region_handle_x") && data.has("region_handle_y"));
-
+    // A record missing these is rejected, not asserted on: it can come from a
+    // cache file as easily as from the wire, and the caller skips it.
     if (!data.has("local_id"))
     {
         return false;
@@ -1273,7 +1271,8 @@ void LLVOCache::removeEntry(HeaderEntryInfo* entry)
     LL_DEBUGS() << "Removing entry for region with filename" << getObjectCacheFilename(entry->mHandle) << LL_ENDL;
 
     // make sure corresponding LLViewerRegion also clears its in-memory cache
-    LLViewerRegion* regionp = LLWorld::instance().getRegionFromHandle(entry->mHandle);
+    LLWorld* world = LLWorld::getInstance();
+    LLViewerRegion* regionp = world ? world->getRegionFromHandle(entry->mHandle) : nullptr;
     if (regionp)
     {
         regionp->clearVOCacheFromMemory();
@@ -1829,10 +1828,9 @@ void LLVOCache::writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry:
 
     if(!dirty_cache)
     {
-        if (!LLAppViewer::instance()->isQuitting())
-        {
-            LL_WARNS() << "Skipping write to cache for " << filename << " (handle:" << handle << "): cache not dirty" << LL_ENDL;
-        }
+        // Every neighbor region that saw no cache miss gets here on a
+        // teleport; that is the expected case, not a warning.
+        LL_DEBUGS("VOCache") << "Skipping write to cache for " << filename << " (handle:" << handle << "): cache not dirty" << LL_ENDL;
         return ; //nothing changed, no need to update.
     }
 
@@ -1932,7 +1930,8 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
     std::filesystem::path filename = getObjectCacheExtrasFilename(handle);
 
     // get ViewerRegion pointer from handle
-    LLViewerRegion* pRegion = LLWorld::getInstance()->getRegionFromHandle(handle);
+    LLWorld* world = LLWorld::getInstance();
+    LLViewerRegion* pRegion = world ? world->getRegionFromHandle(handle) : nullptr;
 
     // Laid out in memory first and written once: a text version line an older
     // reader can reject, the cache id, the count of records actually written,

@@ -2421,7 +2421,7 @@ if (BUILD_TESTING)
 #    llremoteparcelrequest.cpp
     llviewerhelputil.cpp
     llversioninfo.cpp
-#    llvocache.cpp
+    llvocache.cpp
     llworldmap.cpp
     llworldmipmap.cpp
     lutcube.cpp
