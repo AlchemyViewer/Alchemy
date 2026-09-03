@@ -125,7 +125,7 @@ const LLRect LLFolderViewScrollContainer::getScrolledViewRect() const
     LLRect rect = LLRect::null;
     if (mScrolledView)
     {
-        LLFolderView* folder_view = dynamic_cast<LLFolderView*>(mScrolledView);
+        LLFolderView* folder_view = mScrolledView->as<LLFolderView>();
         if (folder_view)
         {
             S32 height = folder_view->getRect().getHeight();
@@ -1633,7 +1633,7 @@ bool LLFolderView::handleHover( S32 x, S32 y, MASK mask )
 
 LLFolderViewItem* LLFolderView::getHoveredItem() const
 {
-    return dynamic_cast<LLFolderViewItem*>(mHoveredItem.get());
+    return mHoveredItem.get();
 }
 
 void LLFolderView::setHoveredItem(LLFolderViewItem* itemp)
@@ -1641,7 +1641,7 @@ void LLFolderView::setHoveredItem(LLFolderViewItem* itemp)
     if (mHoveredItem.get() != itemp)
     {
         if (itemp)
-            mHoveredItem = itemp->getHandle();
+            mHoveredItem = itemp->getDerivedHandle<LLFolderViewItem>();
         else
             mHoveredItem.markDead();
     }

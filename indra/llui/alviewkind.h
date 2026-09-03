@@ -38,6 +38,7 @@ class LLMenuBarGL;
 class LLContextMenu;
 class LLMenuItemGL;
 class LLMenuItemSeparatorGL;
+class LLFolderView;
 
 // The kinds LLView::as<T>() answers with a mask test and a static_cast.
 // A class that is one of these ORs its bit into kindMask() on top of its
@@ -58,6 +59,7 @@ struct ALViewKind
         CONTEXT_MENU = 1u << 8,
         MENU_ITEM    = 1u << 9,
         MENU_SEPARATOR = 1u << 10,
+        FOLDER_VIEW  = 1u << 11,
     };
 };
 
@@ -77,5 +79,6 @@ template <> struct ALViewKindOf<LLMenuBarGL>   { static constexpr U32 bits = ALV
 template <> struct ALViewKindOf<LLContextMenu> { static constexpr U32 bits = ALViewKind::CONTEXT_MENU; };
 template <> struct ALViewKindOf<LLMenuItemGL>  { static constexpr U32 bits = ALViewKind::MENU_ITEM; };
 template <> struct ALViewKindOf<LLMenuItemSeparatorGL> { static constexpr U32 bits = ALViewKind::MENU_SEPARATOR; };
+template <> struct ALViewKindOf<LLFolderView>  { static constexpr U32 bits = ALViewKind::FOLDER_VIEW; };
 
 #endif // AL_ALVIEWKIND_H
