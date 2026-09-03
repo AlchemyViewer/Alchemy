@@ -140,6 +140,16 @@ if (BUILD_TESTING)
     set(registry_test_libs llrender)
   endif()
 
+  # The bundled faces ship in the alchemy-fonts package; newview stages a
+  # copy into its source tree only when the viewer itself is configured,
+  # so the tests read the package directly. ALCHEMY_FONTS_DIR ends in
+  # "fonts", the leaf LLFontGL::getFontPathLocal appends to the app dir,
+  # so its parent stands in for the application directory.
+  find_package(unofficial-alchemy-fonts CONFIG REQUIRED)
+  get_filename_component(font_test_app_dir "${ALCHEMY_FONTS_DIR}" DIRECTORY)
+  set(font_test_data_dir "${ALCHEMY_FONTS_DIR}/")
+  set(font_test_fonts_xml "${INDRA_SOURCE_DIR}/newview/skins/default/xui/en/fonts.xml")
+
   LL_ADD_INTEGRATION_TEST(alfontcolrv1 "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfontregistry "" "${registry_test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llfontbitmapcache "" "${registry_test_libs}" "${test_project}")
@@ -153,9 +163,9 @@ if (BUILD_TESTING)
   set(gl_test_libs llrender ll::SDL3core)
   set(gl_test_compile_defs
       LL_TEST_GL=1
-      "LLFONT_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
-      "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\""
-      "LLFONT_TEST_FONTS_XML=\"${INDRA_SOURCE_DIR}/newview/skins/default/xui/en/fonts.xml\"")
+      "LLFONT_TEST_APP_DIR=\"${font_test_app_dir}\""
+      "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\""
+      "LLFONT_TEST_FONTS_XML=\"${font_test_fonts_xml}\"")
 
   LL_ADD_INTEGRATION_TEST(llfontgl "" "${gl_test_libs}" "${test_project}")
   if (TARGET INTEGRATION_TEST_llfontgl)
@@ -173,18 +183,18 @@ if (BUILD_TESTING)
     # to skip rather than fail, so a partial font set still runs the rest
     # of the suite.
     target_compile_definitions(INTEGRATION_TEST_alfontcolrv1 PRIVATE
-        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+        "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
   endif()
   if (TARGET INTEGRATION_TEST_alfontshaping)
     # Both Unicode tables in one place, so the test can hold them against each
     # other. llrender itself has no need of ICU.
     target_link_libraries(INTEGRATION_TEST_alfontshaping ll::icu)
     target_compile_definitions(INTEGRATION_TEST_alfontshaping PRIVATE
-        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+        "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
   endif()
   if (TARGET INTEGRATION_TEST_llfontfreetype)
     target_compile_definitions(INTEGRATION_TEST_llfontfreetype PRIVATE
-        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\"")
+        "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\"")
   endif()
 
   if (BUILD_HEADLESS)
@@ -192,12 +202,12 @@ if (BUILD_TESTING)
     # pulls llwindowheadless + ll::osmesa) so the tests can stand up an
     # OSMesa GL context and exercise GL-backed code paths. LL_MESA_HEADLESS=1
     # matches the lib's compile-time configuration; the LLFONT_TEST_*
-    # defs feed source-tree font paths to the tests.
+    # defs feed the package font paths to the tests.
     set(headless_test_compile_defs
         LL_MESA_HEADLESS=1
-        "LLFONT_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
-        "LLFONT_TEST_DATA_DIR=\"${INDRA_SOURCE_DIR}/newview/fonts/\""
-        "LLFONT_TEST_FONTS_XML=\"${INDRA_SOURCE_DIR}/newview/skins/default/xui/en/fonts.xml\"")
+        "LLFONT_TEST_APP_DIR=\"${font_test_app_dir}\""
+        "LLFONT_TEST_DATA_DIR=\"${font_test_data_dir}\""
+        "LLFONT_TEST_FONTS_XML=\"${font_test_fonts_xml}\"")
 
     if (TARGET INTEGRATION_TEST_llfontregistry)
       # llfontregistry's GL tests live in the same source file under

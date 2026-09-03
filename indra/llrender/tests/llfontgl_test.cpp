@@ -186,7 +186,8 @@ namespace tut
         ensure("Monospace resolves", mono != nullptr);
         const LLFontFreetype* ft = mono->getFontFreetype();
         ensure("Monospace has a freetype", ft != nullptr);
-        ensure("Monospace freetype is fixed-width", ft->isFixedWidth());
+        ensure("Monospace freetype is fixed-width: " + ft->getName(),
+               ft->isFixedWidth());
     }
 
     // getFontSansSerifBig resolves with positive line-height.
