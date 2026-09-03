@@ -1568,6 +1568,11 @@ bool LLVOCache::readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::voca
                 memcpy(&num_entries, cursor, sizeof(S32));
                 cursor += sizeof(S32);
 
+                // Every entry is at least a header and one body byte, so the
+                // bytes left bound how many the count can honestly claim.
+                const S32 max_possible = (S32)((end - cursor) / (ENTRY_HEADER_SIZE + 1));
+                cache_entry_map.reserve((size_t)llclamp(num_entries, 0, max_possible));
+
                 S32 i = 0;
                 for (; i < num_entries && cursor < end; i++)
                 {

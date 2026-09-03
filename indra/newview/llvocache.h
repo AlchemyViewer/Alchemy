@@ -34,6 +34,7 @@
 #include "llgltfmaterial.h"
 
 #include <boost/unordered_map.hpp>
+#include <boost/unordered/unordered_node_map.hpp>
 
 //---------------------------------------------------------------------------
 // Cache entries
@@ -161,7 +162,10 @@ private:
     void updateParentBoundingInfo(const LLVOCacheEntry* child);
 
 public:
-    typedef std::map<U32, LLPointer<LLVOCacheEntry> >      vocache_entry_map_t;
+    // Keyed by local id, looked up once per cached-object probe the sim sends
+    // after a handshake. A node map keeps each entry's slot at a stable address
+    // across rehash, which callers holding the raw entry pointer rely on.
+    typedef boost::unordered_node_map<U32, LLPointer<LLVOCacheEntry>> vocache_entry_map_t;
     typedef std::set<LLVOCacheEntry*>                      vocache_entry_set_t;
     typedef std::set<LLVOCacheEntry*, CompareVOCacheEntry> vocache_entry_priority_list_t;
 
