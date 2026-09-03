@@ -44,10 +44,11 @@
  *
  * Both axes run 0..1 with y up, i.e. graph coordinates, not screen ones.
  *
- * Handles carry axis locks because most real curves have some. A filmic toe
- * moves only horizontally; a locked spline endpoint moves only vertically.
- * Rather than have every consumer re-derive that from its own model, the lock
- * rides on the handle and the drag honours it.
+ * Handles carry axis locks because most real curves have some. A split-tone
+ * edge moves only horizontally; a locked spline endpoint moves only
+ * vertically; an edge held at the plot boundary moves not at all. Rather than
+ * have every consumer re-derive that from its own model, the lock rides on
+ * the handle and the drag honours it.
  *
  * A drag fires the commit callback on every mouse move (so the preview tracks
  * the pointer, which is the whole point of a graph) with @ref getActiveHandle
@@ -72,7 +73,7 @@ public:
         F32 mY = 0.f;               ///< 0..1, bottom to top
         bool mLockX = false;        ///< drag cannot change x
         bool mLockY = false;        ///< drag cannot change y
-        std::string mName;          ///< reported to the consumer on commit
+        std::string mName;          ///< for the consumer to tell handles apart
         LLColor4 mColor = LLColor4::white;
     };
 

@@ -336,7 +336,9 @@ lets the user add and remove points; that is a param, not a second widget:
 - `setCurve` plots one solid curve, `addGhostCurve` dimmed references,
   `addFillCurve` a filled area down to y=0 for coverage plots like the bands.
 - Handles carry `mLockX`/`mLockY`. **Read those as "this axis cannot change".**
-  A handle that slides horizontally to set a value locks *Y*.
+  A handle that slides horizontally to set a value locks *Y*; a split-tone
+  edge held at the plot boundary locks *X* as well, and its consumer treats
+  that lock as "write nothing".
 - `draw_diagonal="true"` draws the identity, which is meaningful for a tone
   curve and meaningless for anything else.
 - `grid_divisions` sets the backing grid; `curve_samples` how finely the

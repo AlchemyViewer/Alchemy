@@ -110,7 +110,7 @@ The deferred rendering pipeline is orchestrated by `LLPipeline` (`indra/newview/
 - **Depth of Field:** Circle-of-confusion via `gDeferredCoFProgram`, combine via `gDeferredDoFCombineProgram`. Settings: `CameraFNumber`, `CameraFocalLength`, `CameraMaxCoF`
 - **Screen Space Reflections:** Class 3+ feature, iterative ray marching
 - **Tonemapping:** ACES, Reinhard, Filmic, AGX — selectable via `AlchemyRenderTonemapType`
-- **Color Grading:** 3D LUT-based (`gDeferredPostGammaCorrectCGLutProgram`, `mCGLut`)
+- **Color Grading:** 3D LUT-based (`gDeferredPostGammaCorrectCGLutProgram`, `mCGLut`), plus a CPU-baked 1D tone curve LUT (`mToneCurveLut`, baked from `ALToneCurveSet` on a dirty flag) and precomputed split-tone ramps; the helpers live in `colorGradeUtilF.glsl` under `shaders/class1/alchemy/`
 - **Anti-aliasing:** FXAA (1-pass, `gFXAAProgram[4]`) or SMAA (3-pass edge detect → blend weights → neighborhood blend, `gSMAAEdgeDetectProgram[4]`/`gSMAABlendWeightsProgram[4]`/`gSMAANeighborhoodBlendProgram[4]`). CAS (Contrast Adaptive Sharpening) via `gCASProgram`
 - **Final blit effects** (`blitWithEffectsF.glsl` in `shaders/class1/alchemy/`): Vignette (configurable shape/softness/color), film grain (luma/color/coarse/photon styles), TPDF dithering, CVD compensation/preview
 - **Chromatic aberration** (`colorCorrectF.glsl` in `shaders/class1/alchemy/`): Per-channel offset with amount, falloff, angle, anisotropy controls
