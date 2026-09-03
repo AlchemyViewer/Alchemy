@@ -113,7 +113,7 @@ void collectVec3Spinners(LLView* viewp, std::map<std::string, std::array<LLUICtr
 {
     for (LLView* childp : *viewp->getChildList())
     {
-        if (LLUICtrl* ctrlp = dynamic_cast<LLUICtrl*>(childp))
+        if (LLUICtrl* ctrlp = ALViewType::as<LLUICtrl>(childp))
         {
             std::string setting;
             S32 component = 0;
@@ -130,7 +130,7 @@ void collectBoundControls(LLView* viewp, std::set<std::string>& keys)
 {
     for (LLView* childp : *viewp->getChildList())
     {
-        if (LLUICtrl* ctrlp = dynamic_cast<LLUICtrl*>(childp))
+        if (LLUICtrl* ctrlp = ALViewType::as<LLUICtrl>(childp))
         {
             if (LLControlVariable* controlp = ctrlp->getControlVariable())
             {

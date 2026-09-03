@@ -317,7 +317,7 @@ namespace
     {
         for (LLView* menu_item : *menu.getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(menu_item))
+            if (LLMenuItemBranchGL* branch = ALViewType::as<LLMenuItemBranchGL>(menu_item))
             {
                 if (branch->getBranch())
                     restoreMenuEntries(*branch->getBranch());
@@ -346,7 +346,7 @@ namespace
         bool prev_was_separator = true;
         for (LLView* menu_item : *menu.getChildList())
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(menu_item))
+            if (LLMenuItemBranchGL* branch = ALViewType::as<LLMenuItemBranchGL>(menu_item))
             {
                 if (branch->getBranch())
                     hideMenuEntries(*branch->getBranch(), show, disabled);
@@ -356,7 +356,7 @@ namespace
             bool found = std::find(show.begin(), show.end(), name) != show.end();
             if (found)
             {
-                const bool is_separator = dynamic_cast<LLMenuItemSeparatorGL*>(menu_item) != nullptr;
+                const bool is_separator = ALViewType::as<LLMenuItemSeparatorGL>(menu_item) != nullptr;
                 found = !(is_separator && prev_was_separator);
                 prev_was_separator = is_separator;
             }

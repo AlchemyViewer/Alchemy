@@ -59,7 +59,7 @@ bool ALPanelSearchGroups::postBuild()
 
 void ALPanelSearchGroups::onCommitSearch(LLUICtrl* ctrl)
 {
-    LLSearchEditor* pSearchEditor = dynamic_cast<LLSearchEditor*>(ctrl);
+    LLSearchEditor* pSearchEditor = ALViewType::as<LLSearchEditor>(ctrl);
     if (pSearchEditor)
     {
         std::string text = pSearchEditor->getText();

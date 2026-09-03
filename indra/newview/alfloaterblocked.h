@@ -48,6 +48,9 @@ class ALPanelBlockBase
 public:
     virtual const std::string& getFilterString() const = 0;
     virtual void               setFilterString(const std::string& strFilter) = 0;
+
+    // The interface behind a view, for the two panels that implement it.
+    static ALPanelBlockBase* fromView(LLView* view);
 };
 
 // ============================================================================
@@ -292,5 +295,18 @@ protected:
     LLFilterEditor* m_pFilterEditor = nullptr;
     LLTabContainer* m_pBlockedTabs = nullptr;
 };
+
+inline ALPanelBlockBase* ALPanelBlockBase::fromView(LLView* view)
+{
+    if (ALPanelBlockList* list = ALViewType::as<ALPanelBlockList>(view))
+    {
+        return list;
+    }
+    if (ALPanelAvatarRendering* rendering = ALViewType::as<ALPanelAvatarRendering>(view))
+    {
+        return rendering;
+    }
+    return nullptr;
+}
 
 // ============================================================================

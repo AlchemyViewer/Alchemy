@@ -51,6 +51,7 @@
 #include <list>
 
 class LLSD;
+class LLBadgeHolder;
 class LLFontGL;
 
 constexpr U32   FOLLOWS_NONE    = 0x00;
@@ -229,6 +230,10 @@ public:
     }
 
     LLView* asView() override { return this; }
+
+    // The badge holder this view is, or null. A view that holds badges says
+    // so here, and the walk that attaches them asks nothing else.
+    virtual LLBadgeHolder* asBadgeHolder() { return nullptr; }
 
     template <class T> const T* as() const
     {
