@@ -1234,6 +1234,28 @@ U32 LLViewerRegion::getNumOfActiveCachedObjects() const
     return static_cast<U32>(mImpl->mActiveSet.size());
 }
 
+void LLViewerRegion::getObjectCacheFootprint(U32& cached, U32& active, U32& waiting, U64& bytes) const
+{
+    cached = static_cast<U32>(mImpl->mCacheMap.size());
+    active = static_cast<U32>(mImpl->mActiveSet.size());
+    waiting = static_cast<U32>(mImpl->mWaitingSet.size());
+
+    // The entry itself plus the packed object data it holds. Node map and set
+    // overhead is not counted, so this is a floor.
+    U64 total = (U64)mImpl->mCacheMap.size() * sizeof(LLVOCacheEntry);
+    for (const auto& [local_id, entry] : mImpl->mCacheMap)
+    {
+        if (entry.notNull())
+        {
+            if (const LLDataPackerBinaryBuffer* dp = entry->getDP())
+            {
+                total += (U64)dp->getBufferSize();
+            }
+        }
+    }
+    bytes = total;
+}
+
 void LLViewerRegion::addActiveCacheEntry(LLVOCacheEntry* entry)
 {
     if(!entry || mDead)

@@ -58,6 +58,8 @@
 #include "pipeline.h"
 #include "llappviewer.h"        // for do_disconnect()
 #include "llscenemonitor.h"
+#include <fmt/format.h>
+
 #include <deque>
 #include <queue>
 #include <map>
@@ -753,6 +755,40 @@ void LLWorld::updateRegions(F32 max_update_time)
     }
 
     sample(sNumActiveCachedObjects, mNumOfActiveCachedObjects);
+}
+
+void LLWorld::logObjectCacheInfo() const
+{
+    U32 total_cached = 0;
+    U32 total_active = 0;
+    U32 total_waiting = 0;
+    U64 total_bytes = 0;
+
+    for (const LLViewerRegion* regionp : mRegionList)
+    {
+        U32 cached = 0, active = 0, waiting = 0;
+        U64 bytes = 0;
+        regionp->getObjectCacheFootprint(cached, active, waiting, bytes);
+
+        LL_INFOS() << "VOCACHE: " << regionp->getName()
+                   << " cached " << cached
+                   << " active " << active
+                   << " waiting " << waiting
+                   << fmt::format(" {:.2f} MB", (F64)bytes / (1024.0 * 1024.0))
+                   << LL_ENDL;
+
+        total_cached += cached;
+        total_active += active;
+        total_waiting += waiting;
+        total_bytes += bytes;
+    }
+
+    LL_INFOS() << "VOCACHE: " << mRegionList.size() << " regions"
+               << " cached " << total_cached
+               << " active " << total_active
+               << " waiting " << total_waiting
+               << fmt::format(" {:.2f} MB", (F64)total_bytes / (1024.0 * 1024.0))
+               << LL_ENDL;
 }
 
 void LLWorld::clearAllVisibleObjects()

@@ -132,6 +132,7 @@ constexpr F32 TELEPORT_EXPIRY_PER_ATTACHMENT = 3.f;
 U32 gRecentFrameCount = 0; // number of 'recent' frames
 LLFrameTimer gRecentFPSTime;
 LLFrameTimer gRecentMemoryTime;
+LLFrameTimer gRecentVOCacheTime;
 LLFrameTimer gAssetStorageLogTime;
 
 // Rendering stuff
@@ -274,6 +275,13 @@ void display_stats()
         gRecentMemoryTime.reset();
     }
     constexpr F32 ASSET_STORAGE_LOG_FREQUENCY = 60.f;
+    static LLCachedControl<F32> vocache_log_freq(gSavedSettings, "AlchemyVOCacheLogFrequency", 0.f);
+    if (vocache_log_freq > 0.f && gRecentVOCacheTime.getElapsedTimeF32() >= vocache_log_freq)
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("DS - VOCache");
+        LLWorld::getInstance()->logObjectCacheInfo();
+        gRecentVOCacheTime.reset();
+    }
     if (gAssetStorageLogTime.getElapsedTimeF32() >= ASSET_STORAGE_LOG_FREQUENCY)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("DS - Asset Storage");

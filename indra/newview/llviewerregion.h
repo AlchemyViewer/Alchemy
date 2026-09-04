@@ -418,6 +418,9 @@ public:
 
     U32 getNumOfVisibleGroups() const;
     U32 getNumOfActiveCachedObjects() const;
+    // Entry counts and packed-data footprint of this region's object cache.
+    // Walks mCacheMap, so call it at logging frequency, not per frame.
+    void getObjectCacheFootprint(U32& cached, U32& active, U32& waiting, U64& bytes) const;
     LLSpatialPartition* getSpatialPartition(U32 type);
     LLVOCachePartition* getVOCachePartition();
 

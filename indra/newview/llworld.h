@@ -165,6 +165,7 @@ public:
 
     void getInfo(LLSD& info);
     U32  getNumOfActiveCachedObjects() const {return mNumOfActiveCachedObjects;}
+    void logObjectCacheInfo() const;
 
     void clearAllVisibleObjects();
 
