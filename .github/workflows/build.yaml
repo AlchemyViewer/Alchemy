@@ -227,8 +227,6 @@ jobs:
           sudo locale-gen en_GB.UTF-8
           sudo locale-gen fr_FR.UTF-8
 
-          sudo cert-sync /etc/ssl/certs/ca-certificates.crt
-
           df -h
           sudo docker container prune -f
           sudo docker image prune -a -f
