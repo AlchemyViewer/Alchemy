@@ -255,6 +255,30 @@ namespace tut
     }
 
 
+    template<> template<>
+    void lljoint_object::test<16>()
+    {
+        // Writing an unchanged rotation must not dirty the joint, since
+        // touch() would carry that down the entire subtree.
+        LLJoint root, child;
+        root.setup("root");
+        child.setup("child", &root);
+
+        root.updateWorldMatrixChildren();
+        ensure_equals("tree starts clean", root.updateWorldMatrixChildren(), 0);
+
+        const LLQuaternion rot(0.4f, LLVector3::y_axis);
+        root.setRotation(rot);
+        ensure_equals("a new rotation dirties the subtree", root.updateWorldMatrixChildren(), 2);
+
+        root.setRotation(rot);
+        ensure_equals("rewriting the same rotation dirties nothing", root.updateWorldMatrixChildren(), 0);
+
+        root.setRotation(LLQuaternion(0.9f, LLVector3::z_axis));
+        ensure_equals("a different rotation dirties the subtree again", root.updateWorldMatrixChildren(), 2);
+    }
+
+
     /*
         Test cases for the following not added. They perform operations
         on underlying LLXformMatrix and LLVector3 elements which have

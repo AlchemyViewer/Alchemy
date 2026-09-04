@@ -254,6 +254,13 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     F32             sum_weights[3];
     U32             sum_usage = 0;
 
+    // Every channel below is seeded from the joint, so a channel no joint
+    // state contributes to ends up holding the value it started with. Writing
+    // that back is a no-op that still dirties the joint and, through touch(),
+    // its entire subtree. Track which channels actually received a
+    // contribution so the untouched ones can be left alone.
+    U32             contributed_usage = 0;
+
     LLVector3       blended_pos = target_joint->getPosition();
     LLQuaternion    blended_rot = target_joint->getRotation();
     LLVector3       blended_scale = target_joint->getScale();
@@ -280,6 +287,8 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
         {
             continue;
         }
+
+        contributed_usage |= current_usage;
 
         if (mAdditiveBlends[joint_state_index])
         {
@@ -386,7 +395,14 @@ void LLJointStateBlender::blendJointStates(bool apply_now)
     // apply transforms
     // SL-315
     target_joint->setPosition(blended_pos + added_pos);
-    target_joint->setScale(blended_scale + added_scale);
+    // blended_scale was seeded from the joint, which LLXform::setScale keeps
+    // finite, and only a joint state carrying SCALE can move it off that
+    // value. So the reset above is unreachable without a scale contribution,
+    // and skipping the write here cannot strand a non-finite scale.
+    if (contributed_usage & LLJointState::SCALE)
+    {
+        target_joint->setScale(blended_scale + added_scale);
+    }
     target_joint->setRotation(added_rot * blended_rot);
 
     if (apply_now)

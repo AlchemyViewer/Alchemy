@@ -39,6 +39,7 @@
 #include "../test/lltut.h"
 
 #include <algorithm>
+#include <limits>
 #include <vector>
 
 namespace
@@ -362,6 +363,86 @@ namespace tut
 
         mBlender.blendJointStates();
         ensure_quat_equals("the higher priority lands in front", mA.getRotation(), ROT_B);
+    }
+
+    template<> template<>
+    void lljointstateblender_object::test<9>()
+    {
+        // A channel no joint state contributes to holds the value read from
+        // the joint, so writing it back is a no-op that still dirties the
+        // joint and, through touch(), its whole subtree. Scale is observable
+        // on its own: setScale dirties with ALL_DIRTY, so it is the only one
+        // of the three writes that can raise POSITION_DIRTY while the position
+        // itself is unchanged.
+        const LLVector3 scale(2.f, 3.f, 4.f);
+        mA.setScale(scale);
+        mA.updateWorldMatrix();
+        ensure("joint starts clean", mA.mDirtyFlags == 0);
+
+        LLPointer<LLJointState> rot_only = make_state(&mA, LLJointState::ROT);
+        rot_only->setRotation(ROT_A);
+        mBlender.addJointState(rot_only, LLJoint::MEDIUM_PRIORITY, false);
+        mBlender.blendJointStates();
+
+        ensure_vec3_equals("rotation-only blend leaves scale alone", mA.getScale(), scale);
+        ensure_quat_equals("rotation-only blend still applies rotation", mA.getRotation(), ROT_A);
+        ensure("rotation-only blend does not dirty position",
+               (mA.mDirtyFlags & LLJoint::POSITION_DIRTY) == 0);
+        ensure("rotation-only blend does dirty rotation",
+               (mA.mDirtyFlags & LLJoint::ROTATION_DIRTY) != 0);
+    }
+
+    template<> template<>
+    void lljointstateblender_object::test<10>()
+    {
+        // A state that does carry SCALE still writes, including when it is the
+        // only channel in use.
+        const LLVector3 scale(5.f, 6.f, 7.f);
+        LLPointer<LLJointState> scale_only = make_state(&mA, LLJointState::SCALE);
+        scale_only->setScale(scale);
+        mBlender.addJointState(scale_only, LLJoint::MEDIUM_PRIORITY, false);
+        mBlender.blendJointStates();
+
+        ensure_vec3_equals("scale-only blend applies scale", mA.getScale(), scale);
+    }
+
+    template<> template<>
+    void lljointstateblender_object::test<11>()
+    {
+        // A non-finite scale contribution must never reach the joint. Two
+        // layers enforce this, the reset in blendJointStates and the one in
+        // LLXform::setScale, and the second is why a joint can be assumed to
+        // hold a finite scale in the first place.
+        const F32 inf = std::numeric_limits<F32>::infinity();
+        LLPointer<LLJointState> bad_scale = make_state(&mA, LLJointState::SCALE);
+        bad_scale->setScale(LLVector3(inf, inf, inf));
+        mBlender.addJointState(bad_scale, LLJoint::MEDIUM_PRIORITY, false);
+        mBlender.blendJointStates();
+
+        ensure("joint scale stays finite", mA.getScale().isFinite());
+        ensure_vec3_equals("non-finite scale is reset", mA.getScale(), LLVector3(1.f, 1.f, 1.f));
+    }
+
+    template<> template<>
+    void lljointstateblender_object::test<12>()
+    {
+        // The payoff of the scale skip and the rotation compare together: a
+        // motion holding a pose blends the same values every frame, and must
+        // stop dirtying the joint once the first frame has been applied.
+        // Either guard alone leaves the other write dirtying it.
+        LLPointer<LLJointState> held = make_state(&mA, LLJointState::ROT);
+        held->setRotation(ROT_A);
+
+        mBlender.addJointState(held, LLJoint::MEDIUM_PRIORITY, false);
+        mBlender.blendJointStates();
+        ensure_quat_equals("first blend applies the pose", mA.getRotation(), ROT_A);
+
+        mA.updateWorldMatrix();
+        ensure("joint is clean once the pose has been applied", mA.mDirtyFlags == 0);
+
+        mBlender.addJointState(held, LLJoint::MEDIUM_PRIORITY, false);
+        mBlender.blendJointStates();
+        ensure("holding the pose does not dirty the joint again", mA.mDirtyFlags == 0);
     }
 
     //-------------------------------------------------------------------------

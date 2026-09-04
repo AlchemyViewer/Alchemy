@@ -794,7 +794,12 @@ void LLJoint::setRotation( const LLQuaternion& rot )
 {
     if (rot.isFinite())
     {
-    //  if (mXform.getRotation() != rot)
+        // Writing an unchanged rotation still dirties this joint and, through
+        // touch(), every joint below it -- for anything near the root that is
+        // most of the skeleton. The pose blender rewrites each animated joint
+        // every frame, so a motion holding a pose arrives here with the value
+        // already in place.
+        if (mXform.getRotation() != rot)
         {
             mXform.setRotation(rot);
             touch(MATRIX_DIRTY | ROTATION_DIRTY);
