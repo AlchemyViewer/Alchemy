@@ -7832,13 +7832,13 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     const F32 body_scale = llmax(sun_up ? psky->getSunScale() : psky->getMoonScale(), 0.01f);
     const F32 half_tan   = HEAVENLY_BODY_FACTOR * disk_radius * body_scale;
     const F32 fov_y      = llclamp(LLViewerCamera::getInstance()->getView(), 0.01f, F_PI - 0.01f);
-    const F32 radius_uv  = 0.5f * half_tan / tanf(fov_y * 0.5f) * llclamp(lens_flare_occlusion_scale(), 0.25f, 4.f);
+    const F32 radius_uv  = 0.5f * half_tan / tanf(fov_y * 0.5f) * llclamp(lens_flare_occlusion_scale(), 0.25f, 2.f);
 
     // FadeTime to filter constants. A first-order fade of tau = FadeTime/3
     // under a slew of 1/FadeTime rises 10-90% in FadeTime; the fall is 0.6x
     // that. The slew is the guarantee: a full off-on-off cycle cannot
     // complete in less than 1.6 FadeTime whatever passes in front of the sun.
-    const F32 fade     = llclamp(lens_flare_fade_time(), 0.1f, 1.5f);
+    const F32 fade     = llclamp(lens_flare_fade_time(), 0.1f, 1.f);
     const F32 tau_in   = fade / 3.f;
     const F32 tau_out  = fade * 0.2f;
     const F32 slew_in  = 1.f / fade;
