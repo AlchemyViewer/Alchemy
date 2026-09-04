@@ -33,20 +33,63 @@
 
 LLUIString::LLUIString(const std::string& instring, const LLStringUtil::format_map_t& args)
 :   mOrig(instring),
-    mArgs(new LLStringUtil::format_map_t(args))
+    mArgs(std::make_unique<LLStringUtil::format_map_t>(args))
 {
     dirty();
+}
+
+LLUIString::LLUIString(const LLUIString& other)
+:   mOrig(other.mOrig),
+    mResult(other.mResult),
+    mArgs(other.mArgs ? std::make_unique<LLStringUtil::format_map_t>(*other.mArgs) : nullptr),
+    mNeedsResult(other.mNeedsResult),
+    mResultEdited(other.mResultEdited),
+    mGeneration(other.mGeneration)
+{
+    // A new string at an address of its own, which nothing has drawn from
+    // yet -- so there is no count here to carry on from, and the other's
+    // serves as well as any.
+}
+
+LLUIString& LLUIString::operator=(const LLUIString& other)
+{
+    if (this != &other)
+    {
+        mOrig = other.mOrig;
+        mResult = other.mResult;
+        mArgs = other.mArgs ? std::make_unique<LLStringUtil::format_map_t>(*other.mArgs) : nullptr;
+        mNeedsResult = other.mNeedsResult;
+        mResultEdited = other.mResultEdited;
+        ++mGeneration;
+    }
+    return *this;
+}
+
+LLUIString& LLUIString::operator=(LLUIString&& other) noexcept
+{
+    if (this != &other)
+    {
+        mOrig = std::move(other.mOrig);
+        mResult = std::move(other.mResult);
+        mArgs = std::move(other.mArgs);
+        mNeedsResult = other.mNeedsResult;
+        mResultEdited = other.mResultEdited;
+        ++mGeneration;
+    }
+    return *this;
 }
 
 void LLUIString::assign(const std::string& s)
 {
+    // Assigning the value already held substitutes to the same result. A panel
+    // that refreshes a readout every frame assigns most of its labels what
+    // they already said, and announcing that as a change costs every cache
+    // keyed on this text the glyphs it had shaped.
+    if (mOrig == s && !mResultEdited)
+    {
+        return;
+    }
     mOrig = s;
-    dirty();
-}
-
-void LLUIString::assign(const LLWString& instring)
-{
-    mOrig = wstring_to_utf8str(instring);
     dirty();
 }
 
@@ -68,40 +111,69 @@ void LLUIString::setArgs(const LLSD& sd)
     {
         setArg(sd_it->first, sd_it->second.asString());
     }
-    dirty();
 }
 
 void LLUIString::setArg(const std::string& key, const std::string& replacement)
 {
-    getArgs()[key] = replacement;
+    // Same reasoning as assign: an argument set to what it already holds
+    // leaves the substitution identical. The map's comparator is transparent,
+    // so probing it by view costs nothing where operator[] would have built
+    // the key whether or not it was needed -- and would have inserted an empty
+    // one, which is not the same as the name never having been given.
+    LLStringUtil::format_map_t& args = getArgs();
+    const auto it = args.find(std::string_view(key));
+    if (it != args.end())
+    {
+        if (it->second() == replacement)
+        {
+            return;
+        }
+        it->second = replacement;
+    }
+    else
+    {
+        args.emplace(key, replacement);
+    }
     dirty();
 }
 
-void LLUIString::truncate(S32 maxchars)
+void LLUIString::truncate(S32 max_bytes)
 {
-    if (getUpdatedWResult().size() > (size_t)maxchars)
+    std::string& result = getUpdatedResult();
+    if (result.size() > (size_t)max_bytes)
     {
-        LLWStringUtil::truncate(getUpdatedWResult(), maxchars);
-        mResult = wstring_to_utf8str(getUpdatedWResult());
+        ++mGeneration;
+        mResultEdited = true;
+        // Back off to a whole character. A byte count can fall between a
+        // letter and its accent, or inside a flag or a family.
+        result.resize(utf8str_grapheme_align_backward(result, (size_t)max_bytes));
     }
 }
 
-void LLUIString::erase(S32 charidx, S32 len)
+void LLUIString::erase(S32 byte_idx, S32 byte_len)
 {
-    getUpdatedWResult().erase(charidx, len);
-    mResult = wstring_to_utf8str(getUpdatedWResult());
+    getUpdatedResult().erase(byte_idx, byte_len);
+    ++mGeneration;
+    mResultEdited = true;
 }
 
-void LLUIString::insert(S32 charidx, const LLWString& wchars)
+void LLUIString::insert(S32 byte_idx, std::string_view chars)
 {
-    getUpdatedWResult().insert(charidx, wchars);
-    mResult = wstring_to_utf8str(getUpdatedWResult());
+    getUpdatedResult().insert(byte_idx, chars);
+    ++mGeneration;
+    mResultEdited = true;
 }
 
-void LLUIString::replace(S32 charidx, llwchar wc)
+void LLUIString::replace(S32 byte_idx, llwchar wc)
 {
-    getUpdatedWResult()[charidx] = wc;
-    mResult = wstring_to_utf8str(getUpdatedWResult());
+    // Not an assignment the way the UTF-32 form was: the character being
+    // replaced and the one replacing it need not occupy the same number of
+    // bytes, so the span of the old one has to be measured first.
+    std::string& result = getUpdatedResult();
+    const auto at = utf8str_decode_at(result, (size_t)byte_idx);
+    result.replace((size_t)byte_idx, at.next - (size_t)byte_idx, utf8str_from_cp(wc));
+    ++mGeneration;
+    mResultEdited = true;
 }
 
 void LLUIString::clear()
@@ -109,13 +181,14 @@ void LLUIString::clear()
     // Keep Args
     mOrig.clear();
     mResult.clear();
-    mWResult.clear();
+    mResultEdited = false;
+    ++mGeneration;
 }
 
 void LLUIString::dirty()
 {
     mNeedsResult = true;
-    mNeedsWResult = true;
+    ++mGeneration;
 }
 
 void LLUIString::updateResult() const
@@ -123,12 +196,14 @@ void LLUIString::updateResult() const
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     mNeedsResult = false;
+    // The result is the original's again, whatever the edit helpers had made
+    // of it.
+    mResultEdited = false;
 
     // optimize for empty strings (don't attempt string replacement)
     if (mOrig.empty())
     {
         mResult.clear();
-        mWResult.clear();
         return;
     }
     mResult = mOrig;
@@ -149,18 +224,11 @@ void LLUIString::updateResult() const
     }
 }
 
-void LLUIString::updateWResult() const
-{
-    mNeedsWResult = false;
-
-    mWResult = utf8str_to_wstring(getUpdatedResult());
-}
-
 LLStringUtil::format_map_t& LLUIString::getArgs()
 {
     if (!mArgs)
     {
-        mArgs = new LLStringUtil::format_map_t;
+        mArgs = std::make_unique<LLStringUtil::format_map_t>();
     }
     return *mArgs;
 }

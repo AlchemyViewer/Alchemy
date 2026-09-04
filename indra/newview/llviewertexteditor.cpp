@@ -167,10 +167,14 @@ const S32 EMBEDDED_ITEM_LABEL_PADDING = 2;
 class LLEmbeddedItemSegment : public LLTextSegment
 {
 public:
-    LLEmbeddedItemSegment(S32 pos, LLUIImagePtr image, LLPointer<LLInventoryItem> inv_item, LLTextEditor& editor)
-    :   LLTextSegment(pos, pos + 1),
+    // `num_bytes` is what the item's character occupies in the document, not
+    // the width of anything drawn. Those characters live at U+100000 and up,
+    // so it is four -- and a segment that claimed one left the other three
+    // outside it, to be drawn as the replacement characters they are not.
+    LLEmbeddedItemSegment(S32 pos, S32 num_bytes, LLUIImagePtr image, LLPointer<LLInventoryItem> inv_item, LLTextEditor& editor)
+    :   LLTextSegment(pos, pos + num_bytes),
         mImage(image),
-        mLabel(utf8str_to_wstring(inv_item->getName())),
+        mLabel(inv_item->getName()),
         mItem(inv_item),
         mEditor(editor)
     {
@@ -186,17 +190,17 @@ public:
         if (!editor)
             return nullptr;
 
-        return new LLEmbeddedItemSegment(mStart, mImage, mItem, *editor);
+        return new LLEmbeddedItemSegment(mStart, mEnd - mStart, mImage, mItem, *editor);
     }
 
-    /*virtual*/ bool getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
+    /*virtual*/ bool getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
     {
-        return getSegmentDimensionsF32(first_char, num_chars, width, height);
+        return getSegmentDimensionsF32(first_byte, num_bytes, width, height);
     }
 
-    inline bool getSegmentDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height) const
+    inline bool getSegmentDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height) const
     {
-        if (num_chars == 0)
+        if (num_bytes == 0)
         {
             width = 0;
             height = 0;
@@ -209,25 +213,28 @@ public:
         return false;
     }
 
-    /*virtual*/ S32             getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const
+    /*virtual*/ S32             getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
     {
+        // The item is one character however many bytes it takes, so it is
+        // drawn whole or not at all.
+        const S32 span = mEnd - mStart;
         // always draw at beginning of line
         if (line_offset == 0)
         {
-            return 1;
+            return span;
         }
         else
         {
             F32 width;
             S32 height;
-            getSegmentDimensionsF32(mStart, 1, width, height);
+            getSegmentDimensionsF32(mStart, span, width, height);
             if (width > num_pixels)
             {
                 return 0;
             }
             else
             {
-                return 1;
+                return span;
             }
         }
     }
@@ -243,7 +250,7 @@ public:
         const LLColor4& color = mEditor.getReadOnly() ? embedded_item_readonly_col : embedded_item_col;
 
         F32 right_x;
-        mStyle->getFont()->render(mLabel, 0, image_rect.mRight + EMBEDDED_ITEM_LABEL_PADDING, draw_rect.mTop, color, LLFontGL::LEFT, LLFontGL::TOP, LLFontGL::UNDERLINE, LLFontGL::NO_SHADOW, static_cast<S32>(mLabel.length()), S32_MAX, &right_x);
+        mStyle->getFont()->renderBytes(mLabel, 0, image_rect.mRight + EMBEDDED_ITEM_LABEL_PADDING, draw_rect.mTop, color, LLFontGL::LEFT, LLFontGL::TOP, LLFontGL::UNDERLINE, LLFontGL::NO_SHADOW, static_cast<S32>(mLabel.length()), S32_MAX, &right_x);
         return right_x;
     }
 
@@ -252,16 +259,16 @@ public:
     /*virtual*/ bool            handleRightMouseDown(S32 x, S32 y, MASK mask)
     {
         bool show_menu = !mEditor.hasSelection()
-            || (mEditor.mSelectionStart == mStart && mEditor.mSelectionEnd == mStart + 1);
+            || (mEditor.mSelectionStart == mStart && mEditor.mSelectionEnd == mEnd);
         if (show_menu && mEditor.getShowContextMenu())
         {
             // User clicked an item, user expects the menu to be
             // in 'context' for the item. Change selection to match.
             // Todo: Might be better to 'smartly' deselect here
             // and to have an object specific menu.
-            mEditor.setCursorPos(mStart + 1);
+            mEditor.setCursorPos(mEnd);
             mEditor.mSelectionStart = mStart;
-            mEditor.mSelectionEnd = mStart + 1;
+            mEditor.mSelectionEnd = mEnd;
 
             mEditor.showContextMenu(x, y);
             return true;
@@ -303,7 +310,7 @@ public:
 
 private:
     LLUIImagePtr    mImage;
-    LLWString       mLabel;
+    std::string     mLabel;
     LLStyleSP       mStyle;
     std::string     mToolTip;
     LLPointer<LLInventoryItem> mItem;
@@ -491,13 +498,14 @@ llwchar LLEmbeddedItems::getEmbeddedCharFromIndex(S32 index)
 void LLEmbeddedItems::removeUnusedChars()
 {
     std::set<llwchar> used = mEmbeddedUsedChars;
-    const LLWString& wtext = mEditor->getWText();
-    for (S32 i=0; i<(S32)wtext.size(); i++)
+    const std::string& text = mEditor->getText();
+    for (size_t i = 0; i < text.size(); )
     {
-        llwchar wc = wtext[i];
-        if( wc >= LLTextEditor::FIRST_EMBEDDED_CHAR && wc <= LLTextEditor::LAST_EMBEDDED_CHAR )
+        const LLCodepointAt at = utf8str_decode_at(text, i);
+        i = at.next;
+        if( at.cp >= LLTextEditor::FIRST_EMBEDDED_CHAR && at.cp <= LLTextEditor::LAST_EMBEDDED_CHAR )
         {
-            used.erase(wc);
+            used.erase(at.cp);
         }
     }
     // Remove chars not actually used
@@ -658,9 +666,7 @@ public:
         viewer_editor->mEmbeddedItemList->removeUnusedChars();
         if(viewer_editor->mEmbeddedItemList->insertEmbeddedItem( mItem, &mExtCharValue, true ) )
         {
-            LLWString ws;
-            ws.assign(1, mExtCharValue);
-            *delta = insert(editor, getPosition(), ws );
+            *delta = insert(editor, getPosition(), utf8str_from_cp(mExtCharValue) );
             return (*delta != 0);
         }
         return false;
@@ -668,16 +674,14 @@ public:
 
     virtual S32 undo( LLTextBase* editor )
     {
-        remove(editor, getPosition(), 1);
+        remove(editor, getPosition(), wchar_utf8_length(mExtCharValue));
         return getPosition();
     }
 
     virtual S32 redo( LLTextBase* editor )
     {
-        LLWString ws;
-        ws += mExtCharValue;
-        insert(editor, getPosition(), ws );
-        return getPosition() + 1;
+        insert(editor, getPosition(), utf8str_from_cp(mExtCharValue) );
+        return getPosition() + wchar_utf8_length(mExtCharValue);
     }
     virtual bool hasExtCharValue( llwchar value ) const
     {
@@ -754,9 +758,9 @@ bool LLViewerTextEditor::handleMouseDown(S32 x, S32 y, MASK mask)
         {
             setCursorAtLocalPos( x, y, false );
             llwchar wc = 0;
-            if (mCursorPos < getLength())
+            if (mCursorPos < getLengthBytes())
             {
-                wc = getWText()[mCursorPos];
+                wc = utf8str_decode_at(getText(), (size_t)mCursorPos).cp;
             }
             LLPointer<LLInventoryItem> item_at_pos = LLEmbeddedItems::getEmbeddedItemPtr(wc);
             if (item_at_pos)
@@ -867,7 +871,7 @@ bool LLViewerTextEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
         if( allowsEmbeddedItems() )
         {
             S32 doc_index = getDocIndexFromLocalCoord(x, y, false);
-            llwchar doc_char = getWText()[doc_index];
+            const llwchar doc_char = utf8str_decode_at(getText(), (size_t)doc_index).cp;
             if (mEmbeddedItemList->hasEmbeddedItem(doc_char))
             {
                 if( openEmbeddedItemAtPos( doc_index ))
@@ -950,10 +954,12 @@ bool LLViewerTextEditor::handleDragAndDrop(S32 x, S32 y, MASK mask,
                     setCursorAtLocalPos( x, y, true );
                     S32 insert_pos = mCursorPos;
                     setCursorPos(old_cursor);
-                    bool inserted = insertEmbeddedItem( insert_pos, item );
-                    if( inserted && (old_cursor > mCursorPos) )
+                    // insertEmbeddedItem returns the bytes it added, which is
+                    // how far a cursor sitting after the drop has moved.
+                    const S32 inserted = insertEmbeddedItem( insert_pos, item );
+                    if( inserted > 0 && (old_cursor > mCursorPos) )
                     {
-                        setCursorPos(mCursorPos + 1);
+                        setCursorPos(mCursorPos + inserted);
                     }
 
                     needsReflow();
@@ -988,7 +994,9 @@ bool LLViewerTextEditor::handleDragAndDrop(S32 x, S32 y, MASK mask,
 
 void LLViewerTextEditor::setASCIIEmbeddedText(const std::string& instr)
 {
-    LLWString wtext;
+    // The old notecard format marks an embedded item with a byte at or above
+    // 0x80, so this reads bytes rather than characters on purpose.
+    std::string text;
     const U8* buffer = (U8*)(instr.c_str());
     while (*buffer)
     {
@@ -1003,24 +1011,31 @@ void LLViewerTextEditor::setASCIIEmbeddedText(const std::string& instr)
         {
             wch = (llwchar)c;
         }
-        wtext.push_back(wch);
+        utf8str_append_cp(text, wch);
     }
-    setWText(wtext);
+    setText(text);
 }
 
 void LLViewerTextEditor::setEmbeddedText(const std::string& instr)
 {
-    LLWString wtext = utf8str_to_wstring(instr);
-    for (S32 i=0; i<(S32)wtext.size(); i++)
+    // Rebuilt rather than edited in place: the item's character need not
+    // occupy as many bytes as the placeholder it replaces.
+    std::string text;
+    text.reserve(instr.size());
+    for (size_t i = 0; i < instr.size(); )
     {
-        llwchar wch = wtext[i];
+        const LLCodepointAt at = utf8str_decode_at(instr, i);
+        i = at.next;
+
+        llwchar wch = at.cp;
         if( wch >= FIRST_EMBEDDED_CHAR && wch <= LAST_EMBEDDED_CHAR )
         {
             S32 index = wch - FIRST_EMBEDDED_CHAR;
-            wtext[i] = mEmbeddedItemList->getEmbeddedCharFromIndex(index);
+            wch = mEmbeddedItemList->getEmbeddedCharFromIndex(index);
         }
+        utf8str_append_cp(text, wch);
     }
-    setWText(wtext);
+    setText(text);
 }
 
 std::string LLViewerTextEditor::getEmbeddedText()
@@ -1028,18 +1043,22 @@ std::string LLViewerTextEditor::getEmbeddedText()
 #if 1
     // New version (Version 2)
     mEmbeddedItemList->copyUsedCharsToIndexed();
-    LLWString outtextw;
-    for (S32 i=0; i<(S32)getWText().size(); i++)
+    const std::string& text = getText();
+    std::string outtext;
+    outtext.reserve(text.size());
+    for (size_t i = 0; i < text.size(); )
     {
-        llwchar wch = getWText()[i];
+        const LLCodepointAt at = utf8str_decode_at(text, i);
+        i = at.next;
+
+        llwchar wch = at.cp;
         if( wch >= FIRST_EMBEDDED_CHAR && wch <= LAST_EMBEDDED_CHAR )
         {
             S32 index = mEmbeddedItemList->getIndexFromEmbeddedChar(wch);
             wch = FIRST_EMBEDDED_CHAR + index;
         }
-        outtextw.push_back(wch);
+        utf8str_append_cp(outtext, wch);
     }
-    std::string outtext = wstring_to_utf8str(outtextw);
     return outtext;
 #else
     // Old version (Version 1)
@@ -1111,28 +1130,33 @@ void LLViewerTextEditor::onValueChange(S32 start, S32 end)
 
 void LLViewerTextEditor::findEmbeddedItemSegments(S32 start, S32 end)
 {
-    const LLWString& text = getWText();
+    const std::string& text = getText();
 
-    // Start with i just after the first embedded item
-    for(S32 idx = start; idx < end; idx++ )
+    // Start with i just after the first embedded item. The walk steps a
+    // character at a time so an item's four bytes are read as the one
+    // character they are.
+    const S32 stop = llmin(end, (S32)text.size());
+    for (S32 idx = llmax(start, 0); idx < stop; )
     {
-        llwchar embedded_char = text[idx];
+        const LLCodepointAt at = utf8str_decode_at(text, (size_t)idx);
+        const llwchar embedded_char = at.cp;
         if( embedded_char >= FIRST_EMBEDDED_CHAR
             && embedded_char <= LAST_EMBEDDED_CHAR
             && mEmbeddedItemList->hasEmbeddedItem(embedded_char) )
         {
             LLInventoryItem* itemp = mEmbeddedItemList->getEmbeddedItemPtr(embedded_char);
             LLUIImagePtr image = mEmbeddedItemList->getItemImage(embedded_char);
-            insertSegment(new LLEmbeddedItemSegment(idx, image, itemp, *this));
+            insertSegment(new LLEmbeddedItemSegment(idx, (S32)(at.next - (size_t)idx), image, itemp, *this));
         }
+        idx = (S32)at.next;
     }
 }
 
 bool LLViewerTextEditor::openEmbeddedItemAtPos(S32 pos)
 {
-    if( pos < getLength())
+    if( pos < getLengthBytes())
     {
-        llwchar wc = getWText()[pos];
+        const llwchar wc = utf8str_decode_at(getText(), (size_t)pos).cp;
         LLPointer<LLInventoryItem> item = LLEmbeddedItems::getEmbeddedItemPtr( wc );
         if( item )
         {

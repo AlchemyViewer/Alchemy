@@ -354,6 +354,13 @@ LLMenuGL* LLMenuItemGL::getMenu() const
 // getNominalWidth() - returns the normal width of this control in
 // pixels - this is used for calculating the widest item, as well as
 // for horizontal arrangement.
+S32 LLMenuItemGL::labelWidth(S32 offset, S32 max_bytes) const
+{
+    const std::string& label = mLabel.getString();
+    mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+    return llceil(mLabelBuffer.getWidthBytes(getFont(), label, offset, max_bytes, false));
+}
+
 U32 LLMenuItemGL::getNominalWidth( void ) const
 {
     U32 width;
@@ -374,7 +381,7 @@ U32 LLMenuItemGL::getNominalWidth( void ) const
         appendAcceleratorString( temp );
         width += mFont->getWidth( temp );
     }
-    width += mFont->getWidth( mLabel.getWString() );
+    width += labelWidth();
     return width;
 }
 
@@ -514,7 +521,9 @@ void LLMenuItemGL::draw( void )
     // Draw the text on top.
     if (mBriefItem)
     {
-        mFont->render( mLabel, 0, BRIEF_PAD_PIXELS / 2, 0, color,
+        const std::string& label = mLabel.getString();
+        mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+        mLabelBuffer.renderBytes( mFont, label, 0, BRIEF_PAD_PIXELS / 2.f, 0.f, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
     }
     else
@@ -525,19 +534,27 @@ void LLMenuItemGL::draw( void )
         F32 y = (F32)MENU_ITEM_PADDING / 2.f;
         if( !mDrawBoolLabel.empty() )
         {
-            mFont->render( mDrawBoolLabel.getWString(), 0, (F32)LEFT_PAD_PIXELS, y, color,
+            const std::string& bool_label = mDrawBoolLabel.getString();
+            mBoolLabelBuffer.setSource(&mDrawBoolLabel, mDrawBoolLabel.getGeneration());
+        mBoolLabelBuffer.renderBytes( mFont, bool_label, 0, (F32)LEFT_PAD_PIXELS, y, color,
                            LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
-        mFont->render( mLabel.getWString(), 0, (F32)LEFT_PLAIN_PIXELS, y, color,
+        const std::string& label = mLabel.getString();
+        mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+        mLabelBuffer.renderBytes( mFont, label, 0, (F32)LEFT_PLAIN_PIXELS, y, color,
                        LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         if( !mDrawAccelLabel.empty() )
         {
-            mFont->render( mDrawAccelLabel.getWString(), 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
+            const std::string& accel_label = mDrawAccelLabel.getString();
+            mAccelLabelBuffer.setSource(&mDrawAccelLabel, mDrawAccelLabel.getGeneration());
+        mAccelLabelBuffer.renderBytes( mFont, accel_label, 0, (F32)getRect().mRight - (F32)RIGHT_PLAIN_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
         if( !mDrawBranchLabel.empty() )
         {
-            mFont->render( mDrawBranchLabel.getWString(), 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
+            const std::string& branch_label = mDrawBranchLabel.getString();
+            mBranchLabelBuffer.setSource(&mDrawBranchLabel, mDrawBranchLabel.getGeneration());
+        mBranchLabelBuffer.renderBytes( mFont, branch_label, 0, (F32)getRect().mRight - (F32)RIGHT_PAD_PIXELS, y, color,
                            LLFontGL::RIGHT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false );
         }
     }
@@ -545,13 +562,19 @@ void LLMenuItemGL::draw( void )
     // underline "jump" key only when keyboard navigation has been initiated
     if (getMenu()->jumpKeysActive() && LLMenuGL::getKeyboardMode())
     {
-        std::string upper_case_label = mLabel.getString();
+        const std::string& label = mLabel.getString();
+        std::string upper_case_label = label;
         LLStringUtil::toUpper(upper_case_label);
         std::string::size_type offset = upper_case_label.find(mJumpKey);
         if (offset != std::string::npos)
         {
-            S32 x_begin = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset));
-            S32 x_end = LEFT_PLAIN_PIXELS + mFont->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset) + 1);
+            // The offset indexes the uppercased copy, and uppercasing UTF-8
+            // does not preserve length, so it has to be carried back onto the
+            // label before it can measure any of it.
+            const S32 key_begin = (S32)utf8str_bytes_from_cased_bytes(label, offset, true);
+            const S32 key_end   = (S32)utf8str_decode_at(label, (size_t)key_begin).next;
+            S32 x_begin = LEFT_PLAIN_PIXELS + labelWidth(0, key_begin);
+            S32 x_end = LEFT_PLAIN_PIXELS + labelWidth(0, key_end);
             gl_line_2d(x_begin, (MENU_ITEM_PADDING / 2) + 1, x_end, (MENU_ITEM_PADDING / 2) + 1);
         }
     }
@@ -569,6 +592,10 @@ void LLMenuItemGL::onVisibilityChange(bool new_visibility)
     {
         getMenu()->needsArrange();
     }
+    mLabelBuffer.reset();
+    mBoolLabelBuffer.reset();
+    mAccelLabelBuffer.reset();
+    mBranchLabelBuffer.reset();
     LLView::onVisibilityChange(new_visibility);
 }
 
@@ -1394,7 +1421,7 @@ LLMenuItemBranchDownGL::LLMenuItemBranchDownGL( const Params& p) :
 U32 LLMenuItemBranchDownGL::getNominalWidth( void ) const
 {
     U32 width = LEFT_PAD_PIXELS + LEFT_WIDTH_PIXELS + RIGHT_PAD_PIXELS;
-    width += getFont()->getWidth( mLabel.getWString() );
+    width += labelWidth();
     return width;
 }
 
@@ -1645,21 +1672,33 @@ void LLMenuItemBranchDownGL::draw( void )
     // Munus are all of the same size, so fixed offset works here,
     // but it won't work if somebody decides to use different font
     // todo: adjust logic to work of rect and font height
-    getFont()->render( mLabel.getWString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
+    //
+    // Through the cache, as the items inside a menu are. These are the names
+    // along the top of the window, drawn on every frame the viewer runs, and
+    // going to the font direct meant shaping every one of them on every one of
+    // those frames. A colour that changes on hover is rewritten over the
+    // glyphs rather than reshaping them.
+    mLabelBuffer.setSource(&mLabel, mLabel.getGeneration());
+    mLabelBuffer.renderBytes( getFont(), mLabel.getString(), 0, (F32)getRect().getWidth() / 2.f, (F32)LABEL_BOTTOM_PAD_PIXELS, color,
                    LLFontGL::HCENTER, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, S32_MAX, NULL, false, false);
 
 
     // underline navigation key only when keyboard navigation has been initiated
     if (getMenu()->jumpKeysActive() && LLMenuGL::getKeyboardMode())
     {
-        std::string upper_case_label = mLabel.getString();
+        const std::string& label = mLabel.getString();
+        std::string upper_case_label = label;
         LLStringUtil::toUpper(upper_case_label);
         std::string::size_type offset = upper_case_label.find(getJumpKey());
         if (offset != std::string::npos)
         {
-            S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - getFont()->getWidthF32(mLabel.getWString(), 0, S32_MAX) / 2.f);
-            S32 x_begin = x_offset + getFont()->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset));
-            S32 x_end = x_offset + getFont()->getWidth(mLabel.getWString(), 0, static_cast<S32>(offset) + 1);
+            // See LLMenuItemGL::draw: the offset indexes the uppercased copy,
+            // which is not the same length as the label it came from.
+            const S32 key_begin = (S32)utf8str_bytes_from_cased_bytes(label, offset, true);
+            const S32 key_end   = (S32)utf8str_decode_at(label, (size_t)key_begin).next;
+            S32 x_offset = ll_round((F32)getRect().getWidth() / 2.f - (F32)labelWidth() / 2.f);
+            S32 x_begin = x_offset + labelWidth(0, key_begin);
+            S32 x_end = x_offset + labelWidth(0, key_end);
             gl_line_2d(x_begin, LABEL_BOTTOM_PAD_PIXELS, x_end, LABEL_BOTTOM_PAD_PIXELS);
         }
     }
@@ -2115,7 +2154,7 @@ void LLMenuGL::arrange( void )
         U32 max_height = getTornOff() ? U32_MAX: menu_region_rect.getHeight();
 
         // *FIX: create the item first and then ask for its dimensions?
-        S32 spillover_item_width = PLAIN_PAD_PIXELS + LLFontGL::getFontSansSerif()->getWidth( std::string("More") ); // *TODO: Translate
+        S32 spillover_item_width = PLAIN_PAD_PIXELS + LLFontGL::getFontSansSerif()->getWidth("More"); // *TODO: Translate
         S32 spillover_item_height = LLFontGL::getFontSansSerif()->getLineHeight() + MENU_ITEM_PADDING;
 
         // Scrolling support

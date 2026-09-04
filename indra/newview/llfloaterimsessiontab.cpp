@@ -561,7 +561,7 @@ void LLFloaterIMSessionTab::onEmojiPickerClosed()
 
 void LLFloaterIMSessionTab::initEmojiRecentPanel()
 {
-    std::list<LLWString>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
+    std::list<std::string>& recentlyUsed = LLFloaterEmojiPicker::getRecentlyUsed();
     if (recentlyUsed.empty())
     {
         mEmojiRecentEmptyText->setVisible(true);
@@ -570,9 +570,9 @@ void LLFloaterIMSessionTab::initEmojiRecentPanel()
     else
     {
         // Pass as a list-of-clusters so setEmojis can keep ZWJ sequences
-        // intact. A single concatenated LLWString would collapse the groups
+        // intact. A single concatenated string would collapse the groups
         // back into ambiguous codepoints.
-        std::vector<LLWString> emojis(recentlyUsed.begin(), recentlyUsed.end());
+        std::vector<std::string> emojis(recentlyUsed.begin(), recentlyUsed.end());
         mEmojiRecentIconsCtrl->setEmojis(emojis);
         mEmojiRecentEmptyText->setVisible(false);
         mEmojiRecentContainer->setVisible(true);
@@ -596,11 +596,10 @@ void LLFloaterIMSessionTab::onRecentEmojiPicked(const LLSD& value)
     LLSD::String str = value.asString();
     if (str.size())
     {
-        LLWString wstr = utf8string_to_wstring(str);
-        if (wstr.size())
+        if (!str.empty())
         {
-            // Whole wstr so ZWJ / flag / keycap / tag clusters stay together.
-            mInputEditor->insertEmoji(wstr);
+            // The whole string, so ZWJ / flag / keycap / tag clusters stay together.
+            mInputEditor->insertEmoji(str);
         }
     }
 }
@@ -669,7 +668,7 @@ void LLFloaterIMSessionTab::appendMessage(const LLChat& chat, const LLSD& args)
     mChatHistory->appendMessage(chat, chat_args, input_append_params);
 }
 
-void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
+void LLFloaterIMSessionTab::updateUsedEmojis(std::string_view text)
 {
     LLEmojiDictionary* dictionary = LLEmojiDictionary::getInstance();
     llassert_always(dictionary);
@@ -680,26 +679,27 @@ void LLFloaterIMSessionTab::updateUsedEmojis(LLWStringView text)
     // (ZWJ family, flag pair, keycap, tag subdivision) that must be
     // recorded as a single emoji. Codepoints outside any cluster are
     // handled with the single-codepoint path below.
-    const auto clusters = wstring_find_emoji_clusters(text);
+    const auto clusters = utf8str_find_emoji_clusters(text);
     auto next_run = clusters.begin();
     for (size_t i = 0; i < text.size(); )
     {
         if (next_run != clusters.end() && next_run->first == i)
         {
-            LLFloaterEmojiPicker::onEmojiUsed(LLWString(text.data() + next_run->first,
-                                                        next_run->second - next_run->first));
+            LLFloaterEmojiPicker::onEmojiUsed(
+                std::string(text.substr(next_run->first, next_run->second - next_run->first)));
             emojiSent = true;
             i = next_run->second;
             ++next_run;
             continue;
         }
 
-        if (dictionary->isEmoji(text[i]))
+        const LLCodepointAt at = utf8str_decode_at(text, i);
+        if (dictionary->isEmoji(at.cp))
         {
-            LLFloaterEmojiPicker::onEmojiUsed(LLWString(1, text[i]));
+            LLFloaterEmojiPicker::onEmojiUsed(utf8str_from_cp(at.cp));
             emojiSent = true;
         }
-        ++i;
+        i = at.next;
     }
 
     if (!emojiSent)
@@ -1459,9 +1459,13 @@ void LLFloaterIMSessionTab::applyMUPose(std::string& text)
             text.replace(0, 1, "/me");
         }
         // Account for emotes and smilies
-        else if (!isdigit(text.at(1))
-                 && !ispunct(text.at(1))
-                 && !isspace(text.at(1)))
+        // Through LLStringOps rather than <cctype> directly: char is signed,
+        // so the lead byte of anything above ASCII arrives negative and lands
+        // outside the domain those take, which is undefined and asserts in a
+        // debug CRT. Typing a colon in front of an accented word is enough.
+        else if (!LLStringOps::isDigit(text.at(1))
+                 && !LLStringOps::isPunct(text.at(1))
+                 && !LLStringOps::isSpace(text.at(1)))
         {
             text.replace(0, 1, "/me ");
         }

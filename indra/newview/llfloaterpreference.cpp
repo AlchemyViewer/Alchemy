@@ -4253,8 +4253,7 @@ void LLFloaterPreferenceProxy::onChangeSocksSettings()
 
 void LLFloaterPreference::onUpdateFilterTerm(bool force)
 {
-    LLWString seachValue = utf8str_to_wstring(mFilterEdit->getValue());
-    LLWStringUtil::toLower(seachValue);
+    const std::string seachValue = utf8str_tolower(mFilterEdit->getValue().asString());
 
     if (!mSearchData || (mSearchData->mLastFilter == seachValue && !force))
         return;
@@ -4280,7 +4279,7 @@ void LLFloaterPreference::onUpdateFilterTerm(bool force)
 void LLFloaterPreference::onCopySearch()
 {
     std::string search_query = "secondlife:///app/openfloater/preferences?search=" + LLURI::escape(mFilterEdit->getText());
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(search_query), 0, static_cast<S32>(search_query.size()));
+    LLClipboard::instance().copyToClipboard(search_query, 0, static_cast<S32>(search_query.size()));
 }
 
 void LLFloaterPreference::filterIgnorableNotifications()
@@ -4348,8 +4347,7 @@ void collectChildren( LLView const *aView, ll::prefs::PanelDataPtr aParentPanel,
             item->mView = pView;
             item->mCtrl = pSCtrl;
 
-            item->mLabel = utf8str_to_wstring(pSCtrl->getSearchText());
-            LLWStringUtil::toLower(item->mLabel);
+            item->mLabel = utf8str_tolower(pSCtrl->getSearchText());
 
             llassert_always(aParentPanel || aParentTabContainer);
 

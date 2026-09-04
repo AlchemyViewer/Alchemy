@@ -65,8 +65,8 @@ public:
     void releaseMouse() override {};
     void setMouseClipping( bool b ) override {};
     bool isClipboardTextAvailable() override {return false; };
-    bool pasteTextFromClipboard(LLWString &dst) override {return false; };
-    bool copyTextToClipboard(const LLWString &src) override {return false; };
+    bool pasteTextFromClipboard(std::string &dst) override {return false; };
+    bool copyTextToClipboard(const std::string &src) override {return false; };
     void flashIcon(F32 seconds) override {};
     F32 getGamma() override {return 1.0f; };
     bool setGamma(const F32 gamma) override {return false; }; // Set the gamma

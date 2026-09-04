@@ -124,7 +124,7 @@ struct LLFontGlyphInfo
     const ALFontFace* mSourceFace = nullptr;
 
     // Glyph-level metrics. These are taken from phase 0 and used by the
-    // measurement paths (getWidthF32, maxDrawableChars, etc.) that don't
+    // measurement paths (getWidthF32Bytes, maxDrawableBytes, etc.) that don't
     // need phase-specific accuracy. The renderer uses per-phase dimensions
     // from mPhaseSlots[phase] instead.
     S32 mWidth;         // In pixels
@@ -133,8 +133,6 @@ struct LLFontGlyphInfo
     F32 mYAdvance;      // In pixels
     S32 mXBearing;      // Distance from baseline to left in pixels
     S32 mYBearing;      // Distance from baseline to top in pixels
-    S32 mLsbDelta;      // FreeType subpixel left side bearing delta (26.6 units)
-    S32 mRsbDelta;      // FreeType subpixel right side bearing delta (26.6 units)
 
     // Per-phase atlas slots. mPhaseCount == 1 for native-hinted (HINTING_DEFAULT)
     // faces — single integer-pen phase, slots 1..7 are unused. Subpixel-pen
@@ -209,8 +207,6 @@ public:
 
     F32 getXAdvance(llwchar wc) const;
     F32 getXAdvance(const LLFontGlyphInfo* glyph) const;
-    F32 getXKerning(llwchar char_left, llwchar char_right) const; // Get the kerning between the two characters
-    F32 getXKerning(const LLFontGlyphInfo* left_glyph_info, const LLFontGlyphInfo* right_glyph_info) const; // Get the kerning between the two characters
 
     LLFontGlyphInfo* getGlyphInfo(llwchar wch, EFontGlyphType glyph_type) const;
 

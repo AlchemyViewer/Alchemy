@@ -150,10 +150,7 @@ std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::fo
     if (iter != sStringTemplates.end())
     {
         std::string text = iter->second.mText;
-        LLStringUtil::format_map_t args = sDefaultArgs;
-        args.insert(msg_args.begin(), msg_args.end());
-        LLStringUtil::format(text, args);
-
+        formatWithDefaults(text, msg_args);
         return text;
     }
     else
@@ -163,6 +160,30 @@ std::string LLTrans::getString(std::string_view xml_desc, const LLStringUtil::fo
     }
 }
 
+// Merging the caller's arguments over the defaults means copying the whole
+// default map, which is a node and two strings per entry. Most of strings.xml
+// has nothing bracketed in it at all, and most callers add no arguments of
+// their own, so neither case has to pay for the merge -- and the test that
+// decides is the same one format() would run anyway.
+//static
+void LLTrans::formatWithDefaults(std::string& text, const LLStringUtil::format_map_t& msg_args)
+{
+    if (text.find('[') == std::string::npos)
+    {
+        return;
+    }
+
+    if (msg_args.empty())
+    {
+        LLStringUtil::format(text, sDefaultArgs);
+        return;
+    }
+
+    LLStringUtil::format_map_t args = sDefaultArgs;
+    args.insert(msg_args.begin(), msg_args.end());
+    LLStringUtil::format(text, args);
+}
+
 //static
 std::string LLTrans::getDefString(std::string_view xml_desc, const LLStringUtil::format_map_t& msg_args)
 {
@@ -170,10 +191,7 @@ std::string LLTrans::getDefString(std::string_view xml_desc, const LLStringUtil:
     if (iter != sDefaultStringTemplates.end())
     {
         std::string text = iter->second.mText;
-        LLStringUtil::format_map_t args = sDefaultArgs;
-        args.insert(msg_args.begin(), msg_args.end());
-        LLStringUtil::format(text, args);
-
+        formatWithDefaults(text, msg_args);
         return text;
     }
     else
@@ -235,9 +253,7 @@ bool LLTrans::findString(std::string& result, std::string_view xml_desc, const L
     if (iter != sStringTemplates.end())
     {
         std::string text = iter->second.mText;
-        LLStringUtil::format_map_t args = sDefaultArgs;
-        args.insert(msg_args.begin(), msg_args.end());
-        LLStringUtil::format(text, args);
+        formatWithDefaults(text, msg_args);
         result = text;
         return true;
     }

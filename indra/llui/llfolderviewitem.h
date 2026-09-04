@@ -29,7 +29,7 @@
 #include "llflashtimer.h"
 #include "llview.h"
 #include "lluiimage.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 
 #include <memory>
 
@@ -117,7 +117,7 @@ protected:
 
     LLFolderViewItem(const Params& p);
 
-    LLWString                   mLabel;
+    std::string                 mLabel;
     S32                         mLabelWidth;
     bool                        mLabelWidthDirty;
     bool                        mIsFavorite;
@@ -126,7 +126,7 @@ protected:
     LLFolderViewFolder*         mParentFolder;
     LLPointer<LLFolderViewModelItem> mViewModelItem;
     LLFontGL::StyleFlags        mLabelStyle;
-    LLWString                   mLabelSuffix;
+    std::string                 mLabelSuffix;
     bool                        mSuffixNeedsRefresh; //suffix and icons
     LLUIImagePtr                mIcon,
                                 mIconOpen,
@@ -272,7 +272,7 @@ public:
     // This method returns the label displayed on the view. This
     // method was primarily added to allow sorting on the folder
     // contents possible before the entire view has been constructed.
-    const LLWString& getLabel() const { return mLabel; }
+    const std::string& getLabel() const { return mLabel; }
 
     LLFolderViewFolder* getParentFolder( void ) { return mParentFolder; }
     const LLFolderViewFolder* getParentFolder( void ) const { return mParentFolder; }
@@ -294,6 +294,12 @@ public:
     // Show children
     virtual void setOpen(bool open = true) {};
     virtual bool isOpen() const { return false; }
+
+    // Whether anything below this view is on screen. An item has no children
+    // at all; a folder has them while it is open, and still has them while it
+    // animates shut. Draw and reshape have to agree on this, or a folder is
+    // drawn collapsing with children nobody is laying out.
+    virtual bool showsChildren() const { return false; }
 
     virtual LLFolderView*   getRoot();
     virtual const LLFolderView* getRoot() const;
@@ -327,6 +333,10 @@ public:
     // Releases cached text geometry when hidden so off-screen items hold no font buffers.
     virtual void setVisible(bool visible);
 
+    // Sizes itself and stops when out of sight; setVisible settles the width
+    // afterwards. See the definition for why nothing reads what is skipped.
+    virtual void reshape(S32 width, S32 height, bool called_from_parent = true);
+
     //  virtual void handleDropped();
     virtual void draw();
     void drawOpenFolderArrow();
@@ -348,6 +358,18 @@ private:
     static LLUIImagePtr sFavoriteContentImg;
     static LLFontGL* sSuffixFont;
 
+public:
+    // How many items re-measured their label during the arrange in progress.
+    // That measurement goes straight to the font, so it is a HarfBuzz shape of
+    // both strings apiece, and it counts the items that found an input had
+    // moved -- not the ones a refresh merely asked about, which is most of
+    // them. Reported as the value on LLFolderView::arrange's profiler zone,
+    // which is the only way to tell a cheap arrange from one that measured
+    // everything.
+    static S32 sArrangeRemeasures;
+
+private:
+
     // Returns a shared, immutable style for the given params, deduplicated across
     // all items (there are only a handful of distinct param sets). Main-thread only.
     static const LLFolderViewItemStyle* internStyle(const Params& p);
@@ -356,8 +378,44 @@ private:
     // item goes off-screen (see setVisible), so only on-screen items hold vertex
     // buffers and their MSVC per-std::list sentinel allocations. Null until first
     // drawn, after being hidden, or (for the suffix) when there is no suffix.
-    std::unique_ptr<LLFontVertexBuffer> mLabelFontBuffer;
-    std::unique_ptr<LLFontVertexBuffer> mSuffixFontBuffer;
+    // Created on first draw: inventory holds thousands of items and most are
+    // never shown. Both are keyed on mLabelGeneration, which is bumped
+    // wherever anything that decides what this item's text looks like is
+    // rebuilt -- either string, the style that picks the font they are drawn
+    // in, the favourite mark that takes room beside them. One counter for all
+    // of it, because a rebuild the change did not need is the safe direction.
+    std::unique_ptr<LLFontTextCache> mLabelFontBuffer;
+    std::unique_ptr<LLFontTextCache> mSuffixFontBuffer;
+    U32                              mLabelGeneration = 0;
+
+    // What mLabelWidth was measured from. The strings and the font are the
+    // counter above; the other two are read where they live. Measuring is a
+    // shape of both strings, and the flag that asks for it says only that a
+    // refresh ran -- see arrange.
+    //
+    // The resolution starts where the font's own count cannot, so an item that
+    // has never measured always does.
+    U32                              mLabelWidthGeneration = 0;
+    S32                              mLabelWidthIndentation = 0;
+    S32                              mLabelWidthResolution = -1;
+
+    LLFontTextCache& labelCache();
+    LLFontTextCache& suffixCache();
+
+    // Take a new label, suffix, style or favourite mark, and count it only if
+    // it is one. A refresh asks the model for all of them whenever anything
+    // about the item might have changed, and the answer is almost always what
+    // is already held.
+    void setLabelText(std::string label);
+    void setLabelSuffixText(std::string suffix);
+    void setLabelStyle(LLFontGL::StyleFlags style);
+    void setFavorite(bool favorite);
+
+    // A span of this item's label or suffix, measured through its own cache.
+    // Inventory measures both several times per item per frame while a search
+    // filter is matching.
+    S32 labelWidth(const LLFontGL* font, S32 offset, S32 max_bytes);
+    S32 suffixWidth(const LLFontGL* font, S32 offset, S32 max_bytes);
     LLFontGL* pLabelFont{nullptr};
 };
 
@@ -491,6 +549,7 @@ public:
 
     // Get the current state of the folder.
     virtual bool isOpen() const { return mIsOpen; }
+    virtual bool showsChildren() const { return isOpen() || mCurHeight != mTargetHeight; }
 
     // special case if an object is dropped on the child.
     bool handleDragAndDropFromChild(MASK mask,

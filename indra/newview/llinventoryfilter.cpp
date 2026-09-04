@@ -706,14 +706,51 @@ const std::string& LLInventoryFilter::getFilterSubString(bool trim) const
     return mFilterSubString;
 }
 
-std::string::size_type LLInventoryFilter::getStringMatchOffset(LLFolderViewModelItem* item) const
+// The search runs against an uppercased copy of the name, and uppercasing UTF-8
+// changes byte lengths, so the byte offset the find returns does not index the
+// label the highlight is drawn over. Rather than keep an index map per item --
+// inventories run to six figures -- the item's own name is walked applying the
+// same conversion.
+LLFolderViewFilter::Match LLInventoryFilter::getFilterMatch(LLFolderViewModelItem* item) const
 {
-    if (mSearchType == SEARCHTYPE_NAME)
+    Match match;
+    if (mSearchType != SEARCHTYPE_NAME || mFilterSubString.empty())
     {
-        return mFilterSubString.size() ? item->getSearchableName().find(mFilterSubString) : std::string::npos;
+        return match;
     }
 
-    return std::string::npos;
+    const std::string::size_type at = item->getSearchableName().find(mFilterSubString);
+    if (at == std::string::npos)
+    {
+        return match;
+    }
+
+    const std::string& name = item->getDisplayName();
+    const std::string suffix = item->getLabelSuffix();
+
+    // While the label and the search term are both ASCII, uppercasing moved
+    // nothing and the offset already indexes the label as it stands. That covers
+    // most of an inventory, and skips building the combined label as well as
+    // both walks of it.
+    if (utf8str_is_ascii(name) && utf8str_is_ascii(suffix) && utf8str_is_ascii(mFilterSubString))
+    {
+        // Bounded against the label the caller is about to index. The offset
+        // was found in the cached searchable name, which is rebuilt only when
+        // the item asks for it, so a suffix that has shrunk since leaves it
+        // pointing past the end. The path below is bounded by
+        // utf8str_bytes_from_cased_bytes; this one has to say so itself.
+        const size_t label_len = name.size() + suffix.size();
+        match.mOffset = llmin((size_t)at, label_len);
+        match.mLength = llmin(mFilterSubString.size(), label_len - match.mOffset);
+        return match;
+    }
+
+    std::string label = name;
+    label += suffix;
+    match.mOffset = utf8str_bytes_from_cased_bytes(label, at, true);
+    const size_t end = utf8str_bytes_from_cased_bytes(label, at + mFilterSubString.size(), true);
+    match.mLength = (end > match.mOffset) ? end - match.mOffset : 0;
+    return match;
 }
 
 bool LLInventoryFilter::isDefault() const
@@ -1699,10 +1736,6 @@ bool LLInventoryFilter::hasFilterString() const
     return mFilterSubString.size() > 0;
 }
 
-std::string::size_type LLInventoryFilter::getFilterStringSize() const
-{
-    return mFilterSubString.size();
-}
 
 PermissionMask LLInventoryFilter::getFilterPermissions() const
 {

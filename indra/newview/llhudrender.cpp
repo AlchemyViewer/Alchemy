@@ -41,95 +41,90 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-void hud_render_utf8text(const std::string &str, const LLVector3 &pos_agent,
-                     const LLFontGL &font,
-                     const U8 style,
-                     const LLFontGL::ShadowType shadow,
-                     const F32 x_offset, const F32 y_offset,
-                     const LLColor4& color,
-                     const bool orthographic)
-{
-    LLWString wstr(utf8str_to_wstring(str));
-    hud_render_text(wstr, pos_agent, font, style, shadow, x_offset, y_offset, color, orthographic);
-}
-
-void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
-                    const LLFontGL &font,
-                    const U8 style,
-                    const LLFontGL::ShadowType shadow,
-                    const F32 x_offset, const F32 y_offset,
-                    const LLColor4& color,
-                    const bool orthographic)
+LLHUDTextScope::LLHUDTextScope(const LLVector3& pos_agent, bool orthographic)
+:   mPosAgent(pos_agent)
 {
     LLViewerCamera* camera = LLViewerCamera::getInstance();
+
     // Do cheap plane culling
     LLVector3 dir_vec = pos_agent - camera->getOrigin();
     dir_vec /= dir_vec.magVec();
-
-    if (wstr.empty() || (!orthographic && dir_vec * camera->getAtAxis() <= 0.f))
+    if (!orthographic && dir_vec * camera->getAtAxis() <= 0.f)
     {
         return;
     }
 
-    LLVector3 right_axis;
-    LLVector3 up_axis;
     if (orthographic)
     {
-        right_axis.setVec(0.f, -1.f / gViewerWindow->getWorldViewHeightScaled(), 0.f);
-        up_axis.setVec(0.f, 0.f, 1.f / gViewerWindow->getWorldViewHeightScaled());
+        mRightAxis.setVec(0.f, -1.f / gViewerWindow->getWorldViewHeightScaled(), 0.f);
+        mUpAxis.setVec(0.f, 0.f, 1.f / gViewerWindow->getWorldViewHeightScaled());
     }
     else
     {
-        camera->getPixelVectors(pos_agent, up_axis, right_axis);
+        camera->getPixelVectors(pos_agent, mUpAxis, mRightAxis);
     }
-    LLCoordFrame render_frame = *camera;
-    LLQuaternion rot;
-    if (!orthographic)
-    {
-        rot = render_frame.getQuaternion();
-        rot = rot * LLQuaternion(-F_PI_BY_TWO, camera->getYAxis());
-        rot = rot * LLQuaternion(F_PI_BY_TWO, camera->getXAxis());
-    }
-    else
-    {
-        rot = LLQuaternion(-F_PI_BY_TWO, LLVector3(0.f, 0.f, 1.f));
-        rot = rot * LLQuaternion(-F_PI_BY_TWO, LLVector3(0.f, 1.f, 0.f));
-    }
-    F32 angle;
-    LLVector3 axis;
-    rot.getAngleAxis(&angle, axis);
 
-    LLVector3 render_pos = pos_agent + (x_offset * right_axis) + (y_offset * up_axis);
+    mWorldViewRect = gViewerWindow->getWorldViewRectRaw();
 
-    //get the render_pos in screen space
-
-    LLRect world_view_rect = gViewerWindow->getWorldViewRectRaw();
-    glm::ivec4 viewport(world_view_rect.mLeft, world_view_rect.mBottom, world_view_rect.getWidth(), world_view_rect.getHeight());
-
-    glm::vec3 win_coord = al_project(glm::vec3(render_pos), get_current_modelview(), get_current_projection(), viewport);
-
-    //fonts all render orthographically, set up projection``
+    // Fonts all render orthographically, so set that up once for every line
+    // this position is going to draw.
     gGL.matrixMode(LLRender::MM_PROJECTION);
     gGL.pushMatrix();
     gGL.matrixMode(LLRender::MM_MODELVIEW);
     gGL.pushMatrix();
     LLUI::pushMatrix();
 
-    gl_state_for_2d(world_view_rect.getWidth(), world_view_rect.getHeight());
+    gl_state_for_2d(mWorldViewRect.getWidth(), mWorldViewRect.getHeight());
     gViewerWindow->setup3DViewport();
+
+    mVisible = true;
+}
+
+LLHUDTextScope::~LLHUDTextScope()
+{
+    if (!mVisible)
+    {
+        return;
+    }
+
+    LLUI::popMatrix();
+    gGL.popMatrix();
+
+    gGL.matrixMode(LLRender::MM_PROJECTION);
+    gGL.popMatrix();
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+}
+
+void LLHUDTextScope::draw(std::string_view utf8text,
+                          const LLFontGL& font,
+                          const U8 style,
+                          const LLFontGL::ShadowType shadow,
+                          const F32 x_offset, const F32 y_offset,
+                          const LLColor4& color,
+                          LLFontTextCache* cache)
+{
+    if (!mVisible || utf8text.empty())
+    {
+        return;
+    }
+
+    // Where this line sits relative to the position, in screen space.
+    const LLVector3 render_pos = mPosAgent + (x_offset * mRightAxis) + (y_offset * mUpAxis);
+
+    glm::ivec4 viewport(mWorldViewRect.mLeft, mWorldViewRect.mBottom,
+                        mWorldViewRect.getWidth(), mWorldViewRect.getHeight());
+    glm::vec3 win_coord = al_project(glm::vec3(render_pos), get_current_modelview(),
+                                     get_current_projection(), viewport);
 
     // Split the projected position into an integer UI-pixel matrix translate
     // (LLRender2D::translate stores into LLCoordGL via (S32) cast and
-    // discards sub-pixel info) and a sub-pixel residual passed to
-    // font.render as the (x, y) origin. The font's per-glyph 8-phase
-    // rasterization positions horizontal stems to ~1/8 px, so the string
-    // slides smoothly through fractional screen pixels as the camera moves
-    // instead of jumping a whole pixel at every integer boundary the matrix
-    // snap would otherwise enforce. The previous floorf on x_offset/y_offset
-    // above tried to snap along perspective-distorted pixel basis vectors
-    // and is replaced by this single screen-space split.
-    const F32 ui_x  = (win_coord.x - (F32)world_view_rect.mLeft)   / LLFontGL::sScaleX;
-    const F32 ui_y  = (win_coord.y - (F32)world_view_rect.mBottom) / LLFontGL::sScaleY;
+    // discards sub-pixel info) and a sub-pixel residual passed to the font as
+    // the (x, y) origin. The font's per-glyph 8-phase rasterization positions
+    // horizontal stems to ~1/8 px, so the string slides smoothly through
+    // fractional screen pixels as the camera moves instead of jumping a whole
+    // pixel at every integer boundary the matrix snap would otherwise enforce.
+    const F32 ui_x  = (win_coord.x - (F32)mWorldViewRect.mLeft)   / LLFontGL::sScaleX;
+    const F32 ui_y  = (win_coord.y - (F32)mWorldViewRect.mBottom) / LLFontGL::sScaleY;
     const F32 int_x = floorf(ui_x);
     const F32 int_y = floorf(ui_y);
     const F32 frac_x = ui_x - int_x;
@@ -143,14 +138,31 @@ void hud_render_text(const LLWString &wstr, const LLVector3 &pos_agent,
     const F32 hud_text_z = LLRender::sReverseZ ? ((win_coord.z * 2.f) - 1.f)
                                                : -((win_coord.z * 2.f) - 1.f);
     LLUI::translate(int_x, int_y, hud_text_z);
+
     F32 right_x;
+    if (cache)
+    {
+        cache->renderBytes(&font, utf8text, 0, frac_x, 1.f + frac_y, color,
+                           LLFontGL::LEFT, LLFontGL::BASELINE,
+                           style, shadow, static_cast<S32>(utf8text.length()), 1000, &right_x,
+                           /*use_ellipses*/false, /*use_color*/true);
+    }
+    else
+    {
+        font.renderBytes(utf8text, 0, frac_x, 1.f + frac_y, color, LLFontGL::LEFT, LLFontGL::BASELINE,
+                         style, shadow, static_cast<S32>(utf8text.length()), 1000, &right_x,
+                         /*use_ellipses*/false, /*use_color*/true);
+    }
+}
 
-    font.render(wstr, 0, frac_x, 1.f + frac_y, color, LLFontGL::LEFT, LLFontGL::BASELINE, style, shadow, static_cast<S32>(wstr.length()), 1000, &right_x, /*use_ellipses*/false, /*use_color*/true);
-
-    LLUI::popMatrix();
-    gGL.popMatrix();
-
-    gGL.matrixMode(LLRender::MM_PROJECTION);
-    gGL.popMatrix();
-    gGL.matrixMode(LLRender::MM_MODELVIEW);
+void hud_render_text(std::string_view utf8text, const LLVector3 &pos_agent,
+                    const LLFontGL &font,
+                    const U8 style,
+                    const LLFontGL::ShadowType shadow,
+                    const F32 x_offset, const F32 y_offset,
+                    const LLColor4& color,
+                    const bool orthographic)
+{
+    LLHUDTextScope scope(pos_agent, orthographic);
+    scope.draw(utf8text, font, style, shadow, x_offset, y_offset, color);
 }

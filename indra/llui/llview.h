@@ -289,8 +289,50 @@ public:
     void    setAllChildrenEnabled(bool b, bool recursive = false);
 
     virtual void    setVisible(bool visible);
-    void            setVisibleDirect(bool visible) { mVisible = visible; }
+    // Sets the flag alone, without the notifications setVisible sends -- for
+    // hiding a child from a single draw pass. It still settles a transparency
+    // left waiting, because a view that is visible must be holding one however
+    // it came to be visible, and nothing else would come along to give it.
+    void            setVisibleDirect(bool visible)
+    {
+        mVisible = visible;
+        if (visible && mHasPendingTransparency)
+        {
+            applyTransparencyType(mPendingTransparency);
+        }
+    }
     const bool&     getVisible() const          { return mVisible; }
+
+    // Push a floater's transparency down this subtree. Hidden views are left
+    // holding it rather than descended into -- nothing under one draws, so
+    // nothing under one is reading a transparency until it is shown, and
+    // setVisible is where that is settled. Takes LLUICtrl::ETypeTransparency as
+    // a raw value, because that enum belongs to a class built on top of this
+    // one.
+    void            applyTransparencyType(U8 transparency_type);
+
+    // Every view LLView::reshape has entered since a caller last zeroed it, so
+    // a layout pass can report how much of the tree it moved. Counts only what
+    // reached this class: a subclass that answers a reshape itself, as a folder
+    // view item does for anything out of sight, is not seen here.
+    static S32      sReshapeCount;
+
+    // How deep in a reshape the current call is. Non-zero means a cascade is
+    // running and the region it dirties is being accounted for at the top of
+    // it; see updateBoundingRect.
+    static S32      sReshapeDepth;
+
+    // Views the last push actually descended into. An open inventory keeps the
+    // items of its closed folders hidden, and they are most of a floater.
+    static S32      sTransparencyViewsWalked;
+
+    // Bumped whenever a view is given a parent. A pass that pushes a value
+    // down a subtree can skip pushing the value it pushed last time, but only
+    // while the subtree is the one it pushed to: a view added since is holding
+    // whatever it was constructed with. Unsigned because it is only compared
+    // for equality and must be allowed to wrap; a lap costs one redundant
+    // pass. See LLFloater::updateTransparency.
+    static U32      sTreeGeneration;
     virtual void    setEnabled(bool enabled);
     bool            getEnabled() const          { return mEnabled; }
     /// 'available' in this context means 'visible and enabled': in other
@@ -586,6 +628,11 @@ private:
 
     LLView*     mParentView;
     child_list_t mChildList;
+
+    // The transparency a floater tried to give this view while it was hidden,
+    // kept until it is shown. See applyTransparencyType.
+    U8          mPendingTransparency = 0;
+    bool        mHasPendingTransparency = false;
 
     // location in pixels, relative to surrounding structure, bottom,left=0,0
     bool        mVisible;

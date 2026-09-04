@@ -31,7 +31,6 @@
 #include "llview.h"
 
 #include <sstream>
-#include <boost/tokenizer.hpp>
 #include <boost/bind.hpp>
 
 #include "llrender.h"
@@ -145,7 +144,7 @@ LLView::LLView(const LLView::Params& p)
     mFromXUI(p.from_xui),
     mIsFocusRoot(p.focus_root),
     mLastVisible(false),
-    mHoverCursor(getCursorFromString(p.hover_cursor)),
+    mHoverCursor(getCursorFromString(p.hover_cursor())),
     mEnabled(p.enabled),
     mMouseOpaque(p.mouse_opaque),
     mSoundFlags(p.sound_flags),
@@ -250,6 +249,43 @@ void LLView::setRect(const LLRect& rect)
     updateBoundingRect();
 }
 
+S32 LLView::sTransparencyViewsWalked = 0;
+S32 LLView::sReshapeCount = 0;
+S32 LLView::sReshapeDepth = 0;
+U32 LLView::sTreeGeneration = 0;
+
+void LLView::applyTransparencyType(U8 transparency_type)
+{
+    if (!getVisible())
+    {
+        // Stop here and keep the value. Nothing beneath a hidden view is drawn,
+        // so nothing beneath it is reading a transparency, and an inventory
+        // holds two hundred thousand such views to show a few dozen.
+        //
+        // Safe to leave stale where a deferred layout was not: a transparency
+        // is read by the control that holds it and by nothing else, so no view
+        // sizes itself from another view's.
+        mPendingTransparency = transparency_type;
+        mHasPendingTransparency = true;
+        return;
+    }
+    mHasPendingTransparency = false;
+    ++sTransparencyViewsWalked;
+
+    // isCtrl is a virtual returning a constant where dynamic_cast walks the
+    // RTTI graph, and this is asked once per view. The pairing with static_cast
+    // is how the rest of llui asks it.
+    if (isCtrl())
+    {
+        static_cast<LLUICtrl*>(this)->setTransparencyType((LLUICtrl::ETypeTransparency)transparency_type);
+    }
+
+    for (LLView* child : mChildList)
+    {
+        child->applyTransparencyType(transparency_type);
+    }
+}
+
 void LLView::setUseBoundingRect( bool use_bounding_rect )
 {
     if (mUseBoundingRect != use_bounding_rect)
@@ -323,6 +359,9 @@ bool LLView::addChild(LLView* child, S32 tab_group)
 
     // add to front of child list, as normal
     mChildList.push_front(child);
+    // Said before the subtree is walked for anything else, so a pass that
+    // skipped its work last time knows the tree has moved under it.
+    ++sTreeGeneration;
 
     // add to tab order list
     if (tab_group != 0)
@@ -640,7 +679,17 @@ void LLView::setVisible(bool visible)
 {
     if ( mVisible != visible )
     {
+        // Only a real change is named: this is asked constantly and answers
+        // "no" almost every time.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("set visible");
+
         mVisible = visible;
+
+        // Spend the transparency a floater left here while this was hidden.
+        if (visible && mHasPendingTransparency)
+        {
+            applyTransparencyType(mPendingTransparency);
+        }
 
         // notify children of visibility change if root, or part of visible hierarchy
         if (!getParent() || getParent()->isInVisibleChain())
@@ -656,6 +705,12 @@ void LLView::setVisible(bool visible)
 // virtual
 void LLView::onVisibilityChange ( bool new_visibility )
 {
+    // Recurses into every visible descendant, so a floater opening or closing
+    // walks the whole of itself. Reports how wide this level is; the depth
+    // shows as nesting.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("visibility change");
+    LL_PROFILE_ZONE_NUM(mChildList.size());
+
     bool old_visibility;
     bool log_visibility_change = LLViewerEventRecorder::instance().getLoggingStatus();
     for (LLView* viewp : mChildList)
@@ -1436,8 +1491,18 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
     S32 delta_width = width - getRect().getWidth();
     S32 delta_height = height - getRect().getHeight();
 
+    // Every view a cascade touches resolves to the same near-root ancestor and
+    // so asks for the same screen region; the walk that finds it is the cost,
+    // and in an inventory it is a pointer chase through twenty scattered views,
+    // fifteen hundred times. So the region is claimed once, here at the top,
+    // and updateBoundingRect stays quiet while this is running.
+    const bool outermost_reshape = (sReshapeDepth == 0);
+    ++sReshapeDepth;
+
     if (delta_width || delta_height || sForceReshape)
     {
+        ++sReshapeCount;
+
         // adjust our rectangle
         mRect.mRight = getRect().mLeft + width;
         mRect.mTop = getRect().mBottom + height;
@@ -1489,7 +1554,14 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
 
             S32 delta_x = child_rect.mLeft - viewp->getRect().mLeft;
             S32 delta_y = child_rect.mBottom - viewp->getRect().mBottom;
-            viewp->translate( delta_x, delta_y );
+            if (delta_x || delta_y)
+            {
+                // translate() recomputes a bounding rect and can dirty the
+                // screen. A child that did not move wants none of that, and on
+                // a width change none of them move -- a view that follows both
+                // edges keeps its left where it was.
+                viewp->translate( delta_x, delta_y );
+            }
             if (child_rect.getWidth() != viewp->getRect().getWidth()
                 || child_rect.getHeight() != viewp->getRect().getHeight()
                 || sForceReshape)
@@ -1509,6 +1581,12 @@ void LLView::reshape(S32 width, S32 height, bool called_from_parent)
     }
 
     updateBoundingRect();
+
+    --sReshapeDepth;
+    if (outermost_reshape && (delta_width || delta_height || sForceReshape))
+    {
+        dirtyRect();
+    }
 }
 
 LLRect LLView::calcBoundingRect()
@@ -1568,7 +1646,13 @@ void LLView::updateBoundingRect()
         getParent()->updateBoundingRect();
     }
 
-    if (mBoundingRect != cur_rect)
+    // A view that is not on screen has no screen region to repaint, and this is
+    // where a resize spends most of itself: dirtyRect walks to a near-root
+    // ancestor and takes its screen rect, and dragging an inventory floater's
+    // edge resizes two hundred thousand items, nearly all of them inside closed
+    // folders. Being shown marks the region itself -- see setVisible -- so the
+    // repaint is asked for at the moment there is something to repaint.
+    if (mBoundingRect != cur_rect && getVisible() && sReshapeDepth == 0)
     {
         dirtyRect();
     }
@@ -2400,38 +2484,35 @@ void LLView::parseFollowsFlags(const LLView::Params& params)
     {
         setFollows(FOLLOWS_NONE);
 
-        std::string follows = params.follows.string;
+        // Split in place. This runs for every widget a floater builds, and a
+        // boost::tokenizer here copied the whole attribute and then allocated
+        // a std::string for each of the two or three names inside it, to
+        // compare each against five short literals and throw it away.
+        // Bound through a reference: if the accessor ever returns by value, a
+        // view taken straight off it would outlive what it points at.
+        const std::string& follows_str = params.follows.string;
+        const std::string_view follows = follows_str;
 
-        typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-        boost::char_separator<char> sep("|");
-        tokenizer tokens(follows, sep);
-        tokenizer::iterator token_iter = tokens.begin();
-
-        while(token_iter != tokens.end())
+        U32 flags = FOLLOWS_NONE;
+        for (size_t start = 0; start <= follows.size(); )
         {
-            const std::string& token_str = *token_iter;
-            if (token_str == "left")
+            const size_t bar = follows.find('|', start);
+            const std::string_view token =
+                follows.substr(start, bar == std::string_view::npos ? std::string_view::npos : bar - start);
+
+            if      (token == "left")   { flags |= FOLLOWS_LEFT; }
+            else if (token == "right")  { flags |= FOLLOWS_RIGHT; }
+            else if (token == "top")    { flags |= FOLLOWS_TOP; }
+            else if (token == "bottom") { flags |= FOLLOWS_BOTTOM; }
+            else if (token == "all")    { flags |= FOLLOWS_ALL; }
+
+            if (bar == std::string_view::npos)
             {
-                setFollowsLeft();
+                break;
             }
-            else if (token_str == "right")
-            {
-                setFollowsRight();
-            }
-            else if (token_str == "top")
-            {
-                setFollowsTop();
-            }
-            else if (token_str == "bottom")
-            {
-                setFollowsBottom();
-            }
-            else if (token_str == "all")
-            {
-                setFollowsAll();
-            }
-            ++token_iter;
+            start = bar + 1;
         }
+        setFollows(flags);
     }
     else if (params.follows.flags.isChosen())
     {

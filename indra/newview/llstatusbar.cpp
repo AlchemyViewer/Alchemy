@@ -303,20 +303,31 @@ void LLStatusBar::refresh()
     bool mute_audio = LLAppViewer::instance()->getMasterSystemAudioMute();
     mBtnVolume->setToggleState(mute_audio);
 
-    LLViewerMedia* media_inst = LLViewerMedia::getInstance();
+    // What the media button says is worth asking about several times a second,
+    // not several times a frame. Answering it walks every media impl in the
+    // scene and asks the parcel for two URLs, one of which is assembled from a
+    // MIME type comparison -- and the answer decides whether a button is
+    // enabled and which of two images it shows. The clock above and the frame
+    // counter below are metered for the same reason.
+    if (mMediaUpdateTimer.getElapsedTimeF32() > 0.2f)
+    {
+        mMediaUpdateTimer.reset();
 
-    // Disable media toggle if there's no media, parcel media, and no parcel audio
-    // (or if media is disabled)
-    static const LLCachedControl<bool> audio_streaming_enabled(gSavedSettings, "AudioStreamingMusic");
-    static const LLCachedControl<bool> media_streaming_enabled(gSavedSettings, "AudioStreamingMedia");
-    bool button_enabled = (audio_streaming_enabled || media_streaming_enabled) &&
-                          (media_inst->hasInWorldMedia() || media_inst->hasParcelMedia() || media_inst->hasParcelAudio());
-    mMediaToggle->setEnabled(button_enabled);
-    // Note the "sense" of the toggle is opposite whether media is playing or not
-    bool any_media_playing = (media_inst->isAnyMediaPlaying() ||
-                              media_inst->isParcelMediaPlaying() ||
-                              media_inst->isParcelAudioPlaying());
-    mMediaToggle->setValue(!any_media_playing);
+        LLViewerMedia* media_inst = LLViewerMedia::getInstance();
+
+        // Disable media toggle if there's no media, parcel media, and no parcel audio
+        // (or if media is disabled)
+        static const LLCachedControl<bool> audio_streaming_enabled(gSavedSettings, "AudioStreamingMusic");
+        static const LLCachedControl<bool> media_streaming_enabled(gSavedSettings, "AudioStreamingMedia");
+        bool button_enabled = (audio_streaming_enabled || media_streaming_enabled) &&
+                              (media_inst->hasInWorldMedia() || media_inst->hasParcelMedia() || media_inst->hasParcelAudio());
+        mMediaToggle->setEnabled(button_enabled);
+        // Note the "sense" of the toggle is opposite whether media is playing or not
+        bool any_media_playing = (media_inst->isAnyMediaPlaying() ||
+                                  media_inst->isParcelMediaPlaying() ||
+                                  media_inst->isParcelAudioPlaying());
+        mMediaToggle->setValue(!any_media_playing);
+    }
 
     static LLCachedControl<bool> show_fps(gSavedSettings, "ShowStatusBarFPS", false);
     if (show_fps && mFPSUpdateTimer.getElapsedTimeF32() > 0.1f)
@@ -735,8 +746,7 @@ void LLStatusBar::onObscureBalanceChanged(const LLSD& newvalue)
 
 void LLStatusBar::onUpdateFilterTerm()
 {
-    LLWString searchValue = utf8str_to_wstring( mFilterEdit->getValue() );
-    LLWStringUtil::toLower( searchValue );
+    const std::string searchValue = utf8str_tolower( mFilterEdit->getValue().asString() );
 
     if( !mSearchData || mSearchData->mLastFilter == searchValue )
         return;
@@ -756,8 +766,7 @@ void collectChildren( LLMenuGL *aMenu, ll::statusbar::SearchableItemPtr aParentM
         ll::statusbar::SearchableItemPtr pItem = std::make_shared<ll::statusbar::SearchableItem>();
         pItem->mCtrl = pMenu;
         pItem->mMenu = pMenu;
-        pItem->mLabel = utf8str_to_wstring( pMenu->ll::ui::SearchableControl::getSearchText() );
-        LLWStringUtil::toLower( pItem->mLabel );
+        pItem->mLabel = utf8str_tolower( pMenu->ll::ui::SearchableControl::getSearchText() );
         aParentMenu->mChildren.push_back( pItem );
 
         LLMenuItemBranchGL *pBranch = dynamic_cast< LLMenuItemBranchGL* >( pMenu );

@@ -43,7 +43,7 @@
 #include "llviewercontrol.h"
 #include "llfasttimer.h"
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llnamevalue.h"
 #include "llpointer.h"
 #include "llprimitive.h"
@@ -638,8 +638,7 @@ void LLPipeline::init()
         cntrl_ptr->getCommitSignal()->connect([](LLControlVariable* control, const LLSD& value, const LLSD& previous)
         {
             bool enable_buffers = control->getValue().asBoolean();
-            LLFontVertexBuffer::enableBufferCollection(enable_buffers);
-            LLFontWidthBuffer::enableBufferCollection(enable_buffers);
+            LLFontTextCache::enableBufferCollection(enable_buffers);
         });
     }
 
@@ -1250,8 +1249,7 @@ void LLPipeline::refreshCachedSettings()
     }
 
     bool enable_buffers = gSavedSettings.getBOOL("CollectFontVertexBuffers");
-    LLFontVertexBuffer::enableBufferCollection(enable_buffers);
-    LLFontWidthBuffer::enableBufferCollection(enable_buffers);
+    LLFontTextCache::enableBufferCollection(enable_buffers);
     enable_buffers = gSavedSettings.getBOOL("CollectUIImageVertexBuffers");
     LLUIImage::enableDisplayListsCollection(enable_buffers);
 }

@@ -358,6 +358,18 @@ void LLInventoryGallery::initGallery()
 
 void LLInventoryGallery::draw()
 {
+    // A root folder changed while this was hidden is held until it is told it
+    // became visible, and that notification exists only for a change. A view
+    // built into a chain that is already visible is born visible, never
+    // transitions, and so is never told -- it just draws, going on showing the
+    // folder it was last given.
+    //
+    // Being drawn carries the same fact, so it spends the change here too.
+    if (mRootDirty)
+    {
+        updateRootFolder();
+    }
+
     LLPanel::draw();
     if (mGalleryCreated)
     {

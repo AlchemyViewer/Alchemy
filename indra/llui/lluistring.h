@@ -29,6 +29,7 @@
 #define LL_LLUISTRING_H
 
 #include "llstring.h"
+#include <memory>
 #include <string>
 
 // Use this class to store translated text that may have arguments
@@ -58,14 +59,26 @@ class LLUIString
 public:
     // These methods all perform appropriate argument substitution
     // and modify mOrig where appropriate
-    LLUIString() : mArgs(NULL), mNeedsResult(false), mNeedsWResult(false) {}
+    LLUIString() : mNeedsResult(false) {}
     LLUIString(const std::string& instring, const LLStringUtil::format_map_t& args);
-    LLUIString(const std::string& instring) : mArgs(NULL) { assign(instring); }
-    LLUIString(const LLWString& instring) : mArgs(NULL) { assign(instring); }
-    ~LLUIString() { delete mArgs; }
+    LLUIString(const std::string& instring) { assign(instring); }
+
+    // The arguments are owned, so a copy needs a set of its own: a map shared
+    // between two strings is deleted by whichever of them goes out of scope
+    // first.
+    //
+    // An assignment also has to move this string's own version on. Anything
+    // caching work derived from the text -- shaped glyphs, a measured width --
+    // keys on that number together with this object's address, and an
+    // assignment leaves the address where it was. Whatever count the other
+    // string happens to be on says nothing about what was last drawn from
+    // this one, and can even repeat a number this one has already issued.
+    LLUIString(const LLUIString& other);
+    LLUIString& operator=(const LLUIString& other);
+    LLUIString(LLUIString&& other) noexcept = default;
+    LLUIString& operator=(LLUIString&& other) noexcept;
 
     void assign(const std::string& instring);
-    void assign(const LLWString& instring);
     LLUIString& operator=(const std::string& s) { assign(s); return *this; }
 
     void setArgList(const LLStringUtil::format_map_t& args);
@@ -76,42 +89,64 @@ public:
     const std::string& getString() const { return getUpdatedResult(); }
     operator std::string() const { return getUpdatedResult(); }
 
-    const LLWString& getWString() const { return getUpdatedWResult(); }
-    operator LLWString() const { return getUpdatedWResult(); }
+    // Bumped whenever the result could have moved -- a new value, a new
+    // argument, or one of the edit helpers below. Anything caching work
+    // derived from this text (shaped glyphs, a measured width) keys on this
+    // rather than comparing the string, and so cannot forget to. It may bump
+    // without the text actually differing; that costs a rebuild, where the
+    // reverse would leave the wrong text on screen.
+    U32 getGeneration() const { return mGeneration; }
 
     bool empty() const { return getUpdatedResult().empty(); }
-    S32 length() const { return static_cast<S32>(getUpdatedWResult().size()); }
+
+    // Named for its unit, because an S32 length reads the same whether it
+    // counts bytes or characters and the two used to disagree here: this
+    // returned a codepoint count while everything it fed measured and drew in
+    // bytes.
+    S32 lengthBytes() const { return static_cast<S32>(getUpdatedResult().size()); }
 
     void clear();
-    void clearArgs() { if (mArgs) mArgs->clear(); }
+    // Dropping the arguments brings the placeholders back, which is a change
+    // to the result like any other. Announced as one, or a cache keyed on the
+    // version goes on showing the substituted text.
+    void clearArgs() { if (mArgs && !mArgs->empty()) { mArgs->clear(); dirty(); } }
 
     // These utility functions are included for text editing.
-    // They do not affect mOrig and do not perform argument substitution
-    void truncate(S32 maxchars);
-    void erase(S32 charidx, S32 len);
-    void insert(S32 charidx, const LLWString& wchars);
-    void replace(S32 charidx, llwchar wc);
+    // They do not affect mOrig and do not perform argument substitution.
+    // Every offset and length below counts BYTES of the UTF-8 result, and each
+    // is expected to sit at a character start; replace() and truncate() are the
+    // two that move on their own, to whole characters.
+    void truncate(S32 max_bytes);
+    void erase(S32 byte_idx, S32 byte_len);
+    void insert(S32 byte_idx, std::string_view chars);
+    void replace(S32 byte_idx, llwchar wc);
 
 private:
     // something changed, requiring reformatting of strings
     void dirty();
 
     std::string& getUpdatedResult() const { if (mNeedsResult) { updateResult(); } return mResult; }
-    LLWString& getUpdatedWResult() const{ if (mNeedsWResult) { updateWResult(); } return mWResult; }
 
     // do actual work of updating strings (non-inlined)
     void updateResult() const;
-    void updateWResult() const;
     LLStringUtil::format_map_t& getArgs();
 
     std::string mOrig;
     mutable std::string mResult;
-    mutable LLWString mWResult; // for displaying
-    LLStringUtil::format_map_t* mArgs;
+    std::unique_ptr<LLStringUtil::format_map_t> mArgs;
 
     // controls lazy evaluation
     mutable bool    mNeedsResult { true };
-    mutable bool    mNeedsWResult { true };
+
+    // The edit helpers above change the result and deliberately leave the
+    // original alone, so the two can hold different text. Assigning the
+    // original its own value is how a field is put back, and has to rebuild
+    // even though the original did not move.
+    mutable bool    mResultEdited { false };
+
+    // Not mutable: updateResult() recomputes what the last change already
+    // announced, so producing the result must not count as a change.
+    U32             mGeneration { 0 };
 };
 
 #endif // LL_LLUISTRING_H

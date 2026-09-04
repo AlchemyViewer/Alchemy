@@ -717,9 +717,25 @@ void LLFloater::onVisibilityChange ( bool new_visibility )
 
 void LLFloater::openFloater(const LLSD& key)
 {
-    LL_INFOS() << "Opening floater " << getName() << " full path: " << getPathname() << LL_ENDL;
+    // All of this runs inside the click that asked for it, so without a zone
+    // here the whole of it is charged to whatever was draining the mouse queue.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater");
+    LL_PROFILE_ZONE_TEXT(getName().c_str(), getName().length());
 
-    LLViewerEventRecorder::instance().logVisibilityChange( getPathname(), getName(), true,"floater"); // Last param is event subtype or empty string
+    {
+        // getPathname builds a string by walking to the root, and it is asked
+        // for twice here. The recorder is asked only when it is listening: it
+        // took its arguments by value and dropped them on its first line, so
+        // every open paid for a pathname nobody read.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater log");
+        LL_INFOS() << "Opening floater " << getName() << " full path: " << getPathname() << LL_ENDL;
+
+        LLViewerEventRecorder& recorder = LLViewerEventRecorder::instance();
+        if (recorder.getLoggingStatus())
+        {
+            recorder.logVisibilityChange(getPathname(), getName(), true, "floater");
+        }
+    }
 
     mKey = key; // in case we need to open ourselves again
 
@@ -743,32 +759,72 @@ void LLFloater::openFloater(const LLSD& key)
 
     if (getHost() != NULL)
     {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater show hosted");
         getHost()->setMinimized(false);
         getHost()->setVisibleAndFrontmost(mAutoFocus && !getIsChrome());
         getHost()->showFloater(this);
     }
     else
     {
-        LLFloater* floater_to_stack = LLFloaterReg::getLastFloaterInGroup(mInstanceName);
-        if (!floater_to_stack)
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater show");
+        LLFloater* floater_to_stack = nullptr;
         {
-            floater_to_stack = LLFloaterReg::getLastFloaterCascading();
+            // Both walk the registry's floater lists, and llfloaterreg has no
+            // zones of its own at all.
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater find stack");
+            floater_to_stack = LLFloaterReg::getLastFloaterInGroup(mInstanceName);
+            if (!floater_to_stack)
+            {
+                floater_to_stack = LLFloaterReg::getLastFloaterCascading();
+            }
         }
-        applyControlsAndPosition(floater_to_stack);
-        setMinimized(false);
-        setVisibleAndFrontmost(mAutoFocus && !getIsChrome());
+        {
+            // Restores the saved rect, which for a resizable floater is a
+            // reshape -- and this runs while the floater is still hidden, so
+            // it lays out the whole of it before anyone can see it.
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater position");
+            applyControlsAndPosition(floater_to_stack);
+        }
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater unminimize");
+            setMinimized(false);
+        }
+        {
+            // setVisible and its notification cascade, then the floater view
+            // reordering itself around the new front floater.
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater frontmost");
+            setVisibleAndFrontmost(mAutoFocus && !getIsChrome());
+        }
     }
 
-    mOpenSignal(this, key);
-    onOpen(key);
+    {
+        // Where a floater does its own work -- populating a list, requesting
+        // data, rebuilding a panel -- and the most likely place for an open to
+        // cost real time.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("open floater onOpen");
+        mOpenSignal(this, key);
+        onOpen(key);
+    }
 
     dirtyRect();
 }
 
 void LLFloater::closeFloater(bool app_quitting)
 {
-    LL_INFOS() << "Closing floater " << getName() << LL_ENDL;
-    LLViewerEventRecorder::instance().logVisibilityChange( getPathname(), getName(), false,"floater"); // Last param is event subtype or empty string
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("close floater");
+    LL_PROFILE_ZONE_TEXT(getName().c_str(), getName().length());
+
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_UI("close floater log");
+        LL_INFOS() << "Closing floater " << getName() << LL_ENDL;
+
+        LLViewerEventRecorder& recorder = LLViewerEventRecorder::instance();
+        if (recorder.getLoggingStatus())
+        {
+            recorder.logVisibilityChange(getPathname(), getName(), false, "floater");
+        }
+    }
+
     if (app_quitting)
     {
         LLFloater::sQuitting = true;
@@ -841,8 +897,13 @@ void LLFloater::closeFloater(bool app_quitting)
         dirtyRect();
 
         // Close callbacks
-        onClose(app_quitting);
-        mCloseSignal(this, LLSD(app_quitting));
+        {
+            // The mirror of onOpen, and the same warning applies: a floater
+            // tearing down or saving state does it here.
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("close floater onClose");
+            onClose(app_quitting);
+            mCloseSignal(this, LLSD(app_quitting));
+        }
 
         // Hide or Destroy
         if (mSingleInstance)
@@ -1914,8 +1975,14 @@ void LLFloater::setVisibleAndFrontmost(bool take_focus,const LLSD& key)
     }
     else
     {
-        setVisible(true);
-        setFrontmost(take_focus);
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("floater set visible");
+            setVisible(true);
+        }
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_UI("floater set frontmost");
+            setFrontmost(take_focus);
+        }
     }
 }
 
@@ -2248,24 +2315,38 @@ void    LLFloater::drawShadow(LLPanel* panel)
 void LLFloater::updateTransparency(LLView* view, ETypeTransparency transparency_type)
 {
     if (!view) return;
-    child_list_t children = *view->getChildList();
-    child_list_t::iterator it = children.begin();
 
-    LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view);
-    if (ctrl)
-    {
-        ctrl->setTransparencyType(transparency_type);
-    }
-
-    for(; it != children.end(); ++it)
-    {
-        updateTransparency(*it, transparency_type);
-    }
+    // The walk itself belongs to LLView: it has to stop at hidden views and
+    // resume when they are shown, and setVisible is the only place that knows.
+    view->applyTransparencyType((U8)transparency_type);
 }
 
 void LLFloater::updateTransparency(ETypeTransparency transparency_type)
 {
+    // Reached several times on a single open: setFocus ends with it,
+    // setFrontmost ends with it, and the two reach each other -- setFocus
+    // brings itself to front, which focuses, which sets transparency again.
+    // Each pass walks the floater to hand every control a value.
+    //
+    // Asked for the value already pushed, that walk assigns each control what
+    // it is already holding -- with one exception, which is why the tree's own
+    // count is compared beside the value. A control built since the last pass
+    // is holding the transparency it was constructed with, and skipping on the
+    // value alone would leave it holding that until the floater next changed
+    // between active and inactive. A list rebuilt while its floater sits
+    // unfocused is that case, and it draws opaque in a faded floater.
+    if (mAppliedTransparency == transparency_type
+        && mAppliedTreeGeneration == LLView::sTreeGeneration)
+    {
+        return;
+    }
+    mAppliedTransparency = transparency_type;
+    mAppliedTreeGeneration = LLView::sTreeGeneration;
+
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("floater update transparency");
+    LLView::sTransparencyViewsWalked = 0;
     updateTransparency(this, transparency_type);
+    LL_PROFILE_ZONE_NUM(LLView::sTransparencyViewsWalked);
 }
 
 void    LLFloater::setCanMinimize(bool can_minimize)
@@ -2762,6 +2843,11 @@ LLRect LLFloaterView::findNeighboringPosition( LLFloater* reference_floater, LLF
 
 void LLFloaterView::bringToFront(LLFloater* child, bool give_focus, bool restore)
 {
+    // Walks every floater, dynamic_cast-ing as it goes, and can reorder the
+    // child list -- which for a view means the draw and hit-test order of
+    // everything on screen.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("floater bring to front");
+
     if (!child)
         return;
 

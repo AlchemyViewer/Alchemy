@@ -1259,6 +1259,18 @@ private:
     bool            mTypingLast;
     LLFrameTimer    mTypingTimer;
 
+    // What the chat bubble last built. A chat line's text never changes once
+    // it has been said; what moves frame to frame is which lines are still
+    // shown and how far each has faded. Rebuilding for the fade alone re-wrapped
+    // and re-shaped every line of every chatting avatar on screen, every frame,
+    // and threw away the glyphs each had already shaped.
+    struct BubbleLine
+    {
+        std::string mText;
+        U8          mStyle;
+    };
+    std::vector<BubbleLine> mBubbleChatLines;
+
 /**                    Name
  **                                                                            **
  *******************************************************************************/

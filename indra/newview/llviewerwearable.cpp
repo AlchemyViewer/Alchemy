@@ -111,8 +111,8 @@ LLWearable::EImportResult LLViewerWearable::importStream( std::istream& input_st
         return result;
     }
 
-    LLStringUtil::truncate(mName, DB_INV_ITEM_NAME_STR_LEN );
-    LLStringUtil::truncate(mDescription, DB_INV_ITEM_DESC_STR_LEN );
+    mName = utf8str_truncate(mName, DB_INV_ITEM_NAME_STR_LEN);
+    mDescription = utf8str_truncate(mDescription, DB_INV_ITEM_DESC_STR_LEN);
 
     te_map_t::const_iterator iter = mTEMap.begin();
     te_map_t::const_iterator end = mTEMap.end();

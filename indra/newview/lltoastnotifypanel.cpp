@@ -97,14 +97,10 @@ LLButton* LLToastNotifyPanel::createButton(const LLSD& form_element, bool is_opt
     std::string font_name = mIsScriptDialog ? sFontScript : sFontDefault;
     if (mIsScriptDialog)
     {
-        LLWString wtext = utf8str_to_wstring(text);
-        for (llwchar ch : wtext)
+        static const std::string RED_HEART = utf8str_from_cp(0x2764);
+        if (text.find(RED_HEART) != std::string::npos)
         {
-            if (ch == 0x2764)
-            {
-                font_name = "Emoji";
-                break;
-            }
+            font_name = "Emoji";
         }
     }
 

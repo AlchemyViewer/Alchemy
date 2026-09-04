@@ -1185,22 +1185,22 @@ void LLFloaterColorPicker::menuDoToSelected(const LLSD& userdata)
     F32 rVal, gVal, bVal;
     getCurRgb(rVal, gVal, bVal);
 
-    LLWString colorstr;
+    std::string colorstr;
     if (command == "color_copy_lsl")
     {
-        colorstr = utf8str_to_wstring(llformat("<%.3f, %.3f, %.3f>", rVal, gVal, bVal));
+        colorstr = llformat("<%.3f, %.3f, %.3f>", rVal, gVal, bVal);
     }
     else if (command == "color_copy_hex")
     {
-        colorstr = utf8str_to_wstring(llformat("%02x%02x%02x", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f)));
+        colorstr = llformat("%02x%02x%02x", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f));
     }
     else if (command == "color_copy_vec4")
     {
-        colorstr = utf8str_to_wstring(llformat("%.3f, %.3f, %.3f, 1.0", rVal, gVal, bVal));
+        colorstr = llformat("%.3f, %.3f, %.3f, 1.0", rVal, gVal, bVal);
     }
     else if (command == "color_copy_vec4u")
     {
-        colorstr = utf8str_to_wstring(llformat("%d, %d, %d, 1", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f)));
+        colorstr = llformat("%d, %d, %d, 1", (S32)(rVal * 255.f), (S32)(gVal * 255.f), (S32)(bVal * 255.f));
     }
     LLClipboard::instance().copyToClipboard(colorstr, 0, S32(colorstr.size()));
 }

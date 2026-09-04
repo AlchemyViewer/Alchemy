@@ -3811,70 +3811,104 @@ void LLVOAvatar::idleUpdateNameTagText(bool new_name)
         mNameText->setTextAlignment(LLHUDNameTag::ALIGN_TEXT_LEFT);
         mNameText->setFadeDistance(CHAT_NORMAL_RADIUS * 2.f, 5.f);
 
-        std::deque<LLChat>::iterator chat_iter = mChats.begin();
-        mNameText->clearString();
-
         static const LLUIColor user_chat_color = LLUIColorTable::instance().getColor("UserChatColor");
         static const LLUIColor agent_chat_color = LLUIColorTable::instance().getColor("AgentChatColor");
         LLColor4 new_chat = ALAvatarGroups::instance().getAvatarColor(getID(), isSelf() ? agent_chat_color : user_chat_color, ALAvatarGroups::COLOR_CHAT);
         LLColor4 normal_chat = lerp(new_chat, LLColor4(0.8f, 0.8f, 0.8f, 1.f), 0.7f);
         LLColor4 old_chat = lerp(normal_chat, LLColor4(0.6f, 0.6f, 0.6f, 1.f), 0.7f);
-        if (mTyping && mChats.size() >= MAX_BUBBLE_CHAT_UTTERANCES)
+
+        // The lines this frame would show, in order, handed to whatever wants
+        // them. Written once so the comparison below and the build that may
+        // follow cannot decide differently.
+        auto for_each_bubble_line = [&](auto&& emit)
         {
-            ++chat_iter;
+            std::deque<LLChat>::iterator chat_iter = mChats.begin();
+            if (mTyping && mChats.size() >= MAX_BUBBLE_CHAT_UTTERANCES)
+            {
+                ++chat_iter;
+            }
+
+            for(; chat_iter != mChats.end(); ++chat_iter)
+            {
+                F32 chat_fade_amt = llclamp((F32)((LLFrameTimer::getElapsedSeconds() - chat_iter->mTime) / CHAT_FADE_TIME), 0.f, 4.f);
+                LLFontGL::StyleFlags style;
+                switch(chat_iter->mChatType)
+                {
+                case CHAT_TYPE_WHISPER:
+                    style = LLFontGL::ITALIC;
+                    break;
+                case CHAT_TYPE_SHOUT:
+                    style = LLFontGL::BOLD;
+                    break;
+                default:
+                    style = LLFontGL::NORMAL;
+                    break;
+                }
+                if (chat_fade_amt < 1.f)
+                {
+                    F32 u = clamp_rescale(chat_fade_amt, 0.9f, 1.f, 0.f, 1.f);
+                    emit(chat_iter->mText, style, lerp(new_chat, normal_chat, u));
+                }
+                else if (chat_fade_amt < 2.f)
+                {
+                    F32 u = clamp_rescale(chat_fade_amt, 1.9f, 2.f, 0.f, 1.f);
+                    emit(chat_iter->mText, style, lerp(normal_chat, old_chat, u));
+                }
+                else if (chat_fade_amt < 3.f)
+                {
+                    // *NOTE: only remove lines down to minimum number
+                    emit(chat_iter->mText, style, old_chat);
+                }
+            }
+
+            if (is_typing)
+            {
+                static const std::string dots[3] = { ".", "..", "..." };
+                S32 dot_count = (llfloor(mTypingTimer.getElapsedTimeF32() * 3.f) + 2) % 3 + 1;
+                emit(dots[dot_count - 1], LLFontGL::NORMAL, new_chat);
+            }
+        };
+
+        // Does this frame say the same lines as the last one? Only the fade
+        // usually moves, and a colour can be written over the glyphs that are
+        // already shaped.
+        size_t line_count = 0;
+        bool same_lines = true;
+        for_each_bubble_line([&](const std::string& text, LLFontGL::StyleFlags style, const LLColor4&)
+        {
+            if (same_lines
+                && (line_count >= mBubbleChatLines.size()
+                    || mBubbleChatLines[line_count].mStyle != (U8)style
+                    || mBubbleChatLines[line_count].mText != text))
+            {
+                same_lines = false;
+            }
+            ++line_count;
+        });
+        same_lines = same_lines
+                  && line_count == mBubbleChatLines.size()
+                  && mNameText->getNumLines() == (S32)line_count;
+
+        if (same_lines)
+        {
+            S32 line_index = 0;
+            for_each_bubble_line([&](const std::string&, LLFontGL::StyleFlags, const LLColor4& color)
+            {
+                mNameText->setLineColor(line_index++, color);
+            });
+        }
+        else
+        {
+            mNameText->clearString();
+            mBubbleChatLines.clear();
+            for_each_bubble_line([&](const std::string& text, LLFontGL::StyleFlags style, const LLColor4& color)
+            {
+                mNameText->addLine(text, color, style);
+                mBubbleChatLines.push_back({text, (U8)style});
+            });
         }
 
-        for(; chat_iter != mChats.end(); ++chat_iter)
-        {
-            F32 chat_fade_amt = llclamp((F32)((LLFrameTimer::getElapsedSeconds() - chat_iter->mTime) / CHAT_FADE_TIME), 0.f, 4.f);
-            LLFontGL::StyleFlags style;
-            switch(chat_iter->mChatType)
-            {
-            case CHAT_TYPE_WHISPER:
-                style = LLFontGL::ITALIC;
-                break;
-            case CHAT_TYPE_SHOUT:
-                style = LLFontGL::BOLD;
-                break;
-            default:
-                style = LLFontGL::NORMAL;
-                break;
-            }
-            if (chat_fade_amt < 1.f)
-            {
-                F32 u = clamp_rescale(chat_fade_amt, 0.9f, 1.f, 0.f, 1.f);
-                mNameText->addLine(chat_iter->mText, lerp(new_chat, normal_chat, u), style);
-            }
-            else if (chat_fade_amt < 2.f)
-            {
-                F32 u = clamp_rescale(chat_fade_amt, 1.9f, 2.f, 0.f, 1.f);
-                mNameText->addLine(chat_iter->mText, lerp(normal_chat, old_chat, u), style);
-            }
-            else if (chat_fade_amt < 3.f)
-            {
-                // *NOTE: only remove lines down to minimum number
-                mNameText->addLine(chat_iter->mText, old_chat, style);
-            }
-        }
         mNameText->setVisibleOffScreen(true);
-
-        if (is_typing)
-        {
-            S32 dot_count = (llfloor(mTypingTimer.getElapsedTimeF32() * 3.f) + 2) % 3 + 1;
-            switch(dot_count)
-            {
-            case 1:
-                mNameText->addLine(".", new_chat);
-                break;
-            case 2:
-                mNameText->addLine("..", new_chat);
-                break;
-            case 3:
-                mNameText->addLine("...", new_chat);
-                break;
-            }
-
-        }
     }
     else
     {
@@ -3908,6 +3942,9 @@ void LLVOAvatar::clearNameTag()
         mNameText->setLabel("");
         mNameText->setString("");
     }
+    // The bubble's lines went with the string above, so what was recorded
+    // about them no longer describes the tag.
+    mBubbleChatLines.clear();
     mTimeVisible.reset();
 }
 

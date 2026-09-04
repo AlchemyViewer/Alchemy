@@ -1694,14 +1694,16 @@ bool LLWindowSDL::isClipboardTextAvailable()
     return SDL_HasClipboardText();
 }
 
-bool LLWindowSDL::pasteTextFromClipboard(LLWString &dst)
+bool LLWindowSDL::pasteTextFromClipboard(std::string &dst)
 {
     if (isClipboardTextAvailable())
     {
         char* data = SDL_GetClipboardText();
         if (data)
         {
-            dst = LLWString(utf8str_to_wstring(data));
+            // SDL hands back whatever the selection owner published; Win32 gets
+            // its guarantee from WideCharToMultiByte, and this side has none.
+            dst = utf8str_sanitize(data);
             SDL_free(data);
             return true;
         }
@@ -1709,10 +1711,9 @@ bool LLWindowSDL::pasteTextFromClipboard(LLWString &dst)
     return false;
 }
 
-bool LLWindowSDL::copyTextToClipboard(const LLWString& text)
+bool LLWindowSDL::copyTextToClipboard(const std::string& text)
 {
-    const std::string utf8 = wstring_to_utf8str(text);
-    return SDL_SetClipboardText(utf8.c_str());
+    return SDL_SetClipboardText(text.c_str());
 }
 
 bool LLWindowSDL::isPrimaryTextAvailable()
@@ -1720,14 +1721,16 @@ bool LLWindowSDL::isPrimaryTextAvailable()
     return SDL_HasPrimarySelectionText();
 }
 
-bool LLWindowSDL::pasteTextFromPrimary(LLWString &dst)
+bool LLWindowSDL::pasteTextFromPrimary(std::string &dst)
 {
     if (isPrimaryTextAvailable())
     {
         char* data = SDL_GetPrimarySelectionText();
         if (data)
         {
-            dst = LLWString(utf8str_to_wstring(data));
+            // SDL hands back whatever the selection owner published; Win32 gets
+            // its guarantee from WideCharToMultiByte, and this side has none.
+            dst = utf8str_sanitize(data);
             SDL_free(data);
             return true;
         }
@@ -1735,10 +1738,9 @@ bool LLWindowSDL::pasteTextFromPrimary(LLWString &dst)
     return false;
 }
 
-bool LLWindowSDL::copyTextToPrimary(const LLWString& text)
+bool LLWindowSDL::copyTextToPrimary(const std::string& text)
 {
-    const std::string utf8 = wstring_to_utf8str(text);
-    return SDL_SetPrimarySelectionText(utf8.c_str());
+    return SDL_SetPrimarySelectionText(text.c_str());
 }
 
 LLWindow::LLWindowResolution* LLWindowSDL::getSupportedResolutions(S32 &num_resolutions)
@@ -2521,10 +2523,14 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
             {
                 mPreeditor->resetPreedit();
             }
-            auto string = utf8str_to_wstring(event.text.text);
+            const std::string_view committed(event.text.text ? event.text.text : "");
             MASK current_mask = gKeyboard->currentMask(false);
-            for (auto key : string)
+            for (size_t i = 0; i < committed.size(); )
             {
+                const LLCodepointAt at = utf8str_decode_at(committed, i);
+                i = at.next;
+                const llwchar key = at.cp;
+
                 // Deliberately do NOT overwrite mKeyVirtualKey here.
                 // mKeyVirtualKey is read by getNativeKeyData() and forwarded
                 // to Dullahan/CEF as the virtual-key code; Win32 keeps it as
@@ -2583,22 +2589,30 @@ SDL_AppResult LLWindowSDL::handleEvent(const SDL_Event& event)
                 break;
             }
 
-            const LLWString preedit = utf8str_to_wstring(event.edit.text);
+            const std::string_view preedit(event.edit.text);
 
-            // event.edit.start is a UTF-8 byte offset within event.edit.text
-            // (the IME's caret position inside the composition), or -1 when
-            // the IME hasn't reported a position. start == 0 is a legitimate
-            // "caret at the beginning" value and must NOT be confused with
-            // the -1 default (the earlier `> 0` check did exactly that and
-            // pinned the caret to the end of the preedit whenever the IME
-            // started the cursor at byte 0).
+            // event.edit.start is the IME's caret inside the composition
+            // counted in CHARACTERS, or -1 when the IME hasn't reported one.
+            // SDL's own backends settle the unit: fcitx and the Wayland text
+            // input both run their byte position through SDL_utf8strnlen,
+            // which counts codepoints, before dispatching the event. The
+            // preeditor counts bytes, so the caret has to be walked out.
+            // start == 0 is a legitimate "caret at the beginning" value and
+            // must NOT be confused with the -1 default (the earlier `> 0`
+            // check did exactly that and pinned the caret to the end of the
+            // preedit whenever the IME started the cursor at the first
+            // character).
             S32 caret = static_cast<S32>(preedit.length());
             if (event.edit.start >= 0)
             {
-                // Convert from UTF-8 byte offset to llwchar (UTF-32) offset
-                // by re-encoding the prefix and taking its length.
-                const std::string prefix(event.edit.text, event.edit.start);
-                caret = static_cast<S32>(utf8str_to_wstring(prefix).length());
+                size_t at = 0;
+                for (S32 remaining = event.edit.start;
+                     remaining > 0 && at < preedit.size();
+                     --remaining)
+                {
+                    at = utf8str_decode_at(preedit, at).next;
+                }
+                caret = static_cast<S32>(at);
             }
             const LLPreeditor::segment_lengths_t lengths { static_cast<S32>(preedit.length()) };
             const LLPreeditor::standouts_t standouts { false };

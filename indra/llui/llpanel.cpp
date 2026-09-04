@@ -449,7 +449,7 @@ void LLPanel::initFromParams(const LLPanel::Params& p)
     setToolTip(p.tool_tip());
     setFromXUI(p.from_xui);
 
-    mHoverCursor = getCursorFromString(p.hover_cursor);
+    mHoverCursor = getCursorFromString(p.hover_cursor());
 
     if (p.has_border)
     {

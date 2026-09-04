@@ -71,6 +71,8 @@
 // [RLVa:KB] - Checked: 2013-05-10 (RLVa-1.4.9)
 #include "rlvactions.h"
 #include "rlvcommon.h"
+
+#include <fmt/format.h>
 // [/RLVa:KB]
 
 const F32 ME_TYPING_TIMEOUT = 4.0f;
@@ -323,15 +325,17 @@ void LLFloaterIMSession::sendMsgFromInputEditor(bool ooc_chat)
     {
         if (mInputEditor)
         {
-            LLWString text = mInputEditor->getConvertedText();
-            LLWStringUtil::trim(text);
-            LLWStringUtil::replaceChar(text,182,'\n'); // Convert paragraph symbols back into newlines.
+            std::string text = mInputEditor->getConvertedText();
+            LLStringUtil::trim(text);
+            // The paragraph character is two bytes, so this is a substitution
+            // rather than a character-for-character swap.
+            LLStringUtil::replaceString(text, "\xC2\xB6", "\n");
             if(!text.empty())
             {
                 updateUsedEmojis(text);
 
-                // Truncate and convert to UTF8 for transport
-                std::string utf8_text = wstring_to_utf8str(text);
+                // Truncate for transport
+                std::string utf8_text = text;
 
                 if (ooc_chat)
                 {

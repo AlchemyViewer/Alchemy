@@ -1021,7 +1021,7 @@ void LLTeleportHistoryPanel::gotSLURLCallback(const std::string& slurl)
         LLNotificationsUtil::add("LandmarkLocationUnknown");
         return;
     }
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(slurl), 0, static_cast<S32>(slurl.size()));
+    LLClipboard::instance().copyToClipboard(slurl, 0, static_cast<S32>(slurl.size()));
 
     LLSD args;
     args["SLURL"] = slurl;

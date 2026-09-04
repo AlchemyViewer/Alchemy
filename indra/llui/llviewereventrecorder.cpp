@@ -124,7 +124,7 @@ void LLViewerEventRecorder::updateMouseEventInfo(S32 local_x, S32 local_y, S32 g
   LL_DEBUGS() << "LLViewerEventRecorder::updateMouseEventInfo after updatemouseeventinfo - local_x|global x   "<< this->local_x << " " << this->global_x  << "local/global y " << this->local_y << " " << this->global_y << " mname: " << mName << " xui: " << xui << LL_ENDL;
 }
 
-void LLViewerEventRecorder::logVisibilityChange(std::string xui, std::string name, bool visibility, std::string event_subtype) {
+void LLViewerEventRecorder::logVisibilityChange(const std::string& xui, const std::string& name, bool visibility, const std::string& event_subtype) {
 
     if (!logEvents) return;
 
@@ -246,10 +246,10 @@ void LLViewerEventRecorder::logKeyUnicodeEvent(llwchar uni_char) {
   // keycode...or
   // char
 
-  LL_DEBUGS() << "Wrapped in conversion to wstring " <<  wstring_to_utf8str(LLWString( 1, uni_char)) << "\n" << LL_ENDL;
+  LL_DEBUGS() << "Wrapped in conversion to wstring " <<  utf8str_from_cp(uni_char) << "\n" << LL_ENDL;
 
   event.insert("char",
-           LLSD(  wstring_to_utf8str(LLWString( 1,uni_char))  )
+           LLSD(  utf8str_from_cp(uni_char)  )
            );
 
   // path (optional) - for now we are not recording path for key events during record - should not be needed for full record and playback of recorded steps

@@ -32,6 +32,9 @@
 #include "llsdserialize.h"
 #include "u64.h"
 
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
 /**
  * Constructor.
  */

@@ -314,66 +314,13 @@ bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LL
     return false;
 }
 
-bool LLUrlRegistry::findUrl(const LLWString &text, LLUrlMatch &match, const LLUrlLabelCallback &cb)
-{
-    // boost::regex_search() only works on char or wchar_t
-    // types, but wchar_t is only 2-bytes on Win32 (not 4).
-    // So we use UTF-8 to make this work the same everywhere.
-    std::string utf8_text = wstring_to_utf8str(text);
-    if (findUrl(utf8_text, match, cb))
-    {
-        // we cannot blindly return the start/end offsets from
-        // the UTF-8 string because it is a variable-length
-        // character encoding, so we need to update the start
-        // and end values to be correct for the wide string.
-        LLWString wurl = utf8str_to_wstring(match.getUrl());
-        size_t start = text.find(wurl);
-        if (start == std::string::npos)
-        {
-            return false;
-        }
-        auto end = start + wurl.size() - 1;
-
-        match.setValues(static_cast<U32>(start), static_cast<U32>(end), match.getUrl(),
-                        match.getLabel(),
-                        match.getQuery(),
-                        match.getTooltip(),
-                        match.getIcon(),
-                        match.getStyle(),
-                        match.getMenuName(),
-                        match.getLocation(),
-                        match.getID(),
-                        match.getUnderline(),
-                        false,
-                        match.getSkipProfileIcon());
-        return true;
-    }
-    return false;
-}
-
 bool LLUrlRegistry::hasUrl(const std::string &text)
 {
     LLUrlMatch match;
     return findUrl(text, match);
 }
 
-bool LLUrlRegistry::hasUrl(const LLWString &text)
-{
-    LLUrlMatch match;
-    return findUrl(text, match);
-}
-
 bool LLUrlRegistry::isUrl(const std::string &text)
-{
-    LLUrlMatch match;
-    if (findUrl(text, match))
-    {
-        return (match.getStart() == 0 && match.getEnd() >= text.size()-1);
-    }
-    return false;
-}
-
-bool LLUrlRegistry::isUrl(const LLWString &text)
 {
     LLUrlMatch match;
     if (findUrl(text, match))

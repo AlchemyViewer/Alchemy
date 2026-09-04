@@ -127,6 +127,10 @@ public:
     }
 
 private:
+    // Substitute into `text` using the default arguments with `msg_args`
+    // layered over them, skipping the merge whenever it cannot matter.
+    static void formatWithDefaults(std::string& text, const LLStringUtil::format_map_t& msg_args);
+
     typedef boost::unordered_map<std::string, LLTransTemplate, ll::string_hash, std::equal_to<>> template_map_t;
     static template_map_t sStringTemplates;
     static template_map_t sDefaultStringTemplates;

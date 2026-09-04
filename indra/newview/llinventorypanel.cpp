@@ -417,6 +417,20 @@ void LLInventoryPanel::onVisibilityChange(bool new_visibility)
 
 void LLInventoryPanel::draw()
 {
+    // A panel that does not preinitialize its views waits to be told it became
+    // visible before building them, and that notification exists only for a
+    // change. A panel built into a chain that is already visible is born
+    // visible, never transitions, and so is never told -- it just draws.
+    //
+    // Being drawn carries the same fact, so it starts the build too. Without
+    // this the folder view says "Searching..." for the rest of the session:
+    // that message asks whether the filter has run, and the idle callback that
+    // runs it is registered by the build.
+    if (mViewsInitialized == VIEWS_UNINITIALIZED)
+    {
+        initializeViewBuilding();
+    }
+
     // Select the desired item (in case it wasn't loaded when the selection was requested)
     updateSelection();
 
@@ -1065,6 +1079,8 @@ void LLInventoryPanel::initRootContent()
 
 LLFolderViewFolder * LLInventoryPanel::createFolderViewFolder(LLInvFVBridge * bridge, bool allow_drop)
 {
+    ensureViewTemplates();
+
     LLFolderViewFolder::Params params(mParams.folder);
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
@@ -1086,11 +1102,25 @@ LLFolderViewFolder * LLInventoryPanel::createFolderViewFolder(LLInvFVBridge * br
     params.font_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultColor);
     params.font_highlight_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultHighlightColor);
 
-    return LLUICtrlFactory::create<LLFolderViewFolder>(params);
+    return LLUICtrlFactory::createFromTemplate<LLFolderViewFolder>(params);
+}
+
+void LLInventoryPanel::ensureViewTemplates()
+{
+    if (mViewTemplatesMerged)
+    {
+        return;
+    }
+    mViewTemplatesMerged = true;
+
+    mParams.item.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewItem>());
+    mParams.folder.fillFrom(LLUICtrlFactory::getDefaultParams<LLFolderViewFolder>());
 }
 
 LLFolderViewItem * LLInventoryPanel::createFolderViewItem(LLInvFVBridge * bridge)
 {
+    ensureViewTemplates();
+
     LLFolderViewItem::Params params(mParams.item);
 
 #ifndef LL_RELEASE_FOR_DOWNLOAD
@@ -1114,7 +1144,7 @@ LLFolderViewItem * LLInventoryPanel::createFolderViewItem(LLInvFVBridge * bridge
     params.font_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultColor);
     params.font_highlight_color = (bridge->isLibraryItem() ? sLibraryColor : sDefaultHighlightColor);
 
-    return LLUICtrlFactory::create<LLFolderViewItem>(params);
+    return LLUICtrlFactory::createFromTemplate<LLFolderViewItem>(params);
 }
 
 LLFolderViewItem* LLInventoryPanel::buildNewViews(const LLUUID& id)

@@ -30,7 +30,7 @@
 
 #include "v4color.h"
 #include "lleditmenuhandler.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llspellcheckmenuhandler.h"
 #include "llstyle.h"
 #include "llkeywords.h"
@@ -62,31 +62,30 @@ class LLTextSegment
 public:
     LLTextSegment(S32 start, S32 end)
     :   mStart(start),
-        mEnd(end),
-        mPermitsEmoji(true)
+        mEnd(end)
     {}
     virtual ~LLTextSegment();
     virtual LLTextSegmentPtr clone(LLTextBase& terget) const { return new LLTextSegment(mStart, mEnd); }
     static LLStyleSP cloneStyle(LLTextBase& target, const LLStyle* source);
 
-    bool                        getDimensions(S32 first_char, S32 num_chars, S32& width, S32& height);
-    bool                        getPermitsEmoji() const { return mPermitsEmoji; };
+    bool                        getDimensions(S32 first_byte, S32 num_bytes, S32& width, S32& height);
 
-    virtual bool                getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    virtual S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const;
+    virtual bool                getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    virtual S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const;
 
     /**
-    * Get number of chars that fit into free part of current line.
+    * Get number of bytes that fit into free part of current line.
     *
     * @param num_pixels - maximum width of rect
-    * @param segment_offset - symbol in segment we start processing line from
-    * @param line_offset - symbol in line after which segment starts
-    * @param max_chars - limit of symbols that will fit in current line
+    * @param segment_offset - byte in segment we start processing line from
+    * @param line_offset - byte in line after which segment starts
+    * @param max_bytes - limit of bytes that will fit in current line
     * @param line_ind - index of not word-wrapped string inside segment for multi-line segments.
     * Two string separated by word-wrap will have same index.
-    * @return number of chars that will fit into current line
+    * @return number of bytes that will fit into current line, always ending on
+    * a character boundary
     */
-    virtual S32                 getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    virtual S32                 getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     virtual void                updateLayout(const class LLTextBase& editor);
     virtual F32                 draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
     virtual bool                canEdit() const;
@@ -128,8 +127,6 @@ public:
 protected:
     S32             mStart;
     S32             mEnd;
-
-    bool            mPermitsEmoji;
 };
 
 class LLNormalTextSegment : public LLTextSegment
@@ -140,9 +137,9 @@ public:
     virtual ~LLNormalTextSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
 
-    /*virtual*/ bool                getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    /*virtual*/ S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const;
-    /*virtual*/ S32                 getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool                getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    /*virtual*/ S32                 getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const;
+    /*virtual*/ S32                 getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     /*virtual*/ void                updateLayout(const class LLTextBase& editor);
     /*virtual*/ F32                 draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
     /*virtual*/ bool                canEdit() const { return mCanEdit; }
@@ -164,8 +161,11 @@ protected:
     virtual bool        useFontBuffers() const { return true; }
     F32                 drawClippedSegment(S32 seg_start, S32 seg_end, S32 selection_start, S32 selection_end, LLRectf rect);
 
-    virtual     const LLWString&    getWText()  const;
-    virtual     const S32           getLength() const;
+    // The document this segment draws from, and the span of it the segment
+    // covers. Both count BYTES, as every offset in this class does; the names
+    // carry the unit because an S32 cannot.
+    virtual     const std::string&  getTextUtf8()   const;
+    virtual     const S32           getLengthBytes() const;
 
     void setAllowEdit(bool can_edit) { mCanEdit = can_edit; }
 
@@ -178,16 +178,42 @@ protected:
 
     bool mCanEdit { true };
 
-    // font rendering
-    LLFontVertexBuffer  mFontBufferPreSelection;
-    LLFontVertexBuffer  mFontBufferSelection;
-    LLFontVertexBuffer  mFontBufferPostSelection;
-    LLFontWidthBuffer   mFontWidthBuffer;
-    S32                 mLastGeneration = -1;
+    // Font rendering. A segment that wraps is drawn once per line it covers --
+    // a different span of it, in a different place, each time -- so one set of
+    // caches per segment holds one line and every other line rebuilds its
+    // geometry on every frame, which is the whole of what the cache exists to
+    // prevent. There is a set per piece instead.
+    //
+    // Three spans within a piece: before the selection, inside it, after it.
+    struct LinePieceCache
+    {
+        LLFontTextCache mPreSelection;
+        LLFontTextCache mSelection;
+        LLFontTextCache mPostSelection;
+    };
+
+    // Indexed by the order the pieces are drawn in, which is the order of the
+    // lines they sit on and is the same on every pass. A pass that draws fewer
+    // pieces than the last leaves the tail of the vector alone, so a segment
+    // scrolling back into view finds its geometry where it left it.
+    std::vector<LinePieceCache> mLinePieces;
+    size_t                      mNextLinePiece = 0;
+    // 0 is "not drawn yet", and cannot be mistaken for a real pass: the editor
+    // counts the pass before any segment draws in it, so the first one seen
+    // here is 1. A lap of the counter can hand a segment a pass number it has
+    // seen before, which costs one pass of rebuilding and then settles.
+    U32                         mLastDrawPass = 0;
+
+    LinePieceCache&     nextLinePiece();
+
+    // Widths, which are asked for spans that are never drawn and are asked
+    // during reflow, before there is a piece to answer from. Its own cache, so
+    // a measurement and a draw cannot evict each other.
+    LLFontTextCache     mMeasureCache;
 };
 
 // This text segment is the same as LLNormalTextSegment, the only difference
-// is that LLNormalTextSegment draws value of LLTextBase (LLTextBase::getWText()),
+// is that LLNormalTextSegment draws value of LLTextBase (LLTextBase::getText()),
 // but LLLabelTextSegment draws label of the LLTextBase (LLTextBase::mLabel)
 class LLLabelTextSegment : public LLNormalTextSegment
 {
@@ -198,8 +224,8 @@ public:
 
 protected:
 
-    /*virtual*/ const LLWString&    getWText()  const;
-    /*virtual*/ const S32           getLength() const;
+    /*virtual*/ const std::string&  getTextUtf8()   const;
+    /*virtual*/ const S32           getLengthBytes() const;
 };
 
 // Text segment that changes it's style depending of mouse pointer position ( is it inside or outside segment)
@@ -242,8 +268,8 @@ public:
     ~LLInlineViewSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
 
-    /*virtual*/ bool        getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    /*virtual*/ S32         getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool        getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    /*virtual*/ S32         getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     /*virtual*/ void        updateLayout(const class LLTextBase& editor);
     /*virtual*/ F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
     /*virtual*/ bool        canEdit() const { return false; }
@@ -268,8 +294,8 @@ public:
     LLLineBreakTextSegment(S32 pos);
     ~LLLineBreakTextSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
-    /*virtual*/ bool        getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    S32         getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool        getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    S32         getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const;
     F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
 
 private:
@@ -287,8 +313,8 @@ public:
     ~LLImageTextSegment();
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const;
 
-    /*virtual*/ bool        getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height);
-    S32         getNumChars(S32 num_pixels, S32 segment_offset, S32 char_offset, S32 max_chars, S32 line_ind) const;
+    /*virtual*/ bool        getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height);
+    S32         getNumBytes(S32 num_pixels, S32 segment_offset, S32 byte_offset, S32 max_bytes, S32 line_ind) const;
     F32         draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect);
 
     /*virtual*/ bool    handleToolTip(S32 x, S32 y, MASK mask);
@@ -441,10 +467,8 @@ public:
     // used by LLTextSegment layout code
     bool                    getWordWrap() const { return mWordWrap; }
     bool                    getUseEllipses() const { return mUseEllipses; }
-    bool                    getUseEmoji() const { return mUseEmoji; }
     void                    setUseEmoji(bool value) { mUseEmoji = value; }
     bool                    getUseColor() const { return mUseColor; }
-    void                    setUseColor(bool value) { mUseColor = value; }
     bool                    truncate(); // returns true of truncation occurred
 
     bool                    isContentTrusted() const { return mTrustedContent; }
@@ -460,10 +484,14 @@ public:
     void                    setMaxTextLength(S32 length) { mMaxTextByteLength = length; }
     S32                     getMaxTextLength() const { return mMaxTextByteLength; }
 
-    // wide-char versions
-    void                    setWText(const LLWString& text);
-    const LLWString&        getWText() const;
     S32                     getTextGeneration() const;
+
+    // Counts passes over the visible text. A segment that wraps is drawn once
+    // per line it covers, and this is how it tells the pieces of one pass from
+    // the pieces of the next. Unsigned because it is only ever compared for
+    // equality and must be allowed to wrap: signed overflow would be undefined
+    // where this is simply a lap of the counter.
+    U32                     getDrawPass() const { return mDrawPass; }
 
     void                    appendText(const std::string &new_text, bool prepend_newline, const LLStyle::Params& input_params = LLStyle::Params());
 
@@ -471,7 +499,6 @@ public:
     /*virtual*/ bool        setLabelArg(const std::string& key, const LLStringExplicit& text) override;
 
     const   std::string&    getLabel()  { return mLabel.getString(); }
-    const   LLWString&      getWlabel() { return mLabel.getWString();}
 
     void                    setLastSegmentToolTip(const std::string &tooltip);
 
@@ -486,7 +513,10 @@ public:
     // force reflow of text
     void                    needsReflow(S32 index = 0);
 
-    S32                     getLength() const { return static_cast<S32>(getWText().length()); }
+    // Named for its unit. Every offset this class takes and hands back --
+    // cursor, selection, segment bounds, line ranges -- is a byte offset into
+    // getText(), sitting at a character start.
+    S32                     getLengthBytes() const { return static_cast<S32>(getText().length()); }
     S32                     getLineCount() const { return static_cast<S32>(mLineInfoList.size()); }
     S32                     removeFirstLine(); // returns removed length
 
@@ -500,7 +530,6 @@ public:
     S32                     getVPad() const { return mVPad; }
     S32                     getHPad() const { return mHPad; }
     F32                     getLineSpacingMult() const { return mLineSpacingMult; }
-    S32                     getLineSpacingPixels() const { return mLineSpacingPixels; } // only for multiline
 
     S32                     getDocIndexFromLocalCoord( S32 local_x, S32 local_y, bool round, bool hit_past_end_of_line = true) const;
     LLRect                  getLocalRectFromDocIndex(S32 pos) const;
@@ -629,7 +658,7 @@ protected:
         virtual bool    hasExtCharValue( llwchar value ) const { return false; }
 
         // Defined here so they can access protected LLTextEditor editing methods
-        S32             insert(LLTextBase* editor, S32 pos, const LLWString &wstr) { return editor->insertStringNoUndo( pos, wstr, &mSegments ); }
+        S32             insert(LLTextBase* editor, S32 pos, std::string_view utf8str) { return editor->insertStringNoUndo( pos, utf8str, &mSegments ); }
         S32             remove(LLTextBase* editor, S32 pos, S32 length) { return editor->removeStringNoUndo( pos, length ); }
         S32             overwrite(LLTextBase* editor, S32 pos, llwchar wc) { return editor->overwriteCharNoUndo(pos, wc); }
 
@@ -667,7 +696,7 @@ protected:
     void                            drawHighlightedBackground();
 
     // modify contents
-    S32                             insertStringNoUndo(S32 pos, const LLWString &wstr, segment_vec_t* segments = NULL); // returns num of chars actually inserted
+    S32                             insertStringNoUndo(S32 pos, std::string_view utf8str, segment_vec_t* segments = NULL); // returns num of BYTES actually inserted
     S32                             removeStringNoUndo(S32 pos, S32 length);
     S32                             overwriteCharNoUndo(S32 pos, llwchar wc);
     void                            appendAndHighlightText(const std::string &new_text, S32 highlight_part, const LLStyle::Params& stylep, e_underline underline_link = e_underline::UNDERLINE_ALWAYS);
@@ -737,7 +766,6 @@ protected:
 
     void                            appendTextImpl(const std::string &new_text, const LLStyle::Params& input_params = LLStyle::Params(), bool force_slurl = false);
     void                            appendAndHighlightTextImpl(const std::string &new_text, S32 highlight_part, const LLStyle::Params& style_params, e_underline underline_link = e_underline::UNDERLINE_ALWAYS);
-    S32 normalizeUri(std::string& uri);
 
 protected:
     // virtual
@@ -756,6 +784,7 @@ protected:
     // text segmentation and flow
     segment_set_t               mSegments;
     line_list_t                 mLineInfoList;
+    U32                         mDrawPass = 0;
     LLRect                      mVisibleTextRect;           // The rect in which text is drawn.  Excludes borders.
     LLRect                      mTextBoundingRect;
 
@@ -802,7 +831,7 @@ protected:
 
 // [SL:KB] - Patch: Control-TextHighlight | Checked: 2013-12-30 (Catznip-3.6)
     // highlighting
-    LLWString                   mHighlightWord;
+    std::string                 mHighlightWord;
     bool                        mHighlightCaseInsensitive;
     highlight_list_t            mHighlights;
     bool                        mHighlightsDirty;

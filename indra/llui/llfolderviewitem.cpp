@@ -65,6 +65,7 @@ LLUIImagePtr LLFolderViewItem::sSelectionImg;
 LLUIImagePtr LLFolderViewItem::sFavoriteImg;
 LLUIImagePtr LLFolderViewItem::sFavoriteContentImg;
 LLFontGL* LLFolderViewItem::sSuffixFont = nullptr;
+S32 LLFolderViewItem::sArrangeRemeasures = 0;
 LLUIColor LLFolderViewItem::sFavoriteColor;
 bool LLFolderViewItem::sColorSetInitialized = false;
 
@@ -234,7 +235,7 @@ LLFolderViewItem::LLFolderViewItem(const LLFolderViewItem::Params& p)
     mIndentation(0),
     mControlLabelRotation(0.f),
     mDragAndDropTarget(false),
-    mLabel(utf8str_to_wstring(p.name)), // will be immediately reset in postBuild()
+    mLabel(p.name), // will be immediately reset in postBuild()
     mRoot(p.root),
     mViewModelItem(p.listener),
     mIsMouseOverTitle(false),
@@ -281,8 +282,8 @@ bool LLFolderViewItem::postBuild()
         // lazy getLabelSuffix(), it is however needed as it sets
         // search string, which can later determine visibility.
         // Refreshing a search string also requires a filter reset.
-        mLabel = utf8str_to_wstring(vmi->getDisplayName());
-        mIsFavorite = vmi->isFavorite() && !vmi->isItemInTrash();
+        setLabelText(vmi->getDisplayName());
+        setFavorite(vmi->isFavorite() && !vmi->isItemInTrash());
 
         // Dirty the filter flag of the model from the view (CHUI-849)
         vmi->dirtyFilter();
@@ -391,12 +392,13 @@ void LLFolderViewItem::refresh()
 {
     LLFolderViewModelItem& vmi = *getViewModelItem();
 
-    mLabel = utf8str_to_wstring(vmi.getDisplayName());
-    if (mLabelFontBuffer)
-    {
-        mLabelFontBuffer->reset();
-    }
-    mIsFavorite = vmi.isFavorite() && !vmi.isItemInTrash();
+    // A refresh is asked for whenever anything about the item might have
+    // moved, and usually nothing has: the name comes back the same string it
+    // already was. The version is what the shaped glyphs are keyed on, so
+    // bumping it for an identical name throws the label's geometry away and
+    // shapes it again on the next draw.
+    setLabelText(vmi.getDisplayName());
+    setFavorite(vmi.isFavorite() && !vmi.isItemInTrash());
     // icons are slightly expensive to get, can be optimized
     // see LLInventoryIcon::getIcon()
     mIcon = vmi.getIcon();
@@ -407,15 +409,11 @@ void LLFolderViewItem::refresh()
     {
         // Very Expensive!
         // Can do a number of expensive checks, like checking active motions, wearables or friend list
-        mLabelStyle = vmi.getLabelStyle();
-        pLabelFont = nullptr; // refresh can be called from a coro, don't use getLabelFontForStyle, coro trips font list tread safety
-        mLabelSuffix = utf8str_to_wstring(vmi.getLabelSuffix());
-        // Only invalidate cached geometry if the buffer exists; if it doesn't,
-        // draw() will lazily create it. Don't allocate here just to reset it.
-        if (mSuffixFontBuffer)
-        {
-            mSuffixFontBuffer->reset();
-        }
+        // setLabelStyle only drops the cached font when the style moved; refresh
+        // can be called from a coro, and getLabelFontForStyle trips the font
+        // list's thread safety, so the font is never looked up from here.
+        setLabelStyle(vmi.getLabelStyle());
+        setLabelSuffixText(vmi.getLabelSuffix());
     }
 
     // Dirty the filter flag of the model from the view (CHUI-849)
@@ -435,22 +433,14 @@ void LLFolderViewItem::refreshSuffix()
     mIconOpen = vmi->getIconOpen();
     mIconOverlay = vmi->getIconOverlay();
 
-    mIsFavorite = vmi->isFavorite() && !vmi->isItemInTrash();
+    setFavorite(vmi->isFavorite() && !vmi->isItemInTrash());
 
     if (mRoot->useLabelSuffix())
     {
         // Very Expensive!
         // Can do a number of expensive checks, like checking active motions, wearables or friend list
-        mLabelStyle = vmi->getLabelStyle();
-        pLabelFont = nullptr;
-        mLabelSuffix = utf8str_to_wstring(vmi->getLabelSuffix());
-        // LLFontVertexBuffer::render doesn't compare the string, so cached
-        // geometry must be invalidated here or it would replay the old suffix.
-        // (A style change is covered by render's font-pointer compare.)
-        if (mSuffixFontBuffer)
-        {
-            mSuffixFontBuffer->reset();
-        }
+        setLabelStyle(vmi->getLabelStyle());
+        setLabelSuffixText(vmi->getLabelSuffix());
     }
 
     mLabelWidthDirty = true;
@@ -511,13 +501,34 @@ S32 LLFolderViewItem::arrange( S32* width, S32* height )
             // it is purely visual, so it is fine to do at our laisure
             refreshSuffix();
         }
-        // getLabelFont() is the cached font for mLabelStyle; sSuffixFont is the cached NORMAL-style
-        // font. Both avoid the per-call sFonts map lookup that getLabelFontForStyle() does.
-        mLabelWidth = getLabelXPos() + getLabelFont()->getWidth(mLabel) + sSuffixFont->getWidth(mLabelSuffix) + mLabelPaddingRight;
         mLabelWidthDirty = false;
-        if (mIsFavorite)
+
+        // The flag says a refresh ran, not that it found anything. The model
+        // is asked for the name and the suffix whenever anything about the
+        // item might have moved and hands back the strings already held, so
+        // everything the width is derived from is compared here instead: the
+        // two strings and the font through the counter that tracks them, the
+        // state the font would be measured at, and where the label starts.
+        //
+        // Measuring is a shape of both strings, and a filter or an inventory
+        // update dirties every item in the tree.
+        const S32 resolution = LLFontGL::sResolutionGeneration;
+        if (mLabelWidthGeneration != mLabelGeneration
+            || mLabelWidthIndentation != mIndentation
+            || mLabelWidthResolution != resolution)
         {
-            mLabelWidth += FAVORITE_IMAGE_SIZE + FAVORITE_IMAGE_PAD;
+            mLabelWidthGeneration = mLabelGeneration;
+            mLabelWidthIndentation = mIndentation;
+            mLabelWidthResolution = resolution;
+
+            ++sArrangeRemeasures;
+            // getLabelFont() is the cached font for mLabelStyle; sSuffixFont is the cached NORMAL-style
+            // font. Both avoid the per-call sFonts map lookup that getLabelFontForStyle() does.
+            mLabelWidth = getLabelXPos() + getLabelFont()->getWidth(mLabel) + sSuffixFont->getWidth(mLabelSuffix) + mLabelPaddingRight;
+            if (mIsFavorite)
+            {
+                mLabelWidth += FAVORITE_IMAGE_SIZE + FAVORITE_IMAGE_PAD;
+            }
         }
     }
 
@@ -1064,6 +1075,121 @@ void LLFolderViewItem::setVisible(bool visible)
         mSuffixFontBuffer.reset();
     }
     LLView::setVisible(visible);
+
+    // Take the width that was skipped while this was out of sight. An item is
+    // as wide as the folder holding it, by construction -- arrange says so
+    // where it declines to change one. Done after the flag is set, so the
+    // reshape below takes the visible path rather than skipping itself again.
+    if (visible && mParentFolder && getRect().getWidth() != mParentFolder->getRect().getWidth())
+    {
+        reshape(mParentFolder->getRect().getWidth(), getRect().getHeight());
+    }
+}
+
+void LLFolderViewItem::reshape(S32 width, S32 height, bool called_from_parent)
+{
+    if (!getVisible())
+    {
+        // Out of sight, so not drawn, hit tested, or measured -- a folder sizes
+        // itself from its children's labels, never from their rectangles, so
+        // nothing reads what is skipped here. Not even the rect is taken: this
+        // runs once per item of every shut folder, and setVisible settles the
+        // width at the moment there is a reason to have one.
+        return;
+    }
+
+    // A shut folder holds every one of its items hidden, and a plain item holds
+    // nothing at all, so the walk below would step over thousands of views to
+    // leave each exactly as it found it. Take the size and stop.
+    //
+    // This is what a resize costs in an inventory: dragging the floater's edge
+    // reached two hundred thousand items to change the few dozen on screen.
+    //
+    // Asked the same way draw asks it: a folder shut a moment ago is still
+    // animating closed, and its items are still on screen while it does.
+    if (!showsChildren())
+    {
+        LLRect own_rect = getRect();
+        own_rect.mRight = own_rect.mLeft + width;
+        own_rect.mTop = own_rect.mBottom + height;
+        setRect(own_rect);
+        return;
+    }
+
+    LLView::reshape(width, height, called_from_parent);
+}
+
+void LLFolderViewItem::setLabelText(std::string label)
+{
+    if (mLabel != label)
+    {
+        mLabel = std::move(label);
+        ++mLabelGeneration;
+    }
+}
+
+void LLFolderViewItem::setLabelSuffixText(std::string suffix)
+{
+    if (mLabelSuffix != suffix)
+    {
+        mLabelSuffix = std::move(suffix);
+        ++mLabelGeneration;
+    }
+}
+
+void LLFolderViewItem::setLabelStyle(LLFontGL::StyleFlags style)
+{
+    if (mLabelStyle != style)
+    {
+        mLabelStyle = style;
+        // The font this picks out is what the label is measured and shaped
+        // with, so both the cached pointer and the work derived from it go.
+        pLabelFont = nullptr;
+        ++mLabelGeneration;
+    }
+}
+
+void LLFolderViewItem::setFavorite(bool favorite)
+{
+    if (mIsFavorite != favorite)
+    {
+        mIsFavorite = favorite;
+        // Not a change to the text, but a change to how wide the item is: the
+        // mark is drawn beside the label and the width has to leave room for
+        // it. One counter answers both questions, and losing a label's glyphs
+        // over a star is a price paid when someone marks one.
+        ++mLabelGeneration;
+    }
+}
+
+LLFontTextCache& LLFolderViewItem::labelCache()
+{
+    if (!mLabelFontBuffer)
+    {
+        mLabelFontBuffer = std::make_unique<LLFontTextCache>();
+    }
+    mLabelFontBuffer->setSource(&mLabel, mLabelGeneration);
+    return *mLabelFontBuffer;
+}
+
+LLFontTextCache& LLFolderViewItem::suffixCache()
+{
+    if (!mSuffixFontBuffer)
+    {
+        mSuffixFontBuffer = std::make_unique<LLFontTextCache>();
+    }
+    mSuffixFontBuffer->setSource(&mLabelSuffix, mLabelGeneration);
+    return *mSuffixFontBuffer;
+}
+
+S32 LLFolderViewItem::labelWidth(const LLFontGL* font, S32 offset, S32 max_bytes)
+{
+    return llceil(labelCache().getWidthBytes(font, mLabel, offset, max_bytes, false));
+}
+
+S32 LLFolderViewItem::suffixWidth(const LLFontGL* font, S32 offset, S32 max_bytes)
+{
+    return llceil(suffixCache().getWidthBytes(font, mLabelSuffix, offset, max_bytes, false));
 }
 
 void LLFolderViewItem::drawLabel(const LLFontGL * font, const F32 x, const F32 y, const LLColor4& color, F32 &right_x)
@@ -1071,11 +1197,7 @@ void LLFolderViewItem::drawLabel(const LLFontGL * font, const F32 x, const F32 y
     //--------------------------------------------------------------------------------//
     // Draw the actual label text
     //
-    if (!mLabelFontBuffer)
-    {
-        mLabelFontBuffer = std::make_unique<LLFontVertexBuffer>();
-    }
-    mLabelFontBuffer->render(font, mLabel, 0, x, y, color,
+    labelCache().renderBytes(font, mLabel, 0, x, y, color,
         LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
         S32_MAX, getRect().getWidth() - (S32) x - mLabelPaddingRight, &right_x, /*use_ellipses*/true);
 }
@@ -1132,55 +1254,43 @@ void LLFolderViewItem::draw()
     F32 y = (F32)rect_height - line_height - (F32)mStyle->textPadTop - (F32)sTopPad;
     F32 text_left = (F32)getLabelXPos();
 
-    // The model reports the filter match as a byte offset and byte length into the
-    // item's UTF-8 searchable name, but everything below indexes LLWStrings by
-    // codepoint. Convert once here: left in bytes, both the highlight rect and the
-    // highlighted render range slide off the match for any name carrying multi-byte
-    // characters ahead of it. combined_string is only wanted on a match, so it is
-    // built here rather than for every item on every draw.
-    LLWString combined_string;
+    // The model reports the match in bytes of the label followed by the
+    // suffix, which is what the offsets below are indexed by -- a match can
+    // start in one and end in the other.
     S32 filter_offset = 0;
     S32 filter_string_length = 0;
     if (mViewModelItem->hasFilterStringMatch())
     {
-        combined_string = mLabel + mLabelSuffix;
-        filter_offset = wstring_wstring_length_from_utf8_length(
-            combined_string, 0, static_cast<S32>(mViewModelItem->getFilterStringOffset()));
-        filter_string_length = wstring_wstring_length_from_utf8_length(
-            combined_string, filter_offset, static_cast<S32>(mViewModelItem->getFilterStringSize()));
+        filter_offset = static_cast<S32>(mViewModelItem->getFilterStringOffset());
+        filter_string_length = static_cast<S32>(mViewModelItem->getFilterStringSize());
     }
 
     if (filter_string_length > 0)
     {
         S32 bottom = rect_height - line_height - 3 - sTopPad;
         S32 top = rect_height - sTopPad;
-        if(mLabelSuffix.empty() || (font == sSuffixFont))
+        // The label and the suffix are drawn as two runs, so the match over
+        // them is boxed as two. That covers the case where they share a font
+        // and the case where there is no suffix at all -- the shortcut that
+        // used to handle those measured a joined copy of both, which is a
+        // string this item does not otherwise hold.
+        S32 label_filter_length = llmin((S32)mLabel.size() - filter_offset, (S32)filter_string_length);
+        if(label_filter_length > 0)
         {
-            S32 left = ll_round(text_left) + font->getWidth(combined_string, 0, filter_offset) - 2;
-            S32 right = left + font->getWidth(combined_string, filter_offset, filter_string_length) + 2;
-
+            S32 left = ll_round(text_left) + labelWidth(font, 0, llmin(filter_offset, (S32)mLabel.size())) - 2;
+            S32 right = left + labelWidth(font, filter_offset, label_filter_length) + 2;
             LLRect box_rect(left, top, right, bottom);
             sSelectionImg->draw(box_rect, sFilterBGColor);
         }
-        else
+        S32 suffix_filter_length = label_filter_length > 0 ? filter_string_length - label_filter_length : filter_string_length;
+        if(suffix_filter_length > 0)
         {
-            S32 label_filter_length = llmin((S32)mLabel.size() - filter_offset, (S32)filter_string_length);
-            if(label_filter_length > 0)
-            {
-                S32 left = (S32)(ll_round(text_left) + font->getWidthF32(mLabel, 0, llmin(filter_offset, (S32)mLabel.size()))) - 2;
-                S32 right = left + (S32)font->getWidthF32(mLabel, filter_offset, label_filter_length) + 2;
-                LLRect box_rect(left, top, right, bottom);
-                sSelectionImg->draw(box_rect, sFilterBGColor);
-            }
-            S32 suffix_filter_length = label_filter_length > 0 ? filter_string_length - label_filter_length : filter_string_length;
-            if(suffix_filter_length > 0)
-            {
-                S32 suffix_offset = llmax(0, filter_offset - (S32)mLabel.size());
-                S32 left = (S32)(ll_round(text_left) + font->getWidthF32(mLabel, 0, static_cast<S32>(mLabel.size())) + sSuffixFont->getWidthF32(mLabelSuffix, 0, suffix_offset)) - 2;
-                S32 right = left + (S32)sSuffixFont->getWidthF32(mLabelSuffix, suffix_offset, suffix_filter_length) + 2;
-                LLRect box_rect(left, top, right, bottom);
-                sSelectionImg->draw(box_rect, sFilterBGColor);
-            }
+            S32 suffix_offset = llmax(0, filter_offset - (S32)mLabel.size());
+            S32 left = ll_round(text_left) + labelWidth(font, 0, static_cast<S32>(mLabel.size()))
+                     + suffixWidth(sSuffixFont, 0, suffix_offset) - 2;
+            S32 right = left + suffixWidth(sSuffixFont, suffix_offset, suffix_filter_length) + 2;
+            LLRect box_rect(left, top, right, bottom);
+            sSelectionImg->draw(box_rect, sFilterBGColor);
         }
     }
 
@@ -1211,11 +1321,7 @@ void LLFolderViewItem::draw()
     //
     if (!mLabelSuffix.empty())
     {
-        if (!mSuffixFontBuffer)
-        {
-            mSuffixFontBuffer = std::make_unique<LLFontVertexBuffer>();
-        }
-        mSuffixFontBuffer->render(sSuffixFont, mLabelSuffix, 0, right_x, y, isFadeItem() ? color : sSuffixColor.get(),
+        suffixCache().renderBytes(sSuffixFont, mLabelSuffix, 0, right_x, y, isFadeItem() ? color : sSuffixColor.get(),
             LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
             S32_MAX, S32_MAX, &right_x);
     }
@@ -1225,38 +1331,29 @@ void LLFolderViewItem::draw()
     //
     if (filter_string_length > 0)
     {
-        if(mLabelSuffix.empty() || (font == sSuffixFont))
+        S32 label_filter_length = llmin((S32)mLabel.size() - filter_offset, (S32)filter_string_length);
+        if(label_filter_length > 0)
         {
-            F32 match_string_left = text_left + font->getWidthF32(combined_string, 0, filter_offset + filter_string_length) - font->getWidthF32(combined_string, filter_offset, filter_string_length);
+            F32 match_string_left = text_left + (F32)labelWidth(font, 0, filter_offset + label_filter_length)
+                                  - (F32)labelWidth(font, filter_offset, label_filter_length);
             F32 yy = (F32)rect_height - line_height - (F32)mStyle->textPadTop - (F32)sTopPad;
-            font->render(combined_string, filter_offset, match_string_left, yy,
+            font->renderBytes(mLabel, filter_offset, match_string_left, yy,
                 sFilterTextColor, LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
-                filter_string_length, S32_MAX, &right_x);
+                label_filter_length, S32_MAX, &right_x);
         }
-        else
+
+        S32 suffix_filter_length = label_filter_length > 0 ? filter_string_length - label_filter_length : filter_string_length;
+        if(suffix_filter_length > 0)
         {
-            S32 label_filter_length = llmin((S32)mLabel.size() - filter_offset, (S32)filter_string_length);
-            if(label_filter_length > 0)
-            {
-                F32 match_string_left = text_left + font->getWidthF32(mLabel, 0, filter_offset + label_filter_length) - font->getWidthF32(mLabel, filter_offset, label_filter_length);
-                F32 yy = (F32)rect_height - line_height - (F32)mStyle->textPadTop - (F32)sTopPad;
-                font->render(mLabel, filter_offset, match_string_left, yy,
-                    sFilterTextColor, LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
-                    label_filter_length, S32_MAX, &right_x);
-            }
-
-            S32 suffix_filter_length = label_filter_length > 0 ? filter_string_length - label_filter_length : filter_string_length;
-            if(suffix_filter_length > 0)
-            {
-                S32 suffix_offset = llmax(0, filter_offset - (S32)mLabel.size());
-                F32 match_string_left = text_left + font->getWidthF32(mLabel, 0, static_cast<S32>(mLabel.size())) + sSuffixFont->getWidthF32(mLabelSuffix, 0, suffix_offset + suffix_filter_length) - sSuffixFont->getWidthF32(mLabelSuffix, suffix_offset, suffix_filter_length);
-                F32 yy = (F32)rect_height - sSuffixFont->getLineHeight() - (F32)mStyle->textPadTop - (F32)sTopPad;
-                sSuffixFont->render(mLabelSuffix, suffix_offset, match_string_left, yy, sFilterTextColor,
-                    LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
-                    suffix_filter_length, S32_MAX, &right_x);
-            }
+            S32 suffix_offset = llmax(0, filter_offset - (S32)mLabel.size());
+            F32 match_string_left = text_left + (F32)labelWidth(font, 0, static_cast<S32>(mLabel.size()))
+                                  + (F32)suffixWidth(sSuffixFont, 0, suffix_offset + suffix_filter_length)
+                                  - (F32)suffixWidth(sSuffixFont, suffix_offset, suffix_filter_length);
+            F32 yy = (F32)rect_height - sSuffixFont->getLineHeight() - (F32)mStyle->textPadTop - (F32)sTopPad;
+            sSuffixFont->renderBytes(mLabelSuffix, suffix_offset, match_string_left, yy, sFilterTextColor,
+                LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                suffix_filter_length, S32_MAX, &right_x);
         }
-
     }
 
     //Gilbert Linden 9-20-2012: Although this should be legal, removing it because it causes the mLabelSuffix rendering to
@@ -2527,7 +2624,7 @@ void LLFolderViewFolder::draw()
     LLFolderViewItem::draw();
 
     // draw children if root folder, or any other folder that is open or animating to closed state
-    if( getRoot() == this || (isOpen() || mCurHeight != mTargetHeight ))
+    if( getRoot() == this || showsChildren() )
     {
         LLView::draw();
     }

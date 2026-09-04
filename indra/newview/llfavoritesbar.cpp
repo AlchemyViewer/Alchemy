@@ -1250,20 +1250,25 @@ void LLFavoritesBarCtrl::fitLabelWidth(LLMenuItemCallGL* menu_item)
     // Check whether item name wider than menu
     if (menu_item->getNominalWidth() > max_width)
     {
-        S32 chars_total = static_cast<S32>(item_name.length());
-        S32 chars_fitted = 1;
         menu_item->setLabel(LLStringExplicit(""));
-        S32 label_space = max_width - menu_item->getFont()->getWidth("...") -
-                menu_item->getNominalWidth();// This returns width of menu item with empty label (pad pixels)
+        // Signed, and floored. getNominalWidth() is unsigned -- it returns the
+        // width of the item with an empty label, the pad pixels -- so working
+        // this out in the unsigned domain turns a menu narrower than its own
+        // padding into an enormous positive number that arrives here negative.
+        // A budget below zero is no budget, and the font asserts on one.
+        const S32 label_space = llmax(0,
+                (S32)max_width
+                - menu_item->getFont()->getWidth("...")
+                - (S32)menu_item->getNominalWidth());
 
-        while (chars_fitted < chars_total
-                && menu_item->getFont()->getWidth(item_name, 0, chars_fitted) < label_space)
-        {
-            chars_fitted++;
-        }
-        chars_fitted--; // Rolling back one char, that doesn't fit
+        // Measured and cut in the same unit. The re-measuring loop this
+        // replaces counted the total in bytes, asked the font about codepoints
+        // and then cut bytes again, so a non-ASCII name could be sliced through
+        // the middle of a character.
+        const S32 bytes_fitted = menu_item->getFont()->maxDrawableBytes(
+                item_name, (F32)label_space, S32_MAX, LLFontGL::ANYWHERE);
 
-        menu_item->setLabel(item_name.substr(0, chars_fitted) + "...");
+        menu_item->setLabel(item_name.substr(0, bytes_fitted) + "...");
     }
 }
 
@@ -1380,7 +1385,7 @@ void copy_slurl_to_clipboard_cb(std::string& slurl)
         LLNotificationsUtil::add("LandmarkLocationUnknown");
         return;
     }
-    LLClipboard::instance().copyToClipboard(utf8str_to_wstring(slurl), 0, static_cast<S32>(slurl.size()));
+    LLClipboard::instance().copyToClipboard(slurl, 0, static_cast<S32>(slurl.size()));
 
     LLSD args;
     args["SLURL"] = slurl;

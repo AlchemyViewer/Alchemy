@@ -94,7 +94,7 @@ static S32 max_status_w = 0;
 static void update_layout()
 {
     const LLFontGL* font = LLFontGL::getFontMonospace();
-    char_w = llmax(1, font->getWidth(std::string("M")));
+    char_w = llmax(1, font->getWidth("M"));
 
     // Align the progress bar with "[download]" in the column-1 header so the
     // bar sits where its label says.

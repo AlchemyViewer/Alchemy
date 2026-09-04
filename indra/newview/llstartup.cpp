@@ -550,8 +550,7 @@ bool idle_startup()
             }
             else
             {
-                LLWString utf32str = ll_convert<LLWString>(val);
-                if (utf32str.size() > 4)
+                if (utf8str_codepoint_count(val) > 4)
                 {
                     LL_DEBUGS("InitInfo") << "Current locale \"" << locale << "\" "
                         << "has impracitcally long AM/PM time format" << LL_ENDL;
@@ -565,13 +564,11 @@ bool idle_startup()
         // Some locales (as well some of our own dateTimeAM/PM) return long
         // strings for AM/PM which aren't practical to display in the UI.
         // Hardcode to "AM"/"PM" in those cases.
-        LLWString utf32str = ll_convert<LLWString>(LLStringOps::sAM);
-        if (utf32str.size() > 4)
+        if (utf8str_codepoint_count(LLStringOps::sAM) > 4)
         {
             LLStringOps::sAM = "AM";
         }
-        utf32str = ll_convert<LLWString>(LLStringOps::sPM);
-        if (utf32str.size() > 4)
+        if (utf8str_codepoint_count(LLStringOps::sPM) > 4)
         {
             LLStringOps::sPM = "PM";
         }

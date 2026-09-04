@@ -114,6 +114,7 @@ target_sources(llui
     PUBLIC
     FILE_SET HEADERS
     FILES
+    altextcaret.h
     fsvirtualtrackpad.h
     llaccordionctrl.h
     llaccordionctrltab.h
@@ -275,6 +276,8 @@ target_link_libraries(llui
         llxml
         llmath
         llcommon
+        PRIVATE
+        ll::fastfloat
     )
 
 if (USE_NSSPELLCHECKER)
@@ -308,6 +311,7 @@ if(BUILD_TESTING)
   # INTEGRATION TESTS
   set(test_libs llui llmessage llcorehttp llxml llrender llcommon ${spellcheck_lib})
   set(test_project llui)
+  LL_ADD_INTEGRATION_TEST(lluistring "" "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llurlentry llurlentry.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llemojidictionary llemojidictionary.cpp "${test_libs}" "${test_project}")
   LL_ADD_INTEGRATION_TEST(llxuiparser "" "${test_libs}" "${test_project}")

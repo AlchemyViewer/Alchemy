@@ -139,7 +139,7 @@ void LLHexEditor::getPosAndContext(S32 x, S32 y, bool force_context, U32& pos, b
     pos = 0;
 
     F32 line_height = mGLFont->getLineHeight();
-    F32 char_width = mGLFont->getWidthF32(U".");
+    F32 char_width = mGLFont->getWidthF32Bytes(".", 0, S32_MAX);
     F32 data_column_width = char_width * 3; // " 00";
     F32 text_x = mTextRect.mLeft;
     F32 text_x_data = text_x + (char_width * 10.1f); // "00000000  ", dunno why it's a fraction off
@@ -259,7 +259,7 @@ void LLHexEditor::setFocus(bool b)
 F32 LLHexEditor::getSuggestedWidth(U8 cols)
 {
     cols = cols>1?cols:mColumns;
-    F32 char_width = mGLFont->getWidthF32(U".");
+    F32 char_width = mGLFont->getWidthF32Bytes(".", 0, S32_MAX);
     F32 data_column_width = char_width * 3; // " 00";
     F32 text_x = mTextRect.mLeft;
     F32 text_x_data = text_x + (char_width * 10.1f); // "00000000  ", dunno why it's a fraction off
@@ -590,7 +590,7 @@ void LLHexEditor::draw()
     bool has_focus = hasFocus();
 
     F32 line_height = mGLFont->getLineHeight();
-    F32 char_width = mGLFont->getWidthF32(U".");
+    F32 char_width = mGLFont->getWidthF32Bytes(".", 0, S32_MAX);
     F32 data_column_width = char_width * 3; // " 00";
     F32 text_x = mTextRect.mLeft;
     F32 text_x_data = text_x + (char_width * 10.1f); // "00000000  ", dunno why it's a fraction off
@@ -1031,8 +1031,12 @@ void LLHexEditor::copy()
         for(U32 i = start; i < end; i++)
             text.append(llformat("%c", mValue[i]));
     }
-    LLWString wtext = utf8str_to_wstring(text);
-    LLClipboard::instance().copyToClipboard(wtext, 0, wtext.length());
+    // The text column is raw asset bytes rendered one per character, so on any
+    // non-ASCII selection this is not UTF-8 at all. The clipboard is published
+    // as UTF-8 regardless, so what cannot be one character is made into the
+    // character that says so.
+    text = utf8str_sanitize(text);
+    LLClipboard::instance().copyToClipboard(text, 0, (S32)text.length());
 }
 
 bool LLHexEditor::canPaste() const
@@ -1044,10 +1048,9 @@ void LLHexEditor::paste()
 {
     if(!canPaste()) return;
 
-    LLWString paste;
-    LLClipboard::instance().pasteFromClipboard(paste, true);
+    std::string clipstr;
+    LLClipboard::instance().pasteFromClipboard(clipstr, true);
 
-    std::string clipstr = wstring_to_utf8str(paste);//wstring_to_utf8str(LLClipboard::instance().getPasteWString());
     const char* clip = clipstr.c_str();
 
     std::vector<U8> new_data;

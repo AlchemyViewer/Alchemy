@@ -139,12 +139,12 @@ public:
     void setMinSize(U32 min_width, U32 min_height, bool enforce_immediately = true) override;
 
     bool isClipboardTextAvailable() override;
-    bool pasteTextFromClipboard(LLWString &dst) override;
-    bool copyTextToClipboard(const LLWString &src) override;
+    bool pasteTextFromClipboard(std::string &dst) override;
+    bool copyTextToClipboard(const std::string &src) override;
 
     bool isPrimaryTextAvailable() override;
-    bool pasteTextFromPrimary(LLWString &dst) override;
-    bool copyTextToPrimary(const LLWString &src) override;
+    bool pasteTextFromPrimary(std::string &dst) override;
+    bool copyTextToPrimary(const std::string &src) override;
 
     void flashIcon(F32 seconds) override;
     void maybeStopFlashIcon();

@@ -65,5 +65,8 @@ std::string::size_type LLFolderViewModelItemCommon::getFilterStringOffset()
 
 std::string::size_type LLFolderViewModelItemCommon::getFilterStringSize()
 {
-    return mRootViewModel.getFilter().getFilterStringSize();
+    // What the filter measured for this item when it passed, alongside the
+    // offset above. Asking the filter again would answer about the search term
+    // rather than about the span it matched here.
+    return mStringFilterSize;
 }

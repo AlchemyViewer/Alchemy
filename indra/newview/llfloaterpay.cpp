@@ -303,7 +303,7 @@ void LLFloaterPay::processPayPriceReply(LLMessageSystem* msg, void **userdata)
         std::string balance_str = "L$";
         balance_str += LLResMgr::getInstance()->getMonetaryString( max_pay_amount );
         const LLFontGL* font = LLFontGL::getFontSansSerif();
-        S32 new_button_width = font->getWidth( std::string(balance_str));
+        S32 new_button_width = font->getWidth(balance_str);
         new_button_width += ( 12 + 12 );    // padding
 
         // dialong is sized for 2 digit pay amounts - larger pay values need to be scaled
@@ -314,7 +314,7 @@ void LLFloaterPay::processPayPriceReply(LLMessageSystem* msg, void **userdata)
             S32 num_digits_max = (S32)log10((double)max_pay_amount) + 1;
 
             // calculate the extra width required by 2 buttons with max amount and some commas
-            padding_required = ( num_digits_max - num_digits_threshold + ( num_digits_max / 3 ) ) * font->getWidth( std::string("0") );
+            padding_required = ( num_digits_max - num_digits_threshold + ( num_digits_max / 3 ) ) * font->getWidth("0");
         };
 
         // change in button width

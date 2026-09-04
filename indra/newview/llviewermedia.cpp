@@ -1582,7 +1582,12 @@ bool LLViewerMedia::hasParcelMedia()
 //////////////////////////////////////////////////////////////////////////////////////////
 bool LLViewerMedia::hasParcelAudio()
 {
-    return !LLViewerMedia::getParcelAudioURL().empty();
+    // Asked, not fetched. getParcelAudioURL returns the URL by value, and the
+    // status bar asks this twice a frame -- once for whether the media button
+    // is enabled and once, through isParcelAudioPlaying, for what it shows --
+    // so a question about whether a string is empty was copying it, twice,
+    // every frame the viewer ran.
+    return !LLViewerParcelMgr::getInstance()->getAgentParcel()->getMusicURL().empty();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -2943,7 +2948,7 @@ bool LLViewerMediaImpl::handleUnicodeCharHere(llwchar uni_char)
         {
             LLSD native_key_data = gViewerWindow->getWindow()->getNativeKeyData();
 
-            mMediaSource->textInput(wstring_to_utf8str(LLWString(1, uni_char)), gKeyboard->currentMask(false), native_key_data);
+            mMediaSource->textInput(utf8str_from_cp(uni_char), gKeyboard->currentMask(false), native_key_data);
         }
     }
 

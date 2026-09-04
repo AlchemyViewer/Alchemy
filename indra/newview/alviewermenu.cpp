@@ -153,9 +153,8 @@ namespace
         if (!objectp)
             return;
 
-        const LLUUID& object_id = objectp->getID();
-        LLWString idwstr = utf8string_to_wstring(object_id.asString());
-        LLClipboard::instance().copyToClipboard(idwstr,0, narrow(idwstr.size()));
+        const std::string id_str = objectp->getID().asString();
+        LLClipboard::instance().copyToClipboard(id_str, 0, narrow(id_str.size()));
     }
 
     bool can_teleport_to()

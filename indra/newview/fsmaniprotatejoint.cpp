@@ -908,10 +908,10 @@ void FSManipRotateJoint::renderNameXYZ(const LLQuaternion& rot)
         LLGLDepthTest gls_depth(GL_FALSE);
 
         auto renderTextWithShadow = [&](const std::string& text, F32 x, F32 y, const LLColor4& color) {
-            font->render(utf8str_to_wstring(text), 0, x + 1.f, y - 2.f, LLColor4::black,
+            font->renderBytes(text, 0, x + 1.f, y - 2.f, LLColor4::black,
                 LLFontGL::LEFT, LLFontGL::BASELINE,
                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, nullptr);
-            font->render(utf8str_to_wstring(text), 0, x, y, color,
+            font->renderBytes(text, 0, x, y, color,
                 LLFontGL::LEFT, LLFontGL::BASELINE,
                 LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, 1000, nullptr);
         };

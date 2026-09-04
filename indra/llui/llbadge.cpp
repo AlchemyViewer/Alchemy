@@ -30,7 +30,7 @@
 #include "llbadge.h"
 
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llscrollcontainer.h"
 #include "lluictrlfactory.h"
 
@@ -235,13 +235,15 @@ void LLBadge::draw()
             //
 
             S32 badge_label_begin_offset = 0;
-            S32 badge_char_length = S32_MAX;
+            S32 badge_byte_length = S32_MAX;
             S32 badge_pixel_length = S32_MAX;
             F32 *right_position_out = NULL;
             bool do_not_use_ellipses = false;
 
+            mFontBuffer.setSource(&mLabel, mLabel.getGeneration());
             F32 badge_width = (2.0f * mPaddingHoriz) +
-                mGLFont->getWidthF32(mLabel.getWString(), badge_label_begin_offset, badge_char_length);
+                mFontBuffer.getWidthBytes(mGLFont, mLabel.getString(),
+                                          badge_label_begin_offset, badge_byte_length, false);
 
             F32 badge_height = (2.0f * mPaddingVert) + mGLFont->getLineHeight();
 
@@ -354,8 +356,8 @@ void LLBadge::draw()
             //
             // Draw the label
             //
-            mFontBuffer.render(mGLFont,
-                               mLabel.getWString(),
+            mFontBuffer.renderBytes(mGLFont,
+                               mLabel.getString(),
                                badge_label_begin_offset,
                                badge_center_x + mLabelOffsetHoriz,
                                badge_center_y + mLabelOffsetVert,
@@ -363,7 +365,7 @@ void LLBadge::draw()
                                LLFontGL::HCENTER, LLFontGL::VCENTER, // centered around the position
                                LLFontGL::NORMAL, // normal text (not bold, italics, etc.)
                                LLFontGL::DROP_SHADOW_SOFT,
-                               badge_char_length, badge_pixel_length,
+                               badge_byte_length, badge_pixel_length,
                                right_position_out, do_not_use_ellipses);
         }
     }

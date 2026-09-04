@@ -99,48 +99,55 @@ public:
     U64 getCacheGeneration() const;
     const LLFontFreetype* getFontFreetype() const { return mFontFreetype.get(); }
 
-    S32 render(const LLWString &text, S32 begin_offset,
-                const LLRect& rect,
-                const LLColor4 &color,
-                HAlign halign = LEFT,  VAlign valign = BASELINE,
-                U8 style = NORMAL, ShadowType shadow = NO_SHADOW,
-                S32 max_chars = S32_MAX,
-                F32* right_x=NULL,
-                bool use_ellipses = false,
-                bool use_color = true) const;
-
-    S32 render(const LLWString &text, S32 begin_offset,
-                const LLRectf& rect,
-                const LLColor4 &color,
-                HAlign halign = LEFT,  VAlign valign = BASELINE,
-                U8 style = NORMAL, ShadowType shadow = NO_SHADOW,
-                S32 max_chars = S32_MAX,
-                F32* right_x=NULL,
-                bool use_ellipses = false,
-                bool use_color = true) const;
-
     // on_pass_boundary, if non-null, is invoked once between the shadow pass and
-    // the foreground pass when shadow != NO_SHADOW. LLFontVertexBuffer uses it to
+    // the foreground pass when shadow != NO_SHADOW. LLFontTextCache uses it to
     // close one captured display list and open another so each pass lands in its
     // own list with a uniform color across all vertices — a prerequisite for
     // color-only cache regeneration. For NO_SHADOW renders the callback is not
     // invoked (single-pass).
+    // It runs between the two passes of a draw that is still in progress, and
+    // the glyphs pass A collected are held in per-thread buffers until pass B
+    // has walked them. So it must not draw text: a nested render would clear
+    // those buffers out from under the draw that invoked it, and the shadow
+    // would come out carrying the nested string's glyphs.
     typedef std::function<void()> pass_boundary_cb_t;
-    S32 render(const LLWString &text, S32 begin_offset,
+
+    // The draw: `begin_offset`, `max_bytes` and the count returned all index
+    // the UTF-8.
+    S32 renderBytes(std::string_view utf8text, S32 begin_offset,
+                const LLRect& rect,
+                const LLColor4 &color,
+                HAlign halign = LEFT,  VAlign valign = BASELINE,
+                U8 style = NORMAL, ShadowType shadow = NO_SHADOW,
+                S32 max_bytes = S32_MAX,
+                F32* right_x=NULL,
+                bool use_ellipses = false,
+                bool use_color = true) const;
+
+    S32 renderBytes(std::string_view utf8text, S32 begin_offset,
+                const LLRectf& rect,
+                const LLColor4 &color,
+                HAlign halign = LEFT,  VAlign valign = BASELINE,
+                U8 style = NORMAL, ShadowType shadow = NO_SHADOW,
+                S32 max_bytes = S32_MAX,
+                F32* right_x=NULL,
+                bool use_ellipses = false,
+                bool use_color = true) const;
+
+    S32 renderBytes(std::string_view utf8text, S32 begin_offset,
                 F32 x, F32 y,
                 const LLColor4 &color,
                 HAlign halign = LEFT,  VAlign valign = BASELINE,
                 U8 style = NORMAL, ShadowType shadow = NO_SHADOW,
-                S32 max_chars = S32_MAX, S32 max_pixels = S32_MAX,
+                S32 max_bytes = S32_MAX, S32 max_pixels = S32_MAX,
                 F32* right_x=NULL,
                 bool use_ellipses = false,
                 bool use_color = true,
                 pass_boundary_cb_t on_pass_boundary = nullptr) const;
 
-    S32 render(const LLWString &text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color) const;
-
-    // renderUTF8 does a conversion, so is slower!
-    S32 renderUTF8(const std::string &text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign,  VAlign valign, U8 style, ShadowType shadow, S32 max_chars = S32_MAX, S32 max_pixels = S32_MAX,  F32* right_x = NULL, bool use_ellipses = false, bool use_color = true) const;
+    // A convenience name for renderBytes: `begin_offset`, `max_bytes` and the
+    // count returned all index the UTF-8.
+    S32 renderUTF8(const std::string &text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign,  VAlign valign, U8 style, ShadowType shadow, S32 max_bytes = S32_MAX, S32 max_pixels = S32_MAX,  F32* right_x = NULL, bool use_ellipses = false, bool use_color = true) const;
     S32 renderUTF8(const std::string &text, S32 begin_offset, S32 x, S32 y, const LLColor4 &color) const;
     S32 renderUTF8(const std::string &text, S32 begin_offset, S32 x, S32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style = NORMAL, ShadowType shadow = NO_SHADOW) const;
 
@@ -150,38 +157,51 @@ public:
     S32 getLineHeight() const;     // ascender + descender (no line gap)
     S32 getLineSpacing() const;    // face->height — full baseline-to-baseline distance (includes line gap)
 
-    // The wide forms carry their own length, so a caller measuring part of a
-    // string passes a subview rather than a pointer plus a character budget the
-    // callee cannot check. A bare llwchar* still converts (it is what U"..."
-    // literals are), scanning to its terminator for the bound.
-    S32 getWidth(const std::string& utf8text) const;
-    S32 getWidth(LLWStringView wchars) const;
-    S32 getWidth(const std::string& utf8text, S32 offset, S32 max_chars) const;
-    S32 getWidth(LLWStringView wchars, S32 offset, S32 max_chars) const;
+    // Whole-string measurement, for the many callers that want exactly that.
+    S32 getWidth(std::string_view utf8text) const;
+    F32 getWidthF32(std::string_view utf8text) const;
 
-    F32 getWidthF32(const std::string& utf8text) const;
-    F32 getWidthF32(LLWStringView wchars) const;
-    F32 getWidthF32(const std::string& text, S32 offset, S32 max_chars) const;
-    F32 getWidthF32(LLWStringView wchars, S32 offset, S32 max_chars, bool no_padding = false) const;
+    // The measurement itself. `offset` and `max_bytes` index the UTF-8
+    // directly, which is what a caller holding UTF-8 already has. The name
+    // carries the unit because the type cannot -- an S32 offset reads the same
+    // whichever it counts, and that is the one mistake this whole conversion
+    // exists to make impossible.
+    S32 getWidthBytes(std::string_view utf8text, S32 offset, S32 max_bytes) const;
+    F32 getWidthF32Bytes(std::string_view utf8text, S32 offset, S32 max_bytes, bool no_padding = false) const;
 
     // The following are called often, frequently with large buffers, so do not take
     // an owning string
 
-    // Returns the max number of complete characters from text (up to max_chars) that can be drawn in max_pixels
     typedef enum e_word_wrap_style
     {
         ONLY_WORD_BOUNDARIES,
         WORD_BOUNDARY_IF_POSSIBLE,
         ANYWHERE
     } EWordWrapStyle ;
-    S32 maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_chars = S32_MAX, EWordWrapStyle end_on_word_boundary = ANYWHERE) const;
 
-    // Returns the index of the first complete characters from text that can be drawn in max_pixels
-    // given that the character at start_pos should be the last character (or as close to last as possible).
-    S32 firstDrawableChar(LLWStringView wchars, F32 max_pixels, S32 start_pos=S32_MAX, S32 max_chars = S32_MAX) const;
-
-    // Returns the index of the character closest to pixel position x (ignoring text to the right of max_pixels and max_chars)
-    S32 charFromPixelOffset(LLWStringView wchars, S32 char_offset, F32 x, F32 max_pixels=F32_MAX, S32 max_chars = S32_MAX, bool round = true) const;
+    // The three layout walks. Offsets, budgets and results all index the
+    // UTF-8, and every position handed back sits at a character start — and,
+    // where the text shapes, at a cluster start, so no caller is ever given
+    // somewhere it must not begin drawing from.
+    //
+    // maxDrawableBytes: the most of `utf8text` (up to max_bytes) that draws in
+    // max_pixels. firstDrawableByte: where to start so that the byte at
+    // start_pos is the last one drawn, or as close to last as fits.
+    // byteFromPixelOffset: the position closest to pixel x, ignoring anything
+    // beyond max_pixels or max_bytes.
+    //
+    // maxDrawableBytes cannot also report how wide its answer is, tempting as
+    // that looks: wrapping asks it where a line ends and then asks
+    // getWidthF32Bytes how wide that line is, and the two are not measuring
+    // the same thing. This walks the whole remaining text as one shaped run,
+    // so the last glyph before the cut carries the kerning of the character
+    // that follows it; the line is then drawn as a run of its own, where that
+    // character is not there. Handing back the in-context width places lines
+    // by a number the draw will not reproduce. The second call is also not
+    // wasted: it shapes exactly the slice the draw will ask for next.
+    S32 maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 max_bytes = S32_MAX, EWordWrapStyle end_on_word_boundary = ANYWHERE) const;
+    S32 firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 start_pos = S32_MAX, S32 max_bytes = S32_MAX) const;
+    S32 byteFromPixelOffset(std::string_view utf8text, S32 byte_offset, F32 x, F32 max_pixels = F32_MAX, S32 max_bytes = S32_MAX, bool round = true) const;
 
     const LLFontDescriptor& getFontDesc() const;
 
@@ -267,11 +287,8 @@ public:
     static std::string nameFromFont(const LLFontGL* fontp);
     static std::string sizeFromFont(const LLFontGL* fontp);
 
-    static std::string nameFromHAlign(LLFontGL::HAlign align);
     static LLFontGL::HAlign hAlignFromName(const std::string& name);
 
-    static std::string nameFromVAlign(LLFontGL::VAlign align);
-    static LLFontGL::VAlign vAlignFromName(const std::string& name);
 
     static void setFontDisplay(bool flag) { sDisplayFont = flag; }
 
@@ -347,6 +364,16 @@ private:
     LLFontDescriptor mFontDescriptor;
     LLPointer<LLFontFreetype> mFontFreetype;
 
+    // Memo for getCacheGeneration, which is asked on the do-nothing path of
+    // every cached-text widget every frame. Keyed on the global stamp counter
+    // and the fallback chain's length -- between them, the two things that can
+    // move the sum. Mutable because the accessor is const and the answer is
+    // derived state, not a property of the font.
+    mutable U64    mCacheGenSum    = 0;
+    mutable S32    mCacheGenGlobal = 0;
+    mutable size_t mCacheGenChain  = 0;
+    mutable bool   mCacheGenValid  = false;
+
     void renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, F32 slant_amt) const;
     // Caller hoists shadow_color and italic slant_offset out of the glyph loop and
     // selects which half to emit. drawGlyphShadow is a no-op for NO_SHADOW or BOLD
@@ -357,6 +384,34 @@ private:
 
     // Registry holds all instantiated fonts.
     static LLFontRegistry* sFontRegistry;
+};
+
+// Where a piece of text sits, held apart from the glyphs that make it up.
+// Glyph geometry is built relative to this rather than in screen coordinates,
+// which is what lets a captured draw be replayed after the text has moved
+// instead of being rebuilt for its new place: scrolling a list, dragging a
+// floater, resizing one.
+//
+// The origin is snapped to whole pixels. Glyph bitmaps are rasterized on the
+// pixel grid and the fraction of the pen position picks a glyph's subpixel
+// phase, so an origin carrying a fraction would rasterize the text differently
+// depending on where it happened to be. Being whole is also what makes the
+// move exact: it commutes with the rounding the pen does.
+class ALTextTransform
+{
+public:
+    ALTextTransform();
+    ~ALTextTransform();
+
+    ALTextTransform(const ALTextTransform&) = delete;
+    ALTextTransform& operator=(const ALTextTransform&) = delete;
+
+    // Leave the transform ahead of the destructor, for a draw that has one of
+    // its own to bring. Doing it twice is harmless.
+    void end();
+
+private:
+    bool mActive { true };
 };
 
 #endif

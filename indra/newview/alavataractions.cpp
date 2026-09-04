@@ -124,8 +124,7 @@ void ALAvatarActions::copyDataMultiple(const uuid_vec_t& ids, ECopyDataType type
 
         if (!data_string.empty())
         {
-            LLWString wdata_str = utf8str_to_wstring(data_string);
-            LLClipboard::instance().copyToClipboard(wdata_str, 0, narrow(wdata_str.length()));
+            LLClipboard::instance().copyToClipboard(data_string, 0, narrow(data_string.length()));
         }
     }
 }

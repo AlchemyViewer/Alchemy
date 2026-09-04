@@ -1,6 +1,6 @@
 /**
- * @file llfontvertexbuffer.cpp
- * @brief Buffer storage for font rendering.
+ * @file llfonttextcache.cpp
+ * @brief What one piece of text costs to draw, kept so it can be reused.
  *
  * $LicenseInfo:firstyear=2024&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -29,7 +29,7 @@
 
 #include "linden_common.h"
 
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 
 #include "llfontbitmapcache.h"
 #include "llfontfreetype.h"
@@ -42,8 +42,9 @@
 #include "llmath.h"  // clamp_rescale
 
 
-bool LLFontVertexBuffer::sEnableBufferCollection = true;
-bool LLFontVertexBuffer::sEnableColorOnlyRegen = true;
+bool LLFontTextCache::sEnableBufferCollection = true;
+bool LLFontTextCache::sEnableColorOnlyRegen = true;
+U64  LLFontTextCache::sRegenCount = 0;
 
 namespace
 {
@@ -72,51 +73,103 @@ namespace
     }
 }
 
-LLFontVertexBuffer::LLFontVertexBuffer()
+bool ALFontCacheKey::environmentMoved(const LLFontGL* fontp)
+{
+    const U64 font_cache_gen = fontp ? fontp->getCacheGeneration() : 0;
+    if (mFont == fontp
+        && mScaleX == LLFontGL::sScaleX
+        && mScaleY == LLFontGL::sScaleY
+        && mVertDPI == LLFontGL::sVertDPI
+        && mHorizDPI == LLFontGL::sHorizDPI
+        && mResGeneration == LLFontGL::sResolutionGeneration
+        && mFontCacheGen == font_cache_gen)
+    {
+        return false;
+    }
+
+    mFont          = fontp;
+    mScaleX        = LLFontGL::sScaleX;
+    mScaleY        = LLFontGL::sScaleY;
+    mVertDPI       = LLFontGL::sVertDPI;
+    mHorizDPI      = LLFontGL::sHorizDPI;
+    mResGeneration = LLFontGL::sResolutionGeneration;
+    mFontCacheGen  = font_cache_gen;
+    return true;
+}
+
+LLFontTextCache::LLFontTextCache()
 {
 }
 
-LLFontVertexBuffer::~LLFontVertexBuffer()
+LLFontTextCache::~LLFontTextCache()
 {
     reset();
 }
 
-void LLFontVertexBuffer::reset()
+void LLFontTextCache::dropDerived()
 {
     // Todo: some form of debug only frequecy check&assert to see if this is happening too often.
     // Regenerating this list is expensive
     mShadowBufferList.clear();
     mForegroundBufferList.clear();
+    mHasCapture = false;
+    for (WidthSlot& slot : mWidthSlots)
+    {
+        slot.valid = false;
+    }
+    mNextWidthSlot = 0;
 }
 
-S32 LLFontVertexBuffer::render(
+void LLFontTextCache::reset()
+{
+    dropDerived();
+    forgetSource();
+}
+
+namespace
+{
+    S32 font_render(const LLFontGL* fontp, std::string_view text, S32 begin_offset,
+                    F32 x, F32 y, const LLColor4& color,
+                    LLFontGL::HAlign halign, LLFontGL::VAlign valign,
+                    U8 style, LLFontGL::ShadowType shadow,
+                    S32 max_bytes, S32 max_pixels, F32* right_x,
+                    bool use_ellipses, bool use_color,
+                    LLFontGL::pass_boundary_cb_t on_pass_boundary = nullptr)
+    {
+        return fontp->renderBytes(text, begin_offset, x, y, color, halign, valign, style, shadow,
+                                  max_bytes, max_pixels, right_x, use_ellipses, use_color,
+                                  std::move(on_pass_boundary));
+    }
+}
+
+S32 LLFontTextCache::renderBytes(
     const LLFontGL* fontp,
-    const LLWString& text,
+    std::string_view text,
     S32 begin_offset,
     LLRect rect,
     const LLColor4& color,
     LLFontGL::HAlign halign, LLFontGL::VAlign valign,
     U8 style,
     LLFontGL::ShadowType shadow,
-    S32 max_chars, S32 max_pixels,
+    S32 max_bytes, S32 max_pixels,
     F32* right_x,
     bool use_ellipses,
     bool use_color)
 {
     LLRectf rect_float((F32)rect.mLeft, (F32)rect.mTop, (F32)rect.mRight, (F32)rect.mBottom);
-    return render(fontp, text, begin_offset, rect_float, color, halign, valign, style, shadow, max_chars, right_x, use_ellipses, use_color);
+    return renderBytes(fontp, text, begin_offset, rect_float, color, halign, valign, style, shadow, max_bytes, right_x, use_ellipses, use_color);
 }
 
-S32 LLFontVertexBuffer::render(
+S32 LLFontTextCache::renderBytes(
     const LLFontGL* fontp,
-    const LLWString& text,
+    std::string_view text,
     S32 begin_offset,
     LLRectf rect,
     const LLColor4& color,
     LLFontGL::HAlign halign, LLFontGL::VAlign valign,
     U8 style,
     LLFontGL::ShadowType shadow,
-    S32 max_chars,
+    S32 max_bytes,
     F32* right_x,
     bool use_ellipses,
     bool use_color)
@@ -140,23 +193,42 @@ S32 LLFontVertexBuffer::render(
         y = rect.mBottom;
         break;
     }
-    return render(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow, max_chars, (S32)rect.getWidth(), right_x, use_ellipses, use_color);
+    return renderBytes(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow, max_bytes, (S32)rect.getWidth(), right_x, use_ellipses, use_color);
 }
 
-S32 LLFontVertexBuffer::render(
+S32 LLFontTextCache::renderBytes(
     const LLFontGL* fontp,
-    const LLWString& text,
+    std::string_view text,
     S32 begin_offset,
     F32 x, F32 y,
     const LLColor4& color,
     LLFontGL::HAlign halign, LLFontGL::VAlign valign,
     U8 style,
     LLFontGL::ShadowType shadow,
-    S32 max_chars , S32 max_pixels,
+    S32 max_bytes, S32 max_pixels,
     F32* right_x,
     bool use_ellipses,
     bool use_color )
 {
+    return renderImpl(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow,
+                      max_bytes, max_pixels, right_x, use_ellipses, use_color);
+}
+
+S32 LLFontTextCache::renderImpl(
+    const LLFontGL* fontp,
+    std::string_view text,
+    S32 begin_offset,
+    F32 x, F32 y,
+    const LLColor4& color,
+    LLFontGL::HAlign halign, LLFontGL::VAlign valign,
+    U8 style,
+    LLFontGL::ShadowType shadow,
+    S32 max_bytes , S32 max_pixels,
+    F32* right_x,
+    bool use_ellipses,
+    bool use_color )
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     if (!LLFontGL::sDisplayFont) //do not display texts
     {
         return static_cast<S32>(text.length());
@@ -164,27 +236,17 @@ S32 LLFontVertexBuffer::render(
     if (!sEnableBufferCollection)
     {
         // For debug purposes and performance testing
-        return fontp->render(text, begin_offset, x, y, color, halign, valign, style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
+        return font_render(fontp, text, begin_offset, x, y, color, halign, valign, style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color);
     }
-    // Geometry-invalidating params: any change forces full genBuffers.
-    const bool geometry_invalid =
-            mLastX != x
-         || mLastY != y
-         || mLastFont != fontp
-         || mLastHalign != halign
-         || mLastValign != valign
-         || mLastOffset != begin_offset
-         || mLastMaxChars != max_chars
-         || mLastMaxPixels != max_pixels
-         || mLastStyle != style
-         || mLastShadow != shadow // shadow-type change also alters dark-text gate threshold
-         || mLastScaleX != LLFontGL::sScaleX
-         || mLastScaleY != LLFontGL::sScaleY
-         || mLastVertDPI != LLFontGL::sVertDPI
-         || mLastHorizDPI != LLFontGL::sHorizDPI
-         || mLastOrigin != LLFontGL::sCurOrigin
-         || mLastResGeneration != LLFontGL::sResolutionGeneration
-         || mLastFontCacheGen != fontp->getCacheGeneration();
+    // One source, one text: see sameTextAsRecorded.
+    llassert(sameTextAsRecorded(text));
+
+    // Ask once and keep the answer: environmentMoved records as it compares,
+    // so it must not sit inside a short-circuiting chain. It also has to be
+    // asked here, before anything is generated: rendering can rasterize a new
+    // glyph and bump the font's cache generation mid-draw, and the value worth
+    // recording is the one the captured geometry was built against.
+    const bool env_moved = environmentMoved(fontp);
 
     // Crossing the dark-text gate (luminance 0.35) toggles whether shadow
     // geometry was emitted at all, which is geometry-affecting. Detect with a
@@ -194,15 +256,45 @@ S32 LLFontVertexBuffer::render(
         && ((derive_shadow_alpha(color, shadow) == 0) !=
             (derive_shadow_alpha(mLastColor, mLastShadow) == 0));
 
-    if (mShadowBufferList.empty() && mForegroundBufferList.empty())
+    // What stopped this from being a replay, asked in one place so the answer
+    // can be named. Where the UI origin sits is deliberately absent from all
+    // of it: it moves the text without changing a glyph, and the geometry is
+    // built relative to it, so a scroll or a floater drag replays.
+    RegenReason reason = RegenReason::NoReason;
+    if (!mHasCapture)
     {
-        genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
-            style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
+        // Nothing captured yet, or something threw the capture away -- a new
+        // text through setSource, a widget hiding, an explicit reset.
+        reason = RegenReason::NoCapture;
     }
-    else if (geometry_invalid || gate_crossed)
+    else if (env_moved)
     {
-        genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
-            style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
+        reason = RegenReason::FontState;
+    }
+    else if (mLastX != x || mLastY != y)
+    {
+        reason = RegenReason::Position;
+    }
+    else if (mLastOffset != begin_offset || mLastMaxBytes != max_bytes || mLastMaxPixels != max_pixels)
+    {
+        reason = RegenReason::Span;
+    }
+    else if (mLastHalign != halign
+          || mLastValign != valign
+          || mLastStyle != style
+          || mLastShadow != shadow // shadow-type change also alters dark-text gate threshold
+          // Both reach genBuffers and change what it emits -- ellipses replace
+          // the tail of an overflowing string, and use_color decides whether the
+          // caller's colour reaches the vertices at all. Neither was compared,
+          // so a caller flipping one without reset() replayed the old geometry.
+          || mLastUseEllipses != use_ellipses
+          || mLastUseColor != use_color)
+    {
+        reason = RegenReason::Style;
+    }
+    else if (gate_crossed)
+    {
+        reason = RegenReason::ShadowGate;
     }
     else if (mLastColor != color)
     {
@@ -221,41 +313,71 @@ S32 LLFontVertexBuffer::render(
             }
             return mChars;
         }
-        genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
-            style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
+        reason = RegenReason::Color;
     }
-    else
-    {
-        renderBuffers();
 
+    if (env_moved)
+    {
+        // Read after the reason above, so a first draw still reports itself as
+        // one. The widths came off the same glyphs and this call has just
+        // consumed the notice that they moved, so they go now -- otherwise the
+        // next measurement is answered from a slot filled before the atlas
+        // grew under it. Whichever reason was reached leads to a rebuild, so
+        // nothing here can turn a draw into a replay of what it just dropped.
+        dropDerived();
+    }
+
+    auto regen = [&]()
+    {
+        genBuffers(fontp, text, begin_offset, x, y, color, halign, valign,
+            style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color);
+    };
+
+    // One zone per reason. Tracy groups by zone name, so a reason carried as
+    // zone text would have to be read one instance at a time; named, the
+    // breakdown is the statistics view.
+    switch (reason)
+    {
+    case RegenReason::NoReason:
+        renderBuffers();
         if (right_x)
         {
             *right_x = mLastRightX;
         }
+        break;
+    case RegenReason::NoCapture:  { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: no capture");  regen(); break; }
+    case RegenReason::FontState:  { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: font state");  regen(); break; }
+    case RegenReason::Position:   { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: position");    regen(); break; }
+    case RegenReason::Span:       { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: span");        regen(); break; }
+    case RegenReason::Style:      { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: style");       regen(); break; }
+    case RegenReason::ShadowGate: { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: shadow gate"); regen(); break; }
+    case RegenReason::Color:      { LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen: colour");      regen(); break; }
     }
     return mChars;
 }
 
-void LLFontVertexBuffer::genBuffers(
+void LLFontTextCache::genBuffers(
     const LLFontGL* fontp,
-    const LLWString& text,
+    std::string_view text,
     S32 begin_offset,
     F32 x, F32 y,
     const LLColor4& color,
     LLFontGL::HAlign halign, LLFontGL::VAlign valign,
     U8 style, LLFontGL::ShadowType shadow,
-    S32 max_chars, S32 max_pixels,
+    S32 max_bytes, S32 max_pixels,
     F32* right_x,
     bool use_ellipses,
     bool use_color)
 {
+    // The regeneration path: shapes, measures and rebuilds the geometry. Named
+    // apart from the replay so a capture answers the question this class
+    // exists to answer -- whether a frame reused its text or rebuilt it.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font regen");
+    LL_PROFILE_ZONE_NUM(text.size());
+    ++sRegenCount;
     // todo: add a debug build assert if this triggers too often for to long?
     mShadowBufferList.clear();
     mForegroundBufferList.clear();
-    // Save before rendreing, it can change mid-render,
-    // so will need to rerender previous characters
-    mLastFontCacheGen = fontp->getCacheGeneration();
-
     // Snapshot shader-shadow state for the cache. The static flag could flip
     // between gen and replay, so we cache it alongside the captured streams
     // and use the snapshot in renderBuffers. shadowMode is the only shadow
@@ -284,9 +406,16 @@ void LLFontVertexBuffer::genBuffers(
     {
         gGL.beginList(&mForegroundBufferList);
     }
-    mChars = fontp->render(text, begin_offset, x, y, color, halign, valign,
-        style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color, pass_boundary);
+    // Where the text ended is recorded whether or not this caller wanted it.
+    // A replay has only the recorded value to answer with, and the callers of
+    // one cache do not all ask the same question -- a measurement that skips
+    // right_x would otherwise leave the next draw replaying a stale one.
+    F32 local_right_x = x;
+    F32* const right_x_out = right_x ? right_x : &local_right_x;
+    mChars = font_render(fontp, text, begin_offset, x, y, color, halign, valign,
+        style, shadow, max_bytes, max_pixels, right_x_out, use_ellipses, use_color, pass_boundary);
     gGL.endList();
+    mHasCapture = true;
 
     // Detect whether any captured batch sampled the color (RGBA emoji) atlas.
     // Mixed strings can't be recolored cheaply because emoji glyphs use a
@@ -339,9 +468,8 @@ void LLFontVertexBuffer::genBuffers(
         }
     }
 
-    mLastFont = fontp;
     mLastOffset = begin_offset;
-    mLastMaxChars = max_chars;
+    mLastMaxBytes = max_bytes;
     mLastMaxPixels = max_pixels;
     mLastX = x;
     mLastY = y;
@@ -350,21 +478,13 @@ void LLFontVertexBuffer::genBuffers(
     mLastValign = valign;
     mLastStyle = style;
     mLastShadow = shadow;
+    mLastUseEllipses = use_ellipses;
+    mLastUseColor = use_color;
 
-    mLastScaleX = LLFontGL::sScaleX;
-    mLastScaleY = LLFontGL::sScaleY;
-    mLastVertDPI = LLFontGL::sVertDPI;
-    mLastHorizDPI = LLFontGL::sHorizDPI;
-    mLastOrigin = LLFontGL::sCurOrigin;
-    mLastResGeneration = LLFontGL::sResolutionGeneration;
-
-    if (right_x)
-    {
-        mLastRightX = *right_x;
-    }
+    mLastRightX = *right_x_out;
 }
 
-void LLFontVertexBuffer::recolorBuffers(
+void LLFontTextCache::recolorBuffers(
     const LLColor4& color,
     LLFontGL::ShadowType shadow)
 {
@@ -412,21 +532,21 @@ void LLFontVertexBuffer::recolorBuffers(
     mLastColor = color;
 }
 
-void LLFontVertexBuffer::renderBuffers()
+void LLFontTextCache::renderBuffers()
 {
+    // The replay path: no shaping, no measurement, just the captured draws.
+    // Named apart from genBuffers so a capture shows at a glance whether a
+    // frame regenerated its text or reused it -- which is the whole point of
+    // this class, and was not observable.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_UI("font replay");
     gGL.flush(); // deliberately empty pending verts
-    gGL.pushUIMatrix();
 
-    gGL.loadUIIdentity();
-
-    // Depth translation, so that floating text appears 'in-world'
-    // and is correctly occluded.
-    gGL.translatef(0.f, 0.f, LLFontGL::sCurDepth);
+    // The same transform the geometry was built under, taken fresh. The
+    // vertices hold no absolute position, so this is what puts the text where
+    // it is now rather than where it was when it was captured.
+    ALTextTransform transform;
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
-    // Note: ellipses should technically be covered by push/load/translate of their own
-    // but it's more complexity, values do not change, skipping doesn't appear to break
-    // anything, so we can skip that until it proves to cause issues.
     // Shadow first (under), foreground second (over). Pass-boundary order matches
     // the original interleaved-per-glyph emission's net visual stacking — shadow
     // contributions sit beneath glyph foregrounds rather than between them.
@@ -447,83 +567,75 @@ void LLFontVertexBuffer::renderBuffers()
     {
         buffer.draw();
     }
-    gGL.popUIMatrix();
 }
 
-// LLFontWidthBuffer
-bool LLFontWidthBuffer::sEnableBufferCollection = true;
-
-LLFontWidthBuffer::LLFontWidthBuffer()
-{
-}
-
-LLFontWidthBuffer::~LLFontWidthBuffer()
-{
-}
-
-void LLFontWidthBuffer::reset()
-{
-    mLastFont = nullptr;
-    mLastOffset = 0;
-    mLastMaxChars = 0;
-    mLastNoPadding = false;
-    mWidth = -1.f;
-    mLastScaleX = 1.f;
-    mLastScaleY = 1.f;
-    mLastVertDPI = 0.f;
-    mLastHorizDPI = 0.f;
-    mLastResGeneration = 0;
-    mLastFontCacheGen = 0;
-}
-
-F32 LLFontWidthBuffer::getWidth(
+// The cache check is the same whichever unit the caller measures in; only the
+// call that fills it differs, so both entry points route through here.
+template <typename MEASURE>
+F32 LLFontTextCache::cachedWidth(
     const LLFontGL* fontp,
-    LLWStringView wchars,
     S32 begin_offset,
-    S32 max_chars,
-    bool no_padding)
+    S32 max_bytes,
+    bool no_padding,
+    MEASURE&& measure)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    if (!fontp || wchars.empty())
-    {
-        return 0.f;
-    }
 
     if (!sEnableBufferCollection)
     {
-        return fontp->getWidthF32(wchars, begin_offset, max_chars, no_padding);
+        return measure();
     }
 
-    // Check if we can use cached width
-    bool needs_recalc = (mWidth < 0.f)
-        || (mLastFont != fontp)
-        || (mLastOffset != begin_offset)
-        || (mLastMaxChars != max_chars)
-        || (mLastNoPadding != no_padding)
-        || (mLastScaleX != LLFontGL::sScaleX)
-        || (mLastScaleY != LLFontGL::sScaleY)
-        || (mLastVertDPI != LLFontGL::sVertDPI)
-        || (mLastHorizDPI != LLFontGL::sHorizDPI)
-        || (mLastResGeneration != LLFontGL::sResolutionGeneration)
-        || (mLastFontCacheGen != fontp->getCacheGeneration());
-
-    if (needs_recalc)
+    // Everything the whole cache depends on. A change here says nothing
+    // measured earlier is worth keeping, whatever span it was for -- and
+    // nothing captured for the draw either, which asks this same question and
+    // would be told nothing had moved.
+    if (environmentMoved(fontp))
     {
-        // Calculate width using the font
-        mWidth = fontp->getWidthF32(wchars, begin_offset, max_chars, no_padding);
-
-        // Cache the parameters
-        mLastFont = fontp;
-        mLastOffset = begin_offset;
-        mLastMaxChars = max_chars;
-        mLastNoPadding = no_padding;
-        mLastScaleX = LLFontGL::sScaleX;
-        mLastScaleY = LLFontGL::sScaleY;
-        mLastVertDPI = LLFontGL::sVertDPI;
-        mLastHorizDPI = LLFontGL::sHorizDPI;
-        mLastResGeneration = LLFontGL::sResolutionGeneration;
-        mLastFontCacheGen = fontp->getCacheGeneration();
+        dropDerived();
+    }
+    else
+    {
+        for (const WidthSlot& slot : mWidthSlots)
+        {
+            if (slot.valid
+                && slot.offset == begin_offset
+                && slot.max_bytes == max_bytes
+                && slot.no_padding == no_padding)
+            {
+                return slot.width;
+            }
+        }
     }
 
-    return mWidth;
+    const F32 width = measure();
+
+    WidthSlot& slot = mWidthSlots[mNextWidthSlot];
+    mNextWidthSlot       = (mNextWidthSlot + 1) % WIDTH_SLOT_COUNT;
+    slot.offset     = begin_offset;
+    slot.max_bytes  = max_bytes;
+    slot.no_padding = no_padding;
+    slot.width      = width;
+    slot.valid      = true;
+
+    return width;
+}
+
+F32 LLFontTextCache::getWidthBytes(
+    const LLFontGL* fontp,
+    std::string_view utf8text,
+    S32 begin_offset,
+    S32 max_bytes,
+    bool no_padding)
+{
+    if (!fontp || utf8text.empty())
+    {
+        return 0.f;
+    }
+    // One source, one text: see sameTextAsRecorded. Asked here rather than in
+    // cachedWidth below, which takes a measurement to run and not the text to
+    // run it on -- and so could only name a variable it does not have.
+    llassert(sameTextAsRecorded(utf8text));
+    return cachedWidth(fontp, begin_offset, max_bytes, no_padding,
+                       [&] { return fontp->getWidthF32Bytes(utf8text, begin_offset, max_bytes, no_padding); });
 }

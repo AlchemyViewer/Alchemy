@@ -29,7 +29,7 @@
 #define LLSCROLLLISTCELL_H
 
 #include "llfontgl.h"       // HAlign
-#include "llfontvertexbuffer.h"       // HAlign
+#include "llfonttextcache.h"       // HAlign
 #include "llpointer.h"      // LLPointer<>
 #include "lluistring.h"
 #include "v4color.h"
@@ -130,7 +130,10 @@ public:
     virtual void            setToolTip(const std::string &str) { mToolTip = str; }
     virtual bool            getVisible() const { return true; }
     virtual void            setWidth(S32 width) { mWidth = width; }
-    virtual void            highlightText(S32 offset, S32 num_chars) {}
+    // Which run of this cell's own text a search matched. Both count BYTES of
+    // it -- what the scroll list's searches hand over, and what the widths
+    // the highlight is drawn from are measured in. The name said characters.
+    virtual void            highlightText(S32 byte_offset, S32 num_bytes) {}
     virtual bool            isText() const { return false; }
     virtual bool            needsToolTip() const { return ! mToolTip.empty(); }
     virtual void            setColor(const LLColor4&) {}
@@ -166,13 +169,18 @@ public:
 
     /*virtual*/ void    draw(const LLColor4& color, const LLColor4& highlight_color);
     /*virtual*/ S32     getContentWidth() const;
+
+    // A span of this cell's own text, measured through the cache that already
+    // holds its glyphs. Same answer LLFontGL::getWidthBytes gives; the walk is
+    // what it saves, and a scroll list asks several times per row per frame.
+    S32                 cachedWidth(S32 offset = 0, S32 max_bytes = S32_MAX) const;
     /*virtual*/ S32     getHeight() const;
     /*virtual*/ void    setValue(const LLSD& value);
     /*virtual*/ void    setAltValue(const LLSD& value);
     /*virtual*/ const LLSD getValue() const;
     /*virtual*/ const LLSD getAltValue() const;
     /*virtual*/ bool    getVisible() const;
-    /*virtual*/ void    highlightText(S32 offset, S32 num_chars);
+    /*virtual*/ void    highlightText(S32 byte_offset, S32 num_bytes);
 
     /*virtual*/ void    setColor(const LLColor4&);
     /*virtual*/ bool    isText() const;
@@ -193,7 +201,9 @@ protected:
     LLUIString      mAltText;
     S32             mTextWidth;
     const LLFontGL* mFont;
-    LLFontVertexBuffer mFontBuffer;
+    // Mutable because measuring is a const question, and the cache that
+    // answers it is the same one the draw fills.
+    mutable LLFontTextCache mFontBuffer;
     LLColor4        mColor;
     LLColor4        mHighlightColor;
     U8              mUseColor;
@@ -306,8 +316,16 @@ public:
     /*virtual*/ void    setValue(const LLSD& value);
 
     /*virtual*/ void    setWidth(S32 width);
+    /*virtual*/ S32     getContentWidth() const;
 
 private:
+    // How much of the cell the icon takes, including the gap to the text. The
+    // icon is drawn as a square of the font's line height, and only when there
+    // is one -- setValue accepts a null UUID or an empty name and means "no
+    // icon" by it. draw() always knew that; the width reservation did not, so
+    // a cell with no icon still lost the space and ellipsized early.
+    S32                     getIconSpace() const;
+
     LLPointer<LLUIImage>    mIcon;
     S32                     mPad;
 };

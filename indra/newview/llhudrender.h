@@ -28,13 +28,60 @@
 #define LL_LLHUDRENDER_H
 
 #include "llfontgl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 
 class LLVector3;
 class LLFontGL;
 
-// Utility classes for rendering HUD elements
-void hud_render_text(const LLWString &wstr,
+#include "llrect.h"
+#include "v3math.h"
+
+// What a HUD-text draw needs is mostly per world position, not per line: the
+// camera's pixel basis at that point, the viewport, and the 2D projection the
+// font draws under. A nametag draws several lines at one position, and paid
+// for all of that once per line.
+//
+// Construct one, ask whether the position is visible, then draw as many lines
+// against it as that position carries. The matrices it pushes are held for its
+// lifetime, so it is a scope: keep it no longer than the lines it draws.
+class LLHUDTextScope
+{
+public:
+    LLHUDTextScope(const LLVector3& pos_agent, bool orthographic);
+    ~LLHUDTextScope();
+
+    LLHUDTextScope(const LLHUDTextScope&) = delete;
+    LLHUDTextScope& operator=(const LLHUDTextScope&) = delete;
+
+    // False when the position is behind the camera. draw() is then a no-op,
+    // so a caller with one line need not ask.
+    bool visible() const { return mVisible; }
+
+    // `cache` holds the shaped glyphs for this line between frames. The
+    // position it is drawn at is split below into a matrix translate and a
+    // sub-pixel remainder, and only the remainder reaches the font -- so a
+    // line whose projected position has not moved within a pixel replays what
+    // it built last time, and one that has moved rebuilds exactly as it did
+    // before. Pass nothing to shape it every time.
+    void draw(std::string_view utf8text,
+              const LLFontGL& font,
+              const U8 style,
+              const LLFontGL::ShadowType shadow,
+              const F32 x_offset,
+              const F32 y_offset,
+              const LLColor4& color,
+              LLFontTextCache* cache = nullptr);
+
+private:
+    LLVector3 mPosAgent;
+    LLVector3 mRightAxis;
+    LLVector3 mUpAxis;
+    LLRect    mWorldViewRect;
+    bool      mVisible = false;
+};
+
+// One line at one position, for the callers that only ever draw one.
+void hud_render_text(std::string_view utf8text,
                      const LLVector3 &pos_agent,
                      const LLFontGL &font,
                      const U8 style,
@@ -43,17 +90,6 @@ void hud_render_text(const LLWString &wstr,
                      const F32 y_offset,
                      const LLColor4& color,
                      const bool orthographic);
-
-// Legacy, slower
-void hud_render_utf8text(const std::string &str,
-                         const LLVector3 &pos_agent,
-                         const LLFontGL &font,
-                         const U8 style,
-                         const LLFontGL::ShadowType,
-                         const F32 x_offset,
-                         const F32 y_offset,
-                         const LLColor4& color,
-                         const bool orthographic);
 
 
 #endif //LL_LLHUDRENDER_H

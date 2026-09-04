@@ -305,6 +305,7 @@ target_link_libraries(
         Threads::Threads
         PRIVATE
         ll::fastfloat
+        ll::icu
     )
 
 target_include_directories(llcommon PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

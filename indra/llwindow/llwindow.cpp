@@ -237,12 +237,12 @@ bool LLWindow::isPrimaryTextAvailable()
     return false; // no
 }
 //virtual
-bool LLWindow::pasteTextFromPrimary(LLWString &dst)
+bool LLWindow::pasteTextFromPrimary(std::string &dst)
 {
     return false; // fail
 }
 // virtual
-bool LLWindow::copyTextToPrimary(const LLWString &src)
+bool LLWindow::copyTextToPrimary(const std::string &src)
 {
     return false; // fail
 }

@@ -117,6 +117,14 @@ void LLHUDObject::setPositionAgent(const LLVector3 &position_agent)
 void LLHUDObject::cleanupHUDObjects()
 {
     LLHUDIcon::cleanupDeadIcons();
+
+    // Before anything is marked dead, so that marking it dead is what drops
+    // the last reference to it and the list below is where it is destroyed --
+    // with a GL context still under it, which the captured glyphs its lines
+    // hold need in order to give their vertex buffers back.
+    LLHUDText::releaseTextObjects();
+    LLHUDNameTag::releaseTextObjects();
+
     hud_object_list_t::iterator object_it;
     for (object_it = sHUDObjects.begin(); object_it != sHUDObjects.end(); ++object_it)
     {

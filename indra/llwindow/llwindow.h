@@ -168,12 +168,12 @@ public:
     virtual void setMouseClipping( bool b ) = 0;
 
     virtual bool isClipboardTextAvailable() = 0;
-    virtual bool pasteTextFromClipboard(LLWString &dst) = 0;
-    virtual bool copyTextToClipboard(const LLWString &src) = 0;
+    virtual bool pasteTextFromClipboard(std::string &dst) = 0;
+    virtual bool copyTextToClipboard(const std::string &src) = 0;
 
     virtual bool isPrimaryTextAvailable();
-    virtual bool pasteTextFromPrimary(LLWString &dst);
-    virtual bool copyTextToPrimary(const LLWString &src);
+    virtual bool pasteTextFromPrimary(std::string &dst);
+    virtual bool copyTextToPrimary(const std::string &src);
 
     virtual void flashIcon(F32 seconds) = 0;
     virtual F32 getGamma() = 0;

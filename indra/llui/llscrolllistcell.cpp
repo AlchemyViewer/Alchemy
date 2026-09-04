@@ -30,9 +30,18 @@
 #include "llscrolllistcell.h"
 
 #include "llcheckboxctrl.h"
-#include "llfontvertexbuffer.h"
+#include "llfonttextcache.h"
 #include "llui.h"   // LLUIImage
 #include "lluictrlfactory.h"
+
+namespace
+{
+    // Where left-aligned cell text starts. Named because the draw and the
+    // search highlight both have to place themselves from it, and a highlight
+    // sitting one pixel off the text it is behind is not something anyone
+    // would look twice at.
+    const S32 TEXT_LEFT_PAD = 1;
+}
 
 //static
 LLScrollListCell* LLScrollListCell::create(const LLScrollListCell::Params& cell_p)
@@ -304,10 +313,10 @@ LLScrollListText::LLScrollListText(const LLScrollListCell::Params& p)
 }
 
 //virtual
-void LLScrollListText::highlightText(S32 offset, S32 num_chars)
+void LLScrollListText::highlightText(S32 byte_offset, S32 num_bytes)
 {
-    mHighlightOffset = offset;
-    mHighlightCount = llmax(0, num_chars);
+    mHighlightOffset = byte_offset;
+    mHighlightCount = llmax(0, num_bytes);
 }
 
 //virtual
@@ -335,20 +344,18 @@ bool LLScrollListText::needsToolTip() const
         return LLScrollListCell::needsToolTip();
 
     // ...otherwise, show tooltips for truncated text
-    return mFont->getWidth(mText.getWString()) > getWidth();
+    return cachedWidth() > getWidth();
 }
 
 void LLScrollListText::setTextWidth(S32 value)
 {
     mTextWidth = value;
-    mFontBuffer.reset();
 }
 
 void LLScrollListText::setWidth(S32 width)
 {
     LLScrollListCell::setWidth(width);
     mTextWidth = width;
-    mFontBuffer.reset();
 }
 
 //virtual
@@ -369,9 +376,15 @@ LLScrollListText::~LLScrollListText()
     sCount--;
 }
 
+S32 LLScrollListText::cachedWidth(S32 offset, S32 max_bytes) const
+{
+    mFontBuffer.setSource(&mText, mText.getGeneration());
+    return llceil(mFontBuffer.getWidthBytes(mFont, mText.getString(), offset, max_bytes, false));
+}
+
 S32 LLScrollListText::getContentWidth() const
 {
-    return mFont->getWidth(mText.getWString());
+    return cachedWidth();
 }
 
 
@@ -384,7 +397,6 @@ void LLScrollListText::setColor(const LLColor4& color)
 void LLScrollListText::setText(const LLStringExplicit& text)
 {
     mText = text;
-    mFontBuffer.reset();
 }
 
 void LLScrollListText::setFontStyle(const U8 font_style)
@@ -392,13 +404,11 @@ void LLScrollListText::setFontStyle(const U8 font_style)
     LLFontDescriptor new_desc(mFont->getFontDesc());
     new_desc.setStyle(font_style);
     mFont = LLFontGL::getFont(new_desc);
-    mFontBuffer.reset();
 }
 
 void LLScrollListText::setAlignment(LLFontGL::HAlign align)
 {
     mFontAlignment = align;
-    mFontBuffer.reset();
 }
 
 //virtual
@@ -440,35 +450,44 @@ void LLScrollListText::draw(const LLColor4& color, const LLColor4& highlight_col
 
     if (mHighlightCount > 0)
     {
-        // Highlight text
+        // Where the match sits: the left edge of the text, as the alignment
+        // below places it, plus the width of what comes before the match.
+        //
+        // Both halves used to be one measurement with the pen position in the
+        // begin-offset slot -- a pixel count read as a byte index. What that
+        // measured was the text from a byte or two in, for as many bytes as
+        // the match started at, which happens to be nothing at all when the
+        // match is at the start of the cell. That is the case a type-ahead
+        // search produces, and it is why this went unseen.
+        const S32 prefix = cachedWidth(0, mHighlightOffset);
         S32 left = 0;
         switch(mFontAlignment)
         {
         case LLFontGL::LEFT:
-            left = mFont->getWidth(mText.getWString(), 1, mHighlightOffset);
+            left = TEXT_LEFT_PAD + prefix;
             break;
         case LLFontGL::RIGHT:
-            left = getWidth() - mFont->getWidth(mText.getWString(), mHighlightOffset, S32_MAX);
+            left = getWidth() - cachedWidth() + prefix;
             break;
         case LLFontGL::HCENTER:
-            left = (getWidth() - mFont->getWidth(mText.getWString())) / 2;
+            left = (getWidth() - cachedWidth()) / 2 + prefix;
             break;
         }
         LLRect highlight_rect(left - 2,
                 mFont->getLineHeight() + 1,
-                left + mFont->getWidth(mText.getWString(), mHighlightOffset, mHighlightCount) + 1,
+                left + cachedWidth(mHighlightOffset, mHighlightCount) + 1,
                 1);
         mRoundedRectImage->draw(highlight_rect, highlight_color);
     }
 
     // Try to draw the entire string
     F32 right_x;
-    U32 string_chars = mText.length();
+    U32 string_bytes = (U32)mText.getString().size();
     F32 start_x = 0.f;
     switch(mFontAlignment)
     {
     case LLFontGL::LEFT:
-        start_x = 1.f;
+        start_x = (F32)TEXT_LEFT_PAD;
         break;
     case LLFontGL::RIGHT:
         start_x = (F32)getWidth();
@@ -477,15 +496,16 @@ void LLScrollListText::draw(const LLColor4& color, const LLColor4& highlight_col
         start_x = (F32)getWidth() * 0.5f;
         break;
     }
-    mFontBuffer.render(mFont,
-                       mText.getWString(), 0,
+    mFontBuffer.setSource(&mText, mText.getGeneration());
+    mFontBuffer.renderBytes(mFont,
+                       mText.getString(), 0,
                        start_x, 0.f,
                        display_color,
                        mFontAlignment,
                        LLFontGL::BOTTOM,
                        0,
                        LLFontGL::NO_SHADOW,
-                       string_chars,
+                       string_bytes,
                        getTextWidth(),
                        &right_x,
                        true);
@@ -609,7 +629,19 @@ LLScrollListIconText::LLScrollListIconText(const LLScrollListCell::Params& p)
     mIcon(p.value().isUUID() ? LLUI::getUIImageByID(p.value().asUUID()) : LLUI::getUIImage(p.value().asString())),
     mPad(4)
 {
-    mTextWidth = getWidth() - mPad /*padding*/ - mFont->getLineHeight();
+    mTextWidth = getWidth() - getIconSpace();
+}
+
+S32 LLScrollListIconText::getIconSpace() const
+{
+    return mIcon ? (mFont->getLineHeight() + mPad) : 0;
+}
+
+S32 LLScrollListIconText::getContentWidth() const
+{
+    // The icon is content too, and a column sized to fit its contents was
+    // coming out short by exactly the icon it was going to draw.
+    return LLScrollListText::getContentWidth() + getIconSpace();
 }
 
 LLScrollListIconText::~LLScrollListIconText()
@@ -649,13 +681,15 @@ void LLScrollListIconText::setValue(const LLSD& value)
             mIcon = NULL;
         }
     }
+    // Gaining or losing the icon changes how much room the text has, and a
+    // scroll list reassigns cell values as it scrolls.
+    mTextWidth = getWidth() - getIconSpace();
 }
 
 void LLScrollListIconText::setWidth(S32 width)
 {
     LLScrollListCell::setWidth(width);
-    // Assume that iamge height and width is identical to font height and width
-    mTextWidth = width - mPad /*padding*/ - mFont->getLineHeight();
+    mTextWidth = width - getIconSpace();
 }
 
 
@@ -672,61 +706,69 @@ void LLScrollListIconText::draw(const LLColor4& color, const LLColor4& highlight
     }
 
     S32 icon_height = mFont->getLineHeight();
-    S32 icon_space = mIcon ? (icon_height + mPad) : 0;
+    S32 icon_space = getIconSpace();
 
     if (mHighlightCount > 0)
     {
+        // The same reading as the plain text cell above, and the icon moves
+        // the text rather than the match within it: the icon's width belongs
+        // to where the text begins, which is what the alignment below says,
+        // and not to the offset the match sits at. Right-aligned it was
+        // subtracted from a left edge the icon does not move, and centred it
+        // was subtracted where the draw adds it.
+        const S32 prefix = cachedWidth(0, mHighlightOffset);
         S32 left = 0;
         switch (mFontAlignment)
         {
         case LLFontGL::LEFT:
-            left = mFont->getWidth(mText.getWString(), icon_space + 1, mHighlightOffset);
+            left = icon_space + TEXT_LEFT_PAD + prefix;
             break;
         case LLFontGL::RIGHT:
-            left = getWidth() - mFont->getWidth(mText.getWString(), mHighlightOffset, S32_MAX) - icon_space;
+            left = getWidth() - cachedWidth() + prefix;
             break;
         case LLFontGL::HCENTER:
-            left = (getWidth() - mFont->getWidth(mText.getWString()) - icon_space) / 2;
+            left = (getWidth() + icon_space - cachedWidth()) / 2 + prefix;
             break;
         }
         LLRect highlight_rect(left - 2,
             mFont->getLineHeight() + 1,
-            left + mFont->getWidth(mText.getWString(), mHighlightOffset, mHighlightCount) + 1,
+            left + cachedWidth(mHighlightOffset, mHighlightCount) + 1,
             1);
         mRoundedRectImage->draw(highlight_rect, highlight_color);
     }
 
     // Try to draw the entire string
     F32 right_x;
-    U32 string_chars = mText.length();
+    U32 string_bytes = (U32)mText.getString().size();
     F32 start_text_x = 0.f;
     S32 start_icon_x = 0;
     switch (mFontAlignment)
     {
     case LLFontGL::LEFT:
-        start_text_x = icon_space + 1.f;
-        start_icon_x = 1;
+        start_text_x = (F32)(icon_space + TEXT_LEFT_PAD);
+        start_icon_x = TEXT_LEFT_PAD;
         break;
     case LLFontGL::RIGHT:
         start_text_x = (F32)getWidth();
-        start_icon_x = getWidth() - mFont->getWidth(mText.getWString()) - icon_space;
+        start_icon_x = getWidth() - cachedWidth() - icon_space;
         break;
     case LLFontGL::HCENTER:
         F32 center = (F32)getWidth()* 0.5f;
         start_text_x = center + ((F32)icon_space * 0.5f);
-        start_icon_x = (S32)(center - (((F32)icon_space + mFont->getWidth(mText.getWString())) * 0.5f));
+        start_icon_x = (S32)(center - (((F32)icon_space + (F32)cachedWidth()) * 0.5f));
         break;
     }
-    mFontBuffer.render(
+    mFontBuffer.setSource(&mText, mText.getGeneration());
+    mFontBuffer.renderBytes(
         mFont,
-        mText.getWString(), 0,
+        mText.getString(), 0,
         start_text_x, 0.f,
         display_color,
         mFontAlignment,
         LLFontGL::BOTTOM,
         0,
         LLFontGL::NO_SHADOW,
-        string_chars,
+        string_bytes,
         getTextWidth(),
         &right_x,
         true);

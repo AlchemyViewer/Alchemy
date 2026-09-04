@@ -135,7 +135,7 @@ void LLChatEntry::updateHistory()
     // reset current history line number.
     // Be sure only to remember lines that are not empty and that are
     // different from the last on the list.
-    if (mHasHistory && getLength())
+    if (mHasHistory && getLengthBytes())
     {
         // Add text to history, ignoring duplicates
         if (mLineHistory.empty() || getText() != mLineHistory.back())
@@ -149,7 +149,7 @@ void LLChatEntry::updateHistory()
 
 void LLChatEntry::beforeValueChange()
 {
-    if(this->getLength() == 0 && !mLabel.empty())
+    if(this->getLengthBytes() == 0 && !mLabel.empty())
     {
         this->clearSegments();
     }
@@ -163,7 +163,7 @@ void LLChatEntry::onValueChange(S32 start, S32 end)
 
 bool LLChatEntry::useLabel() const
 {
-    return !getLength() && !mLabel.empty();
+    return !getLengthBytes() && !mLabel.empty();
 }
 
 void LLChatEntry::onFocusReceived()

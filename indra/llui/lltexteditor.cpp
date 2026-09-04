@@ -86,31 +86,34 @@ const F32   SPELLCHECK_DELAY = 0.5f;    // delay between the last keypress and s
 class LLTextEditor::TextCmdInsert : public LLTextBase::TextCmd
 {
 public:
-    TextCmdInsert(S32 pos, bool group_with_next, const LLWString &ws, LLTextSegmentPtr segment)
-        : TextCmd(pos, group_with_next, segment), mWString(ws)
+    TextCmdInsert(S32 pos, bool group_with_next, std::string_view utf8str, LLTextSegmentPtr segment)
+        : TextCmd(pos, group_with_next, segment), mString(utf8str)
     {
     }
     virtual ~TextCmdInsert() {}
     virtual bool execute( LLTextBase* editor, S32* delta )
     {
-        *delta = insert(editor, getPosition(), mWString );
-        LLWStringUtil::truncate(mWString, *delta);
-        //mWString = wstring_truncate(mWString, *delta);
+        *delta = insert(editor, getPosition(), mString );
+        // Trimmed to what the document actually took, which the editor can
+        // clamp below what was offered. A byte count is not a place to cut a
+        // string: undo and redo replay this text verbatim, so half a character
+        // stored here is half a character put back into the document.
+        mString = utf8str_truncate(mString, *delta);
         return (*delta != 0);
     }
     virtual S32 undo( LLTextBase* editor )
     {
-        remove(editor, getPosition(), static_cast<S32>(mWString.length()));
+        remove(editor, getPosition(), static_cast<S32>(mString.length()));
         return getPosition();
     }
     virtual S32 redo( LLTextBase* editor )
     {
-        insert(editor, getPosition(), mWString);
-        return getPosition() + static_cast<S32>(mWString.length());
+        insert(editor, getPosition(), mString);
+        return getPosition() + static_cast<S32>(mString.length());
     }
 
 private:
-    LLWString mWString;
+    std::string mString;
 };
 
 ///////////////////////////////////////////////////////////////////
@@ -118,7 +121,7 @@ class LLTextEditor::TextCmdAddChar : public LLTextBase::TextCmd
 {
 public:
     TextCmdAddChar( S32 pos, bool group_with_next, llwchar wc, LLTextSegmentPtr segment)
-        : TextCmd(pos, group_with_next, segment), mWString(1, wc), mBlockExtensions(false)
+        : TextCmd(pos, group_with_next, segment), mString(utf8str_from_cp(wc)), mBlockExtensions(false)
     {
     }
     virtual void blockExtensions()
@@ -130,40 +133,42 @@ public:
         // cannot extend text with custom segments
         if (!mSegments.empty()) return false;
 
-        return !mBlockExtensions && (pos == getPosition() + (S32)mWString.length());
+        return !mBlockExtensions && (pos == getPosition() + (S32)mString.length());
     }
     virtual bool execute( LLTextBase* editor, S32* delta )
     {
-        *delta = insert(editor, getPosition(), mWString);
-        LLWStringUtil::truncate(mWString, *delta);
-        //mWString = wstring_truncate(mWString, *delta);
+        *delta = insert(editor, getPosition(), mString);
+        // Trimmed to what the document actually took, which the editor can
+        // clamp below what was offered. A byte count is not a place to cut a
+        // string: undo and redo replay this text verbatim, so half a character
+        // stored here is half a character put back into the document.
+        mString = utf8str_truncate(mString, *delta);
         return (*delta != 0);
     }
     virtual bool extendAndExecute( LLTextBase* editor, S32 pos, llwchar wc, S32* delta )
     {
-        LLWString ws;
-        ws += wc;
+        const std::string added = utf8str_from_cp(wc);
 
-        *delta = insert(editor, pos, ws);
+        *delta = insert(editor, pos, added);
         if( *delta > 0 )
         {
-            mWString += wc;
+            mString += added;
         }
         return (*delta != 0);
     }
     virtual S32 undo( LLTextBase* editor )
     {
-        remove(editor, getPosition(), static_cast<S32>(mWString.length()));
+        remove(editor, getPosition(), static_cast<S32>(mString.length()));
         return getPosition();
     }
     virtual S32 redo( LLTextBase* editor )
     {
-        insert(editor, getPosition(), mWString);
-        return getPosition() + static_cast<S32>(mWString.length());
+        insert(editor, getPosition(), mString);
+        return getPosition() + static_cast<S32>(mString.length());
     }
 
 private:
-    LLWString   mWString;
+    std::string mString;
     bool        mBlockExtensions;
 
 };
@@ -178,9 +183,11 @@ public:
 
     virtual bool execute( LLTextBase* editor, S32* delta )
     {
-        mOldChar = editor->getWText()[getPosition()];
-        overwrite(editor, getPosition(), mChar);
-        *delta = 0;
+        // The character being replaced, whole: the overwrite is a replacement
+        // now, so undoing it has to put back however many bytes it took, and
+        // the document's length moves by the difference rather than not at all.
+        mOldChar = utf8str_decode_at(editor->getText(), (size_t)getPosition()).cp;
+        *delta = overwrite(editor, getPosition(), mChar);
         return true;
     }
     virtual S32 undo( LLTextBase* editor )
@@ -191,7 +198,7 @@ public:
     virtual S32 redo( LLTextBase* editor )
     {
         overwrite(editor, getPosition(), mChar);
-        return getPosition()+1;
+        return getPosition() + wchar_utf8_length(mChar);
     }
 
 private:
@@ -213,7 +220,7 @@ public:
     {
         try
         {
-            mWString = editor->getWText().substr(getPosition(), mLen);
+            mString = editor->getText().substr(getPosition(), mLen);
             *delta = remove(editor, getPosition(), mLen);
         }
         catch (std::out_of_range&)
@@ -224,8 +231,8 @@ public:
     }
     virtual S32 undo( LLTextBase* editor )
     {
-        insert(editor, getPosition(), mWString);
-        return getPosition() + static_cast<S32>(mWString.length());
+        insert(editor, getPosition(), mString);
+        return getPosition() + static_cast<S32>(mString.length());
     }
     virtual S32 redo( LLTextBase* editor )
     {
@@ -233,7 +240,7 @@ public:
         return getPosition();
     }
 private:
-    LLWString   mWString;
+    std::string mString;
     S32             mLen;
 };
 
@@ -360,7 +367,7 @@ std::string LLTextEditor::getSelectionString() const
 {
     S32 idxSel = 0, lenSel = 0;
     getSelectionRange(&idxSel, &lenSel);
-    return (lenSel > 0) ? wstring_to_utf8str(getWText().substr(idxSel, lenSel)) : LLStringUtil::null;
+    return (lenSel > 0) ? getText().substr(idxSel, lenSel) : LLStringUtil::null;
 }
 // [/SL:KB]
 
@@ -377,17 +384,44 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
 //      return;
     }
 
-    LLWString text = getWText();
-    LLWString search_text = utf8str_to_wstring(search_text_in);
+    // `loc` below indexes `text` and is then handed to setCursorPos, so when a
+    // case-insensitive search folds the document the offset has to be mapped
+    // back: lowercasing is not length-preserving (U+0130 becomes two
+    // codepoints), and every position after such a character would otherwise
+    // be off by the difference.
+    const std::string& doc = getText();
+    std::string search_text = search_text_in;
+    std::string folded;
     if (case_insensitive)
     {
-        LLWStringUtil::toLower(text);
-        LLWStringUtil::toLower(search_text);
+        folded = utf8str_tolower(doc);
+        search_text = utf8str_tolower(search_text);
     }
+    const std::string_view text = case_insensitive ? std::string_view(folded)
+                                                   : std::string_view(doc);
+    const auto to_folded = [&](S32 at) -> size_t
+    {
+        const size_t pos = llmin((size_t)llmax(at, 0), doc.size());
+        // A view of the prefix, not a copy of it -- only the folded length is
+        // wanted, and this runs once per search step.
+        return case_insensitive
+            ? utf8str_tolower(std::string_view(doc).substr(0, pos)).size()
+            : pos;
+    };
+    const auto to_document = [&](size_t folded_at) -> S32
+    {
+        return case_insensitive
+            ? (S32)utf8str_bytes_from_cased_bytes(doc, folded_at, false)
+            : (S32)llmin(folded_at, doc.size());
+    };
 
     if (mIsSelecting)
     {
-        LLWString selected_text = text.substr(mSelectionEnd, mSelectionStart - mSelectionEnd);
+        const size_t sel_begin = to_folded(mSelectionEnd);
+        const size_t sel_end = to_folded(mSelectionStart);
+        const std::string_view selected_text = (sel_end > sel_begin)
+            ? text.substr(sel_begin, sel_end - sel_begin)
+            : std::string_view();
 
         if (selected_text == search_text)
         {
@@ -409,7 +443,10 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
     }
 
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-10-29 (Catznip-2.3)
-    size_t loc = (search_up) ? text.rfind(search_text, llmax(0, mCursorPos - (S32)search_text.size())) : text.find(search_text,mCursorPos);
+    const size_t folded_cursor = to_folded(mCursorPos);
+    const size_t rfind_from = (folded_cursor >= search_text.size())
+        ? folded_cursor - search_text.size() : 0;
+    size_t loc = (search_up) ? text.rfind(search_text, rfind_from) : text.find(search_text, folded_cursor);
 // [/SL:KB]
 //  size_t loc = text.find(search_text,mCursorPos);
 
@@ -440,7 +477,7 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
 //      return;
     }
 
-    setCursorPos(narrow(loc));
+    setCursorPos(to_document(loc));
 // [SL:KB] - Patch: UI-FloaterSearchReplace | Checked: 2010-11-05 (Catznip-2.3)
     if (mReadOnly)
     {
@@ -451,7 +488,10 @@ bool LLTextEditor::selectNext(const std::string& search_text_in, bool case_insen
     mIsSelecting = true;
     mSelectedOnFocusReceived = false;
     mSelectionEnd = mCursorPos;
-    mSelectionStart = llmin((S32)getLength(), (S32)(mCursorPos + search_text.size()));
+    // The match's far edge comes back through the map too: search_text.size()
+    // counts bytes of the folded copy, which is not what the document is
+    // indexed in.
+    mSelectionStart = llmin((S32)getLengthBytes(), to_document(loc + search_text.size()));
 // [SL:KB] - Patch: Chat-Logs | Checked: Catznip-5.2
     return true;
 // [/SL:KB]
@@ -470,15 +510,15 @@ bool LLTextEditor::replaceText(const std::string& search_text_in, const std::str
         return replaced;
     }
 
-    LLWString search_text = utf8str_to_wstring(search_text_in);
+    std::string search_text = search_text_in;
     if (mIsSelecting)
     {
-        LLWString selected_text = getWText().substr(mSelectionEnd, mSelectionStart - mSelectionEnd);
+        std::string selected_text = getText().substr(mSelectionEnd, mSelectionStart - mSelectionEnd);
 
         if (case_insensitive)
         {
-            LLWStringUtil::toLower(selected_text);
-            LLWStringUtil::toLower(search_text);
+            LLStringUtil::toLower(selected_text);
+            LLStringUtil::toLower(search_text);
         }
 
         if (selected_text == search_text)
@@ -507,35 +547,22 @@ void LLTextEditor::replaceTextAll(const std::string& search_text, const std::str
     }
 }
 
+S32 LLTextEditor::getLineColumnFromDocIndex(S32 doc_index, bool include_wordwrap) const
+{
+    const S32 line_start = doc_index - getLineOffsetFromDocIndex(doc_index, include_wordwrap);
+    const S32 span = llmax(doc_index - line_start, 0);
+    return (S32)utf8str_codepoint_count(
+        std::string_view(getText()).substr((size_t)line_start, (size_t)span));
+}
+
 S32 LLTextEditor::prevWordPos(S32 cursorPos) const
 {
-    const LLWString& wtext = getWText();
-    while( (cursorPos > 0) && (wtext[cursorPos-1] == ' ') )
-    {
-        cursorPos--;
-    }
-    while( (cursorPos > 0) && LLWStringUtil::isPartOfWord( wtext[cursorPos-1] ) )
-    {
-        cursorPos--;
-    }
-    // ZWJ, VS and tag codepoints are neither word chars nor spaces, so the
-    // walk can stop in the middle of an emoji cluster. Snap to the cluster
-    // start so ctrl+left never parks the caret inside a ZWJ sequence.
-    return (S32)wstring_grapheme_align_backward(wtext, (size_t)cursorPos);
+    return (S32)utf8str_caret_word_backward(getText(), (size_t)llmax(cursorPos, 0));
 }
 
 S32 LLTextEditor::nextWordPos(S32 cursorPos) const
 {
-    const LLWString& wtext = getWText();
-    while( (cursorPos < getLength()) && LLWStringUtil::isPartOfWord( wtext[cursorPos] ) )
-    {
-        cursorPos++;
-    }
-    while( (cursorPos < getLength()) && (wtext[cursorPos] == ' ') )
-    {
-        cursorPos++;
-    }
-    return (S32)wstring_grapheme_align_forward(wtext, (size_t)cursorPos);
+    return (S32)utf8str_caret_word_forward(getText(), (size_t)llmax(cursorPos, 0));
 }
 
 const LLTextSegmentPtr  LLTextEditor::getPreviousSegment() const
@@ -601,10 +628,10 @@ bool LLTextEditor::selectionContainsLineBreaks()
         S32 left = llmin(mSelectionStart, mSelectionEnd);
         S32 right = left + llabs(mSelectionStart - mSelectionEnd);
 
-        const LLWString& wtext = getWText();
+        const std::string& text = getText();
         for( S32 i = left; i < right; i++ )
         {
-            if (wtext[i] == '\n')
+            if (text[i] == '\n')
             {
                 return true;
             }
@@ -621,7 +648,7 @@ S32 LLTextEditor::indentLine( S32 pos, S32 spaces )
     // Returns the actual number of characters added or removed.
 
     llassert(pos >= 0);
-    llassert(pos <= getLength() );
+    llassert(pos <= getLengthBytes() );
 
     S32 delta_spaces = 0;
 
@@ -635,13 +662,15 @@ S32 LLTextEditor::indentLine( S32 pos, S32 spaces )
     }
     else
     {
-        // Unindent
+        // Unindent. remove() reports a negative delta, as addChar reports a
+        // positive one, so both branches accumulate the same way and the
+        // result carries the sign the caller adds to its bounds.
         for(S32 i=0; i < -spaces; i++)
         {
-            const LLWString& wtext = getWText();
-            if (wtext[pos] == ' ')
+            const std::string& text = getText();
+            if (text[pos] == ' ')
             {
-                delta_spaces -= remove( pos, 1, false );
+                delta_spaces += remove( pos, 1, false );
             }
         }
     }
@@ -655,7 +684,7 @@ void LLTextEditor::indentSelectedLines( S32 spaces )
     {
         // A reference, so the indentLine() calls below are visible through it
         // without re-copying the document once per line.
-        const LLWString& text = getWText();
+        const std::string& text = getText();
         S32 left = llmin( mSelectionStart, mSelectionEnd );
         S32 right = left + llabs( mSelectionStart - mSelectionEnd );
         bool cursor_on_right = (mSelectionEnd > mSelectionStart);
@@ -679,7 +708,11 @@ void LLTextEditor::indentSelectedLines( S32 spaces )
         }
         else
         {
-            while( (text[right] != '\n') && (right <= getLength() ) )
+            // Bound first. Indexing before the test reads text[right] at the
+            // end of the document, which is the terminator and so never the
+            // newline the loop is looking for -- and the test that followed
+            // admitted one more step past that.
+            while( (right < getLengthBytes()) && (text[right] != '\n') )
             {
                 right++;
             }
@@ -714,7 +747,7 @@ void LLTextEditor::indentSelectedLines( S32 spaces )
 
         mParseOnTheFly = true;
 
-        if( (right < getLength()) && (text[right] == '\n') )
+        if( (right < getLengthBytes()) && (text[right] == '\n') )
         {
             right++;
         }
@@ -750,7 +783,7 @@ void LLTextEditor::deselect()
 // virtual
 void LLTextEditor::selectAll()
 {
-    mSelectionStart = getLength();
+    mSelectionStart = getLengthBytes();
     mSelectionEnd = 0;
     setCursorPos(mSelectionEnd);
     updatePrimary();
@@ -769,7 +802,7 @@ void LLTextEditor::setSelectAllOnFocusReceived(bool b)
     mSelectAllOnFocusReceived = b;
 }
 
-void LLTextEditor::insertEmoji(const LLWString& emoji)
+void LLTextEditor::insertEmoji(const std::string& emoji)
 {
     if (emoji.empty())
         return;
@@ -796,10 +829,10 @@ void LLTextEditor::insertEmoji(const LLWString& emoji)
     setCursorPos(mCursorPos + span);
 }
 
-void LLTextEditor::handleEmojiCommit(const LLWString& emoji)
+void LLTextEditor::handleEmojiCommit(const std::string& emoji)
 {
     S32 shortCodePos;
-    if (LLEmojiHelper::isCursorInEmojiCode(getWText(), mCursorPos, &shortCodePos))
+    if (LLEmojiHelper::isCursorInEmojiCode(getText(), mCursorPos, &shortCodePos))
     {
         remove(shortCodePos, mCursorPos - shortCodePos, true);
         setCursorPos(shortCodePos);
@@ -811,12 +844,12 @@ void LLTextEditor::handleEmojiCommit(const LLWString& emoji)
 void LLTextEditor::handleMentionCommit(std::string name_url)
 {
     S32 mention_start_pos;
-    if (LLChatMentionHelper::instance().isCursorInNameMention(getWText(), mCursorPos, &mention_start_pos))
+    if (LLChatMentionHelper::instance().isCursorInNameMention(getText(), mCursorPos, &mention_start_pos))
     {
         remove(mention_start_pos, mCursorPos - mention_start_pos, true);
-        insert(mention_start_pos, utf8str_to_wstring(name_url), false, LLTextSegmentPtr());
+        insert(mention_start_pos, name_url, false, LLTextSegmentPtr());
 
-        std::string new_text(wstring_to_utf8str(getConvertedText()));
+        std::string new_text(getConvertedText());
         clear();
         appendTextImpl(new_text, LLStyle::Params(), true);
 
@@ -893,7 +926,7 @@ bool LLTextEditor::handleMouseDown(S32 x, S32 y, MASK mask)
         if (!mask && mSelectAllOnFocusReceived)
         {
             mIsSelecting = false;
-            mSelectionStart = getLength();
+            mSelectionStart = getLengthBytes();
             mSelectionEnd = 0;
             mSelectedOnFocusReceived = true;
         }
@@ -1063,16 +1096,21 @@ bool LLTextEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
         setCursorAtLocalPos( x, y, false );
         deselect();
 
-        const LLWString& text = getWText();
+        const std::string& text = getText();
 
         // Prefer selecting a whole emoji cluster — covers both halves of the
         // glyph hit-test (cursor lands at cluster_start or cluster_end after
         // setCursorAtLocalPos) and avoids splitting a multi-codepoint cluster
         // like 🏳️‍⚧️ into base scalar + tail.
-        auto cluster = wstring_emoji_range_at(text, (size_t)mCursorPos);
+        auto cluster = utf8str_emoji_range_at(text, (size_t)mCursorPos);
         if (cluster.first == cluster.second && mCursorPos > 0)
         {
-            const auto prev = wstring_emoji_range_at(text, (size_t)(mCursorPos - 1));
+            // Somewhere inside the character just passed; any position within
+            // a cluster reports the whole of it, but only once the offset is
+            // back on a character start -- a continuation byte decodes to no
+            // pictograph at all and the lookup comes back empty.
+            const size_t before = utf8str_grapheme_align_backward(text, (size_t)mCursorPos - 1);
+            const auto prev = utf8str_emoji_range_at(text, before);
             if ((S32)prev.second == mCursorPos)
                 cluster = prev;
         }
@@ -1084,29 +1122,25 @@ bool LLTextEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
             setCursorPos((S32)cluster.second);
             mSelectionEnd = mCursorPos;
         }
-        else if( LLWStringUtil::isPartOfWord( text[mCursorPos] ) )
+        else if (const auto word = utf8str_word_range_at(text, (size_t)mCursorPos);
+                 word.first != word.second)
         {
-            // Select word the cursor is over
-            while ((mCursorPos > 0) && LLWStringUtil::isPartOfWord(text[mCursorPos-1]))
-            {
-                if (!setCursorPos(mCursorPos - 1)) break;
-            }
+            // Select the word the cursor is over, as Unicode bounds it: a
+            // contraction comes out whole, and a script without spaces still
+            // yields a word rather than the run up to the next punctuation.
+            setCursorPos((S32)word.first);
             startSelection();
-
-            while ((mCursorPos < (S32)text.length()) && LLWStringUtil::isPartOfWord( text[mCursorPos] ) )
-            {
-                if (!setCursorPos(mCursorPos + 1)) break;
-            }
-
+            setCursorPos((S32)word.second);
             mSelectionEnd = mCursorPos;
         }
-        else if ((mCursorPos < (S32)text.length()) && !LLStringOps::isSpace( text[mCursorPos]) )
+        else if ((mCursorPos < (S32)text.length())
+                 && !LLStringOps::isSpace(utf8str_decode_at(text, (size_t)mCursorPos).cp))
         {
             // Single non-word, non-space, non-emoji char (punctuation etc.) —
             // select the lone glyph. Step one grapheme to be defensive about
-            // anything wstring_emoji_range_at didn't classify as a cluster.
+            // anything utf8str_emoji_range_at didn't classify as a cluster.
             startSelection();
-            setCursorPos((S32)wstring_step_grapheme_forward(text, (size_t)mCursorPos));
+            setCursorPos((S32)utf8str_step_grapheme_forward(text, (size_t)mCursorPos));
             mSelectionEnd = mCursorPos;
         }
 
@@ -1149,7 +1183,7 @@ S32 LLTextEditor::execute( TextCmd* cmd )
         mUndoStack.push_front(cmd);
         mLastCmd = cmd;
 
-        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(getViewModel()->getDisplay());
+        bool need_to_rollback = mPrevalidator && !mPrevalidator.validate(getViewModel()->getDisplayUtf8());
         if (need_to_rollback)
         {
             LLUI::getInstance()->reportBadKeystroke();
@@ -1175,31 +1209,31 @@ S32 LLTextEditor::execute( TextCmd* cmd )
     return delta;
 }
 
-S32 LLTextEditor::insert(S32 pos, const LLWString &wstr, bool group_with_next_op, LLTextSegmentPtr segment)
+S32 LLTextEditor::insert(S32 pos, std::string_view utf8str, bool group_with_next_op, LLTextSegmentPtr segment)
 {
-    return execute( new TextCmdInsert( pos, group_with_next_op, wstr, segment ) );
+    return execute( new TextCmdInsert( pos, group_with_next_op, utf8str, segment ) );
 }
 
 S32 LLTextEditor::remove(S32 pos, S32 length, bool group_with_next_op)
 {
     S32 end_pos = getEditableIndex(pos + length, true);
-    bool removedChar = false;
 
     segment_vec_t segments_to_remove;
     // store text segments
     getSegmentsInRange(segments_to_remove, pos, pos + length, false);
 
-    if (pos <= end_pos)
+    if (pos > end_pos)
     {
-        removedChar = execute( new TextCmdRemove( pos, group_with_next_op, end_pos - pos, segments_to_remove ) );
+        return 0;
     }
 
-    return removedChar;
+    // Negative, being a removal: the count the document shrank by, in bytes.
+    return execute( new TextCmdRemove( pos, group_with_next_op, end_pos - pos, segments_to_remove ) );
 }
 
 S32 LLTextEditor::overwriteChar(S32 pos, llwchar wc)
 {
-    if ((S32)getLength() == pos)
+    if ((S32)getLengthBytes() == pos)
     {
         return addChar(pos, wc);
     }
@@ -1222,11 +1256,11 @@ void LLTextEditor::removeCharOrTab()
     {
         S32 chars_to_remove = 1;
 
-        const LLWString& text = getWText();
+        const std::string& text = getText();
         if (text[mCursorPos - 1] == ' ')
         {
             // Try to remove a "tab"
-            S32 offset = getLineOffsetFromDocIndex(mCursorPos);
+            S32 offset = getLineColumnFromDocIndex(mCursorPos);
             if (offset > 0)
             {
                 chars_to_remove = offset % SPACES_PER_TAB;
@@ -1259,7 +1293,7 @@ void LLTextEditor::removeCharOrTab()
             S32 span = 1;
             if (chars_to_remove == 1)
             {
-                const size_t new_pos = wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos);
+                const size_t new_pos = utf8str_step_grapheme_backward(getText(), (size_t)mCursorPos);
                 span = mCursorPos - (S32)new_pos;
             }
             setCursorPos(mCursorPos - span);
@@ -1290,7 +1324,7 @@ void LLTextEditor::removeChar()
 
     if (mCursorPos > 0)
     {
-        const size_t new_pos = wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos);
+        const size_t new_pos = utf8str_step_grapheme_backward(getText(), (size_t)mCursorPos);
         const S32 span = mCursorPos - (S32)new_pos;
         setCursorPos((S32)new_pos);
         remove(mCursorPos, span, false);
@@ -1306,7 +1340,7 @@ void LLTextEditor::removeChar()
 // Add a single character to the text
 S32 LLTextEditor::addChar(S32 pos, llwchar wc)
 {
-    if ((wstring_utf8_length(getWText()) + wchar_utf8_length(wc)) > mMaxTextByteLength)
+    if (((S32)getText().size() + wchar_utf8_length(wc)) > mMaxTextByteLength)
     {
         LLUI::getInstance()->reportBadKeystroke();
         return 0;
@@ -1317,11 +1351,11 @@ S32 LLTextEditor::addChar(S32 pos, llwchar wc)
         if (mPrevalidator)
         {
             // get a copy of current text contents
-            LLWString test_string(getViewModel()->getDisplay());
+            std::string test_string(getViewModel()->getDisplayUtf8());
 
             // modify text contents as if this addChar succeeded
             llassert(pos <= (S32)test_string.size());
-            test_string.insert(pos, 1, wc);
+            test_string.insert(pos, utf8str_from_cp(wc));
             if (!mPrevalidator.validate(test_string))
             {
                 LLUI::getInstance()->reportBadKeystroke();
@@ -1355,8 +1389,8 @@ void LLTextEditor::addChar(llwchar wc)
         // Overwrite the whole grapheme cluster, not just one codepoint —
         // otherwise typing over an emoji like 🏳️‍⚧️ peels off only the base
         // (🏳) and leaves the variation selector / ZWJ / payload behind.
-        const LLWString& text = getWText();
-        const S32 span = (S32)wstring_step_grapheme_forward(text, (size_t)mCursorPos) - mCursorPos;
+        const std::string& text = getText();
+        const S32 span = (S32)utf8str_step_grapheme_forward(text, (size_t)mCursorPos) - mCursorPos;
         if (span > 0)
         {
             remove(mCursorPos, span, false);
@@ -1372,9 +1406,9 @@ void LLTextEditor::addChar(llwchar wc)
         // autoreplace the text, if necessary
         S32 replacement_start;
         S32 replacement_length;
-        LLWString replacement_string;
+        std::string replacement_string;
         S32 new_cursor_pos = mCursorPos;
-        mAutoreplaceCallback(replacement_start, replacement_length, replacement_string, new_cursor_pos, getWText());
+        mAutoreplaceCallback(replacement_start, replacement_length, replacement_string, new_cursor_pos, getText());
 
         if (replacement_length > 0 || !replacement_string.empty())
         {
@@ -1391,7 +1425,7 @@ void LLTextEditor::showEmojiHelper()
         return;
 
     const LLRect cursorRect(getLocalRectFromDocIndex(mCursorPos));
-    auto cb = [this](const LLWString& emoji) { insertEmoji(emoji); };
+    auto cb = [this](const std::string& emoji) { insertEmoji(emoji); };
     LLEmojiHelper::instance().showHelper(this, cursorRect.mLeft, cursorRect.mTop, LLStringUtil::null, cb);
 }
 
@@ -1409,13 +1443,12 @@ void LLTextEditor::tryToShowEmojiHelper()
         return;
 
     S32 shortCodePos;
-    const LLWString& wtext = getWText();
-    if (LLEmojiHelper::isCursorInEmojiCode(wtext, mCursorPos, &shortCodePos))
+    const std::string& text = getText();
+    if (LLEmojiHelper::isCursorInEmojiCode(text, mCursorPos, &shortCodePos))
     {
         const LLRect cursorRect(getLocalRectFromDocIndex(shortCodePos));
-        const LLWString wpart(wtext.substr(shortCodePos, mCursorPos - shortCodePos));
-        const std::string part(wstring_to_utf8str(wpart));
-        auto cb = [this](const LLWString& emoji) { handleEmojiCommit(emoji); };
+        const std::string part(text.substr(shortCodePos, mCursorPos - shortCodePos));
+        auto cb = [this](const std::string& emoji) { handleEmojiCommit(emoji); };
         LLEmojiHelper::instance().showHelper(this, cursorRect.mLeft, cursorRect.mTop, part, cb);
     }
     else
@@ -1430,11 +1463,11 @@ void LLTextEditor::tryToShowMentionHelper()
         return;
 
     S32 mention_start_pos;
-    const LLWString& text = getWText();
+    const std::string& text = getText();
     if (LLChatMentionHelper::instance().isCursorInNameMention(text, mCursorPos, &mention_start_pos))
     {
         const LLRect cursor_rect(getLocalRectFromDocIndex(mention_start_pos));
-        std::string name_part(wstring_to_utf8str(text.substr(mention_start_pos, mCursorPos - mention_start_pos)));
+        std::string name_part(text.substr(mention_start_pos, mCursorPos - mention_start_pos));
         name_part.erase(0, 1);
         auto cb = [this](std::string name_url)
         {
@@ -1463,8 +1496,8 @@ void LLTextEditor::addLineBreakChar(bool group_together)
     {
         // Mirror addChar's cluster-aware overwrite: an Enter pressed in
         // overwrite mode over an emoji should consume the whole cluster.
-        const LLWString& text = getWText();
-        const S32 span = (S32)wstring_step_grapheme_forward(text, (size_t)mCursorPos) - mCursorPos;
+        const std::string& text = getText();
+        const S32 span = (S32)utf8str_step_grapheme_forward(text, (size_t)mCursorPos) - mCursorPos;
         if (span > 0)
         {
             remove(mCursorPos, span, false);
@@ -1494,24 +1527,20 @@ bool LLTextEditor::handleSelectionKey(const KEY key, const MASK mask)
             if( 0 < mCursorPos )
             {
                 startSelection();
-                setCursorPos((S32)wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos));
-                if( mask & MASK_CONTROL )
-                {
-                    setCursorPos(prevWordPos(mCursorPos));
-                }
+                setCursorPos((mask & MASK_CONTROL)
+                    ? prevWordPos(mCursorPos)
+                    : (S32)utf8str_step_grapheme_backward(getText(), (size_t)mCursorPos));
                 mSelectionEnd = mCursorPos;
             }
             break;
 
         case KEY_RIGHT:
-            if( mCursorPos < getLength() )
+            if( mCursorPos < getLengthBytes() )
             {
                 startSelection();
-                setCursorPos((S32)wstring_step_grapheme_forward(getWText(), (size_t)mCursorPos));
-                if( mask & MASK_CONTROL )
-                {
-                    setCursorPos(nextWordPos(mCursorPos));
-                }
+                setCursorPos((mask & MASK_CONTROL)
+                    ? nextWordPos(mCursorPos)
+                    : (S32)utf8str_step_grapheme_forward(getText(), (size_t)mCursorPos));
                 mSelectionEnd = mCursorPos;
             }
             break;
@@ -1557,7 +1586,7 @@ bool LLTextEditor::handleSelectionKey(const KEY key, const MASK mask)
             startSelection();
             if( mask & MASK_CONTROL )
             {
-                setCursorPos(getLength());
+                setCursorPos(getLengthBytes());
             }
             else
             {
@@ -1625,7 +1654,7 @@ bool LLTextEditor::handleNavigationKey(const KEY key, const MASK mask)
             {
                 if( 0 < mCursorPos )
                 {
-                    setCursorPos((S32)wstring_step_grapheme_backward(getWText(), (size_t)mCursorPos));
+                    setCursorPos((S32)utf8str_step_grapheme_backward(getText(), (size_t)mCursorPos));
                 }
                 else
                 {
@@ -1641,9 +1670,9 @@ bool LLTextEditor::handleNavigationKey(const KEY key, const MASK mask)
             }
             else
             {
-                if( mCursorPos < getLength() )
+                if( mCursorPos < getLengthBytes() )
                 {
-                    setCursorPos((S32)wstring_step_grapheme_forward(getWText(), (size_t)mCursorPos));
+                    setCursorPos((S32)utf8str_step_grapheme_forward(getText(), (size_t)mCursorPos));
                 }
                 else
                 {
@@ -1695,7 +1724,7 @@ void LLTextEditor::cut()
     }
     S32 left_pos = llmin( mSelectionStart, mSelectionEnd );
     S32 length = llabs( mSelectionStart - mSelectionEnd );
-    LLClipboard::instance().copyToClipboard( getWText(), left_pos, length);
+    LLClipboard::instance().copyToClipboard( getText(), left_pos, length);
     deleteSelection( false );
 
     onKeyStroke();
@@ -1715,7 +1744,7 @@ void LLTextEditor::copy()
     }
     S32 left_pos = llmin( mSelectionStart, mSelectionEnd );
     S32 length = llabs( mSelectionStart - mSelectionEnd );
-    LLClipboard::instance().copyToClipboard(getWText(), left_pos, length);
+    LLClipboard::instance().copyToClipboard(getText(), left_pos, length);
 }
 
 bool LLTextEditor::canPaste() const
@@ -1762,7 +1791,7 @@ void LLTextEditor::pasteHelper(bool is_primary)
         return;
     }
 
-    LLWString paste;
+    std::string paste;
     LLClipboard::instance().pasteFromClipboard(paste, is_primary);
 
     if (paste.empty())
@@ -1777,7 +1806,7 @@ void LLTextEditor::pasteHelper(bool is_primary)
     }
 
     // Clean up string (replace tabs and remove characters that our fonts don't support).
-    LLWString clean_string(paste);
+    std::string clean_string(paste);
     cleanStringForPaste(clean_string);
 
     // Insert the new text into the existing text.
@@ -1792,44 +1821,52 @@ void LLTextEditor::pasteHelper(bool is_primary)
 
 
 // Clean up string (replace tabs and remove characters that our fonts don't support).
-void LLTextEditor::cleanStringForPaste(LLWString & clean_string)
+void LLTextEditor::cleanStringForPaste(std::string& clean_string)
 {
-    std::string clean_string_utf = wstring_to_utf8str(clean_string);
-    std::replace( clean_string_utf.begin(), clean_string_utf.end(), '\r', '\n');
-    clean_string = utf8str_to_wstring(clean_string_utf);
-
-    LLWStringUtil::replaceTabsWithSpaces(clean_string, SPACES_PER_TAB);
+    LLStringUtil::replaceChar(clean_string, '\r', '\n');
+    LLStringUtil::replaceTabsWithSpaces(clean_string, SPACES_PER_TAB);
     if( mAllowEmbeddedItems )
     {
+        // Rebuilt rather than edited in place: a character replaced here need
+        // not occupy as many bytes as the one replacing it, and an embedded
+        // item's character is four bytes whatever it stands in for.
         const llwchar LF = 10;
-        auto len = clean_string.length();
-        for( size_t i = 0; i < len; i++ )
+        std::string rebuilt;
+        rebuilt.reserve(clean_string.size());
+        for( size_t i = 0; i < clean_string.size(); )
         {
-            llwchar wc = clean_string[i];
+            const LLCodepointAt at = utf8str_decode_at(clean_string, i);
+            i = at.next;
+
+            llwchar wc = at.cp;
             if( (wc < LLFontFreetype::FIRST_CHAR) && (wc != LF) )
             {
-                clean_string[i] = LL_UNKNOWN_CHAR;
+                wc = LL_UNKNOWN_CHAR;
             }
             else if (wc >= FIRST_EMBEDDED_CHAR && wc <= LAST_EMBEDDED_CHAR)
             {
-                clean_string[i] = pasteEmbeddedItem(wc);
+                wc = pasteEmbeddedItem(wc);
             }
+            utf8str_append_cp(rebuilt, wc);
         }
+        clean_string.swap(rebuilt);
     }
 }
 
 
-void LLTextEditor::pasteTextWithLinebreaks(LLWString & clean_string)
+void LLTextEditor::pasteTextWithLinebreaks(std::string& clean_string)
 {
-    LLWString::size_type start = 0;
-    LLWString::size_type                  pos   = clean_string.find('\n', start);
+    // Newline is ASCII, so no byte of a multi-byte character can be mistaken
+    // for one and these splits always land on character boundaries.
+    std::string::size_type start = 0;
+    std::string::size_type pos   = clean_string.find('\n', start);
 
-    while (pos != LLWString::npos)
+    while (pos != std::string::npos)
     {
         if (pos != start)
         {
-            std::basic_string<llwchar> str = std::basic_string<llwchar>(clean_string,start,pos-start);
-            setCursorPos(mCursorPos + insert(mCursorPos, str, true, LLTextSegmentPtr()));
+            setCursorPos(mCursorPos + insert(mCursorPos,
+                std::string_view(clean_string).substr(start, pos - start), true, LLTextSegmentPtr()));
         }
         const bool trailing_linebreak = (pos == clean_string.length() - 1);
         addLineBreakChar(!trailing_linebreak);
@@ -1840,8 +1877,8 @@ void LLTextEditor::pasteTextWithLinebreaks(LLWString & clean_string)
 
     if (start < clean_string.length())
     {
-        std::basic_string<llwchar> str = std::basic_string<llwchar>(clean_string,start,clean_string.length()-start);
-        setCursorPos(mCursorPos + insert(mCursorPos, str, false, LLTextSegmentPtr()));
+        setCursorPos(mCursorPos + insert(mCursorPos,
+            std::string_view(clean_string).substr(start), false, LLTextSegmentPtr()));
     }
 }
 
@@ -1854,7 +1891,7 @@ void LLTextEditor::copyPrimary()
     }
     S32 left_pos = llmin( mSelectionStart, mSelectionEnd );
     S32 length = llabs( mSelectionStart - mSelectionEnd );
-    LLClipboard::instance().copyToClipboard(getWText(), left_pos, length, true);
+    LLClipboard::instance().copyToClipboard(getText(), left_pos, length, true);
 }
 
 bool LLTextEditor::canPastePrimary() const
@@ -1917,18 +1954,13 @@ bool LLTextEditor::handleControlKey(const KEY key, const MASK mask)
             }
 
         case KEY_RIGHT:
-            if( mCursorPos < getLength() )
+            if( mCursorPos < getLengthBytes() )
             {
                 // Ctrl-Home, Ctrl-Left, Ctrl-Right, Ctrl-Down
                 // all move the cursor as if clicking, so should deselect.
                 deselect();
 
-                // Step past the current cluster before scanning so multi-
-                // codepoint emoji (🏳️‍⚧️) get treated as one unit, matching
-                // the single-codepoint emoji case (🐶) where +1 already does.
-                const LLWString& wtext = getWText();
-                const S32 stepped = (S32)wstring_step_grapheme_forward(wtext, (size_t)mCursorPos);
-                setCursorPos(nextWordPos(stepped));
+                setCursorPos(nextWordPos(mCursorPos));
             }
             break;
 
@@ -1940,9 +1972,7 @@ bool LLTextEditor::handleControlKey(const KEY key, const MASK mask)
                 // all move the cursor as if clicking, so should deselect.
                 deselect();
 
-                const LLWString& wtext = getWText();
-                const S32 stepped = (S32)wstring_step_grapheme_backward(wtext, (size_t)mCursorPos);
-                setCursorPos(prevWordPos(stepped));
+                setCursorPos(prevWordPos(mCursorPos));
             }
             break;
 
@@ -2034,7 +2064,7 @@ bool LLTextEditor::handleSpecialKey(const KEY key, const MASK mask)
                 deleteSelection(false);
             }
 
-            S32 offset = getLineOffsetFromDocIndex(mCursorPos);
+            S32 offset = getLineColumnFromDocIndex(mCursorPos);
 
             S32 spaces_needed = SPACES_PER_TAB - (offset % SPACES_PER_TAB);
             for( S32 i=0; i < spaces_needed; i++ )
@@ -2061,7 +2091,7 @@ void LLTextEditor::unindentLineBeforeCloseBrace()
 {
     if( mCursorPos >= 1 )
     {
-        const LLWString& text = getWText();
+        const std::string& text = getText();
         if( ' ' == text[ mCursorPos - 1 ] )
         {
             S32 line = getLineNumFromDocIndex(mCursorPos, false);
@@ -2120,7 +2150,7 @@ bool LLTextEditor::handleKeyHere(KEY key, MASK mask )
         {   // Paste the first line of a tooltip into the editor
             std::string message;
             LLToolTipMgr::instance().getToolTipMessage(message);
-            LLWString tool_tip_text(utf8str_to_wstring(message));
+            std::string tool_tip_text(message);
 
             if (tool_tip_text.size() > 0)
             {
@@ -2130,10 +2160,10 @@ bool LLTextEditor::handleKeyHere(KEY key, MASK mask )
                     deleteSelection(true);
                 }
 
-                LLWString::size_type pos = tool_tip_text.find('\n',0);
-                if (pos != LLWString::npos)
+                std::string::size_type pos = tool_tip_text.find('\n',0);
+                if (pos != std::string::npos)
                 {   // Extract the first line of the tooltip
-                    tool_tip_text = LLWString(tool_tip_text, 0, pos);
+                    tool_tip_text.resize(pos);
                 }
 
                 // Add the text
@@ -2215,7 +2245,7 @@ bool LLTextEditor::handleUnicodeCharHere(llwchar uni_char)
 // virtual
 bool LLTextEditor::canDoDelete() const
 {
-    return !mReadOnly && ( !mPassDelete || ( hasSelection() || (mCursorPos < getLength())) );
+    return !mReadOnly && ( !mPassDelete || ( hasSelection() || (mCursorPos < getLengthBytes())) );
 }
 
 void LLTextEditor::doDelete()
@@ -2229,15 +2259,15 @@ void LLTextEditor::doDelete()
         deleteSelection(false);
     }
     else
-    if( mCursorPos < getLength() )
+    if( mCursorPos < getLengthBytes() )
     {
         S32 i;
         S32 chars_to_remove = 1;
-        const LLWString& text = getWText();
-        if( (text[ mCursorPos ] == ' ') && (mCursorPos + SPACES_PER_TAB < getLength()) )
+        const std::string& text = getText();
+        if( (text[ mCursorPos ] == ' ') && (mCursorPos + SPACES_PER_TAB < getLengthBytes()) )
         {
             // Try to remove a full tab's worth of spaces
-            S32 offset = getLineOffsetFromDocIndex(mCursorPos);
+            S32 offset = getLineColumnFromDocIndex(mCursorPos);
             chars_to_remove = SPACES_PER_TAB - (offset % SPACES_PER_TAB);
             if( chars_to_remove == 0 )
             {
@@ -2266,7 +2296,7 @@ void LLTextEditor::doDelete()
             S32 span = 1;
             if (chars_to_remove == 1)
             {
-                const size_t forward = wstring_step_grapheme_forward(getWText(), (size_t)mCursorPos);
+                const size_t forward = utf8str_step_grapheme_forward(getText(), (size_t)mCursorPos);
                 span = (S32)forward - mCursorPos;
             }
             setCursorPos(mCursorPos + span);
@@ -2502,9 +2532,8 @@ void LLTextEditor::drawPreeditMarker()
         return;
     }
 
-    const LLWString& textString = getWText();
-    const llwchar *text = textString.c_str();
-    const S32 text_len = getLength();
+    const std::string& text = getText();
+    const S32 text_len = getLengthBytes();
     const S32 num_lines = getLineCount();
 
     S32 cur_line = getFirstVisibleLine();
@@ -2559,16 +2588,16 @@ void LLTextEditor::drawPreeditMarker()
                 S32 preedit_left = text_rect.mLeft;
                 if (left > line_start)
                 {
-                    preedit_left += mFont->getWidth(text, line_start, left - line_start);
+                    preedit_left += mFont->getWidthBytes(text, line_start, left - line_start);
                 }
                 S32 preedit_right = text_rect.mLeft;
                 if (right < line_end)
                 {
-                    preedit_right += mFont->getWidth(text, line_start, right - line_start);
+                    preedit_right += mFont->getWidthBytes(text, line_start, right - line_start);
                 }
                 else
                 {
-                    preedit_right += mFont->getWidth(text, line_start, line_end - line_start);
+                    preedit_right += mFont->getWidthBytes(text, line_start, line_end - line_start);
                 }
 
                 if (mPreeditStandouts[i])
@@ -2663,7 +2692,7 @@ void LLTextEditor::setCursorAndScrollToEnd()
 void LLTextEditor::getCurrentLineAndColumn( S32* line, S32* col, bool include_wordwrap )
 {
     *line = getLineNumFromDocIndex(mCursorPos, include_wordwrap);
-    *col = getLineOffsetFromDocIndex(mCursorPos, include_wordwrap);
+    *col = getLineColumnFromDocIndex(mCursorPos, include_wordwrap);
 }
 
 void LLTextEditor::autoIndent()
@@ -2674,7 +2703,7 @@ void LLTextEditor::autoIndent()
     S32 space_count = 0;
     S32 i;
 
-    const LLWString& text = getWText();
+    const std::string& text = getText();
     S32 offset = getLineOffsetFromDocIndex(mCursorPos);
     while(( ' ' == text[line_start] ) && (space_count < offset))
     {
@@ -2711,12 +2740,12 @@ void LLTextEditor::insertText(const std::string &new_text)
         deleteSelection(true);
     }
 
-    setCursorPos(mCursorPos + insert( mCursorPos, utf8str_to_wstring(new_text), false, LLTextSegmentPtr() ));
+    setCursorPos(mCursorPos + insert( mCursorPos, new_text, false, LLTextSegmentPtr() ));
 
     setEnabled( enabled );
 }
 
-void LLTextEditor::insertText(LLWString &new_text)
+void LLTextEditor::insertText(std::string &new_text)
 {
     bool enabled = getEnabled();
     setEnabled( true );
@@ -2739,17 +2768,15 @@ void LLTextEditor::appendWidget(const LLInlineViewSegment::Params& params, const
     S32 selection_end = mSelectionEnd;
     bool was_selecting = mIsSelecting;
     S32 cursor_pos = mCursorPos;
-    S32 old_length = getLength();
+    S32 old_length = getLengthBytes();
     bool cursor_was_at_end = (mCursorPos == old_length);
 
     deselect();
 
     setCursorPos(old_length);
 
-    LLWString widget_wide_text = utf8str_to_wstring(text);
-
-    LLTextSegmentPtr segment = new LLInlineViewSegment(params, old_length, old_length + static_cast<S32>(widget_wide_text.size()));
-    insert(getLength(), widget_wide_text, false, segment);
+    LLTextSegmentPtr segment = new LLInlineViewSegment(params, old_length, old_length + static_cast<S32>(text.size()));
+    insert(getLengthBytes(), text, false, segment);
 
     // Set the cursor and scroll position
     if( selection_start != selection_end )
@@ -2762,7 +2789,7 @@ void LLTextEditor::appendWidget(const LLInlineViewSegment::Params& params, const
     }
     else if( cursor_was_at_end )
     {
-        setCursorPos(getLength());
+        setCursorPos(getLengthBytes());
     }
     else
     {
@@ -2773,20 +2800,6 @@ void LLTextEditor::appendWidget(const LLInlineViewSegment::Params& params, const
     {
         blockUndo();
     }
-}
-
-void LLTextEditor::removeTextFromEnd(S32 num_chars)
-{
-    if (num_chars <= 0) return;
-
-    remove(getLength() - num_chars, num_chars, false);
-
-    S32 len = getLength();
-    setCursorPos (llclamp(mCursorPos, 0, len));
-    mSelectionStart = llclamp(mSelectionStart, 0, len);
-    mSelectionEnd = llclamp(mSelectionEnd, 0, len);
-
-    needsScroll();
 }
 
 //----------------------------------------------------------------------------
@@ -2859,7 +2872,7 @@ bool LLTextEditor::tryToRevertToPristineState()
 
 void LLTextEditor::updateLinkSegments()
 {
-    const LLWString& wtext = getWText();
+    const std::string& text = getText();
 
     // update any segments that contain a link
     for (segment_set_t::iterator it = mSegments.begin(); it != mSegments.end(); ++it)
@@ -2869,19 +2882,19 @@ void LLTextEditor::updateLinkSegments()
         {
             LLStyleConstSP style = segment->getStyle();
             LLStyleSP new_style(new LLStyle(*style));
-            LLWString url_label = wtext.substr(segment->getStart(), segment->getEnd()-segment->getStart());
+            std::string url_label = text.substr(segment->getStart(), segment->getEnd()-segment->getStart());
 
             segment_set_t::const_iterator next_it = mSegments.upper_bound(segment);
             LLTextSegment *next_segment = *next_it;
             if (next_segment)
             {
-                LLWString next_url_label = wtext.substr(next_segment->getStart(), next_segment->getEnd()-next_segment->getStart());
-                std::string link_check = wstring_to_utf8str(url_label) + wstring_to_utf8str(next_url_label);
+                std::string next_url_label = text.substr(next_segment->getStart(), next_segment->getEnd()-next_segment->getStart());
+                std::string link_check = url_label + next_url_label;
                 LLUrlMatch match;
 
                 if ( LLUrlRegistry::instance().findUrl(link_check, match))
                 {
-                    if(match.getQuery() == wstring_to_utf8str(next_url_label))
+                    if(match.getQuery() == next_url_label)
                     {
                         continue;
                     }
@@ -2893,7 +2906,7 @@ void LLTextEditor::updateLinkSegments()
             // This lets users edit Urls in-place.
             if (acceptsTextInput() && LLUrlRegistry::instance().hasUrl(url_label))
             {
-                std::string new_url = wstring_to_utf8str(url_label);
+                std::string new_url = url_label;
                 LLStringUtil::trim(new_url);
                 new_style->setLinkHREF(new_url);
                 LLStyleConstSP sp(new_style);
@@ -3007,7 +3020,7 @@ bool LLTextEditor::exportBuffer(std::string &buffer )
     outstream << "Linden text version 1\n";
     outstream << "{\n";
 
-    outstream << llformat("Text length %d\n", getLength() );
+    outstream << llformat("Text length %d\n", getLengthBytes() );
     outstream << getText();
     outstream << "}\n";
 
@@ -3124,12 +3137,19 @@ void LLTextEditor::resetPreedit()
             deselect();
         }
 
-        setCursorPos(mPreeditPositions.front());
-        removeStringNoUndo(mCursorPos, mPreeditPositions.back() - mCursorPos);
-        insertStringNoUndo(mCursorPos, mPreeditOverwrittenWString);
+        // Cut where the preedit was recorded as starting, not where the caret
+        // ends up being put. setCursorPos aligns to a grapheme, so a preedit
+        // whose first codepoint clusters with the character before it -- a
+        // combining mark, a variation selector -- would move the caret back
+        // over that character and take it away with the composition.
+        const S32 preedit_begin = mPreeditPositions.front();
+        const S32 preedit_end   = mPreeditPositions.back();
+        removeStringNoUndo(preedit_begin, preedit_end - preedit_begin);
+        insertStringNoUndo(preedit_begin, mPreeditOverwrittenString);
+        setCursorPos(preedit_begin);
 
-        mPreeditWString.clear();
-        mPreeditOverwrittenWString.clear();
+        mPreeditString.clear();
+        mPreeditOverwrittenString.clear();
         mPreeditPositions.clear();
 
         // A call to updatePreedit should soon follow under a
@@ -3139,7 +3159,7 @@ void LLTextEditor::resetPreedit()
     }
 }
 
-void LLTextEditor::updatePreedit(const LLWString &preedit_string,
+void LLTextEditor::updatePreedit(std::string_view preedit_string,
         const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position)
 {
     // Just in case.
@@ -3152,33 +3172,39 @@ void LLTextEditor::updatePreedit(const LLWString &preedit_string,
 
     S32 insert_preedit_at = mCursorPos;
 
-    mPreeditWString = preedit_string;
+    mPreeditString.assign(preedit_string);
     mPreeditPositions.resize(preedit_segment_lengths.size() + 1);
     S32 position = insert_preedit_at;
     for (segment_lengths_t::size_type i = 0; i < preedit_segment_lengths.size(); i++)
     {
         mPreeditPositions[i] = position;
-        position += preedit_segment_lengths[i];
+        position += llmax(0, preedit_segment_lengths[i]);
     }
     mPreeditPositions.back() = position;
 
     if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode())
     {
-        mPreeditOverwrittenWString = getWText().substr(insert_preedit_at, mPreeditWString.length());
-        removeStringNoUndo(insert_preedit_at, static_cast<S32>(mPreeditWString.length()));
+        // As much of the document as the preedit will cover, backed off to a
+        // whole character so the overwrite cannot end inside one.
+        const S32 overwritten = (S32)utf8str_grapheme_align_backward(
+            getText(),
+            llmin((size_t)insert_preedit_at + preedit_string.length(),
+                  (size_t)getLengthBytes())) - insert_preedit_at;
+        mPreeditOverwrittenString = getText().substr(insert_preedit_at, overwritten);
+        removeStringNoUndo(insert_preedit_at, overwritten);
     }
     else
     {
-        mPreeditOverwrittenWString.clear();
+        mPreeditOverwrittenString.clear();
     }
 
     segment_vec_t segments;
     //pass empty segments to let "insertStringNoUndo" make new LLNormalTextSegment and insert it, if needed.
-    insertStringNoUndo(insert_preedit_at, mPreeditWString, &segments);
+    insertStringNoUndo(insert_preedit_at, mPreeditString, &segments);
 
     mPreeditStandouts = preedit_standouts;
 
-    setCursorPos(insert_preedit_at + caret_position);
+    setCursorPos(insert_preedit_at + llmax(0, caret_position));
 
     // Update of the preedit should be caused by some key strokes.
     resetCursorBlink();
@@ -3236,14 +3262,13 @@ bool LLTextEditor::getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect
         current_line++;
     }
 
-    const LLWString& textString = getWText();
-    const llwchar * const text = textString.c_str();
+    const std::string& text = getText();
     // Multi-line iteration: match segment layout's line spacing (see above).
     const S32 line_height = mFont->getLineSpacing();
 
     if (coord)
     {
-        const S32 query_x = mVisibleTextRect.mLeft + mFont->getWidth(text, current_line_start, query - current_line_start);
+        const S32 query_x = mVisibleTextRect.mLeft + mFont->getWidthBytes(text, current_line_start, query - current_line_start);
         const S32 query_y = mVisibleTextRect.mTop - (current_line - first_visible_line) * line_height - line_height / 2;
         S32 query_screen_x, query_screen_y;
         localPointToScreen(query_x, query_y, &query_screen_x, &query_screen_y);
@@ -3255,17 +3280,17 @@ bool LLTextEditor::getPreeditLocation(S32 query_offset, LLCoordGL *coord, LLRect
         S32 preedit_left = mVisibleTextRect.mLeft;
         if (preedit_left_position > current_line_start)
         {
-            preedit_left += mFont->getWidth(text, current_line_start, preedit_left_position - current_line_start);
+            preedit_left += mFont->getWidthBytes(text, current_line_start, preedit_left_position - current_line_start);
         }
 
         S32 preedit_right = mVisibleTextRect.mLeft;
         if (preedit_right_position < current_line_end)
         {
-            preedit_right += mFont->getWidth(text, current_line_start, preedit_right_position - current_line_start);
+            preedit_right += mFont->getWidthBytes(text, current_line_start, preedit_right_position - current_line_start);
         }
         else
         {
-            preedit_right += mFont->getWidth(text, current_line_start, current_line_end - current_line_start);
+            preedit_right += mFont->getWidthBytes(text, current_line_start, current_line_end - current_line_start);
         }
 
         const S32 preedit_top = mVisibleTextRect.mTop - (current_line - first_visible_line) * line_height;
@@ -3299,29 +3324,32 @@ void LLTextEditor::getPreeditRange(S32 *position, S32 *length) const
     if (hasPreeditString())
     {
         *position = mPreeditPositions.front();
-        *length = mPreeditPositions.back() - mPreeditPositions.front();
+        *length   = mPreeditPositions.back() - mPreeditPositions.front();
     }
     else
     {
         *position = mCursorPos;
-        *length = 0;
+        *length   = 0;
     }
 }
 
 void LLTextEditor::markAsPreedit(S32 position, S32 length)
 {
+    const S32 begin = position;
+    const S32 end   = position + length;
+
     deselect();
-    setCursorPos(position);
+    setCursorPos(begin);
     if (hasPreeditString())
     {
         LL_WARNS() << "markAsPreedit invoked when hasPreeditString is true." << LL_ENDL;
     }
-    mPreeditWString = LLWString( getWText(), position, length );
-    if (length > 0)
+    mPreeditString = getText().substr(begin, end - begin);
+    if (end > begin)
     {
         mPreeditPositions.resize(2);
-        mPreeditPositions[0] = position;
-        mPreeditPositions[1] = position + length;
+        mPreeditPositions[0] = begin;
+        mPreeditPositions[1] = end;
         mPreeditStandouts.resize(1);
         mPreeditStandouts[0] = false;
     }
@@ -3332,11 +3360,11 @@ void LLTextEditor::markAsPreedit(S32 position, S32 length)
     }
     if (LL_KIM_OVERWRITE == gKeyboard->getInsertMode())
     {
-        mPreeditOverwrittenWString = mPreeditWString;
+        mPreeditOverwrittenString = mPreeditString;
     }
     else
     {
-        mPreeditOverwrittenWString.clear();
+        mPreeditOverwrittenString.clear();
     }
 }
 
@@ -3378,7 +3406,7 @@ void LLTextEditor::onKeyStroke()
 //virtual
 void LLTextEditor::clear()
 {
-    getViewModel()->setDisplay(LLWStringUtil::null);
+    getViewModel()->setDisplayUtf8(LLStringUtil::null);
     clearSegments();
 }
 
@@ -3392,18 +3420,20 @@ S32 LLTextEditor::spacesPerTab()
     return SPACES_PER_TAB;
 }
 
-LLWString LLTextEditor::getConvertedText() const
+std::string LLTextEditor::getConvertedText() const
 {
-    LLWString text = getWText();
+    std::string text = getText();
     S32 diff = 0;
     for (auto segment : mSegments)
     {
         if (segment && segment->getStyle() && segment->getStyle()->getDrawHighlightBg())
         {
             S32 seg_length = segment->getEnd() - segment->getStart();
-            std::string slurl = segment->getStyle()->getLinkHREF();
+            const std::string& slurl = segment->getStyle()->getLinkHREF();
 
-            text.replace(segment->getStart() + diff, seg_length, utf8str_to_wstring(slurl));
+            text.replace(segment->getStart() + diff, seg_length, slurl);
+            // Both terms are bytes, because that is what `text` and the segment
+            // offsets are.
             diff += (S32)slurl.size() - seg_length;
         }
     }

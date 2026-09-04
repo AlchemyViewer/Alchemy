@@ -100,31 +100,34 @@ public:
     // LLViewModel functions
     virtual void setValue(const LLSD& value);
     virtual LLSD getValue() const;
-    const std::string& getStringValue() const;
+
+    /// The text itself. Free, and never stale: what the widgets edit is the
+    /// same string in the same encoding, so there is nothing to convert.
+    const std::string& getStringValue() const { return mDisplay; }
 
     // New functions
-    /// Get the stored value in string form
-    const LLWString& getDisplay() const { return mDisplay; }
+    /// Get the stored value in string form. Every offset into it is a byte
+    /// offset, sitting at a character start.
+    const std::string& getDisplayUtf8() const { return mDisplay; }
     S32 getDisplayGeneration() const { return mDisplayGeneration; }
-    LLWString& getEditableDisplay();
+    std::string& getEditableDisplayUtf8();
 
     /**
-     * Set the display string directly (see LLTextEditor). What the user is
-     * editing is actually the LLWString value rather than the underlying
-     * UTF-8 value.
+     * Set the display string directly (see LLTextEditor). A text editor edits
+     * this rather than going through the LLSD value, which is brought back
+     * into line lazily.
      */
-    void setDisplay(const LLWString& value);
+    void setDisplayUtf8(std::string_view value);
 
 private:
-    std::string mStringValue;
-
-    /// To avoid converting every widget's stored value from LLSD to LLWString
-    /// every frame, cache the converted value
-    LLWString mDisplay;
+    /// The text, UTF-8. Named as the display string for the same reason it
+    /// always was -- a widget edits it directly -- but it is no longer a
+    /// second encoding of the value, so there is only the one copy now.
+    std::string mDisplay;
     S32 mDisplayGeneration = -1;
 
-    /// As the user edits individual characters (setDisplay()), defer
-    /// LLWString-to-UTF8 conversions until s/he's done.
+    /// As the user edits individual characters (setDisplayUtf8()), defer
+    /// rebuilding the LLSD value until s/he's done.
     bool mUpdateFromDisplay;
 
     friend void updateFromDisplayIfNeeded(const LLTextViewModel* model);

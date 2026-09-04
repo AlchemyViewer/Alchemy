@@ -84,7 +84,8 @@ const F32 DROP_SHADOW_SOFT_STRENGTH = 0.3f;
 
 namespace
 {
-    // Slice-local result of itemizing + shaping a measurement window. Each
+    // Slice-local result of itemizing + shaping a measurement window. Every
+    // position here is a byte offset. Each
     // pair in `ranges` is [first, second) within `slice`; `glyphs[i]` points
     // into the global shape LRU and is non-null when `ranges[i]` produced
     // glyphs (which is always the case for shapeLine — empty results are
@@ -101,15 +102,55 @@ namespace
     // call and don't fire other shape* in between, this is safe in practice.
     struct ShapeLayout
     {
-        std::vector<std::pair<size_t, size_t>>           ranges;
-        std::vector<const std::vector<ALShapedGlyph>*>   glyphs;
-        // Shape-cache mutation count at build time. The glyph pointers are
+        // One range, always: the slice is shaped end to end. Two vectors used
+        // to hold that, from a design that partitioned the slice per face
+        // before shape_sub_run's feature plan made the partition unnecessary.
+        // Holding one element in two heap allocations cost a malloc and a free
+        // apiece on every draw and every measurement.
+        //
+        // `glyphs` is null for an empty slice or a null face.
+        size_t begin = 0;
+        size_t end   = 0;
+        const std::vector<ALShapedGlyph>* glyphs = nullptr;
+        // Shape-cache mutation count at build time. The glyph pointer is
         // valid only while this matches ALFontShaping::cacheMutationCount();
         // holders llassert equality after their last dereference so a
         // use-after-invalidation trips a debug assert instead of reading
         // freed glyph runs.
         size_t mutation_snapshot = 0;
     };
+
+    // Width of a shaped run in scaled pixels, including the extent overhang of
+    // whichever glyph reaches furthest past its own advance. The one place that
+    // arithmetic lives: renderBytes needs the same number to place a
+    // right-aligned or centred string, and deriving it twice from the same
+    // glyphs is how the drawn position and the measured one drift apart.
+    F32 shaped_run_width(const LLFontFreetype* ft,
+                         const std::vector<ALShapedGlyph>& glyphs,
+                         bool no_padding, bool subpixel_pen)
+    {
+        F32 cur_x   = 0.f;
+        F32 padding = 0.f;
+        for (const ALShapedGlyph& sg : glyphs)
+        {
+            const LLFontGlyphInfo* gi = ft->getGlyphInfoByIndex(
+                sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
+            if (!gi)
+                continue;
+            if (!no_padding)
+            {
+                padding = llmax(0.f,
+                                padding - sg.x_advance,
+                                (F32)(gi->mWidth + gi->mXBearing) - sg.x_advance);
+            }
+            cur_x += sg.x_advance;
+            // Match render()'s pen motion so caret positions and ellipsis
+            // cutoffs agree with what is drawn.
+            if (!subpixel_pen)
+                cur_x = (F32)ll_round(cur_x);
+        }
+        return no_padding ? cur_x : (cur_x + padding);
+    }
 
     // Build the shape layout for `slice` against `root_face`. One
     // all-encompassing range, shaped end-to-end through HarfBuzz. The
@@ -118,7 +159,7 @@ namespace
     // alignment without a separate codepoint partition. Empty slice or
     // null face: empty layout, no allocations.
     ShapeLayout build_shape_layout(const LLFontFreetype* root_face,
-                                   LLWStringView         slice)
+                                   std::string_view      slice)
     {
         ShapeLayout out;
         // Snapshot up front so the empty-layout early return below carries
@@ -129,21 +170,13 @@ namespace
         if (!root_face || slice.empty())
             return out;
 
-        out.ranges.emplace_back(size_t(0), slice.size());
+        out.begin  = 0;
+        out.end    = slice.size();
+        out.glyphs = &ALFontShaping::shapeLine(root_face, slice, out.begin, out.end);
 
-        out.glyphs.resize(out.ranges.size(), nullptr);
-        for (size_t s = 0; s < out.ranges.size(); ++s)
-        {
-            out.glyphs[s] = &ALFontShaping::shapeLine(root_face, slice,
-                                                     out.ranges[s].first,
-                                                     out.ranges[s].second);
-        }
-        // Re-snapshot AFTER all shapeLine calls — each call may itself
-        // mutate (miss-insert), which is fine: only mutations after this
-        // point invalidate the pointers collected above. (With a single
-        // range there's nothing to invalidate mid-build; with several,
-        // entries just shaped sit at the LRU front, out of eviction's
-        // reach.)
+        // Re-snapshot AFTER the shapeLine call — it may itself mutate
+        // (miss-insert), which is fine: only mutations after this point
+        // invalidate the pointer collected above.
         out.mutation_snapshot = ALFontShaping::cacheMutationCount();
         return out;
     }
@@ -202,14 +235,30 @@ U64 LLFontGL::getCacheGeneration() const
     // sum — no A+1/B-1 aliasing. addFallbackFont growing the chain adds a
     // component, which also only increases it.
     //
-    // This used to return the global counter, which invalidated EVERY
-    // cached text buffer viewer-wide whenever any font rasterized a glyph;
-    // during glyph churn (first CJK chat fill, post-eviction warm-up) each
-    // regen rasterized more glyphs and re-invalidated everything again for
-    // several frames.
+    // Per font, not global: a global counter invalidates every cached text
+    // buffer viewer-wide whenever any font rasterizes a glyph, and glyph churn
+    // (the first CJK chat fill, a post-eviction warm-up) then rasterizes more
+    // glyphs per regen and re-invalidates everything again for several frames.
     const LLFontFreetype* ft = mFontFreetype.get();
     if (!ft)
         return 0;
+
+    // Memoized, because the callers ask on the path where the answer is
+    // "nothing changed, replay what you have" -- every cached-text widget,
+    // every frame -- and answering meant walking the whole fallback chain,
+    // which for the default SansSerif is a handful of faces before the OS
+    // ones attach at runtime.
+    //
+    // Two things can move the sum. A component takes a new value, which it can
+    // only draw from the global counter, so the counter moving is a necessary
+    // condition. Or the chain gains a face that already had a cache, which
+    // moves no counter at all -- so its length is part of the key too.
+    const S32    global_gen = LLFontBitmapCache::getGlobalGeneration();
+    const size_t chain_len  = ft->getFallbackFonts().size();
+    if (mCacheGenValid && mCacheGenGlobal == global_gen && mCacheGenChain == chain_len)
+    {
+        return mCacheGenSum;
+    }
     // U64 accumulator: components are non-negative S32s drawn from the
     // monotonic global counter, so the unsigned 64-bit sum can't overflow
     // within any reachable session and the comparison contract in the
@@ -225,63 +274,142 @@ U64 LLFontGL::getCacheGeneration() const
                 gen += (U64)cache->getCacheGeneration();
         }
     }
+
+    mCacheGenSum    = gen;
+    mCacheGenGlobal = global_gen;
+    mCacheGenChain  = chain_len;
+    mCacheGenValid  = true;
     return gen;
 }
 
-S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRect& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
-    ShadowType shadow, S32 max_chars, F32* right_x, bool use_ellipses, bool use_color) const
+// The underline rule, drawn before the glyphs so descenders ('g', 'y', 'p',
+// 'q', 'j') sit on top of it rather than being crossed by it -- typographically
+// correct and what every text engine produces. On the captured-list path
+// (LLFontTextCache) this becomes the first entry in mForegroundBufferList,
+// so replay draws it first too.
+//
+// Texture: sWhiteTexture samples vec4(1,1,1,1), so vertex_color multiplied
+// through the standard ui shader produces a solid stroke. TRIANGLES over a
+// textured quad keeps the pipeline uniform with glyphs -- a LINES + unbind
+// sequence captures a texName=0 batch that replays as an unbind→sWhiteTexture
+// dance and renders inconsistently across drivers. The face's own
+// underline_position / underline_thickness give a typographically correct
+// stroke rather than a 1px line at the descender depth.
+static void draw_underline(const LLFontFreetype* face, F32 start_x, F32 baseline_y,
+                           F32 width, const LLColor4& color)
 {
-    LLRectf rect_float((F32)rect.mLeft, (F32)rect.mTop, (F32)rect.mRight, (F32)rect.mBottom);
-    return render(wstr, begin_offset, rect_float, color, halign, valign, style, shadow, max_chars, right_x, use_ellipses, use_color);
+    const F32 end_x = start_x + width;
+    const F32 y_bot = baseline_y + face->getUnderlinePosition();
+    const F32 y_top = y_bot + face->getUnderlineThickness();
+
+    LLColor4U col(color);
+    gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, ALTextureSlot::sWhiteTexture);
+    gGL.color4ubv(col.mV);
+    gGL.begin(LLRender::TRIANGLES);
+    gGL.vertex2f(start_x, y_bot);
+    gGL.vertex2f(end_x,   y_bot);
+    gGL.vertex2f(start_x, y_top);
+    gGL.vertex2f(end_x,   y_bot);
+    gGL.vertex2f(end_x,   y_top);
+    gGL.vertex2f(start_x, y_top);
+    gGL.end();
 }
 
-S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, const LLRectf& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
-                     ShadowType shadow, S32 max_chars, F32* right_x, bool use_ellipses, bool use_color) const
+// Where a rect-anchored draw starts, which is the only thing the rect forms do
+// beyond handing off to the x/y ones.
+static void origin_from_rect(const LLRectf& rect, LLFontGL::VAlign valign, F32& x, F32& y)
 {
-    F32 x = rect.mLeft;
-    F32 y = 0.f;
+    x = rect.mLeft;
 
     switch(valign)
     {
-    case TOP:
+    case LLFontGL::TOP:
         y = rect.mTop;
         break;
-    case VCENTER:
+    case LLFontGL::VCENTER:
         y = rect.getCenterY();
         break;
-    case BASELINE:
-    case BOTTOM:
+    case LLFontGL::BASELINE:
+    case LLFontGL::BOTTOM:
         y = rect.mBottom;
         break;
     default:
         y = rect.mBottom;
         break;
     }
-    return render(wstr, begin_offset, x, y, color, halign, valign, style, shadow, max_chars, (S32)rect.getWidth(), right_x, use_ellipses, use_color);
+}
+
+S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, const LLRect& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
+    ShadowType shadow, S32 max_bytes, F32* right_x, bool use_ellipses, bool use_color) const
+{
+    LLRectf rect_float((F32)rect.mLeft, (F32)rect.mTop, (F32)rect.mRight, (F32)rect.mBottom);
+    return renderBytes(utf8text, begin_offset, rect_float, color, halign, valign, style, shadow, max_bytes, right_x, use_ellipses, use_color);
+}
+
+S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, const LLRectf& rect, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
+                          ShadowType shadow, S32 max_bytes, F32* right_x, bool use_ellipses, bool use_color) const
+{
+    F32 x, y;
+    origin_from_rect(rect, valign, x, y);
+    return renderBytes(utf8text, begin_offset, x, y, color, halign, valign, style, shadow, max_bytes, (S32)rect.getWidth(), right_x, use_ellipses, use_color);
 }
 
 
-S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
-                     ShadowType shadow, S32 max_chars, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color, pass_boundary_cb_t on_pass_boundary) const
+ALTextTransform::ALTextTransform()
+{
+    // The glyph batch is emitted pre-transformed, so the UI offset the view
+    // tree accumulated must not reach it; the same placement arrives through
+    // the matrix below instead, where it costs nothing to change.
+    gGL.pushUIMatrix();
+    gGL.loadUIIdentity();
+
+    // Where the text sits, and how deep it is so that floating text appears
+    // 'in-world' and is correctly occluded.
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.pushMatrix();
+    gGL.translatef(floorf((F32)LLFontGL::sCurOrigin.mX * LLFontGL::sScaleX),
+                   floorf((F32)LLFontGL::sCurOrigin.mY * LLFontGL::sScaleY),
+                   LLFontGL::sCurDepth);
+}
+
+ALTextTransform::~ALTextTransform()
+{
+    end();
+}
+
+void ALTextTransform::end()
+{
+    if (!mActive)
+    {
+        return;
+    }
+    mActive = false;
+
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
+    gGL.popMatrix();
+    gGL.popUIMatrix();
+}
+
+
+S32 LLFontGL::renderBytes(std::string_view utf8text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style,
+                          ShadowType shadow, S32 max_bytes, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color, pass_boundary_cb_t on_pass_boundary) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
     if(!sDisplayFont) //do not display texts
     {
-        return static_cast<S32>(wstr.length());
+        return static_cast<S32>(utf8text.length());
     }
 
-    if (wstr.empty() || begin_offset < 0 || begin_offset >= (S32)wstr.length())
+    if (utf8text.empty() || begin_offset < 0 || begin_offset >= (S32)utf8text.length())
     {
         return 0;
     }
 
-    // Atlas-sheet eviction now runs once per frame from
-    // LLFontGL::sweepGlyphCaches (driven by LLViewerWindow::checkSettings),
-    // not here. Doing it inside render() forced every glyph render to
-    // pay the throttle-check overhead and risked racing eviction with
-    // glyph pointers active inside the same render call.
-
+    // Atlas-sheet eviction belongs to LLFontGL::sweepGlyphCaches, once per
+    // frame: run from here it would put a throttle check in the per-glyph path
+    // and could evict a sheet while this call still holds glyph pointers into
+    // it.
 
     S32 scaled_max_pixels = max_pixels == S32_MAX ? S32_MAX : llceil((F32)max_pixels * sScaleX);
 
@@ -314,27 +442,33 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         }
     }
 
-    gGL.pushUIMatrix();
-
-    gGL.loadUIIdentity();
-
-    LLVector2 origin(floorf(sCurOrigin.mX*sScaleX), floorf(sCurOrigin.mY*sScaleY));
-
-    // Depth translation, so that floating text appears 'in-world'
-    // and is correctly occluded.
-    gGL.translatef(0.f,0.f,sCurDepth);
+    // Everything below places glyphs relative to this, never in screen
+    // coordinates, so the same geometry serves wherever the text ends up.
+    ALTextTransform transform;
 
     S32 chars_drawn = 0;
     S32 i;
     S32 length;
 
-    if (-1 == max_chars)
+    if (-1 == max_bytes)
     {
-        max_chars = length = (S32)wstr.length() - begin_offset;
+        max_bytes = length = (S32)utf8text.length() - begin_offset;
     }
     else
     {
-        length = llmin((S32)wstr.length() - begin_offset, max_chars );
+        length = llmin((S32)utf8text.length() - begin_offset, max_bytes );
+    }
+
+    // Nothing past an embedded NUL is ever drawn -- the walk below stops there
+    // -- so nothing past it is worth shaping either, and stopping here is also
+    // what lets the width be taken from the same glyphs the draw uses:
+    // getWidthF32Bytes trims at the NUL, and a run measured past one would
+    // place a right-aligned string by text that never appears.
+    {
+        S32 trimmed = 0;
+        while (trimmed < length && utf8text[begin_offset + trimmed] != 0)
+            ++trimmed;
+        length = trimmed;
     }
 
     F32 cur_x, cur_y, cur_render_x, cur_render_y;
@@ -351,8 +485,8 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // FORCE_AUTOHINT and NO_HINTING.
     const bool subpixel_pen = mFontFreetype->useSubpixelPen();
 
-    cur_x = ((F32)x * sScaleX) + origin.mV[VX];
-    cur_y = ((F32)y * sScaleY) + origin.mV[VY];
+    cur_x = (F32)x * sScaleX;
+    cur_y = (F32)y * sScaleY;
 
     // Offset y by vertical alignment.
     // use unscaled font metrics here
@@ -381,9 +515,24 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // measurement work paid for nothing.
     const bool needs_string_width = (halign == RIGHT) || (halign == HCENTER)
                                   || (style_to_add & UNDERLINE) || use_ellipses;
-    const F32 string_width_unscaled = needs_string_width
-        ? getWidthF32(wstr, begin_offset, length)
-        : 0.f;
+
+    // The slice is shaped here rather than further down, so the width comes
+    // out of the glyphs this draw is about to lay down instead of a second
+    // shape and a second walk of the same text. getWidthF32Bytes did both, on
+    // every button label and every scroll-list cell.
+    const std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)length);
+    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
+
+    F32 string_width_unscaled = 0.f;
+    if (needs_string_width)
+    {
+        // Shaping failing leaves nothing to measure from, so that case still
+        // asks the codepoint walk -- which is where it lives.
+        string_width_unscaled = (layout.glyphs && !layout.glyphs->empty())
+            ? shaped_run_width(mFontFreetype, *layout.glyphs,
+                               /*no_padding=*/false, subpixel_pen) / sScaleX
+            : getWidthF32Bytes(utf8text, begin_offset, length);
+    }
     const S32 scaled_string_width = ll_round(string_width_unscaled * sScaleX);
 
     switch (halign)
@@ -407,46 +556,12 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
     if (style_to_add & UNDERLINE)
     {
-        // Draw the underline BEFORE glyph emission so descenders ('g',
-        // 'y', 'p', 'q', 'j') sit on top of the rule rather than being
-        // crossed by it — typographically correct and what every text
-        // engine produces. Captured-list path (LLFontVertexBuffer) gets
-        // an underline batch as the first entry in mForegroundBufferList,
-        // so replay draws it first too. Non-capture mode just streams it
-        // ahead of the glyph batches.
-        //
-        // Width: getWidthF32 is the same per-pen-accumulation walk the
-        // render loop uses, clamped to scaled_max_pixels for the ellipses
-        // path. Mirrors halign-RIGHT/HCENTER's existing math (lines 286,
-        // 289). For the rare overflow-without-ellipses case the rule may
-        // extend slightly past the last visible glyph; the typography
-        // win on common usage outweighs that corner.
-        //
-        // Texture: sWhiteTexture sample = vec4(1,1,1,1), so vertex_color
-        // multiplied through the standard ui shader produces a solid
-        // colored stroke. Going through TRIANGLES + textured-quad keeps
-        // the pipeline uniform with glyphs (the legacy LINES + unbind
-        // sequence captured a texName=0 batch that re-played as an
-        // unbind→sWhiteTexture dance and rendered inconsistently across
-        // drivers). Using the face's own underline_position /
-        // underline_thickness gives a typographically correct stroke
-        // instead of a fixed 1px line stuck at the descender depth.
-        const S32 underline_width = llmin(scaled_max_pixels, scaled_string_width);
-        const F32 end_x = start_x + (F32)underline_width;
-        const F32 y_bot = cur_y + mFontFreetype->getUnderlinePosition();
-        const F32 y_top = y_bot + mFontFreetype->getUnderlineThickness();
-
-        LLColor4U col(color);
-        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, ALTextureSlot::sWhiteTexture);
-        gGL.color4ubv(col.mV);
-        gGL.begin(LLRender::TRIANGLES);
-        gGL.vertex2f(start_x, y_bot);
-        gGL.vertex2f(end_x,   y_bot);
-        gGL.vertex2f(start_x, y_top);
-        gGL.vertex2f(end_x,   y_bot);
-        gGL.vertex2f(end_x,   y_top);
-        gGL.vertex2f(start_x, y_top);
-        gGL.end();
+        // The same string width the halign cases above use, clamped to
+        // scaled_max_pixels for the ellipses path. In the rare
+        // overflow-without-ellipses case the rule may extend slightly past the
+        // last visible glyph; the typography win on common usage outweighs it.
+        draw_underline(mFontFreetype, start_x, cur_y,
+                       (F32)llmin(scaled_max_pixels, scaled_string_width), color);
     }
 
     // After the ALFontFace move, atlas ownership is per source face — heads
@@ -462,7 +577,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // textShadowMode is pushed once before pass A starts and reset to
     // passthrough (0) before pass B's foreground emission. It is the only
     // shadow uniform by design: per-pass constant, so the captured-buffer
-    // replay (LLFontVertexBuffer::renderBuffers re-pushes it; LLVertexBufferData
+    // replay (LLFontTextCache::renderBuffers re-pushes it; LLVertexBufferData
     // doesn't capture uniforms) stays correct. Everything that varies per
     // batch in a mixed-atlas string — texel size of the bound atlas, alpha
     // channel layout — derives from the bound texture inside uiF.glsl
@@ -487,13 +602,12 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         if (scaled_string_width > scaled_max_pixels)
         {
             // use four dots for ellipsis width to generate padding
-            static const LLWString dots(U"....");
+            static const std::string dots("....");
             scaled_max_pixels = llmax(0, scaled_max_pixels - ll_round(getWidthF32(dots)));
             draw_ellipses = true;
         }
     }
 
-    const LLFontGlyphInfo* next_glyph = NULL;
 
     // string can have more than one glyph per char (ex: bold or shadow),
     // make sure that GLYPH_BATCH_SIZE won't end up with half a symbol.
@@ -515,7 +629,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // string and emits shadow geometry (or nothing, when the luminance gate
     // above force-disabled it) plus per-glyph metadata into `deferred`; pass B
     // walks `deferred` and emits foreground geometry. The boundary callback
-    // (if any) fires between the passes so LLFontVertexBuffer can swap capture
+    // (if any) fires between the passes so LLFontTextCache can swap capture
     // lists, giving each pass its own captured stream with a uniform color
     // across all vertices — the structural prerequisite for color-only cache
     // regen. We key on the *original* requested shadow type so the callback
@@ -530,10 +644,19 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         const ALFontFace* face;
         LLColor4U color;
     };
-    std::vector<DeferredGlyph> deferred;
+    // Reused rather than built per call: every shadowed draw in the UI takes
+    // the two-pass path, so this was an allocate-and-free on each one. The
+    // ellipsis tail below DOES re-enter this function, but only after pass B
+    // has finished walking `deferred` -- nothing reads it again afterwards,
+    // so the recursive clear is harmless. Keep it that way: a read of
+    // `deferred` placed after the ellipsis render would see the tail's glyphs.
+    static thread_local std::vector<DeferredGlyph> deferred;
+    deferred.clear();
     if (needs_two_pass)
     {
-        deferred.reserve(length);
+        // Glyphs, not bytes: a CJK line is three bytes per glyph and an emoji
+        // four, and this vector never gives its capacity back.
+        deferred.reserve(layout.glyphs ? layout.glyphs->size() : 0);
     }
 
     LLColor4U text_color(color);
@@ -551,12 +674,10 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
     // binds brand-new sheets to create their GL textures), so the texture
     // bound at flush time is NOT necessarily the one the pending quads were
     // built for. Submitting under the stomped binding samples another atlas
-    // page — glyphs from unrelated text — which is exactly the legacy
-    // "CJK/emoji on first render" corruption the old per-codepoint
-    // `last_char != wch` flush band-aided around (the per-char flush kept the
-    // pending batch to ~1 glyph, making the misdraw practically invisible).
-    // bind() is a cached no-op when the binding didn't move, so the re-assert
-    // costs nothing on the common path.
+    // page — glyphs from unrelated text, which is what "CJK and emoji come out
+    // corrupted the first time they are drawn" looks like. bind() is a cached
+    // no-op when the binding didn't move, so the re-assert costs nothing on the
+    // common path.
     LLImageGL* batch_image = nullptr;
     auto flush_batch = [&]()
     {
@@ -573,44 +694,188 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         }
     };
 
+    // Point the batch at the atlas sheet a glyph comes from, draining whatever
+    // is queued under the old one first. Both passes ask for this -- the first
+    // from the shaped glyphs, the second from the metadata the first deferred
+    // -- and each carried its own copy of these rules, one of them without the
+    // texel-size update.
+    auto use_atlas = [&](const ALFontFace* face, std::pair<EFontGlyphType, S32> entry)
+    {
+        if (face == current_face && entry == bitmap_entry)
+        {
+            return;
+        }
+
+        flush_batch();
+        bitmap_entry = entry;
+        if (face != current_face)
+        {
+            current_face = face;
+            font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
+            if (font_bitmap_cache)
+            {
+                inv_width  = 1.f / font_bitmap_cache->getBitmapWidth();
+                inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
+            }
+        }
+
+        // Null when the slot's sheet has been released (shouldn't happen
+        // mid-render -- eviction runs at the frame boundary and purges glyph
+        // entries first). The emission guards skip the quad rather than
+        // sampling whatever texture happens to be bound.
+        batch_image = font_bitmap_cache
+            ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
+            : nullptr;
+        if (batch_image)
+        {
+            gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
+        }
+    };
+
+    // Where a glyph's bitmap lands for a given pen position. Shared so the
+    // cluster measurement below and the emission that follows it cannot drift
+    // apart: they have to agree on the subpixel phase, since the phase decides
+    // which slot is consulted and so how wide the glyph is.
+    auto place_glyph = [](const LLFontGlyphInfo* gi, F32 pen, U8& phase, S32& dest_int_x)
+    {
+        if (gi->mPhaseCount > 1)
+        {
+            const F32 frac_x = pen - floorf(pen);
+            const U32 raw =
+                (U32)floorf(frac_x * (F32)LLFontGlyphInfo::kNumPhases + 0.5f);
+            if (raw >= LLFontGlyphInfo::kNumPhases)
+            {
+                phase = 0;
+                dest_int_x = (S32)floorf(pen) + 1;
+            }
+            else
+            {
+                phase = (U8)raw;
+                dest_int_x = (S32)floorf(pen);
+            }
+        }
+        else
+        {
+            phase = 0;
+            dest_int_x = ll_round(pen);
+        }
+    };
+
     // Itemize + shape the slice via the shared helper. Strict-monospace
     // gets emoji-cluster ranges so ASCII keeps the codepoint path's exact
     // metrics (visual parity with toggle-off) while embedded emoji
     // clusters still shape; the non-mono path gets a single range covering
     // the whole slice. Layout's ranges are slice-local; we compare against
     // `i - begin_offset` in the loop.
-    LLWStringView slice(wstr.data() + begin_offset, (size_t)length);
-    const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
-    size_t next_shape_run = 0;
+    // Constant for the whole draw, and it was being derived again for every
+    // glyph -- twice in the innermost loop, once more per cluster measured.
+    const EFontGlyphType glyph_type = (!use_color || LLFontGL::sForceMonochromeEmoji)
+                                    ? EFontGlyphType::Grayscale : EFontGlyphType::Color;
 
-    for (i = begin_offset; i < begin_offset + length; i++)
+    bool shape_run_taken = false;
+
+    S32 next_i = begin_offset;
+    for (i = begin_offset; i < begin_offset + length; i = next_i)
     {
+        const LLCodepointAt at = utf8str_decode_at(utf8text, (size_t)i);
+        next_i = (S32)at.next;
         const S32 i_slice = i - begin_offset;
         // Entered a shaped run? Emit its HarfBuzz-positioned glyphs in one
         // go and jump past the range. When shaping produced no glyphs (rare —
         // face/HB failure) we fall through to the codepoint path so the
         // range still draws something, even if ZWJ presentation is wrong.
-        if (next_shape_run < layout.ranges.size()
-            && (S32)layout.ranges[next_shape_run].first == i_slice)
+        if (!shape_run_taken && layout.glyphs && (S32)layout.begin == i_slice)
         {
-            const auto  run_range  = layout.ranges[next_shape_run];
-            const auto& run_glyphs = *layout.glyphs[next_shape_run];
-            ++next_shape_run;
+            const std::pair<size_t, size_t> run_range{ layout.begin, layout.end };
+            const auto& run_glyphs = *layout.glyphs;
+            shape_run_taken = true;
 
             if (!run_glyphs.empty())
             {
-                next_glyph = NULL;  // drop any kerning prefetch from before the run
                 bool overflow = false;
-                // Slice-local cp index of the glyph that overflowed. shapeLine
-                // returns clusters relative to its begin parameter (here,
-                // run_range.first), so this is in [0, run_len). Used so
-                // chars_drawn reflects only cps whose cluster was reached
-                // before clipping — counting the full run on overflow lies
+                // Byte offset within the run of the glyph that overflowed.
+                // shapeLine returns clusters relative to its begin parameter
+                // (here, run_range.first), so this is in [0, run_len). Used so
+                // chars_drawn reflects only what was reached before clipping —
+                // counting the full run on overflow lies
                 // to callers that drive word-wrap / chunked draw off the
                 // return value.
                 S32 overflow_cluster_local = 0;
-                for (const ALShapedGlyph& sg : run_glyphs)
+
+                // Whether every glyph sharing the cluster that starts at
+                // `first` fits, measured from the pen it would start at.
+                // Several glyphs can carry one cluster -- a mark stack, a
+                // Devanagari conjunct, an emoji and its variation selector --
+                // and the pen moves inside one, so this walks the cluster the
+                // way the emission does rather than assuming the marks are
+                // weightless. A cluster drawn with only some of its glyphs is
+                // not a clipped syllable; it is a different syllable.
+                auto cluster_fits = [&](size_t first, F32 pen_from) -> bool
                 {
+                    const S32 cluster = run_glyphs[first].cluster;
+                    F32 sim_x = pen_from;
+                    F32 right = pen_from;
+                    for (size_t k = first;
+                         k < run_glyphs.size() && run_glyphs[k].cluster == cluster;
+                         ++k)
+                    {
+                        const ALShapedGlyph& g = run_glyphs[k];
+                        const LLFontGlyphInfo* gi = mFontFreetype->getGlyphInfoByIndex(
+                            g.face, g.glyph_id, glyph_type);
+                        // A glyph with no info is skipped whole by the loop
+                        // below, pen included, so it is skipped here too.
+                        if (!gi)
+                            continue;
+
+                        U8  sim_phase;
+                        S32 sim_dest;
+                        place_glyph(gi, sim_x + g.x_offset, sim_phase, sim_dest);
+                        const auto& sim_slot = gi->mPhaseSlots[sim_phase];
+                        right = llmax(right,
+                                      (F32)(sim_dest + sim_slot.mXBearing) + (F32)sim_slot.mWidth);
+
+                        sim_x += g.x_advance;
+                        if (!subpixel_pen)
+                            sim_x = (F32)ll_round(sim_x);
+                    }
+                    return (start_x + scaled_max_pixels) >= right;
+                };
+
+                S32 open_cluster = -1;
+                for (size_t sg_index = 0; sg_index < run_glyphs.size(); ++sg_index)
+                {
+                    const ALShapedGlyph& sg = run_glyphs[sg_index];
+
+                    // Tested once per cluster, before any of it is emitted.
+                    // Testing per glyph clips between two glyphs of the same
+                    // cluster, which paints a base without its mark and then
+                    // reports the whole cluster as undrawn.
+                    //
+                    // Only a cluster that actually carries several glyphs needs
+                    // the walk, and most do not -- every Latin cluster is one
+                    // glyph. Walking regardless costs a second
+                    // getGlyphInfoByIndex and a second placement for every
+                    // glyph drawn, both of which the emission below is about to
+                    // do anyway. The single-glyph case is tested further down
+                    // from the values it already has.
+                    const bool starts_cluster = (sg.cluster != open_cluster);
+                    const bool shares_cluster = starts_cluster
+                        && (sg_index + 1) < run_glyphs.size()
+                        && run_glyphs[sg_index + 1].cluster == sg.cluster;
+                    if (shares_cluster)
+                    {
+                        if (!cluster_fits(sg_index, cur_render_x))
+                        {
+                            overflow = true;
+                            overflow_cluster_local = sg.cluster;
+                            break;
+                        }
+                    }
+                    if (starts_cluster)
+                    {
+                        open_cluster = sg.cluster;
+                    }
+
                     // Cache lives on the root face and its bitmap atlas; the
                     // fallback face is only the *source* for the glyph. The
                     // codepoint path also routes through getGlyphInfoByIndex
@@ -618,9 +883,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     // hits the same atlas slot regardless of which path
                     // produced the ALShapedGlyph.
                     const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
-                        sg.face, sg.glyph_id,
-                        (!use_color || LLFontGL::sForceMonochromeEmoji)
-                            ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
+                        sg.face, sg.glyph_id, glyph_type);
                     if (!sfgi)
                         continue;
 
@@ -635,65 +898,20 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                     const F32 pen_y = cur_render_y + sg.y_offset;
                     U8 phase;
                     S32 dest_int_x;
-                    if (sfgi->mPhaseCount > 1)
-                    {
-                        const F32 frac_x = pen_x - floorf(pen_x);
-                        const U32 raw =
-                            (U32)floorf(frac_x * (F32)LLFontGlyphInfo::kNumPhases + 0.5f);
-                        if (raw >= LLFontGlyphInfo::kNumPhases)
-                        {
-                            phase = 0;
-                            dest_int_x = (S32)floorf(pen_x) + 1;
-                        }
-                        else
-                        {
-                            phase = (U8)raw;
-                            dest_int_x = (S32)floorf(pen_x);
-                        }
-                    }
-                    else
-                    {
-                        phase = 0;
-                        dest_int_x = ll_round(pen_x);
-                    }
+                    place_glyph(sfgi, pen_x, phase, dest_int_x);
                     const auto& slot = sfgi->mPhaseSlots[phase];
 
-                    const ALFontFace* glyph_face = sfgi->mSourceFace;
-                    std::pair<EFontGlyphType, S32> next_bitmap_entry = slot.mBitmapEntry;
-                    if (glyph_face != current_face || next_bitmap_entry != bitmap_entry)
-                    {
-                        // Drain the queued glyphs under their own texture
-                        // before switching the batch to the new one.
-                        flush_batch();
-                        bitmap_entry = next_bitmap_entry;
-                        if (glyph_face != current_face)
-                        {
-                            current_face = glyph_face;
-                            font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
-                            if (font_bitmap_cache)
-                            {
-                                inv_width  = 1.f / font_bitmap_cache->getBitmapWidth();
-                                inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
-                            }
-                        }
-                        // Null when the slot's sheet has been released
-                        // (shouldn't happen mid-render — eviction runs at the
-                        // frame boundary and purges glyph entries first). The
-                        // emission guard below skips the quad rather than
-                        // sampling whatever texture happens to be bound.
-                        batch_image = font_bitmap_cache
-                            ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
-                            : nullptr;
-                        if (batch_image)
-                        {
-                            gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
-                        }
-                    }
+                    use_atlas(sfgi->mSourceFace, slot.mBitmapEntry);
 
                     const F32 glyph_x = (F32)(dest_int_x + slot.mXBearing);
                     const F32 glyph_y = (F32)ll_round(pen_y) + (F32)slot.mYBearing;
 
-                    if ((start_x + scaled_max_pixels) < (glyph_x + (F32)slot.mWidth))
+                    // The other half of the cluster test above. One glyph
+                    // carrying a cluster means its own extent is the cluster's,
+                    // so the answer is the lookup and the placement already
+                    // done rather than a second pass over the same glyph.
+                    if (starts_cluster && !shares_cluster
+                        && (start_x + scaled_max_pixels) < (glyph_x + (F32)slot.mWidth))
                     {
                         overflow = true;
                         overflow_cluster_local = sg.cluster;
@@ -752,180 +970,25 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
                 if (overflow)
                 {
-                    // Count cps strictly before the overflowing cluster.
-                    // overflow_cluster_local is slice-local (0-based within
-                    // the run), so adding it directly gives the cp count.
+                    // Count the bytes strictly before the overflowing cluster.
+                    // overflow_cluster_local is run-local (0-based within the
+                    // run), so adding it directly gives that count.
                     chars_drawn += llmax(0, overflow_cluster_local);
                     break;
                 }
                 chars_drawn += (S32)(run_range.second - run_range.first);
 
-                i = begin_offset + (S32)run_range.second - 1;  // loop's ++ lands past the run
+                next_i = begin_offset + (S32)run_range.second;
                 continue;
             }
-            // Empty run_glyphs — shaping failed. Fall through to the
-            // codepoint path for this iteration.
         }
 
-        llwchar wch = wstr[i];
-
-        const LLFontGlyphInfo* fgi = next_glyph;
-        next_glyph = NULL;
-        if(!fgi)
-        {
-            fgi = mFontFreetype->getGlyphInfo(wch,
-                (!use_color || LLFontGL::sForceMonochromeEmoji)
-                    ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
-        }
-        if (!fgi)
-        {
-            LL_ERRS() << "Missing Glyph Info" << LL_ENDL;
-            break;
-        }
-        // Quantize pen x and split into integer dest + subpixel phase. See the
-        // matching block in the shaped path above for the wrap-around rationale.
-        U8 cp_phase;
-        S32 cp_dest_int_x;
-        if (fgi->mPhaseCount > 1)
-        {
-            const F32 frac_x = cur_render_x - floorf(cur_render_x);
-            const U32 raw =
-                (U32)floorf(frac_x * (F32)LLFontGlyphInfo::kNumPhases + 0.5f);
-            if (raw >= LLFontGlyphInfo::kNumPhases)
-            {
-                cp_phase = 0;
-                cp_dest_int_x = (S32)floorf(cur_render_x) + 1;
-            }
-            else
-            {
-                cp_phase = (U8)raw;
-                cp_dest_int_x = (S32)floorf(cur_render_x);
-            }
-        }
-        else
-        {
-            cp_phase = 0;
-            cp_dest_int_x = ll_round(cur_render_x);
-        }
-        const auto& cp_slot = fgi->mPhaseSlots[cp_phase];
-
-        // Per-glyph bitmap texture. Flush + rebind only when the atlas
-        // slot actually changes; flush_batch re-asserts the batch's own
-        // texture, so glyph rasterization between flushes (which leaves the
-        // upload target bound) can't misdirect the queued quads. The legacy
-        // `last_char != wch` clause forced a per-codepoint flush as a
-        // band-aid over exactly that misdirection; Latin text now batches
-        // up to GLYPH_BATCH_SIZE glyphs per draw the way it should.
-        const ALFontFace* cp_glyph_face = fgi->mSourceFace;
-        std::pair<EFontGlyphType, S32> next_bitmap_entry = cp_slot.mBitmapEntry;
-        if (cp_glyph_face != current_face || next_bitmap_entry != bitmap_entry)
-        {
-            // Actually draw the queued glyphs before switching their texture;
-            // otherwise the queued glyphs will be taken from wrong textures.
-            flush_batch();
-
-            bitmap_entry = next_bitmap_entry;
-            if (cp_glyph_face != current_face)
-            {
-                current_face = cp_glyph_face;
-                font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
-                if (font_bitmap_cache)
-                {
-                    inv_width  = 1.f / font_bitmap_cache->getBitmapWidth();
-                    inv_height = 1.f / font_bitmap_cache->getBitmapHeight();
-                }
-            }
-            // Defensive: getImageGL returns null when a sheet has been
-            // released (collectGarbage) or when the slot index is out
-            // of range. The emission guard below skips the glyph in that
-            // case — emitting quads without a known binding would sample
-            // whatever texture is currently bound.
-            batch_image = font_bitmap_cache
-                ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
-                : nullptr;
-            if (batch_image)
-            {
-                gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
-            }
-        }
-
-        if ((start_x + scaled_max_pixels) < (cur_x + cp_slot.mXBearing + cp_slot.mWidth))
-        {
-            // Not enough room for this character.
-            break;
-        }
-
-        if (batch_image)
-        {
-            // Draw the text at the appropriate location
-            //Specify vertices and texture coordinates
-            LLRectf uv_rect((cp_slot.mXBitmapOffset) * inv_width,
-                    (cp_slot.mYBitmapOffset + cp_slot.mHeight + PAD_UVY) * inv_height,
-                    (cp_slot.mXBitmapOffset + cp_slot.mWidth) * inv_width,
-                    (cp_slot.mYBitmapOffset - PAD_UVY) * inv_height);
-            // Integer dest derived from quantized pen + per-phase bearing.
-            const F32 cp_glyph_x = (F32)(cp_dest_int_x + cp_slot.mXBearing);
-            const F32 cp_glyph_y = (F32)ll_round(cur_render_y) + (F32)cp_slot.mYBearing;
-            LLRectf screen_rect(cp_glyph_x,
-                        cp_glyph_y,
-                        cp_glyph_x + (F32)cp_slot.mWidth,
-                        cp_glyph_y - (F32)cp_slot.mHeight);
-
-            if (glyph_count >= GLYPH_BATCH_SIZE)
-            {
-                flush_batch();
-            }
-
-            // Grayscale tints with text_color; Color tints with emoji_color
-            // (white, preserving CPAL palette colors baked into the bitmap).
-            const LLColor4U& col = bitmap_entry.first == EFontGlyphType::Grayscale
-                                 ? text_color : emoji_color;
-            if (needs_two_pass)
-            {
-                // BOLD suppresses shadow per the legacy drawGlyph contract
-                // (see FIXME at drawGlyphForeground): the bold doubled quad
-                // and the shadow taps are mutually exclusive. drawGlyphShadow
-                // doesn't see `style`, so gate the call here.
-                if (!(style_to_add & BOLD))
-                {
-                    drawGlyphShadow(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                                    precomputed_shadow_color, shadow, slant_offset);
-                }
-                deferred.push_back({screen_rect, uv_rect, bitmap_entry, current_face, col});
-            }
-            else
-            {
-                drawGlyphForeground(glyph_count, vertices, uvs, colors, screen_rect, uv_rect,
-                                    col, style_to_add, slant_offset);
-            }
-        }
-
-        chars_drawn++;
-        cur_x += mFontFreetype->getXAdvance(fgi);
-        cur_y += fgi->mYAdvance;
-
-        llwchar next_char = wstr[i+1];
-        if (next_char)
-        {
-            // Kern this puppy. The old `next_char < LAST_CHAR_FULL`
-            // gate was a vestigial ASCII-bucket-cache limit; today
-            // getXKerning works for any pair.
-            next_glyph = mFontFreetype->getGlyphInfo(next_char,
-                (!use_color || LLFontGL::sForceMonochromeEmoji)
-                    ? EFontGlyphType::Grayscale : EFontGlyphType::Color);
-            cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
-        }
-
-        // Round after kerning. With subpixel_pen on the cumulative advance
-        // stays fractional through the loop and only the per-glyph draw rect
-        // (above) snaps to integer pixels. Without subpixel_pen we keep the
-        // legacy per-glyph round so native-hinted glyphs stay on the
-        // integer grid the foundry designed them for.
-        if (!subpixel_pen)
-            cur_x = (F32)ll_round(cur_x);
-
-        cur_render_x = cur_x;
-        cur_render_y = cur_y;
+        // Nothing shaped at this position, and there is no second way to draw
+        // it: shaping comes back empty only when the font has no face behind
+        // it -- in which case there are no glyphs to be had either -- or when
+        // the run held nothing but variation selectors the face does not
+        // carry, which are meant to draw nothing.
+        break;
     }
 
     // The layout's glyph pointers reach into the shape LRU; nothing inside
@@ -939,7 +1002,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
     if (needs_two_pass)
     {
-        // Pass-boundary callback: LLFontVertexBuffer uses this to close the
+        // Pass-boundary callback: LLFontTextCache uses this to close the
         // shadow capture list and open the foreground capture list. With no
         // callback this is a no-op (direct callers don't need separate lists).
         if (on_pass_boundary)
@@ -967,23 +1030,7 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         batch_image = nullptr;
         for (const DeferredGlyph& dg : deferred)
         {
-            if (dg.face != current_face || dg.bitmap_entry != bitmap_entry)
-            {
-                flush_batch();
-                bitmap_entry = dg.bitmap_entry;
-                if (dg.face != current_face)
-                {
-                    current_face = dg.face;
-                    font_bitmap_cache = current_face ? current_face->getBitmapCache() : nullptr;
-                }
-                batch_image = font_bitmap_cache
-                    ? font_bitmap_cache->getImageGL(bitmap_entry.first, bitmap_entry.second)
-                    : nullptr;
-                if (batch_image)
-                {
-                    gGL.getTextureSlot(0)->bindSampled(batch_image, ALSamplers::PointWrap);
-                }
-            }
+            use_atlas(dg.face, dg.bitmap_entry);
 
             if (!batch_image)
             {
@@ -1005,8 +1052,13 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
 
     if (right_x)
     {
-        *right_x = (cur_x - origin.mV[VX]) / sScaleX;
+        *right_x = cur_x / sScaleX;
     }
+
+    // The ellipsis is a draw of its own and sets up its own transform, so this
+    // one has to be gone before it starts or the origin would be applied twice.
+    const F32 ellipsis_x = cur_x / sScaleX;
+    transform.end();
 
     if (draw_ellipses)
     {
@@ -1016,11 +1068,10 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
         // already split the capture lists, and forwarding the callback would
         // double-fire it. Rendering the ellipsis without a shadow keeps the
         // captured streams consistent and avoids tinting the ellipsis shadow
-        // with the foreground color in LLFontVertexBuffer.
-        static const LLWString elipses_wstr(U"...");
-        render(elipses_wstr,
+        // with the foreground color in LLFontTextCache.
+        renderBytes("...",
                 0,
-                (cur_x - origin.mV[VX]) / sScaleX, (F32)y,
+                ellipsis_x, (F32)y,
                 color,
                 LEFT, valign,
                 style_to_add,
@@ -1031,19 +1082,12 @@ S32 LLFontGL::render(const LLWString &wstr, S32 begin_offset, F32 x, F32 y, cons
                 use_color);
     }
 
-    gGL.popUIMatrix();
-
     return chars_drawn;
 }
 
-S32 LLFontGL::render(const LLWString &text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color) const
+S32 LLFontGL::renderUTF8(const std::string &text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style, ShadowType shadow, S32 max_bytes, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color) const
 {
-    return render(text, begin_offset, x, y, color, LEFT, BASELINE, NORMAL, NO_SHADOW);
-}
-
-S32 LLFontGL::renderUTF8(const std::string &text, S32 begin_offset, F32 x, F32 y, const LLColor4 &color, HAlign halign, VAlign valign, U8 style, ShadowType shadow, S32 max_chars, S32 max_pixels, F32* right_x, bool use_ellipses, bool use_color) const
-{
-    return render(utf8str_to_wstring(text), begin_offset, x, y, color, halign, valign, style, shadow, max_chars, max_pixels, right_x, use_ellipses, use_color);
+    return renderBytes(text, begin_offset, x, y, color, halign, valign, style, shadow, max_bytes, max_pixels, right_x, use_ellipses, use_color);
 }
 
 S32 LLFontGL::renderUTF8(const std::string &text, S32 begin_offset, S32 x, S32 y, const LLColor4 &color) const
@@ -1087,182 +1131,71 @@ S32 LLFontGL::getLineSpacing() const
     return llceil(mFontFreetype->getLineHeight() / sScaleY);
 }
 
-S32 LLFontGL::getWidth(const std::string& utf8text) const
+S32 LLFontGL::getWidth(std::string_view utf8text) const
 {
-    LLWString wtext = utf8str_to_wstring(utf8text);
-    return getWidth(wtext, 0, S32_MAX);
+    return getWidthBytes(utf8text, 0, S32_MAX);
 }
 
-S32 LLFontGL::getWidth(LLWStringView wchars) const
+S32 LLFontGL::getWidthBytes(std::string_view utf8text, S32 begin_offset, S32 max_bytes) const
 {
-    return getWidth(wchars, 0, S32_MAX);
-}
-
-S32 LLFontGL::getWidth(const std::string& utf8text, S32 begin_offset, S32 max_chars) const
-{
-    LLWString wtext = utf8str_to_wstring(utf8text);
-    return getWidth(wtext, begin_offset, max_chars);
-}
-
-S32 LLFontGL::getWidth(LLWStringView wchars, S32 begin_offset, S32 max_chars) const
-{
-    F32 width = getWidthF32(wchars, begin_offset, max_chars);
     // llceil, not ll_round: getWidth's contract is "minimum integer pixel
     // width that contains the rendered text". With subpixel pen position
-    // (mUseSubpixelPen), getWidthF32 returns fractional widths; ll_round
+    // (mUseSubpixelPen), getWidthF32Bytes returns fractional widths; ll_round
     // would truncate fractions < 0.5 (e.g. 28.4 -> 28) and clip the last
     // glyph in callers that size layout rects to the returned width
     // (LLButton::resize, scroll list cells, tooltip backgrounds, etc.).
-    return llceil(width);
+    return llceil(getWidthF32Bytes(utf8text, begin_offset, max_bytes));
 }
 
-F32 LLFontGL::getWidthF32(const std::string& utf8text) const
+F32 LLFontGL::getWidthF32(std::string_view utf8text) const
 {
-    LLWString wtext = utf8str_to_wstring(utf8text);
-    return getWidthF32(wtext, 0, S32_MAX);
+    return getWidthF32Bytes(utf8text, 0, S32_MAX);
 }
 
-F32 LLFontGL::getWidthF32(LLWStringView wchars) const
-{
-    return getWidthF32(wchars, 0, S32_MAX);
-}
-
-F32 LLFontGL::getWidthF32(const std::string& utf8text, S32 begin_offset, S32 max_chars) const
-{
-    LLWString wtext = utf8str_to_wstring(utf8text);
-    return getWidthF32(wtext, begin_offset, max_chars);
-}
-
-F32 LLFontGL::getWidthF32(LLWStringView wchars, S32 begin_offset, S32 max_chars, bool no_padding) const
+F32 LLFontGL::getWidthF32Bytes(std::string_view utf8text, S32 begin_offset, S32 max_bytes, bool no_padding) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    F32 cur_x = 0;
-    const S32 text_len = (S32)wchars.length();
+    const S32 text_len = (S32)utf8text.length();
     const S32 begin = llclamp(begin_offset, 0, text_len);
-    // Clamp the upper bound the same way charFromPixelOffset does. The default
-    // max_chars value is S32_MAX, so a non-zero begin_offset would otherwise
+    // Clamp the upper bound the same way byteFromPixelOffset does. The default
+    // max_bytes value is S32_MAX, so a non-zero begin_offset would otherwise
     // overflow the S32 sum (UB on signed overflow). Halign-right and underline
     // measurement paths in render() routinely call this with begin_offset > 0.
-    const S32 max_index = llmin(text_len, begin + llmin(S32_MAX - begin, max_chars));
+    const S32 max_index = llmin(text_len, begin + llmin(S32_MAX - begin, max_bytes));
 
     // Mirror render()'s pen accumulation policy so width measurements agree
     // with what's drawn — see the comment at render()'s subpixel_pen.
     const bool subpixel_pen = mFontFreetype->useSubpixelPen();
 
-    // Determine the tight slice we'll actually measure (bounded by max_chars,
+    // Determine the tight slice we'll actually measure (bounded by max_bytes,
     // the view's own end, and the first embedded NUL) so shaping only runs over
     // real content.
     S32 measure_end = begin;
-    while (measure_end < max_index && wchars[measure_end] != 0)
+    while (measure_end < max_index && utf8text[measure_end] != 0)
         ++measure_end;
     const S32 measure_len = measure_end - begin;
 
     // Same shape-first preprocessing as render(); kept consistent so caret
-    // positions and ellipsis cutoffs agree with what's drawn. The layout's
-    // ranges come back slice-local; we compare against `i - begin`
-    // in the loop rather than mutating ranges.
-    LLWStringView slice = wchars.substr((size_t)begin, (size_t)measure_len);
+    // positions and ellipsis cutoffs agree with what is drawn.
+    std::string_view slice = utf8text.substr((size_t)begin, (size_t)measure_len);
     const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
-    size_t next_shape_run = 0;
-
-    const LLFontGlyphInfo* next_glyph = NULL;
-
-    F32 width_padding = 0.f;
-    for (S32 i = begin; i < max_index && wchars[i] != 0; i++)
+    if (!layout.glyphs || layout.glyphs->empty())
     {
-        const S32 i_slice = i - begin;
-        if (next_shape_run < layout.ranges.size()
-            && (S32)layout.ranges[next_shape_run].first == i_slice)
-        {
-            const auto  run_range  = layout.ranges[next_shape_run];
-            const auto& run_glyphs = *layout.glyphs[next_shape_run];
-            ++next_shape_run;
-
-            if (!run_glyphs.empty())
-            {
-                next_glyph = NULL;
-                F32 run_padding = 0.f;
-                for (const ALShapedGlyph& sg : run_glyphs)
-                {
-                    const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
-                        sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
-                    if (!sfgi)
-                        continue;
-                    if (!no_padding)
-                    {
-                        run_padding = llmax(0.f,
-                            run_padding - sg.x_advance,
-                            (F32)(sfgi->mWidth + sfgi->mXBearing) - sg.x_advance);
-                    }
-                    cur_x += sg.x_advance;
-                    // Match render()'s pen motion so caret positions and
-                    // ellipsis cutoffs agree with what's drawn.
-                    if (!subpixel_pen)
-                        cur_x = (F32)ll_round(cur_x);
-                }
-                width_padding = run_padding;
-                i = begin + (S32)run_range.second - 1;
-                continue;
-            }
-            // Fall through to codepoint path when shaping failed.
-        }
-
-        llwchar wch = wchars[i];
-
-        const LLFontGlyphInfo* fgi = next_glyph;
-        next_glyph = NULL;
-        if(!fgi)
-        {
-            fgi = mFontFreetype->getGlyphInfo(wch, EFontGlyphType::Unspecified);
-        }
-
-        F32 advance = mFontFreetype->getXAdvance(fgi);
-
-        if (!no_padding)
-        {
-            // for the last character we want to measure the greater of its width and xadvance values
-            // so keep track of the difference between these values for the each character we measure
-            // so we can fix things up at the end
-            width_padding = llmax(0.f,                                          // always use positive padding amount
-                width_padding - advance,                        // previous padding left over after advance of current character
-                (F32)(fgi->mWidth + fgi->mXBearing) - advance); // difference between width of this character and advance to next character
-        }
-
-        cur_x += advance;
-
-        // Read the kerning partner only once it is known to be in range. The
-        // old form indexed [i+1] before testing it, which stayed inside the
-        // buffer only because callers handed over a NUL-terminated pointer.
-        if ((i + 1) < max_index)
-        {
-            const llwchar next_char = wchars[i + 1];
-            if (next_char)
-            {
-                // Kern this puppy. LAST_CHARACTER (255) was a vestigial limit
-                // from the era of ASCII-bucketed glyph caches; getXKerning
-                // works for any pair today and the codepoint path is the
-                // shape-failure / strict-mono fallback where this matters.
-                next_glyph = mFontFreetype->getGlyphInfo(next_char, EFontGlyphType::Unspecified);
-                cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
-            }
-        }
-        // Round after kerning. With subpixel_pen on, accumulator stays
-        // fractional so cumulative kerning precision survives.
-        if (!subpixel_pen)
-            cur_x = (F32)ll_round(cur_x);
+        // Nothing shaped, which happens two ways and has the same answer for
+        // both. The face has no FT face behind it, so there are no metrics to
+        // report; or the run was nothing but variation selectors that the face
+        // does not carry, which were stripped before shaping and occupy no
+        // width of their own.
+        return 0.f;
     }
 
-    // Layout pointers must have stayed valid for the whole measurement walk.
+    const F32 width = shaped_run_width(mFontFreetype, *layout.glyphs,
+                                       no_padding, subpixel_pen);
+    // The glyph pointer must have stayed valid for the whole measurement.
     llassert(layout.mutation_snapshot == ALFontShaping::cacheMutationCount());
 
-    if (!no_padding)
-    {
-        // add in extra pixels for last character's width past its xadvance
-        cur_x += width_padding;
-    }
-
-    return cur_x / sScaleX;
+    return width / sScaleX;
 }
 
 void LLFontGL::generateASCIIglyphs()
@@ -1274,35 +1207,33 @@ void LLFontGL::generateASCIIglyphs()
     }
 }
 
-// Returns the max number of complete characters from text (up to max_chars) that can be drawn in max_pixels
-S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_chars, EWordWrapStyle end_on_word_boundary) const
+S32 LLFontGL::maxDrawableBytes(std::string_view utf8text, F32 max_pixels, S32 max_bytes, EWordWrapStyle end_on_word_boundary) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    if (wchars.empty() || !wchars[0] || max_chars <= 0)
+    if (utf8text.empty() || !utf8text[0] || max_bytes <= 0)
     {
         return 0;
     }
 
-    // Everything below walks by index up to max_chars; the view's own end is the
+    // Everything below walks by offset up to max_bytes; the view's own end is the
     // other bound. Folding them together here keeps the walk inside the buffer
-    // even when a caller asks for more characters than it handed over.
-    max_chars = llmin(max_chars, (S32)wchars.length());
+    // even when a caller asks for more text than it handed over.
+    max_bytes = llmin(max_bytes, (S32)utf8text.length());
 
     llassert(max_pixels >= 0.f);
 
     bool clip = false;
     F32 cur_x = 0;
 
-    S32 start_of_last_word = 0;
-    bool in_word = false;
+    // Where the line may end, per UAX #14. Tracked against the walk below so
+    // that when the text clips we know the last place a break was allowed.
+    S32 last_break = 0;
 
     // avoid S32 overflow when max_pixels == S32_MAX by staying in floating point
     F32 scaled_max_pixels = max_pixels * sScaleX;
     F32 width_padding = 0.f;
 
     const bool subpixel_pen = mFontFreetype->useSubpixelPen();
-
-    LLFontGlyphInfo* next_glyph = NULL;
 
     // Pre-shape the entire slice so advance accounts for GPOS pair-kerning
     // and ligatures. The codepoint loop below uses a parallel walker
@@ -1316,26 +1247,73 @@ S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_cha
     static const std::vector<ALShapedGlyph> sEmptyShape;
     const std::vector<ALShapedGlyph>* shape_glyphs = &sEmptyShape;
     size_t shape_idx = 0;
-    if (max_chars > 0 && wchars[0])
-    {
-        S32 measure_end = 0;
-        while (measure_end < max_chars && wchars[measure_end] != 0)
-            ++measure_end;
-        if (measure_end > 0)
-        {
-            LLWStringView slice = wchars.substr(0, (size_t)measure_end);
-            shape_glyphs = &ALFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)measure_end);
-        }
-    }
-    const bool use_shaped = !shape_glyphs->empty();
-    // shape_glyphs points into the shape LRU until the loop's last use.
-    const size_t shape_gen = ALFontShaping::cacheMutationCount();
-    (void)shape_gen;
 
-    S32 i;
-    for (i=0; (i < max_chars); i++)
+    S32 measure_end = 0;
+    while (measure_end < max_bytes && utf8text[measure_end] != 0)
+        ++measure_end;
+
+    // Only the word-boundary styles ever read the break list. ANYWHERE is the
+    // default argument, and asking ICU to enumerate every break in the window
+    // so the answer can be discarded is a rule-engine pass for nothing.
+    // The buffer outlives the call so a wrapping loop does not allocate per
+    // line; nothing re-enters this function while `breaks` is live.
+    static thread_local std::vector<size_t> breaks;
+    const bool wants_breaks = (end_on_word_boundary != ANYWHERE);
+
+    size_t break_idx = 0;
+    size_t shape_gen = 0;
+    bool   use_shaped = false;
+
+    S32 i = 0;
+    S32 next_i = 0;
+
+    // Shape and walk the first `window` bytes, and say where the walk stopped.
+    // Everything it touches lives in the enclosing scope because the answer is
+    // read from there afterwards -- `clip` and `last_break` decide where a
+    // clipped line retreats to. False means a glyph the font could not supply,
+    // which the caller answers with zero rather than a measurement.
+    auto measure_window = [&](S32 window) -> bool
     {
-        llwchar wch = wchars[i];
+        clip          = false;
+        cur_x         = 0.f;
+        last_break    = 0;
+        width_padding = 0.f;
+        shape_idx     = 0;
+        break_idx     = 0;
+        shape_glyphs  = &sEmptyShape;
+
+        if (window > 0)
+        {
+            std::string_view slice = utf8text.substr(0, (size_t)window);
+            shape_glyphs = &ALFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)window);
+            if (wants_breaks)
+            {
+                utf8str_line_break_opportunities(slice, breaks);
+            }
+        }
+        if (!wants_breaks)
+        {
+            breaks.clear();
+        }
+        use_shaped = !shape_glyphs->empty();
+        if (!use_shaped)
+        {
+            // Nothing shaped, so there is nothing to fit: either the font has
+            // no face behind it, or the window held only variation selectors it
+            // does not carry. Both answer with none of it drawn rather than
+            // with a second measurement of the same text by other means.
+            return false;
+        }
+        // shape_glyphs points into the shape LRU until the walk's last use.
+        shape_gen = ALFontShaping::cacheMutationCount();
+        (void)shape_gen;
+
+    next_i = 0;
+    for (i = 0; (i < window); i = next_i)
+    {
+        const LLCodepointAt at = utf8str_decode_at(utf8text, (size_t)i);
+        next_i = (S32)at.next;
+        llwchar wch = at.cp;
 
         if(wch == 0)
         {
@@ -1343,44 +1321,18 @@ S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_cha
             break;
         }
 
-        if (in_word)
+        // Carry the break cursor up to the last opportunity at or before i, so
+        // a clip here knows where it may retreat to.
+        while (break_idx < breaks.size() && breaks[break_idx] <= (size_t)i)
         {
-            if (LLStringOps::isSpace(wch))
-            {
-                if(wch !=(0x00A0))
-                {
-                    in_word = false;
-                }
-            }
-            if (iswindividual(wch))
-            {
-                // Past the end reads as 0, which is what the NUL terminator used
-                // to supply here — isPunct(0) is false either way.
-                const llwchar peek = ((i + 1) < max_chars) ? wchars[i + 1] : 0;
-                if (LLStringOps::isPunct(peek))
-                {
-                    in_word=true;
-                }
-                else
-                {
-                    in_word=false;
-                    start_of_last_word = i;
-                }
-            }
-        }
-        else
-        {
-            start_of_last_word = i;
-            if (!LLStringOps::isSpace(wch) || !iswindividual(wch))
-            {
-                in_word = true;
-            }
+            last_break = (S32)breaks[break_idx];
+            ++break_idx;
         }
 
         if (use_shaped)
         {
             // Sum advances and the largest extent of any glyph whose cluster
-            // lands on this codepoint. Trailing codepoints of a multi-cp
+            // lands on this character. Trailing characters of a multi-character
             // cluster (ligatures, ZWJ sequences) consume zero glyphs and
             // pass through with cur_x unchanged.
             F32 advance_this = 0.f;
@@ -1407,62 +1359,65 @@ S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_cha
             }
             if (!subpixel_pen)
                 cur_x = (F32)ll_round(cur_x);
-            continue;
         }
-
-        LLFontGlyphInfo* fgi = next_glyph;
-        next_glyph = NULL;
-        if(!fgi)
-        {
-            fgi = mFontFreetype->getGlyphInfo(wch, EFontGlyphType::Unspecified);
-
-            if (NULL == fgi)
-            {
-                return 0;
-            }
-        }
-
-        // account for glyphs that run beyond the starting point for the next glyphs
-        width_padding = llmax(  0.f,                                                    // always use positive padding amount
-                                width_padding - fgi->mXAdvance,                         // previous padding left over after advance of current character
-                                (F32)(fgi->mWidth + fgi->mXBearing) - fgi->mXAdvance);  // difference between width of this character and advance to next character
-
-        cur_x += fgi->mXAdvance;
-
-        // clip if current character runs past scaled_max_pixels (using width_padding)
-        if (scaled_max_pixels < cur_x + width_padding)
-        {
-            clip = true;
-            break;
-        }
-
-        if (((i+1) < max_chars) && wchars[i+1])
-        {
-            // Kern this puppy.
-            next_glyph = mFontFreetype->getGlyphInfo(wchars[i+1], EFontGlyphType::Unspecified);
-            cur_x += mFontFreetype->getXKerning(fgi, next_glyph);
-        }
-
-        // Round after kerning.
-        if (!subpixel_pen)
-            cur_x = (F32)ll_round(cur_x);
     }
 
     // No shape* call may fire while shape_glyphs is held (see the comment
     // at the shapeLine call above).
     llassert(shape_gen == ALFontShaping::cacheMutationCount());
+    return true;
+    };
+
+    // Answering "how much fits in max_pixels" does not need the rest of the
+    // document shaped. The wrapping callers hand this the whole remaining
+    // segment and call it once per line, each time with a different suffix, so
+    // each call was a fresh HarfBuzz pass and a fresh UAX #14 enumeration over
+    // everything that was left -- quadratic in the length of a wrapped
+    // paragraph, and a shape-cache entry per line holding all of it.
+    //
+    // Start from a window that comfortably covers the budget. A byte is never
+    // more than a glyph and no glyph we ship advances less than a pixel, so a
+    // byte per pixel is already generous for text that advances at all; text
+    // that does not -- a long run of combining marks -- is what the widening
+    // below is for. Widen only when the walk ran out of text before it ran out
+    // of pixels, which is the one case the window can be wrong in.
+    S32 window = measure_end;
+    if (max_pixels < (F32)S32_MAX)
+    {
+        const F32 guess = max_pixels + 64.f;
+        if (guess < (F32)measure_end)
+        {
+            window = (S32)guess;
+        }
+    }
+
+    for (;;)
+    {
+        if (!measure_window(window))
+        {
+            return 0;
+        }
+        if (clip || window >= measure_end)
+        {
+            break;
+        }
+        window = (window > measure_end / 2) ? measure_end : (window * 2);
+    }
 
     if( clip )
     {
         switch (end_on_word_boundary)
         {
         case ONLY_WORD_BOUNDARIES:
-            i = start_of_last_word;
+            i = last_break;
             break;
         case WORD_BOUNDARY_IF_POSSIBLE:
-            if (start_of_last_word != 0)
+            // Zero means nothing on this line was a legal place to break, so
+            // the caller gets the clip position and a mid-word split rather
+            // than an empty line it would never make progress past.
+            if (last_break != 0)
             {
-                i = start_of_last_word;
+                i = last_break;
             }
             break;
         default:
@@ -1471,134 +1426,153 @@ S32 LLFontGL::maxDrawableChars(LLWStringView wchars, F32 max_pixels, S32 max_cha
             break;
         }
     }
-    return i;
+    // The walk only ever lands on character starts, so it can step past a
+    // budget that stops inside one. Clamping to the budget would then hand back
+    // an offset in the middle of a character, and the callers cut strings at
+    // what they are given -- a segment whose own end falls mid-character is
+    // enough to get here. Come back to the character that budget started in
+    // instead: never more than was asked for, and never somewhere that splits.
+    if (i <= max_bytes)
+    {
+        return i;
+    }
+    return (S32)utf8str_grapheme_align_backward(utf8text, (size_t)max_bytes);
 }
 
-S32 LLFontGL::firstDrawableChar(LLWStringView wchars, F32 max_pixels, S32 start_pos, S32 max_chars) const
+S32 LLFontGL::firstDrawableByte(std::string_view utf8text, F32 max_pixels, S32 start_pos, S32 max_bytes) const
 {
-    if (wchars.empty() || !wchars[0] || max_chars <= 0)
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    if (utf8text.empty() || !utf8text[0] || max_bytes <= 0)
     {
         return 0;
     }
 
     F32 total_width = 0.0;
-    S32 drawable_chars = 0;
 
     F32 scaled_max_pixels = max_pixels * sScaleX;
     const bool subpixel_pen = mFontFreetype->useSubpixelPen();
 
-    S32 start = llmin(start_pos, (S32)wchars.length() - 1);
-
-    // pre-shape [0, start+1) and project advances onto a
-    // per-codepoint table. Walking backward through that table substitutes for
-    // the legacy fgi->mXAdvance + getXKerning chain. Ligatures and ZWJ
-    // clusters get their full advance attributed to the cluster's first cp;
-    // trailing cps contribute zero, which is what we want for measurement.
-    std::vector<F32> per_cp_advance;
-    F32 per_cp_last_extent = 0.f;
-    if (start >= 0 && wchars[0])
+    S32 start = llmin(start_pos, (S32)utf8text.length() - 1);
+    if (start < 0)
     {
-        // shapeLine ref valid through the per_cp_advance fill below since
-        // no other shape* calls run in between. Clusters are slice-local
-        // (begin=0), which equals 0..start here.
-        LLWStringView slice = wchars.substr(0, (size_t)(start + 1));
-        const auto& shape_glyphs = ALFontShaping::shapeLine(mFontFreetype, slice, 0, (size_t)(start + 1));
+        return 0;
+    }
+    // start_pos may land inside a character; the run measured here begins at
+    // that character's own start.
+    while (start > 0 && ((unsigned char)utf8text[start] & 0xC0) == 0x80)
+    {
+        --start;
+    }
+    // And back to the start of the cluster holding it. A caller may not begin
+    // drawing partway through one, so the cluster is the unit at both ends of
+    // this walk -- and the extent lookup below keys on the cluster the shaper
+    // reports, which is its first byte.
+    start = (S32)utf8str_grapheme_align_backward(utf8text, (size_t)start);
+    // Measure to the end of that cluster, not the end of the one character
+    // there. A run cut after the first codepoint of a ZWJ sequence shapes as
+    // its unligated parts, so the advances collected below are not the ones
+    // render() lays down -- and the caller scrolls a field by them.
+    const size_t measure_end = utf8str_step_grapheme_forward(utf8text, (size_t)start);
+
+    // Pre-shape [0, measure_end) and collect the advance each cluster carries,
+    // so the backward sweep below has something to walk. Ligatures and ZWJ
+    // clusters get their full advance attributed to the cluster's first
+    // character.
+    //
+    // Sparse on purpose, one entry per cluster in ascending byte order: a table
+    // indexed by position would now be one float per BYTE rather than one per
+    // character, which is memory this conversion is supposed to save. It also
+    // states the thing the walk needs outright — a position that appears here
+    // is a cluster start, and only a cluster start is somewhere the caller may
+    // begin drawing from.
+    // Reused rather than built per call: this runs on every cursor move that
+    // scrolls a line editor, and the table is a few entries long.
+    static thread_local std::vector<std::pair<S32, F32>> cluster_advance;
+    cluster_advance.clear();
+    F32 last_cluster_extent = 0.f;
+    {
+        std::string_view slice = utf8text.substr(0, measure_end);
+        const auto& shape_glyphs = ALFontShaping::shapeLine(mFontFreetype, slice, 0, measure_end);
         const size_t shape_gen = ALFontShaping::cacheMutationCount();
         (void)shape_gen;
-        if (!shape_glyphs.empty())
+        cluster_advance.reserve(shape_glyphs.size());
+        for (const auto& sg : shape_glyphs)
         {
-            per_cp_advance.assign(start + 1, 0.f);
-            for (const auto& sg : shape_glyphs)
+            if (sg.cluster < 0 || (size_t)sg.cluster >= measure_end)
+                continue;
+            // HarfBuzz emits an LTR run with non-decreasing clusters, and the
+            // direction is set LTR unconditionally, so glyphs sharing a cluster
+            // arrive together and the table comes out ordered. Summing them as
+            // they arrive replaces a sort and a compaction pass; the assert is
+            // what says the ordering is being relied on rather than assumed.
+            if (!cluster_advance.empty() && cluster_advance.back().first == sg.cluster)
             {
-                if (sg.cluster >= 0 && sg.cluster <= start)
-                {
-                    per_cp_advance[sg.cluster] += sg.x_advance;
-                    if (sg.cluster == start)
-                    {
-                        const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
-                            sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
-                        if (sfgi)
-                            per_cp_last_extent = llmax(per_cp_last_extent,
-                                                       (F32)(sfgi->mWidth + sfgi->mXBearing));
-                    }
-                }
+                cluster_advance.back().second += sg.x_advance;
+            }
+            else
+            {
+                llassert(cluster_advance.empty()
+                         || cluster_advance.back().first < sg.cluster);
+                cluster_advance.emplace_back(sg.cluster, sg.x_advance);
+            }
+            if (sg.cluster == start)
+            {
+                const LLFontGlyphInfo* sfgi = mFontFreetype->getGlyphInfoByIndex(
+                    sg.face, sg.glyph_id, EFontGlyphType::Unspecified);
+                if (sfgi)
+                    last_cluster_extent = llmax(last_cluster_extent,
+                                                (F32)(sfgi->mWidth + sfgi->mXBearing));
             }
         }
         // The fill above is shape_glyphs' last dereference — it must not
         // have been invalidated by a shape-cache mutation mid-hold.
         llassert(shape_gen == ALFontShaping::cacheMutationCount());
     }
-    const bool use_shaped = !per_cp_advance.empty();
 
-    for (S32 i = start; i >= 0; i--)
+    if (cluster_advance.empty())
     {
-        if (use_shaped)
-        {
-            // Last cp uses extent so the rightmost glyph stays fully visible.
-            F32 width = (i == start)
-                        ? llmax(per_cp_last_extent, per_cp_advance[i])
-                        : per_cp_advance[i];
-            if (scaled_max_pixels < (total_width + width))
-                break;
-            total_width += width;
-            drawable_chars++;
-            if (max_chars >= 0 && drawable_chars >= max_chars)
-                break;
-            if (!subpixel_pen)
-                total_width = (F32)ll_round(total_width);
-            continue;
-        }
+        // Nothing shaped, so there are no clusters to walk back through and no
+        // metrics behind them. Drawing begins where it was asked to.
+        return start;
+    }
 
-        llwchar wch = wchars[i];
-
-        const LLFontGlyphInfo* fgi= mFontFreetype->getGlyphInfo(wch, EFontGlyphType::Unspecified);
-
-        // last character uses character width, since the whole character needs to be visible
-        // other characters just use advance
-        F32 width = (i == start)
-            ? (F32)(fgi->mWidth + fgi->mXBearing)   // use actual width for last character
-            : fgi->mXAdvance;                       // use advance for all other characters
-
-        if( scaled_max_pixels < (total_width + width) )
-        {
+    // Where drawing may begin. Nothing fitting leaves it at the last cluster
+    // rather than the last character: start is only a character start, and a
+    // caller may not begin partway through a cluster even when that is all the
+    // room there is. Ascending order, so the last entry at or before start is
+    // the cluster holding it.
+    S32 first = start;
+    for (const auto& entry : cluster_advance)
+    {
+        if (entry.first > start)
             break;
-        }
+        first = entry.first;
+    }
 
+    for (size_t k = cluster_advance.size(); k-- > 0; )
+    {
+        const S32 pos     = cluster_advance[k].first;
+        const F32 advance = llmax(0.f, cluster_advance[k].second);
+        // The last cluster uses its extent so the rightmost glyph stays fully
+        // visible.
+        const F32 width = (pos == start) ? llmax(last_cluster_extent, advance)
+                                         : advance;
+        if (scaled_max_pixels < (total_width + width))
+            break;
         total_width += width;
-        drawable_chars++;
-
-        if( max_chars >= 0 && drawable_chars >= max_chars )
-        {
+        first = pos;
+        if ((S32)(measure_end - (size_t)pos) >= max_bytes)
             break;
-        }
-
-        if ( i > 0 )
-        {
-            // kerning
-            total_width += mFontFreetype->getXKerning(wchars[i-1], wch);
-        }
-
-        // Round after kerning.
         if (!subpixel_pen)
             total_width = (F32)ll_round(total_width);
     }
-
-    if (drawable_chars == 0)
-    {
-        return start_pos; // just draw last character
-    }
-    else
-    {
-        // if only 1 character is drawable, we want to return start_pos as the first character to draw
-        // if 2 are drawable, return start_pos and character before start_pos, etc.
-        return start_pos + 1 - drawable_chars;
-    }
-
+    return first;
 }
 
-S32 LLFontGL::charFromPixelOffset(LLWStringView wchars, S32 begin_offset, F32 target_x, F32 max_pixels, S32 max_chars, bool round) const
+S32 LLFontGL::byteFromPixelOffset(std::string_view utf8text, S32 begin_offset, F32 target_x, F32 max_pixels, S32 max_bytes, bool round) const
 {
-    if (wchars.empty() || !wchars[0] || max_chars <= 0)
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    if (utf8text.empty() || !utf8text[0] || max_bytes <= 0)
     {
         return 0;
     }
@@ -1608,135 +1582,67 @@ S32 LLFontGL::charFromPixelOffset(LLWStringView wchars, S32 begin_offset, F32 ta
 
     target_x *= sScaleX;
 
-    const S32 text_len = (S32)wchars.length();
+    const S32 text_len = (S32)utf8text.length();
     begin_offset = llclamp(begin_offset, 0, text_len);
 
-    // max_chars is S32_MAX by default, so make sure we don't get overflow
-    const S32 max_index = llmin(text_len, begin_offset + llmin(S32_MAX - begin_offset, max_chars - 1));
+    // max_bytes is S32_MAX by default, so make sure we don't get overflow
+    const S32 budget_end = llmin(text_len, begin_offset + llmin(S32_MAX - begin_offset, max_bytes));
+    // Every character inside the budget is hit-tested, the last one included.
+    // Running the walk out means the click was past all of them, and the answer
+    // is then the budget's own end, so the caret lands after the final character
+    // rather than on it. Stopping a character short would also shape a slice
+    // narrower than the one render() draws, and measure a cluster it split.
+    const S32 max_index = budget_end;
 
     F32 scaled_max_pixels = max_pixels * sScaleX;
 
-    // Locate the tight slice we'll consider (bounded by max_chars, the view's
+    // Locate the tight slice we'll consider (bounded by max_bytes, the view's
     // own end, and the first embedded NUL) so we can shape the same window
-    // render() does. Without this, per-codepoint advances disagree with the
+    // render() does. Without this, per-character advances disagree with the
     // rendered composite glyph: clicks land in the middle of an emoji cluster
     // instead of on its edges.
     S32 slice_end = begin_offset;
-    while (slice_end < max_index && wchars[slice_end] != 0)
+    while (slice_end < max_index && utf8text[slice_end] != 0)
         ++slice_end;
     const S32 slice_len = slice_end - begin_offset;
 
-    LLWStringView slice = wchars.substr((size_t)begin_offset, (size_t)slice_len);
+    std::string_view slice = utf8text.substr((size_t)begin_offset, (size_t)slice_len);
     const ShapeLayout layout = build_shape_layout(mFontFreetype, slice);
-    size_t next_shape_run = 0;
-
-    const LLFontGlyphInfo* next_glyph = NULL;
-
-    S32 pos;
-    for (pos = begin_offset; pos < max_index; pos++)
+    if (!layout.glyphs || layout.glyphs->empty())
     {
-        llwchar wch = wchars[pos];
-        if (!wch)
-        {
-            break; // done
-        }
+        // Nothing shaped: no face behind the font, or a run of nothing but
+        // variation selectors it does not carry. Either way there is no glyph
+        // to hit, so the answer is where the caller started.
+        return 0;
+    }
+    const auto& run_glyphs = *layout.glyphs;
 
-        const S32 pos_slice = pos - begin_offset;
-        // Per-glyph hit-test inside a shape range. Each glyph's `cluster`
-        // points back to a codepoint within the slice; clicks land on
-        // that boundary. For ligatures (one glyph spans multiple cps) and
-        // mark stacks (multiple glyphs share one cluster), this correctly
-        // snaps to the nearest cluster boundary — you can't put the cursor
-        // mid-ligature. Mid-test matches the legacy codepoint path's
-        // unrounded `cur_x + W*0.5f` so behavior agrees character-for-
-        // character on Latin text.
-        if (next_shape_run < layout.ranges.size()
-            && (S32)layout.ranges[next_shape_run].first == pos_slice)
-        {
-            const auto  run_range  = layout.ranges[next_shape_run];
-            const auto& run_glyphs = *layout.glyphs[next_shape_run];
-            ++next_shape_run;
+    // Per-glyph hit-test. Each glyph's `cluster` points back to a character
+    // within the slice, so clicks land on those boundaries: for a ligature
+    // (one glyph over several characters) and for a mark stack (several
+    // glyphs on one cluster) this snaps to the nearest cluster edge rather
+    // than letting the caret sit inside one.
+    F32 run_x = 0.f;
+    for (const ALShapedGlyph& sg : run_glyphs)
+    {
+        const F32 glyph_start = run_x;
+        run_x += sg.x_advance;
+        if (!subpixel_pen)
+            run_x = (F32)ll_round(run_x);
 
-            if (!run_glyphs.empty())
-            {
-                // shapeLine returns cluster values relative to its `begin`
-                // arg — i.e. relative to run_range.first within the slice.
-                // The function returns slice-local positions, so add
-                // run_range.first to get back into slice coords.
-                const S32 cluster_base = (S32)run_range.first;
-                F32 run_x = cur_x;
-                for (const ALShapedGlyph& sg : run_glyphs)
-                {
-                    const F32 glyph_start = run_x;
-                    run_x += sg.x_advance;
-                    if (!subpixel_pen)
-                        run_x = (F32)ll_round(run_x);
-
-                    const S32 cluster_slice = cluster_base + (S32)sg.cluster;
-                    if (round)
-                    {
-                        if (target_x < glyph_start + sg.x_advance * 0.5f)
-                            return llmin(max_chars, cluster_slice);
-                    }
-                    else if (target_x < glyph_start + sg.x_advance)
-                    {
-                        return llmin(max_chars, cluster_slice);
-                    }
-
-                    if (scaled_max_pixels < run_x)
-                        return llmin(max_chars, cluster_slice);
-                }
-
-                // Click is past the entire shaped run; advance and continue.
-                cur_x = run_x;
-                pos = begin_offset + (S32)run_range.second - 1;  // loop's ++ lands past the run
-                next_glyph = NULL;
-                continue;
-            }
-        }
-
-        const LLFontGlyphInfo* glyph = next_glyph;
-        next_glyph = NULL;
-        if(!glyph)
-        {
-            glyph = mFontFreetype->getGlyphInfo(wch, EFontGlyphType::Unspecified);
-        }
-
-        F32 char_width = mFontFreetype->getXAdvance(glyph);
-
+        const S32 cluster_slice = (S32)sg.cluster;
         if (round)
         {
-            // Note: if the mouse is on the left half of the character, the pick is to the character's left
-            // If it's on the right half, the pick is to the right.
-            if (target_x  < cur_x + char_width*0.5f)
-            {
-                break;
-            }
+            if (target_x < glyph_start + sg.x_advance * 0.5f)
+                return llmin(max_bytes, cluster_slice);
         }
-        else if (target_x  < cur_x + char_width)
+        else if (target_x < glyph_start + sg.x_advance)
         {
-            break;
+            return llmin(max_bytes, cluster_slice);
         }
 
-        if (scaled_max_pixels < cur_x + char_width)
-        {
-            break;
-        }
-
-        cur_x += char_width;
-
-        if (((pos + 1) < max_index)
-            && (wchars[(pos + 1)]))
-        {
-            // Kern this puppy.
-            next_glyph = mFontFreetype->getGlyphInfo(wchars[pos + 1], EFontGlyphType::Unspecified);
-            cur_x += mFontFreetype->getXKerning(glyph, next_glyph);
-        }
-
-
-        // Round after kerning.
-        if (!subpixel_pen)
-            cur_x = (F32)ll_round(cur_x);
+        if (scaled_max_pixels < run_x)
+            return llmin(max_bytes, cluster_slice);
     }
 
     // Hit-test walk holds the layout's glyph pointers; early returns inside
@@ -1744,7 +1650,8 @@ S32 LLFontGL::charFromPixelOffset(LLWStringView wchars, S32 begin_offset, F32 ta
     // for shape-cache mutation mid-hold, not exhaustive coverage.
     llassert(layout.mutation_snapshot == ALFontShaping::cacheMutationCount());
 
-    return llmin(max_chars, pos - begin_offset);
+    // Past every glyph, so the answer is the whole of what was considered.
+    return llmin(max_bytes, slice_len);
 }
 
 const LLFontDescriptor& LLFontGL::getFontDesc() const
@@ -2022,15 +1929,6 @@ std::string LLFontGL::sizeFromFont(const LLFontGL* fontp)
 }
 
 // static
-std::string LLFontGL::nameFromHAlign(LLFontGL::HAlign align)
-{
-    if (align == LEFT)          return std::string("left");
-    else if (align == RIGHT)    return std::string("right");
-    else if (align == HCENTER)  return std::string("center");
-    else return std::string();
-}
-
-// static
 LLFontGL::HAlign LLFontGL::hAlignFromName(const std::string& name)
 {
     LLFontGL::HAlign gl_hfont_align = LLFontGL::LEFT;
@@ -2048,40 +1946,6 @@ LLFontGL::HAlign LLFontGL::hAlignFromName(const std::string& name)
     }
     //else leave left
     return gl_hfont_align;
-}
-
-// static
-std::string LLFontGL::nameFromVAlign(LLFontGL::VAlign align)
-{
-    if (align == TOP)           return std::string("top");
-    else if (align == VCENTER)  return std::string("center");
-    else if (align == BASELINE) return std::string("baseline");
-    else if (align == BOTTOM)   return std::string("bottom");
-    else return std::string();
-}
-
-// static
-LLFontGL::VAlign LLFontGL::vAlignFromName(const std::string& name)
-{
-    LLFontGL::VAlign gl_vfont_align = LLFontGL::BASELINE;
-    if (name == "top")
-    {
-        gl_vfont_align = LLFontGL::TOP;
-    }
-    else if (name == "center")
-    {
-        gl_vfont_align = LLFontGL::VCENTER;
-    }
-    else if (name == "baseline")
-    {
-        gl_vfont_align = LLFontGL::BASELINE;
-    }
-    else if (name == "bottom")
-    {
-        gl_vfont_align = LLFontGL::BOTTOM;
-    }
-    //else leave baseline
-    return gl_vfont_align;
 }
 
 //static

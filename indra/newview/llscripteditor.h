@@ -57,7 +57,7 @@ public:
     bool    getIsLuauLanguage() { return mLuauLanguage; }
     void    setLuauLanguage(bool luau_language) { mLuauLanguage = luau_language; }
     U32     getKeywordsGeneration() const { return mKeywordsGeneration; }
-    void    applySyntaxSegments(const LLWString& text, const LLKeywords::segment_ops_t& ops);
+    void    applySyntaxSegments(const std::string& text, const LLKeywords::segment_ops_t& ops);
 
     static std::string getScriptFontSize();
     LLFontGL* getScriptFont();
@@ -80,7 +80,7 @@ private:
     void  drawSelectionBackground() override;
     void    ensureSyntaxWorker();
     void    queueSyntaxParse();
-    void    queueSyntaxApply(LLWString text,
+    void    queueSyntaxApply(std::string text,
                              LLKeywords::segment_ops_t ops,
                              S32 text_generation,
                              U32 keywords_generation,
@@ -107,7 +107,7 @@ private:
     LLKeywords* mLastQueuedKeywords;
     class LLScriptEditorSyntaxWorker* mSyntaxWorker;
     SyntaxApplyState mSyntaxApplyState;
-    LLWString   mPendingApplyText;
+    std::string mPendingApplyText;
     LLKeywords::segment_ops_t mPendingApplyOps;
     segment_vec_t mPendingApplySegments;
     segment_set_t mPendingApplySegmentSet;

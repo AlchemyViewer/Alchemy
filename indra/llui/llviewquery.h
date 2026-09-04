@@ -126,7 +126,11 @@ public:
 
 private:
 
-    filterResult_t runFilters(LLView * view, const viewList_t children, const filterList_t filters) const;
+    // Both lists by reference. They were taken by value, and this runs at every
+    // node of a recursive walk over a whole view tree, so each node copied its
+    // own child list and the filter list -- a heap allocation per element, for
+    // nothing. A folder tree made that hundreds of thousands of allocations.
+    filterResult_t runFilters(LLView * view, const viewList_t& children, const filterList_t& filters) const;
 
     filterList_t mPreFilters;
     filterList_t mPostFilters;

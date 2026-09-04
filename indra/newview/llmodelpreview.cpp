@@ -3177,9 +3177,13 @@ void LLModelPreview::lookupLODModelFiles(S32 lod)
 
     if (ext_pos != std::string::npos)
     {
-        // Replace extension with LOD suffix + original extension
+        // Replace extension with LOD suffix + original extension. The offset
+        // was found in the lowercased copy, and lowercasing is not
+        // length-preserving, so carry it back before it indexes the name the
+        // file is actually called.
+        const size_t ext_at = utf8str_bytes_from_cased_bytes(lod_filename, ext_pos, false);
         std::string lod_file_to_check = lod_filename;
-        lod_file_to_check.replace(ext_pos, found_ext.size(), getLodSuffix(next_lod) + found_ext);
+        lod_file_to_check.replace(ext_at, found_ext.size(), getLodSuffix(next_lod) + found_ext);
 
         if (gDirUtilp->fileExists(lod_file_to_check))
         {

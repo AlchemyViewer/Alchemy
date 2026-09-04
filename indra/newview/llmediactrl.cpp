@@ -684,8 +684,8 @@ void LLMediaCtrl::navigateTo( std::string url_in, std::string mime_type, bool cl
     // don't browse to anything that starts with secondlife:// or sl://
     const std::string protocol1 = "secondlife://";
     const std::string protocol2 = "sl://";
-    if ((LLStringUtil::compareInsensitive(url_in.substr(0, protocol1.length()), protocol1) == 0) ||
-        (LLStringUtil::compareInsensitive(url_in.substr(0, protocol2.length()), protocol2) == 0))
+    if (LLStringUtil::isEqualInsensitiveASCII(url_in.substr(0, protocol1.length()), protocol1) ||
+        LLStringUtil::isEqualInsensitiveASCII(url_in.substr(0, protocol2.length()), protocol2))
     {
         // TODO: Print out/log this attempt?
         // LL_INFOS() << "Rejecting attempt to load restricted website :" << urlIn << LL_ENDL;

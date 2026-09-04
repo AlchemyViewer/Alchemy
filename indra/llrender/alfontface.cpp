@@ -310,7 +310,7 @@ void ALFontFace::collectGarbage() const
     // Shaped runs in ALFontShaping's cache hold only metric/glyph_id data — no
     // atlas references — so they survive eviction; getGlyphInfoByIndex on the
     // next frame re-rasterizes whichever glyphs were dropped here. Cache
-    // generation bumps inside releaseSheet so LLFontVertexBuffer rebuilds.
+    // generation bumps inside releaseSheet so LLFontTextCache rebuilds.
     for (U32 t = 0; t < static_cast<U32>(EFontGlyphType::Count); ++t)
     {
         const EFontGlyphType type = static_cast<EFontGlyphType>(t);

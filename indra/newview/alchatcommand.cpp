@@ -128,11 +128,18 @@ bool ALChatCommand::parseCommand(std::string data)
     static LLCachedControl<bool> enableChatCmd(gSavedSettings, COMMAND_ENABLE, true);
     if (enableChatCmd)
     {
-        utf8str_tolower(data);
         std::istringstream input(data);
         std::string cmd;
 
         if (!(input >> cmd))    return false;
+
+        // The argument tails below are cut out of `data`, which stays in the
+        // case the user typed it: a /calc expression and a region message are
+        // passed on as written. So the token's length has to be taken before
+        // it is folded -- case mapping is not length-preserving, and a folded
+        // token cannot index the original bytes.
+        const std::string::size_type cmd_bytes = cmd.length();
+        cmd = utf8str_tolower(cmd);
 
         static LLCachedControl<std::string> sDrawDistanceCommand(gSavedSettings, COMMAND_DRAW_DISTANCE, "/dd");
         static LLCachedControl<std::string> sHeightCommand(gSavedSettings, COMMAND_HEIGHT, "/gth");
@@ -247,10 +254,10 @@ bool ALChatCommand::parseCommand(std::string data)
         }
         else if (cmd == utf8str_tolower(sCalcCommand()))  // calc
         {
-            if (data.length() > cmd.length() + 1)
+            if (data.length() > cmd_bytes + 1)
             {
                 F32 result = 0.f;
-                std::string expr = data.substr(cmd.length() + 1);
+                std::string expr = data.substr(cmd_bytes + 1);
                 LLStringUtil::toUpper(expr);
                 if (LLCalc::getInstance()->evalString(expr, result))
                 {
@@ -266,7 +273,7 @@ bool ALChatCommand::parseCommand(std::string data)
         }
         else if (cmd == utf8str_tolower(sMaptoCommand()))  // mapto
         {
-            const std::string::size_type length = cmd.length() + 1;
+            const std::string::size_type length = cmd_bytes + 1;
             if (data.length() > length)
             {
                 const LLVector3d& pos = gAgent.getPositionGlobal();
@@ -300,9 +307,9 @@ bool ALChatCommand::parseCommand(std::string data)
         }
         else if (cmd == utf8str_tolower(sRegionMsgCommand())) // Region Message / Dialog
         {
-            if (data.length() > cmd.length() + 1)
+            if (data.length() > cmd_bytes + 1)
             {
-                std::string notification_message = data.substr(cmd.length() + 1);
+                std::string notification_message = data.substr(cmd_bytes + 1);
                 std::vector<std::string> strings(5, "-1");
                 // [0] grid_x, unused here
                 // [1] grid_y, unused here

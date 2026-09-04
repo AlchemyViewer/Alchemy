@@ -403,8 +403,7 @@ void LLAgentWearables::saveWearableAs(const LLWearableType::EType type,
         LL_WARNS() << "LLAgent::saveWearableAs() no inventory item." << LL_ENDL;
         return;
     }
-    std::string trunc_name(new_name);
-    LLStringUtil::truncate(trunc_name, DB_INV_ITEM_NAME_STR_LEN);
+    std::string trunc_name = utf8str_truncate(new_name, DB_INV_ITEM_NAME_STR_LEN);
     LLViewerWearable* new_wearable = LLWearableList::instance().createCopy(
         old_wearable,
         trunc_name);

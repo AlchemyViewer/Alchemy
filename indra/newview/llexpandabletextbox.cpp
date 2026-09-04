@@ -41,7 +41,7 @@ public:
     :   LLTextSegment(start, end),
         mEditor(editor),
         mStyle(style),
-        mExpanderLabel(utf8str_to_wstring(more_text))
+        mExpanderLabel(more_text)
     {}
 
     /*virtual*/ LLTextSegmentPtr clone(LLTextBase& target) const
@@ -52,10 +52,10 @@ public:
         return copy;
     }
 
-    /*virtual*/ bool    getDimensionsF32(S32 first_char, S32 num_chars, F32& width, S32& height)
+    /*virtual*/ bool    getDimensionsF32(S32 first_byte, S32 num_bytes, F32& width, S32& height)
     {
         // more label always spans width of text box
-        if (num_chars == 0)
+        if (num_bytes == 0)
         {
             width = 0;
             height = 0;
@@ -67,11 +67,11 @@ public:
         }
         return true;
     }
-    /*virtual*/ S32     getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_chars, bool round) const
+    /*virtual*/ S32     getOffset(S32 segment_local_x_coord, S32 start_offset, S32 num_bytes, bool round) const
     {
         return start_offset;
     }
-    /*virtual*/ S32     getNumChars(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_chars, S32 line_ind) const
+    /*virtual*/ S32     getNumBytes(S32 num_pixels, S32 segment_offset, S32 line_offset, S32 max_bytes, S32 line_ind) const
     {
         // require full line to ourselves
         if (line_offset == 0)
@@ -88,7 +88,7 @@ public:
     /*virtual*/ F32     draw(S32 start, S32 end, S32 selection_start, S32 selection_end, const LLRectf& draw_rect)
     {
         F32 right_x;
-        mStyle->getFont()->render(mExpanderLabel, start,
+        mStyle->getFont()->renderBytes(mExpanderLabel, start,
                                     draw_rect.mRight, draw_rect.mTop,
                                     mStyle->getColor(),
                                     LLFontGL::RIGHT, LLFontGL::TOP,
@@ -111,7 +111,7 @@ public:
 private:
     LLTextBase& mEditor;
     LLStyleSP   mStyle;
-    LLWString mExpanderLabel;
+    std::string mExpanderLabel;
 };
 
 LLExpandableTextBox::LLTextBoxEx::Params::Params()
@@ -159,7 +159,7 @@ void LLExpandableTextBox::LLTextBoxEx::showExpandText()
         LLStyle::Params expander_style(getStyleParams());
         expander_style.font.style = "UNDERLINE";
         expander_style.color = LLUIColorTable::instance().getColor("HTMLLinkColor");
-        LLExpanderSegment* expanderp = new LLExpanderSegment(new LLStyle(expander_style), getLineStart(last_line), getLength() + 1, mExpanderLabel, *this);
+        LLExpanderSegment* expanderp = new LLExpanderSegment(new LLStyle(expander_style), getLineStart(last_line), getLengthBytes() + 1, mExpanderLabel, *this);
         insertSegment(expanderp);
         mExpanderVisible = true;
     }
@@ -172,7 +172,7 @@ void LLExpandableTextBox::LLTextBoxEx::hideExpandText()
     if (mExpanderVisible)
     {
         // this will overwrite the expander segment and all text styling with a single style
-        LLNormalTextSegment* segmentp = new LLNormalTextSegment(getDefaultStyle(), 0, getLength() + 1, *this);
+        LLNormalTextSegment* segmentp = new LLNormalTextSegment(getDefaultStyle(), 0, getLengthBytes() + 1, *this);
         insertSegment(segmentp);
 
         mExpanderVisible = false;

@@ -29,6 +29,7 @@
 
 #include <list>
 
+#include "llfonttextcache.h"
 #include "llstring.h"
 #include "v4color.h"
 #include "llframetimer.h"
@@ -103,6 +104,10 @@ public:
     virtual bool handleAcceleratorKey(KEY key, MASK mask);
 
     LLColor4 getHighlightBgColor() { return mHighlightBackground.get(); }
+
+    // A span of this item's label, measured through the cache that holds its
+    // glyphs. The menu bar is measured and drawn every frame.
+    S32 labelWidth(S32 offset = 0, S32 max_bytes = S32_MAX) const;
 
     void setJumpKey(KEY key);
     KEY getJumpKey() const { return mJumpKey; }
@@ -202,6 +207,16 @@ protected:
     LLUIString mDrawBoolLabel;
     LLUIString mDrawAccelLabel;
     LLUIString mDrawBranchLabel;
+
+    // The menu bar is drawn on every frame the viewer runs, and an open menu
+    // on every frame it is open, so each of the four labels keeps its geometry
+    // between frames rather than being shaped and laid out again.
+    // Mutable because getNominalWidth is const, and the width it asks for
+    // comes from the same cache the draw fills.
+    mutable LLFontTextCache mLabelBuffer;
+    LLFontTextCache mBoolLabelBuffer;
+    LLFontTextCache mAccelLabelBuffer;
+    LLFontTextCache mBranchLabelBuffer;
 
     LLUIColor mEnabledColor;
     LLUIColor mDisabledColor;

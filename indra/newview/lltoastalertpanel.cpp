@@ -165,7 +165,7 @@ LLToastAlertPanel::LLToastAlertPanel( LLNotificationPtr notification, bool modal
 
     // Calc total width of buttons
     S32 button_width = 0;
-    S32 sp = font->getWidth(std::string("OO"));
+    S32 sp = font->getWidth("OO");
     S32 btn_total_width = 0;
     S32 default_size_btns = 0;
     for (size_t i = 0; i < num_options; i++)

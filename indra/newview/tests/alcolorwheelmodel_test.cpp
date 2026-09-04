@@ -389,4 +389,31 @@ namespace tut
         ensure_approximately_equals("max is the high one", mWheel.getMax(), 0.5f, 5);
         ensure("max saturation is positive", mWheel.getMaxSat() > 0.f);
     }
+
+    // Exactly zero, not approximately: the vectorscope bins chroma with floorf,
+    // so an epsilon of either sign puts one grey in a different cell from the
+    // next. Compared bit for bit because that is the property callers rely on,
+    // and because an epsilon is exactly what a tolerance would hide.
+    template<> template<>
+    void wheel_object::test<19>()
+    {
+        for (S32 level = 0; level < 256; ++level)
+        {
+            const F32 grey = (F32)level / 255.f;
+            F32 u = 1.f, v = 1.f;
+            ALColorWheelModel::toChroma(LLVector3(grey, grey, grey), u, v);
+            ensure("grey has no u", u == 0.f);
+            ensure("grey has no v", v == 0.f);
+        }
+
+        // Outside 0..1 as well: wheels carry lift and gain, which sit either
+        // side of the unit range.
+        for (F32 grey : { -0.4f, 1.5f, 37.f })
+        {
+            F32 u = 1.f, v = 1.f;
+            ALColorWheelModel::toChroma(LLVector3(grey, grey, grey), u, v);
+            ensure("grey has no u", u == 0.f);
+            ensure("grey has no v", v == 0.f);
+        }
+    }
 }

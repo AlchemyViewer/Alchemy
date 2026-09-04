@@ -212,8 +212,7 @@ void LLFloaterDisplayName::onSave()
     }
 
     const U32 DISPLAY_NAME_MAX_LENGTH = 31; // characters, not bytes
-    LLWString display_name_wstr = utf8string_to_wstring(display_name_utf8);
-    if (display_name_wstr.size() > DISPLAY_NAME_MAX_LENGTH)
+    if (utf8str_codepoint_count(display_name_utf8) > DISPLAY_NAME_MAX_LENGTH)
     {
         LLSD args;
         args["LENGTH"] = llformat("%d", DISPLAY_NAME_MAX_LENGTH);

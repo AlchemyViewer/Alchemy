@@ -115,11 +115,10 @@ public:
 
     bool showAllResults() const override { return false; }
 
-    // Offset of the text match within the item's display name (npos when the
-    // match landed in another field), so the folder view draws the standard
-    // inventory match highlight.
-    std::string::size_type getStringMatchOffset(LLFolderViewModelItem* item) const override;
-    std::string::size_type getFilterStringSize() const override { return mConstraints.mFilterSubString.size(); }
+    // Span of the text match within the item's display name, in bytes (empty
+    // when the match landed in another field), so the folder view draws the
+    // standard inventory match highlight.
+    Match getFilterMatch(LLFolderViewModelItem* item) const override;
 
     bool isActive() const override;
     bool isModified() const override { return mModified; }

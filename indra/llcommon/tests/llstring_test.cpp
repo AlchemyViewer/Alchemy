@@ -208,6 +208,24 @@ namespace tut
 
         str_val = "ABC ";
         ensure("containsNonprintable failed", LLStringUtil::containsNonprintable(str_val) == false);
+
+        // Controls above the ASCII range are two bytes, and neither of them
+        // looks like a control on its own. U+0085 NEXT LINE.
+        str_val = "AB\xC2\x85" "C";
+        ensure("C1 control found", LLStringUtil::containsNonprintable(str_val) == true);
+        // U+2028 LINE SEPARATOR.
+        str_val = "AB\xE2\x80\xA8" "C";
+        ensure("line separator found", LLStringUtil::containsNonprintable(str_val) == true);
+        // DEL, which a test for "below 0x20" never saw.
+        str_val = "AB\x7F" "C";
+        ensure("delete found", LLStringUtil::containsNonprintable(str_val) == true);
+
+        // Non-ASCII text is printable, and so are the format characters that
+        // scripts depend on -- ZWJ here, which Indic conjuncts need.
+        str_val = "\xE6\x97\xA5" "\xC3\xA9" "ok";
+        ensure("ordinary text is printable", LLStringUtil::containsNonprintable(str_val) == false);
+        str_val = "\xE0\xA4\x95\xE2\x80\x8D\xE0\xA4\xB7";
+        ensure("ZWJ is printable", LLStringUtil::containsNonprintable(str_val) == false);
     }
 
     template<> template<>
@@ -224,6 +242,40 @@ namespace tut
         str_val = "";
         LLStringUtil::stripNonprintable(str_val);
         ensure_equals("stripNonprintable of empty string resulting in empty string failed", str_val, "");
+
+        // A control above the ASCII range goes whole, taking both its bytes.
+        str_val = "AB\xC2\x85" "C";
+        LLStringUtil::stripNonprintable(str_val);
+        ensure_equals("C1 control stripped whole", str_val, "ABC");
+
+        // Text either side of it is left alone, bytes and all.
+        str_val = "\xE6\x97\xA5" "\xE2\x80\xA8" "\xC3\xA9";
+        LLStringUtil::stripNonprintable(str_val);
+        ensure_equals("only the separator goes", str_val, "\xE6\x97\xA5" "\xC3\xA9");
+    }
+
+    // Capitalising a byte can only ever reach ASCII, so the narrow form works
+    // in codepoints.
+    template<> template<>
+    void string_index_object_t::test<45>()
+    {
+        std::string str_val("hello world-again_now");
+        LLStringUtil::capitalize(str_val);
+        ensure_equals("ascii words", str_val, "Hello World-Again_Now");
+
+        // U+00E9 -> U+00C9, which uppercasing one byte at a time could not do.
+        str_val = "\xC3\xA9" "cole";
+        LLStringUtil::capitalize(str_val);
+        ensure_equals("accented first letter", str_val, "\xC3\x89" "cole");
+
+        // The word rule is the caller's and still only sees these three.
+        str_val = "a b-c_d.e";
+        LLStringUtil::capitalize(str_val);
+        ensure_equals("dot is not a separator", str_val, "A B-C_D.e");
+
+        str_val = "";
+        LLStringUtil::capitalize(str_val);
+        ensure_equals("empty", str_val, "");
     }
 
     template<> template<>
@@ -346,6 +398,17 @@ namespace tut
 
         str_val = "4294967296";
         ensure("3: convertToU32 failed", !LLStringUtil::convertToU32(str_val, value));
+
+        // A negative is rejected rather than wrapped. convertToU8 and
+        // convertToU16 above already answer false for "-1" -- they range-check
+        // after parsing as signed -- so this is the unsigned form agreeing with
+        // its own siblings. Stream extraction let num_get negate it instead.
+        str_val = "-1";
+        ensure("4: convertToU32 failed", !LLStringUtil::convertToU32(str_val, value));
+
+        // A leading '+' is still accepted, as it was through the stream.
+        str_val = "+7";
+        ensure("5: convertToU32 failed", LLStringUtil::convertToU32(str_val, value) && value == 7);
     }
 
     template<> template<>
@@ -368,6 +431,22 @@ namespace tut
 
         str_val = "-2147483649";
         ensure("5: convertToS32 failed", !LLStringUtil::convertToS32(str_val, value));
+
+        // from_chars does not take a leading '+' on its own; the conversions
+        // strip it so they keep accepting what stream extraction accepted.
+        str_val = "+42";
+        ensure("6: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 42);
+
+        // Surrounding space is trimmed, and a parse that stops early still
+        // reports what it read -- both as the stream did.
+        str_val = "  13  ";
+        ensure("7: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 13);
+
+        str_val = "12abc";
+        ensure("8: convertToS32 failed", LLStringUtil::convertToS32(str_val, value) && value == 12);
+
+        str_val = "abc";
+        ensure("9: convertToS32 failed", !LLStringUtil::convertToS32(str_val, value));
     }
 
     template<> template<>
@@ -390,6 +469,27 @@ namespace tut
         str_val = "-2147483649";
         ensure("5: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
         */
+
+        // The reals go through fast_float now. Decimals, exponents, a sign and
+        // a leading '+' all read the same as they did through the stream, and
+        // the decimal point stays a point whatever the C locale is set to.
+        str_val = "1.5";
+        ensure("6: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 1.5f);
+
+        str_val = "-2.25";
+        ensure("7: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == -2.25f);
+
+        str_val = "+0.5";
+        ensure("8: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 0.5f);
+
+        str_val = "1.5e2";
+        ensure("9: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 150.f);
+
+        str_val = "  0.25  ";
+        ensure("10: convertToF32 failed", LLStringUtil::convertToF32(str_val, value) && value == 0.25f);
+
+        str_val = "nonsense";
+        ensure("11: convertToF32 failed", !LLStringUtil::convertToF32(str_val, value));
     }
 
     template<> template<>
@@ -447,6 +547,25 @@ namespace tut
         str1 = "A is equal to a";
         str2 = "a is EQUAL to A";
         ensure("4: compareInsensitive failed", LLStringUtil::compareInsensitive(str1, str2) == 0);
+
+        // Ignoring case is not the same as uppercasing both sides, which is
+        // what this used to do: that turns sharp s into SS and so calls two
+        // different words the same word.
+        ensure("sharp s is not ss",
+               LLStringUtil::compareInsensitive(std::string("stra\xC3\x9F""e"),
+                                                std::string("strasse")) != 0);
+        ensure("sharp s is not SS",
+               LLStringUtil::compareInsensitive(std::string("stra\xC3\x9F""e"),
+                                                std::string("STRASSE")) != 0);
+
+        // Accents are a secondary difference and survive; case is tertiary
+        // and does not.
+        ensure("accents survive",
+               LLStringUtil::compareInsensitive(std::string("ab"),
+                                                std::string("\xC3\xA4""b")) < 0);
+        ensure("case does not",
+               LLStringUtil::compareInsensitive(std::string("\xC3\x84""B"),
+                                                std::string("\xC3\xA4""b")) == 0);
     }
 
     template<> template<>
@@ -466,6 +585,31 @@ namespace tut
         rhs_str = "PROgRAM12FILES";
         ensure("compareDict 3 failed", LLStringUtil::compareDict(lhs_str, rhs_str) > 0);
         ensure("precedesDict 3 failed", LLStringUtil::precedesDict(lhs_str, rhs_str) == false);
+
+        // Uppercase sorts first, which is a tertiary-level ordering. The
+        // caseless form drops that level and so sees no difference at all.
+        ensure("compareDictInsensitive case", LLStringUtil::compareDictInsensitive(lhs_str, rhs_str) == 0);
+        ensure("compareDict case", LLStringUtil::compareDict(std::string("abc"), std::string("ABC")) > 0);
+        ensure("compareDict case 2", LLStringUtil::compareDict(std::string("Apple"), std::string("apple")) < 0);
+
+        // Digit runs compare as the numbers they spell.
+        ensure("natural 2 before 10",
+               LLStringUtil::compareDict(std::string("item2"), std::string("item10")) < 0);
+        ensure("natural 10 after 9",
+               LLStringUtil::compareDict(std::string("item10"), std::string("item9")) > 0);
+
+        // An accented letter sorts beside the letter it decorates rather than
+        // past the end of the alphabet: a < a-diaeresis < b, not merely
+        // somewhere before z. Codepoint order put it after z.
+        ensure("accent after plain",
+               LLStringUtil::compareDict(std::string("ab"), std::string("\xC3\xA4" "b")) < 0);
+        ensure("accent before next letter",
+               LLStringUtil::compareDict(std::string("\xC3\xA4" "b"), std::string("bb")) < 0);
+        ensure("accent before z",
+               LLStringUtil::compareDict(std::string("\xC3\xA4" "b"), std::string("zb")) < 0);
+        // ... and case-insensitive still keeps accents apart.
+        ensure("caseless keeps accents",
+               LLStringUtil::compareDictInsensitive(std::string("ab"), std::string("\xC3\xA4" "b")) < 0);
     }
 
     template<> template<>
@@ -933,5 +1077,93 @@ namespace tut
         ensure_equals("mixed count", 1, LLStringUtil::format(s, fmt_map));
         ensure_equals("mixed result", s,
                       std::string("no bar here [MISSING] -=[Stylized Name]=-"));
+    }
+
+    // Both views replaceString takes are allowed to point into the string it is
+    // replacing into, and both are read after a replace that can have moved the
+    // buffer under them. Taking them by value used to make that safe without
+    // saying so; a view does not, so the guard is the only thing holding it up
+    // and nothing was watching the guard.
+    template<> template<>
+    void string_index_object_t::test<46>()
+    {
+        // replacement views the subject: the classic case, and the one the
+        // original guard covered.
+        {
+            std::string s("abcabc");
+            LLStringUtil::replaceString(s, "b", std::string_view(s).substr(0, 3));
+            ensure_equals("replacement viewing the subject",
+                          s, std::string("aabccaabcc"));
+        }
+
+        // target views the subject. This one is read on every turn of the loop,
+        // so it dangles from the second replace onward rather than the first.
+        {
+            std::string s("xyxyxy");
+            LLStringUtil::replaceString(s, std::string_view(s).substr(0, 2), "Q");
+            ensure_equals("target viewing the subject", s, std::string("QQQ"));
+        }
+
+        // Both at once, and a replacement long enough to force the subject to
+        // reallocate while the views are still live.
+        {
+            std::string s("aXbXc");
+            LLStringUtil::replaceString(s,
+                                        std::string_view(s).substr(1, 1),
+                                        std::string_view(s).substr(0, 1));
+            ensure_equals("both viewing the subject", s, std::string("aabac"));
+        }
+
+        // And the ordinary path still works.
+        {
+            std::string s("one two one");
+            LLStringUtil::replaceString(s, "one", "three");
+            ensure_equals("unrelated arguments", s, std::string("three two three"));
+        }
+        {
+            std::string s("aaa");
+            LLStringUtil::replaceString(s, "a", "aa");
+            ensure_equals("replacement containing the target terminates",
+                          s, std::string("aaaaaa"));
+        }
+    }
+
+    // copyInto has the same shape: src may view dst, the append path appends
+    // from it, and the insert path assigns dst out from under it first.
+    template<> template<>
+    void string_index_object_t::test<47>()
+    {
+        // Append from a view of the destination.
+        {
+            std::string s("abcd");
+            LLStringUtil::copyInto(s, std::string_view(s).substr(0, 2), s.length());
+            ensure_equals("append from a view of the destination",
+                          s, std::string("abcdab"));
+        }
+
+        // Insert from a view of the destination, at the front, so the assign
+        // that shortens dst happens before src is read.
+        {
+            std::string s("abcd");
+            LLStringUtil::copyInto(s, std::string_view(s).substr(2, 2), 0);
+            ensure_equals("insert from a view of the destination",
+                          s, std::string("cdabcd"));
+        }
+
+        // A view of the whole of it, long enough that the growth reallocates.
+        {
+            std::string s("0123456789");
+            LLStringUtil::copyInto(s, std::string_view(s), 5);
+            ensure_equals("insert the whole of the destination into itself",
+                          s, std::string("01234012345678956789"));
+        }
+
+        // Offset at the end is the append fast path; offset past it is not a
+        // case any caller has, so it is simply not exercised here.
+        {
+            std::string s("head");
+            LLStringUtil::copyInto(s, std::string("-tail"), s.length());
+            ensure_equals("unrelated source appends", s, std::string("head-tail"));
+        }
     }
 }

@@ -44,32 +44,37 @@ public:
 
     virtual void resetPreedit() = 0;
 
+    // EVERY offset and length below counts BYTES of UTF-8, and every one sits
+    // at a character start. The editors store UTF-8; a windowing back end that
+    // speaks another unit -- the Win32 IME counts UTF-16 code units -- converts
+    // on its own side, which is the only place that knows what unit it was
+    // handed.
+
     // Update the preedit feedback using specified details.
     // Existing preedit is discarded and replaced with the new one.  (I.e., updatePreedit is not cumulative.)
     // All arguments are IN.
-    // preedit_count is the number of elements in arrays preedit_list and preedit_standouts.
-    // preedit list is an array of preedit texts (clauses.)
+    // preedit_segment_lengths partitions preedit_string, in bytes.
     // preedit_standouts indicates whether each preedit text should be shown as standout clause.
-    // caret_position is the preedit-local position of text editing caret, in # of llwchar.
+    // caret_position is the preedit-local position of text editing caret, in bytes.
 
-    virtual void updatePreedit(const LLWString &preedit_string,
+    virtual void updatePreedit(std::string_view preedit_string,
                         const segment_lengths_t &preedit_segment_lengths, const standouts_t &preedit_standouts, S32 caret_position) = 0;
 
     // Turn the specified sub-contents into an active preedit.
-    // Both position and length are IN and count with UTF-32 (llwchar) characters.
+    // Both position and length are IN and count bytes.
     // This method primarily facilitates reconversion.
 
     virtual void markAsPreedit(S32 position, S32 length) = 0;
 
     // Get the position and the length of the active preedit in the contents.
-    // Both position and length are OUT and count with UTF-32 (llwchar) characters.
+    // Both position and length are OUT and count bytes.
     // When this preeditor has no active preedit, position receives
     // the caret position, and length receives 0.
 
     virtual void getPreeditRange(S32 *position, S32 *length) const = 0;
 
     // Get the position and the length of the current selection in the contents.
-    // Both position and length are OUT and count with UTF-32 (llwchar) characters.
+    // Both position and length are OUT and count bytes.
     // When this preeditor has no selection, position receives
     // the caret position, and length receives 0.
 
@@ -77,7 +82,7 @@ public:
 
     // Get the locations where the preedit and related UI elements are displayed.
     // Locations are relative to the app window and measured in GL coordinate space (before scaling.)
-    // query_position is IN argument, and other three are OUT.
+    // query_position is IN, preedit-local and counted in bytes; the other three are OUT.
 
     virtual bool getPreeditLocation(S32 query_position, LLCoordGL *coord, LLRect *bounds, LLRect *control) const = 0;
 
@@ -85,10 +90,10 @@ public:
 
     virtual S32 getPreeditFontSize() const = 0;
 
-    // Get the contents of this preeditor as a LLWString.  If there is an active preedit,
-    // the returned LLWString contains it.
+    // Get the contents of this preeditor as UTF-8.  If there is an active
+    // preedit, the returned string contains it.
 
-    virtual LLWString getPreeditString() const = 0;
+    virtual const std::string& getPreeditStringUtf8() const = 0;
 
     // Handle a UTF-32 char on this preeditor, i.e., add the character
     // to the contents.

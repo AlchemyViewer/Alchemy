@@ -73,6 +73,8 @@
 // [RLVa:KB] - Checked: 2010-02-27 (RLVa-1.2.0b)
 #include "rlvactions.h"
 #include "rlvcommon.h"
+
+#include <fmt/format.h>
 // [/RLVa:KB]
 
 class ALChatBarGestureObserver final : public LLGestureManagerObserver
@@ -328,9 +330,11 @@ void ALChatBar::sendChat( EChatType type )
 {
     if (mInputEditor)
     {
-        LLWString text = mInputEditor->getConvertedText();
-        LLWStringUtil::trim(text);
-        LLWStringUtil::replaceChar(text, 182, '\n'); // Convert paragraph symbols back into newlines.
+        std::string text = mInputEditor->getConvertedText();
+        LLStringUtil::trim(text);
+        // The paragraph character is two bytes, so this is a substitution
+        // rather than a character-for-character swap.
+        LLStringUtil::replaceString(text, "\xC2\xB6", "\n");
         if (!text.empty())
         {
             // Check if this is destined for another channel
@@ -343,7 +347,7 @@ void ALChatBar::sendChat( EChatType type )
                 nearby_chat->updateUsedEmojis(text);
             }
 
-            std::string utf8text = wstring_to_utf8str(text);
+            std::string utf8text = text;
 
             if (type == CHAT_TYPE_OOC)
             {
@@ -453,12 +457,12 @@ void ALChatBar::updateChatFont()
 
 void ALChatBar::onInputEditorKeystroke(LLTextEditor* caller)
 {
-    LLWString raw_text;
-    if (mInputEditor) raw_text = mInputEditor->getWText();
+    std::string raw_text;
+    if (mInputEditor) raw_text = mInputEditor->getText();
 
     // Can't trim the end, because that will cause autocompletion
     // to eat trailing spaces that might be part of a gesture.
-    LLWStringUtil::trimHead(raw_text);
+    LLStringUtil::trimHead(raw_text);
 
     S32 length = narrow(raw_text.length());
 
@@ -478,7 +482,7 @@ void ALChatBar::onInputEditorKeystroke(LLTextEditor* caller)
 
     ALChatAutocomplete::update(
         mInputEditor,
-        wstring_to_utf8str(raw_text),
+        raw_text,
         key,
         [this](const LLGestureAutocompleteHelper::Row& row, ALChatAutocomplete::CommitAction action)
         {

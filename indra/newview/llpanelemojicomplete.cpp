@@ -118,8 +118,8 @@ void LLPanelEmojiComplete::draw()
 
     for (size_t curIdx = firstVisibleIdx; curIdx < lastVisibleIdx; curIdx++)
     {
-        const LLWString& text = mEmojis[curIdx].Character;
-        mIconFont->render(text, 0, iconCenterX, iconCenterY,
+        const std::string& text = mEmojis[curIdx].Character;
+        mIconFont->renderBytes(text, 0, iconCenterX, iconCenterY,
             LLColor4::white, LLFontGL::HCENTER, LLFontGL::VCENTER, LLFontGL::NORMAL,
             LLFontGL::DROP_SHADOW_SOFT, static_cast<S32>(text.size()), S32_MAX, nullptr, false, true);
         if (mVertical)
@@ -283,7 +283,7 @@ void LLPanelEmojiComplete::onCommit()
 {
     if (mCurSelected < mTotalEmojis)
     {
-        LLSD value(wstring_to_utf8str(mEmojis[mCurSelected].Character));
+        LLSD value(mEmojis[mCurSelected].Character);
         setValue(value);
         LLUICtrl::onCommit();
     }
@@ -302,12 +302,12 @@ void LLPanelEmojiComplete::reshape(S32 width, S32 height, bool called_from_paren
     }
 }
 
-void LLPanelEmojiComplete::setEmojis(const std::vector<LLWString>& emojis)
+void LLPanelEmojiComplete::setEmojis(const std::vector<std::string>& emojis)
 {
     mEmojis.clear();
 
     auto& emoji2descr = LLEmojiDictionary::instance().getEmoji2Descr();
-    for (const LLWString& emoji : emojis)
+    for (const std::string& emoji : emojis)
     {
         std::string shortCode;
         if (mVertical)
@@ -329,7 +329,7 @@ void LLPanelEmojiComplete::setEmojis(const std::vector<LLWString>& emojis)
 
 void LLPanelEmojiComplete::setEmojiHint(const std::string& hint)
 {
-    const LLWString curEmoji = mCurSelected < mTotalEmojis ? mEmojis[mCurSelected].Character : LLWString();
+    const std::string curEmoji = mCurSelected < mTotalEmojis ? mEmojis[mCurSelected].Character : std::string();
 
     LLEmojiDictionary::instance().findByShortCode(mEmojis, hint);
     mTotalEmojis = mEmojis.size();
@@ -441,7 +441,7 @@ void LLPanelEmojiComplete::updateConstraints()
 {
     mRenderRect = getLocalRect();
 
-    static const LLWString emojiForSize = LLWString(U"🏳️‍🌈"); // This emoji consists of 4 code points and is one of the widest emojis
+    static const std::string emojiForSize = "🏳️‍🌈"; // 4 code points, one of the widest emojis
     mEmojiWidth = (U16)(mIconFont->getWidthF32(emojiForSize) + mPadding * 2);
     if (mVertical)
     {

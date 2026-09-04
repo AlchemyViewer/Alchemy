@@ -413,6 +413,11 @@ void LLLayoutStack::updateLayout()
 
     if (!mNeedsLayout) return;
 
+    // How much of the view tree this pass moved. setShape on a panel reshapes
+    // everything under it, and the question a capture cannot otherwise answer
+    // is whether that is many views once or few views many times.
+    const S32 reshapes_before = LLView::sReshapeCount;
+
     bool continue_animating = animatePanels();
     F32 total_visible_fraction = 0.f;
     S32 space_to_distribute = (mOrientation == HORIZONTAL)
@@ -552,6 +557,8 @@ void LLLayoutStack::updateLayout()
     // clear animation flag at end, since panel resizes will set it
     // and leave it set if there is any animation in progress
     mNeedsLayout = continue_animating;
+
+    LL_PROFILE_ZONE_NUM(LLView::sReshapeCount - reshapes_before);
 } // end LLLayoutStack::updateLayout
 
 void LLLayoutStack::setPanelSpacing(S32 val)

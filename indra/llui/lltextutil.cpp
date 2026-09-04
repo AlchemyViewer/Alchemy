@@ -38,24 +38,46 @@ void LLTextUtil::textboxSetHighlightedVal(LLTextBox *txtbox, const LLStyle::Para
 {
     static LLUIColor sFilterTextColor = LLUIColorTable::instance().getColor("FilterTextColor", LLColor4::green);
 
-    std::string text_uc = text;
-    LLStringUtil::toUpper(text_uc);
-
-    size_t hl_begin = 0, hl_len = hl.size();
-
-    if (hl_len == 0 || (hl_begin = text_uc.find(hl)) == std::string::npos)
+    if (hl.empty())
     {
         txtbox->setText(text, normal_style);
         return;
     }
 
+    std::string text_uc = text;
+    LLStringUtil::toUpper(text_uc);
+
+    const size_t cased_begin = text_uc.find(hl);
+    if (cased_begin == std::string::npos)
+    {
+        txtbox->setText(text, normal_style);
+        return;
+    }
+
+    // The match was found in the uppercased copy, and uppercasing is not
+    // length-preserving -- sharp s grows a byte, and so do the ligatures --
+    // so both ends have to come back through the fold before they can index
+    // `text`. Taking them straight across highlights the wrong characters,
+    // and substr throws outright once the copy has grown past the original.
+    const size_t hl_begin = utf8str_bytes_from_cased_bytes(text, cased_begin, true);
+    const size_t hl_end   = utf8str_bytes_from_cased_bytes(text, cased_begin + hl.size(), true);
+    const size_t hl_len   = hl_end - hl_begin;
+
     LLStyle::Params hl_style = normal_style;
     hl_style.color = sFilterTextColor;
 
+    // Slice before clearing. `text` is routinely the box's own content --
+    // LLAvatarListItem passes mAvatarName->getText() straight back in -- and
+    // setText() empties the string it refers to, so every offset taken above
+    // would then index a string that no longer holds anything.
+    const std::string before = text.substr(0, hl_begin);
+    const std::string match  = text.substr(hl_begin, hl_len);
+    const std::string after  = text.substr(hl_begin + hl_len);
+
     txtbox->setText(LLStringUtil::null); // clear text
-    txtbox->appendText(text.substr(0, hl_begin),        false, normal_style);
-    txtbox->appendText(text.substr(hl_begin, hl_len),   false, hl_style);
-    txtbox->appendText(text.substr(hl_begin + hl_len),  false, normal_style);
+    txtbox->appendText(before, false, normal_style);
+    txtbox->appendText(match,  false, hl_style);
+    txtbox->appendText(after,  false, normal_style);
 }
 
 void LLTextUtil::textboxSetGreyedVal(LLTextBox *txtbox, const LLStyle::Params& normal_style, const std::string& text, const std::string& greyed)
@@ -72,10 +94,16 @@ void LLTextUtil::textboxSetGreyedVal(LLTextBox *txtbox, const LLStyle::Params& n
 
     LLStyle::Params greyed_style = normal_style;
     greyed_style.color = sGreyedTextColor;
+
+    // Slice before clearing -- see textboxSetHighlightedVal above.
+    const std::string before = text.substr(0, greyed_begin);
+    const std::string match  = text.substr(greyed_begin, greyed_len);
+    const std::string after  = text.substr(greyed_begin + greyed_len);
+
     txtbox->setText(LLStringUtil::null); // clear text
-    txtbox->appendText(text.substr(0, greyed_begin),        false, normal_style);
-    txtbox->appendText(text.substr(greyed_begin, greyed_len),   false, greyed_style);
-    txtbox->appendText(text.substr(greyed_begin + greyed_len),  false, normal_style);
+    txtbox->appendText(before, false, normal_style);
+    txtbox->appendText(match,  false, greyed_style);
+    txtbox->appendText(after,  false, normal_style);
 }
 
 bool LLTextUtil::processUrlMatch(LLUrlMatch* match,LLTextBase* text_base, bool is_content_trusted)

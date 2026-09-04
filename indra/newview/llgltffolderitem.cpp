@@ -157,7 +157,8 @@ bool LLGLTFFolderItem::filter(LLFolderViewFilter& filter)
                 view_model = static_cast<LLGLTFFolderItem*>(view_model->mParent);
             }
         }
-        setPassedFilter(passed_filter, filter_generation, filter.getStringMatchOffset(this), filter.getFilterStringSize());
+        const LLFolderViewFilter::Match match = filter.getFilterMatch(this);
+        setPassedFilter(passed_filter, filter_generation, match.mOffset, match.mLength);
         continue_filtering = !filter.isTimedOut();
     }
     return continue_filtering;
