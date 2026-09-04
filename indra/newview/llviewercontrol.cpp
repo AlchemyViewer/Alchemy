@@ -72,6 +72,7 @@
 #include "llkeyboard.h"
 #include "llerrorcontrol.h"
 #include "llappviewer.h"
+#include "llmemory.h"
 #include "llvosurfacepatch.h"
 #include "llvowlsky.h"
 #include "alsamplerstate.h"
@@ -125,6 +126,12 @@ extern bool gDebugGL;
 static bool handleRenderAvatarMouselookChanged(const LLSD& newvalue)
 {
     LLVOAvatar::sVisibleInFirstPerson = newvalue.asBoolean();
+    return true;
+}
+
+static bool handleMemoryDrawDistanceLimitChanged(const LLSD& newvalue)
+{
+    LLMemory::setSystemMemoryBudgetEnabled(newvalue.asBoolean());
     return true;
 }
 
@@ -990,6 +997,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "FirstPersonAvatarVisible", handleRenderAvatarMouselookChanged);
     setting_setup_signal_listener(gSavedSettings, "NumpadControl", handleNumpadControlChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFarClip", handleRenderFarClipChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderMemoryDrawDistanceLimit", handleMemoryDrawDistanceLimitChanged);
+    // Listeners only fire on change, so hand LLMemory the starting value.
+    LLMemory::setSystemMemoryBudgetEnabled(gSavedSettings.getBOOL("AlchemyRenderMemoryDrawDistanceLimit"));
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainScale", handleTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRScale", handlePBRTerrainScaleChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderTerrainPBRDetail", handleSetShaderChanged);

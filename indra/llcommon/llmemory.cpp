@@ -76,6 +76,7 @@ U32Kilobytes LLMemory::sAllocatedPageSizeInKB(0);
 LLFrameTimer LLMemory::sMemoryCheckTimer;
 F32 LLMemory::sSysMemoryFactor = 1.f;
 U32 LLMemory::sFactorLastFrameCount = 0;
+bool LLMemory::sSysMemoryBudgetEnabled = true;
 
 static const S32Megabytes MEM_LOW_THRESHOLD = S32Megabytes(256);
 
@@ -206,8 +207,25 @@ void LLMemory::updateFreeSystemMemory()
     }
 }
 
+//static
+void LLMemory::setSystemMemoryBudgetEnabled(bool enabled)
+{
+    sSysMemoryBudgetEnabled = enabled;
+    if (!enabled)
+    {
+        // Restore full draw range immediately rather than ramping out of
+        // whatever reduction was in effect when this was turned off.
+        sSysMemoryFactor = 1.f;
+    }
+}
+
 F32 LLMemory::getSystemMemoryBudgetFactor()
 {
+    if (!sSysMemoryBudgetEnabled)
+    {
+        return 1.f;
+    }
+
     // Only update once per frame
     U32 current_frame = LLFrameTimer::getFrameCount();
     if (sFactorLastFrameCount == current_frame)

@@ -425,7 +425,13 @@ public:
     // so the whole viewer shares a single sample per second.
     static void updateFreeSystemMemory();
     static void logMemoryInfo(bool update = false);
+
+    // Scales down draw distance as free system memory runs out. Returns 1 for
+    // no reduction, up to 2 for half range.
     static F32 getSystemMemoryBudgetFactor();
+    // Machines that will never exhaust system memory can opt out entirely,
+    // pinning the factor at 1 so draw distance is left alone.
+    static void setSystemMemoryBudgetEnabled(bool enabled);
 
 #if LL_WINDOWS
     // Commit charge is a Windows-only concept, combines page file and ram
@@ -449,6 +455,7 @@ private:
     static LLFrameTimer sMemoryCheckTimer;
     static F32 sSysMemoryFactor;
     static U32 sFactorLastFrameCount;
+    static bool sSysMemoryBudgetEnabled;
 };
 
 // LLRefCount moved to llrefcount.h

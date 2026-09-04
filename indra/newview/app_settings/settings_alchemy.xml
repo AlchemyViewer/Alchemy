@@ -1151,6 +1151,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderMemoryDrawDistanceLimit</key>
+        <map>
+            <key>Comment</key>
+            <string>Shrink draw distance while free system memory is critically low, restoring it as memory frees up. Turn off to keep the full draw distance at all times.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderShadowDepth32F</key>
         <map>
             <key>Comment</key>
