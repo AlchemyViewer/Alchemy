@@ -5002,6 +5002,12 @@ void LLVOAvatar::updateRootPositionAndRotation(LLAgent& agent, F32 speed, bool w
         // SL-315
         mRoot->setPosition(pos);
         mRoot->setRotation(mDrawable->getRotation());
+
+        // Both of those are seat relative, so they hold still while the seat
+        // moves and neither one dirties the skeleton. The seat is mRoot's
+        // xform parent but no joint, so the joint dirty flags cannot see it
+        // move either; without this the avatar stays where it sat down.
+        mRoot->touchIfXformParentMoved();
     }
 }
 
@@ -8397,6 +8403,9 @@ void LLVOAvatar::sitOnObject(LLViewerObject *sit_object)
     mRoot->getXform()->setParent(&sit_object->mDrawable->mXform); // LLVOAvatar::sitOnObject
     // SL-315
     mRoot->setPosition(getPosition());
+    // Taking a new xform parent moves the root without any write to it, and
+    // the write above can land on the value already there.
+    mRoot->touchIfXformParentMoved();
     mRoot->updateWorldMatrixChildren();
 
     stopMotion(ANIM_AGENT_BODY_NOISE);
@@ -8458,7 +8467,9 @@ void LLVOAvatar::getOffObject()
     // SL-315
     mRoot->setPosition(cur_position_world);
     mRoot->setRotation(cur_rotation_world);
-    mRoot->getXform()->update();
+    // Losing the seat as an xform parent moves the root without any write to
+    // it, and the writes above can land on the values already there.
+    mRoot->touchIfXformParentMoved();
 
     if (mEnableDefaultMotions)
     {

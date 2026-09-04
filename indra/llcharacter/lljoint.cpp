@@ -986,6 +986,28 @@ void LLJoint::updateWorldMatrix()
     }
 }
 
+//-----------------------------------------------------------------------------
+// touchIfXformParentMoved()
+//-----------------------------------------------------------------------------
+void LLJoint::touchIfXformParentMoved()
+{
+    // A joint learns its world matrix is stale from a write to itself or to a
+    // joint above it. The root of a joint tree can hang off an LLXform that is
+    // no joint at all -- an avatar sitting on an object hangs its root off the
+    // seat's transform -- and the transforms written to the root are then seat
+    // relative, so they hold still while the seat carries the joint somewhere
+    // else. Nothing in the tree hears about that, so ask the parent directly.
+    const LLVector3 last_position = mXform.getWorldPosition();
+    const LLQuaternion last_rotation = mXform.getWorldRotation();
+
+    mXform.update();
+
+    if (mXform.getWorldPosition() != last_position || mXform.getWorldRotation() != last_rotation)
+    {
+        touch();
+    }
+}
+
 //--------------------------------------------------------------------
 // getSkinOffset()
 //--------------------------------------------------------------------

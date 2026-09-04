@@ -279,6 +279,43 @@ namespace tut
     }
 
 
+    template<> template<>
+    void lljoint_object::test<17>()
+    {
+        // A sitting avatar hangs its root joint off the seat's transform,
+        // which is no joint, and then writes seat relative values into the
+        // root. Those hold still while the seat moves, and touch() only
+        // travels down from a joint that was written to, so the skeleton
+        // never hears that the seat carried it somewhere.
+        LLXformMatrix seat;
+        seat.setPosition(LLVector3(1.f, 0.f, 0.f));
+        seat.updateMatrix();
+
+        LLJoint root, child;
+        root.setup("root");
+        child.setup("child", &root);
+        root.getXform()->setParent(&seat);
+
+        root.updateWorldMatrixChildren();
+        ensure_equals("tree starts clean", root.updateWorldMatrixChildren(), 0);
+
+        seat.setPosition(LLVector3(5.f, 0.f, 0.f));
+        seat.updateMatrix();
+        ensure_equals("a moved seat dirties nothing on its own", root.updateWorldMatrixChildren(), 0);
+
+        root.touchIfXformParentMoved();
+        ensure_equals("the seat's move dirties the whole tree", root.updateWorldMatrixChildren(), 2);
+        ensure("the root followed the seat", root.getWorldPosition() == LLVector3(5.f, 0.f, 0.f));
+
+        root.touchIfXformParentMoved();
+        ensure_equals("a still seat dirties nothing", root.updateWorldMatrixChildren(), 0);
+
+        seat.setRotation(LLQuaternion(0.5f, LLVector3::z_axis));
+        seat.updateMatrix();
+        root.touchIfXformParentMoved();
+        ensure_equals("a rotated seat dirties the whole tree", root.updateWorldMatrixChildren(), 2);
+    }
+
     /*
         Test cases for the following not added. They perform operations
         on underlying LLXformMatrix and LLVector3 elements which have

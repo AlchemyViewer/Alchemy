@@ -266,6 +266,10 @@ public:
 
     void updateWorldMatrix();
 
+    // dirties this subtree when the xform this joint hangs off, which need
+    // not be a joint, has moved since the last world matrix was built
+    void touchIfXformParentMoved();
+
     // get/set skin offset
     const LLVector3 &getSkinOffset();
     void setSkinOffset( const LLVector3 &offset);
