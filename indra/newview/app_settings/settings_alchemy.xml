@@ -643,6 +643,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyTextureDiscardOnFocusLoss</key>
+        <map>
+            <key>Comment</key>
+            <string>Treat losing window focus as being in the background, discarding textures after TextureDiscardBackgroundedTime even while the viewer is still on screen. Minimized and hidden windows discard regardless.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyToolbarAutoHideLeft</key>
         <map>
             <key>Comment</key>

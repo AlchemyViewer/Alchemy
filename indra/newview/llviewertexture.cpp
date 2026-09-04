@@ -577,8 +577,16 @@ void LLViewerTexture::updateClass()
     static LLCachedControl<F32> minimized_discard_time(gSavedSettings, "TextureDiscardMinimizedTime", 1.f);
     static LLCachedControl<F32> backgrounded_discard_time(gSavedSettings, "TextureDiscardBackgroundedTime", 60.f);
 
-    bool in_background = (gViewerWindow && !gViewerWindow->getWindow()->getVisible()) || !gFocusMgr.getAppHasFocus();
-    bool is_minimized  = gViewerWindow && gViewerWindow->getWindow()->getMinimized() && in_background;
+    static LLCachedControl<bool> discard_on_focus_loss(gSavedSettings, "AlchemyTextureDiscardOnFocusLoss", false);
+
+    // A window can be visible and unfocused at the same time, on a second
+    // monitor for instance, where purging its textures buys nothing and costs
+    // the user a full re-stream on the way back. Treat focus loss on its own
+    // as backgrounded only when asked to.
+    const bool has_focus = gFocusMgr.getAppHasFocus();
+    const bool is_hidden = gViewerWindow && !gViewerWindow->getWindow()->getVisible();
+    bool is_minimized  = gViewerWindow && gViewerWindow->getWindow()->getMinimized() && !has_focus;
+    bool in_background = is_hidden || is_minimized || (discard_on_focus_loss && !has_focus);
     if (in_background)
     {
         F32 discard_time = is_minimized ? minimized_discard_time : backgrounded_discard_time;
