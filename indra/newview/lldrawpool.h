@@ -372,7 +372,7 @@ public:
 
     static void applyModelMatrix(const LLDrawInfo& params);
     // For rendering that doesn't use LLDrawInfo for some reason
-    static void applyModelMatrix(const LLMatrix4* model_matrix);
+    static void applyModelMatrix(const LLMatrix4a* model_matrix);
 
     // Bind an indexed-texture batch (tex0..texN-1, see objects/indexedTextureV.glsl).
     //

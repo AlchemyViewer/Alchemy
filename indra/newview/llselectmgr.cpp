@@ -1578,7 +1578,7 @@ void LLSelectMgr::getGrid(LLVector3& origin, LLQuaternion &rotation, LLVector3 &
             LLDrawable* drawable = first_grid_object->mDrawable;
             if (drawable && drawable->isActive())
             {
-                mGridOrigin = mGridOrigin * first_grid_object->getRenderMatrix();
+                mGridOrigin = mGridOrigin * first_grid_object->getRenderMatrix().toMatrix4();
             }
             mGridScale.set(size.getF32ptr());
         }
@@ -6924,7 +6924,7 @@ void LLSelectMgr::renderSilhouettes(bool for_hud)
 
         if (objectp->mDrawable->isActive())
         {
-            gGL.multMatrix((F32*)objectp->getRenderMatrix().mMatrix);
+            gGL.multMatrix(objectp->getRenderMatrix().getF32ptr());
         }
         else if (!is_hud_object)
         {
@@ -7584,7 +7584,7 @@ void LLSelectNode::renderOneSilhouette(const LLColor4 &color)
 
     if (drawable->isActive())
     {
-        gGL.multMatrix((F32*) objectp->getRenderMatrix().mMatrix);
+        gGL.multMatrix(objectp->getRenderMatrix().getF32ptr());
     }
 
     LLVolume *volume = objectp->getVolume();

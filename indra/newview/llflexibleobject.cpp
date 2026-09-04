@@ -932,7 +932,7 @@ void LLVolumeImplFlexible::updateRelativeXform(bool force_identity)
     vo->mRelativeXformInvTrans.setRows(x_axis, y_axis, z_axis);
 }
 
-const LLMatrix4& LLVolumeImplFlexible::getWorldMatrix(LLXformMatrix* xform) const
+const LLMatrix4a& LLVolumeImplFlexible::getWorldMatrix(LLXformMatrix* xform) const
 {
     return xform->getWorldMatrix();
 }

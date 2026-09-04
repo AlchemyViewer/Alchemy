@@ -228,7 +228,7 @@ LLVOVolume* LLDrawable::getVOVolume() const
     }
 }
 
-const LLMatrix4& LLDrawable::getRenderMatrix() const
+const LLMatrix4a& LLDrawable::getRenderMatrix() const
 {
     return isRoot() ? getWorldMatrix() : getParent()->getWorldMatrix();
 }
@@ -1343,8 +1343,7 @@ void LLSpatialBridge::updateSpatialExtents()
     LLVector4a size = root_bounds[1];
 
     //VECTORIZE THIS
-    LLMatrix4a mat;
-    mat.set(mDrawable->getXform()->getWorldMatrix());
+    const LLMatrix4a& mat = mDrawable->getXform()->getWorldMatrix();
 
     LLVector4a t;
     t.splat(0.f);
@@ -1410,7 +1409,7 @@ LLCamera LLSpatialBridge::transformCamera(LLCamera& camera)
 {
     LLCamera ret = camera;
     LLXformMatrix* mat = mDrawable->getXform();
-    LLVector3 center = LLVector3(0,0,0) * mat->getWorldMatrix();
+    LLVector3 center = LLVector3(0,0,0) * mat->getWorldMatrix().toMatrix4();
 
     LLVector3 delta = ret.getOrigin() - center;
     LLQuaternion rot = ~mat->getRotation();
@@ -1437,7 +1436,7 @@ LLCamera LLSpatialBridge::transformCamera(LLCamera& camera)
 
 void LLSpatialBridge::transformExtents(const LLVector4a* src, LLVector4a* dst)
 {
-    LLMatrix4 mat = mDrawable->getXform()->getWorldMatrix();
+    LLMatrix4 mat = mDrawable->getXform()->getWorldMatrix().toMatrix4();
     mat.invert();
 
     LLMatrix4a world_to_bridge(mat);
@@ -1719,7 +1718,7 @@ const LLVector3 LLDrawable::getPositionAgent() const
             {
                 pos = mVObjp->getPosition();
             }
-            return pos * getRenderMatrix();
+            return pos * getRenderMatrix().toMatrix4();
         }
         else
         {

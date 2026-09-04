@@ -268,7 +268,7 @@ bool    gAvatarBacklight = false;
 
 bool    gDebugPipeline = false;
 LLPipeline gPipeline;
-const LLMatrix4* gGLLastMatrix = NULL;
+const LLMatrix4a* gGLLastMatrix = NULL;
 
 //----------------------------------------
 
@@ -5086,7 +5086,7 @@ void LLPipeline::renderDebug()
             if (!bridge->isDead() && hasRenderType(bridge->mDrawableType))
             {
                 gGL.pushMatrix();
-                gGL.multMatrix((F32*)bridge->mDrawable->getRenderMatrix().mMatrix);
+                gGL.multMatrix(bridge->mDrawable->getRenderMatrix().getF32ptr());
                 bridge->renderDebug();
                 gGL.popMatrix();
             }

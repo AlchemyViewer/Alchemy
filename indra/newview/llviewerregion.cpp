@@ -901,6 +901,9 @@ void LLViewerRegion::setOriginGlobal(const LLVector3d &origin_global)
 
 void LLViewerRegion::updateRenderMatrix()
 {
+    // LLMatrix4a is trivial and starts uninitialised, where the LLMatrix4 this
+    // replaced default-constructed to the identity.
+    mRenderMatrix.setIdentity();
     mRenderMatrix.setTranslation(getOriginAgent());
 }
 

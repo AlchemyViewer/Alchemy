@@ -715,7 +715,7 @@ void LLRenderPass::applyModelMatrix(const LLDrawInfo& params)
     applyModelMatrix(params.mModelMatrix);
 }
 
-void LLRenderPass::applyModelMatrix(const LLMatrix4* model_matrix)
+void LLRenderPass::applyModelMatrix(const LLMatrix4a* model_matrix)
 {
     if (model_matrix != gGLLastMatrix)
     {
@@ -724,7 +724,7 @@ void LLRenderPass::applyModelMatrix(const LLMatrix4* model_matrix)
         gGL.loadMatrix(gGLModelView);
         if (model_matrix)
         {
-            gGL.multMatrix((GLfloat*) model_matrix->mMatrix);
+            gGL.multMatrix(model_matrix->getF32ptr());
         }
         gPipeline.mMatrixOpCount++;
     }

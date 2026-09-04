@@ -95,7 +95,7 @@ public:
     virtual bool isVolumeUnique() const = 0; // Do we need a unique LLVolume instance?
     virtual bool isVolumeGlobal() const = 0; // Are we in global space?
     virtual bool isActive() const = 0; // Is this object currently active?
-    virtual const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const = 0;
+    virtual const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const = 0;
     virtual void updateRelativeXform(bool force_identity = false) = 0;
     virtual U32 getID() const = 0;
     virtual void preRebuild() = 0;
@@ -147,7 +147,7 @@ public:
     const LLVector3     getPivotPositionAgent() const override;
     const LLMatrix4&    getRelativeXform() const                { return mRelativeXform; }
     const LLMatrix3&    getRelativeXformInvTrans() const        { return mRelativeXformInvTrans; }
-    /*virtual*/ const LLMatrix4 getRenderMatrix() const override;
+    /*virtual*/ const LLMatrix4a getRenderMatrix() const override;
                 typedef boost::unordered_set<const LLViewerTexture*> texture_cost_t;
                 static S32 getTextureCost(const LLViewerTexture* img);
                 U32     getRenderCost(texture_cost_t &textures) const;
@@ -183,7 +183,7 @@ public:
                 bool    getVolumeChanged() const                { return mVolumeChanged; }
 
     F32 getVObjRadius() const override              { return mVObjRadius; };
-                const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const override;
+                const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const override;
 
                 void    markForUpdate() override;
                 void    faceMappingChanged() override           { mFaceMappingChanged=true; }

@@ -89,26 +89,25 @@ void LLXformMatrix::updateMatrix(bool update_bounds)
 
     if (update_bounds && (mChanged & MOVED))
     {
-        mMin.mV[0] = mMax.mV[0] = mWorldMatrix.mMatrix[3][0];
-        mMin.mV[1] = mMax.mV[1] = mWorldMatrix.mMatrix[3][1];
-        mMin.mV[2] = mMax.mV[2] = mWorldMatrix.mMatrix[3][2];
+        // Half the sum of the absolute basis rows is the extent the box has to
+        // grow by on each axis; the same three sums the scalar version built a
+        // component at a time.
+        LLVector4a extent, row1, row2;
+        extent.setAbs(mWorldMatrix.getRow<0>());
+        row1.setAbs(mWorldMatrix.getRow<1>());
+        row2.setAbs(mWorldMatrix.getRow<2>());
+        row1.add(row2);
+        extent.add(row1);
+        extent.mul(0.5f);
 
-        F32 f0 = (fabs(mWorldMatrix.mMatrix[0][0])+fabs(mWorldMatrix.mMatrix[1][0])+fabs(mWorldMatrix.mMatrix[2][0])) * 0.5f;
-        F32 f1 = (fabs(mWorldMatrix.mMatrix[0][1])+fabs(mWorldMatrix.mMatrix[1][1])+fabs(mWorldMatrix.mMatrix[2][1])) * 0.5f;
-        F32 f2 = (fabs(mWorldMatrix.mMatrix[0][2])+fabs(mWorldMatrix.mMatrix[1][2])+fabs(mWorldMatrix.mMatrix[2][2])) * 0.5f;
-
-        mMin.mV[0] -= f0;
-        mMin.mV[1] -= f1;
-        mMin.mV[2] -= f2;
-
-        mMax.mV[0] += f0;
-        mMax.mV[1] += f1;
-        mMax.mV[2] += f2;
+        mMin = mMax = mWorldMatrix.getTranslation();
+        mMin.sub(extent);
+        mMax.add(extent);
     }
 }
 
 void LLXformMatrix::getMinMax(LLVector3& min, LLVector3& max) const
 {
-    min = mMin;
-    max = mMax;
+    min.set(mMin.getF32ptr());
+    max.set(mMax.getF32ptr());
 }

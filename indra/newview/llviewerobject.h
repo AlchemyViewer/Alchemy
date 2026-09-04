@@ -343,7 +343,7 @@ public:
     const LLQuaternion getRotationRegion() const;
     const LLQuaternion getRotationEdit() const;
     const LLQuaternion getRenderRotation() const;
-    virtual const LLMatrix4 getRenderMatrix() const;
+    virtual const LLMatrix4a getRenderMatrix() const;
 
     void setPosition(const LLVector3 &pos, bool damped = false);
     void setPositionGlobal(const LLVector3d &position, bool damped = false);
@@ -353,7 +353,7 @@ public:
     void setPositionParent(const LLVector3 &pos_parent, bool damped = false);
     void setPositionAbsoluteGlobal( const LLVector3d &pos_global, bool damped = false );
 
-    virtual const LLMatrix4& getWorldMatrix(LLXformMatrix* xform) const     { return xform->getWorldMatrix(); }
+    virtual const LLMatrix4a& getWorldMatrix(LLXformMatrix* xform) const    { return xform->getWorldMatrix(); }
 
     inline void setRotation(const F32 x, const F32 y, const F32 z, bool damped = false);
     inline void setRotation(const LLQuaternion& quat, bool damped = false);

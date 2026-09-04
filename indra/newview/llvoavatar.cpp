@@ -1404,7 +1404,7 @@ const LLVector3 LLVOAvatar::getRenderPosition() const
     }
     else
     {
-        return getPosition() * mDrawable->getParent()->getRenderMatrix();
+        return getPosition() * mDrawable->getParent()->getRenderMatrix().toMatrix4();
     }
 }
 

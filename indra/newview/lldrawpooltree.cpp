@@ -92,7 +92,7 @@ void LLDrawPoolTree::renderDeferred(S32 pass)
 
         if (buff)
         {
-            LLMatrix4* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
+            LLMatrix4a* model_matrix = &(face->getDrawable()->getRegion()->mRenderMatrix);
 
             llassert(gGL.getMatrixMode() == LLRender::MM_MODELVIEW);
             LLRenderPass::applyModelMatrix(model_matrix);

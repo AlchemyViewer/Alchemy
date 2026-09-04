@@ -229,7 +229,7 @@ namespace {
 
 struct GLTFPreviewModel
 {
-    GLTFPreviewModel(LLPointer<LLDrawInfo>& info, const LLMatrix4& mat)
+    GLTFPreviewModel(LLPointer<LLDrawInfo>& info, const LLMatrix4a& mat)
     : mDrawInfo(info)
     , mModelMatrix(mat)
     {
@@ -243,14 +243,14 @@ struct GLTFPreviewModel
         gGLLastMatrix = nullptr;
     }
     LLPointer<LLDrawInfo> mDrawInfo;
-    LLMatrix4 mModelMatrix; // Referenced by mDrawInfo
+    LLMatrix4a mModelMatrix; // Referenced by mDrawInfo
 };
 
 using PreviewSpherePart = std::unique_ptr<GLTFPreviewModel>;
 using PreviewSphere = std::vector<PreviewSpherePart>;
 
 // Like LLVolumeGeometryManager::registerFace but without batching or too-many-indices/vertices checking.
-PreviewSphere create_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, const LLMatrix4& model_matrix)
+PreviewSphere create_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, const LLMatrix4a& model_matrix)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
@@ -368,7 +368,7 @@ void set_preview_sphere_material(PreviewSphere& preview_sphere, LLPointer<LLFetc
     }
 }
 
-PreviewSphere& get_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, const LLMatrix4& model_matrix)
+PreviewSphere& get_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, const LLMatrix4a& model_matrix)
 {
     static PreviewSphere preview_sphere;
     if (preview_sphere.empty())
@@ -459,8 +459,9 @@ bool LLGLTFPreviewTexture::render()
     // Negative coordinate shows the textures on the sphere right-side up, when
     // combined with the UV hacks in create_preview_sphere
     const LLVector3 object_position(0.0, -object_distance, 0.0);
-    LLMatrix4 object_transform;
-    object_transform.translate(object_position);
+    LLMatrix4a object_transform;
+    object_transform.setIdentity();
+    object_transform.setTranslation(object_position);
 
     // Set up camera and viewport
     const LLVector3 origin(0.0, 0.0, 0.0);

@@ -2530,7 +2530,7 @@ void renderPhysicsShapes(LLSpatialGroup* group, bool wireframe)
             if (bridge)
             {
                 gGL.pushMatrix();
-                gGL.multMatrix((F32*)bridge->mDrawable->getRenderMatrix().mMatrix);
+                gGL.multMatrix(bridge->mDrawable->getRenderMatrix().getF32ptr());
                 bridge->renderPhysicsShapes(wireframe);
                 gGL.popMatrix();
             }
@@ -2560,7 +2560,7 @@ void renderPhysicsShapes(LLSpatialGroup* group, bool wireframe)
                 if (object && object->getPCode() == LLViewerObject::LL_VO_SURFACE_PATCH)
                 {
                     gGL.pushMatrix();
-                    gGL.multMatrix((F32*) object->getRegion()->mRenderMatrix.mMatrix);
+                    gGL.multMatrix(object->getRegion()->mRenderMatrix.getF32ptr());
                     //push face vertices for terrain
                     for (S32 i = 0; i < drawable->getNumFaces(); ++i)
                     {
@@ -3683,7 +3683,7 @@ public:
 
             if (group->getSpatialPartition()->isBridge())
             {
-                LLMatrix4 local_matrix = group->getSpatialPartition()->asBridge()->mDrawable->getRenderMatrix();
+                LLMatrix4 local_matrix = group->getSpatialPartition()->asBridge()->mDrawable->getRenderMatrix().toMatrix4();
                 local_matrix.invert();
 
                 LLMatrix4a local_matrix4a;

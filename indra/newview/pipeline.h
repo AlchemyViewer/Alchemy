@@ -1286,6 +1286,6 @@ void render_hud_elements();
 
 extern LLPipeline gPipeline;
 extern bool gDebugPipeline;
-extern const LLMatrix4* gGLLastMatrix;
+extern const LLMatrix4a* gGLLastMatrix;
 
 #endif

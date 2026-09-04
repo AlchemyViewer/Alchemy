@@ -99,7 +99,7 @@ public:
     const LLMatrix4* mSpecularMapMatrix = nullptr;
     const LLMatrix4* mNormalMapMatrix = nullptr;
     const LLMatrix4* mTextureMatrix = nullptr;
-    const LLMatrix4* mModelMatrix = nullptr;
+    const LLMatrix4a* mModelMatrix = nullptr;
 
     LLPointer<LLVOAvatar> mAvatar = nullptr;
     // Owning, like mAvatar above: the mesh repo culls skins whose only

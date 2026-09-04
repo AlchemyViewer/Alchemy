@@ -413,7 +413,7 @@ void LLAgentCamera::slamLookAt(const LLVector3 &look_at)
 //-----------------------------------------------------------------------------
 LLVector3 LLAgentCamera::calcFocusOffset(LLViewerObject *object, LLVector3 original_focus_point, S32 x, S32 y)
 {
-    LLMatrix4 obj_matrix = object->getRenderMatrix();
+    LLMatrix4 obj_matrix = object->getRenderMatrix().toMatrix4();
     LLQuaternion obj_rot = object->getRenderRotation();
     LLVector3 obj_pos = object->getRenderPosition();
 
@@ -1900,7 +1900,7 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(bool *hit_limit)
             head_offset.mdV[VX] += gAgentAvatarp->mHeadOffset.mV[VX];
             head_offset.mdV[VY] += gAgentAvatarp->mHeadOffset.mV[VY];
             head_offset.mdV[VZ] += gAgentAvatarp->mHeadOffset.mV[VZ];
-            const LLMatrix4& mat = ((LLViewerObject*) gAgentAvatarp->getParent())->getRenderMatrix();
+            const LLMatrix4 mat = ((LLViewerObject*) gAgentAvatarp->getParent())->getRenderMatrix().toMatrix4();
             camera_position_global = gAgent.getPosGlobalFromAgent
                                 ((gAgentAvatarp->getPosition()+
                                  LLVector3(head_offset)*gAgentAvatarp->getRotation()) * mat);

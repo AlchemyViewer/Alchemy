@@ -500,7 +500,7 @@ void LLFace::updateCenterAgent()
 {
     if (mDrawablep->isActive())
     {
-        mCenterAgent = mCenterLocal * getRenderMatrix();
+        mCenterAgent = mCenterLocal * getRenderMatrix().toMatrix4();
     }
     else
     {
@@ -532,11 +532,11 @@ void LLFace::renderSelected(LLViewerTexture *imagep, const LLColor4& color)
         gGL.pushMatrix();
         if (mDrawablep->isActive())
         {
-            gGL.multMatrix((GLfloat*)mDrawablep->getRenderMatrix().mMatrix);
+            gGL.multMatrix(mDrawablep->getRenderMatrix().getF32ptr());
         }
         else
         {
-            gGL.multMatrix((GLfloat*)mDrawablep->getRegion()->mRenderMatrix.mMatrix);
+            gGL.multMatrix(mDrawablep->getRegion()->mRenderMatrix.getF32ptr());
         }
 
         gGL.diffuseColor4fv(color.mV);
@@ -945,7 +945,7 @@ LLVector2 LLFace::surfaceToTexture(LLVector2 surface_coord, const LLVector4a& po
 // by planarProjection(). This is needed to match planar texgen parameters.
 void LLFace::getPlanarProjectedParams(LLQuaternion* face_rot, LLVector3* face_pos, F32* scale) const
 {
-    const LLMatrix4& vol_mat = getWorldMatrix();
+    const LLMatrix4 vol_mat = getWorldMatrix().toMatrix4();
     const LLVolumeFace& vf = getViewerObject()->getVolume()->getVolumeFace(mTEOffset);
     if (! (vf.mNormals && vf.mTangents))
     {
@@ -1595,7 +1595,7 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
             LLQuaternion bump_quat;
             if (mDrawablep->isActive())
             {
-                bump_quat = LLQuaternion(mDrawablep->getRenderMatrix());
+                bump_quat = LLQuaternion(mDrawablep->getRenderMatrix().toMatrix4());
             }
 
             if (bump_code)
@@ -2593,7 +2593,7 @@ void LLFace::setViewerObject(LLViewerObject* objp)
 }
 
 
-const LLMatrix4& LLFace::getRenderMatrix() const
+const LLMatrix4a& LLFace::getRenderMatrix() const
 {
     return mDrawablep->getRenderMatrix();
 }
@@ -2628,7 +2628,7 @@ LLVector3 LLFace::getPositionAgent() const
     }
     else
     {
-        return mCenterLocal * getRenderMatrix();
+        return mCenterLocal * getRenderMatrix().toMatrix4();
     }
 }
 
