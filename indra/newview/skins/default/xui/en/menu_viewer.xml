@@ -4753,15 +4753,6 @@ function="World.EnvPreset"
                  function="Advanced.ToggleShowPointAt" />
             </menu_item_check>
             <menu_item_check
-             label="Debug Joint Updates"
-             name="Debug Joint Updates">
-                <menu_item_check.on_check
-                 function="Advanced.CheckDebugJointUpdates"
-                 parameter="DebugJointUpdates" />
-                <menu_item_check.on_click
-                 function="Advanced.ToggleDebugJointUpdates" />
-            </menu_item_check>
-            <menu_item_check
              label="Disable LOD"
              name="Disable LOD">
                 <menu_item_check.on_check

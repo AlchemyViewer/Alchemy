@@ -34,9 +34,6 @@
 #include "llmath.h"
 #include <boost/algorithm/string.hpp>
 
-S32 LLJoint::sNumUpdates = 0;
-S32 LLJoint::sNumTouches = 0;
-
 template <class T>
 bool attachment_map_iter_compare_key(const T& a, const T& b)
 {
@@ -199,7 +196,6 @@ void LLJoint::touch(U32 flags)
 {
     if ((flags | mDirtyFlags) != mDirtyFlags)
     {
-        sNumTouches++;
         mDirtyFlags |= flags;
         U32 child_flags = flags;
         if (flags & ROTATION_DIRTY)
@@ -959,19 +955,23 @@ void LLJoint::updateWorldPRSParent()
 
 //-----------------------------------------------------------------------------
 // updateWorldMatrixChildren()
+// Returns the number of world matrices recomputed in this subtree.
 //-----------------------------------------------------------------------------
-void LLJoint::updateWorldMatrixChildren()
+S32 LLJoint::updateWorldMatrixChildren()
 {
-    if (!this->mUpdateXform) return;
+    if (!this->mUpdateXform) return 0;
 
+    S32 updated = 0;
     if (mDirtyFlags & MATRIX_DIRTY)
     {
         updateWorldMatrix();
+        ++updated;
     }
     for (LLJoint* joint : mChildren)
     {
-        joint->updateWorldMatrixChildren();
+        updated += joint->updateWorldMatrixChildren();
     }
+    return updated;
 }
 
 //-----------------------------------------------------------------------------
@@ -981,7 +981,6 @@ void LLJoint::updateWorldMatrix()
 {
     if (mDirtyFlags & MATRIX_DIRTY)
     {
-        sNumUpdates++;
         mXform.updateMatrix(false);
         mWorldMatrix.loadu(mXform.getWorldMatrix());
         mDirtyFlags = 0x0;

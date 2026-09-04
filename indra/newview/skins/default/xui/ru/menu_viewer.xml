@@ -400,7 +400,6 @@
 			<menu_item_check label="Данные об анимации" name="Animation Info"/>
 			<menu_item_check label="Показать взгляд" name="Show Look At"/>
 			<menu_item_check label="Показать указание" name="Show Point At"/>
-			<menu_item_check label="Отладка обновленных движений суставов" name="Debug Joint Updates"/>
 			<menu_item_check label="Отключить детализацию" name="Disable LOD"/>
 			<menu_item_check label="Отладка видимости персонажа" name="Debug Character Vis"/>
 			<menu_item_check label="Показать скелет" name="Show Collision Skeleton"/>

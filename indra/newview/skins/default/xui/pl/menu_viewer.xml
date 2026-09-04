@@ -418,7 +418,6 @@
 			<menu_item_check label="Informacje o animacji" name="Animation Info" />
 			<menu_item_check label="Pokaż na co patrzą inni" name="Show Look At" />
 			<menu_item_check label="Pokaż na co wskazują inni" name="Show Point At" />
-			<menu_item_check label="Debuguj aktualizacje stawów" name="Debug Joint Updates" />
 			<menu_item_check label="Wyłącz poziomy detali (LOD)" name="Disable LOD" />
 			<menu_item_check label="Debuguj VIs postaci" name="Debug Character Vis" />
 			<menu_item_check label="Pokaż szkielet kolizji" name="Show Collision Skeleton" />

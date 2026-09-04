@@ -420,7 +420,6 @@
 		<menu_item_check name="Debug Name Tooltips" label="Depurar Nomear Dicas de Contexto"/>
 		<menu_item_call name="Dump Inventory" label="Apagar Inventário"/>
 		<menu_item_call name="Dump SelectMgr" label="Apagar SelectMgr"/>
-		<menu_item_check name="Debug Joint Updates" label="Depurar Atualizações Conjuntas"/>
 		<menu_item_call name="Group Info to Debug Console" label="Informações do Grupo para o Painel de Depuração"/>
 		<menu_item_check name="Texture Priority" label="Prioridade da Textura"/>
 		<menu_item_check name="Loop Playback" label="Reprodução em Loop"/>

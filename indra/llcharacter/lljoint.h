@@ -147,9 +147,6 @@ public:
     typedef std::vector<LLJoint*> joints_t;
     joints_t mChildren;
 
-    // debug statics
-    static S32      sNumTouches;
-    static S32      sNumUpdates;
     typedef std::set<std::string> debug_joint_name_t;
     static debug_joint_name_t s_debugJointNames;
     static void setDebugJointNames(const debug_joint_name_t& names);
@@ -264,7 +261,8 @@ public:
 
     const LLMatrix4a& getWorldMatrix4a();
 
-    void updateWorldMatrixChildren();
+    // recomputes every dirty world matrix in this subtree; returns how many
+    S32 updateWorldMatrixChildren();
     void updateWorldMatrixParent();
 
     void updateWorldPRSParent();

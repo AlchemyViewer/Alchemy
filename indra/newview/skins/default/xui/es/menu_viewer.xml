@@ -412,7 +412,6 @@
 		<menu_item_check name="Debug" label="Depurar"/>
 		<menu_item_call name="Dump Inventory" label="Desechar Inventario"/>
 		<menu_item_check name="Warning" label="Advertencia"/>
-		<menu_item_check name="Debug Joint Updates" label="Depurar Actualizaciones de Mezcla"/>
 		<menu_item_call name="Group Info to Debug Console" label="Información de Grupo a Consola de Depuración"/>
 		<menu_item_check name="Texture Priority" label="Prioridad de texturas"/>
 		<menu_item_check name="Loop Playback" label="Reproducir en bucle"/>

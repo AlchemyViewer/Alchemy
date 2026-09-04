@@ -421,7 +421,6 @@
 			<menu_item_check label="Animations-Info" name="Animation Info"/>
 			<menu_item_check label="Kamerafokus anzeigen" name="Show Look At"/>
 			<menu_item_check label="Klickpunkt anzeigen??" name="Show Point At"/>
-			<menu_item_check label="Fehler in Landaktualisierung beseitigen" name="Debug Joint Updates"/>
 			<menu_item_check label="LOD deaktiveren" name="Disable LOD"/>
 			<menu_item_check label="Fehler für sichtbare Agenten beseitigen" name="Debug Character Vis"/>
 			<menu_item_check label="Gelenkpunkte anzeigen" name="Show Collision Skeleton"/>

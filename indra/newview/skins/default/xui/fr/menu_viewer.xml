@@ -409,7 +409,6 @@
 			<menu_item_check label="Infos sur l'animation" name="Animation Info"/>
 			<menu_item_check label="Afficher la direction du regard" name="Show Look At"/>
 			<menu_item_check label="Afficher la direction du pointeur" name="Show Point At"/>
-			<menu_item_check label="Débogages des mises à jour" name="Debug Joint Updates"/>
 			<menu_item_check label="Désactiver LOD" name="Disable LOD"/>
 			<menu_item_check label="Debogage Character Vis" name="Debug Character Vis"/>
 			<menu_item_check label="Afficher le squelette de collision" name="Show Collision Skeleton"/>

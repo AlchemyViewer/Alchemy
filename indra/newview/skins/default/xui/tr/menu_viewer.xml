@@ -401,7 +401,6 @@
 			<menu_item_check label="Animasyon Bilgisi" name="Animation Info"/>
 			<menu_item_check label="Şuraya Bak&apos;ı Göster" name="Show Look At"/>
 			<menu_item_check label="Şuraya İşaret Et&apos;i Göster" name="Show Point At"/>
-			<menu_item_check label="Eklem Güncelleştirmeleri İçin Hata Ayıklama" name="Debug Joint Updates"/>
 			<menu_item_check label="Ayrıntı Seviyesi Bilgisini Devre Dışı Bırak" name="Disable LOD"/>
 			<menu_item_check label="Debug Character Vis" name="Debug Character Vis"/>
 			<menu_item_check label="Çarpışma İskeletini Göster" name="Show Collision Skeleton"/>

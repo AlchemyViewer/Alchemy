@@ -401,7 +401,6 @@
 			<menu_item_check label="動作資訊" name="Animation Info"/>
 			<menu_item_check label="顯示注視在" name="Show Look At"/>
 			<menu_item_check label="顯示指向在" name="Show Point At"/>
-			<menu_item_check label="除錯旋軸的更新" name="Debug Joint Updates"/>
 			<menu_item_check label="停用細節層次" name="Disable LOD"/>
 			<menu_item_check label="除錯字元可見性" name="Debug Character Vis"/>
 			<menu_item_check label="顯示碰撞骨架" name="Show Collision Skeleton"/>

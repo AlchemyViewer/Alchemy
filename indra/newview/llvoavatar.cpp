@@ -685,7 +685,6 @@ bool LLVOAvatar::sShowAnimationDebug = false;
 bool LLVOAvatar::sVisibleInFirstPerson = false;
 F32 LLVOAvatar::sLODFactor = 1.f;
 F32 LLVOAvatar::sPhysicsLODFactor = 1.f;
-bool LLVOAvatar::sJointDebug            = false;
 F32 LLVOAvatar::sUnbakedTime = 0.f;
 F32 LLVOAvatar::sUnbakedUpdateTime = 0.f;
 F32 LLVOAvatar::sGreyTime = 0.f;
@@ -3091,14 +3090,6 @@ static void override_bbox(LLDrawable* drawable, LLVector4a* extents)
 void LLVOAvatar::idleUpdateMisc(bool detailed_update)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
-    if (LLVOAvatar::sJointDebug)
-    {
-        LL_INFOS() << getDebugName() << ": joint touches: " << LLJoint::sNumTouches << " updates: " << LLJoint::sNumUpdates << LL_ENDL;
-    }
-
-    LLJoint::sNumUpdates = 0;
-    LLJoint::sNumTouches = 0;
-
     bool visible = isVisible() || mNeedsAnimUpdate;
 
     // update attachments positions
@@ -5209,9 +5200,7 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
     // Update child joints as needed.
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_AVATAR("updateWorldMatrixChildren");
-        const S32 updates_before = LLJoint::sNumUpdates;
-        mRoot->updateWorldMatrixChildren();
-        const S32 updates = LLJoint::sNumUpdates - updates_before;
+        const S32 updates = mRoot->updateWorldMatrixChildren();
         LL_PROFILE_ZONE_NUM(updates);
         census.mJointUpdates += updates;
     }

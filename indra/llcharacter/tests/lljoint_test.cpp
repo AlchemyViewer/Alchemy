@@ -221,6 +221,39 @@ namespace tut
         ensure("2. addChild failed to remove prior parent", llparent1.findJoint("child2") == NULL);
     }
 
+    template<> template<>
+    void lljoint_object::test<15>()
+    {
+        // updateWorldMatrixChildren() reports how many world matrices it
+        // recomputed. A joint is recomputed only while MATRIX_DIRTY is set,
+        // and only below joints that still have mUpdateXform.
+        LLJoint root, a, b, c, d;
+        root.setup("root");
+        a.setup("a", &root);
+        b.setup("b", &a);
+        c.setup("c", &a);
+        d.setup("d", &root);
+
+        ensure_equals("fresh tree recomputes every joint", root.updateWorldMatrixChildren(), 5);
+        ensure_equals("clean tree recomputes nothing", root.updateWorldMatrixChildren(), 0);
+
+        root.setRotation(LLQuaternion(0.5f, LLVector3::x_axis));
+        ensure_equals("root rotation dirties the whole tree", root.updateWorldMatrixChildren(), 5);
+
+        a.setRotation(LLQuaternion(0.25f, LLVector3::y_axis));
+        ensure_equals("mid-level rotation dirties its subtree", root.updateWorldMatrixChildren(), 3);
+
+        root.setPosition(root.getPosition());
+        ensure_equals("unchanged position dirties nothing", root.updateWorldMatrixChildren(), 0);
+
+        root.setPosition(LLVector3(1.f, 2.f, 3.f));
+        ensure_equals("root position dirties the whole tree", root.updateWorldMatrixChildren(), 5);
+
+        a.mUpdateXform = false;
+        root.setRotation(LLQuaternion(0.75f, LLVector3::z_axis));
+        ensure_equals("subtree without mUpdateXform is skipped", root.updateWorldMatrixChildren(), 2);
+    }
+
 
     /*
         Test cases for the following not added. They perform operations
@@ -229,13 +262,12 @@ namespace tut
         Unit Testing these functions will basically require re-implementing
         logic of these function in the test case itself
 
-        1) void WorldMatrixChildren();
-        2) void updateWorldMatrixParent();
-        3) void updateWorldPRSParent();
-        4) void updateWorldMatrix();
-        5) LLXformMatrix *getXform() { return &mXform; }
-        6) void setConstraintSilhouette(LLDynamicArray<LLVector3>& silhouette);
-        7) void clampRotation(LLQuaternion old_rot, LLQuaternion new_rot);
+        1) void updateWorldMatrixParent();
+        2) void updateWorldPRSParent();
+        3) void updateWorldMatrix();
+        4) LLXformMatrix *getXform() { return &mXform; }
+        5) void setConstraintSilhouette(LLDynamicArray<LLVector3>& silhouette);
+        6) void clampRotation(LLQuaternion old_rot, LLQuaternion new_rot);
 
     */
 }

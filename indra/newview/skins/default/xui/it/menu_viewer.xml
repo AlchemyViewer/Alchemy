@@ -420,7 +420,6 @@
 		<menu_item_check name="Debug Name Tooltips" label="Debug della descrizione comandi"/>
 		<menu_item_call name="Dump Inventory" label="Cestina l'inventario"/>
 		<menu_item_call name="Dump SelectMgr" label="Cestina SelectMgr"/>
-		<menu_item_check name="Debug Joint Updates" label="Debug gli aggiornamenti congiunti"/>
 		<menu_item_call name="Group Info to Debug Console" label="Informazioni di gruppo alla console di debug"/>
 		<menu_item_check name="Texture Priority" label="Priorità  texture"/>
 		<menu_item_check name="Loop Playback" label="Riproduzione in loop"/>

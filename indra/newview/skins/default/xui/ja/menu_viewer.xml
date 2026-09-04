@@ -576,7 +576,6 @@
 			<menu_item_check label="アニメーション情報" name="Animation Info"/>
 			<menu_item_check label="見えているものを表示する" name="Show Look At"/>
 			<menu_item_check label="クリックした場所を表示する" name="Show Point At"/>
-			<menu_item_check label="ジョイント部分の更新をデバッグ" name="Debug Joint Updates"/>
 			<menu_item_check label="ＬｏＤを無効にする" name="Disable LOD"/>
 			<menu_item_check label="キャラクターのVisをデバッグ" name="Debug Character Vis"/>
 			<menu_item_check label="キャラクターのRezステートをデバッグ" name="Debug Character Rez State"/>
