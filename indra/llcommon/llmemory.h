@@ -420,6 +420,10 @@ public:
     static void* tryToAlloc(void* address, U32 size);
     static void initMaxHeapSizeGB(F32Gigabytes max_heap_size);
     static void updateMemoryInfo() ;
+    // Refreshes the memory counters at most once per second. Every subsystem
+    // that polls free memory should call this rather than updateMemoryInfo(),
+    // so the whole viewer shares a single sample per second.
+    static void updateFreeSystemMemory();
     static void logMemoryInfo(bool update = false);
     static F32 getSystemMemoryBudgetFactor();
 
@@ -431,7 +435,6 @@ public:
     static U32Kilobytes getMaxMemKB() ;
     static U32Kilobytes getAllocatedMemKB() ;
 private:
-    static void updateFreeSystemMemory();
     // LLMemoryInfo directly updates memory stats
     friend class LLMemoryInfo;
 

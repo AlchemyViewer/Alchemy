@@ -629,19 +629,8 @@ void LLViewerTexture::updateClass()
 //static
 U32Megabytes LLViewerTexture::getFreeSystemMemory()
 {
-    static LLFrameTimer timer;
-    static U32Megabytes physical_res = U32Megabytes(U32_MAX);
-
-    if (timer.getElapsedTimeF32() < MEMORY_CHECK_WAIT_TIME) //call this once per second.
-    {
-        return physical_res;
-    }
-
-    timer.reset();
-
-    LLMemory::updateMemoryInfo();
-    physical_res = LLMemory::getAvailableMemKB();
-    return physical_res;
+    LLMemory::updateFreeSystemMemory(); //samples at most once per second.
+    return LLMemory::getAvailableMemKB();
 }
 
 S32Megabytes get_render_free_main_memory_treshold()

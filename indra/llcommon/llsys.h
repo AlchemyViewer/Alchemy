@@ -146,8 +146,7 @@ public:
     static void updateAvailableMemory();
 
     // Retrieve a map of memory statistics. The keys of the map are platform-
-    // dependent.
-    // On Windows updates LLMemory values.
+    // dependent. This allocates; it is for diagnostics, not for polling.
     LLSD getStatsMap() const;
 
     // Re-fetch memory data (as reported by stream() and getStatsMap()) from the

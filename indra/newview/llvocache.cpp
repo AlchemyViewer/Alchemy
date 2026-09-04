@@ -459,7 +459,7 @@ void LLVOCacheEntry::updateDebugSettings()
     static LLCachedControl<U32> low_mem_bound_MB(gSavedSettings,"SceneLoadLowMemoryBound");
     static LLCachedControl<U32> high_mem_bound_MB(gSavedSettings,"SceneLoadHighMemoryBound");
 
-    LLMemory::updateMemoryInfo() ;
+    LLMemory::updateFreeSystemMemory() ;
     U32 allocated_mem = LLMemory::getAllocatedMemKB().value();
     static const F32 KB_to_MB = 1.f / 1024.f;
     U32 clamped_memory = (U32)llclamp(allocated_mem * KB_to_MB, (F32) low_mem_bound_MB, (F32) high_mem_bound_MB);
