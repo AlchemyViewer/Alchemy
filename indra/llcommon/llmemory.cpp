@@ -236,58 +236,42 @@ F32 LLMemory::getSystemMemoryBudgetFactor()
         free_sys_mem = llmin(free_sys_mem, S32Megabytes(avail_commit));
     }
 #endif
-    bool is_sys_low = free_sys_mem < MEM_LOW_THRESHOLD;
-    static bool was_low = false;
-
-    // sSysMemoryFactor affects draw distance
-    //
-    // We only decrement when more than 406MB is free, but increment
-    // when below 256MB free. This should provide a stable value
-    // in the 256-406MB range to avoid draw range fluctuations.
+    // sSysMemoryFactor divides draw distance, so 1 is full range and 2 is half.
+    // The target is 1 at the threshold and 2 once only PAD_BUFFER is left, so a
+    // shallow dip costs a little range and a deep one costs a lot.
     //
     // Draw range reduction is a last resort, texture bias is supposed
     // to free at least some memory before we get here.
     // Note: textures were mostly moved to vram, we might want to
     // detach texture bias from system memory.
-    if (is_sys_low)
-    {
-        // debt is a negative value since MIN_FREE_MAIN_MEMORY > free memory.
-        S32Megabytes sys_budget_debt = free_sys_mem - MEM_LOW_THRESHOLD;
 
-        // Leave some padding, otherwise we will crash out of memory before hitting factor 2.
-        const S32Megabytes PAD_BUFFER(32);
-        S32Megabytes budget_target = MEM_LOW_THRESHOLD - PAD_BUFFER;
-        if (!was_low)
-        {
-            // Result should range from 1 at 0 debt to 2 at -224 debt, 2.14 at -256MB
-            F32 new_factor = 1.f - (F32)sys_budget_debt.value() / (F32)budget_target.value();
-            sSysMemoryFactor = llmax(sSysMemoryFactor, new_factor);
-        }
-        else
-        {
-            // Slowly ramp up factor to free memory (increasing factor decreases draw range)
-            constexpr F32 MAX_INCREMENT = 0.05f;
-            F32 increment = MAX_INCREMENT * llmax(-(F32)sys_budget_debt.value() / (F32)budget_target.value(), 0.f);
-            sSysMemoryFactor += increment * LLFrameTimer::getFrameDeltaTimeF32();
-        }
-        sSysMemoryFactor = llclamp(sSysMemoryFactor, 1.f, 2.f);
-    }
-    else
+    // Leave some padding, otherwise we will crash out of memory before hitting factor 2.
+    const S32Megabytes PAD_BUFFER(32);
+    const S32Megabytes budget_target = MEM_LOW_THRESHOLD - PAD_BUFFER;
+
+    // debt is a negative value when free memory is under the threshold.
+    const S32Megabytes sys_budget_debt = free_sys_mem - MEM_LOW_THRESHOLD;
+    const F32 factor_target = 1.f + llclamp(-(F32)sys_budget_debt.value() / (F32)budget_target.value(), 0.f, 1.f);
+
+    // Recovery waits for real breathing room, so the factor holds steady in the
+    // 256-406MB band instead of pumping every time free memory grazes the
+    // threshold. This has to stay under isSystemMemoryLow's threshold, or we
+    // drag texture bias back into 1.5+ territory on each fluctuation.
+    const S32Megabytes RECOVERY_THRESHOLD = MEM_LOW_THRESHOLD + S32Megabytes(150);
+    if (factor_target < sSysMemoryFactor && free_sys_mem <= RECOVERY_THRESHOLD)
     {
-        // Only start ramping down when we have breathing room.
-        // This should be under the value of isSystemMemoryLow to not throw texture
-        // bias into 1.5+ territory each time we fluctuate around isSystemMemoryLow's
-        // threshold.
-        const S32Megabytes MEM_THRESHOLD = MEM_LOW_THRESHOLD + S32Megabytes(150);
-        if (free_sys_mem > MEM_THRESHOLD && sSysMemoryFactor > 1.f)
-        {
-            // Ramp down factor over time.
-            constexpr F32 DECREMENT = 0.02f;
-            sSysMemoryFactor -= DECREMENT * LLFrameTimer::getFrameDeltaTimeF32();
-            sSysMemoryFactor = llclamp(sSysMemoryFactor, 1.f, 2.f);
-        }
+        return sSysMemoryFactor;
     }
-    was_low = is_sys_low;
+
+    // Rate limit both directions: rising fast enough to matter under real
+    // pressure, falling slower so draw range does not oscillate, but bounded
+    // either way so one dip cannot cost minutes of reduced range.
+    constexpr F32 MAX_RISE_PER_SEC = 0.5f;
+    constexpr F32 MAX_FALL_PER_SEC = 0.1f;
+    const F32 max_step = (factor_target > sSysMemoryFactor ? MAX_RISE_PER_SEC : MAX_FALL_PER_SEC)
+                         * LLFrameTimer::getFrameDeltaTimeF32();
+    sSysMemoryFactor += llclamp(factor_target - sSysMemoryFactor, -max_step, max_step);
+    sSysMemoryFactor = llclamp(sSysMemoryFactor, 1.f, 2.f);
 
     return sSysMemoryFactor;
 }
