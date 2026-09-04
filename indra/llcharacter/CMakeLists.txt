@@ -76,4 +76,8 @@ if (BUILD_TESTING)
   set(test_libs llcommon llmath)
   set(test_project llcharacter)
   LL_ADD_INTEGRATION_TEST(lljoint "lljoint.cpp" "${test_libs}" "${test_project}")
+
+  set(character_test_libs llcharacter)
+  LL_ADD_INTEGRATION_TEST(llpose "" "${character_test_libs}" "${test_project}")
+  LL_ADD_INTEGRATION_TEST(llcharacter "" "${character_test_libs}" "${test_project}")
 endif()
