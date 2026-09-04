@@ -141,6 +141,7 @@ public:
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
     void generateLensFlareState(LLRenderTarget* src);
+    void clearLensFlareState();
     void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade);
     void generateGlow(LLRenderTarget* src);
     void generateBloomHDR(LLRenderTarget* src);
@@ -860,10 +861,11 @@ public:
     LLRenderTarget          mExposureMap;
     LLRenderTarget          mLastExposure;
 
-    // lens flare sun state, 2x1: [0] is current, [1] last frame's copy.
-    // texel 0 = filtered flare drive + instability, texel 1 = raw target + reference
+    // lens flare sun state, 2x1, swapped each frame: [0] is this frame's, [1]
+    // last frame's. Layout in lensFlareStateF.glsl.
     LLRenderTarget          mLensFlareState[2];
     bool                    mLensFlareStateValid = false;
+    bool                    mLensFlareSunUp = true;    // which body the history describes
 
     // FXAA helper target
     LLRenderTarget          mFXAAMap;
@@ -1000,8 +1002,7 @@ public:
     LLVector4           mTransformedSunDir;
     LLVector4           mTransformedMoonDir;
 
-    // Sun (or moon) on screen this frame in UV, projected once by
-    // generateLensFlareState and reused by colorCorrect.
+    // Sun (or moon) on screen this frame in UV, from generateLensFlareState.
     LLVector2           mLensFlareSunUV = LLVector2(0.5f, 0.5f);
 
     bool                    mInitialized;

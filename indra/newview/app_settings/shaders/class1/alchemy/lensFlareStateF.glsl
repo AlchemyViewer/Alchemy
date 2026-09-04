@@ -11,20 +11,28 @@
  * covered, the whole flare (a streak across the frame, halo, ghosts) is gone
  * in one frame and back the next. A moving camera behind fence posts or
  * foliage turned that into a strobe. Here the visibility can only change at
- * a bounded rate, whatever the geometry does.
+ * a bounded rate, whatever the geometry does. This header is the one place
+ * that story is told; the other sites point here.
  *
  * Layout (texelFetch, no filtering):
- *   texel 0: rgb = drive, linear HDR: sun colour x HDR gate x coverage x edge
+ *   texel 0: rgb = drive, linear HDR: the sun's overbright colour integrated
+ *                  over the unoccluded part of the disc, times the screen-edge
  *                  fade, filtered. Premultiplied on purpose -- fading out to
- *                  black holds the last sun colour for free.
+ *                  black holds the last sun colour for free, and exact black
+ *                  means no flare whatever the reason.
  *            a   = instability score, sign-packed with the direction of the
- *                  last significant move of the raw target.
+ *                  last registered step of the raw target.
  *   texel 1: r = raw target luminance, g = reference luminance (a decaying
- *            running maximum the slew limit is relative to), b = raw coverage,
- *            a = the dt this frame used. b and a are for inspection only.
+ *            running maximum the slew limit is relative to), b = anchor: the
+ *            raw target luminance at the last registered step -- the step
+ *            detector measures displacement from it, so its verdict does not
+ *            depend on how many frames a crossing takes -- a = the dt this
+ *            frame used, for inspection only.
  *
- * Every constant below was chosen by scripts/content_tools/check_lens_flare_state.py,
- * which mirrors this file statement for statement. Change them together.
+ * This file is the source of truth for the filter. Its mirror,
+ * scripts/content_tools/check_lens_flare_state.py, is the tool that chose the
+ * constants and the only regression test they have: change a constant here
+ * first, then make the script agree and re-run it.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -56,34 +64,57 @@ uniform sampler2D depthMap;             // final scene depth (after alpha)
 uniform sampler2D uLensFlareStateMap;   // this target, last frame
 
 uniform float dt;                       // frame interval, seconds
-uniform uint  uFrameId;
 uniform vec2  uResolution;              // framebuffer size in pixels
 uniform vec2  uLensFlareSunPos;         // sun (or moon) centre in UV
 uniform float uLensFlareSunVisibility;  // CPU screen-edge fade, 0..1
 uniform float uLensFlareOcclusionRadius;// probe radius as a fraction of screen height
-uniform vec4  uLensFlareFadeParams;     // x tau_in, y tau_out (s); z slew_in, w slew_out (1/s)
+uniform float uLensFlareFadeTime;       // RenderLensFlareFadeTime: seconds for a full fade-in
 
 const vec3  LUMA         = vec3(0.2126, 0.7152, 0.0722);
 const float GOLDEN_ANGLE = 2.39996322972865332;
 
 // ---- Spatial kernel ---------------------------------------------------------
-// A Fermat spiral of 48 taps: uniform area density with no angular clustering,
-// so a straight edge through the centre reads within 0.02 of half at every
-// angle, and no single tap carries more than 3.3% of the weight. The ad-hoc
-// Poisson table it replaces swung 0.45..0.65 with the edge angle.
-const int   TAP_COUNT = 48;
-const float K_COVER   = 1.0;    // coverage weight  exp(-K_COVER * r^2)
-const float K_COLOR   = 8.0;    // colour weight    exp(-K_COLOR * r^2): tight, so the
-                                // unoccluded mean stays within 2% of the centre texel
+// A fixed Fermat spiral of 256 taps, weighted exp(-K_TAP r^2): tight enough that
+// the unoccluded estimate is 98% of the disc's centre texel, dense enough that
+// a straight edge through the centre reads within 0.04 of half at every angle
+// (std 0.015) and no single tap carries more than 3.1% of the weight.
+//
+// The pattern is deliberately NOT rotated per frame. Against a fine occluder
+// such as alpha-masked foliage every tap is a coin toss, and a pattern that
+// moves re-tosses them all every frame: the flare then flickered with the
+// camera and the trees perfectly still. A fixed pattern is exact for a still
+// scene and changes continuously as the camera moves. 48 taps could only
+// afford that with rotation (worst edge bias 0.14, 15% per tap); 256 cannot
+// be told apart from the rotated pattern and cost two fragments a frame.
+//
+// Each tap is gated on its own: an occluded tap contributes nothing, an
+// unoccluded one its overbright colour (only an HDR-bright sun flares, never
+// a bright wall). Gating the mean colour instead switched the whole flare on
+// and off at the threshold whenever the disc was mostly hidden.
+const int   TAP_COUNT = 256;
+const float K_TAP     = 8.0;
+const float GATE      = 2.0;    // luminance below which a texel is not sun
+
+// ---- FadeTime to the filter's rates -----------------------------------------
+// A first-order fade of tau = FadeTime/3 under a slew of 1/FadeTime rises
+// 10-90% in FadeTime; the fall is 0.6x that. The slew is the guarantee: a full
+// off-on-off cycle cannot complete in less than 1.6 FadeTime whatever passes
+// in front of the sun.
+const float TAU_IN_MUL   = 1.0 / 3.0;   // x FadeTime, seconds
+const float TAU_OUT_MUL  = 0.2;         // x FadeTime, seconds
+const float SLEW_IN_MUL  = 1.0;         // / FadeTime, per second, relative to the reference
+const float SLEW_OUT_MUL = 1.0 / 0.6;   // / FadeTime, per second
 
 // ---- Temporal filter --------------------------------------------------------
 const float DT_MAX      = 0.25; // a stall converges, it does not teleport
 const float TAU_REF     = 2.0;  // reference luminance decay, seconds
-const float STEP_THRESH = 0.1;  // raw-target move that counts as a step, relative to the reference
+const float STEP_THRESH = 0.1;  // displacement from the anchor that registers a step,
+                                // relative to the unoccluded sun's brightness
 const float GAIN        = 0.35; // instability added per direction reversal
 const float TAU_I       = 1.0;  // instability decay, seconds
 const float I_DEADZONE  = 0.30; // one reversal (an ordinary reveal) slows nothing
 const float K_DAMP      = 20.0; // tau multiplier slope above the dead zone
+const float SNAP_FLOOR  = 1e-4; // drive luminance below which a black target snaps to exact zero
 
 float skyOf(float d)
 {
@@ -100,72 +131,76 @@ void main()
 {
     vec2  sun_uv    = uLensFlareSunPos;
     vec2  radius_uv = uLensFlareOcclusionRadius * vec2(uResolution.y / max(uResolution.x, 1.0), 1.0);
-    // Rotate the whole pattern by the golden angle each frame: the residual
-    // angular bias becomes zero-mean noise (std 0.017) the filter removes.
-    float rot = float(uFrameId & 1023u) * GOLDEN_ANGLE;
 
     float w_sum = 0.0;
-    float cover = 0.0;
-    vec3  col   = vec3(0.0);
-    float col_w = 0.0;
+    vec3  energy = vec3(0.0);
+    float peak   = 0.0;
     for (int i = 0; i < TAP_COUNT; i++)
     {
         float r  = sqrt((float(i) + 0.5) / float(TAP_COUNT));
-        float a  = float(i) * GOLDEN_ANGLE + rot;
+        float a  = float(i) * GOLDEN_ANGLE;
         vec2  t  = vec2(cos(a), sin(a)) * r;
-        float r2 = dot(t, t);
-        float w  = exp(-K_COVER * r2);
-        vec2  uv = sun_uv + t * radius_uv;
+        float w  = exp(-K_TAP * dot(t, t));
         w_sum += w;
-        if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
-        {
-            // Off screen: nothing known, and the edge fade already handles a
-            // sun leaving the frame. Count it as sky, keep it out of the colour.
-            cover += w;
-            continue;
-        }
+        // A tap past the frame reads the nearest edge texel for depth and
+        // colour, as the clamped sampler did before this pass existed: an
+        // occluder reaching the edge still occludes, and a sun just out of
+        // view keeps its glow, so the streak survives across the edge margin.
+        vec2  uv  = clamp(sun_uv + t * radius_uv, vec2(0.0), vec2(1.0));
         float sky = skyOf(texture(depthMap, uv).r);
-        cover += w * sky;
-        float wc = exp(-K_COLOR * r2) * sky;
-        col   += wc * texture(diffuseRect, uv).rgb;
-        col_w += wc;
+        if (sky > 0.0)
+        {
+            // Colour fetched only for unoccluded taps, so an occluder texel
+            // never enters the estimate, not even times zero.
+            vec3  c    = texture(diffuseRect, uv).rgb;
+            float lum  = dot(c, LUMA);
+            vec3  over = c * (max(lum - GATE, 0.0) / max(lum, 1e-4));
+            energy += w * sky * over;
+            peak    = max(peak, dot(over, LUMA));
+        }
     }
-    cover /= w_sum;
-    col = (col_w > 0.0) ? col / col_w : vec3(0.0);
-
-    // Only an HDR-bright sun drives the flare -- a bright diffuse wall must not.
-    float sun_lum = dot(col, LUMA);
-    float bright  = max(sun_lum - 2.0, 0.0) / max(sun_lum, 1e-4);
-    vec3  target  = col * bright * cover * uLensFlareSunVisibility;
+    vec3 sun_drive = energy / w_sum;                // the visible sun's overbright colour
+    vec3 target    = sun_drive * uLensFlareSunVisibility;
 
     // ---- Temporal filter, in luminance, RGB following ------------------------
-    vec4  prev0 = texelFetch(uLensFlareStateMap, ivec2(0, 0), 0);
-    vec4  prev1 = texelFetch(uLensFlareStateMap, ivec2(1, 0), 0);
-    float dtc   = clamp(dt, 0.0, DT_MAX);
-    float Lp    = dot(prev0.rgb, LUMA);
-    float Lt    = dot(target, LUMA);
-    float L_ref = max(max(prev1.g * exp(-dtc / TAU_REF), Lt), Lp);
+    vec4  prev0  = texelFetch(uLensFlareStateMap, ivec2(0, 0), 0);
+    vec4  prev1  = texelFetch(uLensFlareStateMap, ivec2(1, 0), 0);
+    float dtc    = clamp(dt, 0.0, DT_MAX);
+    float fade   = max(uLensFlareFadeTime, 0.05);
+    float Lp     = dot(prev0.rgb, LUMA);
+    float Lt     = dot(target, LUMA);
+    float L_full = peak;                            // the sun as if fully unoccluded
+    float L_ref  = max(max(prev1.g * exp(-dtc / TAU_REF), Lt), Lp);
 
     // Instability: direction reversals of the raw target within about a second.
-    // A fence post train reverses every crossing; a single reveal does not.
-    float packed = prev0.a;
-    float I      = abs(packed);
-    float s_prev = sign(packed);
-    float delta  = (Lt - prev1.r) / max(L_ref, 1e-6);
+    // A step is a move of more than STEP_THRESH away from the anchor (the value
+    // at the last step), measured against the unoccluded sun's brightness
+    // rather than the current level, so neither a crossing spread over many
+    // frames nor the tap jitter behind a thin post can hide or fake one. A
+    // fence post train reverses every crossing; a single reveal does not.
+    float inst_packed = prev0.a;
+    float I      = abs(inst_packed);
+    float s_prev = sign(inst_packed);
+    float anchor = prev1.b;
+    float delta  = (Lt - anchor) / max(max(L_full, L_ref), 1e-6);
     float s_now  = (abs(delta) > STEP_THRESH) ? sign(delta) : 0.0;
+    if (s_now != 0.0)
+    {
+        anchor = Lt;
+    }
     bool  reversal = (s_now != 0.0) && (s_prev != 0.0) && (s_now != s_prev);
     I = min(I * exp(-dtc / TAU_I) + (reversal ? GAIN : 0.0), 1.0);
     float s_store = (s_now != 0.0) ? s_now : s_prev;
-    packed = (s_store != 0.0) ? s_store * max(I, 1e-3) : 0.0;
+    inst_packed = (s_store != 0.0) ? s_store * max(I, 1e-3) : 0.0;
 
-    // Fade: asymmetric time constants, slowed while unstable, and a slew cap
-    // relative to the reference so no frame moves the drive by more than a
-    // bounded fraction of the sun's recent brightness.
+    // Fade: asymmetric time constants from FadeTime, slowed while unstable,
+    // and a slew cap relative to the reference so no frame moves the drive by
+    // more than a bounded fraction of the sun's recent brightness.
     bool  rising = Lt > Lp;
-    float tau    = rising ? uLensFlareFadeParams.x : uLensFlareFadeParams.y;
+    float tau    = fade * (rising ? TAU_IN_MUL : TAU_OUT_MUL);
     tau *= 1.0 + K_DAMP * max(I - I_DEADZONE, 0.0);
     float alpha  = 1.0 - exp(-dtc / tau);
-    float slew   = rising ? uLensFlareFadeParams.z : uLensFlareFadeParams.w;
+    float slew   = (rising ? SLEW_IN_MUL : SLEW_OUT_MUL) / fade;
     float cap    = slew * dtc * L_ref;
     float diff   = abs(Lt - Lp);
     if (diff > 1e-9)
@@ -173,13 +208,20 @@ void main()
         alpha = min(alpha, cap / diff);
     }
     vec3 drive = max(mix(prev0.rgb, target, alpha), vec3(0.0));
+    // A geometric decay never reaches zero in a half-float target (it pins at
+    // a denormal) and the reader's early-out needs exact black: snap once the
+    // target is black and the drive is far below anything visible.
+    if (Lt <= 0.0 && dot(drive, LUMA) < SNAP_FLOOR)
+    {
+        drive = vec3(0.0);
+    }
 
     if (gl_FragCoord.x < 1.0)
     {
-        frag_color = vec4(drive, packed);
+        frag_color = vec4(drive, inst_packed);
     }
     else
     {
-        frag_color = vec4(Lt, L_ref, cover, dtc);
+        frag_color = vec4(Lt, L_ref, anchor, dtc);
     }
 }

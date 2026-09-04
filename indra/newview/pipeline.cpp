@@ -1593,16 +1593,11 @@ void LLPipeline::createLUTBuffers()
 
     mLastExposure.allocate(1, 1, GL_R16F);
 
-    // Lens flare sun state, 2x1, two of them for ping-pong. Zero is the
+    // Lens flare sun state, 2x1, two of them swapped each frame. Zero is the
     // correct history: no drive, no instability, no reference luminance.
-    for (LLRenderTarget& state : mLensFlareState)
-    {
-        state.allocate(2, 1, GL_RGBA16F);
-        state.bindTarget();
-        state.clear();
-        state.flush();
-    }
-    mLensFlareStateValid = false;
+    mLensFlareState[0].allocate(2, 1, GL_RGBA16F);
+    mLensFlareState[1].allocate(2, 1, GL_RGBA16F);
+    clearLensFlareState();
 }
 
 void LLPipeline::setupGradingLUT()
@@ -7763,33 +7758,44 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     }
 }
 
+void LLPipeline::clearLensFlareState()
+{
+    // Only [0] is ever read as history: the swap in generateLensFlareState
+    // makes it last frame's target before anything samples it, and [1] is
+    // fully overwritten by the draw before it is read.
+    mLensFlareState[0].bindTarget();
+    mLensFlareState[0].clear();
+    mLensFlareState[0].flush();
+    mLensFlareStateValid = false;
+}
+
 // Sun coverage, colour and the temporally filtered flare drive, into a 2x1
-// target the colour-correct programs read through uLensFlareStateMap. This
-// is the only place the flare's visibility changes, and it changes at a
-// bounded rate: see lensFlareStateF.glsl for the filter and
-// scripts/content_tools/check_lens_flare_state.py for the numbers behind it.
-// Runs right before colorCorrect, against the frame's final depth, in both
-// the HDR and non-HDR paths.
+// target the colour-correct programs read through uLensFlareStateMap. The
+// only place the flare's visibility changes, at a bounded rate; the filter
+// and the reasons for it are in lensFlareStateF.glsl. Runs right before
+// colorCorrect, against the frame's final depth, in both the HDR and
+// non-HDR paths.
 void LLPipeline::generateLensFlareState(LLRenderTarget* src)
 {
     static LLCachedControl<F32> lens_flare_strength(gSavedSettings, "RenderLensFlareStrength", 0.f);
     static LLCachedControl<F32> lens_flare_occlusion_scale(gSavedSettings, "RenderLensFlareOcclusionScale", 1.f);
     static LLCachedControl<F32> lens_flare_fade_time(gSavedSettings, "RenderLensFlareFadeTime", 0.35f);
 
-    const bool active = lens_flare_strength() > 0.f && !gSnapshotNoPost && gLensFlareStateProgram.isComplete();
-    if (!active)
+    if (gSnapshotNoPost)
     {
-        // Leave no history behind: a stale drive would flash back on the
-        // frame the flare is switched on again.
+        // A clean-plate render: colorCorrect zeroes the strength for this
+        // frame, so hold the history rather than clear it, or the flare would
+        // blink out and fade back in after every no-post snapshot.
+        return;
+    }
+
+    if (lens_flare_strength() <= 0.f || !gLensFlareStateProgram.isComplete())
+    {
+        // Switched off, or nothing to run it with: leave no history behind,
+        // or a stale drive would flash back on the frame the flare returns.
         if (mLensFlareStateValid)
         {
-            for (LLRenderTarget& state : mLensFlareState)
-            {
-                state.bindTarget();
-                state.clear();
-                state.flush();
-            }
-            mLensFlareStateValid = false;
+            clearLensFlareState();
         }
         return;
     }
@@ -7803,6 +7809,17 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     // xy/w == ndc under both conventions; z would flip sign under reverse-Z.
     LLEnvironment& environment = LLEnvironment::instance();
     const bool sun_up = environment.getIsSunUp();
+    if (sun_up != mLensFlareSunUp)
+    {
+        // The history holds the old body's colour while the anchor moves to
+        // the new one this frame; a sun flare fading out on the moon is wrong,
+        // so start over, as the per-frame probe used to.
+        mLensFlareSunUp = sun_up;
+        if (mLensFlareStateValid)
+        {
+            clearLensFlareState();
+        }
+    }
     const LLVector4 light_dir = sun_up ? mSunDir : mMoonDir;
     const glm::vec4 sun_clip = get_current_projection() * get_current_modelview() * glm::vec4(light_dir.mV[0], light_dir.mV[1], light_dir.mV[2], 0.0f);
     F32 edge_fade = 0.f;
@@ -7830,22 +7847,25 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
         disk_radius = (sun_up ? gSky.mVOSkyp->getSun() : gSky.mVOSkyp->getMoon()).getDiskRadius();
     }
     const F32 body_scale = llmax(sun_up ? psky->getSunScale() : psky->getMoonScale(), 0.01f);
-    const F32 half_tan   = HEAVENLY_BODY_FACTOR * disk_radius * body_scale;
-    const F32 fov_y      = llclamp(LLViewerCamera::getInstance()->getView(), 0.01f, F_PI - 0.01f);
-    const F32 radius_uv  = 0.5f * half_tan / tanf(fov_y * 0.5f) * llclamp(lens_flare_occlusion_scale(), 0.25f, 2.f);
+    // The drawn quad grows towards the horizon (1.3x wide and 1.2x tall at
+    // dir.z = 0, llvosky.cpp); a circular probe takes the mean of the two.
+    const F32 enlargement = 1.f + (1.f - light_dir.mV[VZ]) * 0.25f;
+    const F32 half_tan    = HEAVENLY_BODY_FACTOR * disk_radius * body_scale * enlargement;
+    const LLViewerCamera* camera = LLViewerCamera::getInstance();
+    const F32 fov_y       = llclamp(camera->getView(), 0.01f, F_PI - 0.01f);
+    // A tiled snapshot zooms the projection without touching the FOV, and the
+    // radius has to follow the projection the centre was put through. Capped
+    // so a wide sky sun scale at a narrow FOV cannot probe half the frame.
+    const F32 radius_uv   = llmin(0.5f * half_tan / tanf(fov_y * 0.5f) * llmax(camera->getZoomFactor(), 1.f)
+                                  * llclamp(lens_flare_occlusion_scale(), 0.25f, 2.f), 0.3f);
 
-    // FadeTime to filter constants. A first-order fade of tau = FadeTime/3
-    // under a slew of 1/FadeTime rises 10-90% in FadeTime; the fall is 0.6x
-    // that. The slew is the guarantee: a full off-on-off cycle cannot
-    // complete in less than 1.6 FadeTime whatever passes in front of the sun.
-    const F32 fade     = llclamp(lens_flare_fade_time(), 0.1f, 1.f);
-    const F32 tau_in   = fade / 3.f;
-    const F32 tau_out  = fade * 0.2f;
-    const F32 slew_in  = 1.f / fade;
-    const F32 slew_out = slew_in / 0.6f;
+    // The shader derives its time constants and slew from FadeTime itself, so
+    // the filter is defined in one file and its mirror can check it.
+    const F32 fade = llclamp(lens_flare_fade_time(), 0.1f, 1.f);
 
-    // Ping-pong: last frame's state becomes the history this frame reads.
-    mLensFlareState[1].copyContents(mLensFlareState[0], 0, 0, 2, 1, 0, 0, 2, 1, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    // Ping-pong by swapping handles: [1] becomes last frame's state, the
+    // history this frame reads, and [0] is fully overwritten below.
+    mLensFlareState[0].swapFBORefs(mLensFlareState[1]);
 
     mLensFlareState[0].bindTarget();
     LLGLDepthTest depth(GL_FALSE, GL_FALSE);
@@ -7857,12 +7877,11 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     const S32 state_channel   = shader.bindTexture(LLShaderMgr::LENS_FLARE_STATE_MAP, &mLensFlareState[1], ALSamplers::PointClamp);
 
     shader.uniform1f(LLShaderMgr::DT, gFrameIntervalSeconds);
-    shader.uniform1ui(LLShaderMgr::FRAME_ID, LLFrameTimer::getFrameCount());
     shader.uniform2f(LLShaderMgr::SCREEN_RESOLUTION, (GLfloat)src->getWidth(), (GLfloat)src->getHeight());
     shader.uniform2f(LLShaderMgr::LENS_FLARE_SUN_POS, mLensFlareSunUV.mV[VX], mLensFlareSunUV.mV[VY]);
     shader.uniform1f(LLShaderMgr::LENS_FLARE_SUN_VISIBILITY, edge_fade);
     shader.uniform1f(LLShaderMgr::LENS_FLARE_OCCLUSION_RADIUS, radius_uv);
-    shader.uniform4f(LLShaderMgr::LENS_FLARE_FADE_PARAMS, tau_in, tau_out, slew_in, slew_out);
+    shader.uniform1f(LLShaderMgr::LENS_FLARE_FADE_TIME, fade);
 
     mScreenTriangleVB->setBuffer();
     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -7938,7 +7957,6 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         shader->bind();
 
         S32 diffuse_channel = shader->bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, src, ALSamplers::PointMirror);
-        S32 depth_channel = shader->bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &mRT->deferredScreen);
         S32 exposure_channel = shader->bindTexture(LLShaderMgr::EXPOSURE_MAP, &mExposureMap);
 
         // HDR bloom pyramid is folded into the tonemap variants of this shader
@@ -7974,10 +7992,11 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         // aberration and the lens flare are applied *inside* this program, in
         // every variant including the no-post ones, so their strengths have to
         // be silenced here or a clean plate still carries both.
-        // The material preview sphere comes through here too, with its own
-        // scene buffer; the flare state was measured against the world's
-        // depth, so a preview is a clean plate as far as the flare goes.
-        const bool clean_plate = gSnapshotNoPost || src != &mRT->screen;
+        const bool clean_plate = gSnapshotNoPost;
+        // The material preview renders through here too, inside the auxiliary
+        // target pack. The flare state was measured for the world frame, so
+        // only the main pack gets the flare; aberration is left as it was.
+        const bool world_frame = (mRT == &mMainRT);
 
         // Chromatic aberration parameters
         static LLCachedControl<F32> chromatic_aberration_strength(gSavedSettings, "RenderChromaticAberrationStrength", 0.f);
@@ -8027,15 +8046,12 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
 
             // Zeroing the master strength both hits the shader's early-out and
             // skips the whole detail block below.
-            F32 strength = clean_plate ? 0.f : llclamp(lens_flare_strength(), 0.f, 1.f);
+            F32 strength = (clean_plate || !world_frame) ? 0.f : llclamp(lens_flare_strength(), 0.f, 1.f);
             shader->uniform1f(LLShaderMgr::LENS_FLARE_STRENGTH, strength);
 
             if (strength > 0.f)
             {
-                // Where the sun is was projected by generateLensFlareState this
-                // frame. Whether it is visible, how much of it, and what colour,
-                // arrive already filtered in the state texture -- this pass no
-                // longer probes depth, and nothing here can pop.
+                // Sun UV and the filtered drive both come from generateLensFlareState.
                 shader->uniform2f(LLShaderMgr::LENS_FLARE_SUN_POS, mLensFlareSunUV.mV[VX], mLensFlareSunUV.mV[VY]);
                 state_channel = shader->bindTexture(LLShaderMgr::LENS_FLARE_STATE_MAP, &mLensFlareState[0], ALSamplers::PointClamp);
 
@@ -8352,10 +8368,6 @@ void LLPipeline::colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool app
         if (bloom_channel > -1)
         {
             gGL.getTextureSlot(bloom_channel)->unbind();
-        }
-        if (depth_channel > -1)
-        {
-            gGL.getTextureSlot(depth_channel)->unbind();
         }
         if (state_channel > -1)
         {
@@ -9254,8 +9266,7 @@ void LLPipeline::renderFinalize()
         generateBloomHDR(&mRT->screen);
     }
 
-    // Sun coverage, colour and the filtered flare drive, against this frame's
-    // final depth and the linear scene. Both the HDR and non-HDR paths flare.
+    // Lens flare sun state (see lensFlareStateF.glsl), in both HDR paths.
     generateLensFlareState(&mRT->screen);
 
     // Read any pending scene probe here, while the buffer still holds linear

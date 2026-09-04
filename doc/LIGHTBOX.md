@@ -810,12 +810,14 @@ only; apply per row, not on the parent panel. Reference patterns:
 - **`gSnapshotNoPost` gates the renderer, not the UI, and it is easy to miss.**
   The snapshot floater's "No post-processing" box has to mean it, so a new
   *print* effect must check it wherever its strength is uploaded — there are
-  `clean_plate` gates in **two** places, because post-grade is two passes.
-  Effects in the final blit (vignette, grain, CVD, the preview modes) gate in
-  `renderFinalize`; effects applied *inside* the colorCorrect program
-  (chromatic aberration, lens flare) gate in `colorCorrect`, because they run
-  in every variant including the no-post ones — those two leaked through the
-  first time for exactly that reason. The one deliberate exception is dither,
+  `clean_plate` gates in **three** places. Effects in the final blit (vignette,
+  grain, CVD, the preview modes) gate in `renderFinalize`; effects applied
+  *inside* the colorCorrect program (chromatic aberration, lens flare) gate in
+  `colorCorrect`, because they run in every variant including the no-post
+  ones — those two leaked through the first time for exactly that reason; and
+  `generateLensFlareState`, which owns the flare's history, skips its update
+  on a no-post frame rather than clearing it, so the flare does not blink
+  after the capture. The one deliberate exception is dither,
   which is a quantisation aid rather than a look and which an 8-bit PNG wants
   either way.
 

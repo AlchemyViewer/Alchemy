@@ -446,7 +446,7 @@ public:
         LENS_FLARE_STARBURST_FALLOFF,       //  "uLensFlareStarburstFalloff"
         LENS_FLARE_LIGHT_COLOR,             //  "uLensFlareLightColor"
         LENS_FLARE_STATE_MAP,               //  "uLensFlareStateMap"    2x1 written by generateLensFlareState
-        LENS_FLARE_FADE_PARAMS,             //  "uLensFlareFadeParams"  (tau_in, tau_out, slew_in, slew_out)
+        LENS_FLARE_FADE_TIME,               //  "uLensFlareFadeTime"    RenderLensFlareFadeTime, seconds; the shader derives its rates
 
         // Color Correction LUT
         COLOR_GRADE_LUT,                    //  "uColorGradeLut"
