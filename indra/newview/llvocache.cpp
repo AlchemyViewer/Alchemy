@@ -541,24 +541,25 @@ bool LLVOCacheEntry::isAnyVisible(const LLVector4a& camera_origin, const LLVecto
     // the spatial partition system and is redundant to the object cache, but this is a start
     //  - davep 2024.06.07
 
+    // A drawable carries no group while it moves between spatial groups, and
+    // LLSpatialBridge::cleanupReferences clears one for a whole child list.
+    // Answering "invisible" there evicts objects mid-rebin, so ask the octree
+    // only when there is an octree to ask and let the frame window below judge
+    // the rest.
     LLOcclusionCullingGroup* group = (LLOcclusionCullingGroup*)getGroup();
-    if(!group)
-    {
-        return false;
-    }
 
     //any visible
-    bool vis = group->isAnyRecentlyVisible();
+    bool vis = group && group->isAnyRecentlyVisible();
 
     //not ready to remove
     if(!vis)
     {
-        S32 cur_vis = llmax(group->getAnyVisible(), (S32)getVisible());
+        S32 cur_vis = group ? llmax(group->getAnyVisible(), (S32)getVisible()) : (S32)getVisible();
         vis = (cur_vis + (S32)sMinFrameRange > LLViewerOctreeEntryData::getCurrentFrame());
     }
 
     //within the back sphere
-    if(!vis && !mParentID && !group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
+    if(!vis && !mParentID && !(group && group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED)))
     {
         LLVector4a lookAt;
 
