@@ -504,7 +504,7 @@ LLVector3 LLModel::getTransformedCenter(const LLMatrix4& mat)
     if (!mVolumeFaces.empty())
     {
         LLMatrix4a m;
-        m.loadu(mat);
+        m.set(mat);
 
         LLVector4a minv,maxv;
 
@@ -1736,7 +1736,7 @@ void LLMeshSkinInfo::fromLLSD(LLSD& skin)
                 mat.mMatrix[j][k] = (F32)skin["bind_shape_matrix"][j*4+k].asReal();
             }
         }
-        mBindShapeMatrix.loadu(mat);
+        mBindShapeMatrix.set(mat);
     }
 
     if (skin.has("alt_inverse_bind_matrix"))
@@ -1774,7 +1774,7 @@ void LLMeshSkinInfo::fromLLSD(LLSD& skin)
     mBindPoseMatrix.resize(mInvBindMatrix.size());
     for (U32 i = 0; i < mInvBindMatrix.size(); ++i)
     {
-        matMul(mBindShapeMatrix, mInvBindMatrix[i], mBindPoseMatrix[i]);
+        mBindPoseMatrix[i].setMul(mBindShapeMatrix, mInvBindMatrix[i]);
     }
 
     updateHash();

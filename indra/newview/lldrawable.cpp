@@ -1344,7 +1344,7 @@ void LLSpatialBridge::updateSpatialExtents()
 
     //VECTORIZE THIS
     LLMatrix4a mat;
-    mat.loadu(mDrawable->getXform()->getWorldMatrix());
+    mat.set(mDrawable->getXform()->getWorldMatrix());
 
     LLVector4a t;
     t.splat(0.f);

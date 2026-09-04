@@ -179,7 +179,7 @@ void LLSkinningUtil::initSkinningMatrixPalette(
 
     while (m < end)
     {
-        matMulUnsafe(*(invBind++), *(w++), *(m++));
+        (m++)->setMulNoAlias(*(invBind++), *(w++));
     }
 }
 

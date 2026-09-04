@@ -1312,7 +1312,7 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
 
     LLMatrix3 rot(twist * qang);
 
-    pt->mRot.loadu(rot);
+    pt->mRot.set(rot);
 
     t+=step;
 
@@ -1344,7 +1344,7 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
         // Rotate the point around the circle's center.
         qang.setQuat   (ang,path_axis);
         LLMatrix3 tmp(twist*qang);
-        pt->mRot.loadu(tmp);
+        pt->mRot.set(tmp);
 
         t+=step;
     }
@@ -1370,7 +1370,7 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
     // Rotate the point around the circle's center.
     qang.setQuat   (ang,path_axis);
     LLMatrix3 tmp(twist*qang);
-    pt->mRot.loadu(tmp);
+    pt->mRot.set(tmp);
 
     mTotal = mPath.size();
 }
@@ -1502,7 +1502,7 @@ bool LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
                 LLQuaternion quat;
                 quat.setQuat(lerp(F_PI * params.getTwistBegin(),F_PI * params.getTwist(),t),0,0,1);
                 LLMatrix3 tmp(quat);
-                mPath[i].mRot.loadu(tmp);
+                mPath[i].mRot.set(tmp);
                 mPath[i].mScale.set(lerp(start_scale.mV[0],end_scale.mV[0],t),
                                     lerp(start_scale.mV[1],end_scale.mV[1],t),
                                     0,1);
@@ -1569,7 +1569,7 @@ bool LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
             LLQuaternion quat;
             quat.setQuat(F_PI * params.getTwist() * t,1,0,0);
             LLMatrix3 tmp(quat);
-            mPath[i].mRot.loadu(tmp);
+            mPath[i].mRot.set(tmp);
         }
 
         break;
@@ -1600,7 +1600,7 @@ bool LLDynamicPath::generate(const LLPathParams& params, F32 detail, S32 split,
         for (U32 i = 0; i < 2; i++)
         {
             mPath[i].mPos.set(0, 0, 0);
-            mPath[i].mRot.loadu(tmp);
+            mPath[i].mRot.set(tmp);
             mPath[i].mScale.set(1, 1, 0, 1);
             mPath[i].mTexT = 0;
         }
@@ -2117,7 +2117,7 @@ bool LLVolume::generate()
             scale_mat *= rot;
 
             LLMatrix4a rot_mat;
-            rot_mat.loadu(scale_mat);
+            rot_mat.set(scale_mat);
 
             LLVector4a* profile = mProfilep->mProfile.mArray;
             LLVector4a* end_profile = profile+sizeT;
@@ -4270,10 +4270,10 @@ void LLVolume::generateSilhouetteVertices(std::vector<LLVector3> &vertices,
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
 
     LLMatrix4a mat;
-    mat.loadu(mat_in);
+    mat.set(mat_in);
 
     LLMatrix4a norm_mat;
-    norm_mat.loadu(norm_mat_in);
+    norm_mat.set(norm_mat_in);
 
     LLVector4a obj_cam_vec;
     obj_cam_vec.load3(obj_cam_vec_in.mV);

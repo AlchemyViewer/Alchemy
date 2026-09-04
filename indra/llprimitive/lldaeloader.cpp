@@ -1250,10 +1250,10 @@ void LLDAELoader::processDomModel(LLModel* model, DAE* dae, daeElement* root, do
                 }
             }
 
-            skin_info.mBindShapeMatrix.loadu(mat);
+            skin_info.mBindShapeMatrix.set(mat);
 
             LLMatrix4a trans(normalized_transformation);
-            matMul(trans, skin_info.mBindShapeMatrix, skin_info.mBindShapeMatrix);
+            skin_info.mBindShapeMatrix.setMul(trans, skin_info.mBindShapeMatrix);
         }
 
 

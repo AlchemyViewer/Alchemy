@@ -3687,7 +3687,7 @@ public:
                 local_matrix.invert();
 
                 LLMatrix4a local_matrix4a;
-                local_matrix4a.loadu(local_matrix);
+                local_matrix4a.set(local_matrix);
 
                 local_matrix4a.affineTransform(mStart, local_start);
                 local_matrix4a.affineTransform(mEnd, local_end);

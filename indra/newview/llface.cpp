@@ -845,7 +845,7 @@ bool LLFace::genVolumeBBoxes(const LLVolume &volume, S32 f,
 
         //VECTORIZE THIS
         LLMatrix4a mat_vert;
-        mat_vert.loadu(mat_vert_in);
+        mat_vert.set(mat_vert_in);
 
         llassert(less_than_max_mag(face.mExtents[0]));
         llassert(less_than_max_mag(face.mExtents[1]));
@@ -1553,7 +1553,7 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
         }
         else
         {
-            mat_vert.loadu(mat_vert_in);
+            mat_vert.set(mat_vert_in);
         }
     }
 
@@ -1574,7 +1574,7 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
         }
         else
         {
-            mat_normal.loadu(mat_norm_in);
+            mat_normal.set(mat_norm_in);
         }
     }
 

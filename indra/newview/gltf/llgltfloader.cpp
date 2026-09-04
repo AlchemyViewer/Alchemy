@@ -489,7 +489,7 @@ void LLGLTFLoader::processNodeHierarchy(S32 node_idx, std::map<std::string, S32>
                 // (based of values the 'bento shoes' mesh might be missing 90 degrees horizontaly
                 // prior to skinning)
 
-                pModel->mSkinInfo.mBindShapeMatrix.loadu(mesh_scale);
+                pModel->mSkinInfo.mBindShapeMatrix.set(mesh_scale);
                 LL_INFOS("GLTF_DEBUG") << "Model: " << pModel->mLabel << " mBindShapeMatrix: " << pModel->mSkinInfo.mBindShapeMatrix << LL_ENDL;
             }
 

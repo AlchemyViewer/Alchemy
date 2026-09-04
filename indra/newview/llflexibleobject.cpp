@@ -710,7 +710,7 @@ void LLVolumeImplFlexible::doFlexibleUpdate()
             mUpdated = false;
         }
 
-        new_point->mRot.loadu(LLMatrix3(rot));
+        new_point->mRot.set(LLMatrix3(rot));
         new_point->mScale.set(newSection[i].mScale.mV[0], newSection[i].mScale.mV[1], 0,1);
         new_point->mTexT = ((F32)i)/(num_render_sections);
     }

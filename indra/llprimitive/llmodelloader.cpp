@@ -93,7 +93,7 @@ void LLModelLoader::stretch_extents(const LLModel* model, const LLMatrix4& mat)
     LLVector4a mina, maxa;
     LLMatrix4a mata;
 
-    mata.loadu(mat);
+    mata.set(mat);
     mina.load3(mExtents[0].mV);
     maxa.load3(mExtents[1].mV);
 

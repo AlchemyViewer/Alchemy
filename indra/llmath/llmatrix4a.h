@@ -41,7 +41,7 @@ public:
 
     explicit LLMatrix4a(const LLMatrix4& val)
     {
-        loadu(val);
+        set(val);
     }
 
     explicit LLMatrix4a(const F32* val)
@@ -51,13 +51,12 @@ public:
 
     static const LLMatrix4a& identity()
     {
-        static const F32 v[] =
-        {   1.f, 0.f, 0.f, 0.f,
-            0.f, 1.f, 0.f, 0.f,
-            0.f, 0.f, 1.f, 0.f,
-            0.f, 0.f, 0.f, 1.f
-        };
-        static LLMatrix4a identity_mat(v);
+        static const LLMatrix4a identity_mat = []
+        {
+            LLMatrix4a m;
+            m.setIdentity();
+            return m;
+        }();
 
         return identity_mat;
     }
@@ -170,7 +169,10 @@ public:
         mMatrix[3] = _mm_setr_ps(pos.mV[VX], pos.mV[VY], pos.mV[VZ], 1.f);
     }
 
-    inline void loadu(const LLMatrix4& src)
+    // Conversions from the scalar matrix types. These are not unaligned
+    // loads of a float buffer -- loadu(const F32*) is -- so they do not carry
+    // its name; the LLMatrix3 form does not load a fourth row at all.
+    inline void set(const LLMatrix4& src)
     {
         mMatrix[0] = _mm_loadu_ps(src.mMatrix[0]);
         mMatrix[1] = _mm_loadu_ps(src.mMatrix[1]);
@@ -186,7 +188,7 @@ public:
         mMatrix[3] = _mm_loadu_ps(src+12);
     }
 
-    inline void loadu(const LLMatrix3& src)
+    inline void set(const LLMatrix3& src)
     {
         mMatrix[0].load3(src.mMatrix[0]);
         mMatrix[1].load3(src.mMatrix[1]);
@@ -254,7 +256,9 @@ public:
         res.add(z);
     }
 
-    inline void affineTransformSSE(const LLVector4a& v, LLVector4a& res) const
+    // Transforms v as a point: the upper 3x3 applies, then the translation
+    // row is added. Contrast rotate(), which leaves the translation out.
+    inline void affineTransform(const LLVector4a& v, LLVector4a& res) const
     {
         LLVector4a x,y,z;
 
@@ -271,56 +275,55 @@ public:
         res.setAdd(x,z);
     }
 
-    inline void affineTransformNonSSE(const LLVector4a& v, LLVector4a& res) const
-    {
-        F32 x = v[0] * mMatrix[0][0] + v[1] * mMatrix[1][0] + v[2] * mMatrix[2][0] + mMatrix[3][0];
-        F32 y = v[0] * mMatrix[0][1] + v[1] * mMatrix[1][1] + v[2] * mMatrix[2][1] + mMatrix[3][1];
-        F32 z = v[0] * mMatrix[0][2] + v[1] * mMatrix[1][2] + v[2] * mMatrix[2][2] + mMatrix[3][2];
-        F32 w = 1.0f;
-        res.set(x,y,z,w);
-    }
-
-    inline void affineTransform(const LLVector4a& v, LLVector4a& res) const
-    {
-        affineTransformSSE(v,res);
-    }
+    template<int N> const LLVector4a& getRow() const { return mMatrix[N]; }
+    template<int N> void setRow(const LLVector4a& row) { mMatrix[N] = row; }
 
     const LLVector4a& getTranslation() const { return mMatrix[3]; }
+
+    // Replaces the translation while leaving the basis alone, keeping the
+    // row's w at 1 so the matrix stays affine.
+    inline void setTranslation(const LLVector3& pos)
+    {
+        mMatrix[3] = _mm_setr_ps(pos.mV[VX], pos.mV[VY], pos.mV[VZ], 1.f);
+    }
+
+    // this = a * b. a or b may alias this.
+    inline void setMul(const LLMatrix4a& a, const LLMatrix4a& b)
+    {
+        const LLVector4a row0 = rowMul(a.mMatrix[0], b);
+        const LLVector4a row1 = rowMul(a.mMatrix[1], b);
+        const LLVector4a row2 = rowMul(a.mMatrix[2], b);
+        const LLVector4a row3 = rowMul(a.mMatrix[3], b);
+
+        mMatrix[0] = row0;
+        mMatrix[1] = row1;
+        mMatrix[2] = row2;
+        mMatrix[3] = row3;
+    }
+
+    // this = a * b, without the temporaries setMul needs to tolerate
+    // aliasing. Neither a nor b may be this.
+    inline void setMulNoAlias(const LLMatrix4a& a, const LLMatrix4a& b)
+    {
+        mMatrix[0] = rowMul(a.mMatrix[0], b);
+        mMatrix[1] = rowMul(a.mMatrix[1], b);
+        mMatrix[2] = rowMul(a.mMatrix[2], b);
+        mMatrix[3] = rowMul(a.mMatrix[3], b);
+    }
+
+private:
+    static inline LLVector4a rowMul(const LLVector4a& row, const LLMatrix4a& mat)
+    {
+        LLVector4a result;
+        result = _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(0, 0, 0, 0)), mat.mMatrix[0]);
+        result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(1, 1, 1, 1)), mat.mMatrix[1]));
+        result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(2, 2, 2, 2)), mat.mMatrix[2]));
+        result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(3, 3, 3, 3)), mat.mMatrix[3]));
+        return result;
+    }
 };
 
 static_assert(std::is_trivial<LLMatrix4a>::value, "LLMatrix4a must be a trivial type");
-
-inline LLVector4a rowMul(const LLVector4a &row, const LLMatrix4a &mat)
-{
-    LLVector4a result;
-    result = _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(0, 0, 0, 0)), mat.mMatrix[0]);
-    result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(1, 1, 1, 1)), mat.mMatrix[1]));
-    result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(2, 2, 2, 2)), mat.mMatrix[2]));
-    result = _mm_add_ps(result, _mm_mul_ps(_mm_shuffle_ps(row, row, _MM_SHUFFLE(3, 3, 3, 3)), mat.mMatrix[3]));
-    return result;
-}
-
-inline void matMul(const LLMatrix4a &a, const LLMatrix4a &b, LLMatrix4a &res)
-{
-    LLVector4a row0 = rowMul(a.mMatrix[0], b);
-    LLVector4a row1 = rowMul(a.mMatrix[1], b);
-    LLVector4a row2 = rowMul(a.mMatrix[2], b);
-    LLVector4a row3 = rowMul(a.mMatrix[3], b);
-
-    res.mMatrix[0] = row0;
-    res.mMatrix[1] = row1;
-    res.mMatrix[2] = row2;
-    res.mMatrix[3] = row3;
-}
-
-//Faster version of matMul wehere res must not be a or b
-inline void matMulUnsafe(const LLMatrix4a &a, const LLMatrix4a &b, LLMatrix4a &res)
-{
-    res.mMatrix[0] = rowMul(a.mMatrix[0], b);
-    res.mMatrix[1] = rowMul(a.mMatrix[1], b);
-    res.mMatrix[2] = rowMul(a.mMatrix[2], b);
-    res.mMatrix[3] = rowMul(a.mMatrix[3], b);
-}
 
 inline std::ostream& operator<<(std::ostream& s, const LLMatrix4a& m)
 {

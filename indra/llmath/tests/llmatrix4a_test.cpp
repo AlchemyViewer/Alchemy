@@ -154,6 +154,130 @@ namespace tut
     }
 
     template<> template<>
+    void llmatrix4a_object::test<5>()
+    {
+        // set(LLMatrix4) is the inverse of toMatrix4().
+        LLMatrix4 src;
+        src.initAll(LLVector3(2.f, 3.f, 4.f),
+                    LLQuaternion(0.6f, LLVector3(0.f, 1.f, 0.f)),
+                    LLVector3(7.f, 8.f, 9.f));
+
+        LLMatrix4a m;
+        m.set(src);
+        const LLMatrix4 back = m.toMatrix4();
+        for (S32 row = 0; row < 4; ++row)
+        {
+            for (S32 col = 0; col < 4; ++col)
+            {
+                ensure_equals("round trip", back.mMatrix[row][col], src.mMatrix[row][col]);
+            }
+        }
+    }
+
+    template<> template<>
+    void llmatrix4a_object::test<6>()
+    {
+        // set(LLMatrix3) fills the basis and leaves an identity fourth row.
+        LLMatrix3 src;
+        src.setRows(LLVector3(1.f, 2.f, 3.f),
+                    LLVector3(4.f, 5.f, 6.f),
+                    LLVector3(7.f, 8.f, 9.f));
+
+        LLMatrix4a m;
+        m.set(src);
+        const LLMatrix4 out = m.toMatrix4();
+        ensure_equals("m00", out.mMatrix[0][0], 1.f);
+        ensure_equals("m12", out.mMatrix[1][2], 6.f);
+        ensure_equals("m22", out.mMatrix[2][2], 9.f);
+        ensure_equals("row 3 is the origin", out.mMatrix[3][0], 0.f);
+        ensure_equals("row 3 w is one", out.mMatrix[3][3], 1.f);
+    }
+
+    template<> template<>
+    void llmatrix4a_object::test<7>()
+    {
+        LLMatrix4a a;
+        a.initAll(LLVector3(2.f, 1.f, 3.f),
+                  LLQuaternion(0.4f, LLVector3(0.f, 0.f, 1.f)),
+                  LLVector3(1.f, 2.f, 3.f));
+
+        // Multiplying by the identity in either position is a no-op.
+        LLMatrix4a r;
+        r.setMul(a, LLMatrix4a::identity());
+        ensure("a * identity == a", r == a);
+        r.setMul(LLMatrix4a::identity(), a);
+        ensure("identity * a == a", r == a);
+
+        LLMatrix4a b;
+        b.initAll(LLVector3(1.f, 1.f, 1.f),
+                  LLQuaternion(-0.9f, LLVector3(1.f, 0.f, 0.f)),
+                  LLVector3(-4.f, 0.f, 5.f));
+
+        // setMulNoAlias agrees with setMul when nothing aliases.
+        LLMatrix4a safe, fast;
+        safe.setMul(a, b);
+        fast.setMulNoAlias(a, b);
+        ensure("setMulNoAlias matches setMul", safe == fast);
+
+        // setMul tolerates its result aliasing either input, which is why it
+        // exists alongside setMulNoAlias.
+        LLMatrix4a lhs = a;
+        lhs.setMul(lhs, b);
+        ensure("result may alias the left operand", lhs == safe);
+
+        LLMatrix4a rhs = b;
+        rhs.setMul(a, rhs);
+        ensure("result may alias the right operand", rhs == safe);
+    }
+
+    template<> template<>
+    void llmatrix4a_object::test<8>()
+    {
+        // affineTransform applies the translation, rotate() does not.
+        LLMatrix4a m;
+        m.initAll(LLVector3(1.f, 1.f, 1.f), LLQuaternion(), LLVector3(10.f, 20.f, 30.f));
+
+        LLVector4a point;
+        point.set(1.f, 2.f, 3.f, 1.f);
+
+        LLVector4a moved;
+        m.affineTransform(point, moved);
+        ensure_equals("affineTransform adds x", moved[0], 11.f);
+        ensure_equals("affineTransform adds y", moved[1], 22.f);
+        ensure_equals("affineTransform adds z", moved[2], 33.f);
+
+        LLVector4a turned;
+        m.rotate(point, turned);
+        ensure_equals("rotate leaves x", turned[0], 1.f);
+        ensure_equals("rotate leaves y", turned[1], 2.f);
+        ensure_equals("rotate leaves z", turned[2], 3.f);
+    }
+
+    template<> template<>
+    void llmatrix4a_object::test<9>()
+    {
+        LLMatrix4a m;
+        m.initAll(LLVector3(2.f, 2.f, 2.f),
+                  LLQuaternion(0.3f, LLVector3(0.f, 1.f, 0.f)),
+                  LLVector3(1.f, 1.f, 1.f));
+
+        const LLVector4a basis = m.getRow<0>();
+        m.setTranslation(LLVector3(5.f, 6.f, 7.f));
+
+        ensure("setTranslation leaves the basis alone", m.getRow<0>() == basis);
+        const LLMatrix4 out = m.toMatrix4();
+        ensure_equals("tx", out.mMatrix[3][0], 5.f);
+        ensure_equals("ty", out.mMatrix[3][1], 6.f);
+        ensure_equals("tz", out.mMatrix[3][2], 7.f);
+        ensure_equals("stays affine", out.mMatrix[3][3], 1.f);
+
+        LLVector4a replacement;
+        replacement.set(1.f, 2.f, 3.f, 4.f);
+        m.setRow<2>(replacement);
+        ensure("setRow round trips", m.getRow<2>() == replacement);
+    }
+
+    template<> template<>
     void llmatrix4a_object::test<4>()
     {
         // Scale lands on the corresponding basis row, not the diagonal, so a
