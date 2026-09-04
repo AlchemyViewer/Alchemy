@@ -151,8 +151,10 @@ void main()
         if (sky > 0.0)
         {
             // Colour fetched only for unoccluded taps, so an occluder texel
-            // never enters the estimate, not even times zero.
-            vec3  c    = texture(diffuseRect, uv).rgb;
+            // never enters the estimate, not even times zero. This fetch sits
+            // in non-uniform control flow, where implicit derivatives are
+            // undefined; an explicit level keeps it defined on every driver.
+            vec3  c    = textureLod(diffuseRect, uv, 0.0).rgb;
             float lum  = dot(c, LUMA);
             vec3  over = c * (max(lum - GATE, 0.0) / max(lum, 1e-4));
             energy += w * sky * over;
