@@ -117,7 +117,6 @@ public:
     };
 protected:
     // explicit transformation members
-    LLMatrix4a          mWorldMatrix;
     LLXformMatrix       mXform;
 
     std::string mName;

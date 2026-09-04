@@ -895,7 +895,7 @@ const LLMatrix4a& LLJoint::getWorldMatrix()
 {
     updateWorldMatrixParent();
 
-    return mWorldMatrix;
+    return mXform.getWorldMatrix();
 }
 
 
@@ -979,11 +979,9 @@ void LLJoint::updateWorldMatrix()
 {
     if (mDirtyFlags & MATRIX_DIRTY)
     {
-        // Only the world position and rotation are wanted from the transform;
-        // building its LLMatrix4 as well would mean assembling the same
-        // matrix a second time in scalar registers and loading it back.
-        mXform.update();
-        mWorldMatrix.initAll(mXform.getScale(), mXform.getWorldRotation(), mXform.getWorldPosition());
+        // The transform builds straight into its own LLMatrix4a, so there is
+        // one world matrix per joint rather than a scalar one to copy from.
+        mXform.updateMatrix(false);
         mDirtyFlags = 0x0;
     }
 }
