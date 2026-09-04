@@ -2114,7 +2114,7 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0.25"
-				 max_val="4"
+				 max_val="2"
 				 name="flare_occlusion_scale"
 				 tool_tip="Occlusion probe as a multiple of the sun disc; larger lets objects near the sun dim the flare sooner"
 				 control_name="RenderLensFlareOcclusionScale" />
@@ -2147,7 +2147,7 @@ rebuild. Revisit if RenderBloomHDR gets wired.)
 				 decimal_digits="2"
 				 increment="0.05"
 				 min_val="0.1"
-				 max_val="1.5"
+				 max_val="1"
 				 name="flare_fade_time"
 				 tool_tip="Seconds for the flare to fade in when the sun is revealed; it fades out faster. Longer is calmer through foliage"
 				 control_name="RenderLensFlareFadeTime" />

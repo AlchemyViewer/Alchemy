@@ -814,7 +814,7 @@
         <key>RenderLensFlareOcclusionScale</key>
         <map>
             <key>Comment</key>
-            <string>Size of the sun-occlusion probe as a multiple of the sun disc; it follows zoom and the sky's sun scale. Below 1 only the core of the disc counts, above 1 objects near the sun start to dim the flare. Range 0.25 to 4.</string>
+            <string>Size of the sun-occlusion probe as a multiple of the sun disc; it follows zoom and the sky's sun scale. Below 1 only the core of the disc counts, above 1 objects near the sun start to dim the flare. Range 0.25 to 2.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -825,7 +825,7 @@
         <key>RenderLensFlareFadeTime</key>
         <map>
             <key>Comment</key>
-            <string>Seconds for the lens flare to fade in when the sun is revealed; it fades out in 0.6 of this, and never faster whatever passes in front of the sun. Longer is calmer through foliage and fences. Range 0.1 to 1.5.</string>
+            <string>Seconds for the lens flare to fade in when the sun is revealed; it fades out in 0.6 of this, and never faster whatever passes in front of the sun. Longer is calmer through foliage and fences. Range 0.1 to 1.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
