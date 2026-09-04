@@ -76,13 +76,26 @@ void ALColorWheelModel::toChroma(const LLVector3& rgb, F32& u_out, F32& v_out)
     const F32 g = rgb.mV[VY];
     const F32 b = rgb.mV[VZ];
 
-    // (2r - g - b) / 3 rather than r - (r + g + b) / 3. Algebraically the same
-    // deviation from the master, but this form is exactly zero when the three
-    // channels are equal: 2v - v - v cancels bit for bit whatever the compiler
-    // does with contraction, where the mean of three equal floats is generally
-    // not the float they came from, leaving a deviation of an epsilon whose
-    // sign is not even stable. A neutral colour has no chroma, and everything
-    // downstream bins or pins on that being zero and not nearly zero.
+    // A neutral colour has no chroma, and everything downstream needs that to
+    // be zero and not nearly zero: the vectorscope cells with floorf, so an
+    // epsilon above zero and an epsilon below it land in neighbouring cells and
+    // scatter a grey ramp across the four that meet at the centre, and toPolar
+    // has no hue to report at the origin. The deviation below is algebraically
+    // zero for equal channels, but not dependably zero in floating point --
+    // fast math may reassociate it into a form that leaves an epsilon whose
+    // sign is not stable, and link-time code generation does exactly that. So
+    // the neutral case is answered by the comparison rather than the
+    // arithmetic, which no amount of reassociation can undo.
+    if (r == g && g == b)
+    {
+        u_out = 0.f;
+        v_out = 0.f;
+        return;
+    }
+
+    // The deviation from the master, as (2r - g - b) / 3 rather than
+    // r - (r + g + b) / 3: algebraically the same, better conditioned near
+    // neutral where the two forms differ most.
     const LLVector3 d((2.f * r - g - b) / 3.f,
                       (2.f * g - r - b) / 3.f,
                       (2.f * b - r - g) / 3.f);
