@@ -105,7 +105,7 @@ The deferred rendering pipeline is orchestrated by `LLPipeline` (`indra/newview/
 
 **Post-processing chain:**
 - **Auto-exposure:** Progressive histogram (`gLuminanceProgram`, `gExposureProgram`) with history fade
-- **Lens flare sun state:** a 2x1 temporal pass (`gLensFlareStateProgram`, `lensFlareStateF.glsl`) run just before colour correction measures how much of the sun disc is unoccluded and its colour, and filters both over time under a rate limit; `computeLensFlare` in `postEffectUtilsF.glsl` reads one texel of it instead of probing depth per fragment. Constants come from `scripts/content_tools/check_lens_flare_state.py`
+- **Lens flare sun state:** a 2x1 temporal pass (`gLensFlareStateProgram`, `lensFlareStateF.glsl`) run just before colour correction measures how much of the sun disc is unoccluded and its colour, and filters both under a rate limit; `computeLensFlare` in `postEffectUtilsF.glsl` reads one texel of it. The shader is the source of truth for the filter; `scripts/content_tools/check_lens_flare_state.py` mirrors it and is its regression test
 - **Bloom:** Bright-area extraction → 3-level glow pyramid (`mGlow[3]`) with warmth correction
 - **Depth of Field:** Circle-of-confusion via `gDeferredCoFProgram`, combine via `gDeferredDoFCombineProgram`. Settings: `CameraFNumber`, `CameraFocalLength`, `CameraMaxCoF`
 - **Screen Space Reflections:** Class 3+ feature, iterative ray marching

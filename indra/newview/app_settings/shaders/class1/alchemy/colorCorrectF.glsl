@@ -33,7 +33,6 @@ out vec4 frag_color;
 
 // ---- Input ------------------------------------------------------------------
 uniform sampler2D diffuseRect;
-uniform sampler2D depthMap;
 
 // Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
 // and bound at UB_ENVIRONMENT. Members are read by bare name. Declared unconditionally --

@@ -198,13 +198,10 @@ vec4 applyChromaticAberration(sampler2D tex, vec2 uv)
 // Lens flare — anamorphic streak with optional glow, ghosts, halo, starburst
 // =============================================================================
 //
-// Screen-space approximation of an anamorphic lens flare. Driven by a
-// CPU-computed sun UV position and by the sun state texture: how much of the
-// disc is unoccluded, what colour it is and the screen-edge fade are measured
-// once per frame by lensFlareStateF.glsl and filtered over time there, so
-// nothing in this function can pop. It used to probe the depth buffer per
-// fragment -- a frame-wide constant recomputed per pixel, and a one-frame
-// strobe whenever the sun's centre pixel was covered.
+// Screen-space approximation of an anamorphic lens flare, driven by a
+// CPU-computed sun UV position and by the sun state texture that
+// lensFlareStateF.glsl measures and filters once per frame (its header says
+// why the measurement lives there and not here).
 //
 // Each sub-effect (glow / ghosts / halo / starburst) is gated by its own
 // intensity uniform (0 = disabled, else acts as a brightness multiplier), so
@@ -217,9 +214,7 @@ uniform vec2  uLensFlareSunPos;                   // sun position in UV space
 uniform vec3  uLensFlareLightColor;               // artist tint applied to whole flare
 
 // ---- Sun state (2x1, written by lensFlareStateF.glsl each frame) -----------
-// texel 0 rgb = sun colour x HDR gate x unoccluded fraction x edge fade,
-// temporally filtered. Premultiplied: it is the flare's colour and its
-// visibility in one, and black means no flare whatever the reason.
+// texel 0 rgb = the filtered, premultiplied flare drive; black means no flare.
 uniform sampler2D uLensFlareStateMap;
 
 // ---- Anamorphic streak -----------------------------------------------------
@@ -258,10 +253,7 @@ vec3 computeLensFlare(vec2 uv)
     if (uLensFlareStrength <= 0.0)
         return vec3(0.0);
 
-    // The drive: sun colour already multiplied by the HDR gate (only an
-    // overbright sun flares, never a bright wall), by the unoccluded fraction
-    // of the disc and by the screen-edge fade -- and already filtered over
-    // time. Black means no flare, whatever the reason.
+    // The filtered drive from the state pass: colour and visibility in one.
     vec3 sun_color = texelFetch(uLensFlareStateMap, ivec2(0, 0), 0).rgb;
     if (max(sun_color.r, max(sun_color.g, sun_color.b)) <= 0.0)
         return vec3(0.0);
@@ -391,7 +383,7 @@ vec3 computeLensFlare(vec2 uv)
     }
 
     // Final scale: 0.15 tames peak intensity to a plausible lens-response
-    // range; tint and visibility factor apply equally to all sub-effects.
+    // range; tint and the master strength apply equally to all sub-effects.
     return max(flare * vis * uLensFlareLightColor * 0.15, vec3(0.0));
 }
 
