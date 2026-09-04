@@ -217,10 +217,24 @@ F32 LLMemory::getSystemMemoryBudgetFactor()
     sFactorLastFrameCount = current_frame;
 
     updateFreeSystemMemory();
-#if LL_WINDOWS
-    S32Megabytes free_sys_mem = getAvailableCommitMemMB();
-#else
+
+    if (sAvailPhysicalMemInKB == U32Kilobytes(U32_MAX))
+    {
+        // Counters have never been read; every value is still its sentinel.
+        return sSysMemoryFactor;
+    }
+
     S32Megabytes free_sys_mem = getAvailableMemKB();
+#if LL_WINDOWS
+    // Running out of commit charge kills us just as fast as running out of
+    // physical memory, so budget against whichever is scarcer. Physical is
+    // the one that matters in practice: commit includes the page file and
+    // only collapses once the machine is already thrashing.
+    const U32Megabytes avail_commit = getAvailableCommitMemMB();
+    if (avail_commit != U32Megabytes(U32_MAX)) // unset would convert to -1MB
+    {
+        free_sys_mem = llmin(free_sys_mem, S32Megabytes(avail_commit));
+    }
 #endif
     bool is_sys_low = free_sys_mem < MEM_LOW_THRESHOLD;
     static bool was_low = false;
