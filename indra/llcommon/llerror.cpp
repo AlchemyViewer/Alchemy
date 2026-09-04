@@ -1334,12 +1334,6 @@ namespace {
         static LL_PROFILE_MUTEX_NAMED(std::recursive_mutex, sLogMutex, "Log Mutex");
         return &sLogMutex;
     }
-    auto getStacksMutex()
-    {
-        // guaranteed to be initialized the first time control reaches here
-        static LL_PROFILE_MUTEX_NAMED(std::recursive_mutex, sStacksMutex, "Stacks Mutex");
-        return &sStacksMutex;
-    }
 
     bool checkLevelMap(const LevelMap& map, const std::string& key,
                         LLError::ELevel& level)
