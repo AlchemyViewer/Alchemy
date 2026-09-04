@@ -285,8 +285,8 @@ bool LLKeyframeStandMotion::onUpdate(F32 time, U8* joint_mask)
     //-------------------------------------------------------------------------
     if ( mTrackAnkles )
     {
-        LLVector4 dirLeft4 = mAnkleLeftJoint.getWorldMatrix().getFwdRow4();
-        LLVector4 dirRight4 = mAnkleRightJoint.getWorldMatrix().getFwdRow4();
+        LLVector4 dirLeft4 = mAnkleLeftJoint.getWorldMatrix().toMatrix4().getFwdRow4();
+        LLVector4 dirRight4 = mAnkleRightJoint.getWorldMatrix().toMatrix4().getFwdRow4();
         LLVector3 dirLeft = vec4to3( dirLeft4 );
         LLVector3 dirRight = vec4to3( dirRight4 );
 

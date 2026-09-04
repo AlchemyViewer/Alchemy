@@ -150,7 +150,7 @@ void LLSkinningUtil::initSkinningMatrixPalette(
 
         if (joint)
         {
-            world[j] = joint->getWorldMatrix4a();
+            world[j] = joint->getWorldMatrix();
         }
         else
         {

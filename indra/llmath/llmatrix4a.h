@@ -126,6 +126,50 @@ public:
         mMatrix[3].set(0.f, 0.f, 0.f, 1.f);
     }
 
+    // Builds scale * rotation * translation directly, so a caller that wants
+    // the result in SIMD registers does not have to build an LLMatrix4 and
+    // load it back. Each term is written in the same order as
+    // LLMatrix4::initAll, but the results are not bit-identical: this tree
+    // compiles with /fp:fast, which lets the compiler contract and reorder
+    // each version independently. They agree to well within single precision.
+    //
+    // LLMatrix4::initAll leaves the fourth column of the upper three rows
+    // untouched, relying on them already holding zero; this writes the zeroes,
+    // which is what an affine transform is expected to carry regardless of
+    // what the matrix held before.
+    inline void initAll(const LLVector3& scale, const LLQuaternion& q, const LLVector3& pos)
+    {
+        const F32 sx = scale.mV[VX];
+        const F32 sy = scale.mV[VY];
+        const F32 sz = scale.mV[VZ];
+
+        const F32 xx = q.mQ[VX] * q.mQ[VX];
+        const F32 xy = q.mQ[VX] * q.mQ[VY];
+        const F32 xz = q.mQ[VX] * q.mQ[VZ];
+        const F32 xw = q.mQ[VX] * q.mQ[VW];
+
+        const F32 yy = q.mQ[VY] * q.mQ[VY];
+        const F32 yz = q.mQ[VY] * q.mQ[VZ];
+        const F32 yw = q.mQ[VY] * q.mQ[VW];
+
+        const F32 zz = q.mQ[VZ] * q.mQ[VZ];
+        const F32 zw = q.mQ[VZ] * q.mQ[VW];
+
+        mMatrix[0] = _mm_setr_ps((1.f - 2.f * ( yy + zz )) * sx,
+                                 (      2.f * ( xy + zw )) * sx,
+                                 (      2.f * ( xz - yw )) * sx,
+                                 0.f);
+        mMatrix[1] = _mm_setr_ps((      2.f * ( xy - zw )) * sy,
+                                 (1.f - 2.f * ( xx + zz )) * sy,
+                                 (      2.f * ( yz + xw )) * sy,
+                                 0.f);
+        mMatrix[2] = _mm_setr_ps((      2.f * ( xz + yw )) * sz,
+                                 (      2.f * ( yz - xw )) * sz,
+                                 (1.f - 2.f * ( xx + yy )) * sz,
+                                 0.f);
+        mMatrix[3] = _mm_setr_ps(pos.mV[VX], pos.mV[VY], pos.mV[VZ], 1.f);
+    }
+
     inline void loadu(const LLMatrix4& src)
     {
         mMatrix[0] = _mm_loadu_ps(src.mMatrix[0]);

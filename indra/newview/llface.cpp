@@ -2323,7 +2323,7 @@ bool LLFace::calcPixelArea(F32& cos_angle_to_view_dir, F32& radius)
                         if (joint)
                         {
                             LLMatrix4a worldMat;
-                            worldMat.loadu((F32*)&joint->getWorldMatrix().mMatrix[0][0]);
+                            worldMat = joint->getWorldMatrix();
 
                             LLVector4a extents[2];
 

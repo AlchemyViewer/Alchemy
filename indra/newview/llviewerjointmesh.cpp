@@ -104,7 +104,7 @@ void LLViewerJointMesh::uploadJointMatrices()
     size_t num_joints = llmin(reference_mesh->mJointRenderData.size(), LL_CHARACTER_MAX_JOINTS_PER_MESH);
     for (joint_num = 0; joint_num < num_joints; joint_num++)
     {
-        LLMatrix4 joint_mat = *reference_mesh->mJointRenderData[joint_num]->mWorldMatrix;
+        LLMatrix4 joint_mat = reference_mesh->mJointRenderData[joint_num]->mWorldMatrix->toMatrix4();
 
         joint_mat *= LLDrawPoolAvatar::getModelView();
         gJointMatUnaligned[joint_num] = joint_mat;
@@ -298,7 +298,7 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
     else
     {
         gGL.pushMatrix();
-        LLMatrix4 jointToWorld = getWorldMatrix();
+        LLMatrix4 jointToWorld = getWorldMatrix().toMatrix4();
         gGL.multMatrix((GLfloat*)jointToWorld.mMatrix);
         buff->setBuffer();
         buff->drawRange(LLRender::TRIANGLES, start, end, count, offset);

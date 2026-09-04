@@ -256,10 +256,8 @@ public:
     void setScale( const LLVector3& scale, bool apply_attachment_overrides = false );
 
     // get/set world matrix
-    const LLMatrix4 &getWorldMatrix();
+    const LLMatrix4a& getWorldMatrix();
     void setWorldMatrix( const LLMatrix4& mat );
-
-    const LLMatrix4a& getWorldMatrix4a();
 
     // recomputes every dirty world matrix in this subtree; returns how many
     S32 updateWorldMatrixChildren();

@@ -145,7 +145,7 @@ namespace tut
         LLMatrix4 mat;
         mat.setIdentity();
         lljoint.setWorldMatrix(mat);//giving warning setWorldMatrix not correctly implemented;
-        LLMatrix4 mat4 = lljoint.getWorldMatrix();
+        LLMatrix4 mat4 = lljoint.getWorldMatrix().toMatrix4();
         ensure("setWorldMatrix()/getWorldMatrix failed ", (mat4 == mat));
     }
 

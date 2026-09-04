@@ -251,7 +251,7 @@ void LLAvatarJointCollisionVolume::renderCollision()
     updateWorldMatrix();
 
     gGL.pushMatrix();
-    gGL.multMatrix( &mXform.getWorldMatrix().mMatrix[0][0] );
+    gGL.multMatrix( getWorldMatrix().getF32ptr() );
 
     gGL.diffuseColor3f( 0.f, 0.f, 1.f );
 

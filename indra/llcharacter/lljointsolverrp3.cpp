@@ -173,7 +173,7 @@ void LLJointSolverRP3::solve()
     LLMatrix4 worldJointAParentMat;
     if ( mJointA->getParent() )
     {
-        worldJointAParentMat = mJointA->getParent()->getWorldMatrix();
+        worldJointAParentMat = mJointA->getParent()->getWorldMatrix().toMatrix4();
     }
     LLVector3 poleVec = rotate_vector( mPoleVector, worldJointAParentMat );
 

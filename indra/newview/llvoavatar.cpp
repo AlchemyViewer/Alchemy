@@ -1515,7 +1515,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
             for (S32 joint_num = 0; joint_num < mesh->mJointRenderData.size(); joint_num++)
             {
                 LLVector4a trans;
-                trans.load3( mesh->mJointRenderData[joint_num]->mWorldMatrix->getTranslation().mV);
+                trans.load3( mesh->mJointRenderData[joint_num]->mWorldMatrix->getTranslation().getF32ptr());
                 update_min_max(newMin, newMax, trans);
             }
         }
@@ -1623,7 +1623,7 @@ void LLVOAvatar::calculateSpatialExtents(LLVector4a& newMin, LLVector4a& newMax)
                 }
                 LLMatrix4a mat;
                 LLVector4a new_extents[2];
-                mat.loadu(joint->getWorldMatrix());
+                mat = joint->getWorldMatrix();
                 matMulBoundBox(mat, rig_info->getRiggedExtents(), new_extents);
                 update_min_max(newMin, newMax, new_extents[0]);
                 update_min_max(newMin, newMax, new_extents[1]);
@@ -1701,7 +1701,7 @@ void LLVOAvatar::renderCollisionVolumes()
         collision_volume.updateWorldMatrix();
 
         gGL.pushMatrix();
-        gGL.multMatrix( &collision_volume.getXform()->getWorldMatrix().mMatrix[0][0] );
+        gGL.multMatrix( collision_volume.getWorldMatrix().getF32ptr() );
 
         LLVector3 begin_pos(0,0,0);
         LLVector3 end_pos(collision_volume.getEnd());
@@ -1817,7 +1817,7 @@ void LLVOAvatar::renderBones(const std::string &selected_joint)
 
 
         gGL.pushMatrix();
-        gGL.multMatrix( &jointp->getXform()->getWorldMatrix().mMatrix[0][0] );
+        gGL.multMatrix( jointp->getWorldMatrix().getF32ptr() );
 
         render_sphere_and_line(begin_pos, end_pos, sphere_scale, occ_color, visible_color);
 
@@ -1845,7 +1845,7 @@ void LLVOAvatar::renderBones(const std::string &selected_joint)
                 continue;
             }
             gGL.pushMatrix();
-            gGL.multMatrix(&joint->getXform()->getWorldMatrix().mMatrix[0][0]);
+            gGL.multMatrix(joint->getWorldMatrix().getF32ptr());
 
             LLVector4a pos;
             LLVector4a size;
@@ -1927,7 +1927,7 @@ void LLVOAvatar::renderJoints()
         jointp->updateWorldMatrix();
 
         gGL.pushMatrix();
-        gGL.multMatrix( &jointp->getXform()->getWorldMatrix().mMatrix[0][0] );
+        gGL.multMatrix( jointp->getWorldMatrix().getF32ptr() );
 
         gGL.diffuseColor3f( 1.f, 0.f, 1.f );
 
@@ -2022,7 +2022,7 @@ bool LLVOAvatar::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
         {
             mCollisionVolumes[i].updateWorldMatrix();
 
-            glm::mat4 mat(glm::make_mat4((F32*) mCollisionVolumes[i].getXform()->getWorldMatrix().mMatrix));
+            glm::mat4 mat(glm::make_mat4(mCollisionVolumes[i].getWorldMatrix().getF32ptr()));
             glm::mat4 inverse = glm::inverse(mat);
             glm::mat4 norm_mat = glm::transpose(inverse);
 
@@ -4715,7 +4715,7 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
                 }
             }
 
-            LLQuaternion root_rotation = mRoot->getWorldMatrix().quaternion();
+            LLQuaternion root_rotation = mRoot->getWorldMatrix().toMatrix4().quaternion();
             F32 root_roll, root_pitch, root_yaw;
             root_rotation.getEulerAngles(&root_roll, &root_pitch, &root_yaw);
 
@@ -4724,7 +4724,7 @@ void LLVOAvatar::updateOrientation(LLAgent& agent, F32 speed, F32 delta_time)
             // and head turn.  Once in motion, it must conform however.
             bool self_in_mouselook = isSelf() && gAgentCamera.cameraMouselook();
 
-            LLVector3 pelvisDir( mRoot->getWorldMatrix().getFwdRow4().mV );
+            LLVector3 pelvisDir( mRoot->getWorldMatrix().toMatrix4().getFwdRow4().mV );
 
             static LLCachedControl<F32> s_pelvis_rot_threshold_slow(gSavedSettings, "AvatarRotateThresholdSlow", 60.0);
             static LLCachedControl<F32> s_pelvis_rot_threshold_fast(gSavedSettings, "AvatarRotateThresholdFast", 2.0);
@@ -10993,7 +10993,7 @@ void LLVOAvatar::dumpArchetypeXMLCallback(const std::vector<std::string>& filena
                 {
                     LLMatrix4a mat;
                     LLVector4a new_extents[2];
-                    mat.loadu(joint->getWorldMatrix());
+                    mat = joint->getWorldMatrix();
                     matMulBoundBox(mat, rig_info.getRiggedExtents(), new_extents);
                     LLVector4a rrp[2];
                     rrp[0].setSub(new_extents[0],rpv);

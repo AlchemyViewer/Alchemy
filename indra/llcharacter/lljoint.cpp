@@ -760,12 +760,12 @@ void LLJoint::setWorldPosition( const LLVector3& pos )
         return;
     }
 
-    LLMatrix4 temp_matrix = getWorldMatrix();
+    LLMatrix4 temp_matrix = getWorldMatrix().toMatrix4();
     temp_matrix.mMatrix[VW][VX] = pos.mV[VX];
     temp_matrix.mMatrix[VW][VY] = pos.mV[VY];
     temp_matrix.mMatrix[VW][VZ] = pos.mV[VZ];
 
-    LLMatrix4 parentWorldMatrix = mParent->getWorldMatrix();
+    LLMatrix4 parentWorldMatrix = mParent->getWorldMatrix().toMatrix4();
     LLMatrix4 invParentWorldMatrix = parentWorldMatrix.invert();
 
     temp_matrix *= invParentWorldMatrix;
@@ -839,7 +839,7 @@ void LLJoint::setWorldRotation( const LLQuaternion& rot )
 
     LLMatrix4 temp_mat(rot);
 
-    LLMatrix4 parentWorldMatrix = mParent->getWorldMatrix();
+    LLMatrix4 parentWorldMatrix = mParent->getWorldMatrix().toMatrix4();
     parentWorldMatrix.mMatrix[VW][VX] = 0;
     parentWorldMatrix.mMatrix[VW][VY] = 0;
     parentWorldMatrix.mMatrix[VW][VZ] = 0;
@@ -891,14 +891,7 @@ void LLJoint::setScale( const LLVector3& requested_scale, bool apply_attachment_
 //--------------------------------------------------------------------
 // getWorldMatrix()
 //--------------------------------------------------------------------
-const LLMatrix4 &LLJoint::getWorldMatrix()
-{
-    updateWorldMatrixParent();
-
-    return mXform.getWorldMatrix();
-}
-
-const LLMatrix4a& LLJoint::getWorldMatrix4a()
+const LLMatrix4a& LLJoint::getWorldMatrix()
 {
     updateWorldMatrixParent();
 
@@ -986,8 +979,11 @@ void LLJoint::updateWorldMatrix()
 {
     if (mDirtyFlags & MATRIX_DIRTY)
     {
-        mXform.updateMatrix(false);
-        mWorldMatrix.loadu(mXform.getWorldMatrix());
+        // Only the world position and rotation are wanted from the transform;
+        // building its LLMatrix4 as well would mean assembling the same
+        // matrix a second time in scalar registers and loading it back.
+        mXform.update();
+        mWorldMatrix.initAll(mXform.getScale(), mXform.getWorldRotation(), mXform.getWorldPosition());
         mDirtyFlags = 0x0;
     }
 }
