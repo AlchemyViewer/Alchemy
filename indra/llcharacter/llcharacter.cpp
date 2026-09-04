@@ -495,6 +495,8 @@ void LLCharacter::addVisualParam(LLVisualParam *param)
 //-----------------------------------------------------------------------------
 void LLCharacter::updateVisualParams()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    S32 applied = 0;
     for (LLVisualParam *param = getFirstVisualParam();
         param;
         param = getNextVisualParam())
@@ -508,8 +510,11 @@ void LLCharacter::updateVisualParams()
         if (effective_weight != param->getLastWeight())
         {
             param->apply( mSex );
+            ++applied;
         }
     }
+    LL_PROFILE_ZONE_NUM(getVisualParamCount());
+    LL_PROFILE_ZONE_NUM(applied);
 }
 
 LLAnimPauseRequest LLCharacter::requestPause()

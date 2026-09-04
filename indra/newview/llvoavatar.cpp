@@ -602,6 +602,54 @@ private:
  **                                                                             **
  *********************************************************************************/
 
+//-----------------------------------------------------------------------------
+// Per-frame census of skeleton updates, kept separately for avatars and
+// control avatars and plotted at the first updateCharacter() of the next frame.
+//-----------------------------------------------------------------------------
+namespace
+{
+    struct ALSkeletonUpdateCensus
+    {
+        S32 mFull = 0;            // NORMAL_UPDATE or FORCE_UPDATE
+        S32 mHiddenByPeriod = 0;  // HIDDEN_UPDATE because computeNeedsUpdate() said no
+        S32 mHiddenByCull = 0;    // HIDDEN_UPDATE because the drawable is not visible
+        S32 mThrottled = 0;       // mUpdatePeriod > 1
+        S32 mJointUpdates = 0;    // world matrices recomputed by the skeleton sweep
+    };
+
+    ALSkeletonUpdateCensus sAvatarCensus;
+    ALSkeletonUpdateCensus sAnimeshCensus;
+    U32 sCensusFrame = 0;
+
+    ALSkeletonUpdateCensus& skeletonUpdateCensus(const LLVOAvatar* avatar)
+    {
+        return avatar->isControlAvatar() ? sAnimeshCensus : sAvatarCensus;
+    }
+
+    void plotSkeletonUpdateCensus()
+    {
+        const U32 frame = LLFrameTimer::getFrameCount();
+        if (frame == sCensusFrame)
+        {
+            return;
+        }
+        sCensusFrame = frame;
+
+        LL_PROFILE_PLOT("Avatars: full update", (int64_t)sAvatarCensus.mFull);
+        LL_PROFILE_PLOT("Avatars: hidden by period", (int64_t)sAvatarCensus.mHiddenByPeriod);
+        LL_PROFILE_PLOT("Avatars: hidden by cull", (int64_t)sAvatarCensus.mHiddenByCull);
+        LL_PROFILE_PLOT("Avatars: period > 1", (int64_t)sAvatarCensus.mThrottled);
+        LL_PROFILE_PLOT("Avatars: joint updates", (int64_t)sAvatarCensus.mJointUpdates);
+        LL_PROFILE_PLOT("Animesh: full update", (int64_t)sAnimeshCensus.mFull);
+        LL_PROFILE_PLOT("Animesh: hidden by period", (int64_t)sAnimeshCensus.mHiddenByPeriod);
+        LL_PROFILE_PLOT("Animesh: hidden by cull", (int64_t)sAnimeshCensus.mHiddenByCull);
+        LL_PROFILE_PLOT("Animesh: period > 1", (int64_t)sAnimeshCensus.mThrottled);
+        LL_PROFILE_PLOT("Animesh: joint updates", (int64_t)sAnimeshCensus.mJointUpdates);
+
+        sAvatarCensus = {};
+        sAnimeshCensus = {};
+    }
+}
 
 //-----------------------------------------------------------------------------
 // Static Data
@@ -2455,6 +2503,7 @@ void LLVOAvatar::restoreMeshData()
 //-----------------------------------------------------------------------------
 void LLVOAvatar::updateMeshData()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     if (mDrawable.notNull())
     {
         S32 f_num = 0 ;
@@ -5021,6 +5070,10 @@ bool LLVOAvatar::computeNeedsUpdate()
 //------------------------------------------------------------------------
 bool LLVOAvatar::updateCharacter(LLAgent &agent)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    plotSkeletonUpdateCensus();
+    ALSkeletonUpdateCensus& census = skeletonUpdateCensus(this);
+
     updateDebugText();
 
     if (!mIsBuilt)
@@ -5043,6 +5096,10 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
     // and flag for impostor update if needed.
     //--------------------------------------------------------------------
     bool needs_update = computeNeedsUpdate();
+    if (mUpdatePeriod > 1)
+    {
+        ++census.mThrottled;
+    }
 
     //--------------------------------------------------------------------
     // Early out if does not need update and not self
@@ -5052,6 +5109,7 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
     //--------------------------------------------------------------------
     if (!needs_update && !isSelf())
     {
+        ++census.mHiddenByPeriod;
         updateMotions(LLCharacter::HIDDEN_UPDATE);
         return false;
     }
@@ -5112,15 +5170,18 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
     // update animations
     if (!visible && !isSelf()) // NOTE: never do a "hidden update" for self avatar as it interrupts controller processing
     {
+        ++census.mHiddenByCull;
         updateMotions(LLCharacter::HIDDEN_UPDATE);
     }
     else if (mSpecialRenderMode == 1) // Animation Preview
     {
+        ++census.mFull;
         updateMotions(LLCharacter::FORCE_UPDATE);
     }
     else
     {
         // Might be better to do HIDDEN_UPDATE if cloud
+        ++census.mFull;
         updateMotions(LLCharacter::NORMAL_UPDATE);
     }
 
@@ -5146,7 +5207,14 @@ bool LLVOAvatar::updateCharacter(LLAgent &agent)
     updateFootstepSounds();
 
     // Update child joints as needed.
-    mRoot->updateWorldMatrixChildren();
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_AVATAR("updateWorldMatrixChildren");
+        const S32 updates_before = LLJoint::sNumUpdates;
+        mRoot->updateWorldMatrixChildren();
+        const S32 updates = LLJoint::sNumUpdates - updates_before;
+        LL_PROFILE_ZONE_NUM(updates);
+        census.mJointUpdates += updates;
+    }
 
     if (visible)
     {

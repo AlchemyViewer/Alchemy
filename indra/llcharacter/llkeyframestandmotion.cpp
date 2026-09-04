@@ -160,6 +160,7 @@ void LLKeyframeStandMotion::onDeactivate()
 //-----------------------------------------------------------------------------
 bool LLKeyframeStandMotion::onUpdate(F32 time, U8* joint_mask)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     //-------------------------------------------------------------------------
     // let the base class update the cycle
     //-------------------------------------------------------------------------

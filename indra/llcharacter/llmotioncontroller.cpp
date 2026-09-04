@@ -573,8 +573,11 @@ void LLMotionController::updateIdleActiveMotions()
 void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_type)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    LL_PROFILE_ZONE_NUM(mActiveMotions.size());
     bool update_result = true;
     U8 last_joint_signature[LL_CHARACTER_MAX_ANIMATED_JOINTS];
+    S32 motions_blended = 0;
+    S32 joint_states_blended = 0;
 
     memset(&last_joint_signature, 0, sizeof(U8) * LL_CHARACTER_MAX_ANIMATED_JOINTS);
 
@@ -791,7 +794,11 @@ void LLMotionController::updateMotionsByType(LLMotion::LLMotionBlendType anim_ty
 
         // even if onupdate returns false, add this motion in to the blend one last time
         mPoseBlender.addMotion(motionp);
+        ++motions_blended;
+        joint_states_blended += posep->getNumJointStates();
     }
+    LL_PROFILE_ZONE_NUM(motions_blended);
+    LL_PROFILE_ZONE_NUM(joint_states_blended);
 }
 
 //-----------------------------------------------------------------------------

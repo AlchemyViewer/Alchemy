@@ -147,7 +147,7 @@ LLJointState* LLPose::findJointState(const std::string &name)
 //-----------------------------------------------------------------------------
 void LLPose::setWeight(F32 weight)
 {
-    joint_map_iterator iter;
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     for (joint_map_value_type& joint_pair : mJointMap)
     {
         joint_pair.second->setWeight(weight);
@@ -470,6 +470,7 @@ LLPoseBlender::~LLPoseBlender()
 //-----------------------------------------------------------------------------
 bool LLPoseBlender::addMotion(LLMotion* motion)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
     LLPose* pose = motion->getPose();
 
     for(LLJointState* jsp = pose->getFirstJointState(); jsp; jsp = pose->getNextJointState())
@@ -511,6 +512,8 @@ bool LLPoseBlender::addMotion(LLMotion* motion)
 //-----------------------------------------------------------------------------
 void LLPoseBlender::blendAndApply()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    LL_PROFILE_ZONE_NUM(mActiveBlenders.size());
     for (blender_list_t::reverse_iterator iter = mActiveBlenders.rbegin(), end = mActiveBlenders.rend();
          iter != end; )
     {
