@@ -276,7 +276,7 @@ private:
     // faded -- and those are three different fixes.
     enum class RegenReason
     {
-        None,
+        NoReason,
         NoCapture,
         FontState,
         Position,

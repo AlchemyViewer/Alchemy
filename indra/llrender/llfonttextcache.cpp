@@ -260,7 +260,7 @@ S32 LLFontTextCache::renderImpl(
     // can be named. Where the UI origin sits is deliberately absent from all
     // of it: it moves the text without changing a glyph, and the geometry is
     // built relative to it, so a scroll or a floater drag replays.
-    RegenReason reason = RegenReason::None;
+    RegenReason reason = RegenReason::NoReason;
     if (!mHasCapture)
     {
         // Nothing captured yet, or something threw the capture away -- a new
@@ -338,7 +338,7 @@ S32 LLFontTextCache::renderImpl(
     // breakdown is the statistics view.
     switch (reason)
     {
-    case RegenReason::None:
+    case RegenReason::NoReason:
         renderBuffers();
         if (right_x)
         {
